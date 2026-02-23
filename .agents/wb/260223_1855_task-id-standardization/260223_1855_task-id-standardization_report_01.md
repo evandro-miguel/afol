@@ -4,7 +4,7 @@ id: 260223_1855_task-id-standardization_report_01
 theme: task-id-standardization
 status: final
 created_at: '2026-02-23T15:56:33-03:00'
-updated_at: '2026-02-23T17:38:41-03:00'
+updated_at: '2026-02-23T18:00:21-03:00'
 related_tasks:
 - 260223_1855_task-id-standardization_task_01
 links:
@@ -41,39 +41,24 @@ links:
 
 ## Files Changed
 
+- `.agents/a-docs/lessons/README.md`
+- `.agents/a-docs/lessons/entries/`
 - `.agents/a-docs/lessons/general-lessons.md`
 - `.agents/a-docs/standards/Makefile`
 - `.agents/a-docs/standards/agents-usage.md`
-- `.agents/a-docs/standards/checkbox-protocol.md`
-- `.agents/a-docs/standards/evolution.md`
-- `.agents/a-docs/standards/frontmatter.md`
-- `.agents/a-docs/standards/metrics.md`
+- `.agents/a-docs/standards/bootstrap-other-repo.md`
 - `.agents/a-docs/standards/scripts-reference.md`
-- `.agents/a-docs/standards/template-standards.md`
-- `.agents/a-docs/standards/workflow.md`
 - `.agents/a-docs/templates/retrospective.md`
-- `.agents/a-docs/templates/spec-lite.md`
 - `.agents/a-docs/templates/task.md`
+- `.agents/agents`
 - `.agents/arc/structure/README.md`
 - `.agents/arc/structure/backend.md`
+- `.agents/arc/structure/data.md`
 - `.agents/arc/structure/tests.md`
 - `.agents/scripts/README.md`
-- `.agents/scripts/agents-doctor.py`
-- `.agents/scripts/agents-index.py`
-- `.agents/scripts/agents-lint-docs.py`
-- `.agents/scripts/agents-new.py`
-- `.agents/scripts/agents-structure-map.py`
-- `.agents/scripts/agents-tools-smoke.py`
-- `.agents/scripts/agents-wb-update.py`
-- `.agents/scripts/lib/`
-- `.agents/scripts/sync-agent-docs.py`
-- `.agents/scripts/verify-tasks.py`
+- `.agents/scripts/agents-bootstrap.py`
 - `.agents/tools.json`
-- `.agents/z-arq/20260223_id-fix-check-temp/`
 - `AGENTS.md`
-- `CLAUDE.md`
-- `GEMINI.md`
-- `QWEN.md`
 ## Verification
 - `python3 -m py_compile .agents/scripts/verify-tasks.py` -> pass.
 - `python3 -m py_compile .agents/scripts/agents-new.py` -> pass.

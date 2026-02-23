@@ -35,7 +35,7 @@ links: []
 
 ## Lessons Identified
 
-<!-- New insights to capture in general-lessons.md -->
+<!-- New insights to capture as one-file-per-lesson in .agents/a-docs/lessons/entries/ -->
 
 ### For This Project
 

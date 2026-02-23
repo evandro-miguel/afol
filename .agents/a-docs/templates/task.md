@@ -40,7 +40,7 @@ See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/
 Before starting work, consult relevant resources:
 
 ### Prevention Rules
-- [ ] Check: [`.agents/a-docs/lessons/general-lessons.md`](.agents/a-docs/lessons/general-lessons.md)
+- [ ] Check relevant lesson entries in [`.agents/a-docs/lessons/entries/`](.agents/a-docs/lessons/entries/)
 
 ### Useful Resources
 - Rules useful for this task:

@@ -118,6 +118,48 @@
       "side_effect": "Atualiza .agents/wb/.active_session apontando para nova sessao"
     },
     {
+      "id": "bootstrap",
+      "name": "Agents Bootstrap",
+      "tool": "agents-bootstrap.py",
+      "wrapper_command": ".agents/agents bootstrap <target-path> [--force] [--dry-run] [--skip-checks]",
+      "make_command": "make bootstrap TARGET=/path/to/repo [FORCE=1] [DRY=1] [SKIP_CHECKS=1]",
+      "type": "creation",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-23",
+      "updated_at": "2026-02-23",
+      "description": "Install the .agents system into another repository and generate a project adaptation checklist.",
+      "when_to_use": [
+        "Initialize .agents in a new repository",
+        "Standardize agent operations across repositories",
+        "Bootstrap templates/scripts/config into another codebase",
+        "Generate a project-specific adaptation checklist after install"
+      ],
+      "commands": [
+        {
+          "name": "bootstrap",
+          "usage": "bootstrap /path/to/repo --dry-run",
+          "description": "Preview copy/actions without writing"
+        },
+        {
+          "name": "bootstrap",
+          "usage": "bootstrap /path/to/repo --force",
+          "description": "Overwrite existing bootstrap-managed files"
+        },
+        {
+          "name": "bootstrap",
+          "usage": "bootstrap /path/to/repo",
+          "description": "Apply and run doctor/tools-check in target repo"
+        }
+      ],
+      "checks": [
+        "Validates target path exists and differs from source repo",
+        "Detects basic stack signals (Node/Python/Go/Rust)",
+        "Writes adaptation checklist for target project",
+        "Runs post-bootstrap checks unless --skip-checks"
+      ],
+      "output": "Installed .agents system in target repo and generated bootstrap-adaptation checklist"
+    },
+    {
       "id": "index",
       "name": "Agents Index",
       "tool": "agents-index.py",
@@ -171,8 +213,15 @@
         "IDs de tarefa seguem padrao T-NN"
       ],
       "valid_statuses": [
-        "draft", "active", "review", "approved", "final",
-        "deprecated", "superseded", "done", "blocked"
+        "draft",
+        "active",
+        "review",
+        "approved",
+        "final",
+        "deprecated",
+        "superseded",
+        "done",
+        "blocked"
       ],
       "excluded_paths": [
         "a-docs/",
@@ -355,8 +404,17 @@
         "Padronizar execucao de scripts"
       ],
       "commands": [
-        "doctor", "new", "index", "lint-docs", "structure-map",
-        "sync", "verify-tasks", "wb-update", "tools", "help"
+        "doctor",
+        "new",
+        "index",
+        "lint-docs",
+        "structure-map",
+        "sync",
+        "verify-tasks",
+        "wb-update",
+        "bootstrap",
+        "tools",
+        "help"
       ],
       "requirements": [
         "uv instalado (https://astral.sh/uv/)",
@@ -388,49 +446,69 @@
     "wb-status": "Seta status no frontmatter (STATUS required)",
     "wb-timeline": "Adiciona entrada timeline (MSG required)",
     "wb-link": "Seta links.frontmatter (FILE + KEY + VALUE required)",
-    "all": "Executa doctor + structure + index + verify",
+    "all": "Executa doctor + structure + index + verify + tools-check",
     "refresh": "Clean + setup + structure",
-    "clean": "Remove .venv e caches"
+    "clean": "Remove .venv e caches",
+    "bootstrap": "Install .agents system in another repository (TARGET required)"
   },
   "tool_categories": {
     "validation": {
       "description": "Validam estrutura, sintaxe e conformidade",
-      "tools": ["doctor", "lint-docs"],
+      "tools": [
+        "doctor",
+        "lint-docs"
+      ],
       "usage_pattern": "Executar antes de commits ou como gate de qualidade"
     },
     "creation": {
       "description": "Criam novos arquivos e workstreams",
-      "tools": ["new"],
+      "tools": [
+        "new",
+        "bootstrap"
+      ],
       "usage_pattern": "Inicio de nova funcionalidade, bug fix ou investigacao"
     },
     "documentation": {
       "description": "Geram e atualizam documentacao",
-      "tools": ["index", "structure-map"],
+      "tools": [
+        "index",
+        "structure-map"
+      ],
       "usage_pattern": "Apos criar specs/ADRs ou documentar estrutura"
     },
     "verification": {
       "description": "Verificam estado e conclusao",
-      "tools": ["verify-tasks"],
+      "tools": [
+        "verify-tasks"
+      ],
       "usage_pattern": "Antes de marcar workstream como completa"
     },
     "automation": {
       "description": "Automatizam tarefas repetitivas de baixo valor",
-      "tools": ["wb-update"],
+      "tools": [
+        "wb-update"
+      ],
       "usage_pattern": "Durante trabalho para manter docs atualizados"
     },
     "synchronization": {
       "description": "Mantem consistencia entre arquivos",
-      "tools": ["sync"],
+      "tools": [
+        "sync"
+      ],
       "usage_pattern": "Apos atualizar template AGENTS.md"
     },
     "infrastructure": {
       "description": "Suporte e wrappers para execucao",
-      "tools": ["agents"],
+      "tools": [
+        "agents"
+      ],
       "usage_pattern": "Interface primaria para todas as ferramentas"
     },
     "discovery": {
       "description": "Descobre e explora ferramentas disponiveis",
-      "tools": ["tools"],
+      "tools": [
+        "tools"
+      ],
       "usage_pattern": "Quando precisar identificar qual ferramenta usar"
     }
   },
@@ -448,7 +526,19 @@
   "execution_modes": {
     "on-demand": {
       "description": "Execucao manual sob comando do usuario/agente",
-      "tools": ["tools", "doctor", "new", "index", "lint-docs", "structure-map", "sync", "verify-tasks", "wb-update", "agents"]
+      "tools": [
+        "tools",
+        "doctor",
+        "new",
+        "index",
+        "lint-docs",
+        "structure-map",
+        "sync",
+        "verify-tasks",
+        "wb-update",
+        "agents",
+        "bootstrap"
+      ]
     },
     "cron": {
       "description": "Execucao agendada periodica (nao implementado nativamente)",

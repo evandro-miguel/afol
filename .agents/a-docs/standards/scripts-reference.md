@@ -25,6 +25,7 @@ make all           # Full validation workflow
 | `make sync` | Sync AGENTS.md files | - |
 | `make tools-check` | Validate tools catalog + CLI smoke tests | - |
 | `make new` | Create workstream | `THEME=<name>` `SPEC=1\|lite` |
+| `make bootstrap` | Bootstrap .agents system in another repository | `TARGET=/path/to/repo` |
 | `make verify` | Check task completion | - |
 | `make lint` | Lint markdown docs | - |
 | `make wb-touch` | Update `updated_at` in active session docs | - |
@@ -121,3 +122,13 @@ Legacy fallback: `agents.config` at repository root.
 
 ---
 *Reference: `.agents/scripts/QUICKSTART.md`*
+
+
+### Bootstrap in Another Repo
+
+```bash
+./.agents/agents bootstrap /path/to/target-repo --dry-run
+./.agents/agents bootstrap /path/to/target-repo
+```
+
+See: `.agents/a-docs/standards/bootstrap-other-repo.md`

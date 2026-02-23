@@ -20,10 +20,10 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 
 | Script | Purpose |
 |--------|---------|
-| `agents-tools.py` | **Discover and explore available tools** (NEW) |
 | `agents-doctor.py` | Validate .agents structure |
 | `agents-tools.py` | Discover and inspect available tools |
 | `agents-tools-smoke.py` | Smoke-test `tools` CLI behavior |
+| `agents-bootstrap.py` | Bootstrap .agents system into another repository |
 | `agents-new.py` | Create new workstream |
 | `agents-index.py` | Update SPECS/ADRS indexes |
 | `agents-lint-docs.py` | Validate markdown docs |

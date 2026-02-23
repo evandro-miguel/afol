@@ -10,7 +10,7 @@
 #   make structure
 #   make all
 
-.PHONY: help setup doctor new quick wb-touch wb-normalize-time wb-files-changed wb-task wb-status wb-timeline wb-link structure index sync verify lint tools-check clean all
+.PHONY: help setup doctor new quick bootstrap wb-touch wb-normalize-time wb-files-changed wb-task wb-status wb-timeline wb-link structure index sync verify lint tools-check clean all
 
 # ==============================================================================
 # HELP
@@ -34,6 +34,7 @@ help:
 	@echo "║  Workflows                                                ║"
 	@echo "║    make new          - Create workstream (THEME=xxx)      ║"
 	@echo "║    make quick        - Use active session for quick task   ║"
+	@echo "║    make bootstrap    - Install system into another repo    ║"
 	@echo "║    make wb-touch     - Update updated_at in active session ║"
 	@echo "║    make wb-normalize-time - Normalize WB timestamps        ║"
 	@echo "║    make wb-files-changed - Refresh report files changed    ║"
@@ -127,6 +128,15 @@ else
 	@./.agents/agents new $(THEME) --quick
 endif
 
+bootstrap:
+ifndef TARGET
+	@echo "Usage: make bootstrap TARGET=/path/to/other-repo [FORCE=1] [DRY=1] [SKIP_CHECKS=1]"
+	@exit 1
+else
+	@echo "→ Bootstrapping .agents system into: $(TARGET)"
+	@./.agents/agents bootstrap "$(TARGET)" $(if $(FORCE),--force,) $(if $(DRY),--dry-run,) $(if $(SKIP_CHECKS),--skip-checks,)
+endif
+
 wb-touch:
 	@./.agents/agents wb-update touch
 
@@ -210,7 +220,7 @@ tools-check:
 # QUICK WORKFLOWS
 # ==============================================================================
 
-all: doctor structure index verify
+all: doctor structure index verify tools-check
 	@echo ""
 	@echo "╔═══════════════════════════════════════════════════════════╗"
 	@echo "║  ✓ All validations passed                                 ║"

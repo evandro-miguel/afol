@@ -8,11 +8,13 @@ Capture learnings from user corrections and project experiences to prevent repea
 
 ## Structure
 
-```
+```text
 lessons/
-├── general-lessons.md    # Core lessons for the project
-├── <session-id>-lessons.md  # Session-specific lessons (optional)
-└── README.md             # This file
+├── entries/                                # One lesson per file (mandatory)
+│   ├── YYYYMMDD_HHMM_<slug>.md
+│   └── README.md
+├── general-lessons.md                      # Legacy aggregated lessons (historical)
+└── README.md
 ```
 
 ## When to update
@@ -23,17 +25,36 @@ Update lessons when:
 - A new guardrail is identified
 - A better pattern is discovered
 
-## Lesson format
+Mandatory format:
+- One lesson = one file in `.agents/a-docs/lessons/entries/`
+
+## Lesson format (per-file)
+
+Use frontmatter + sections:
 
 ```markdown
-### YYYY-MM-DD - <short title>
-**Context:** <situation where this occurred>
+---
+doc_type: lesson_entry
+id: "YYYYMMDD_HHMM_<slug>"
+status: active
+created_at: "YYYY-MM-DDTHH:MM:SSZ"
+updated_at: "YYYY-MM-DDTHH:MM:SSZ"
+tags: ["process", "quality"]
+---
 
-**Lesson:** <what was learned>
+# YYYY-MM-DD - <short title>
 
-**Prevention rule:** <actionable rule to prevent recurrence>
+## Context
+<situation where this occurred>
 
-**Guardrail:** <automated check if feasible>
+## Lesson
+<what was learned>
+
+## Prevention Rule
+<actionable rule to prevent recurrence>
+
+## Guardrail
+<automated check if feasible>
 ```
 
 ## Prevention rules
@@ -57,7 +78,7 @@ Guardrails are automated checks:
 Reports should reference lessons:
 ```markdown
 ## Lessons (if any)
-- See lessons/general-lessons.md#task-marker-format
+- See `.agents/a-docs/lessons/entries/YYYYMMDD_HHMM_<slug>.md`
 ```
 
 ---

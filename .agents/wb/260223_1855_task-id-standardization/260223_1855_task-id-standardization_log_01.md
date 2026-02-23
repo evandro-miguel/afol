@@ -4,7 +4,7 @@ id: 260223_1855_task-id-standardization_log_01
 theme: task-id-standardization
 status: active
 created_at: '2026-02-23T15:55:42-03:00'
-updated_at: '2026-02-23T17:38:41-03:00'
+updated_at: '2026-02-23T18:00:21-03:00'
 ---
 
 # Log: task-id-standardization
@@ -22,6 +22,12 @@ updated_at: '2026-02-23T17:38:41-03:00'
 - 2026-02-23 17:34-03 - Validated new tools discovery mechanism and fixed search/error handling in agents-tools
 - 2026-02-23 17:35-03 - Hardened agents-tools search/type validation and updated tools docs
 - 2026-02-23 17:38-03 - Implemented tools validate + tools smoke + make tools-check workflow
+- 2026-02-23 17:41-03 - Updated make all to include tools-check and validated full pipeline
+- 2026-02-23 17:45-03 - Rewrote AGENTS.md as generic template with placeholders and management tool workflow sections
+- 2026-02-23 17:48-03 - Refined AGENTS template tools section to concise discovery-first format
+- 2026-02-23 17:50-03 - Added AGENTS language policy: English default, Portuguese only when explicitly requested
+- 2026-02-23 17:53-03 - Added mandatory script-only updated_at rule and switched lessons policy to one-file-per-lesson
+- 2026-02-23 18:00-03 - Implemented bootstrap command for installing .agents into another repo with adaptation checklist and docs
 ## Decisions
 - Enforce ID-based parsing to guarantee deterministic `task -> file -> line` mapping.
 - Enforce "one active session + quick mode" to avoid unnecessary WB folder creation.

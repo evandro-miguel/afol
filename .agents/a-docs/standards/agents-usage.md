@@ -69,6 +69,7 @@ make all
 |---------|-------------|---------|
 | `make new` | Create workstream | `THEME=<name>` `SPEC=1\|lite` |
 | `make quick` | Reuse active session for small task | `THEME=<name>` |
+| `make bootstrap` | Bootstrap .agents system in another repository | `TARGET=/path/to/repo` |
 | `make verify` | Check task completion | - |
 | `make lint` | Validate markdown docs | - |
 | `make wb-touch` | Update `updated_at` in active session docs | - |
@@ -83,7 +84,7 @@ make all
 
 | Command | Description |
 |---------|-------------|
-| `make all` | Run full validation (doctor + structure + index + verify) |
+| `make all` | Run full validation (doctor + structure + index + verify + tools-check) |
 | `make refresh` | Clean + setup + structure |
 | `make docs` | Structure + index + sync |
 | `make check` | Doctor + lint + verify |
@@ -406,6 +407,24 @@ Discovers and validates the tools catalog used by autonomous agents.
 .agents/agents tools validate
 make tools-check
 ```
+
+### Bootstrap Another Repository
+
+```bash
+# Required dry-run
+./.agents/agents bootstrap /path/to/target-repo --dry-run
+
+# Apply
+./.agents/agents bootstrap /path/to/target-repo
+
+# Make wrapper
+make bootstrap TARGET=/path/to/target-repo DRY=1
+make bootstrap TARGET=/path/to/target-repo
+```
+
+Detailed playbook: `.agents/a-docs/standards/bootstrap-other-repo.md`
+
+---
 
 ---
 *Standard: `.agents/a-docs/standards/agents-usage.md`*

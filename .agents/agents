@@ -18,6 +18,7 @@
 #   verify-tasks        Check task completion
 #   wb-update           Update workbench metadata (touch/task/status/link/timeline/files-changed)
 #   tools               Discover available tools and usage details
+#   bootstrap           Install .agents system into another repository
 #
 
 set -e
@@ -83,6 +84,10 @@ case "${COMMAND}" in
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-tools.py" "$@"
         ;;
+    bootstrap)
+        cd "${ORIGINAL_PWD}"
+        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-bootstrap.py" "$@"
+        ;;
     help|-h|--help)
         echo "Agents CLI - Operational scripts for .agents system"
         echo
@@ -99,6 +104,7 @@ case "${COMMAND}" in
         echo "  verify-tasks        Check if all tasks are completed"
         echo "  wb-update           Update WB metadata (touch/task/status/link/timeline/files-changed)"
         echo "  tools               Discover and explore available tools"
+        echo "  bootstrap           Install .agents system in another repository"
         echo "  help                Show this help message"
         echo
         echo "Examples:"
@@ -111,6 +117,7 @@ case "${COMMAND}" in
         echo "  .agents/agents tools list"
         echo "  .agents/agents tools info doctor"
         echo "  .agents/agents tools search validate"
+        echo "  .agents/agents bootstrap /path/to/target-repo --dry-run"
         ;;
     "")
         echo "❌ No command specified"

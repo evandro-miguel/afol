@@ -1,8 +1,8 @@
 ---
 doc_type: lessons
 status: active
-created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-02-23T16:33:00-03:00"
+created_at: '2026-02-23T00:00:00Z'
+updated_at: '2026-02-23T17:54:59-03:00'
 ---
 
 # General Lessons
@@ -93,6 +93,33 @@ Lessons should be reviewed periodically:
 
 **Guardrail:** Added shared loader (`.agents/scripts/lib/agents_config.py`) and root `agents.config`; migrated core scripts to read from it.
 
+### 2026-02-23 - AGENTS.md must remain template-first
+**Context:** User requested AGENTS.md to stay generic, with placeholders and operational management tool guidance.
+
+**Lesson:** Root AGENTS contract should be reusable across projects and avoid overfitting concrete project values.
+
+**Prevention rule:** Prefer placeholders and generalized process rules; include operational command patterns without hardcoding project-specific stack values.
+
+**Guardrail:** Keep AGENTS sections for placeholders, management workflows, verification, and tools discovery/operations.
+
+### 2026-02-23 - Keep AGENTS tools section concise and discovery-first
+**Context:** User requested listing only main tools and delegating command details to tool discovery.
+
+**Lesson:** Template AGENTS should avoid long static command inventories that get stale.
+
+**Prevention rule:** Keep only core tool entrypoints in AGENTS templates and direct users/agents to `.agents/agents tools list|info|search`.
+
+**Guardrail:** Use a short `Main Tools` section and a `Discovery-First Rule` block in template AGENTS.
+
+### 2026-02-23 - Default repository language must be English
+**Context:** User requested an explicit language rule for repository content.
+
+**Lesson:** Language consistency is part of repository quality and collaboration standards.
+
+**Prevention rule:** Write repository content in English by default; only write Portuguese when explicitly requested.
+
+**Guardrail:** Keep a `Language Policy` section in root `AGENTS.md` and apply it to docs, logs, and management artifacts.
+
 ---
 
 ## Prevention rules
@@ -109,6 +136,9 @@ Lessons should be reviewed periodically:
 10. **Task IDs required** - Every checklist task must include a stable ID (`T-01`/`T-001`)
 11. **One active session** - Use quick mode for minor work; force new stream only for significant work
 12. **Config single source** - Use `agents.config` for tool paths/time settings and avoid script-local hardcoded project config
+13. **Template-first AGENTS** - Keep root AGENTS generic with placeholders and reusable operational rules
+14. **Discovery-first tool docs** - Keep AGENTS tool guidance short and rely on dynamic tools catalog commands
+15. **English by default** - Use English across repo artifacts unless user explicitly requests another language
 
 ## Guardrails
 
@@ -123,6 +153,9 @@ Lessons should be reviewed periodically:
 - `verify-tasks.py` parses only ID-based checklist lines and reports open tasks with location
 - `agents-new.py` blocks parallel new sessions unless `--force-new` and supports `--quick`
 - `agents.config` + `.agents/scripts/lib/agents_config.py` define shared operational configuration
+- Root `AGENTS.md` preserves placeholder sections and generic management-tool workflow guidance
+- Root `AGENTS.md` keeps tools guidance concise and delegates details to `.agents/agents tools` discovery commands
+- Root `AGENTS.md` includes explicit `Language Policy` enforcing English as default
 
 ---
 *Lessons: `.agents/a-docs/lessons/general-lessons.md`*
