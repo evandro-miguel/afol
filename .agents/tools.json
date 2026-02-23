@@ -1,0 +1,487 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-02-23T00:00:00-03:00",
+  "description": "Catalogo de ferramentas do sistema .agents para agentes autonomos",
+  "tools": [
+    {
+      "id": "tools",
+      "name": "Agents Tools Discovery",
+      "tool": "agents-tools.py",
+      "wrapper_command": ".agents/agents tools <command> [args]",
+      "make_command": "N/A",
+      "type": "discovery",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-23",
+      "updated_at": "2026-02-23",
+      "description": "Descobre e explora ferramentas disponiveis. Lista todas as tools com descricoes, permite busca por palavra-chave e mostra detalhes completos incluindo subcomandos.",
+      "when_to_use": [
+        "Quando nao sabe qual ferramenta usar",
+        "Explorar capacidades do sistema .agents",
+        "Buscar ferramenta por funcionalidade",
+        "Obter detalhes sobre subcomandos de uma tool"
+      ],
+      "commands": [
+        {
+          "name": "list",
+          "usage": "tools list [--type <type>]",
+          "description": "Lista todas as ferramentas disponiveis com descricoes curtas"
+        },
+        {
+          "name": "info",
+          "usage": "tools info <tool-id>",
+          "description": "Mostra informacoes detalhadas sobre uma ferramenta especifica"
+        },
+        {
+          "name": "search",
+          "usage": "tools search <query>",
+          "description": "Busca ferramentas por palavra-chave na descricao e uso"
+        },
+        {
+          "name": "help",
+          "usage": "tools help",
+          "description": "Mostra ajuda sobre o comando tools"
+        }
+      ],
+      "output": "Lista formatada com descricoes, tipos e exemplos de uso",
+      "workflow": [
+        "1. Agente executa 'tools list' para ver todas as opcoes",
+        "2. Agente identifica ferramenta de interesse",
+        "3. Agente executa 'tools info <tool-id>' para detalhes",
+        "4. Agente recebe subcomandos, opcoes e exemplos de uso"
+      ]
+    },
+    {
+      "id": "doctor",
+      "name": "Agents Doctor",
+      "tool": "agents-doctor.py",
+      "wrapper_command": ".agents/agents doctor",
+      "make_command": "make doctor",
+      "type": "validation",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-20",
+      "updated_at": "2026-02-23",
+      "description": "Valida a estrutura e integridade do diretorio .agents. Verifica pastas obrigatorias, templates, frontmatter YAML, convencoes de nomenclatura e timestamps.",
+      "when_to_use": [
+        "Antes de iniciar trabalho para validar estrutura",
+        "Apos criar nova workstream para verificar conformidade",
+        "Quando houver suspeita de problemas na estrutura .agents",
+        "Como parte de validacao continua (CI/CD)"
+      ],
+      "checks": [
+        "Pastas obrigatorias existem",
+        "Templates estao presentes",
+        "Frontmatter YAML e valido",
+        "IDs seguem convencao (YYMMDD_HHMM_theme_type_N)",
+        "Timestamps em ISO 8601 com Z ou offset",
+        "Cross-links entre documentos sao validos"
+      ],
+      "output": "Relatorio com erros, avisos e informacoes",
+      "exit_code": "0 se valido, 1 se houver erros"
+    },
+    {
+      "id": "new",
+      "name": "Agents New",
+      "tool": "agents-new.py",
+      "wrapper_command": ".agents/agents new <theme> [options]",
+      "make_command": "make new THEME=<theme> [SPEC=1|lite]",
+      "type": "creation",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-20",
+      "updated_at": "2026-02-23",
+      "description": "Cria nova workstream com pasta de sessao e todos os arquivos obrigatorios (plan, task, log, etc.) usando templates padronizados.",
+      "when_to_use": [
+        "Iniciar nova funcionalidade ou feature",
+        "Comecar refatoracao de codigo",
+        "Investigar bug ou issue",
+        "Documentar decisao de arquitetura (ADR)",
+        "Criar especificacao tecnica"
+      ],
+      "options": [
+        "--spec: Inclui arquivo spec.md completo",
+        "--spec-lite: Inclui arquivo spec-lite.md simplificado",
+        "--plan-only: Cria apenas arquivo plan.md",
+        "--quick: Registra tarefa rapida na sessao ativa"
+      ],
+      "files_created": [
+        "YYMMDD_HHMM_<theme>_plan_01.md",
+        "YYMMDD_HHMM_<theme>_task_01.md",
+        "YYMMDD_HHMM_<theme>_log_01.md",
+        "YYMMDD_HHMM_<theme>_spec_01.md (opcional)",
+        "YYMMDD_HHMM_<theme>_spec-lite_01.md (opcional)"
+      ],
+      "output": "Pasta de sessao em .agents/wb/ com arquivos inicializados",
+      "side_effect": "Atualiza .agents/wb/.active_session apontando para nova sessao"
+    },
+    {
+      "id": "index",
+      "name": "Agents Index",
+      "tool": "agents-index.py",
+      "wrapper_command": ".agents/agents index",
+      "make_command": "make index",
+      "type": "documentation",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-20",
+      "updated_at": "2026-02-23",
+      "description": "Atualiza arquivos INDEX.md para SPECS e ADRs, escaneando diretorios e extraindo metadados dos frontmatters.",
+      "when_to_use": [
+        "Apos criar nova especificacao (spec.md)",
+        "Apos criar nova decisao de arquitetura (adr.md)",
+        "Antes de revisar documentacao de arquitetura",
+        "Como parte de manutencao de documentacao"
+      ],
+      "scans": [
+        ".agents/arc/SPECS/ para arquivos spec",
+        ".agents/arc/DECISIONS/ para arquivos adr"
+      ],
+      "updates": [
+        ".agents/arc/SPECS/INDEX.md",
+        ".agents/arc/DECISIONS/INDEX.md"
+      ],
+      "output": "Indices atualizados com lista de documentos, status, owners e links",
+      "dry_run": "--dry-run para visualizar sem aplicar"
+    },
+    {
+      "id": "lint-docs",
+      "name": "Agents Lint Docs",
+      "tool": "agents-lint-docs.py",
+      "wrapper_command": ".agents/agents lint-docs [folder] [--fix]",
+      "make_command": "make lint",
+      "type": "validation",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-20",
+      "updated_at": "2026-02-23",
+      "description": "Valida documentos markdown por consistencia: checkboxes, status, frontmatter, cross-referencias e convencoes.",
+      "when_to_use": [
+        "Antes de commitar mudancas em documentacao",
+        "Apos edicao manual de arquivos .md",
+        "Como validacao de qualidade em workstream",
+        "Para identificar inconsistencias em tarefas"
+      ],
+      "checks": [
+        "Markers de checkbox (- [X], - [/], - [ ])",
+        "Campos de status no frontmatter",
+        "Valores de state sao validos",
+        "Campos obrigatorios no frontmatter",
+        "Cross-referencias entre documentos",
+        "IDs de tarefa seguem padrao T-NN"
+      ],
+      "valid_statuses": [
+        "draft", "active", "review", "approved", "final",
+        "deprecated", "superseded", "done", "blocked"
+      ],
+      "excluded_paths": [
+        "a-docs/",
+        "arc/structure/",
+        "scripts/.agent/docs/",
+        "z-arq/"
+      ],
+      "output": "Relatorio de issues encontradas",
+      "fix_mode": "--fix tenta corrigir automaticamente"
+    },
+    {
+      "id": "structure-map",
+      "name": "Agents Structure Map",
+      "tool": "agents-structure-map.py",
+      "wrapper_command": ".agents/agents structure-map <path> [--output <dir>]",
+      "make_command": "make structure",
+      "type": "documentation",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-20",
+      "updated_at": "2026-02-23",
+      "description": "Gera documentacao automatica da estrutura do projeto, incluindo inventario de arquivos, contagem de linhas, tamanhos e descricoes por categoria.",
+      "when_to_use": [
+        "Documentar estrutura de novo projeto",
+        "Atualizar visao geral do codigo",
+        "Criar documentacao para onboarding",
+        "Mapear arquitetura de codigo legado"
+      ],
+      "sections": [
+        "frontend: Componentes React, hooks, UI",
+        "backend: Servicos, APIs, logica de negocio",
+        "types: Definicoes de tipo e interfaces",
+        "tests: Arquivos de teste",
+        "config: Configuracoes e manifests",
+        "docs: Documentacao markdown"
+      ],
+      "output": "Arquivos .md em .agents/arc/structure/ com inventario detalhado",
+      "cache": "Usa cache para atualizacoes incrementais",
+      "options": [
+        "--output <dir>: Diretorio de saida (padrao: .agents/arc/structure/)",
+        "--no-cache: Ignora cache e recria tudo"
+      ]
+    },
+    {
+      "id": "sync",
+      "name": "Sync Agent Docs",
+      "tool": "sync-agent-docs.py",
+      "wrapper_command": ".agents/agents sync [--force]",
+      "make_command": "make sync",
+      "type": "synchronization",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-20",
+      "updated_at": "2026-02-23",
+      "description": "Sincroniza documentacao de agentes (QWEN.md, CLAUDE.md, GEMINI.md) a partir do template AGENTS.md, preservando modificacoes locais quando detectadas.",
+      "when_to_use": [
+        "Apos atualizar AGENTS.md com novas instrucoes",
+        "Manter consistencia entre agentes de IA",
+        "Propagar mudancas de padrao para todos os agentes",
+        "Antes de iniciar sessao com multiplos agentes"
+      ],
+      "source": "AGENTS.md",
+      "targets": [
+        "QWEN.md",
+        "CLAUDE.md",
+        "GEMINI.md"
+      ],
+      "behavior": [
+        "Detecta modificacoes locais nos arquivos alvo",
+        "Reporta diferencas encontradas",
+        "Pede confirmacao antes de sobrescrever",
+        "Preserva header especifico do agente"
+      ],
+      "options": [
+        "--force: Sobrescreve sem perguntar"
+      ],
+      "output": "Arquivos de agente atualizados ou relatorio de diferencas"
+    },
+    {
+      "id": "verify-tasks",
+      "name": "Verify Tasks",
+      "tool": "verify-tasks.py",
+      "wrapper_command": ".agents/agents verify-tasks <session-folder>",
+      "make_command": "make verify",
+      "type": "verification",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-20",
+      "updated_at": "2026-02-23",
+      "description": "Verifica se todas as tarefas em uma workstream estao completas, escaneando arquivos task.md e validando markers de status.",
+      "when_to_use": [
+        "Antes de marcar workstream como completa",
+        "Validar conclusao de sprint ou fase",
+        "Verificar pendencias antes de deploy",
+        "Auditoria de tarefas em multiplas sessoes"
+      ],
+      "task_markers": {
+        "pending": "- [ ]",
+        "in_progress": "- [/]",
+        "ready_for_test": "- [%]",
+        "blocked": "- [!]",
+        "skipped": "- [>]",
+        "completed": "- [x]"
+      },
+      "scans": "Arquivos *_task_*.md na pasta de sessao",
+      "output": "Relatorio de status por tarefa (ID, descricao, status)",
+      "exit_code": "0 se todas completas, 1 se houver pendencias"
+    },
+    {
+      "id": "wb-update",
+      "name": "Agents Workbench Update",
+      "tool": "agents-wb-update.py",
+      "wrapper_command": ".agents/agents wb-update <command> [options]",
+      "make_command": "make wb-<command> [ARGS...]",
+      "type": "automation",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-23",
+      "updated_at": "2026-02-23",
+      "description": "Automatiza atualizacoes de baixo valor em workstreams: metadata, timestamps, tarefas, status, timeline e links.",
+      "when_to_use": [
+        "Atualizar updated_at apos trabalhar em sessao",
+        "Normalizar timestamps para timezone configurado",
+        "Marcar tarefa como completa/em progresso",
+        "Adicionar entrada de timeline no log",
+        "Atualizar lista de arquivos modificados no report",
+        "Setar status ou links no frontmatter"
+      ],
+      "commands": [
+        {
+          "name": "touch",
+          "usage": "wb-update touch",
+          "description": "Atualiza updated_at no frontmatter da sessao ativa"
+        },
+        {
+          "name": "normalize-time",
+          "usage": "wb-update normalize-time --all-wb",
+          "description": "Normaliza timestamps para offset configurado (WB_OFFSET)"
+        },
+        {
+          "name": "files-changed",
+          "usage": "wb-update files-changed",
+          "description": "Atualiza secao Files Changed no arquivo report.md"
+        },
+        {
+          "name": "task",
+          "usage": "wb-update task T-01 --mark-done|--mark-in-progress|--mark-pending|--mark-ready|--mark-blocked|--mark-skipped",
+          "description": "Marca tarefa por ID com status especifico"
+        },
+        {
+          "name": "status",
+          "usage": "wb-update status --value <status> --file <plan|task|spec-lite|report|log|all>",
+          "description": "Seta campo status no frontmatter de um ou mais documentos"
+        },
+        {
+          "name": "timeline",
+          "usage": "wb-update timeline --message your message",
+          "description": "Adiciona entrada de timeline no arquivo log.md"
+        },
+        {
+          "name": "link",
+          "usage": "wb-update link --file <file> --key <key> --value <value>",
+          "description": "Seta frontmatter links.<key> = <value>"
+        }
+      ],
+      "active_session": "Le .agents/wb/.active_session para determinar sessao alvo",
+      "offset": "Usa WB_OFFSET do config para timestamps"
+    },
+    {
+      "id": "agents",
+      "name": "Agents CLI Wrapper",
+      "tool": "agents (bash script)",
+      "wrapper_command": ".agents/agents <command> [args]",
+      "make_command": "N/A (e o proprio wrapper)",
+      "type": "infrastructure",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-20",
+      "updated_at": "2026-02-23",
+      "description": "Wrapper bash que executa scripts Python com isolamento de virtualenv via uv. Interface unificada para todas as ferramentas.",
+      "when_to_use": [
+        "Executar qualquer ferramenta .agents",
+        "Garantir ambiente Python isolado",
+        "Evitar conflitos de dependencias",
+        "Padronizar execucao de scripts"
+      ],
+      "commands": [
+        "doctor", "new", "index", "lint-docs", "structure-map",
+        "sync", "verify-tasks", "wb-update", "tools", "help"
+      ],
+      "requirements": [
+        "uv instalado (https://astral.sh/uv/)",
+        ".venv em .agents/scripts/.venv (criado automaticamente)"
+      ],
+      "behavior": [
+        "Detecta se uv esta instalado",
+        "Cria .venv se nao existir",
+        "Executa com uv run --with pyyaml",
+        "Preserva diretorio de trabalho original"
+      ]
+    }
+  ],
+  "makefile_targets": {
+    "setup": "Inicializa virtualenv com uv",
+    "doctor": "Valida estrutura .agents",
+    "new": "Cria nova workstream (THEME=required)",
+    "quick": "Registra tarefa rapida na sessao ativa",
+    "structure": "Gera docs de estrutura do projeto",
+    "index": "Atualiza indices SPECS/ADRS",
+    "sync": "Sincroniza AGENTS.md para agentes",
+    "verify": "Verifica conclusao de tarefas",
+    "lint": "Valida docs markdown",
+    "wb-touch": "Atualiza updated_at na sessao ativa",
+    "wb-normalize-time": "Normaliza timestamps WB",
+    "wb-files-changed": "Atualiza Files Changed no report",
+    "wb-task": "Marca tarefa por ID (TASK_ID + ACTION required)",
+    "wb-status": "Seta status no frontmatter (STATUS required)",
+    "wb-timeline": "Adiciona entrada timeline (MSG required)",
+    "wb-link": "Seta links.frontmatter (FILE + KEY + VALUE required)",
+    "all": "Executa doctor + structure + index + verify",
+    "refresh": "Clean + setup + structure",
+    "clean": "Remove .venv e caches"
+  },
+  "tool_categories": {
+    "validation": {
+      "description": "Validam estrutura, sintaxe e conformidade",
+      "tools": ["doctor", "lint-docs"],
+      "usage_pattern": "Executar antes de commits ou como gate de qualidade"
+    },
+    "creation": {
+      "description": "Criam novos arquivos e workstreams",
+      "tools": ["new"],
+      "usage_pattern": "Inicio de nova funcionalidade, bug fix ou investigacao"
+    },
+    "documentation": {
+      "description": "Geram e atualizam documentacao",
+      "tools": ["index", "structure-map"],
+      "usage_pattern": "Apos criar specs/ADRs ou documentar estrutura"
+    },
+    "verification": {
+      "description": "Verificam estado e conclusao",
+      "tools": ["verify-tasks"],
+      "usage_pattern": "Antes de marcar workstream como completa"
+    },
+    "automation": {
+      "description": "Automatizam tarefas repetitivas de baixo valor",
+      "tools": ["wb-update"],
+      "usage_pattern": "Durante trabalho para manter docs atualizados"
+    },
+    "synchronization": {
+      "description": "Mantem consistencia entre arquivos",
+      "tools": ["sync"],
+      "usage_pattern": "Apos atualizar template AGENTS.md"
+    },
+    "infrastructure": {
+      "description": "Suporte e wrappers para execucao",
+      "tools": ["agents"],
+      "usage_pattern": "Interface primaria para todas as ferramentas"
+    },
+    "discovery": {
+      "description": "Descobre e explora ferramentas disponiveis",
+      "tools": ["tools"],
+      "usage_pattern": "Quando precisar identificar qual ferramenta usar"
+    }
+  },
+  "makefile_aliases": {
+    "note": "Aliases de atalho no Makefile. Use nomes completos para clareza.",
+    "aliases": {
+      "st": "structure (NÃO use doc - isso seria documents)",
+      "ix": "index",
+      "sy": "sync",
+      "vf": "verify",
+      "dr": "doctor (abreviacao de doctor, NÃO doc)"
+    },
+    "warning": "doc NÃO é um alias valido. Use 'dr' para doctor ou nomes completos."
+  },
+  "execution_modes": {
+    "on-demand": {
+      "description": "Execucao manual sob comando do usuario/agente",
+      "tools": ["tools", "doctor", "new", "index", "lint-docs", "structure-map", "sync", "verify-tasks", "wb-update", "agents"]
+    },
+    "cron": {
+      "description": "Execucao agendada periodica (nao implementado nativamente)",
+      "tools": [],
+      "suggested": [
+        "doctor (diario em CI/CD)",
+        "lint-docs (pre-commit hook)",
+        "verify-tasks (pre-merge)"
+      ]
+    },
+    "event-driven": {
+      "description": "Disparado por eventos especificos",
+      "tools": {
+        "new": "Ao criar nova feature/bug",
+        "index": "Apos criar spec/adr",
+        "sync": "Apos atualizar AGENTS.md",
+        "structure-map": "Ao documentar arquitetura",
+        "wb-update touch": "Ao finalizar sessao de trabalho"
+      }
+    }
+  },
+  "configuration": {
+    "file": ".agents/agents.config",
+    "sections": {
+      "paths": "Diretorios e arquivos de configuracao",
+      "time": "Timezones (default_offset, wb_offset)",
+      "lint": "Exclusoes para validacao de docs",
+      "doctor": "Pastas e templates obrigatorios",
+      "sync": "Arquivos source e target para sincronizacao"
+    }
+  },
+  "best_practices": [
+    "Sempre execute make doctor antes de iniciar trabalho",
+    "Use make new THEME=x para criar workstreams padronizadas",
+    "Execute make verify antes de marcar tarefa como completa",
+    "Mantenha docs sincronizados com make sync apos mudar AGENTS.md",
+    "Use wb-update para automatizar atualizacoes de baixo valor",
+    "Rode make all como validacao completa antes de commits",
+    "Prefira wrapper .agents/agents para execucao direta",
+    "Consulte tools.json para entender quando usar cada ferramenta"
+  ]
+}
