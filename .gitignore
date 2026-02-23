@@ -1,0 +1,19 @@
+# Agents scripts virtualenv (isolated per project)
+.agents/scripts/.venv/
+
+# UV lock files (optional: commit for reproducible builds)
+.agents/scripts/uv.lock
+uv.lock
+
+# Python cache
+.agents/scripts/__pycache__/
+.agents/scripts/*.pyc
+**/__pycache__/
+**/*.pyc
+
+# Structure map cache
+.agents/arc/structure/.structure-cache.json
+**/.structure-cache.json
+
+# Makefile in a-docs (keep root Makefile)
+# .agents/a-docs/standards/Makefile
