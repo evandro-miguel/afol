@@ -12,6 +12,12 @@ updated_at: "2026-02-23T00:00:00Z"
 
 This document describes how to use the `.agents/` operational system.
 
+## Central Configuration
+
+All scripts load settings from `.agents/agents.config` (preferred).
+Legacy fallback: `agents.config` in the repository root.
+Use this file to adjust paths, timezone offsets, lint exclusions, doctor requirements, and sync targets for each project.
+
 ## Quick Start
 
 ### Using Makefile (Recommended)
@@ -55,14 +61,23 @@ make all
 | `make structure` | Generate project structure docs |
 | `make index` | Update SPECS/ADRS indexes |
 | `make sync` | Sync AGENTS.md to agent files |
+| `make tools-check` | Validate tools catalog and run tools CLI smoke tests |
 
 ### Workflows
 
 | Command | Description | Options |
 |---------|-------------|---------|
 | `make new` | Create workstream | `THEME=<name>` `SPEC=1\|lite` |
+| `make quick` | Reuse active session for small task | `THEME=<name>` |
 | `make verify` | Check task completion | - |
 | `make lint` | Validate markdown docs | - |
+| `make wb-touch` | Update `updated_at` in active session docs | - |
+| `make wb-normalize-time` | Normalize `created_at`/`updated_at` to configured WB offset | - |
+| `make wb-files-changed` | Refresh report `Files Changed` section | - |
+| `make wb-task` | Mark task by ID in active session | `TASK_ID=T-01 ACTION=done\|in_progress\|pending\|ready\|blocked\|skipped` |
+| `make wb-status` | Set frontmatter status | `STATUS=<value>` `FILE=plan\|task\|spec-lite\|report\|log\|all` |
+| `make wb-timeline` | Append log timeline entry | `MSG=\"text\"` |
+| `make wb-link` | Set frontmatter link field | `FILE=<doc>` `KEY=<k>` `VALUE=<v>` |
 
 ### Quick Workflows
 
@@ -108,11 +123,17 @@ Creates new workstream with all required files.
 - Task file
 - Spec file (optional)
 - Log file
+- Sets `.agents/wb/.active_session`
+
+**Policy:**
+- One active workstream at a time
+- Use `--quick` for non-significant tasks (no new folder)
+- Use `--force-new` only for significant new streams
 
 **Usage:**
 ```bash
 # Basic (plan + task + log)
-make new THEME=auth-refactor
+make new THEME=auth-refactor SPEC=lite
 
 # With full spec
 make new THEME=api-endpoint SPEC=1
@@ -120,9 +141,14 @@ make new THEME=api-endpoint SPEC=1
 # With lite spec
 make new THEME=bugfix-login SPEC=lite
 
+# Quick task in current active session
+make quick THEME=small-fix
+
 # Direct
 .agents/agents new auth-refactor --spec
 .agents/agents new api-endpoint --spec-lite
+.agents/agents new tiny-fix --quick
+.agents/agents new major-refactor --force-new --spec
 ```
 
 ---
@@ -224,8 +250,10 @@ make sync
 Verifies all tasks in a session are completed.
 
 **Checks:**
-- All tasks marked with `- [x]`
+- Task lines with IDs in format `- [ ] T-01 ...` (supports `T-001` too)
+- All parsed tasks marked with `- [x]`
 - Reports status of each task
+- Shows open tasks with `ID | file:line | status | text`
 - Returns error if incomplete
 
 **Usage:**
@@ -329,6 +357,55 @@ This creates:
 - `.agents/a-docs/standards/verification.md` - Verification standard
 - `.agents/a-docs/standards/structure-map.md` - Structure map strategy
 - `.agents/a-docs/templates/` - All available templates
+
+---
+
+### agents-wb-update.py
+
+Automates common metadata edits to avoid manual WB file editing.
+
+**Commands:**
+- `touch` -> update `updated_at` in session files (supports `--all-wb`)
+- `files-changed` -> refresh report `## Files Changed` from git status
+- `task` -> mark task by ID (`T-01`/`T-001`) and sync state board row
+- `status` -> set frontmatter `status` by doc type
+- `timeline` -> append timeline entry in log
+- `link` -> set frontmatter `links.<key>` value
+
+**Examples:**
+```bash
+make wb-touch
+make wb-files-changed
+make wb-task TASK_ID=T-01 ACTION=done
+make wb-status STATUS=final FILE=report
+make wb-timeline MSG="Ran full validation"
+make wb-link FILE=report KEY=spec VALUE=260223_1855_task-id-standardization_spec-lite_01
+
+# Direct wrapper
+.agents/agents wb-update touch --all-wb
+.agents/agents wb-update task T-02 --mark-in-progress
+```
+
+---
+### agents-tools.py
+
+Discovers and validates the tools catalog used by autonomous agents.
+
+**Commands:**
+- `list` -> list tools (optional `--type`)
+- `info` -> detailed tool metadata and subcommands
+- `search` -> keyword lookup across descriptions/usages
+- `validate` -> schema/consistency checks for `.agents/tools.json`
+- `help` -> CLI help
+
+**Examples:**
+```bash
+.agents/agents tools list
+.agents/agents tools info wb-update
+.agents/agents tools search automate
+.agents/agents tools validate
+make tools-check
+```
 
 ---
 *Standard: `.agents/a-docs/standards/agents-usage.md`*

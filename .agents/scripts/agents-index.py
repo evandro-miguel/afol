@@ -18,7 +18,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Dict, Optional
 
 try:
@@ -27,11 +27,15 @@ try:
 except ImportError:
     HAS_YAML = False
 
+from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
+
 # Configuration
-ROOT_DIR = Path(__file__).parent.parent.parent
-AGENTS_DIR = ROOT_DIR / ".agents"
-SPECS_DIR = AGENTS_DIR / "arc" / "SPECS"
-DECISIONS_DIR = AGENTS_DIR / "arc" / "DECISIONS"
+ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
+SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
+DECISIONS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "decisions_dir")
+DEFAULT_OFFSET = CONFIG.get("time", {}).get("default_offset", "+00:00")
+DEFAULT_TZ = parse_offset(DEFAULT_OFFSET)
 
 
 class DocEntry:
@@ -126,7 +130,7 @@ def scan_docs(directory: Path, pattern: str) -> List[DocEntry]:
 
 def generate_index(entries: List[DocEntry], doc_type: str) -> str:
     """Generate INDEX.md content."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
     
     content = f"""---
 doc_type: {doc_type}_index

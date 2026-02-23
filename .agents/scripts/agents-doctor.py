@@ -7,7 +7,7 @@ Checks:
 - Templates are present
 - YAML frontmatter is valid
 - IDs follow naming convention
-- Timestamps are ISO 8601 with Z suffix
+- Timestamps are ISO 8601 with Z or timezone offset
 - Cross-links between docs are valid
 
 Usage:
@@ -21,6 +21,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 
+from lib.agents_config import get_cfg_path, load_agents_config
+
 try:
     import yaml
     HAS_YAML = True
@@ -28,42 +30,13 @@ except ImportError:
     HAS_YAML = False
 
 # Configuration
-ROOT_DIR = Path(__file__).parent.parent.parent
-AGENTS_DIR = ROOT_DIR / ".agents"
-
-REQUIRED_FOLDERS = [
-    "a-docs/templates",
-    "a-docs/standards",
-    "a-docs/lessons",
-    "a-docs/arc",
-    "a-docs/specs",
-    "arc",
-    "arc/SPECS",
-    "arc/DECISIONS",
-    "wb",
-    "rules",
-    "scripts",
-    "skills",
-    "z-arq",
-]
-
-REQUIRED_TEMPLATES = [
-    "plan.md",
-    "task.md",
-    "report.md",
-    "log.md",
-    "research.md",
-    "brainstorm.md",
-    "blocks.md",
-    "spec.md",
-    "spec-lite.md",
-    "adr.md",
-    "architecture.md",
-    "roadmap.md",
-]
+ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
+REQUIRED_FOLDERS = CONFIG.get("doctor", {}).get("required_folders", [])
+REQUIRED_TEMPLATES = CONFIG.get("doctor", {}).get("required_templates", [])
 
 ID_PATTERN = re.compile(r'^\d{6}_\d{4}_[a-z0-9_-]+_(plan|task|report|log|research|brainstorm|blocks|spec|spec-lite|adr|architecture|roadmap)_\d+$')
-TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
+TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$')
 
 
 class Issue:
@@ -274,7 +247,7 @@ class AgentsDoctor:
                         self.issues.append(Issue(
                             "warning",
                             str(file_path),
-                            f"Invalid timestamp format for {ts_field}: {ts_value} (expected YYYY-MM-DDTHH:MM:SSZ)"
+                            f"Invalid timestamp format for {ts_field}: {ts_value} (expected ISO 8601: ...Z or ...-03:00)"
                         ))
             
             # Check ID format

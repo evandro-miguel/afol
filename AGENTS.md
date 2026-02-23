@@ -1,175 +1,112 @@
 # AGENTS.md
-# Repo contract for coding agents
 
-## 0) Prime directive
-Ship correct changes with proof.
-Minimize blast radius.
-Do not guess. Search the repo.
+## Project overview
 
-## 1) Instruction layering
-- This file applies to the whole repo.
-- If a folder contains its own AGENTS.md, those rules override locally.
-- Keep the root contract short.
-- Put operational details in `.agents/a-docs/standards/`.
-- Architecture docs live in `.agents/arc/`.
-- Structure maps live in `.agents/arc/structure/`.
+{feed with the main goal of this repo}
 
-## 2) Single source of truth for management docs
-All planning and management docs MUST use templates from:
-`.agents/a-docs/templates/`
+## Current stack
 
-Do not create ad-hoc formats.
-Do not invent new frontmatter fields unless documented.
+{feed with the stack for this repo. Ex: Bun, TS}
 
-## 3) Workbench rules
-All workstreams must live in:
-`.agents/wb/YYMMDD_HHMM_<theme>/`
+## Repo structure
 
-Naming:
-`<theme>_<doc_type>_<NN>.md`
+{feed with structure for this repo}
 
-Doc types:
-plan, task, brainstorm, research, log, report
+## Important files
 
-Every file must have YAML frontmatter.
-Use UTC timestamps with Z suffix.
+.agent/arc/{all the architecture files} (ARCHITECTURE, GENERAL-ROADMAP, SPECS/{SPECS})
 
-### Spec linking rule
-- Plan -> link to Spec ID
-- Task -> link to Spec ID
-- Report -> cite Spec ID with evidence
+## General Rules
 
-### Structure map rule
-- Run `agents-structure-map.py` after major refactors
-- Keep structure docs in sync with codebase
-- See: `.agents/a-docs/standards/structure-map.md`
+### Self-Improvement Loop
 
-## 4) Mandatory workflow
-Non-trivial work requires:
-1) Plan file
-2) Task file
-3) Execution + log updates
-4) Report with verification evidence
+- After ANY correction from the user: update `tasks/lessons.md` with the pattern
+- Write rules for yourself that prevent the same mistake
+- Ruthlessly iterate on these lessons until mistake rate drops
+- Review lessons at session start for relevant project
 
-If the user asks for a quick change, still do steps 3 and 4.
+### Verification Before Done
 
-## 5) Setup and verification commands
-This repo must define the real commands below.
-Agents must search the repo for the truth.
-Agents must not invent commands.
+- Never mark a task complete without proving it works
+- Diff behavior between main and your changes when relevant
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness
 
-Install:
-- `<project-specific command>`
+### Demand Elegance (Balanced)
 
-Dev:
-- `<project-specific command>`
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip this for simple, obvious fixes; do not over-engineer
+- Challenge your own work before presenting it
 
-Lint:
-- `<project-specific command>`
+### Autonomous Bug Fixing
 
-Typecheck:
-- `<project-specific command>`
+- When given a bug report: just fix it. Do not ask for hand-holding
+- Point at logs, errors, failing tests, then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
 
-Test:
-- `<project-specific command>`
+## Agentic files
 
-Build:
-- `<project-specific command>`
+You have to use this structure when writing `.md` management files.
 
-If commands are missing:
-- Create `.agents/a-docs/standards/verification.md` with the discovered commands and references.
-- Do not proceed to risky refactors.
+Use the skill `workbench-agent-teams` for better understanding and templates.
 
-## 6) Verification before done
-A task is done only with evidence.
-Evidence is one of:
-- test output
-- CI link
-- log excerpt
-- deterministic command output
-- screenshot of output (only if needed)
+Key rules:
+- One session folder per workstream (`YYMMDD_HHMM_{theme}/`)
+- Standardized file naming: `YYMMDD_HHMM_{theme}_{type}_{N}.md`
+- All `.md` files must have YAML frontmatter
+- Task markers with ID: `- [ ] T-01 ...`, `- [/] T-01 ...`, `- [x] T-01 ...`
+- Plans > 500 lines: split into phases
+- Reports must include problems found and solutions applied
 
-Report must contain:
-- commands run
-- pass/fail
-- evidence
+```text
+# OBS: N = Number (e.g., 01)
+.agent/wb/
+  YYMMDD_HHMM_<theme>/
+    <theme>_plan_{N}.md
+    <theme>_task_{N}.md
+    <theme>_brainstorm_{N}.md
+    <theme>_report_{N}.md
+    <theme>_log_{N}.md
+    <theme>_research_{N}.md
+```
 
-If verification is blocked:
-- explain why
-- propose a smaller safe change
-- add diagnostics
+## Task Management
 
-## 7) Bug fixing protocol
-When given a bug:
-- reproduce or explain the block
-- locate root cause
-- fix
-- add guardrail if feasible
-- verify
-- report symptom, cause, fix, proof
+1. Plan first: write plan to `<theme>_task_{N}.md` with checkable items.
+2. Verify plan: check in before starting implementation.
+3. Track progress: mark items complete as you go.
+4. Explain changes: high-level summary at each step.
+5. Document results: add review section to `<theme>_task_{N}.md`.
+6. Capture lessons: update `<theme>_report_{N}.md` after corrections.
 
-## 8) Self-improvement loop
-After ANY correction from the user:
-- append an entry to `.agents/a-docs/lessons/general-lessons.md`
-- add a prevention rule
-- add a guardrail when feasible (test, assertion, lint rule, CI step)
+## List most important Skills
 
-Do not repeat the same mistake twice.
+{feed with the most important skills for this repo}
 
-## 9) Checkbox markers and compatibility
-Preferred checklist markers:
-- `- [ ]` pending
-- `- [/]` in progress
-- `- [%]` implemented, not tested yet
-- `- [!]` blocked/error (requires blocks file)
-- `- [>]` skipped by user request (requires log entry)
-- `- [x]` done (tested and verified)
+## List of MCPs
 
-### Marker Authorization Rules
-| Marker | Who can set | Requires log |
-|--------|-------------|--------------|
-| `- [ ]` | Anyone | No |
-| `- [/]` | Agent | No |
-| `- [%]` | Agent | No |
-| `- [!]` | Agent | Yes (blocks file) |
-| `- [>]` | **User only** | **Yes (mandatory)** |
-| `- [x]` | Agent | No |
+{feed with the most important MCPs for this repo and common MCPs via Docker MCP}
 
-**Agents MUST NOT set `- [>]` without explicit user authorization.**
+### Docker MCP
 
-If a tool cannot parse `- [/]` or `- [%]`, it must fall back to:
-- `- [ ]` with a `state: in_progress` or `ready_for_test` in the State Board.
+- Search for extra MCPs using the Docker MCP gateway
+- `mcp-find`   - Discovers available MCP servers by query (e.g., query=context7)
+- `mcp-add`    - Adds a discovered server to current session (e.g., name=context7)
+- `mcp-exec`   - Executes a tool from an added MCP server with arguments
+- `mcp-remove` - Removes a specific server from session
 
-### Blocked tasks protocol
-When marking a task with `- [!]`:
-1. Create `<task-id>-blocks.md` in the same session folder
-2. Document the problem, errors, and context
-3. Propose next steps or workarounds
+## Tools to use
 
-### Skipped tasks protocol
-When a task is marked with `- [>]`:
-1. User must explicitly authorize the skip
-2. Create a log entry documenting the skip reason
-3. Record timestamp and authorization
+### CLI
+- Grepai: for semantic search on the folder you are working on
 
-## 10) Safety rules
-- No secrets in commits or logs.
-- No new dependencies without justification.
-- No behavior changes without docs and tests.
-- Keep diffs small and reviewable.
+### {theme}
+- {add project-specific tools here}
 
-## 11) Definition of done
-Done means:
-- plan and tasks tracked
-- verification performed and recorded
-- report written with proof
-- lessons updated if user corrected anything
+## Core Principles
 
-## 12) Archive before delete
-Never permanently delete files.
-
-All files/folders inside the .agents being removed must go to:
-`.agents/z-arq/YYYYMMDD_<description>/`
-
-This maintains history and allows recovery.
-Document the reason for archival in a report or lessons log.
+- Simplicity first: make every change as simple as possible; minimal impact
+- No laziness: find root causes; no temporary fixes; senior standards
+- Minimal impact: touch only what is necessary; avoid introducing bugs

@@ -24,6 +24,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Dict, Tuple, Optional
 
+from lib.agents_config import get_cfg_path, load_agents_config
+
 try:
     import yaml
     HAS_YAML = True
@@ -31,12 +33,48 @@ except ImportError:
     HAS_YAML = False
 
 # Configuration
-ROOT_DIR = Path(__file__).parent.parent
+ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
+EXCLUDED_PATH_PREFIXES = tuple(CONFIG.get("lint", {}).get("excluded_path_prefixes", []))
 
 # Valid values
-VALID_STATUSES = ["draft", "active", "review", "approved", "final", "deprecated", "superseded"]
+VALID_STATUSES = [
+    "draft",
+    "active",
+    "review",
+    "approved",
+    "final",
+    "deprecated",
+    "superseded",
+    "done",
+    "blocked",
+    "blocking",
+    "accepted",
+]
 VALID_STATES = ["pending", "in_progress", "ready_for_test", "testing", "done", "blocked", "skipped"]
-VALID_DOC_TYPES = ["plan", "task", "report", "log", "research", "brainstorm", "blocks", "spec", "spec-lite", "adr", "architecture", "roadmap", "specs_index", "adr_index"]
+VALID_DOC_TYPES = [
+    "plan",
+    "task",
+    "report",
+    "log",
+    "research",
+    "brainstorm",
+    "blocks",
+    "spec",
+    "spec-lite",
+    "spec_lite",
+    "adr",
+    "architecture",
+    "roadmap",
+    "specs_index",
+    "adr_index",
+    "standard",
+    "index",
+    "structure",
+    "lessons",
+    "retrospective",
+    "specs_readme",
+]
 
 # Checkbox markers
 VALID_MARKERS = [" ", "/", "%", "!", ">", "x"]
@@ -53,7 +91,11 @@ class LintIssue:
     def __str__(self):
         icon = {"error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(self.severity, "?")
         line_info = f":{self.line}" if self.line > 0 else ""
-        return f"{icon} [{self.severity.upper()}] {self.file_path.relative_to(ROOT_DIR)}{line_info}: {self.message}"
+        try:
+            display_path = self.file_path.resolve().relative_to(ROOT_DIR.resolve())
+        except Exception:
+            display_path = self.file_path
+        return f"{icon} [{self.severity.upper()}] {display_path}{line_info}: {self.message}"
 
 
 class DocLinter:
@@ -90,6 +132,8 @@ class DocLinter:
     def check_frontmatter(self, file_path: Path, content: str):
         """Check YAML frontmatter."""
         if not content.startswith("---"):
+            if file_path.name.lower() == "readme.md":
+                return
             self.issues.append(LintIssue(
                 "warning", file_path, 0,
                 "Missing YAML frontmatter"
@@ -111,6 +155,18 @@ class DocLinter:
         
         try:
             fm = yaml.safe_load(frontmatter_text)
+            if fm is None:
+                self.issues.append(LintIssue(
+                    "warning", file_path, 0,
+                    "Empty YAML frontmatter"
+                ))
+                return
+            if not isinstance(fm, dict):
+                self.issues.append(LintIssue(
+                    "error", file_path, 0,
+                    "Frontmatter must be a YAML mapping/object"
+                ))
+                return
             
             # Check doc_type
             doc_type = fm.get("doc_type", fm.get("type", ""))
@@ -144,7 +200,7 @@ class DocLinter:
                         if not self._is_valid_timestamp(ts_value):
                             self.issues.append(LintIssue(
                                 "warning", file_path, 0,
-                                f"Invalid timestamp format for {ts_field}: '{ts_value}' (expected YYYY-MM-DDTHH:MM:SSZ)"
+                                f"Invalid timestamp format for {ts_field}: '{ts_value}' (expected ISO 8601: ...Z or ...-03:00)"
                             ))
         
         except yaml.YAMLError as e:
@@ -175,11 +231,12 @@ class DocLinter:
                     ))
                 
                 # Check for missing space after checkbox
-                full_match = match.group(0)
-                if not full_match.endswith("] "):
+                end_idx = match.end()
+                has_separator = end_idx >= len(line) or line[end_idx] in {" ", "|"}
+                if not has_separator:
                     self.issues.append(LintIssue(
                         "warning", file_path, i,
-                        f"Missing space after checkbox: '{full_match}' should be '- [{marker}] '"
+                        f"Missing separator after checkbox marker: '- [{marker}]'"
                     ))
     
     def check_state_board(self, file_path: Path, lines: List[str]):
@@ -209,6 +266,8 @@ class DocLinter:
         """Check status field consistency."""
         if not HAS_YAML:
             return
+        if not content.startswith("---"):
+            return
         
         parts = content.split("---", 2)
         if len(parts) < 3:
@@ -216,6 +275,8 @@ class DocLinter:
         
         try:
             fm = yaml.safe_load(parts[1].strip())
+            if not isinstance(fm, dict):
+                return
             status = fm.get("status", "")
             
             # Check if status matches content indicators
@@ -252,8 +313,10 @@ class DocLinter:
                     ))
     
     def _is_valid_timestamp(self, ts: str) -> bool:
-        """Check if timestamp is valid ISO 8601 with Z suffix."""
-        pattern = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
+        """Check if timestamp is valid ISO 8601 with Z or timezone offset."""
+        if ts == "YYYY-MM-DDTHH:MM:SSZ":
+            return True
+        pattern = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$')
         return bool(pattern.match(ts))
     
     def lint_folder(self, folder: Path):
@@ -263,9 +326,22 @@ class DocLinter:
             return
         
         for md_file in folder.rglob("*.md"):
-            if "node_modules" in str(md_file) or ".git" in str(md_file):
+            if self.should_skip_file(md_file):
                 continue
             self.lint_file(md_file)
+
+    def should_skip_file(self, file_path: Path) -> bool:
+        """Return True when file should be excluded from lint scope."""
+        file_str = str(file_path)
+        if "node_modules" in file_str or ".git" in file_str:
+            return True
+
+        try:
+            rel = file_path.resolve().relative_to(AGENTS_DIR.resolve()).as_posix()
+        except Exception:
+            rel = file_path.as_posix()
+
+        return any(rel.startswith(prefix) for prefix in EXCLUDED_PATH_PREFIXES)
     
     def print_report(self):
         """Print lint report."""
@@ -311,7 +387,7 @@ class DocLinter:
 
 def main():
     if len(sys.argv) < 2:
-        folder = ROOT_DIR / ".agents"
+        folder = AGENTS_DIR
     else:
         folder = Path(sys.argv[1])
     

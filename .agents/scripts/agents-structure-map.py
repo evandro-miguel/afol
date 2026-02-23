@@ -21,9 +21,11 @@ import sys
 import json
 import hashlib
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass, asdict
+
+from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
 
 # Configuration
 DEFAULT_SECTIONS = {
@@ -60,6 +62,28 @@ DEFAULT_SECTIONS = {
 }
 
 CACHE_FILE = ".structure-cache.json"
+ALLOWED_HIDDEN_DIRS = {".agents", ".agent", ".github"}
+IGNORED_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "node_modules",
+    "dist",
+    "build",
+    "target",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".cache",
+}
+
+ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+ARC_DIR = get_cfg_path(ROOT_DIR, CONFIG, "arc_dir")
+DEFAULT_OUTPUT_DIR = ARC_DIR / "structure"
+DEFAULT_OFFSET = CONFIG.get("time", {}).get("default_offset", "+00:00")
+DEFAULT_TZ = parse_offset(DEFAULT_OFFSET)
 
 
 @dataclass
@@ -226,8 +250,12 @@ class StructureMapper:
         
         # Walk through project directory
         for root, dirs, files in os.walk(self.project_path):
-            # Skip hidden and common ignore directories
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', 'venv', '__pycache__', 'dist', 'build', 'target']]
+            # Keep selected hidden dirs like .agents, while ignoring common heavy/cache dirs.
+            dirs[:] = [
+                d for d in dirs
+                if (not d.startswith(".") or d in ALLOWED_HIDDEN_DIRS)
+                and d not in IGNORED_DIRS
+            ]
             
             for file in files:
                 file_path = Path(root) / file
@@ -307,7 +335,7 @@ class StructureMapper:
     
     def generate_readme(self, sections: Dict[str, SectionStats]) -> str:
         """Generate main README.md for structure folder."""
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
         
         content = f"""# 📁 Project Structure - Complete Index
 
@@ -361,7 +389,7 @@ This documentation uses **incremental updates**:
     
     def generate_section_md(self, stats: SectionStats) -> str:
         """Generate markdown for a section."""
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
         
         content = f"""# 🎨 {stats.title} Structure
 
@@ -465,7 +493,10 @@ def main():
     
     # Default output path
     if not output_path:
-        output_path = project_path / ".agents" / "arc" / "structure"
+        if project_path.resolve() == ROOT_DIR.resolve():
+            output_path = DEFAULT_OUTPUT_DIR
+        else:
+            output_path = project_path / ".agents" / "arc" / "structure"
     
     # Run mapper
     mapper = StructureMapper(project_path, output_path)

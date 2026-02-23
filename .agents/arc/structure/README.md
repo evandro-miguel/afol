@@ -1,91 +1,36 @@
-# Structure
+# 📁 Project Structure - Complete Index
 
-This folder contains project structure maps and directory conventions.
+**Generated:** 2026-02-23T19:12:56Z
+**Last Update:** First run
 
-## Purpose
+## 📊 Overview
 
-Structure files document **how the project is organized** at a directory level.
+| Metric | Value |
+|--------|-------|
+| **Total Files** | 14 |
+| **Total Lines** | 2,475 |
 
-## Auto-Generated vs Manual
+## 📂 Documentation Sections
 
-This project supports **both** approaches:
+| Section | Description | Files |
+|---------|-------------|-------|
+| [Backend](./backend.md) | Services, utilities, and business logic | 8 |
+| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 6 |
 
-### Auto-Generated (Recommended for large projects)
-- Run: `python .agents/scripts/agents-structure-map.py .`
-- Generates: File inventory with descriptions
-- Updates: Incremental via cache
-- Best for: 200+ files, frequent changes
+## 🔄 Change Detection
 
-### Manual (Recommended for conventions)
-- Edit: `default.md` or custom `.md` files
-- Documents: Rules, conventions, import patterns
-- Updates: When conventions change
-- Best for: Defining standards
+This documentation uses **incremental updates**:
+- ✅ Descriptions cached to avoid regenerating everything
+- ✅ Only new/changed files get new descriptions
+- ✅ Detects when file purpose changes
 
-## Structure
-
-```
-structure/
-├── README.md              # This file
-├── TEMPLATE_structure.md  # Template for manual docs
-├── default.md             # Default project structure
-├── <project-type>.md      # Project-type specific structures
-└── *.md                   # Auto-generated sections (frontend.md, backend.md, etc.)
-```
-
-## When to use
-
-Create a structure file when:
-- Starting a new project type
-- Documenting monorepo layout
-- Mapping microservices architecture
-- Defining folder conventions
-
-## Structure map format
-
-Structure files use a tree format with annotations:
-
-```markdown
-## Directory Tree
+## 🌳 Quick Directory Tree
 
 ```
-project-root/
-├── src/                    # Source code
-│   ├── components/         # Reusable components
-│   │   └── README.md       # Component conventions
-│   ├── lib/                # Library code
-│   └── main.ts             # Entry point
-├── tests/                  # Test files
-│   ├── unit/               # Unit tests
-│   └── e2e/                # E2E tests
-└── docs/                   # Documentation
-    └── api/                # API docs
+agentic_start_folder/
 ```
-
-## Directory Rules
-
-| Directory | Purpose | Allowed files |
-|-----------|---------|---------------|
-| `src/` | Source code | `.ts`, `.tsx`, `.js` |
-| `tests/` | Tests | `.test.ts`, `.spec.ts` |
-| `docs/` | Documentation | `.md` |
-```
-
-## Linking to architecture
-
-Structure files complement architecture docs:
-
-- `structure/` → **Physical layout** (directories, files)
-- `arc/ARCHITECTURE.md` → **Logical layout** (components, layers)
-- `arc/SPECS/` → **Behavior** (what system does)
-
-## Updating structure
-
-When project structure changes:
-
-1. Update relevant structure file
-2. Add changelog entry
-3. Link from plan/report if structure change is part of work
 
 ---
-*Structure folder: `.agents/arc/structure/`*
+
+*Generated automatically by `agents-structure-map.py`*
+*For detailed structure, see individual section files*

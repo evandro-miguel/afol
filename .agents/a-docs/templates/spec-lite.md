@@ -1,5 +1,5 @@
 ---
-doc_type: spec_lite
+doc_type: spec-lite
 id: "YYMMDD_HHMM_<theme>_spec-lite_01"
 theme: "<theme>"
 status: draft

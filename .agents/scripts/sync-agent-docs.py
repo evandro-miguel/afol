@@ -19,13 +19,15 @@ import os
 import sys
 from pathlib import Path
 
+from lib.agents_config import load_agents_config, resolve_repo_path
+
 # Configuration
-ROOT_DIR = Path(__file__).parent.parent.parent
-AGENTS_FILE = ROOT_DIR / "AGENTS.md"
+ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+SYNC_CFG = CONFIG.get("sync", {})
+AGENTS_FILE = resolve_repo_path(ROOT_DIR, SYNC_CFG.get("source_file", "AGENTS.md"))
 AGENT_FILES = [
-    ROOT_DIR / "QWEN.md",
-    ROOT_DIR / "CLAUDE.md",
-    ROOT_DIR / "GEMINI.md",
+    resolve_repo_path(ROOT_DIR, p)
+    for p in SYNC_CFG.get("target_files", ["QWEN.md", "CLAUDE.md", "GEMINI.md"])
 ]
 
 # Header that should be preserved in target files

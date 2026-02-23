@@ -21,23 +21,28 @@ Examples:
 import os
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime
+
+from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
 
 # Configuration
-ROOT_DIR = Path(__file__).parent.parent.parent
-AGENTS_DIR = ROOT_DIR / ".agents"
-TEMPLATES_DIR = AGENTS_DIR / "a-docs" / "templates"
-WB_DIR = AGENTS_DIR / "wb"
+ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
+TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")
+WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
+ACTIVE_SESSION_FILE = get_cfg_path(ROOT_DIR, CONFIG, "active_session_file")
+WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
+WB_TZ = parse_offset(WB_OFFSET)
 
 
 def get_timestamp() -> str:
-    """Get current UTC timestamp in ISO format."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """Get current timestamp in configured workbench timezone."""
+    return datetime.now(WB_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{WB_OFFSET}")
 
 
 def get_session_id(theme: str) -> str:
     """Generate session folder ID."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(WB_TZ)
     date_part = now.strftime("%y%m%d_%H%M")
     # Sanitize theme
     theme_clean = theme.lower().replace(" ", "-").replace("_", "-")
@@ -59,20 +64,10 @@ def fill_template(template: str, session_id: str, theme: str, timestamp: str) ->
     """Fill template with session data."""
     # Replace common placeholders
     content = template
-    content = content.replace("<theme>", theme)
     content = content.replace("YYMMDD_HHMM_<theme>", session_id)
+    content = content.replace("<theme>", theme)
+    content = content.replace("<topic>", theme)
     content = content.replace("YYYY-MM-DDTHH:MM:SSZ", timestamp)
-    
-    # Replace ID placeholders
-    content = content.replace('"YYMMDD_HHMM_<theme>_plan_01"', f'"{session_id}_plan_01"')
-    content = content.replace('"YYMMDD_HHMM_<theme>_task_01"', f'"{session_id}_task_01"')
-    content = content.replace('"YYMMDD_HHMM_<theme>_spec_01"', f'"{session_id}_spec_01"')
-    content = content.replace('"YYMMDD_HHMM_<theme>_spec-lite_01"', f'"{session_id}_spec-lite_01"')
-    content = content.replace('"YYMMDD_HHMM_<theme>_log_01"', f'"{session_id}_log_01"')
-    
-    # Replace links
-    content = content.replace('"YYMMDD_HHMM_<theme>_plan_01"', f'"{session_id}_plan_01"')
-    content = content.replace('"YYMMDD_HHMM_<theme>_task_01"', f'"{session_id}_task_01"')
     
     return content
 
@@ -86,6 +81,23 @@ def create_session_folder(session_id: str) -> Path:
     
     session_path.mkdir(parents=True)
     return session_path
+
+
+def get_active_session() -> str | None:
+    """Return active session id if configured and existing."""
+    if not ACTIVE_SESSION_FILE.exists():
+        return None
+    session_id = ACTIVE_SESSION_FILE.read_text().strip()
+    if not session_id:
+        return None
+    if not (WB_DIR / session_id).exists():
+        return None
+    return session_id
+
+
+def set_active_session(session_id: str):
+    """Set active session id."""
+    ACTIVE_SESSION_FILE.write_text(session_id + "\n")
 
 
 def create_file(session_path: Path, filename: str, content: str):
@@ -102,18 +114,55 @@ def create_file(session_path: Path, filename: str, content: str):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python agents-new.py <theme> [--spec | --spec-lite] [--plan-only]")
+        print("Usage: python agents-new.py <theme> [--spec | --spec-lite] [--plan-only] [--force-new | --quick]")
         print()
         print("Examples:")
         print("  python agents-new.py auth-refactor")
         print("  python agents-new.py api-endpoint --spec")
         print("  python agents-new.py bugfix-login --spec-lite")
+        print("  python agents-new.py tiny-fix --quick")
+        print("  python agents-new.py new-epic --spec --force-new")
         sys.exit(1)
     
     theme = sys.argv[1]
     use_spec = "--spec" in sys.argv
     use_spec_lite = "--spec-lite" in sys.argv
     plan_only = "--plan-only" in sys.argv
+    force_new = "--force-new" in sys.argv
+    quick_mode = "--quick" in sys.argv
+
+    active_session = get_active_session()
+
+    # Quick mode: do not create new workstream, enforce single active stream.
+    if quick_mode:
+        if not active_session:
+            print("❌ No active session found for quick mode.")
+            print("Create one significant workstream first with:")
+            print("  .agents/agents new <theme> [--spec|--spec-lite]")
+            sys.exit(1)
+        print("=" * 60)
+        print(f"Quick task mode: {theme}")
+        print("=" * 60)
+        print()
+        print(f"Active session: {active_session}")
+        print(f"Session path: .agents/wb/{active_session}/")
+        print()
+        print("No new workstream created (quick mode).")
+        print("Add the quick task to the current session task/log files.")
+        print("=" * 60)
+        sys.exit(0)
+
+    if active_session and not force_new:
+        print("❌ Active session already exists.")
+        print(f"   Active: .agents/wb/{active_session}/")
+        print()
+        print("Policy: one active workstream at a time.")
+        print("Use quick mode for small changes:")
+        print(f"  .agents/agents new {theme} --quick")
+        print()
+        print("If this is a significant new stream, force creation:")
+        print(f"  .agents/agents new {theme} --force-new [--spec|--spec-lite]")
+        sys.exit(1)
     
     # Generate session data
     session_id = get_session_id(theme)
@@ -125,6 +174,8 @@ def main():
     print()
     print(f"Session ID: {session_id}")
     print(f"Timestamp: {timestamp}")
+    if active_session and force_new:
+        print(f"Previous active session: {active_session}")
     print()
     
     # Create session folder
@@ -135,6 +186,10 @@ def main():
     except FileExistsError as e:
         print(f"❌ Error: {e}")
         sys.exit(1)
+
+    set_active_session(session_id)
+    print(f"✓ Set active session: {session_id}")
+    print()
     
     # Create plan file (always)
     print("Creating files:")

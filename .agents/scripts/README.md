@@ -23,6 +23,7 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 | `agents-tools.py` | **Discover and explore available tools** (NEW) |
 | `agents-doctor.py` | Validate .agents structure |
 | `agents-tools.py` | Discover and inspect available tools |
+| `agents-tools-smoke.py` | Smoke-test `tools` CLI behavior |
 | `agents-new.py` | Create new workstream |
 | `agents-index.py` | Update SPECS/ADRS indexes |
 | `agents-lint-docs.py` | Validate markdown docs |
@@ -34,6 +35,7 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 `agents-wb-update.py` also supports task/status/timeline/link automation for active WB sessions.
 
 Tools catalog source: `.agents/tools.json`.
+Catalog validation: `./.agents/agents tools validate`.
 
 **Tool Discovery:** Use `.agents/agents tools list` to see all available tools with descriptions, then `.agents/agents tools info <tool-id>` for detailed info including subcommands.
 

@@ -37,6 +37,11 @@
           "description": "Busca ferramentas por palavra-chave na descricao e uso"
         },
         {
+          "name": "validate",
+          "usage": "tools validate",
+          "description": "Valida schema e consistencia do catalogo tools.json"
+        },
+        {
           "name": "help",
           "usage": "tools help",
           "description": "Mostra ajuda sobre o comando tools"
@@ -375,6 +380,7 @@
     "sync": "Sincroniza AGENTS.md para agentes",
     "verify": "Verifica conclusao de tarefas",
     "lint": "Valida docs markdown",
+    "tools-check": "Valida tools.json e executa smoke tests da CLI tools",
     "wb-touch": "Atualiza updated_at na sessao ativa",
     "wb-normalize-time": "Normaliza timestamps WB",
     "wb-files-changed": "Atualiza Files Changed no report",

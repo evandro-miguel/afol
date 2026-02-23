@@ -31,29 +31,47 @@ MARKERS = {
     'completed': r'- \[x\]',
 }
 
+MARKER_TO_STATUS = {
+    " ": "pending",
+    "/": "in_progress",
+    "%": "ready_for_test",
+    "!": "blocked",
+    ">": "skipped",
+    "x": "completed",
+}
 
-def extract_tasks(content: str, file_path: Path) -> List[Tuple[str, str, int]]:
+TASK_LINE_RE = re.compile(r'^\s*-\s\[( |/|%|!|>|x)\]\s+(T-\d{2,3})\s+(.+?)\s*$')
+
+
+def extract_tasks(content: str, file_path: Path) -> List[Tuple[str, str, str, int]]:
     """
     Extract all tasks from markdown content.
     
-    Returns list of (task_text, marker_type, line_number)
+    Returns list of (task_id, task_text, marker_type, line_number)
     """
     tasks = []
     lines = content.splitlines()
+    in_code_block = False
     
     for line_num, line in enumerate(lines, 1):
-        # Skip code blocks
-        if line.strip().startswith('```'):
+        if line.strip().startswith("```"):
+            in_code_block = not in_code_block
             continue
-            
-        for marker_type, pattern in MARKERS.items():
-            match = re.search(pattern, line)
-            if match:
-                # Extract task description (after the marker)
-                task_text = re.sub(r'- \[.[^\]]*\]\s*', '', line).strip()
-                if task_text and not task_text.startswith('#'):
-                    tasks.append((task_text, marker_type, line_num))
-                break
+
+        if in_code_block:
+            continue
+
+        match = TASK_LINE_RE.match(line)
+        if not match:
+            continue
+
+        marker_char = match.group(1)
+        task_id = match.group(2)
+        task_text = match.group(3).strip()
+        marker_type = MARKER_TO_STATUS[marker_char]
+
+        if task_text:
+            tasks.append((task_id, task_text, marker_type, line_num))
     
     return tasks
 
@@ -67,6 +85,7 @@ def verify_session(session_path: Path) -> Tuple[bool, Dict]:
     results = {
         'session': session_path,
         'task_files': [],
+        'open_tasks': [],
         'total_tasks': 0,
         'completed': 0,
         'pending': 0,
@@ -81,8 +100,8 @@ def verify_session(session_path: Path) -> Tuple[bool, Dict]:
         results['issues'].append(f"Session folder not found: {session_path}")
         return False, results
     
-    # Find all task files
-    task_files = list(session_path.glob('*task*.md'))
+    # Find all task files (recursive, so .agents/wb/ can be used directly)
+    task_files = list(session_path.rglob('*task*.md'))
     
     if not task_files:
         results['issues'].append("No task files found in session")
@@ -100,11 +119,13 @@ def verify_session(session_path: Path) -> Tuple[bool, Dict]:
         content = task_file.read_text()
         tasks = extract_tasks(content, task_file)
         
-        for task_text, marker_type, line_num in tasks:
+        for task_id, task_text, marker_type, line_num in tasks:
             task_info = {
+                'id': task_id,
                 'description': task_text,
                 'status': marker_type,
                 'line': line_num,
+                'file': task_file,
             }
             file_result['tasks'].append(task_info)
             results['total_tasks'] += 1
@@ -113,18 +134,22 @@ def verify_session(session_path: Path) -> Tuple[bool, Dict]:
                 results['completed'] += 1
             elif marker_type == 'pending':
                 results['pending'] += 1
+                results['open_tasks'].append(task_info)
                 all_completed = False
                 file_result['all_completed'] = False
             elif marker_type == 'in_progress':
                 results['in_progress'] += 1
+                results['open_tasks'].append(task_info)
                 all_completed = False
                 file_result['all_completed'] = False
             elif marker_type == 'ready_for_test':
                 results['ready_for_test'] += 1
+                results['open_tasks'].append(task_info)
                 all_completed = False
                 file_result['all_completed'] = False
             elif marker_type == 'blocked':
                 results['blocked'] += 1
+                results['open_tasks'].append(task_info)
                 all_completed = False
                 file_result['all_completed'] = False
             elif marker_type == 'skipped':
@@ -182,7 +207,15 @@ def print_report(all_completed: bool, results: Dict) -> None:
         
         for task in file_result['tasks']:
             icon = status_icon.get(task['status'], '?')
-            print(f"   {icon} Line {task['line']}: {task['description']}")
+            print(f"   {icon} {task['id']} @ line {task['line']}: {task['description']}")
+
+    if results['open_tasks']:
+        print()
+        print("Open Tasks:")
+        print("-" * 60)
+        for task in results['open_tasks']:
+            rel = task["file"].relative_to(results["session"])
+            print(f"  {task['id']} | {rel}:{task['line']} | {task['status']} | {task['description']}")
     
     print()
     print("=" * 60)
