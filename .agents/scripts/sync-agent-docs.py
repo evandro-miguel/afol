@@ -36,6 +36,17 @@ HEADER_TEMPLATE = """# Agent-specific instructions for {agent_name}
 
 """
 
+# Footer warning to add at the end of each agent file
+FOOTER_WARNING = """
+---
+
+> **⚠️ IMPORTANT:** THIS FILE IS A REPLICA OF THE `AGENTS.md`.
+>
+> - **DO NOT READ** the `AGENTS.md` AGAIN if you read this one.
+> - The official skills and files of the repo are always on `.agents/skills`.
+> - This file is auto-synced. Run `.agents/scripts/sync-agent-docs.py` to update.
+"""
+
 
 def compute_hash(content: str) -> str:
     """Compute SHA256 hash of content."""
@@ -46,11 +57,20 @@ def get_expected_content(agent_file: Path) -> str:
     """Get expected content for an agent file based on AGENTS.md."""
     if not AGENTS_FILE.exists():
         raise FileNotFoundError(f"Source file not found: {AGENTS_FILE}")
-    
+
     agents_content = AGENTS_FILE.read_text()
     agent_name = agent_file.stem.upper()
     header = HEADER_TEMPLATE.format(agent_name=agent_name)
-    return header + agents_content
+    
+    # Add footer warning
+    content = header + agents_content
+    
+    # Ensure there's a newline before footer
+    if not content.endswith('\n'):
+        content += '\n'
+    content += FOOTER_WARNING
+    
+    return content
 
 
 def check_file_status(agent_file: Path) -> dict:
