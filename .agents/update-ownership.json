@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "description": "Ownership map for agentic system update - defines which paths are system/user/hybrid",
+  "ownership_rules": [
+    {
+      "path": "scripts",
+      "type": "system",
+      "recursive": true,
+      "description": "Python operational scripts"
+    },
+    {
+      "path": "rules",
+      "type": "system",
+      "recursive": true,
+      "description": "Agent rules and instructions"
+    },
+    {
+      "path": "a-docs/templates",
+      "type": "system",
+      "recursive": true,
+      "description": "Document templates"
+    },
+    {
+      "path": "a-docs/standards",
+      "type": "system",
+      "recursive": true,
+      "description": "Standards and conventions"
+    },
+    {
+      "path": "a-docs/patterns",
+      "type": "system",
+      "recursive": true,
+      "description": "Pattern documentation"
+    },
+    {
+      "path": "a-docs/agentic",
+      "type": "system",
+      "recursive": true,
+      "description": "Agent system documentation"
+    },
+    {
+      "path": "a-docs/lessons",
+      "type": "user",
+      "recursive": true,
+      "description": "User lessons learned - NEVER touch"
+    },
+    {
+      "path": "a-docs/telemetry",
+      "type": "user",
+      "recursive": true,
+      "description": "Telemetry data"
+    },
+    {
+      "path": "arc/SPECS",
+      "type": "user",
+      "recursive": true,
+      "description": "User specifications"
+    },
+    {
+      "path": "arc/DECISIONS",
+      "type": "user",
+      "recursive": true,
+      "description": "User architecture decisions"
+    },
+    {
+      "path": "wb",
+      "type": "user",
+      "recursive": true,
+      "description": "Workbench sessions - NEVER touch"
+    },
+    {
+      "path": "data",
+      "type": "user",
+      "recursive": true,
+      "description": "Operational data"
+    },
+    {
+      "path": "z-arq",
+      "type": "user",
+      "recursive": true,
+      "description": "User archives"
+    },
+    {
+      "path": "skills/core",
+      "type": "system",
+      "recursive": true,
+      "description": "Core system skills"
+    },
+    {
+      "path": "skills",
+      "type": "hybrid",
+      "recursive": true,
+      "default": "user",
+      "exceptions": ["skills/core"],
+      "description": "Skills folder - hybrid, most are user data"
+    },
+    {
+      "path": "agents",
+      "type": "system",
+      "recursive": false,
+      "description": "CLI wrapper script"
+    },
+    {
+      "path": "agents.config",
+      "type": "hybrid",
+      "default": "user",
+      "system_defaults": "agents.config.defaults",
+      "description": "Config with system defaults overlay"
+    },
+    {
+      "path": "agents.config.defaults",
+      "type": "system",
+      "recursive": false,
+      "description": "System default config"
+    },
+    {
+      "path": "tools.json",
+      "type": "system",
+      "recursive": false,
+      "description": "Tools catalog"
+    },
+    {
+      "path": ".cache",
+      "type": "system",
+      "recursive": true,
+      "description": "Cache directory (temp)"
+    },
+    {
+      "path": "versions",
+      "type": "system",
+      "recursive": true,
+      "description": "Version storage"
+    },
+    {
+      "path": "current",
+      "type": "system",
+      "recursive": true,
+      "description": "Current version symlink/folder"
+    },
+    {
+      "path": "manifest.json",
+      "type": "system",
+      "recursive": false,
+      "description": "System manifest"
+    },
+    {
+      "path": "state.json",
+      "type": "system",
+      "recursive": false,
+      "description": "System state"
+    },
+    {
+      "path": "agents-update.lock",
+      "type": "system",
+      "recursive": false,
+      "description": "Lock file"
+    },
+    {
+      "path": "update-ownership.json",
+      "type": "system",
+      "recursive": false,
+      "description": "This file"
+    }
+  ],
+  "default_policy": "user"
+}
