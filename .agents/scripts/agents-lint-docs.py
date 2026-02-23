@@ -128,10 +128,34 @@ class DocLinter:
         
         # Check cross-references
         self.check_cross_references(file_path, content)
+
+    def _extract_frontmatter(self, content: str) -> Tuple[Optional[str], str, bool]:
+        """
+        Extract YAML frontmatter safely.
+
+        Returns:
+            (frontmatter_text, body, invalid_structure)
+        """
+        if not content.startswith("---"):
+            return None, content, False
+
+        lines = content.splitlines(keepends=True)
+        if not lines or lines[0].strip() != "---":
+            return None, content, False
+
+        for i, line in enumerate(lines[1:], start=1):
+            if line.strip() == "---":
+                frontmatter_text = "".join(lines[1:i]).strip()
+                body = "".join(lines[i + 1 :])
+                return frontmatter_text, body, False
+
+        return None, content, True
     
     def check_frontmatter(self, file_path: Path, content: str):
         """Check YAML frontmatter."""
-        if not content.startswith("---"):
+        frontmatter_text, _, invalid_structure = self._extract_frontmatter(content)
+
+        if frontmatter_text is None and not invalid_structure:
             if file_path.name.lower() == "readme.md":
                 return
             self.issues.append(LintIssue(
@@ -139,17 +163,14 @@ class DocLinter:
                 "Missing YAML frontmatter"
             ))
             return
-        
-        parts = content.split("---", 2)
-        if len(parts) < 3:
+
+        if invalid_structure:
             self.issues.append(LintIssue(
                 "error", file_path, 0,
                 "Invalid frontmatter structure"
             ))
             return
-        
-        frontmatter_text = parts[1].strip()
-        
+
         if not HAS_YAML:
             return
         
@@ -275,15 +296,13 @@ class DocLinter:
         """Check status field consistency."""
         if not HAS_YAML:
             return
-        if not content.startswith("---"):
+
+        frontmatter_text, _, invalid_structure = self._extract_frontmatter(content)
+        if frontmatter_text is None or invalid_structure:
             return
-        
-        parts = content.split("---", 2)
-        if len(parts) < 3:
-            return
-        
+
         try:
-            fm = yaml.safe_load(parts[1].strip())
+            fm = yaml.safe_load(frontmatter_text)
             if not isinstance(fm, dict):
                 return
             status = fm.get("status", "")
@@ -306,11 +325,7 @@ class DocLinter:
     
     def check_cross_references(self, file_path: Path, content: str):
         """Check cross-references between docs."""
-        body = content
-        if content.startswith("---"):
-            parts = content.split("---", 2)
-            if len(parts) == 3:
-                body = parts[2]
+        _, body, _ = self._extract_frontmatter(content)
 
         # Check for plan/task links
         if "plan:" in body or "task:" in body:

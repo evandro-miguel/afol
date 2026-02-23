@@ -5,7 +5,7 @@ theme: "telemetry-system"
 status: "final"
 created_at: "2026-02-23T00:00:00Z"
 updated_at: "2026-02-23T21:35:00Z"
-related_tasks: ["T-01" through "T-15"]
+related_tasks: ["T-01", "T-02", "T-03", "T-04", "T-05", "T-06", "T-07", "T-08", "T-09", "T-10", "T-11", "T-12", "T-13", "T-14", "T-15"]
 links:
   plan: "260223_0000_telemetry-system_plan_01.md"
 ---

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "selected_skills": [
-    "writing-skills",
-    "markdownlint-skill"
+    "markdownlint-skill",
+    "writing-skills"
   ],
   "mode": "copy",
   "upstream_branch": "main"

@@ -1,46 +1,96 @@
-# Skills
+# Skills System
 
-This is the **mandatory** skills folder for all agents.
+Skills define capabilities and behaviors for AI agents operating in this repository.
 
-All agent-specific skills should be stored here and symlinked from agent config folders.
+## Overview
 
-## Available Skills
-
-| Skill | Purpose |
-|-------|---------|
-| (none yet) | Create when user requests |
+Skills are modular definitions that provide:
+- **Prompt templates** - Standardized prompts for specific tasks
+- **Rules** - Operational rules for agents
+- **Examples** - Usage examples and best practices
 
 ## Structure
 
 ```
 .agents/skills/
+├── README.md                 # This file
 ├── <skill-name>/
-│   ├── __init__.py
-│   ├── skill.py
-│   └── README.md
-└── README.md
+│   ├── SKILL.md             # Skill definition
+│   ├── prompts/             # Prompt templates
+│   ├── rules/               # Skill rules
+│   └── examples/            # Usage examples
 ```
 
-## Usage
+## Available Skills
 
-Agents access skills via symlinks:
-- `.qwen/skills` → `.agents/skills`
-- `.opencode/skills` → `.agents/skills`
-- `.codex/skills` → `.agents/skills`
-- `.claude/skills` → `.agents/skills`
+### writing-skills
 
-## Creating a new skill
+Writing and documentation skills.
 
-1. Create folder: `mkdir <skill-name>`
-2. Add skill implementation
-3. Add documentation
-4. Test with all agents
+**Capabilities:**
+- Technical writing
+- Documentation standards
+- Markdown formatting
+
+**Location:** `.agents/skills/writing-skills/`
+
+### markdownlint-skill
+
+Markdown linting and validation.
+
+**Capabilities:**
+- Markdown linting
+- Format validation
+- Auto-fix capabilities
+
+**Location:** `.agents/skills/markdownlint-skill/`
+
+## Adding New Skills
+
+### Manual Addition
+
+1. Create directory: `.agents/skills/<skill-name>/`
+2. Create `SKILL.md` with definition
+3. Add prompts, rules, examples
+4. Update this README
+
+### Via Skills Sync
+
+```bash
+# Sync from universal-skills
+make skills-sync SKILLS=new-skill
+
+# Or individual commands
+./.agents/agents skills-sync pull
+./.agents/agents skills-sync apply --skills=new-skill
+```
+
+## Skill Definition Format
+
+```markdown
+# Skill: <name>
+
+## Purpose
+What this skill enables.
+
+## Capabilities
+- Capability 1
+- Capability 2
+
+## Prompts
+Prompt templates for common tasks.
 
 ## Rules
+Operational rules for agents.
 
-- Skills must be agent-agnostic
-- Document dependencies clearly
-- Test across all agent platforms
+## Examples
+Usage examples.
+```
+
+## Related
+
+- [agents-skills-sync.md](../agentic/agents-skills-sync.md) - Skills synchronization
+- `.agents/agents.config` - Skills configuration
 
 ---
-*Mandatory skills folder: `.agents/skills/`*
+*Document: `.agents/skills/README.md`*
