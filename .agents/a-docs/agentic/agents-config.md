@@ -16,14 +16,14 @@ links:
 ## Por Que Existe
 
 **Problema:** Múltiplos scripts Python precisam:
-- Ler configuração centralizada
+- Ler Configuration centralizada
 - Resolver caminhos relativos
 - Parsear timestamps e timezones
 - Ter valores default seguros
 
-**Solução:** Módulo de configuração centralizado que todos os scripts importam.
+**Solução:** Módulo de Configuration centralizado que todos os scripts importam.
 
-## Função
+## Function
 
 Fornece:
 
@@ -35,15 +35,15 @@ Fornece:
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
-| `.agents/agents.config` | Configuração YAML |
+| `.agents/agents.config` | Configuration YAML |
 
-### Arquivos Escritos
+### Files Escritos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | Nenhum | Apenas leitura |
 
@@ -57,7 +57,7 @@ Fornece:
 | `agents-wb-update.py` | `load_agents_config()`, `parse_offset()` |
 | ... | ... |
 
-## Como Configurar
+## How to Configure
 
 ### agents.config
 
@@ -94,7 +94,7 @@ sync:
     - GEMINI.md
 ```
 
-## Como Modificar
+## How to Modify
 
 ### Adicionar Nova Seção de Config
 
@@ -131,7 +131,7 @@ def new_helper(config: Dict[str, Any]) -> str:
     return config.get("nova_secao", {}).get("opcao1")
 ```
 
-## Como Testar
+## How to Test
 
 ```bash
 # Testar carregamento
@@ -152,7 +152,7 @@ print('Timezone:', tz)
 "
 ```
 
-## Principais Funções
+## main Funções
 
 ```python
 # Carregamento
@@ -214,4 +214,4 @@ def parse_offset(offset: str) -> timezone:
 
 ---
 
-*agents_config.py é o coração da configuração do sistema*
+*agents_config.py é o coração da Configuration do sistema*

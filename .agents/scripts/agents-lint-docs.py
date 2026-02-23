@@ -249,11 +249,20 @@ class DocLinter:
                 continue
             
             if in_state_board:
-                if line.strip().startswith("|") and "-" not in line:
+                stripped = line.strip()
+                if stripped.startswith("|"):
+                    # Skip markdown table separators like: |---|:---:|---|
+                    if re.match(r'^\|[\s:\-]+\|$', stripped):
+                        continue
+
                     # Parse table row
                     parts = [p.strip() for p in line.split("|")]
                     if len(parts) >= 4:
+                        row_task = parts[1].lower() if len(parts) > 1 else ""
                         state = parts[3] if len(parts) > 3 else ""
+                        # Skip table header row
+                        if row_task == "task" or state.lower() == "state":
+                            continue
                         if state and state not in VALID_STATES:
                             self.issues.append(LintIssue(
                                 "warning", file_path, i,
@@ -297,11 +306,17 @@ class DocLinter:
     
     def check_cross_references(self, file_path: Path, content: str):
         """Check cross-references between docs."""
+        body = content
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) == 3:
+                body = parts[2]
+
         # Check for plan/task links
-        if "plan:" in content or "task:" in content:
+        if "plan:" in body or "task:" in body:
             # Extract referenced IDs
             id_pattern = re.compile(r'["\']?(\d{6}_\d{4}_[a-z0-9_-]+_(?:plan|task|report|spec|adr)_\d+)["\']?')
-            references = id_pattern.findall(content)
+            references = id_pattern.findall(body)
             
             # Note: We can't validate if the referenced file exists without more context
             # This is just a lint check for format
@@ -336,10 +351,16 @@ class DocLinter:
         if "node_modules" in file_str or ".git" in file_str:
             return True
 
+        resolved = file_path.resolve()
         try:
-            rel = file_path.resolve().relative_to(AGENTS_DIR.resolve()).as_posix()
+            rel = resolved.relative_to(AGENTS_DIR.resolve()).as_posix()
         except Exception:
-            rel = file_path.as_posix()
+            parts = resolved.parts
+            if ".agents" in parts:
+                idx = parts.index(".agents")
+                rel = "/".join(parts[idx + 1 :])
+            else:
+                rel = resolved.as_posix().lstrip("/")
 
         return any(rel.startswith(prefix) for prefix in EXCLUDED_PATH_PREFIXES)
     

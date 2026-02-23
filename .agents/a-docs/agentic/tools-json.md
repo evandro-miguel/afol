@@ -11,50 +11,50 @@ links:
   agents_tools: ./agents-tools.md
 ---
 
-# tools.json - Catálogo de Ferramentas
+# tools.json - Catalog de tools
 
 ## Por Que Existe
 
-**Problema:** Agentes autônomos precisam descobrir quais ferramentas estão disponíveis, quando usá-las, e como obter detalhes sobre subcomandos e opções.
+**Problema:** Agentes autônomos precisam descobrir quais tools estão disponíveis, when usá-las, e como obter detalhes sobre subcomandos e opções.
 
-**Solução:** Um arquivo JSON centralizado que documenta todas as ferramentas do sistema `.agents` com:
+**Solução:** Um arquivo JSON centralizado que documenta todas as tools do sistema `.agents` com:
 - Descrições claras
 - Casos de uso (when_to_use)
 - Comandos e opções
 - Classificação por tipo
 - Metadados de execução
 
-## Função
+## Function
 
 `tools.json` serve como:
 
-1. **Catálogo de ferramentas** - Lista todas as ferramentas disponíveis
+1. **Catalog de tools** - Lista todas as tools disponíveis
 2. **Guia de descoberta** - Usado por `agents-tools.py` para comandos `list`, `info`, `search`
 3. **Referência técnica** - Documenta subcomandos, opções, e padrões de uso
-4. **Classificador** - Categoriza ferramentas por tipo e modo de execução
+4. **Classificador** - Categoriza tools por tipo e modo de execução
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | `.agents/tools.json` | Fonte primária (este arquivo) |
 | `.agents/agents.config` | Configurações de caminho |
 
-### Arquivos Escritos
+### Files Escritos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | Nenhum | tools.json é apenas leitura em runtime |
 
-### Arquivos Atualizados (edição humana)
+### Files Atualizados (edição humana)
 
-| Arquivo | Quando |
+| Arquivo | when |
 |---------|--------|
-| `.agents/tools.json` | Ao adicionar nova ferramenta |
+| `.agents/tools.json` | Ao adicionar nova tool |
 
-## Como Configurar
+## How to Configure
 
 ### Estrutura do JSON
 
@@ -62,7 +62,7 @@ links:
 {
   "version": "1.0.0",
   "updated_at": "2026-02-23T00:00:00-03:00",
-  "description": "Catálogo de ferramentas...",
+  "description": "Catalog de tools...",
   "tools": [...],
   "makefile_targets": {...},
   "tool_categories": {...},
@@ -72,11 +72,11 @@ links:
 }
 ```
 
-### Seções Principais
+### Seções main
 
 #### `tools` (array)
 
-Lista de todas as ferramentas. Cada tool tem:
+Lista de todas as tools. Cada tool tem:
 
 ```json
 {
@@ -91,9 +91,9 @@ Lista de todas as ferramentas. Cada tool tem:
   "updated_at": "2026-02-23",
   "description": "...",
   "when_to_use": ["...", "..."],
-  "commands": [...],  // opcional, para subcomandos
-  "options": [...],   // opcional
-  "checks": [...]     // opcional
+  "commands": [...],  // optional, para subcomandos
+  "options": [...],   // optional
+  "checks": [...]     // optional
 }
 ```
 
@@ -144,9 +144,9 @@ Aliases de atalho no Makefile:
 }
 ```
 
-## Como Modificar
+## How to Modify
 
-### Adicionar Nova Ferramenta
+### Adicionar Nova tool
 
 1. **Criar script** em `.agents/scripts/<tool>.py`
 2. **Registrar no wrapper** `.agents/agents`
@@ -163,7 +163,7 @@ Aliases de atalho no Makefile:
   "execution_mode": "on-demand",
   "created_at": "2026-02-23",
   "updated_at": "2026-02-23",
-  "description": "Descrição clara da ferramenta",
+  "description": "Descrição clara da tool",
   "when_to_use": [
     "Caso de uso 1",
     "Caso de uso 2"
@@ -174,7 +174,7 @@ Aliases de atalho no Makefile:
 4. **Adicionar à categoria** em `tool_categories`
 5. **Validar JSON**: `python -m json.tool .agents/tools.json`
 
-### Atualizar Ferramenta Existente
+### Atualizar tool Existente
 
 1. Localizar tool por `id` em `tools` array
 2. Atualizar campos relevantes
@@ -182,33 +182,33 @@ Aliases de atalho no Makefile:
 4. Atualizar `updated_at` no root do JSON
 5. Validar JSON
 
-### Remover Ferramenta
+### Remover tool
 
 1. Remover entrada de `tools` array
 2. Remover de `tool_categories` se aplicável
 3. Atualizar `execution_modes` se aplicável
 4. Validar JSON
 
-## Como Testar
+## How to Test
 
-### Validação de Sintaxe
+### Validation de Sintaxe
 
 ```bash
 # Validar JSON
 python -m json.tool .agents/tools.json > /dev/null && echo "✓ Válido"
 ```
 
-### Validação de Conteúdo
+### Validation de Conteúdo
 
 ```bash
-# Contar ferramentas
+# Contar tools
 python3 -c "import json; d=json.load(open('.agents/tools.json')); print(f'Tools: {len(d[\"tools\"])}')"
 
 # Listar categorias
 python3 -c "import json; d=json.load(open('.agents/tools.json')); print('Categories:', list(d['tool_categories'].keys()))"
 ```
 
-### Validação de Uso
+### Validation de Uso
 
 ```bash
 # Testar list
@@ -218,19 +218,19 @@ python3 -c "import json; d=json.load(open('.agents/tools.json')); print('Categor
 ./.agents/agents tools info doctor
 
 # Testar search
-./.agents/agents tools search valida
+./.agents/agents tools search Validates
 ```
 
-### Métricas de Saúde
+### Metrics de Health
 
 | Métrica | Comando | Ideal |
 |---------|---------|-------|
-| JSON válido | `python -m json.tool` | Sem erros |
+| JSON válido | `python -m json.tool` | Sem errors |
 | Tools count | `len(tools)` | 10+ |
 | Categorias | `len(tool_categories)` | 8 |
 | Info funciona | `.agents/agents tools info <id>` | Output correto |
 
-## Principais Funções
+## main Funções
 
 ### Estrutura de uma Tool Entry
 
@@ -248,15 +248,15 @@ python3 -c "import json; d=json.load(open('.agents/tools.json')); print('Categor
     "updated_at": "2026-02-23",
     "description": "Automatiza atualizações de baixo valor...",
     "when_to_use": [
-        "Atualizar updated_at após trabalhar em sessão",
+        "Atualizar updated_at after trabalhar em session",
         "Normalizar timestamps para timezone configurado",
-        "Marcar tarefa como completa/em progresso"
+        "Marcar task como completa/em progresso"
     ],
     "commands": [
         {
             "name": "touch",
             "usage": "wb-update touch",
-            "description": "Atualiza updated_at no frontmatter"
+            "description": "Updates updated_at no frontmatter"
         },
         # ... mais subcomandos
     ],
@@ -286,7 +286,7 @@ python3 -c "import json; d=json.load(open('.agents/tools.json')); print('Categor
 | `commands` | array | Subcomandos (para tools com subcommands) |
 | `options` | array | Opções de linha de comando |
 | `checks` | array | Checks realizados (para validation tools) |
-| `task_markers` | object | Markers de tarefa (para verify-tasks) |
+| `task_markers` | object | Markers de task (para verify-tasks) |
 | `workflow` | array | Passo a passo de uso |
 
 ## Troubleshooting
@@ -294,7 +294,7 @@ python3 -c "import json; d=json.load(open('.agents/tools.json')); print('Categor
 ### JSON Inválido
 
 ```bash
-# Identificar erro
+# Identificar error
 python -m json.tool .agents/tools.json 2>&1 | head -5
 
 # Comum: vírgula faltando ou aspas não escapadas
@@ -314,10 +314,10 @@ python -m json.tool .agents/tools.json 2>&1 | head -5
 
 ## Referências
 
-- [agents-tools.md](./agents-tools.md) - Ferramenta que consome este catálogo
-- [agents-config.md](./agents-config.md) - Configuração central
+- [agents-tools.md](./agents-tools.md) - tool que consome este Catalog
+- [agents-config.md](./agents-config.md) - Configuration central
 - [agents-wrapper.md](./agents-wrapper.md) - Wrapper bash
 
 ---
 
-*tools.json é o coração do sistema de descoberta de ferramentas*
+*tools.json é o coração do sistema de descoberta de tools*

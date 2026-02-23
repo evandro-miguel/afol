@@ -3,4 +3,9 @@
 # Usage: ./.agents/agents-update [command] [options]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 "${SCRIPT_DIR}/scripts/agents-update/agents-update.py" "$@"
+if [ -f "${SCRIPT_DIR}/current/scripts/agents-update/agents-update.py" ]; then
+  SCRIPT_PATH="${SCRIPT_DIR}/current/scripts/agents-update/agents-update.py"
+else
+  SCRIPT_PATH="${SCRIPT_DIR}/scripts/agents-update/agents-update.py"
+fi
+exec python3 "${SCRIPT_PATH}" "$@"

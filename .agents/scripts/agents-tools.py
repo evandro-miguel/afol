@@ -19,6 +19,7 @@ Examples:
 
 import json
 import re
+import subprocess
 import sys
 import unicodedata
 from pathlib import Path
@@ -339,6 +340,9 @@ def show_help() -> None:
     print("  validate             Validate tools catalog schema and consistency")
     print("                       Checks required keys, IDs, categories, and references")
     print()
+    print("  smoke                Run tools CLI smoke tests")
+    print("                       Verifies list/info/search/validate behavior end-to-end")
+    print()
     print("  help                 Show this help message")
     print()
     print("EXAMPLES:")
@@ -347,6 +351,7 @@ def show_help() -> None:
     print("  .agents/agents tools info doctor")
     print("  .agents/agents tools search validate")
     print("  .agents/agents tools validate")
+    print("  .agents/agents tools smoke")
     print("  .agents/agents tools info wb-update")
     print()
     print("TOOL TYPES:")
@@ -538,6 +543,14 @@ def main() -> None:
     elif command == "validate":
         code = validate_catalog(tools_data)
         sys.exit(code)
+
+    elif command == "smoke":
+        smoke_script = SCRIPT_DIR / "agents-tools-smoke.py"
+        if not smoke_script.exists():
+            print(f"❌ Smoke script not found: {smoke_script}")
+            sys.exit(1)
+        result = subprocess.run([sys.executable, str(smoke_script)])
+        sys.exit(result.returncode)
     
     else:
         print(f"❌ Unknown command: {command}")

@@ -11,54 +11,54 @@ links:
   wrapper: ./agents-wrapper.md
 ---
 
-# agents-tools.py - Descoberta de Ferramentas
+# agents-tools.py - Descoberta de tools
 
 ## Por Que Existe
 
-**Problema:** Quando um agente autônomo recebe uma tarefa, ele precisa:
-1. Descobrir qual ferramenta do sistema `.agents` usar
+**Problema:** when um agente autônomo recebe uma task, ele precisa:
+1. Descobrir qual tool do sistema `.agents` usar
 2. Entender os subcomandos e opções disponíveis
 3. Aprender casos de uso sem ler código fonte
 
-**Solução:** Uma ferramenta de descoberta que lista, busca e mostra detalhes de todas as ferramentas registradas em `tools.json`.
+**Solução:** Uma tool de descoberta que lista, busca e mostra detalhes de todas as tools registradas em `tools.json`.
 
-## Função
+## Function
 
-`agents-tools.py` é uma ferramenta de **descoberta e exploração** que:
+`agents-tools.py` é uma tool de **descoberta e exploração** que:
 
-1. **Lista** todas as ferramentas disponíveis agrupadas por tipo
-2. **Busca** ferramentas por palavra-chave na descrição e casos de uso
-3. **Mostra detalhes** de uma ferramenta específica incluindo subcomandos
-4. **Guia o agente** no fluxo de descoberta → seleção → uso
+1. **Lista** todas as tools disponíveis agrupadas por tipo
+2. **Busca** tools por palavra-chave na descrição e casos de uso
+3. **Mostra detalhes** de uma tool específica incluindo subcomandos
+4. **Guia o agente** no Flow de descoberta → seleção → uso
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
-| `.agents/tools.json` | Catálogo de ferramentas |
+| `.agents/tools.json` | Catalog de tools |
 | `.agents/agents.config` | Configurações de caminho |
 
-### Arquivos Escritos
+### Files Escritos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
-| Nenhum | Ferramenta é apenas leitura |
+| Nenhum | tool é apenas leitura |
 
 ### Output
 
 | Tipo | Descrição |
 |------|-----------|
 | stdout | Listagem formatada, detalhes, resultados de busca |
-| exit code | 0 = sucesso, 1 = erro (tool não encontrada, etc.) |
+| exit code | 0 = success, 1 = error (tool não encontrada, etc.) |
 
-## Como Configurar
+## How to Configure
 
 ### Comandos Disponíveis
 
 ```bash
-# Listar todas as ferramentas
+# Listar todas as tools
 ./.agents/agents tools list
 
 # Filtrar por tipo
@@ -66,12 +66,12 @@ links:
 ./.agents/agents tools list --type creation
 ./.agents/agents tools list --type automation
 
-# Mostrar detalhes de uma ferramenta
+# Mostrar detalhes de uma tool
 ./.agents/agents tools info doctor
 ./.agents/agents tools info wb-update
 
 # Buscar por palavra-chave
-./.agents/agents tools search valida
+./.agents/agents tools search Validates
 ./.agents/agents tools search automate
 ./.agents/agents tools search create
 
@@ -85,7 +85,7 @@ links:
 |-------|-----------|
 | `--type <type>` | Filtrar listagem por tipo (validation, creation, etc.) |
 
-## Como Modificar
+## How to Modify
 
 ### Adicionar Novo Comando
 
@@ -99,13 +99,13 @@ elif command == "new-command":
 
 ### Modificar Output
 
-1. **List:** Editar função `list_tools()`
-2. **Info:** Editar função `show_tool_info()`
-3. **Search:** Editar função `search_tools()`
+1. **List:** Editar Function `list_tools()`
+2. **Info:** Editar Function `show_tool_info()`
+3. **Search:** Editar Function `search_tools()`
 
 ### Alterar Critério de Busca
 
-Editar função `search_tools()`:
+Editar Function `search_tools()`:
 
 ```python
 def search_tools(tools_data: Dict[str, Any], query: str) -> None:
@@ -128,7 +128,7 @@ def search_tools(tools_data: Dict[str, Any], query: str) -> None:
 2. Adicionar categoria em `tool_categories` no `tools.json`
 3. Atualizar badge emoji em `format_type_badge()` se necessário
 
-## Como Testar
+## How to Test
 
 ### Testes Manuais
 
@@ -150,7 +150,7 @@ def search_tools(tools_data: Dict[str, Any], query: str) -> None:
 # Esperado: Subcomandos listados (touch, task, status, etc.)
 
 # 5. Search com match
-./.agents/agents tools search valida
+./.agents/agents tools search Validates
 # Esperado: doctor, lint-docs, verify-tasks
 
 # 6. Search sem match
@@ -162,10 +162,10 @@ def search_tools(tools_data: Dict[str, Any], query: str) -> None:
 # Esperado: "Tool not found" com lista de tools disponíveis
 ```
 
-### Testes de Validação
+### Testes de Validation
 
 ```bash
-# Validar JSON antes
+# Validar JSON before
 python -m json.tool .agents/tools.json > /dev/null && echo "✓ JSON válido"
 
 # Contar tools
@@ -177,22 +177,22 @@ python3 -c "import json; print(len(json.load(open('.agents/tools.json'))['tools'
 # Esperado: Help message com todos os comandos
 ```
 
-### Métricas de Saúde
+### Metrics de Health
 
 | Métrica | Como Medir | Ideal |
 |---------|------------|-------|
 | List funciona | `.agents/agents tools list` | Output formatado |
 | Info funciona | `.agents/agents tools info doctor` | Detalhes completos |
-| Search funciona | `.agents/agents tools search valida` | Matches relevantes |
+| Search funciona | `.agents/agents tools search Validates` | Matches relevantes |
 | Help funciona | `.agents/agents tools help` | Todos comandos listados |
-| Exit codes | `echo $?` após erro | 1 para erros |
+| Exit codes | `echo $?` after error | 1 para errors |
 
-## Principais Funções
+## main Funções
 
 ### Estrutura do Script
 
 ```python
-# Funções principais
+# Funções main
 load_tools()           # Carrega tools.json
 list_tools()           # Lista todas as tools
 show_tool_info()       # Mostra detalhes de uma tool
@@ -201,7 +201,7 @@ show_help()            # Mostra ajuda
 main()                 # Entry point
 ```
 
-### Função: load_tools
+### Function: load_tools
 
 ```python
 def load_tools() -> Dict[str, Any]:
@@ -211,7 +211,7 @@ def load_tools() -> Dict[str, Any]:
     return json.loads(TOOLS_JSON.read_text())
 ```
 
-### Função: list_tools
+### Function: list_tools
 
 ```python
 def list_tools(tools_data: Dict[str, Any], filter_type: Optional[str] = None) -> None:
@@ -235,7 +235,7 @@ def list_tools(tools_data: Dict[str, Any], filter_type: Optional[str] = None) ->
         # ... print tools
 ```
 
-### Função: show_tool_info
+### Function: show_tool_info
 
 ```python
 def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> None:
@@ -257,7 +257,7 @@ def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> None:
     # - TASK MARKERS (if has "task_markers" field)
 ```
 
-### Função: search_tools
+### Function: search_tools
 
 ```python
 def search_tools(tools_data: Dict[str, Any], query: str) -> None:
@@ -312,11 +312,11 @@ Sort by score descending
 Return matches with score > 0
 ```
 
-## Fluxo do Agente
+## Flow do Agente
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Agente recebe tarefa                                   │
+│  Agente recebe task                                   │
 │  Ex: "Valide a estrutura do projeto"                    │
 └─────────────────────────────────────────────────────────┘
                         ↓
@@ -333,20 +333,20 @@ Return matches with score > 0
 └─────────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────────┐
-│  Identifica "doctor" como validação de estrutura        │
+│  Identifica "doctor" como Validation de estrutura        │
 │  → Executa: .agents/agents tools info doctor            │
 └─────────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────────┐
 │  Recebe detalhes:                                       │
-│  - Description: "Valida estrutura e integridade..."     │
-│  - When to use: "Antes de iniciar trabalho..."          │
+│  - Description: "Validates estrutura e integridade..."     │
+│  - When to use: "before de iniciar trabalho..."          │
 │  - Commands: .agents/agents doctor                      │
-│  - Checks: Pastas, templates, frontmatter, etc.         │
+│  - Checks: Folders, templates, frontmatter, etc.         │
 └─────────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────────┐
-│  Agente executa ferramenta:                             │
+│  Agente executa tool:                             │
 │  → .agents/agents doctor                                │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -375,7 +375,7 @@ python3 -c "import json; tools=json.load(open('.agents/tools.json'))['tools']; p
 2. Verificar palavras em `description` e `when_to_use`
 3. Adicionar sinônimos em `when_to_use`
 
-### Erro "Tools catalog not found"
+### error "Tools catalog not found"
 
 ```bash
 # Verificar caminho
@@ -387,10 +387,10 @@ ls -la .agents/tools.json
 
 ## Referências
 
-- [tools-json.md](./tools-json.md) - Catálogo de ferramentas
+- [tools-json.md](./tools-json.md) - Catalog de tools
 - [agents-wrapper.md](./agents-wrapper.md) - Wrapper bash
 - [agents-config.md](./agents-config.md) - Config loader
 
 ---
 
-*agents-tools.py é o ponto de entrada para descoberta de ferramentas*
+*agents-tools.py é o ponto de entrada para descoberta de tools*

@@ -11,7 +11,7 @@ links:
   templates: ../../templates/
 ---
 
-# agents-new.py - Criação de Workstreams
+# agents-new.py - Creation de Workstreams
 
 ## Por Que Existe
 
@@ -21,29 +21,29 @@ links:
 - Preencher frontmatter
 - Atualizar .active_session
 
-**Solução:** Automação que cria estrutura completa com um comando.
+**Solução:** Automation que Creates estrutura completa com um comando.
 
-## Função
+## Function
 
-Cria nova workstream com:
+Creates nova workstream com:
 
-1. **Pasta de sessão** - Nome padronizado
+1. **Pasta de session** - Nome padronizado
 2. **Plan file** - Planejamento
-3. **Task file** - Tarefas com checklist
+3. **Task file** - tasks com checklist
 4. **Log file** - Timeline de atividades
-5. **Spec file** (opcional) - Especificação completa ou lite
-6. **Atualiza .active_session** - Aponta para nova sessão
+5. **Spec file** (optional) - Especificação completa ou lite
+6. **Updates .active_session** - Aponta para nova session
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | `.agents/agents.config` | Config de caminhos |
 | `.agents/a-docs/templates/*.md` | Templates para copiar |
 
-### Arquivos Criados
+### Files Criados
 
 ```
 .agents/wb/
@@ -51,16 +51,16 @@ Cria nova workstream com:
     ├── YYMMDD_HHMM_<theme>_plan_01.md
     ├── YYMMDD_HHMM_<theme>_task_01.md
     ├── YYMMDD_HHMM_<theme>_log_01.md
-    └── YYMMDD_HHMM_<theme>_spec_01.md (opcional)
+    └── YYMMDD_HHMM_<theme>_spec_01.md (optional)
 ```
 
-### Arquivos Atualizados
+### Files Atualizados
 
-| Arquivo | Mudança |
+| Arquivo | Change |
 |---------|---------|
-| `.agents/wb/.active_session` | Aponta para nova sessão |
+| `.agents/wb/.active_session` | Aponta para nova session |
 
-## Como Configurar
+## How to Configure
 
 ### Opções de Linha de Comando
 
@@ -77,11 +77,11 @@ Cria nova workstream com:
 # Apenas plan
 ./.agents/agents new quick-task --plan-only
 
-# Tarefa rápida na sessão ativa
+# task rápida na session ativa
 ./.agents/agents new adicionar-log --quick
 ```
 
-## Como Modificar
+## How to Modify
 
 ### Adicionar Novo Tipo de Arquivo
 
@@ -91,7 +91,7 @@ Cria nova workstream com:
 
 ### Alterar Naming Convention
 
-Editar função `get_session_id()`:
+Editar Function `get_session_id()`:
 
 ```python
 def get_session_id(theme: str) -> str:
@@ -101,7 +101,7 @@ def get_session_id(theme: str) -> str:
     return f"{date_part}_{theme_clean}"
 ```
 
-## Como Testar
+## How to Test
 
 ```bash
 # Criar workstream
@@ -114,16 +114,16 @@ ls -la .agents/wb/260223_*_test-feature/
 cat .agents/wb/.active_session
 ```
 
-## Principais Funções
+## main Funções
 
 ```python
 get_timestamp()           # Timestamp no timezone WB
-get_session_id(theme)     # Gera ID da sessão
-create_session_folder()   # Cria pasta
+get_session_id(theme)     # Gera ID da session
+create_session_folder()   # Creates pasta
 copy_template()           # Copia template
-update_active_session()   # Atualiza ponteiro
+update_active_session()   # Updates ponteiro
 ```
 
 ---
 
-*new padroniza criação de workstreams*
+*new padroniza Creation de workstreams*

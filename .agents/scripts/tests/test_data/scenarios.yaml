@@ -1,0 +1,236 @@
+# -*- coding: utf-8 -*-
+"""
+Test cases para o update system.
+
+This YAML file defines the main test scenarios
+used nos tests E2E e integration.
+"""
+
+scenarios:
+  
+  - id: TC-001
+    name: "Check - No updates available"
+    type: unit
+    description: "When local and upstream have the same version"
+    input:
+      current_version: "v1.2.0"
+      upstream_version: "v1.2.0"
+    expected:
+      has_update: false
+      message: "already up to date"
+      
+  - id: TC-002
+    name: "Check - Update major disponível"
+    type: unit
+    description: "When upstream has higher major version"
+    input:
+      current_version: "v1.0.0"
+      upstream_version: "v2.0.0"
+    expected:
+      has_update: true
+      update_type: "major"
+      new_version: "v2.0.0"
+      
+  - id: TC-003
+    name: "Check - Update minor disponível"
+    type: unit
+    description: "When upstream has higher minor version"
+    input:
+      current_version: "v1.1.0"
+      upstream_version: "v1.2.0"
+    expected:
+      has_update: true
+      update_type: "minor"
+      
+  - id: TC-004
+    name: "Check - Update patch disponível"
+    type: unit
+    description: "When upstream has higher patch version"
+    input:
+      current_version: "v1.1.0"
+      upstream_version: "v1.1.1"
+    expected:
+      has_update: true
+      update_type: "patch"
+
+  # ─────────────────────────────────────────────────────────────────
+  #  Scenario 2: Plan - Mostrar diff
+  # ─────────────────────────────────────────────────────────────────
+  
+  - id: TC-005
+    name: "Plan - Diff vazio quando sem mudanças"
+    type: integration
+    description: "Plan mostra diff vazio quando não há mudanças"
+    input:
+      local_version: "v1.2.0"
+      upstream_version: "v1.2.0"
+    expected:
+      diff: ""
+      changed_files: []
+      
+  - id: TC-006
+    name: "Plan - Diff com mudanças"
+    type: integration
+    description: "Plan mostra arquivos modificados"
+    input:
+      local_files:
+        - file1.py
+        - file2.py
+      upstream_files:
+        - file1.py
+        - file2.py
+        - file3.py
+    expected:
+      changed_files_count: > 0
+      has_diff: true
+
+  # ─────────────────────────────────────────────────────────────────
+  #  Scenario 3: Apply - Aplicar update com backup
+  # ─────────────────────────────────────────────────────────────────
+  
+  - id: TC-007
+    name: "Apply - Primeiro update cria backup"
+    type: integration
+    description: "Apply cria backup na primeira vez"
+    setup:
+      backup_dir_exists: false
+    input:
+      apply_update: true
+    expected:
+      backup_created: true
+      backup_id: /backup_\d{8}_\d{6}/
+      
+  - id: TC-008
+    name: "Apply - Update com mudanças locais faz stash"
+    type: integration
+    description: "Apply detecta e faz stash de mudanças locais"
+    setup:
+      local_uncommitted_changes: true
+    input:
+      apply_update: true
+      stash: true
+    expected:
+      stashed: true
+      backup_created: true
+      
+  - id: TC-009
+    name: "Apply - Falha faz rollback automático"
+    type: integration
+    description: "Se algo falhar, rollback é automático"
+    setup:
+      simulate_failure: true
+    input:
+      apply_update: true
+    expected:
+      success: false
+      rolled_back: true
+      backup_used: true
+
+  # ─────────────────────────────────────────────────────────────────
+  #  Scenario 4: Rollback - Restaurar versão anterior
+  # ─────────────────────────────────────────────────────────────────
+  
+  - id: TC-010
+    name: "Rollback - Restaura backup com sucesso"
+    type: integration
+    description: "Rollback restaura backup existente"
+    setup:
+      backup_exists: true
+    input:
+      rollback: true
+      backup_id: "backup_20260223_120000"
+    expected:
+      success: true
+      version_restored: true
+      
+  - id: TC-011
+    name: "Rollback - Sem backup disponível"
+    type: integration
+    description: "Rollback falha elegantemente sem backups"
+    setup:
+      backup_exists: false
+    input:
+      rollback: true
+    expected:
+      success: false
+      error: /no backup/i
+      
+  - id: TC-012
+    name: "Rollback - Requer confirmação"
+    type: integration
+    description: "Rollback não executa sem --yes"
+    input:
+      rollback: true
+      confirm: false
+    expected:
+      success: false
+      requires_confirmation: true
+
+  # ─────────────────────────────────────────────────────────────────
+  #  Scenario 5: Errors e Edge Cases
+  # ─────────────────────────────────────────────────────────────────
+  
+  - id: TC-013
+    name: "Check - upstream indisponível"
+    type: integration
+    description: "Check lida com rede indisponível"
+    setup:
+      network_available: false
+    input:
+      check_update: true
+    expected:
+      error: true
+      message: /unavailable|network|connection/i
+      # Can use cache if available
+      or:
+        cached: true
+        
+  - id: TC-014
+    name: "Apply - Update interrompido pode retomar"
+    type: e2e
+    description: "Update interrompido pode ser retomado"
+    setup:
+      interrupted_state: true
+    input:
+      apply_resume: true
+    expected:
+      resumed: true
+      success: true
+      
+  - id: TC-015
+    name: "Apply - Reparo forçado após interrupção"
+    type: e2e
+    description: "Reparo forçado limpa estado inconsistente"
+    setup:
+      corrupted_state: true
+    input:
+      repair_force: true
+    expected:
+      success: true
+      lock_removed: true
+
+  # ─────────────────────────────────────────────────────────────────
+  #  Scenario 6: Edge Cases
+  # ─────────────────────────────────────────────────────────────────
+  
+  - id: TC-016
+    name: "Version inválida é tratada"
+    type: unit
+    description: "Version mal formatada gera erro claro"
+    input:
+      current_version: "invalid"
+      upstream_version: "v1.0.0"
+    expected:
+      error: true
+      message: /invalid.*version/i
+      
+  - id: TC-017
+    name: "Version prerelease"
+    type: unit
+    description: "Version beta/alpha é tratada"
+    input:
+      current_version: "v1.0.0-beta"
+      upstream_version: "v1.0.0"
+    expected:
+      has_update: true
+      # Stable > prerelease

@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "telemetry-event-schema-v1",
+  "title": "Telemetry Event",
+  "description": "Schema for telemetry events in .agents system",
+  "type": "object",
+  "required": ["timestamp", "event_type", "session_id"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp with timezone"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "session_start",
+        "session_end",
+        "tool_exec",
+        "task_complete",
+        "task_status_change",
+        "blocker",
+        "error",
+        "pattern_applied",
+        "file_changed"
+      ],
+      "description": "Type of telemetry event"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Workstream session ID (YYMMDD_HHMM_theme)"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique event identifier"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Event-specific metadata",
+      "properties": {
+        "theme": { "type": "string" },
+        "workstream_type": { "type": "string" },
+        "tool_name": { "type": "string" },
+        "tool_command": { "type": "string" },
+        "task_id": { "type": "string" },
+        "task_description": { "type": "string" },
+        "previous_status": { "type": "string" },
+        "new_status": { "type": "string" },
+        "blocker_reason": { "type": "string" },
+        "error_message": { "type": "string" },
+        "error_stack": { "type": "string" },
+        "pattern_id": { "type": "string" },
+        "pattern_type": { "type": "string" },
+        "file_path": { "type": "string" },
+        "file_type": { "type": "string" },
+        "lines_added": { "type": "integer" },
+        "lines_removed": { "type": "integer" },
+        "duration_seconds": { "type": "number" },
+        "outcome": {
+          "type": "string",
+          "enum": ["success", "failure", "partial", "skipped"]
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "Execution context",
+      "properties": {
+        "agent": { "type": "string" },
+        "user": { "type": "string" },
+        "environment": { "type": "string" },
+        "git_branch": { "type": "string" },
+        "git_commit": { "type": "string" }
+      }
+    }
+  }
+}

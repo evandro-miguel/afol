@@ -11,22 +11,22 @@ links:
   index: ./agents-index.md
 ---
 
-# agents-structure-map.py - Mapeamento de Estrutura
+# agents-structure-map.py - Mapping de Estrutura
 
 ## Por Que Existe
 
 **Problema:** Projetos crescem e a estrutura fica complexa. Novos desenvolvedores (ou agentes) precisam:
-- Entender organização de arquivos
+- Entender organização de Files
 - Saber onde cada tipo de código vive
-- Ter visão geral do código
+- Ter Overview do código
 
-**Solução:** Geração automática de documentação de estrutura com inventário de arquivos.
+**Solução:** Geração automática de Documentation de estrutura com inventário de Files.
 
-## Função
+## Function
 
-Escaneia projeto e gera documentação:
+Escaneia projeto e gera Documentation:
 
-1. **Inventário de arquivos** - Por categoria
+1. **Inventário de Files** - Por categoria
 2. **Line counts** - Tamanho de cada arquivo
 3. **Descrições** - Extraídas de comentários/docstrings
 4. **Agrupamento** - Frontend, Backend, Types, Tests, etc.
@@ -34,26 +34,26 @@ Escaneia projeto e gera documentação:
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
-| Projeto alvo (ex: `.`) | Arquivos para mapear |
+| Projeto alvo (ex: `.`) | Files para mapear |
 | `.agents/agents.config` | Config de caminhos |
 
-### Arquivos Escritos
+### Files Escritos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
-| `.agents/arc/structure/README.md` | Visão geral |
+| `.agents/arc/structure/README.md` | Overview |
 | `.agents/arc/structure/frontend.md` | Frontend |
 | `.agents/arc/structure/backend.md` | Backend |
 | `.agents/arc/structure/tests.md` | Tests |
 | ... | Outras categorias |
 
-## Como Configurar
+## How to Configure
 
-### Seções Padrão
+### Seções default
 
 ```python
 DEFAULT_SECTIONS = {
@@ -76,7 +76,7 @@ DEFAULT_SECTIONS = {
 }
 ```
 
-## Como Modificar
+## How to Modify
 
 ### Adicionar Nova Seção
 
@@ -91,9 +91,9 @@ DEFAULT_SECTIONS["mobile"] = {
 
 ### Alterar Output
 
-Editar função `generate_section_md()`.
+Editar Function `generate_section_md()`.
 
-## Como Testar
+## How to Test
 
 ```bash
 # Mapear projeto atual
@@ -109,17 +109,17 @@ make structure
 cat .agents/arc/structure/README.md
 ```
 
-## Principais Funções
+## main Funções
 
 ```python
-scan_directory()            # Escaneia diretório
+scan_directory()            # Escaneia Directory
 categorize_file()           # Categoriza arquivo
 count_lines()               # Conta linhas
 extract_description()       # Extrai descrição
 generate_section_md()       # Gera markdown
-update_cache()              # Atualiza cache
+update_cache()              # Updates cache
 ```
 
 ---
 
-*structure-map documenta arquitetura de código automaticamente*
+*structure-map documenta Architecture de código automaticamente*

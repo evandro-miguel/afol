@@ -10,7 +10,7 @@
 #   make structure
 #   make all
 
-.PHONY: help setup doctor new quick bootstrap wb-touch wb-normalize-time wb-files-changed wb-task wb-status wb-timeline wb-link structure index sync verify lint tools-check clean all
+.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-plan skills-apply skills-status skills-check skills-sync wb-touch wb-normalize-time wb-files-changed wb-task wb-status wb-timeline wb-link structure index sync verify lint tools-check test-scripts telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
 
 # ==============================================================================
 # HELP
@@ -35,6 +35,7 @@ help:
 	@echo "║    make new          - Create workstream (THEME=xxx)      ║"
 	@echo "║    make quick        - Use active session for quick task   ║"
 	@echo "║    make bootstrap    - Install system into another repo    ║"
+	@echo "║    make fix-symlinks - Repair links/copy fallback          ║"
 	@echo "║    make wb-touch     - Update updated_at in active session ║"
 	@echo "║    make wb-normalize-time - Normalize WB timestamps        ║"
 	@echo "║    make wb-files-changed - Refresh report files changed    ║"
@@ -44,6 +45,19 @@ help:
 	@echo "║    make wb-link      - Set links.<key> in doc frontmatter  ║"
 	@echo "║    make verify       - Check task completion              ║"
 	@echo "║    make lint         - Validate markdown docs             ║"
+	@echo "║    make test-scripts - Run Python unit tests for scripts  ║"
+	@echo "║                                                           ║"
+	@echo "║  Telemetry & Patterns                                     ║"
+	@echo "║    make telemetry-record  - Record telemetry event        ║"
+	@echo "║    make telemetry-report  - Generate telemetry report     ║"
+	@echo "║    make telemetry-export  - Export telemetry data         ║"
+	@echo "║    make telemetry-validate- Validate telemetry schema     ║"
+	@echo "║    make telemetry-heat    - Show heat map of elements     ║"
+	@echo "║    make telemetry-hot     - Show hottest elements         ║"
+	@echo "║    make telemetry-cold    - Show coldest elements         ║"
+	@echo "║    make patterns-suggest  - Suggest patterns for theme    ║"
+	@echo "║    make patterns-list     - List all patterns             ║"
+	@echo "║    make patterns-show     - Show pattern details         ║"
 	@echo "║                                                           ║"
 	@echo "║  Quick Workflows                                          ║"
 	@echo "║    make all          - Run full validation                ║"
@@ -137,6 +151,32 @@ else
 	@./.agents/agents bootstrap "$(TARGET)" $(if $(FORCE),--force,) $(if $(DRY),--dry-run,) $(if $(SKIP_CHECKS),--skip-checks,)
 endif
 
+fix-symlinks:
+	@echo "→ Repairing agent symlinks..."
+	@./.agents/agents fix-symlinks $(if $(MODE),--mode $(MODE),) $(if $(TARGETS),--targets "$(TARGETS)",) $(if $(FORCE),--force,) $(if $(DRY),--dry-run,)
+
+
+skills-init:
+	@./.agents/agents skills-sync init
+
+skills-pull:
+	@./.agents/agents skills-sync pull
+
+skills-plan:
+	@./.agents/agents skills-sync plan $(if $(SKILLS),--skills "$(SKILLS)",)
+
+skills-apply:
+	@./.agents/agents skills-sync apply $(if $(SKILLS),--skills "$(SKILLS)",)
+
+skills-status:
+	@./.agents/agents skills-sync status
+
+skills-check:
+	@./.agents/agents skills-sync check $(if $(SKILLS),--skills "$(SKILLS)",)
+
+skills-sync:
+	@./.agents/agents skills-sync sync $(if $(SKILLS),--skills "$(SKILLS)",)
+
 wb-touch:
 	@./.agents/agents wb-update touch
 
@@ -213,14 +253,88 @@ tools-check:
 	@echo "→ Validating tools catalog..."
 	@./.agents/agents tools validate
 	@echo "→ Running tools smoke tests..."
-	@python3 .agents/scripts/agents-tools-smoke.py
+	@./.agents/agents tools smoke
 	@echo "✓ Tools catalog and CLI smoke validated"
+
+test-scripts:
+	@echo "→ Running script unit tests..."
+	@python3 -m unittest discover -s .agents/scripts/tests -p "test_*.py" -v
+	@echo "✓ Script unit tests passed"
+
+# ==============================================================================
+# TELEMETRY & PATTERNS
+# ==============================================================================
+
+telemetry-record:
+	@echo "→ Recording telemetry event..."
+	@python3 .agents/scripts/agents-telemetry.py record $(EVENT_TYPE) $(if $(SESSION_ID),--session-id="$(SESSION_ID)",) $(if $(METADATA),--metadata='$(METADATA)',) $(if $(OUTCOME),--outcome="$(OUTCOME)",)
+
+telemetry-report:
+	@echo "→ Generating telemetry report..."
+	@python3 .agents/scripts/agents-telemetry.py report --period="$(if $(PERIOD),$(PERIOD),weekly)" --format="$(if $(FORMAT),$(FORMAT),text)"
+
+telemetry-export:
+	@echo "→ Exporting telemetry data..."
+	@python3 .agents/scripts/agents-telemetry.py export --format="$(if $(FORMAT),$(FORMAT),json)" $(if $(OUTPUT),--output="$(OUTPUT)",)
+
+telemetry-validate:
+	@echo "→ Validating telemetry data..."
+	@python3 .agents/scripts/agents-telemetry.py validate
+
+telemetry-heat:
+	@echo "→ Generating heat map..."
+	@python3 .agents/scripts/agents-telemetry.py heat $(if $(TYPE),--type=$(TYPE),) $(if $(FORMAT),--format=$(FORMAT),) $(if $(MIN_SCORE),--min-score=$(MIN_SCORE),) $(if $(PERIOD),--period=$(PERIOD),)
+
+telemetry-hot:
+	@echo "→ Showing hottest elements..."
+	@python3 .agents/scripts/agents-telemetry.py hot $(if $(LIMIT),--limit=$(LIMIT),) $(if $(TYPE),--type=$(TYPE),) $(if $(PERIOD),--period=$(PERIOD),)
+
+telemetry-cold:
+	@echo "→ Showing coldest elements..."
+	@python3 .agents/scripts/agents-telemetry.py cold $(if $(LIMIT),--limit=$(LIMIT),) $(if $(TYPE),--type=$(TYPE),) $(if $(PERIOD),--period=$(PERIOD),)
+
+patterns-suggest:
+	@echo "→ Suggesting patterns..."
+	@python3 .agents/scripts/agents-patterns.py suggest $(if $(THEME),--theme="$(THEME)",) $(if $(TAGS),--tags="$(TAGS)",) $(if $(LIMIT),--limit=$(LIMIT),)
+
+patterns-list:
+	@echo "→ Listing patterns..."
+	@python3 .agents/scripts/agents-patterns.py list $(if $(TYPE),--type=$(TYPE),) $(if $(STATUS),--status=$(STATUS),)
+
+patterns-show:
+ifndef PATTERN_ID
+	@echo "Usage: make patterns-show PATTERN_ID=PAT-001"
+	@exit 1
+else
+	@python3 .agents/scripts/agents-patterns.py show $(PATTERN_ID)
+endif
+
+patterns-apply:
+ifndef PATTERN_ID
+	@echo "Usage: make patterns-apply PATTERN_ID=PAT-001 [SESSION=xxx]"
+	@exit 1
+else
+	@python3 .agents/scripts/agents-patterns.py apply $(PATTERN_ID) $(if $(SESSION),--session="$(SESSION)",)
+endif
+
+patterns-rate:
+ifndef PATTERN_ID
+	@echo "Usage: make patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high|medium|low"
+	@exit 1
+else
+ifndef EFFECTIVENESS
+	@echo "Usage: make patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high|medium|low"
+	@exit 1
+else
+	@python3 .agents/scripts/agents-patterns.py rate $(PATTERN_ID) --effectiveness=$(EFFECTIVENESS)
+endif
+endif
 
 # ==============================================================================
 # QUICK WORKFLOWS
 # ==============================================================================
 
-all: doctor structure index verify tools-check
+all: doctor structure index verify skills-check tools-check telemetry-validate
 	@echo ""
 	@echo "╔═══════════════════════════════════════════════════════════╗"
 	@echo "║  ✓ All validations passed                                 ║"

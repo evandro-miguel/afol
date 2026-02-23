@@ -1,0 +1,13 @@
+# Python virtualenv
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# UV lock file (optional: commit if you want reproducible builds)
+uv.lock
+
+# IDE
+.vscode/
+.idea/

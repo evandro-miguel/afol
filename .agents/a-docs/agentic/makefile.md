@@ -22,7 +22,7 @@ links:
 
 **Solução:** Makefile com targets nomeados e aliases curtos.
 
-## Função
+## Function
 
 Fornece:
 
@@ -33,14 +33,14 @@ Fornece:
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
-| `.agents/a-docs/standards/Makefile` | Makefile principal |
+| `.agents/a-docs/standards/Makefile` | Makefile main |
 | `.agents/agents.config` | Configurações |
 
-### Arquivos Executados
+### Files Executados
 
 | Target | Comando Executado |
 |--------|-------------------|
@@ -48,20 +48,20 @@ Fornece:
 | `make new THEME=x` | `.agents/agents new x` |
 | `make verify` | `.agents/agents verify-tasks` |
 
-## Como Configurar
+## How to Configure
 
-### Targets Principais
+### Targets main
 
 ```makefile
 make setup        # Setup do virtualenv
-make doctor       # Validação de estrutura
+make doctor       # Validation de estrutura
 make new          # Criar workstream (THEME=required)
 make structure    # Gerar docs de estrutura
 make index        # Atualizar índices
 make sync         # Sincronizar agent docs
-make verify       # Verificar tarefas
+make verify       # Verificar tasks
 make lint         # Lint de markdown
-make all          # Validação completa
+make all          # Validation completa
 ```
 
 ### Aliases Curtos
@@ -84,7 +84,7 @@ make wb-timeline MSG="Implementação concluída"
 make wb-link FILE=plan KEY=related VALUE=xxx
 ```
 
-## Como Modificar
+## How to Modify
 
 ### Adicionar Novo Target
 
@@ -101,7 +101,7 @@ new-target:
 nt: new-target  # Alias curto
 ```
 
-## Como Testar
+## How to Test
 
 ```bash
 # Help
@@ -110,7 +110,7 @@ make help
 # Setup
 make setup
 
-# Validação
+# Validation
 make doctor
 make lint
 make verify
@@ -126,7 +126,7 @@ make st  # structure
 make dr  # doctor
 ```
 
-## Principais Targets
+## main Targets
 
 ### Setup & Maintenance
 

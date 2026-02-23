@@ -24,6 +24,8 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 | `agents-tools.py` | Discover and inspect available tools |
 | `agents-tools-smoke.py` | Smoke-test `tools` CLI behavior |
 | `agents-bootstrap.py` | Bootstrap .agents system into another repository |
+| `agents-fix-symlinks.py` | Repair agent symlinks and fallback to copy replication |
+| `agents-skills-sync.py` | Sync project skills from universal-skills |
 | `agents-new.py` | Create new workstream |
 | `agents-index.py` | Update SPECS/ADRS indexes |
 | `agents-lint-docs.py` | Validate markdown docs |
@@ -50,6 +52,12 @@ Quick reference: `.agents/a-docs/standards/scripts-quickstart.md`
 ```bash
 # One-time setup
 cd .agents/scripts && uv sync
+```
+
+## Tests
+
+```bash
+python3 -m unittest discover -s .agents/scripts/tests -p "test_*.py" -v
 ```
 
 ---

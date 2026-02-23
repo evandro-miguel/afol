@@ -4,7 +4,7 @@ id: 260223_1855_task-id-standardization_log_01
 theme: task-id-standardization
 status: active
 created_at: '2026-02-23T15:55:42-03:00'
-updated_at: '2026-02-23T18:00:21-03:00'
+updated_at: '2026-02-23T18:25:49-03:00'
 ---
 
 # Log: task-id-standardization
@@ -28,6 +28,9 @@ updated_at: '2026-02-23T18:00:21-03:00'
 - 2026-02-23 17:50-03 - Added AGENTS language policy: English default, Portuguese only when explicitly requested
 - 2026-02-23 17:53-03 - Added mandatory script-only updated_at rule and switched lessons policy to one-file-per-lesson
 - 2026-02-23 18:00-03 - Implemented bootstrap command for installing .agents into another repo with adaptation checklist and docs
+- 2026-02-23 18:17-03 - Implemented universal skills sync standard with strict skills/<name>/SKILL.md contract and new skills-sync toolchain
+- 2026-02-23 18:20-03 - Set default template skills to writing-skills and markdownlint-skill in skills-sync config/manifest/docs
+- 2026-02-23 18:25-03 - Added AGENTS rule: .agents/a-docs is documentation-only and preserved suggested follow-up phrasing
 ## Decisions
 - Enforce ID-based parsing to guarantee deterministic `task -> file -> line` mapping.
 - Enforce "one active session + quick mode" to avoid unnecessary WB folder creation.

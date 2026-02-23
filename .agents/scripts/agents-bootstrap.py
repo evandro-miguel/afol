@@ -228,9 +228,14 @@ def run_post_checks(target: Path):
             raise RuntimeError(f"Post-bootstrap check failed: {name}")
 
 
-def validate_target(target: Path):
-    if not target.exists() or not target.is_dir():
-        raise FileNotFoundError(f"Target directory not found: {target}")
+def validate_target(target: Path, dry_run: bool):
+    if not target.exists():
+        if dry_run:
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            raise FileNotFoundError(f"Target directory not found: {target}")
+    if not target.is_dir():
+        raise FileNotFoundError(f"Target path is not a directory: {target}")
     if target.resolve() == ROOT_DIR.resolve():
         raise ValueError("Target must be a different repository path")
 
@@ -248,7 +253,7 @@ def main() -> int:
     print()
 
     try:
-        validate_target(target)
+        validate_target(target, args.dry_run)
 
         stack = detect_stack(target)
         print("Detected stack:")

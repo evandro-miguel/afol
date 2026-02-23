@@ -20,6 +20,21 @@ from upstream import UpstreamManager, get_installed_version
 from conflict import ConflictResolver, print_update_plan
 
 
+def confirm_or_abort(prompt: str, force: bool) -> bool:
+    """Return True when operation is confirmed."""
+    if force:
+        return True
+    if not sys.stdin.isatty():
+        print("❌ Non-interactive mode detected. Re-run with --force.")
+        return False
+    try:
+        response = input(prompt).strip().lower()
+    except EOFError:
+        print("❌ No interactive input available. Re-run with --force.")
+        return False
+    return response in ["y", "yes"]
+
+
 def get_agents_dir() -> Path:
     """Get the .agents directory from current location."""
     # Check if we're inside .agents/scripts/agents-update/
@@ -216,6 +231,11 @@ def cmd_apply(args) -> int:
     print("🚀 Applying update...")
     print(f"   Agents directory: {agents_dir}")
     
+    # Dry run should not acquire lock; it delegates to plan.
+    if args.dry_run:
+        print("\n🧪 DRY RUN - No changes will be made")
+        return cmd_plan(args)
+
     # Check if locked
     lock_status = get_lock_status(agents_dir)
     if lock_status["locked"]:
@@ -254,11 +274,6 @@ def cmd_apply(args) -> int:
             print("\n✅ Already up to date!")
             return 0
         
-        # Dry run - just show plan
-        if args.dry_run:
-            print("\n🧪 DRY RUN - No changes will be made")
-            return cmd_plan(args)
-        
         # Generate manifests
         from manifest import generate_manifest
         local_manifest = generate_manifest(
@@ -292,11 +307,9 @@ def cmd_apply(args) -> int:
             return 1
         
         # Confirm
-        if not args.force:
-            response = input("\n⚡ Apply update? [y/N]: ")
-            if response.lower() not in ['y', 'yes']:
-                print("Update cancelled.")
-                return 0
+        if not confirm_or_abort("\n⚡ Apply update? [y/N]: ", args.force):
+            print("Update cancelled.")
+            return 0
         
         # Create backup
         print("\n💾 Creating backup...")
@@ -396,11 +409,11 @@ def cmd_rollback(args) -> int:
     print(f"\n{create_backup_report(target_backup)}")
     
     # Confirm
-    if not args.force:
-        response = input(f"\n⚡ Rollback to {target_backup.name}? [y/N]: ")
-        if response.lower() not in ['y', 'yes']:
-            print("Rollback cancelled.")
-            return 0
+    if not confirm_or_abort(
+        f"\n⚡ Rollback to {target_backup.name}? [y/N]: ", args.force
+    ):
+        print("Rollback cancelled.")
+        return 0
     
     # Perform rollback
     success = backup_mgr.restore_from_backup(target_backup, dry_run=args.dry_run)
@@ -540,6 +553,14 @@ Examples:
     rollback_parser = subparsers.add_parser("rollback", help="Rollback update")
     rollback_parser.add_argument(
         "--to", dest="target_version", help="Rollback to specific version"
+    )
+    rollback_parser.add_argument(
+        "-f", "--force", action="store_true", help="Force rollback without confirmation"
+    )
+    rollback_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be restored without writing",
     )
 
     # doctor

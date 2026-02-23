@@ -11,42 +11,42 @@ links:
   lint_docs: ./agents-lint-docs.md
 ---
 
-# verify-tasks.py - Verificação de Tarefas
+# verify-tasks.py - Verification de tasks
 
 ## Por Que Existe
 
-**Problema:** Workstreams podem ter tarefas pendentes sem aviso claro. Antes de marcar workstream como completa, é necessário:
-- Verificar se todas tarefas estão completas
-- Identificar tarefas bloqueadas
+**Problema:** Workstreams podem ter tasks pendentes sem aviso claro. before de marcar workstream como completa, é necessário:
+- Verificar se todas tasks estão completas
+- Identificar tasks bloqueadas
 - Reportar status geral
 
-**Solução:** Verificação automática que escaneia task files e reporta status.
+**Solução:** Verification automática que escaneia task files e reporta status.
 
-## Função
+## Function
 
-Verifica conclusão de tarefas:
+Checks conclusão de tasks:
 
 1. **Escaneia task files** - `*_task_*.md`
-2. **Extrai tarefas** - Regex para markers
+2. **Extrai tasks** - Regex para markers
 3. **Classifica status** - pending, in_progress, done, etc.
-4. **Reporta** - Lista status de cada tarefa
+4. **Reporta** - Lista status de cada task
 5. **Exit code** - 0 se todas completas, 1 se pendências
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | `.agents/wb/*/`*`_task_*.md` | Task files para verificar |
 
-### Arquivos Escritos
+### Files Escritos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | Nenhum | Apenas leitura e relatório |
 
-## Como Configurar
+## How to Configure
 
 ### Task Markers
 
@@ -61,7 +61,7 @@ MARKERS = {
 }
 ```
 
-## Como Modificar
+## How to Modify
 
 ### Adicionar Novo Status
 
@@ -74,13 +74,13 @@ MARKER_TO_STATUS['@'] = 'review'
 
 Editar regex `TASK_LINE_RE`.
 
-## Como Testar
+## How to Test
 
 ```bash
-# Verificar sessão específica
+# Verificar session específica
 ./.agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/
 
-# Verificar diretório atual
+# Verificar Directory atual
 ./.agents/agents verify-tasks .
 
 # Via Makefile
@@ -90,13 +90,13 @@ make verify
 echo $?  # 0 = todas completas, 1 = pendências
 ```
 
-## Principais Funções
+## main Funções
 
 ```python
-extract_tasks()             # Extrai tarefas do markdown
+extract_tasks()             # Extrai tasks do markdown
 classify_status()           # Classifica por marker
 report_status()             # Imprime relatório
-check_all_complete()        # Verifica se todas completas
+check_all_complete()        # Checks se todas completas
 ```
 
 ---

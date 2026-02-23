@@ -5,12 +5,14 @@ Handles git operations to fetch updates from upstream.
 """
 
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Tuple
 import json
-import os
+import io
+import re
+import shutil
+import tarfile
 
 
 @dataclass
@@ -174,31 +176,55 @@ class UpstreamManager:
 
     def fetch_upstream(self, ref: Optional[str] = None, force: bool = False) -> Path:
         """
-        Get upstream from current repository.
-        Since we're in the repo, just return the repo root.
+        Materialize upstream ref into a clean cache snapshot directory.
 
         Args:
             ref: Git ref to checkout (tag, branch, commit)
-            force: Force re-fetch even if exists
+            force: Force regenerate snapshot even if already cached
 
         Returns:
-            Path to repository root
+            Path to clean upstream snapshot
         """
         if not self.repo_root:
             raise UpstreamError("Not in a git repository")
 
-        # Ensure we're on latest
         main_branch = self._get_main_branch()
         self._run_git(["fetch", "origin", main_branch], check=False)
 
-        return self.repo_root
+        resolved_ref = ref or f"origin/{main_branch}"
+        safe_ref = re.sub(r"[^a-zA-Z0-9._-]+", "-", resolved_ref)
+        snapshot_dir = self.cache_dir / f"snapshot-{safe_ref}"
+
+        if snapshot_dir.exists() and not force:
+            return snapshot_dir
+
+        if snapshot_dir.exists():
+            shutil.rmtree(snapshot_dir)
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+
+        archive_cmd = ["git", "archive", "--format=tar", resolved_ref]
+        result = subprocess.run(
+            archive_cmd,
+            cwd=self.repo_root,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise UpstreamError(
+                f"Git archive failed for ref '{resolved_ref}': {result.stderr.decode(errors='ignore')}"
+            )
+
+        with tarfile.open(fileobj=io.BytesIO(result.stdout), mode="r:") as tf:
+            tf.extractall(snapshot_dir)
+
+        return snapshot_dir
 
     def get_manifest(self, ref: Optional[str] = None) -> Optional[dict]:
         """
-        Get manifest from upstream (current repo).
+        Get manifest from clean upstream snapshot.
 
         Args:
-            ref: Git ref to use (ignored for local repo)
+            ref: Git ref to use (tag/branch/commit)
 
         Returns:
             Manifest dict or None if not found
@@ -206,11 +232,26 @@ class UpstreamManager:
         if not self.repo_root:
             return None
 
-        manifest_path = self.repo_root / ".agents" / "manifest.json"
+        snapshot = self.fetch_upstream(ref=ref)
+        manifest_path = snapshot / ".agents" / "manifest.json"
 
         if not manifest_path.exists():
-            # Generate from structure
-            return self._generate_manifest_from_repo(self.repo_root)
+            # Generate from snapshot structure
+            info = self.check_upstream()
+            from manifest import generate_manifest
+
+            agents_path = snapshot / ".agents"
+            if not agents_path.exists():
+                raise UpstreamError(f"No .agents directory found in snapshot: {snapshot}")
+
+            manifest = generate_manifest(
+                agents_path,
+                version=info.version,
+                upstream_commit=info.commit,
+                upstream_url=info.url,
+                upstream_tag=info.tag,
+            )
+            return manifest.to_dict()
 
         with open(manifest_path, "r") as f:
             return json.load(f)

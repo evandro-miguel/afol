@@ -16,7 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Configurar o sistema `.agents` manualmente em outro repositório requer:
-- Copiar múltiplos arquivos e pastas
+- Copiar múltiplos Files e Folders
 - Criar estrutura de diretórios obrigatória
 - Configurar Makefile wrapper
 - Detectar stack do projeto alvo
@@ -24,40 +24,40 @@ links:
 
 **Solução:** Bootstrap automático que instala `.agents` em qualquer repositório com um comando.
 
-## Função
+## Function
 
 Instala o sistema `.agents` em outro repositório:
 
 1. **Detecta stack** - Node.js, Python, Go, etc.
-2. **Copia arquivos** - Scripts, configs, templates
-3. **Cria pastas** - Estrutura obrigatória
+2. **Copia Files** - Scripts, configs, templates
+3. **Creates Folders** - Estrutura obrigatória
 4. **Configura Makefile** - Wrapper no repo alvo
-5. **Valida** - Roda doctor e verifica tools
+5. **Validates** - Roda doctor e Checks tools
 
 ## O Que Tocar
 
-### Arquivos Lidos (Origem)
+### Files Lidos (Origem)
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | `.agents/agents` | CLI wrapper |
-| `.agents/agents.config` | Configuração |
-| `.agents/tools.json` | Catálogo de tools |
+| `.agents/agents.config` | Configuration |
+| `.agents/tools.json` | Catalog de tools |
 | `.agents/scripts/` | Scripts Python |
-| `.agents/a-docs/` | Documentação |
+| `.agents/a-docs/` | Documentation |
 | `.agents/rules/` | Regras de agentes |
 
-### Arquivos Escritos (Destino)
+### Files Escritos (Destino)
 
 | Local | Ação |
 |-------|------|
 | `<target>/AGENTS.md` | Copiado |
 | `<target>/.agents/` | Estrutura completa |
 | `<target>/Makefile` | Wrapper configurado |
-| `<target>/.agents/arc/` | Pastas criadas |
-| `<target>/.agents/wb/` | Pastas criadas |
+| `<target>/.agents/arc/` | Folders criadas |
+| `<target>/.agents/wb/` | Folders criadas |
 
-## Como Configurar
+## How to Configure
 
 ### Uso Básico
 
@@ -71,7 +71,7 @@ Instala o sistema `.agents` em outro repositório:
 # Forçar sobrescrita
 ./.agents/agents bootstrap /path/to/target --force
 
-# Pular validação pós-bootstrap
+# Pular Validation pós-bootstrap
 ./.agents/agents bootstrap /path/to/target --skip-checks
 ```
 
@@ -79,11 +79,11 @@ Instala o sistema `.agents` em outro repositório:
 
 | Opção | Descrição |
 |-------|-----------|
-| `--force` | Sobrescreve arquivos existentes |
+| `--force` | Sobrescreve Files existentes |
 | `--dry-run` | Mostra ações sem executar |
 | `--skip-checks` | Pula doctor/tools-check |
 
-## Como Modificar
+## How to Modify
 
 ### Adicionar Novo Arquivo para Copiar
 
@@ -131,7 +131,7 @@ ENSURE_DIRS = [
 ]
 ```
 
-## Como Testar
+## How to Test
 
 ### Teste Local (Dry Run)
 
@@ -163,7 +163,7 @@ cd /tmp/test-agents
 ./.agents/agents tools list
 ```
 
-### Validação Pós-Bootstrap
+### Validation Pós-Bootstrap
 
 ```bash
 # O bootstrap roda automaticamente:
@@ -175,18 +175,18 @@ cd <target-repo>
 ./.agents/agents doctor
 ```
 
-## Principais Funções
+## main Funções
 
 ```python
 # Estrutura do script
 parse_args()              # Parse argumentos
 detect_stack()            # Detecta stack do projeto
-copy_files()              # Copia arquivos
-copy_directories()        # Copia pastas
-ensure_structure()        # Cria pastas obrigatórias
+copy_files()              # Copia Files
+copy_directories()        # Copia Folders
+ensure_structure()        # Creates Folders obrigatórias
 setup_makefile()          # Configura Makefile wrapper
-run_doctor()              # Valida instalação
-run_tools_check()         # Verifica tools
+run_doctor()              # Validates instalação
+run_tools_check()         # Checks tools
 ```
 
 ### detect_stack
@@ -216,7 +216,7 @@ def detect_stack(target: Path) -> Dict[str, List[str]]:
 
 ```python
 def copy_files(source: Path, target: Path, force: bool):
-    """Copia arquivos da origem para destino."""
+    """Copia Files da origem para destino."""
     for file_path in FILES_TO_COPY:
         src = source / file_path
         dst = target / file_path
@@ -233,23 +233,23 @@ def copy_files(source: Path, target: Path, force: bool):
 
 ```python
 def ensure_structure(target: Path):
-    """Cria pastas obrigatórias."""
+    """Creates Folders obrigatórias."""
     for dir_path in ENSURE_DIRS:
         full_path = target / dir_path
         full_path.mkdir(parents=True, exist_ok=True)
         print(f"✓ Created {dir_path}")
 ```
 
-## Fluxo de Bootstrap
+## Flow de Bootstrap
 
 ```
 1. Parse argumentos (--force, --dry-run, --skip-checks)
    ↓
 2. Detectar stack do projeto alvo
    ↓
-3. Copiar arquivos (AGENTS.md, agents, agents.config, tools.json)
+3. Copiar Files (AGENTS.md, agents, agents.config, tools.json)
    ↓
-4. Copiar pastas (scripts, a-docs, rules)
+4. Copiar Folders (scripts, a-docs, rules)
    ↓
 5. Criar estrutura obrigatória (arc, wb, skills, z-arq)
    ↓
@@ -262,14 +262,14 @@ def ensure_structure(target: Path):
 
 ## Troubleshooting
 
-### Arquivos Já Existem
+### Files Já Existem
 
 ```bash
 # Usar --force para sobrescrever
 ./.agents/agents bootstrap /path/to/repo --force
 ```
 
-### Validação Falha
+### Validation failure
 
 ```bash
 # Rodar manualmente no target

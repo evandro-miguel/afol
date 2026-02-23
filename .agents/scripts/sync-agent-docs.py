@@ -15,7 +15,6 @@ Options:
 """
 
 import hashlib
-import os
 import sys
 from pathlib import Path
 
@@ -171,7 +170,16 @@ def sync_files(force: bool = False) -> int:
         print("  [F] force all - Overwrite all without asking")
         print()
         
-        response = input("Your choice (O/K/A/F): ").strip().upper()
+        if not sys.stdin.isatty():
+            print("ERROR: Non-interactive input detected and modified target files exist.")
+            print("Run with --force to overwrite in CI/non-interactive environments.")
+            return 1
+
+        try:
+            response = input("Your choice (O/K/A/F): ").strip().upper()
+        except EOFError:
+            print("ERROR: No interactive input available. Use --force for non-interactive runs.")
+            return 1
         
         if response == "A":
             print("Sync aborted.")

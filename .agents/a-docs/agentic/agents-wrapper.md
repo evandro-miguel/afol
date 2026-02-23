@@ -23,26 +23,26 @@ links:
 
 **Solução:** Wrapper bash que abstrai complexidade e fornece interface unificada.
 
-## Função
+## Function
 
 Wrapper bash que:
 
-1. **Verifica uv** - Garante que está instalado
-2. **Verifica .venv** - Cria se não existir
+1. **Checks uv** - Garante que está instalado
+2. **Checks .venv** - Creates se não existir
 3. **Executa com isolamento** - `uv run --with pyyaml`
-4. **Preserva contexto** - Mantém diretório de trabalho
+4. **Preserva contexto** - Mantém Directory de trabalho
 5. **Interface unificada** - `.agents/agents <command>`
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | `.agents/scripts/.venv/` | Virtualenv |
 | `.agents/scripts/*.py` | Scripts Python |
 
-### Arquivos Executados
+### Files Executados
 
 | Script | Comando |
 |--------|---------|
@@ -52,19 +52,19 @@ Wrapper bash que:
 | `agents-wb-update.py` | `.agents/agents wb-update ...` |
 | ... | ... |
 
-## Como Configurar
+## How to Configure
 
 ### Comandos Disponíveis
 
 ```bash
-doctor              # Validação de estrutura
+doctor              # Validation de estrutura
 new <theme>         # Criar workstream
 index               # Atualizar índices
 lint-docs           # Lint de markdown
 structure-map       # Mapear estrutura
 sync                # Sincronizar agent docs
-verify-tasks        # Verificar tarefas
-wb-update           # Automação WB
+verify-tasks        # Verificar tasks
+wb-update           # Automation WB
 tools               # Descoberta de tools
 help                # Ajuda
 ```
@@ -78,7 +78,7 @@ verify-tasks → verify
 wb-update → wb
 ```
 
-## Como Modificar
+## How to Modify
 
 ### Adicionar Novo Comando
 
@@ -100,7 +100,7 @@ Editar seção `help`:
 echo "  new-command         Descrição do comando"
 ```
 
-## Como Testar
+## How to Test
 
 ```bash
 # Help geral
@@ -116,7 +116,7 @@ which uv
 ls -la .agents/scripts/.venv/
 ```
 
-## Principais Funções
+## main Funções
 
 ```bash
 # Estrutura do wrapper
@@ -147,4 +147,4 @@ esac
 
 ---
 
-*agents wrapper é a interface primária para todas as ferramentas*
+*agents wrapper é a interface primária para todas as tools*

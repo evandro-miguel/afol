@@ -13,32 +13,32 @@ links:
 
 # Agentic Tools Documentation
 
-**Purpose:** Documentação técnica das ferramentas do sistema `.agents` para agentes autônomos.
+**Purpose:** Technical documentation of `.agents` system tools for autonomous agents.
 
-**Audience:** Agentes de IA (QWEN, CLAUDE, GEMINI) que operam neste repositório.
-
----
-
-## Visão Geral
-
-Este diretório contém documentação técnica detalhada de cada ferramenta operacional do sistema `.agents`. Cada documento responde:
-
-1. **Por que existe** - Problema que resolve
-2. **Função** - O que faz
-3. **O que tocar** - Arquivos que lê/escreve
-4. **Como configurar** - Configurações relevantes
-5. **Como modificar** - Guia de manutenção
-6. **Como testar** - Métricas de funcionamento
-7. **Principais funções** - Código chave
+**Audience:** AI agents (QWEN, CLAUDE, GEMINI) operating in this repository.
 
 ---
 
-## Ferramentas Documentadas
+## Overview
+
+This directory contains detailed technical documentation for each operational tool in the `.agents` system. Each document answers:
+
+1. **Why it exists** - Problem it solves
+2. **Function** - What it does
+3. **What it touches** - Files it reads/writes
+4. **How to configure** - Relevant configurations
+5. **How to modify** - Maintenance guide
+6. **How to test** - Functionality metrics
+7. **Main functions** - Key code
+
+---
+
+## Documented Tools
 
 ### Core Tools
 
-| Tool | Tipo | Documento |
-|------|------|-----------|
+| Tool | Type | Document |
+|------|------|----------|
 | `tools` | discovery | [agents-tools.md](./agents-tools.md) |
 | `doctor` | validation | [agents-doctor.md](./agents-doctor.md) |
 | `new` | creation | [agents-new.md](./agents-new.md) |
@@ -51,8 +51,8 @@ Este diretório contém documentação técnica detalhada de cada ferramenta ope
 
 ### Infrastructure
 
-| Component | Tipo | Documento |
-|-----------|------|-----------|
+| Component | Type | Document |
+|-----------|------|----------|
 | `agents` (wrapper) | infrastructure | [agents-wrapper.md](./agents-wrapper.md) |
 | `Makefile` | infrastructure | [makefile.md](./makefile.md) |
 | `tools.json` | configuration | [tools-json.md](./tools-json.md) |
@@ -60,9 +60,9 @@ Este diretório contém documentação técnica detalhada de cada ferramenta ope
 
 ---
 
-## Padrão de Documentação
+## Documentation Standard
 
-Cada ferramenta segue esta estrutura:
+Each tool follows this structure:
 
 ```markdown
 ---
@@ -77,108 +77,108 @@ updated_at: <date>
 
 # <Tool Name>
 
-## Por Que Existe
+## Why It Exists
 
-## Função
+## Function
 
-## O Que Tocar
+## What It Touches
 
-## Como Configurar
+## How to Configure
 
-## Como Modificar
+## How to Modify
 
-## Como Testar
+## How to Test
 
-## Principais Funções
+## Main Functions
 ```
 
 ---
 
-## Como Usar Esta Documentação
+## How to Use This Documentation
 
-### Para Agentes
+### For Agents
 
-1. **Descobrir ferramentas:** Use `.agents/agents tools list`
-2. **Entender ferramenta:** Leia o documento correspondente neste diretório
-3. **Usar ferramenta:** Siga exemplos de uso no documento
-4. **Troubleshoot:** Consulte seção "Como Testar"
+1. **Discover tools:** Use `.agents/agents tools list`
+2. **Understand tool:** Read corresponding document in this directory
+3. **Use tool:** Follow usage examples in the document
+4. **Troubleshoot:** Consult "How to Test" section
 
-### Para Humanos
+### For Humans
 
-1. **Entender sistema:** Comece por [tools-json.md](./tools-json.md)
-2. **Modificar ferramenta:** Leia "Como Modificar" do documento específico
-3. **Adicionar ferramenta:** Siga padrão de documentação
+1. **Understand system:** Start with [tools-json.md](./tools-json.md)
+2. **Modify tool:** Read "How to Modify" in specific document
+3. **Add tool:** Follow documentation standard
 
 ---
 
-## Arquitetura
+## Architecture
 
 ```
 .agents/
-├── agents              # Wrapper bash (CLI entry point)
-├── tools.json          # Catálogo de ferramentas (JSON)
-├── agents.config       # Configuração central (YAML)
+├── agents              # Bash wrapper (CLI entry point)
+├── tools.json          # Tool catalog (JSON)
+├── agents.config       # Central configuration (YAML)
 ├── scripts/
-│   ├── agents-tools.py         # Descoberta
-│   ├── agents-doctor.py        # Validação
-│   ├── agents-new.py           # Criação
-│   ├── agents-index.py         # Indexação
+│   ├── agents-tools.py         # Discovery
+│   ├── agents-doctor.py        # Validation
+│   ├── agents-new.py           # Creation
+│   ├── agents-index.py         # Indexing
 │   ├── agents-lint-docs.py     # Linting
-│   ├── agents-structure-map.py # Mapeamento
-│   ├── sync-agent-docs.py      # Sincronização
-│   ├── verify-tasks.py         # Verificação
-│   ├── agents-wb-update.py     # Automação WB
+│   ├── agents-structure-map.py # Mapping
+│   ├── sync-agent-docs.py      # Synchronization
+│   ├── verify-tasks.py         # Verification
+│   ├── agents-wb-update.py     # WB Automation
 │   └── lib/
 │       └── agents_config.py    # Config loader
 └── a-docs/
-    └── agentic/        # Esta documentação
+    └── agentic/        # This documentation
 ```
 
 ---
 
-## Fluxo Típico do Agente
+## Typical Agent Flow
 
 ```
-1. Agente recebe tarefa
+1. Agent receives task
    ↓
-2. Não sabe qual ferramenta usar?
+2. Unsure which tool to use?
    → .agents/agents tools list
    → .agents/agents tools search <keyword>
    ↓
-3. Identifica ferramenta
-   → Lê documentação em .agents/a-docs/agentic/
+3. Identifies tool
+   → Reads documentation in .agents/a-docs/agentic/
    ↓
-4. Obtém detalhes da ferramenta
+4. Gets tool details
    → .agents/agents tools info <tool-id>
    ↓
-5. Executa ferramenta
+5. Executes tool
    → .agents/agents <command> [args]
    ↓
-6. Verifica resultado
-   → Checa output e exit code
+6. Verifies result
+   → Checks output and exit code
 ```
 
 ---
 
-## Métricas de Saúde
+## Health Metrics
 
-| Métrica | Como Medir | Ideal |
-|---------|------------|-------|
-| Tools funcionais | `.agents/agents tools list` | 10+ tools |
-| Documentação completa | Contar arquivos em `agentic/` | 1 doc por tool |
-| Configuração válida | `python -m json.tool .agents/tools.json` | JSON válido |
-| Wrapper funcional | `.agents/agents help` | Lista todos commands |
+| Metric | How to Measure | Ideal |
+|--------|----------------|-------|
+| Functional tools | `.agents/agents tools list` | 10+ tools |
+| Complete documentation | Count files in `agentic/` | 1 doc per tool |
+| Valid configuration | `python -m json.tool .agents/tools.json` | Valid JSON |
+| Functional wrapper | `.agents/agents help` | Lists all commands |
 
 ---
 
 ## Changelog
 
-| Data | Mudança |
-|------|---------|
-| 2026-02-23 | Criação da documentação agentic |
-| 2026-02-23 | Adicionado tools discovery |
-| 2026-02-23 | Movido agents.config para .agents/ |
+| Date | Change |
+|------|--------|
+| 2026-02-23 | Created agentic documentation |
+| 2026-02-23 | Added tools discovery |
+| 2026-02-23 | Moved agents.config to .agents/ |
 
 ---
 
-*Documentação mantida para agentes autônomos operarem com eficiência no sistema .agents*
+*Documentation maintained for autonomous agents to operate efficiently in .agents system*

@@ -11,47 +11,47 @@ links:
   doctor: ./agents-doctor.md
 ---
 
-# agents-lint-docs.py - Validação de Documentos Markdown
+# agents-lint-docs.py - Validation de Documentos Markdown
 
 ## Por Que Existe
 
 **Problema:** Documentos markdown podem ter inconsistências:
 - Checkboxes em formatos diferentes
 - Status inválidos no frontmatter
-- IDs de tarefa fora do padrão
+- IDs de task fora do default
 - Cross-referências quebradas
 
-**Solução:** Linter específico para documentos `.agents` que valida convenções.
+**Solução:** Linter específico para documentos `.agents` que Validates convenções.
 
-## Função
+## Function
 
-Valida documentos markdown:
+Validates documentos markdown:
 
 1. **Checkbox markers** - `- [X]`, `- [/]`, `- [ ]`
 2. **Status fields** - draft, active, review, approved, etc.
 3. **State values** - pending, in_progress, done, etc.
 4. **Frontmatter** - Campos obrigatórios
 5. **Cross-references** - Links entre documentos
-6. **Task IDs** - Padrão T-NN
+6. **Task IDs** - default T-NN
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | `.agents/wb/**/*.md` | Workstreams |
-| `.agents/arc/**/*.md` | Arquitetura |
+| `.agents/arc/**/*.md` | Architecture |
 | `.agents/agents.config` | Exclusões de lint |
 
-### Arquivos Escritos
+### Files Escritos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
-| Nenhum (modo normal) | Apenas validação |
-| Mesmos arquivos (modo --fix) | Corrige issues |
+| Nenhum (modo normal) | Apenas Validation |
+| Mesmos Files (modo --fix) | Corrige issues |
 
-## Como Configurar
+## How to Configure
 
 ### agents.config
 
@@ -73,9 +73,9 @@ VALID_STATUSES = [
 ]
 ```
 
-## Como Modificar
+## How to Modify
 
-### Adicionar Nova Validação
+### Adicionar Nova Validation
 
 ```python
 def check_new_rule(content: str, file_path: Path):
@@ -89,7 +89,7 @@ def check_new_rule(content: str, file_path: Path):
 
 Editar `VALID_STATUSES` em `agents-lint-docs.py`.
 
-## Como Testar
+## How to Test
 
 ```bash
 # Lint em pasta específica
@@ -105,17 +105,17 @@ Editar `VALID_STATUSES` em `agents-lint-docs.py`.
 make lint
 ```
 
-## Principais Funções
+## main Funções
 
 ```python
-check_checkbox_markers()    # Valida checkboxes
-check_status_fields()       # Valida status
-check_frontmatter()         # Valida frontmatter
-check_task_ids()            # Valida T-NN
-check_cross_references()    # Valida links
+check_checkbox_markers()    # Validates checkboxes
+check_status_fields()       # Validates status
+check_frontmatter()         # Validates frontmatter
+check_task_ids()            # Validates T-NN
+check_cross_references()    # Validates links
 fix_issues()                # Auto-correção
 ```
 
 ---
 
-*lint-docs mantém consistência da documentação*
+*lint-docs mantém consistência da Documentation*

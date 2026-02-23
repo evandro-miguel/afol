@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "updated_at": "2026-02-23T00:00:00-03:00",
-  "description": "Catalogo de ferramentas do sistema .agents para agentes autonomos",
+  "description": "Tool catalog for .agents system autonomous agents",
   "tools": [
     {
       "id": "tools",
@@ -13,41 +13,46 @@
       "execution_mode": "on-demand",
       "created_at": "2026-02-23",
       "updated_at": "2026-02-23",
-      "description": "Descobre e explora ferramentas disponiveis. Lista todas as tools com descricoes, permite busca por palavra-chave e mostra detalhes completos incluindo subcomandos.",
+      "description": "Discovers and explores available tools. Lists all tools with descriptions, allows keyword search, and shows complete details including subcommands.",
       "when_to_use": [
-        "Quando nao sabe qual ferramenta usar",
-        "Explorar capacidades do sistema .agents",
-        "Buscar ferramenta por funcionalidade",
-        "Obter detalhes sobre subcomandos de uma tool"
+        "When unsure which tool to use",
+        "Explore .agents system capabilities",
+        "Search for tools by functionality",
+        "Get details about tool subcommands"
       ],
       "commands": [
         {
           "name": "list",
           "usage": "tools list [--type <type>]",
-          "description": "Lista todas as ferramentas disponiveis com descricoes curtas"
+          "description": "List all available tools with short descriptions"
         },
         {
           "name": "info",
           "usage": "tools info <tool-id>",
-          "description": "Mostra informacoes detalhadas sobre uma ferramenta especifica"
+          "description": "Show detailed information about a specific tool"
         },
         {
           "name": "search",
           "usage": "tools search <query>",
-          "description": "Busca ferramentas por palavra-chave na descricao e uso"
+          "description": "Search tools by keyword in description and usage"
         },
         {
           "name": "validate",
           "usage": "tools validate",
-          "description": "Valida schema e consistencia do catalogo tools.json"
+          "description": "Validate schema and consistency of tools.json catalog"
         },
         {
           "name": "help",
           "usage": "tools help",
-          "description": "Mostra ajuda sobre o comando tools"
+          "description": "Show help for tools command"
+        },
+        {
+          "name": "smoke",
+          "usage": "tools smoke",
+          "description": "Executa smoke tests da CLI tools end-to-end"
         }
       ],
-      "output": "Lista formatada com descricoes, tipos e exemplos de uso",
+      "output": "Lista formatada with descriptions, tipos e exemplos de uso",
       "workflow": [
         "1. Agente executa 'tools list' para ver todas as opcoes",
         "2. Agente identifica ferramenta de interesse",
@@ -65,23 +70,23 @@
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
       "updated_at": "2026-02-23",
-      "description": "Valida a estrutura e integridade do diretorio .agents. Verifica pastas obrigatorias, templates, frontmatter YAML, convencoes de nomenclatura e timestamps.",
+      "description": "Validates the structure e integridade do diretorio .agents. Checks folders obrigatorias, templates, frontmatter YAML, conventions de naming e timestamps.",
       "when_to_use": [
-        "Antes de iniciar trabalho para validar estrutura",
-        "Apos criar nova workstream para verificar conformidade",
-        "Quando houver suspeita de problemas na estrutura .agents",
-        "Como parte de validacao continua (CI/CD)"
+        "Before starting trabalho para validar estrutura",
+        "After creating nova workstream to verify compliance",
+        "When suspected suspeita de problems na estrutura .agents",
+        "As part of de validation continua (CI/CD)"
       ],
       "checks": [
-        "Pastas obrigatorias existem",
-        "Templates estao presentes",
-        "Frontmatter YAML e valido",
-        "IDs seguem convencao (YYMMDD_HHMM_theme_type_N)",
-        "Timestamps em ISO 8601 com Z ou offset",
-        "Cross-links entre documentos sao validos"
+        "Required folders exist",
+        "Templates are present",
+        "YAML frontmatter e valid",
+        "IDs follow convencao (YYMMDD_HHMM_theme_type_N)",
+        "Timestamps in ISO 8601 com Z ou offset",
+        "Cross-links between documentos sao valids"
       ],
-      "output": "Relatorio com erros, avisos e informacoes",
-      "exit_code": "0 se valido, 1 se houver erros"
+      "output": "Report with erros, avisos e informacoes",
+      "exit_code": "0 if valid, 1 if has erros"
     },
     {
       "id": "new",
@@ -93,29 +98,29 @@
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
       "updated_at": "2026-02-23",
-      "description": "Cria nova workstream com pasta de sessao e todos os arquivos obrigatorios (plan, task, log, etc.) usando templates padronizados.",
+      "description": "Creates new workstream com session folder e todos os required files (plan, task, log, etc.) using templates padronizados.",
       "when_to_use": [
-        "Iniciar nova funcionalidade ou feature",
-        "Comecar refatoracao de codigo",
-        "Investigar bug ou issue",
-        "Documentar decisao de arquitetura (ADR)",
-        "Criar especificacao tecnica"
+        "Start new funcionalidade ou feature",
+        "Start refactoring de codigo",
+        "Investigate bug ou issue",
+        "Document decision de arquitetura (ADR)",
+        "Create specification tecnica"
       ],
       "options": [
-        "--spec: Inclui arquivo spec.md completo",
-        "--spec-lite: Inclui arquivo spec-lite.md simplificado",
-        "--plan-only: Cria apenas arquivo plan.md",
-        "--quick: Registra tarefa rapida na sessao ativa"
+        "--spec: Includes file spec.md completo",
+        "--spec-lite: Includes file spec-lite.md simplificado",
+        "--plan-only: Creates only arquivo plan.md",
+        "--quick: Registers quick task rapida na sessao ativa"
       ],
       "files_created": [
         "YYMMDD_HHMM_<theme>_plan_01.md",
         "YYMMDD_HHMM_<theme>_task_01.md",
         "YYMMDD_HHMM_<theme>_log_01.md",
-        "YYMMDD_HHMM_<theme>_spec_01.md (opcional)",
-        "YYMMDD_HHMM_<theme>_spec-lite_01.md (opcional)"
+        "YYMMDD_HHMM_<theme>_spec_01.md (optional)",
+        "YYMMDD_HHMM_<theme>_spec-lite_01.md (optional)"
       ],
-      "output": "Pasta de sessao em .agents/wb/ com arquivos inicializados",
-      "side_effect": "Atualiza .agents/wb/.active_session apontando para nova sessao"
+      "output": "Session folder em .agents/wb/ with files inicializados",
+      "side_effect": "Updates .agents/wb/.active_session pointing to nova sessao"
     },
     {
       "id": "bootstrap",
@@ -169,12 +174,12 @@
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
       "updated_at": "2026-02-23",
-      "description": "Atualiza arquivos INDEX.md para SPECS e ADRs, escaneando diretorios e extraindo metadados dos frontmatters.",
+      "description": "Updates arquivos INDEX.md para SPECS e ADRs, escaneando diretorios e extraindo metadados dos frontmatters.",
       "when_to_use": [
-        "Apos criar nova especificacao (spec.md)",
-        "Apos criar nova decisao de arquitetura (adr.md)",
+        "After creating nova especificacao (spec.md)",
+        "After creating nova decisao de arquitetura (adr.md)",
         "Antes de revisar documentacao de arquitetura",
-        "Como parte de manutencao de documentacao"
+        "As part of de manutencao de documentacao"
       ],
       "scans": [
         ".agents/arc/SPECS/ para arquivos spec",
@@ -197,17 +202,17 @@
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
       "updated_at": "2026-02-23",
-      "description": "Valida documentos markdown por consistencia: checkboxes, status, frontmatter, cross-referencias e convencoes.",
+      "description": "Valida documentos markdown por consistencia: checkboxes, status, frontmatter, cross-referencias e conventions.",
       "when_to_use": [
         "Antes de commitar mudancas em documentacao",
         "Apos edicao manual de arquivos .md",
-        "Como validacao de qualidade em workstream",
+        "Como validation de qualidade em workstream",
         "Para identificar inconsistencias em tarefas"
       ],
       "checks": [
         "Markers de checkbox (- [X], - [/], - [ ])",
         "Campos de status no frontmatter",
-        "Valores de state sao validos",
+        "Valores de state sao valids",
         "Campos obrigatorios no frontmatter",
         "Cross-referencias entre documentos",
         "IDs de tarefa seguem padrao T-NN"
@@ -224,7 +229,6 @@
         "blocked"
       ],
       "excluded_paths": [
-        "a-docs/",
         "arc/structure/",
         "scripts/.agent/docs/",
         "z-arq/"
@@ -245,7 +249,7 @@
       "description": "Gera documentacao automatica da estrutura do projeto, incluindo inventario de arquivos, contagem de linhas, tamanhos e descricoes por categoria.",
       "when_to_use": [
         "Documentar estrutura de novo projeto",
-        "Atualizar visao geral do codigo",
+        "Updatesr visao geral do codigo",
         "Criar documentacao para onboarding",
         "Mapear arquitetura de codigo legado"
       ],
@@ -279,7 +283,7 @@
         "Apos atualizar AGENTS.md com novas instrucoes",
         "Manter consistencia entre agentes de IA",
         "Propagar mudancas de padrao para todos os agentes",
-        "Antes de iniciar sessao com multiplos agentes"
+        "Before starting sessao com multiplos agentes"
       ],
       "source": "AGENTS.md",
       "targets": [
@@ -323,9 +327,9 @@
         "skipped": "- [>]",
         "completed": "- [x]"
       },
-      "scans": "Arquivos *_task_*.md na pasta de sessao",
+      "scans": "Arquivos *_task_*.md na session folder",
       "output": "Relatorio de status por tarefa (ID, descricao, status)",
-      "exit_code": "0 se todas completas, 1 se houver pendencias"
+      "exit_code": "0 se todas completas, 1 if has pendencias"
     },
     {
       "id": "wb-update",
@@ -339,18 +343,18 @@
       "updated_at": "2026-02-23",
       "description": "Automatiza atualizacoes de baixo valor em workstreams: metadata, timestamps, tarefas, status, timeline e links.",
       "when_to_use": [
-        "Atualizar updated_at apos trabalhar em sessao",
+        "Updatesr updated_at apos trabalhar em sessao",
         "Normalizar timestamps para timezone configurado",
         "Marcar tarefa como completa/em progresso",
         "Adicionar entrada de timeline no log",
-        "Atualizar lista de arquivos modificados no report",
+        "Updatesr lista de arquivos modificados no report",
         "Setar status ou links no frontmatter"
       ],
       "commands": [
         {
           "name": "touch",
           "usage": "wb-update touch",
-          "description": "Atualiza updated_at no frontmatter da sessao ativa"
+          "description": "Updates updated_at no frontmatter da sessao ativa"
         },
         {
           "name": "normalize-time",
@@ -360,7 +364,7 @@
         {
           "name": "files-changed",
           "usage": "wb-update files-changed",
-          "description": "Atualiza secao Files Changed no arquivo report.md"
+          "description": "Updates secao Files Changed no arquivo report.md"
         },
         {
           "name": "task",
@@ -413,6 +417,7 @@
         "verify-tasks",
         "wb-update",
         "bootstrap",
+        "skills-sync",
         "tools",
         "help"
       ],
@@ -426,34 +431,193 @@
         "Executa com uv run --with pyyaml",
         "Preserva diretorio de trabalho original"
       ]
+    },
+    {
+      "id": "skills-sync",
+      "name": "Skills Sync",
+      "tool": "agents-skills-sync.py",
+      "wrapper_command": ".agents/agents skills-sync <command> [--skills a,b,c]",
+      "make_command": "make skills-sync [SKILLS=a,b,c]",
+      "type": "synchronization",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-23",
+      "updated_at": "2026-02-23",
+      "description": "Synchronize project skills from universal-skills while enforcing strict skills/<name>/SKILL.md structure.",
+      "when_to_use": [
+        "Set up project skill subset from universal-skills",
+        "Update local project skills after upstream changes",
+        "Validate skill drift and structure contract",
+        "Gate full validation with required skills sync checks"
+      ],
+      "commands": [
+        {
+          "name": "init",
+          "usage": "skills-sync init",
+          "description": "Initialize sync state and local mirror"
+        },
+        {
+          "name": "pull",
+          "usage": "skills-sync pull",
+          "description": "Update local mirror from upstream repo"
+        },
+        {
+          "name": "plan",
+          "usage": "skills-sync plan --skills a,b,c",
+          "description": "Preview missing/drift state"
+        },
+        {
+          "name": "apply",
+          "usage": "skills-sync apply --skills a,b,c",
+          "description": "Apply selected skills to skills/<name>/"
+        },
+        {
+          "name": "check",
+          "usage": "skills-sync check --skills a,b,c",
+          "description": "Validate structure and drift"
+        },
+        {
+          "name": "sync",
+          "usage": "skills-sync sync --skills a,b,c",
+          "description": "pull + apply + check"
+        }
+      ],
+      "checks": [
+        "No forbidden cache/pool directories inside skills/",
+        "Every selected skill contains skills/<name>/SKILL.md",
+        "Drift detection between source mirror and project skills"
+      ]
+    },
+    {
+      "id": "telemetry",
+      "name": "Agents Telemetry",
+      "tool": "agents-telemetry.py",
+      "wrapper_command": ".agents/agents telemetry <command> [args]",
+      "make_command": "make telemetry-record|telemetry-report|telemetry-export|telemetry-validate",
+      "type": "observability",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-23",
+      "updated_at": "2026-02-23",
+      "description": "Collect, query, and report telemetry data for .agents sessions. Track session metrics, tool usage, task completion, blockers, and generate periodic reports.",
+      "when_to_use": [
+        "Record session start/end events",
+        "Track tool execution and outcomes",
+        "Log blockers and errors",
+        "Generate weekly/monthly telemetry reports",
+        "Export telemetry data for analysis"
+      ],
+      "commands": [
+        {
+          "name": "record",
+          "usage": "telemetry record <event_type> [--session-id=<id>] [--metadata=<json>] [--outcome=<outcome>]",
+          "description": "Record a telemetry event (session_start, session_end, tool_exec, task_complete, blocker, error, pattern_applied)"
+        },
+        {
+          "name": "query",
+          "usage": "telemetry query [--event-type=<type>] [--session-id=<id>] [--since=<date>] [--limit=<n>] [--format=text|json|csv]",
+          "description": "Query telemetry events with filters"
+        },
+        {
+          "name": "export",
+          "usage": "telemetry export [--format=json|csv] [--output=<path>]",
+          "description": "Export telemetry data to file"
+        },
+        {
+          "name": "report",
+          "usage": "telemetry report [--period=weekly|monthly|all] [--format=text|json]",
+          "description": "Generate telemetry report with metrics and summaries"
+        },
+        {
+          "name": "validate",
+          "usage": "telemetry validate",
+          "description": "Validate telemetry events against schema"
+        }
+      ],
+      "output": "Events recorded to .agents/a-docs/telemetry/data/events.jsonl",
+      "side_effect": "Appends event to JSONL telemetry log"
+    },
+    {
+      "id": "patterns",
+      "name": "Agents Patterns",
+      "tool": "agents-patterns.py",
+      "wrapper_command": ".agents/agents patterns <command> [args]",
+      "make_command": "make patterns-suggest|patterns-list|patterns-show|patterns-apply|patterns-rate",
+      "type": "knowledge",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-23",
+      "updated_at": "2026-02-23",
+      "description": "Suggest, list, and apply patterns for .agents system usage. Catalog of success patterns, anti-patterns, tool patterns, and template patterns.",
+      "when_to_use": [
+        "Starting new workstream and want proven approaches",
+        "Unsure about best practices for a task",
+        "Want to avoid common mistakes",
+        "Looking for tool effectiveness ratings",
+        "Recording pattern application in telemetry"
+      ],
+      "commands": [
+        {
+          "name": "suggest",
+          "usage": "patterns suggest [--theme=<theme>] [--tags=<tags>] [--limit=<n>]",
+          "description": "Suggest relevant patterns based on theme or tags"
+        },
+        {
+          "name": "list",
+          "usage": "patterns list [--type=success|anti|tool|template] [--status=active|deprecated]",
+          "description": "List all patterns with optional filters"
+        },
+        {
+          "name": "show",
+          "usage": "patterns show <pattern-id>",
+          "description": "Show detailed pattern information"
+        },
+        {
+          "name": "apply",
+          "usage": "patterns apply <pattern-id> [--session=<session>]",
+          "description": "Apply pattern to session (records in telemetry)"
+        },
+        {
+          "name": "rate",
+          "usage": "patterns rate <pattern-id> --effectiveness=high|medium|low",
+          "description": "Rate pattern effectiveness"
+        }
+      ],
+      "output": "Pattern suggestions or details",
+      "side_effect": "Apply records pattern usage in telemetry"
     }
   ],
   "makefile_targets": {
     "setup": "Inicializa virtualenv com uv",
     "doctor": "Valida estrutura .agents",
-    "new": "Cria nova workstream (THEME=required)",
-    "quick": "Registra tarefa rapida na sessao ativa",
+    "new": "Creates new workstream (THEME=required)",
+    "quick": "Registers quick task rapida na sessao ativa",
     "structure": "Gera docs de estrutura do projeto",
-    "index": "Atualiza indices SPECS/ADRS",
+    "index": "Updates indices SPECS/ADRS",
     "sync": "Sincroniza AGENTS.md para agentes",
     "verify": "Verifica conclusao de tarefas",
     "lint": "Valida docs markdown",
     "tools-check": "Valida tools.json e executa smoke tests da CLI tools",
-    "wb-touch": "Atualiza updated_at na sessao ativa",
+    "wb-touch": "Updates updated_at na sessao ativa",
     "wb-normalize-time": "Normaliza timestamps WB",
-    "wb-files-changed": "Atualiza Files Changed no report",
+    "wb-files-changed": "Updates Files Changed no report",
     "wb-task": "Marca tarefa por ID (TASK_ID + ACTION required)",
     "wb-status": "Seta status no frontmatter (STATUS required)",
     "wb-timeline": "Adiciona entrada timeline (MSG required)",
     "wb-link": "Seta links.frontmatter (FILE + KEY + VALUE required)",
-    "all": "Executa doctor + structure + index + verify + tools-check",
+    "all": "Executa doctor + structure + index + verify + tools-check + test-scripts",
     "refresh": "Clean + setup + structure",
     "clean": "Remove .venv e caches",
-    "bootstrap": "Install .agents system in another repository (TARGET required)"
+    "bootstrap": "Install .agents system in another repository (TARGET required)",
+    "skills-init": "Initialize universal skills sync",
+    "skills-pull": "Update universal skills mirror",
+    "skills-plan": "Preview selected skills drift/missing state",
+    "skills-apply": "Apply selected skills to project skills/",
+    "skills-status": "Show skills sync status/config",
+    "skills-check": "Validate skills structure and sync state",
+    "skills-sync": "Run pull + apply + check sequence",
+    "test-scripts": "Run Python unit tests for operational scripts"
   },
   "tool_categories": {
     "validation": {
-      "description": "Validam estrutura, sintaxe e conformidade",
+      "description": "Validam estrutura, sintaxe e compliance",
       "tools": [
         "doctor",
         "lint-docs"
@@ -474,7 +638,7 @@
         "index",
         "structure-map"
       ],
-      "usage_pattern": "Apos criar specs/ADRs ou documentar estrutura"
+      "usage_pattern": "After creating specs/ADRs ou documentar estrutura"
     },
     "verification": {
       "description": "Verificam estado e conclusao",
@@ -493,35 +657,50 @@
     "synchronization": {
       "description": "Mantem consistencia entre arquivos",
       "tools": [
-        "sync"
+        "sync",
+        "skills-sync"
       ],
-      "usage_pattern": "Apos atualizar template AGENTS.md"
+      "usage_pattern": "After updating AGENTS.md template"
     },
     "infrastructure": {
-      "description": "Suporte e wrappers para execucao",
+      "description": "Support and wrappers for execution",
       "tools": [
         "agents"
       ],
-      "usage_pattern": "Interface primaria para todas as ferramentas"
+      "usage_pattern": "Primary interface for all tools"
     },
     "discovery": {
-      "description": "Descobre e explora ferramentas disponiveis",
+      "description": "Discovers and explores available tools",
       "tools": [
         "tools"
       ],
-      "usage_pattern": "Quando precisar identificar qual ferramenta usar"
+      "usage_pattern": "When needing to identify which tool to use"
+    },
+    "observability": {
+      "description": "Collects and reports usage and performance metrics",
+      "tools": [
+        "telemetry"
+      ],
+      "usage_pattern": "During and after sessions to capture metrics"
+    },
+    "knowledge": {
+      "description": "Catalog of patterns and best practices",
+      "tools": [
+        "patterns"
+      ],
+      "usage_pattern": "Before starting work to suggest approaches"
     }
   },
   "makefile_aliases": {
-    "note": "Aliases de atalho no Makefile. Use nomes completos para clareza.",
+    "note": "Shortcut aliases in Makefile. Use full names for clarity.",
     "aliases": {
-      "st": "structure (NÃO use doc - isso seria documents)",
+      "st": "structure (do NOT use doc - that would be documents)",
       "ix": "index",
       "sy": "sync",
       "vf": "verify",
-      "dr": "doctor (abreviacao de doctor, NÃO doc)"
+      "dr": "doctor (abbreviation for doctor, NOT doc)"
     },
-    "warning": "doc NÃO é um alias valido. Use 'dr' para doctor ou nomes completos."
+    "warning": "doc is NOT a valid alias. Use 'dr' for doctor or full names."
   },
   "execution_modes": {
     "on-demand": {
@@ -537,7 +716,10 @@
         "verify-tasks",
         "wb-update",
         "agents",
-        "bootstrap"
+        "bootstrap",
+        "skills-sync",
+        "telemetry",
+        "patterns"
       ]
     },
     "cron": {
@@ -553,7 +735,7 @@
       "description": "Disparado por eventos especificos",
       "tools": {
         "new": "Ao criar nova feature/bug",
-        "index": "Apos criar spec/adr",
+        "index": "After creating spec/adr",
         "sync": "Apos atualizar AGENTS.md",
         "structure-map": "Ao documentar arquitetura",
         "wb-update touch": "Ao finalizar sessao de trabalho"
@@ -565,7 +747,7 @@
     "sections": {
       "paths": "Diretorios e arquivos de configuracao",
       "time": "Timezones (default_offset, wb_offset)",
-      "lint": "Exclusoes para validacao de docs",
+      "lint": "Exclusoes para validation de docs",
       "doctor": "Pastas e templates obrigatorios",
       "sync": "Arquivos source e target para sincronizacao"
     }
@@ -576,7 +758,7 @@
     "Execute make verify antes de marcar tarefa como completa",
     "Mantenha docs sincronizados com make sync apos mudar AGENTS.md",
     "Use wb-update para automatizar atualizacoes de baixo valor",
-    "Rode make all como validacao completa antes de commits",
+    "Rode make all como validation completa antes de commits",
     "Prefira wrapper .agents/agents para execucao direta",
     "Consulte tools.json para entender quando usar cada ferramenta"
   ]

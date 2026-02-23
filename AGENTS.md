@@ -56,6 +56,12 @@
 - Do not add dependencies without clear justification
 - Archive before delete under `.agents/z-arq/YYYYMMDD_<description>/`
 
+### a-docs Boundary Rule
+
+- `.agents/a-docs/` is documentation-only
+- Do not use `.agents/a-docs/` for runtime state, caches, mirrors, generated artifacts, or operational data
+- Operational state must live outside `.agents/a-docs/` (for example: `.agents/cache/`, `.agents/wb/`)
+
 ### Language Policy
 
 - Write all repository artifacts in English by default
@@ -147,6 +153,12 @@ Key rules:
 - `.agents/agents` - Unified wrapper to execute agentic scripts
 - `.agents/agents tools` - Tool discovery and guidance for project management
 
+### Skills Structure Rule
+
+- Project skills must follow strict structure: `skills/<skill-name>/SKILL.md`
+- Do not create mirror/cache folders inside `skills/`
+- Use `skills-sync` commands for synchronization
+
 ### Discovery-First Rule
 
 - Prefer discovery over memorizing long command lists
@@ -155,6 +167,8 @@ Key rules:
   - `.agents/agents tools info <tool-id>`
   - `.agents/agents tools search <query>`
 - Use `make help` for Make targets when needed
+- Optional follow-up phrasing can be:
+  - `If you want, I can also set skills_sync.enabled=true in template defaults so new repos start with sync flow active by default.`
 
 ## Repo-Specific Command Placeholders
 

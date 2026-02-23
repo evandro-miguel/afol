@@ -4,7 +4,7 @@ id: 260223_1855_task-id-standardization_report_01
 theme: task-id-standardization
 status: final
 created_at: '2026-02-23T15:56:33-03:00'
-updated_at: '2026-02-23T18:00:21-03:00'
+updated_at: '2026-02-23T18:25:49-03:00'
 related_tasks:
 - 260223_1855_task-id-standardization_task_01
 links:
@@ -41,22 +41,20 @@ links:
 
 ## Files Changed
 
-- `.agents/a-docs/lessons/README.md`
-- `.agents/a-docs/lessons/entries/`
-- `.agents/a-docs/lessons/general-lessons.md`
 - `.agents/a-docs/standards/Makefile`
 - `.agents/a-docs/standards/agents-usage.md`
-- `.agents/a-docs/standards/bootstrap-other-repo.md`
 - `.agents/a-docs/standards/scripts-reference.md`
-- `.agents/a-docs/templates/retrospective.md`
-- `.agents/a-docs/templates/task.md`
+- `.agents/a-docs/standards/skills-sync.md`
 - `.agents/agents`
+- `.agents/agents.config`
 - `.agents/arc/structure/README.md`
 - `.agents/arc/structure/backend.md`
 - `.agents/arc/structure/data.md`
 - `.agents/arc/structure/tests.md`
 - `.agents/scripts/README.md`
-- `.agents/scripts/agents-bootstrap.py`
+- `.agents/scripts/agents-skills-sync.py`
+- `.agents/scripts/lib/agents_config.py`
+- `.agents/skills-sync.manifest.json`
 - `.agents/tools.json`
 - `AGENTS.md`
 ## Verification

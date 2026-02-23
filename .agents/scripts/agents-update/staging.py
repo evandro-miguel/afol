@@ -153,11 +153,16 @@ class StagingManager:
         if agents_wrapper.exists():
             shutil.copy2(agents_wrapper, self.staging_dir / "agents")
 
+        # Copy agents-update wrapper
+        update_wrapper = self.agents_dir / "agents-update"
+        if update_wrapper.exists():
+            shutil.copy2(update_wrapper, self.staging_dir / "agents-update")
+
     def validate(self) -> bool:
         """Validate staging area integrity."""
         print(f"   Validating staging area...")
 
-        required = ["scripts", "agents", "manifest.json"]
+        required = ["scripts", "agents", "agents-update", "manifest.json"]
 
         for item in required:
             path = self.staging_dir / item

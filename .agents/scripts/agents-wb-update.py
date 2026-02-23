@@ -295,7 +295,7 @@ def update_task_markers(task_file: Path, task_id: str, marker: str, state: str) 
     for i, line in enumerate(lines):
         m = checklist_re.match(line)
         if m and m.group(2) == task_id:
-            prefix = f"{m.group(1)[:-2]}[{marker}] "
+            prefix = re.sub(r"\[[ /%!>x]\]", f"[{marker}]", m.group(1), count=1)
             lines[i] = f"{prefix}{m.group(2)}{m.group(3)}"
             found = True
 

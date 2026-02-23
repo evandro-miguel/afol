@@ -31,7 +31,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     },
     "lint": {
         "excluded_path_prefixes": [
-            "a-docs/",
             "arc/structure/",
             "scripts/.agent/docs/",
             "z-arq/",
@@ -71,6 +70,18 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "sync": {
         "source_file": "AGENTS.md",
         "target_files": ["QWEN.md", "CLAUDE.md", "GEMINI.md"],
+    },
+    "skills_sync": {
+        "enabled": False,
+        "upstream_repo_url": "",
+        "upstream_branch": "main",
+        "pool_dir": ".agents/cache/universal-skills",
+        "project_dir": "skills",
+        "mode": "copy",
+        "required": False,
+        "manifest_file": ".agents/skills-sync.manifest.json",
+        "upstream_skills_dir": "skills",
+        "default_skills": ["writing-skills", "markdownlint-skill"],
     },
 }
 

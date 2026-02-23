@@ -19,13 +19,39 @@
 #   wb-update           Update workbench metadata (touch/task/status/link/timeline/files-changed)
 #   tools               Discover available tools and usage details
 #   bootstrap           Install .agents system into another repository
+#   skills-sync         Sync project skills from universal-skills
+#   fix-symlinks        Repair symlinks with replication fallback
 #
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
+if [ -d "${SCRIPT_DIR}/current/scripts" ]; then
+    SCRIPTS_DIR="${SCRIPT_DIR}/current/scripts"
+else
+    SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
+fi
 ORIGINAL_PWD="$(pwd)"
+TELEMETRY_SCRIPT="${SCRIPTS_DIR}/agents-telemetry.py"
+ACTIVE_SESSION_FILE="${SCRIPT_DIR}/wb/.active_session"
+
+# Auto-record telemetry for tool execution
+record_tool_telemetry() {
+    local tool_name="$1"
+    local outcome="${2:-success}"
+    local session_id=""
+    
+    if [ -f "${ACTIVE_SESSION_FILE}" ]; then
+        session_id=$(cat "${ACTIVE_SESSION_FILE}")
+    fi
+    
+    if [ -n "${session_id}" ] && [ -f "${TELEMETRY_SCRIPT}" ]; then
+        python3 "${TELEMETRY_SCRIPT}" record tool_exec \
+            --session-id="${session_id}" \
+            --metadata="{\"tool_name\":\"${tool_name}\",\"outcome\":\"${outcome}\"}" \
+            2>/dev/null || true
+    fi
+}
 
 # Check if uv is installed
 if ! command -v uv &> /dev/null; then
@@ -51,42 +77,62 @@ case "${COMMAND}" in
     doctor)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-doctor.py" "$@"
+        record_tool_telemetry "doctor" "success"
         ;;
     new)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-new.py" "$@"
+        record_tool_telemetry "new" "success"
         ;;
     index)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-index.py" "$@"
+        record_tool_telemetry "index" "success"
         ;;
     lint-docs|lint)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-lint-docs.py" "$@"
+        record_tool_telemetry "lint-docs" "success"
         ;;
     structure-map|map)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-structure-map.py" "$@"
+        record_tool_telemetry "structure-map" "success"
         ;;
     sync)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/sync-agent-docs.py" "$@"
+        record_tool_telemetry "sync" "success"
         ;;
     verify-tasks|verify)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/verify-tasks.py" "$@"
+        record_tool_telemetry "verify-tasks" "success"
         ;;
     wb-update|wb)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-wb-update.py" "$@"
+        record_tool_telemetry "wb-update" "success"
         ;;
     tools)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-tools.py" "$@"
+        record_tool_telemetry "tools" "success"
         ;;
     bootstrap)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-bootstrap.py" "$@"
+        record_tool_telemetry "bootstrap" "success"
+        ;;
+    skills-sync)
+        cd "${ORIGINAL_PWD}"
+        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-skills-sync.py" "$@"
+        record_tool_telemetry "skills-sync" "success"
+        ;;
+    fix-symlinks)
+        cd "${ORIGINAL_PWD}"
+        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-fix-symlinks.py" "$@"
+        record_tool_telemetry "fix-symlinks" "success"
         ;;
     help|-h|--help)
         echo "Agents CLI - Operational scripts for .agents system"
@@ -105,6 +151,8 @@ case "${COMMAND}" in
         echo "  wb-update           Update WB metadata (touch/task/status/link/timeline/files-changed)"
         echo "  tools               Discover and explore available tools"
         echo "  bootstrap           Install .agents system in another repository"
+        echo "  skills-sync         Sync project skills from universal-skills"
+        echo "  fix-symlinks        Repair symlinks with copy fallback"
         echo "  help                Show this help message"
         echo
         echo "Examples:"
@@ -118,6 +166,8 @@ case "${COMMAND}" in
         echo "  .agents/agents tools info doctor"
         echo "  .agents/agents tools search validate"
         echo "  .agents/agents bootstrap /path/to/target-repo --dry-run"
+        echo "  .agents/agents skills-sync status"
+        echo "  .agents/agents fix-symlinks --dry-run"
         ;;
     "")
         echo "❌ No command specified"

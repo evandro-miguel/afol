@@ -72,6 +72,13 @@ make all
 | `make bootstrap` | Bootstrap .agents system in another repository | `TARGET=/path/to/repo` |
 | `make verify` | Check task completion | - |
 | `make lint` | Validate markdown docs | - |
+| `make skills-init` | Initialize universal skills sync | - |
+| `make skills-pull` | Update universal skills mirror | - |
+| `make skills-plan` | Preview selected skills drift/missing state | `SKILLS=a,b,c` |
+| `make skills-apply` | Apply selected skills to `skills/` | `SKILLS=a,b,c` |
+| `make skills-status` | Show skills sync status/config | - |
+| `make skills-check` | Validate skills structure/sync state | `SKILLS=a,b,c` |
+| `make skills-sync` | Run pull + apply + check | `SKILLS=a,b,c` |
 | `make wb-touch` | Update `updated_at` in active session docs | - |
 | `make wb-normalize-time` | Normalize `created_at`/`updated_at` to configured WB offset | - |
 | `make wb-files-changed` | Refresh report `Files Changed` section | - |
@@ -357,6 +364,7 @@ This creates:
 - `.agents/a-docs/standards/workflow.md` - General workflow standard
 - `.agents/a-docs/standards/verification.md` - Verification standard
 - `.agents/a-docs/standards/structure-map.md` - Structure map strategy
+- `.agents/a-docs/standards/skills-sync.md` - Universal skills sync standard
 - `.agents/a-docs/templates/` - All available templates
 
 ---

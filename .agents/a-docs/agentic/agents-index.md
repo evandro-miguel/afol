@@ -11,7 +11,7 @@ links:
   structure_map: ./agents-structure-map.md
 ---
 
-# agents-index.py - Atualização de Índices
+# agents-index.py - Update de Índices
 
 ## Por Que Existe
 
@@ -22,12 +22,12 @@ links:
 
 **Solução:** Índices automáticos que agregam metadados de todos os documentos.
 
-## Função
+## Function
 
 Escaneia diretórios e gera índices:
 
 1. **SPECS/INDEX.md** - Lista todas as especificações
-2. **DECISIONS/INDEX.md** - Lista todas as decisões de arquitetura
+2. **DECISIONS/INDEX.md** - Lista todas as decisões de Architecture
 
 Extrai do frontmatter:
 - ID, tema, status
@@ -36,21 +36,21 @@ Extrai do frontmatter:
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Diretório | Propósito |
+| Directory | Purpose |
 |-----------|-----------|
 | `.agents/arc/SPECS/**/*.md` | Specs para indexar |
 | `.agents/arc/DECISIONS/**/*.md` | ADRs para indexar |
 
-### Arquivos Escritos
+### Files Escritos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | `.agents/arc/SPECS/INDEX.md` | Índice de specs |
 | `.agents/arc/DECISIONS/INDEX.md` | Índice de ADRs |
 
-## Como Configurar
+## How to Configure
 
 ### agents.config
 
@@ -60,11 +60,11 @@ paths:
   decisions_dir: .agents/arc/DECISIONS
 ```
 
-## Como Modificar
+## How to Modify
 
 ### Alterar Formato do Índice
 
-Editar função `generate_index_md()`:
+Editar Function `generate_index_md()`:
 
 ```python
 def generate_index_md(entries: List[DocEntry], output_path: Path):
@@ -73,7 +73,7 @@ def generate_index_md(entries: List[DocEntry], output_path: Path):
     # Modificar conforme necessário
 ```
 
-## Como Testar
+## How to Test
 
 ```bash
 # Executar index
@@ -87,7 +87,7 @@ cat .agents/arc/DECISIONS/INDEX.md
 ./.agents/agents index --dry-run
 ```
 
-## Principais Funções
+## main Funções
 
 ```python
 scan_specs_dir()          # Escaneia SPECS
@@ -98,4 +98,4 @@ generate_index_md()       # Gera INDEX.md
 
 ---
 
-*index mantém documentação de arquitetura navegável*
+*index mantém Documentation de Architecture navegável*

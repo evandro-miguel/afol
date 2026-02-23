@@ -11,56 +11,46 @@ links:
   lint_docs: ./agents-lint-docs.md
 ---
 
-# agents-doctor.py - Validação de Estrutura
+# agents-doctor.py - Structure Validation
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** O sistema `.agents` requer estrutura específica de pastas, templates, e convenções de nomenclatura. Erros na estrutura causam falhas em cascata nas outras ferramentas.
+**Problem:** The `.agents` system requires specific structure of folders, templates, and naming conventions. Errors in structure cause cascading failures in other tools.
 
-**Solução:** Validação automática que verifica integridade da estrutura antes que problemas ocorram.
+**Solution:** Automatic validation that checks structure integrity before problems occur.
 
-## Função
+## Function
 
-Valida a estrutura do diretório `.agents`:
+Validates `.agents` directory structure:
 
-1. **Pastas obrigatórias** - Verifica existência
-2. **Templates** - Verifica presença de todos os templates
-3. **Frontmatter YAML** - Valida sintaxe
-4. **IDs** - Verifica convenção (YYMMDD_HHMM_theme_type_N)
-5. **Timestamps** - Valida formato ISO 8601
-6. **Cross-links** - Verifica links entre documentos
+1. **Required folders** - Checks existence
+2. **Templates** - Checks presence of all templates
+3. **YAML Frontmatter** - Validates syntax
+4. **IDs** - Checks convention (YYMMDD_HHMM_theme_type_N)
+5. **Timestamps** - Validates ISO 8601 format
+6. **Cross-links** - Checks links between documents
 
-## O Que Tocar
+## What It Touches
 
-### Arquivos Lidos
+### Files Read
 
-| Arquivo | Propósito |
-|---------|-----------|
+| File | Purpose |
+|------|---------|
 | `.agents/agents.config` | Config (required_folders, required_templates) |
 | `.agents/a-docs/templates/*.md` | Templates |
-| `.agents/wb/**/*.md` | Workstreams para validar |
-| `.agents/arc/SPECS/**/*.md` | Specs para validar |
-| `.agents/arc/DECISIONS/**/*.md` | ADRs para validar |
+| `.agents/wb/**/*.md` | Workstreams to validate |
+| `.agents/arc/SPECS/**/*.md` | Specs to validate |
+| `.agents/arc/DECISIONS/**/*.md` | ADRs to validate |
 
-### Arquivos Escritos
+### Files Written
 
-| Arquivo | Propósito |
-|---------|-----------|
-| Nenhum | Apenas leitura e validação |
+| File | Purpose |
+|------|---------|
+| None | Read-only and validation |
 
-### Output
+## How to Configure
 
-```
-✓ a-docs/templates
-✓ a-docs/standards
-✓ wb
-❌ arc/SPECS/INDEX.md - Missing file
-⚠️  260223_1200_auth-refactor_plan_01.md - Invalid timestamp format
-```
-
-## Como Configurar
-
-### agents.config
+Configuration in `.agents/agents.config`:
 
 ```yaml
 doctor:
@@ -68,87 +58,85 @@ doctor:
     - a-docs/templates
     - a-docs/standards
     - a-docs/lessons
-    - arc
-    - arc/SPECS
-    - arc/DECISIONS
     - wb
     - rules
     - scripts
-    - skills
   required_templates:
     - plan.md
     - task.md
     - report.md
     - log.md
-    - spec.md
-    - spec-lite.md
-    - adr.md
 ```
 
-## Como Modificar
-
-### Adicionar Nova Validação
-
-```python
-# Em agents-doctor.py
-def check_new_validation():
-    """Nova validação."""
-    issues = []
-    # Implementar lógica
-    return issues
-```
-
-### Alterar Pastas Obrigatórias
-
-Editar `agents.config`:
-
-```yaml
-doctor:
-  required_folders:
-    - nova-pasta  # Adicionar
-```
-
-## Como Testar
+## How to Use
 
 ```bash
-# Executar doctor
-./.agents/agents doctor
+# Validate structure
+.agents/agents doctor
 
 # Via Makefile
 make doctor
-
-# Esperado: 
-# ✓ para todos os checks
-# ou ❌/⚠️ com descrição do problema
 ```
 
-### Métricas de Saúde
+## How to Modify
 
-| Métrica | Ideal |
-|---------|-------|
-| Pastas existentes | 100% |
-| Templates existentes | 100% |
-| Frontmatter válido | 100% |
-| IDs no padrão | 100% |
-
-## Principais Funções
+### Main Functions
 
 ```python
-# Validações
-check_required_folders()
-check_templates()
-check_frontmatter()
-check_ids_convention()
-check_timestamps()
-check_cross_links()
-
-# Issue classes
-class Issue:
-    severity: "error" | "warning" | "info"
-    path: str
-    message: str
+def validate_folders() -> List[str]:
+    """Check required folders exist."""
+    
+def validate_templates() -> List[str]:
+    """Check required templates exist."""
+    
+def validate_frontmatter(filepath: Path) -> List[str]:
+    """Validate YAML frontmatter syntax."""
+    
+def validate_ids(filepath: Path) -> List[str]:
+    """Check ID convention."""
+    
+def validate_timestamps(filepath: Path) -> List[str]:
+    """Validate ISO 8601 timestamps."""
 ```
 
----
+### Adding New Validations
 
-*doctor previne problemas de estrutura antes que causem falhas*
+1. Create function `validate_<thing>()` returning `List[str]` (errors)
+2. Add to `main()` validation pipeline
+3. Update this document
+
+## How to Test
+
+```bash
+# Run validation
+make doctor
+
+# Expected: Exit code 0 if valid, 1 if errors
+```
+
+## Output
+
+### Success
+```
+✓ All required folders exist
+✓ All required templates present
+✓ Frontmatter YAML valid
+✓ IDs follow convention
+✓ Timestamps in ISO 8601 format
+✓ Cross-links valid
+```
+
+### Errors
+```
+❌ Missing folder: .agents/wb
+❌ Missing template: plan.md
+❌ Invalid frontmatter in file.md: missing 'id' field
+```
+
+## Related
+
+- [agents-lint-docs.md](./agents-lint-docs.md) - Markdown linting
+- [tools-json.md](./tools-json.md) - Tool catalog
+
+---
+*Document: `.agents/a-docs/agentic/agents-doctor.md`*

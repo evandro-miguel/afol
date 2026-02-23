@@ -14,12 +14,10 @@ Usage:
     python agents-doctor.py [--fix]
 """
 
-import os
 import re
 import sys
 from pathlib import Path
-from datetime import datetime
-from typing import List, Dict, Tuple, Optional
+from typing import List
 
 from lib.agents_config import get_cfg_path, load_agents_config
 
@@ -34,9 +32,37 @@ ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 REQUIRED_FOLDERS = CONFIG.get("doctor", {}).get("required_folders", [])
 REQUIRED_TEMPLATES = CONFIG.get("doctor", {}).get("required_templates", [])
+WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
+ACTIVE_SESSION_FILE = get_cfg_path(ROOT_DIR, CONFIG, "active_session_file")
 
-ID_PATTERN = re.compile(r'^\d{6}_\d{4}_[a-z0-9_-]+_(plan|task|report|log|research|brainstorm|blocks|spec|spec-lite|adr|architecture|roadmap)_\d+$')
+VALID_DOC_TYPES = [
+    "plan",
+    "task",
+    "report",
+    "log",
+    "research",
+    "brainstorm",
+    "blocks",
+    "spec",
+    "spec-lite",
+    "spec_lite",
+    "adr",
+    "architecture",
+    "roadmap",
+    "specs_index",
+    "adr_index",
+    "standard",
+    "index",
+    "structure",
+    "lessons",
+    "retrospective",
+    "specs_readme",
+]
+DOC_TYPES_PATTERN = "|".join(re.escape(t) for t in VALID_DOC_TYPES)
+ID_PATTERN = re.compile(rf'^\d{{6}}_\d{{4}}_[a-z0-9_-]+_({DOC_TYPES_PATTERN})_\d+$')
 TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$')
+TIGHT_CHECKBOX_PATTERN = re.compile(r'^(\s*)-\[([ xX/!>%])\](.*)$')
+MISSING_SEP_PATTERN = re.compile(r'(- \[[ xX/!>%]\])(?=\S)')
 
 
 class Issue:
@@ -71,6 +97,7 @@ class AgentsDoctor:
         self.check_required_folders()
         self.check_templates()
         self.check_workbench_sessions()
+        self.check_active_session_pointer()
         self.check_arc_docs()
         
         self.print_report()
@@ -164,6 +191,48 @@ class AgentsDoctor:
         
         print()
     
+    def check_active_session_pointer(self):
+        """Validate active session pointer consistency."""
+        print("Checking active session pointer...")
+
+        if not ACTIVE_SESSION_FILE.exists():
+            self.issues.append(Issue(
+                "warning",
+                str(ACTIVE_SESSION_FILE),
+                "Active session file missing"
+            ))
+            print()
+            return
+
+        raw = ACTIVE_SESSION_FILE.read_text().strip()
+        if not raw:
+            self.issues.append(Issue(
+                "warning",
+                str(ACTIVE_SESSION_FILE),
+                "Active session file is empty"
+            ))
+            print()
+            return
+
+        if not re.match(r'^\d{6}_\d{4}_[a-z0-9_-]+$', raw):
+            self.issues.append(Issue(
+                "warning",
+                str(ACTIVE_SESSION_FILE),
+                f"Active session id format looks invalid: {raw}"
+            ))
+
+        session_dir = WB_DIR / raw
+        if not session_dir.exists() or not session_dir.is_dir():
+            self.issues.append(Issue(
+                "error",
+                str(ACTIVE_SESSION_FILE),
+                f"Active session points to missing folder: {session_dir}"
+            ))
+        else:
+            print(f"  ✓ active -> {raw}")
+
+        print()
+
     def check_arc_docs(self):
         """Check architecture docs."""
         print("Checking architecture docs...")
@@ -190,6 +259,12 @@ class AgentsDoctor:
         if specs_index.exists():
             self.validate_frontmatter(specs_index)
             print(f"  ✓ SPECS/INDEX.md")
+
+        # Check DECISIONS index
+        decisions_index = arc_dir / "DECISIONS" / "INDEX.md"
+        if decisions_index.exists():
+            self.validate_frontmatter(decisions_index)
+            print("  ✓ DECISIONS/INDEX.md")
         
         print()
     
@@ -270,21 +345,46 @@ class AgentsDoctor:
     def validate_checkboxes(self, file_path: Path):
         """Validate checkbox markers in file."""
         content = file_path.read_text()
-        
-        # Check for inconsistent checkbox formats
         lines = content.splitlines()
-        for i, line in enumerate(lines, 1):
-            # Skip code blocks
+        had_trailing_newline = content.endswith("\n")
+        in_code_block = False
+        changed = False
+
+        for idx, line in enumerate(lines):
             if "```" in line:
+                in_code_block = not in_code_block
                 continue
-            
-            # Check for checkboxes without proper format
-            if re.search(r'-\[[^\s]\]', line) and not re.search(r'- \[[ x/!>%]\]', line):
+            if in_code_block:
+                continue
+
+            original = line
+
+            if self.fix:
+                tight = TIGHT_CHECKBOX_PATTERN.match(line)
+                if tight:
+                    marker = "x" if tight.group(2) == "X" else tight.group(2)
+                    line = f"{tight.group(1)}- [{marker}]{tight.group(3)}"
+                line = MISSING_SEP_PATTERN.sub(r"\1 ", line)
+
+                if line != original:
+                    lines[idx] = line
+                    changed = True
+
+            if re.search(r'-\[[^\s]\]', original) and not re.search(r'- \[[ xX/!>%]\]', original):
                 self.issues.append(Issue(
                     "info",
                     str(file_path),
-                    f"Line {i}: Checkbox may have non-standard marker"
+                    f"Line {idx + 1}: Checkbox may have non-standard marker"
                 ))
+
+        if changed:
+            normalized = "\n".join(lines) + ("\n" if had_trailing_newline else "")
+            file_path.write_text(normalized)
+            self.issues.append(Issue(
+                "info",
+                str(file_path),
+                "Auto-fixed checkbox formatting issues (--fix)"
+            ))
     
     def print_report(self):
         """Print validation report."""

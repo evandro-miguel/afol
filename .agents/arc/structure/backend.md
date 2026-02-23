@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-02-23T20:41:49+00:00
+**Generated:** 2026-02-23T21:20:28+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,7 +9,7 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 12 files, 2,882 lines, 112.0 KB
+**Stats:** 14 files, 3,422 lines, 131.8 KB
 
 ### Files
 
@@ -20,11 +20,13 @@ Services, utilities, and business logic.
 | `.agents/scripts/agents-wb-update.py` | 409 | 16.4 KB | Module; functionality |
 | `.agents/scripts/agents-lint-docs.py` | 349 | 13.6 KB | Module; functionality |
 | `.agents/scripts/agents-doctor.py` | 283 | 11.3 KB | Module; functionality |
+| `.agents/scripts/agents-skills-sync.py` | 272 | 10.0 KB | Module; functionality |
+| `.agents/scripts/agents-bootstrap.py` | 241 | 8.8 KB | Module; functionality |
 | `.agents/scripts/verify-tasks.py` | 216 | 7.7 KB | Module; functionality |
 | `.agents/scripts/agents-new.py` | 210 | 8.5 KB | Module; functionality |
 | `.agents/scripts/agents-index.py` | 181 | 6.5 KB | Module; functionality |
-| `.agents/scripts/sync-agent-docs.py` | 161 | 6.5 KB | Module; functionality |
-| `.agents/scripts/lib/agents_config.py` | 134 | 4.7 KB | Module; functionality |
+| `.agents/scripts/sync-agent-docs.py` | 176 | 7.1 KB | Module; functionality |
+| `.agents/scripts/lib/agents_config.py` | 146 | 5.1 KB | Module; functionality |
 | `.agents/scripts/agents-tools-smoke.py` | 57 | 2.3 KB | Module; functionality |
 | `.agents/scripts/lib/__init__.py` | 1 | 0.1 KB | Module; functionality |
 

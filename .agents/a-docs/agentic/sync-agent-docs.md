@@ -11,47 +11,47 @@ links:
   agents_md: ../../AGENTS.md
 ---
 
-# sync-agent-docs.py - Sincronização de Documentação de Agentes
+# sync-agent-docs.py - Synchronization de Documentation de Agentes
 
 ## Por Que Existe
 
-**Problema:** Múltiplos agentes (QWEN, CLAUDE, GEMINI) têm arquivos de instruções separados. Manter sincronizado manualmente é:
-- Propenso a erros
+**Problema:** Múltiplos agentes (QWEN, CLAUDE, GEMINI) têm Files de instruções separados. Manter sincronizado manualmente é:
+- Propenso a errors
 - Trabalhoso
 - Causa inconsistência entre agentes
 
-**Solução:** Sincronização automática a partir de um template central (AGENTS.md).
+**Solução:** Synchronization automática a partir de um template central (AGENTS.md).
 
-## Função
+## Function
 
-Sincroniza arquivos de agentes:
+Sincroniza Files de agentes:
 
 1. **Lê AGENTS.md** - Template central
 2. **Detecta modificações locais** - Hash comparison
 3. **Reporta diferenças** - Mostra o que mudou
-4. **Pede confirmação** - Antes de sobrescrever
+4. **Pede confirmação** - before de sobrescrever
 5. **Preserva headers** - Headers específicos por agente
 
 ## O Que Tocar
 
-### Arquivos Lidos
+### Files Lidos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | `AGENTS.md` | Template central |
 | `QWEN.md` | Instruções QWEN |
 | `CLAUDE.md` | Instruções CLAUDE |
 | `GEMINI.md` | Instruções GEMINI |
 
-### Arquivos Escritos
+### Files Escritos
 
-| Arquivo | Propósito |
+| Arquivo | Purpose |
 |---------|-----------|
 | `QWEN.md` | Atualizado do template |
 | `CLAUDE.md` | Atualizado do template |
 | `GEMINI.md` | Atualizado do template |
 
-## Como Configurar
+## How to Configure
 
 ### agents.config
 
@@ -73,7 +73,7 @@ HEADER_TEMPLATE = """# Agent-specific instructions for {agent_name}
 """
 ```
 
-## Como Modificar
+## How to Modify
 
 ### Adicionar Novo Agente
 
@@ -83,12 +83,12 @@ HEADER_TEMPLATE = """# Agent-specific instructions for {agent_name}
 
 ### Alterar Comportamento de Merge
 
-Editar função `merge_with_local_changes()`.
+Editar Function `merge_with_local_changes()`.
 
-## Como Testar
+## How to Test
 
 ```bash
-# Sync normal (pergunta antes de sobrescrever)
+# Sync normal (pergunta before de sobrescrever)
 ./.agents/agents sync
 
 # Forçar sync (sem perguntas)
@@ -98,14 +98,14 @@ Editar função `merge_with_local_changes()`.
 make sync
 ```
 
-## Principais Funções
+## main Funções
 
 ```python
 compute_hash()              # SHA256 do conteúdo
 get_expected_content()      # Conteúdo esperado do template
 detect_local_changes()      # Detecta modificações locais
 merge_headers()             # Preserva headers específicos
-sync_files()                # Executa sincronização
+sync_files()                # Executa Synchronization
 ```
 
 ---

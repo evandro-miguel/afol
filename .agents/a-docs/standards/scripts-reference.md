@@ -28,6 +28,13 @@ make all           # Full validation workflow
 | `make bootstrap` | Bootstrap .agents system in another repository | `TARGET=/path/to/repo` |
 | `make verify` | Check task completion | - |
 | `make lint` | Lint markdown docs | - |
+| `make skills-init` | Initialize universal skills sync | - |
+| `make skills-pull` | Update universal skills mirror | - |
+| `make skills-plan` | Preview selected skills drift/missing state | `SKILLS=a,b,c` |
+| `make skills-apply` | Apply selected skills to project skills/ | `SKILLS=a,b,c` |
+| `make skills-status` | Show skills sync status/config | - |
+| `make skills-check` | Validate skills structure and sync state | `SKILLS=a,b,c` |
+| `make skills-sync` | Pull + apply + check selected skills | `SKILLS=a,b,c` |
 | `make wb-touch` | Update `updated_at` in active session docs | - |
 | `make wb-normalize-time` | Normalize WB timestamps to configured offset | - |
 | `make wb-files-changed` | Refresh report `Files Changed` from git | - |
@@ -132,3 +139,14 @@ Legacy fallback: `agents.config` at repository root.
 ```
 
 See: `.agents/a-docs/standards/bootstrap-other-repo.md`
+
+
+### Skills Sync
+
+```bash
+make skills-init
+make skills-sync SKILLS=writing-skills,markdownlint-skill
+make skills-check
+```
+
+See: `.agents/a-docs/standards/skills-sync.md`
