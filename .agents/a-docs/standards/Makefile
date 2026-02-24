@@ -10,7 +10,7 @@
 #   make structure
 #   make all
 
-.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-plan skills-apply skills-status skills-check skills-sync wb-touch wb-normalize-time wb-files-changed wb-task wb-status wb-timeline wb-link structure index sync verify verify-session verify-active lint tools-check test-scripts lint-scripts lint-fix lint-fix-dry lint-fix-check lint-fix-checkboxes lint-fix-frontmatter telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
+.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-plan skills-apply skills-status skills-check skills-sync wb-touch wb-normalize-time wb-files-changed wb-evidence wb-task wb-status wb-timeline wb-link structure index sync verify verify-session verify-active lint tools-check test-scripts lint-scripts lint-fix lint-fix-dry lint-fix-check lint-fix-checkboxes lint-fix-frontmatter telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
 
 # ==============================================================================
 # HELP
@@ -39,6 +39,7 @@ help:
 	@echo "║    make wb-touch     - Update updated_at (SESSION_ID req.) ║"
 	@echo "║    make wb-normalize-time - Normalize WB timestamps        ║"
 	@echo "║    make wb-files-changed - Refresh report files changed    ║"
+	@echo "║    make wb-evidence  - Register evidence for task closure  ║"
 	@echo "║    make wb-task      - Mark task by ID (SESSION_ID req.)   ║"
 	@echo "║    make wb-status    - Set doc status (SESSION_ID req.)    ║"
 	@echo "║    make wb-timeline  - Append timeline (SESSION_ID req.)   ║"
@@ -46,6 +47,7 @@ help:
 	@echo "║    make verify       - Check task completion (all sessions)║"
 	@echo "║    make verify-session - Check one session (SESSION_ID=)   ║"
 	@echo "║    make verify-active - Check active session only          ║"
+	@echo "║    make verify-strict - Strict verification with evidence  ║"
 	@echo "║    make lint         - Validate markdown docs             ║"
 	@echo "║    make lint-fix     - Fix common lint issues             ║"
 	@echo "║    make lint-fix-dry - Preview lint fixes                 ║"
@@ -223,17 +225,47 @@ else
 	fi
 endif
 
-wb-task:
+wb-evidence:
 ifndef SESSION_ID
-	@echo "Usage: make wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped"
+	@echo "Usage: make wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD=\"...\" RESULT=\"...\" [ARTIFACT=<path>] [NOTE=\"...\"]"
 	@exit 1
 else
 ifndef TASK_ID
-	@echo "Usage: make wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped"
+	@echo "Usage: make wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD=\"...\" RESULT=\"...\" [ARTIFACT=<path>] [NOTE=\"...\"]"
+	@exit 1
+else
+ifndef CMD
+	@echo "Usage: make wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD=\"...\" RESULT=\"...\" [ARTIFACT=<path>] [NOTE=\"...\"]"
+	@exit 1
+else
+ifndef RESULT
+	@echo "Usage: make wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD=\"...\" RESULT=\"...\" [ARTIFACT=<path>] [NOTE=\"...\"]"
+	@exit 1
+else
+	@./.agents/agents wb-update evidence "$(TASK_ID)" --session "$(SESSION_ID)" --command "$(CMD)" --result "$(RESULT)" $(if $(ARTIFACT),--artifact "$(ARTIFACT)",) $(if $(NOTE),--note "$(NOTE)",)
+endif
+endif
+endif
+endif
+
+wb-task:
+ifndef SESSION_ID
+	@echo "Usage: make wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped [EVIDENCE_ID=E-...] [ALLOW_UNSAFE_DONE=1]"
+	@exit 1
+else
+ifndef TASK_ID
+	@echo "Usage: make wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped [EVIDENCE_ID=E-...] [ALLOW_UNSAFE_DONE=1]"
 	@exit 1
 else
 	@if [ "$(ACTION)" = "done" ]; then \
-		./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-done; \
+		if [ -n "$(EVIDENCE_ID)" ]; then \
+			./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-done --evidence-id "$(EVIDENCE_ID)"; \
+		elif [ "$(ALLOW_UNSAFE_DONE)" = "1" ]; then \
+			./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-done --allow-unsafe-done; \
+		else \
+			echo "ACTION=done requires EVIDENCE_ID. Use make wb-evidence first or set ALLOW_UNSAFE_DONE=1"; \
+			exit 1; \
+		fi; \
 	elif [ "$(ACTION)" = "in_progress" ]; then \
 		./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-in-progress; \
 	elif [ "$(ACTION)" = "pending" ]; then \
@@ -318,6 +350,15 @@ verify-active:
 	fi; \
 	echo "→ Verifying active session $$ACTIVE_SESSION..."; \
 	./.agents/agents verify-tasks ".agents/wb/$$ACTIVE_SESSION"
+
+verify-strict:
+	@ACTIVE_SESSION="$$(cat .agents/wb/.active_session 2>/dev/null || true)"; \
+	if [ -z "$$ACTIVE_SESSION" ]; then \
+		echo "Usage: make verify-strict (requires .agents/wb/.active_session)"; \
+		exit 1; \
+	fi; \
+	echo "→ Running strict verification on active session $$ACTIVE_SESSION..."; \
+	./.agents/agents verify-tasks ".agents/wb/$$ACTIVE_SESSION" --strict
 
 lint:
 	@echo "→ Linting markdown docs..."
@@ -413,7 +454,7 @@ endif
 # QUICK WORKFLOWS
 # ==============================================================================
 
-all: doctor structure index verify-active skills-check tools-check telemetry-validate
+all: doctor structure index verify-active skills-check tools-check telemetry-validate verify-strict
 	@echo ""
 	@echo "╔═══════════════════════════════════════════════════════════╗"
 	@echo "║  ✓ All validations passed                                 ║"

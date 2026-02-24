@@ -6,6 +6,7 @@ Commands:
   touch          Update updated_at in frontmatter
   normalize-time Normalize frontmatter timestamps to configured WB offset
   files-changed  Refresh "## Files Changed" in report file(s)
+  evidence       Register execution evidence in session ledger
   task           Mark task checklist/state by task ID
   status         Set frontmatter status in one or more docs
   timeline       Append entry to log timeline
@@ -15,6 +16,7 @@ Commands:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -58,6 +60,8 @@ TASK_ACTIONS = {
     "mark-skipped": (">", "skipped"),
 }
 TIMESTAMP_FIELDS = ("created_at", "updated_at")
+TASK_ID_RE = re.compile(r"^T-\d{2,3}$")
+EVIDENCE_TAG_RE = re.compile(r"\s+\(evidence:\s*([^)]+)\)\s*$", re.IGNORECASE)
 
 
 def now_iso_gmt3() -> str:
@@ -307,7 +311,13 @@ def update_link(path: Path, key: str, value: str):
     write_frontmatter(path, fm, body)
 
 
-def update_task_markers(task_file: Path, task_id: str, marker: str, state: str) -> bool:
+def update_task_markers(
+    task_file: Path,
+    task_id: str,
+    marker: str,
+    state: str,
+    evidence_id: str | None = None,
+) -> bool:
     content = task_file.read_text()
     parsed = split_frontmatter(content)
     if not parsed:
@@ -322,7 +332,10 @@ def update_task_markers(task_file: Path, task_id: str, marker: str, state: str) 
         m = checklist_re.match(line)
         if m and m.group(2) == task_id:
             prefix = re.sub(r"\[[ /%!>x]\]", f"[{marker}]", m.group(1), count=1)
-            lines[i] = f"{prefix}{m.group(2)}{m.group(3)}"
+            description = EVIDENCE_TAG_RE.sub("", m.group(3)).rstrip()
+            if marker == "x" and evidence_id:
+                description = f"{description} (evidence: {evidence_id})"
+            lines[i] = f"{prefix}{m.group(2)}{description}"
             found = True
 
         if line.strip().startswith("|"):
@@ -341,6 +354,77 @@ def update_task_markers(task_file: Path, task_id: str, marker: str, state: str) 
     fm["updated_at"] = now_iso_gmt3()
     write_frontmatter(task_file, fm, "\n".join(lines))
     return True
+
+
+def _session_ledger_file(session_dir: Path) -> Path:
+    return session_dir / ".evidence.jsonl"
+
+
+def _new_evidence_id() -> str:
+    return datetime.now(WB_TZ).strftime("E-%Y%m%d%H%M%S%f")
+
+
+def _load_evidence_records(session_dir: Path) -> list[dict]:
+    ledger = _session_ledger_file(session_dir)
+    if not ledger.exists():
+        return []
+
+    records: list[dict] = []
+    for raw_line in ledger.read_text().splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            records.append(payload)
+    return records
+
+
+def append_evidence_record(
+    session_dir: Path,
+    task_id: str,
+    command: str,
+    result: str,
+    artifacts: list[str] | None = None,
+    note: str | None = None,
+) -> dict:
+    if not TASK_ID_RE.match(task_id):
+        raise ValueError(f"Invalid task id '{task_id}'. Expected format like T-01 or T-001")
+
+    ledger = _session_ledger_file(session_dir)
+    evidence_id = _new_evidence_id()
+    payload = {
+        "id": evidence_id,
+        "task_id": task_id,
+        "created_at": now_iso_gmt3(),
+        "command": command.strip(),
+        "result": result.strip(),
+        "artifacts": [a.strip() for a in (artifacts or []) if a and a.strip()],
+        "note": (note or "").strip(),
+        "source": "wb-update evidence",
+    }
+    with ledger.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    return payload
+
+
+def validate_evidence_reference(session_dir: Path, evidence_id: str, task_id: str) -> None:
+    records = _load_evidence_records(session_dir)
+    for record in records:
+        if record.get("id") != evidence_id:
+            continue
+        if record.get("task_id") != task_id:
+            raise ValueError(
+                f"Evidence '{evidence_id}' belongs to task '{record.get('task_id')}', not '{task_id}'"
+            )
+        return
+
+    raise ValueError(
+        f"Evidence '{evidence_id}' not found in {_session_ledger_file(session_dir).relative_to(ROOT_DIR)}"
+    )
 
 
 def append_timeline(log_file: Path, message: str):
@@ -463,9 +547,41 @@ def cmd_task(args: argparse.Namespace):
     if not action:
         raise ValueError("No task action provided")
 
+    if action == "mark-done":
+        if not args.evidence_id and not args.allow_unsafe_done:
+            raise ValueError(
+                "mark-done requires --evidence-id. Register evidence first via "
+                "'wb-update evidence <TASK_ID> ...' or use --allow-unsafe-done (not recommended)."
+            )
+        if args.evidence_id:
+            validate_evidence_reference(session_dir, args.evidence_id, args.task_id)
+        if args.allow_unsafe_done and not args.evidence_id:
+            print(
+                "⚠️  mark-done executed without evidence id (unsafe bypass enabled).",
+                file=sys.stderr,
+            )
+
     marker, state = TASK_ACTIONS[action]
-    update_task_markers(task_file, args.task_id, marker, state)
+    update_task_markers(task_file, args.task_id, marker, state, evidence_id=args.evidence_id)
     print(f"✓ {args.task_id} updated to {state} in {task_file.relative_to(ROOT_DIR)}")
+
+
+def cmd_evidence(args: argparse.Namespace):
+    require_explicit_session(args, "evidence")
+    session_dir = resolve_session(args.session)
+    record = append_evidence_record(
+        session_dir=session_dir,
+        task_id=args.task_id,
+        command=args.command,
+        result=args.result,
+        artifacts=args.artifact,
+        note=args.note,
+    )
+    ledger = _session_ledger_file(session_dir).relative_to(ROOT_DIR)
+    print(
+        f"✓ evidence recorded: {record['id']} for {record['task_id']} "
+        f"in {ledger}"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -493,6 +609,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_task = sub.add_parser("task", help="update task marker/state by task id")
     p_task.add_argument("task_id", help="Task ID (e.g., T-01 or T-001)")
     p_task.add_argument("--session", help="session id/path (required)")
+    p_task.add_argument(
+        "--evidence-id",
+        help="evidence ID from 'wb-update evidence' (required for --mark-done unless bypassed)",
+    )
+    p_task.add_argument(
+        "--allow-unsafe-done",
+        action="store_true",
+        help="allow --mark-done without evidence-id (prints warning and is audit-risky)",
+    )
     action_group = p_task.add_mutually_exclusive_group(required=True)
     action_group.add_argument("--mark-done", action="store_true")
     action_group.add_argument("--mark-in-progress", action="store_true")
@@ -501,6 +626,15 @@ def build_parser() -> argparse.ArgumentParser:
     action_group.add_argument("--mark-blocked", action="store_true")
     action_group.add_argument("--mark-skipped", action="store_true")
     p_task.set_defaults(func=cmd_task)
+
+    p_evidence = sub.add_parser("evidence", help="register evidence for a task in session ledger")
+    p_evidence.add_argument("task_id", help="Task ID (e.g., T-01 or T-001)")
+    p_evidence.add_argument("--session", help="session id/path (required)")
+    p_evidence.add_argument("--command", required=True, help="command or action that produced evidence")
+    p_evidence.add_argument("--result", required=True, help="execution result summary")
+    p_evidence.add_argument("--artifact", action="append", default=[], help="artifact path/reference (repeatable)")
+    p_evidence.add_argument("--note", help="optional note")
+    p_evidence.set_defaults(func=cmd_evidence)
 
     p_status = sub.add_parser("status", help="set frontmatter status in session docs")
     p_status.add_argument("--session", help="session id/path (required)")

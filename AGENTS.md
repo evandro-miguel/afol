@@ -33,6 +33,7 @@
 - Never mark work complete without proof
 - Compare intended behavior vs actual behavior
 - Run verification commands and capture evidence
+- Mandatory gate: `make lint` must pass before any task/session can be marked as complete
 - Ask: `Would this pass a strict senior/staff review?`
 
 ### Demand Elegance (Balanced)

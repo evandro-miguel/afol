@@ -4,37 +4,52 @@ Tests for refactored hotspot functions.
 
 Ensures refactored functions maintain correct behavior:
 - validate_catalog helpers
-- generate_report helpers
+- generate_report helpers  
 - calculate_heat_scores helpers
 - check_frontmatter helpers
 - validate_frontmatter helpers
 """
 
 import sys
+import importlib.util
 from pathlib import Path
 
 # Add scripts to path
-SCRIPTS_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(SCRIPTS_DIR))
+SCRIPTS_DIR = Path(__file__).parent.parent.parent
+
+
+def load_module_from_path(name, path):
+    """Load a Python module from a file path."""
+    # Add scripts/lib to path for dependencies
+    lib_dir = path.parent / "lib"
+    if lib_dir.exists() and str(lib_dir) not in sys.path:
+        sys.path.insert(0, str(lib_dir))
+    if str(path.parent) not in sys.path:
+        sys.path.insert(0, str(path.parent))
+
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_validate_catalog_helpers():
     """Test agents-tools.py validation helpers."""
     print("Testing: validate_catalog helpers...")
     
-    from agents_tools import _validate_tool_entries, _validate_categories, _validate_execution_modes
+    tools = load_module_from_path("agents_tools", SCRIPTS_DIR / "agents-tools.py")
     
     errors = []
     
     # Test _validate_tool_entries
-    tools = [
+    tools_data = [
         {"id": "test-tool", "name": "Test", "type": "validation", "tool": "test", 
          "wrapper_command": "test", "make_command": "test", "execution_mode": "on-demand",
          "updated_at": "2026-01-01", "description": "Test tool"}
     ]
     ids = []
     type_set = set()
-    _validate_tool_entries(tools, ids, type_set, errors)
+    tools._validate_tool_entries(tools_data, ids, type_set, errors)
     
     if len(ids) != 1:
         print(f"  FAIL: Expected 1 id, got {len(ids)}")
@@ -52,10 +67,10 @@ def test_generate_report_helpers():
     """Test agents-telemetry.py report helpers."""
     print("Testing: generate_report helpers...")
     
-    from agents_telemetry import _calculate_date_range, _count_outcomes
+    telemetry = load_module_from_path("agents_telemetry", SCRIPTS_DIR / "agents-telemetry.py")
     
     # Test _calculate_date_range
-    since = _calculate_date_range("weekly")
+    since = telemetry._calculate_date_range("weekly")
     if since is None:
         print("  FAIL: _calculate_date_range returned None")
         return False
@@ -70,7 +85,7 @@ def test_generate_report_helpers():
         {"metadata": {"outcome": "success"}},
         {"metadata": {"outcome": "failure"}},
     ]
-    outcomes = _count_outcomes(events)
+    outcomes = telemetry._count_outcomes(events)
     
     if outcomes.get("success") != 2:
         print(f"  FAIL: Expected 2 success, got {outcomes.get('success')}")
@@ -84,11 +99,11 @@ def test_heat_score_helpers():
     """Test agents-telemetry.py heat score helpers."""
     print("Testing: calculate_heat_scores helpers...")
     
-    from agents_telemetry import _get_period_delta, _calculate_element_heat_score
+    telemetry = load_module_from_path("agents_telemetry", SCRIPTS_DIR / "agents-telemetry.py")
     
     # Test _get_period_delta
     from datetime import timedelta
-    delta = _get_period_delta("weekly")
+    delta = telemetry._get_period_delta("weekly")
     
     if not isinstance(delta, timedelta):
         print("  FAIL: _get_period_delta did not return timedelta")
@@ -107,7 +122,7 @@ def test_heat_score_helpers():
         "success_count": 10,
         "fail_count": 0,
     }
-    score = _calculate_element_heat_score(stats, max_access=10)
+    score = telemetry._calculate_element_heat_score(stats, max_access=10)
     
     if score["heat_level"] != "hot":
         print(f"  FAIL: Expected hot, got {score['heat_level']}")
@@ -125,33 +140,29 @@ def test_frontmatter_helpers():
     """Test agents-lint-docs.py frontmatter helpers."""
     print("Testing: check_frontmatter helpers...")
     
-    # Import the class
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("agents_lint_docs", SCRIPTS_DIR / "agents-lint-docs.py")
-    lint_docs = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(lint_docs)
+    lint_docs = load_module_from_path("agents_lint_docs", SCRIPTS_DIR / "agents-lint-docs.py")
     
     # Create linter instance
     linter = lint_docs.DocLinter()
     
-    # Test _validate_frontmatter_yaml with valid YAML
-    from pathlib import Path
-    import tempfile
-    
+    # Test with valid YAML
     valid_frontmatter = """---
 doc_type: test
 status: active
 created_at: '2026-02-24T10:00:00-03:00'
 ---
+# Test
+
+Content
 """
     
+    import tempfile
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write(valid_frontmatter)
-        f.write("# Test\n\nContent\n")
         temp_path = Path(f.name)
     
     try:
-        linter.check_frontmatter(temp_path, valid_frontmatter + "# Test\n\nContent\n")
+        linter.check_frontmatter(temp_path, valid_frontmatter)
         
         # Should have no errors for valid frontmatter
         if linter.issues:
@@ -168,29 +179,25 @@ def test_doctor_frontmatter_helpers():
     """Test agents-doctor.py frontmatter helpers."""
     print("Testing: validate_frontmatter helpers...")
     
-    # Import the class
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("agents_doctor", SCRIPTS_DIR / "agents-doctor.py")
-    doctor = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(doctor)
+    doctor = load_module_from_path("agents_doctor", SCRIPTS_DIR / "agents-doctor.py")
     
     # Create doctor instance
     doc = doctor.AgentsDoctor()
     
     # Test with valid frontmatter
     import tempfile
-    from pathlib import Path
-    
     valid_frontmatter = """---
 doc_type: test
 id: test_01
 created_at: '2026-02-24T10:00:00-03:00'
 ---
+# Test
+
+Content
 """
     
     with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
         f.write(valid_frontmatter)
-        f.write("# Test\n\nContent\n")
         temp_path = Path(f.name)
     
     try:

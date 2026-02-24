@@ -1,5 +1,6 @@
 import importlib.util
 import argparse
+import json
 import sys
 import tempfile
 import unittest
@@ -16,6 +17,23 @@ def load_module(module_name: str, file_path: Path):
 
 
 class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
+    @staticmethod
+    def _build_task_args(session: str, task_id: str, **overrides):
+        args = {
+            "session": session,
+            "task_id": task_id,
+            "evidence_id": None,
+            "allow_unsafe_done": False,
+            "mark_done": False,
+            "mark_in_progress": False,
+            "mark_pending": False,
+            "mark_ready": False,
+            "mark_blocked": False,
+            "mark_skipped": False,
+        }
+        args.update(overrides)
+        return argparse.Namespace(**args)
+
     def test_require_explicit_session_for_write_commands(self):
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
         sys.path.insert(0, str(script_path.parent))
@@ -59,7 +77,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_test", script_path)
 
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             task_file = Path(td) / "task.md"
             task_file.write_text(
                 "---\n"
@@ -81,6 +99,101 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             self.assertIn("- [x] T-01 Fix auth", content)
             self.assertNotIn("- [ [x] T-01", content)
             self.assertIn("| T-01 | - [x] | done |", content)
+
+    def test_mark_done_requires_evidence_unless_bypassed(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_mark_done_gate_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_gate-test"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            task_file = session_dir / "260224_0000_gate-test_task_01.md"
+            task_file.write_text(
+                "---\n"
+                "doc_type: task\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Tasks\n\n"
+                "## Task List\n"
+                "- [ ] T-01 Add gate\n\n"
+                "## State Board\n"
+                "| Task | Checklist | State | Owner | Notes |\n"
+                "|------|----------:|-------|-------|-------|\n"
+                "| T-01 | - [ ] | pending | build | note |\n"
+            )
+
+            args_missing = self._build_task_args(
+                session=str(session_dir),
+                task_id="T-01",
+                mark_done=True,
+            )
+            with self.assertRaises(ValueError):
+                wb_update.cmd_task(args_missing)
+
+            args_unsafe = self._build_task_args(
+                session=str(session_dir),
+                task_id="T-01",
+                mark_done=True,
+                allow_unsafe_done=True,
+            )
+            wb_update.cmd_task(args_unsafe)
+            self.assertIn("- [x] T-01 Add gate", task_file.read_text())
+
+    def test_evidence_ledger_validates_mark_done_reference(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_evidence_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_evidence-test"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            task_file = session_dir / "260224_0000_evidence-test_task_01.md"
+            task_file.write_text(
+                "---\n"
+                "doc_type: task\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Tasks\n\n"
+                "## Task List\n"
+                "- [ ] T-01 Add evidence flow\n\n"
+                "## State Board\n"
+                "| Task | Checklist | State | Owner | Notes |\n"
+                "|------|----------:|-------|-------|-------|\n"
+                "| T-01 | - [ ] | pending | build | note |\n"
+            )
+
+            record = wb_update.append_evidence_record(
+                session_dir=session_dir,
+                task_id="T-01",
+                command="make verify-strict",
+                result="passed",
+                artifacts=[".agents/scripts/verify-tasks.py"],
+                note="strict run evidence",
+            )
+            ledger_file = session_dir / ".evidence.jsonl"
+            self.assertTrue(ledger_file.exists())
+            loaded = [json.loads(line) for line in ledger_file.read_text().splitlines() if line.strip()]
+            self.assertEqual(len(loaded), 1)
+            self.assertEqual(loaded[0]["id"], record["id"])
+
+            args_done = self._build_task_args(
+                session=str(session_dir),
+                task_id="T-01",
+                mark_done=True,
+                evidence_id=record["id"],
+            )
+            wb_update.cmd_task(args_done)
+            self.assertIn("- [x] T-01 Add evidence flow", task_file.read_text())
+
+            args_mismatch = self._build_task_args(
+                session=str(session_dir),
+                task_id="T-02",
+                mark_done=True,
+                evidence_id=record["id"],
+            )
+            with self.assertRaises(ValueError):
+                wb_update.cmd_task(args_mismatch)
 
 
 if __name__ == "__main__":

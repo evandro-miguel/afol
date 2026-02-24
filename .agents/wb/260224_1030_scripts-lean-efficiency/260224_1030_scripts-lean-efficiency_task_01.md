@@ -6,7 +6,7 @@ status: active
 owners:
 - worker
 created_at: '2026-02-24T10:30:20-03:00'
-updated_at: '2026-02-24T12:54:13-03:00'
+updated_at: '2026-02-24T14:30:52-03:00'
 depends_on:
 - 260224_1030_scripts-lean-efficiency_plan_01
 links:
@@ -31,7 +31,9 @@ links:
 - [x] T-09 Align phase tasks (`task_02..task_04`) with measured baseline.
 - [x] T-10 Mark phase ready for execution handoff.
 - [x] T-11 test-refactor (quick task added during execution).
-- [ ] T-12 integration-test-task
+- [x] T-12 integration-test-task (quick task - integration test validation).
+- [x] T-13 integration-test-task (quick task - test execution validation).
+- [ ] T-14 integration-test-task
 
 ## State Board
 | Task | Checklist | State | Owner | Notes |

@@ -4,7 +4,7 @@ id: scripts-usage
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-02-23T23:37:47-03:00'
+updated_at: '2026-02-24T16:10:00-03:00'
 ---
 
 # Scripts Usage
@@ -35,6 +35,22 @@ make structure
 
 # Full validation
 make all
+
+# Lint fixes
+make lint-fix          # Fix common issues
+make lint-fix-dry      # Preview fixes
+make lint-fix-check    # Check for issues
+make lint-fix-checkboxes  # Fix checkbox separators
+make lint-fix-frontmatter # Add missing frontmatter
+
+# Tests
+make test-scripts      # Run unit tests
+make lint-scripts      # Lint Python code
+
+# Workbench updates
+make wb-touch          # Update timestamps
+make wb-evidence SESSION_ID=<id> TASK_ID=T-01 CMD="make verify-strict" RESULT="passed"
+make wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with evidence
 ```
 
 ### Using Wrapper
@@ -43,6 +59,10 @@ make all
 .agents/agents help
 .agents/agents doctor
 .agents/agents new auth-refactor --spec
+.agents/agents wb-update touch
+.agents/agents wb-update evidence T-01 --session <id> --command "make verify-strict" --result "passed"
+.agents/agents tools list
+.agents/agents telemetry heat --period weekly
 ```
 
 ## Setup (One Time)
@@ -75,6 +95,9 @@ This creates:
 .agents/agents help
 
 # Validate structure
+.agents/agents doctor
+
+# Create new workstream
 .agents/agents doctor
 
 # Create new workstream

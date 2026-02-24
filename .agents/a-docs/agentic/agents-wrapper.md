@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: 2026-02-20T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+updated_at: '2026-02-24T16:15:00-03:00'
 links:
   tools_json: ./tools-json.md
   makefile: ./makefile.md
@@ -32,6 +32,7 @@ Bash wrapper that:
 3. **Executes with isolation** - `uv run --with pyyaml`
 4. **Preserves context** - Maintains working directory
 5. **Unified interface** - `.agents/agents <command>`
+6. **Command-map dispatch** - Efficient routing (refactored 2026-02-24)
 
 ## What It Touches
 
@@ -50,6 +51,8 @@ Bash wrapper that:
 | `agents-new.py` | `.agents/agents new <theme>` |
 | `agents-tools.py` | `.agents/agents tools ...` |
 | `agents-wb-update.py` | `.agents/agents wb-update ...` |
+| `agents-telemetry.py` | `.agents/agents telemetry ...` |
+| `agents-lint-docs.py` | `.agents/agents lint-docs` |
 | ... | ... |
 
 ## How to Configure
@@ -64,8 +67,13 @@ lint-docs           # Markdown lint
 structure-map       # Map structure
 sync                # Sync agent docs
 verify-tasks        # Verify tasks
-wb-update           # WB automation
+ wb-update           # WB automation (touch/evidence/task/status/link/timeline/files-changed)
 tools               # Tool discovery
+telemetry           # Heat scoring
+patterns            # Pattern suggestions
+bootstrap           # Install in another repo
+skills-sync         # Sync skills
+fix-symlinks        # Repair symlinks
 help                # Help
 ```
 

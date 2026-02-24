@@ -1,6 +1,6 @@
 # 🎨 Data Structure
 
-**Generated:** 2026-02-24T15:36:37+00:00
+**Generated:** 2026-02-24T22:13:17+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -9,17 +9,17 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 63 files, 4,991 lines, 536.2 KB
+**Stats:** 63 files, 5,286 lines, 609.8 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
+| `.agents/data/telemetry/events.jsonl` | 595 | 147.6 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vite-skill/references/config/README.md` | 365 | 7.9 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vitest-skill/references/mocks/README.md` | 320 | 9.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vitest-skill/references/configuration/README.md` | 306 | 7.6 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/tailwind-skill/references/configuration/README.md` | 302 | 5.5 KB | Module; functionality |
-| `.agents/data/telemetry/events.jsonl` | 301 | 74.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/biome-skill/references/configuration/README.md` | 212 | 4.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/playwright-skill/references/configuration/README.md` | 193 | 4.7 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/wsl-skill/references/configuration/README.md` | 110 | 2.4 KB | Module; functionality |
@@ -32,7 +32,7 @@ Data files, constants, and configuration.
 | `.agents/cache/universal-skills/skills/ux-skill/data/colors.csv` | 97 | 12.7 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/playwright-skill/references/fixtures/README.md` | 93 | 2.5 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/typescript-skill/references/tsconfig-strict.json` | 92 | 3.3 KB | Module; functionality |
-| `.agents/agents.config` | 81 | 1.8 KB | Module; functionality |
+| `.agents/agents.config` | 82 | 1.8 KB | Module; functionality |
 | `.agents/data/telemetry/schemas/event.json` | 78 | 2.3 KB | Module; functionality |
 | `.agents/arc/structure/data.md` | 75 | 7.8 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/react-skill/references/storybook/config.md` | 70 | 3.1 KB | Module; functionality |
