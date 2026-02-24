@@ -1,11 +1,10 @@
-# Agents scripts virtualenv (isolated per project)
-.agents/scripts/.venv/
+# Example ignore file for local agent workspaces
+# Copy/merge into your local .gitignore after cloning this repository.
 
-# UV lock files (optional: commit for reproducible builds)
+# Agents scripts virtualenv and caches
+.agents/scripts/.venv/
 .agents/scripts/uv.lock
 uv.lock
-
-# Python cache
 .agents/scripts/__pycache__/
 .agents/scripts/*.pyc
 **/__pycache__/
@@ -15,17 +14,14 @@ uv.lock
 .agents/arc/structure/.structure-cache.json
 **/.structure-cache.json
 
-# Runtime telemetry events (operational data)
+# Runtime telemetry events
 .agents/data/telemetry/events.jsonl
 
 # Local temporary/reference workspace
 .agents/.tmp/
 
-# Workbench sessions (operational state; should not be cloned)
+# Workbench sessions (operational state)
 .agents/wb/
 
 # Local coverage artifact
 .coverage
-
-# Makefile in a-docs (keep root Makefile)
-# .agents/a-docs/standards/Makefile
