@@ -93,7 +93,7 @@ make telemetry-heat PERIOD=daily
 .agents/agents verify
 
 # Generate report
-make wb-update files-changed
+make wb-files-changed
 
 # View session telemetry
 make telemetry-report PERIOD=weekly
@@ -370,7 +370,7 @@ make telemetry-cold PERIOD=monthly TYPE=tools
 2. Follow templates from `a-docs/templates/`
 3. Apply relevant patterns
 4. Validate: `make all`
-5. Report: `make wb-update files-changed`
+5. Report: `make wb-files-changed`
 
 ## 📄 License
 

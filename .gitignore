@@ -15,5 +15,8 @@ uv.lock
 .agents/arc/structure/.structure-cache.json
 **/.structure-cache.json
 
+# Runtime telemetry events (operational data)
+.agents/data/telemetry/events.jsonl
+
 # Makefile in a-docs (keep root Makefile)
 # .agents/a-docs/standards/Makefile
