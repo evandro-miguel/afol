@@ -9,6 +9,18 @@
       "description": "Python operational scripts"
     },
     {
+      "path": "scripts/agents-update",
+      "type": "user",
+      "recursive": true,
+      "description": "Local update subsystem - preserve unless explicitly replaced"
+    },
+    {
+      "path": "agents-update",
+      "type": "user",
+      "recursive": false,
+      "description": "Local update wrapper - preserve unless explicitly replaced"
+    },
+    {
       "path": "rules",
       "type": "system",
       "recursive": true,
@@ -91,7 +103,9 @@
       "type": "hybrid",
       "recursive": true,
       "default": "user",
-      "exceptions": ["skills/core"],
+      "exceptions": [
+        "skills/core"
+      ],
       "description": "Skills folder - hybrid, most are user data"
     },
     {
@@ -157,9 +171,10 @@
     },
     {
       "path": "update-ownership.json",
-      "type": "system",
+      "type": "hybrid",
       "recursive": false,
-      "description": "This file"
+      "description": "Ownership map with local overrides",
+      "default": "user"
     }
   ],
   "default_policy": "user"

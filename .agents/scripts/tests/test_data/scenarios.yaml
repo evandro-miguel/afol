@@ -20,7 +20,7 @@ scenarios:
       message: "already up to date"
       
   - id: TC-002
-    name: "Check - Update major disponível"
+    name: "Check - Update major available"
     type: unit
     description: "When upstream has higher major version"
     input:
@@ -32,7 +32,7 @@ scenarios:
       new_version: "v2.0.0"
       
   - id: TC-003
-    name: "Check - Update minor disponível"
+    name: "Check - Update minor available"
     type: unit
     description: "When upstream has higher minor version"
     input:
@@ -43,7 +43,7 @@ scenarios:
       update_type: "minor"
       
   - id: TC-004
-    name: "Check - Update patch disponível"
+    name: "Check - Update patch available"
     type: unit
     description: "When upstream has higher patch version"
     input:
@@ -58,9 +58,9 @@ scenarios:
   # ─────────────────────────────────────────────────────────────────
   
   - id: TC-005
-    name: "Plan - Diff vazio quando sem mudanças"
+    name: "Plan - Empty diff when no changes"
     type: integration
-    description: "Plan mostra diff vazio quando não há mudanças"
+    description: "Plan shows empty diff when no changes"
     input:
       local_version: "v1.2.0"
       upstream_version: "v1.2.0"
@@ -69,7 +69,7 @@ scenarios:
       changed_files: []
       
   - id: TC-006
-    name: "Plan - Diff com mudanças"
+    name: "Plan - Diff with changes"
     type: integration
     description: "Plan mostra arquivos modificados"
     input:
@@ -101,9 +101,9 @@ scenarios:
       backup_id: /backup_\d{8}_\d{6}/
       
   - id: TC-008
-    name: "Apply - Update com mudanças locais faz stash"
+    name: "Apply - Update with local changes does stash"
     type: integration
-    description: "Apply detecta e faz stash de mudanças locais"
+    description: "Apply detects and stashes local changes"
     setup:
       local_uncommitted_changes: true
     input:
@@ -114,9 +114,9 @@ scenarios:
       backup_created: true
       
   - id: TC-009
-    name: "Apply - Falha faz rollback automático"
+    name: "Apply - Failure does automatic rollback"
     type: integration
-    description: "Se algo falhar, rollback é automático"
+    description: "If something fails, rollback is automatic"
     setup:
       simulate_failure: true
     input:
@@ -127,7 +127,7 @@ scenarios:
       backup_used: true
 
   # ─────────────────────────────────────────────────────────────────
-  #  Scenario 4: Rollback - Restaurar versão anterior
+  #  Scenario 4: Rollback - Restore previous version
   # ─────────────────────────────────────────────────────────────────
   
   - id: TC-010
@@ -144,7 +144,7 @@ scenarios:
       version_restored: true
       
   - id: TC-011
-    name: "Rollback - Sem backup disponível"
+    name: "Rollback - Sem backup available"
     type: integration
     description: "Rollback falha elegantemente sem backups"
     setup:
@@ -156,9 +156,9 @@ scenarios:
       error: /no backup/i
       
   - id: TC-012
-    name: "Rollback - Requer confirmação"
+    name: "Rollback - Requires confirmation"
     type: integration
-    description: "Rollback não executa sem --yes"
+    description: "Rollback does not execute without --yes"
     input:
       rollback: true
       confirm: false
@@ -171,9 +171,9 @@ scenarios:
   # ─────────────────────────────────────────────────────────────────
   
   - id: TC-013
-    name: "Check - upstream indisponível"
+    name: "Check - upstream inavailable"
     type: integration
-    description: "Check lida com rede indisponível"
+    description: "Check lida com rede inavailable"
     setup:
       network_available: false
     input:
@@ -198,9 +198,9 @@ scenarios:
       success: true
       
   - id: TC-015
-    name: "Apply - Reparo forçado após interrupção"
+    name: "Apply - Forced repair after interruption"
     type: e2e
-    description: "Reparo forçado limpa estado inconsistente"
+    description: "Forced repair clears inconsistent state"
     setup:
       corrupted_state: true
     input:
@@ -214,7 +214,7 @@ scenarios:
   # ─────────────────────────────────────────────────────────────────
   
   - id: TC-016
-    name: "Version inválida é tratada"
+    name: "Invalid version is handled"
     type: unit
     description: "Version mal formatada gera erro claro"
     input:
@@ -227,7 +227,7 @@ scenarios:
   - id: TC-017
     name: "Version prerelease"
     type: unit
-    description: "Version beta/alpha é tratada"
+    description: "Beta/alpha version is handled"
     input:
       current_version: "v1.0.0-beta"
       upstream_version: "v1.0.0"

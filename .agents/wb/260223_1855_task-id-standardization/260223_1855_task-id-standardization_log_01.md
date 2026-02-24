@@ -31,6 +31,8 @@ updated_at: '2026-02-23T18:25:49-03:00'
 - 2026-02-23 18:17-03 - Implemented universal skills sync standard with strict skills/<name>/SKILL.md contract and new skills-sync toolchain
 - 2026-02-23 18:20-03 - Set default template skills to writing-skills and markdownlint-skill in skills-sync config/manifest/docs
 - 2026-02-23 18:25-03 - Added AGENTS rule: .agents/a-docs is documentation-only and preserved suggested follow-up phrasing
+- 2026-02-23T19:29:52-03:00 - Added quick task T-05: translate-agentic-01 - pending
+- 2026-02-23T19:35:58-03:00 - Added quick task T-06: translate-final-check - pending
 ## Decisions
 - Enforce ID-based parsing to guarantee deterministic `task -> file -> line` mapping.
 - Enforce "one active session + quick mode" to avoid unnecessary WB folder creation.

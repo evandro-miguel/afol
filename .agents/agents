@@ -18,6 +18,8 @@
 #   verify-tasks        Check task completion
 #   wb-update           Update workbench metadata (touch/task/status/link/timeline/files-changed)
 #   tools               Discover available tools and usage details
+#   telemetry           Query/report heat and telemetry data
+#   patterns            Suggest/apply/rate implementation patterns
 #   bootstrap           Install .agents system into another repository
 #   skills-sync         Sync project skills from universal-skills
 #   fix-symlinks        Repair symlinks with replication fallback
@@ -49,7 +51,7 @@ record_tool_telemetry() {
         python3 "${TELEMETRY_SCRIPT}" record tool_exec \
             --session-id="${session_id}" \
             --metadata="{\"tool_name\":\"${tool_name}\",\"outcome\":\"${outcome}\"}" \
-            2>/dev/null || true
+            >/dev/null 2>&1 || true
     fi
 }
 
@@ -119,6 +121,16 @@ case "${COMMAND}" in
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-tools.py" "$@"
         record_tool_telemetry "tools" "success"
         ;;
+    telemetry)
+        cd "${ORIGINAL_PWD}"
+        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-telemetry.py" "$@"
+        record_tool_telemetry "telemetry" "success"
+        ;;
+    patterns)
+        cd "${ORIGINAL_PWD}"
+        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-patterns.py" "$@"
+        record_tool_telemetry "patterns" "success"
+        ;;
     bootstrap)
         cd "${ORIGINAL_PWD}"
         uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-bootstrap.py" "$@"
@@ -150,6 +162,8 @@ case "${COMMAND}" in
         echo "  verify-tasks        Check if all tasks are completed"
         echo "  wb-update           Update WB metadata (touch/task/status/link/timeline/files-changed)"
         echo "  tools               Discover and explore available tools"
+        echo "  telemetry           Query/report telemetry and heat scoring"
+        echo "  patterns            Discover and apply reusable patterns"
         echo "  bootstrap           Install .agents system in another repository"
         echo "  skills-sync         Sync project skills from universal-skills"
         echo "  fix-symlinks        Repair symlinks with copy fallback"
@@ -165,6 +179,8 @@ case "${COMMAND}" in
         echo "  .agents/agents tools list"
         echo "  .agents/agents tools info doctor"
         echo "  .agents/agents tools search validate"
+        echo "  .agents/agents telemetry heat --period weekly"
+        echo "  .agents/agents patterns suggest --theme auth"
         echo "  .agents/agents bootstrap /path/to/target-repo --dry-run"
         echo "  .agents/agents skills-sync status"
         echo "  .agents/agents fix-symlinks --dry-run"

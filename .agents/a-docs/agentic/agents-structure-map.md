@@ -11,49 +11,49 @@ links:
   index: ./agents-index.md
 ---
 
-# agents-structure-map.py - Mapping de Estrutura
+# agents-structure-map.py - Structure Mapping
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Projetos crescem e a estrutura fica complexa. Novos desenvolvedores (ou agentes) precisam:
-- Entender organização de Files
-- Saber onde cada tipo de código vive
-- Ter Overview do código
+**Problem:** Projects grow and structure becomes complex. New developers (or agents) need to:
+- Understand file organization
+- Know where each type of code lives
+- Have code overview
 
-**Solução:** Geração automática de Documentation de estrutura com inventário de Files.
+**Solution:** Automatic generation of structure documentation with file inventory.
 
 ## Function
 
-Escaneia projeto e gera Documentation:
+Scans project and generates documentation:
 
-1. **Inventário de Files** - Por categoria
-2. **Line counts** - Tamanho de cada arquivo
-3. **Descrições** - Extraídas de comentários/docstrings
-4. **Agrupamento** - Frontend, Backend, Types, Tests, etc.
-5. **Cache** - Para atualizações incrementais
+1. **File inventory** - By category
+2. **Line counts** - Size of each file
+3. **Descriptions** - Extracted from comments/docstrings
+4. **Grouping** - Frontend, Backend, Types, Tests, etc.
+5. **Cache** - For incremental updates
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
-| Arquivo | Purpose |
-|---------|-----------|
-| Projeto alvo (ex: `.`) | Files para mapear |
-| `.agents/agents.config` | Config de caminhos |
+| File | Purpose |
+|------|---------|
+| Target project (e.g., `.`) | Files to map |
+| `.agents/agents.config` | Path configuration |
 
-### Files Escritos
+### Files Written
 
-| Arquivo | Purpose |
-|---------|-----------|
+| File | Purpose |
+|------|---------|
 | `.agents/arc/structure/README.md` | Overview |
 | `.agents/arc/structure/frontend.md` | Frontend |
 | `.agents/arc/structure/backend.md` | Backend |
 | `.agents/arc/structure/tests.md` | Tests |
-| ... | Outras categorias |
+| ... | Other categories |
 
 ## How to Configure
 
-### Seções default
+### Default Sections
 
 ```python
 DEFAULT_SECTIONS = {
@@ -78,48 +78,46 @@ DEFAULT_SECTIONS = {
 
 ## How to Modify
 
-### Adicionar Nova Seção
+### Add New Category
 
-```python
-DEFAULT_SECTIONS["mobile"] = {
-    "patterns": ["mobile", "react-native"],
-    "extensions": [".tsx"],
-    "title": "Mobile",
-    "description": "React Native components"
-}
-```
-
-### Alterar Output
-
-Editar Function `generate_section_md()`.
+1. Add to `DEFAULT_SECTIONS` dict
+2. Define patterns and extensions
+3. Create template in `.agents/arc/structure/`
 
 ## How to Test
 
 ```bash
-# Mapear projeto atual
-./.agents/agents structure-map .
-
-# Output customizado
+# Generate structure docs
 ./.agents/agents structure-map . --output .agents/arc/structure/
 
 # Via Makefile
 make structure
 
-# Verificar output
+# Verify output
 cat .agents/arc/structure/README.md
 ```
 
-## main Funções
+## Output Example
 
-```python
-scan_directory()            # Escaneia Directory
-categorize_file()           # Categoriza arquivo
-count_lines()               # Conta linhas
-extract_description()       # Extrai descrição
-generate_section_md()       # Gera markdown
-update_cache()              # Updates cache
+```markdown
+# Project Structure
+
+## Frontend
+| File | Lines | Description |
+|------|-------|-------------|
+| src/components/Button.tsx | 150 | Reusable button component |
+| src/hooks/useAuth.ts | 80 | Authentication hook |
+
+## Backend
+| File | Lines | Description |
+|------|-------|-------------|
+| src/api/users.py | 200 | User API endpoints |
 ```
 
----
+## Related
 
-*structure-map documenta Architecture de código automaticamente*
+- [agents-index.md](./agents-index.md) - Index generation
+- [tools-json.md](./tools-json.md) - Tool catalog
+
+---
+*Document: `.agents/a-docs/agentic/agents-structure-map.md`*

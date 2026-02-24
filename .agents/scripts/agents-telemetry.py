@@ -662,17 +662,19 @@ def main():
     
     if args.command == "record":
         metadata = {}
+        context = {}
         if args.metadata:
             metadata = json.loads(args.metadata)
         if args.context:
-            metadata["context"] = json.loads(args.context)
+            context = json.loads(args.context)
         if args.outcome:
             metadata["outcome"] = args.outcome
         
         event = record_event(
             event_type=args.event_type,
             session_id=args.session_id,
-            metadata=metadata
+            metadata=metadata,
+            context=context
         )
         print(f"Recorded event: {event['event_id']}")
         print(json.dumps(event, indent=2))

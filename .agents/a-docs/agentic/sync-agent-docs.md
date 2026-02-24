@@ -11,45 +11,45 @@ links:
   agents_md: ../../AGENTS.md
 ---
 
-# sync-agent-docs.py - Synchronization de Documentation de Agentes
+# sync-agent-docs.py - Agent Documentation Synchronization
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Múltiplos agentes (QWEN, CLAUDE, GEMINI) têm Files de instruções separados. Manter sincronizado manualmente é:
-- Propenso a errors
-- Trabalhoso
-- Causa inconsistência entre agentes
+**Problem:** Multiple agents (QWEN, CLAUDE, GEMINI) have separate instruction files. Keeping them synchronized manually is:
+- Error-prone
+- Laborious
+- Causes inconsistency between agents
 
-**Solução:** Synchronization automática a partir de um template central (AGENTS.md).
+**Solution:** Automatic synchronization from a central template (AGENTS.md).
 
 ## Function
 
-Sincroniza Files de agentes:
+Synchronizes agent files:
 
-1. **Lê AGENTS.md** - Template central
-2. **Detecta modificações locais** - Hash comparison
-3. **Reporta diferenças** - Mostra o que mudou
-4. **Pede confirmação** - before de sobrescrever
-5. **Preserva headers** - Headers específicos por agente
+1. **Reads AGENTS.md** - Central template
+2. **Detects local modifications** - Hash comparison
+3. **Reports differences** - Shows what changed
+4. **Asks confirmation** - Before overwriting
+5. **Preserves headers** - Agent-specific headers
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
-| Arquivo | Purpose |
-|---------|-----------|
-| `AGENTS.md` | Template central |
-| `QWEN.md` | Instruções QWEN |
-| `CLAUDE.md` | Instruções CLAUDE |
-| `GEMINI.md` | Instruções GEMINI |
+| File | Purpose |
+|------|---------|
+| `AGENTS.md` | Central template |
+| `QWEN.md` | QWEN instructions |
+| `CLAUDE.md` | CLAUDE instructions |
+| `GEMINI.md` | GEMINI instructions |
 
-### Files Escritos
+### Files Written
 
-| Arquivo | Purpose |
-|---------|-----------|
-| `QWEN.md` | Atualizado do template |
-| `CLAUDE.md` | Atualizado do template |
-| `GEMINI.md` | Atualizado do template |
+| File | Purpose |
+|------|---------|
+| `QWEN.md` | Updated from template |
+| `CLAUDE.md` | Updated from template |
+| `GEMINI.md` | Updated from template |
 
 ## How to Configure
 
@@ -75,39 +75,37 @@ HEADER_TEMPLATE = """# Agent-specific instructions for {agent_name}
 
 ## How to Modify
 
-### Adicionar Novo Agente
+### Add New Agent
 
-1. Criar arquivo (ex: `COPILOT.md`)
-2. Adicionar em `sync.target_files` no `agents.config`
-3. Adicionar header específico se necessário
+1. Create file (e.g., `COPILOT.md`)
+2. Add to `agents.config` sync.target_files
+3. Run sync
 
-### Alterar Comportamento de Merge
-
-Editar Function `merge_with_local_changes()`.
-
-## How to Test
+## How to Use
 
 ```bash
-# Sync normal (pergunta before de sobrescrever)
-./.agents/agents sync
-
-# Forçar sync (sem perguntas)
+# Sync all agents
 ./.agents/agents sync --force
 
 # Via Makefile
 make sync
 ```
 
-## main Funções
+## Output
 
-```python
-compute_hash()              # SHA256 do conteúdo
-get_expected_content()      # Conteúdo esperado do template
-detect_local_changes()      # Detecta modificações locais
-merge_headers()             # Preserva headers específicos
-sync_files()                # Executa Synchronization
+```
+→ Syncing AGENTS.md to agent files...
+QWEN.md: No local modifications detected
+CLAUDE.md: 3 differences found
+GEMINI.md: No local modifications detected
+
+Sync complete.
 ```
 
----
+## Related
 
-*sync mantém agentes consistentes com instruções centralizadas*
+- [tools-json.md](./tools-json.md) - Tool catalog
+- `AGENTS.md` - Central template
+
+---
+*Document: `.agents/a-docs/agentic/sync-agent-docs.md`*

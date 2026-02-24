@@ -4,23 +4,23 @@
 
 This document defines the complete test strategy for the agents update system, covering unit, integration, and E2E tests.
 
-## Stack de Testes
+## Test Stack
 
 - **Framework**: pytest
 - **Mocks**: pytest-mock, unittest.mock
-- **Fixtures**: pytest fixtures personalizadas
+- **Fixtures**: Custom pytest fixtures
 - **Coverage**: pytest-cov
 - **Git Mocks**: pytest-git, custom fixtures
 
 ---
 
-## 1. Estrutura do Projeto de Testes
+## 1. Test Project Structure
 
 ```
 .agents/scripts/
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py              # Fixtures globais
+│   ├── conftest.py              # Global fixtures
 │   │
 │   ├── unit/
 │   │   ├── __init__.py
@@ -79,7 +79,7 @@ import os
 
 @pytest.fixture
 def temp_home(tmp_path):
-    """Creates directory temporário for tests."""
+    """Creates temporary directory for tests."""
     return tmp_path
 
 
@@ -98,7 +98,7 @@ def mock_agents_home(temp_home, monkeypatch):
 
 @pytest.fixture
 def mock_git_repo(temp_home):
-    """Cria um repository git mock for tests."""
+    """Creates um repository git mock for tests."""
     repo_path = temp_home / "test_repo"
     repo_path.mkdir()
     
@@ -117,7 +117,7 @@ def mock_git_repo(temp_home):
 
 
 class MockGitCommand:
-    """Simula comandos git for tests."""
+    """Simulates comandos git for tests."""
     
     def __init__(self, repo_path: Path):
         self.repo = repo_path
@@ -135,7 +135,7 @@ class MockGitCommand:
         return "\n".join(commits)
     
     def diff(self, ref1, ref2="", stat=False):
-        """Retorna diff simulado entre refs."""
+        """Returns diff simulado entre refs."""
         if stat:
             return "file1.py | 10 +++---\nfile2.py | 5 +++\n2 files changed, 15 insertions(+)"
         return "diff --git a/file1.py b/file1.py\n@@ -1,5 +1,10 @@\n+new line added\n-old line removed"
@@ -184,7 +184,7 @@ class MockGitCommand:
 
 
 class MockResult:
-    """Simula resultado de subprocess.run."""
+    """Simulates resultado de subprocess.run."""
     
     def __init__(self, returncode, stdout, stderr):
         self.returncode = returncode
@@ -213,7 +213,7 @@ def mock_git(mocker):
 # ─────────────────────────────────────────────────────────
 
 class MockUpstreamServer:
-    """Simula servidor upstream for tests."""
+    """Simulates servidor upstream for tests."""
     
     def __init__(self):
         self.available = True
@@ -268,11 +268,11 @@ def backup_dir(temp_home):
 
 @pytest.fixture
 def existing_backup(backup_dir):
-    """Cria backup existente for tests."""
+    """Creates backup existente for tests."""
     backup_path = backup_dir / "backup_20260223_120000"
     backup_path.mkdir()
     
-    # Cria estrutura de backup simulada
+    # Creates structure de backup simulada
     (backup_path / ".agents").mkdir()
     (backup_path / ".agents" / "agents").write_text("# old version")
     (backup_path / "metadata.json").write_text(json.dumps({
@@ -290,7 +290,7 @@ def existing_backup(backup_dir):
 
 @pytest.fixture
 def mock_config(temp_home):
-    """Cria configuração mock for tests."""
+    """Creates mock configuration for tests."""
     config = {
         "version": "v1.1.0",
         "check_interval_hours": 24,
@@ -311,9 +311,9 @@ def mock_config(temp_home):
 # ─────────────────────────────────────────────────────────
 
 def create_fake_git_history(repo_path: Path, commits: list[str]):
-    """Cria histórico git falso for tests."""
+    """Creates fake git history for tests."""
     for i, msg in enumerate(commits):
-        # Cria arquivo para commit
+        # Creates arquivo to commit
         file = repo_path / f"file_{i}.txt"
         file.write_text(f"Content {i}\n")
         
@@ -327,7 +327,7 @@ def create_fake_git_history(repo_path: Path, commits: list[str]):
 
 @pytest.fixture
 def sample_diff_content():
-    """Retorna conteúdo de diff de exemplo."""
+    """Returns sample diff content."""
     return """diff --git a/.agents/agents b/.agents/agents
 index 1234567..89abcdef 100755
 --- a/.agents/agents
@@ -364,18 +364,18 @@ diff --git a/.agents/scripts/agents-doctor.py b/.agents/scripts/agents-doctor.py
 
 import pytest
 from unittest.mock import MagicMock, patch
-import semver
+import withoutver
 
 
 class TestVersionComparison:
-    """Testa comparação de versões semânticas."""
+    """Tests withoutantic version comparison."""
     
     # ─────────────────────────────────────────────
-    #  Cases: Current version é older
+    #  Cases: Current version is older
     # ─────────────────────────────────────────────
     
     def test_update_available_major_version(self):
-        """Quando upstream tem versão major maior, update available."""
+        """When upstream has higher major version, update available."""
         from agents_update.version import check_version
         
         current = "v1.0.0"
@@ -388,7 +388,7 @@ class TestVersionComparison:
         assert result["new_version"] == "v2.0.0"
     
     def test_update_available_minor_version(self):
-        """Quando upstream tem versão minor maior."""
+        """When upstream has higher minor version."""
         current = "v1.1.0"
         upstream = "v1.2.0"
         
@@ -398,7 +398,7 @@ class TestVersionComparison:
         assert result["update_type"] == "minor"
     
     def test_update_available_patch_version(self):
-        """Quando upstream tem versão patch maior."""
+        """When upstream has higher patch version."""
         current = "v1.1.0"
         upstream = "v1.1.1"
         
@@ -412,7 +412,7 @@ class TestVersionComparison:
     # ─────────────────────────────────────────────
     
     def test_no_update_same_version(self):
-        """Mesma versão não tem update."""
+        """Same version has no update."""
         current = "v1.2.0"
         upstream = "v1.2.0"
         
@@ -422,7 +422,7 @@ class TestVersionComparison:
         assert result["update_type"] is None
     
     def test_no_update_upstream_behind(self):
-        """Quando upstream está atrás (rare but possible)."""
+        """When upstream is behind (rare but possible)."""
         current = "v1.2.0"
         upstream = "v1.1.0"
         
@@ -435,7 +435,7 @@ class TestVersionComparison:
     # ─────────────────────────────────────────────
     
     def test_version_with_prefix_v(self):
-        """Versões com prefixo v são tratadas corretamente."""
+        """Versions with v prefix are handled correctly."""
         current = "v1.0.0"
         upstream = "v1.0.1"
         
@@ -444,7 +444,7 @@ class TestVersionComparison:
         assert result["has_update"] is True
     
     def test_version_without_prefix_v(self):
-        """Versões sem prefixo funcionam."""
+        """Versions without prefix work."""
         current = "1.0.0"
         upstream = "1.0.1"
         
@@ -453,7 +453,7 @@ class TestVersionComparison:
         assert result["has_update"] is True
     
     def test_invalid_version_format(self):
-        """Versão inválida levanta exceção clara."""
+        """Invalid version raises clear exception."""
         current = "invalid"
         upstream = "v1.0.0"
         
@@ -461,7 +461,7 @@ class TestVersionComparison:
             check_version(current, upstream)
     
     def test_prerelease_version(self):
-        """Versões prerelease são tratadas corretamente."""
+        """Prerelease versions are handled correctly."""
         current = "v1.0.0-beta"
         upstream = "v1.0.0"
         
@@ -472,16 +472,16 @@ class TestVersionComparison:
 
 
 class TestVersionParser:
-    """Testa parsing de versão de diferentes fontes."""
+    """Tests version parsing from different sources."""
     
-    @pytest.mark.parametrize("input,expected", [
+    @pytest.mark.tometrize("input,expected", [
         ("v1.2.3", "1.2.3"),
         ("1.2.3", "1.2.3"),
         ("v1.2.3-beta.1", "1.2.3-beta.1"),
         ("version: 1.2.3", "1.2.3"),
     ])
     def test_parse_version_string(self, input, expected):
-        """Diferentes formatos de versão são parseados."""
+        """Different version formats are parsed."""
         from agents_update.version import parse_version
         
         result = parse_version(input)
@@ -525,7 +525,7 @@ diff --git a/scripts/test.py b/scripts/test.py
 """
     
     def test_parse_diff_returns_file_list(self, sample_diff):
-        """Diff parsing returns lista de arquivos modificados."""
+        """Diff parsing returns lista de files modificados."""
         result = parse_diff(sample_diff)
         
         assert len(result["files"]) == 2
@@ -533,7 +533,7 @@ diff --git a/scripts/test.py b/scripts/test.py
         assert "scripts/test.py" in result["files"]
     
     def test_extract_file_changes(self, sample_diff):
-        """Extração de mudanças por arquivo."""
+        """Extract changes per file."""
         changes = extract_file_changes(sample_diff)
         
         assert changes["file1.py"]["additions"] == 1
@@ -541,14 +541,14 @@ diff --git a/scripts/test.py b/scripts/test.py
         assert changes["scripts/test.py"]["additions"] == 2
     
     def test_categorize_changes_by_type(self, sample_diff):
-        """Categorização de arquivos por tipo de mudança."""
+        """Categorize files by change type."""
         categories = categorize_changes(sample_diff)
         
         assert "scripts" in categories["python"]
         assert "file1.py" in categories["python"]
     
     def test_calculate_impact_score(self, sample_diff):
-        """Cálculo de score de impacto."""
+        """Calculate impact score."""
         score = calculate_impact_score(sample_diff)
         
         assert score > 0
@@ -556,10 +556,10 @@ diff --git a/scripts/test.py b/scripts/test.py
 
 
 class TestDiffFiltering:
-    """Testa filtragem de mudanças."""
+    """Tests filtering de changes."""
     
     def test_ignore_patterns(self):
-        """Arquivos em ignore_patterns são filtrados."""
+        """Arquivos em ignore_patterns are filtered."""
         diff = """diff --git a/node_modules/package/index.js b/node_modules/package/index.js
 --- a/node_modules/package/index.js
 +++ b/node_modules/package/index.js
@@ -572,7 +572,7 @@ class TestDiffFiltering:
         assert len(result["files"]) == 0
     
     def test_critical_files_detection(self):
-        """Arquivos críticos são marcados."""
+        """Critical files are marked."""
         diff = """diff --git a/.agents/agents b/.agents/agents
 +new line
 diff --git a/README.md b/README.md
@@ -597,7 +597,7 @@ from agents_update.backup import BackupManager
 
 
 class TestBackupCreation:
-    """Testa criação de backups."""
+    """Tests creation de backups."""
     
     @pytest.fixture
     def manager(self, temp_home):
@@ -613,7 +613,7 @@ class TestBackupCreation:
         return agents
     
     def test_create_backup(self, manager, agents_home):
-        """Backup é criado corretamente."""
+        """Backup is created correctly."""
         result = manager.create(agents_home)
         
         assert result["success"] is True
@@ -621,7 +621,7 @@ class TestBackupCreation:
         assert result["files_backed_up"] > 0
     
     def test_backup_includes_metadata(self, manager, agents_home):
-        """Backup inclui metadados."""
+        """Backup inclui metadata."""
         result = manager.create(agents_home)
         
         backup_path = manager.backup_dir / result["backup_id"]
@@ -643,7 +643,7 @@ class TestBackupCreation:
         assert len(result["backup_id"]) > 20
     
     def test_incremental_backup(self, manager, agents_home):
-        """Backups incrementais funcionam."""
+        """Backups incrementais worksm."""
         # Primeiro backup
         result1 = manager.create(agents_home)
         
@@ -667,24 +667,24 @@ class TestBackupListing:
         assert all("timestamp" in b for b in backups)
     
     def test_list_backups_sorted_by_date(self, manager_with_backups):
-        """Backups são ordenados por data."""
+        """Backups are sorted por data."""
         backups = manager.list()
         
         timestamps = [b["timestamp"] for b in backups]
         assert timestamps == sorted(timestamps, reverse=True)
     
     def test_filter_by_version(self, manager_with_backups):
-        """Filtro por versão funciona."""
+        """Version filter works."""
         backups = manager.list(version="v1.1.0")
         
         assert all(b["version"] == "v1.1.0" for b in backups)
 
 
 class TestBackupDeletion:
-    """Testa exclusão de backups."""
+    """Tests deletion de backups."""
     
     def test_delete_backup(self, manager_with_backups):
-        """Exclusão de backup específico."""
+        """Specific backup deletion."""
         backups_before = manager.list()
         backup_id = backups_before[0]["id"]
         
@@ -696,7 +696,7 @@ class TestBackupDeletion:
         assert backup_id not in [b["id"] for b in backups_after]
     
     def test_delete_old_backups_retention(self, manager_with_backups):
-        """Limite de retenção é aplicado."""
+        """Retention limit is applied."""
         # Assume retention de 30 dias
         result = manager.cleanup_old(retention_days=30)
         
@@ -708,14 +708,14 @@ class TestBackupIntegrity:
     """Testa integridade do backup."""
     
     def test_verify_backup_integrity(self, valid_backup):
-        """Backup válido passa na verificação."""
+        """Valid backup passes verification."""
         result = manager.verify(valid_backup["id"])
         
         assert result["valid"] is True
         assert len(result["issues"]) == 0
     
     def test_detect_corrupted_backup(self, corrupted_backup):
-        """Backup corrompido é detectado."""
+        """Backup corrompido is detected."""
         result = manager.verify(corrupted_backup["id"])
         
         assert result["valid"] is False
@@ -742,10 +742,10 @@ class TestUpdateCheck:
     """Testa o comando check de update."""
     
     def test_check_no_updates_available(self, mock_git_repo, mock_upstream):
-        """Check reporta quando não há updates."""
+        """Check reports when no updates."""
         from agents_update.cli import check
         
-        # Setup: repository está no latest
+        # Setup: repository is at latest
         mock_upstream.latest_version = "v1.1.0"
         
         result = check(repo_path=mock_git_repo)
@@ -754,7 +754,7 @@ class TestUpdateCheck:
         assert result["current_version"] == "v1.1.0"
     
     def test_check_update_available(self, mock_git_repo, mock_upstream):
-        """Check reporta quando há update available."""
+        """Check reports when update available."""
         from agents_update.cli import check
         
         mock_upstream.latest_version = "v1.2.0"
@@ -765,7 +765,7 @@ class TestUpdateCheck:
         assert result["new_version"] == "v1.2.0"
     
     def test_check_upstream_unavailable(self, mock_git_repo, mock_upstream):
-        """Check lida com upstream indisponível."""
+        """Check handles upstream unavailable."""
         from agents_update.cli import check
         import requests
         
@@ -777,10 +777,10 @@ class TestUpdateCheck:
         assert "unavailable" in result["error"].lower()
     
     def test_check_with_cached_version(self, mock_git_repo, mock_upstream, temp_home):
-        """Check usa cache quando disponível."""
+        """Check uses cache quando available."""
         from agents_update.cli import check
         
-        # Cria cache
+        # Creates cache
         cache_file = temp_home / ".update_cache"
         cache_file.write_text(json.dumps({
             "last_check": "2026-02-23T10:00:00Z",
@@ -789,7 +789,7 @@ class TestUpdateCheck:
         
         result = check(repo_path=mock_git_repo, use_cache=True)
         
-        # Não deveria fazer request real
+        # Should not fazer request real
         assert result.get("cached") is True
 
 
@@ -797,7 +797,7 @@ class TestUpdatePlan:
     """Testa o comando plan de update."""
     
     def test_plan_shows_diff(self, mock_git_repo, mock_upstream):
-        """Plan mostra diff das mudanças."""
+        """Plan shows diff of changes."""
         from agents_update.cli import plan
         
         mock_upstream.latest_version = "v1.2.0"
@@ -808,10 +808,10 @@ class TestUpdatePlan:
         assert len(result["changed_files"]) > 0
     
     def test_plan_with_local_changes(self, mock_git_repo, mock_upstream):
-        """Plan detecta mudanças locais não commitadas."""
+        """Plan detects changes local uncommitted."""
         from agents_update.cli import plan
         
-        # Cria arquivo modificado
+        # Creates arquivo modificado
         (mock_git_repo / "modified.txt").write_text("local change")
         
         result = plan(repo_path=mock_git_repo)
@@ -820,7 +820,7 @@ class TestUpdatePlan:
         assert len(result["local_files"]) > 0
     
     def test_plan_categorizes_changes(self, mock_git_repo, mock_upstream):
-        """Plan categoriza mudanças por tipo."""
+        """Plan categorizes changes by type."""
         from agents_update.cli import plan
         
         result = plan(repo_path=mock_git_repo)
@@ -835,8 +835,8 @@ class TestUpdateApply:
     
     @pytest.fixture
     def prepared_update(self, mock_git_repo, mock_upstream):
-        """Prepara ambiente para apply."""
-        # Setup upstream com arquivos
+        """Preto ambiente to apply."""
+        # Setup upstream com files
         mock_upstream.latest_version = "v1.2.0"
         return mock_git_repo
     
@@ -850,32 +850,32 @@ class TestUpdateApply:
         assert result["success"] is True
     
     def test_apply_updates_files(self, prepared_update):
-        """Apply atualiza arquivos corretamente."""
+        """Apply atualiza files corretamente."""
         from agents_update.cli import apply
         
         result = apply(repo_path=prepared_update)
         
-        # Verifica que arquivos foram atualizados
+        # Verifies que files foram atualizados
         version_file = prepared_update / ".agents" / "VERSION"
         assert version_file.exists()
     
     def test_apply_with_local_changes_stashes(self, mock_git_repo):
-        """Apply faz stash de mudanças locais."""
+        """Apply does stash de changes local."""
         from agents_update.cli import apply
         
-        # Simula mudanças locais
+        # Simulates changes local
         (mock_git_repo / "local.txt").write_text("my changes")
         
         result = apply(repo_path=mock_git_repo)
         
-        # Deve ter stash
+        # Should ter stash
         assert result.get("stashed") is True
     
     def test_apply_rollback_on_failure(self, mock_git_repo):
-        """Apply faz rollback se algo falhar."""
+        """Apply faz rollback se algo failsr."""
         from agents_update.cli import apply
         
-        # Simula falha
+        # Simulates fails
         with patch("agents_update.git.apply_changes", side_effect=Exception("Git error")):
             result = apply(repo_path=mock_git_repo)
             
@@ -884,10 +884,10 @@ class TestUpdateApply:
             assert result["backup_used"] is not None
     
     def test_apply_interrupted_recovery(self, mock_git_repo):
-        """Recuperação de update interrompido."""
+        """Recovery de update interrupted."""
         from agents_update.cli import apply
         
-        # Simula estado de interrupção
+        # Simulates state de interruption
         lock_file = mock_git_repo / ".agents" / ".update.lock"
         lock_file.write_text(json.dumps({
             "pid": 12345,
@@ -913,10 +913,10 @@ class TestRollback:
         assert result["restored_files"] > 0
     
     def test_rollback_to_specific_version(self, mock_git_repo, manager_with_backups):
-        """Rollback para versão específica."""
+        """Rollback to specific version."""
         from agents_update.cli import rollback
         
-        # Pega backup específico
+        # Gets backup specific
         backups = manager_with_backups.list()
         target_backup = backups[0]
         
@@ -928,14 +928,14 @@ class TestRollback:
         assert result["version_restored"] == target_backup["version"]
     
     def test_rollback_requires_confirmation(self, mock_git_repo):
-        """Rollback requer confirmação."""
+        """Rollback requires confirmation."""
         from agents_update.cli import rollback
         
         with pytest.raises(ValueError, match="confirmation required"):
             rollback(repo_path=mock_git_repo, backup_id="test", confirm=False)
     
     def test_rollback_fresh_install_no_backup(self, mock_git_repo):
-        """Rollback em instalação fresca sem backup."""
+        """Rollback on fresh install without backup."""
         from agents_update.cli import rollback
         
         result = rollback(repo_path=mock_git_repo)
@@ -963,13 +963,13 @@ import json
 
 @pytest.fixture(scope="session")
 def test_repos_root(tmp_path_factory):
-    """Diretório base para repositorys de teste."""
+    """Base directory to repositorys for test."""
     return tmp_path_factory.mktemp("e2e_repos")
 
 
 @pytest.fixture
 def fresh_repo(test_repos_root):
-    """Reposítório vazio para primeiro update."""
+    """Empty repository to first update."""
     repo_path = test_repos_root / "fresh_repo"
     repo_path.mkdir()
     
@@ -984,13 +984,13 @@ def fresh_repo(test_repos_root):
         cwd=repo_path, capture_output=True
     )
     
-    # Cria estrutura inicial
+    # Creates structure initial
     (repo_path / ".agents").mkdir()
     (repo_path / ".agents" / "VERSION").write_text("v1.0.0")
     (repo_path / ".agents" / "agents").write_text("#!/bin/bash\necho v1.0.0")
     (repo_path / ".agents" / "scripts").mkdir()
     
-    # Commit inicial
+    # Commit initial
     subprocess.run(["git", "add", "."], cwd=repo_path, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Initial v1.0.0"],
@@ -1005,7 +1005,7 @@ def fresh_repo(test_repos_root):
 
 @pytest.fixture
 def repo_with_backup(test_repos_root):
-    """Repositório com backup anterior."""
+    """Repository with previous backup."""
     repo_path = test_repos_root / "repo_with_backup"
     repo_path.mkdir()
     
@@ -1020,7 +1020,7 @@ def repo_with_backup(test_repos_root):
         cwd=repo_path, capture_output=True
     )
     
-    # Cria estrutura com backup
+    # Creates structure com backup
     agents_dir = repo_path / ".agents"
     agents_dir.mkdir()
     
@@ -1051,11 +1051,11 @@ def repo_with_backup(test_repos_root):
 
 @pytest.fixture
 def repo_with_uncommitted(test_repos_root):
-    """Repositório com mudanças não commitadas."""
+    """Repository with uncommitted changes."""
     repo_path = test_repos_root / "repo_uncommitted"
     repo_path.mkdir()
     
-    # Setup git básico
+    # Setup git basic
     subprocess.run(["git", "init"], cwd=repo_path, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
@@ -1066,7 +1066,7 @@ def repo_with_uncommitted(test_repos_root):
         cwd=repo_path, capture_output=True
     )
     
-    # Cria arquivos commitados
+    # Creates files commitados
     agents_dir = repo_path / ".agents"
     agents_dir.mkdir()
     (agents_dir / "VERSION").write_text("v1.1.0")
@@ -1077,7 +1077,7 @@ def repo_with_uncommitted(test_repos_root):
         cwd=repo_path, capture_output=True
     )
     
-    # Adiciona mudanças não commitadas
+    # Adds changes uncommitted
     (repo_path / ".agents" / "local_patch.py").write_text("# My custom change")
     (repo_path / "notes.txt").write_text("My notes")
     
@@ -1088,11 +1088,11 @@ def repo_with_uncommitted(test_repos_root):
 
 @pytest.fixture
 def interrupted_update_repo(test_repos_root):
-    """Repositório com update incompleto."""
+    """Repository with incomplete update."""
     repo_path = test_repos_root / "interrupted_update"
     repo_path.mkdir()
     
-    # Setup básico
+    # Setup basic
     subprocess.run(["git", "init"], cwd=repo_path, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
@@ -1103,12 +1103,12 @@ def interrupted_update_repo(test_repos_root):
         cwd=repo_path, capture_output=True
     )
     
-    # Cria estado de interrupção
+    # Creates state de interruption
     agents_dir = repo_path / ".agents"
     agents_dir.mkdir()
     (agents_dir / "VERSION").write_text("v1.1.0")
     
-    # Lock file de update incompleto
+    # Lock file de update incomplete
     lock_file = agents_dir / ".update.lock"
     lock_file.write_text(json.dumps({
         "phase": "downloading",
@@ -1141,8 +1141,8 @@ class TestFirstUpdateScenario:
     """
     
     def test_fresh_install_check_no_updates(self, fresh_repo, mock_upstream):
-        """Repo novo com latest versão reporta sem updates."""
-        # Simula que upstream tem a mesma versão
+        """New repo with latest version reports no updates."""
+        # Simulates upstream has the same version
         mock_upstream.latest_version = "v1.0.0"
         
         result = subprocess.run(
@@ -1156,7 +1156,7 @@ class TestFirstUpdateScenario:
         assert "up to date" in result.stdout.lower() or "no updates" in result.stdout.lower()
     
     def test_fresh_install_update_flow(self, fresh_repo, mock_upstream):
-        """Update completo em repo novo funciona."""
+        """Update full em repo novo works."""
         mock_upstream.latest_version = "v1.2.0"
         
         # Check
@@ -1177,7 +1177,7 @@ class TestFirstUpdateScenario:
         )
         assert plan_result.returncode == 0
         
-        # Apply (com --yes para pular confirmação)
+        # Apply (with --yes to skip confirmation)
         apply_result = subprocess.run(
             [".agents/agents", "update", "apply", "--yes"],
             cwd=fresh_repo,
@@ -1188,11 +1188,11 @@ class TestFirstUpdateScenario:
         assert apply_result.returncode == 0
         assert "success" in apply_result.stdout.lower()
         
-        # Verifica versão atualizada
+        # Verifies updated version
         version_file = fresh_repo / ".agents" / "VERSION"
         assert version_file.read_text() == "v1.2.0"
         
-        # Verifica backup foi criado
+        # Verifies backup foi criado
         backup_dir = fresh_repo / ".backups"
         assert backup_dir.exists()
         backups = list(backup_dir.iterdir())
@@ -1201,11 +1201,11 @@ class TestFirstUpdateScenario:
 
 class TestUpdateWithExistingBackup:
     """
-    Scenario: Update quando já existe backup anterior
+    Scenario: Update when already exists backup previous
     """
     
     def test_update_respects_backup_retention(self, repo_with_backup):
-        """Update não remove backups antigos desnecessários."""
+        """Update does not remove backups old unnecessary."""
         # Faz update
         result = subprocess.run(
             [".agents/agents", "update", "apply", "--yes"],
@@ -1216,13 +1216,13 @@ class TestUpdateWithExistingBackup:
         
         assert result.returncode == 0
         
-        # Verifica que backup antigo permanece
+        # Verifies que backup antigo permanece
         backup_dir = repo_with_backup / ".backups"
         old_backup = backup_dir / "backup_20260220_100000"
         assert old_backup.exists()
     
     def test_update_can_use_previous_backup(self, repo_with_backup):
-        """Update pode fazer rollback para backup anterior."""
+        """Update pode fazer rollback to backup previous."""
         # Aplica update
         subprocess.run(
             [".agents/agents", "update", "apply", "--yes"],
@@ -1240,18 +1240,18 @@ class TestUpdateWithExistingBackup:
         
         assert rollback_result.returncode == 0
         
-        # Verifica versão anterior
+        # Verifies previous version
         version_file = repo_with_backup / ".agents" / "VERSION"
         assert version_file.read_text() == "v1.0.0"
 
 
 class TestUpdateWithLocalChanges:
     """
-    Scenario: Update com modificações locais não commitadas
+    Scenario: Update com modifications local uncommitted
     """
     
     def test_update_detects_uncommitted_changes(self, repo_with_uncommitted):
-        """Update detecta mudanças locais."""
+        """Update detects changes local."""
         result = subprocess.run(
             [".agents/agents", "update", "plan"],
             cwd=repo_with_uncommitted,
@@ -1262,8 +1262,8 @@ class TestUpdateWithLocalChanges:
         assert "uncommitted" in result.stdout.lower() or "local" in result.stdout.lower()
     
     def test_update_with_stash_and_unstash(self, repo_with_uncommitted):
-        """Update faz stash/unstash de mudanças locais."""
-        # Apply com stash automático
+        """Update does stash/unstash de changes local."""
+        # Apply com stash automatic
         result = subprocess.run(
             [".agents/agents", "update", "apply", "--yes", "--stash"],
             cwd=repo_with_uncommitted,
@@ -1272,11 +1272,11 @@ class TestUpdateWithLocalChanges:
         )
         
         assert result.returncode == 0
-        # Verifica que mudanças locais foram salvas
-        # (implícito no fluxo)
+        # Verifies que changes local were saved
+        # (implicit in flow)
     
     def test_update_fails_without_stash_flag(self, repo_with_uncommitted):
-        """Update falha sem --stash quando há mudanças locais."""
+        """Update fails without --stash when has changes local."""
         result = subprocess.run(
             [".agents/agents", "update", "apply", "--yes"],
             cwd=repo_with_uncommitted,
@@ -1284,18 +1284,18 @@ class TestUpdateWithLocalChanges:
             text=True
         )
         
-        # Deve falhar ou avisar
+        # Should failsr ou avisar
         assert result.returncode != 0 or "warning" in result.stdout.lower()
 
 
 class TestInterruptedUpdate:
     """
-    Scenario: Update falha no meio (simular interrupção)
+    Scenario: Update fails in middle (simulate interruption)
     """
     
     def test_resume_interrupted_update(self, interrupted_update_repo):
-        """Update interrompido pode ser retomado."""
-        # Tenta aplicar (deve detectar estado inconsistente)
+        """Update interrupted pode ser retomado."""
+        # Tenta aplicar (deve detectsr state inconsistente)
         result = subprocess.run(
             [".agents/agents", "update", "apply", "--yes", "--resume"],
             cwd=interrupted_update_repo,
@@ -1303,11 +1303,11 @@ class TestInterruptedUpdate:
             text=True
         )
         
-        # Deve conseguir recuperar
+        # Should conseguir recuperar
         assert result.returncode == 0 or "resumed" in result.stdout.lower()
     
     def test_force_repair_after_interruption(self, interrupted_update_repo):
-        """Force repair após interrupção."""
+        """Force repair after interruption."""
         result = subprocess.run(
             [".agents/agents", "update", "repair", "--force"],
             cwd=interrupted_update_repo,
@@ -1317,18 +1317,18 @@ class TestInterruptedUpdate:
         
         assert result.returncode == 0
         
-        # Verifica que lock foi removido
+        # Verifies que lock foi removido
         lock_file = interrupted_update_repo / ".agents" / ".update.lock"
         assert not lock_file.exists()
 
 
 class TestUpstreamUnavailable:
     """
-    Scenario: Update quando upstream está indisponível
+    Scenario: Update quando upstream is unavailable
     """
     
     def test_check_handles_no_network(self, fresh_repo, mock_upstream):
-        """Check lida com indisponibilidade de rede."""
+        """Check handles indisponibilidade de rede."""
         mock_upstream.available = False
         
         result = subprocess.run(
@@ -1338,12 +1338,12 @@ class TestUpstreamUnavailable:
             text=True
         )
         
-        # Pode falhar ou usar cache
+        # Pode failsr ou usar cache
         assert result.returncode != 0 or "cache" in result.stdout.lower()
     
     def test_apply_works_with_cached(self, fresh_repo, mock_upstream):
-        """Apply funciona com dados em cache."""
-        # Cria cache primeiro
+        """Apply works com data em cache."""
+        # Creates cache first
         cache_file = fresh_repo / ".agents" / ".update_cache"
         cache_file.write_text(json.dumps({
             "version": "v1.2.0",
@@ -1358,20 +1358,20 @@ class TestUpstreamUnavailable:
             text=True
         )
         
-        # Pode funcionar com cache ou falhar
+        # Pode worksr com cache ou failsr
         if result.returncode == 0:
             assert "offline" in result.stdout.lower()
 
 
 class TestRollbackScenarios:
     """
-    Scenario: Rollback após update
+    Scenario: Rollback after update
     """
     
     def test_rollback_after_successful_update(self, fresh_repo):
-        """Rollback funciona após update bem-sucedido."""
-        # Setup: faz update primeiro
-        # (implícito - o repo já está em estado inicial)
+        """Rollback works after update successful."""
+        # Setup: faz update first
+        # (implicit - the repo already is em state initial)
         
         # Aplica update
         subprocess.run(
@@ -1391,7 +1391,7 @@ class TestRollbackScenarios:
         assert result.returncode == 0
     
     def test_rollback_requires_confirmation(self, fresh_repo):
-        """Rollback precisa de confirmação explícita."""
+        """Rollback needs confirmation explicit."""
         result = subprocess.run(
             [".agents/agents", "update", "rollback"],
             cwd=fresh_repo,
@@ -1399,11 +1399,11 @@ class TestRollbackScenarios:
             text=True
         )
         
-        # Deve falhar ou pedir confirmação
+        # Should failsr ou ask confirmation
         assert result.returncode != 0 or "confirm" in result.stdout.lower()
     
     def test_rollback_to_specific_backup(self, repo_with_backup):
-        """Rollback para backup específico."""
+        """Rollback to backup specific."""
         backups = list((repo_with_backup / ".backups").iterdir())
         
         if backups:
@@ -1421,7 +1421,7 @@ class TestRollbackScenarios:
 
 ---
 
-## 6. Estratégia de Mock para Git/Upstream
+## 6. Strategy of Mock to Git/Upstream
 
 ### 6.1 Overview
 
@@ -1455,7 +1455,7 @@ class TestRollbackScenarios:
 
 | Camada | O que Mockar | Como |
 |--------|-------------|------|
-| **Unit** | Funções puras, parsing, validação | `unittest.mock.MagicMock` |
+| **Unit** | Pure functions, parsing, validation | `unittest.mock.MagicMock` |
 | **Integration** | `subprocess.run` git, HTTP requests | `pytest-mock` fixtures |
 | **E2E** | Nada (ou Docker container) | Repos reais + upstream mock server |
 
@@ -1466,7 +1466,7 @@ class TestRollbackScenarios:
 
 class GitMock:
     """
-    Mock completo de operações git for tests.
+    Complete mock de operations git for tests.
     
     Uso:
         git = GitMock(repo_path)
@@ -1487,7 +1487,7 @@ class GitMock:
         self._commits_db = {}  # commit_hash -> commit_data
         
     def add_commit(self, message: str, files: dict = None) -> str:
-        """Adiciona um commit simulado."""
+        """Adds um commit simulado."""
         import hashlib
         import uuid
         
@@ -1509,7 +1509,7 @@ class GitMock:
         return commit_hash
     
     def get_commit(self, ref: str) -> dict:
-        """Retorna dados de um commit."""
+        """Returns data de um commit."""
         return self._commits_db.get(ref, {})
     
     def list_branches(self) -> list[str]:
@@ -1517,15 +1517,15 @@ class GitMock:
         return self.branches
     
     def current_branch(self) -> str:
-        """Retorna branch atual."""
+        """Returns branch atual."""
         return self.current
     
     def diff(self, ref1: str = None, ref2: str = None) -> str:
-        """Retorna diff simulado."""
+        """Returns diff simulado."""
         return "diff --git a/test.py b/test.py\n+new line\n-old line"
     
     def log(self, max_count: int = 10) -> list[dict]:
-        """Retorna histórico de commits."""
+        """Returns history de commits."""
         commits = []
         for h in self.commits[-max_count:]:
             commits.append(self._commits_db.get(h, {}))
@@ -1568,9 +1568,9 @@ class UpstreamMock:
         return self.releases.get(version, {})
     
     def _parse_version(self, v: str) -> tuple:
-        """Parse version para comparação."""
-        import semver
-        return semver.VersionInfo.parse(v.lstrip("v"))
+        """Parse version for comparison."""
+        import withoutver
+        return withoutver.VersionInfo.parse(v.lstrip("v"))
 ```
 
 ---
@@ -1579,23 +1579,23 @@ class UpstreamMock:
 
 ### 7.1 Scenarios de Teste
 
-| ID | Scenario | Entrada | Saída Esperada |
+| ID | Scenario | Input | Expected Output |
 |----|---------|---------|----------------|
-| **TC-001** | Check - sem updates | v1.2.0 local, v1.2.0 upstream | `has_update: false` |
+| **TC-001** | Check - without updates | v1.2.0 local, v1.2.0 upstream | `has_update: false` |
 | **TC-002** | Check - update major | v1.0.0 local, v2.0.0 upstream | `has_update: true, type: major` |
 | **TC-003** | Check - update minor | v1.1.0 local, v1.2.0 upstream | `has_update: true, type: minor` |
 | **TC-004** | Check - update patch | v1.1.0 local, v1.1.1 upstream | `has_update: true, type: patch` |
-| **TC-005** | Check - offline | Sem rede | Erro claro ou cache |
-| **TC-006** | Plan - diff vazio | Sem mudanças | `diff: ""` |
-| **TC-007** | Plan - com mudanças | Arquivos modificados | `files: [list]` |
-| **TC-008** | Plan - local changes | Mundos não commitados | `has_local_changes: true` |
+| **TC-005** | Check - offline | Without rede | Erro claro ou cache |
+| **TC-006** | Plan - diff empty | Without changes | `diff: ""` |
+| **TC-007** | Plan - with changes | Arquivos modificados | `files: [list]` |
+| **TC-008** | Plan - local changes | Uncommitted changes | `has_local_changes: true` |
 | **TC-009** | Apply - sucesso | Tudo ok | `success: true` |
 | **TC-010** | Apply - com backup | Primeira vez | Backup criado |
-| **TC-011** | Apply - stash | Mundos locais | Stash criado |
-| **TC-012** | Apply - falha git | Git error | Rollback automático |
+| **TC-011** | Apply - stash | Changes local | Stash criado |
+| **TC-012** | Apply - fails git | Git error | Rollback automatic |
 | **TC-013** | Rollback - sucesso | Backup existe | Restaurado |
-| **TC-014** | Rollback - sem backup | Sem backups | Erro |
-| **TC-015** | Rollback - confirmar | Sem --yes | Pedir confirmação |
+| **TC-014** | Rollback - without backup | Without backups | Erro |
+| **TC-015** | Rollback - confirm | Without --yes | Ask confirmation |
 
 ### 7.2 Test Data Files
 
@@ -1604,7 +1604,7 @@ class UpstreamMock:
 
 scenarios:
   - id: fresh_repo_no_update
-    description: Repo novo, mesma versão
+    description: New repo, same version
     setup:
       local_version: "v1.2.0"
       upstream_version: "v1.2.0"
@@ -1612,7 +1612,7 @@ scenarios:
       has_update: false
       
   - id: update_available
-    description: Update disponível
+    description: Update available
     setup:
       local_version: "v1.1.0"
       upstream_version: "v1.2.0"
@@ -1621,7 +1621,7 @@ scenarios:
       update_type: "minor"
       
   - id: local_changes_detected
-    description: Mundos locais detectadas
+    description: Changes local detectsdas
     setup:
       local_version: "v1.1.0"
       uncommitted:
@@ -1632,7 +1632,7 @@ scenarios:
       local_files_count: 2
       
   - id: interrupted_update
-    description: Update interrompido
+    description: Update interrupted
     setup:
       lock_file:
         phase: "downloading"
@@ -1648,18 +1648,18 @@ scenarios:
 ### 8.1 Comandos
 
 ```bash
-# No diretório .agents/scripts/
+# In directory .agents/scripts/
 
 # Todos os testes
 pytest tests/ -v
 
-# Apenas unitários
+# Only unit
 pytest tests/unit/ -v
 
-# Apenas integração
+# Only integration
 pytest tests/integration/ -v
 
-# Apenas E2E
+# Only E2E
 pytest tests/e2e/ -v
 
 # Com coverage
@@ -1668,10 +1668,10 @@ pytest tests/ --cov=agents_update --cov-report=html
 # Com verbose e mostrar print
 pytest tests/ -v -s
 
-# Teste específico
+# Teste specific
 pytest tests/unit/test_version_check.py::TestVersionComparison::test_update_available_major_version -v
 
-# Marcar como skip (para debugging)
+# Marcar como skip (to debugging)
 pytest tests/ -v --skip
 ```
 
@@ -1712,9 +1712,9 @@ jobs:
 
 ---
 
-## 9. Métricas e Cobertura
+## 9. Metrics e Coverage
 
-### 9.1 Targets de Cobertura
+### 9.1 Targets de Coverage
 
 | Tipo de Teste | Target Minimum | Ideal |
 |---------------|---------------|-------|
@@ -1731,26 +1731,26 @@ jobs:
 
 ---
 
-## 10. Próximos Passos
+## 10. Next Steps
 
-1. **Setup inicial**: Adicionar dependências de teste ao `pyproject.toml`
-2. **Criar estrutura**: Criar diretórios `tests/unit/`, `tests/integration/`, `tests/e2e/`
-3. **Implementar fixtures**: Criar `conftest.py` com fixtures base
-4. **Unit tests**: Implementar testes de versão, diff, backup
-5. **Testes integração**: Implementar fluxo completo check→plan→apply
-6. **Testes E2E**: Criar fixtures de repo real e testar cenários
+1. **Setup initial**: Addsr dependencies for test ao `pyproject.toml`
+2. **Creates structure**: Creates directories `tests/unit/`, `tests/integration/`, `tests/e2e/`
+3. **Implement fixtures**: Createsr `conftest.py` com fixtures base
+4. **Unit tests**: Implement version, diff, backup tests
+5. **Testes integration**: Implement flow full check→plan→apply
+6. **Testes E2E**: Createsr fixtures de repo real e testar scenarios
 7. **CI/CD**: Configurar GitHub Actions
-8. **Documentação**: Adicionar ao README
+8. **Documentation**: Addsr ao README
 
 ---
 
-## Apêndice: Fixture Factory Helpers
+## Appendix: Fixture Factory Helpers
 
 ```python
-# helpers.py - Funções auxiliares para criar dados de teste
+# helpers.py - Helper functions to create test data
 
 def make_git_commit(repo_path: Path, message: str, content: dict) -> str:
-    """Cria commit com arquivos específicos."""
+    """Creates commit com files specifics."""
     for path, text in content.items():
         file_path = repo_path / path
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1776,7 +1776,7 @@ def make_git_commit(repo_path: Path, message: str, content: dict) -> str:
 
 
 def make_backup(backup_dir: Path, version: str, files: dict) -> str:
-    """Cria estrutura de backup."""
+    """Creates structure de backup."""
     from datetime import datetime
     import json
     
@@ -1806,4 +1806,4 @@ def make_backup(backup_dir: Path, version: str, files: dict) -> str:
 ---
 
 *Documento criado em: 2026-02-23*
-*Versão: 1.0.0*
+*Version: 1.0.0*

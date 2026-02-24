@@ -11,40 +11,40 @@ links:
   lint_docs: ./agents-lint-docs.md
 ---
 
-# verify-tasks.py - Verification de tasks
+# verify-tasks.py - Task Verification
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Workstreams podem ter tasks pendentes sem aviso claro. before de marcar workstream como completa, é necessário:
-- Verificar se todas tasks estão completas
-- Identificar tasks bloqueadas
-- Reportar status geral
+**Problem:** Workstreams can have pending tasks without clear warning. Before marking workstream as complete, it's necessary to:
+- Verify all tasks are complete
+- Identify blocked tasks
+- Report overall status
 
-**Solução:** Verification automática que escaneia task files e reporta status.
+**Solution:** Automatic verification that scans task files and reports status.
 
 ## Function
 
-Checks conclusão de tasks:
+Checks task completion:
 
-1. **Escaneia task files** - `*_task_*.md`
-2. **Extrai tasks** - Regex para markers
-3. **Classifica status** - pending, in_progress, done, etc.
-4. **Reporta** - Lista status de cada task
-5. **Exit code** - 0 se todas completas, 1 se pendências
+1. **Scans task files** - `*_task_*.md`
+2. **Extracts tasks** - Regex for markers
+3. **Classifies status** - pending, in_progress, done, etc.
+4. **Reports** - Lists status of each task
+5. **Exit code** - 0 if all complete, 1 if pending
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
-| Arquivo | Purpose |
-|---------|-----------|
-| `.agents/wb/*/`*`_task_*.md` | Task files para verificar |
+| File | Purpose |
+|------|---------|
+| `.agents/wb/*/`*`_task_*.md` | Task files to verify |
 
-### Files Escritos
+### Files Written
 
-| Arquivo | Purpose |
-|---------|-----------|
-| Nenhum | Apenas leitura e relatório |
+| File | Purpose |
+|------|---------|
+| None | Read-only and reporting |
 
 ## How to Configure
 
@@ -63,42 +63,51 @@ MARKERS = {
 
 ## How to Modify
 
-### Adicionar Novo Status
+### Add New Status
 
 ```python
-MARKERS['review'] = r'- \[@\]'  # Novo marker
+MARKERS['review'] = r'- \[@\]'  # New marker
 MARKER_TO_STATUS['@'] = 'review'
 ```
 
-### Alterar Formato de Task ID
+### Change Task ID Format
 
-Editar regex `TASK_LINE_RE`.
+Edit regex `TASK_LINE_RE`.
 
 ## How to Test
 
 ```bash
-# Verificar session específica
-./.agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/
+# Verify specific session
+./.agents/agents verify-tasks .agents/wb/260223_1800_auth-refactor/
 
-# Verificar Directory atual
-./.agents/agents verify-tasks .
+# Verify all
+./.agents/agents verify-tasks .agents/wb/
 
 # Via Makefile
 make verify
-
-# Verificar exit code
-echo $?  # 0 = todas completas, 1 = pendências
 ```
 
-## main Funções
+## Output
 
-```python
-extract_tasks()             # Extrai tasks do markdown
-classify_status()           # Classifica por marker
-report_status()             # Imprime relatório
-check_all_complete()        # Checks se todas completas
+### All Complete
 ```
+✓ All tasks complete (5/5)
+```
+
+### Pending Tasks
+```
+❌ Pending tasks found:
+
+T-01: Implement login - pending (file.md:15)
+T-03: Write tests - in_progress (file.md:28)
+
+Complete: 3/5 (60%)
+```
+
+## Related
+
+- [agents-lint-docs.md](./agents-lint-docs.md) - Markdown linting
+- [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
-
-*verify-tasks garante que workstreams estão realmente completas*
+*Document: `.agents/a-docs/agentic/verify-tasks.md`*

@@ -11,45 +11,45 @@ links:
   doctor: ./agents-doctor.md
 ---
 
-# agents-lint-docs.py - Validation de Documentos Markdown
+# agents-lint-docs.py - Markdown Documents Validation
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Documentos markdown podem ter inconsistências:
-- Checkboxes em formatos diferentes
-- Status inválidos no frontmatter
-- IDs de task fora do default
-- Cross-referências quebradas
+**Problem:** Markdown documents can have inconsistencies:
+- Checkboxes in different formats
+- Invalid status in frontmatter
+- Task IDs outside convention
+- Broken cross-references
 
-**Solução:** Linter específico para documentos `.agents` que Validates convenções.
+**Solution:** Linter specific for `.agents` documents that validates conventions.
 
 ## Function
 
-Validates documentos markdown:
+Validates markdown documents:
 
 1. **Checkbox markers** - `- [X]`, `- [/]`, `- [ ]`
 2. **Status fields** - draft, active, review, approved, etc.
 3. **State values** - pending, in_progress, done, etc.
-4. **Frontmatter** - Campos obrigatórios
-5. **Cross-references** - Links entre documentos
-6. **Task IDs** - default T-NN
+4. **Frontmatter** - Required fields
+5. **Cross-references** - Links between documents
+6. **Task IDs** - Convention T-NN
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
-| Arquivo | Purpose |
-|---------|-----------|
+| File | Purpose |
+|------|---------|
 | `.agents/wb/**/*.md` | Workstreams |
 | `.agents/arc/**/*.md` | Architecture |
-| `.agents/agents.config` | Exclusões de lint |
+| `.agents/agents.config` | Lint exclusions |
 
-### Files Escritos
+### Files Written
 
-| Arquivo | Purpose |
-|---------|-----------|
-| Nenhum (modo normal) | Apenas Validation |
-| Mesmos Files (modo --fix) | Corrige issues |
+| File | Purpose |
+|------|---------|
+| None (normal mode) | Validation only |
+| Same files (--fix mode) | Fixes issues |
 
 ## How to Configure
 
@@ -64,7 +64,7 @@ lint:
     - z-arq/
 ```
 
-### Status Válidos
+### Valid Statuses
 
 ```python
 VALID_STATUSES = [
@@ -75,47 +75,47 @@ VALID_STATUSES = [
 
 ## How to Modify
 
-### Adicionar Nova Validation
+### Add New Validation
 
 ```python
-def check_new_rule(content: str, file_path: Path):
-    """Nova regra de lint."""
-    issues = []
-    # Implementar lógica
-    return issues
+def validate_new_thing(filepath: Path) -> List[str]:
+    """Return list of errors found."""
+    errors = []
+    # Add validation logic
+    return errors
 ```
-
-### Adicionar Novo Status
-
-Editar `VALID_STATUSES` em `agents-lint-docs.py`.
 
 ## How to Test
 
 ```bash
-# Lint em pasta específica
-./.agents/agents lint-docs .agents/wb/260223_1200_auth-refactor/
+# Run lint
+./.agents/agents lint-docs .agents/wb/
 
-# Lint em tudo
-./.agents/agents lint-docs .agents/
-
-# Com auto-fix
-./.agents/agents lint-docs .agents/wb --fix
+# Fix issues
+./.agents/agents lint-docs .agents/wb/ --fix
 
 # Via Makefile
 make lint
 ```
 
-## main Funções
+## Output
 
-```python
-check_checkbox_markers()    # Validates checkboxes
-check_status_fields()       # Validates status
-check_frontmatter()         # Validates frontmatter
-check_task_ids()            # Validates T-NN
-check_cross_references()    # Validates links
-fix_issues()                # Auto-correção
+### Success
+```
+✓ All documents valid
 ```
 
----
+### Errors Found
+```
+file.md:15 - Invalid checkbox format: use '- [x]' not '- [X]'
+file.md:23 - Invalid status: 'inprogress' not in valid statuses
+file.md:45 - Missing frontmatter field: 'updated_at'
+```
 
-*lint-docs mantém consistência da Documentation*
+## Related
+
+- [agents-doctor.md](./agents-doctor.md) - Structure validation
+- [tools-json.md](./tools-json.md) - Tool catalog
+
+---
+*Document: `.agents/a-docs/agentic/agents-lint-docs.md`*

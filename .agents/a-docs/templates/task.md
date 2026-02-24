@@ -33,14 +33,15 @@ Task ID format:
 
 ## State Marker Rules
 
-See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
+See: [../standards/checkbox-protocol.md](../standards/checkbox-protocol.md)
 
-## Lessons Aplicáveis
+## Relevant Lessons
 
 Before starting work, consult relevant resources:
 
 ### Prevention Rules
-- [ ] Check relevant lesson entries in [`.agents/a-docs/lessons/entries/`](.agents/a-docs/lessons/entries/)
+- [ ] Check [../lessons/general-lessons.md](../lessons/general-lessons.md)
+- [ ] Check lesson entries in [../lessons/entries/](../lessons/entries/)
 
 ### Useful Resources
 - Rules useful for this task:
@@ -49,8 +50,8 @@ Before starting work, consult relevant resources:
   - [ ] <doc-1>
 - Skills useful for this task:
   - [ ] <skill-1>
-- Integrações useful for this task:
-  - [ ] <integracao-1>
+- Integrations useful for this task:
+  - [ ] <integration-1>
 
 ## Implementation Checkpoint
 - Files touched:

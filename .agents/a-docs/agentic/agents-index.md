@@ -11,44 +11,44 @@ links:
   structure_map: ./agents-structure-map.md
 ---
 
-# agents-index.py - Update de Índices
+# agents-index.py - Index Update
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Specs e ADRs são criados em diretórios separados. Sem um índice centralizado, é difícil:
-- Descobrir documentos existentes
-- Ver status de cada documento
-- Navegar entre documentos relacionados
+**Problem:** Specs and ADRs are created in separate directories. Without a centralized index, it's difficult to:
+- Discover existing documents
+- See status of each document
+- Navigate between related documents
 
-**Solução:** Índices automáticos que agregam metadados de todos os documentos.
+**Solution:** Automatic indexes that aggregate metadata from all documents.
 
 ## Function
 
-Escaneia diretórios e gera índices:
+Scans directories and generates indexes:
 
-1. **SPECS/INDEX.md** - Lista todas as especificações
-2. **DECISIONS/INDEX.md** - Lista todas as decisões de Architecture
+1. **SPECS/INDEX.md** - Lists all specifications
+2. **DECISIONS/INDEX.md** - Lists all architecture decisions
 
-Extrai do frontmatter:
-- ID, tema, status
+Extracts from frontmatter:
+- ID, theme, status
 - Owner, created_at, updated_at
-- Links relacionados
+- Related links
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
 | Directory | Purpose |
-|-----------|-----------|
-| `.agents/arc/SPECS/**/*.md` | Specs para indexar |
-| `.agents/arc/DECISIONS/**/*.md` | ADRs para indexar |
+|-----------|---------|
+| `.agents/arc/SPECS/**/*.md` | Specs to index |
+| `.agents/arc/DECISIONS/**/*.md` | ADRs to index |
 
-### Files Escritos
+### Files Written
 
-| Arquivo | Purpose |
-|---------|-----------|
-| `.agents/arc/SPECS/INDEX.md` | Índice de specs |
-| `.agents/arc/DECISIONS/INDEX.md` | Índice de ADRs |
+| File | Purpose |
+|------|---------|
+| `.agents/arc/SPECS/INDEX.md` | Specs index |
+| `.agents/arc/DECISIONS/INDEX.md` | ADRs index |
 
 ## How to Configure
 
@@ -62,40 +62,42 @@ paths:
 
 ## How to Modify
 
-### Alterar Formato do Índice
+### Change Index Format
 
-Editar Function `generate_index_md()`:
+Edit function `generate_index_md()`:
 
 ```python
 def generate_index_md(entries: List[DocEntry], output_path: Path):
-    # Formato atual:
-    # | ID | Tema | Status | Owner | Created | Links |
-    # Modificar conforme necessário
+    # Current format:
+    # | ID | Theme | Status | Owner | Created | Links |
+    # Modify as needed
 ```
 
 ## How to Test
 
 ```bash
-# Executar index
+# Run index
 ./.agents/agents index
 
-# Verificar índices
+# Verify generated files
 cat .agents/arc/SPECS/INDEX.md
 cat .agents/arc/DECISIONS/INDEX.md
-
-# Dry run (se implementado)
-./.agents/agents index --dry-run
 ```
 
-## main Funções
+## Output Example
 
-```python
-scan_specs_dir()          # Escaneia SPECS
-scan_decisions_dir()      # Escaneia DECISIONS
-extract_frontmatter()     # Extrai metadados
-generate_index_md()       # Gera INDEX.md
+```markdown
+# Specs Index
+
+| ID | Theme | Status | Owner | Created | Links |
+|----|-------|--------|-------|---------|-------|
+| SPEC-AUTH-001 | OAuth2 Implementation | active | team | 2026-02-20 | [ADR-003] |
 ```
+
+## Related
+
+- [agents-structure-map.md](./agents-structure-map.md) - Structure mapping
+- [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
-
-*index mantém Documentation de Architecture navegável*
+*Document: `.agents/a-docs/agentic/agents-index.md`*

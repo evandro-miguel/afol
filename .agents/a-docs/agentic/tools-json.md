@@ -11,58 +11,58 @@ links:
   agents_tools: ./agents-tools.md
 ---
 
-# tools.json - Catalog de tools
+# tools.json - Tool Catalog
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Agentes autônomos precisam descobrir quais tools estão disponíveis, when usá-las, e como obter detalhes sobre subcomandos e opções.
+**Problem:** Autonomous agents need to discover which tools are available, when to use them, and how to get details about subcommands and options.
 
-**Solução:** Um arquivo JSON centralizado que documenta todas as tools do sistema `.agents` com:
-- Descrições claras
-- Casos de uso (when_to_use)
-- Comandos e opções
-- Classificação por tipo
-- Metadados de execução
+**Solution:** A centralized JSON file that documents all `.agents` system tools with:
+- Clear descriptions
+- Use cases (when_to_use)
+- Commands and options
+- Type classification
+- Execution metadata
 
 ## Function
 
-`tools.json` serve como:
+`tools.json` serves as:
 
-1. **Catalog de tools** - Lista todas as tools disponíveis
-2. **Guia de descoberta** - Usado por `agents-tools.py` para comandos `list`, `info`, `search`
-3. **Referência técnica** - Documenta subcomandos, opções, e padrões de uso
-4. **Classificador** - Categoriza tools por tipo e modo de execução
+1. **Tool catalog** - Lists all available tools
+2. **Discovery guide** - Used by `agents-tools.py` for `list`, `info`, `search` commands
+3. **Technical reference** - Documents subcommands, options, and usage patterns
+4. **Classifier** - Categorizes tools by type and execution mode
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
-| Arquivo | Purpose |
-|---------|-----------|
-| `.agents/tools.json` | Fonte primária (este arquivo) |
-| `.agents/agents.config` | Configurações de caminho |
+| File | Purpose |
+|------|---------|
+| `.agents/tools.json` | Primary source (this file) |
+| `.agents/agents.config` | Path configurations |
 
-### Files Escritos
+### Files Written
 
-| Arquivo | Purpose |
-|---------|-----------|
-| Nenhum | tools.json é apenas leitura em runtime |
+| File | Purpose |
+|------|---------|
+| None | tools.json is read-only at runtime |
 
-### Files Atualizados (edição humana)
+### Files Updated (human editing)
 
-| Arquivo | when |
-|---------|--------|
-| `.agents/tools.json` | Ao adicionar nova tool |
+| File | When |
+|------|------|
+| `.agents/tools.json` | When adding new tool |
 
 ## How to Configure
 
-### Estrutura do JSON
+### JSON Structure
 
 ```json
 {
   "version": "1.0.0",
   "updated_at": "2026-02-23T00:00:00-03:00",
-  "description": "Catalog de tools...",
+  "description": "Tool catalog...",
   "tools": [...],
   "makefile_targets": {...},
   "tool_categories": {...},
@@ -72,11 +72,11 @@ links:
 }
 ```
 
-### Seções main
+### Main Sections
 
 #### `tools` (array)
 
-Lista de todas as tools. Cada tool tem:
+List of all tools. Each tool has:
 
 ```json
 {
@@ -87,237 +87,94 @@ Lista de todas as tools. Cada tool tem:
   "make_command": "make doctor",
   "type": "validation",
   "execution_mode": "on-demand",
-  "created_at": "2026-02-20",
-  "updated_at": "2026-02-23",
-  "description": "...",
-  "when_to_use": ["...", "..."],
-  "commands": [...],  // optional, para subcomandos
-  "options": [...],   // optional
-  "checks": [...]     // optional
+  "description": "Validates .agents structure...",
+  "when_to_use": [...],
+  "commands": [...],
+  "output": "...",
+  "side_effect": "..."
 }
 ```
 
 #### `tool_categories`
 
-Classificação por tipo:
+Groups tools by purpose:
 
 ```json
 {
-  "validation": { "description": "...", "tools": ["doctor", "lint-docs"] },
-  "creation": { "description": "...", "tools": ["new"] },
-  "documentation": { "description": "...", "tools": ["index", "structure-map"] },
-  "verification": { "description": "...", "tools": ["verify-tasks"] },
-  "automation": { "description": "...", "tools": ["wb-update"] },
-  "synchronization": { "description": "...", "tools": ["sync"] },
-  "infrastructure": { "description": "...", "tools": ["agents"] },
-  "discovery": { "description": "...", "tools": ["tools"] }
+  "validation": {
+    "description": "Validates structure, syntax, and compliance",
+    "tools": ["doctor", "lint-docs"],
+    "usage_pattern": "Run before commits or as quality gate"
+  },
+  "creation": {
+    "description": "Creates new files and workstreams",
+    "tools": ["new", "bootstrap"],
+    "usage_pattern": "Start of new feature, bug fix, or investigation"
+  }
 }
 ```
 
 #### `execution_modes`
 
-Padrões de execução:
+Describes when each tool runs:
 
 ```json
 {
-  "on-demand": { "description": "...", "tools": [...] },
-  "cron": { "description": "...", "tools": [], "suggested": [...] },
-  "event-driven": { "description": "...", "tools": {...} }
-}
-```
-
-#### `makefile_aliases`
-
-Aliases de atalho no Makefile:
-
-```json
-{
-  "note": "Aliases de atalho no Makefile...",
-  "aliases": {
-    "st": "structure",
-    "ix": "index",
-    "sy": "sync",
-    "vf": "verify",
-    "dr": "doctor"
+  "on-demand": {
+    "description": "Manual execution on user/agent command",
+    "tools": ["tools", "doctor", "new", ...]
   },
-  "warning": "doc NÃO é um alias valido..."
+  "cron": {
+    "description": "Scheduled periodic execution",
+    "suggested": ["doctor (daily in CI/CD)", "lint-docs (pre-commit hook)"]
+  },
+  "event-driven": {
+    "description": "Triggered by specific events",
+    "tools": {
+      "new": "When creating new feature/bug",
+      "index": "After creating spec/adr"
+    }
+  }
 }
 ```
 
 ## How to Modify
 
-### Adicionar Nova tool
+### Add New Tool
 
-1. **Criar script** em `.agents/scripts/<tool>.py`
-2. **Registrar no wrapper** `.agents/agents`
-3. **Adicionar entrada em `tools`**:
+1. Add entry to `tools` array
+2. Include all required fields
+3. Add to appropriate category in `tool_categories`
+4. Add to `execution_modes.on-demand.tools`
+5. Run `./.agents/agents tools validate`
 
-```json
-{
-  "id": "my-new-tool",
-  "name": "My New Tool",
-  "tool": "agents-my-new-tool.py",
-  "wrapper_command": ".agents/agents my-new-tool [args]",
-  "make_command": "make my-new-tool",
-  "type": "validation",
-  "execution_mode": "on-demand",
-  "created_at": "2026-02-23",
-  "updated_at": "2026-02-23",
-  "description": "Descrição clara da tool",
-  "when_to_use": [
-    "Caso de uso 1",
-    "Caso de uso 2"
-  ]
-}
-```
+### Update Existing Tool
 
-4. **Adicionar à categoria** em `tool_categories`
-5. **Validar JSON**: `python -m json.tool .agents/tools.json`
-
-### Atualizar tool Existente
-
-1. Localizar tool por `id` em `tools` array
-2. Atualizar campos relevantes
-3. Atualizar `updated_at` no metadata da tool
-4. Atualizar `updated_at` no root do JSON
-5. Validar JSON
-
-### Remover tool
-
-1. Remover entrada de `tools` array
-2. Remover de `tool_categories` se aplicável
-3. Atualizar `execution_modes` se aplicável
-4. Validar JSON
+1. Find tool by `id`
+2. Update fields
+3. Update `updated_at` timestamp
+4. Validate: `./.agents/agents tools validate`
 
 ## How to Test
 
-### Validation de Sintaxe
-
 ```bash
-# Validar JSON
-python -m json.tool .agents/tools.json > /dev/null && echo "✓ Válido"
-```
+# Validate catalog
+./.agents/agents tools validate
 
-### Validation de Conteúdo
-
-```bash
-# Contar tools
-python3 -c "import json; d=json.load(open('.agents/tools.json')); print(f'Tools: {len(d[\"tools\"])}')"
-
-# Listar categorias
-python3 -c "import json; d=json.load(open('.agents/tools.json')); print('Categories:', list(d['tool_categories'].keys()))"
-```
-
-### Validation de Uso
-
-```bash
-# Testar list
+# List tools
 ./.agents/agents tools list
 
-# Testar info
+# Get tool info
 ./.agents/agents tools info doctor
 
-# Testar search
-./.agents/agents tools search Validates
+# Search tools
+./.agents/agents tools search validation
 ```
 
-### Metrics de Health
+## Related
 
-| Métrica | Comando | Ideal |
-|---------|---------|-------|
-| JSON válido | `python -m json.tool` | Sem errors |
-| Tools count | `len(tools)` | 10+ |
-| Categorias | `len(tool_categories)` | 8 |
-| Info funciona | `.agents/agents tools info <id>` | Output correto |
-
-## main Funções
-
-### Estrutura de uma Tool Entry
-
-```python
-# Exemplo de estrutura completa
-{
-    "id": "wb-update",
-    "name": "Agents Workbench Update",
-    "tool": "agents-wb-update.py",
-    "wrapper_command": ".agents/agents wb-update <command> [options]",
-    "make_command": "make wb-<command> [ARGS...]",
-    "type": "automation",
-    "execution_mode": "on-demand",
-    "created_at": "2026-02-23",
-    "updated_at": "2026-02-23",
-    "description": "Automatiza atualizações de baixo valor...",
-    "when_to_use": [
-        "Atualizar updated_at after trabalhar em session",
-        "Normalizar timestamps para timezone configurado",
-        "Marcar task como completa/em progresso"
-    ],
-    "commands": [
-        {
-            "name": "touch",
-            "usage": "wb-update touch",
-            "description": "Updates updated_at no frontmatter"
-        },
-        # ... mais subcomandos
-    ],
-    "options": ["--force", "--dry-run"],  # se aplicável
-    "checks": ["Check 1", "Check 2"]      # se aplicável
-}
-```
-
-### Campos Obrigatórios
-
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| `id` | string | Identificador único (kebab-case) |
-| `name` | string | Nome legível |
-| `tool` | string | Nome do arquivo Python |
-| `wrapper_command` | string | Comando via wrapper |
-| `make_command` | string | Comando via Makefile |
-| `type` | string | Categoria (validation, creation, etc.) |
-| `execution_mode` | string | on-demand, cron, event-driven |
-| `description` | string | Descrição clara |
-| `when_to_use` | array | Casos de uso |
-
-### Campos Opcionais
-
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| `commands` | array | Subcomandos (para tools com subcommands) |
-| `options` | array | Opções de linha de comando |
-| `checks` | array | Checks realizados (para validation tools) |
-| `task_markers` | object | Markers de task (para verify-tasks) |
-| `workflow` | array | Passo a passo de uso |
-
-## Troubleshooting
-
-### JSON Inválido
-
-```bash
-# Identificar error
-python -m json.tool .agents/tools.json 2>&1 | head -5
-
-# Comum: vírgula faltando ou aspas não escapadas
-```
-
-### Tool Não Aparece no List
-
-1. Verificar se está em `tools` array
-2. Verificar se JSON é válido
-3. Recarregar: `.agents/agents tools list`
-
-### Search Não Encontra Tool
-
-1. Verificar campos `description` e `when_to_use`
-2. Adicionar palavras-chave relevantes
-3. Search é case-insensitive
-
-## Referências
-
-- [agents-tools.md](./agents-tools.md) - tool que consome este Catalog
-- [agents-config.md](./agents-config.md) - Configuration central
-- [agents-wrapper.md](./agents-wrapper.md) - Wrapper bash
+- [agents-tools.md](./agents-tools.md) - Tool discovery
+- [agents-config.md](./agents-config.md) - Configuration
 
 ---
-
-*tools.json é o coração do sistema de descoberta de tools*
+*Document: `.agents/a-docs/agentic/tools-json.md`*

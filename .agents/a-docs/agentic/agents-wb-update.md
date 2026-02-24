@@ -11,51 +11,51 @@ links:
   new: ./agents-new.md
 ---
 
-# agents-wb-update.py - Automation de Workbench
+# agents-wb-update.py - Workbench Automation
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Manter workbench atualizado requer tasks repetitivas de baixo valor:
-- Atualizar `updated_at` no frontmatter
-- Normalizar timestamps
-- Atualizar lista de Files modificados
-- Marcar tasks como completas
-- Adicionar entradas de timeline
+**Problem:** Keeping workbench updated requires repetitive low-value tasks:
+- Update `updated_at` in frontmatter
+- Normalize timestamps
+- Update list of modified files
+- Mark tasks as complete
+- Add timeline entries
 
-**Solução:** Automation que executa essas tasks com um comando.
+**Solution:** Automation that executes these tasks with one command.
 
 ## Function
 
-Automatiza atualizações de workbench:
+Automates workbench updates:
 
 1. **touch** - Updates `updated_at`
-2. **normalize-time** - Normaliza timestamps para WB timezone
-3. **files-changed** - Updates seção "Files Changed" no report
-4. **task** - Marca task por ID (done, in_progress, etc.)
-5. **status** - Setar status no frontmatter
-6. **timeline** - Adiciona entrada de timeline no log
-7. **link** - Setar `links.<key>` no frontmatter
+2. **normalize-time** - Normalizes timestamps to WB timezone
+3. **files-changed** - Updates "Files Changed" section in report
+4. **task** - Marks task by ID (done, in_progress, etc.)
+5. **status** - Set status in frontmatter
+6. **timeline** - Adds timeline entry to log
+7. **link** - Set `links.<key>` in frontmatter
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
-| Arquivo | Purpose |
-|---------|-----------|
-| `.agents/wb/.active_session` | session ativa |
-| `.agents/wb/*/*.md` | Documentos da session |
+| File | Purpose |
+|------|---------|
+| `.agents/wb/.active_session` | Active session |
+| `.agents/wb/*/*.md` | Session documents |
 | `.agents/agents.config` | Config (WB_OFFSET, etc.) |
 
-### Files Escritos
+### Files Written
 
-| Comando | Arquivo | Change |
-|---------|---------|---------|
-| `touch` | Session files | `updated_at` no frontmatter |
-| `task` | `*_task_*.md` | Marker da task |
-| `status` | Session files | `status` no frontmatter |
-| `timeline` | `*_log_*.md` | Entrada na timeline |
-| `files-changed` | `*_report_*.md` | Lista de Files |
-| `link` | Session files | `links.<key>` no frontmatter |
+| Command | File | Change |
+|---------|------|--------|
+| `touch` | Session files | `updated_at` in frontmatter |
+| `task` | `*_task_*.md` | Task marker |
+| `status` | Session files | `status` in frontmatter |
+| `timeline` | `*_log_*.md` | Timeline entry |
+| `files-changed` | `*_report_*.md` | File list |
+| `link` | Session files | `links.<key>` in frontmatter |
 
 ## How to Configure
 
@@ -63,62 +63,50 @@ Automatiza atualizações de workbench:
 
 ```yaml
 time:
-  wb_offset: "-03:00"  # Timezone do workbench
+  wb_offset: "-03:00"  # Workbench timezone
 ```
 
 ## How to Modify
 
-### Adicionar Novo Subcomando
+### Add New Subcommand
 
 ```python
 def cmd_new_command(args):
-    """Novo subcomando."""
+    """New subcommand."""
     session = get_active_session()
-    # Implementar lógica
+    # Implement logic
     save_session(session)
 ```
 
-### Alterar Timezone
-
-Editar `WB_OFFSET` em `agents.config`.
-
-## How to Test
+## How to Use
 
 ```bash
-# Touch (atualizar updated_at)
+# Update updated_at
 ./.agents/agents wb-update touch
 
-# Normalizar timestamps
-./.agents/agents wb-update normalize-time --all-wb
-
-# Atualizar files changed
-./.agents/agents wb-update files-changed
-
-# Marcar task
+# Mark task as done
 ./.agents/agents wb-update task T-01 --mark-done
-./.agents/agents wb-update task T-02 --mark-in-progress
 
-# Setar status
+# Set status
 ./.agents/agents wb-update status --value active --file plan
 
-# Adicionar timeline
-./.agents/agents wb-update timeline --message "Implementação concluída"
+# Add timeline entry
+./.agents/agents wb-update timeline --message "Implemented login"
 
-# Setar link
-./.agents/agents wb-update link --file plan --key related --value "260220_1000_other-session"
+# Update files changed
+./.agents/agents wb-update files-changed
+
+# Via Makefile
+make wb-touch
+make wb-task TASK_ID=T-01 ACTION=done
+make wb-status STATUS=active
+make wb-timeline MSG="Implemented login"
 ```
 
-## main Funções
+## Related
 
-```python
-get_active_session()      # Lê .active_session
-update_frontmatter()      # Updates frontmatter YAML
-mark_task()               # Marca task
-append_timeline()         # Adiciona timeline entry
-update_files_changed()    # Updates lista de Files
-normalize_timestamps()    # Normaliza para WB timezone
-```
+- [agents-new.md](./agents-new.md) - Workstream creation
+- [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
-
-*wb-update automatiza trabalho repetitivo de manutenção de docs*
+*Document: `.agents/a-docs/agentic/agents-wb-update.md`*

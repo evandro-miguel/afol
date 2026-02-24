@@ -13,44 +13,44 @@ links:
 
 # agents_config.py - Config Loader
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Múltiplos scripts Python precisam:
-- Ler Configuration centralizada
-- Resolver caminhos relativos
-- Parsear timestamps e timezones
-- Ter valores default seguros
+**Problem:** Multiple Python scripts need to:
+- Read central configuration
+- Resolve relative paths
+- Parse timestamps and timezones
+- Have safe default values
 
-**Solução:** Módulo de Configuration centralizado que todos os scripts importam.
+**Solution:** Centralized configuration module that all scripts import.
 
 ## Function
 
-Fornece:
+Provides:
 
-1. **Carregamento de YAML** - Lê `agents.config`
-2. **Deep merge** - Override de defaults
-3. **Path resolution** - Caminhos absolutos
-4. **Timezone parsing** - Offset para datetime
-5. **Helpers de tempo** - Timestamps no formato correto
+1. **YAML loading** - Reads `agents.config`
+2. **Deep merge** - Override defaults
+3. **Path resolution** - Absolute paths
+4. **Timezone parsing** - Offset to datetime
+5. **Time helpers** - Correct timestamp format
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
-| Arquivo | Purpose |
-|---------|-----------|
+| File | Purpose |
+|------|---------|
 | `.agents/agents.config` | Configuration YAML |
 
-### Files Escritos
+### Files Written
 
-| Arquivo | Purpose |
-|---------|-----------|
-| Nenhum | Apenas leitura |
+| File | Purpose |
+|------|---------|
+| None | Read-only |
 
-### Importado Por
+### Imported By
 
-| Script | Uso |
-|--------|-----|
+| Script | Usage |
+|--------|-------|
 | `agents-doctor.py` | `load_agents_config()` |
 | `agents-new.py` | `get_cfg_path()`, `parse_offset()` |
 | `agents-tools.py` | `load_agents_config()` |
@@ -79,139 +79,64 @@ time:
 
 lint:
   excluded_path_prefixes:
-    - a-docs/
     - arc/structure/
+    - scripts/.agent/docs/
+    - z-arq/
+```
 
-doctor:
-  required_folders: [...]
-  required_templates: [...]
+## How to Use
 
-sync:
-  source_file: AGENTS.md
-  target_files:
-    - QWEN.md
-    - CLAUDE.md
-    - GEMINI.md
+### In Python Scripts
+
+```python
+from lib.agents_config import load_agents_config, get_cfg_path, parse_offset
+
+# Load config
+ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+
+# Get path
+TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")
+
+# Parse timezone
+WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
+WB_TZ = parse_offset(WB_OFFSET)
 ```
 
 ## How to Modify
 
-### Adicionar Nova Seção de Config
-
-1. Adicionar em `agents.config`:
-
-```yaml
-nova_secao:
-  opcao1: valor1
-  opcao2: valor2
-```
-
-2. Adicionar defaults em `agents_config.py`:
+### Main Functions
 
 ```python
-DEFAULT_CONFIG = {
-    "nova_secao": {
-        "opcao1": "default1",
-        "opcao2": "default2"
-    }
-}
+def load_agents_config(script_path: Path) -> Tuple[Path, Dict]:
+    """Load agents.config and return (root_dir, config_dict)."""
+
+def get_cfg_path(root: Path, config: Dict, key: str) -> Path:
+    """Resolve config path to absolute path."""
+
+def parse_offset(offset_str: str) -> timezone:
+    """Parse ISO offset (e.g., '-03:00') to timezone."""
 ```
 
-3. Usar nos scripts:
+### Adding New Config Options
 
-```python
-CONFIG.get("nova_secao", {}).get("opcao1")
-```
-
-### Adicionar Novo Helper
-
-```python
-def new_helper(config: Dict[str, Any]) -> str:
-    """Novo helper."""
-    return config.get("nova_secao", {}).get("opcao1")
-```
+1. Add to `.agents/agents.config`
+2. Add default in `load_agents_config()`
+3. Update this document
 
 ## How to Test
 
-```bash
-# Testar carregamento
-python3 -c "
-from pathlib import Path
+```python
+# Test loading
 from lib.agents_config import load_agents_config
 root, config = load_agents_config(Path.cwd())
-print('Root:', root)
-print('WB dir:', config['paths']['wb_dir'])
-print('WB offset:', config['time']['wb_offset'])
-"
-
-# Testar parse de offset
-python3 -c "
-from lib.agents_config import parse_offset
-tz = parse_offset('-03:00')
-print('Timezone:', tz)
-"
+assert 'paths' in config
+assert 'time' in config
 ```
 
-## main Funções
+## Related
 
-```python
-# Carregamento
-find_repo_root()          # Encontra raiz do repo
-load_agents_config()      # Carrega YAML
-_deep_merge()             # Merge de configs
-
-# Paths
-resolve_repo_path()       # Resolve caminho relativo
-get_cfg_path()            # Get path por key
-
-# Time
-parse_offset()            # Parse offset para timezone
-now_iso_with_offset()     # Timestamp ISO com offset
-now_compact_for_session() # Timestamp compacto
-```
-
-### find_repo_root
-
-```python
-def find_repo_root(start: Path | None = None) -> Path:
-    current = (start or Path.cwd()).resolve()
-    for candidate in [current, *current.parents]:
-        if (candidate / CONFIG_FILENAME).exists():
-            return candidate
-    return current
-```
-
-### load_agents_config
-
-```python
-def load_agents_config(repo_root: Path | None = None) -> tuple[Path, Dict[str, Any]]:
-    root = find_repo_root(repo_root)
-    config = DEFAULT_CONFIG
-    cfg_path = root / CONFIG_FILENAME
-    
-    if cfg_path.exists():
-        loaded = yaml.safe_load(cfg_path.read_text()) or {}
-        config = _deep_merge(DEFAULT_CONFIG, loaded)
-    
-    return root, config
-```
-
-### parse_offset
-
-```python
-def parse_offset(offset: str) -> timezone:
-    value = offset.strip()
-    if value == "Z":
-        return timezone.utc
-    # Parse +HH:MM or -HH:MM
-    hours = int(value[1:3])
-    minutes = int(value[4:6])
-    delta = timedelta(hours=hours, minutes=minutes)
-    if value[0] == "-":
-        delta = -delta
-    return timezone(delta)
-```
+- [tools-json.md](./tools-json.md) - Tool catalog
+- `.agents/agents.config` - Configuration file
 
 ---
-
-*agents_config.py é o coração da Configuration do sistema*
+*Document: `.agents/a-docs/agentic/agents-config.md`*

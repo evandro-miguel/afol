@@ -22,6 +22,8 @@ links:
 - [x] T-02 Atualizar template/docs para exigir ID e validar fluxo.
 - [x] T-03 Implementar politica de sessao ativa unica + quick mode para evitar proliferacao de pastas.
 - [x] T-04 Criar automacao para `updated_at` e `Files Changed` sem editar docs manualmente.
+- [ ] T-05 translate-agentic-01
+- [ ] T-06 translate-final-check
 
 ## State Board
 | Task | Checklist | State | Owner | Notes |

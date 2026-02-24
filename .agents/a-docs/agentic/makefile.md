@@ -11,167 +11,120 @@ links:
   wrapper: ./agents-wrapper.md
 ---
 
-# Makefile - Targets e Aliases
+# Makefile - Targets and Aliases
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Comandos `.agents/agents` são verbosos para uso frequente. Desenvolvedores preferem:
-- Comandos curtos
-- Autocomplete do shell
-- Workflows compostos
+**Problem:** `.agents/agents` commands are verbose for frequent use. Developers prefer:
+- Short commands
+- Shell autocomplete
+- Composed workflows
 
-**Solução:** Makefile com targets nomeados e aliases curtos.
+**Solution:** Makefile with named targets and short aliases.
 
 ## Function
 
-Fornece:
+Provides:
 
-1. **Targets nomeados** - `make doctor`, `make new`
-2. **Aliases curtos** - `st`, `ix`, `sy`, `vf`, `dr`
-3. **Workflows compostos** - `make all`, `make refresh`
-4. **Variáveis** - `THEME=`, `TASK_ID=`, etc.
+1. **Named targets** - `make doctor`, `make new`
+2. **Short aliases** - `st`, `ix`, `sy`, `vf`, `dr`
+3. **Composed workflows** - `make all`, `make refresh`
+4. **Variables** - `THEME=`, `TASK_ID=`, etc.
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
-| Arquivo | Purpose |
-|---------|-----------|
-| `.agents/a-docs/standards/Makefile` | Makefile main |
-| `.agents/agents.config` | Configurações |
+| File | Purpose |
+|------|---------|
+| `.agents/a-docs/standards/Makefile` | Main Makefile |
+| `.agents/agents.config` | Configuration |
 
-### Files Executados
+### Files Executed
 
-| Target | Comando Executado |
-|--------|-------------------|
+| Target | Command Executed |
+|--------|------------------|
 | `make doctor` | `.agents/agents doctor` |
 | `make new THEME=x` | `.agents/agents new x` |
 | `make verify` | `.agents/agents verify-tasks` |
 
 ## How to Configure
 
-### Targets main
+### Main Targets
 
 ```makefile
-make setup        # Setup do virtualenv
-make doctor       # Validation de estrutura
-make new          # Criar workstream (THEME=required)
-make structure    # Gerar docs de estrutura
-make index        # Atualizar índices
-make sync         # Sincronizar agent docs
-make verify       # Verificar tasks
-make lint         # Lint de markdown
-make all          # Validation completa
+make setup        # Virtualenv setup
+make doctor       # Structure validation
+make new          # Create workstream (THEME=required)
+make structure    # Generate structure docs
+make index        # Update indexes
+make sync         # Sync agent docs
+make verify       # Verify tasks
+make lint         # Markdown lint
+make all          # Full validation
 ```
 
-### Aliases Curtos
+### Short Aliases
 
 ```makefile
 st: structure     # structure
 ix: index         # index
 sy: sync          # sync
 vf: verify        # verify
-dr: doctor        # doctor (NÃO use doc!)
+dr: doctor        # doctor (do NOT use doc!)
 ```
 
-### Targets com Variáveis
+### Targets with Variables
 
 ```makefile
 make new THEME=auth-refactor
 make wb-task TASK_ID=T-01 ACTION=done
 make wb-status STATUS=active
-make wb-timeline MSG="Implementação concluída"
-make wb-link FILE=plan KEY=related VALUE=xxx
+make wb-timeline MSG="Implemented login"
 ```
 
 ## How to Modify
 
-### Adicionar Novo Target
+### Add New Target
+
+Edit `.agents/a-docs/standards/Makefile`:
 
 ```makefile
 new-target:
-	@echo "→ Executando novo target..."
-	@./.agents/agents new-command args
-	@echo "✓ Concluído"
-```
-
-### Adicionar Alias
-
-```makefile
-nt: new-target  # Alias curto
+	@echo "→ Running new target..."
+	@./.agents/agents new-command
 ```
 
 ## How to Test
 
 ```bash
-# Help
+# List targets
 make help
 
-# Setup
-make setup
-
-# Validation
+# Run target
 make doctor
-make lint
-make verify
 
-# Workflow completo
-make all  # doctor + structure + index + verify
-
-# Criar workstream
-make new THEME=test-feature
-
-# Aliases
-make st  # structure
-make dr  # doctor
+# Run with variable
+make new THEME=test
 ```
 
-## main Targets
+## Output
 
-### Setup & Maintenance
-
-```makefile
-setup     # Initialize UV virtualenv
-clean     # Remove .venv e caches
-doctor    # Validate .agents structure
+```
+╔═══════════════════════════════════════════════════════════╗
+║         Agents System - Available Commands                ║
+╠═══════════════════════════════════════════════════════════╣
+║  Setup & Maintenance                                      ║
+║    make setup        - Initialize UV virtualenv           ║
+║    make doctor       - Validate .agents structure         ║
+║    ...                                                    ║
+╚═══════════════════════════════════════════════════════════╝
 ```
 
-### Documentation
+## Related
 
-```makefile
-structure # Generate project structure docs
-index     # Update SPECS/ADRS indexes
-sync      # Sync AGENTS.md to agent files
-```
-
-### Workflows
-
-```makefile
-new       # Create workstream (THEME=xxx)
-quick     # Quick task in active session
-verify    # Check task completion
-lint      # Validate markdown docs
-```
-
-### WB Update
-
-```makefile
-wb-touch            # Update updated_at
-wb-normalize-time   # Normalize timestamps
-wb-files-changed    # Refresh Files Changed
-wb-task             # Mark task by ID
-wb-status           # Set doc status
-wb-timeline         # Append timeline entry
-wb-link             # Set frontmatter links
-```
-
-### Quick Workflows
-
-```makefile
-all       # Run full validation (doctor + structure + index + verify)
-refresh   # Clean + setup + structure
-```
+- [agents-wrapper.md](./agents-wrapper.md) - Bash wrapper
+- [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
-
-*Makefile fornece interface conveniente para operações frequentes*
+*Document: `.agents/a-docs/agentic/makefile.md`*

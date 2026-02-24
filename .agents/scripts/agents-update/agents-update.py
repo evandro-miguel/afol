@@ -19,6 +19,24 @@ from ownership import load_default_ownership_map, OwnershipType
 from upstream import UpstreamManager, get_installed_version
 from conflict import ConflictResolver, print_update_plan
 
+CANONICAL_UPSTREAM_HINTS = (
+    "evandro-miguel/agentic-standard-folder",
+    "agentic-standard-folder.git",
+)
+CRITICAL_DELETE_PREFIXES = (
+    "agents",
+    "agents-update",
+    "update-ownership.json",
+    "scripts/agents-update",
+    "scripts/tests",
+    "scripts/agents-telemetry.py",
+    "scripts/agents-patterns.py",
+    "scripts/agents-skills-sync.py",
+    "scripts/agents-fix-symlinks.py",
+    "a-docs/patterns/",
+    "a-docs/telemetry/",
+    "a-docs/standards/skills-sync.md",
+)
 
 def confirm_or_abort(prompt: str, force: bool) -> bool:
     """Return True when operation is confirmed."""
@@ -192,7 +210,7 @@ def cmd_plan(args) -> int:
         # Print plan
         print()
         print("=" * 70)
-        print_update_plan(plan, show_unchanged=args.verbose)
+        print_update_plan(plan, show_unchanged=getattr(args, "verbose", False))
         print("=" * 70)
 
         # Summary
@@ -208,7 +226,7 @@ def cmd_plan(args) -> int:
             print(f"\n⚠️  {len(plan.get_by_type('conflict'))} CONFLICTS detected!")
             print("   Local modifications will be backed up as .local.bak")
 
-        if action > 0 and not args.force:
+        if action > 0 and not getattr(args, "force", False):
             print(f"\n⚠️  Some files require attention.")
             print("   Review the plan above carefully before applying.")
 
@@ -274,6 +292,14 @@ def cmd_apply(args) -> int:
             print("\n✅ Already up to date!")
             return 0
         
+        # Prevent accidental self-update on canonical template repo unless explicitly acknowledged.
+        upstream_url = str(getattr(info, "url", "")).lower()
+        if any(hint in upstream_url for hint in CANONICAL_UPSTREAM_HINTS) and not args.i_know_what_im_doing:
+            print("\n⚠️  Canonical template repository detected.")
+            print("   This repo is the upstream source used by other projects.")
+            print("   Re-run with --i-know-what-im-doing to continue.")
+            return 1
+
         # Generate manifests
         from manifest import generate_manifest
         local_manifest = generate_manifest(
@@ -284,7 +310,8 @@ def cmd_apply(args) -> int:
         
         # Fetch upstream
         print("\n📥 Fetching upstream...")
-        upstream_path = upstream.fetch_upstream(ref=f"v{info.version}" if info.version != "0.0.0-dev" else None)
+        ref = info.tag if getattr(info, "tag", None) else f"origin/{info.branch}"
+        upstream_path = upstream.fetch_upstream(ref=ref)
         upstream_manifest_dict = upstream.get_manifest()
         upstream_manifest = Manifest.from_dict(upstream_manifest_dict) if upstream_manifest_dict else None
         
@@ -300,6 +327,21 @@ def cmd_apply(args) -> int:
         print(f"\n📊 Update summary:")
         print(f"   Safe to update: {len(plan.get_safe_changes())}")
         print(f"   Require action: {len(plan.get_action_required())}")
+
+        from conflict import ChangeType
+        critical_deletes = [
+            c.path
+            for c in plan.get_by_type(ChangeType.DELETED_UPSTREAM)
+            if c.path.startswith(CRITICAL_DELETE_PREFIXES)
+        ]
+        if critical_deletes and not args.allow_deletes:
+            print("\n❌ Critical deletions detected.")
+            for path in critical_deletes[:20]:
+                print(f"   - {path}")
+            if len(critical_deletes) > 20:
+                print(f"   ... and {len(critical_deletes) - 20} more")
+            print("   Re-run with --allow-deletes to proceed.")
+            return 1
         
         if plan.has_conflicts() and not args.force:
             print("\n⚠️  Conflicts detected! Review with 'agents-update plan'")
@@ -547,6 +589,16 @@ Examples:
         "--dry-run",
         action="store_true",
         help="Show what would be done without applying",
+    )
+    apply_parser.add_argument(
+        "--allow-deletes",
+        action="store_true",
+        help="Allow applying plans that include critical upstream deletions",
+    )
+    apply_parser.add_argument(
+        "--i-know-what-im-doing",
+        action="store_true",
+        help="Acknowledge updates on canonical template repo",
     )
 
     # rollback

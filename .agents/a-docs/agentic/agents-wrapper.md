@@ -13,38 +13,38 @@ links:
 
 # agents (Bash Wrapper) - CLI Entry Point
 
-## Por Que Existe
+## Why It Exists
 
-**Problema:** Scripts Python requerem:
-- Virtualenv configurado
-- Dependências instaladas
-- Comando uv run correto
-- Ambiente isolado
+**Problem:** Python scripts require:
+- Configured virtualenv
+- Installed dependencies
+- Correct `uv run` command
+- Isolated environment
 
-**Solução:** Wrapper bash que abstrai complexidade e fornece interface unificada.
+**Solution:** Bash wrapper that abstracts complexity and provides unified interface.
 
 ## Function
 
-Wrapper bash que:
+Bash wrapper that:
 
-1. **Checks uv** - Garante que está instalado
-2. **Checks .venv** - Creates se não existir
-3. **Executa com isolamento** - `uv run --with pyyaml`
-4. **Preserva contexto** - Mantém Directory de trabalho
-5. **Interface unificada** - `.agents/agents <command>`
+1. **Checks uv** - Ensures it's installed
+2. **Checks .venv** - Creates if doesn't exist
+3. **Executes with isolation** - `uv run --with pyyaml`
+4. **Preserves context** - Maintains working directory
+5. **Unified interface** - `.agents/agents <command>`
 
-## O Que Tocar
+## What It Touches
 
-### Files Lidos
+### Files Read
 
-| Arquivo | Purpose |
-|---------|-----------|
+| File | Purpose |
+|------|---------|
 | `.agents/scripts/.venv/` | Virtualenv |
-| `.agents/scripts/*.py` | Scripts Python |
+| `.agents/scripts/*.py` | Python scripts |
 
-### Files Executados
+### Files Executed
 
-| Script | Comando |
+| Script | Command |
 |--------|---------|
 | `agents-doctor.py` | `.agents/agents doctor` |
 | `agents-new.py` | `.agents/agents new <theme>` |
@@ -54,19 +54,19 @@ Wrapper bash que:
 
 ## How to Configure
 
-### Comandos Disponíveis
+### Available Commands
 
 ```bash
-doctor              # Validation de estrutura
-new <theme>         # Criar workstream
-index               # Atualizar índices
-lint-docs           # Lint de markdown
-structure-map       # Mapear estrutura
-sync                # Sincronizar agent docs
-verify-tasks        # Verificar tasks
-wb-update           # Automation WB
-tools               # Descoberta de tools
-help                # Ajuda
+doctor              # Structure validation
+new <theme>         # Create workstream
+index               # Update indexes
+lint-docs           # Markdown lint
+structure-map       # Map structure
+sync                # Sync agent docs
+verify-tasks        # Verify tasks
+wb-update           # WB automation
+tools               # Tool discovery
+help                # Help
 ```
 
 ### Aliases
@@ -80,71 +80,49 @@ wb-update → wb
 
 ## How to Modify
 
-### Adicionar Novo Comando
+### Add New Command
 
-Editar `agents`:
+Edit `.agents/agents` bash script:
 
 ```bash
 case "${COMMAND}" in
     new-command)
         cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-new-command.py" "$@"
+        uv run --with pyyaml "${SCRIPTS_DIR}/agents-new-command.py" "$@"
         ;;
-```
-
-### Adicionar Help
-
-Editar seção `help`:
-
-```bash
-echo "  new-command         Descrição do comando"
 ```
 
 ## How to Test
 
 ```bash
-# Help geral
-./.agents/agents help
+# Test wrapper
+.agents/agents help
 
-# Executar comando
-./.agents/agents doctor
+# Test specific command
+.agents/agents doctor
 
-# Verificar uv
-which uv
-
-# Verificar .venv
-ls -la .agents/scripts/.venv/
+# Test with args
+.agents/agents new test-workstream
 ```
 
-## main Funções
+## Output
 
-```bash
-# Estrutura do wrapper
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
-ORIGINAL_PWD="$(pwd)"
-
-# Check uv
-if ! command -v uv &> /dev/null; then
-    echo "❌ uv not found"
-    exit 1
-fi
-
-# Check .venv
-if [ ! -d "${SCRIPTS_DIR}/.venv" ]; then
-    echo "⚠️  Virtualenv not found. Setting up..."
-    cd "${SCRIPTS_DIR}"
-    uv sync
-fi
-
-# Executar
-case "${COMMAND}" in
-    ...)
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-*.py" "$@"
-        ;;
-esac
 ```
+Agents CLI - Operational scripts for .agents system
+
+Usage:
+  .agents/agents <command> [args...]
+
+Commands:
+  doctor              Validate .agents structure
+  new <theme>         Create new workstream
+  ...
+```
+
+## Related
+
+- [makefile.md](./makefile.md) - Makefile targets
+- [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
-
-*agents wrapper é a interface primária para todas as tools*
+*Document: `.agents/a-docs/agentic/agents-wrapper.md`*
