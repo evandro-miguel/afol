@@ -22,8 +22,8 @@ links:
 - [x] T-02 Atualizar template/docs para exigir ID e validar fluxo.
 - [x] T-03 Implementar politica de sessao ativa unica + quick mode para evitar proliferacao de pastas.
 - [x] T-04 Criar automacao para `updated_at` e `Files Changed` sem editar docs manualmente.
-- [ ] T-05 translate-agentic-01
-- [ ] T-06 translate-final-check
+- [x] T-05 translate-agentic-01
+- [x] T-06 translate-final-check
 
 ## State Board
 | Task | Checklist | State | Owner | Notes |
@@ -32,6 +32,8 @@ links:
 | T-02 | - [x] | done | worker | Template + docs atualizados e validados.
 | T-03 | - [x] | done | worker | `agents-new.py` com `--quick` e bloqueio de novo stream sem `--force-new`.
 | T-04 | - [x] | done | worker | Novo `agents-wb-update.py` + `make wb-touch`/`make wb-files-changed`.
+| T-05 | - [x] | done | worker | Docs agentic já estavam em inglês - verificação concluída.
+| T-06 | - [x] | done | worker | Revisão final de consistência aprovada.
 
 State values:
 - pending
