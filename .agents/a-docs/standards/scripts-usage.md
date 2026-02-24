@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: scripts-usage
+theme: standards
+status: active
+created_at: '2026-02-23T23:37:47-03:00'
+updated_at: '2026-02-23T23:37:47-03:00'
+---
+
 # Scripts Usage
 
 **Main documentation:** See `.agents/a-docs/standards/agents-usage.md`

@@ -45,6 +45,9 @@ help:
 	@echo "║    make wb-link      - Set links.<key> in doc frontmatter  ║"
 	@echo "║    make verify       - Check task completion              ║"
 	@echo "║    make lint         - Validate markdown docs             ║"
+	@echo "║    make lint-fix     - Fix common lint issues             ║"
+	@echo "║    make lint-fix-dry - Preview lint fixes                 ║"
+	@echo "║    make lint-fix-check - Check for lint issues            ║"
 	@echo "║    make test-scripts - Run Python unit tests for scripts  ║"
 	@echo "║                                                           ║"
 	@echo "║  Telemetry & Patterns                                     ║"
@@ -361,3 +364,28 @@ dr: doctor
 docs: structure index sync
 check: doctor lint verify
 init: setup doctor
+
+# ==============================================================================
+# LINT FIX COMMANDS
+# ==============================================================================
+
+lint-fix:
+	@echo "→ Fixing common lint issues..."
+	@python3 .agents/scripts/fix-lint-all.py .agents
+	@echo "✓ Lint fixes applied"
+
+lint-fix-dry:
+	@echo "→ Previewing lint fixes (dry run)..."
+	@python3 .agents/scripts/fix-lint-all.py --dry-run .agents
+
+lint-fix-check:
+	@echo "→ Checking for lint issues..."
+	@python3 .agents/scripts/fix-lint-all.py --check .agents
+
+lint-fix-checkboxes:
+	@echo "→ Fixing missing checkbox separators..."
+	@python3 .agents/scripts/fix-lint-checkboxes.py .agents
+
+lint-fix-frontmatter:
+	@echo "→ Adding missing frontmatter..."
+	@python3 .agents/scripts/fix-lint-frontmatter.py .agents/a-docs/standards/scripts-usage.md .agents/a-docs/standards/scripts-reference.md .agents/scripts/tests/TEST_STRATEGY.md

@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: scripts-reference
+theme: standards
+status: active
+created_at: '2026-02-23T23:37:47-03:00'
+updated_at: '2026-02-23T23:37:47-03:00'
+---
+
 # Agents System - Quick Reference
 
 ## Makefile Commands
