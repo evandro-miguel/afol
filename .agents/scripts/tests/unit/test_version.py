@@ -8,7 +8,6 @@ de versões do update system.
 
 import pytest
 import re
-from unittest.mock import patch, MagicMock
 
 
 # ═══════════════════════════════════════════════════════════════

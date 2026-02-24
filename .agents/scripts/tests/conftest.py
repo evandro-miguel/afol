@@ -7,12 +7,9 @@ testes (unit, integration, e2e).
 """
 
 import pytest
-import tempfile
-import shutil
 import json
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock
 from typing import Any
 
 

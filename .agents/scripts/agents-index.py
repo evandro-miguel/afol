@@ -14,12 +14,10 @@ Usage:
     python agents-index.py [--dry-run]
 """
 
-import os
-import re
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List
 
 try:
     import yaml

@@ -336,7 +336,7 @@ if __name__ == "__main__":
         if upstream.repo_root:
             try:
                 info = upstream.check_upstream()
-                print(f"\nUpstream info:")
+                print("\nUpstream info:")
                 print(f"  Branch: {info.branch}")
                 print(f"  Version: {info.version}")
                 print(f"  Commit: {info.commit}")

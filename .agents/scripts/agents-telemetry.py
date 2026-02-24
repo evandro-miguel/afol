@@ -33,7 +33,6 @@ Options:
 """
 
 import json
-import os
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -459,7 +458,7 @@ def calculate_heat_scores(
     
     # Collect element stats for current period
     element_stats = {}
-    previous_stats = {} if compare_previous else None
+    _previous_stats = {} if compare_previous else None
     
     for event in events:
         event_type = event.get("event_type")

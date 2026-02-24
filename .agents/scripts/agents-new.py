@@ -167,7 +167,7 @@ def next_task_id(task_content: str) -> str:
 def insert_task_line(content: str, task_line: str) -> str:
     """Insert task line into Task List section when possible."""
     lines = content.splitlines()
-    section_idx = next((i for i, l in enumerate(lines) if l.strip() == "## Task List"), -1)
+    section_idx = next((i for i, line in enumerate(lines) if line.strip() == "## Task List"), -1)
     if section_idx == -1:
         if lines and lines[-1].strip():
             lines.append("")
@@ -190,7 +190,7 @@ def insert_task_line(content: str, task_line: str) -> str:
 def insert_log_timeline(content: str, entry: str) -> str:
     """Insert entry into Timeline section, fallback append."""
     lines = content.splitlines()
-    section_idx = next((i for i, l in enumerate(lines) if l.strip() == "## Timeline"), -1)
+    section_idx = next((i for i, line in enumerate(lines) if line.strip() == "## Timeline"), -1)
     if section_idx == -1:
         if lines and lines[-1].strip():
             lines.append("")

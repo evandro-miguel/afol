@@ -164,7 +164,7 @@ def verify_session(session_path: Path) -> Tuple[bool, Dict]:
 def print_report(all_completed: bool, results: Dict) -> None:
     """Print verification report."""
     print("=" * 60)
-    print(f"Task Verification Report")
+    print("Task Verification Report")
     print("=" * 60)
     print(f"Session: {results['session']}")
     print()

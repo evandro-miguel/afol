@@ -6,9 +6,8 @@ Prepares new version in isolated directory before atomic swap.
 
 import shutil
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
-from manifest import Manifest
 from conflict import FileChange, ChangeType
 from ownership import OwnershipMap
 
@@ -160,7 +159,7 @@ class StagingManager:
 
     def validate(self) -> bool:
         """Validate staging area integrity."""
-        print(f"   Validating staging area...")
+        print("   Validating staging area...")
 
         required = ["scripts", "agents", "agents-update", "manifest.json"]
 
@@ -169,7 +168,7 @@ class StagingManager:
             if not path.exists():
                 raise StagingError(f"Missing required item: {item}")
 
-        print(f"   ✓ Staging valid")
+        print("   ✓ Staging valid")
         return True
 
     def cleanup(self) -> None:

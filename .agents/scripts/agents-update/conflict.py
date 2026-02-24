@@ -6,7 +6,7 @@ Implements three-way diff algorithm for detecting file changes.
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional
 from pathlib import Path
 import difflib
 
@@ -375,7 +375,7 @@ def print_update_plan(plan: UpdatePlan, show_unchanged: bool = False) -> None:
             if change.resolution:
                 print(f"  → Resolution: {change.resolution}")
             else:
-                print(f"  → Will backup local and use upstream")
+                print("  → Will backup local and use upstream")
 
 
 if __name__ == "__main__":

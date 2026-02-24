@@ -1,6 +1,6 @@
 ---
 doc_type: index
-id: decisions-index
+id: "260223_0000_decisions_index_01"
 title: Architecture Decision Records Index
 created_at: '2026-02-23T00:00:00-03:00'
 updated_at: '2026-02-23T00:00:00-03:00'

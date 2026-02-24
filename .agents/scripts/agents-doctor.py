@@ -117,13 +117,13 @@ class AgentsDoctor:
                 self.issues.append(Issue(
                     "error",
                     str(folder_path),
-                    f"Required folder missing"
+                    "Required folder missing"
                 ))
             elif not folder_path.is_dir():
                 self.issues.append(Issue(
                     "error",
                     str(folder_path),
-                    f"Path exists but is not a directory"
+                    "Path exists but is not a directory"
                 ))
             else:
                 print(f"  ✓ {folder}")
@@ -144,7 +144,7 @@ class AgentsDoctor:
                 self.issues.append(Issue(
                     "error",
                     str(template_path),
-                    f"Required template missing"
+                    "Required template missing"
                 ))
             else:
                 # Validate template has frontmatter
@@ -153,7 +153,7 @@ class AgentsDoctor:
                     self.issues.append(Issue(
                         "warning",
                         str(template_path),
-                        f"Template missing YAML frontmatter"
+                        "Template missing YAML frontmatter"
                     ))
                 else:
                     print(f"  ✓ {template}")
@@ -179,7 +179,7 @@ class AgentsDoctor:
                 self.issues.append(Issue(
                     "warning",
                     str(session),
-                    f"Session folder name doesn't follow YYMMDD_HHMM_theme pattern"
+                    "Session folder name doesn't follow YYMMDD_HHMM_theme pattern"
                 ))
             else:
                 print(f"  ✓ {session.name}")
@@ -251,14 +251,14 @@ class AgentsDoctor:
                 self.issues.append(Issue(
                     "warning",
                     str(file_path),
-                    f"Recommended architecture file missing"
+                    "Recommended architecture file missing"
                 ))
         
         # Check SPECS index
         specs_index = arc_dir / "SPECS" / "INDEX.md"
         if specs_index.exists():
             self.validate_frontmatter(specs_index)
-            print(f"  ✓ SPECS/INDEX.md")
+            print("  ✓ SPECS/INDEX.md")
 
         # Check DECISIONS index
         decisions_index = arc_dir / "DECISIONS" / "INDEX.md"
@@ -277,7 +277,7 @@ class AgentsDoctor:
             self.issues.append(Issue(
                 "warning",
                 str(file_path),
-                f"Missing YAML frontmatter"
+                "Missing YAML frontmatter"
             ))
             return
         
@@ -287,7 +287,7 @@ class AgentsDoctor:
             self.issues.append(Issue(
                 "warning",
                 str(file_path),
-                f"Invalid frontmatter structure"
+                "Invalid frontmatter structure"
             ))
             return
         
@@ -299,7 +299,7 @@ class AgentsDoctor:
                 self.issues.append(Issue(
                     "warning",
                     str(file_path),
-                    f"Missing created_at/created field"
+                    "Missing created_at/created field"
                 ))
             return
         
@@ -311,7 +311,7 @@ class AgentsDoctor:
                 self.issues.append(Issue(
                     "warning",
                     str(file_path),
-                    f"Missing doc_type/type field"
+                    "Missing doc_type/type field"
                 ))
             
             # Check timestamp format

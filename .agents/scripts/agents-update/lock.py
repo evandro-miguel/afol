@@ -269,6 +269,6 @@ if __name__ == "__main__":
         print(f"After release locked: {lock.is_locked()}")
 
         # Context manager
-        with UpdateLock(agents_dir) as l:
-            print(f"In context locked: {l.is_locked()}")
+        with UpdateLock(agents_dir) as lock_obj:
+            print(f"In context locked: {lock_obj.is_locked()}")
         print(f"After context locked: {lock.is_locked()}")

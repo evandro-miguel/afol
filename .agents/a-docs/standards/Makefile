@@ -48,6 +48,7 @@ help:
 	@echo "║    make lint-fix     - Fix common lint issues             ║"
 	@echo "║    make lint-fix-dry - Preview lint fixes                 ║"
 	@echo "║    make lint-fix-check - Check for lint issues            ║"
+	@echo "║    make lint-scripts - Lint Python scripts                ║"
 	@echo "║    make test-scripts - Run Python unit tests for scripts  ║"
 	@echo "║                                                           ║"
 	@echo "║  Telemetry & Patterns                                     ║"
@@ -263,6 +264,11 @@ test-scripts:
 	@echo "→ Running script unit tests..."
 	@python3 -m unittest discover -s .agents/scripts/tests -p "test_*.py" -v
 	@echo "✓ Script unit tests passed"
+
+lint-scripts:
+	@echo "→ Linting Python scripts..."
+	@cd .agents/scripts && uv run ruff check .
+	@echo "✓ Python scripts linted"
 
 # ==============================================================================
 # TELEMETRY & PATTERNS

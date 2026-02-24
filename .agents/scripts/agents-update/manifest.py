@@ -6,7 +6,7 @@ Handles manifest.json generation, validation, and hash computation.
 
 import hashlib
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 from datetime import datetime

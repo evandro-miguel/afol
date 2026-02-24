@@ -17,12 +17,10 @@ Examples:
     python agents-lint-docs.py .agents/wb --fix
 """
 
-import os
 import re
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
-from typing import List, Dict, Tuple, Optional
+from typing import List, Tuple, Optional
 
 from lib.agents_config import get_cfg_path, load_agents_config
 

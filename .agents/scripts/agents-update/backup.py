@@ -6,13 +6,12 @@ Implements skeleton + delta backup strategy.
 
 import json
 import shutil
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
-import hashlib
+from typing import List, Optional
 
-from manifest import Manifest, FileEntry, compute_file_hash
+from manifest import Manifest
 from conflict import FileChange, ChangeType
 
 

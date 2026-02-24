@@ -7,7 +7,6 @@ Main entry point for checking and applying updates.
 import argparse
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -15,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from version import Version, get_update_type, format_version_diff
 from manifest import Manifest
 from lock import UpdateLock, LockError, get_lock_status
-from ownership import load_default_ownership_map, OwnershipType
+from ownership import load_default_ownership_map
 from upstream import UpstreamManager, get_installed_version
 from conflict import ConflictResolver, print_update_plan
 
@@ -106,7 +105,7 @@ def cmd_check(args) -> int:
                 print("\n✅ System is up to date!")
                 return 0
 
-            print(f"\n📦 Update available!")
+            print("\n📦 Update available!")
             print(f"   {format_version_diff(current, latest)}")
 
             if update_type == "major":
@@ -116,8 +115,8 @@ def cmd_check(args) -> int:
             elif update_type == "patch":
                 print("\nℹ️  This is a PATCH update with bug fixes.")
 
-            print(f"\nRun 'agents-update plan' to see what will change.")
-            print(f"Run 'agents-update apply' to apply the update.")
+            print("\nRun 'agents-update plan' to see what will change.")
+            print("Run 'agents-update apply' to apply the update.")
 
         except ValueError as e:
             print(f"\n⚠️  Could not compare versions: {e}")
@@ -214,11 +213,11 @@ def cmd_plan(args) -> int:
         print("=" * 70)
 
         # Summary
-        stats = plan.get_stats()
+        _stats = plan.get_stats()
         safe = len(plan.get_safe_changes())
         action = len(plan.get_action_required())
 
-        print(f"\n📊 Summary:")
+        print("\n📊 Summary:")
         print(f"   Safe to update: {safe} files")
         print(f"   Require action: {action} files")
 
@@ -227,10 +226,10 @@ def cmd_plan(args) -> int:
             print("   Local modifications will be backed up as .local.bak")
 
         if action > 0 and not getattr(args, "force", False):
-            print(f"\n⚠️  Some files require attention.")
+            print("\n⚠️  Some files require attention.")
             print("   Review the plan above carefully before applying.")
 
-        print(f"\n✅ Run 'agents-update apply' to apply changes.")
+        print("\n✅ Run 'agents-update apply' to apply changes.")
 
     except Exception as e:
         print(f"\n❌ Error generating plan: {e}")
@@ -324,7 +323,7 @@ def cmd_apply(args) -> int:
         resolver = ConflictResolver(local_manifest, local_manifest, upstream_manifest, ownership)
         plan = resolver.detect_changes()
         
-        print(f"\n📊 Update summary:")
+        print("\n📊 Update summary:")
         print(f"   Safe to update: {len(plan.get_safe_changes())}")
         print(f"   Require action: {len(plan.get_action_required())}")
 
@@ -366,14 +365,14 @@ def cmd_apply(args) -> int:
         
         # Staging
         print("\n📦 Preparing staging area...")
-        from staging import StagingManager, StagingError
+        from staging import StagingManager
         staging = StagingManager(agents_dir, info.version, upstream_path)
         staging_dir = staging.prepare(plan.changes, ownership)
         staging.validate()
         
         # Atomic swap
         print("\n🔄 Performing atomic swap...")
-        from swap import SwapManager, SwapError
+        from swap import SwapManager
         swapper = SwapManager(agents_dir)
         
         def on_swap_error():
@@ -391,7 +390,7 @@ def cmd_apply(args) -> int:
         # Update manifest
         upstream_manifest.save(agents_dir / "manifest.json")
         
-        print(f"\n🎉 Update complete!")
+        print("\n🎉 Update complete!")
         print(f"   {current_version} → {info.version}")
         print(f"   Backup: {backup_dir.name}")
         
@@ -426,7 +425,7 @@ def cmd_rollback(args) -> int:
         return 1
     
     # Show available backups
-    print(f"\n📋 Available backups:")
+    print("\n📋 Available backups:")
     for i, backup_dir in enumerate(backups[:5], 1):
         print(f"   {i}. {backup_dir.name}")
     
@@ -468,7 +467,7 @@ def cmd_rollback(args) -> int:
             from swap import SwapManager
             swapper = SwapManager(agents_dir)
             swapper.rollback()
-        except:
+        except Exception:
             pass
     elif args.dry_run:
         print("\n🧪 Dry run complete - no changes made")
@@ -525,7 +524,7 @@ def cmd_doctor(args) -> int:
     checks.append(("ℹ️", "Version", version))
 
     # Print results
-    max_status = max(len(c[0]) for c in checks)
+    _max_status = max(len(c[0]) for c in checks)
     max_name = max(len(c[1]) for c in checks)
 
     for status, name, result in checks:
@@ -533,7 +532,7 @@ def cmd_doctor(args) -> int:
 
     # Stale lock recovery
     if lock_status.get("stale"):
-        print(f"\n⚠️  Stale lock detected!")
+        print("\n⚠️  Stale lock detected!")
         if args.fix:
             lock = UpdateLock(agents_dir)
             lock._force_release()
@@ -569,7 +568,7 @@ Examples:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # check
-    check_parser = subparsers.add_parser("check", help="Check for updates")
+    _check_parser = subparsers.add_parser("check", help="Check for updates")
 
     # plan
     plan_parser = subparsers.add_parser("plan", help="Show update plan")

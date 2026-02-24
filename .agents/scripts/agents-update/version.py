@@ -6,7 +6,7 @@ Follows SemVer 2.0.0 specification.
 
 import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 
 @dataclass(frozen=True)

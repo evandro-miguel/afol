@@ -1,6 +1,6 @@
 ---
 doc_type: architecture
-id: "arc-readme"
+id: "260223_0000_arc_architecture_01"
 status: active
 created_at: "2026-02-23T00:00:00Z"
 updated_at: "2026-02-23T00:00:00Z"

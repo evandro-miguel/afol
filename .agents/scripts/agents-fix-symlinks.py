@@ -7,7 +7,7 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import List, Tuple
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
