@@ -33,9 +33,10 @@ Options:
 """
 
 import json
+import os
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import argparse
@@ -46,6 +47,9 @@ TELEMETRY_DATA_DIR = Path(__file__).parent.parent / "data" / "telemetry"
 TELEMETRY_SCHEMA_PATH = TELEMETRY_DATA_DIR / "schemas" / "event.json"
 TELEMETRY_EVENTS_FILE = TELEMETRY_DATA_DIR / "events.jsonl"
 ACTIVE_SESSION_FILE = Path(__file__).parent.parent / "wb" / ".active_session"
+ACTIVE_SESSION_FILE = Path(
+    os.environ.get("AGENTS_ACTIVE_SESSION_FILE", str(ACTIVE_SESSION_FILE))
+)
 
 # Ensure data directory exists
 TELEMETRY_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -253,31 +257,19 @@ def export_events(
     print(f"Exported {len(events)} events to {output_file}")
 
 
-def generate_report(period: str = "weekly") -> Dict[str, Any]:
-    """Generate telemetry report for specified period."""
-    # Calculate date range
+def _calculate_date_range(period: str) -> Optional[str]:
+    """Calculate date range for telemetry query."""
+    from datetime import timedelta
     now = datetime.now(timezone.utc)
     if period == "weekly":
-        from datetime import timedelta
-        since = (now - timedelta(days=7)).isoformat().replace("+00:00", "Z")
+        return (now - timedelta(days=7)).isoformat().replace("+00:00", "Z")
     elif period == "monthly":
-        from datetime import timedelta
-        since = (now - timedelta(days=30)).isoformat().replace("+00:00", "Z")
-    else:
-        since = None
-    
-    events = load_events(since=since, limit=10000)
-    
-    # Calculate metrics
-    total_events = len(events)
-    sessions = set(e.get("session_id") for e in events)
-    
-    event_counts = {}
-    for event in events:
-        etype = event.get("event_type", "unknown")
-        event_counts[etype] = event_counts.get(etype, 0) + 1
-    
-    # Session durations (for completed sessions)
+        return (now - timedelta(days=30)).isoformat().replace("+00:00", "Z")
+    return None
+
+
+def _calculate_session_durations(events: List[Dict]) -> List[float]:
+    """Calculate session durations from start/end events."""
     session_starts = {}
     session_ends = {}
     for event in events:
@@ -286,38 +278,66 @@ def generate_report(period: str = "weekly") -> Dict[str, Any]:
             session_starts[sid] = event.get("timestamp")
         elif event.get("event_type") == "session_end":
             session_ends[sid] = event.get("timestamp")
-    
-    session_durations = []
+
+    durations = []
     for sid in session_starts:
         if sid in session_ends:
             try:
                 start = datetime.fromisoformat(session_starts[sid].replace("Z", "+00:00"))
                 end = datetime.fromisoformat(session_ends[sid].replace("Z", "+00:00"))
-                duration = (end - start).total_seconds()
-                session_durations.append(duration)
+                durations.append((end - start).total_seconds())
             except (ValueError, KeyError):
                 continue
-    
-    avg_duration = sum(session_durations) / len(session_durations) if session_durations else 0
-    
-    # Tool usage
+    return durations
+
+
+def _count_tool_usage(events: List[Dict]) -> Dict[str, int]:
+    """Count tool execution events by tool name."""
     tool_usage = {}
     for event in events:
         if event.get("event_type") == "tool_exec":
             tool = event.get("metadata", {}).get("tool_name", "unknown")
             tool_usage[tool] = tool_usage.get(tool, 0) + 1
-    
-    # Outcomes
+    return tool_usage
+
+
+def _count_outcomes(events: List[Dict]) -> Dict[str, int]:
+    """Count events by outcome."""
     outcomes = {"success": 0, "failure": 0, "partial": 0, "skipped": 0}
     for event in events:
         outcome = event.get("metadata", {}).get("outcome")
         if outcome in outcomes:
             outcomes[outcome] += 1
-    
+    return outcomes
+
+
+def generate_report(period: str = "weekly") -> Dict[str, Any]:
+    """Generate telemetry report for specified period."""
+    # Calculate date range
+    since = _calculate_date_range(period)
+    events = load_events(since=since, limit=10000)
+
+    # Calculate metrics
+    total_events = len(events)
+    sessions = set(e.get("session_id") for e in events)
+
+    event_counts = {}
+    for event in events:
+        etype = event.get("event_type", "unknown")
+        event_counts[etype] = event_counts.get(etype, 0) + 1
+
+    # Session durations
+    session_durations = _calculate_session_durations(events)
+    avg_duration = sum(session_durations) / len(session_durations) if session_durations else 0
+
+    # Tool usage and outcomes
+    tool_usage = _count_tool_usage(events)
+    outcomes = _count_outcomes(events)
+
     # Blockers and errors
     blockers = [e for e in events if e.get("event_type") == "blocker"]
     errors = [e for e in events if e.get("event_type") == "error"]
-    
+
     report = {
         "period": period,
         "generated_at": get_iso_timestamp(),
@@ -337,7 +357,7 @@ def generate_report(period: str = "weekly") -> Dict[str, Any]:
             for e in blockers[:5]
         ]
     }
-    
+
     return report
 
 
@@ -418,66 +438,37 @@ def validate_telemetry() -> bool:
     return errors == 0
 
 
-def calculate_heat_scores(
-    period: str = "weekly",
-    compare_previous: bool = False
-) -> Dict[str, Any]:
-    """
-    Calculate heat scores for elements within a specific time period.
-    
-    Args:
-        period: "daily", "weekly", "monthly", "all"
-        compare_previous: If True, compare with previous period
-    
-    Heat Score Formula (per period):
-    - frequency_score (50%): Access count in period (0-100)
-    - recency_score (30%): Days since last access in period (0-100)
-    - success_score (20%): Success rate in period (0-100)
-    
-    Returns dict with elements categorized by heat level and optional trend.
-    """
-    events = load_events(limit=10000)
-    
-    if not events:
-        return {"tools": {}, "patterns": {}, "templates": {}, "documents": {}, "summary": {}}
-    
-    # Calculate date range
-    now = datetime.now(timezone.utc)
-    from datetime import timedelta
-    
+def _get_period_delta(period: str) -> timedelta:
+    """Get timedelta for period."""
     if period == "daily":
-        delta = timedelta(days=1)
+        return timedelta(days=1)
     elif period == "weekly":
-        delta = timedelta(weeks=1)
+        return timedelta(weeks=1)
     elif period == "monthly":
-        delta = timedelta(days=30)
-    else:  # "all"
-        delta = timedelta(days=365*10)  # ~10 years
-    
-    period_start = now - delta
-    
-    # Collect element stats for current period
+        return timedelta(days=30)
+    return timedelta(days=365*10)  # ~10 years for "all"
+
+
+def _collect_element_stats(events: List[Dict], period_start: datetime) -> Dict[str, Dict]:
+    """Collect element statistics from events."""
+    now = datetime.now(timezone.utc)
     element_stats = {}
-    _previous_stats = {} if compare_previous else None
-    
+
     for event in events:
         event_type = event.get("event_type")
         metadata = event.get("metadata", {})
         timestamp_str = event.get("timestamp", "")
         outcome = metadata.get("outcome", "success")
-        
-        # Parse timestamp
+
         try:
             timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
         except (ValueError, TypeError):
             continue
-        
+
         days_ago = (now - timestamp).days
-        
-        # Track element
         element_id = None
         element_type = None
-        
+
         if event_type == "tool_exec":
             element_id = metadata.get("tool_name")
             element_type = "tool"
@@ -487,15 +478,13 @@ def calculate_heat_scores(
         elif event_type in ["element_access", "element_view", "element_apply"]:
             element_id = metadata.get("element_id")
             element_type = metadata.get("element_type", "document")
-        
+
         if not element_id:
             continue
-        
+
         key = f"{element_type}:{element_id}"
-        
-        # Determine which period this event belongs to
         in_current_period = timestamp >= period_start
-        
+
         if in_current_period:
             if key not in element_stats:
                 element_stats[key] = {
@@ -505,76 +494,77 @@ def calculate_heat_scores(
                     "success_count": 0,
                     "fail_count": 0,
                     "last_access_days_ago": days_ago,
-                    "first_access_in_period": timestamp,
-                    "access_events": []
                 }
-            
+
             stats = element_stats[key]
             stats["access_count"] += 1
-            stats["access_events"].append({
-                "timestamp": timestamp_str,
-                "outcome": outcome,
-                "event_type": event_type
-            })
-            
             if outcome == "success":
                 stats["success_count"] += 1
             elif outcome in ["failure", "error"]:
                 stats["fail_count"] += 1
-            
-            # Track most recent
             if days_ago < stats["last_access_days_ago"]:
                 stats["last_access_days_ago"] = days_ago
-    
-    # Calculate scores
+
+    return element_stats
+
+
+def _calculate_element_heat_score(stats: Dict, max_access: int) -> Dict:
+    """Calculate heat score for a single element."""
+    frequency_score = (stats["access_count"] / max_access) * 100 if max_access > 0 else 0
+    recency_score = 100 * (0.9 ** stats["last_access_days_ago"])
+    total_outcomes = stats["success_count"] + stats["fail_count"]
+    success_score = (stats["success_count"] / total_outcomes * 100) if total_outcomes > 0 else 100
+    heat_score = (frequency_score * 0.5) + (recency_score * 0.3) + (success_score * 0.2)
+
+    heat_level = "hot" if heat_score >= 70 else ("warm" if heat_score >= 40 else "cold")
+
+    return {
+        "element_id": stats["element_id"],
+        "element_type": stats["element_type"],
+        "heat_score": round(heat_score, 1),
+        "heat_level": heat_level,
+        "frequency_score": round(frequency_score, 1),
+        "recency_score": round(recency_score, 1),
+        "success_score": round(success_score, 1),
+        "access_count": stats["access_count"],
+        "last_access_days_ago": stats["last_access_days_ago"],
+        "success_count": stats["success_count"],
+        "fail_count": stats["fail_count"],
+        "trend": "stable"
+    }
+
+
+def calculate_heat_scores(
+    period: str = "weekly",
+    compare_previous: bool = False
+) -> Dict[str, Any]:
+    """
+    Calculate heat scores for elements within a specific time period.
+
+    Heat Score Formula (per period):
+    - frequency_score (50%): Access count in period (0-100)
+    - recency_score (30%): Days since last access in period (0-100)
+    - success_score (20%): Success rate in period (0-100)
+    """
+    events = load_events(limit=10000)
+    if not events:
+        return {"tools": {}, "patterns": {}, "templates": {}, "documents": {}, "summary": {}}
+
+    # Calculate date range
+    now = datetime.now(timezone.utc)
+    period_start = now - _get_period_delta(period)
+
+    # Collect element stats
+    element_stats = _collect_element_stats(events, period_start)
     if not element_stats:
         return {"tools": {}, "patterns": {}, "templates": {}, "documents": {}, "summary": {}}
-    
+
     max_access = max(s["access_count"] for s in element_stats.values())
-    
-    scored_elements = []
-    for key, stats in element_stats.items():
-        # Frequency score (0-100): percentage of max access count in period
-        frequency_score = (stats["access_count"] / max_access) * 100 if max_access > 0 else 0
-        
-        # Recency score (0-100): based on days since last access
-        # 0 days = 100, 7 days = 50, 30 days = 10
-        recency_score = 100 * (0.9 ** stats["last_access_days_ago"])
-        
-        # Success score (0-100): percentage of successful outcomes
-        total_outcomes = stats["success_count"] + stats["fail_count"]
-        success_score = (stats["success_count"] / total_outcomes * 100) if total_outcomes > 0 else 100
-        
-        # Final heat score
-        heat_score = (frequency_score * 0.5) + (recency_score * 0.3) + (success_score * 0.2)
-        
-        # Categorize
-        if heat_score >= 70:
-            heat_level = "hot"
-        elif heat_score >= 40:
-            heat_level = "warm"
-        else:
-            heat_level = "cold"
-        
-        scored_elements.append({
-            "element_id": stats["element_id"],
-            "element_type": stats["element_type"],
-            "heat_score": round(heat_score, 1),
-            "heat_level": heat_level,
-            "frequency_score": round(frequency_score, 1),
-            "recency_score": round(recency_score, 1),
-            "success_score": round(success_score, 1),
-            "access_count": stats["access_count"],
-            "last_access_days_ago": stats["last_access_days_ago"],
-            "success_count": stats["success_count"],
-            "fail_count": stats["fail_count"],
-            "period": period,
-            "trend": "stable"  # Will be updated if compare_previous is True
-        })
-    
-    # Sort by heat score descending
+
+    # Calculate scores
+    scored_elements = [_calculate_element_heat_score(stats, max_access) for stats in element_stats.values()]
     scored_elements.sort(key=lambda x: -x["heat_score"])
-    
+
     # Categorize by type
     result = {
         "tools": [e for e in scored_elements if e["element_type"] == "tool"],
@@ -594,7 +584,7 @@ def calculate_heat_scores(
             "total_accesses": sum(e["access_count"] for e in scored_elements)
         }
     }
-    
+
     return result
 
 

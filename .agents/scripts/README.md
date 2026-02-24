@@ -34,7 +34,8 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 | `verify-tasks.py` | Check task completion |
 | `agents-wb-update.py` | Automate `updated_at` and report `Files Changed` updates |
 
-`agents-wb-update.py` also supports task/status/timeline/link automation for active WB sessions.
+`agents-wb-update.py` supports task/status/timeline/link automation with explicit `--session` scope for write safety.
+For per-process isolation, set `AGENTS_ACTIVE_SESSION_FILE` to use a custom active-session pointer.
 
 Tools catalog source: `.agents/tools.json`.
 Catalog validation: `./.agents/agents tools validate`.

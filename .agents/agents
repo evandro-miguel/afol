@@ -8,22 +8,6 @@
 #   .agents/agents doctor [args...]
 #   .agents/agents new <theme> [options]
 #
-# Available commands:
-#   doctor              Validate .agents structure
-#   new                 Create new workstream
-#   index               Update SPECS/ADRS indexes
-#   lint-docs           Validate markdown docs
-#   structure-map       Generate project structure docs
-#   sync                Sync AGENTS.md to agent files
-#   verify-tasks        Check task completion
-#   wb-update           Update workbench metadata (touch/task/status/link/timeline/files-changed)
-#   tools               Discover available tools and usage details
-#   telemetry           Query/report heat and telemetry data
-#   patterns            Suggest/apply/rate implementation patterns
-#   bootstrap           Install .agents system into another repository
-#   skills-sync         Sync project skills from universal-skills
-#   fix-symlinks        Repair symlinks with replication fallback
-#
 
 set -e
 
@@ -35,18 +19,18 @@ else
 fi
 ORIGINAL_PWD="$(pwd)"
 TELEMETRY_SCRIPT="${SCRIPTS_DIR}/agents-telemetry.py"
-ACTIVE_SESSION_FILE="${SCRIPT_DIR}/wb/.active_session"
+ACTIVE_SESSION_FILE="${AGENTS_ACTIVE_SESSION_FILE:-${SCRIPT_DIR}/wb/.active_session}"
 
 # Auto-record telemetry for tool execution
 record_tool_telemetry() {
     local tool_name="$1"
     local outcome="${2:-success}"
     local session_id=""
-    
+
     if [ -f "${ACTIVE_SESSION_FILE}" ]; then
         session_id=$(cat "${ACTIVE_SESSION_FILE}")
     fi
-    
+
     if [ -n "${session_id}" ] && [ -f "${TELEMETRY_SCRIPT}" ]; then
         python3 "${TELEMETRY_SCRIPT}" record tool_exec \
             --session-id="${session_id}" \
@@ -71,136 +55,107 @@ if [ ! -d "${SCRIPTS_DIR}/.venv" ]; then
     echo
 fi
 
+# Command map: command -> script_name (without .py)
+# Aliases are handled in the case statement below
+declare -A COMMAND_MAP=(
+    ["doctor"]="agents-doctor"
+    ["new"]="agents-new"
+    ["index"]="agents-index"
+    ["lint-docs"]="agents-lint-docs"
+    ["lint"]="agents-lint-docs"
+    ["structure-map"]="agents-structure-map"
+    ["map"]="agents-structure-map"
+    ["sync"]="sync-agent-docs"
+    ["verify-tasks"]="verify-tasks"
+    ["verify"]="verify-tasks"
+    ["wb-update"]="agents-wb-update"
+    ["wb"]="agents-wb-update"
+    ["tools"]="agents-tools"
+    ["telemetry"]="agents-telemetry"
+    ["patterns"]="agents-patterns"
+    ["bootstrap"]="agents-bootstrap"
+    ["skills-sync"]="agents-skills-sync"
+    ["fix-symlinks"]="agents-fix-symlinks"
+)
+
+# Help message
+show_help() {
+    echo "Agents CLI - Operational scripts for .agents system"
+    echo
+    echo "Usage:"
+    echo "  .agents/agents <command> [args...]"
+    echo
+    echo "Commands:"
+    echo "  doctor              Validate .agents structure and integrity"
+    echo "  new <theme>         Create new workstream with plan/task/log"
+    echo "  index               Update SPECS/ADRS indexes"
+    echo "  lint-docs           Validate markdown docs consistency"
+    echo "  structure-map       Generate project structure documentation"
+    echo "  sync                Sync AGENTS.md to QWEN/CLAUDE/GEMINI.md"
+    echo "  verify-tasks        Check if all tasks are completed"
+    echo "  wb-update           Update WB metadata (touch/task/status/link/timeline/files-changed)"
+    echo "  tools               Discover and explore available tools"
+    echo "  telemetry           Query/report telemetry and heat scoring"
+    echo "  patterns            Discover and apply reusable patterns"
+    echo "  bootstrap           Install .agents system in another repository"
+    echo "  skills-sync         Sync project skills from universal-skills"
+    echo "  fix-symlinks        Repair symlinks with copy fallback"
+    echo "  help                Show this help message"
+    echo
+    echo "Examples:"
+    echo "  .agents/agents doctor"
+    echo "  .agents/agents new auth-refactor --spec"
+    echo "  .agents/agents structure-map . --output .agents/arc/structure/"
+    echo "  .agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/"
+    echo "  .agents/agents wb-update touch"
+    echo "  .agents/agents wb-update task T-01 --mark-done"
+    echo "  .agents/agents tools list"
+    echo "  .agents/agents tools info doctor"
+    echo "  .agents/agents tools search validate"
+    echo "  .agents/agents telemetry heat --period weekly"
+    echo "  .agents/agents patterns suggest --theme auth"
+    echo "  .agents/agents bootstrap /path/to/target-repo --dry-run"
+    echo "  .agents/agents skills-sync status"
+    echo "  .agents/agents fix-symlinks --dry-run"
+}
+
 # Parse command
 COMMAND="$1"
 shift || true
 
-case "${COMMAND}" in
-    doctor)
+# Handle help and empty command first
+if [ "${COMMAND}" = "help" ] || [ "${COMMAND}" = "-h" ] || [ "${COMMAND}" = "--help" ]; then
+    show_help
+    exit 0
+fi
+
+if [ -z "${COMMAND}" ]; then
+    echo "❌ No command specified"
+    echo
+    echo "Run '.agents/agents help' for usage"
+    exit 1
+fi
+
+# Look up command in map
+SCRIPT_NAME="${COMMAND_MAP[${COMMAND}]:-}"
+
+if [ -n "${SCRIPT_NAME}" ]; then
+    # Command found in map
+    if [ -f "${SCRIPTS_DIR}/${SCRIPT_NAME}.py" ]; then
         cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-doctor.py" "$@"
-        record_tool_telemetry "doctor" "success"
-        ;;
-    new)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-new.py" "$@"
-        record_tool_telemetry "new" "success"
-        ;;
-    index)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-index.py" "$@"
-        record_tool_telemetry "index" "success"
-        ;;
-    lint-docs|lint)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-lint-docs.py" "$@"
-        record_tool_telemetry "lint-docs" "success"
-        ;;
-    structure-map|map)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-structure-map.py" "$@"
-        record_tool_telemetry "structure-map" "success"
-        ;;
-    sync)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/sync-agent-docs.py" "$@"
-        record_tool_telemetry "sync" "success"
-        ;;
-    verify-tasks|verify)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/verify-tasks.py" "$@"
-        record_tool_telemetry "verify-tasks" "success"
-        ;;
-    wb-update|wb)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-wb-update.py" "$@"
-        record_tool_telemetry "wb-update" "success"
-        ;;
-    tools)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-tools.py" "$@"
-        record_tool_telemetry "tools" "success"
-        ;;
-    telemetry)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-telemetry.py" "$@"
-        record_tool_telemetry "telemetry" "success"
-        ;;
-    patterns)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-patterns.py" "$@"
-        record_tool_telemetry "patterns" "success"
-        ;;
-    bootstrap)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-bootstrap.py" "$@"
-        record_tool_telemetry "bootstrap" "success"
-        ;;
-    skills-sync)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-skills-sync.py" "$@"
-        record_tool_telemetry "skills-sync" "success"
-        ;;
-    fix-symlinks)
-        cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/agents-fix-symlinks.py" "$@"
-        record_tool_telemetry "fix-symlinks" "success"
-        ;;
-    help|-h|--help)
-        echo "Agents CLI - Operational scripts for .agents system"
-        echo
-        echo "Usage:"
-        echo "  .agents/agents <command> [args...]"
-        echo
-        echo "Commands:"
-        echo "  doctor              Validate .agents structure and integrity"
-        echo "  new <theme>         Create new workstream with plan/task/log"
-        echo "  index               Update SPECS/ADRS indexes"
-        echo "  lint-docs           Validate markdown docs consistency"
-        echo "  structure-map       Generate project structure documentation"
-        echo "  sync                Sync AGENTS.md to QWEN/CLAUDE/GEMINI.md"
-        echo "  verify-tasks        Check if all tasks are completed"
-        echo "  wb-update           Update WB metadata (touch/task/status/link/timeline/files-changed)"
-        echo "  tools               Discover and explore available tools"
-        echo "  telemetry           Query/report telemetry and heat scoring"
-        echo "  patterns            Discover and apply reusable patterns"
-        echo "  bootstrap           Install .agents system in another repository"
-        echo "  skills-sync         Sync project skills from universal-skills"
-        echo "  fix-symlinks        Repair symlinks with copy fallback"
-        echo "  help                Show this help message"
-        echo
-        echo "Examples:"
-        echo "  .agents/agents doctor"
-        echo "  .agents/agents new auth-refactor --spec"
-        echo "  .agents/agents structure-map . --output .agents/arc/structure/"
-        echo "  .agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/"
-        echo "  .agents/agents wb-update touch"
-        echo "  .agents/agents wb-update task T-01 --mark-done"
-        echo "  .agents/agents tools list"
-        echo "  .agents/agents tools info doctor"
-        echo "  .agents/agents tools search validate"
-        echo "  .agents/agents telemetry heat --period weekly"
-        echo "  .agents/agents patterns suggest --theme auth"
-        echo "  .agents/agents bootstrap /path/to/target-repo --dry-run"
-        echo "  .agents/agents skills-sync status"
-        echo "  .agents/agents fix-symlinks --dry-run"
-        ;;
-    "")
-        echo "❌ No command specified"
-        echo
-        echo "Run '.agents/agents help' for usage"
+        uv run --with "pyyaml" "${SCRIPTS_DIR}/${SCRIPT_NAME}.py" "$@"
+        record_tool_telemetry "${COMMAND}" "success"
+    else
+        echo "❌ Script not found: ${SCRIPT_NAME}.py"
         exit 1
-        ;;
-    *)
-        # Try to run as script name
-        if [ -f "${SCRIPTS_DIR}/${COMMAND}.py" ]; then
-            cd "${ORIGINAL_PWD}"
-            uv run --directory "${SCRIPTS_DIR}" "${COMMAND}.py" "$@"
-        else
-            echo "❌ Unknown command: ${COMMAND}"
-            echo
-            echo "Run '.agents/agents help' for usage"
-            exit 1
-        fi
-        ;;
-esac
+    fi
+elif [ -f "${SCRIPTS_DIR}/${COMMAND}.py" ]; then
+    # Try to run as script name directly (fallback for unknown commands)
+    cd "${ORIGINAL_PWD}"
+    uv run --directory "${SCRIPTS_DIR}" "${COMMAND}.py" "$@"
+else
+    echo "❌ Unknown command: ${COMMAND}"
+    echo
+    echo "Run '.agents/agents help' for usage"
+    exit 1
+fi

@@ -388,23 +388,13 @@ def _print_validate_errors(errors: List[str], warnings: List[str]) -> None:
             print(f"  - {warn}")
 
 
-def validate_catalog(tools_data: Dict[str, Any]) -> int:
-    """Validate tools catalog schema and cross-references."""
-    errors: List[str] = []
-    warnings: List[str] = []
-
-    missing_top = sorted(REQUIRED_TOP_LEVEL_KEYS - set(tools_data.keys()))
-    if missing_top:
-        errors.append(f"Missing top-level keys: {', '.join(missing_top)}")
-
-    tools = tools_data.get("tools")
-    if not isinstance(tools, list) or not tools:
-        errors.append("`tools` must be a non-empty array")
-        tools = []
-
-    # Validate tool entries
-    ids: List[str] = []
-    type_set: Set[str] = set()
+def _validate_tool_entries(
+    tools: List[Dict[str, Any]],
+    ids: List[str],
+    type_set: Set[str],
+    errors: List[str]
+) -> None:
+    """Validate individual tool entries."""
     for idx, tool in enumerate(tools):
         if not isinstance(tool, dict):
             errors.append(f"tools[{idx}] must be an object")
@@ -425,15 +415,17 @@ def validate_catalog(tools_data: Dict[str, Any]) -> int:
         else:
             errors.append(f"tools[{idx}] ({tid}) has non-string type")
 
-    # Unique IDs
-    duplicates = sorted({tid for tid in ids if ids.count(tid) > 1})
-    if duplicates:
-        errors.append(f"Duplicate tool IDs: {', '.join(duplicates)}")
 
-    categories = tools_data.get("tool_categories", {})
+def _validate_categories(
+    categories: Any,
+    type_set: Set[str],
+    id_set: Set[str],
+    errors: List[str]
+) -> None:
+    """Validate tool_categories structure and references."""
     if not isinstance(categories, dict):
         errors.append("`tool_categories` must be an object")
-        categories = {}
+        return
 
     category_names = set(categories.keys())
     if not category_names:
@@ -445,7 +437,6 @@ def validate_catalog(tools_data: Dict[str, Any]) -> int:
         errors.append(f"Missing categories for tool types: {', '.join(missing_categories)}")
 
     # Category references should point to existing IDs
-    id_set = set(ids)
     for cname, cdata in categories.items():
         if not isinstance(cdata, dict):
             errors.append(f"Category `{cname}` must be an object")
@@ -458,15 +449,17 @@ def validate_catalog(tools_data: Dict[str, Any]) -> int:
         if unknown:
             errors.append(f"Category `{cname}` references unknown tool IDs: {', '.join(unknown)}")
 
-    # Makefile targets should be object
-    make_targets = tools_data.get("makefile_targets", {})
-    if not isinstance(make_targets, dict):
-        errors.append("`makefile_targets` must be an object")
 
-    # Execution modes sanity
-    execution_modes = tools_data.get("execution_modes", {})
+def _validate_execution_modes(
+    execution_modes: Any,
+    ids: List[str],
+    errors: List[str],
+    warnings: List[str]
+) -> None:
+    """Validate execution_modes structure."""
     if execution_modes and not isinstance(execution_modes, dict):
         errors.append("`execution_modes` must be an object")
+        return
     if isinstance(execution_modes, dict):
         on_demand = execution_modes.get("on-demand", {})
         if isinstance(on_demand, dict):
@@ -478,7 +471,49 @@ def validate_catalog(tools_data: Dict[str, Any]) -> int:
                         f"on-demand tools list does not include: {', '.join(undeclared)}"
                     )
             else:
-                errors.append("execution_modes.on-demand.tools must be an array")
+                errors.append("`on-demand.tools` must be an array")
+
+
+def validate_catalog(tools_data: Dict[str, Any]) -> int:
+    """Validate tools catalog schema and cross-references."""
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    # Validate top-level keys
+    missing_top = sorted(REQUIRED_TOP_LEVEL_KEYS - set(tools_data.keys()))
+    if missing_top:
+        errors.append(f"Missing top-level keys: {', '.join(missing_top)}")
+
+    # Validate tools array
+    tools = tools_data.get("tools")
+    if not isinstance(tools, list) or not tools:
+        errors.append("`tools` must be a non-empty array")
+        tools = []
+
+    # Collect IDs and types
+    ids: List[str] = []
+    type_set: Set[str] = set()
+
+    # Validate tool entries
+    _validate_tool_entries(tools, ids, type_set, errors)
+
+    # Check for duplicate IDs
+    duplicates = sorted({tid for tid in ids if ids.count(tid) > 1})
+    if duplicates:
+        errors.append(f"Duplicate tool IDs: {', '.join(duplicates)}")
+
+    # Validate categories
+    categories = tools_data.get("tool_categories", {})
+    _validate_categories(categories, type_set, set(ids), errors)
+
+    # Validate makefile_targets
+    make_targets = tools_data.get("makefile_targets", {})
+    if not isinstance(make_targets, dict):
+        errors.append("`makefile_targets` must be an object")
+
+    # Validate execution_modes
+    execution_modes = tools_data.get("execution_modes", {})
+    _validate_execution_modes(execution_modes, ids, errors, warnings)
 
     print("\n" + "=" * 70)
     print("  AGENTS TOOLS - Catalog Validation")
@@ -486,7 +521,8 @@ def validate_catalog(tools_data: Dict[str, Any]) -> int:
     print()
     print(f"Tools file: {TOOLS_JSON}")
     print(f"Tools found: {len(ids)}")
-    print(f"Categories: {len(category_names)}")
+    categories = tools_data.get("tool_categories", {})
+    print(f"Categories: {len(categories)}")
     print()
 
     _print_validate_errors(errors, warnings)

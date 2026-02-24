@@ -29,6 +29,7 @@ except ImportError as exc:
     sys.exit(1)
 
 from lib.agents_config import (
+    get_active_session_file_path,
     get_cfg_path,
     load_agents_config,
     parse_offset,
@@ -36,7 +37,7 @@ from lib.agents_config import (
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
-ACTIVE_SESSION_FILE = get_cfg_path(ROOT_DIR, CONFIG, "active_session_file")
+ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
 WB_TZ = parse_offset(WB_OFFSET)
 
@@ -107,6 +108,31 @@ def resolve_session(session: str | None) -> Path:
     if not active:
         raise FileNotFoundError("No active session found in .agents/wb/.active_session")
     return (WB_DIR / active).resolve()
+
+
+def require_explicit_session(args: argparse.Namespace, command: str) -> None:
+    """
+    Enforce explicit scope for write operations.
+
+    Allowed no-session exceptions:
+    - touch/normalize-time with --file or --all-wb
+    - files-changed with --report
+    """
+    if getattr(args, "session", None):
+        return
+
+    if command in {"touch", "normalize-time"} and (
+        getattr(args, "file", None) or getattr(args, "all_wb", False)
+    ):
+        return
+
+    if command == "files-changed" and getattr(args, "report", None):
+        return
+
+    raise ValueError(
+        f"Command '{command}' requires --session for write safety. "
+        "Use explicit --session <id/path> (or --file/--all-wb/--report where supported)."
+    )
 
 
 def split_frontmatter(content: str) -> tuple[dict, str] | None:
@@ -347,6 +373,7 @@ def append_timeline(log_file: Path, message: str):
 
 
 def cmd_touch(args: argparse.Namespace):
+    require_explicit_session(args, "touch")
     if args.file:
         count = touch_targets([Path(args.file).resolve()])
         print(f"✓ updated_at touched in {count} file(s)")
@@ -364,6 +391,7 @@ def cmd_touch(args: argparse.Namespace):
 
 
 def cmd_normalize_time(args: argparse.Namespace):
+    require_explicit_session(args, "normalize-time")
     if args.file:
         targets = [Path(args.file).resolve()]
     elif args.all_wb:
@@ -387,6 +415,7 @@ def cmd_normalize_time(args: argparse.Namespace):
 
 
 def cmd_files_changed(args: argparse.Namespace):
+    require_explicit_session(args, "files-changed")
     if args.report:
         report_file = Path(args.report).resolve()
     else:
@@ -398,6 +427,7 @@ def cmd_files_changed(args: argparse.Namespace):
 
 
 def cmd_status(args: argparse.Namespace):
+    require_explicit_session(args, "status")
     session_dir = resolve_session(args.session)
     paths = doc_files(session_dir, args.file)
     count = set_status(paths, args.value)
@@ -405,6 +435,7 @@ def cmd_status(args: argparse.Namespace):
 
 
 def cmd_link(args: argparse.Namespace):
+    require_explicit_session(args, "link")
     session_dir = resolve_session(args.session)
     target = latest_doc_file(session_dir, args.file)
     update_link(target, args.key, args.value)
@@ -412,6 +443,7 @@ def cmd_link(args: argparse.Namespace):
 
 
 def cmd_timeline(args: argparse.Namespace):
+    require_explicit_session(args, "timeline")
     session_dir = resolve_session(args.session)
     log_file = latest_doc_file(session_dir, "log")
     append_timeline(log_file, args.message)
@@ -419,6 +451,7 @@ def cmd_timeline(args: argparse.Namespace):
 
 
 def cmd_task(args: argparse.Namespace):
+    require_explicit_session(args, "task")
     session_dir = resolve_session(args.session)
     task_file = latest_doc_file(session_dir, "task")
 
@@ -440,26 +473,26 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     p_touch = sub.add_parser("touch", help="update updated_at in frontmatter")
-    p_touch.add_argument("--session", help="session id/path (default: active session)")
+    p_touch.add_argument("--session", help="session id/path (required for session-scoped writes)")
     p_touch.add_argument("--file", help="single file to touch")
     p_touch.add_argument("--all-wb", action="store_true", help="touch all markdown files under .agents/wb")
     p_touch.set_defaults(func=cmd_touch)
 
     p_norm = sub.add_parser("normalize-time", help="normalize created_at/updated_at to configured WB offset")
-    p_norm.add_argument("--session", help="session id/path (default: active session)")
+    p_norm.add_argument("--session", help="session id/path (required for session-scoped writes)")
     p_norm.add_argument("--file", help="single file to normalize")
     p_norm.add_argument("--all-wb", action="store_true", help="normalize all markdown files under .agents/wb")
     p_norm.set_defaults(func=cmd_normalize_time)
 
     p_changed = sub.add_parser("files-changed", help="refresh report 'Files Changed' from git status")
-    p_changed.add_argument("--session", help="session id/path (default: active session)")
+    p_changed.add_argument("--session", help="session id/path (required for session-scoped writes)")
     p_changed.add_argument("--report", help="explicit report file")
     p_changed.add_argument("--include-wb", action="store_true", help="include .agents/wb paths in output")
     p_changed.set_defaults(func=cmd_files_changed)
 
     p_task = sub.add_parser("task", help="update task marker/state by task id")
     p_task.add_argument("task_id", help="Task ID (e.g., T-01 or T-001)")
-    p_task.add_argument("--session", help="session id/path (default: active session)")
+    p_task.add_argument("--session", help="session id/path (required)")
     action_group = p_task.add_mutually_exclusive_group(required=True)
     action_group.add_argument("--mark-done", action="store_true")
     action_group.add_argument("--mark-in-progress", action="store_true")
@@ -470,18 +503,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_task.set_defaults(func=cmd_task)
 
     p_status = sub.add_parser("status", help="set frontmatter status in session docs")
-    p_status.add_argument("--session", help="session id/path (default: active session)")
+    p_status.add_argument("--session", help="session id/path (required)")
     p_status.add_argument("--file", choices=["plan", "task", "spec-lite", "report", "log", "all"], default="all")
     p_status.add_argument("--value", required=True, help="new status value")
     p_status.set_defaults(func=cmd_status)
 
     p_timeline = sub.add_parser("timeline", help="append timeline entry in log")
-    p_timeline.add_argument("--session", help="session id/path (default: active session)")
+    p_timeline.add_argument("--session", help="session id/path (required)")
     p_timeline.add_argument("--message", required=True, help="timeline message")
     p_timeline.set_defaults(func=cmd_timeline)
 
     p_link = sub.add_parser("link", help="set frontmatter links.<key> for a doc")
-    p_link.add_argument("--session", help="session id/path (default: active session)")
+    p_link.add_argument("--session", help="session id/path (required)")
     p_link.add_argument("--file", choices=["plan", "task", "spec-lite", "report", "log"], required=True)
     p_link.add_argument("--key", required=True, help="links key")
     p_link.add_argument("--value", required=True, help="links value")

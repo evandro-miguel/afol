@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict
@@ -144,6 +145,14 @@ def get_cfg_path(root: Path, config: Dict[str, Any], key: str) -> Path:
     if not raw:
         raise KeyError(f"Missing paths.{key} in configuration")
     return resolve_repo_path(root, str(raw))
+
+
+def get_active_session_file_path(root: Path, config: Dict[str, Any]) -> Path:
+    """Resolve active-session pointer path, allowing per-process override."""
+    override = os.environ.get("AGENTS_ACTIVE_SESSION_FILE")
+    if override:
+        return resolve_repo_path(root, override)
+    return get_cfg_path(root, config, "active_session_file")
 
 
 def parse_offset(offset: str) -> timezone:

@@ -20,7 +20,7 @@ Examples:
 import re
 import sys
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 
 from lib.agents_config import get_cfg_path, load_agents_config
 
@@ -160,7 +160,75 @@ class DocLinter:
                 return frontmatter_text, body, False
 
         return None, content, True
-    
+
+    def _validate_frontmatter_yaml(self, file_path: Path, frontmatter_text: str):
+        """Validate YAML frontmatter content."""
+        if not HAS_YAML:
+            return
+
+        try:
+            fm = yaml.safe_load(frontmatter_text)
+            if fm is None:
+                self.issues.append(LintIssue(
+                    "warning", file_path, 0,
+                    "Empty YAML frontmatter"
+                ))
+                return
+            if not isinstance(fm, dict):
+                self.issues.append(LintIssue(
+                    "error", file_path, 0,
+                    "Frontmatter must be a YAML mapping/object"
+                ))
+                return
+
+            self._check_frontmatter_fields(file_path, fm)
+        except yaml.YAMLError as e:
+            self.issues.append(LintIssue(
+                "error", file_path, 0,
+                f"Invalid YAML: {e}"
+            ))
+
+    def _check_frontmatter_fields(self, file_path: Path, fm: Dict):
+        """Check frontmatter field values."""
+        # Check doc_type
+        doc_type = fm.get("doc_type", fm.get("type", ""))
+        if doc_type and not self._is_placeholder_value(doc_type) and doc_type not in VALID_DOC_TYPES:
+            self.issues.append(LintIssue(
+                "warning", file_path, 0,
+                f"Unknown doc_type: '{doc_type}'. Valid: {', '.join(VALID_DOC_TYPES)}"
+            ))
+
+        # Check status
+        status = fm.get("status", "")
+        if status and not self._is_placeholder_value(status) and status not in VALID_STATUSES:
+            self.issues.append(LintIssue(
+                "warning", file_path, 0,
+                f"Unknown status: '{status}'. Valid: {', '.join(VALID_STATUSES)}"
+            ))
+
+        # Check required fields based on doc_type
+        if doc_type in ["plan", "task", "report"]:
+            if not fm.get("theme"):
+                self.issues.append(LintIssue(
+                    "warning", file_path, 0,
+                    "Missing required field: 'theme'"
+                ))
+
+        # Check timestamp format
+        self._check_timestamps(file_path, fm)
+
+    def _check_timestamps(self, file_path: Path, fm: Dict):
+        """Check timestamp fields format."""
+        for ts_field in ["created_at", "updated_at", "created", "updated"]:
+            if ts_field in fm:
+                ts_value = fm[ts_field]
+                if isinstance(ts_value, str):
+                    if not self._is_valid_timestamp(ts_value):
+                        self.issues.append(LintIssue(
+                            "warning", file_path, 0,
+                            f"Invalid timestamp format for {ts_field}: '{ts_value}' (expected ISO 8601: ...Z or ...-03:00)"
+                        ))
+
     def check_frontmatter(self, file_path: Path, content: str):
         """Check YAML frontmatter."""
         frontmatter_text, _, invalid_structure = self._extract_frontmatter(content)
@@ -181,64 +249,7 @@ class DocLinter:
             ))
             return
 
-        if not HAS_YAML:
-            return
-        
-        try:
-            fm = yaml.safe_load(frontmatter_text)
-            if fm is None:
-                self.issues.append(LintIssue(
-                    "warning", file_path, 0,
-                    "Empty YAML frontmatter"
-                ))
-                return
-            if not isinstance(fm, dict):
-                self.issues.append(LintIssue(
-                    "error", file_path, 0,
-                    "Frontmatter must be a YAML mapping/object"
-                ))
-                return
-            
-            # Check doc_type
-            doc_type = fm.get("doc_type", fm.get("type", ""))
-            if doc_type and not self._is_placeholder_value(doc_type) and doc_type not in VALID_DOC_TYPES:
-                self.issues.append(LintIssue(
-                    "warning", file_path, 0,
-                    f"Unknown doc_type: '{doc_type}'. Valid: {', '.join(VALID_DOC_TYPES)}"
-                ))
-            
-            # Check status
-            status = fm.get("status", "")
-            if status and not self._is_placeholder_value(status) and status not in VALID_STATUSES:
-                self.issues.append(LintIssue(
-                    "warning", file_path, 0,
-                    f"Unknown status: '{status}'. Valid: {', '.join(VALID_STATUSES)}"
-                ))
-            
-            # Check required fields based on doc_type
-            if doc_type in ["plan", "task", "report"]:
-                if not fm.get("theme"):
-                    self.issues.append(LintIssue(
-                        "warning", file_path, 0,
-                        "Missing required field: 'theme'"
-                    ))
-            
-            # Check timestamp format
-            for ts_field in ["created_at", "updated_at", "created", "updated"]:
-                if ts_field in fm:
-                    ts_value = fm[ts_field]
-                    if isinstance(ts_value, str):
-                        if not self._is_valid_timestamp(ts_value):
-                            self.issues.append(LintIssue(
-                                "warning", file_path, 0,
-                                f"Invalid timestamp format for {ts_field}: '{ts_value}' (expected ISO 8601: ...Z or ...-03:00)"
-                            ))
-        
-        except yaml.YAMLError as e:
-            self.issues.append(LintIssue(
-                "error", file_path, 0,
-                f"Invalid YAML: {e}"
-            ))
+        self._validate_frontmatter_yaml(file_path, frontmatter_text)
     
     def check_checkboxes(self, file_path: Path, lines: List[str]):
         """Check checkbox markers."""

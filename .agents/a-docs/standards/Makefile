@@ -10,7 +10,7 @@
 #   make structure
 #   make all
 
-.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-plan skills-apply skills-status skills-check skills-sync wb-touch wb-normalize-time wb-files-changed wb-task wb-status wb-timeline wb-link structure index sync verify lint tools-check test-scripts telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
+.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-plan skills-apply skills-status skills-check skills-sync wb-touch wb-normalize-time wb-files-changed wb-task wb-status wb-timeline wb-link structure index sync verify verify-session verify-active lint tools-check test-scripts lint-scripts lint-fix lint-fix-dry lint-fix-check lint-fix-checkboxes lint-fix-frontmatter telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
 
 # ==============================================================================
 # HELP
@@ -36,18 +36,22 @@ help:
 	@echo "║    make quick        - Use active session for quick task   ║"
 	@echo "║    make bootstrap    - Install system into another repo    ║"
 	@echo "║    make fix-symlinks - Repair links/copy fallback          ║"
-	@echo "║    make wb-touch     - Update updated_at in active session ║"
+	@echo "║    make wb-touch     - Update updated_at (SESSION_ID req.) ║"
 	@echo "║    make wb-normalize-time - Normalize WB timestamps        ║"
 	@echo "║    make wb-files-changed - Refresh report files changed    ║"
-	@echo "║    make wb-task      - Mark task by ID in active session   ║"
-	@echo "║    make wb-status    - Set doc status in active session    ║"
-	@echo "║    make wb-timeline  - Append timeline entry to log        ║"
-	@echo "║    make wb-link      - Set links.<key> in doc frontmatter  ║"
-	@echo "║    make verify       - Check task completion              ║"
+	@echo "║    make wb-task      - Mark task by ID (SESSION_ID req.)   ║"
+	@echo "║    make wb-status    - Set doc status (SESSION_ID req.)    ║"
+	@echo "║    make wb-timeline  - Append timeline (SESSION_ID req.)   ║"
+	@echo "║    make wb-link      - Set links key (SESSION_ID req.)     ║"
+	@echo "║    make verify       - Check task completion (all sessions)║"
+	@echo "║    make verify-session - Check one session (SESSION_ID=)   ║"
+	@echo "║    make verify-active - Check active session only          ║"
 	@echo "║    make lint         - Validate markdown docs             ║"
 	@echo "║    make lint-fix     - Fix common lint issues             ║"
 	@echo "║    make lint-fix-dry - Preview lint fixes                 ║"
 	@echo "║    make lint-fix-check - Check for lint issues            ║"
+	@echo "║    make lint-fix-checkboxes - Fix checkbox separators     ║"
+	@echo "║    make lint-fix-frontmatter - Add missing frontmatter    ║"
 	@echo "║    make lint-scripts - Lint Python scripts                ║"
 	@echo "║    make test-scripts - Run Python unit tests for scripts  ║"
 	@echo "║                                                           ║"
@@ -182,72 +186,138 @@ skills-sync:
 	@./.agents/agents skills-sync sync $(if $(SKILLS),--skills "$(SKILLS)",)
 
 wb-touch:
-	@./.agents/agents wb-update touch
+ifndef SESSION_ID
+	@echo "Usage: make wb-touch SESSION_ID=<session-id> [FILE=<path>]"
+	@exit 1
+else
+	@if [ -n "$(FILE)" ]; then \
+		./.agents/agents wb-update touch --session "$(SESSION_ID)" --file "$(FILE)"; \
+	else \
+		./.agents/agents wb-update touch --session "$(SESSION_ID)"; \
+	fi
+endif
 
 wb-normalize-time:
-	@./.agents/agents wb-update normalize-time --all-wb
+ifeq ($(strip $(SESSION_ID)$(FILE)$(ALL_WB)),)
+	@echo "Usage: make wb-normalize-time SESSION_ID=<session-id> | FILE=<path> | ALL_WB=1"
+	@exit 1
+else
+	@if [ -n "$(FILE)" ]; then \
+		./.agents/agents wb-update normalize-time --file "$(FILE)"; \
+	elif [ "$(ALL_WB)" = "1" ]; then \
+		./.agents/agents wb-update normalize-time --all-wb; \
+	else \
+		./.agents/agents wb-update normalize-time --session "$(SESSION_ID)"; \
+	fi
+endif
 
 wb-files-changed:
-	@./.agents/agents wb-update files-changed
+ifeq ($(strip $(SESSION_ID)$(REPORT)),)
+	@echo "Usage: make wb-files-changed SESSION_ID=<session-id> [INCLUDE_WB=1] | REPORT=<report-file>"
+	@exit 1
+else
+	@if [ -n "$(REPORT)" ]; then \
+		./.agents/agents wb-update files-changed --report "$(REPORT)" $(if $(INCLUDE_WB),--include-wb,); \
+	else \
+		./.agents/agents wb-update files-changed --session "$(SESSION_ID)" $(if $(INCLUDE_WB),--include-wb,); \
+	fi
+endif
 
 wb-task:
+ifndef SESSION_ID
+	@echo "Usage: make wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped"
+	@exit 1
+else
 ifndef TASK_ID
-	@echo "Usage: make wb-task TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped"
+	@echo "Usage: make wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped"
 	@exit 1
 else
 	@if [ "$(ACTION)" = "done" ]; then \
-		./.agents/agents wb-update task $(TASK_ID) --mark-done; \
+		./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-done; \
 	elif [ "$(ACTION)" = "in_progress" ]; then \
-		./.agents/agents wb-update task $(TASK_ID) --mark-in-progress; \
+		./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-in-progress; \
 	elif [ "$(ACTION)" = "pending" ]; then \
-		./.agents/agents wb-update task $(TASK_ID) --mark-pending; \
+		./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-pending; \
 	elif [ "$(ACTION)" = "ready" ]; then \
-		./.agents/agents wb-update task $(TASK_ID) --mark-ready; \
+		./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-ready; \
 	elif [ "$(ACTION)" = "blocked" ]; then \
-		./.agents/agents wb-update task $(TASK_ID) --mark-blocked; \
+		./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-blocked; \
 	elif [ "$(ACTION)" = "skipped" ]; then \
-		./.agents/agents wb-update task $(TASK_ID) --mark-skipped; \
+		./.agents/agents wb-update task $(TASK_ID) --session "$(SESSION_ID)" --mark-skipped; \
 	else \
 		echo "Invalid ACTION=$(ACTION)"; \
 		echo "Use one of: done, in_progress, pending, ready, blocked, skipped"; \
 		exit 1; \
 	fi
 endif
+endif
 
 wb-status:
-ifndef STATUS
-	@echo "Usage: make wb-status STATUS=<value> [FILE=plan|task|spec-lite|report|log|all]"
+ifndef SESSION_ID
+	@echo "Usage: make wb-status SESSION_ID=<session-id> STATUS=<value> [FILE=plan|task|spec-lite|report|log|all]"
 	@exit 1
 else
-	@./.agents/agents wb-update status --value "$(STATUS)" --file "$(if $(FILE),$(FILE),all)"
+ifndef STATUS
+	@echo "Usage: make wb-status SESSION_ID=<session-id> STATUS=<value> [FILE=plan|task|spec-lite|report|log|all]"
+	@exit 1
+else
+	@./.agents/agents wb-update status --session "$(SESSION_ID)" --value "$(STATUS)" --file "$(if $(FILE),$(FILE),all)"
+endif
 endif
 
 wb-timeline:
-ifndef MSG
-	@echo "Usage: make wb-timeline MSG=\"your message\""
+ifndef SESSION_ID
+	@echo "Usage: make wb-timeline SESSION_ID=<session-id> MSG=\"your message\""
 	@exit 1
 else
-	@./.agents/agents wb-update timeline --message "$(MSG)"
+ifndef MSG
+	@echo "Usage: make wb-timeline SESSION_ID=<session-id> MSG=\"your message\""
+	@exit 1
+else
+	@./.agents/agents wb-update timeline --session "$(SESSION_ID)" --message "$(MSG)"
+endif
 endif
 
 wb-link:
+ifndef SESSION_ID
+	@echo "Usage: make wb-link SESSION_ID=<session-id> FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
+	@exit 1
+endif
 ifndef FILE
-	@echo "Usage: make wb-link FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
+	@echo "Usage: make wb-link SESSION_ID=<session-id> FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
 	@exit 1
 endif
 ifndef KEY
-	@echo "Usage: make wb-link FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
+	@echo "Usage: make wb-link SESSION_ID=<session-id> FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
 	@exit 1
 endif
 ifndef VALUE
-	@echo "Usage: make wb-link FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
+	@echo "Usage: make wb-link SESSION_ID=<session-id> FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
 	@exit 1
 endif
-	@./.agents/agents wb-update link --file "$(FILE)" --key "$(KEY)" --value "$(VALUE)"
+	@./.agents/agents wb-update link --session "$(SESSION_ID)" --file "$(FILE)" --key "$(KEY)" --value "$(VALUE)"
 
 verify:
-	@echo "→ Verifying task completion..."
+	@echo "→ Verifying task completion across all sessions..."
 	@./.agents/agents verify-tasks .agents/wb/
+
+verify-session:
+ifndef SESSION_ID
+	@echo "Usage: make verify-session SESSION_ID=<session-id>"
+	@exit 1
+else
+	@echo "→ Verifying task completion for session $(SESSION_ID)..."
+	@./.agents/agents verify-tasks ".agents/wb/$(SESSION_ID)"
+endif
+
+verify-active:
+	@ACTIVE_SESSION="$$(cat .agents/wb/.active_session 2>/dev/null || true)"; \
+	if [ -z "$$ACTIVE_SESSION" ]; then \
+		echo "Usage: make verify-active (requires .agents/wb/.active_session)"; \
+		exit 1; \
+	fi; \
+	echo "→ Verifying active session $$ACTIVE_SESSION..."; \
+	./.agents/agents verify-tasks ".agents/wb/$$ACTIVE_SESSION"
 
 lint:
 	@echo "→ Linting markdown docs..."
@@ -343,7 +413,7 @@ endif
 # QUICK WORKFLOWS
 # ==============================================================================
 
-all: doctor structure index verify skills-check tools-check telemetry-validate
+all: doctor structure index verify-active skills-check tools-check telemetry-validate
 	@echo ""
 	@echo "╔═══════════════════════════════════════════════════════════╗"
 	@echo "║  ✓ All validations passed                                 ║"
@@ -364,11 +434,12 @@ st: structure
 ix: index
 sy: sync
 vf: verify
+va: verify-active
 dr: doctor
 
 # Common workflows
 docs: structure index sync
-check: doctor lint verify
+check: doctor lint verify-active
 init: setup doctor
 
 # ==============================================================================

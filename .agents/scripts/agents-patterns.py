@@ -28,6 +28,7 @@ Options:
 """
 
 import json
+import os
 import sys
 import subprocess
 from datetime import datetime, timezone
@@ -40,6 +41,9 @@ import argparse
 PATTERNS_DIR = Path(__file__).parent.parent / "a-docs" / "patterns"
 TELEMETRY_SCRIPT = Path(__file__).parent / "agents-telemetry.py"
 ACTIVE_SESSION_FILE = Path(__file__).parent.parent / "wb" / ".active_session"
+ACTIVE_SESSION_FILE = Path(
+    os.environ.get("AGENTS_ACTIVE_SESSION_FILE", str(ACTIVE_SESSION_FILE))
+)
 
 # Pattern subdirectories by type
 PATTERN_SUBDIRS = {

@@ -24,8 +24,14 @@ import json
 import subprocess
 from pathlib import Path
 from datetime import datetime
+from typing import Dict, Optional
 
-from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
+from lib.agents_config import (
+    get_active_session_file_path,
+    get_cfg_path,
+    load_agents_config,
+    parse_offset,
+)
 
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
@@ -33,7 +39,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
-ACTIVE_SESSION_FILE = get_cfg_path(ROOT_DIR, CONFIG, "active_session_file")
+ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 TELEMETRY_SCRIPT = SCRIPTS_DIR / "agents-telemetry.py"
 PATTERNS_SCRIPT = SCRIPTS_DIR / "agents-patterns.py"
 WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
@@ -232,62 +238,76 @@ def add_quick_task_to_active_session(active_session: str, theme: str, timestamp:
     return task_id, task_file, log_file
 
 
-def main():
+def _parse_args():
+    """Parse command line arguments."""
     if len(sys.argv) < 2:
-        print("Usage: python agents-new.py <theme> [--spec | --spec-lite] [--plan-only] [--force-new | --quick]")
-        print()
-        print("Examples:")
-        print("  python agents-new.py auth-refactor")
-        print("  python agents-new.py api-endpoint --spec")
-        print("  python agents-new.py bugfix-login --spec-lite")
-        print("  python agents-new.py tiny-fix --quick")
-        print("  python agents-new.py new-epic --spec --force-new")
-        sys.exit(1)
-    
+        return None
     raw_theme = sys.argv[1]
     try:
         theme = sanitize_theme(raw_theme)
-    except ValueError as exc:
-        print(f"❌ Invalid theme: {exc}")
+    except ValueError:
+        return None
+
+    return {
+        "theme": theme,
+        "use_spec": "--spec" in sys.argv,
+        "use_spec_lite": "--spec-lite" in sys.argv,
+        "plan_only": "--plan-only" in sys.argv,
+        "force_new": "--force-new" in sys.argv,
+        "quick_mode": "--quick" in sys.argv,
+    }
+
+
+def _print_usage():
+    """Print usage information."""
+    print("Usage: python agents-new.py <theme> [--spec | --spec-lite] [--plan-only] [--force-new | --quick]")
+    print()
+    print("Examples:")
+    print("  python agents-new.py auth-refactor")
+    print("  python agents-new.py api-endpoint --spec")
+    print("  python agents-new.py bugfix-login --spec-lite")
+    print("  python agents-new.py tiny-fix --quick")
+    print("  python agents-new.py new-epic --spec --force-new")
+
+
+def _handle_quick_mode(args: Dict, active_session: str) -> bool:
+    """Handle quick mode execution. Returns True if handled."""
+    if not args["quick_mode"]:
+        return False
+
+    if not active_session:
+        print("❌ No active session found for quick mode.")
+        print("Create one significant workstream first with:")
+        print("  .agents/agents new <theme> [--spec|--spec-lite]")
         sys.exit(1)
-    use_spec = "--spec" in sys.argv
-    use_spec_lite = "--spec-lite" in sys.argv
-    plan_only = "--plan-only" in sys.argv
-    force_new = "--force-new" in sys.argv
-    quick_mode = "--quick" in sys.argv
 
-    active_session = get_active_session()
+    print("=" * 60)
+    print(f"Quick task mode: {args['theme']}")
+    print("=" * 60)
+    print()
+    print(f"Active session: {active_session}")
+    print(f"Session path: .agents/wb/{active_session}/")
+    print()
 
-    # Quick mode: do not create new workstream, enforce single active stream.
-    if quick_mode:
-        if not active_session:
-            print("❌ No active session found for quick mode.")
-            print("Create one significant workstream first with:")
-            print("  .agents/agents new <theme> [--spec|--spec-lite]")
-            sys.exit(1)
-        print("=" * 60)
-        print(f"Quick task mode: {theme}")
-        print("=" * 60)
-        print()
-        print(f"Active session: {active_session}")
-        print(f"Session path: .agents/wb/{active_session}/")
-        print()
-        try:
-            task_id, task_file, log_file = add_quick_task_to_active_session(
-                active_session=active_session,
-                theme=theme,
-                timestamp=get_timestamp(),
-            )
-        except FileNotFoundError as exc:
-            print(f"❌ {exc}")
-            sys.exit(1)
+    try:
+        task_id, task_file, log_file = add_quick_task_to_active_session(
+            active_session=active_session,
+            theme=args["theme"],
+            timestamp=get_timestamp(),
+        )
+    except FileNotFoundError as exc:
+        print(f"❌ {exc}")
+        sys.exit(1)
 
-        print("No new workstream created (quick mode).")
-        print(f"✓ Added task: {task_id} in {task_file.relative_to(ROOT_DIR)}")
-        print(f"✓ Added timeline entry in {log_file.relative_to(ROOT_DIR)}")
-        print("=" * 60)
-        sys.exit(0)
+    print("No new workstream created (quick mode).")
+    print(f"✓ Added task: {task_id} in {task_file.relative_to(ROOT_DIR)}")
+    print(f"✓ Added timeline entry in {log_file.relative_to(ROOT_DIR)}")
+    print("=" * 60)
+    return True
 
+
+def _check_active_session_policy(active_session: Optional[str], theme: str, force_new: bool) -> None:
+    """Check active session policy and exit if violation."""
     if active_session and not force_new:
         print("❌ Active session already exists.")
         print(f"   Active: .agents/wb/{active_session}/")
@@ -299,34 +319,18 @@ def main():
         print("If this is a significant new stream, force creation:")
         print(f"  .agents/agents new {theme} --force-new [--spec|--spec-lite]")
         sys.exit(1)
-    
-    # Generate session data
-    session_id = get_session_id(theme)
-    timestamp = get_timestamp()
-    
-    print("=" * 60)
-    print(f"Creating new workstream: {theme}")
-    print("=" * 60)
+
+
+def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) -> None:
+    """Create new workstream with all files."""
+    session_path = create_session_folder(session_id)
+    print(f"✓ Created session folder: {session_path.name}")
     print()
-    print(f"Session ID: {session_id}")
-    print(f"Timestamp: {timestamp}")
-    if active_session and force_new:
-        print(f"Previous active session: {active_session}")
-    print()
-    
-    # Create session folder
-    try:
-        session_path = create_session_folder(session_id)
-        print(f"✓ Created session folder: {session_path.name}")
-        print()
-    except FileExistsError as e:
-        print(f"❌ Error: {e}")
-        sys.exit(1)
 
     set_active_session(session_id)
     print(f"✓ Set active session: {session_id}")
     print()
-    
+
     # Create plan file (always)
     print("Creating files:")
     try:
@@ -336,9 +340,9 @@ def main():
     except FileNotFoundError as e:
         print(f"❌ Error: {e}")
         sys.exit(1)
-    
+
     # Create task file (always)
-    if not plan_only:
+    if not args["plan_only"]:
         try:
             task_template = load_template("task.md")
             task_content = fill_template(task_template, session_id, theme, timestamp)
@@ -346,9 +350,9 @@ def main():
         except FileNotFoundError as e:
             print(f"❌ Error: {e}")
             sys.exit(1)
-        
+
         # Create spec file (optional)
-        if use_spec:
+        if args["use_spec"]:
             try:
                 spec_template = load_template("spec.md")
                 spec_content = fill_template(spec_template, session_id, theme, timestamp)
@@ -356,7 +360,7 @@ def main():
             except FileNotFoundError as e:
                 print(f"❌ Error: {e}")
                 sys.exit(1)
-        elif use_spec_lite:
+        elif args["use_spec_lite"]:
             try:
                 spec_lite_template = load_template("spec-lite.md")
                 spec_lite_content = fill_template(spec_lite_template, session_id, theme, timestamp)
@@ -364,7 +368,7 @@ def main():
             except FileNotFoundError as e:
                 print(f"❌ Error: {e}")
                 sys.exit(1)
-        
+
         # Create log file (always)
         try:
             log_template = load_template("log.md")
@@ -382,25 +386,57 @@ def main():
         except FileNotFoundError as e:
             print(f"❌ Error: {e}")
             sys.exit(1)
-    
+
     print()
     print("=" * 60)
     print("Next steps:")
     print(f"1. Edit: .agents/wb/{session_id}/{session_id}_plan_01.md")
-    if not plan_only:
+    if not args["plan_only"]:
         print(f"2. Edit: .agents/wb/{session_id}/{session_id}_task_01.md")
-        if use_spec or use_spec_lite:
+        if args["use_spec"] or args["use_spec_lite"]:
             print(f"3. Edit: .agents/wb/{session_id}/{session_id}_spec*.md")
     print()
     print("Session folder:")
     print(f"  .agents/wb/{session_id}/")
     print("=" * 60)
-    
+
     # Auto-record session_start telemetry
-    record_session_start(session_id, theme, use_spec or use_spec_lite)
-    
+    record_session_start(session_id, theme, args["use_spec"] or args["use_spec_lite"])
     # Auto-suggest patterns
     suggest_patterns_for_theme(theme)
+
+
+def main():
+    """Main entry point."""
+    args = _parse_args()
+    if args is None:
+        _print_usage()
+        sys.exit(1)
+
+    active_session = get_active_session()
+
+    # Quick mode: do not create new workstream, enforce single active stream.
+    if _handle_quick_mode(args, active_session):
+        return
+
+    # Check active session policy
+    _check_active_session_policy(active_session, args["theme"], args["force_new"])
+
+    # Generate session data
+    session_id = get_session_id(args["theme"])
+    timestamp = get_timestamp()
+
+    print("=" * 60)
+    print(f"Creating new workstream: {args['theme']}")
+    print("=" * 60)
+    print()
+    print(f"Session ID: {session_id}")
+    print(f"Timestamp: {timestamp}")
+    if active_session and args["force_new"]:
+        print(f"Previous active session: {active_session}")
+    print()
+
+    _create_workstream(session_id, args["theme"], timestamp, args)
 
 
 def record_session_start(session_id: str, theme: str, has_spec: bool):

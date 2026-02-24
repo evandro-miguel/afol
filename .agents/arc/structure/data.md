@@ -1,6 +1,6 @@
 # 🎨 Data Structure
 
-**Generated:** 2026-02-24T12:53:22+00:00
+**Generated:** 2026-02-24T15:36:37+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -9,7 +9,7 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 63 files, 4,880 lines, 508.9 KB
+**Stats:** 63 files, 4,991 lines, 536.2 KB
 
 ### Files
 
@@ -19,9 +19,9 @@ Data files, constants, and configuration.
 | `.agents/cache/universal-skills/skills/vitest-skill/references/mocks/README.md` | 320 | 9.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vitest-skill/references/configuration/README.md` | 306 | 7.6 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/tailwind-skill/references/configuration/README.md` | 302 | 5.5 KB | Module; functionality |
+| `.agents/data/telemetry/events.jsonl` | 301 | 74.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/biome-skill/references/configuration/README.md` | 212 | 4.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/playwright-skill/references/configuration/README.md` | 193 | 4.7 KB | Module; functionality |
-| `.agents/data/telemetry/events.jsonl` | 190 | 46.7 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/wsl-skill/references/configuration/README.md` | 110 | 2.4 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/unreal-engine/references/plugin-code/metadata.md` | 104 | 4.1 KB | Module; functionality |
 | `.agents/a-docs/agentic/agents-config.md` | 104 | 2.9 KB | Module; functionality |

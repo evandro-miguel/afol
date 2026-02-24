@@ -1,4 +1,5 @@
 import importlib.util
+import argparse
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,44 @@ def load_module(module_name: str, file_path: Path):
 
 
 class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
+    def test_require_explicit_session_for_write_commands(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_require_session_test", script_path)
+
+        no_scope_args = argparse.Namespace(
+            session=None,
+            file=None,
+            all_wb=False,
+            report=None,
+        )
+        with self.assertRaises(ValueError):
+            wb_update.require_explicit_session(no_scope_args, "task")
+
+        explicit_session_args = argparse.Namespace(
+            session="260224_1030_scripts-lean-efficiency",
+            file=None,
+            all_wb=False,
+            report=None,
+        )
+        wb_update.require_explicit_session(explicit_session_args, "task")
+
+        file_scoped_args = argparse.Namespace(
+            session=None,
+            file=".agents/wb/260224_1030_scripts-lean-efficiency/260224_1030_scripts-lean-efficiency_plan_01.md",
+            all_wb=False,
+            report=None,
+        )
+        wb_update.require_explicit_session(file_scoped_args, "touch")
+
+        report_scoped_args = argparse.Namespace(
+            session=None,
+            file=None,
+            all_wb=False,
+            report=".agents/wb/260224_1030_scripts-lean-efficiency/260224_1030_scripts-lean-efficiency_report_01.md",
+        )
+        wb_update.require_explicit_session(report_scoped_args, "files-changed")
+
     def test_update_task_marker_does_not_break_checkbox_format(self):
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
         sys.path.insert(0, str(script_path.parent))
@@ -46,4 +85,3 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-02-24T12:53:22+00:00
+**Generated:** 2026-02-24T15:36:37+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,18 +9,18 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 69 files, 19,356 lines, 677.4 KB
+**Stats:** 69 files, 19,418 lines, 679.5 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
 | `.agents/cache/universal-skills/scripts/skillpool.js` | 984 | 32.9 KB | Module; functionality |
-| `.agents/scripts/agents-telemetry.py` | 670 | 29.7 KB | Module; functionality |
+| `.agents/scripts/agents-telemetry.py` | 658 | 29.2 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/create-skill.js` | 630 | 16.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/writing-skills/scripts/create-skill.js` | 630 | 16.3 KB | Module; functionality |
 | `.agents/scripts/agents-update/agents-update.py` | 526 | 20.2 KB | Module; functionality |
-| `.agents/scripts/agents-tools.py` | 487 | 18.5 KB | Module; functionality |
+| `.agents/scripts/agents-tools.py` | 516 | 19.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/inline-task-planner/scripts/inline_tasks.ts` | 470 | 14.4 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/check-skill.js` | 454 | 13.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/writing-skills/scripts/check-skill.js` | 454 | 13.0 KB | Module; functionality |
@@ -29,9 +29,9 @@ Services, utilities, and business logic.
 | `.agents/cache/universal-skills/skills/writing-skills/scripts/skill-advisor.js` | 417 | 12.0 KB | Module; functionality |
 | `.agents/scripts/agents-structure-map.py` | 413 | 16.7 KB | Module; functionality |
 | `.agents/scripts/agents-wb-update.py` | 409 | 16.4 KB | Module; functionality |
-| `.agents/scripts/agents-lint-docs.py` | 397 | 15.8 KB | Module; functionality |
-| `.agents/scripts/agents-doctor.py` | 372 | 14.2 KB | Module; functionality |
-| `.agents/scripts/agents-new.py` | 370 | 15.1 KB | Module; functionality |
+| `.agents/scripts/agents-lint-docs.py` | 406 | 16.2 KB | Module; functionality |
+| `.agents/scripts/agents-new.py` | 397 | 16.1 KB | Module; functionality |
+| `.agents/scripts/agents-doctor.py` | 381 | 14.6 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/product-manager-toolkit/scripts/customer_interview_analyzer.py` | 363 | 16.7 KB | Module; functionality |
 | `.agents/scripts/agents-update/conflict.py` | 354 | 13.7 KB | Module; functionality |
 | `.agents/scripts/agents-patterns.py` | 351 | 14.0 KB | Module; functionality |

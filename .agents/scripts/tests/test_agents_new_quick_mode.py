@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -15,6 +16,40 @@ def load_module(module_name: str, file_path: Path):
 
 
 class AgentsNewQuickModeTests(unittest.TestCase):
+    def test_main_does_not_create_session_folder_twice(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_main_flow_test", script_path)
+
+        args = {
+            "theme": "execution-integrity-hardening",
+            "use_spec": False,
+            "use_spec_lite": True,
+            "plan_only": False,
+            "force_new": True,
+            "quick_mode": False,
+        }
+
+        with (
+            mock.patch.object(agents_new, "_parse_args", return_value=args),
+            mock.patch.object(agents_new, "get_active_session", return_value="260224_1030_scripts-lean-efficiency"),
+            mock.patch.object(agents_new, "_handle_quick_mode", return_value=False),
+            mock.patch.object(agents_new, "_check_active_session_policy"),
+            mock.patch.object(agents_new, "get_session_id", return_value="260224_1300_execution-integrity-hardening"),
+            mock.patch.object(agents_new, "get_timestamp", return_value="2026-02-24T13:00:00-03:00"),
+            mock.patch.object(agents_new, "_create_workstream") as create_workstream_mock,
+            mock.patch.object(agents_new, "create_session_folder") as create_session_folder_mock,
+        ):
+            agents_new.main()
+
+        create_workstream_mock.assert_called_once_with(
+            "260224_1300_execution-integrity-hardening",
+            "execution-integrity-hardening",
+            "2026-02-24T13:00:00-03:00",
+            args,
+        )
+        create_session_folder_mock.assert_not_called()
+
     def test_telemetry_pattern_helpers_are_non_blocking(self):
         script_path = Path(".agents/scripts/agents-new.py").resolve()
         sys.path.insert(0, str(script_path.parent))

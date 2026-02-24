@@ -17,9 +17,9 @@ Usage:
 import re
 import sys
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
-from lib.agents_config import get_cfg_path, load_agents_config
+from lib.agents_config import get_active_session_file_path, get_cfg_path, load_agents_config
 
 try:
     import yaml
@@ -33,7 +33,7 @@ AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 REQUIRED_FOLDERS = CONFIG.get("doctor", {}).get("required_folders", [])
 REQUIRED_TEMPLATES = CONFIG.get("doctor", {}).get("required_templates", [])
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
-ACTIVE_SESSION_FILE = get_cfg_path(ROOT_DIR, CONFIG, "active_session_file")
+ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 
 VALID_DOC_TYPES = [
     "plan",
@@ -267,12 +267,51 @@ class AgentsDoctor:
             print("  ✓ DECISIONS/INDEX.md")
         
         print()
-    
+
+    def _validate_frontmatter_fields(self, file_path: Path, fm: Dict):
+        """Validate frontmatter field values."""
+        # Check required fields
+        if not fm.get("doc_type") and not fm.get("type"):
+            self.issues.append(Issue(
+                "warning",
+                str(file_path),
+                "Missing doc_type/type field"
+            ))
+
+        # Check timestamp format
+        self._check_frontmatter_timestamps(file_path, fm)
+
+        # Check ID format
+        self._check_frontmatter_id(file_path, fm)
+
+    def _check_frontmatter_timestamps(self, file_path: Path, fm: Dict):
+        """Check timestamp fields format in frontmatter."""
+        for ts_field in ["created_at", "updated_at", "created", "updated"]:
+            if ts_field in fm:
+                ts_value = fm[ts_field]
+                if isinstance(ts_value, str) and not TIMESTAMP_PATTERN.match(ts_value):
+                    self.issues.append(Issue(
+                        "warning",
+                        str(file_path),
+                        f"Invalid timestamp format for {ts_field}: {ts_value} (expected ISO 8601: ...Z or ...-03:00)"
+                    ))
+
+    def _check_frontmatter_id(self, file_path: Path, fm: Dict):
+        """Check ID field format in frontmatter."""
+        if "id" in fm:
+            id_value = fm["id"]
+            if isinstance(id_value, str) and not ID_PATTERN.match(id_value) and not id_value.endswith("_root") and not id_value.endswith("_readme") and not id_value.endswith("_index"):
+                self.issues.append(Issue(
+                    "info",
+                    str(file_path),
+                    f"ID may not follow convention: {id_value}"
+                ))
+
     def validate_frontmatter(self, file_path: Path):
         """Validate YAML frontmatter in a file."""
         self.stats["frontmatter_checked"] += 1
         content = file_path.read_text()
-        
+
         if not content.startswith("---"):
             self.issues.append(Issue(
                 "warning",
@@ -280,7 +319,7 @@ class AgentsDoctor:
                 "Missing YAML frontmatter"
             ))
             return
-        
+
         # Extract frontmatter
         parts = content.split("---", 2)
         if len(parts) < 3:
@@ -290,9 +329,9 @@ class AgentsDoctor:
                 "Invalid frontmatter structure"
             ))
             return
-        
+
         frontmatter_text = parts[1].strip()
-        
+
         if not HAS_YAML:
             # Basic validation without yaml library
             if "created_at:" not in frontmatter_text and "created:" not in frontmatter_text:
@@ -302,39 +341,10 @@ class AgentsDoctor:
                     "Missing created_at/created field"
                 ))
             return
-        
+
         try:
             fm = yaml.safe_load(frontmatter_text)
-            
-            # Check required fields
-            if not fm.get("doc_type") and not fm.get("type"):
-                self.issues.append(Issue(
-                    "warning",
-                    str(file_path),
-                    "Missing doc_type/type field"
-                ))
-            
-            # Check timestamp format
-            for ts_field in ["created_at", "updated_at", "created", "updated"]:
-                if ts_field in fm:
-                    ts_value = fm[ts_field]
-                    if isinstance(ts_value, str) and not TIMESTAMP_PATTERN.match(ts_value):
-                        self.issues.append(Issue(
-                            "warning",
-                            str(file_path),
-                            f"Invalid timestamp format for {ts_field}: {ts_value} (expected ISO 8601: ...Z or ...-03:00)"
-                        ))
-            
-            # Check ID format
-            if "id" in fm:
-                id_value = fm["id"]
-                if isinstance(id_value, str) and not ID_PATTERN.match(id_value) and not id_value.endswith("_root") and not id_value.endswith("_readme") and not id_value.endswith("_index"):
-                    self.issues.append(Issue(
-                        "info",
-                        str(file_path),
-                        f"ID may not follow convention: {id_value}"
-                    ))
-        
+            self._validate_frontmatter_fields(file_path, fm)
         except yaml.YAMLError as e:
             self.issues.append(Issue(
                 "error",
