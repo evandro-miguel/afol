@@ -4,8 +4,8 @@ theme: agents-bootstrap
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: '2026-02-23T00:00:00-03:00'
+updated_at: '2026-02-24T20:39:51-03:00'
 links:
   tools_json: ./tools-json.md
   wrapper: ./agents-wrapper.md
@@ -29,10 +29,11 @@ links:
 Installs `.agents` system in another repository:
 
 1. **Detects stack** - Node.js, Python, Go, etc.
-2. **Copies files** - Scripts, configs, templates
-3. **Creates folders** - Required structure
+2. **Copies mandatory files** - Core configs, arc baseline docs, mirror docs
+3. **Creates folders** - Required structure and runtime agent folders
 4. **Configures Makefile** - Wrapper in target repo
-5. **Validates** - Runs doctor and checks tools
+5. **Runs system setup** - Sync docs, skills sync, and symlink repair
+6. **Validates** - Runs doctor and tools checks
 
 ## What It Touches
 
@@ -40,22 +41,42 @@ Installs `.agents` system in another repository:
 
 | File | Purpose |
 |------|---------|
+| `AGENTS.md` | Canonical instruction template |
+| `QWEN.md` | Mandatory agent instruction replica |
+| `CLAUDE.md` | Mandatory agent instruction replica |
+| `GEMINI.md` | Mandatory agent instruction replica |
 | `.agents/agents` | CLI wrapper |
 | `.agents/agents.config` | Configuration |
 | `.agents/tools.json` | Tool catalog |
+| `.agents/skills-sync.manifest.json` | Skills sync state |
+| `.agents/arc/ARCHITECTURE.md` | Architecture baseline |
+| `.agents/arc/GENERAL-ROADMAP.md` | Roadmap baseline |
 | `.agents/scripts/` | Python scripts |
 | `.agents/a-docs/` | Documentation |
 | `.agents/rules/` | Agent rules |
+| `.agents/skills/` | Project skills |
+| `.agents/data/telemetry/schemas/` | Telemetry schema |
 
 ### Files Written (Destination)
 
 | Location | Action |
 |----------|--------|
 | `<target>/AGENTS.md` | Copied |
+| `<target>/QWEN.md` | Copied |
+| `<target>/CLAUDE.md` | Copied |
+| `<target>/GEMINI.md` | Copied |
 | `<target>/.agents/` | Complete structure |
+| `<target>/.claude/.qwen/.codex/.gemini` | Runtime folders ensured |
 | `<target>/Makefile` | Wrapper configured |
 | `<target>/.agents/arc/` | Folders created |
 | `<target>/.agents/wb/` | Folders created |
+
+Bootstrap fails fast if any mandatory source file or directory is missing.
+Bootstrap also runs:
+
+- `.agents/agents sync --force`
+- `.agents/agents skills-sync sync`
+- `.agents/agents fix-symlinks --force`
 
 ## How to Configure
 
@@ -90,13 +111,17 @@ Installs `.agents` system in another repository:
 Edit `agents-bootstrap.py`:
 
 ```python
-FILES_TO_COPY = [
-    "agents",
-    "agents.config",
-    "tools.json",
-    "scripts/",
-    "a-docs/",
-    "rules/",
+MANDATORY_FILES_TO_COPY = [
+    "AGENTS.md",
+    "QWEN.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    ".agents/agents",
+    ".agents/agents.config",
+    ".agents/tools.json",
+    ".agents/skills-sync.manifest.json",
+    ".agents/arc/ARCHITECTURE.md",
+    ".agents/arc/GENERAL-ROADMAP.md",
 ]
 ```
 

@@ -15,17 +15,34 @@ from typing import Dict, List, Tuple
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 SOURCE_AGENTS_DIR = ROOT_DIR / ".agents"
 
-FILES_TO_COPY = [
+MANDATORY_FILES_TO_COPY = [
     Path("AGENTS.md"),
+    Path("QWEN.md"),
+    Path("CLAUDE.md"),
+    Path("GEMINI.md"),
     Path(".agents/agents"),
     Path(".agents/agents.config"),
     Path(".agents/tools.json"),
+    Path(".agents/skills-sync.manifest.json"),
+    Path(".agents/arc/README.md"),
+    Path(".agents/arc/ARCHITECTURE.md"),
+    Path(".agents/arc/GENERAL-ROADMAP.md"),
 ]
 
-DIRS_TO_COPY = [
+OPTIONAL_FILES_TO_COPY = [
+    Path(".claude/README.md"),
+    Path(".claude/rules/README.md"),
+    Path(".qwen/README.md"),
+    Path(".codex/README.md"),
+    Path(".gemini/README.md"),
+]
+
+MANDATORY_DIRS_TO_COPY = [
     Path(".agents/scripts"),
     Path(".agents/a-docs"),
     Path(".agents/rules"),
+    Path(".agents/skills"),
+    Path(".agents/data/telemetry/schemas"),
 ]
 
 ENSURE_DIRS = [
@@ -35,10 +52,44 @@ ENSURE_DIRS = [
     Path(".agents/wb"),
     Path(".agents/skills"),
     Path(".agents/z-arq"),
+    Path(".agents/data/telemetry"),
+    Path(".claude"),
+    Path(".claude/rules"),
+    Path(".qwen"),
+    Path(".codex"),
+    Path(".gemini"),
 ]
 
 MAKEFILE_INCLUDE = "include .agents/a-docs/standards/Makefile"
 MAKEFILE_WRAPPER = """# Makefile wrapper - delegates to .agents/a-docs/standards/Makefile\n# This keeps the root clean while maintaining make functionality\n\n# Include the actual Makefile from a-docs\ninclude .agents/a-docs/standards/Makefile\n"""
+
+
+def copy_required_files(target: Path, force: bool, dry_run: bool):
+    for rel in MANDATORY_FILES_TO_COPY:
+        src = ROOT_DIR / rel
+        if not src.exists():
+            raise FileNotFoundError(f"Mandatory source file missing: {src}")
+        dst = target / rel
+        safe_copy_file(src, dst, force, dry_run)
+
+
+def copy_required_dirs(target: Path, force: bool, dry_run: bool):
+    for rel in MANDATORY_DIRS_TO_COPY:
+        src = ROOT_DIR / rel
+        if not src.exists():
+            raise FileNotFoundError(f"Mandatory source directory missing: {src}")
+        dst = target / rel
+        safe_copy_dir(src, dst, force, dry_run)
+
+
+def copy_optional_files(target: Path, force: bool, dry_run: bool):
+    for rel in OPTIONAL_FILES_TO_COPY:
+        src = ROOT_DIR / rel
+        if not src.exists():
+            print_action("skip optional (missing in source)", src)
+            continue
+        dst = target / rel
+        safe_copy_file(src, dst, force, dry_run)
 
 
 def parse_args() -> argparse.Namespace:
@@ -188,8 +239,9 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
             "1. Fill placeholders in `AGENTS.md` for project goal, stack, and structure.",
             "2. Update `.agents/agents.config` timezone/path settings if needed.",
             "3. Define real verification commands in repo docs (`install/dev/lint/typecheck/test/build`).",
-            "4. Run `make doctor`, `make tools-check`, and `make all`.",
-            "5. Create first workstream with `make new THEME=<theme>`.",
+            "4. Confirm mirror docs (`QWEN.md`/`CLAUDE.md`/`GEMINI.md`) and agent folders (`.claude/.qwen/.codex/.gemini`) are present.",
+            "5. Run `make doctor`, `make tools-check`, and `make all`.",
+            "6. Create first workstream with `make new THEME=<theme>`.",
             "",
             "## Verification Evidence",
             "",
@@ -211,6 +263,18 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
 
 def run_post_checks(target: Path):
     commands: List[Tuple[str, List[str]]] = [
+        (
+            "sync-agent-docs",
+            ["./.agents/agents", "sync", "--force"],
+        ),
+        (
+            "skills-sync",
+            ["./.agents/agents", "skills-sync", "sync"],
+        ),
+        (
+            "fix-symlinks",
+            ["./.agents/agents", "fix-symlinks", "--force"],
+        ),
         (
             "doctor",
             ["make", "-f", ".agents/a-docs/standards/Makefile", "doctor"],
@@ -260,19 +324,10 @@ def main() -> int:
         for signal in stack["signals"]:
             print(f"  - {signal}")
 
-        # Copy core files
-        for rel in FILES_TO_COPY:
-            src = ROOT_DIR / rel
-            dst = target / rel
-            if src.exists():
-                safe_copy_file(src, dst, args.force, args.dry_run)
-
-        # Copy core directories
-        for rel in DIRS_TO_COPY:
-            src = ROOT_DIR / rel
-            dst = target / rel
-            if src.exists():
-                safe_copy_dir(src, dst, args.force, args.dry_run)
+        # Copy mandatory files and directories.
+        copy_required_files(target, args.force, args.dry_run)
+        copy_required_dirs(target, args.force, args.dry_run)
+        copy_optional_files(target, args.force, args.dry_run)
 
         ensure_dirs(target, args.dry_run)
         ensure_makefile(target, args.dry_run)
