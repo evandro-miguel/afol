@@ -7,7 +7,7 @@ owners:
 - worker
 - tester
 created_at: '2026-02-23T15:55:42-03:00'
-updated_at: '2026-02-23T18:25:49-03:00'
+updated_at: '2026-02-24T00:30:00-03:00'
 depends_on:
 - 260223_1855_task-id-standardization_plan_01
 links:
@@ -24,6 +24,7 @@ links:
 - [x] T-04 Criar automacao para `updated_at` e `Files Changed` sem editar docs manualmente.
 - [x] T-05 translate-agentic-01
 - [x] T-06 translate-final-check
+- [x] T-07 Criar scripts de automacao para lint fix (checkboxes, frontmatter, doctypes)
 
 ## State Board
 | Task | Checklist | State | Owner | Notes |
@@ -34,6 +35,7 @@ links:
 | T-04 | - [x] | done | worker | Novo `agents-wb-update.py` + `make wb-touch`/`make wb-files-changed`.
 | T-05 | - [x] | done | worker | Docs agentic já estavam em inglês - verificação concluída.
 | T-06 | - [x] | done | worker | Revisão final de consistência aprovada.
+| T-07 | - [x] | done | worker | 4 scripts + 2 docs + 5 comandos Makefile + frontmatter em 3 arquivos.
 
 State values:
 - pending

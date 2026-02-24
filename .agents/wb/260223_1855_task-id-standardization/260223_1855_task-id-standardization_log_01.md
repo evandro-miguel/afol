@@ -4,7 +4,7 @@ id: 260223_1855_task-id-standardization_log_01
 theme: task-id-standardization
 status: active
 created_at: '2026-02-23T15:55:42-03:00'
-updated_at: '2026-02-23T18:25:49-03:00'
+updated_at: '2026-02-24T00:30:00-03:00'
 ---
 
 # Log: task-id-standardization
@@ -33,6 +33,11 @@ updated_at: '2026-02-23T18:25:49-03:00'
 - 2026-02-23 18:25-03 - Added AGENTS rule: .agents/a-docs is documentation-only and preserved suggested follow-up phrasing
 - 2026-02-23T19:29:52-03:00 - Added quick task T-05: translate-agentic-01 - pending
 - 2026-02-23T19:35:58-03:00 - Added quick task T-06: translate-final-check - pending
+- 2026-02-24T00:00:00-03:00 - Created lint fix automation scripts (fix-lint-all.py, fix-lint-checkboxes.py, fix-lint-frontmatter.py, fix-lint-doctypes.py)
+- 2026-02-24T00:05:00-03:00 - Added Makefile commands (lint-fix, lint-fix-dry, lint-fix-check, lint-fix-checkboxes, lint-fix-frontmatter)
+- 2026-02-24T00:10:00-03:00 - Created documentation (lint-fix-scripts.md, lint-false-positives.md)
+- 2026-02-24T00:15:00-03:00 - Applied frontmatter fixes to scripts-usage.md, scripts-reference.md, TEST_STRATEGY.md
+- 2026-02-24T00:20:00-03:00 - Committed and pushed all changes to main
 ## Decisions
 - Enforce ID-based parsing to guarantee deterministic `task -> file -> line` mapping.
 - Enforce "one active session + quick mode" to avoid unnecessary WB folder creation.
