@@ -15,6 +15,18 @@ def load_module(module_name: str, file_path: Path):
 
 
 class AgentsNewQuickModeTests(unittest.TestCase):
+    def test_telemetry_pattern_helpers_are_non_blocking(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_helpers_test", script_path)
+
+        # Helpers should never break main flow when optional scripts are unavailable.
+        agents_new.TELEMETRY_SCRIPT = Path("/tmp/does-not-exist-telemetry.py")
+        agents_new.PATTERNS_SCRIPT = Path("/tmp/does-not-exist-patterns.py")
+
+        agents_new.record_session_start("sid", "theme", False)
+        agents_new.suggest_patterns_for_theme("theme")
+
     def test_add_quick_task_updates_task_and_log(self):
         script_path = Path(".agents/scripts/agents-new.py").resolve()
         sys.path.insert(0, str(script_path.parent))

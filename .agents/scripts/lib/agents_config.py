@@ -33,6 +33,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "excluded_path_prefixes": [
             "arc/structure/",
             "scripts/.agent/docs/",
+            ".cache/",
+            "cache/",
             "z-arq/",
         ]
     },

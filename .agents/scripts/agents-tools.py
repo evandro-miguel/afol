@@ -49,11 +49,21 @@ REQUIRED_TOOL_KEYS = {
 }
 
 
+def _reject_duplicate_object_keys(pairs: List[tuple[str, Any]]) -> Dict[str, Any]:
+    """JSON hook that raises on duplicate object keys."""
+    obj: Dict[str, Any] = {}
+    for key, value in pairs:
+        if key in obj:
+            raise ValueError(f"Duplicate key in tools.json: '{key}'")
+        obj[key] = value
+    return obj
+
+
 def load_tools() -> Dict[str, Any]:
     """Load tools.json configuration."""
     if not TOOLS_JSON.exists():
         raise FileNotFoundError(f"Tools catalog not found: {TOOLS_JSON}")
-    return json.loads(TOOLS_JSON.read_text())
+    return json.loads(TOOLS_JSON.read_text(), object_pairs_hook=_reject_duplicate_object_keys)
 
 
 def format_type_badge(tool_type: str) -> str:
@@ -503,7 +513,7 @@ def main() -> None:
     
     try:
         tools_data = load_tools()
-    except FileNotFoundError as e:
+    except (FileNotFoundError, ValueError) as e:
         print(f"❌ Error: {e}")
         sys.exit(1)
     

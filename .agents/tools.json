@@ -582,6 +582,33 @@
       ],
       "output": "Pattern suggestions or details",
       "side_effect": "Apply records pattern usage in telemetry"
+    },
+    {
+      "id": "check-links",
+      "name": "Check Links",
+      "tool": "check-links.py",
+      "wrapper_command": "python3 .agents/scripts/check-links.py [directories...]",
+      "make_command": "N/A (add custom target to Makefile)",
+      "type": "validation",
+      "execution_mode": "on-demand",
+      "created_at": "2026-02-23",
+      "updated_at": "2026-02-23",
+      "description": "Scans markdown files and detects broken internal links. Validates link targets exist and reports issues with file and line number.",
+      "when_to_use": [
+        "Before committing documentation changes",
+        "After restructuring documentation directories",
+        "As part of CI/CD pipeline",
+        "Periodic documentation health check"
+      ],
+      "commands": [
+        {
+          "name": "check-links",
+          "usage": "check-links.py [directories...] [--verbose] [--quiet] [--fix] [--output <file>]",
+          "description": "Check for broken links in markdown files"
+        }
+      ],
+      "output": "Report of broken links with file, line number, and reason",
+      "exit_code": "0 if all links valid, 1 if broken links found"
     }
   ],
   "makefile_targets": {
@@ -620,7 +647,8 @@
       "description": "Validam estrutura, sintaxe e compliance",
       "tools": [
         "doctor",
-        "lint-docs"
+        "lint-docs",
+        "check-links"
       ],
       "usage_pattern": "Executar antes de commits ou como gate de qualidade"
     },
@@ -719,7 +747,8 @@
         "bootstrap",
         "skills-sync",
         "telemetry",
-        "patterns"
+        "patterns",
+        "check-links"
       ]
     },
     "cron": {

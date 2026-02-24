@@ -20,6 +20,8 @@ Examples:
 
 import re
 import sys
+import json
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -27,10 +29,13 @@ from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
 
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+SCRIPTS_DIR = Path(__file__).resolve().parent
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 ACTIVE_SESSION_FILE = get_cfg_path(ROOT_DIR, CONFIG, "active_session_file")
+TELEMETRY_SCRIPT = SCRIPTS_DIR / "agents-telemetry.py"
+PATTERNS_SCRIPT = SCRIPTS_DIR / "agents-patterns.py"
 WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
 WB_TZ = parse_offset(WB_OFFSET)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
