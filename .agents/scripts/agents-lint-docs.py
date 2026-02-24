@@ -74,11 +74,23 @@ VALID_DOC_TYPES = [
     "lessons",
     "retrospective",
     "specs_readme",
+    "lesson_entry",
+    "tool-doc",
+    "reference",
+    "pattern",
+    "pattern_index",
+    "quick_reference",
+    "telemetry_guide",
+    "telemetry_dashboard",
+    "telemetry_feature",
 ]
 
 # Checkbox markers
 VALID_MARKERS = [" ", "/", "%", "!", ">", "x"]
 MARKER_PATTERN = re.compile(r'- \[(.)\]')
+INLINE_CODE_PATTERN = re.compile(r"`[^`]*`")
+FENCE_PATTERN = re.compile(r"^\s*```")
+TABLE_SEPARATOR_PATTERN = re.compile(r"^\|(?:\s*:?-{3,}:?\s*\|)+\s*$")
 
 
 class LintIssue:
@@ -191,7 +203,7 @@ class DocLinter:
             
             # Check doc_type
             doc_type = fm.get("doc_type", fm.get("type", ""))
-            if doc_type and doc_type not in VALID_DOC_TYPES:
+            if doc_type and not self._is_placeholder_value(doc_type) and doc_type not in VALID_DOC_TYPES:
                 self.issues.append(LintIssue(
                     "warning", file_path, 0,
                     f"Unknown doc_type: '{doc_type}'. Valid: {', '.join(VALID_DOC_TYPES)}"
@@ -199,7 +211,7 @@ class DocLinter:
             
             # Check status
             status = fm.get("status", "")
-            if status and status not in VALID_STATUSES:
+            if status and not self._is_placeholder_value(status) and status not in VALID_STATUSES:
                 self.issues.append(LintIssue(
                     "warning", file_path, 0,
                     f"Unknown status: '{status}'. Valid: {', '.join(VALID_STATUSES)}"
@@ -235,15 +247,17 @@ class DocLinter:
         in_code_block = False
         
         for i, line in enumerate(lines, 1):
-            if "```" in line:
+            if FENCE_PATTERN.match(line):
                 in_code_block = not in_code_block
                 continue
             
             if in_code_block:
                 continue
+
+            search_line = INLINE_CODE_PATTERN.sub("", line)
             
             # Find all checkbox markers
-            for match in MARKER_PATTERN.finditer(line):
+            for match in MARKER_PATTERN.finditer(search_line):
                 marker = match.group(1)
                 if marker not in VALID_MARKERS:
                     self.issues.append(LintIssue(
@@ -253,7 +267,7 @@ class DocLinter:
                 
                 # Check for missing space after checkbox
                 end_idx = match.end()
-                has_separator = end_idx >= len(line) or line[end_idx] in {" ", "|"}
+                has_separator = end_idx >= len(search_line) or search_line[end_idx] in {" ", "|"}
                 if not has_separator:
                     self.issues.append(LintIssue(
                         "warning", file_path, i,
@@ -273,18 +287,18 @@ class DocLinter:
                 stripped = line.strip()
                 if stripped.startswith("|"):
                     # Skip markdown table separators like: |---|:---:|---|
-                    if re.match(r'^\|[\s:\-]+\|$', stripped):
+                    if TABLE_SEPARATOR_PATTERN.match(stripped):
                         continue
 
                     # Parse table row
-                    parts = [p.strip() for p in line.split("|")]
-                    if len(parts) >= 4:
-                        row_task = parts[1].lower() if len(parts) > 1 else ""
-                        state = parts[3] if len(parts) > 3 else ""
+                    cells = [p.strip() for p in stripped.strip("|").split("|")]
+                    if len(cells) >= 3:
+                        row_task = cells[0].lower()
+                        state = cells[2]
                         # Skip table header row
                         if row_task == "task" or state.lower() == "state":
                             continue
-                        if state and state not in VALID_STATES:
+                        if state and not self._is_placeholder_value(state) and state not in VALID_STATES:
                             self.issues.append(LintIssue(
                                 "warning", file_path, i,
                                 f"Unknown state: '{state}'. Valid: {', '.join(VALID_STATES)}"
@@ -348,6 +362,15 @@ class DocLinter:
             return True
         pattern = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$')
         return bool(pattern.match(ts))
+
+    def _is_placeholder_value(self, value: object) -> bool:
+        """Return True when a field value looks like a template placeholder."""
+        if not isinstance(value, str):
+            return False
+        stripped = value.strip()
+        if not stripped:
+            return False
+        return any(token in stripped for token in ("<", ">", "|", "YYYY-"))
     
     def lint_folder(self, folder: Path):
         """Lint all markdown files in folder."""
