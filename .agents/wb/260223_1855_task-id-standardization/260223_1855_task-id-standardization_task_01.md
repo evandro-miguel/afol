@@ -17,37 +17,20 @@ links:
 
 # Tasks: task-id-standardization
 
-## Task List
-- [x] T-01 Implementar parser de tasks por ID no `verify-tasks.py`.
-- [x] T-02 Atualizar template/docs para exigir ID e validar fluxo.
-- [x] T-03 Implementar politica de sessao ativa unica + quick mode para evitar proliferacao de pastas.
-- [x] T-04 Criar automacao para `updated_at` e `Files Changed` sem editar docs manualmente.
-- [x] T-05 translate-agentic-01
-- [x] T-06 translate-final-check
-- [x] T-07 Criar scripts de automacao para lint fix (checkboxes, frontmatter, doctypes)
 
 ## State Board
-| Task | Checklist | State | Owner | Notes |
-|------|----------:|-------|-------|-------|
-| T-01 | - [x] | done | worker | Parser atualizado para formato `- [ ] T-01 ...`/`T-001`.
-| T-02 | - [x] | done | worker | Template + docs atualizados e validados.
-| T-03 | - [x] | done | worker | `agents-new.py` com `--quick` e bloqueio de novo stream sem `--force-new`.
-| T-04 | - [x] | done | worker | Novo `agents-wb-update.py` + `make wb-touch`/`make wb-files-changed`.
-| T-05 | - [x] | done | worker | Docs agentic já estavam em inglês - verificação concluída.
-| T-06 | - [x] | done | worker | Revisão final de consistência aprovada.
-| T-07 | - [x] | done | worker | 4 scripts + 2 docs + 5 comandos Makefile + frontmatter em 3 arquivos.
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Parser atualizado para formato `- [ ] T-01 ...`/`T-001`.
+| T-02 | done | worker | Template + docs atualizados e validados.
+| T-03 | done | worker | `agents-new.py` com `--quick` e bloqueio de novo stream sem `--force-new`.
+| T-04 | done | worker | Novo `agents-wb-update.py` + `make wb-touch`/`make wb-files-changed`.
+| T-05 | done | worker | Docs agentic já estavam em inglês - verificação concluída.
+| T-06 | done | worker | Revisão final de consistência aprovada.
+| T-07 | done | worker | 4 scripts + 2 docs + 5 comandos Makefile + frontmatter em 3 arquivos.
 
-State values:
-- pending
-- in_progress
-- ready_for_test
-- testing
-- done
-- blocked
 
-## State Marker Rules
-
-See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
+**State marker rules:** See [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
 
 ## Lessons Aplicáveis
 

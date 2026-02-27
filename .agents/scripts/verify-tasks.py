@@ -54,6 +54,19 @@ MARKER_TO_STATUS = {
 
 TASK_LINE_RE = re.compile(r'^\s*-\s\[( |/|%|!|>|x)\]\s+(T-\d{2,3})\s+(.+?)\s*$')
 
+# State Board table pattern: | T-01 | done | worker | notes |
+STATE_BOARD_TASK_RE = re.compile(r'^\s*\|\s*(T-\d{2,3})\s*\|\s*(\w+)\s*\|\s*(\w+)\s*\|')
+
+STATE_BOARD_MAP = {
+    'pending': 'pending',
+    'in_progress': 'in_progress',
+    'ready_for_test': 'ready_for_test',
+    'testing': 'ready_for_test',
+    'done': 'completed',
+    'blocked': 'blocked',
+    'skipped': 'skipped',
+}
+
 # Evidence patterns for strict mode
 EVIDENCE_PATTERNS = {
     'command': re.compile(r'```(?:bash|shell|console|python|text)?\s*.*?```', re.DOTALL | re.IGNORECASE),
@@ -412,13 +425,18 @@ def has_sufficient_evidence(evidence: Dict[str, Any]) -> bool:
 def extract_tasks(content: str, file_path: Path) -> List[Tuple[str, str, str, int]]:
     """
     Extract all tasks from markdown content.
-    
+
+    Supports both formats:
+    1. Legacy: `- [x] T-01 description`
+    2. State Board: `| T-01 | done | worker | notes |`
+
     Returns list of (task_id, task_text, marker_type, line_number)
     """
     tasks = []
     lines = content.splitlines()
     in_code_block = False
-    
+    in_state_board = False
+
     for line_num, line in enumerate(lines, 1):
         if line.strip().startswith("```"):
             in_code_block = not in_code_block
@@ -427,6 +445,29 @@ def extract_tasks(content: str, file_path: Path) -> List[Tuple[str, str, str, in
         if in_code_block:
             continue
 
+        # Check if we're entering a State Board section
+        if "## State Board" in line:
+            in_state_board = True
+            continue
+
+        # Exit State Board when we hit another section
+        if in_state_board and line.strip().startswith("##"):
+            in_state_board = False
+
+        # Try to match State Board table row first
+        if in_state_board:
+            match = STATE_BOARD_TASK_RE.match(line)
+            if match:
+                task_id = match.group(1)
+                state = match.group(2).lower()
+                # Extract description from notes column (use state as placeholder for description)
+                task_text = f"{state} (State Board)"
+                marker_type = STATE_BOARD_MAP.get(state, 'pending')
+                if task_text:
+                    tasks.append((task_id, task_text, marker_type, line_num))
+                continue
+
+        # Try to match legacy checkbox format
         match = TASK_LINE_RE.match(line)
         if not match:
             continue
@@ -438,7 +479,7 @@ def extract_tasks(content: str, file_path: Path) -> List[Tuple[str, str, str, in
 
         if task_text:
             tasks.append((task_id, task_text, marker_type, line_num))
-    
+
     return tasks
 
 

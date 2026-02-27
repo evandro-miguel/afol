@@ -277,7 +277,7 @@ class TestStrictVerification(unittest.TestCase):
 
     def test_strict_mode_passes_with_evidence(self):
         """Strict mode passes when tasks have evidence."""
-        # Create task file with evidence
+        # Create task file with evidence (using State Board format)
         task_content = """---
 doc_type: task
 id: test_task_01
@@ -285,7 +285,11 @@ id: test_task_01
 
 # Tasks
 
-- [x] T-01 Implement feature with evidence
+## State Board
+
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Implement feature with evidence |
 
 ## Execution
 
@@ -318,7 +322,7 @@ Implementation completed and verified.
 
     def test_strict_mode_fails_without_evidence(self):
         """Strict mode fails when completed tasks lack evidence."""
-        # Create task file WITHOUT evidence
+        # Create task file WITHOUT evidence (using State Board format)
         task_content = """---
 doc_type: task
 id: test_task_01
@@ -326,7 +330,11 @@ id: test_task_01
 
 # Tasks
 
-- [x] T-01 Implement feature
+## State Board
+
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Implement feature
 """
         task_file = self.session_dir / "test_task_01.md"
         task_file.write_text(task_content)
@@ -337,7 +345,7 @@ id: test_task_01
 
     def test_strict_mode_fails_with_contradictions(self):
         """Strict mode fails when report has contradictions."""
-        # Create task with evidence
+        # Create task with evidence (State Board format)
         task_content = """---
 doc_type: task
 id: test_task_01
@@ -345,7 +353,11 @@ id: test_task_01
 
 # Tasks
 
-- [x] T-01 Implement feature
+## State Board
+
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Implement feature
 
 ```bash
 python3 test.py
@@ -377,7 +389,7 @@ However, some items are still pending review.
 
     def test_non_strict_mode_ignores_evidence(self):
         """Non-strict mode passes without evidence checks."""
-        # Create task file WITHOUT evidence
+        # Create task file WITHOUT evidence (State Board format)
         task_content = """---
 doc_type: task
 id: test_task_01
@@ -385,7 +397,11 @@ id: test_task_01
 
 # Tasks
 
-- [x] T-01 Implement feature
+## State Board
+
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Implement feature
 """
         task_file = self.session_dir / "test_task_01.md"
         task_file.write_text(task_content)
@@ -418,7 +434,12 @@ links:
 ---
 
 # Tasks
-- [x] T-01 Implement
+
+## State Board
+
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Implement
 
 ```bash
 python3 test.py
@@ -453,7 +474,12 @@ links:
 ---
 
 # Tasks
-- [x] T-01 Implement
+
+## State Board
+
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Implement
 
 ```bash
 python3 test.py

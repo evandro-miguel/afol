@@ -17,27 +17,15 @@ links:
 
 # Tasks: lint-doc-exclusions
 
-## Task List
-- [x] T-001 Excluir docs de ensino/orientação do escopo do lint.
-- [x] T-002 Validar fluxo completo e registrar evidências.
 
 ## State Board
-| Task | Checklist | State | Owner | Notes |
-|------|----------:|-------|-------|-------|
-| T-001 | - [x] | done | worker | Exclusions adicionadas no scanner do linter. |
-| T-002 | - [x] | done | worker | `make lint` e validações finais executadas. |
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-001 | done | worker | Exclusions adicionadas no scanner do linter. |
+| T-002 | done | worker | `make lint` e validações finais executadas. |
 
-State values:
-- pending
-- in_progress
-- ready_for_test
-- testing
-- done
-- blocked
 
-## State Marker Rules
-
-See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
+**State marker rules:** See [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
 
 ## Lessons Aplicáveis
 

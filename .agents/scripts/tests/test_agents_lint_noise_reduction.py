@@ -31,13 +31,15 @@ class AgentsLintNoiseReductionTests(unittest.TestCase):
             self.assertEqual(linter.issues, [])
 
     def test_state_board_separator_row_is_ignored(self):
+        """Test that State Board table separator row is ignored."""
         with tempfile.TemporaryDirectory() as td:
             file_path = Path(td) / "task.md"
+            # New format: 4 columns (Task | State | Owner | Notes)
             lines = [
                 "## State Board",
-                "| Task | Checklist | State | Owner | Notes |",
-                "|------|----------:|-------|-------|-------|",
-                "| T-01 | - [x] | done | worker | ok |",
+                "| Task | State | Owner | Notes |",
+                "|------|-------|-------|-------|",
+                "| T-01 | done | worker | ok |",
             ]
 
             linter = self.lint_docs.DocLinter(fix=False)

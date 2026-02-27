@@ -286,12 +286,12 @@ class DocLinter:
     def check_state_board(self, file_path: Path, lines: List[str]):
         """Check state board table."""
         in_state_board = False
-        
+
         for i, line in enumerate(lines, 1):
             if "State Board" in line or "| Task |" in line and "State" in line:
                 in_state_board = True
                 continue
-            
+
             if in_state_board:
                 stripped = line.strip()
                 if stripped.startswith("|"):
@@ -301,9 +301,11 @@ class DocLinter:
 
                     # Parse table row
                     cells = [p.strip() for p in stripped.strip("|").split("|")]
-                    if len(cells) >= 3:
+                    if len(cells) >= 2:
                         row_task = cells[0].lower()
-                        state = cells[2]
+                        # New format (4 cols): Task | State | Owner | Notes
+                        # State is at index 1
+                        state = cells[1]
                         # Skip table header row
                         if row_task == "task" or state.lower() == "state":
                             continue

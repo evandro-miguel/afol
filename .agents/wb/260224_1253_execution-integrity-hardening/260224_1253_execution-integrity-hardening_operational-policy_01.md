@@ -4,7 +4,7 @@ id: execution-integrity-operational-policy
 theme: execution-integrity-hardening
 status: active
 created_at: '2026-02-24T19:06:00-03:00'
-updated_at: '2026-02-24T19:13:10-03:00'
+updated_at: '2026-02-26T23:54:14-03:00'
 links:
   plan: 260224_1253_execution-integrity-hardening_plan_02
   report: 260224_1253_execution-integrity-hardening_report_02

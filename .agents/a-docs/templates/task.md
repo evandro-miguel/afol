@@ -11,29 +11,17 @@ depends_on: ["<optional_plan_id>"]
 
 # Tasks: <theme>
 
-## Task List
-- [ ] T-01 <task description>
-- [ ] T-02 <task description>
-
 ## State Board
-| Task | Checklist | State | Owner | Notes |
-|------|----------:|-------|-------|-------|
-| T-01 | - [ ] | pending | build | <note> |
 
-State values:
-- pending
-- in_progress
-- ready_for_test
-- testing
-- done
-- blocked
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | pending | worker | <note> |
 
-Task ID format:
-- `T-01`, `T-02`, ... (or `T-001`, `T-002` for larger boards)
+**State values:** `pending` | `in_progress` | `ready_for_test` | `testing` | `done` | `blocked`
 
-## State Marker Rules
+**Task ID format:** `T-01`, `T-02`, ... (ou `T-001` para boards grandes)
 
-See: [../standards/checkbox-protocol.md](../standards/checkbox-protocol.md)
+**State marker rules:** See [../standards/checkbox-protocol.md](../standards/checkbox-protocol.md)
 
 ## Relevant Lessons
 

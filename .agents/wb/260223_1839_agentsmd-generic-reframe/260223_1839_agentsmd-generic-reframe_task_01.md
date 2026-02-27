@@ -17,27 +17,15 @@ links:
 
 # Tasks: agentsmd-generic-reframe
 
-## Task List
-- [x] T-001 Reestruturar AGENTS.md no formato generico solicitado pelo usuario.
-- [x] T-002 Sincronizar docs de agentes e validar fluxo (`lint`, `verify`).
 
 ## State Board
-| Task | Checklist | State | Owner | Notes |
-|------|----------:|-------|-------|-------|
-| T-001 | - [x] | done | worker | AGENTS.md reescrito com secoes genericas + dados atuais do repo. |
-| T-002 | - [x] | done | worker | Sync + validacao executados com sucesso. |
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-001 | done | worker | AGENTS.md reescrito com secoes genericas + dados atuais do repo. |
+| T-002 | done | worker | Sync + validacao executados com sucesso. |
 
-State values:
-- pending
-- in_progress
-- ready_for_test
-- testing
-- done
-- blocked
 
-## State Marker Rules
-
-See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
+**State marker rules:** See [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
 
 ## Lessons Aplicáveis
 

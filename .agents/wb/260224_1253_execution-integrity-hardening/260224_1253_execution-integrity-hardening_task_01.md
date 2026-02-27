@@ -7,7 +7,7 @@ owners:
 - worker
 - tester
 created_at: '2026-02-24T12:56:00-03:00'
-updated_at: '2026-02-24T19:13:10-03:00'
+updated_at: '2026-02-26T23:54:14-03:00'
 depends_on:
 - 260224_1253_execution-integrity-hardening_plan_01
 - 260224_1253_execution-integrity-hardening_plan_02
@@ -22,27 +22,18 @@ links:
 ## Phase Goal
 - Implement strict WB verification with deterministic checks for evidence, contradictions, and timestamp consistency.
 
-## Task List
-- [x] T-01 Define strict evidence schema and migration policy for legacy sessions.
-- [x] T-02 Implement verify-tasks strict mode and structured failure output.
-- [x] T-03 Validate done-task evidence references in strict mode.
-- [x] T-04 Detect report contradictions in strict mode.
-- [x] T-05 Detect timeline/frontmatter timestamp inconsistencies in strict mode.
-- [x] T-06 Add tests for strict verification pass/fail fixtures.
-- [x] T-07 Add make verify-strict and wire it into validation flow.
-- [x] T-08 Update docs and publish execution report with evidence. (evidence: E-20260224155115870450)
-
 ## State Board
-| Task | Checklist | State | Owner | Notes |
-|------|----------:|-------|-------|-------|
-| T-01 | - [x] | done | worker | Define fields and backward-compat policy. |
-| T-02 | - [x] | done | worker | Add strict CLI path and output contract. |
-| T-03 | - [x] | done | worker | Enforce evidence linkage for done tasks. |
-| T-04 | - [x] | done | worker | Add contradiction rule set and checks. |
-| T-05 | - [x] | done | worker | Add temporal coherence checks. |
-| T-06 | - [x] | done | tester | Add deterministic fixtures and assertions. |
-| T-07 | - [x] | done | worker | New make target + pipeline integration. |
-| T-08 | - [x] | done | tester | Final report and residual risks. |
+
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Define strict evidence schema and migration policy for legacy sessions. |
+| T-02 | done | worker | Implement verify-tasks strict mode and structured failure output. |
+| T-03 | done | worker | Validate done-task evidence references in strict mode. |
+| T-04 | done | worker | Detect report contradictions in strict mode. |
+| T-05 | done | worker | Detect timeline/frontmatter timestamp inconsistencies in strict mode. |
+| T-06 | done | tester | Add tests for strict verification pass/fail fixtures. |
+| T-07 | done | worker | Add make verify-strict and wire it into validation flow. |
+| T-08 | done | tester | Update docs and publish execution report with evidence. (E-20260224155115870450) |
 
 ## Acceptance Criteria
 - [x] Strict mode fails on synthetic done-without-evidence scenarios.

@@ -73,6 +73,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         wb_update.require_explicit_session(report_scoped_args, "files-changed")
 
     def test_update_task_marker_does_not_break_checkbox_format(self):
+        """Test that updating task markers preserves State Board format."""
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_test", script_path)
@@ -85,22 +86,20 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
                 "---\n\n"
                 "# Tasks\n\n"
-                "## Task List\n"
-                "- [ ] T-01 Fix auth\n\n"
                 "## State Board\n"
-                "| Task | Checklist | State | Owner | Notes |\n"
-                "|------|----------:|-------|-------|-------|\n"
-                "| T-01 | - [ ] | pending | build | note |\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | pending | worker | Fix auth\n"
             )
 
             wb_update.update_task_markers(task_file, "T-01", "x", "done")
             content = task_file.read_text()
 
-            self.assertIn("- [x] T-01 Fix auth", content)
-            self.assertNotIn("- [ [x] T-01", content)
-            self.assertIn("| T-01 | - [x] | done |", content)
+            # State Board format should be updated
+            self.assertIn("| T-01 | done | worker |", content)
 
     def test_mark_done_requires_evidence_unless_bypassed(self):
+        """Test that mark-done requires evidence unless bypassed."""
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_mark_done_gate_test", script_path)
@@ -115,12 +114,10 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
                 "---\n\n"
                 "# Tasks\n\n"
-                "## Task List\n"
-                "- [ ] T-01 Add gate\n\n"
                 "## State Board\n"
-                "| Task | Checklist | State | Owner | Notes |\n"
-                "|------|----------:|-------|-------|-------|\n"
-                "| T-01 | - [ ] | pending | build | note |\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | pending | worker | Add gate\n"
             )
 
             args_missing = self._build_task_args(
@@ -138,9 +135,11 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 allow_unsafe_done=True,
             )
             wb_update.cmd_task(args_unsafe)
-            self.assertIn("- [x] T-01 Add gate", task_file.read_text())
+            content = task_file.read_text()
+            self.assertIn("| T-01 | done |", content)
 
     def test_evidence_ledger_validates_mark_done_reference(self):
+        """Test that evidence ledger validates mark-done reference."""
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_evidence_test", script_path)
@@ -155,12 +154,10 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
                 "---\n\n"
                 "# Tasks\n\n"
-                "## Task List\n"
-                "- [ ] T-01 Add evidence flow\n\n"
                 "## State Board\n"
-                "| Task | Checklist | State | Owner | Notes |\n"
-                "|------|----------:|-------|-------|-------|\n"
-                "| T-01 | - [ ] | pending | build | note |\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | pending | worker | Add evidence flow\n"
             )
 
             record = wb_update.append_evidence_record(
@@ -184,7 +181,8 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 evidence_id=record["id"],
             )
             wb_update.cmd_task(args_done)
-            self.assertIn("- [x] T-01 Add evidence flow", task_file.read_text())
+            content = task_file.read_text()
+            self.assertIn("| T-01 | done |", content)
 
             args_mismatch = self._build_task_args(
                 session=str(session_dir),

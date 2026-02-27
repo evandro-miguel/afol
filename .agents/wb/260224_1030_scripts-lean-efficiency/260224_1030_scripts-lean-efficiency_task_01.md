@@ -19,35 +19,20 @@ links:
 ## Phase Goal
 - Establish objective baseline metrics and a command parity contract before code refactor.
 
-## Task List
-- [x] T-01 Capture scripts inventory (files, line counts, responsibility map).
-- [x] T-02 Capture complexity baseline (`ruff --select C901`) and list top hotspots.
-- [x] T-03 Capture productive-code coverage baseline with `coverage`.
-- [x] T-04 Capture baseline status of key commands (`make doctor/lint/test-scripts/tools-check/all`).
-- [x] T-05 Build parity matrix for public commands and expected behavior.
-- [x] T-06 Define "must not change" command outputs/side effects.
-- [x] T-07 Confirm compatibility policy (aliases and deprecation path).
-- [x] T-08 Write baseline evidence to log and report sections.
-- [x] T-09 Align phase tasks (`task_02..task_04`) with measured baseline.
-- [x] T-10 Mark phase ready for execution handoff.
-- [x] T-11 test-refactor (quick task added during execution).
-- [x] T-12 integration-test-task (quick task - integration test validation).
-- [x] T-13 integration-test-task (quick task - test execution validation).
-- [ ] T-14 integration-test-task
 
 ## State Board
-| Task | Checklist | State | Owner | Notes |
-|------|----------:|-------|-------|-------|
-| T-01 | - [x] | done | worker | Inventory is source of truth for consolidation decisions. |
-| T-02 | - [x] | done | worker | Use measured values only, no estimates. |
-| T-03 | - [x] | done | worker | Productive scripts only. |
-| T-04 | - [x] | done | worker | Baseline green/red matrix. |
-| T-05 | - [x] | done | worker | Parity matrix drives all later phases. |
-| T-06 | - [x] | done | worker | Prevent accidental behavior drift. |
-| T-07 | - [x] | done | worker | Backward compatibility contract. |
-| T-08 | - [x] | done | worker | Evidence-first updates. |
-| T-09 | - [x] | done | worker | Reconcile tasks with baseline facts. |
-| T-10 | - [x] | done | worker | Formal phase closure checkpoint. |
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Inventory is source of truth for consolidation decisions. |
+| T-02 | done | worker | Use measured values only, no estimates. |
+| T-03 | done | worker | Productive scripts only. |
+| T-04 | done | worker | Baseline green/red matrix. |
+| T-05 | done | worker | Parity matrix drives all later phases. |
+| T-06 | done | worker | Prevent accidental behavior drift. |
+| T-07 | done | worker | Backward compatibility contract. |
+| T-08 | done | worker | Evidence-first updates. |
+| T-09 | done | worker | Reconcile tasks with baseline facts. |
+| T-10 | done | worker | Formal phase closure checkpoint. |
 
 ## Acceptance Criteria
 - [x] Baseline metrics recorded with commands and outputs.

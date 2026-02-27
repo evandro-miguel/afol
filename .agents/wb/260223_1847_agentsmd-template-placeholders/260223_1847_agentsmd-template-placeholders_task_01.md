@@ -17,27 +17,15 @@ links:
 
 # Tasks: agentsmd-template-placeholders
 
-## Task List
-- [x] T-001 Reescrever AGENTS.md como template puro com placeholders.
-- [x] T-002 Sincronizar e validar (`make sync`, `make lint`, `make verify`).
 
 ## State Board
-| Task | Checklist | State | Owner | Notes |
-|------|----------:|-------|-------|-------|
-| T-001 | - [x] | done | worker | Template puro aplicado sem preenchimento de tools/MCP/skills. |
-| T-002 | - [x] | done | worker | Sync e checks executados com sucesso. |
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-001 | done | worker | Template puro aplicado sem preenchimento de tools/MCP/skills. |
+| T-002 | done | worker | Sync e checks executados com sucesso. |
 
-State values:
-- pending
-- in_progress
-- ready_for_test
-- testing
-- done
-- blocked
 
-## State Marker Rules
-
-See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
+**State marker rules:** See [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
 
 ## Lessons Aplicáveis
 

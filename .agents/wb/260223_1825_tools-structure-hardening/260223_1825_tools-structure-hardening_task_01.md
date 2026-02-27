@@ -17,27 +17,16 @@ links:
 
 # Tasks: tools-structure-hardening
 
-## Task List
-- [x] T-001 Reproduzir falhas de `make lint` e `make structure` e documentar causa raiz.
-- [x] T-002 Corrigir scripts e revalidar comandos de ponta a ponta.
 
 ## State Board
-| Task | Checklist | State | Owner | Notes |
-|------|----------:|-------|-------|-------|
-| T-001 | - [x] | done | worker | Causa raiz identificada em parser de frontmatter e filtro de diretórios ocultos. |
-| T-002 | - [x] | done | worker | Correções aplicadas e verificadas com comandos reais. |
 
-State values:
-- pending
-- in_progress
-- ready_for_test
-- testing
-- done
-- blocked
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-001 | done | worker | Causa raiz identificada em parser de frontmatter e filtro de diretórios ocultos. |
+| T-002 | done | worker | Correções aplicadas e verificadas com comandos reais. |
 
-## State Marker Rules
 
-See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
+**State marker rules:** See [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/checkbox-protocol.md)
 
 ## Lessons Aplicáveis
 

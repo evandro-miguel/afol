@@ -329,6 +329,7 @@ def update_task_markers(
     checklist_re = re.compile(r'^(\s*-\s\[[ /%!>x]\]\s+)(T-\d{2,3})(\s+.+)$')
 
     for i, line in enumerate(lines):
+        # Legacy format: - [x] T-01 description
         m = checklist_re.match(line)
         if m and m.group(2) == task_id:
             prefix = re.sub(r"\[[ /%!>x]\]", f"[{marker}]", m.group(1), count=1)
@@ -338,14 +339,19 @@ def update_task_markers(
             lines[i] = f"{prefix}{m.group(2)}{description}"
             found = True
 
+        # State Board format: | T-01 | state | owner | notes |
+        # New format has 4 columns: Task | State | Owner | Notes
         if line.strip().startswith("|"):
-            parts = line.split("|")
-            if len(parts) >= 6:
-                row_task = parts[1].strip()
+            parts = [p.strip() for p in line.split("|")]
+            # Filter empty strings from split (first and last are empty due to leading/trailing |)
+            cells = [p for p in parts if p or parts.index(p) != 0]
+            if len(cells) >= 2:
+                row_task = cells[0].strip()
                 if row_task == task_id:
-                    parts[2] = f" - [{marker}] "
-                    parts[3] = f" {state} "
-                    lines[i] = "|".join(parts)
+                    # Update state (column 2, index 1)
+                    cells[1] = state
+                    # Reconstruct the row with proper formatting
+                    lines[i] = f"| {cells[0]} | {cells[1]} | {cells[2] if len(cells) > 2 else ''} | {cells[3] if len(cells) > 3 else ''} |"
                     found = True
 
     if not found:

@@ -4,7 +4,7 @@ id: 260224_1253_execution-integrity-hardening_research_01
 theme: execution-integrity-hardening
 status: final
 created_at: '2026-02-24T19:00:00-03:00'
-updated_at: '2026-02-24T19:06:00-03:00'
+updated_at: '2026-02-26T23:54:14-03:00'
 links:
   plan: 260224_1253_execution-integrity-hardening_plan_02
   task: 260224_1253_execution-integrity-hardening_task_01
