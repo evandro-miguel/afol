@@ -80,8 +80,30 @@ Creates new workstream with:
 # Quick task in active session
 ./.agents/agents new update-docs --quick
 
-# Force new session (even with active)
+# Multiple sessions are allowed - create new session even with active one
+./.agents/agents new another-feature
+
+# Force flag still exists for backward compatibility
 ./.agents/agents new epic-feature --force-new
+```
+
+### Multi-Session Support
+
+**Multiple sessions can coexist.** When you create a new session while another is active:
+
+- ⚠️ System shows a warning (non-blocking)
+- ✅ New session is created normally
+- 📌 `.active_session` pointer updates to the new session
+- 🎯 Use `--session <id>` to target specific sessions in `wb-update` commands
+
+```bash
+# Example: Working with multiple sessions
+./.agents/agents new feature-a          # Creates session A (active)
+./.agents/agents new feature-b          # Creates session B (now active, warns about A)
+
+# Target specific session for operations
+./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done
+./.agents/agents wb-update touch --session 260224_1200_feature-b
 ```
 
 ## How to Modify

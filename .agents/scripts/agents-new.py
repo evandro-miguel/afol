@@ -307,18 +307,16 @@ def _handle_quick_mode(args: Dict, active_session: str) -> bool:
 
 
 def _check_active_session_policy(active_session: Optional[str], theme: str, force_new: bool) -> None:
-    """Check active session policy and exit if violation."""
+    """Check active session policy and inform user (non-blocking)."""
     if active_session and not force_new:
-        print("❌ Active session already exists.")
-        print(f"   Active: .agents/wb/{active_session}/")
+        print(f"⚠️  Note: Another session is currently active: {active_session}")
         print()
-        print("Policy: one active workstream at a time.")
-        print("Use quick mode for small changes:")
+        print("Creating new session. To target a specific session in future commands:")
+        print(f"  .agents/agents wb-update <command> --session {active_session}")
+        print()
+        print("Tip: Use --quick for small tasks in the current session:")
         print(f"  .agents/agents new {theme} --quick")
         print()
-        print("If this is a significant new stream, force creation:")
-        print(f"  .agents/agents new {theme} --force-new [--spec|--spec-lite]")
-        sys.exit(1)
 
 
 def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) -> None:
