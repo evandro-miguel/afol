@@ -35,20 +35,22 @@
 - Run verification commands and capture evidence
 - Mandatory gate: `make lint` must pass before any task/session can be marked as complete
 - Ask: `Would this pass a strict senior/staff review?`
+- Deterministic verification: evidence over assumptions
 
 ### Demand Elegance (Balanced)
 
 - For non-trivial changes, evaluate if there is a cleaner design
 - If the solution is hacky, refactor to a maintainable one
-- Avoid over-engineering simple tasks
+- Avoid over-engineering simple tasks / Simplicity first: minimal necessary change
 - Keep diffs small, clear, and reviewable
 
 ### Autonomous Bug Fixing
 
 - Reproduce or explain why reproduction is blocked
-- Identify root cause, not only symptoms
+- Identify root cause first, not only symptoms (no temporary patch as final solution)
 - Implement fix + guardrail when feasible
 - Verify and report symptom, cause, fix, and proof
+- Minimal blast radius: touch only what is required
 
 ### Safety Rules
 
@@ -86,7 +88,8 @@ Use standardized templates from:
 
 Key rules:
 
-- One session folder per workstream: `.agents/wb/YYMMDD_HHMM_<theme>/`
+- Documentation consistency: keep templates, standards, and reports aligned
+- Always work on a session folder: `.agents/wb/YYMMDD_HHMM_<theme>/`
 - Standardized naming: `YYMMDD_HHMM_<theme>_<doc_type>_<NN>.md`
 - All management `.md` files must contain YAML frontmatter
 - Use task IDs in checklist lines: `- [ ] T-01 {text}`
@@ -180,10 +183,65 @@ Key rules:
 - Test: `{project_test_command}`
 - Build: `{project_build_command}`
 
-## Core Principles
+## Security Guidelines
 
-- Simplicity first: minimal necessary change
-- Root cause first: no temporary patch as final solution
-- Minimal blast radius: touch only what is required
-- Deterministic verification: evidence over assumptions
-- Documentation consistency: keep templates, standards, and reports aligned
+**Before ANY commit:**
+- No hardcoded secrets (API keys, passwords, tokens)
+- All user inputs validated
+- SQL injection prevention (parameterized queries)
+- XSS prevention (sanitized HTML)
+- CSRF protection enabled
+- Authentication/authorization verified
+- Rate limiting on all endpoints
+- Error messages don't leak sensitive data
+
+**Secret management:** NEVER hardcode secrets. Use environment variables or a secret manager. Validate required secrets at startup. Rotate any exposed secrets immediately.
+
+**If security issue found:** STOP → use security-reviewer agent → fix CRITICAL issues → rotate exposed secrets → review codebase for similar issues.
+
+## Coding Style
+
+**Immutability (CRITICAL):** Always create new objects, never mutate. Return new copies with changes applied.
+
+**File organization:** Many small files over few large ones. 200-400 lines typical, 800 max. Organize by feature/domain, not by type. High cohesion, low coupling.
+
+**Error handling:** Handle errors at every level. Provide user-friendly messages in UI code. Log detailed context server-side. Never silently swallow errors.
+
+**Input validation:** Validate all user input at system boundaries. Use schema-based validation. Fail fast with clear messages. Never trust external data.
+
+**Code quality checklist:**
+- Functions small (<50 lines), files focused (<800 lines)
+- No deep nesting (>4 levels)
+- Proper error handling, no hardcoded values
+- Readable, well-named identifiers
+
+## Testing Requirements
+
+**Minimum coverage: 80%**
+
+Test types (all required):
+1. **Unit tests** — Individual functions, utilities, components
+2. **Integration tests** — API endpoints, database operations
+3. **E2E tests** — Critical user flows
+
+**TDD workflow (mandatory):**
+1. Write test first (RED) — test should FAIL
+2. Write minimal implementation (GREEN) — test should PASS
+3. Refactor (IMPROVE) — verify coverage 80%+
+
+Troubleshoot failures: check test isolation → verify mocks → fix implementation (not tests, unless tests are wrong).
+
+## Development Workflow
+
+1. **Plan** — Use planner agent, plan complex features before writing code, identify dependencies and risks, break into phases
+2. **TDD** — Use tdd-guide agent, write tests first, implement, refactor
+3. **Review** — Use code-reviewer agent immediately, address CRITICAL/HIGH issues
+4. **Commit** — Conventional commits format, comprehensive PR summaries
+
+## Success Metrics
+
+- All tests pass with 80%+ coverage
+- No security vulnerabilities
+- Code is readable and maintainable
+- Performance is acceptable
+- User requirements are met
