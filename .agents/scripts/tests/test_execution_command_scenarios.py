@@ -81,6 +81,21 @@ def write_log_file(session_dir: Path) -> Path:
     return log_file
 
 
+def write_global_context(root: Path) -> dict[str, Path]:
+    product = root / "PROJECT-BRIEF.md"
+    guidelines = root / "ENGINEERING-GUIDELINES.md"
+    tech_stack = root / "TECH-STACK.md"
+    product.write_text("# brief\n", encoding="utf-8")
+    guidelines.write_text("# guidelines\n", encoding="utf-8")
+    tech_stack.write_text("# stack\n", encoding="utf-8")
+    return {
+        "product": product,
+        "guidelines": guidelines,
+        "tech-stack": tech_stack,
+        "tech_stack": tech_stack,
+    }
+
+
 class ExecutionCommandsScenarioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -212,10 +227,13 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
 
     def test_resolve_artifact_tech_stack_alias_variants(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            session_dir = Path(td) / "260307_0107_alias"
+            temp_root = Path(td)
+            session_dir = temp_root / "260307_0107_alias"
             session_dir.mkdir(parents=True, exist_ok=True)
-            a = self.execution_commands.resolve_artifact(session_dir, "tech-stack")
-            b = self.execution_commands.resolve_artifact(session_dir, "tech_stack")
+            context = write_global_context(temp_root)
+            with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
+                a = self.execution_commands.resolve_artifact(session_dir, "tech-stack")
+                b = self.execution_commands.resolve_artifact(session_dir, "tech_stack")
             self.assertIsNotNone(a)
             self.assertEqual(a, b)
 

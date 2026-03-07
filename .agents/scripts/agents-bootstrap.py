@@ -29,6 +29,9 @@ MANDATORY_FILES_TO_COPY = [
     Path(".agents/arc/README.md"),
     Path(".agents/arc/ARCHITECTURE.md"),
     Path(".agents/arc/GENERAL-ROADMAP.md"),
+    Path(".agents/arc/PROJECT-BRIEF.md"),
+    Path(".agents/arc/ENGINEERING-GUIDELINES.md"),
+    Path(".agents/arc/TECH-STACK.md"),
 ]
 
 OPTIONAL_FILES_TO_COPY = [

@@ -94,6 +94,21 @@ def write_session_research(session_dir: Path) -> None:
     )
 
 
+def write_global_context(root: Path) -> dict[str, Path]:
+    product = root / "PROJECT-BRIEF.md"
+    guidelines = root / "ENGINEERING-GUIDELINES.md"
+    tech_stack = root / "TECH-STACK.md"
+    product.write_text("# brief\n", encoding="utf-8")
+    guidelines.write_text("# guidelines\n", encoding="utf-8")
+    tech_stack.write_text("# stack\n", encoding="utf-8")
+    return {
+        "product": product,
+        "guidelines": guidelines,
+        "tech-stack": tech_stack,
+        "tech_stack": tech_stack,
+    }
+
+
 class ExecutionCommandFlowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -116,20 +131,27 @@ class ExecutionCommandFlowTests(unittest.TestCase):
         self.assertEqual(nxt.task_id, "T-02")
 
     def test_resolve_artifact_supports_context_aliases(self):
-        session_dir = Path(".agents/wb/260306_2128_context-driven-execution-commands").resolve()
-        product = self.execution_commands.resolve_artifact(session_dir, "product")
-        guidelines = self.execution_commands.resolve_artifact(session_dir, "guidelines")
-        tech_stack = self.execution_commands.resolve_artifact(session_dir, "tech-stack")
-        active_task = self.execution_commands.resolve_artifact(session_dir, "active_task")
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            temp_root = Path(td)
+            session_dir = temp_root / "260307_0013_aliases"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_session_task(session_dir, "| T-01 | pending | worker | first |")
+            context = write_global_context(temp_root)
 
-        self.assertIsNotNone(product)
-        self.assertIsNotNone(guidelines)
-        self.assertIsNotNone(tech_stack)
-        self.assertIsNotNone(active_task)
-        self.assertEqual(product.name, "PROJECT-BRIEF.md")
-        self.assertEqual(guidelines.name, "ENGINEERING-GUIDELINES.md")
-        self.assertEqual(tech_stack.name, "TECH-STACK.md")
-        self.assertTrue(active_task.name.endswith("_task_01.md"))
+            with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
+                product = self.execution_commands.resolve_artifact(session_dir, "product")
+                guidelines = self.execution_commands.resolve_artifact(session_dir, "guidelines")
+                tech_stack = self.execution_commands.resolve_artifact(session_dir, "tech-stack")
+                active_task = self.execution_commands.resolve_artifact(session_dir, "active_task")
+
+            self.assertIsNotNone(product)
+            self.assertIsNotNone(guidelines)
+            self.assertIsNotNone(tech_stack)
+            self.assertIsNotNone(active_task)
+            self.assertEqual(product.name, "PROJECT-BRIEF.md")
+            self.assertEqual(guidelines.name, "ENGINEERING-GUIDELINES.md")
+            self.assertEqual(tech_stack.name, "TECH-STACK.md")
+            self.assertTrue(active_task.name.endswith("_task_01.md"))
 
     def test_implement_start_rejects_out_of_order_task(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -332,6 +354,7 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             write_session_task(session_dir, "| T-01 | pending | worker | first |")
             write_session_log(session_dir)
             write_session_report(session_dir, status="active")
+            context = write_global_context(temp_root)
             (temp_root / "src").mkdir(parents=True, exist_ok=True)
             changed_file = temp_root / "src" / "app.py"
             changed_file.write_text("print('drift')\n", encoding="utf-8")
@@ -345,9 +368,10 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             with mock.patch.object(self.agents_session, "ROOT_DIR", temp_root):
                 with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", temp_root / ".active_session"):
                     with mock.patch.object(self.execution_commands, "ROOT_DIR", temp_root):
-                        with mock.patch.object(self.execution_commands.subprocess, "run", return_value=git_status):
-                            with contextlib.redirect_stdout(buf):
-                                code = self.agents_session.cmd_catchup(args)
+                        with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
+                            with mock.patch.object(self.execution_commands.subprocess, "run", return_value=git_status):
+                                with contextlib.redirect_stdout(buf):
+                                    code = self.agents_session.cmd_catchup(args)
 
             payload = json.loads(buf.getvalue())
             self.assertEqual(code, 0)
@@ -375,6 +399,7 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             write_session_task(session_dir, "| T-01 | pending | worker | first |")
             write_session_log(session_dir)
             write_session_report(session_dir, status="active")
+            context = write_global_context(temp_root)
 
             args = argparse.Namespace(session=str(session_dir), json=True, paths_limit=10)
             git_status = mock.Mock(returncode=0, stdout="", stderr="")
@@ -382,9 +407,10 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ROOT_DIR", temp_root):
                 with mock.patch.object(self.execution_commands, "ROOT_DIR", temp_root):
-                    with mock.patch.object(self.execution_commands.subprocess, "run", return_value=git_status):
-                        with contextlib.redirect_stdout(buf):
-                            code = self.agents_session.cmd_catchup(args)
+                    with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
+                        with mock.patch.object(self.execution_commands.subprocess, "run", return_value=git_status):
+                            with contextlib.redirect_stdout(buf):
+                                code = self.agents_session.cmd_catchup(args)
 
             payload = json.loads(buf.getvalue())
             self.assertEqual(code, 0)
@@ -401,6 +427,7 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             write_session_log(session_dir)
             write_session_report(session_dir, status="active")
             write_session_research(session_dir)
+            context = write_global_context(temp_root)
             (temp_root / "src").mkdir(parents=True, exist_ok=True)
             changed_file = temp_root / "src" / "app.py"
             changed_file.write_text("print('drift')\n", encoding="utf-8")
@@ -410,10 +437,11 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             git_status = mock.Mock(returncode=0, stdout=" M src/app.py\n", stderr="")
             buf = io.StringIO()
             with mock.patch.object(self.execution_commands, "ROOT_DIR", temp_root):
-                with mock.patch.object(self.execution_commands.subprocess, "run", return_value=git_status):
-                    with mock.patch.object(self.agents_review, "run_verify_tasks", return_value=(0, "verify ok\n", "")):
-                        with contextlib.redirect_stdout(buf):
-                            code = self.agents_review.cmd_scope(session_dir, "all")
+                with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
+                    with mock.patch.object(self.execution_commands.subprocess, "run", return_value=git_status):
+                        with mock.patch.object(self.agents_review, "run_verify_tasks", return_value=(0, "verify ok\n", "")):
+                            with contextlib.redirect_stdout(buf):
+                                code = self.agents_review.cmd_scope(session_dir, "all")
 
             output = buf.getvalue()
             self.assertEqual(code, 0)
