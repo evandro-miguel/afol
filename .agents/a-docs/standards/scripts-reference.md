@@ -123,6 +123,7 @@ Alternative to Makefile:
 .agents/agents doctor
 .agents/agents new auth-refactor --spec
 .agents/agents structure-map . --output .agents/arc/structure/
+.agents/agents status --session <session-id>
 ```
 
 ## UV Scripts

@@ -4,7 +4,7 @@ id: scripts-usage
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-02-24T16:10:00-03:00'
+updated_at: '2026-03-07T18:19:40-03:00'
 ---
 
 # Scripts Usage
@@ -63,6 +63,12 @@ make wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with e
 .agents/agents wb-update evidence T-01 --session <id> --command "make verify-strict" --result "passed"
 .agents/agents tools list
 .agents/agents telemetry heat --period weekly
+.agents/agents status
+.agents/agents implement next
+.agents/agents review
+.agents/agents revert task --session <session-id> --task-id <T-xx>
+.agents/agents session catchup --session <session-id>
+.agents/agents session close --session <session-id>
 ```
 
 ## Setup (One Time)
@@ -108,6 +114,12 @@ This creates:
 
 # Verify tasks
 .agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/
+
+# Show session status
+.agents/agents status --session .agents/wb/260306_2128_context-driven-execution-commands
+
+# Catch up a session before resuming work
+.agents/agents session catchup --session .agents/wb/260306_2128_context-driven-execution-commands
 ```
 
 ### With UV Directly
@@ -261,6 +273,83 @@ python .agents/scripts/agents-structure-map.py /path/to/project --output .agents
 - `.structure-cache.json` - Cache for incremental updates
 
 ---
+
+### agents-status.py
+Displays current execution state for the active or explicitly-selected session.
+
+**Features:**
+- Resolves key canonical artifacts (`plan`, `task`, `spec`, `report`, `roadmap`)
+- Shows total/done progress with next task and blockers
+- Supports artifact-only output via `--artifact`
+- Optional JSON mode with `--json`
+
+**Usage:**
+```bash
+python .agents/scripts/agents-status.py
+python .agents/scripts/agents-status.py --session .agents/wb/260306_2128_context-driven-execution-commands
+python .agents/scripts/agents-status.py --json
+python .agents/scripts/agents-status.py --artifact plan --artifact task
+python .agents/scripts/agents-status.py --artifact product --artifact guidelines --artifact tech-stack
+```
+
+---
+
+### agents-implement.py
+Executes guided task transitions.
+
+**Commands:***
+- `next`: show the next active task
+- `start`: move a task to `in_progress`
+- `complete`: mark a task done and write a lightweight evidence record
+
+**Usage:**
+```bash
+python .agents/scripts/agents-implement.py next
+python .agents/scripts/agents-implement.py start --task-id T-01
+python .agents/scripts/agents-implement.py complete --task-id T-01 --command "make test-scripts" --result "passed"
+```
+
+### agents-review.py
+Checks plan/task/report constraints and prints severity-classified findings.
+
+**Usage:**
+```bash
+python .agents/scripts/agents-review.py --session .agents/wb/260306_2128_context-driven-execution-commands
+python .agents/scripts/agents-review.py --scope verify
+```
+
+### agents-revert.py
+Reverts logical units by scope (`task`, `phase`, `pack`, `session`).
+
+Mutating scopes require an explicit `--confirm`. Without it, the command prints a summary and exits without changing files.
+
+**Usage:**
+```bash
+python .agents/scripts/agents-revert.py task --task-id T-04 --to-state pending --confirm
+python .agents/scripts/agents-revert.py phase --phase P-01 --confirm
+python .agents/scripts/agents-revert.py session --confirm
+```
+
+### agents-session.py
+Summarizes catchup/resume state and closes a session only after strict verification succeeds.
+
+**Behavior:**
+- `catchup` reports working-tree drift, stale or missing artifacts, and the next safe resume step
+- Runs `verify-tasks.py --strict` for the target session
+- Refuses closure if strict verification fails
+- Optionally repoints `.agents/wb/.active_session` with `--next-session`
+- Leaves the active pointer unchanged by default
+
+**Usage:**
+```bash
+python .agents/scripts/agents-session.py catchup
+python .agents/scripts/agents-session.py catchup --session .agents/wb/260306_2128_context-driven-execution-commands
+python .agents/scripts/agents-session.py catchup --json
+python .agents/scripts/agents-session.py close
+python .agents/scripts/agents-session.py close --session .agents/wb/260306_2128_context-driven-execution-commands
+python .agents/scripts/agents-session.py close --session .agents/wb/260306_2128_context-driven-execution-commands --next-session .agents/wb/260306_2240_session-close-command
+python .agents/scripts/agents-session.py close --json
+```
 
 ## Workflow
 

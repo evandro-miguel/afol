@@ -10,7 +10,7 @@ Scans a project directory and generates markdown documentation with:
 
 Usage:
     python agents-structure-map.py <project-path> [--output <output-dir>]
-    
+
 Examples:
     python agents-structure-map.py .
     python agents-structure-map.py /home/ozy/apps/my-project --output .agents/arc/structure/
@@ -96,10 +96,10 @@ class FileInfo:
     section: str
     description: str = ""
     hash: str = ""
-    
+
     def to_dict(self) -> dict:
         return asdict(self)
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> 'FileInfo':
         return cls(**data)
@@ -113,7 +113,7 @@ class SectionStats:
     files: List[FileInfo]
     total_lines: int
     total_size_kb: float
-    
+
     def to_dict(self) -> dict:
         return {
             **asdict(self),
@@ -132,7 +132,7 @@ class StructureMapper:
             "total_lines": 0,
             "sections": {},
         }
-        
+
     def load_cache(self):
         """Load existing cache if available."""
         cache_file = self.output_path / CACHE_FILE
@@ -143,16 +143,16 @@ class StructureMapper:
             except Exception as e:
                 print(f"⚠️  Cache load failed: {e}")
                 self.cache = {}
-    
+
     def save_cache(self):
         """Save cache for incremental updates."""
         if not self.cache_enabled:
             return
-        
+
         cache_file = self.output_path / CACHE_FILE
         cache_file.write_text(json.dumps(self.cache, indent=2))
         print(f"✓ Saved cache: {len(self.cache.get('files', {}))} entries")
-    
+
     def compute_file_hash(self, file_path: Path) -> str:
         """Compute hash of file content for change detection."""
         try:
@@ -160,7 +160,7 @@ class StructureMapper:
             return hashlib.md5(content.encode()).hexdigest()
         except Exception:
             return ""
-    
+
     def count_lines(self, file_path: Path) -> int:
         """Count non-empty lines in file."""
         try:
@@ -168,53 +168,53 @@ class StructureMapper:
             return len([line for line in content.splitlines() if line.strip()])
         except Exception:
             return 0
-    
+
     def get_file_size_kb(self, file_path: Path) -> float:
         """Get file size in KB."""
         try:
             return file_path.stat().st_size / 1024
         except Exception:
             return 0.0
-    
+
     def classify_file(self, rel_path: str, extension: str) -> str:
         """Classify file into a section based on path and extension."""
         rel_path_lower = rel_path.lower()
-        
+
         # Check tests first (highest priority)
         for pattern in DEFAULT_SECTIONS["tests"]["patterns"]:
             if pattern in rel_path_lower:
                 return "tests"
-        
+
         # Check type definitions
         for pattern in DEFAULT_SECTIONS["types"]["patterns"]:
             if pattern in rel_path_lower and extension in [".ts", ".tsx", ".d.ts"]:
                 return "types"
-        
+
         # Check frontend
         for pattern in DEFAULT_SECTIONS["frontend"]["patterns"]:
             if pattern in rel_path_lower and extension in DEFAULT_SECTIONS["frontend"]["extensions"]:
                 return "frontend"
-        
+
         # Check backend
         for pattern in DEFAULT_SECTIONS["backend"]["patterns"]:
             if pattern in rel_path_lower and extension in DEFAULT_SECTIONS["backend"]["extensions"]:
                 return "backend"
-        
+
         # Check data
         for pattern in DEFAULT_SECTIONS["data"]["patterns"]:
             if pattern in rel_path_lower:
                 return "data"
-        
+
         # Default: backend for code, skip others
         if extension in [".ts", ".js", ".py", ".go", ".rs", ".java"]:
             return "backend"
-        
+
         return ""  # Skip this file
-    
+
     def generate_description(self, file_info: FileInfo) -> str:
         """Generate a brief description for a file."""
         name = Path(file_info.relative_path).stem
-        
+
         # Heuristic descriptions based on naming patterns
         if name.endswith('View'):
             return "View component; view component (stateful)"
@@ -240,14 +240,14 @@ class StructureMapper:
             return "Type definitions; interfaces and types"
         else:
             return "Module; functionality"
-    
+
     def scan_files(self) -> Dict[str, SectionStats]:
         """Scan all files in project."""
         print(f"Scanning: {self.project_path}")
         print()
-        
+
         sections: Dict[str, List[FileInfo]] = {name: [] for name in DEFAULT_SECTIONS}
-        
+
         # Walk through project directory
         for root, dirs, files in os.walk(self.project_path):
             # Keep selected hidden dirs like .agents, while ignoring common heavy/cache dirs.
@@ -256,26 +256,26 @@ class StructureMapper:
                 if (not d.startswith(".") or d in ALLOWED_HIDDEN_DIRS)
                 and d not in IGNORED_DIRS
             ]
-            
+
             for file in files:
                 file_path = Path(root) / file
                 rel_path = str(file_path.relative_to(self.project_path))
                 extension = file_path.suffix.lower()
-                
+
                 # Classify file
                 section = self.classify_file(rel_path, extension)
                 if not section:
                     continue
-                
+
                 # Get file info
                 lines = self.count_lines(file_path)
                 size_kb = self.get_file_size_kb(file_path)
                 file_hash = self.compute_file_hash(file_path)
-                
+
                 # Check cache for existing description
                 cache_key = rel_path
                 cached = self.cache.get('files', {}).get(cache_key)
-                
+
                 if cached and cached.get('hash') == file_hash:
                     # Use cached description
                     description = cached.get('description', '')
@@ -289,7 +289,7 @@ class StructureMapper:
                         extension=extension,
                         section=section
                     ))
-                    
+
                     # Update cache
                     if 'files' not in self.cache:
                         self.cache['files'] = {}
@@ -298,7 +298,7 @@ class StructureMapper:
                         'description': description,
                         'section': section,
                     }
-                
+
                 file_info = FileInfo(
                     path=str(file_path),
                     relative_path=rel_path,
@@ -309,18 +309,18 @@ class StructureMapper:
                     description=description,
                     hash=file_hash
                 )
-                
+
                 sections[section].append(file_info)
                 self.stats["total_files"] += 1
                 self.stats["total_lines"] += lines
                 self.stats["sections"][section] = self.stats["sections"].get(section, 0) + 1
-        
+
         # Build section stats
         result = {}
         for name, files in sections.items():
             if not files:
                 continue
-            
+
             config = DEFAULT_SECTIONS[name]
             result[name] = SectionStats(
                 name=name,
@@ -330,13 +330,13 @@ class StructureMapper:
                 total_lines=sum(f.lines for f in files),
                 total_size_kb=sum(f.size_kb for f in files)
             )
-        
+
         return result
-    
+
     def generate_readme(self, sections: Dict[str, SectionStats]) -> str:
         """Generate main README.md for structure folder."""
         timestamp = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
-        
+
         content = f"""# 📁 Project Structure - Complete Index
 
 **Generated:** {timestamp}
@@ -354,10 +354,10 @@ class StructureMapper:
 | Section | Description | Files |
 |---------|-------------|-------|
 """
-        
+
         for name, stats in sections.items():
             content += f"| [{stats.title}](./{name}.md) | {stats.description} | {len(stats.files)} |\n"
-        
+
         content += f"""
 ## 🔄 Change Detection
 
@@ -371,12 +371,12 @@ This documentation uses **incremental updates**:
 ```
 {self.project_path.name}/
 """
-        
+
         # Add top-level directories
         top_dirs = sorted([d for d in self.project_path.iterdir() if d.is_dir() and not d.name.startswith('.')])[:10]
         for d in top_dirs:
             content += f"├── 📁 {d.name}/\n"
-        
+
         content += """```
 
 ---
@@ -384,13 +384,13 @@ This documentation uses **incremental updates**:
 *Generated automatically by `agents-structure-map.py`*
 *For detailed structure, see individual section files*
 """
-        
+
         return content
-    
+
     def generate_section_md(self, stats: SectionStats) -> str:
         """Generate markdown for a section."""
         timestamp = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
-        
+
         content = f"""# 🎨 {stats.title} Structure
 
 **Generated:** {timestamp}
@@ -409,54 +409,54 @@ This documentation uses **incremental updates**:
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
 """
-        
+
         for file_info in stats.files:
             display_path = file_info.relative_path.replace('\\', '/')
             content += f"| `{display_path}` | {file_info.lines:,} | {file_info.size_kb:.1f} KB | {file_info.description} |\n"
-        
+
         content += """
 ---
 *Generated by `agents-structure-map.py`*
 """
-        
+
         return content
-    
+
     def run(self):
         """Run the structure mapping process."""
         print("=" * 60)
         print("AGENTS STRUCTURE MAP - Project Documentation")
         print("=" * 60)
         print()
-        
+
         # Load cache
         self.load_cache()
-        
+
         # Scan files
         sections = self.scan_files()
-        
+
         if not sections:
             print("⚠️  No files found to document")
             return
-        
+
         # Create output directory
         self.output_path.mkdir(parents=True, exist_ok=True)
-        
+
         # Generate README
         readme_content = self.generate_readme(sections)
         readme_path = self.output_path / "README.md"
         readme_path.write_text(readme_content)
         print(f"✓ Created: {readme_path.relative_to(self.project_path)}")
-        
+
         # Generate section files
         for name, stats in sections.items():
             section_content = self.generate_section_md(stats)
             section_path = self.output_path / f"{name}.md"
             section_path.write_text(section_content)
             print(f"✓ Created: {section_path.relative_to(self.project_path)}")
-        
+
         # Save cache
         self.save_cache()
-        
+
         # Print summary
         print()
         print("=" * 60)
@@ -480,23 +480,23 @@ def main():
         print("  python agents-structure-map.py .")
         print("  python agents-structure-map.py /home/ozy/apps/my-project --output .agents/arc/structure/")
         sys.exit(1)
-    
+
     project_path = Path(sys.argv[1])
-    
+
     # Parse output path
     output_path = None
     if "--output" in sys.argv:
         idx = sys.argv.index("--output")
         if idx + 1 < len(sys.argv):
             output_path = Path(sys.argv[idx + 1])
-    
+
     # Default output path
     if not output_path:
         if project_path.resolve() == ROOT_DIR.resolve():
             output_path = DEFAULT_OUTPUT_DIR
         else:
             output_path = project_path / ".agents" / "arc" / "structure"
-    
+
     # Run mapper
     mapper = StructureMapper(project_path, output_path)
     mapper.run()

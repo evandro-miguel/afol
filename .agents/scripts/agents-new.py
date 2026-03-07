@@ -22,6 +22,7 @@ import re
 import sys
 import json
 import subprocess
+import yaml
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Optional
@@ -39,6 +40,8 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
+ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
+SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 TELEMETRY_SCRIPT = SCRIPTS_DIR / "agents-telemetry.py"
 PATTERNS_SCRIPT = SCRIPTS_DIR / "agents-patterns.py"
@@ -46,6 +49,10 @@ WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
 WB_TZ = parse_offset(WB_OFFSET)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
 MAX_PLAN_LINES_THRESHOLD = int(WORKFLOW_CFG.get("max_plan_lines_threshold", 500))
+GOVERNANCE_REQUIRED = bool(WORKFLOW_CFG.get("governance_required", True))
+QUICK_MODE_BYPASSES_GOVERNANCE = bool(WORKFLOW_CFG.get("quick_mode_bypasses_governance", True))
+FEATURE_ID_PATTERN = re.compile(WORKFLOW_CFG.get("feature_id_pattern", r"^F-\d{2,3}$"))
+PACK_DIR_NAME = str(WORKFLOW_CFG.get("pack_dir_name", "packs")).strip() or "packs"
 PLACEHOLDER_PATTERN = re.compile(r"\{([a-zA-Z0-9_.-]+)\}")
 
 
@@ -90,14 +97,20 @@ def get_config_placeholder(name: str) -> str | None:
 def load_template(template_name: str) -> str:
     """Load template content."""
     template_path = TEMPLATES_DIR / template_name
-    
+
     if not template_path.exists():
         raise FileNotFoundError(f"Template not found: {template_path}")
-    
+
     return template_path.read_text()
 
 
-def fill_template(template: str, session_id: str, theme: str, timestamp: str) -> str:
+def fill_template(
+    template: str,
+    session_id: str,
+    theme: str,
+    timestamp: str,
+    replacements: Optional[Dict[str, str]] = None,
+) -> str:
     """Fill template with session data."""
     # Replace common placeholders
     content = template
@@ -105,6 +118,8 @@ def fill_template(template: str, session_id: str, theme: str, timestamp: str) ->
     content = content.replace("<theme>", theme)
     content = content.replace("<topic>", theme)
     content = content.replace("YYYY-MM-DDTHH:MM:SSZ", timestamp)
+    for placeholder, value in (replacements or {}).items():
+        content = content.replace(placeholder, value)
 
     def _replace(match: re.Match[str]) -> str:
         key = match.group(1)
@@ -119,12 +134,22 @@ def fill_template(template: str, session_id: str, theme: str, timestamp: str) ->
 def create_session_folder(session_id: str) -> Path:
     """Create session folder."""
     session_path = WB_DIR / session_id
-    
+
     if session_path.exists():
         raise FileExistsError(f"Session folder already exists: {session_path}")
-    
+
     session_path.mkdir(parents=True)
     return session_path
+
+
+def resolve_existing_session(session_id: str) -> Path:
+    """Resolve an existing session directory by id or path."""
+    candidate = Path(session_id)
+    if not candidate.is_absolute():
+        candidate = (ROOT_DIR / session_id).resolve() if "/" in session_id else (WB_DIR / session_id).resolve()
+    if not candidate.exists() or not candidate.is_dir():
+        raise FileNotFoundError(f"Session folder not found: {session_id}")
+    return candidate
 
 
 def get_active_session() -> str | None:
@@ -147,18 +172,205 @@ def set_active_session(session_id: str):
 def create_file(session_path: Path, filename: str, content: str):
     """Create file in session folder."""
     file_path = session_path / filename
-    
+
     if file_path.exists():
         print(f"  ⚠️  Skipping existing file: {filename}")
         return
-    
+
     file_path.write_text(content)
     print(f"  ✓ Created: {filename}")
 
 
+def _read_frontmatter(path: Path) -> Dict[str, object]:
+    """Read YAML frontmatter from a markdown file when present."""
+    try:
+        content = path.read_text()
+    except FileNotFoundError:
+        return {}
+
+    if not content.startswith("---\n"):
+        return {}
+    parts = content.split("---", 2)
+    if len(parts) < 3:
+        return {}
+    loaded = yaml.safe_load(parts[1].strip()) or {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def _doc_id_from_path(path: Path) -> str:
+    """Return frontmatter id when available, fallback to stem."""
+    doc_id = _read_frontmatter(path).get("id")
+    if isinstance(doc_id, str) and doc_id.strip():
+        return doc_id.strip()
+    return path.stem
+
+
+def _resolve_spec_reference(reference: str) -> Optional[Path]:
+    """Resolve a spec by frontmatter id or by file path."""
+    if not reference:
+        return None
+
+    if "/" in reference or reference.endswith(".md"):
+        candidate = Path(reference)
+        if not candidate.is_absolute():
+            candidate = (ROOT_DIR / candidate).resolve()
+        if candidate.exists() and candidate.is_file():
+            return candidate
+        return None
+
+    for spec_file in sorted(SPECS_DIR.rglob("*.md")):
+        if spec_file.name in {"INDEX.md", "README.md"}:
+            continue
+        if _doc_id_from_path(spec_file) == reference:
+            return spec_file
+    return None
+
+
+def _roadmap_has_feature(feature_id: str) -> bool:
+    """Return True when the roadmap contains a heading for the feature id."""
+    if not ROADMAP_FILE.exists():
+        return False
+    pattern = re.compile(rf"^###\s+{re.escape(feature_id)}\b", re.MULTILINE)
+    return bool(pattern.search(ROADMAP_FILE.read_text()))
+
+
+def _get_cli_flag_value(flag: str) -> str:
+    """Read value for --flag value or --flag=value forms."""
+    prefix = f"{flag}="
+    for idx, arg in enumerate(sys.argv):
+        if arg == flag and idx + 1 < len(sys.argv):
+            return sys.argv[idx + 1].strip()
+        if arg.startswith(prefix):
+            return arg[len(prefix):].strip()
+    return ""
+
+
+def _normalize_spec_reference(reference: str, role: str) -> str:
+    """Validate and normalize a spec reference to its frontmatter id."""
+    spec_path = _resolve_spec_reference(reference)
+    if spec_path is None:
+        print(f"❌ {role} spec not found: {reference}")
+        print(f"Expected a file under {SPECS_DIR.relative_to(ROOT_DIR)} or a matching frontmatter id.")
+        sys.exit(1)
+
+    try:
+        spec_path.resolve().relative_to(SPECS_DIR.resolve())
+    except ValueError:
+        print(f"❌ {role} spec must live under {SPECS_DIR.relative_to(ROOT_DIR)}: {spec_path}")
+        sys.exit(1)
+
+    return _doc_id_from_path(spec_path)
+
+
+def _validate_governance_requirements(args: Dict[str, object]) -> None:
+    """Enforce roadmap/spec linkage for standard workstreams."""
+    if args.get("quick_mode") and QUICK_MODE_BYPASSES_GOVERNANCE:
+        return
+    if not GOVERNANCE_REQUIRED:
+        return
+
+    missing_flags = []
+    if not args.get("feature_id"):
+        missing_flags.append("--feature-id")
+    if not args.get("parent_spec"):
+        missing_flags.append("--parent-spec")
+
+    if missing_flags:
+        print("❌ Roadmap-first governance is mandatory for standard workstreams.")
+        print(f"Missing required flags: {', '.join(missing_flags)}")
+        print("Example:")
+        print("  .agents/agents new <theme> --feature-id F-01 --parent-spec <parent-spec-id>")
+        sys.exit(1)
+
+    feature_id = str(args["feature_id"]).strip()
+    if not FEATURE_ID_PATTERN.match(feature_id):
+        print(f"❌ Invalid feature id: {feature_id}")
+        print(f"Expected pattern: {FEATURE_ID_PATTERN.pattern}")
+        sys.exit(1)
+
+    if not ROADMAP_FILE.exists():
+        print(f"❌ Roadmap file not found: {ROADMAP_FILE}")
+        sys.exit(1)
+    if not _roadmap_has_feature(feature_id):
+        print(f"❌ Roadmap feature not found in {ROADMAP_FILE.relative_to(ROOT_DIR)}: {feature_id}")
+        print("Add the feature to the roadmap before creating a new standard workstream.")
+        sys.exit(1)
+
+    args["feature_id"] = feature_id
+    args["parent_spec"] = _normalize_spec_reference(str(args["parent_spec"]), "Parent")
+
+    child_spec = str(args.get("child_spec") or "").strip()
+    if child_spec:
+        normalized_child = _normalize_spec_reference(child_spec, "Child")
+        if normalized_child == args["parent_spec"]:
+            print("❌ --child-spec must differ from --parent-spec")
+            sys.exit(1)
+        args["child_spec"] = normalized_child
+    else:
+        args["child_spec"] = ""
+
+
+def _get_repo_name() -> str:
+    """Return repository folder name."""
+    return ROOT_DIR.name
+
+
+def _get_branch_or_worktree() -> str:
+    """Return current git branch when available."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(ROOT_DIR), "branch", "--show-current"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        branch = result.stdout.strip()
+        return branch or "main"
+    except Exception:
+        return "main"
+
+
+def _build_template_replacements(session_id: str, args: Dict[str, object]) -> Dict[str, str]:
+    """Build placeholder replacements for workstream templates."""
+    doc_prefix = _doc_prefix(session_id, args)
+    return {
+        "<repo_name>": _get_repo_name(),
+        "<branch_or_worktree>": _get_branch_or_worktree(),
+        "<feature_id>": str(args.get("feature_id") or ""),
+        "<parent_spec_id>": str(args.get("parent_spec") or ""),
+        "<parent_spec_id_or_empty>": str(args.get("parent_spec") or ""),
+        "<child_spec_id_or_empty>": str(args.get("child_spec") or ""),
+        "<roadmap_path>": f".agents/arc/{ROADMAP_FILE.name}",
+        "<brainstorm_doc_id>": f"{doc_prefix}_brainstorm_01",
+        "<explorer_check_doc_id>": f"{doc_prefix}_explorer-check_01",
+        "<research_doc_id>": f"{doc_prefix}_research_01",
+        "<plan_doc_id>": f"{doc_prefix}_plan_01",
+        "<task_doc_id>": f"{doc_prefix}_task_01",
+        "<log_doc_id>": f"{doc_prefix}_log_01",
+        "<report_doc_id_or_empty>": f"{doc_prefix}_report_01",
+        "<postmortem_doc_id>": f"{doc_prefix}_postmortem_01",
+        "<spec_role>": "workstream",
+    }
+
+
+def _doc_prefix(session_id: str, args: Dict[str, object]) -> str:
+    pack = str(args.get("pack") or "").strip()
+    return f"{session_id}-{pack}" if pack else session_id
+
+
+def _doc_dir(session_path: Path, args: Dict[str, object]) -> Path:
+    pack = str(args.get("pack") or "").strip()
+    if not pack:
+        return session_path
+    target = session_path / PACK_DIR_NAME / pack
+    target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
 def find_primary_doc(session_path: Path, doc_type: str) -> Path | None:
     """Find the first workstream document by type."""
-    matches = sorted(session_path.glob(f"*_{doc_type}_*.md"))
+    matches = sorted(session_path.rglob(f"*_{doc_type}_*.md"))
     return matches[0] if matches else None
 
 
@@ -255,19 +467,29 @@ def _parse_args():
         "plan_only": "--plan-only" in sys.argv,
         "force_new": "--force-new" in sys.argv,
         "quick_mode": "--quick" in sys.argv,
+        "feature_id": _get_cli_flag_value("--feature-id"),
+        "parent_spec": _get_cli_flag_value("--parent-spec"),
+        "child_spec": _get_cli_flag_value("--child-spec"),
+        "pack": sanitize_theme(_get_cli_flag_value("--pack")) if _get_cli_flag_value("--pack") else "",
+        "into_session": _get_cli_flag_value("--into-session"),
     }
 
 
 def _print_usage():
     """Print usage information."""
-    print("Usage: python agents-new.py <theme> [--spec | --spec-lite] [--plan-only] [--force-new | --quick]")
+    print(
+        "Usage: python agents-new.py <theme> "
+        "[--feature-id F-01 --parent-spec <spec-id> [--child-spec <spec-id>]] "
+        "[--spec | --spec-lite] [--pack <pack-slug>] [--into-session <session-id>] [--plan-only] [--force-new | --quick]"
+    )
     print()
     print("Examples:")
-    print("  python agents-new.py auth-refactor")
-    print("  python agents-new.py api-endpoint --spec")
-    print("  python agents-new.py bugfix-login --spec-lite")
+    print("  python agents-new.py auth-refactor --feature-id F-01 --parent-spec my-parent-spec")
+    print("  python agents-new.py api-endpoint --feature-id F-02 --parent-spec my-parent-spec --spec")
+    print("  python agents-new.py bugfix-login --feature-id F-03 --parent-spec my-parent-spec --spec-lite")
+    print("  python agents-new.py api-follow-up --feature-id F-07 --parent-spec parent --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec")
     print("  python agents-new.py tiny-fix --quick")
-    print("  python agents-new.py new-epic --spec --force-new")
+    print("  python agents-new.py new-epic --feature-id F-04 --parent-spec parent --child-spec child --spec --force-new")
 
 
 def _handle_quick_mode(args: Dict, active_session: str) -> bool:
@@ -278,7 +500,7 @@ def _handle_quick_mode(args: Dict, active_session: str) -> bool:
     if not active_session:
         print("❌ No active session found for quick mode.")
         print("Create one significant workstream first with:")
-        print("  .agents/agents new <theme> [--spec|--spec-lite]")
+        print("  .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> [--spec|--spec-lite]")
         sys.exit(1)
 
     print("=" * 60)
@@ -321,30 +543,56 @@ def _check_active_session_policy(active_session: Optional[str], theme: str, forc
 
 def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) -> None:
     """Create new workstream with all files."""
-    session_path = create_session_folder(session_id)
-    print(f"✓ Created session folder: {session_path.name}")
+    if args.get("into_session"):
+        if not args.get("pack"):
+            raise ValueError("--into-session requires --pack so document ids remain unique")
+        session_path = resolve_existing_session(str(args["into_session"]))
+        session_id = session_path.name
+    else:
+        session_path = create_session_folder(session_id)
+    target_dir = _doc_dir(session_path, args)
+    doc_prefix = _doc_prefix(session_id, args)
+    replacements = _build_template_replacements(session_id, args)
+    if args.get("into_session"):
+        print(f"✓ Reusing session folder: {session_path.name}")
+    else:
+        print(f"✓ Created session folder: {session_path.name}")
     print()
 
-    set_active_session(session_id)
-    print(f"✓ Set active session: {session_id}")
-    print()
+    if not args.get("into_session"):
+        set_active_session(session_id)
+        print(f"✓ Set active session: {session_id}")
+        print()
+    if target_dir != session_path:
+        print(f"✓ Created pack directory: {target_dir.relative_to(ROOT_DIR)}")
+        print()
 
-    # Create plan file (always)
     print("Creating files:")
     try:
+        brainstorm_template = load_template("brainstorm.md")
+        brainstorm_content = fill_template(brainstorm_template, doc_prefix, theme, timestamp, replacements)
+        create_file(target_dir, f"{doc_prefix}_brainstorm_01.md", brainstorm_content)
+
+        research_template = load_template("research.md")
+        research_content = fill_template(research_template, doc_prefix, theme, timestamp, replacements)
+        create_file(target_dir, f"{doc_prefix}_research_01.md", research_content)
+
+        explorer_template = load_template("explorer-check.md")
+        explorer_content = fill_template(explorer_template, doc_prefix, theme, timestamp, replacements)
+        create_file(target_dir, f"{doc_prefix}_explorer-check_01.md", explorer_content)
+
         plan_template = load_template("plan.md")
-        plan_content = fill_template(plan_template, session_id, theme, timestamp)
-        create_file(session_path, f"{session_id}_plan_01.md", plan_content)
+        plan_content = fill_template(plan_template, doc_prefix, theme, timestamp, replacements)
+        create_file(target_dir, f"{doc_prefix}_plan_01.md", plan_content)
     except FileNotFoundError as e:
         print(f"❌ Error: {e}")
         sys.exit(1)
 
-    # Create task file (always)
     if not args["plan_only"]:
         try:
             task_template = load_template("task.md")
-            task_content = fill_template(task_template, session_id, theme, timestamp)
-            create_file(session_path, f"{session_id}_task_01.md", task_content)
+            task_content = fill_template(task_template, doc_prefix, theme, timestamp, replacements)
+            create_file(target_dir, f"{doc_prefix}_task_01.md", task_content)
         except FileNotFoundError as e:
             print(f"❌ Error: {e}")
             sys.exit(1)
@@ -353,34 +601,45 @@ def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) 
         if args["use_spec"]:
             try:
                 spec_template = load_template("spec.md")
-                spec_content = fill_template(spec_template, session_id, theme, timestamp)
-                create_file(session_path, f"{session_id}_spec_01.md", spec_content)
+                spec_replacements = dict(replacements)
+                spec_replacements["<spec_role>"] = "workstream"
+                spec_content = fill_template(
+                    spec_template, doc_prefix, theme, timestamp, spec_replacements
+                )
+                create_file(target_dir, f"{doc_prefix}_spec_01.md", spec_content)
             except FileNotFoundError as e:
                 print(f"❌ Error: {e}")
                 sys.exit(1)
         elif args["use_spec_lite"]:
             try:
                 spec_lite_template = load_template("spec-lite.md")
-                spec_lite_content = fill_template(spec_lite_template, session_id, theme, timestamp)
-                create_file(session_path, f"{session_id}_spec-lite_01.md", spec_lite_content)
+                spec_lite_content = fill_template(
+                    spec_lite_template, doc_prefix, theme, timestamp, replacements
+                )
+                create_file(target_dir, f"{doc_prefix}_spec-lite_01.md", spec_lite_content)
             except FileNotFoundError as e:
                 print(f"❌ Error: {e}")
                 sys.exit(1)
 
-        # Create log file (always)
         try:
             log_template = load_template("log.md")
-            log_content = fill_template(log_template, session_id, theme, timestamp)
-            create_file(session_path, f"{session_id}_log_01.md", log_content)
+            log_content = fill_template(log_template, doc_prefix, theme, timestamp, replacements)
+            create_file(target_dir, f"{doc_prefix}_log_01.md", log_content)
         except FileNotFoundError as e:
             print(f"❌ Error: {e}")
             sys.exit(1)
 
-        # Create report file (always)
         try:
             report_template = load_template("report.md")
-            report_content = fill_template(report_template, session_id, theme, timestamp)
-            create_file(session_path, f"{session_id}_report_01.md", report_content)
+            report_content = fill_template(
+                report_template, doc_prefix, theme, timestamp, replacements
+            )
+            create_file(target_dir, f"{doc_prefix}_report_01.md", report_content)
+            postmortem_template = load_template("postmortem.md")
+            postmortem_content = fill_template(
+                postmortem_template, doc_prefix, theme, timestamp, replacements
+            )
+            create_file(target_dir, f"{doc_prefix}_postmortem_01.md", postmortem_content)
         except FileNotFoundError as e:
             print(f"❌ Error: {e}")
             sys.exit(1)
@@ -388,18 +647,29 @@ def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) 
     print()
     print("=" * 60)
     print("Next steps:")
-    print(f"1. Edit: .agents/wb/{session_id}/{session_id}_plan_01.md")
+    print(f"0. Confirm roadmap feature `{args['feature_id']}` and parent spec `{args['parent_spec']}` stay current")
+    print(f"1. Edit: {target_dir.relative_to(ROOT_DIR)}/{doc_prefix}_brainstorm_01.md")
+    print(f"2. Edit: {target_dir.relative_to(ROOT_DIR)}/{doc_prefix}_explorer-check_01.md")
+    print(f"3. Edit: {target_dir.relative_to(ROOT_DIR)}/{doc_prefix}_plan_01.md")
     if not args["plan_only"]:
-        print(f"2. Edit: .agents/wb/{session_id}/{session_id}_task_01.md")
+        print(f"4. Edit: {target_dir.relative_to(ROOT_DIR)}/{doc_prefix}_task_01.md")
         if args["use_spec"] or args["use_spec_lite"]:
-            print(f"3. Edit: .agents/wb/{session_id}/{session_id}_spec*.md")
+            print(f"5. Edit: {target_dir.relative_to(ROOT_DIR)}/{doc_prefix}_spec*.md")
     print()
     print("Session folder:")
     print(f"  .agents/wb/{session_id}/")
+    if target_dir != session_path:
+        print("Pack folder:")
+        print(f"  {target_dir.relative_to(ROOT_DIR)}/")
     print("=" * 60)
 
     # Auto-record session_start telemetry
-    record_session_start(session_id, theme, args["use_spec"] or args["use_spec_lite"])
+    record_session_start(
+        session_id,
+        theme,
+        args["use_spec"] or args["use_spec_lite"],
+        args=args,
+    )
     # Auto-suggest patterns
     suggest_patterns_for_theme(theme)
 
@@ -417,11 +687,14 @@ def main():
     if _handle_quick_mode(args, active_session):
         return
 
+    _validate_governance_requirements(args)
+
     # Check active session policy
-    _check_active_session_policy(active_session, args["theme"], args["force_new"])
+    if not args.get("into_session"):
+        _check_active_session_policy(active_session, args["theme"], args["force_new"])
 
     # Generate session data
-    session_id = get_session_id(args["theme"])
+    session_id = str(args["into_session"]).strip() if args.get("into_session") else get_session_id(args["theme"])
     timestamp = get_timestamp()
 
     print("=" * 60)
@@ -430,6 +703,14 @@ def main():
     print()
     print(f"Session ID: {session_id}")
     print(f"Timestamp: {timestamp}")
+    print(f"Roadmap feature: {args['feature_id']}")
+    print(f"Parent spec: {args['parent_spec']}")
+    if args.get("child_spec"):
+        print(f"Child spec: {args['child_spec']}")
+    if args.get("pack"):
+        print(f"Pack: {args['pack']}")
+    if args.get("into_session"):
+        print(f"Into existing session: {args['into_session']}")
     if active_session and args["force_new"]:
         print(f"Previous active session: {active_session}")
     print()
@@ -437,19 +718,26 @@ def main():
     _create_workstream(session_id, args["theme"], timestamp, args)
 
 
-def record_session_start(session_id: str, theme: str, has_spec: bool):
+def record_session_start(session_id: str, theme: str, has_spec: bool, args: Optional[Dict] = None):
     """Record session_start event in telemetry."""
     if not TELEMETRY_SCRIPT.exists():
         return
-    
+
     metadata = {
         "theme": theme,
         "workstream_type": "spec" if has_spec else "feature"
     }
-    
+    if args:
+        metadata["feature_id"] = args.get("feature_id", "")
+        metadata["parent_spec"] = args.get("parent_spec", "")
+        if args.get("child_spec"):
+            metadata["child_spec"] = args["child_spec"]
+        if args.get("pack"):
+            metadata["pack"] = args["pack"]
+
     try:
         subprocess.run(
-            ["python3", str(TELEMETRY_SCRIPT), "record", "session_start",
+            [sys.executable, str(TELEMETRY_SCRIPT), "record", "session_start",
              "--session-id", session_id,
              "--metadata", json.dumps(metadata)],
             capture_output=True,
@@ -463,15 +751,15 @@ def suggest_patterns_for_theme(theme: str):
     """Suggest relevant patterns for the theme."""
     if not PATTERNS_SCRIPT.exists():
         return
-    
+
     try:
         result = subprocess.run(
-            ["python3", str(PATTERNS_SCRIPT), "suggest", "--theme", theme, "--limit", "3"],
+            [sys.executable, str(PATTERNS_SCRIPT), "suggest", "--theme", theme, "--limit", "3"],
             capture_output=True,
             text=True,
             timeout=5
         )
-        
+
         if result.stdout.strip():
             print()
             print("📋 Suggested patterns for this workstream:")

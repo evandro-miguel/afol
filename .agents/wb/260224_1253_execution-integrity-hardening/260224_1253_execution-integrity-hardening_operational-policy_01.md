@@ -181,28 +181,28 @@ make doctor && make verify-strict
 
 ### 4.1 Pre-Merge Checklist
 **Reference checklist for future work sessions:**
-- [-] `make doctor` passes
-- [-] `make lint` passes (or warnings documented)
-- [-] `make test-scripts` passes
-- [-] `make verify-strict` passes (for touched sessions)
-- [-] Evidence recorded for all `mark-done` operations
-- [-] No contradictions in reports
+- [ ] `make doctor` passes
+- [ ] `make lint` passes (or warnings documented)
+- [ ] `make test-scripts` passes
+- [ ] `make verify-strict` passes (for touched sessions)
+- [ ] Evidence recorded for all `mark-done` operations
+- [ ] No contradictions in reports
 
 ### 4.2 Release Checklist
 **Reference checklist for releases:**
-- [-] `make all` passes
-- [-] Docs parity check: CLI help matches documented examples
-- [-] Evidence ledger audited for bypasses
-- [-] Lessons learned documented
-- [-] Version tag created (if applicable)
+- [ ] `make all` passes
+- [ ] Docs parity check: CLI help matches documented examples
+- [ ] Evidence ledger audited for bypasses
+- [ ] Lessons learned documented
+- [ ] Version tag created (if applicable)
 
 ### 4.3 Quarterly Audit Checklist
 **Reference checklist for audits:**
-- [-] Review all unsafe bypass entries
-- [-] Validate evidence threshold effectiveness
-- [-] Update failure playbook if new patterns found
-- [-] Review multi-session conflict logs
-- [-] Update this policy document if needed
+- [ ] Review all unsafe bypass entries
+- [ ] Validate evidence threshold effectiveness
+- [ ] Update failure playbook if new patterns found
+- [ ] Review multi-session conflict logs
+- [ ] Update this policy document if needed
 
 ---
 

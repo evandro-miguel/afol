@@ -12,11 +12,13 @@ Covers:
 import unittest
 import tempfile
 import shutil
+import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 import importlib.util
 
 # Load the module under test dynamically
+sys.path.insert(0, str((Path(__file__).parent.parent).resolve()))
 spec = importlib.util.spec_from_file_location(
     "verify_tasks",
     Path(__file__).parent.parent / "verify-tasks.py"
@@ -270,122 +272,260 @@ class TestStrictVerification(unittest.TestCase):
         """Create temporary session folder."""
         self.temp_dir = tempfile.mkdtemp()
         self.session_dir = Path(self.temp_dir)
+        self.original_root_dir = verify_tasks.ROOT_DIR
+        self.original_roadmap_file = verify_tasks.ROADMAP_FILE
+        self.original_specs_dir = verify_tasks.SPECS_DIR
+        self._install_governance_context()
 
     def tearDown(self):
         """Clean up temporary folder."""
+        verify_tasks.ROOT_DIR = self.original_root_dir
+        verify_tasks.ROADMAP_FILE = self.original_roadmap_file
+        verify_tasks.SPECS_DIR = self.original_specs_dir
         shutil.rmtree(self.temp_dir)
+
+    def _install_governance_context(self):
+        """Create a minimal roadmap/spec context for strict governance checks."""
+        arc_dir = self.session_dir / ".agents" / "arc"
+        specs_dir = arc_dir / "SPECS"
+        specs_dir.mkdir(parents=True)
+
+        roadmap_file = arc_dir / "GENERAL-ROADMAP.md"
+        roadmap_file.write_text(
+            "# General Roadmap\n\n"
+            "### F-01 Governance-Aware Feature\n"
+            "- Governing spec: `.agents/arc/SPECS/test-parent-spec_01.md`\n"
+        )
+        (specs_dir / "test-parent-spec_01.md").write_text(
+            "---\n"
+            "doc_type: spec\n"
+            "id: test-parent-spec_01\n"
+            "---\n\n"
+            "# Parent Spec\n"
+        )
+        (specs_dir / "test-child-spec_01.md").write_text(
+            "---\n"
+            "doc_type: spec\n"
+            "id: test-child-spec_01\n"
+            "---\n\n"
+            "# Child Spec\n"
+        )
+
+        verify_tasks.ROOT_DIR = self.session_dir
+        verify_tasks.ROADMAP_FILE = roadmap_file
+        verify_tasks.SPECS_DIR = specs_dir
+
+    def _governance_fields(self, *, feature_id: str = "F-01", child_spec: str = "") -> str:
+        return (
+            f"roadmap_feature: {feature_id}\n"
+            "parent_spec: test-parent-spec_01\n"
+            f'child_spec: "{child_spec}"\n'
+        )
+
+    def _write_standard_docs(
+        self,
+        *,
+        task_body: str,
+        report_body: str = "Implementation completed and verified.\n",
+        feature_id: str = "F-01",
+        child_spec: str = "",
+    ) -> None:
+        governance = self._governance_fields(feature_id=feature_id, child_spec=child_spec)
+        plan_content = (
+            "---\n"
+            "doc_type: plan\n"
+            "id: test_plan_01\n"
+            "status: active\n"
+            f"{governance}"
+            "links:\n"
+            "  task: test_task_01\n"
+            "---\n\n"
+            "# Plan\n"
+        )
+        task_content = (
+            "---\n"
+            "doc_type: task\n"
+            "id: test_task_01\n"
+            "status: active\n"
+            f"{governance}"
+            "depends_on:\n"
+            "  - test_plan_01\n"
+            "links:\n"
+            "  plan: test_plan_01\n"
+            "---\n\n"
+            f"{task_body}"
+        )
+        report_content = (
+            "---\n"
+            "doc_type: report\n"
+            "id: test_report_01\n"
+            "status: active\n"
+            f"{governance}"
+            "links:\n"
+            "  plan: test_plan_01\n"
+            "  task: test_task_01\n"
+            "---\n\n"
+            "# Report\n"
+            f"{report_body}"
+        )
+        log_content = (
+            "---\n"
+            "doc_type: log\n"
+            "id: test_log_01\n"
+            "status: active\n"
+            f"{governance}"
+            "links:\n"
+            "  plan: test_plan_01\n"
+            "  task: test_task_01\n"
+            "---\n\n"
+            "# Log\n"
+        )
+
+        (self.session_dir / "test_plan_01.md").write_text(plan_content)
+        (self.session_dir / "test_task_01.md").write_text(task_content)
+        (self.session_dir / "test_report_01.md").write_text(report_content)
+        (self.session_dir / "test_log_01.md").write_text(log_content)
 
     def test_strict_mode_passes_with_evidence(self):
         """Strict mode passes when tasks have evidence."""
-        # Create task file with evidence (using State Board format)
-        task_content = """---
-doc_type: task
-id: test_task_01
----
-
-# Tasks
-
-## State Board
-
-| Task | State | Owner | Notes |
-|------|-------|-------|-------|
-| T-01 | done | worker | Implement feature with evidence |
-
-## Execution
-
-```bash
-python3 -m unittest
-```
-
-Result: All tests passed successfully.
-"""
-        task_file = self.session_dir / "test_task_01.md"
-        task_file.write_text(task_content)
-
-        # Create report without contradictions
-        report_content = """---
-doc_type: report
-id: test_report_01
----
-
-# Report
-
-Implementation completed and verified.
-"""
-        report_file = self.session_dir / "test_report_01.md"
-        report_file.write_text(report_content)
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "## Execution\n\n"
+                "```bash\n"
+                "python3 -m unittest\n"
+                "```\n\n"
+                "Result: All tests passed successfully.\n"
+            )
+        )
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertTrue(all_completed)
         self.assertEqual(len(results['evidence_issues']), 0)
         self.assertEqual(len(results['contradictions']), 0)
+        self.assertEqual(len(results['governance_issues']), 0)
 
     def test_strict_mode_fails_without_evidence(self):
         """Strict mode fails when completed tasks lack evidence."""
-        # Create task file WITHOUT evidence (using State Board format)
-        task_content = """---
-doc_type: task
-id: test_task_01
----
-
-# Tasks
-
-## State Board
-
-| Task | State | Owner | Notes |
-|------|-------|-------|-------|
-| T-01 | done | worker | Implement feature
-"""
-        task_file = self.session_dir / "test_task_01.md"
-        task_file.write_text(task_content)
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature |\n"
+            )
+        )
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
         self.assertGreater(len(results['evidence_issues']), 0)
+        self.assertEqual(len(results['governance_issues']), 0)
 
     def test_strict_mode_fails_with_contradictions(self):
         """Strict mode fails when report has contradictions."""
-        # Create task with evidence (State Board format)
-        task_content = """---
-doc_type: task
-id: test_task_01
----
-
-# Tasks
-
-## State Board
-
-| Task | State | Owner | Notes |
-|------|-------|-------|-------|
-| T-01 | done | worker | Implement feature
-
-```bash
-python3 test.py
-```
-
-Result: Success.
-"""
-        task_file = self.session_dir / "test_task_01.md"
-        task_file.write_text(task_content)
-
-        # Create report WITH contradictions
-        report_content = """---
-doc_type: report
-id: test_report_01
----
-
-# Report
-
-All tasks completed!
-
-However, some items are still pending review.
-"""
-        report_file = self.session_dir / "test_report_01.md"
-        report_file.write_text(report_content)
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature |\n\n"
+                "```bash\n"
+                "python3 test.py\n"
+                "```\n\n"
+                "Result: Success.\n"
+            ),
+            report_body=(
+                "All tasks completed!\n\n"
+                "However, some items are still pending review.\n"
+            ),
+        )
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
         self.assertGreater(len(results['contradictions']), 0)
+        self.assertEqual(len(results['governance_issues']), 0)
+
+    def test_strict_mode_fails_when_final_plan_lacks_exploration_gates(self):
+        governance = self._governance_fields()
+        (self.session_dir / "test_plan_01.md").write_text(
+            "---\n"
+            "doc_type: plan\n"
+            "id: test_plan_01\n"
+            "status: final\n"
+            f"{governance}"
+            "links:\n"
+            "  task: test_task_01\n"
+            "---\n\n"
+            "# Plan\n"
+        )
+        (self.session_dir / "test_task_01.md").write_text(
+            "---\n"
+            "doc_type: task\n"
+            "id: test_task_01\n"
+            "status: active\n"
+            f"{governance}"
+            "depends_on:\n"
+            "  - test_plan_01\n"
+            "links:\n"
+            "  plan: test_plan_01\n"
+            "---\n\n"
+            "# Tasks\n\n"
+            "## State Board\n\n"
+            "| Task | State | Owner | Notes |\n"
+            "|------|-------|-------|-------|\n"
+            "| T-01 | done | worker | Covered |\n\n"
+            "```bash\npytest\n```\n\n"
+            "Result: passed.\n"
+        )
+        (self.session_dir / "test_report_01.md").write_text(
+            "---\n"
+            "doc_type: report\n"
+            "id: test_report_01\n"
+            "status: active\n"
+            f"{governance}"
+            "---\n\n"
+            "# Report\n"
+        )
+        (self.session_dir / "test_log_01.md").write_text(
+            "---\n"
+            "doc_type: log\n"
+            "id: test_log_01\n"
+            "status: active\n"
+            f"{governance}"
+            "---\n\n"
+            "# Log\n"
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results["planning_gate_issues"]), 0)
+
+    def test_strict_mode_fails_when_final_report_lacks_postmortem(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            ),
+            report_body="Implementation completed and verified.\n",
+        )
+        report_file = self.session_dir / "test_report_01.md"
+        report_text = report_file.read_text().replace("status: active", "status: final", 1)
+        report_file.write_text(report_text)
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results["postmortem_issues"]), 0)
 
     def test_non_strict_mode_ignores_evidence(self):
         """Non-strict mode passes without evidence checks."""
@@ -417,6 +557,9 @@ id: test_task_01
 doc_type: plan
 id: test_plan_02
 status: active
+roadmap_feature: F-01
+parent_spec: test-parent-spec_01
+child_spec: ""
 links:
   task: test_task_01
 ---
@@ -427,6 +570,9 @@ links:
 doc_type: task
 id: test_task_01
 status: active
+roadmap_feature: F-01
+parent_spec: test-parent-spec_01
+child_spec: ""
 depends_on:
   - test_plan_01
 links:
@@ -450,18 +596,40 @@ Result: passed
 doc_type: report
 id: test_report_01
 status: active
+roadmap_feature: F-01
+parent_spec: test-parent-spec_01
+child_spec: ""
+links:
+  plan: test_plan_02
+  task: test_task_01
 ---
 
 # Report
 All done.
 """
+        log_content = """---
+doc_type: log
+id: test_log_01
+status: active
+roadmap_feature: F-01
+parent_spec: test-parent-spec_01
+child_spec: ""
+links:
+  plan: test_plan_02
+  task: test_task_01
+---
+
+# Log
+"""
         (self.session_dir / "z_test_plan_02.md").write_text(plan_content)
         (self.session_dir / "z_test_task_01.md").write_text(task_content)
         (self.session_dir / "z_test_report_01.md").write_text(report_content)
+        (self.session_dir / "z_test_log_01.md").write_text(log_content)
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
         self.assertGreater(len(results.get('coherence_issues', [])), 0)
+        self.assertEqual(len(results.get('governance_issues', [])), 0)
 
     def test_strict_mode_fails_when_final_doc_has_open_checklist(self):
         """Strict mode fails when status=final doc still has open checklist markers."""
@@ -469,8 +637,13 @@ All done.
 doc_type: task
 id: test_task_01
 status: active
+roadmap_feature: F-01
+parent_spec: test-parent-spec_01
+child_spec: ""
 links:
   plan: test_plan_01
+depends_on:
+  - test_plan_01
 ---
 
 # Tasks
@@ -490,11 +663,28 @@ Result: passed
 doc_type: plan
 id: test_plan_01
 status: active
+roadmap_feature: F-01
+parent_spec: test-parent-spec_01
+child_spec: ""
 links:
   task: test_task_01
 ---
 
 # Plan
+"""
+        log_content = """---
+doc_type: log
+id: test_log_01
+status: active
+roadmap_feature: F-01
+parent_spec: test-parent-spec_01
+child_spec: ""
+links:
+  plan: test_plan_01
+  task: test_task_01
+---
+
+# Log
 """
         final_standard = """---
 doc_type: standard
@@ -507,11 +697,38 @@ status: final
 """
         (self.session_dir / "a_test_plan_01.md").write_text(plan_content)
         (self.session_dir / "a_test_task_01.md").write_text(task_content)
+        (self.session_dir / "a_test_log_01.md").write_text(log_content)
         (self.session_dir / "a_test_policy_01.md").write_text(final_standard)
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
         self.assertGreater(len(results.get('final_doc_issues', [])), 0)
+
+    def test_strict_mode_fails_on_governance_mismatch(self):
+        """Strict mode fails when latest task/log/report do not match plan governance."""
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature |\n\n"
+                "```bash\n"
+                "python3 test.py\n"
+                "```\n"
+                "Result: passed\n"
+            ),
+            child_spec="test-child-spec_01",
+        )
+
+        task_path = self.session_dir / "test_task_01.md"
+        task_path.write_text(
+            task_path.read_text().replace("roadmap_feature: F-01", "roadmap_feature: F-02", 1)
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results.get("governance_issues", [])), 0)
 
 
 if __name__ == '__main__':

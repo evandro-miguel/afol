@@ -1,9 +1,9 @@
 ---
 doc_type: index
-id: "agentic-docs-index"
+id: agentic-docs-index
 status: active
-created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-02-23T00:00:00Z"
+created_at: '2026-02-23T00:00:00Z'
+updated_at: '2026-03-06T20:23:51-03:00'
 ---
 
 # Documentation Index
@@ -37,6 +37,7 @@ Central index for all `.agents` system documentation.
 | `wb-update` | [agents-wb-update.md](./agents-wb-update.md) | Workbench automation |
 | `telemetry` | [agents-telemetry.md](./agents-telemetry.md) | Telemetry collection |
 | `patterns` | [agents-patterns.md](./agents-patterns.md) | Pattern catalog |
+| `knowledge` | [../knowledge/README.md](../knowledge/README.md) | Reusable knowledge layer |
 | `bootstrap` | [agents-bootstrap.md](./agents-bootstrap.md) | Repository bootstrap |
 | `skills-sync` | [agents-skills-sync.md](./agents-skills-sync.md) | Skills sync |
 | `tools-smoke` | [agents-tools-smoke.md](./agents-tools-smoke.md) | Smoke tests |
@@ -84,7 +85,9 @@ Central index for all `.agents` system documentation.
 | [spec-lite.md](../templates/spec-lite.md) | Lite specification |
 | [adr.md](../templates/adr.md) | Architecture decision |
 | [brainstorm.md](../templates/brainstorm.md) | Ideation |
+| [explorer-check.md](../templates/explorer-check.md) | Current-project exploration proof |
 | [research.md](../templates/research.md) | Research |
+| [postmortem.md](../templates/postmortem.md) | Final session closure artifact |
 | [blocks.md](../templates/blocks.md) | Building blocks |
 | [architecture.md](../templates/architecture.md) | Architecture doc |
 | [roadmap.md](../templates/roadmap.md) | Roadmap |

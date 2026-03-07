@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 def load_module(module_name: str, file_path: Path):
@@ -192,6 +193,63 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             )
             with self.assertRaises(ValueError):
                 wb_update.cmd_task(args_mismatch)
+
+    def test_status_final_on_report_records_session_end(self):
+        """Setting the report to final should emit a session_end telemetry event."""
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_session_end_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_report-final"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            report_file = session_dir / "260224_0000_report-final_report_01.md"
+            postmortem_file = session_dir / "260224_0000_report-final_postmortem_01.md"
+            report_file.write_text(
+                "---\n"
+                "doc_type: report\n"
+                "status: active\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Report\n"
+            )
+            postmortem_file.write_text(
+                "---\n"
+                "doc_type: postmortem\n"
+                "status: final\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Postmortem\n"
+            )
+
+            args = argparse.Namespace(session=str(session_dir), file="report", value="final")
+            with mock.patch.object(wb_update, "maybe_record_session_end") as record_mock:
+                wb_update.cmd_status(args)
+
+            content = report_file.read_text()
+            self.assertIn("status: final", content)
+            record_mock.assert_called_once_with(session_dir, "wb-update status")
+
+    def test_status_final_on_report_requires_final_postmortem(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_postmortem_gate_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_postmortem-gate"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            (session_dir / "260224_0000_postmortem-gate_report_01.md").write_text(
+                "---\n"
+                "doc_type: report\n"
+                "status: active\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Report\n"
+            )
+
+            args = argparse.Namespace(session=str(session_dir), file="report", value="final")
+            with self.assertRaises(ValueError):
+                wb_update.cmd_status(args)
 
 
 if __name__ == "__main__":

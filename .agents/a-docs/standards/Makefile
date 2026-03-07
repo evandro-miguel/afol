@@ -10,7 +10,13 @@
 #   make structure
 #   make all
 
-.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-plan skills-apply skills-status skills-check skills-sync wb-touch wb-normalize-time wb-files-changed wb-evidence wb-task wb-status wb-timeline wb-link structure index sync verify verify-session verify-active lint tools-check test-scripts lint-scripts lint-fix lint-fix-dry lint-fix-check lint-fix-checkboxes lint-fix-frontmatter telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
+.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-plan skills-apply skills-status skills-check skills-sync wb-touch wb-normalize-time wb-files-changed wb-evidence wb-task wb-status wb-timeline wb-link structure index knowledge-index knowledge-list knowledge-search knowledge-pull sync verify verify-session verify-active verify-active-if-present verify-strict-if-present lint tools-check test-scripts lint-scripts lint-fix lint-fix-dry lint-fix-check lint-fix-checkboxes lint-fix-frontmatter telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
+
+# Use local virtualenv python when available for reproducible script execution
+PYTHON := .agents/scripts/.venv/bin/python3
+ifeq ($(wildcard $(PYTHON)),)
+PYTHON := python3
+endif
 
 # ==============================================================================
 # HELP
@@ -28,11 +34,15 @@ help:
 	@echo "║  Documentation                                            ║"
 	@echo "║    make structure    - Generate project structure docs    ║"
 	@echo "║    make index        - Update SPECS/ADRS indexes          ║"
+	@echo "║    make knowledge-index - Build knowledge index           ║"
+	@echo "║    make knowledge-list - List knowledge artifacts         ║"
+	@echo "║    make knowledge-search QUERY=x - Search prior findings  ║"
+	@echo "║    make knowledge-pull QUERY=x - Pull compact context     ║"
 	@echo "║    make sync         - Sync AGENTS.md to agent files      ║"
 	@echo "║    make tools-check  - Validate/discover tools catalog     ║"
 	@echo "║                                                           ║"
 	@echo "║  Workflows                                                ║"
-	@echo "║    make new          - Create workstream (THEME=xxx)      ║"
+	@echo "║    make new          - Create governed workstream         ║"
 	@echo "║    make quick        - Use active session for quick task   ║"
 	@echo "║    make bootstrap    - Install system into another repo    ║"
 	@echo "║    make fix-symlinks - Repair links/copy fallback          ║"
@@ -47,7 +57,9 @@ help:
 	@echo "║    make verify       - Check task completion (all sessions)║"
 	@echo "║    make verify-session - Check one session (SESSION_ID=)   ║"
 	@echo "║    make verify-active - Check active session only          ║"
+	@echo "║    make verify-active-if-present - Run active verify if set║"
 	@echo "║    make verify-strict - Strict verification with evidence  ║"
+	@echo "║    make verify-strict-if-present - Run strict verify if set║"
 	@echo "║    make lint         - Validate markdown docs             ║"
 	@echo "║    make lint-fix     - Fix common lint issues             ║"
 	@echo "║    make lint-fix-dry - Preview lint fixes                 ║"
@@ -109,6 +121,30 @@ index:
 	@./.agents/agents index
 	@echo "✓ Indexes updated"
 
+knowledge-index:
+	@echo "→ Building reusable knowledge index..."
+	@./.agents/agents knowledge index
+	@echo "✓ Knowledge index updated"
+
+knowledge-list:
+	@./.agents/agents knowledge list $(if $(TYPE),--type $(TYPE),)
+
+knowledge-search:
+ifndef QUERY
+	@echo "Usage: make knowledge-search QUERY=<term>"
+	@exit 1
+else
+	@./.agents/agents knowledge search "$(QUERY)"
+endif
+
+knowledge-pull:
+ifndef QUERY
+	@echo "Usage: make knowledge-pull QUERY=<term>"
+	@exit 1
+else
+	@./.agents/agents knowledge pull "$(QUERY)"
+endif
+
 sync:
 	@echo "→ Syncing AGENTS.md to agent files..."
 	@./.agents/agents sync --force
@@ -123,24 +159,38 @@ ifndef THEME
 	@echo "╔═══════════════════════════════════════════════════════════╗"
 	@echo "║  Error: THEME required                                    ║"
 	@echo "╠═══════════════════════════════════════════════════════════╣"
-	@echo "║  Usage: make new THEME=<theme-name> [SPEC=1]              ║"
+	@echo "║  Usage: make new THEME=<theme> FEATURE_ID=F-01            ║"
+	@echo "║         PARENT_SPEC=<parent-spec-id> [SPEC=1|lite]        ║"
 	@echo "║                                                           ║"
 	@echo "║  Examples:                                                ║"
-	@echo "║    make new THEME=auth-refactor                           ║"
-	@echo "║    make new THEME=api-endpoint SPEC=1                     ║"
-	@echo "║    make new THEME=bugfix-login SPEC=lite                  ║"
+	@echo "║    make new THEME=auth-refactor FEATURE_ID=F-01          ║"
+	@echo "║      PARENT_SPEC=my-parent-spec                           ║"
+	@echo "║    make new THEME=api-endpoint FEATURE_ID=F-02           ║"
+	@echo "║      PARENT_SPEC=my-parent-spec SPEC=1                    ║"
+	@echo "║    make new THEME=bugfix-login FEATURE_ID=F-03           ║"
+	@echo "║      PARENT_SPEC=my-parent-spec SPEC=lite                 ║"
 	@echo "╚═══════════════════════════════════════════════════════════╝"
+	@exit 1
+else
+ifndef FEATURE_ID
+	@echo "Usage: make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id> [SPEC=1|lite] [CHILD_SPEC=<child-spec-id>]"
+	@exit 1
+else
+ifndef PARENT_SPEC
+	@echo "Usage: make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id> [SPEC=1|lite] [CHILD_SPEC=<child-spec-id>]"
 	@exit 1
 else
 	@echo "→ Creating workstream: $(THEME)..."
 	@if [ "$(SPEC)" = "1" ]; then \
-		./.agents/agents new $(THEME) --spec; \
+		./.agents/agents new $(THEME) --feature-id "$(FEATURE_ID)" --parent-spec "$(PARENT_SPEC)" $(if $(CHILD_SPEC),--child-spec "$(CHILD_SPEC)",) --spec; \
 	elif [ "$(SPEC)" = "lite" ]; then \
-		./.agents/agents new $(THEME) --spec-lite; \
+		./.agents/agents new $(THEME) --feature-id "$(FEATURE_ID)" --parent-spec "$(PARENT_SPEC)" $(if $(CHILD_SPEC),--child-spec "$(CHILD_SPEC)",) --spec-lite; \
 	else \
-		./.agents/agents new $(THEME); \
+		./.agents/agents new $(THEME) --feature-id "$(FEATURE_ID)" --parent-spec "$(PARENT_SPEC)" $(if $(CHILD_SPEC),--child-spec "$(CHILD_SPEC)",); \
 	fi
 	@echo "✓ Workstream created: $(THEME)"
+endif
+endif
 endif
 
 quick:
@@ -351,6 +401,15 @@ verify-active:
 	echo "→ Verifying active session $$ACTIVE_SESSION..."; \
 	./.agents/agents verify-tasks ".agents/wb/$$ACTIVE_SESSION"
 
+verify-active-if-present:
+	@ACTIVE_SESSION="$$(cat .agents/wb/.active_session 2>/dev/null || true)"; \
+	if [ -z "$$ACTIVE_SESSION" ]; then \
+		echo "→ No active session set; skipping active-session verification"; \
+	else \
+		echo "→ Verifying active session $$ACTIVE_SESSION..."; \
+		./.agents/agents verify-tasks ".agents/wb/$$ACTIVE_SESSION"; \
+	fi
+
 verify-strict:
 	@ACTIVE_SESSION="$$(cat .agents/wb/.active_session 2>/dev/null || true)"; \
 	if [ -z "$$ACTIVE_SESSION" ]; then \
@@ -359,6 +418,15 @@ verify-strict:
 	fi; \
 	echo "→ Running strict verification on active session $$ACTIVE_SESSION..."; \
 	./.agents/agents verify-tasks ".agents/wb/$$ACTIVE_SESSION" --strict
+
+verify-strict-if-present:
+	@ACTIVE_SESSION="$$(cat .agents/wb/.active_session 2>/dev/null || true)"; \
+	if [ -z "$$ACTIVE_SESSION" ]; then \
+		echo "→ No active session set; skipping strict active-session verification"; \
+	else \
+		echo "→ Running strict verification on active session $$ACTIVE_SESSION..."; \
+		./.agents/agents verify-tasks ".agents/wb/$$ACTIVE_SESSION" --strict; \
+	fi
 
 lint:
 	@echo "→ Linting markdown docs..."
@@ -373,7 +441,7 @@ tools-check:
 
 test-scripts:
 	@echo "→ Running script unit tests..."
-	@python3 -m unittest discover -s .agents/scripts/tests -p "test_*.py" -v
+	@uv run --project .agents/scripts pytest .agents/scripts/tests -m "not integration and not e2e"
 	@echo "✓ Script unit tests passed"
 
 lint-scripts:
@@ -387,46 +455,46 @@ lint-scripts:
 
 telemetry-record:
 	@echo "→ Recording telemetry event..."
-	@python3 .agents/scripts/agents-telemetry.py record $(EVENT_TYPE) $(if $(SESSION_ID),--session-id="$(SESSION_ID)",) $(if $(METADATA),--metadata='$(METADATA)',) $(if $(OUTCOME),--outcome="$(OUTCOME)",)
+	@$(PYTHON) .agents/scripts/agents-telemetry.py record $(EVENT_TYPE) $(if $(SESSION_ID),--session-id="$(SESSION_ID)",) $(if $(METADATA),--metadata='$(METADATA)',) $(if $(OUTCOME),--outcome="$(OUTCOME)",)
 
 telemetry-report:
 	@echo "→ Generating telemetry report..."
-	@python3 .agents/scripts/agents-telemetry.py report --period="$(if $(PERIOD),$(PERIOD),weekly)" --format="$(if $(FORMAT),$(FORMAT),text)"
+	@$(PYTHON) .agents/scripts/agents-telemetry.py report --period="$(if $(PERIOD),$(PERIOD),weekly)" --format="$(if $(FORMAT),$(FORMAT),text)"
 
 telemetry-export:
 	@echo "→ Exporting telemetry data..."
-	@python3 .agents/scripts/agents-telemetry.py export --format="$(if $(FORMAT),$(FORMAT),json)" $(if $(OUTPUT),--output="$(OUTPUT)",)
+	@$(PYTHON) .agents/scripts/agents-telemetry.py export --format="$(if $(FORMAT),$(FORMAT),json)" $(if $(OUTPUT),--output="$(OUTPUT)",)
 
 telemetry-validate:
 	@echo "→ Validating telemetry data..."
-	@python3 .agents/scripts/agents-telemetry.py validate
+	@$(PYTHON) .agents/scripts/agents-telemetry.py validate
 
 telemetry-heat:
 	@echo "→ Generating heat map..."
-	@python3 .agents/scripts/agents-telemetry.py heat $(if $(TYPE),--type=$(TYPE),) $(if $(FORMAT),--format=$(FORMAT),) $(if $(MIN_SCORE),--min-score=$(MIN_SCORE),) $(if $(PERIOD),--period=$(PERIOD),)
+	@$(PYTHON) .agents/scripts/agents-telemetry.py heat $(if $(TYPE),--type=$(TYPE),) $(if $(FORMAT),--format=$(FORMAT),) $(if $(MIN_SCORE),--min-score=$(MIN_SCORE),) $(if $(PERIOD),--period=$(PERIOD),)
 
 telemetry-hot:
 	@echo "→ Showing hottest elements..."
-	@python3 .agents/scripts/agents-telemetry.py hot $(if $(LIMIT),--limit=$(LIMIT),) $(if $(TYPE),--type=$(TYPE),) $(if $(PERIOD),--period=$(PERIOD),)
+	@$(PYTHON) .agents/scripts/agents-telemetry.py hot $(if $(LIMIT),--limit=$(LIMIT),) $(if $(TYPE),--type=$(TYPE),) $(if $(PERIOD),--period=$(PERIOD),)
 
 telemetry-cold:
 	@echo "→ Showing coldest elements..."
-	@python3 .agents/scripts/agents-telemetry.py cold $(if $(LIMIT),--limit=$(LIMIT),) $(if $(TYPE),--type=$(TYPE),) $(if $(PERIOD),--period=$(PERIOD),)
+	@$(PYTHON) .agents/scripts/agents-telemetry.py cold $(if $(LIMIT),--limit=$(LIMIT),) $(if $(TYPE),--type=$(TYPE),) $(if $(PERIOD),--period=$(PERIOD),)
 
 patterns-suggest:
 	@echo "→ Suggesting patterns..."
-	@python3 .agents/scripts/agents-patterns.py suggest $(if $(THEME),--theme="$(THEME)",) $(if $(TAGS),--tags="$(TAGS)",) $(if $(LIMIT),--limit=$(LIMIT),)
+	@$(PYTHON) .agents/scripts/agents-patterns.py suggest $(if $(THEME),--theme="$(THEME)",) $(if $(TAGS),--tags="$(TAGS)",) $(if $(LIMIT),--limit=$(LIMIT),)
 
 patterns-list:
 	@echo "→ Listing patterns..."
-	@python3 .agents/scripts/agents-patterns.py list $(if $(TYPE),--type=$(TYPE),) $(if $(STATUS),--status=$(STATUS),)
+	@$(PYTHON) .agents/scripts/agents-patterns.py list $(if $(TYPE),--type=$(TYPE),) $(if $(STATUS),--status=$(STATUS),)
 
 patterns-show:
 ifndef PATTERN_ID
 	@echo "Usage: make patterns-show PATTERN_ID=PAT-001"
 	@exit 1
 else
-	@python3 .agents/scripts/agents-patterns.py show $(PATTERN_ID)
+	@$(PYTHON) .agents/scripts/agents-patterns.py show $(PATTERN_ID)
 endif
 
 patterns-apply:
@@ -434,7 +502,7 @@ ifndef PATTERN_ID
 	@echo "Usage: make patterns-apply PATTERN_ID=PAT-001 [SESSION=xxx]"
 	@exit 1
 else
-	@python3 .agents/scripts/agents-patterns.py apply $(PATTERN_ID) $(if $(SESSION),--session="$(SESSION)",)
+	@$(PYTHON) .agents/scripts/agents-patterns.py apply $(PATTERN_ID) $(if $(SESSION),--session="$(SESSION)",)
 endif
 
 patterns-rate:
@@ -446,7 +514,7 @@ ifndef EFFECTIVENESS
 	@echo "Usage: make patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high|medium|low"
 	@exit 1
 else
-	@python3 .agents/scripts/agents-patterns.py rate $(PATTERN_ID) --effectiveness=$(EFFECTIVENESS)
+	@$(PYTHON) .agents/scripts/agents-patterns.py rate $(PATTERN_ID) --effectiveness=$(EFFECTIVENESS)
 endif
 endif
 
@@ -454,7 +522,7 @@ endif
 # QUICK WORKFLOWS
 # ==============================================================================
 
-all: doctor structure index verify-active skills-check tools-check telemetry-validate verify-strict
+all: doctor structure index knowledge-index sync lint skills-check tools-check telemetry-validate test-scripts
 	@echo ""
 	@echo "╔═══════════════════════════════════════════════════════════╗"
 	@echo "║  ✓ All validations passed                                 ║"
@@ -479,8 +547,8 @@ va: verify-active
 dr: doctor
 
 # Common workflows
-docs: structure index sync
-check: doctor lint verify-active
+docs: structure index knowledge-index sync
+check: doctor lint verify-active-if-present
 init: setup doctor
 
 # ==============================================================================
@@ -489,21 +557,21 @@ init: setup doctor
 
 lint-fix:
 	@echo "→ Fixing common lint issues..."
-	@python3 .agents/scripts/fix-lint-all.py .agents
+	@$(PYTHON) .agents/scripts/fix-lint-all.py .agents
 	@echo "✓ Lint fixes applied"
 
 lint-fix-dry:
 	@echo "→ Previewing lint fixes (dry run)..."
-	@python3 .agents/scripts/fix-lint-all.py --dry-run .agents
+	@$(PYTHON) .agents/scripts/fix-lint-all.py --dry-run .agents
 
 lint-fix-check:
 	@echo "→ Checking for lint issues..."
-	@python3 .agents/scripts/fix-lint-all.py --check .agents
+	@$(PYTHON) .agents/scripts/fix-lint-all.py --check .agents
 
 lint-fix-checkboxes:
 	@echo "→ Fixing missing checkbox separators..."
-	@python3 .agents/scripts/fix-lint-checkboxes.py .agents
+	@$(PYTHON) .agents/scripts/fix-lint-checkboxes.py .agents
 
 lint-fix-frontmatter:
 	@echo "→ Adding missing frontmatter..."
-	@python3 .agents/scripts/fix-lint-frontmatter.py .agents/a-docs/standards/scripts-usage.md .agents/a-docs/standards/scripts-reference.md .agents/scripts/tests/TEST_STRATEGY.md
+	@$(PYTHON) .agents/scripts/fix-lint-frontmatter.py .agents/a-docs/standards/scripts-usage.md .agents/a-docs/standards/scripts-reference.md .agents/scripts/tests/TEST_STRATEGY.md

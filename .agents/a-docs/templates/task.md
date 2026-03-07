@@ -6,7 +6,13 @@ status: active
 owners: ["worker", "tester"]
 created_at: "YYYY-MM-DDTHH:MM:SSZ"
 updated_at: "YYYY-MM-DDTHH:MM:SSZ"
-depends_on: ["<optional_plan_id>"]
+roadmap_feature: "<feature_id>"
+parent_spec: "<parent_spec_id>"
+child_spec: "<child_spec_id_or_empty>"
+depends_on: ["<plan_doc_id>"]
+links:
+  plan: "<plan_doc_id>"
+  roadmap: "<roadmap_path>"
 ---
 
 # Tasks: <theme>
@@ -22,6 +28,13 @@ depends_on: ["<optional_plan_id>"]
 **Task ID format:** `T-01`, `T-02`, ... (ou `T-001` para boards grandes)
 
 **State marker rules:** See [../standards/checkbox-protocol.md](../standards/checkbox-protocol.md)
+
+## Governance Context
+- Roadmap feature: `<feature_id>`
+- Parent spec: `<parent_spec_id>`
+- Child spec: `<child_spec_id_or_empty>`
+- Task rule:
+  - Tasks execute approved intent; they do not replace roadmap/spec definition.
 
 ## Relevant Lessons
 

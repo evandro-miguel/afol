@@ -5,9 +5,21 @@ theme: "<theme>"
 status: active
 created_at: "YYYY-MM-DDTHH:MM:SSZ"
 updated_at: "YYYY-MM-DDTHH:MM:SSZ"
+roadmap_feature: "<feature_id>"
+parent_spec: "<parent_spec_id>"
+child_spec: "<child_spec_id_or_empty>"
+links:
+  roadmap: "<roadmap_path>"
+  plan: "<plan_doc_id>"
+  task: "<task_doc_id>"
 ---
 
 # Log: <theme>
+
+## Governance Context
+- Roadmap feature: `<feature_id>`
+- Parent spec: `<parent_spec_id>`
+- Child spec: `<child_spec_id_or_empty>`
 
 ## Timeline
 - YYYY-MM-DD HH:MMZ - <action> - <result>

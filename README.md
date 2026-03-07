@@ -2,11 +2,15 @@
 
 Operating system for agentic LLM workflows with automated telemetry and element heat scoring.
 
+Primary supported runtimes: OpenCode, Codex, and Qwen.
+
 ## 🎯 Overview
 
 `.agents` is a standardized system for managing LLM-assisted development workflows, focused on:
 
 - **Consistent documentation** - Standardized templates for plans, tasks, reports
+- **Planning rigor** - Brainstorm and explorer-check gates for major plans
+- **Knowledge reuse** - Low-token search over prior research, reports, and postmortems
 - **Automated telemetry** - Tracks tool, pattern, and document usage without manual intervention
 - **Heat scoring** - Identifies hot/cold elements by period (daily, weekly, monthly)
 - **Pattern catalog** - Catalog of patterns and anti-patterns with automatic suggestions
@@ -47,6 +51,8 @@ Operating system for agentic LLM workflows with automated telemetry and element 
 │   ├── .active_session      # Current session
 │   └── YYMMDD_HHMM_theme/   # Session folders
 │
+├── tmp/                     # Temporary non-canonical artifacts
+│
 ├── rules/                   # Operational rules
 ├── skills/                  # Project skills
 └── tools.json               # Tool catalog
@@ -67,16 +73,34 @@ make doctor
 ### 2. Create Workstream
 
 ```bash
-# Create new workstream (significant)
-.agents/agents new auth-refactor --spec-lite
+# 1. Define or update the roadmap feature in .agents/arc/GENERAL-ROADMAP.md
+
+# 2. Define or update the governing parent spec in .agents/arc/SPECS/
+
+# 3. Create the workstream with mandatory governance linkage
+.agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --spec-lite
+
+# Optional: add a pack for another major track inside an existing session
+.agents/agents new api-follow-up --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec
 
 # Quick task in active session
 .agents/agents new update-docs --quick
 ```
 
+### Runtime Entry Points
+
+- `AGENTS.md` is the canonical instruction source.
+- `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, and `GEMINI.md` are runtime-facing mirrors generated from it.
+- `opencode.json` is the committed OpenCode project adapter and must remain secret-free.
+- Runtime folders such as `.opencode/`, `.codex/`, and `.qwen/` should only contain project-safe adapters and docs.
+
 ### 3. Work
 
 ```bash
+# Reuse prior findings before deep exploration when relevant
+.agents/agents knowledge search runtime
+.agents/agents knowledge pull runtime
+
 # Use tools (automatic telemetry)
 .agents/agents doctor
 .agents/agents verify
@@ -92,6 +116,17 @@ make telemetry-heat PERIOD=daily
 # Verify complete tasks
 .agents/agents verify
 
+# Catch up the active session before resuming after a gap
+.agents/agents session catchup --session <session-id>
+
+# Finalize postmortem before closing the session report
+.agents/agents wb-update status --session <session-id> --file postmortem --value final
+.agents/agents wb-update status --session <session-id> --file report --value final
+
+# Close the verified session and optionally move the active pointer
+.agents/agents session close --session <session-id>
+.agents/agents session close --session <session-id> --next-session <next-session-id>
+
 # Generate report
 make wb-files-changed
 
@@ -99,16 +134,26 @@ make wb-files-changed
 make telemetry-report PERIOD=weekly
 ```
 
+### Documentation Currency (Required)
+
+Before ending work, close the documentation loop first:
+
+- update all affected management artifacts in the active session (`plan`, `task`, `log`, `report`)
+- align impacted specs/roadmap entries and standards/standards templates
+- refresh runtime mirrors if canonical behavior changed
+- keep required metadata updates (`updated_at`) automation-driven
+- if a defect is found and fixed, add a lesson entry in `.agents/a-docs/lessons/entries/`
+
 ## 🔥 Automated Telemetry
 
 ### What's Tracked (Automatically)
 
 | Event | When | Source |
 |-------|------|--------|
-| `tool_exec` | Every `.agents/agents <tool>` | `.agents/agents` wrapper |
+| `tool_exec` | Every `.agents/agents <tool>` attempt | `.agents/agents` wrapper |
 | `session_start` | Creating workstream | `agents-new.py` |
 | `pattern_applied` | Applying pattern | `agents-patterns.py` |
-| `session_end` | Completing session | `wb-update touch` |
+| `session_end` | Finalizing a session report, or touching a session whose report is already final | `agents-wb-update.py` |
 
 ### Heat Scoring by Period
 
@@ -200,9 +245,11 @@ make patterns-apply PATTERN_ID=PAT-001
 - `task.md` - Task list with IDs
 - `log.md` - Decision timeline
 - `report.md` - Outcome report
-- `spec.md` / `spec-lite.md` - Specifications
+- `spec.md` / `spec-lite.md` - Local workstream refinements chosen as needed
 - `brainstorm.md` - Ideation
+- `explorer-check.md` - Current-project exploration proof
 - `research.md` - Research
+- `postmortem.md` - Mandatory final session closure artifact
 
 ### Required Frontmatter
 
@@ -238,13 +285,13 @@ updated_at: "2026-02-23T00:00:00-03:00"
 make setup          # Setup UV virtualenv
 make doctor         # Validate .agents structure
 make clean          # Clean caches
-make all            # Full validation
+make all            # Bootstrap-safe full validation
 ```
 
 ### Workflows
 
 ```bash
-make new THEME=x    # Create workstream
+make new THEME=x FEATURE_ID=F-01 PARENT_SPEC=<spec-id>  # Create governed workstream
 make quick THEME=x  # Quick task
 make verify         # Verify tasks
 make lint           # Lint markdown
@@ -279,8 +326,9 @@ make patterns-rate      # Rate pattern
 ```bash
 # Main tools
 .agents/agents doctor           # Validate structure
-.agents/agents new <theme>      # Create workstream
+.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id>  # Create workstream
 .agents/agents verify-tasks     # Verify tasks
+.agents/agents status           # Show session status
 .agents/agents wb-update touch  # Update session
 .agents/agents tools list       # List tools
 .agents/agents structure-map .  # Map structure
@@ -366,10 +414,10 @@ make telemetry-cold PERIOD=monthly TYPE=tools
 
 ## 🤝 Contributing
 
-1. Create workstream: `.agents/agents new feature-x --spec-lite`
+1. Create workstream: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite`
 2. Follow templates from `a-docs/templates/`
 3. Apply relevant patterns
-4. Validate: `make all`
+4. Validate: `make lint && make test-scripts && make all`
 5. Report: `make wb-files-changed`
 
 ## 📄 License

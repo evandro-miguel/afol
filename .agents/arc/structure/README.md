@@ -1,23 +1,23 @@
 # 📁 Project Structure - Complete Index
 
-**Generated:** 2026-02-27T15:00:37+00:00
+**Generated:** 2026-03-07T01:56:33+00:00
 **Last Update:** First run
 
 ## 📊 Overview
 
 | Metric | Value |
 |--------|-------|
-| **Total Files** | 205 |
-| **Total Lines** | 37,111 |
+| **Total Files** | 197 |
+| **Total Lines** | 36,761 |
 
 ## 📂 Documentation Sections
 
 | Section | Description | Files |
 |---------|-------------|-------|
-| [Backend](./backend.md) | Services, utilities, and business logic | 92 |
+| [Backend](./backend.md) | Services, utilities, and business logic | 77 |
 | [Types](./types.md) | Type definitions and interfaces | 1 |
-| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 47 |
-| [Data](./data.md) | Data files, constants, and configuration | 65 |
+| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 56 |
+| [Data](./data.md) | Data files, constants, and configuration | 63 |
 
 ## 🔄 Change Detection
 
@@ -30,7 +30,6 @@ This documentation uses **incremental updates**:
 
 ```
 agentic_start_folder/
-├── 📁 C:\Users\evand\.claude\plugins\marketplaces\claude-plugins-official/
 ```
 
 ---

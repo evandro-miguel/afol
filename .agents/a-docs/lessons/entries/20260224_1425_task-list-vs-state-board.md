@@ -24,14 +24,16 @@ During execution, the **State Board** (table) was used exclusively while the **T
 ### Example from task_03.md
 
 **Task List (what to execute):**
-```markdown
+`- [ ]` task item:
 - [ ] T-03 Refactor `agents-telemetry.py` hotspots (`calculate_heat_scores`, `generate_report`, `main`).
-```
 
 **State Board (status tracking):**
-```markdown
-| T-03 | - [ ] | pending | worker | Highest ROI area #2. |
-```
+State row fields:
+- Task: `T-03`
+- Checklist: `- [ ]` (for execution record)
+- State: `pending`
+- Owner: `worker`
+- Notes: `Highest ROI area #2.`
 
 ### Why Task List Matters
 
@@ -71,15 +73,16 @@ The **State Board** Notes column only said:
 
 Both sections must exist and be consistent:
 
-```markdown
-## Task List
+**Task List example**
 - [x] T-01 Specific actionable item with details.
 
-## State Board
-| Task | Checklist | State | Owner | Notes              |
-|------|----------:|-------|-------|--------------------|
-| T-01 | - [x]     | done  | worker | Details completed |
-```
+**State Board example**
+Task row:
+- Task: `T-01`
+- Checklist: `- [x]`
+- State: `done`
+- Owner: `worker`
+- Notes: `Details completed`
 
 **Inconsistency = Error** (Task List says `- [ ]` but State Board says `done`)
 

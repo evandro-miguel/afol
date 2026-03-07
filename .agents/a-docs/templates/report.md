@@ -5,10 +5,23 @@ theme: "<theme>"
 status: final
 created_at: "YYYY-MM-DDTHH:MM:SSZ"
 updated_at: "YYYY-MM-DDTHH:MM:SSZ"
+roadmap_feature: "<feature_id>"
+parent_spec: "<parent_spec_id>"
+child_spec: "<child_spec_id_or_empty>"
 related_tasks: ["<optional_task_id>"]
+links:
+  roadmap: "<roadmap_path>"
+  plan: "<plan_doc_id>"
+  task: "<task_doc_id>"
+  postmortem: "<postmortem_doc_id>"
 ---
 
 # Report: <theme>
+
+## Governance Context
+- Roadmap feature: `<feature_id>`
+- Parent spec: `<parent_spec_id>`
+- Child spec: `<child_spec_id_or_empty>`
 
 ## Summary
 - <high-level outcome>
@@ -31,6 +44,9 @@ related_tasks: ["<optional_task_id>"]
 
 ## Risks / Follow-ups
 - <open item>
+
+## Postmortem Link
+- Postmortem: `<postmortem_doc_id>`
 
 ## Lessons (if any)
 - <what to avoid next time>

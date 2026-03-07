@@ -26,12 +26,23 @@ import re
 import sys
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+
+from lib.agents_config import get_cfg_path, load_agents_config
 
 try:
     import yaml
 except ImportError:
     yaml = None
+
+ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
+SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
+FEATURE_ID_PATTERN = re.compile(CONFIG.get("workflow", {}).get("feature_id_pattern", r"^F-\d{2,3}$"))
+WORKFLOW_CFG = CONFIG.get("workflow", {})
+REQUIRE_BRAINSTORM_BEFORE_PLAN_FINAL = bool(WORKFLOW_CFG.get("require_brainstorm_before_plan_final", True))
+REQUIRE_EXPLORER_CHECK_BEFORE_PLAN_FINAL = bool(WORKFLOW_CFG.get("require_explorer_check_before_plan_final", True))
+REQUIRE_POSTMORTEM_BEFORE_REPORT_FINAL = bool(WORKFLOW_CFG.get("require_postmortem_before_report_final", True))
 
 # Task status markers
 MARKERS = {
@@ -93,13 +104,6 @@ def parse_iso_timestamp(value: str) -> datetime:
     if candidate.endswith("Z"):
         candidate = candidate[:-1] + "+00:00"
     return datetime.fromisoformat(candidate)
-
-
-def to_utc(dt: datetime) -> datetime:
-    """Normalize datetime into UTC for consistent comparisons."""
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
 
 
 def extract_evidence(content: str, file_path: Path) -> Dict[str, Any]:
@@ -189,7 +193,9 @@ def check_temporal_consistency(session_dir: Path) -> List[Dict[str, Any]]:
     - Consistent timestamps across linked documents
     """
     issues = []
-    now_utc = datetime.now(timezone.utc)
+    # Use wall-clock time for temporal validation. This keeps checks stable across
+    # host timezones while still catching clearly future-dated timestamps.
+    now_local = datetime.now()
 
     if yaml is None:
         return [{'type': 'config', 'severity': 'warning', 'description': 'PyYAML not available, skipping temporal checks'}]
@@ -243,14 +249,17 @@ def check_temporal_consistency(session_dir: Path) -> List[Dict[str, Any]]:
                         'document': doc_name,
                             'description': f'updated_at ({updated_at}) is before created_at ({created_at})',
                     })
-                if to_utc(created_dt) > now_utc + FUTURE_TOLERANCE:
+
+                # Compare in wall-clock form to avoid brittle timezone assumptions.
+                if created_dt.replace(tzinfo=None) > now_local + FUTURE_TOLERANCE:
                     issues.append({
                         'type': 'temporal_inconsistency',
                         'severity': 'error',
                         'document': doc_name,
                         'description': f'created_at ({created_at}) is in the future',
                     })
-                if to_utc(updated_dt) > now_utc + FUTURE_TOLERANCE:
+
+                if updated_dt.replace(tzinfo=None) > now_local + FUTURE_TOLERANCE:
                     issues.append({
                         'type': 'temporal_inconsistency',
                         'severity': 'error',
@@ -287,7 +296,7 @@ def check_temporal_consistency(session_dir: Path) -> List[Dict[str, Any]]:
 def load_frontmatter_docs(session_dir: Path) -> List[Dict[str, Any]]:
     """Load markdown docs with parsed frontmatter/body."""
     docs: List[Dict[str, Any]] = []
-    for doc_file in sorted(session_dir.glob("*.md")):
+    for doc_file in sorted(session_dir.rglob("*.md")):
         content = doc_file.read_text()
         if not content.startswith("---\n") or yaml is None:
             continue
@@ -311,6 +320,15 @@ def load_frontmatter_docs(session_dir: Path) -> List[Dict[str, Any]]:
     return docs
 
 
+def _docs_by_id(docs: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    indexed: Dict[str, Dict[str, Any]] = {}
+    for doc in docs:
+        doc_id = str(doc["fm"].get("id", "")).strip()
+        if doc_id:
+            indexed[doc_id] = doc
+    return indexed
+
+
 def check_plan_task_coherence(session_dir: Path) -> List[Dict[str, Any]]:
     """
     Validate coherence between the latest plan and linked task.
@@ -328,48 +346,244 @@ def check_plan_task_coherence(session_dir: Path) -> List[Dict[str, Any]]:
     if not plans:
         return issues
 
-    latest_plan = sorted(plans, key=lambda d: d["name"])[-1]
-    plan_id = latest_plan["fm"].get("id")
-    links = latest_plan["fm"].get("links", {})
-    if not isinstance(links, dict):
-        return issues
-
-    linked_task_id = links.get("task")
-    if not isinstance(linked_task_id, str) or not linked_task_id.strip():
-        return issues
-
     task_docs = {
         str(d["fm"].get("id", "")).strip(): d
         for d in docs
         if d["name"].find("_task_") != -1
     }
-    linked_task = task_docs.get(linked_task_id.strip())
-    if linked_task is None:
-        issues.append(
-            {
-                "type": "plan_task_coherence",
-                "severity": "error",
-                "description": f"Plan {plan_id} links.task='{linked_task_id}' but no task doc with this id exists",
-            }
-        )
+    for plan_doc in sorted(plans, key=lambda d: d["name"]):
+        plan_id = plan_doc["fm"].get("id")
+        links = plan_doc["fm"].get("links", {})
+        if not isinstance(links, dict):
+            continue
+        linked_task_id = links.get("task")
+        if not isinstance(linked_task_id, str) or not linked_task_id.strip():
+            continue
+
+        linked_task = task_docs.get(linked_task_id.strip())
+        if linked_task is None:
+            issues.append(
+                {
+                    "type": "plan_task_coherence",
+                    "severity": "error",
+                    "description": f"Plan {plan_id} links.task='{linked_task_id}' but no task doc with this id exists",
+                }
+            )
+            continue
+
+        task_fm = linked_task["fm"]
+        task_links = task_fm.get("links", {})
+        links_plan = task_links.get("plan") if isinstance(task_links, dict) else None
+        depends_on = task_fm.get("depends_on")
+        depends_values = depends_on if isinstance(depends_on, list) else []
+        if links_plan != plan_id and plan_id not in depends_values:
+            issues.append(
+                {
+                    "type": "plan_task_coherence",
+                    "severity": "error",
+                    "description": (
+                        f"Task {task_fm.get('id')} is linked from plan {plan_id} "
+                        "but does not reference it via links.plan or depends_on"
+                    ),
+                }
+            )
+
+    return issues
+
+
+def _roadmap_has_feature(feature_id: str) -> bool:
+    """Return True when the roadmap contains a feature section heading."""
+    if not ROADMAP_FILE.exists():
+        return False
+    pattern = re.compile(rf"^###\s+{re.escape(feature_id)}\b", re.MULTILINE)
+    return bool(pattern.search(ROADMAP_FILE.read_text()))
+
+
+def _spec_id_exists(spec_id: str) -> bool:
+    """Return True when a spec with the given frontmatter id exists."""
+    if yaml is None:
+        return False
+    for spec_file in SPECS_DIR.rglob("*.md"):
+        if spec_file.name in {"INDEX.md", "README.md"}:
+            continue
+        content = spec_file.read_text()
+        if not content.startswith("---\n"):
+            continue
+        parts = content.split("---", 2)
+        if len(parts) < 3:
+            continue
+        fm = yaml.safe_load(parts[1].strip()) or {}
+        if isinstance(fm, dict) and str(fm.get("id", "")).strip() == spec_id:
+            return True
+    return False
+
+
+def _fm_text(value: Any) -> str:
+    """Normalize optional frontmatter scalar values to comparable text."""
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def check_governance_coherence(session_dir: Path) -> List[Dict[str, Any]]:
+    """Validate roadmap/spec linkage for the latest workstream docs."""
+    issues: List[Dict[str, Any]] = []
+    if yaml is None:
         return issues
 
-    task_fm = linked_task["fm"]
-    task_links = task_fm.get("links", {})
-    links_plan = task_links.get("plan") if isinstance(task_links, dict) else None
-    depends_on = task_fm.get("depends_on")
-    depends_values = depends_on if isinstance(depends_on, list) else []
-    if links_plan != plan_id and plan_id not in depends_values:
-        issues.append(
-            {
-                "type": "plan_task_coherence",
+    docs = load_frontmatter_docs(session_dir)
+    plans = [d for d in docs if d["name"].find("_plan_") != -1]
+    if not plans:
+        return issues
+
+    docs_by_id = _docs_by_id(docs)
+
+    for plan_doc in sorted(plans, key=lambda d: d["name"]):
+        plan_fm = plan_doc["fm"]
+        plan_id = plan_fm.get("id")
+        feature_id = _fm_text(plan_fm.get("roadmap_feature", ""))
+        parent_spec = _fm_text(plan_fm.get("parent_spec", ""))
+        child_spec = _fm_text(plan_fm.get("child_spec", ""))
+
+        if not feature_id:
+            issues.append({
+                "type": "governance",
                 "severity": "error",
-                "description": (
-                    f"Task {task_fm.get('id')} is linked from latest plan {plan_id} "
-                    "but does not reference it via links.plan or depends_on"
-                ),
-            }
-        )
+                "description": f"Plan {plan_id} is missing roadmap_feature",
+            })
+        elif not FEATURE_ID_PATTERN.match(feature_id):
+            issues.append({
+                "type": "governance",
+                "severity": "error",
+                "description": f"Plan {plan_id} has invalid roadmap_feature '{feature_id}'",
+            })
+        elif not _roadmap_has_feature(feature_id):
+            issues.append({
+                "type": "governance",
+                "severity": "error",
+                "description": f"Plan {plan_id} references missing roadmap feature '{feature_id}'",
+            })
+
+        if not parent_spec:
+            issues.append({
+                "type": "governance",
+                "severity": "error",
+                "description": f"Plan {plan_id} is missing parent_spec",
+            })
+        elif not _spec_id_exists(parent_spec):
+            issues.append({
+                "type": "governance",
+                "severity": "error",
+                "description": f"Plan {plan_id} references missing parent_spec '{parent_spec}'",
+            })
+
+        if child_spec and not _spec_id_exists(child_spec):
+            issues.append({
+                "type": "governance",
+                "severity": "error",
+                "description": f"Plan {plan_id} references missing child_spec '{child_spec}'",
+            })
+
+        links = plan_fm.get("links", {})
+        if not isinstance(links, dict):
+            continue
+        for alias, link_key in (("task", "task"), ("brainstorm", "brainstorm"), ("research", "research"), ("explorer-check", "explorer_check")):
+            linked_id = _fm_text(links.get(link_key, ""))
+            if not linked_id:
+                continue
+            linked_doc = docs_by_id.get(linked_id)
+            if linked_doc is None:
+                issues.append({
+                    "type": "governance",
+                    "severity": "error",
+                    "description": f"Plan {plan_id} links.{link_key}='{linked_id}' but no such doc exists",
+                })
+                continue
+            linked_fm = linked_doc["fm"]
+            if _fm_text(linked_fm.get("roadmap_feature", "")) not in {"", feature_id}:
+                issues.append({
+                    "type": "governance",
+                    "severity": "error",
+                    "description": f"{alias.title()} {linked_id} must match plan roadmap_feature '{feature_id}'",
+                })
+            if _fm_text(linked_fm.get("parent_spec", "")) not in {"", parent_spec}:
+                issues.append({
+                    "type": "governance",
+                    "severity": "error",
+                    "description": f"{alias.title()} {linked_id} must match plan parent_spec '{parent_spec}'",
+                })
+
+    return issues
+
+
+def check_planning_intelligence_gates(session_dir: Path) -> List[Dict[str, Any]]:
+    """Validate brainstorm/explorer-check gates for finalized planning."""
+    issues: List[Dict[str, Any]] = []
+    if yaml is None:
+        return issues
+
+    docs = load_frontmatter_docs(session_dir)
+    docs_by_id = _docs_by_id(docs)
+    for plan_doc in [d for d in docs if "_plan_" in d["name"]]:
+        status = str(plan_doc["fm"].get("status", "")).strip().lower()
+        if status != "final":
+            continue
+        links = plan_doc["fm"].get("links", {})
+        if not isinstance(links, dict):
+            links = {}
+        plan_id = str(plan_doc["fm"].get("id", "")).strip()
+
+        if REQUIRE_BRAINSTORM_BEFORE_PLAN_FINAL:
+            brainstorm_id = _fm_text(links.get("brainstorm", ""))
+            if not brainstorm_id or brainstorm_id not in docs_by_id:
+                issues.append({
+                    "type": "planning_gate",
+                    "severity": "error",
+                    "description": f"Plan {plan_id} is final but has no linked brainstorm artifact",
+                })
+
+        if REQUIRE_EXPLORER_CHECK_BEFORE_PLAN_FINAL:
+            explorer_id = _fm_text(links.get("explorer_check", ""))
+            if not explorer_id or explorer_id not in docs_by_id:
+                issues.append({
+                    "type": "planning_gate",
+                    "severity": "error",
+                    "description": f"Plan {plan_id} is final but has no linked explorer-check artifact",
+                })
+
+    return issues
+
+
+def check_postmortem_closure(session_dir: Path) -> List[Dict[str, Any]]:
+    """Require a finalized postmortem when the report is final."""
+    issues: List[Dict[str, Any]] = []
+    if yaml is None or not REQUIRE_POSTMORTEM_BEFORE_REPORT_FINAL:
+        return issues
+
+    docs = load_frontmatter_docs(session_dir)
+    reports = [d for d in docs if "_report_" in d["name"]]
+    if not reports:
+        return issues
+
+    final_reports = [d for d in reports if str(d["fm"].get("status", "")).strip().lower() == "final"]
+    if not final_reports:
+        return issues
+
+    postmortems = [d for d in docs if "_postmortem_" in d["name"]]
+    if not postmortems:
+        issues.append({
+            "type": "postmortem_gate",
+            "severity": "error",
+            "description": "Final report exists but no postmortem document was found",
+        })
+        return issues
+
+    if not any(str(d["fm"].get("status", "")).strip().lower() == "final" for d in postmortems):
+        issues.append({
+            "type": "postmortem_gate",
+            "severity": "error",
+            "description": "Final report exists but no postmortem has status=final",
+        })
 
     return issues
 
@@ -511,6 +725,9 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
         'contradictions': [],
         'temporal_issues': [],
         'coherence_issues': [],
+        'governance_issues': [],
+        'planning_gate_issues': [],
+        'postmortem_issues': [],
         'final_doc_issues': [],
     }
 
@@ -621,6 +838,24 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
             if issue.get('severity') == 'error':
                 all_completed = False
 
+        governance_issues = check_governance_coherence(session_path)
+        results['governance_issues'] = governance_issues
+        for issue in governance_issues:
+            if issue.get('severity') == 'error':
+                all_completed = False
+
+        planning_gate_issues = check_planning_intelligence_gates(session_path)
+        results['planning_gate_issues'] = planning_gate_issues
+        for issue in planning_gate_issues:
+            if issue.get('severity') == 'error':
+                all_completed = False
+
+        postmortem_issues = check_postmortem_closure(session_path)
+        results['postmortem_issues'] = postmortem_issues
+        for issue in postmortem_issues:
+            if issue.get('severity') == 'error':
+                all_completed = False
+
         # Final documents must not have open checklist markers
         final_doc_issues = check_final_docs_for_open_checklists(session_path)
         results['final_doc_issues'] = final_doc_issues
@@ -699,6 +934,27 @@ def print_report(all_completed: bool, results: Dict) -> None:
         else:
             print("  ✓ Plan/task coherence checks passed")
 
+        if results.get('governance_issues'):
+            print(f"\n❌ Governance Issues: {len(results['governance_issues'])}")
+            for issue in results['governance_issues']:
+                print(f"  ⚠️  [{issue.get('severity', 'error').upper()}] {issue['description']}")
+        else:
+            print("  ✓ Roadmap/spec governance checks passed")
+
+        if results.get('planning_gate_issues'):
+            print(f"\n❌ Planning Gate Issues: {len(results['planning_gate_issues'])}")
+            for issue in results['planning_gate_issues']:
+                print(f"  ⚠️  [{issue.get('severity', 'error').upper()}] {issue['description']}")
+        else:
+            print("  ✓ Planning gate checks passed")
+
+        if results.get('postmortem_issues'):
+            print(f"\n❌ Postmortem Issues: {len(results['postmortem_issues'])}")
+            for issue in results['postmortem_issues']:
+                print(f"  ⚠️  [{issue.get('severity', 'error').upper()}] {issue['description']}")
+        else:
+            print("  ✓ Postmortem closure checks passed")
+
         # Final docs checklist issues
         if results.get('final_doc_issues'):
             print(f"\n❌ Final Doc Checklist Issues: {len(results['final_doc_issues'])}")
@@ -766,6 +1022,12 @@ def print_report(all_completed: bool, results: Dict) -> None:
                 print(f"  - {len(results['temporal_issues'])} temporal issue(s) found")
             if results.get('coherence_issues'):
                 print(f"  - {len(results['coherence_issues'])} plan/task coherence issue(s) found")
+            if results.get('governance_issues'):
+                print(f"  - {len(results['governance_issues'])} roadmap/spec governance issue(s) found")
+            if results.get('planning_gate_issues'):
+                print(f"  - {len(results['planning_gate_issues'])} planning gate issue(s) found")
+            if results.get('postmortem_issues'):
+                print(f"  - {len(results['postmortem_issues'])} postmortem issue(s) found")
             if results.get('final_doc_issues'):
                 print(f"  - {len(results['final_doc_issues'])} final-doc checklist issue(s) found")
         else:

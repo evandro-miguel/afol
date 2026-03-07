@@ -6,7 +6,7 @@
 # Usage:
 #   .agents/agents <script> [args...]
 #   .agents/agents doctor [args...]
-#   .agents/agents new <theme> [options]
+#   .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> [options]
 #
 
 set -e
@@ -18,6 +18,15 @@ else
     SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
 fi
 ORIGINAL_PWD="$(pwd)"
+
+if [ -x "${SCRIPTS_DIR}/.venv/bin/python3" ]; then
+    PYTHON_BIN="${SCRIPTS_DIR}/.venv/bin/python3"
+elif [ -x "${SCRIPTS_DIR}/.venv/bin/python" ]; then
+    PYTHON_BIN="${SCRIPTS_DIR}/.venv/bin/python"
+else
+    PYTHON_BIN="python3"
+fi
+
 TELEMETRY_SCRIPT="${SCRIPTS_DIR}/agents-telemetry.py"
 ACTIVE_SESSION_FILE="${AGENTS_ACTIVE_SESSION_FILE:-${SCRIPT_DIR}/wb/.active_session}"
 
@@ -25,6 +34,7 @@ ACTIVE_SESSION_FILE="${AGENTS_ACTIVE_SESSION_FILE:-${SCRIPT_DIR}/wb/.active_sess
 record_tool_telemetry() {
     local tool_name="$1"
     local outcome="${2:-success}"
+    local exit_code="${3:-0}"
     local session_id=""
 
     if [ -f "${ACTIVE_SESSION_FILE}" ]; then
@@ -32,11 +42,29 @@ record_tool_telemetry() {
     fi
 
     if [ -n "${session_id}" ] && [ -f "${TELEMETRY_SCRIPT}" ]; then
-        python3 "${TELEMETRY_SCRIPT}" record tool_exec \
+        "${PYTHON_BIN}" "${TELEMETRY_SCRIPT}" record tool_exec \
             --session-id="${session_id}" \
-            --metadata="{\"tool_name\":\"${tool_name}\",\"outcome\":\"${outcome}\"}" \
+            --metadata="{\"tool_name\":\"${tool_name}\",\"outcome\":\"${outcome}\",\"exit_code\":${exit_code}}" \
             >/dev/null 2>&1 || true
     fi
+}
+
+run_and_record() {
+    local tool_name="$1"
+    shift
+
+    set +e
+    "$@"
+    local exit_code=$?
+    set -e
+
+    if [ "${exit_code}" -eq 0 ]; then
+        record_tool_telemetry "${tool_name}" "success" "${exit_code}"
+    else
+        record_tool_telemetry "${tool_name}" "failure" "${exit_code}"
+    fi
+
+    return "${exit_code}"
 }
 
 # Check if uv is installed
@@ -63,6 +91,11 @@ declare -A COMMAND_MAP=(
     ["index"]="agents-index"
     ["lint-docs"]="agents-lint-docs"
     ["lint"]="agents-lint-docs"
+    ["status"]="agents-status"
+    ["implement"]="agents-implement"
+    ["review"]="agents-review"
+    ["revert"]="agents-revert"
+    ["session"]="agents-session"
     ["structure-map"]="agents-structure-map"
     ["map"]="agents-structure-map"
     ["sync"]="sync-agent-docs"
@@ -73,6 +106,7 @@ declare -A COMMAND_MAP=(
     ["tools"]="agents-tools"
     ["telemetry"]="agents-telemetry"
     ["patterns"]="agents-patterns"
+    ["knowledge"]="agents-knowledge"
     ["bootstrap"]="agents-bootstrap"
     ["skills-sync"]="agents-skills-sync"
     ["fix-symlinks"]="agents-fix-symlinks"
@@ -87,16 +121,22 @@ show_help() {
     echo
     echo "Commands:"
     echo "  doctor              Validate .agents structure and integrity"
-    echo "  new <theme>         Create new workstream with plan/task/log"
+    echo "  new <theme>         Create new workstream linked to roadmap/spec governance"
     echo "  index               Update SPECS/ADRS indexes"
     echo "  lint-docs           Validate markdown docs consistency"
     echo "  structure-map       Generate project structure documentation"
-    echo "  sync                Sync AGENTS.md to QWEN/CLAUDE/GEMINI.md"
+    echo "  sync                Sync AGENTS.md to OPENCODE/QWEN/CLAUDE/GEMINI.md"
     echo "  verify-tasks        Check if all tasks are completed"
+    echo "  status              Show workstream status summary and key artifact pointers"
+    echo "  implement           Execute governed task transitions (next/start/complete)"
+    echo "  review              Review governed execution state and constraints"
+    echo "  revert              Revert a logical unit (task/phase/pack/session) coherently"
+    echo "  session             Catch up or close a governed session"
     echo "  wb-update           Update WB metadata (touch/evidence/task/status/link/timeline/files-changed)"
     echo "  tools               Discover and explore available tools"
     echo "  telemetry           Query/report telemetry and heat scoring"
     echo "  patterns            Discover and apply reusable patterns"
+    echo "  knowledge           Search and pull reusable workbench knowledge"
     echo "  bootstrap           Install .agents system in another repository"
     echo "  skills-sync         Sync project skills from universal-skills"
     echo "  fix-symlinks        Repair symlinks with copy fallback"
@@ -104,9 +144,15 @@ show_help() {
     echo
     echo "Examples:"
     echo "  .agents/agents doctor"
-    echo "  .agents/agents new auth-refactor --spec"
+    echo "  .agents/agents new auth-refactor --feature-id F-01 --parent-spec my-parent-spec --spec"
     echo "  .agents/agents structure-map . --output .agents/arc/structure/"
     echo "  .agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/"
+    echo "  .agents/agents status --session 260223_1200_auth-refactor"
+    echo "  .agents/agents implement next --session 260306_2128_context-driven-execution-commands"
+    echo "  .agents/agents review --session 260306_2128_context-driven-execution-commands"
+    echo "  .agents/agents revert task --session 260306_2128_context-driven-execution-commands --task-id T-04 --to-state pending --confirm"
+    echo "  .agents/agents session catchup --session 260306_2128_context-driven-execution-commands"
+    echo "  .agents/agents session close --session 260306_2128_context-driven-execution-commands --next-session 260306_2240_session-close-command"
     echo "  .agents/agents wb-update touch"
     echo "  .agents/agents wb-update evidence T-01 --session <id> --command \"make test-scripts\" --result \"passed\""
     echo "  .agents/agents wb-update task T-01 --session <id> --mark-done --evidence-id E-YYYY..."
@@ -115,6 +161,7 @@ show_help() {
     echo "  .agents/agents tools search validate"
     echo "  .agents/agents telemetry heat --period weekly"
     echo "  .agents/agents patterns suggest --theme auth"
+    echo "  .agents/agents knowledge pull runtime"
     echo "  .agents/agents bootstrap /path/to/target-repo --dry-run"
     echo "  .agents/agents skills-sync status"
     echo "  .agents/agents fix-symlinks --dry-run"
@@ -144,16 +191,24 @@ if [ -n "${SCRIPT_NAME}" ]; then
     # Command found in map
     if [ -f "${SCRIPTS_DIR}/${SCRIPT_NAME}.py" ]; then
         cd "${ORIGINAL_PWD}"
-        uv run --with "pyyaml" "${SCRIPTS_DIR}/${SCRIPT_NAME}.py" "$@"
-        record_tool_telemetry "${COMMAND}" "success"
+        run_and_record "${COMMAND}" uv run --with "pyyaml" "${SCRIPTS_DIR}/${SCRIPT_NAME}.py" "$@"
+        exit_code=$?
+        if [ "${exit_code}" -ne 0 ]; then
+            exit "${exit_code}"
+        fi
     else
+        record_tool_telemetry "${COMMAND}" "failure" "127"
         echo "❌ Script not found: ${SCRIPT_NAME}.py"
         exit 1
     fi
 elif [ -f "${SCRIPTS_DIR}/${COMMAND}.py" ]; then
     # Try to run as script name directly (fallback for unknown commands)
     cd "${ORIGINAL_PWD}"
-    uv run --directory "${SCRIPTS_DIR}" "${COMMAND}.py" "$@"
+    run_and_record "${COMMAND}" uv run --directory "${SCRIPTS_DIR}" "${COMMAND}.py" "$@"
+    exit_code=$?
+    if [ "${exit_code}" -ne 0 ]; then
+        exit "${exit_code}"
+    fi
 else
     echo "❌ Unknown command: ${COMMAND}"
     echo

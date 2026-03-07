@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -71,6 +73,37 @@ class AgentsTelemetryTests(unittest.TestCase):
             self.assertEqual(len(saved), 1)
             self.assertEqual(saved[0]["context"], {"via": "flag"})
             self.assertNotIn("context", saved[0]["metadata"])
+
+    def test_wrapper_records_failed_tool_exec_with_exit_code(self):
+        wrapper_path = Path(".agents/agents").resolve()
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            events_file = root / "events.jsonl"
+            active_session_file = root / ".active_session"
+            active_session_file.write_text("test-session\n")
+
+            env = os.environ.copy()
+            env["AGENTS_ACTIVE_SESSION_FILE"] = str(active_session_file)
+            env["AGENTS_TELEMETRY_EVENTS_FILE"] = str(events_file)
+
+            result = subprocess.run(
+                [str(wrapper_path), "doctor", "--definitely-invalid-flag"],
+                cwd=wrapper_path.parent.parent,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            saved = [json.loads(line) for line in events_file.read_text().splitlines() if line.strip()]
+            self.assertGreaterEqual(len(saved), 1)
+            last_event = saved[-1]
+            self.assertEqual(last_event["event_type"], "tool_exec")
+            self.assertEqual(last_event["session_id"], "test-session")
+            self.assertEqual(last_event["metadata"]["tool_name"], "doctor")
+            self.assertEqual(last_event["metadata"]["outcome"], "failure")
+            self.assertGreater(last_event["metadata"]["exit_code"], 0)
 
 
 if __name__ == "__main__":

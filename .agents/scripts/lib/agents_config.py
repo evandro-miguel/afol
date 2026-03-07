@@ -23,12 +23,24 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "active_session_file": ".agents/wb/.active_session",
         "templates_dir": ".agents/a-docs/templates",
         "arc_dir": ".agents/arc",
+        "roadmap_file": ".agents/arc/GENERAL-ROADMAP.md",
         "specs_dir": ".agents/arc/SPECS",
         "decisions_dir": ".agents/arc/DECISIONS",
     },
     "time": {
         "default_offset": "+00:00",
         "wb_offset": "-03:00",
+    },
+    "workflow": {
+        "max_plan_lines_threshold": 500,
+        "governance_required": True,
+        "quick_mode_bypasses_governance": True,
+        "feature_id_pattern": r"^F-\d{2,3}$",
+        "require_brainstorm_before_plan_final": True,
+        "require_explorer_check_before_plan_final": True,
+        "require_postmortem_before_report_final": True,
+        "pack_dir_name": "packs",
+        "knowledge_lookup_required_before_major_plan": True,
     },
     "lint": {
         "excluded_path_prefixes": [
@@ -43,6 +55,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "required_folders": [
             "a-docs/templates",
             "a-docs/standards",
+            "a-docs/knowledge",
             "a-docs/lessons",
             "a-docs/arc",
             "a-docs/specs",
@@ -62,6 +75,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "log.md",
             "research.md",
             "brainstorm.md",
+            "explorer-check.md",
+            "postmortem.md",
             "blocks.md",
             "spec.md",
             "spec-lite.md",
@@ -70,10 +85,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "roadmap.md",
         ],
     },
-    "sync": {
-        "source_file": "AGENTS.md",
-        "target_files": ["QWEN.md", "CLAUDE.md", "GEMINI.md"],
-    },
+        "sync": {
+            "source_file": "AGENTS.md",
+            "target_files": ["OPENCODE.md", "QWEN.md", "CLAUDE.md", "GEMINI.md"],
+        },
     "skills_sync": {
         "enabled": False,
         "upstream_repo_url": "",

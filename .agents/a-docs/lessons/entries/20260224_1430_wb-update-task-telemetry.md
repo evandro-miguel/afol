@@ -33,13 +33,11 @@ All task state changes were done via direct `edit` tool on markdown files, bypas
 
 ### When to Use Each
 
-| Use Case | Tool |
-|----------|------|
-| Mark task done/in_progress/pending | `wb-update task` |
-| Update task description | `edit` |
-| Add notes to State Board | `edit` |
-| Change acceptance criteria | `edit` |
-| Record completion with telemetry | `wb-update task` |
+- Mark task done / in_progress / pending: `wb-update task`
+- Update task description: `edit`
+- Add notes to State Board: `edit`
+- Change acceptance criteria: `edit`
+- Record completion with telemetry: `wb-update task`
 
 ## Guardrail
 

@@ -6,10 +6,14 @@ status: draft
 owners: ["orchestrator"]
 created_at: "YYYY-MM-DDTHH:MM:SSZ"
 updated_at: "YYYY-MM-DDTHH:MM:SSZ"
+roadmap_feature: "<feature_id>"
+spec_role: "<spec_role>" # parent|child|workstream
+parent_spec: "<parent_spec_id_or_empty>"
 links:
-  plan: "YYMMDD_HHMM_<theme>_plan_01"
-  tasks: "YYMMDD_HHMM_<theme>_task_01"
-  report: ""
+  roadmap: "<roadmap_path>"
+  plan: "<plan_doc_id>"
+  task: "<task_doc_id>"
+  report: "<report_doc_id_or_empty>"
 scope:
   repo_areas: ["<area>"]
   packages: ["<package_or_service>"]
@@ -18,155 +22,94 @@ risk_level: low # low|medium|high
 
 # SPEC: <theme>
 
-## 1) Objective
-- <one sentence outcome>
+## 1) Feature Intent
+- Outcome: <what changes for the user or system>
+- Why now: <why this feature matters now>
+- Roadmap feature: `<feature_id>`
+- Role of this spec: <parent, child, or workstream refinement>
 
 ## 2) Problem
-- <what is broken or missing>
-- <why it matters>
+- <what is missing or unclear today>
+- <why the current state is insufficient>
 
-## 3) Non-goals
-- <explicitly out of scope>
-- <not doing X>
+## 3) Users and User Journey
+Primary users:
+- <user type>
 
-## 4) Scope
+User journey:
+1. <starting point>
+2. <interaction or decision>
+3. <expected outcome>
+
+Failure or friction points:
+- <problem> -> <expected handling>
+
+## 4) Experience and Behavior
+- Expected behavior:
+  - <behavior>
+  - <behavior>
+- Boundaries:
+  - <what should not happen>
+  - <what remains out of scope>
+
+## 5) Scope
 In scope:
+- <item>
 - <item>
 
 Out of scope:
 - <item>
+- <item>
 
-## 5) Users and Use Cases
-Primary user:
-- <who>
+## 6) Child Spec Strategy
+- Child specs required: <yes/no>
+- Decomposition rule:
+  - <when this spec must split into child specs>
+- Planned child specs:
+  - <child spec + purpose>
 
-Use cases:
-- UC-01 <use case>
-- UC-02 <use case>
+## 7) Constraints and Assumptions
+- Assumptions:
+  - <assumption>
+- Constraints:
+  - Compatibility: <constraint>
+  - Operational: <constraint>
+  - Security/privacy: <constraint>
 
-## 6) Assumptions
-- <assumption>
-- <assumption>
+## 8) Acceptance
+- Success looks like:
+  - <acceptance statement>
+  - <acceptance statement>
+- Review questions:
+  - Does this spec explain the feature without code?
+  - Can an executor understand the user journey from this document alone?
 
-## 7) Constraints
-- Compatibility: <versions, runtime>
-- Repo constraints: <monorepo, worktrees, etc>
-- Security: <no secrets, sandbox, etc>
-
-## 8) Proposed Solution
-Summary:
-- <what we will build>
-
-Key design choices:
-- <choice> -> <reason>
-
-## 9) Architecture Impact
-Touched layers:
-- <layer>
-- <layer>
-
-New components:
-- <component> at <path>
-
-Dependency rules:
-- Allowed deps: <A -> B>
-- Forbidden deps: <A -X-> B>
-
-## 10) Interfaces
-APIs:
-- Endpoint: <name> | Input | Output | Errors
-
-CLI or scripts:
-- Command: <cmd> | Effect | Safety
-
-Events or jobs:
-- Event: <name> | Producer | Consumer
-
-## 11) Data Model
-Entities:
-- <entity> fields: <fields>
-
-Storage:
-- Table/Collection: <name> key: <key>
-
-Migrations:
-- <yes/no> + outline
-
-## 12) Flow
-Happy path:
-1. <step>
-2. <step>
-
-Error paths:
-- E-01 <error> -> <handling>
-- E-02 <error> -> <handling>
-
-## 13) Error Handling
-- Error taxonomy: <types>
-- Retries: <policy>
-- User messages: <rules>
-
-## 14) Security and Privacy
-- Secrets handling: <where stored, never logged>
-- Permissions: <who can do what>
-- Threats: <top risks> -> <mitigation>
-
-## 15) Performance
-Budgets:
-- Latency: <target>
-- Memory: <target>
-- IO: <target>
-
-Hot paths:
-- <path> -> <optimization approach>
-
-## 16) Observability
-Logs:
-- What to log: <events>
-- Never log: <secrets, PII>
-
-Metrics:
-- <metric> -> <why>
-
-Tracing:
-- <optional>
-
-## 17) Rollout Plan
-- Feature flag: <yes/no>
-- Steps:
-  1. <step>
-  2. <step>
-
-Backout:
-- <how to revert safely>
-
-## 18) Verification Plan
-Commands:
-- Lint: `<command or N/A>`
-- Typecheck: `<command or N/A>`
-- Unit: `<command or N/A>`
-- E2E: `<command or N/A>`
-
-Test cases:
-- TC-01 <test>
-- TC-02 <test>
-
-Evidence required:
-- Output snippet or CI link recorded in report
-
-## 19) Risks and Mitigations
+## 9) Risks and Tradeoffs
 - Risk: <risk> -> Mitigation: <mitigation>
+- Tradeoff: <tradeoff> -> Why accepted: <reason>
 
-## 20) Open Questions
-- Q-01 <question>
-- Q-02 <question>
+## 10) Rollout and Lifecycle
+- Rollout approach:
+  - <how this enters delivery>
+- Workstream linkage:
+  - Execution must reference `roadmap_feature` and `parent_spec`
+- Backout or deferral:
+  - <how scope can be safely reduced or deferred>
 
-## 21) Acceptance Checklist
+## 11) Verification Philosophy
+- Evidence expected from delivery:
+  - <kind of proof>
+  - <kind of proof>
+- Open questions:
+  - Q-01 <question>
+  - Q-02 <question>
+
+## 12) Acceptance Checklist
+- [ ] User journey is explicit
 - [ ] Scope and non-goals are explicit
-- [ ] Dependency rules defined
-- [ ] Verification commands defined
-- [ ] Rollout and backout defined
-- [ ] Observability included
+- [ ] Child-spec policy is defined
+- [ ] Constraints and risks are explicit
+- [ ] Feature intent is understandable without implementation detail
 
 ---
 *Template: `.agents/a-docs/templates/spec.md`*

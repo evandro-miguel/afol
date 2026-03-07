@@ -10,49 +10,84 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 # GENERAL ROADMAP
 
 ## 1) North Star
-- <long term direction>
+- <long-term product direction>
+- <why this repository exists>
+- <what success looks like for users and maintainers>
 
-## 2) Current Phase
-- Phase: <name>
-- Goal: <goal>
+## 2) Mandatory Operating Model
+- Every meaningful feature must exist in this roadmap before implementation starts.
+- Every roadmap feature must link to one parent spec.
+- Large features must declare child specs before execution starts.
+- Workstreams must reference the roadmap feature and governing spec context.
+- Specs define philosophy, expected behavior, user journey, constraints, and acceptance.
+- Execution artifacts define delivery, verification, and outcomes.
+
+## 3) Current Phase
+- Phase: <current phase>
+- Goal: <phase goal>
 - Definition of done:
-  - <done>
+  - <done condition>
 
-## 3) Milestones
-M-001:
-- What: <deliverable>
-- Why: <impact>
+## 4) Feature Portfolio
+
+### F-01 <feature title>
+- Status: planned
+- Why: <why this feature matters>
+- Governing spec: `.agents/arc/SPECS/<parent-spec-file>.md`
+- Child spec policy:
+  - Required: <yes/no>
+  - Child specs:
+    - <child-spec-id-or-file>
 - Exit criteria:
-  - <criteria>
+  - <criterion>
+  - <criterion>
+- Delivery tasks:
+  - [ ] Define or update the parent spec
+  - [ ] Create child specs if the feature is large
+  - [ ] Implement through linked workstreams
 
-M-002:
-- What:
-- Why:
+### F-02 <feature title>
+- Status: planned
+- Why: <why this feature matters>
+- Governing spec: `.agents/arc/SPECS/<parent-spec-file>.md`
+- Child spec policy:
+  - Required: <yes/no>
+  - Child specs:
+    - <child-spec-id-or-file>
 - Exit criteria:
+  - <criterion>
+- Delivery tasks:
+  - [ ] <task>
 
-## 4) Backlog Rules
-- Every item must link to a SPEC or SPEC LITE
-- No work without verification plan
-- Prefer small milestones
+## 5) Backlog Rules
+- No non-trivial implementation without a roadmap feature.
+- No roadmap feature without a governing parent spec.
+- No large feature without child-spec decomposition.
+- Prefer updating existing features/specs over creating duplicate records.
+- Close roadmap tasks only when linked work and verification are complete.
 
-## 5) Prioritization
+## 6) Prioritization
 Score inputs:
-- Impact
+- User impact
+- Strategic leverage
 - Risk reduction
-- Effort
 - Dependencies
+- Effort
 
 Tie-breaker:
-- Prefer items that unblock others
+- Prefer features that unblock other roadmap items.
 
-## 6) Risks
+## 7) Risks
+- <risk> -> <mitigation>
 - <risk> -> <mitigation>
 
-## 7) Operating cadence
+## 8) Operating Cadence
 - Weekly review:
-  - Roadmap deltas
-  - Tech debt
-  - Reliability
+  - roadmap status changes
+  - new features added or removed
+  - parent specs created or updated
+  - child specs needed before next execution
+  - blocked features and follow-ups
 
 ---
 *Template: `.agents/a-docs/templates/roadmap.md`*

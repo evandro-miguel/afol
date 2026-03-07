@@ -17,9 +17,11 @@ SOURCE_AGENTS_DIR = ROOT_DIR / ".agents"
 
 MANDATORY_FILES_TO_COPY = [
     Path("AGENTS.md"),
+    Path("OPENCODE.md"),
     Path("QWEN.md"),
     Path("CLAUDE.md"),
     Path("GEMINI.md"),
+    Path("opencode.json"),
     Path(".agents/agents"),
     Path(".agents/agents.config"),
     Path(".agents/tools.json"),
@@ -30,6 +32,8 @@ MANDATORY_FILES_TO_COPY = [
 ]
 
 OPTIONAL_FILES_TO_COPY = [
+    Path(".opencode/README.md"),
+    Path(".opencode/agent/README.md"),
     Path(".claude/README.md"),
     Path(".claude/rules/README.md"),
     Path(".qwen/README.md"),
@@ -40,8 +44,10 @@ OPTIONAL_FILES_TO_COPY = [
 MANDATORY_DIRS_TO_COPY = [
     Path(".agents/scripts"),
     Path(".agents/a-docs"),
+    Path(".agents/arc/SPECS"),
     Path(".agents/rules"),
     Path(".agents/skills"),
+    Path(".agents/templates"),
     Path(".agents/data/telemetry/schemas"),
 ]
 
@@ -49,10 +55,13 @@ ENSURE_DIRS = [
     Path(".agents/arc"),
     Path(".agents/arc/SPECS"),
     Path(".agents/arc/DECISIONS"),
+    Path(".agents/tmp"),
     Path(".agents/wb"),
     Path(".agents/skills"),
     Path(".agents/z-arq"),
     Path(".agents/data/telemetry"),
+    Path(".opencode"),
+    Path(".opencode/agent"),
     Path(".claude"),
     Path(".claude/rules"),
     Path(".qwen"),
@@ -237,11 +246,13 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
             "## Mandatory Adaptations",
             "",
             "1. Fill placeholders in `AGENTS.md` for project goal, stack, and structure.",
-            "2. Update `.agents/agents.config` timezone/path settings if needed.",
-            "3. Define real verification commands in repo docs (`install/dev/lint/typecheck/test/build`).",
-            "4. Confirm mirror docs (`QWEN.md`/`CLAUDE.md`/`GEMINI.md`) and agent folders (`.claude/.qwen/.codex/.gemini`) are present.",
-            "5. Run `make doctor`, `make tools-check`, and `make all`.",
-            "6. Create first workstream with `make new THEME=<theme>`.",
+            "2. Confirm `.agents/arc/GENERAL-ROADMAP.md` contains the real feature backlog for the target project.",
+            "3. Create or adapt the governing parent spec in `.agents/arc/SPECS/` before starting non-trivial implementation.",
+            "4. Update `.agents/agents.config` timezone/path settings if needed.",
+            "5. Define real verification commands in repo docs (`install/dev/lint/typecheck/test/build`).",
+            "6. Confirm mirror docs (`OPENCODE.md`/`QWEN.md`/`CLAUDE.md`/`GEMINI.md`) and runtime folders (`.opencode/.claude/.qwen/.codex/.gemini`) are present.",
+            "7. Run `make doctor`, `make lint`, `make test-scripts`, and `make all`.",
+            "8. Create the first workstream with `make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<spec-id>`.",
             "",
             "## Verification Evidence",
             "",
@@ -262,34 +273,39 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
 
 
 def run_post_checks(target: Path):
-    commands: List[Tuple[str, List[str]]] = [
+    commands: List[Tuple[str, List[str], bool]] = [
         (
             "sync-agent-docs",
             ["./.agents/agents", "sync", "--force"],
+            True,
         ),
         (
             "skills-sync",
             ["./.agents/agents", "skills-sync", "sync"],
+            False,
         ),
         (
             "fix-symlinks",
             ["./.agents/agents", "fix-symlinks", "--force"],
+            True,
         ),
         (
             "doctor",
             ["make", "-f", ".agents/a-docs/standards/Makefile", "doctor"],
+            True,
         ),
-        (
-            "tools-check",
-            ["make", "-f", ".agents/a-docs/standards/Makefile", "tools-check"],
-        ),
+        ("lint", ["make", "-f", ".agents/a-docs/standards/Makefile", "lint"], True),
+        ("test-scripts", ["make", "-f", ".agents/a-docs/standards/Makefile", "test-scripts"], True),
+        ("all", ["make", "-f", ".agents/a-docs/standards/Makefile", "all"], True),
     ]
 
-    for name, cmd in commands:
+    for name, cmd, required in commands:
         print(f"\n→ Running post-bootstrap check: {name}")
         result = subprocess.run(cmd, cwd=target)
         if result.returncode != 0:
-            raise RuntimeError(f"Post-bootstrap check failed: {name}")
+            if required:
+                raise RuntimeError(f"Post-bootstrap check failed: {name}")
+            print(f"⚠️  Optional post-bootstrap check failed: {name}")
 
 
 def validate_target(target: Path, dry_run: bool):

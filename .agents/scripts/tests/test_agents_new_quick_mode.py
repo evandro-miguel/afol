@@ -28,12 +28,16 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             "plan_only": False,
             "force_new": True,
             "quick_mode": False,
+            "feature_id": "F-01",
+            "parent_spec": "260306_roadmap-first-delivery-system_spec_01",
+            "child_spec": "",
         }
 
         with (
             mock.patch.object(agents_new, "_parse_args", return_value=args),
             mock.patch.object(agents_new, "get_active_session", return_value="260224_1030_scripts-lean-efficiency"),
             mock.patch.object(agents_new, "_handle_quick_mode", return_value=False),
+            mock.patch.object(agents_new, "_validate_governance_requirements"),
             mock.patch.object(agents_new, "_check_active_session_policy"),
             mock.patch.object(agents_new, "get_session_id", return_value="260224_1300_execution-integrity-hardening"),
             mock.patch.object(agents_new, "get_timestamp", return_value="2026-02-24T13:00:00-03:00"),
@@ -61,6 +65,49 @@ class AgentsNewQuickModeTests(unittest.TestCase):
 
         agents_new.record_session_start("sid", "theme", False)
         agents_new.suggest_patterns_for_theme("theme")
+
+    def test_validate_governance_requirements_normalizes_parent_and_child_specs(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_governance_test", script_path)
+
+        args = {
+            "quick_mode": False,
+            "feature_id": "F-07",
+            "parent_spec": "parent-raw",
+            "child_spec": "child-raw",
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            roadmap_file = Path(td) / "GENERAL-ROADMAP.md"
+            roadmap_file.write_text("### F-07 Governance Fixture\n")
+            with (
+                mock.patch.object(agents_new, "GOVERNANCE_REQUIRED", True),
+                mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True),
+                mock.patch.object(agents_new, "ROADMAP_FILE", roadmap_file),
+                mock.patch.object(agents_new, "_roadmap_has_feature", return_value=True),
+                mock.patch.object(agents_new, "_normalize_spec_reference", side_effect=["parent-spec", "child-spec"]),
+            ):
+                agents_new._validate_governance_requirements(args)
+
+        self.assertEqual(args["feature_id"], "F-07")
+        self.assertEqual(args["parent_spec"], "parent-spec")
+        self.assertEqual(args["child_spec"], "child-spec")
+
+    def test_validate_governance_requirements_skips_standard_checks_in_quick_mode(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_governance_quick_test", script_path)
+
+        args = {
+            "quick_mode": True,
+            "feature_id": "",
+            "parent_spec": "",
+            "child_spec": "",
+        }
+
+        with mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True):
+            agents_new._validate_governance_requirements(args)
 
     def test_add_quick_task_updates_task_and_log(self):
         script_path = Path(".agents/scripts/agents-new.py").resolve()
@@ -115,6 +162,29 @@ class AgentsNewQuickModeTests(unittest.TestCase):
                 "- 2026-02-23T12:34:56-03:00 - Added quick task T-02: quick-fix - pending",
                 log_content,
             )
+
+    def test_template_replacements_include_exploration_and_postmortem_docs(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_template_replacements_test", script_path)
+
+        replacements = agents_new._build_template_replacements(
+            "260306_2002_execution-intelligence-system",
+            {"feature_id": "F-07", "parent_spec": "parent", "child_spec": "", "pack": "api-cleanup"},
+        )
+
+        self.assertEqual(
+            replacements["<brainstorm_doc_id>"],
+            "260306_2002_execution-intelligence-system-api-cleanup_brainstorm_01",
+        )
+        self.assertEqual(
+            replacements["<explorer_check_doc_id>"],
+            "260306_2002_execution-intelligence-system-api-cleanup_explorer-check_01",
+        )
+        self.assertEqual(
+            replacements["<postmortem_doc_id>"],
+            "260306_2002_execution-intelligence-system-api-cleanup_postmortem_01",
+        )
 
 
 if __name__ == "__main__":

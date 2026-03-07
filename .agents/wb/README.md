@@ -20,6 +20,12 @@ Each session folder contains:
 - `*_report_*.md` - Final reports
 - `*_research_*.md` - Research documents
 - `*_brainstorm_*.md` - Ideation notes
+- `*_explorer-check_*.md` - Proof that the plan was checked against the current repo
+- `*_postmortem_*.md` - Final closure artifact required before report finalization
+
+Optional pack folders for multiple major tracks:
+
+- `packs/<pack-slug>/` - grouped plan/task/brainstorm/research/log/report/postmortem docs
 
 ## Active sessions
 

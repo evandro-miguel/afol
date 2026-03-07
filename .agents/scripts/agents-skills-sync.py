@@ -269,6 +269,14 @@ def cmd_check(args: argparse.Namespace):
         return
 
     required = bool(cfg("required"))
+    if not upstream_skills_root().exists():
+        msg = f"skills pool not initialized: {upstream_skills_root()}"
+        if required:
+            print(f"ERROR: {msg}")
+            raise RuntimeError(msg)
+        print(f"WARN: {msg}")
+        return
+
     problems = validate_project_structure()
     for p in problems:
         print(f"ERROR: {p}")
@@ -293,6 +301,9 @@ def cmd_check(args: argparse.Namespace):
 
     has_errors = bool(problems or missing_source or missing_project or drift)
     if has_errors:
+        if not required:
+            print("WARN: skills sync is not fully aligned, but it is optional in this repo")
+            return
         raise RuntimeError("skills-check failed")
 
     print("PASS: skills structure and sync are valid")

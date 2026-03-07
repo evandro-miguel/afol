@@ -1,42 +1,43 @@
 # Specifications
 
-This folder contains all specifications for the project.
+This folder contains the strategic feature specifications for the project.
 
 ## Purpose
 
-Specifications define **what** the system should do, without prescribing **how**.
+Specifications define feature intent before execution starts.
+They explain what a feature means, why it exists, who it serves, what journey it creates, and what acceptance looks like.
+They should not be code-heavy implementation documents.
 
-## Structure
+## Roadmap-First Rule
 
-```
-specs/
-├── <domain>/
-│   ├── README.md          # Overview of domain specs
-│   ├── functional.md      # Functional requirements
-│   ├── non-functional.md  # NFRs (performance, security, etc.)
-│   └── api.md             # API specifications
-└── README.md              # This file
-```
+- Every meaningful roadmap feature must link to one parent spec.
+- Large features must define child specs before implementation starts.
+- Workstreams execute approved feature intent; they do not replace the parent spec.
 
-## Spec types
+## Spec Types
 
-### Functional specifications
-- User stories
-- Use cases
-- Business rules
-- Data requirements
+### Parent Specs
+- One parent spec governs one roadmap feature.
+- It captures philosophy, scope, user journey, constraints, and acceptance.
 
-### Non-functional specifications
-- Performance requirements
-- Security requirements
-- Scalability requirements
-- Compliance requirements
+### Child Specs
+- Child specs decompose large parent features into bounded objectives.
+- They inherit the parent feature goal but narrow the delivery focus.
 
-### API specifications
-- Endpoints
-- Request/response schemas
-- Authentication
-- Rate limits
+### Workstream Specs
+- A local workstream `spec` or `spec-lite` can refine delivery context.
+- It never replaces the parent strategic spec in `.agents/arc/SPECS/`.
+
+## Required Content
+
+A useful parent spec should answer:
+
+- What problem does this feature solve?
+- Who is the user or operator?
+- What is the intended journey or behavioral outcome?
+- What is in scope and out of scope?
+- When are child specs required?
+- What counts as acceptance?
 
 ## Template
 
@@ -53,38 +54,34 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 # Specification: <title>
 
-## Overview
-- <brief description>
+## Feature Intent
+- <what changes>
 
-## Requirements
-- REQ-001: <requirement>
-- REQ-002: <requirement>
+## Users and User Journey
+- <who and what experience changes>
 
-## Acceptance Criteria
+## Scope
+- <in scope>
+- <out of scope>
+
+## Child Spec Strategy
+- <when decomposition is required>
+
+## Acceptance
 - [ ] <criterion>
-
-## Dependencies
-- <related specs or systems>
-
-## Change Log
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0.0 | YYYY-MM-DD | <author> | Initial |
 ```
 
-## Status workflow
+## Status Workflow
 
 ```
-draft → review → approved → deprecated
+draft -> active -> final -> deprecated
 ```
 
-## Linking to work
+## Linking to Work
 
-Plans should reference spec IDs:
-```markdown
-## Objective
-- Implement SPEC-AUTH-001: OAuth2 authentication
-```
+- Roadmap features must reference parent specs.
+- Workstream plans, tasks, logs, and reports must carry `roadmap_feature` and `parent_spec`.
+- Child specs should reference the parent spec in frontmatter.
 
 ---
 *Specifications folder: `.agents/a-docs/specs/`*

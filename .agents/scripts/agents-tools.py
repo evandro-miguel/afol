@@ -119,26 +119,26 @@ def list_tools(tools_data: Dict[str, Any], filter_type: Optional[str] = None) ->
     """List all available tools with descriptions."""
     tools = tools_data["tools"]
     available_types = {t["type"] for t in tools}
-    
+
     if filter_type:
         if filter_type not in available_types:
             print(f"❌ Unknown type: {filter_type}")
             print(f"Available types: {', '.join(sorted(available_types))}")
             return False
         tools = [t for t in tools if t["type"] == filter_type]
-    
+
     print("\n" + "=" * 70)
     print("  AGENTS TOOLS - Available Tools")
     print("=" * 70)
     print()
-    
+
     if not tools:
         print(f"No tools found for type: {filter_type}")
         return True
-    
+
     print(f"Total: {len(tools)} tool(s)")
     print()
-    
+
     # Group by type
     by_type: Dict[str, List[Dict]] = {}
     for tool in tools:
@@ -146,7 +146,7 @@ def list_tools(tools_data: Dict[str, Any], filter_type: Optional[str] = None) ->
         if t not in by_type:
             by_type[t] = []
         by_type[t].append(tool)
-    
+
     for tool_type, type_tools in sorted(by_type.items()):
         print(f"\n{format_type_badge(tool_type)}")
         print("-" * 50)
@@ -155,7 +155,7 @@ def list_tools(tools_data: Dict[str, Any], filter_type: Optional[str] = None) ->
             summary = f"{desc[:50]}..." if len(desc) > 50 else desc
             print(f"  {tool['id']:15} - {summary}")
         print()
-    
+
     print("-" * 70)
     print("Usage: .agents/agents tools info <tool-id>  # Get detailed info")
     print("       .agents/agents tools search <query>  # Search tools")
@@ -167,14 +167,14 @@ def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> bool:
     """Show detailed information about a specific tool."""
     tools = tools_data["tools"]
     tool = next((t for t in tools if t["id"] == tool_id), None)
-    
+
     if not tool:
         print(f"❌ Tool not found: {tool_id}")
         print("\nAvailable tools:")
         for t in tools:
             print(f"  - {t['id']}")
         return False
-    
+
     print("\n" + "=" * 70)
     print(f"  TOOL: {tool['name']}")
     print("=" * 70)
@@ -188,19 +188,19 @@ def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> bool:
     print("-" * 70)
     print(f"  {tool['description']}")
     print()
-    
+
     print("WHEN TO USE")
     print("-" * 70)
     for use in tool.get("when_to_use", []):
         print(f"  • {use}")
     print()
-    
+
     print("COMMANDS")
     print("-" * 70)
     print(f"  Wrapper:  {tool['wrapper_command']}")
     print(f"  Make:     {tool['make_command']}")
     print()
-    
+
     # Show subcommands if available
     if "commands" in tool:
         print("SUBCOMMANDS")
@@ -213,7 +213,7 @@ def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> bool:
             else:
                 print(f"  {str(cmd):15}")
         print()
-    
+
     # Show options if available
     if "options" in tool:
         print("OPTIONS")
@@ -221,7 +221,7 @@ def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> bool:
         for opt in tool["options"]:
             print(f"  {opt}")
         print()
-    
+
     # Show checks if available
     if "checks" in tool:
         print("CHECKS")
@@ -229,7 +229,7 @@ def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> bool:
         for check in tool["checks"]:
             print(f"  ✓ {check}")
         print()
-    
+
     # Show task markers if available
     if "task_markers" in tool:
         print("TASK MARKERS")
@@ -237,7 +237,7 @@ def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> bool:
         for marker, symbol in tool["task_markers"].items():
             print(f"  {marker:15} {symbol}")
         print()
-    
+
     print("=" * 70 + "\n")
     return True
 
@@ -246,25 +246,25 @@ def search_tools(tools_data: Dict[str, Any], query: str) -> None:
     """Search tools by query in multiple fields with normalized matching."""
     tools = tools_data["tools"]
     terms = expand_query_terms(query)
-    
+
     matches = []
     for tool in tools:
         score = 0
         matched_fields = []
-        
+
         # Search in description
         description = normalize_text(tool.get("description", ""))
         if any(term in description for term in terms):
             score += 3
             matched_fields.append("description")
-        
+
         # Search in when_to_use
         for use in tool.get("when_to_use", []):
             if any(term in normalize_text(use) for term in terms):
                 score += 2
                 matched_fields.append("when_to_use")
                 break
-        
+
         # Search in id and name
         if any(term in normalize_text(tool.get("id", "")) for term in terms):
             score += 5
@@ -294,33 +294,33 @@ def search_tools(tools_data: Dict[str, Any], query: str) -> None:
                 score += 2
                 matched_fields.append("commands")
                 break
-        
+
         if score > 0:
             matches.append((score, tool, sorted(set(matched_fields))))
-    
+
     # Sort by score
     matches.sort(key=lambda x: x[0], reverse=True)
-    
+
     print("\n" + "=" * 70)
     print(f"  SEARCH RESULTS: '{query}'")
     print("=" * 70)
     print()
-    
+
     if not matches:
         print("No tools found matching your query.")
         print("\nTry different keywords like:")
         print("  validate, create, document, verify, automate, sync")
         print()
         return
-    
+
     print(f"Found {len(matches)} tool(s):\n")
-    
+
     for score, tool, fields in matches:
         print(f"{format_type_badge(tool['type'])} {tool['id']}")
         print(f"  Match: {', '.join(fields)} (score: {score})")
         print(f"  {tool['description'][:60]}...")
         print()
-    
+
     print("-" * 70)
     print("Get detailed info: .agents/agents tools info <tool-id>")
     print("=" * 70 + "\n")
@@ -540,22 +540,22 @@ def validate_catalog(tools_data: Dict[str, Any]) -> int:
 def main() -> None:
     """Main entry point."""
     args = sys.argv[1:]
-    
+
     if not args:
         show_help()
         return
-    
+
     command = args[0]
-    
+
     try:
         tools_data = load_tools()
     except (FileNotFoundError, ValueError) as e:
         print(f"❌ Error: {e}")
         sys.exit(1)
-    
+
     if command == "help" or command in ["-h", "--help"]:
         show_help()
-    
+
     elif command == "list":
         filter_type = None
         if "--type" in args:
@@ -565,7 +565,7 @@ def main() -> None:
         ok = list_tools(tools_data, filter_type)
         if not ok:
             sys.exit(1)
-    
+
     elif command == "info":
         if len(args) < 2:
             print("❌ Error: tool-id required")
@@ -576,7 +576,7 @@ def main() -> None:
         ok = show_tool_info(tools_data, tool_id)
         if not ok:
             sys.exit(1)
-    
+
     elif command == "search":
         if len(args) < 2:
             print("❌ Error: search query required")
@@ -597,7 +597,7 @@ def main() -> None:
             sys.exit(1)
         result = subprocess.run([sys.executable, str(smoke_script)])
         sys.exit(result.returncode)
-    
+
     else:
         print(f"❌ Unknown command: {command}")
         print("\nRun '.agents/agents tools help' for usage")

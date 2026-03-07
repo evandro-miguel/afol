@@ -2,7 +2,7 @@
 doc_type: task
 id: 260224_1822_context-engineering-adoption_task_01
 theme: context-engineering-adoption
-status: canceled
+status: deprecated
 owners:
 - worker
 created_at: '2026-02-24T18:22:00-03:00'
@@ -24,8 +24,8 @@ links:
 Workstream discontinued - Context Engineering skills migration will not proceed.
 
 ## Acceptance Criteria
-- [x] Session properly closed with canceled status
-- [x] All tasks marked as canceled [-]
+- [x] Session properly closed with deprecated status
+- [x] All tasks archived after cancellation
 
 ---
 *Template: .agents/a-docs/templates/task.md*

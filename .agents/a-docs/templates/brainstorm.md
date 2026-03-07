@@ -3,6 +3,12 @@ doc_type: brainstorm
 id: "YYMMDD_HHMM_<theme>_brainstorm_01"
 theme: "<theme>"
 status: draft
+roadmap_feature: "<feature_id>"
+parent_spec: "<parent_spec_id>"
+child_spec: "<child_spec_id_or_empty>"
+links:
+  roadmap: "<roadmap_path>"
+  plan: "<plan_doc_id>"
 created_at: "YYYY-MM-DDTHH:MM:SSZ"
 updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 ---
@@ -11,6 +17,12 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 ## Problem Statement
 - <what needs to be solved>
+
+## Repo Context to Validate
+- Files/areas likely involved:
+  - <path>
+- Existing patterns or constraints to confirm:
+  - <constraint>
 
 ## Assumptions
 - <assumption 1>
@@ -35,6 +47,13 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 ## Decision Criteria
 - <criterion>
 - <criterion>
+
+## Planning Readiness
+- Ready for explorer-check: <yes/no>
+- Unknowns that must be verified against the current repo:
+  - <unknown>
+- Knowledge to reuse before planning:
+  - <existing doc/tool/search to check>
 
 ---
 *Template: `.agents/a-docs/templates/brainstorm.md`*

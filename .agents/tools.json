@@ -92,21 +92,23 @@
       "id": "new",
       "name": "Agents New",
       "tool": "agents-new.py",
-      "wrapper_command": ".agents/agents new <theme> [options]",
-      "make_command": "make new THEME=<theme> [SPEC=1|lite]",
+      "wrapper_command": ".agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> [options]",
+      "make_command": "make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<spec-id> [SPEC=1|lite] [CHILD_SPEC=<spec-id>]",
       "type": "creation",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
       "updated_at": "2026-02-23",
-      "description": "Creates new workstream com session folder e todos os required files (plan, task, log, etc.) using templates padronizados.",
+      "description": "Creates a new governed workstream linked to a roadmap feature and parent spec, then initializes plan/task/log/report templates.",
       "when_to_use": [
-        "Start new funcionalidade ou feature",
-        "Start refactoring de codigo",
-        "Investigate bug ou issue",
-        "Document decision de arquitetura (ADR)",
-        "Create specification tecnica"
+        "Start implementation for an approved roadmap feature",
+        "Create a new execution workstream under an existing parent spec",
+        "Refine one child objective of a larger feature",
+        "Investigate a bug inside an existing roadmap/spec context"
       ],
       "options": [
+        "--feature-id: Mandatory roadmap feature identifier (for example F-01)",
+        "--parent-spec: Mandatory parent spec id or file under .agents/arc/SPECS/",
+        "--child-spec: Optional child spec id or file for large features",
         "--spec: Includes file spec.md completo",
         "--spec-lite: Includes file spec-lite.md simplificado",
         "--plan-only: Creates only arquivo plan.md",
@@ -277,30 +279,31 @@
       "type": "synchronization",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
-      "updated_at": "2026-02-23",
-      "description": "Sincroniza documentacao de agentes (QWEN.md, CLAUDE.md, GEMINI.md) a partir do template AGENTS.md, preservando modificacoes locais quando detectadas.",
+      "updated_at": "2026-03-06",
+      "description": "Sync agent documentation (OPENCODE.md, QWEN.md, CLAUDE.md, GEMINI.md) from the canonical AGENTS.md source, preserving local modifications when detected.",
       "when_to_use": [
-        "Apos atualizar AGENTS.md com novas instrucoes",
-        "Manter consistencia entre agentes de IA",
-        "Propagar mudancas de padrao para todos os agentes",
-        "Before starting sessao com multiplos agentes"
+        "After updating AGENTS.md with new repository instructions",
+        "Keep primary runtime entrypoints aligned with canonical governance",
+        "Propagate standard instruction changes across supported runtimes",
+        "Before working with multiple agent runtimes in the same repo"
       ],
       "source": "AGENTS.md",
       "targets": [
+        "OPENCODE.md",
         "QWEN.md",
         "CLAUDE.md",
         "GEMINI.md"
       ],
       "behavior": [
-        "Detecta modificacoes locais nos arquivos alvo",
-        "Reporta diferencas encontradas",
-        "Pede confirmacao antes de sobrescrever",
-        "Preserva header especifico do agente"
+        "Detect local modifications in target files",
+        "Report differences against canonical content",
+        "Ask before overwriting when running interactively",
+        "Preserve the runtime-specific header wrapper"
       ],
       "options": [
-        "--force: Sobrescreve sem perguntar"
+        "--force: Overwrite without prompting"
       ],
-      "output": "Arquivos de agente atualizados ou relatorio de diferencas"
+      "output": "Updated runtime instruction files or a diff report"
     },
     {
       "id": "verify-tasks",
@@ -330,6 +333,60 @@
       "scans": "Arquivos *_task_*.md na session folder",
       "output": "Relatorio de status por tarefa (ID, descricao, status)",
       "exit_code": "0 se todas completas, 1 if has pendencias"
+    },
+    {
+      "id": "session",
+      "name": "Agents Session",
+      "tool": "agents-session.py",
+      "wrapper_command": ".agents/agents session <catchup|close> [options]",
+      "make_command": "N/A",
+      "type": "workflow",
+      "execution_mode": "on-demand",
+      "created_at": "2026-03-06",
+      "updated_at": "2026-03-06",
+      "description": "Summarizes resume/catchup state for a governed session and closes it only after strict verification passes.",
+      "when_to_use": [
+        "Before resuming a session after a gap or after repo changes accumulated",
+        "After all session tasks are done and the report/postmortem are final",
+        "Before handing off to a new workstream",
+        "To gate session closure on strict evidence and governance checks",
+        "To move the active-session pointer to the next session after closure"
+      ],
+      "commands": [
+        {
+          "name": "catchup",
+          "usage": "session catchup --session <session-id>",
+          "description": "Summarize working-tree drift, stale/missing artifacts, and the next safe action"
+        },
+        {
+          "name": "catchup",
+          "usage": "session catchup --json",
+          "description": "Emit machine-readable catchup output"
+        },
+        {
+          "name": "close",
+          "usage": "session close --session <session-id>",
+          "description": "Run strict verification and confirm the session can close"
+        },
+        {
+          "name": "close",
+          "usage": "session close --session <session-id> --next-session <session-id>",
+          "description": "Close the current session and repoint the active-session pointer"
+        },
+        {
+          "name": "close",
+          "usage": "session close --json",
+          "description": "Emit machine-readable closure output"
+        }
+      ],
+      "checks": [
+        "Reads plan/task/research/log/report artifact freshness",
+        "Summarizes git working-tree drift relative to the current session",
+        "Runs verify-tasks.py in strict mode",
+        "Requires the target session folder to exist",
+        "Refuses to repoint to the same session being closed"
+      ],
+      "output": "Catchup summary or closure summary, depending on subcommand"
     },
     {
       "id": "wb-update",
@@ -415,6 +472,7 @@
         "structure-map",
         "sync",
         "verify-tasks",
+        "session",
         "wb-update",
         "bootstrap",
         "skills-sync",
@@ -584,6 +642,51 @@
       "side_effect": "Apply records pattern usage in telemetry"
     },
     {
+      "id": "knowledge",
+      "name": "Agents Knowledge",
+      "tool": "agents-knowledge.py",
+      "wrapper_command": ".agents/agents knowledge <command> [args]",
+      "make_command": "make knowledge-index|knowledge-list|knowledge-search|knowledge-pull",
+      "type": "knowledge",
+      "execution_mode": "on-demand",
+      "created_at": "2026-03-06",
+      "updated_at": "2026-03-06",
+      "description": "Search and pull reusable workbench knowledge with low-token outputs across research, brainstorm, explorer-check, report, and postmortem docs.",
+      "when_to_use": [
+        "Before deep repo exploration to reuse prior findings",
+        "When looking for earlier research on a feature or bug",
+        "When generating or refreshing the reusable knowledge index"
+      ],
+      "commands": [
+        {
+          "name": "list",
+          "usage": "knowledge list [--type=research|brainstorm|explorer-check|postmortem|report] [--limit=<n>]",
+          "description": "List reusable knowledge docs"
+        },
+        {
+          "name": "search",
+          "usage": "knowledge search <query> [--limit=<n>]",
+          "description": "Search prior findings with concise summaries"
+        },
+        {
+          "name": "pull",
+          "usage": "knowledge pull <query> [--limit=<n>] [--snippets=<n>]",
+          "description": "Pull a compact digest with summaries and matching snippets"
+        },
+        {
+          "name": "show",
+          "usage": "knowledge show <doc-id-or-path>",
+          "description": "Show one knowledge document"
+        },
+        {
+          "name": "index",
+          "usage": "knowledge index",
+          "description": "Generate .agents/a-docs/knowledge/INDEX.md"
+        }
+      ],
+      "output": "Concise knowledge hits, compact reuse digests, or generated index"
+    },
+    {
       "id": "check-links",
       "name": "Check Links",
       "tool": "check-links.py",
@@ -618,6 +721,9 @@
     "quick": "Registers quick task rapida na sessao ativa",
     "structure": "Gera docs de estrutura do projeto",
     "index": "Updates indices SPECS/ADRS",
+    "knowledge-index": "Build reusable knowledge index",
+    "knowledge-list": "List knowledge artifacts",
+    "knowledge-search": "Search prior findings",
     "sync": "Sincroniza AGENTS.md para agentes",
     "verify": "Verifica conclusao de tarefas",
     "lint": "Valida docs markdown",
@@ -629,7 +735,7 @@
     "wb-status": "Seta status no frontmatter (STATUS required)",
     "wb-timeline": "Adiciona entrada timeline (MSG required)",
     "wb-link": "Seta links.frontmatter (FILE + KEY + VALUE required)",
-    "all": "Executa doctor + structure + index + verify + tools-check + test-scripts",
+    "all": "Run doctor + structure + index + knowledge-index + sync + lint + tools-check + telemetry-validate + test-scripts",
     "refresh": "Clean + setup + structure",
     "clean": "Remove .venv e caches",
     "bootstrap": "Install .agents system in another repository (TARGET required)",
@@ -712,11 +818,19 @@
       "usage_pattern": "During and after sessions to capture metrics"
     },
     "knowledge": {
-      "description": "Catalog of patterns and best practices",
+      "description": "Reusable patterns and prior workbench knowledge",
       "tools": [
-        "patterns"
+        "patterns",
+        "knowledge"
       ],
       "usage_pattern": "Before starting work to suggest approaches"
+    },
+    "workflow": {
+      "description": "Guided execution and closure actions over workstream state",
+      "tools": [
+        "session"
+      ],
+      "usage_pattern": "When moving a session through explicit operational checkpoints"
     }
   },
   "makefile_aliases": {
@@ -742,12 +856,14 @@
         "structure-map",
         "sync",
         "verify-tasks",
+        "session",
         "wb-update",
         "agents",
         "bootstrap",
         "skills-sync",
         "telemetry",
         "patterns",
+        "knowledge",
         "check-links"
       ]
     },

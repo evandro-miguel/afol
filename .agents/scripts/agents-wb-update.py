@@ -40,15 +40,21 @@ from lib.agents_config import (
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
+TELEMETRY_SCRIPT = Path(__file__).resolve().parent / "agents-telemetry.py"
 WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
 WB_TZ = parse_offset(WB_OFFSET)
 
 DOC_ALIAS_TO_GLOB = {
     "plan": "*_plan_*.md",
     "task": "*_task_*.md",
+    "spec": "*_spec_*.md",
     "spec-lite": "*_spec-lite_*.md",
+    "brainstorm": "*_brainstorm_*.md",
+    "research": "*_research_*.md",
+    "explorer-check": "*_explorer-check_*.md",
     "report": "*_report_*.md",
     "log": "*_log_*.md",
+    "postmortem": "*_postmortem_*.md",
 }
 
 TASK_ACTIONS = {
@@ -159,11 +165,11 @@ def write_frontmatter(path: Path, fm: dict, body: str):
 
 def doc_files(session_dir: Path, alias: str) -> List[Path]:
     if alias == "all":
-        return sorted(session_dir.glob("*.md"))
+        return sorted(session_dir.rglob("*.md"))
     pattern = DOC_ALIAS_TO_GLOB.get(alias)
     if not pattern:
         raise ValueError(f"Unknown doc alias: {alias}")
-    return sorted(session_dir.glob(pattern))
+    return sorted(session_dir.rglob(pattern))
 
 
 def latest_doc_file(session_dir: Path, alias: str) -> Path:
@@ -171,6 +177,67 @@ def latest_doc_file(session_dir: Path, alias: str) -> Path:
     if not files:
         raise FileNotFoundError(f"No {alias} file found in {session_dir}")
     return files[-1]
+
+
+def _report_status(session_dir: Path) -> str:
+    try:
+        report_file = latest_doc_file(session_dir, "report")
+    except FileNotFoundError:
+        return ""
+    parsed = split_frontmatter(report_file.read_text())
+    if not parsed:
+        return ""
+    fm, _ = parsed
+    return str(fm.get("status", "")).strip().lower()
+
+
+def maybe_record_session_end(session_dir: Path, source: str) -> None:
+    """Emit session_end once the session report is marked final."""
+    if _report_status(session_dir) != "final":
+        return
+    if not TELEMETRY_SCRIPT.exists():
+        return
+
+    metadata = {"source": source, "report_status": "final"}
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                str(TELEMETRY_SCRIPT),
+                "record",
+                "session_end",
+                "--session-id",
+                session_dir.name,
+                "--metadata",
+                json.dumps(metadata),
+            ],
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception:
+        pass
+
+
+def ensure_postmortem_ready_for_report_final(session_dir: Path) -> None:
+    """Require at least one finalized postmortem before final report closure."""
+    postmortems = doc_files(session_dir, "postmortem")
+    if not postmortems:
+        raise ValueError(
+            "Cannot finalize report without a postmortem. Create *_postmortem_*.md first."
+        )
+
+    for postmortem in postmortems:
+        parsed = split_frontmatter(postmortem.read_text())
+        if not parsed:
+            continue
+        fm, _ = parsed
+        if str(fm.get("status", "")).strip().lower() == "final":
+            return
+
+    raise ValueError(
+        "Cannot finalize report until at least one postmortem has status=final."
+    )
 
 
 def touch_file(path: Path, timestamp: str) -> bool:
@@ -475,8 +542,9 @@ def cmd_touch(args: argparse.Namespace):
         return
 
     session_dir = resolve_session(args.session)
-    files = sorted(session_dir.glob("*.md"))
+    files = sorted(session_dir.rglob("*.md"))
     count = touch_targets(files)
+    maybe_record_session_end(session_dir, "wb-update touch")
     print(f"✓ updated_at touched in {count} file(s) under {session_dir.relative_to(ROOT_DIR)}")
 
 
@@ -488,7 +556,7 @@ def cmd_normalize_time(args: argparse.Namespace):
         targets = sorted(WB_DIR.rglob("*.md"))
     else:
         session_dir = resolve_session(args.session)
-        targets = sorted(session_dir.glob("*.md"))
+        targets = sorted(session_dir.rglob("*.md"))
 
     changed = 0
     for path in targets:
@@ -519,8 +587,12 @@ def cmd_files_changed(args: argparse.Namespace):
 def cmd_status(args: argparse.Namespace):
     require_explicit_session(args, "status")
     session_dir = resolve_session(args.session)
+    if args.value.strip().lower() == "final" and args.file in {"report", "all"}:
+        ensure_postmortem_ready_for_report_final(session_dir)
     paths = doc_files(session_dir, args.file)
     count = set_status(paths, args.value)
+    if args.value.strip().lower() == "final" and args.file in {"report", "all"}:
+        maybe_record_session_end(session_dir, "wb-update status")
     print(f"✓ status='{args.value}' set in {count} file(s)")
 
 
@@ -644,7 +716,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_status = sub.add_parser("status", help="set frontmatter status in session docs")
     p_status.add_argument("--session", help="session id/path (required)")
-    p_status.add_argument("--file", choices=["plan", "task", "spec-lite", "report", "log", "all"], default="all")
+    p_status.add_argument(
+        "--file",
+        choices=["plan", "task", "spec", "spec-lite", "brainstorm", "research", "explorer-check", "report", "log", "postmortem", "all"],
+        default="all",
+    )
     p_status.add_argument("--value", required=True, help="new status value")
     p_status.set_defaults(func=cmd_status)
 
@@ -655,7 +731,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_link = sub.add_parser("link", help="set frontmatter links.<key> for a doc")
     p_link.add_argument("--session", help="session id/path (required)")
-    p_link.add_argument("--file", choices=["plan", "task", "spec-lite", "report", "log"], required=True)
+    p_link.add_argument(
+        "--file",
+        choices=["plan", "task", "spec", "spec-lite", "brainstorm", "research", "explorer-check", "report", "log", "postmortem"],
+        required=True,
+    )
     p_link.add_argument("--key", required=True, help="links key")
     p_link.add_argument("--value", required=True, help="links value")
     p_link.set_defaults(func=cmd_link)

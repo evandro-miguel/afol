@@ -14,6 +14,7 @@ Usage:
     python agents-doctor.py [--fix]
 """
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -33,6 +34,8 @@ AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 REQUIRED_FOLDERS = CONFIG.get("doctor", {}).get("required_folders", [])
 REQUIRED_TEMPLATES = CONFIG.get("doctor", {}).get("required_templates", [])
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
+ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
+SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 
 VALID_DOC_TYPES = [
@@ -42,6 +45,7 @@ VALID_DOC_TYPES = [
     "log",
     "research",
     "brainstorm",
+    "explorer-check",
     "blocks",
     "spec",
     "spec-lite",
@@ -56,6 +60,7 @@ VALID_DOC_TYPES = [
     "structure",
     "lessons",
     "retrospective",
+    "postmortem",
     "specs_readme",
 ]
 DOC_TYPES_PATTERN = "|".join(re.escape(t) for t in VALID_DOC_TYPES)
@@ -70,7 +75,7 @@ class Issue:
         self.severity = severity  # error, warning, info
         self.path = path
         self.message = message
-    
+
     def __str__(self):
         icon = {"error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(self.severity, "?")
         return f"{icon} [{self.severity.upper()}] {self.path}: {self.message}"
@@ -86,33 +91,35 @@ class AgentsDoctor:
             "docs_checked": 0,
             "frontmatter_checked": 0,
         }
-    
+
     def run(self) -> bool:
         """Run all checks and return True if all pass."""
         print("=" * 60)
         print("AGENTS DOCTOR - Structure Validation")
         print("=" * 60)
         print()
-        
+
         self.check_required_folders()
         self.check_templates()
         self.check_workbench_sessions()
         self.check_active_session_pointer()
         self.check_arc_docs()
-        
+        self.check_roadmap_governance()
+        self.check_primary_runtime_compatibility()
+
         self.print_report()
-        
+
         errors = [i for i in self.issues if i.severity == "error"]
         return len(errors) == 0
-    
+
     def check_required_folders(self):
         """Check if all required folders exist."""
         print("Checking required folders...")
-        
+
         for folder in REQUIRED_FOLDERS:
             self.stats["folders_checked"] += 1
             folder_path = AGENTS_DIR / folder
-            
+
             if not folder_path.exists():
                 self.issues.append(Issue(
                     "error",
@@ -127,19 +134,19 @@ class AgentsDoctor:
                 ))
             else:
                 print(f"  ✓ {folder}")
-        
+
         print()
-    
+
     def check_templates(self):
         """Check if all required templates exist."""
         print("Checking templates...")
-        
+
         templates_dir = AGENTS_DIR / "a-docs" / "templates"
-        
+
         for template in REQUIRED_TEMPLATES:
             self.stats["templates_checked"] += 1
             template_path = templates_dir / template
-            
+
             if not template_path.exists():
                 self.issues.append(Issue(
                     "error",
@@ -157,23 +164,23 @@ class AgentsDoctor:
                     ))
                 else:
                     print(f"  ✓ {template}")
-        
+
         print()
-    
+
     def check_workbench_sessions(self):
         """Check workbench sessions for valid structure."""
         print("Checking workbench sessions...")
-        
+
         wb_dir = AGENTS_DIR / "wb"
         if not wb_dir.exists():
             return
-        
+
         for session in wb_dir.iterdir():
             if not session.is_dir() or session.name.startswith("."):
                 continue
-            
+
             self.stats["docs_checked"] += 1
-            
+
             # Check session naming convention
             if not re.match(r'^\d{6}_\d{4}_[a-z0-9_-]+$', session.name):
                 self.issues.append(Issue(
@@ -183,14 +190,14 @@ class AgentsDoctor:
                 ))
             else:
                 print(f"  ✓ {session.name}")
-            
+
             # Check files in session
-            for md_file in session.glob("*.md"):
+            for md_file in session.rglob("*.md"):
                 self.validate_frontmatter(md_file)
                 self.validate_checkboxes(md_file)
-        
+
         print()
-    
+
     def check_active_session_pointer(self):
         """Validate active session pointer consistency."""
         print("Checking active session pointer...")
@@ -236,11 +243,11 @@ class AgentsDoctor:
     def check_arc_docs(self):
         """Check architecture docs."""
         print("Checking architecture docs...")
-        
+
         arc_dir = AGENTS_DIR / "arc"
         if not arc_dir.exists():
             return
-        
+
         # Check main arc files
         for arc_file in ["ARCHITECTURE.md", "GENERAL-ROADMAP.md", "README.md"]:
             file_path = arc_dir / arc_file
@@ -253,7 +260,7 @@ class AgentsDoctor:
                     str(file_path),
                     "Recommended architecture file missing"
                 ))
-        
+
         # Check SPECS index
         specs_index = arc_dir / "SPECS" / "INDEX.md"
         if specs_index.exists():
@@ -265,8 +272,200 @@ class AgentsDoctor:
         if decisions_index.exists():
             self.validate_frontmatter(decisions_index)
             print("  ✓ DECISIONS/INDEX.md")
-        
+
         print()
+
+    def check_roadmap_governance(self):
+        """Validate roadmap-first governance structure in the main roadmap."""
+        print("Checking roadmap governance...")
+
+        if not ROADMAP_FILE.exists():
+            self.issues.append(Issue(
+                "error",
+                str(ROADMAP_FILE),
+                "Main roadmap file missing"
+            ))
+            print()
+            return
+
+        content = ROADMAP_FILE.read_text()
+        feature_matches = list(re.finditer(r"^###\s+(F-\d{2,3})\b", content, re.MULTILINE))
+        if not feature_matches:
+            self.issues.append(Issue(
+                "warning",
+                str(ROADMAP_FILE),
+                "No roadmap feature sections found (expected headings like '### F-01 ...')"
+            ))
+            print()
+            return
+
+        for idx, match in enumerate(feature_matches):
+            feature_id = match.group(1)
+            section_start = match.start()
+            section_end = feature_matches[idx + 1].start() if idx + 1 < len(feature_matches) else len(content)
+            section = content[section_start:section_end]
+
+            governing_spec_match = re.search(r"^- Governing spec:\s+`?([^`\n]+)`?\s*$", section, re.MULTILINE)
+            if not governing_spec_match:
+                self.issues.append(Issue(
+                    "warning",
+                    str(ROADMAP_FILE),
+                    f"Roadmap feature {feature_id} is missing a 'Governing spec' line"
+                ))
+                continue
+
+            raw_ref = governing_spec_match.group(1).strip()
+            spec_path = (ROOT_DIR / raw_ref).resolve() if not Path(raw_ref).is_absolute() else Path(raw_ref)
+            if not spec_path.exists():
+                self.issues.append(Issue(
+                    "error",
+                    str(ROADMAP_FILE),
+                    f"Roadmap feature {feature_id} references missing governing spec: {raw_ref}"
+                ))
+                continue
+
+            try:
+                spec_path.relative_to(SPECS_DIR.resolve())
+            except ValueError:
+                self.issues.append(Issue(
+                    "warning",
+                    str(ROADMAP_FILE),
+                    f"Roadmap feature {feature_id} governing spec is outside {SPECS_DIR.relative_to(ROOT_DIR)}"
+                ))
+
+        print(f"  ✓ {len(feature_matches)} roadmap feature(s) found")
+        print()
+
+    def check_primary_runtime_compatibility(self):
+        """Validate committed primary-runtime adapters and boundaries."""
+        print("Checking primary runtime compatibility...")
+
+        runtime_docs = {
+            "OpenCode": ROOT_DIR / "OPENCODE.md",
+            "Qwen": ROOT_DIR / "QWEN.md",
+            "Codex": ROOT_DIR / "AGENTS.md",
+        }
+        for runtime_name, path in runtime_docs.items():
+            if not path.exists():
+                self.issues.append(Issue(
+                    "error",
+                    str(path),
+                    f"Primary runtime entrypoint missing for {runtime_name}"
+                ))
+            else:
+                print(f"  ✓ {runtime_name} entrypoint -> {path.name}")
+
+        runtime_dirs = {
+            "OpenCode": ROOT_DIR / ".opencode",
+            "Codex": ROOT_DIR / ".codex",
+            "Qwen": ROOT_DIR / ".qwen",
+        }
+        for runtime_name, path in runtime_dirs.items():
+            if not path.exists() or not path.is_dir():
+                self.issues.append(Issue(
+                    "error",
+                    str(path),
+                    f"Primary runtime folder missing for {runtime_name}"
+                ))
+                continue
+
+            print(f"  ✓ {runtime_name} folder -> {path.relative_to(ROOT_DIR)}")
+
+            readme_path = path / "README.md"
+            if not readme_path.exists():
+                self.issues.append(Issue(
+                    "warning",
+                    str(readme_path),
+                    f"Runtime README missing for {runtime_name}"
+                ))
+
+            skills_path = path / "skills"
+            if not skills_path.exists():
+                self.issues.append(Issue(
+                    "warning",
+                    str(skills_path),
+                    f"Runtime skills link missing for {runtime_name}"
+                ))
+            elif not skills_path.is_symlink():
+                self.issues.append(Issue(
+                    "warning",
+                    str(skills_path),
+                    f"Runtime skills path for {runtime_name} is not a symlink to .agents/skills"
+                ))
+
+        self._check_opencode_project_adapter()
+        print()
+
+    def _check_opencode_project_adapter(self):
+        """Validate committed OpenCode adapter shape and secret boundary."""
+        adapter_path = ROOT_DIR / "opencode.json"
+        if not adapter_path.exists():
+            self.issues.append(Issue(
+                "error",
+                str(adapter_path),
+                "OpenCode project adapter missing"
+            ))
+            return
+
+        try:
+            config = json.loads(adapter_path.read_text())
+        except json.JSONDecodeError as exc:
+            self.issues.append(Issue(
+                "error",
+                str(adapter_path),
+                f"Invalid JSON: {exc}"
+            ))
+            return
+
+        schema_value = config.get("$schema")
+        if schema_value != "https://opencode.ai/config.json":
+            self.issues.append(Issue(
+                "warning",
+                str(adapter_path),
+                "Expected OpenCode schema https://opencode.ai/config.json"
+            ))
+
+        instructions = config.get("instructions")
+        if not isinstance(instructions, list):
+            self.issues.append(Issue(
+                "error",
+                str(adapter_path),
+                "OpenCode adapter must define an instructions array"
+            ))
+        else:
+            required_refs = {"AGENTS.md", ".agents/arc/GENERAL-ROADMAP.md"}
+            missing_refs = sorted(required_refs - set(instructions))
+            if missing_refs:
+                self.issues.append(Issue(
+                    "error",
+                    str(adapter_path),
+                    f"OpenCode adapter is missing canonical references: {', '.join(missing_refs)}"
+                ))
+
+        permission = config.get("permission", {})
+        if not isinstance(permission, dict):
+            self.issues.append(Issue(
+                "error",
+                str(adapter_path),
+                "OpenCode adapter permission block must be a JSON object"
+            ))
+        else:
+            for key in ("edit", "bash", "webfetch"):
+                if permission.get(key) != "ask":
+                    self.issues.append(Issue(
+                        "warning",
+                        str(adapter_path),
+                        f"OpenCode permission '{key}' should default to 'ask'"
+                    ))
+
+        serialized = json.dumps(config).lower()
+        banned_tokens = ("token", "secret", "password", "api_key", "apikey", "bearer", "auth")
+        if any(token in serialized for token in banned_tokens):
+            self.issues.append(Issue(
+                "warning",
+                str(adapter_path),
+                "OpenCode adapter appears to contain credential-like fields; review secret boundary"
+            ))
 
     def _validate_frontmatter_fields(self, file_path: Path, fm: Dict):
         """Validate frontmatter field values."""
@@ -351,7 +550,7 @@ class AgentsDoctor:
                 str(file_path),
                 f"Invalid YAML frontmatter: {e}"
             ))
-    
+
     def validate_checkboxes(self, file_path: Path):
         """Validate checkbox markers in file."""
         content = file_path.read_text()
@@ -395,7 +594,7 @@ class AgentsDoctor:
                 str(file_path),
                 "Auto-fixed checkbox formatting issues (--fix)"
             ))
-    
+
     def print_report(self):
         """Print validation report."""
         print("=" * 60)
@@ -407,7 +606,7 @@ class AgentsDoctor:
         print(f"Docs checked: {self.stats['docs_checked']}")
         print(f"Frontmatter checked: {self.stats['frontmatter_checked']}")
         print()
-        
+
         if not self.issues:
             print("✅ No issues found!")
         else:
@@ -415,27 +614,27 @@ class AgentsDoctor:
             errors = [i for i in self.issues if i.severity == "error"]
             warnings = [i for i in self.issues if i.severity == "warning"]
             infos = [i for i in self.issues if i.severity == "info"]
-            
+
             if errors:
                 print(f"❌ ERRORS ({len(errors)}):")
                 for issue in errors:
                     print(f"   {issue}")
                 print()
-            
+
             if warnings:
                 print(f"⚠️  WARNINGS ({len(warnings)}):")
                 for issue in warnings:
                     print(f"   {issue}")
                 print()
-            
+
             if infos:
                 print(f"ℹ️  INFO ({len(infos)}):")
                 for issue in infos:
                     print(f"   {issue}")
                 print()
-        
+
         print("=" * 60)
-        
+
         if not HAS_YAML:
             print()
             print("⚠️  Note: PyYAML not installed. Install for full validation:")

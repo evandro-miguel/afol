@@ -43,21 +43,21 @@ def find_files(paths: list[str]) -> list[Path]:
 def fix_checkbox_separators(content: str) -> tuple[str, int]:
     """
     Fix missing separators after checkbox markers.
-    
+
     Pattern: `- [x]text` → `- [x] text`
     Works for all checkbox types: [ ], [x], [X], [/], [%], [!], [>]
     """
     # Pattern to match checkbox without following space
     # Matches: - [x]text (no space after ])
     pattern = r'^(\s*-\s*\[[ xX/!>%]\])(\S)'
-    
+
     count = 0
-    
+
     def replacer(match):
         nonlocal count
         count += 1
         return match.group(1) + ' ' + match.group(2)
-    
+
     fixed_content = re.sub(pattern, replacer, content, flags=re.MULTILINE)
     return fixed_content, count
 
@@ -69,18 +69,18 @@ def process_file(file_path: Path, dry_run: bool = False) -> dict:
         'fixed': 0,
         'error': None
     }
-    
+
     try:
         content = file_path.read_text(encoding='utf-8')
         fixed_content, count = fix_checkbox_separators(content)
-        
+
         if count > 0:
             result['fixed'] = count
             if not dry_run:
                 file_path.write_text(fixed_content, encoding='utf-8')
     except Exception as e:
         result['error'] = str(e)
-    
+
     return result
 
 
@@ -105,9 +105,9 @@ def main():
         default=['.venv', 'node_modules', '.git', 'cache'],
         help='Directories to exclude'
     )
-    
+
     args = parser.parse_args()
-    
+
     # Filter paths
     all_files = find_files(args.paths)
     excluded = set(args.exclude)
@@ -115,21 +115,21 @@ def main():
         f for f in all_files
         if not any(excl in str(f) for excl in excluded)
     ]
-    
+
     if not files:
         print("No markdown files found to process.")
         return 0
-    
+
     print(f"Processing {len(files)} markdown files...")
     if args.dry_run:
         print("(DRY RUN - no files will be modified)\n")
-    
+
     total_fixed = 0
     fixed_files = 0
-    
+
     for file_path in files:
         result = process_file(file_path, dry_run=args.dry_run)
-        
+
         if result['error']:
             print(f"  ✗ {result['file']}: {result['error']}")
         elif result['fixed'] > 0:
@@ -137,15 +137,15 @@ def main():
             fixed_files += 1
             action = "Would fix" if args.dry_run else "Fixed"
             print(f"  ✓ {result['file']}: {action} {result['fixed']} checkbox(es)")
-    
+
     print(f"\n{'='*60}")
     print(f"Files processed: {len(files)}")
     print(f"Files with fixes: {fixed_files}")
     print(f"Total checkboxes fixed: {total_fixed}")
-    
+
     if args.dry_run and total_fixed > 0:
         print("\nRun without --dry-run to apply fixes.")
-    
+
     return 0
 
 

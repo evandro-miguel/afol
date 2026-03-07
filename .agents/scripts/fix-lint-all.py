@@ -9,7 +9,7 @@ This is a unified script that runs all fix operations:
 
 Usage:
     python fix-lint-all.py [--dry-run] [--check]
-    
+
 Examples:
     python fix-lint-all.py --dry-run     # Preview fixes
     python fix-lint-all.py               # Apply all fixes
@@ -25,7 +25,7 @@ from pathlib import Path
 
 class LintFixer:
     """Main class for fixing lint issues."""
-    
+
     def __init__(self, base_dir: str, dry_run: bool = False, check_only: bool = False):
         self.base_dir = Path(base_dir)
         self.dry_run = dry_run
@@ -36,7 +36,7 @@ class LintFixer:
             'files_processed': 0,
             'errors': 0
         }
-    
+
     def find_files(self) -> list[Path]:
         """Find all markdown files, excluding common directories and known example files."""
         excluded_dirs = {'.venv', 'node_modules', '.git', 'cache', '__pycache__'}
@@ -46,49 +46,49 @@ class LintFixer:
         }
         excluded_patterns = ['**/templates/**', '**/rules/**']
         files = []
-        
+
         for f in self.base_dir.rglob('*.md'):
             # Check directory exclusions
             if any(excl in str(f) for excl in excluded_dirs):
                 continue
-            
+
             # Check file name exclusions
             if f.name in excluded_files:
                 continue
-            
+
             # Check pattern exclusions
             if any(pattern in str(f) for pattern in excluded_patterns):
                 continue
-            
+
             files.append(f)
-        
+
         return files
-    
+
     def fix_checkbox(self, content: str) -> tuple[str, int]:
         """Fix missing separators after checkbox markers."""
         pattern = r'^(\s*-\s*\[[ xX/!>%]\])(\S)'
         count = 0
-        
+
         def replacer(match):
             nonlocal count
             count += 1
             return match.group(1) + ' ' + match.group(2)
-        
+
         fixed = re.sub(pattern, replacer, content, flags=re.MULTILINE)
         return fixed, count
-    
+
     def has_frontmatter(self, content: str) -> bool:
         """Check if content has YAML frontmatter."""
         return content.strip().startswith('---')
-    
+
     def generate_frontmatter(self, file_path: Path) -> str:
         """Generate YAML frontmatter for a file."""
         filename = file_path.stem
         parent_dir = file_path.parent.name
-        
+
         # Try to extract structured info from filename
         match = re.match(r'(\d{6}_\d{4})_(.+)_(\w+)_(\d+)', filename)
-        
+
         if match:
             timestamp, theme, doc_type, num = match.groups()
             id_value = f"{timestamp}_{theme}_{doc_type}_{num}"
@@ -108,9 +108,9 @@ class LintFixer:
                 type_value = 'rule'
             else:
                 type_value = 'standard'
-        
+
         now = datetime.now().astimezone().isoformat(timespec='seconds')
-        
+
         return f"""---
 doc_type: {type_value}
 id: {id_value}
@@ -121,7 +121,7 @@ updated_at: '{now}'
 ---
 
 """
-    
+
     def process_file(self, file_path: Path) -> dict:
         """Process a single file and return results."""
         result = {
@@ -130,63 +130,63 @@ updated_at: '{now}'
             'frontmatter_added': False,
             'errors': []
         }
-        
+
         try:
             content = file_path.read_text(encoding='utf-8')
             original_content = content
-            
+
             # Fix checkboxes
             content, checkbox_count = self.fix_checkbox(content)
             result['checkbox_fixes'] = checkbox_count
-            
+
             # Add frontmatter if missing
             if not self.has_frontmatter(content):
                 frontmatter = self.generate_frontmatter(file_path)
                 content = frontmatter + content
                 result['frontmatter_added'] = True
-            
+
             # Write if changed and not dry-run/check
             if content != original_content:
                 if not self.dry_run and not self.check_only:
                     file_path.write_text(content, encoding='utf-8')
-                
+
                 self.stats['files_processed'] += 1
-            
+
             self.stats['checkbox_fixed'] += checkbox_count
             if result['frontmatter_added']:
                 self.stats['frontmatter_added'] += 1
-                
+
         except Exception as e:
             result['errors'].append(str(e))
             self.stats['errors'] += 1
-        
+
         return result
-    
+
     def run(self):
         """Run all fixes."""
         files = self.find_files()
-        
+
         if not files:
             print("No markdown files found.")
             return 0
-        
+
         mode = "CHECK" if self.check_only else ("DRY RUN" if self.dry_run else "APPLY")
         print(f"{'='*60}")
         print(f"Lint Fix - Mode: {mode}")
         print(f"{'='*60}\n")
         print(f"Files to process: {len(files)}\n")
-        
+
         results = []
         for file_path in files:
             result = self.process_file(file_path)
             if result['checkbox_fixes'] > 0 or result['frontmatter_added'] or result['errors']:
                 results.append(result)
-        
+
         # Print summary
         print(f"{'='*60}")
         print("RESULTS")
         print(f"{'='*60}")
-        
+
         if results:
             for r in results:
                 status = []
@@ -198,12 +198,12 @@ updated_at: '{now}'
                     status.append(f"{action} frontmatter")
                 if r['errors']:
                     status.append(f"Errors: {', '.join(r['errors'])}")
-                
+
                 print(f"  {r['file']}")
                 for s in status:
                     print(f"    - {s}")
             print()
-        
+
         print(f"{'='*60}")
         print("SUMMARY")
         print(f"{'='*60}")
@@ -211,13 +211,13 @@ updated_at: '{now}'
         print(f"Checkboxes fixed: {self.stats['checkbox_fixed']}")
         print(f"Frontmatter added: {self.stats['frontmatter_added']}")
         print(f"Errors: {self.stats['errors']}")
-        
+
         if self.check_only and (self.stats['checkbox_fixed'] > 0 or self.stats['frontmatter_added'] > 0):
             print("\n⚠️  Lint issues found. Run without --check to fix.")
             return 1
         elif self.dry_run and (self.stats['checkbox_fixed'] > 0 or self.stats['frontmatter_added'] > 0):
             print("\nℹ️  Run without --dry-run to apply fixes.")
-        
+
         return 0
 
 
@@ -249,9 +249,9 @@ Examples:
         action='store_true',
         help='Check for issues (exit code 1 if fixes needed)'
     )
-    
+
     args = parser.parse_args()
-    
+
     fixer = LintFixer(args.directory, dry_run=args.dry_run, check_only=args.check)
     return fixer.run()
 

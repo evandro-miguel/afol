@@ -1,9 +1,9 @@
 ---
 doc_type: standard
-id: "agents-usage-standard"
+id: agents-usage-standard
 status: active
-created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-02-23T00:00:00Z"
+created_at: '2026-02-23T00:00:00Z'
+updated_at: '2026-03-07T18:19:40-03:00'
 ---
 
 # Agents System Usage
@@ -42,6 +42,9 @@ make all
 .agents/agents help
 .agents/agents doctor
 .agents/agents new auth-refactor --spec
+.agents/agents status --session .agents/wb/260223_1200_auth-refactor
+.agents/agents session catchup --session .agents/wb/260223_1200_auth-refactor
+.agents/agents session close --session .agents/wb/260223_1200_auth-refactor
 ```
 
 ## Available Commands
@@ -271,6 +274,49 @@ make verify
 .agents/agents verify-tasks
 # OR
 .agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/
+```
+
+---
+
+### agents-status.py
+
+Shows current execution state for active or selected workstream session.
+
+**Checks:**
+- Resolves canonical artifacts (`plan`, `task`, `spec`, `report`, `roadmap`, `session`)
+- Summarizes task progress and identifies next task
+- Exposes blockers and artifact pointers
+- Supports `--json` output
+
+**Usage:**
+```bash
+.agents/agents status
+.agents/agents status --session .agents/wb/260306_2128_context-driven-execution-commands
+.agents/agents status --session .agents/wb/260306_2128_context-driven-execution-commands --artifact plan --artifact task
+```
+
+### agents-session.py
+
+Closes a session after strict verification passes and optionally repoints the active-session pointer.
+
+**Catchup behavior:**
+- Summarizes working-tree drift inside and outside the target session
+- Flags missing or stale `plan`/`research`/`log`/`report` artifacts
+- Recommends the next safe step before implementation continues
+
+**Checks:**
+- Runs strict task/workbench verification before closure
+- Refuses closure if the session is not in a final, coherent state
+- Supports reassigning `.agents/wb/.active_session` to another session
+
+**Usage:**
+```bash
+.agents/agents session catchup
+.agents/agents session catchup --session .agents/wb/260306_2128_context-driven-execution-commands
+.agents/agents session catchup --json
+.agents/agents session close
+.agents/agents session close --session .agents/wb/260306_2128_context-driven-execution-commands
+.agents/agents session close --session .agents/wb/260306_2128_context-driven-execution-commands --next-session .agents/wb/260306_2240_session-close-command
 ```
 
 ## Workflow Examples

@@ -359,14 +359,14 @@ index 1234567..89abcdef 100755
 +# Another comment
  #
  set -e
- 
+
 diff --git a/.agents/scripts/agents-doctor.py b/.agents/scripts/agents-doctor.py
 --- a/.agents/scripts/agents-doctor.py
 +++ b/.agents/scripts/agents-doctor.py
 @@ -10,6 +10,8 @@
  import sys
 +import logging
- 
+
  def main():
      print("Doctor check")
 """

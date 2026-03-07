@@ -11,7 +11,7 @@ Checks:
 
 Usage:
     python agents-lint-docs.py [folder] [--fix]
-    
+
 Examples:
     python agents-lint-docs.py .agents/wb/260223_1200_auth-refactor/
     python agents-lint-docs.py .agents/wb --fix
@@ -57,6 +57,7 @@ VALID_DOC_TYPES = [
     "log",
     "research",
     "brainstorm",
+    "explorer-check",
     "blocks",
     "spec",
     "spec-lite",
@@ -71,6 +72,7 @@ VALID_DOC_TYPES = [
     "structure",
     "lessons",
     "retrospective",
+    "postmortem",
     "specs_readme",
     "lesson_entry",
     "tool-doc",
@@ -97,7 +99,7 @@ class LintIssue:
         self.file_path = file_path
         self.line = line
         self.message = message
-    
+
     def __str__(self):
         icon = {"error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(self.severity, "?")
         line_info = f":{self.line}" if self.line > 0 else ""
@@ -117,25 +119,25 @@ class DocLinter:
             "issues_found": 0,
             "issues_fixed": 0,
         }
-    
+
     def lint_file(self, file_path: Path):
         """Lint a single markdown file."""
         self.stats["files_checked"] += 1
         content = file_path.read_text()
         lines = content.splitlines()
-        
+
         # Check frontmatter
         self.check_frontmatter(file_path, content)
-        
+
         # Check checkboxes
         self.check_checkboxes(file_path, lines)
-        
+
         # Check state board
         self.check_state_board(file_path, lines)
-        
+
         # Check status field
         self.check_status_field(file_path, content)
-        
+
         # Check cross-references
         self.check_cross_references(file_path, content)
 
@@ -250,21 +252,21 @@ class DocLinter:
             return
 
         self._validate_frontmatter_yaml(file_path, frontmatter_text)
-    
+
     def check_checkboxes(self, file_path: Path, lines: List[str]):
         """Check checkbox markers."""
         in_code_block = False
-        
+
         for i, line in enumerate(lines, 1):
             if FENCE_PATTERN.match(line):
                 in_code_block = not in_code_block
                 continue
-            
+
             if in_code_block:
                 continue
 
             search_line = INLINE_CODE_PATTERN.sub("", line)
-            
+
             # Find all checkbox markers
             for match in MARKER_PATTERN.finditer(search_line):
                 marker = match.group(1)
@@ -273,7 +275,7 @@ class DocLinter:
                         "info", file_path, i,
                         f"Non-standard checkbox marker: '[{marker}]'. Valid: {', '.join(f'[{m}]' for m in VALID_MARKERS)}"
                     ))
-                
+
                 # Check for missing space after checkbox
                 end_idx = match.end()
                 has_separator = end_idx >= len(search_line) or search_line[end_idx] in {" ", "|"}
@@ -282,7 +284,7 @@ class DocLinter:
                         "warning", file_path, i,
                         f"Missing separator after checkbox marker: '- [{marker}]'"
                     ))
-    
+
     def check_state_board(self, file_path: Path, lines: List[str]):
         """Check state board table."""
         in_state_board = False
@@ -316,7 +318,7 @@ class DocLinter:
                             ))
                 elif line.strip() and not line.strip().startswith("|"):
                     in_state_board = False
-    
+
     def check_status_field(self, file_path: Path, content: str):
         """Check status field consistency."""
         if not HAS_YAML:
@@ -331,23 +333,23 @@ class DocLinter:
             if not isinstance(fm, dict):
                 return
             status = fm.get("status", "")
-            
+
             # Check if status matches content indicators
             if status == "final" and "- [ ]" in content:
                 self.issues.append(LintIssue(
                     "warning", file_path, 0,
                     "Status is 'final' but file contains unchecked items"
                 ))
-            
+
             if status == "draft" and "- [x]" in content:
                 self.issues.append(LintIssue(
                     "info", file_path, 0,
                     "Status is 'draft' but file contains completed items"
                 ))
-        
+
         except yaml.YAMLError:
             pass
-    
+
     def check_cross_references(self, file_path: Path, content: str):
         """Check cross-references between docs."""
         _, body, _ = self._extract_frontmatter(content)
@@ -357,7 +359,7 @@ class DocLinter:
             # Extract referenced IDs
             id_pattern = re.compile(r'["\']?(\d{6}_\d{4}_[a-z0-9_-]+_(?:plan|task|report|spec|adr)_\d+)["\']?')
             references = id_pattern.findall(body)
-            
+
             # Note: We can't validate if the referenced file exists without more context
             # This is just a lint check for format
             for ref in references:
@@ -366,7 +368,7 @@ class DocLinter:
                         "info", file_path, 0,
                         f"Cross-reference may have invalid format: '{ref}'"
                     ))
-    
+
     def _is_valid_timestamp(self, ts: str) -> bool:
         """Check if timestamp is valid ISO 8601 with Z or timezone offset."""
         if ts == "YYYY-MM-DDTHH:MM:SSZ":
@@ -382,13 +384,13 @@ class DocLinter:
         if not stripped:
             return False
         return any(token in stripped for token in ("<", ">", "|", "YYYY-"))
-    
+
     def lint_folder(self, folder: Path):
         """Lint all markdown files in folder."""
         if not folder.exists():
             print(f"❌ Folder not found: {folder}")
             return
-        
+
         for md_file in folder.rglob("*.md"):
             if self.should_skip_file(md_file):
                 continue
@@ -412,7 +414,7 @@ class DocLinter:
                 rel = resolved.as_posix().lstrip("/")
 
         return any(rel.startswith(prefix) for prefix in EXCLUDED_PATH_PREFIXES)
-    
+
     def print_report(self):
         """Print lint report."""
         print()
@@ -425,7 +427,7 @@ class DocLinter:
         if self.fix:
             print(f"Issues fixed: {self.stats['issues_fixed']}")
         print()
-        
+
         if not self.issues:
             print("✅ No issues found!")
         else:
@@ -433,25 +435,25 @@ class DocLinter:
             errors = [i for i in self.issues if i.severity == "error"]
             warnings = [i for i in self.issues if i.severity == "warning"]
             infos = [i for i in self.issues if i.severity == "info"]
-            
+
             if errors:
                 print(f"❌ ERRORS ({len(errors)}):")
                 for issue in errors:
                     print(f"   {issue}")
                 print()
-            
+
             if warnings:
                 print(f"⚠️  WARNINGS ({len(warnings)}):")
                 for issue in warnings:
                     print(f"   {issue}")
                 print()
-            
+
             if infos:
                 print(f"ℹ️  INFO ({len(infos)}):")
                 for issue in infos:
                     print(f"   {issue}")
                 print()
-        
+
         print("=" * 60)
 
 
@@ -460,9 +462,9 @@ def main():
         folder = AGENTS_DIR
     else:
         folder = Path(sys.argv[1])
-    
+
     fix = "--fix" in sys.argv
-    
+
     print("=" * 60)
     print("AGENTS LINT DOCS - Markdown Validation")
     print("=" * 60)
@@ -471,12 +473,12 @@ def main():
     if fix:
         print("Fix mode: enabled")
     print()
-    
+
     linter = DocLinter(fix=fix)
     linter.lint_folder(folder)
     linter.stats["issues_found"] = len(linter.issues)
     linter.print_report()
-    
+
     errors = [i for i in linter.issues if i.severity == "error"]
     sys.exit(0 if len(errors) == 0 else 1)
 

@@ -244,10 +244,10 @@ def cmd_plan(args) -> int:
 def cmd_apply(args) -> int:
     """Apply pending update."""
     agents_dir = get_agents_dir()
-    
+
     print("🚀 Applying update...")
     print(f"   Agents directory: {agents_dir}")
-    
+
     # Dry run should not acquire lock; it delegates to plan.
     if args.dry_run:
         print("\n🧪 DRY RUN - No changes will be made")
@@ -260,7 +260,7 @@ def cmd_apply(args) -> int:
         if lock_status["stale"]:
             print("   Lock appears stale. Use 'agents-update doctor --fix' to repair.")
         return 1
-    
+
     # Acquire lock
     try:
         lock = UpdateLock(agents_dir)
@@ -269,7 +269,7 @@ def cmd_apply(args) -> int:
     except LockError as e:
         print(f"   ❌ Could not acquire lock: {e}")
         return 1
-    
+
     try:
         # Load ownership map
         try:
@@ -277,20 +277,20 @@ def cmd_apply(args) -> int:
         except FileNotFoundError as e:
             print(f"\n❌ {e}")
             return 1
-        
+
         # Get versions
         current_version = get_installed_version(agents_dir)
         print(f"   Current version: {current_version}")
-        
+
         # Check upstream
         upstream = UpstreamManager(agents_dir)
         info = upstream.check_upstream()
         print(f"   Target version: {info.version}")
-        
+
         if current_version == info.version:
             print("\n✅ Already up to date!")
             return 0
-        
+
         # Prevent accidental self-update on canonical template repo unless explicitly acknowledged.
         upstream_url = str(getattr(info, "url", "")).lower()
         if any(hint in upstream_url for hint in CANONICAL_UPSTREAM_HINTS) and not args.i_know_what_im_doing:
@@ -306,23 +306,23 @@ def cmd_apply(args) -> int:
             version=current_version,
             exclude_patterns=[".cache/*", "versions/*", "z-arq/*", "wb/*", "*.pyc", "__pycache__/*"]
         )
-        
+
         # Fetch upstream
         print("\n📥 Fetching upstream...")
         ref = info.tag if getattr(info, "tag", None) else f"origin/{info.branch}"
         upstream_path = upstream.fetch_upstream(ref=ref)
         upstream_manifest_dict = upstream.get_manifest()
         upstream_manifest = Manifest.from_dict(upstream_manifest_dict) if upstream_manifest_dict else None
-        
+
         if not upstream_manifest:
             print("❌ Could not get upstream manifest")
             return 1
-        
+
         # Detect changes
         print("🔍 Analyzing changes...")
         resolver = ConflictResolver(local_manifest, local_manifest, upstream_manifest, ownership)
         plan = resolver.detect_changes()
-        
+
         print("\n📊 Update summary:")
         print(f"   Safe to update: {len(plan.get_safe_changes())}")
         print(f"   Require action: {len(plan.get_action_required())}")
@@ -341,17 +341,17 @@ def cmd_apply(args) -> int:
                 print(f"   ... and {len(critical_deletes) - 20} more")
             print("   Re-run with --allow-deletes to proceed.")
             return 1
-        
+
         if plan.has_conflicts() and not args.force:
             print("\n⚠️  Conflicts detected! Review with 'agents-update plan'")
             print("   Use --force to apply anyway (local files will be backed up)")
             return 1
-        
+
         # Confirm
         if not confirm_or_abort("\n⚡ Apply update? [y/N]: ", args.force):
             print("Update cancelled.")
             return 0
-        
+
         # Create backup
         print("\n💾 Creating backup...")
         from backup import BackupManager
@@ -362,43 +362,43 @@ def cmd_apply(args) -> int:
             changes=plan.changes,
             current_manifest=local_manifest
         )
-        
+
         # Staging
         print("\n📦 Preparing staging area...")
         from staging import StagingManager
         staging = StagingManager(agents_dir, info.version, upstream_path)
         staging_dir = staging.prepare(plan.changes, ownership)
         staging.validate()
-        
+
         # Atomic swap
         print("\n🔄 Performing atomic swap...")
         from swap import SwapManager
         swapper = SwapManager(agents_dir)
-        
+
         def on_swap_error():
             print("   Attempting rollback...")
             backup_mgr.restore_from_backup(backup_dir)
-        
+
         success = swapper.swap(staging_dir, on_error=on_swap_error)
-        
+
         if not success:
             print("\n❌ Update failed")
             return 1
-        
+
         # Validation
         print("\n✅ Validating update...")
         # Update manifest
         upstream_manifest.save(agents_dir / "manifest.json")
-        
+
         print("\n🎉 Update complete!")
         print(f"   {current_version} → {info.version}")
         print(f"   Backup: {backup_dir.name}")
-        
+
         # Cleanup old versions
         swapper.cleanup_old_versions(keep=5)
-        
+
         return 0
-        
+
     except Exception as e:
         print(f"\n❌ Update failed: {e}")
         import traceback
@@ -411,24 +411,24 @@ def cmd_apply(args) -> int:
 def cmd_rollback(args) -> int:
     """Rollback to previous version."""
     agents_dir = get_agents_dir()
-    
+
     print("⏪ Rolling back...")
     print(f"   Agents directory: {agents_dir}")
-    
+
     from backup import BackupManager, create_backup_report
-    
+
     backup_mgr = BackupManager(agents_dir)
     backups = backup_mgr.list_backups()
-    
+
     if not backups:
         print("\n❌ No backups found")
         return 1
-    
+
     # Show available backups
     print("\n📋 Available backups:")
     for i, backup_dir in enumerate(backups[:5], 1):
         print(f"   {i}. {backup_dir.name}")
-    
+
     # Select backup
     if args.target_version:
         # Find backup for specific version
@@ -438,30 +438,30 @@ def cmd_rollback(args) -> int:
             if restore_point and restore_point.version_from == args.target_version:
                 target_backup = backup_dir
                 break
-        
+
         if not target_backup:
             print(f"\n❌ No backup found for version {args.target_version}")
             return 1
     else:
         # Use most recent
         target_backup = backups[0]
-    
+
     # Show details
     print(f"\n{create_backup_report(target_backup)}")
-    
+
     # Confirm
     if not confirm_or_abort(
         f"\n⚡ Rollback to {target_backup.name}? [y/N]: ", args.force
     ):
         print("Rollback cancelled.")
         return 0
-    
+
     # Perform rollback
     success = backup_mgr.restore_from_backup(target_backup, dry_run=args.dry_run)
-    
+
     if success and not args.dry_run:
         print("\n✅ Rollback complete!")
-        
+
         # Also try swap rollback if using versioning
         try:
             from swap import SwapManager
@@ -474,7 +474,7 @@ def cmd_rollback(args) -> int:
     else:
         print("\n❌ Rollback failed")
         return 1
-    
+
     return 0
 
 

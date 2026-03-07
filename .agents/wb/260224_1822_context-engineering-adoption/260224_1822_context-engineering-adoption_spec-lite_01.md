@@ -2,7 +2,7 @@
 doc_type: spec-lite
 id: 260224_1822_context-engineering-adoption_spec-lite_01
 theme: context-engineering-adoption
-status: canceled
+status: deprecated
 created_at: '2026-02-24T18:22:00-03:00'
 updated_at: '2026-02-24T18:45:00-03:00'
 links:
@@ -13,7 +13,7 @@ links:
 # Spec Lite: Context Engineering Adoption - CANCELED
 
 ## Status
-**CANCELED** - This specification is no longer active.
+**CANCELED** - This specification is no longer active and is now marked as deprecated.
 
 ## Problem Statement
 ~~Current agent sessions experience context degradation over long-horizon tasks due to:~~

@@ -1,6 +1,6 @@
 # 🎨 Data Structure
 
-**Generated:** 2026-02-27T15:00:37+00:00
+**Generated:** 2026-03-07T01:56:33+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -9,13 +9,13 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 65 files, 5,478 lines, 626.3 KB
+**Stats:** 63 files, 5,813 lines, 744.4 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/data/telemetry/events.jsonl` | 639 | 158.6 KB | Module; functionality |
+| `.agents/data/telemetry/events.jsonl` | 1,105 | 281.7 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vite-skill/references/config/README.md` | 365 | 7.9 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vitest-skill/references/mocks/README.md` | 320 | 9.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vitest-skill/references/configuration/README.md` | 306 | 7.6 KB | Module; functionality |
@@ -28,12 +28,11 @@ Data files, constants, and configuration.
 | `.agents/cache/universal-skills/skills/ux-skill/data/ui-reasoning.csv` | 101 | 30.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/icons.csv` | 101 | 13.1 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/ux-guidelines.csv` | 100 | 18.3 KB | Module; functionality |
+| `.agents/agents.config` | 99 | 2.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/products.csv` | 97 | 29.1 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/colors.csv` | 97 | 12.7 KB | Module; functionality |
-| `C:/Users/evand/.claude/plugins/marketplaces/claude-plugins-official/plugins/hookify/commands/configure.md` | 96 | 2.8 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/playwright-skill/references/fixtures/README.md` | 93 | 2.5 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/typescript-skill/references/tsconfig-strict.json` | 92 | 3.3 KB | Module; functionality |
-| `.agents/agents.config` | 82 | 1.8 KB | Module; functionality |
 | `.agents/data/telemetry/schemas/event.json` | 78 | 2.3 KB | Module; functionality |
 | `.agents/arc/structure/data.md` | 75 | 7.8 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/react-skill/references/storybook/config.md` | 70 | 3.1 KB | Module; functionality |
@@ -51,7 +50,6 @@ Data files, constants, and configuration.
 | `.agents/skills/writing-skills/references/standards/metadata-standard.md` | 52 | 1.5 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/stacks/react-native.csv` | 52 | 9.8 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/writing-skills/references/standards/metadata-standard.md` | 52 | 1.5 KB | Module; functionality |
-| `C:/Users/evand/.claude/plugins/marketplaces/claude-plugins-official/plugins/playground/skills/playground/templates/data-explorer.md` | 52 | 2.8 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/stacks/nuxt-ui.csv` | 51 | 13.7 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/stacks/swiftui.csv` | 51 | 10.6 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/unreal-engine/references/python-api/configuration.md` | 51 | 1.2 KB | Module; functionality |

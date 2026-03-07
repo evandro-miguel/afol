@@ -2,7 +2,7 @@
 doc_type: plan
 id: 260224_1822_context-engineering-adoption_plan_01
 theme: context-engineering-adoption
-status: canceled
+status: deprecated
 owners:
 - orchestrator
 - worker

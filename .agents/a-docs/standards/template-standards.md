@@ -1,10 +1,10 @@
 ---
 doc_type: standard
-id: "000000_000000_template-standards_standard_01"
+id: 000000_000000_template-standards_standard_01
 status: active
-created_at: 2026-02-23T00:00:00Z
-updated_at: 2026-02-23T00:00:00Z
-title: "Template Quality Standards"
+created_at: 2026-02-23 00:00:00+00:00
+updated_at: '2026-03-06T20:23:51-03:00'
+title: Template Quality Standards
 ---
 
 # Template Quality Standards
@@ -96,7 +96,9 @@ Location: `.agents/a-docs/templates/`
 - log.md
 - report.md
 - brainstorm.md
+- explorer-check.md
 - research.md
+- postmortem.md
 - blocks.md
 - retrospective.md
 

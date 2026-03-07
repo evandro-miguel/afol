@@ -15,7 +15,7 @@ links:
 
 ## Why It Exists
 
-**Problem:** Multiple agents (QWEN, CLAUDE, GEMINI) have separate instruction files. Keeping them synchronized manually is:
+**Problem:** Multiple runtimes and agents (OPENCODE, QWEN, CLAUDE, GEMINI) have separate instruction files. Keeping them synchronized manually is:
 - Error-prone
 - Laborious
 - Causes inconsistency between agents
@@ -39,6 +39,7 @@ Synchronizes agent files:
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Central template |
+| `OPENCODE.md` | OpenCode instructions |
 | `QWEN.md` | QWEN instructions |
 | `CLAUDE.md` | CLAUDE instructions |
 | `GEMINI.md` | GEMINI instructions |
@@ -47,6 +48,7 @@ Synchronizes agent files:
 
 | File | Purpose |
 |------|---------|
+| `OPENCODE.md` | Updated from template |
 | `QWEN.md` | Updated from template |
 | `CLAUDE.md` | Updated from template |
 | `GEMINI.md` | Updated from template |
@@ -59,6 +61,7 @@ Synchronizes agent files:
 sync:
   source_file: AGENTS.md
   target_files:
+    - OPENCODE.md
     - QWEN.md
     - CLAUDE.md
     - GEMINI.md
