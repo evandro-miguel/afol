@@ -2,27 +2,29 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-03-07T01:56:33+00:00"
-updated_at: "2026-03-07T01:56:33+00:00"
+created_at: "2026-03-07T21:25:54+00:00"
+updated_at: "2026-03-07T21:25:54+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 29
+- Total indexed docs: 33
 
 ## Brainstorm
 
 - `260306_2002_execution-intelligence-system_brainstorm_01` | `.agents/wb/260306_2002_execution-intelligence-system/260306_2002_execution-intelligence-system_brainstorm_01.md` | - The scaffold lacks enforced pre-plan exploration, reusable prior-research discovery, structured multi-plan packs, and mandatory postmortem closure.
 - `260306_2128_context-driven-execution-commands_brainstorm_01` | `.agents/wb/260306_2128_context-driven-execution-commands/260306_2128_context-driven-execution-commands_brainstorm_01.md` | - The scaffold has strong governance and knowledge systems, but operators still need to manually compose low-level commands and locate the right artifacts themselves.
 - `260306_2240_session-close-command_brainstorm_01` | `.agents/wb/260306_2240_session-close-command/260306_2240_session-close-command_brainstorm_01.md` | - Agents can prove a session is complete through strict verification, but there is no explicit command that performs the closure gate and handles the active-session pointer coheren
+- `260307_1734_persistent-planning-memory_brainstorm_01` | `.agents/wb/260307_1734_persistent-planning-memory/260307_1734_persistent-planning-memory_brainstorm_01.md` | - The system has durable workbench artifacts but lacks a simple, native workflow for high-frequency note capture and session resume.
 
 ## Explorer-Check
 
 - `260306_2002_execution-intelligence-system_explorer-check_01` | `.agents/wb/260306_2002_execution-intelligence-system/260306_2002_execution-intelligence-system_explorer-check_01.md` | - Prove the plan is grounded in the current scaffold code and docs.
 - `260306_2128_context-driven-execution-commands_explorer-check_01` | `.agents/wb/260306_2128_context-driven-execution-commands/260306_2128_context-driven-execution-commands_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
 - `260306_2240_session-close-command_explorer-check_01` | `.agents/wb/260306_2240_session-close-command/260306_2240_session-close-command_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
+- `260307_1734_persistent-planning-memory_explorer-check_01` | `.agents/wb/260307_1734_persistent-planning-memory/260307_1734_persistent-planning-memory_explorer-check_01.md` | - Prove the improvement plan is grounded in the current repo’s workflow system instead of copying the external pattern literally.
 
 ## Postmortem
 
@@ -48,6 +50,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260306_2002_execution-intelligence-system_report_01` | `.agents/wb/260306_2002_execution-intelligence-system/260306_2002_execution-intelligence-system_report_01.md` | - Roadmap feature: F-07
 - `260306_2128_context-driven-execution-commands_report_01` | `.agents/wb/260306_2128_context-driven-execution-commands/260306_2128_context-driven-execution-commands_report_01.md` | - Roadmap feature: F-08
 - `260306_2240_session-close-command_report_01` | `.agents/wb/260306_2240_session-close-command/260306_2240_session-close-command_report_01.md` | - Roadmap feature: F-08
+- `260307_1734_persistent-planning-memory_report_01` | `.agents/wb/260307_1734_persistent-planning-memory/260307_1734_persistent-planning-memory_report_01.md` | - Roadmap feature: F-09
 
 ## Research
 
@@ -55,3 +58,4 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260306_1937_primary-runtime-compatibility_research_01` | `.agents/wb/260306_1937_primary-runtime-compatibility/260306_1937_primary-runtime-compatibility_research_01.md` | - Confirm the committed compatibility contract against official runtime documentation for OpenCode, Codex, and Qwen.
 - `260306_2002_execution-intelligence-system_research_01` | `.agents/wb/260306_2002_execution-intelligence-system/260306_2002_execution-intelligence-system_research_01.md` | - Which existing scripts must become recursive to support pack folders?
 - `260306_2240_session-close-command_research_01` | `.agents/wb/260306_2240_session-close-command/260306_2240_session-close-command_research_01.md` | - <question 1>
+- `260307_1734_persistent-planning-memory_research_01` | `.agents/wb/260307_1734_persistent-planning-memory/260307_1734_persistent-planning-memory_research_01.md` | - Which parts of the "planning with files" pattern are already covered by the current scaffold?

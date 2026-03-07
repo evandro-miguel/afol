@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-03-07T01:56:33+00:00
+**Generated:** 2026-03-07T21:25:54+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 56 files, 8,486 lines, 331.8 KB
+**Stats:** 57 files, 8,686 lines, 343.4 KB
 
 ### Files
 
@@ -21,8 +21,8 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/cache/universal-skills/skills/playwright-skill/references/e2e/API_REFERENCE.md` | 510 | 16.2 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/playwright-skill/references/e2e/lib/helpers.js` | 385 | 12.3 KB | Module; functionality |
 | `.agents/scripts/tests/test_execution_command_scenarios.py` | 376 | 19.0 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_execution_command_flow.py` | 370 | 18.7 KB | Test file; unit tests |
 | `.agents/scripts/tests/conftest.py` | 290 | 12.4 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_execution_command_flow.py` | 272 | 13.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_wb_update_task_marker.py` | 225 | 10.1 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_data/scenarios.yaml` | 212 | 7.2 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/playwright-skill/references/e2e/run.js` | 199 | 5.7 KB | Module; functionality |
@@ -37,6 +37,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/unit/test_refactored_functions.py` | 117 | 4.3 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_knowledge.py` | 115 | 5.3 KB | Test file; unit tests |
 | `.agents/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md` | 104 | 5.4 KB | Module; functionality |
+| `.agents/arc/SPECS/260307_persistent-planning-memory_spec_01.md` | 101 | 6.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/unreal-engine/references/automation-testing/python-tests.md` | 94 | 3.1 KB | Test file; unit tests |
 | `.agents/arc/SPECS/260306_artifact-resolution-layer_spec_01.md` | 93 | 4.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/tests/writing-scaffold.snapshot.test.js` | 92 | 2.7 KB | Test file; unit tests |
@@ -47,7 +48,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/arc/SPECS/260306_review-and-logical-revert_spec_01.md` | 76 | 2.8 KB | Module; functionality |
 | `.agents/cache/universal-skills/tests/fixtures/writing-scaffold/manifests.json` | 76 | 2.3 KB | Module; functionality |
 | `.agents/arc/SPECS/260306_runtime-command-parity_spec_01.md` | 71 | 2.5 KB | Module; functionality |
-| `.agents/arc/structure/tests.md` | 67 | 5.9 KB | Test file; unit tests |
+| `.agents/arc/structure/tests.md` | 68 | 6.0 KB | Test file; unit tests |
 | `.agents/a-docs/specs/README.md` | 62 | 2.1 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_lint_noise_reduction.py` | 60 | 2.4 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_lint_state_board.py` | 58 | 2.7 KB | Test file; unit tests |

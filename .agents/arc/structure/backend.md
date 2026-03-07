@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-03-07T01:56:33+00:00
+**Generated:** 2026-03-07T21:25:54+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,7 +9,7 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 77 files, 22,181 lines, 793.2 KB
+**Stats:** 77 files, 22,413 lines, 803.5 KB
 
 ### Files
 
@@ -25,6 +25,7 @@ Services, utilities, and business logic.
 | `.agents/scripts/agents-doctor.py` | 559 | 21.8 KB | Module; functionality |
 | `.agents/scripts/agents-update/agents-update.py` | 526 | 20.0 KB | Module; functionality |
 | `.agents/scripts/agents-tools.py` | 516 | 19.2 KB | Module; functionality |
+| `.agents/scripts/lib/execution_commands.py` | 482 | 19.7 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/inline-task-planner/scripts/inline_tasks.ts` | 470 | 14.4 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/check-skill.js` | 454 | 13.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/writing-skills/scripts/check-skill.js` | 454 | 13.0 KB | Module; functionality |
@@ -39,7 +40,6 @@ Services, utilities, and business logic.
 | `.agents/skills/writing-skills/scripts/fix-skill.js` | 339 | 9.9 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/writing-skills/scripts/fix-skill.js` | 339 | 9.9 KB | Module; functionality |
 | `.agents/scripts/agents-update/backup.py` | 324 | 12.9 KB | Module; functionality |
-| `.agents/scripts/lib/execution_commands.py` | 321 | 12.2 KB | Module; functionality |
 | `.agents/scripts/check-links.py` | 319 | 11.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/scripts/universal-contract.js` | 313 | 9.1 KB | Module; functionality |
 | `.agents/scripts/agents-bootstrap.py` | 311 | 11.7 KB | Module; functionality |
@@ -76,6 +76,7 @@ Services, utilities, and business logic.
 | `.agents/cache/universal-skills/skills/personal-security/scripts/clean_codex_sessions.py` | 167 | 6.2 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/typescript-skill/scripts/ts_diagnostic.py` | 166 | 6.1 KB | Module; functionality |
 | `.agents/cache/universal-skills/scripts/source-checksum.js` | 160 | 4.2 KB | Module; functionality |
+| `.agents/scripts/agents-session.py` | 159 | 6.4 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/doc-standards/cli.ts` | 151 | 4.8 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/systematic-debugging/condition-based-waiting-example.ts` | 144 | 4.9 KB | Module; functionality |
 | `.agents/scripts/agents-implement.py` | 139 | 6.0 KB | Module; functionality |
@@ -86,8 +87,7 @@ Services, utilities, and business logic.
 | `.agents/cache/universal-skills/scripts/install-skills.js` | 113 | 3.1 KB | Module; functionality |
 | `.agents/scripts/fix-lint-frontmatter.py` | 112 | 3.9 KB | Module; functionality |
 | `.agents/cache/universal-skills/scripts/upgrade-project.js` | 111 | 2.9 KB | Module; functionality |
-| `.agents/scripts/agents-session.py` | 99 | 4.0 KB | Module; functionality |
-| `.agents/scripts/agents-review.py` | 96 | 4.6 KB | Module; functionality |
+| `.agents/scripts/agents-review.py` | 107 | 5.1 KB | Module; functionality |
 | `.agents/scripts/migrate-task-board.py` | 87 | 3.9 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/scripts/search.py` | 65 | 3.2 KB | Module; functionality |
 | `.agents/scripts/agents-tools-smoke.py` | 57 | 2.3 KB | Module; functionality |

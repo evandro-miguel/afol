@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-03-07T01:56:33+00:00"
-updated_at: "2026-03-07T01:56:33+00:00"
+created_at: "2026-03-07T21:25:54+00:00"
+updated_at: "2026-03-07T21:25:54+00:00"
 ---
 
 # SPECS INDEX
@@ -14,9 +14,9 @@ updated_at: "2026-03-07T01:56:33+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 12 |
+| Total | 13 |
 | Draft | 0 |
-| Active | 12 |
+| Active | 13 |
 | Final | 0 |
 
 ## Index
@@ -35,6 +35,7 @@ updated_at: "2026-03-07T01:56:33+00:00"
 | 260306_review-and-logical-revert_spec_01 |  | active | orchestrator | roadmap: .agents/arc/GENERAL-ROADMAP.md, plan: 260306_2128_context-driven-execution-commands_plan_01, task: 260306_2128_context-driven-execution-commands_task_01 |
 | 260306_context-driven-execution-commands_spec_01 |  | active | orchestrator | roadmap: .agents/arc/GENERAL-ROADMAP.md |
 | 260306_project-context-canon-and-setup_spec_01 |  | active | orchestrator | roadmap: .agents/arc/GENERAL-ROADMAP.md, plan: 260306_2128_context-driven-execution-commands_plan_01, task: 260306_2128_context-driven-execution-commands_task_01 |
+| 260307_persistent-planning-memory_spec_01 | persistent-planning-memory | active | orchestrator | roadmap: 260223_0000_arc_roadmap_01 |
 
 ---
 *Index: `.agents/arc/SPECS/INDEX.md`*
