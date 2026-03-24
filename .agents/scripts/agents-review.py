@@ -24,6 +24,11 @@ def _append_issue(findings: List[Dict[str, str]], scope: str, severity: str, mes
     findings.append({"scope": scope, "severity": severity, "message": message})
 
 
+def _latest_artifact(session_dir: Path, pattern: str) -> Path | None:
+    matches = sorted(session_dir.glob(pattern))
+    return matches[-1] if matches else None
+
+
 def run_verify_tasks(session_dir: Path) -> Tuple[int, str, str]:
     proc = subprocess.run(
         [sys.executable, str(ROOT_DIR / ".agents/scripts/verify-tasks.py"), str(session_dir)],
@@ -33,46 +38,58 @@ def run_verify_tasks(session_dir: Path) -> Tuple[int, str, str]:
     return proc.returncode, proc.stdout, proc.stderr
 
 
-def inspect_artifacts(session_dir: Path) -> List[Dict[str, str]]:
-    findings: List[Dict[str, str]] = []
-
-    plan_candidates = sorted(session_dir.glob("*_plan_*.md"))
-    task_candidates = sorted(session_dir.glob("*_task_*.md"))
-    spec_candidates = sorted(session_dir.glob("*_spec*.md"))
-    report_candidates = sorted(session_dir.glob("*_report_*.md"))
-
-    if not plan_candidates:
+def _inspect_plan_and_task(
+    findings: List[Dict[str, str]],
+    plan_file: Path | None,
+    task_file: Path | None,
+) -> None:
+    if plan_file is None:
         _append_issue(findings, "plan", "error", "No plan artifact found")
-        return findings
+        return
 
-    plan_fm, _ = split_frontmatter(plan_candidates[-1].read_text(encoding="utf-8"))
+    plan_fm, _ = split_frontmatter(plan_file.read_text(encoding="utf-8"))
     if not plan_fm:
         _append_issue(findings, "plan", "error", "Plan file missing frontmatter")
 
-    if not task_candidates:
+    if task_file is None:
         _append_issue(findings, "task", "error", "No task artifact found")
-    else:
-        task_fm, _ = split_frontmatter(task_candidates[-1].read_text(encoding="utf-8"))
-        if str(task_fm.get("roadmap_feature", "")).strip() != str(plan_fm.get("roadmap_feature", "")).strip():
-            _append_issue(findings, "task", "error", "task.roadmap_feature does not match plan")
-        links = task_fm.get("links", {})
-        if not isinstance(links, dict) or links.get("plan") != plan_fm.get("id", ""):
-            _append_issue(findings, "task", "warning", "Task plan link missing or mismatch")
+        return
 
-    if not spec_candidates:
+    task_fm, _ = split_frontmatter(task_file.read_text(encoding="utf-8"))
+    if str(task_fm.get("roadmap_feature", "")).strip() != str(plan_fm.get("roadmap_feature", "")).strip():
+        _append_issue(findings, "task", "error", "task.roadmap_feature does not match plan")
+
+    links = task_fm.get("links", {})
+    if not isinstance(links, dict) or links.get("plan") != plan_fm.get("id", ""):
+        _append_issue(findings, "task", "warning", "Task plan link missing or mismatch")
+
+
+def _inspect_optional_artifacts(
+    findings: List[Dict[str, str]],
+    spec_file: Path | None,
+    report_file: Path | None,
+) -> None:
+    if spec_file is None:
         _append_issue(findings, "spec", "info", "No spec artifact found; implementation guidance may be incomplete")
-
-    if not report_candidates:
+    if report_file is None:
         _append_issue(findings, "report", "warning", "No report artifact found")
 
-    if task_candidates:
-        rows = parse_task_rows(task_candidates[-1])
-        if not rows:
-            _append_issue(findings, "task", "warning", "Task file exists but no parsed task rows")
-        blocked = [r for r in rows if r.state == "blocked"]
-        if blocked:
-            _append_issue(findings, "task", "warning", f"Blocked tasks present: {', '.join(r.task_id for r in blocked)}")
 
+def _inspect_task_rows(findings: List[Dict[str, str]], task_file: Path | None) -> None:
+    if task_file is None:
+        return
+
+    rows = parse_task_rows(task_file)
+    if not rows:
+        _append_issue(findings, "task", "warning", "Task file exists but no parsed task rows")
+        return
+
+    blocked = [r for r in rows if r.state == "blocked"]
+    if blocked:
+        _append_issue(findings, "task", "warning", f"Blocked tasks present: {', '.join(r.task_id for r in blocked)}")
+
+
+def _inspect_catchup(findings: List[Dict[str, str]], session_dir: Path) -> None:
     catchup = build_session_catchup(session_dir, paths_limit=5)
     if catchup["warnings"]:
         _append_issue(findings, "verify", "warning", f"Session catchup advised: {catchup['warnings'][0]}")
@@ -83,6 +100,24 @@ def inspect_artifacts(session_dir: Path) -> List[Dict[str, str]]:
             "warning",
             f"Stale session artifacts: {', '.join(catchup['stale_artifacts'])}",
         )
+
+
+def inspect_artifacts(session_dir: Path) -> List[Dict[str, str]]:
+    findings: List[Dict[str, str]] = []
+
+    plan_file = _latest_artifact(session_dir, "*_plan_*.md")
+    task_file = _latest_artifact(session_dir, "*_task_*.md")
+    _inspect_plan_and_task(findings, plan_file, task_file)
+    if plan_file is None:
+        return findings
+
+    _inspect_optional_artifacts(
+        findings,
+        _latest_artifact(session_dir, "*_spec*.md"),
+        _latest_artifact(session_dir, "*_report_*.md"),
+    )
+    _inspect_task_rows(findings, task_file)
+    _inspect_catchup(findings, session_dir)
 
     return findings
 

@@ -4,8 +4,8 @@ theme: makefile
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-20T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-20 00:00:00-03:00
+updated_at: '2026-03-23T20:38:52-03:00'
 links:
   tools_json: ./tools-json.md
   wrapper: ./agents-wrapper.md
@@ -30,6 +30,7 @@ Provides:
 2. **Short aliases** - `st`, `ix`, `sy`, `vf`, `dr`
 3. **Composed workflows** - `make all`, `make refresh`
 4. **Variables** - `THEME=`, `TASK_ID=`, etc.
+5. **Runtime contract helpers** - command shortcuts for skills and optional external memory
 
 ## What It Touches
 
@@ -61,6 +62,8 @@ make index        # Update indexes
 make sync         # Sync agent docs
 make verify       # Verify tasks
 make lint         # Markdown lint
+make memory-status  # Show external memory provider config
+make memory-search QUERY=x  # Emit memory MCP contract
 make all          # Full validation
 ```
 
@@ -81,6 +84,7 @@ make new THEME=auth-refactor
 make wb-task TASK_ID=T-01 ACTION=done
 make wb-status STATUS=active
 make wb-timeline MSG="Implemented login"
+make memory-search QUERY="agent memory" RUNTIME=codex
 ```
 
 ## How to Modify

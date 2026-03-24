@@ -1,0 +1,46 @@
+{
+  "expectations": [
+    {
+      "text": "The agent reads SKILL.md first",
+      "passed": false,
+      "evidence": "Only found 1/4 keywords",
+      "category": "other"
+    },
+    {
+      "text": "The agent references migration.md for v1 to v2 changes",
+      "passed": true,
+      "evidence": "Found 3/4 keywords in transcript",
+      "category": "other"
+    },
+    {
+      "text": "The agent mentions key differences like function call syntax",
+      "passed": false,
+      "evidence": "Only found 2/5 keywords",
+      "category": "other"
+    },
+    {
+      "text": "Agent respected progressive disclosure",
+      "passed": false,
+      "evidence": "Agent didn't read SKILL.md first",
+      "category": "progressive_disclosure"
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 3,
+    "total": 4,
+    "pass_rate": 0.25
+  },
+  "file_reads": [
+    "migration.md"
+  ],
+  "tools_used": [],
+  "progressive_disclosure": {
+    "respected": false,
+    "issues": [
+      "Agent didn't read SKILL.md first"
+    ],
+    "read_count": 1
+  },
+  "tier": 2
+}

@@ -10,13 +10,15 @@
 #   make structure
 #   make all
 
-.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-plan skills-apply skills-status skills-check skills-sync wb-touch wb-normalize-time wb-files-changed wb-evidence wb-task wb-status wb-timeline wb-link structure index knowledge-index knowledge-list knowledge-search knowledge-pull sync verify verify-session verify-active verify-active-if-present verify-strict-if-present lint tools-check test-scripts lint-scripts lint-fix lint-fix-dry lint-fix-check lint-fix-checkboxes lint-fix-frontmatter telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
+.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-list skills-search skills-plan skills-apply skills-ensure skills-status skills-check skills-sync memory-status memory-search memory-context memory-recent memory-show wb-touch wb-normalize-time wb-files-changed wb-evidence wb-task wb-status wb-timeline wb-link structure repo-map index knowledge-index knowledge-list knowledge-search knowledge-pull sync verify verify-session verify-active verify-active-if-present verify-strict-if-present lint tools-check test-scripts lint-scripts lint-fix lint-fix-dry lint-fix-check lint-fix-checkboxes lint-fix-frontmatter telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
 
 # Use local virtualenv python when available for reproducible script execution
 PYTHON := .agents/scripts/.venv/bin/python3
 ifeq ($(wildcard $(PYTHON)),)
 PYTHON := python3
 endif
+UV_CACHE_DIR ?= $(CURDIR)/.agents/cache/uv
+UV := UV_CACHE_DIR="$(UV_CACHE_DIR)" uv
 
 # ==============================================================================
 # HELP
@@ -33,13 +35,20 @@ help:
 	@echo "║                                                           ║"
 	@echo "║  Documentation                                            ║"
 	@echo "║    make structure    - Generate project structure docs    ║"
+	@echo "║    make repo-map     - Generate full repository codemap   ║"
 	@echo "║    make index        - Update SPECS/ADRS indexes          ║"
 	@echo "║    make knowledge-index - Build knowledge index           ║"
 	@echo "║    make knowledge-list - List knowledge artifacts         ║"
 	@echo "║    make knowledge-search QUERY=x - Search prior findings  ║"
 	@echo "║    make knowledge-pull QUERY=x - Pull compact context     ║"
+	@echo "║    make memory-status - Show external memory config       ║"
+	@echo "║    make memory-search QUERY=x - Emit memory MCP contract  ║"
+	@echo "║    make memory-context TOPIC=x - Emit context contract    ║"
 	@echo "║    make sync         - Sync AGENTS.md to agent files      ║"
 	@echo "║    make tools-check  - Validate/discover tools catalog     ║"
+	@echo "║    make skills-list  - List available upstream skills      ║"
+	@echo "║    make skills-search QUERY=x - Search upstream skills     ║"
+	@echo "║    make skills-ensure SKILL=x - Ensure one project skill   ║"
 	@echo "║                                                           ║"
 	@echo "║  Workflows                                                ║"
 	@echo "║    make new          - Create governed workstream         ║"
@@ -92,7 +101,8 @@ help:
 
 setup:
 	@echo "→ Setting up UV virtualenv..."
-	@cd .agents/scripts && uv sync
+	@mkdir -p "$(UV_CACHE_DIR)"
+	@cd .agents/scripts && $(UV) sync
 	@echo "✓ Setup complete"
 
 doctor:
@@ -115,6 +125,11 @@ structure:
 	@echo "→ Generating project structure documentation..."
 	@./.agents/agents structure-map . --output .agents/arc/structure/
 	@echo "✓ Structure docs generated"
+
+repo-map:
+	@echo "→ Generating repository codemap..."
+	@./.agents/agents repo-map $(if $(TARGET_PATH),$(TARGET_PATH),.) $(if $(OUTPUT_DIR),--output "$(OUTPUT_DIR)",) $(if $(RUNNER),--runner "$(RUNNER)",) $(if $(IMAGE),--image "$(IMAGE)",) $(if $(DRY),--dry-run,)
+	@echo "✓ Repository codemap completed"
 
 index:
 	@echo "→ Updating SPECS/ADRS indexes..."
@@ -143,6 +158,36 @@ ifndef QUERY
 	@exit 1
 else
 	@./.agents/agents knowledge pull "$(QUERY)"
+endif
+
+memory-status:
+	@./.agents/agents memory status
+
+memory-search:
+ifndef QUERY
+	@echo "Usage: make memory-search QUERY=<term> [RUNTIME=<runtime>] [PROJECT=<project>] [LIMIT=<n>]"
+	@exit 1
+else
+	@./.agents/agents memory search "$(QUERY)" $(if $(RUNTIME),--runtime $(RUNTIME),) $(if $(PROJECT),--project "$(PROJECT)",) $(if $(LIMIT),--limit $(LIMIT),)
+endif
+
+memory-context:
+ifndef TOPIC
+	@echo "Usage: make memory-context TOPIC=<topic> [RUNTIME=<runtime>] [PROJECT=<project>] [URL=memory://...] [DEPTH=<n>] [RELATED=<n>] [LIMIT=<n>]"
+	@exit 1
+else
+	@./.agents/agents memory context "$(TOPIC)" $(if $(RUNTIME),--runtime $(RUNTIME),) $(if $(PROJECT),--project "$(PROJECT)",) $(if $(URL),--url "$(URL)",) $(if $(DEPTH),--depth $(DEPTH),) $(if $(RELATED),--max-related $(RELATED),) $(if $(LIMIT),--limit $(LIMIT),)
+endif
+
+memory-recent:
+	@./.agents/agents memory recent $(if $(RUNTIME),--runtime $(RUNTIME),) $(if $(PROJECT),--project "$(PROJECT)",) $(if $(TIMEFRAME),--timeframe "$(TIMEFRAME)",) $(if $(LIMIT),--limit $(LIMIT),)
+
+memory-show:
+ifndef NOTE
+	@echo "Usage: make memory-show NOTE=<identifier> [RUNTIME=<runtime>] [PROJECT=<project>]"
+	@exit 1
+else
+	@./.agents/agents memory show "$(NOTE)" $(if $(RUNTIME),--runtime $(RUNTIME),) $(if $(PROJECT),--project "$(PROJECT)",)
 endif
 
 sync:
@@ -204,11 +249,11 @@ endif
 
 bootstrap:
 ifndef TARGET
-	@echo "Usage: make bootstrap TARGET=/path/to/other-repo [FORCE=1] [DRY=1] [SKIP_CHECKS=1]"
+	@echo "Usage: make bootstrap TARGET=/path/to/other-repo [PARTIAL=1] [FORCE=1] [DRY=1] [SKIP_CHECKS=1]"
 	@exit 1
 else
 	@echo "→ Bootstrapping .agents system into: $(TARGET)"
-	@./.agents/agents bootstrap "$(TARGET)" $(if $(FORCE),--force,) $(if $(DRY),--dry-run,) $(if $(SKIP_CHECKS),--skip-checks,)
+	@./.agents/agents bootstrap "$(TARGET)" $(if $(PARTIAL),--partial,) $(if $(FORCE),--force,) $(if $(DRY),--dry-run,) $(if $(SKIP_CHECKS),--skip-checks,)
 endif
 
 fix-symlinks:
@@ -222,11 +267,30 @@ skills-init:
 skills-pull:
 	@./.agents/agents skills-sync pull
 
+skills-list:
+	@./.agents/agents skills-sync list $(if $(RUNTIME),--runtime $(RUNTIME),) $(if $(PROFILE),--profile "$(PROFILE)",) $(if $(SELECTED),--selected,) $(if $(INSTALLED),--installed,)
+
+skills-search:
+ifndef QUERY
+	@echo "Usage: make skills-search QUERY=<term> [RUNTIME=<runtime>] [PROFILE=<profile>] [LIMIT=<n>] [SELECTED=1]"
+	@exit 1
+else
+	@./.agents/agents skills-sync search "$(QUERY)" $(if $(RUNTIME),--runtime $(RUNTIME),) $(if $(PROFILE),--profile "$(PROFILE)",) $(if $(LIMIT),--limit $(LIMIT),) $(if $(SELECTED),--selected,)
+endif
+
 skills-plan:
 	@./.agents/agents skills-sync plan $(if $(SKILLS),--skills "$(SKILLS)",)
 
 skills-apply:
 	@./.agents/agents skills-sync apply $(if $(SKILLS),--skills "$(SKILLS)",)
+
+skills-ensure:
+ifndef SKILL
+	@echo "Usage: make skills-ensure SKILL=<name> [RUNTIME=<runtime>] [PROFILE=<profile>] [PERSIST=1] [PULL=1]"
+	@exit 1
+else
+	@./.agents/agents skills-sync ensure "$(SKILL)" $(if $(RUNTIME),--runtime $(RUNTIME),) $(if $(PROFILE),--profile "$(PROFILE)",) $(if $(PERSIST),--persist,) $(if $(PULL),--pull,)
+endif
 
 skills-status:
 	@./.agents/agents skills-sync status
@@ -441,12 +505,14 @@ tools-check:
 
 test-scripts:
 	@echo "→ Running script unit tests..."
-	@uv run --project .agents/scripts pytest .agents/scripts/tests -m "not integration and not e2e"
+	@mkdir -p "$(UV_CACHE_DIR)"
+	@$(UV) run --project .agents/scripts pytest .agents/scripts/tests -m "not integration and not e2e"
 	@echo "✓ Script unit tests passed"
 
 lint-scripts:
 	@echo "→ Linting Python scripts..."
-	@cd .agents/scripts && uv run ruff check .
+	@mkdir -p "$(UV_CACHE_DIR)"
+	@cd .agents/scripts && $(UV) run ruff check .
 	@echo "✓ Python scripts linted"
 
 # ==============================================================================
@@ -522,11 +588,15 @@ endif
 # QUICK WORKFLOWS
 # ==============================================================================
 
-all: doctor structure index knowledge-index sync lint skills-check tools-check telemetry-validate test-scripts
+agents-all: doctor structure index knowledge-index sync lint lint-scripts skills-check tools-check telemetry-validate test-scripts
 	@echo ""
 	@echo "╔═══════════════════════════════════════════════════════════╗"
 	@echo "║  ✓ All validations passed                                 ║"
 	@echo "╚═══════════════════════════════════════════════════════════╝"
+
+ifndef AGENTS_PRESERVE_LOCAL_ALL
+all: agents-all
+endif
 
 refresh: clean setup structure
 	@echo ""

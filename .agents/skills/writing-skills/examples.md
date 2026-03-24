@@ -117,7 +117,7 @@ another example
 ## Detailed Docs
 
 For more options, run `--help` or see:
-- [patterns.md](patterns.md)
+- [pattern.md](./references/templates/pattern.md)
 - [examples.md](./examples.md)
 ```
 

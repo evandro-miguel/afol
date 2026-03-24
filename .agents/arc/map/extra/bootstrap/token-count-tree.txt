@@ -1,0 +1,5 @@
+# Largest files in bootstrap scope
+
+| Bytes | Path |
+| ---: | --- |
+| 218 | `Makefile` |

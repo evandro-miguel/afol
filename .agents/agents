@@ -19,13 +19,23 @@ else
 fi
 ORIGINAL_PWD="$(pwd)"
 
-if [ -x "${SCRIPTS_DIR}/.venv/bin/python3" ]; then
-    PYTHON_BIN="${SCRIPTS_DIR}/.venv/bin/python3"
-elif [ -x "${SCRIPTS_DIR}/.venv/bin/python" ]; then
-    PYTHON_BIN="${SCRIPTS_DIR}/.venv/bin/python"
-else
-    PYTHON_BIN="python3"
-fi
+resolve_python_bin() {
+    if [ -x "${SCRIPTS_DIR}/.venv/bin/python3" ]; then
+        echo "${SCRIPTS_DIR}/.venv/bin/python3"
+    elif [ -x "${SCRIPTS_DIR}/.venv/bin/python" ]; then
+        echo "${SCRIPTS_DIR}/.venv/bin/python"
+    elif command -v python3 >/dev/null 2>&1; then
+        command -v python3
+    elif command -v python >/dev/null 2>&1; then
+        command -v python
+    else
+        echo ""
+    fi
+}
+
+PYTHON_BIN="$(resolve_python_bin)"
+UV_BIN="$(command -v uv 2>/dev/null || true)"
+export UV_CACHE_DIR="${AGENTS_UV_CACHE_DIR:-${SCRIPT_DIR}/cache/uv}"
 
 TELEMETRY_SCRIPT="${SCRIPTS_DIR}/agents-telemetry.py"
 ACTIVE_SESSION_FILE="${AGENTS_ACTIVE_SESSION_FILE:-${SCRIPT_DIR}/wb/.active_session}"
@@ -67,20 +77,29 @@ run_and_record() {
     return "${exit_code}"
 }
 
-# Check if uv is installed
-if ! command -v uv &> /dev/null; then
-    echo "❌ uv not found. Install with:"
-    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
-    exit 1
-fi
-
 # Check if .venv exists
 if [ ! -d "${SCRIPTS_DIR}/.venv" ]; then
+    if [ -z "${UV_BIN}" ]; then
+        echo "❌ uv not found. Install with:"
+        echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+        exit 1
+    fi
     echo "⚠️  Virtualenv not found. Setting up..."
+    mkdir -p "${UV_CACHE_DIR}"
     cd "${SCRIPTS_DIR}"
-    uv sync
+    "${UV_BIN}" sync
+    PYTHON_BIN="$(resolve_python_bin)"
+    if [ -z "${PYTHON_BIN}" ]; then
+        echo "❌ Python interpreter not found after virtualenv setup"
+        exit 1
+    fi
     echo "✓ Setup complete"
     echo
+fi
+
+if [ -z "${PYTHON_BIN}" ]; then
+    echo "❌ Python interpreter not found. Run 'make setup' to provision .agents/scripts/.venv."
+    exit 1
 fi
 
 # Command map: command -> script_name (without .py)
@@ -98,6 +117,8 @@ declare -A COMMAND_MAP=(
     ["session"]="agents-session"
     ["structure-map"]="agents-structure-map"
     ["map"]="agents-structure-map"
+    ["repo-map"]="agents-repo-map"
+    ["codemap"]="agents-repo-map"
     ["sync"]="sync-agent-docs"
     ["verify-tasks"]="verify-tasks"
     ["verify"]="verify-tasks"
@@ -107,6 +128,7 @@ declare -A COMMAND_MAP=(
     ["telemetry"]="agents-telemetry"
     ["patterns"]="agents-patterns"
     ["knowledge"]="agents-knowledge"
+    ["memory"]="agents-memory"
     ["bootstrap"]="agents-bootstrap"
     ["skills-sync"]="agents-skills-sync"
     ["fix-symlinks"]="agents-fix-symlinks"
@@ -125,6 +147,7 @@ show_help() {
     echo "  index               Update SPECS/ADRS indexes"
     echo "  lint-docs           Validate markdown docs consistency"
     echo "  structure-map       Generate project structure documentation"
+    echo "  repo-map            Generate or refresh the full repository codemap under .agents/arc/map"
     echo "  sync                Sync AGENTS.md to OPENCODE/QWEN/CLAUDE/GEMINI.md"
     echo "  verify-tasks        Check if all tasks are completed"
     echo "  status              Show workstream status summary and key artifact pointers"
@@ -137,6 +160,7 @@ show_help() {
     echo "  telemetry           Query/report telemetry and heat scoring"
     echo "  patterns            Discover and apply reusable patterns"
     echo "  knowledge           Search and pull reusable workbench knowledge"
+    echo "  memory              Emit governed external-memory MCP contracts"
     echo "  bootstrap           Install .agents system in another repository"
     echo "  skills-sync         Sync project skills from universal-skills"
     echo "  fix-symlinks        Repair symlinks with copy fallback"
@@ -146,6 +170,7 @@ show_help() {
     echo "  .agents/agents doctor"
     echo "  .agents/agents new auth-refactor --feature-id F-01 --parent-spec my-parent-spec --spec"
     echo "  .agents/agents structure-map . --output .agents/arc/structure/"
+    echo "  .agents/agents repo-map ."
     echo "  .agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/"
     echo "  .agents/agents status --session 260223_1200_auth-refactor"
     echo "  .agents/agents implement next --session 260306_2128_context-driven-execution-commands"
@@ -162,6 +187,7 @@ show_help() {
     echo "  .agents/agents telemetry heat --period weekly"
     echo "  .agents/agents patterns suggest --theme auth"
     echo "  .agents/agents knowledge pull runtime"
+    echo "  .agents/agents memory search \"agent memory\" --runtime codex"
     echo "  .agents/agents bootstrap /path/to/target-repo --dry-run"
     echo "  .agents/agents skills-sync status"
     echo "  .agents/agents fix-symlinks --dry-run"
@@ -191,7 +217,7 @@ if [ -n "${SCRIPT_NAME}" ]; then
     # Command found in map
     if [ -f "${SCRIPTS_DIR}/${SCRIPT_NAME}.py" ]; then
         cd "${ORIGINAL_PWD}"
-        run_and_record "${COMMAND}" uv run --with "pyyaml" "${SCRIPTS_DIR}/${SCRIPT_NAME}.py" "$@"
+        run_and_record "${COMMAND}" "${PYTHON_BIN}" "${SCRIPTS_DIR}/${SCRIPT_NAME}.py" "$@"
         exit_code=$?
         if [ "${exit_code}" -ne 0 ]; then
             exit "${exit_code}"
@@ -204,7 +230,7 @@ if [ -n "${SCRIPT_NAME}" ]; then
 elif [ -f "${SCRIPTS_DIR}/${COMMAND}.py" ]; then
     # Try to run as script name directly (fallback for unknown commands)
     cd "${ORIGINAL_PWD}"
-    run_and_record "${COMMAND}" uv run --directory "${SCRIPTS_DIR}" "${COMMAND}.py" "$@"
+    run_and_record "${COMMAND}" "${PYTHON_BIN}" "${SCRIPTS_DIR}/${COMMAND}.py" "$@"
     exit_code=$?
     if [ "${exit_code}" -ne 0 ]; then
         exit "${exit_code}"

@@ -71,6 +71,9 @@ make wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with e
 .agents/agents session close --session <session-id>
 ```
 
+The wrapper uses the local `.agents/scripts/.venv` interpreter directly when available.
+`uv` stays on the setup path only, and UV cache writes are redirected to `.agents/cache/uv/`.
+
 ## Setup (One Time)
 
 ### Prerequisites
@@ -120,12 +123,15 @@ This creates:
 
 # Catch up a session before resuming work
 .agents/agents session catchup --session .agents/wb/260306_2128_context-driven-execution-commands
+
+# Emit the exact MCP contract for external memory usage
+.agents/agents memory search "agent memory" --runtime codex
 ```
 
 ### With UV Directly
 
 ```bash
-# Uses temporary environment with pyyaml
+# For setup/bootstrap or direct script execution outside the wrapper
 uv run --with pyyaml .agents/scripts/agents-doctor.py
 uv run --with pyyaml .agents/scripts/agents-new.py auth-refactor --spec
 ```
@@ -193,6 +199,25 @@ Updates INDEX.md files for SPECS and ADRs.
 ```bash
 python .agents/scripts/agents-index.py
 python .agents/scripts/agents-index.py --dry-run
+```
+
+---
+
+### agents-memory.py
+Resolves the configured external-memory provider and emits deterministic MCP contracts for interactive runtimes.
+
+**Notes:**
+- Contract-only: does not execute MCP tool calls from shell
+- Intended for auxiliary retrieval, not canonical project state
+- Complements repo-local `knowledge` instead of replacing it
+
+**Usage:**
+```bash
+python .agents/scripts/agents-memory.py status
+python .agents/scripts/agents-memory.py search "agent memory" --runtime codex
+python .agents/scripts/agents-memory.py context "persistent planning memory" --runtime codex
+python .agents/scripts/agents-memory.py recent --timeframe 7d
+python .agents/scripts/agents-memory.py show projects/260311-basic-memory-implementation/current-state
 ```
 
 ---
@@ -271,6 +296,28 @@ python .agents/scripts/agents-structure-map.py /path/to/project --output .agents
 - `tests.md` - Test files
 - `data.md` - Data files, constants
 - `.structure-cache.json` - Cache for incremental updates
+
+---
+
+### agents-repo-map.py
+Generates or refreshes the full repository codemap under `.agents/arc/map/`.
+
+**Features:**
+- Wraps the external `docker-analisys-tools` runner in a scaffold-native command
+- Supports deterministic `repo`, `output`, `runner`, and `image` resolution
+- Prepares the canonical `extra/changelogs/` sink before execution
+- Fails if required root codemap docs are missing after the run
+
+**Usage:**
+```bash
+python .agents/scripts/agents-repo-map.py .
+python .agents/scripts/agents-repo-map.py . --dry-run
+python .agents/scripts/agents-repo-map.py . --runner /path/to/run-repo-map.sh
+```
+
+**Output:**
+- `.agents/arc/map/*.md` - Current-state codemap docs
+- `.agents/arc/map/extra/` - Raw evidence from the analysis pipeline
 
 ---
 

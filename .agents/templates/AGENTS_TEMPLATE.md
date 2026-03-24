@@ -1,8 +1,8 @@
 ---
 doc_type: standard
 id: agents-template-01
-created_at: "YYYY-MM-DDTHH:MM:SSZ"
-updated_at: "YYYY-MM-DDTHH:MM:SSZ"
+created_at: YYYY-MM-DDTHH:MM:SSZ
+updated_at: '2026-03-23T19:07:53-03:00'
 status: draft
 ---
 
@@ -10,14 +10,20 @@ status: draft
 
 ## Project Overview
 
-`{project_name}` is a scaffold repository that provides an agentic workflow system for LLM-assisted development. It standardizes workstreams, docs, telemetry, and tool usage across projects.
+`{project_name}` is a scaffold repository that provides an agentic workflow system for LLM-assisted development. It is intended for interactive agent runtimes that work through terminal-first CLI products such as Codex CLI, OpenCode, Gemini CLI, Claude Code, and similar environments. It standardizes workstreams, docs, telemetry, and tool usage across projects.
 
 ## Current Stack
 
 - **Languages:** Python 3.11+
-- **Runtime/CLI:** Python scripts and a Makefile-driven command wrapper
+- **Runtime/CLI:** Python scripts, runtime adapter docs for interactive agent CLIs, and a Makefile-driven command wrapper
 - **Package/tool manager:** uv (for Python environment and dependency management), make
 - **Data/config formats:** YAML, JSON, Markdown, TOML
+
+## Runtime Positioning
+
+- This scaffold is optimized for interactive agent execution inside CLI tools, not for embedding a standalone agent SDK into an application backend.
+- Runtime folders and adapter files should stay thin, secret-free, and focused on interactive execution compatibility.
+- Prefer governance, tooling, and docs changes that improve interactive terminal workflows.
 
 ## Repo Structure
 
@@ -55,6 +61,17 @@ status: draft
 - Mandatory gate: `make lint` must pass before considering the task complete
 - Ask: `Would this pass a strict senior/staff review?`
 - Deterministic verification: evidence over assumptions
+
+### Planning Intelligence (Mandatory For Major Work)
+
+- For major work, the workbench plan file is an ExecPlan and must follow `PLANS.md`
+- The canonical ExecPlan path is `.agents/wb/<session_id>/<session_id>_plan_01.md`
+- ExecPlans must stay self-contained and living: keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current while work proceeds
+- Major plans must link to a brainstorm artifact before the plan can be considered complete
+- Major plans must link to an explorer-check artifact proving the current repo was inspected
+- Search prior findings through `.agents/agents knowledge` before broad repo rereads when relevant
+- Prefer `.agents/agents knowledge pull "<topic>"` before opening full historical docs so the first pass stays compact
+- Final session closure requires a finalized postmortem
 
 ### Demand Elegance (Balanced)
 
@@ -103,3 +120,9 @@ status: draft
 
 - This file is the source for generated agent docs in this repo (`QWEN.md`, `CLAUDE.md`, `GEMINI.md`).
 - Keep generic operational guidance in sync here and add repo-specific detail in this file.
+
+## Project-Local Skills Preferred
+
+- Prefer project-local skills under `.agents/skills/` as the main skill surface for interactive runtimes in this repo.
+- Keep global Codex skills lean; do not depend on a large machine-global skill set as the primary project behavior source.
+- When the repo lives under an `apps/` workspace, prefer a sibling `../universal-skills` checkout as the shared upstream source.

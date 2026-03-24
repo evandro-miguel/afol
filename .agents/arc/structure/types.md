@@ -1,6 +1,6 @@
 # 🎨 Types Structure
 
-**Generated:** 2026-03-07T21:25:54+00:00
+**Generated:** 2026-03-23T23:31:40+00:00
 **Last Update:** First run
 
 Type definitions and interfaces.
@@ -9,12 +9,13 @@ Type definitions and interfaces.
 
 ## 📁 Directory Overview
 
-**Stats:** 1 files, 281 lines, 8.4 KB
+**Stats:** 2 files, 562 lines, 16.9 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
+| `.agents/skills/typescript-skill/references/utility-types.ts` | 281 | 8.4 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/typescript-skill/references/utility-types.ts` | 281 | 8.4 KB | Module; functionality |
 
 ---

@@ -4,8 +4,8 @@ theme: agentic-tools-documentation
 type: index
 status: active
 owner: system
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-23 00:00:00-03:00
+updated_at: '2026-03-23T20:38:52-03:00'
 links:
   tools_json: ../tools.json
   scripts_dir: ../scripts/
@@ -48,6 +48,7 @@ This directory contains detailed technical documentation for each operational to
 | `sync` | synchronization | [sync-agent-docs.md](./sync-agent-docs.md) |
 | `verify-tasks` | verification | [verify-tasks.md](./verify-tasks.md) |
 | `wb-update` | automation | [agents-wb-update.md](./agents-wb-update.md) |
+| `memory` | knowledge | [agents-memory.md](./agents-memory.md) |
 
 ### Infrastructure
 
@@ -124,6 +125,7 @@ updated_at: <date>
 │   ├── agents-new.py           # Creation
 │   ├── agents-index.py         # Indexing
 │   ├── agents-lint-docs.py     # Linting
+│   ├── agents-memory.py        # External memory contracts
 │   ├── agents-structure-map.py # Mapping
 │   ├── sync-agent-docs.py      # Synchronization
 │   ├── verify-tasks.py         # Verification
@@ -164,8 +166,8 @@ updated_at: <date>
 
 | Metric | How to Measure | Ideal |
 |--------|----------------|-------|
-| Functional tools | `.agents/agents tools list` | 10+ tools |
-| Complete documentation | Count files in `agentic/` | 1 doc per tool |
+| Functional tools | `.agents/agents tools list` | 15+ tools |
+| Complete documentation | Count files in `agentic/` | 1 doc per tool/infra surface |
 | Valid configuration | `python -m json.tool .agents/tools.json` | Valid JSON |
 | Functional wrapper | `.agents/agents help` | Lists all commands |
 

@@ -1,0 +1,36 @@
+{
+  "expectations": [
+    {
+      "text": "The agent does NOT load ahk-v2 skill",
+      "passed": false,
+      "evidence": "Only found 0/3 keywords",
+      "category": "other"
+    },
+    {
+      "text": "The agent responds with general knowledge",
+      "passed": false,
+      "evidence": "Only found 0/4 keywords",
+      "category": "other"
+    },
+    {
+      "text": "Agent respected progressive disclosure",
+      "passed": true,
+      "evidence": "Read 0 files appropriately",
+      "category": "progressive_disclosure"
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 1,
+    "total": 2,
+    "pass_rate": 0.5
+  },
+  "file_reads": [],
+  "tools_used": [],
+  "progressive_disclosure": {
+    "respected": true,
+    "issues": [],
+    "read_count": 0
+  },
+  "tier": 2
+}

@@ -201,13 +201,20 @@ class AgentsDoctor:
     def check_active_session_pointer(self):
         """Validate active session pointer consistency."""
         print("Checking active session pointer...")
+        has_sessions = any(
+            entry.is_dir() and not entry.name.startswith(".")
+            for entry in WB_DIR.iterdir()
+        ) if WB_DIR.exists() else False
 
         if not ACTIVE_SESSION_FILE.exists():
-            self.issues.append(Issue(
-                "warning",
-                str(ACTIVE_SESSION_FILE),
-                "Active session file missing"
-            ))
+            if has_sessions:
+                self.issues.append(Issue(
+                    "warning",
+                    str(ACTIVE_SESSION_FILE),
+                    "Active session file missing"
+                ))
+            else:
+                print("  ✓ no active session set")
             print()
             return
 

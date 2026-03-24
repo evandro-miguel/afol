@@ -1,0 +1,93 @@
+---
+title: "Repository Map"
+description: "Entry point for the generated repository map, including reading order, scope, and current structural signals."
+doc_kind: "codemap-index"
+version: "v2026-03-23_2"
+created_at: "2026-03-23T20:49:00Z"
+updated_at: "2026-03-23T21:28:11Z"
+---
+
+# Repository Map
+
+This folder is the distilled architecture view of the repository.
+
+## Scaffold Contract
+
+- `.agents/arc/map/` is the current-state, descriptive evidence surface for repository mapping.
+- Goal-state canon stays outside this folder in `.agents/arc/`, roadmap, specs, ADRs, and related architecture docs.
+- Use this map for refreshable observation and analysis, not as approval authority for desired-state decisions.
+## Read This First
+
+- Repo: `agentic_start_folder`
+- Current version: `v2026-03-23_2`
+- Derived docs available: `LLM_QUICKSTART.md, CLI_REFERENCE.md`
+- Targets analyzed: `.`
+- Raw evidence: `extra/`
+
+## What This Map Is Supposed To Answer
+
+- Which domains exist and why they exist.
+- Which files define the public boundaries and integration points.
+- Which files other code depends on most heavily.
+- Which hotspots and static findings deserve attention first.
+- Where the main classes, functions, interfaces, and constants live.
+
+## Recommended Reading Order
+
+- `README.md`
+- `CHANGELOG.md`
+- `LLM_QUICKSTART.md`
+- `CLI_REFERENCE.md`
+- `ARCHITECTURE.md`
+- `FEATURES.md`
+- `BACKEND.md`
+- `FRONTEND.md`
+- `API_MAP.md`
+- `CONNECTIONS.md`
+- `DEPENDENCY_GRAPH.md`
+- `HOTSPOTS.md`
+- `SYMBOLS.md`
+- `domains/`
+- `extra/`
+
+## What Lives Where
+
+- Root `.md` files: distilled explanations for agents and humans.
+- Derived docs: deeper task-oriented references generated or maintained alongside the base codemap.
+- `domains/`: domain-focused breakdowns with responsibilities, key files, and risks.
+- `extra/`: raw tool outputs, logs, and machine-readable evidence.
+
+## System Overview
+
+- No concise README system summary was extracted; rely on the domain and architecture docs below.
+
+## Major Runtime Surfaces
+
+
+## Cross-Domain Flow
+
+- Cross-domain flows must be inferred from the available route, symbol, and dependency artifacts.
+
+## Product And Platform Signals
+
+- No feature bullets were extracted from the repo README.
+
+## Current System Shape
+
+- Stack signals: `none detected`
+- Runtime versions: `not declared`
+- Stack versions: `not declared`
+- Dependency graph source: `dependency-cruiser`
+- Modules analyzed: `43`
+- Internal dependency edges: `0`
+- Route-bearing files: `0`
+- Public boundary files: `0`
+- Hotspots ranked: `50`
+
+## Critical Signals
+
+- Top hotspot: `.agents/scripts/lib/execution_commands.py`
+- Circular dependencies: `0`
+- Orphan modules: `1`
+- Semgrep auto findings: `0`
+- Semgrep custom findings: `0`

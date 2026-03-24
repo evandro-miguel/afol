@@ -4,8 +4,8 @@ theme: agents-wrapper
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-20T00:00:00-03:00
-updated_at: '2026-02-24T16:15:00-03:00'
+created_at: 2026-02-20 00:00:00-03:00
+updated_at: '2026-03-23T20:38:52-03:00'
 links:
   tools_json: ./tools-json.md
   makefile: ./makefile.md
@@ -18,7 +18,7 @@ links:
 **Problem:** Python scripts require:
 - Configured virtualenv
 - Installed dependencies
-- Correct `uv run` command
+- Consistent command routing
 - Isolated environment
 
 **Solution:** Bash wrapper that abstracts complexity and provides unified interface.
@@ -27,12 +27,12 @@ links:
 
 Bash wrapper that:
 
-1. **Checks uv** - Ensures it's installed
-2. **Checks .venv** - Creates if doesn't exist
-3. **Executes with isolation** - `uv run --with pyyaml`
+1. **Prefers local venv Python** - Uses `.agents/scripts/.venv/bin/python*` when present
+2. **Uses `uv` only for setup** - Provisions the environment when `.venv` is missing
+3. **Executes with isolation** - Keeps cache writes inside `.agents/cache/uv`
 4. **Preserves context** - Maintains working directory
 5. **Unified interface** - `.agents/agents <command>`
-6. **Command-map dispatch** - Efficient routing (refactored 2026-02-24)
+6. **Command-map dispatch** - Efficient routing for scripts such as `knowledge`, `skills-sync`, and `memory`
 
 ## What It Touches
 
@@ -52,6 +52,7 @@ Bash wrapper that:
 | `agents-tools.py` | `.agents/agents tools ...` |
 | `agents-wb-update.py` | `.agents/agents wb-update ...` |
 | `agents-telemetry.py` | `.agents/agents telemetry ...` |
+| `agents-memory.py` | `.agents/agents memory ...` |
 | `agents-lint-docs.py` | `.agents/agents lint-docs` |
 | ... | ... |
 
@@ -71,6 +72,7 @@ verify-tasks        # Verify tasks
 tools               # Tool discovery
 telemetry           # Heat scoring
 patterns            # Pattern suggestions
+memory              # External memory MCP contracts
 bootstrap           # Install in another repo
 skills-sync         # Sync skills
 fix-symlinks        # Repair symlinks
@@ -93,11 +95,9 @@ wb-update → wb
 Edit `.agents/agents` bash script:
 
 ```bash
-case "${COMMAND}" in
-    new-command)
-        cd "${ORIGINAL_PWD}"
-        uv run --with pyyaml "${SCRIPTS_DIR}/agents-new-command.py" "$@"
-        ;;
+declare -A COMMAND_MAP=(
+    ["memory"]="agents-memory"
+)
 ```
 
 ## How to Test
@@ -108,6 +108,9 @@ case "${COMMAND}" in
 
 # Test specific command
 .agents/agents doctor
+
+# Test contract-only external memory command
+.agents/agents memory status
 
 # Test with args
 .agents/agents new test-workstream

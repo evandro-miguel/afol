@@ -1,9 +1,9 @@
 ---
 doc_type: standard
-id: "structure-map-standard"
+id: structure-map-standard
 status: active
-created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-02-23T00:00:00Z"
+created_at: '2026-02-23T00:00:00Z'
+updated_at: '2026-03-23T18:06:20-03:00'
 ---
 
 # Structure Map Standard
@@ -11,6 +11,9 @@ updated_at: "2026-02-23T00:00:00Z"
 ## Purpose
 
 Define the strategy for auto-generating project structure documentation using `agents-structure-map.py`.
+
+This standard covers the lightweight physical layout view under `.agents/arc/structure/`.
+If a repository also adopts `.agents/arc/map/`, treat `structure/` as one current-state input surface among others, not as the goal-state canon.
 
 ## Overview
 
@@ -20,6 +23,14 @@ This standard establishes a **hybrid approach**:
 |----------|------|---------|------|
 | **Auto-generated** | `agents-structure-map.py` | File inventory, line counts, descriptions | Large projects (200+ files) |
 | **Manual** | `TEMPLATE_structure.md` | Conventions, rules, import patterns | All projects |
+
+## Relationship to `arc/map/`
+
+- `.agents/arc/structure/` documents the **physical structure** of the current repository.
+- `.agents/arc/map/` may hold a broader **current-state** surface, such as module maps, API maps, dependency views, and codemap-style artifacts.
+- Use `.agents/agents repo-map` for the full codemap workflow described in [repo-map.md](repo-map.md).
+- Neither `structure/` nor `map/` replaces roadmap/spec governance.
+- Desired architecture, product intent, roadmap, and specs remain outside `arc/map/`.
 
 ## Script: agents-structure-map.py
 

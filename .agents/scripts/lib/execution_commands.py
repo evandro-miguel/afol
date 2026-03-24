@@ -31,6 +31,9 @@ ARCHIVE_KNOWLEDGE = ROOT_DIR / ".agents/a-docs/knowledge"
 PRODUCT_BRIEF = ROOT_DIR / ".agents/arc/PROJECT-BRIEF.md"
 ENGINEERING_GUIDELINES = ROOT_DIR / ".agents/arc/ENGINEERING-GUIDELINES.md"
 TECH_STACK = ROOT_DIR / ".agents/arc/TECH-STACK.md"
+ARCHITECTURE_DOC = ROOT_DIR / ".agents/arc/ARCHITECTURE.md"
+GOAL_STATE_CANON = ROOT_DIR / ".agents/arc/README.md"
+CURRENT_STATE_MAP = get_cfg_path(ROOT_DIR, CONFIG, "map_dir") / "README.md"
 WB_TZ = CONFIG.get("time", {}).get("wb_offset", "-03:00")
 
 DOC_PATTERNS: dict[str, str] = {
@@ -66,6 +69,13 @@ GLOBAL_ARTIFACT_PATHS: dict[str, Path] = {
     "guidelines": ENGINEERING_GUIDELINES,
     "tech-stack": TECH_STACK,
     "tech_stack": TECH_STACK,
+    "architecture": ARCHITECTURE_DOC,
+    "goal-state": GOAL_STATE_CANON,
+    "goal_state": GOAL_STATE_CANON,
+    "current-state-map": CURRENT_STATE_MAP,
+    "current_state_map": CURRENT_STATE_MAP,
+    "current-state": CURRENT_STATE_MAP,
+    "current_state": CURRENT_STATE_MAP,
 }
 
 ALIAS_ARTIFACTS = set(DOC_PATTERNS.keys()) | {
@@ -82,6 +92,13 @@ ALIAS_ARTIFACTS = set(DOC_PATTERNS.keys()) | {
     "guidelines",
     "tech-stack",
     "tech_stack",
+    "architecture",
+    "goal-state",
+    "goal_state",
+    "current-state-map",
+    "current_state_map",
+    "current-state",
+    "current_state",
 }
 
 TASK_TABLE_RE = re.compile(r"^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]*)\s*\|\s*([^|]*)\s*\|")
@@ -257,22 +274,20 @@ def git_status_entries(root_dir: Path = ROOT_DIR) -> Tuple[bool, List[Dict[str, 
     return True, entries
 
 
-def build_session_catchup(session_dir: Path, paths_limit: int = 10) -> Dict[str, Any]:
+def _session_artifacts(session_dir: Path) -> Dict[str, Dict[str, Any]]:
     artifact_names = ["plan", "task", "research", "log", "report", "brainstorm", "explorer-check"]
-    artifacts = {name: artifact_snapshot(resolve_artifact(session_dir, name)) for name in artifact_names}
+    return {name: artifact_snapshot(resolve_artifact(session_dir, name)) for name in artifact_names}
 
-    task_file = resolve_artifact(session_dir, "task")
-    total, done, remaining, blocked_rows, rows = parse_state_summary(task_file)
-    nxt = next_task(rows)
-    context_ready, missing_context = context_readiness(session_dir)
 
-    roadmap_feature = ""
+def _session_roadmap_feature(artifacts: Dict[str, Dict[str, Any]]) -> str:
     for alias in ("task", "plan", "research"):
         feature_id = artifacts[alias].get("roadmap_feature", "")
         if feature_id:
-            roadmap_feature = str(feature_id)
-            break
+            return str(feature_id)
+    return ""
 
+
+def _split_session_git_changes(session_dir: Path) -> Tuple[bool, List[Dict[str, Any]], List[Dict[str, Any]]]:
     git_available, git_changes = git_status_entries(ROOT_DIR)
     session_prefix = relative_to_root(session_dir).rstrip("/")
     session_changes = [
@@ -280,12 +295,23 @@ def build_session_catchup(session_dir: Path, paths_limit: int = 10) -> Dict[str,
         if entry["path"] == session_prefix or entry["path"].startswith(f"{session_prefix}/")
     ]
     repo_changes = [entry for entry in git_changes if entry not in session_changes]
+    return git_available, session_changes, repo_changes
 
+
+def _collect_catchup_state(
+    artifacts: Dict[str, Dict[str, Any]],
+    repo_changes: List[Dict[str, Any]],
+    session_changes: List[Dict[str, Any]],
+) -> Tuple[List[str], List[str]]:
     warnings: List[str] = []
     stale_artifacts: List[str] = []
 
     plan_links = artifacts["plan"].get("links", {}) if artifacts["plan"]["exists"] else {}
-    expects_research = bool(plan_links.get("research")) or artifacts["brainstorm"]["exists"] or artifacts["explorer-check"]["exists"]
+    expects_research = (
+        bool(plan_links.get("research"))
+        or artifacts["brainstorm"]["exists"]
+        or artifacts["explorer-check"]["exists"]
+    )
     if expects_research and not artifacts["research"]["exists"]:
         warnings.append("Plan context exists but no research artifact is present for durable findings capture.")
 
@@ -313,24 +339,46 @@ def build_session_catchup(session_dir: Path, paths_limit: int = 10) -> Dict[str,
     if artifacts["report"]["exists"] and artifacts["report"].get("status", "").lower() == "final" and repo_changes:
         warnings.append("Report is marked final while the working tree still has unrecorded repo changes.")
 
-    catchup_required = bool(missing_context or repo_changes or warnings)
+    return warnings, stale_artifacts
 
+
+def _catchup_next_step(
+    missing_context: List[str],
+    stale_artifacts: List[str],
+    warnings: List[str],
+    repo_changes: List[Dict[str, Any]],
+    artifacts: Dict[str, Dict[str, Any]],
+    nxt: Optional[TaskRow],
+) -> str:
     if missing_context:
-        next_step = "Restore missing governed artifacts before resuming implementation."
-    elif "log" in stale_artifacts:
-        next_step = "Repo changes are newer than the session log; capture progress before continuing."
-    elif len(repo_changes) >= 5 and (not artifacts["research"]["exists"] or "research" in stale_artifacts):
-        next_step = "Refresh the research artifact so findings are durable before making new decisions."
-    elif warnings:
-        next_step = warnings[0]
-    elif nxt is not None and nxt.state == "in_progress":
-        next_step = f"Resume {nxt.task_id} and update the session log as you go."
-    elif nxt is not None:
-        next_step = f"Review the plan and start {nxt.task_id}: {nxt.notes}"
-    elif repo_changes:
-        next_step = "Reconcile repo changes into report/log artifacts before closing or handing off the session."
-    else:
-        next_step = "Session appears synchronized; continue with the next planned action."
+        return "Restore missing governed artifacts before resuming implementation."
+    if "log" in stale_artifacts:
+        return "Repo changes are newer than the session log; capture progress before continuing."
+    if len(repo_changes) >= 5 and (not artifacts["research"]["exists"] or "research" in stale_artifacts):
+        return "Refresh the research artifact so findings are durable before making new decisions."
+    if warnings:
+        return warnings[0]
+    if nxt is not None and nxt.state == "in_progress":
+        return f"Resume {nxt.task_id} and update the session log as you go."
+    if nxt is not None:
+        return f"Review the plan and start {nxt.task_id}: {nxt.notes}"
+    if repo_changes:
+        return "Reconcile repo changes into report/log artifacts before closing or handing off the session."
+    return "Session appears synchronized; continue with the next planned action."
+
+
+def build_session_catchup(session_dir: Path, paths_limit: int = 10) -> Dict[str, Any]:
+    artifacts = _session_artifacts(session_dir)
+
+    task_file = resolve_artifact(session_dir, "task")
+    total, done, remaining, blocked_rows, rows = parse_state_summary(task_file)
+    nxt = next_task(rows)
+    context_ready, missing_context = context_readiness(session_dir)
+    roadmap_feature = _session_roadmap_feature(artifacts)
+    git_available, session_changes, repo_changes = _split_session_git_changes(session_dir)
+    warnings, stale_artifacts = _collect_catchup_state(artifacts, repo_changes, session_changes)
+    catchup_required = bool(missing_context or repo_changes or warnings)
+    next_step = _catchup_next_step(missing_context, stale_artifacts, warnings, repo_changes, artifacts, nxt)
 
     return {
         "session": session_dir.name,
@@ -352,7 +400,7 @@ def build_session_catchup(session_dir: Path, paths_limit: int = 10) -> Dict[str,
         },
         "git": {
             "available": git_available,
-            "changed": len(git_changes),
+            "changed": len(session_changes) + len(repo_changes),
             "session_changed": len(session_changes),
             "repo_changed": len(repo_changes),
             "repo_paths": [entry["path"] for entry in repo_changes[:paths_limit]],

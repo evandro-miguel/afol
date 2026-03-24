@@ -329,18 +329,55 @@ class TestStrictVerification(unittest.TestCase):
         report_body: str = "Implementation completed and verified.\n",
         feature_id: str = "F-01",
         child_spec: str = "",
+        plan_status: str = "active",
+        plan_body: str | None = None,
     ) -> None:
         governance = self._governance_fields(feature_id=feature_id, child_spec=child_spec)
+        default_plan_body = (
+            "# Plan\n\n"
+            "## Purpose / Big Picture\n"
+            "Explain the user-visible outcome.\n\n"
+            "## Progress\n"
+            "- [x] 2026-03-23 18:00Z - Baseline planning completed.\n\n"
+            "## Surprises & Discoveries\n"
+            "- Observation: none yet.\n"
+            "  Evidence: n/a\n\n"
+            "## Decision Log\n"
+            "- Decision: keep the workbench plan canonical.\n"
+            "  Rationale: matches the scaffold workflow.\n"
+            "  Date/Author: 2026-03-23 / test\n\n"
+            "## Outcomes & Retrospective\n"
+            "- Outcome: baseline prepared.\n"
+            "- Remaining: implementation.\n"
+            "- Lesson: keep the plan current.\n\n"
+            "## Context and Orientation\n"
+            "Current repo state and key files.\n\n"
+            "## Plan of Work\n"
+            "Describe the sequence of changes.\n\n"
+            "## Concrete Steps\n"
+            "1. Edit the template.\n"
+            "2. Run verification.\n\n"
+            "## Validation and Acceptance\n"
+            "- Run pytest and expect success.\n\n"
+            "## Idempotence and Recovery\n"
+            "Safe to rerun validation.\n\n"
+            "## Artifacts and Notes\n"
+            "- None.\n\n"
+            "## Interfaces and Dependencies\n"
+            "- verify-tasks.py\n"
+        )
         plan_content = (
             "---\n"
             "doc_type: plan\n"
             "id: test_plan_01\n"
-            "status: active\n"
+            f"status: {plan_status}\n"
             f"{governance}"
             "links:\n"
+            "  brainstorm: test_brainstorm_01\n"
+            "  explorer_check: test_explorer_check_01\n"
             "  task: test_task_01\n"
             "---\n\n"
-            "# Plan\n"
+            f"{plan_body or default_plan_body}"
         )
         task_content = (
             "---\n"
@@ -380,11 +417,31 @@ class TestStrictVerification(unittest.TestCase):
             "---\n\n"
             "# Log\n"
         )
+        brainstorm_content = (
+            "---\n"
+            "doc_type: brainstorm\n"
+            "id: test_brainstorm_01\n"
+            "status: final\n"
+            f"{governance}"
+            "---\n\n"
+            "# Brainstorm\n"
+        )
+        explorer_content = (
+            "---\n"
+            "doc_type: explorer-check\n"
+            "id: test_explorer_check_01\n"
+            "status: final\n"
+            f"{governance}"
+            "---\n\n"
+            "# Explorer Check\n"
+        )
 
         (self.session_dir / "test_plan_01.md").write_text(plan_content)
         (self.session_dir / "test_task_01.md").write_text(task_content)
         (self.session_dir / "test_report_01.md").write_text(report_content)
         (self.session_dir / "test_log_01.md").write_text(log_content)
+        (self.session_dir / "test_brainstorm_01.md").write_text(brainstorm_content)
+        (self.session_dir / "test_explorer_check_01.md").write_text(explorer_content)
 
     def test_strict_mode_passes_with_evidence(self):
         """Strict mode passes when tasks have evidence."""
@@ -505,6 +562,87 @@ class TestStrictVerification(unittest.TestCase):
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
         self.assertGreater(len(results["planning_gate_issues"]), 0)
+
+    def test_strict_mode_fails_when_final_plan_lacks_execplan_sections(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Covered |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            ),
+            plan_status="final",
+            plan_body="# Plan\n\n## Progress\n- [x] 2026-03-23 18:00Z - Only progress present.\n",
+        )
+        report_file = self.session_dir / "test_report_01.md"
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
+        postmortem_file = self.session_dir / "test_postmortem_01.md"
+        postmortem_file.write_text(
+            "---\n"
+            "doc_type: postmortem\n"
+            "id: test_postmortem_01\n"
+            "status: final\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            "child_spec: \"\"\n"
+            "---\n\n"
+            "# Postmortem\n"
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results["execplan_issues"]), 0)
+
+    def test_strict_mode_fails_when_final_plan_progress_has_no_checkboxes(self):
+        plan_body = (
+            "# Plan\n\n"
+            "## Purpose / Big Picture\nText.\n\n"
+            "## Progress\nPlain text only.\n\n"
+            "## Surprises & Discoveries\nNone.\n\n"
+            "## Decision Log\nNone.\n\n"
+            "## Outcomes & Retrospective\nNone.\n\n"
+            "## Context and Orientation\nText.\n\n"
+            "## Plan of Work\nText.\n\n"
+            "## Concrete Steps\nText.\n\n"
+            "## Validation and Acceptance\nText.\n\n"
+            "## Idempotence and Recovery\nText.\n\n"
+            "## Artifacts and Notes\nText.\n\n"
+            "## Interfaces and Dependencies\nText.\n"
+        )
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Covered |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            ),
+            plan_status="final",
+            plan_body=plan_body,
+        )
+        report_file = self.session_dir / "test_report_01.md"
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
+        postmortem_file = self.session_dir / "test_postmortem_01.md"
+        postmortem_file.write_text(
+            "---\n"
+            "doc_type: postmortem\n"
+            "id: test_postmortem_01\n"
+            "status: final\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            "child_spec: \"\"\n"
+            "---\n\n"
+            "# Postmortem\n"
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results["execplan_issues"]), 0)
 
     def test_strict_mode_fails_when_final_report_lacks_postmortem(self):
         self._write_standard_docs(

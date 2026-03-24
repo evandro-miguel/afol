@@ -4,8 +4,8 @@ theme: agents-config
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-20T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-20 00:00:00-03:00
+updated_at: '2026-03-23T20:38:52-03:00'
 links:
   tools_json: ./tools-json.md
   config_file: ../agents.config
@@ -32,6 +32,7 @@ Provides:
 3. **Path resolution** - Absolute paths
 4. **Timezone parsing** - Offset to datetime
 5. **Time helpers** - Correct timestamp format
+6. **Provider defaults** - Stable defaults for optional integrations such as external memory
 
 ## What It Touches
 
@@ -82,6 +83,14 @@ lint:
     - arc/structure/
     - scripts/.agent/docs/
     - z-arq/
+
+memory:
+  enabled: true
+  provider: "basic_memory"
+  mode: "contract"
+  authority: "auxiliary"
+  project: "main"
+  runtime_server: "basic_memory"
 ```
 
 ## How to Use
@@ -122,6 +131,7 @@ def parse_offset(offset_str: str) -> timezone:
 1. Add to `.agents/agents.config`
 2. Add default in `load_agents_config()`
 3. Update this document
+4. If the option feeds a user-facing command, update the corresponding tool doc and standards usage docs
 
 ## How to Test
 
@@ -136,6 +146,7 @@ assert 'time' in config
 ## Related
 
 - [tools-json.md](./tools-json.md) - Tool catalog
+- [agents-memory.md](./agents-memory.md) - External memory adapter
 - `.agents/agents.config` - Configuration file
 
 ---

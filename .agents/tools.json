@@ -271,6 +271,38 @@
       ]
     },
     {
+      "id": "repo-map",
+      "name": "Agents Repo Map",
+      "tool": "agents-repo-map.py",
+      "wrapper_command": ".agents/agents repo-map [path] [--output <dir>] [--runner <path>] [--image <tag>] [--dry-run]",
+      "make_command": "make repo-map [TARGET_PATH=. OUTPUT_DIR=.agents/arc/map RUNNER=/path/to/run-repo-map.sh IMAGE=docker-analisys-tools:latest DRY=1]",
+      "type": "documentation",
+      "execution_mode": "on-demand",
+      "created_at": "2026-03-23",
+      "updated_at": "2026-03-23",
+      "description": "Runs the deep repository analysis pipeline and refreshes the full current-state codemap under .agents/arc/map using the external docker-analisys-tools runner.",
+      "when_to_use": [
+        "When .agents/arc/map needs a fresh repository-wide codemap",
+        "After major architectural refactors, file moves, or domain boundary changes",
+        "Before deep architecture analysis that should rely on generated artifacts instead of broad manual reading",
+        "When onboarding a repo that needs current-state maps beyond the lightweight structure map"
+      ],
+      "options": [
+        "path: Optional repository root to analyze (default: current directory)",
+        "--output: Override the map output directory",
+        "--runner: Explicit path to run-repo-map.sh",
+        "--image: Docker image tag for the analysis toolbox",
+        "--dry-run: Print the resolved runner command without executing it"
+      ],
+      "checks": [
+        "Resolves repo root and map output path deterministically",
+        "Finds the external run-repo-map.sh runner via CLI flag, env var, config, or default hint",
+        "Ensures the output root exists before execution",
+        "Fails if required root codemap docs are missing after the run"
+      ],
+      "output": "Generated or refreshed codemap markdown files and raw evidence under .agents/arc/map and .agents/arc/map/extra"
+    },
+    {
       "id": "sync",
       "name": "Sync Agent Docs",
       "tool": "sync-agent-docs.py",
@@ -470,6 +502,7 @@
         "index",
         "lint-docs",
         "structure-map",
+        "repo-map",
         "sync",
         "verify-tasks",
         "session",
@@ -494,7 +527,7 @@
       "id": "skills-sync",
       "name": "Skills Sync",
       "tool": "agents-skills-sync.py",
-      "wrapper_command": ".agents/agents skills-sync <command> [--skills a,b,c]",
+      "wrapper_command": ".agents/agents skills-sync <command> [args]",
       "make_command": "make skills-sync [SKILLS=a,b,c]",
       "type": "synchronization",
       "execution_mode": "on-demand",
@@ -504,6 +537,9 @@
       "when_to_use": [
         "Set up project skill subset from universal-skills",
         "Update local project skills after upstream changes",
+        "Discover available upstream skills from the project itself",
+        "Search skill content before deciding what to install",
+        "Ensure one missing skill into the local project on demand",
         "Validate skill drift and structure contract",
         "Gate full validation with required skills sync checks"
       ],
@@ -516,7 +552,17 @@
         {
           "name": "pull",
           "usage": "skills-sync pull",
-          "description": "Update local mirror from upstream repo"
+          "description": "Update the active local universal-skills source checkout"
+        },
+        {
+          "name": "list",
+          "usage": "skills-sync list [--runtime codex] [--selected|--installed]",
+          "description": "List available or selected skills from the local universal-skills source"
+        },
+        {
+          "name": "search",
+          "usage": "skills-sync search <query> [--runtime codex] [--limit 20]",
+          "description": "Search skill names and SKILL.md content from the local universal-skills source"
         },
         {
           "name": "plan",
@@ -527,6 +573,11 @@
           "name": "apply",
           "usage": "skills-sync apply --skills a,b,c",
           "description": "Apply selected skills to skills/<name>/"
+        },
+        {
+          "name": "ensure",
+          "usage": "skills-sync ensure <skill> [--runtime codex] [--persist]",
+          "description": "Install or refresh one skill into the project on demand"
         },
         {
           "name": "check",
@@ -542,7 +593,7 @@
       "checks": [
         "No forbidden cache/pool directories inside skills/",
         "Every selected skill contains skills/<name>/SKILL.md",
-        "Drift detection between source mirror and project skills"
+        "Drift detection between source repo and project skills"
       ]
     },
     {
@@ -687,6 +738,51 @@
       "output": "Concise knowledge hits, compact reuse digests, or generated index"
     },
     {
+      "id": "memory",
+      "name": "Agents Memory",
+      "tool": "agents-memory.py",
+      "wrapper_command": ".agents/agents memory <command> [args]",
+      "make_command": "make memory-status|memory-search|memory-context|memory-recent|memory-show",
+      "type": "knowledge",
+      "execution_mode": "on-demand",
+      "created_at": "2026-03-23",
+      "updated_at": "2026-03-23",
+      "description": "Emit governed external-memory MCP contracts for interactive runtimes. This command family resolves provider config and exact tool arguments, but does not execute MCP tool calls from shell.",
+      "when_to_use": [
+        "After repo-local knowledge lookup when cross-project context is still needed",
+        "When an interactive runtime needs exact MCP server/tool names and argument contracts",
+        "When maintainers need to inspect or document the configured external-memory provider"
+      ],
+      "commands": [
+        {
+          "name": "status",
+          "usage": "memory status",
+          "description": "Show configured memory provider, project, boundary, and supported commands"
+        },
+        {
+          "name": "search",
+          "usage": "memory search <query> [--runtime codex] [--project <project>] [--search-type hybrid] [--limit 5]",
+          "description": "Emit the exact MCP contract for a memory search"
+        },
+        {
+          "name": "context",
+          "usage": "memory context <topic> [--runtime codex] [--project <project>] [--url memory://...] [--depth 1] [--max-related 3]",
+          "description": "Emit the exact MCP contract for contextual expansion of a memory topic"
+        },
+        {
+          "name": "recent",
+          "usage": "memory recent [--runtime codex] [--project <project>] [--timeframe 7d] [--limit 10]",
+          "description": "Emit the exact MCP contract for recent memory activity"
+        },
+        {
+          "name": "show",
+          "usage": "memory show <identifier> [--runtime codex] [--project <project>]",
+          "description": "Emit the exact MCP contract for loading one memory note"
+        }
+      ],
+      "output": "Provider-aware MCP contracts and boundary guidance for external memory usage"
+    },
+    {
       "id": "check-links",
       "name": "Check Links",
       "tool": "check-links.py",
@@ -724,6 +820,11 @@
     "knowledge-index": "Build reusable knowledge index",
     "knowledge-list": "List knowledge artifacts",
     "knowledge-search": "Search prior findings",
+    "memory-status": "Show external memory provider status",
+    "memory-search": "Emit MCP contract for external memory search",
+    "memory-context": "Emit MCP contract for external memory context expansion",
+    "memory-recent": "Emit MCP contract for recent external memory activity",
+    "memory-show": "Emit MCP contract for one external memory note",
     "sync": "Sincroniza AGENTS.md para agentes",
     "verify": "Verifica conclusao de tarefas",
     "lint": "Valida docs markdown",
@@ -821,7 +922,8 @@
       "description": "Reusable patterns and prior workbench knowledge",
       "tools": [
         "patterns",
-        "knowledge"
+        "knowledge",
+        "memory"
       ],
       "usage_pattern": "Before starting work to suggest approaches"
     },
@@ -854,6 +956,7 @@
         "index",
         "lint-docs",
         "structure-map",
+        "repo-map",
         "sync",
         "verify-tasks",
         "session",
@@ -864,6 +967,7 @@
         "telemetry",
         "patterns",
         "knowledge",
+        "memory",
         "check-links"
       ]
     },
@@ -883,6 +987,7 @@
         "index": "After creating spec/adr",
         "sync": "Apos atualizar AGENTS.md",
         "structure-map": "Ao documentar arquitetura",
+        "repo-map": "Ao precisar regenerar o mapeamento completo do repositório",
         "wb-update touch": "Ao finalizar sessao de trabalho"
       }
     }
@@ -895,6 +1000,8 @@
       "lint": "Exclusoes para validation de docs",
       "doctor": "Pastas e templates obrigatorios",
       "sync": "Arquivos source e target para sincronizacao"
+      ,
+      "memory": "Optional external-memory provider config and MCP contract defaults"
     }
   },
   "best_practices": [
@@ -905,6 +1012,7 @@
     "Use wb-update para automatizar atualizacoes de baixo valor",
     "Rode make all como validation completa antes de commits",
     "Prefira wrapper .agents/agents para execucao direta",
-    "Consulte tools.json para entender quando usar cada ferramenta"
+    "Consulte tools.json para entender quando usar cada ferramenta",
+    "Use repo-local knowledge first and external memory second; keep workbench artifacts canonical"
   ]
 }

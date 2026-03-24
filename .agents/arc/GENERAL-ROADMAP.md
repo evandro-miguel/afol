@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-03-07T18:19:40-03:00'
+updated_at: '2026-03-23T18:05:33-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -184,6 +184,52 @@ updated_at: '2026-03-07T18:19:40-03:00'
   - [ ] Define freshness and cadence rules for updating research/log artifacts during exploration-heavy work.
   - [ ] Add status/review/verify signals for stale or missing working-memory artifacts in major sessions.
   - [ ] Update operator docs so the three-file mental model maps cleanly onto workbench `plan`/`research`/`log` artifacts.
+
+### F-10 Universal Skills Runtime Integration
+- Status: planned
+- Why: The scaffold already ships a basic `skills-sync`, but the upstream universal-skills system is more mature about lockfiles, profiles, host-specific installs, and reproducible project adoption. The scaffold should absorb that model so interactive runtimes such as Codex, OpenCode, Gemini CLI, and Claude Code can bootstrap the right skill surface deterministically.
+- Governing spec: `.agents/arc/SPECS/260323_1704_universal-skills-runtime-integration_spec_01.md`
+- Exit criteria:
+  - Project skill selection can be pinned to a source repo/ref contract instead of only a mutable branch/skill list.
+  - The scaffold can describe and install skill sets by profile or explicit skill list for the supported interactive runtimes.
+  - Bootstrap can prepare downstream repos with a reproducible skills lock/config baseline.
+  - Skills validation can distinguish source contract issues, install drift, and runtime-target compatibility problems.
+- Delivery tasks:
+  - [ ] Define the product contract for lockfile/profile-based universal-skills integration in this scaffold.
+  - [ ] Upgrade `skills-sync` to support pinned source metadata, profiles, and on-demand skill install semantics.
+  - [ ] Integrate the new skills model into bootstrap for fresh and partial installs.
+  - [ ] Add validation and test coverage for the supported runtime targets and lockfile semantics.
+  - [ ] Update operator docs so project maintainers understand local vs upstream skill ownership and upgrade flow.
+
+### F-11 Current-State Maps and Goal-State Governance
+- Status: planned
+- Why: The scaffold already distinguishes roadmap/spec/workbench governance from execution, but it still lacks an explicit contract for separating descriptive current-state project maps from goal-state product and architecture intent. As downstream repos adopt heavier codemap and analysis surfaces under `.agents/arc/map/`, the scaffold needs to prevent those artifacts from being mistaken for roadmap/spec governance sources.
+- Governing spec: `.agents/arc/SPECS/260323_1741_current-state-maps-and-goal-state-governance_spec_01.md`
+- Exit criteria:
+  - `.agents/arc/map/` is explicitly defined as the current-state, descriptive, non-governance surface for repository maps, codemaps, and analysis evidence.
+  - Desired-state docs remain outside `arc/map/` and stay canonical for architecture intent, roadmap, project brief, tech stack, ADRs, and feature specs.
+  - Workstreams and operator docs explain when to consume `arc/map/` as evidence and when to use roadmap/specs as the governing source of truth.
+  - Bootstrap and project documentation can explain the split without introducing a second planning or verification system.
+- Delivery tasks:
+  - [ ] Define the document taxonomy for current-state vs goal-state artifacts.
+  - [ ] Define `arc/map/` boundaries, ownership, and refresh semantics.
+  - [ ] Define how roadmap/spec/workbench flows may reference maps without promoting them to governance sources.
+  - [ ] Plan the documentation, bootstrap, and command changes needed to adopt the split safely.
+
+### F-12 ExecPlan-Native Planning System
+- Status: planned
+- Why: The scaffold already requires plans for major work, but the current `plan.md` is still too static and governance-oriented compared with the stronger ExecPlan pattern described for Codex. Plans should be living, self-contained, novice-guiding documents that remain executable from the plan file alone while still fitting this repo's roadmap/spec/workbench model.
+- Governing spec: `.agents/arc/SPECS/260323_1815_execplan-native-planning-system_spec_01.md`
+- Exit criteria:
+  - The scaffold has a canonical `PLANS.md` contract adapted to workbench-based planning.
+  - `AGENTS.md` and operator docs explain when to use ExecPlans and where they live in this repo.
+  - The plan template is upgraded with required living-document sections such as progress, discoveries, decisions, and outcomes.
+  - Strict verification can detect final plans that lack required ExecPlan sections or a maintained progress checklist.
+- Delivery tasks:
+  - [ ] Define the adapted ExecPlan contract for this scaffold and how it maps into roadmap/spec/workbench artifacts.
+  - [ ] Update `AGENTS.md`, README, workflow docs, and the plan template to reflect the ExecPlan model.
+  - [ ] Add strict verification for required ExecPlan sections and living-plan progress tracking.
+  - [ ] Add tests proving the new plan requirements are enforced and the template remains usable.
 
 ## 5) Prioritization
 Score inputs:

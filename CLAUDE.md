@@ -5,14 +5,21 @@
 
 ## Project Overview
 
-This repository is a base scaffold for an `AGENTS`-based workflow system used to coordinate LLM-assisted development. It provides standardized tooling for creating workstreams, tracking tasks, validating docs, and collecting telemetry across projects.
+This repository is a base scaffold for an `AGENTS`-based workflow system used to coordinate LLM-assisted development. It is designed for interactive agent runtimes that operate through CLI products such as Codex CLI, OpenCode, Gemini CLI, Claude Code, and similar terminal-first agents. It provides standardized tooling for creating workstreams, tracking tasks, validating docs, and collecting telemetry across projects.
 
 ## Current Stack
 
 - **Main language:** Python 3.11+
-- **Runtime and tooling:** Python scripts (`.agents/scripts/*`), Bash wrappers, Make, shell-based automation
+- **Runtime and tooling:** Python scripts (`.agents/scripts/*`), Bash wrappers, Make, shell-based automation, runtime adapter docs for interactive agent CLIs
 - **Package manager:** `uv` (for Python environment/dependency management)
 - **Docs/data formats:** Markdown, YAML, JSON, TOML
+
+## Runtime Positioning
+
+- This scaffold is for interactive agent execution environments, not for embedding a general-purpose agent SDK into an application runtime.
+- The primary execution model is: an operator opens a repository in an interactive CLI agent, and the scaffold provides the governance, docs, tools, telemetry, and runtime adapters that the agent uses while working.
+- Runtime folders such as `.opencode/`, `.codex/`, `.qwen/`, `.claude/`, and `.gemini/` should stay thin and focused on adapter/configuration concerns for those interactive CLIs.
+- Do not redesign the scaffold around long-lived backend agent services unless the roadmap explicitly introduces that use case.
 
 ## Repo Structure
 
@@ -81,10 +88,15 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 
 ### Planning Intelligence (Mandatory For Major Work)
 
+- For major work, the workbench plan file is an ExecPlan and must follow `PLANS.md`
+- The canonical ExecPlan path is `.agents/wb/<session_id>/<session_id>_plan_01.md`
+- ExecPlans must stay self-contained and living: keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current while work proceeds
 - Major plans must link to a brainstorm artifact before the plan can be considered complete
 - Major plans must link to an explorer-check artifact proving the current repo was inspected
 - Search prior findings through `.agents/agents knowledge` before broad repo rereads when relevant
 - Prefer `.agents/agents knowledge pull "<topic>"` before opening full historical docs so the first pass stays compact
+- If external memory integration is enabled, use `.agents/agents memory search|context "<topic>"` after repo-local `knowledge` lookup when cross-project context is still needed
+- Treat external memory as auxiliary retrieval only; never replace `.agents/wb/` or repo-local `knowledge` as canonical project state
 - Final session closure requires a finalized postmortem
 
 ### Demand Elegance (Balanced)
@@ -143,10 +155,26 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 
 ### Primary Runtime Compatibility
 
-- Treat OpenCode, Codex, and Qwen as the primary supported runtimes for this scaffold
+- Treat OpenCode, Codex, Qwen, Gemini CLI, and Claude Code style interactive runtimes as the primary supported environments for this scaffold
 - Keep `AGENTS.md` and `.agents/*` as the canonical governance layer across all runtimes
 - Keep committed runtime adapters thin, secret-free, and traceable back to canonical governance
 - Never commit runtime credentials, auth state, or user-local machine configuration
+- Prefer changes that improve terminal-first interactive execution over changes that only benefit embedded SDK/server scenarios
+
+### Project-Local Skills Preferred
+
+- Prefer project-local skills under `.agents/skills/` as the main skill surface for Codex, OpenCode, Qwen, Claude Code, and Gemini CLI in this repo.
+- Keep global Codex skills lean; do not rely on a large machine-global skill set as the primary source of project behavior.
+- Use the sibling `../universal-skills` checkout as the reusable upstream source when the repo lives under an `apps/` workspace.
+- Bootstrap and `skills-sync` should prepare the project-local skill surface so each repository carries only the subset it actually needs.
+
+### Optional External Memory
+
+- The scaffold may expose an optional `memory` adapter for external memory providers such as `basic_memory`.
+- Use `.agents/agents memory status` to inspect the configured provider/project/runtime contract.
+- Use `.agents/agents memory search|context|recent|show` to emit exact MCP contracts for interactive runtimes when cross-project context is needed.
+- The `memory` command family is contract-only in the scaffold. It governs how agents should call memory MCP tools through the host runtime; it does not execute MCP tool calls from shell.
+- Keep repo-local workbench docs and `knowledge` canonical. External memory is for auxiliary retrieval and curated reuse, not for live task/plan/report authority.
 
 ---
 

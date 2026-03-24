@@ -1,0 +1,30 @@
+[project]
+name = "writing-skills-scripts"
+version = "0.1.0"
+description = "Skill evaluation and improvement scripts for writing-skills"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.40.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[project.scripts]
+run-eval = "scripts.run_eval:main"
+run-loop = "scripts.run_loop:main"
+improve-description = "scripts.improve_description:main"
+aggregate-benchmark = "scripts.aggregate_benchmark:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

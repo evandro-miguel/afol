@@ -1,8 +1,8 @@
 # .agents - Agentic Workflow System
 
-Operating system for agentic LLM workflows with automated telemetry and element heat scoring.
+Operating system for interactive agentic CLI workflows with automated telemetry and element heat scoring.
 
-Primary supported runtimes: OpenCode, Codex, and Qwen.
+Primary supported runtimes: OpenCode, Codex, Qwen, Gemini CLI, and Claude Code style interactive agents.
 
 ## 🎯 Overview
 
@@ -15,6 +15,8 @@ Primary supported runtimes: OpenCode, Codex, and Qwen.
 - **Heat scoring** - Identifies hot/cold elements by period (daily, weekly, monthly)
 - **Pattern catalog** - Catalog of patterns and anti-patterns with automatic suggestions
 - **Self-improvement** - Lessons learned system after each correction
+
+This scaffold is built for interactive, terminal-first agent sessions. It is not positioned as an application SDK for embedding long-lived agent runtimes into backend services.
 
 ## 📁 Repository Structure
 
@@ -87,12 +89,67 @@ make doctor
 .agents/agents new update-docs --quick
 ```
 
+### Bootstrap Another Repo
+
+```bash
+# Full bootstrap for a new or mostly empty repo
+./.agents/agents bootstrap /path/to/target-repo
+
+# Partial install for an existing project with live content
+./.agents/agents bootstrap /path/to/existing-project --partial
+
+# If the target lives under .../apps/<repo>, bootstrap also prepares
+# .../apps/universal-skills as the sibling upstream source checkout.
+```
+
 ### Runtime Entry Points
 
 - `AGENTS.md` is the canonical instruction source.
 - `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, and `GEMINI.md` are runtime-facing mirrors generated from it.
 - `opencode.json` is the committed OpenCode project adapter and must remain secret-free.
 - Runtime folders such as `.opencode/`, `.codex/`, and `.qwen/` should only contain project-safe adapters and docs.
+- The scaffold should be optimized for interactive CLI agent execution paths first; embedded SDK/server use cases are secondary and should not drive the default structure.
+- Bootstrap exports a generic, history-free baseline for downstream repos and supports a partial install mode that preserves existing project-owned files.
+- The exported baseline separates goal-state canon in `.agents/arc/` from optional current-state evidence in `.agents/arc/map/`.
+- The skills baseline is treated as an adoption artifact, not as scaffold-local history; downstream repos should pin their own selection and evolve it from there.
+
+### Skills Source and Discovery
+
+```bash
+# Show the active upstream source checkout and manifest state
+./.agents/agents skills-sync status
+
+# List available upstream skills from the local source checkout
+./.agents/agents skills-sync list --runtime codex
+
+# Search by keyword across skill names and SKILL.md content
+./.agents/agents skills-sync search markdown --runtime codex
+
+# Ensure one skill is installed in .agents/skills/
+./.agents/agents skills-sync ensure writing-skills --runtime codex
+```
+
+- Preferred upstream source checkout: `../universal-skills` relative to the repo root.
+- Compatibility fallback: `.agents/cache/universal-skills` if an older repo still has the legacy cache clone.
+- The scaffold should not depend on global Codex skills for universal-skills content.
+- Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and project-agnostic.
+
+### Optional External Memory
+
+```bash
+# Show the configured external-memory provider and boundary rules
+./.agents/agents memory status
+
+# Emit the exact MCP contract for a cross-project memory search
+./.agents/agents memory search "agent memory mcp integration" --runtime codex
+
+# Emit the exact MCP contract for contextual expansion around a topic
+./.agents/agents memory context "persistent planning memory" --runtime codex
+```
+
+- `memory` is a governed adapter for interactive runtimes, not a shell-side MCP executor.
+- Use repo-local `knowledge` first, then `memory`, then targeted repo rereads when needed.
+- External memory remains auxiliary; `.agents/wb/` and repo-local `knowledge` stay canonical.
 
 ### 3. Work
 
@@ -100,6 +157,10 @@ make doctor
 # Reuse prior findings before deep exploration when relevant
 .agents/agents knowledge search runtime
 .agents/agents knowledge pull runtime
+
+# If configured, emit exact MCP contracts for cross-project memory lookup
+.agents/agents memory search "agent memory"
+.agents/agents memory context "session catchup"
 
 # Use tools (automatic telemetry)
 .agents/agents doctor
@@ -241,7 +302,7 @@ make patterns-apply PATTERN_ID=PAT-001
 
 ### Available Templates
 
-- `plan.md` - Workstream planning
+- `plan.md` - Workstream ExecPlan (living execution document)
 - `task.md` - Task list with IDs
 - `log.md` - Decision timeline
 - `report.md` - Outcome report
@@ -250,6 +311,13 @@ make patterns-apply PATTERN_ID=PAT-001
 - `explorer-check.md` - Current-project exploration proof
 - `research.md` - Research
 - `postmortem.md` - Mandatory final session closure artifact
+
+### ExecPlans
+
+- Non-trivial work should use the workbench plan as a living ExecPlan.
+- The canonical contract lives in `PLANS.md`.
+- The canonical file path is `.agents/wb/<session_id>/<session_id>_plan_01.md`.
+- Finalized plans are strictly verified for required ExecPlan sections and maintained `Progress`.
 
 ### Required Frontmatter
 
@@ -285,6 +353,7 @@ updated_at: "2026-02-23T00:00:00-03:00"
 make setup          # Setup UV virtualenv
 make doctor         # Validate .agents structure
 make clean          # Clean caches
+make lint-scripts   # Lint Python operational scripts
 make all            # Bootstrap-safe full validation
 ```
 
@@ -330,8 +399,12 @@ make patterns-rate      # Rate pattern
 .agents/agents verify-tasks     # Verify tasks
 .agents/agents status           # Show session status
 .agents/agents wb-update touch  # Update session
+.agents/agents bootstrap /path/to/target-repo --dry-run  # Preview generic export to another repo
+.agents/agents bootstrap /path/to/existing-project --partial  # Partial install for a live repo
+make agents-all  # Aggregate scaffold validations when local Makefile already owns `all`
 .agents/agents tools list       # List tools
 .agents/agents structure-map .  # Map structure
+.agents/agents repo-map .       # Refresh full repository codemap
 
 # Telemetry
 .agents/agents telemetry heat   # Heat map
@@ -417,7 +490,7 @@ make telemetry-cold PERIOD=monthly TYPE=tools
 1. Create workstream: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite`
 2. Follow templates from `a-docs/templates/`
 3. Apply relevant patterns
-4. Validate: `make lint && make test-scripts && make all`
+4. Validate: `make lint && make lint-scripts && make test-scripts && make all`
 5. Report: `make wb-files-changed`
 
 ## 📄 License

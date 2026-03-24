@@ -4,8 +4,8 @@ theme: verify-tasks
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-20T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-20 00:00:00-03:00
+updated_at: '2026-03-23T18:05:33-03:00'
 links:
   tools_json: ./tools-json.md
   lint_docs: ./agents-lint-docs.md
@@ -31,6 +31,7 @@ Checks task completion:
 3. **Classifies status** - pending, in_progress, done, etc.
 4. **Reports** - Lists status of each task
 5. **Exit code** - 0 if all complete, 1 if pending
+6. **Strict plan checks** - Validates final plans against the ExecPlan contract from `PLANS.md`
 
 ## What It Touches
 
@@ -39,6 +40,8 @@ Checks task completion:
 | File | Purpose |
 |------|---------|
 | `.agents/wb/*/`*`_task_*.md` | Task files to verify |
+| `.agents/wb/*/`*`_plan_*.md` | Final ExecPlan sections and progress state in strict mode |
+| `PLANS.md` | Canonical planning contract referenced by docs and templates |
 
 ### Files Written
 
@@ -85,6 +88,9 @@ Edit regex `TASK_LINE_RE`.
 
 # Via Makefile
 make verify
+
+# Strict verification for session closure
+./.agents/scripts/.venv/bin/python .agents/scripts/verify-tasks.py --strict .agents/wb/<session>/
 ```
 
 ## Output
@@ -103,6 +109,12 @@ T-03: Write tests - in_progress (file.md:28)
 
 Complete: 3/5 (60%)
 ```
+
+## Strict Mode Notes
+
+- Final plans must keep the required ExecPlan sections.
+- Final plans must maintain a checkbox-based `Progress` section.
+- Final reports still require a finalized postmortem.
 
 ## Related
 

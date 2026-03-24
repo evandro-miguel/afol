@@ -1,0 +1,185 @@
+{
+  "repo": "agentic_start_folder",
+  "version": "v2026-03-23_2",
+  "previous_version": "v2026-03-23_1",
+  "analysis_mode": "standard",
+  "mixed_language_repo": 0,
+  "large_repo": 0,
+  "monorepo_like": 0,
+  "requires_full_map_before_comparison": 0,
+  "run_date": "2026-03-23",
+  "run_sequence": 2,
+  "repo_root": "/work/repo",
+  "host_repo_root": "/home/ozy/apps/agentic_start_folder",
+  "host_out_root": "/home/ozy/apps/agentic_start_folder/.agents/arc/map",
+  "host_extra_root": "/home/ozy/apps/agentic_start_folder/.agents/arc/map/extra",
+  "target_dirs": [
+    "."
+  ],
+  "runtime_target_dirs": [
+    "."
+  ],
+  "detected_languages": [],
+  "runtime_versions": {},
+  "stack_versions": {},
+  "package_managers": [],
+  "frontend_dirs": [],
+  "backend_dirs": [],
+  "stacks": {
+    "bun": 0,
+    "typescript": 0,
+    "javascript": 0,
+    "python": 0,
+    "react": 0,
+    "vite": 0,
+    "vitest": 0,
+    "biome": 0,
+    "convex": 0,
+    "tanstack": 0,
+    "zod": 0,
+    "sqlite": 0,
+    "docker": 0,
+    "shadcn": 0
+  },
+  "generated_at_utc": "2026-03-23T21:28:11Z",
+  "summary": {
+    "version": "v2026-03-23_2",
+    "target_dirs": [
+      "."
+    ],
+    "domains": [
+      ".agents"
+    ],
+    "domain_file_counts": {
+      ".agents": 0
+    },
+    "top_features": [
+      ".agents/scripts",
+      ".agents/.cache",
+      ".agents/skills"
+    ],
+    "module_count": 43,
+    "dependency_edges": 0,
+    "cycle_count": 0,
+    "orphan_count": 1,
+    "route_file_count": 0,
+    "route_raw_matches": 0,
+    "route_files": [],
+    "frontend_route_file_count": 0,
+    "frontend_route_files": [],
+    "tanstack_route_count": 0,
+    "tanstack_route_files": [],
+    "tanstack_query_file_count": 0,
+    "tanstack_query_files": [],
+    "fetch_file_count": 0,
+    "fetch_raw_matches": 0,
+    "fetch_files": [],
+    "zod_schema_file_count": 0,
+    "zod_schema_files": [],
+    "sqlite_usage_file_count": 0,
+    "sqlite_usage_files": [],
+    "public_boundary_count": 0,
+    "public_boundary_files": [],
+    "top_hotspots": [
+      ".agents/scripts/lib/execution_commands.py",
+      ".agents/.cache/upstream/snapshot-origin-main/.agents/scripts/agents-tools.py",
+      ".agents/skills/writing-skills/scripts/check-skill.js",
+      ".agents/scripts/verify-tasks.py",
+      ".agents/.cache/upstream/snapshot-origin-main/.agents/scripts/agents-wb-update.py",
+      ".agents/scripts/agents-telemetry.py",
+      ".agents/.cache/upstream/snapshot-origin-main/.agents/scripts/agents-structure-map.py",
+      ".agents/skills/writing-skills/scripts/skill-advisor.js",
+      ".agents/.cache/upstream/snapshot-origin-main/.agents/scripts/agents-lint-docs.py",
+      ".agents/scripts/agents-skills-sync.py",
+      ".agents/skills/writing-skills/scripts/fix-skill.js",
+      ".agents/skills/writing-skills/scripts/create-skill.js",
+      ".agents/scripts/agents-new.py",
+      ".agents/scripts/agents-wb-update.py",
+      ".agents/scripts/agents-tools.py"
+    ],
+    "top_hubs": [
+      ".claude/skills/typescript-skill/references/utility-types.ts",
+      ".claude/skills/writing-skills/scripts/check-skill.js",
+      ".claude/skills/writing-skills/scripts/check-tier-migration.js",
+      ".claude/skills/writing-skills/scripts/check-universal-skills-sync.js",
+      ".claude/skills/writing-skills/scripts/cleanup-empty-folders.js",
+      ".claude/skills/writing-skills/scripts/create-skill.js",
+      ".claude/skills/writing-skills/scripts/fix-skill.js",
+      ".claude/skills/writing-skills/scripts/skill-advisor.js",
+      ".claude/skills/writing-skills/scripts/skill-files.js",
+      ".claude/skills/writing-skills/scripts/skill-read.js",
+      ".codex/skills/typescript-skill/references/utility-types.ts",
+      ".codex/skills/writing-skills/scripts/check-skill.js"
+    ],
+    "top_finding_files": [],
+    "semgrep_auto_count": 0,
+    "semgrep_custom_count": 0,
+    "stacks": [],
+    "runtime_versions": {},
+    "stack_versions": {},
+    "symbol_counts_by_kind": {
+      "classes": 0,
+      "functions": 0,
+      "types": 0,
+      "values": 0
+    },
+    "previous_symbol_catalog_note": "",
+    "derived_docs": [
+      "LLM_QUICKSTART.md",
+      "CLI_REFERENCE.md"
+    ],
+    "doc_hashes": {
+      "README.md": "0c792f24352a507e4d78f551277d325d49d024e3",
+      "ARCHITECTURE.md": "f35f6c30213076606f139e216b93c9d036a2f9c8",
+      "FEATURES.md": "0fa991a85be32a4434b9515d4bf6e1838565e9d2",
+      "BACKEND.md": "421694b7a3a3de5b3e0693e56679a247ec27a3f3",
+      "FRONTEND.md": "b0b25873a52b2d9473b7f96b956758e839c6b617",
+      "API_MAP.md": "1c4337c779b6fb76d8f9a8c78147f869b9f7260e",
+      "CONNECTIONS.md": "ff834f50f4854a1b525d2e33e0565364d003a482",
+      "DEPENDENCY_GRAPH.md": "c01d7269f76853f9ff4d0b982364e4bbf13d079c",
+      "HOTSPOTS.md": "c2c97118890cd953a7ed8e53552ce91c4ea1e7d3",
+      "SYMBOLS.md": "e4a86a48c62b2c8c69c7173fcd986f4918da7ea8",
+      "LLM_QUICKSTART.md": "63e0bbc94be9b0e7fb126e4e81e98e5234e1b821",
+      "CLI_REFERENCE.md": "6096097542356422044d6e71683a143a737dd711",
+      "CHANGELOG.md": "580c38d2b7acb96981c9d38a5516c2b92d22fe98"
+    },
+    "domain_hashes": {
+      ".agents.md": "c3cfc6504863eb1072b1f9a6d673fe3d4dc70187",
+      "README.md": "fa74fdc49a9fc7ad5f737f22fcc682ad9853abec"
+    }
+  },
+  "map_created_at": "2026-03-23T21:25:46Z",
+  "last_updated_at": "2026-03-23T21:28:11Z",
+  "derived_docs": [
+    "LLM_QUICKSTART.md",
+    "CLI_REFERENCE.md"
+  ],
+  "generated_files": [
+    "README.md",
+    "CHANGELOG.md",
+    "ARCHITECTURE.md",
+    "FEATURES.md",
+    "BACKEND.md",
+    "FRONTEND.md",
+    "API_MAP.md",
+    "CONNECTIONS.md",
+    "DEPENDENCY_GRAPH.md",
+    "HOTSPOTS.md",
+    "SYMBOLS.md",
+    "LLM_QUICKSTART.md",
+    "CLI_REFERENCE.md",
+    "domains/",
+    "extra/"
+  ],
+  "derived_doc_candidates": [
+    "LLM_QUICKSTART.md",
+    "CLI_REFERENCE.md"
+  ],
+  "derived_docs_generated_this_run": [
+    "CLI_REFERENCE.md"
+  ],
+  "phase5_artifacts": [
+    "cli-surface.json",
+    "data-models.json"
+  ]
+}

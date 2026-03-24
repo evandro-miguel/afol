@@ -4,7 +4,7 @@ id: scripts-reference
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-02-24T13:05:14-03:00'
+updated_at: '2026-03-23T20:38:52-03:00'
 ---
 
 # Agents System - Quick Reference
@@ -40,12 +40,20 @@ make all           # Full validation workflow
 | `make verify-active` | Check task completion for active session only | - |
 | `make lint` | Lint markdown docs | - |
 | `make skills-init` | Initialize universal skills sync | - |
-| `make skills-pull` | Update universal skills mirror | - |
+| `make skills-pull` | Update universal skills source checkout | - |
+| `make skills-list` | List available or selected upstream skills | `RUNTIME=codex`, `PROFILE=x`, `SELECTED=1`, `INSTALLED=1` |
+| `make skills-search` | Search upstream skills by keyword | `QUERY=x`, `RUNTIME=codex`, `PROFILE=x`, `LIMIT=20`, `SELECTED=1` |
 | `make skills-plan` | Preview selected skills drift/missing state | `SKILLS=a,b,c` |
 | `make skills-apply` | Apply selected skills to project skills/ | `SKILLS=a,b,c` |
+| `make skills-ensure` | Ensure one skill into project skills/ | `SKILL=name`, `RUNTIME=codex`, `PROFILE=x`, `PERSIST=1`, `PULL=1` |
 | `make skills-status` | Show skills sync status/config | - |
 | `make skills-check` | Validate skills structure and sync state | `SKILLS=a,b,c` |
 | `make skills-sync` | Pull + apply + check selected skills | `SKILLS=a,b,c` |
+| `make memory-status` | Show external memory provider and boundary | - |
+| `make memory-search` | Emit external memory MCP contract for search | `QUERY=x`, `RUNTIME=codex`, `PROJECT=x`, `LIMIT=5` |
+| `make memory-context` | Emit external memory MCP contract for context | `TOPIC=x`, `RUNTIME=codex`, `PROJECT=x`, `URL=memory://...` |
+| `make memory-recent` | Emit external memory MCP contract for recent activity | `TIMEFRAME=7d`, `RUNTIME=codex`, `PROJECT=x` |
+| `make memory-show` | Emit external memory MCP contract for one note | `NOTE=x`, `RUNTIME=codex`, `PROJECT=x` |
 | `make wb-touch` | Update `updated_at` in one session docs | `SESSION_ID=<session-id>` `[FILE=<path>]` |
 | `make wb-normalize-time` | Normalize WB timestamps to configured offset | - |
 | `make wb-files-changed` | Refresh report `Files Changed` from git | `SESSION_ID=<session-id>` or `REPORT=<report-file>` |
@@ -123,7 +131,10 @@ Alternative to Makefile:
 .agents/agents doctor
 .agents/agents new auth-refactor --spec
 .agents/agents structure-map . --output .agents/arc/structure/
+.agents/agents repo-map .
 .agents/agents status --session <session-id>
+.agents/agents memory status
+.agents/agents memory search "agent memory" --runtime codex
 ```
 
 ## UV Scripts
@@ -140,6 +151,20 @@ uv run --with pyyaml .agents/scripts/agents-new.py my-feature --spec
 All scripts use `.agents/agents.config` as single source of configuration.
 Legacy fallback: `agents.config` at repository root.
 
+### Optional External Memory
+
+```bash
+make memory-status
+make memory-search QUERY="persistent planning memory" RUNTIME=codex
+make memory-context TOPIC="persistent planning memory" RUNTIME=codex
+make memory-show NOTE="projects/260311-basic-memory-implementation/current-state"
+```
+
+The `memory` command family is contract-only in the scaffold:
+- it emits exact MCP server/tool/argument guidance for interactive runtimes
+- it does not execute MCP calls from shell
+- it complements repo-local `knowledge` instead of replacing canonical workbench state
+
 ---
 *Reference: `.agents/scripts/QUICKSTART.md`*
 
@@ -149,7 +174,15 @@ Legacy fallback: `agents.config` at repository root.
 ```bash
 ./.agents/agents bootstrap /path/to/target-repo --dry-run
 ./.agents/agents bootstrap /path/to/target-repo
+./.agents/agents bootstrap /path/to/existing-project --partial
 ```
+
+Bootstrap writes a generic baseline for the target repo and intentionally omits scaffold-local `wb/` history, generated knowledge indexes, telemetry reports, and the scaffold's own roadmap/spec backlog.
+Bootstrap also copies `PLANS.md` so the target repo inherits the canonical ExecPlan contract.
+Use the partial install path for already-live projects so existing files remain intact and the bootstrap only fills missing scaffold surface.
+The skills baseline is intentionally generic here; the upstream universal-skills contract should evolve without turning bootstrap into a second skills distribution system.
+
+For an existing project, use `--partial`. The installer preserves files that already exist unless `--force` is used. If the target repo already owns `make all`, use `make agents-all` for the scaffold's aggregate validation target.
 
 See: `.agents/a-docs/standards/bootstrap-other-repo.md`
 
@@ -158,7 +191,10 @@ See: `.agents/a-docs/standards/bootstrap-other-repo.md`
 
 ```bash
 make skills-init
+make skills-list RUNTIME=codex
+make skills-search QUERY=markdown RUNTIME=codex
 make skills-sync SKILLS=writing-skills,markdownlint-skill
+make skills-ensure SKILL=writing-skills RUNTIME=codex
 make skills-check
 ```
 

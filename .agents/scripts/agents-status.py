@@ -30,10 +30,12 @@ DOCS_TO_DISPLAY = [
     "report",
     "log",
     "roadmap",
+    "architecture",
     "workflow",
     "product",
     "guidelines",
     "tech-stack",
+    "current-state-map",
     "knowledge",
 ]
 
@@ -62,9 +64,11 @@ def print_status(data: Dict[str, object]) -> None:
     print(f"spec: {data['artifacts'].get('spec', '')}")
     print(f"report: {data['artifacts'].get('report', '')}")
     print(f"log: {data['artifacts'].get('log', '')}")
+    print(f"architecture: {data['artifacts'].get('architecture', '')}")
     print(f"product: {data['artifacts'].get('product', '')}")
     print(f"guidelines: {data['artifacts'].get('guidelines', '')}")
     print(f"tech_stack: {data['artifacts'].get('tech-stack', '')}")
+    print(f"current_state_map: {data['artifacts'].get('current-state-map', '')}")
     print(f"ready_state: {data['ready_state']}")
 
 

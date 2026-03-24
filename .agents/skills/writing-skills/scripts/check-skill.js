@@ -16,7 +16,10 @@
 const fs = require("fs");
 const path = require("path");
 
-const MAX_LINES = 500;
+const MAX_LINES = 800;
+const MIN_LINES_FOR_TIER2 = 800;
+const IDEAL_MIN_LINES = 250;
+const IDEAL_MAX_LINES = 800;
 const MAX_DESCRIPTION_LENGTH = 1024;
 const NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const TIER_PATTERN = /^(1|2|3)$/;
@@ -238,7 +241,16 @@ function validateMarkdownFile(filePath, opts = {}) {
   }
 
   if (lineCount > MAX_LINES) {
-    addWarning(`${filePath}: file has ${lineCount} lines (recommended < ${MAX_LINES})`);
+    addError(`${filePath}: file has ${lineCount} lines (max ${MAX_LINES}). Split into smaller files or upgrade to Tier 2 structure.`);
+  } else if (lineCount > IDEAL_MAX_LINES) {
+    addWarning(`${filePath}: file has ${lineCount} lines (ideal: ${IDEAL_MIN_LINES}-${IDEAL_MAX_LINES}). Consider splitting into smaller files.`);
+  } else if (lineCount < IDEAL_MIN_LINES && opts.requireName) {
+    addWarning(`${filePath}: file has ${lineCount} lines (ideal: ${IDEAL_MIN_LINES}-${IDEAL_MAX_LINES})`);
+  }
+
+  // Check if Tier 1 skill exceeds threshold and should migrate to Tier 2
+  if (opts.requireName && lineCount >= MIN_LINES_FOR_TIER2) {
+    addError(`${filePath}: file has ${lineCount} lines (≥${MIN_LINES_FOR_TIER2}). Migrate to Tier 2 structure with references/ directory.`);
   }
 
   if (opts.requireSections && !content.includes("## ")) {

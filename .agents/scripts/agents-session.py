@@ -28,6 +28,14 @@ def _write_active_session(session_id: str) -> None:
     ACTIVE_SESSION_FILE.write_text(f"{session_id}\n", encoding="utf-8")
 
 
+def _print_items(label: str, items: list[str]) -> None:
+    if not items:
+        return
+    print(f"{label}:")
+    for item in items:
+        print(f" - {item}")
+
+
 def _run_strict_verify(session_dir: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(VERIFY_TASKS_SCRIPT), "--strict", str(session_dir)],
@@ -44,6 +52,23 @@ def _resolve_next_session(reference: Optional[str], target: Path) -> Optional[Pa
     if next_session == target:
         raise ExecutionError("--next-session must differ from the session being closed")
     return next_session
+
+
+def _print_task_summary(tasks: Dict[str, object]) -> None:
+    print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
+    nxt = tasks.get("next")
+    if nxt:
+        print(f"next_task: {nxt['task_id']} {nxt['state']} {nxt['notes']}")
+    _print_items("blocked_tasks", list(tasks.get("blocked", [])))
+
+
+def _print_git_summary(git_data: Dict[str, object]) -> None:
+    print(
+        "git_changes: "
+        f"total={git_data['changed']} repo={git_data['repo_changed']} session={git_data['session_changed']}"
+    )
+    _print_items("repo_paths", list(git_data.get("repo_paths", [])))
+    _print_items("session_paths", list(git_data.get("session_paths", [])))
 
 
 def cmd_close(args: argparse.Namespace) -> int:
@@ -100,49 +125,11 @@ def _print_catchup(payload: Dict[str, object]) -> None:
     print(f"roadmap_feature: {payload['roadmap_feature']}")
     print(f"catchup_required: {payload['catchup_required']}")
     print(f"context_ready: {payload['context_ready']}")
-
-    missing = payload.get("missing_context", [])
-    if missing:
-        print("missing_context:")
-        for item in missing:
-            print(f" - {item}")
-
-    tasks = payload["tasks"]
-    print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
-    if tasks["next"]:
-        nxt = tasks["next"]
-        print(f"next_task: {nxt['task_id']} {nxt['state']} {nxt['notes']}")
-    if tasks["blocked"]:
-        print("blocked_tasks:")
-        for item in tasks["blocked"]:
-            print(f" - {item}")
-
-    git_data = payload["git"]
-    print(
-        "git_changes: "
-        f"total={git_data['changed']} repo={git_data['repo_changed']} session={git_data['session_changed']}"
-    )
-    if git_data["repo_paths"]:
-        print("repo_paths:")
-        for item in git_data["repo_paths"]:
-            print(f" - {item}")
-    if git_data["session_paths"]:
-        print("session_paths:")
-        for item in git_data["session_paths"]:
-            print(f" - {item}")
-
-    stale = payload.get("stale_artifacts", [])
-    if stale:
-        print("stale_artifacts:")
-        for item in stale:
-            print(f" - {item}")
-
-    warnings = payload.get("warnings", [])
-    if warnings:
-        print("warnings:")
-        for item in warnings:
-            print(f" - {item}")
-
+    _print_items("missing_context", list(payload.get("missing_context", [])))
+    _print_task_summary(payload["tasks"])
+    _print_git_summary(payload["git"])
+    _print_items("stale_artifacts", list(payload.get("stale_artifacts", [])))
+    _print_items("warnings", list(payload.get("warnings", [])))
     print(f"next_step: {payload['next_step']}")
 
 

@@ -98,14 +98,23 @@ def write_global_context(root: Path) -> dict[str, Path]:
     product = root / "PROJECT-BRIEF.md"
     guidelines = root / "ENGINEERING-GUIDELINES.md"
     tech_stack = root / "TECH-STACK.md"
+    architecture = root / "ARCHITECTURE.md"
+    current_state_map = root / "map-README.md"
     product.write_text("# brief\n", encoding="utf-8")
     guidelines.write_text("# guidelines\n", encoding="utf-8")
     tech_stack.write_text("# stack\n", encoding="utf-8")
+    architecture.write_text("# architecture\n", encoding="utf-8")
+    current_state_map.write_text("# current state\n", encoding="utf-8")
     return {
         "product": product,
         "guidelines": guidelines,
         "tech-stack": tech_stack,
         "tech_stack": tech_stack,
+        "architecture": architecture,
+        "current-state-map": current_state_map,
+        "current_state_map": current_state_map,
+        "current-state": current_state_map,
+        "current_state": current_state_map,
     }
 
 
@@ -142,15 +151,21 @@ class ExecutionCommandFlowTests(unittest.TestCase):
                 product = self.execution_commands.resolve_artifact(session_dir, "product")
                 guidelines = self.execution_commands.resolve_artifact(session_dir, "guidelines")
                 tech_stack = self.execution_commands.resolve_artifact(session_dir, "tech-stack")
+                architecture = self.execution_commands.resolve_artifact(session_dir, "architecture")
+                current_state_map = self.execution_commands.resolve_artifact(session_dir, "current-state-map")
                 active_task = self.execution_commands.resolve_artifact(session_dir, "active_task")
 
             self.assertIsNotNone(product)
             self.assertIsNotNone(guidelines)
             self.assertIsNotNone(tech_stack)
+            self.assertIsNotNone(architecture)
+            self.assertIsNotNone(current_state_map)
             self.assertIsNotNone(active_task)
             self.assertEqual(product.name, "PROJECT-BRIEF.md")
             self.assertEqual(guidelines.name, "ENGINEERING-GUIDELINES.md")
             self.assertEqual(tech_stack.name, "TECH-STACK.md")
+            self.assertEqual(architecture.name, "ARCHITECTURE.md")
+            self.assertEqual(current_state_map.name, "map-README.md")
             self.assertTrue(active_task.name.endswith("_task_01.md"))
 
     def test_implement_start_rejects_out_of_order_task(self):

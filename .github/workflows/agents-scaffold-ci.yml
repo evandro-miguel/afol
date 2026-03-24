@@ -24,6 +24,9 @@ jobs:
       - name: Sync script environment
         run: cd .agents/scripts && uv sync
 
+      - name: Lint scripts
+        run: make lint-scripts
+
       - name: Lint docs
         run: make lint
 

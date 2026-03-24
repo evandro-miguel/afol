@@ -1,9 +1,9 @@
 ---
 doc_type: architecture
-id: "260223_0000_arc_architecture_01"
+id: 260223_0000_arc_architecture_01
 status: active
-created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-02-23T00:00:00Z"
+created_at: '2026-02-23T00:00:00Z'
+updated_at: '2026-03-23T18:06:20-03:00'
 ---
 
 # Architecture
@@ -20,6 +20,7 @@ Architecture documents define **how** the system is structured and how component
 arc/
 ├── ARCHITECTURE.md      # Root architecture document
 ├── GENERAL-ROADMAP.md   # North star and milestones
+├── map/                 # Current-state descriptive maps and analysis surfaces
 ├── structure/           # Project structure maps
 │   ├── README.md
 │   ├── TEMPLATE_structure.md
@@ -55,6 +56,12 @@ arc/
 - Entry points
 - Import conventions
 
+### map/
+- Current-state descriptive repository maps
+- Analysis evidence and codemap-style surfaces
+- Refreshable operator references
+- Never the approval source for roadmap/spec intent
+
 ### Specifications (SPECS/)
 - Full SPEC: new features, architectural changes
 - SPEC LITE: small changes, localized fixes
@@ -80,6 +87,7 @@ Plans and tasks should reference architecture docs:
 - Deprecate (don't delete) old ADRs
 - Link ADRs to implementation tasks
 - Update SPECS INDEX for every new spec
+- Keep `map/` descriptive and refreshable; keep desired-state decisions in roadmap/spec/ADR docs outside that folder
 
 ---
 *Architecture folder: `.agents/arc/`*

@@ -1,10 +1,10 @@
 ---
 doc_type: standard
-id: "000000_000000_workflow-standard_standard_01"
+id: 000000_000000_workflow-standard_standard_01
 status: active
-created_at: 2026-02-23T00:00:00Z
-updated_at: 2026-02-23T00:00:00Z
-title: "Workflow Standards"
+created_at: 2026-02-23 00:00:00+00:00
+updated_at: '2026-03-23T18:06:20-03:00'
+title: Workflow Standards
 ---
 
 # Workflow Standards
@@ -25,13 +25,16 @@ Create or update the governing feature spec in `.agents/arc/SPECS/`
 - Keep implementation detail out of the spec
 - Use child specs when decomposition improves clarity or coordination
 - Local workstreams may choose `spec` or `spec-lite` as needed after the parent spec exists
+- Keep current-state evidence in `.agents/arc/map/` when needed, and keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder
 
 ### Step 3: Plan
 Create a plan file using `.agents/a-docs/templates/plan.md`
 
 - Link the plan to `roadmap_feature` and `parent_spec`
+- Treat the plan as an ExecPlan: a living execution document, not a static memo
+- Follow `PLANS.md` from the repo root when authoring or updating the plan
 - Use the plan to organize delivery, not to invent feature philosophy
-- Identify tools, risks, and verification
+- Keep progress, discoveries, decisions, outcomes, and validation current while work proceeds
 
 ### Step 4: Tasks
 Create task files using `.agents/a-docs/templates/task.md`
@@ -48,6 +51,7 @@ Update log as work progresses
 - Update task status
 - After each meaningful documentation-sensitive change, update the corresponding strategy and process artifacts in the same session
 - Keep this section as the canonical place for execution narrative so agents do not reconstruct work from terminal history alone
+- Use `arc/map/` as descriptive input evidence only; do not treat map artifacts as substitutes for roadmap/spec/workbench authority
 
 ### Step 6: Report
 Create report using `.agents/a-docs/templates/report.md`
@@ -79,6 +83,12 @@ For a new non-trivial feature:
 - Quick mode is not enough
 - Create or update roadmap + parent spec first
 - Then create the workstream
+
+## ExecPlan expectation
+
+- For non-trivial work, the workbench plan file is the canonical ExecPlan for that session.
+- It must be self-contained enough that a new contributor can resume from the plan and repo alone.
+- Finalized plans must keep the required living sections and a checkbox-based progress trail.
 
 ### Documentation-First Completion Rule
 

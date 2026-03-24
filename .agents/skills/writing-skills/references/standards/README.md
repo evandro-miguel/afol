@@ -82,7 +82,7 @@ bun skills/writing-skills/scripts/check-universal-skills-sync.js
 
 **Project-local alternative:**
 ```
-.agent/skills/{skill-name}/SKILL.md
+.agents/skills/{skill-name}/SKILL.md
 ```
 
 ## Tier Structure Matrix
@@ -173,10 +173,12 @@ Skills load into context on-demand. Optimize for token usage:
 
 | Guideline | Reason |
 |-----------|--------|
-| Keep SKILL.md < 500 lines | Reduces context consumption |
+| Keep SKILL.md 250-800 lines | Ideal size for focus and maintainability |
+| Files ≥800 lines must migrate to Tier 2 | Enforces progressive disclosure |
 | Put details in supporting files | Agent reads only what's needed |
 | Use tables for reference data | More compact than prose |
 | Link to `--help` for CLI tools | Avoids duplicating docs |
+| Prefer splitting over summarizing | Preserves tribal knowledge |
 
 ## Supporting Files
 
@@ -264,5 +266,6 @@ Before deploying:
 - [ ] Description starts with "Use when..."?
 - [ ] Triggers listed under metadata?
 - [ ] `tags/triggers/references` use CSV strings?
-- [ ] Under 500 lines?
+- [ ] File size between 250-800 lines?
+- [ ] If ≥800 lines, migrated to Tier 2?
 - [ ] Tested with real scenarios?

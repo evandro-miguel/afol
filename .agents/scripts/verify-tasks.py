@@ -42,6 +42,12 @@ FEATURE_ID_PATTERN = re.compile(CONFIG.get("workflow", {}).get("feature_id_patte
 WORKFLOW_CFG = CONFIG.get("workflow", {})
 REQUIRE_BRAINSTORM_BEFORE_PLAN_FINAL = bool(WORKFLOW_CFG.get("require_brainstorm_before_plan_final", True))
 REQUIRE_EXPLORER_CHECK_BEFORE_PLAN_FINAL = bool(WORKFLOW_CFG.get("require_explorer_check_before_plan_final", True))
+REQUIRE_EXECPLAN_SECTIONS_BEFORE_PLAN_FINAL = bool(
+    WORKFLOW_CFG.get("require_execplan_sections_before_plan_final", True)
+)
+REQUIRE_EXECPLAN_PROGRESS_BEFORE_PLAN_FINAL = bool(
+    WORKFLOW_CFG.get("require_execplan_progress_before_plan_final", True)
+)
 REQUIRE_POSTMORTEM_BEFORE_REPORT_FINAL = bool(WORKFLOW_CFG.get("require_postmortem_before_report_final", True))
 
 # Task status markers
@@ -96,6 +102,21 @@ CONTRADICTION_PHRASES = {
 
 FINAL_OPEN_MARKER_RE = re.compile(r'^\s*-\s\[( |/|%|!|>)\]\s+')
 FUTURE_TOLERANCE = timedelta(minutes=2)
+EXECPLAN_REQUIRED_HEADINGS = [
+    "Purpose / Big Picture",
+    "Progress",
+    "Surprises & Discoveries",
+    "Decision Log",
+    "Outcomes & Retrospective",
+    "Context and Orientation",
+    "Plan of Work",
+    "Concrete Steps",
+    "Validation and Acceptance",
+    "Idempotence and Recovery",
+    "Artifacts and Notes",
+    "Interfaces and Dependencies",
+]
+PROGRESS_MARKER_RE = re.compile(r'^\s*-\s\[( |/|%|!|>|x)\]\s+', re.MULTILINE)
 
 
 def parse_iso_timestamp(value: str) -> datetime:
@@ -554,6 +575,71 @@ def check_planning_intelligence_gates(session_dir: Path) -> List[Dict[str, Any]]
     return issues
 
 
+def _heading_present(content: str, heading: str) -> bool:
+    pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.MULTILINE)
+    return bool(pattern.search(content))
+
+
+def _section_body(content: str, heading: str) -> str:
+    pattern = re.compile(
+        rf"^##\s+{re.escape(heading)}\s*$\n(?P<body>.*?)(?=^##\s+|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(content)
+    return match.group("body") if match else ""
+
+
+def check_execplan_requirements(session_dir: Path) -> List[Dict[str, Any]]:
+    """Validate final plans against the ExecPlan contract."""
+    issues: List[Dict[str, Any]] = []
+    if yaml is None:
+        return issues
+
+    docs = load_frontmatter_docs(session_dir)
+    for plan_doc in [d for d in docs if "_plan_" in d["name"]]:
+        status = str(plan_doc["fm"].get("status", "")).strip().lower()
+        if status != "final":
+            continue
+
+        plan_id = str(plan_doc["fm"].get("id", "")).strip() or plan_doc["name"]
+        body = plan_doc["body"]
+
+        if REQUIRE_EXECPLAN_SECTIONS_BEFORE_PLAN_FINAL:
+            for heading in EXECPLAN_REQUIRED_HEADINGS:
+                if not _heading_present(body, heading):
+                    issues.append(
+                        {
+                            "type": "execplan",
+                            "severity": "error",
+                            "document": plan_doc["name"],
+                            "description": f"Plan {plan_id} is final but missing required ExecPlan section '{heading}'",
+                        }
+                    )
+
+        if REQUIRE_EXECPLAN_PROGRESS_BEFORE_PLAN_FINAL:
+            progress_body = _section_body(body, "Progress")
+            if not progress_body:
+                issues.append(
+                    {
+                        "type": "execplan",
+                        "severity": "error",
+                        "document": plan_doc["name"],
+                        "description": f"Plan {plan_id} is final but missing the ExecPlan progress body",
+                    }
+                )
+            elif not PROGRESS_MARKER_RE.search(progress_body):
+                issues.append(
+                    {
+                        "type": "execplan",
+                        "severity": "error",
+                        "document": plan_doc["name"],
+                        "description": f"Plan {plan_id} is final but Progress has no checkbox entries",
+                    }
+                )
+
+    return issues
+
+
 def check_postmortem_closure(session_dir: Path) -> List[Dict[str, Any]]:
     """Require a finalized postmortem when the report is final."""
     issues: List[Dict[str, Any]] = []
@@ -727,6 +813,7 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
         'coherence_issues': [],
         'governance_issues': [],
         'planning_gate_issues': [],
+        'execplan_issues': [],
         'postmortem_issues': [],
         'final_doc_issues': [],
     }
@@ -850,6 +937,12 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
             if issue.get('severity') == 'error':
                 all_completed = False
 
+        execplan_issues = check_execplan_requirements(session_path)
+        results['execplan_issues'] = execplan_issues
+        for issue in execplan_issues:
+            if issue.get('severity') == 'error':
+                all_completed = False
+
         postmortem_issues = check_postmortem_closure(session_path)
         results['postmortem_issues'] = postmortem_issues
         for issue in postmortem_issues:
@@ -948,6 +1041,13 @@ def print_report(all_completed: bool, results: Dict) -> None:
         else:
             print("  ✓ Planning gate checks passed")
 
+        if results.get('execplan_issues'):
+            print(f"\n❌ ExecPlan Issues: {len(results['execplan_issues'])}")
+            for issue in results['execplan_issues']:
+                print(f"  ⚠️  [{issue.get('severity', 'error').upper()}] {issue['description']}")
+        else:
+            print("  ✓ ExecPlan section checks passed")
+
         if results.get('postmortem_issues'):
             print(f"\n❌ Postmortem Issues: {len(results['postmortem_issues'])}")
             for issue in results['postmortem_issues']:
@@ -1026,6 +1126,8 @@ def print_report(all_completed: bool, results: Dict) -> None:
                 print(f"  - {len(results['governance_issues'])} roadmap/spec governance issue(s) found")
             if results.get('planning_gate_issues'):
                 print(f"  - {len(results['planning_gate_issues'])} planning gate issue(s) found")
+            if results.get('execplan_issues'):
+                print(f"  - {len(results['execplan_issues'])} ExecPlan issue(s) found")
             if results.get('postmortem_issues'):
                 print(f"  - {len(results['postmortem_issues'])} postmortem issue(s) found")
             if results.get('final_doc_issues'):

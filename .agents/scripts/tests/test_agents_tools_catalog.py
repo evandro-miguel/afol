@@ -42,6 +42,18 @@ class AgentsToolsCatalogTests(unittest.TestCase):
             finally:
                 tools_mod.TOOLS_JSON = original
 
+    def test_tools_catalog_includes_memory_tool(self):
+        script_path = Path(".agents/scripts/agents-tools.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        tools_mod = load_module("agents_tools_memory_catalog_test", script_path)
+
+        tools = tools_mod.load_tools()
+        memory_tool = next((tool for tool in tools["tools"] if tool["id"] == "memory"), None)
+
+        self.assertIsNotNone(memory_tool)
+        self.assertEqual(memory_tool["tool"], "agents-memory.py")
+        self.assertIn("memory status", memory_tool["commands"][0]["usage"])
+
 
 if __name__ == "__main__":
     unittest.main()

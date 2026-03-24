@@ -4,8 +4,8 @@ theme: agents-new
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-20T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-20 00:00:00-03:00
+updated_at: '2026-03-23T18:05:33-03:00'
 links:
   tools_json: ./tools-json.md
   templates: ../../templates/
@@ -28,7 +28,7 @@ links:
 Creates new workstream with:
 
 1. **Session folder** - Standardized name
-2. **Plan file** - Planning document
+2. **Plan file** - Canonical ExecPlan for the session
 3. **Task file** - Tasks with checklist
 4. **Log file** - Activity timeline
 5. **Spec file** (optional) - Full or lite specification
@@ -105,6 +105,12 @@ Creates new workstream with:
 ./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done
 ./.agents/agents wb-update touch --session 260224_1200_feature-b
 ```
+
+## ExecPlan Convention
+
+- The generated `*_plan_01.md` file is the session ExecPlan.
+- It must follow `PLANS.md` and stay updated as work progresses.
+- For non-trivial work, do not treat it as a static pre-implementation note.
 
 ## How to Modify
 

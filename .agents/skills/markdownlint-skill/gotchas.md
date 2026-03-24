@@ -361,10 +361,61 @@ Then restart Neovim or run `:Lazy reload`
 **Solution**: Add `./` prefix to all relative links
 ```markdown
 <!-- Instead of: -->
-[Link](references/file.md)
+`[Link](references/file.md)`
 
 <!-- Use: -->
-[Link](./references/file.md)
+`[Link](./references/file.md)`
+```
+
+### VS Code/Marksman shows "link to non existent document"
+
+**Problem**: Editor reports `link to non existent document` for local markdown links
+
+**Cause**:
+- Link path is wrong relative to the current file
+- Target file was renamed or removed
+- Link points to a directory instead of an explicit file (`README.md` or `SKILL.md`)
+
+**Solution**:
+```markdown
+<!-- Prefer explicit relative links -->
+`[Windows API](./references/windows-api.md)`
+`[Commands Index](./references/commands/README.md)`
+```
+
+Quick check for broken local links in one skill:
+```bash
+skill_dir="skills/markdownlint-skill"
+rg -n --pcre2 '\]\((?!https?://|mailto:|#)[^)]+\)' "$skill_dir"
+```
+
+If a directory is linked, change it to an explicit target file:
+```markdown
+<!-- Avoid -->
+`Commands -> ./references/commands/`
+
+<!-- Prefer -->
+`Commands -> ./references/commands/README.md`
+```
+
+### Strict guard fails on `[[wikilink]]`
+
+**Problem**: `links:guard:strict` fails with `MD_WIKILINK_UNSUPPORTED`
+
+**Cause**: strict guard blocks raw wikilinks outside code contexts.
+
+**Solution**:
+```bash
+# Day-to-day pipeline (recommended for mixed repositories)
+bun run lint:docs:full
+
+# Strict pipeline (enforce no raw wikilinks)
+bun run lint:docs:full:strict
+```
+
+If wikilinks are documentation examples, wrap as inline code:
+```markdown
+Use `[[Note]]` for examples in generic markdown docs.
 ```
 
 ### Emacs markdown-mode conflicts

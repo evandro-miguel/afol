@@ -288,17 +288,17 @@ function main() {
     }
   }
 
-  if (!options.skills.length) {
-    for (const mirrorSkill of mirrorSkills) {
-      if (!sourceSet.has(mirrorSkill)) {
-        findings.push({
-          level: "WARN",
-          code: "EXTRA_MIRROR_SKILL",
-          message: `${mirrorSkill} exists in mirror but not in source`,
-        });
-      }
+  for (const mirrorSkill of mirrorSkills) {
+    if (!sourceSet.has(mirrorSkill)) {
+      findings.push({
+        level: "WARN",
+        code: "EXTRA_MIRROR_SKILL",
+        message: `${mirrorSkill} exists in mirror but not in source`,
+      });
     }
+  }
 
+  if (!options.skills.length) {
     for (const sourceSkill of sourceSkills) {
       if (!mirrorSet.has(sourceSkill)) {
         findings.push({

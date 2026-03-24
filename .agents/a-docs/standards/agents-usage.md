@@ -3,7 +3,7 @@ doc_type: standard
 id: agents-usage-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-03-07T18:19:40-03:00'
+updated_at: '2026-03-23T18:40:56-03:00'
 ---
 
 # Agents System Usage
@@ -47,6 +47,14 @@ make all
 .agents/agents session close --session .agents/wb/260223_1200_auth-refactor
 ```
 
+Wrapper contract:
+- Use `.agents/scripts/.venv` directly for normal command execution when it exists.
+- Require `uv` only for setup or environment refresh.
+- Keep UV cache writes inside `.agents/cache/uv/` so the scaffold remains usable in isolated workspaces.
+- Use `./.agents/agents bootstrap /path/to/existing-project --partial` for live repos so project-owned files stay intact.
+- Treat the skills baseline as an adoption artifact, not as scaffold-local history.
+- Treat external memory as an optional, auxiliary retrieval layer; repo-local `knowledge` and `.agents/wb/` remain canonical.
+
 ## Available Commands
 
 ### Setup & Maintenance
@@ -76,12 +84,20 @@ make all
 | `make verify` | Check task completion | - |
 | `make lint` | Validate markdown docs | - |
 | `make skills-init` | Initialize universal skills sync | - |
-| `make skills-pull` | Update universal skills mirror | - |
+| `make skills-pull` | Update universal skills source checkout | - |
+| `make skills-list` | List available or selected upstream skills | `RUNTIME=codex`, `PROFILE=x`, `SELECTED=1`, `INSTALLED=1` |
+| `make skills-search` | Search upstream skills by keyword | `QUERY=x`, `RUNTIME=codex`, `PROFILE=x`, `LIMIT=20`, `SELECTED=1` |
 | `make skills-plan` | Preview selected skills drift/missing state | `SKILLS=a,b,c` |
 | `make skills-apply` | Apply selected skills to `skills/` | `SKILLS=a,b,c` |
+| `make skills-ensure` | Ensure one skill into `skills/` | `SKILL=name`, `RUNTIME=codex`, `PROFILE=x`, `PERSIST=1`, `PULL=1` |
 | `make skills-status` | Show skills sync status/config | - |
 | `make skills-check` | Validate skills structure/sync state | `SKILLS=a,b,c` |
 | `make skills-sync` | Run pull + apply + check | `SKILLS=a,b,c` |
+| `make memory-status` | Show configured external-memory provider/boundary | - |
+| `make memory-search` | Emit MCP contract for external memory search | `QUERY=x`, `RUNTIME=codex`, `PROJECT=x`, `LIMIT=5` |
+| `make memory-context` | Emit MCP contract for memory context expansion | `TOPIC=x`, `RUNTIME=codex`, `PROJECT=x`, `URL=memory://...` |
+| `make memory-recent` | Emit MCP contract for recent memory activity | `TIMEFRAME=7d`, `RUNTIME=codex`, `PROJECT=x` |
+| `make memory-show` | Emit MCP contract for one memory note | `NOTE=x`, `RUNTIME=codex`, `PROJECT=x` |
 | `make wb-touch` | Update `updated_at` in active session docs | - |
 | `make wb-normalize-time` | Normalize `created_at`/`updated_at` to configured WB offset | - |
 | `make wb-files-changed` | Refresh report `Files Changed` section | - |
@@ -99,6 +115,15 @@ make all
 | `make docs` | Structure + index + sync |
 | `make check` | Doctor + lint + verify |
 | `make init` | Setup + doctor |
+
+Bootstrap workflow note:
+- Fresh repos use the full bootstrap path.
+- Existing repos should use the partial install path so the scaffold adds missing files without overwriting the live project unless `--force` is intentionally supplied.
+
+External memory workflow note:
+- Start with repo-local `knowledge` for project history.
+- Use `memory` when cross-project or durable external context is still needed.
+- Do not treat external memory results as authoritative plan/task/report state for the current repo.
 
 ## Scripts Reference
 
@@ -233,6 +258,31 @@ make structure
 - `tests.md` - Test files
 - `data.md` - Data files, constants
 - `.structure-cache.json` - Cache for incremental updates
+
+---
+
+### agents-repo-map.py
+
+Runs the full repository codemap pipeline for `.agents/arc/map/`.
+
+**Features:**
+- Wraps the external `run-repo-map.sh` runner with project-local command semantics
+- Resolves output root, Docker image, and runner path deterministically
+- Validates that required root map docs exist after the run
+- Keeps full current-state mapping separate from lightweight `structure-map`
+
+**Usage:**
+```bash
+make repo-map
+# OR
+.agents/agents repo-map .
+# OR
+.agents/agents repo-map . --dry-run
+```
+
+**Output:**
+- `.agents/arc/map/*.md` - Distilled repository codemap docs
+- `.agents/arc/map/extra/` - Raw evidence and machine-readable artifacts
 
 ---
 
@@ -471,10 +521,19 @@ make tools-check
 # Apply
 ./.agents/agents bootstrap /path/to/target-repo
 
+# Partial install for an existing project
+./.agents/agents bootstrap /path/to/existing-project --partial
+
 # Make wrapper
 make bootstrap TARGET=/path/to/target-repo DRY=1
 make bootstrap TARGET=/path/to/target-repo
+make bootstrap TARGET=/path/to/existing-project PARTIAL=1
 ```
+
+Bootstrap exports a generic starter state. It does not carry over this scaffold's active `wb/` sessions, knowledge index entries, lesson-entry history, telemetry reports, or live roadmap/spec backlog.
+
+For an existing project, use `--partial`: files that already exist in the target repo are preserved unless `--force` is used. That makes it safe to add the scaffold to a live codebase without clobbering project-owned files.
+If the target repo already defines `make all`, the scaffold preserves that target and exposes its aggregate validation entrypoint as `make agents-all`.
 
 Detailed playbook: `.agents/a-docs/standards/bootstrap-other-repo.md`
 

@@ -3,7 +3,7 @@ doc_type: index
 id: agentic-docs-index
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-03-06T20:23:51-03:00'
+updated_at: '2026-03-23T20:38:52-03:00'
 ---
 
 # Documentation Index
@@ -38,6 +38,7 @@ Central index for all `.agents` system documentation.
 | `telemetry` | [agents-telemetry.md](./agents-telemetry.md) | Telemetry collection |
 | `patterns` | [agents-patterns.md](./agents-patterns.md) | Pattern catalog |
 | `knowledge` | [../knowledge/README.md](../knowledge/README.md) | Reusable knowledge layer |
+| `memory` | [agents-memory.md](./agents-memory.md) | External memory contract adapter |
 | `bootstrap` | [agents-bootstrap.md](./agents-bootstrap.md) | Repository bootstrap |
 | `skills-sync` | [agents-skills-sync.md](./agents-skills-sync.md) | Skills sync |
 | `tools-smoke` | [agents-tools-smoke.md](./agents-tools-smoke.md) | Smoke tests |

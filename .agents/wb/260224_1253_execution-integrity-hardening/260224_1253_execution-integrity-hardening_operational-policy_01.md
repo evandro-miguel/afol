@@ -1,6 +1,6 @@
 ---
 doc_type: standard
-id: execution-integrity-operational-policy
+id: 260224_1906_execution-integrity-operational-policy_standard_01
 theme: execution-integrity-hardening
 status: active
 created_at: '2026-02-24T19:06:00-03:00'

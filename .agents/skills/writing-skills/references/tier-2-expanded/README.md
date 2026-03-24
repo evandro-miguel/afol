@@ -11,9 +11,11 @@ Multi-file skills for complex topics with multiple sub-concepts.
 ## When to Use
 
 - **Multiple related concepts**: Needs separation of concerns
-- **200-1000 lines total**: Too big for one file
+- **≥800 lines total**: Tier 1 file exceeds size limit
 - **Needs reference files**: Patterns, examples, troubleshooting
 - **Cross-linking**: Users need to navigate between sub-topics
+
+**Migration trigger:** If your Tier 1 skill reaches 800 lines, migrate to Tier 2. Split content into focused files of 250-800 lines each.
 
 ## Structure
 
@@ -57,7 +59,7 @@ writing-skills/
 | Aspect | Tier 1 | Tier 2 |
 |--------|--------|--------|
 | Files | 1 | 5-20 |
-| Total lines | <200 | 200-1000 |
+| Total lines | <800 | 800+ (split into 250-800 per file) |
 | Decision logic | None | Simple tree |
 | Token cost | Minimal | Medium (progressive) |
 

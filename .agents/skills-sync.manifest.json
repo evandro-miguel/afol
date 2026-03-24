@@ -1,9 +1,12 @@
 {
-  "version": 1,
-  "selected_skills": [
-    "markdownlint-skill",
-    "writing-skills"
-  ],
+  "version": 2,
+  "repo": "https://github.com/evandro-miguel/skill-universal.git",
+  "ref": "main",
   "mode": "copy",
-  "upstream_branch": "main"
+  "installs": [
+    {
+      "app": "all",
+      "profile": "core"
+    }
+  ]
 }

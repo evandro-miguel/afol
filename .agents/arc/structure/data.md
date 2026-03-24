@@ -1,6 +1,6 @@
 # 🎨 Data Structure
 
-**Generated:** 2026-03-07T21:25:54+00:00
+**Generated:** 2026-03-23T23:31:40+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -9,32 +9,37 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 63 files, 5,840 lines, 751.4 KB
+**Stats:** 62 files, 7,312 lines, 911.3 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/data/telemetry/events.jsonl` | 1,132 | 288.7 KB | Module; functionality |
+| `.agents/data/telemetry/events.jsonl` | 1,603 | 416.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vite-skill/references/config/README.md` | 365 | 7.9 KB | Module; functionality |
+| `.agents/cache/universal-skills/skills/react-skill/references/performance/04-client-data.md` | 352 | 12.4 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vitest-skill/references/mocks/README.md` | 320 | 9.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/vitest-skill/references/configuration/README.md` | 306 | 7.6 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/tailwind-skill/references/configuration/README.md` | 302 | 5.5 KB | Module; functionality |
+| `.agents/cache/universal-skills/skills/react-skill/references/frontend-patterns/resources/data-table.md` | 250 | 8.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/biome-skill/references/configuration/README.md` | 212 | 4.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/playwright-skill/references/configuration/README.md` | 193 | 4.7 KB | Module; functionality |
+| `.agents/arc/map/extra/previous-metadata.json` | 186 | 5.8 KB | Module; functionality |
+| `.agents/arc/map/extra/metadata.json` | 185 | 5.8 KB | Module; functionality |
+| `.agents/agents.config` | 133 | 3.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/wsl-skill/references/configuration/README.md` | 110 | 2.4 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/unreal-engine/references/plugin-code/metadata.md` | 104 | 4.1 KB | Module; functionality |
 | `.agents/a-docs/agentic/agents-config.md` | 104 | 2.9 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/ui-reasoning.csv` | 101 | 30.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/icons.csv` | 101 | 13.1 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/ux-guidelines.csv` | 100 | 18.3 KB | Module; functionality |
-| `.agents/agents.config` | 99 | 2.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/products.csv` | 97 | 29.1 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/colors.csv` | 97 | 12.7 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/playwright-skill/references/fixtures/README.md` | 93 | 2.5 KB | Module; functionality |
+| `.agents/skills/typescript-skill/references/tsconfig-strict.json` | 92 | 3.3 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/typescript-skill/references/tsconfig-strict.json` | 92 | 3.3 KB | Module; functionality |
 | `.agents/data/telemetry/schemas/event.json` | 78 | 2.3 KB | Module; functionality |
-| `.agents/arc/structure/data.md` | 75 | 7.8 KB | Module; functionality |
+| `.agents/arc/structure/data.md` | 74 | 7.5 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/react-skill/references/storybook/config.md` | 70 | 3.1 KB | Module; functionality |
 | `.agents/cache/universal-skills/scripts/configure-branch-protection.sh` | 68 | 2.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/arq/skills-deprecated/opencode-expert/references/config/README.md` | 62 | 1.9 KB | Module; functionality |
@@ -69,15 +74,9 @@ Data files, constants, and configuration.
 | `.agents/cache/universal-skills/skills/ux-skill/data/charts.csv` | 26 | 7.5 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/ux-skill/data/prompts.csv` | 24 | 17.0 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/mcp-skill/mcp/basic-memory/generate-metadata.sh` | 22 | 0.4 KB | Module; functionality |
-| `.agents/cache/universal-skills/skills/opencode-platform/references/config/api.md` | 20 | 0.7 KB | Module; functionality |
-| `.agents/cache/universal-skills/skills/opencode-platform/references/config/configuration.md` | 19 | 0.6 KB | Module; functionality |
 | `.agents/cache/universal-skills/arq/skills-deprecated/opencode-config-expert/SKILL.md` | 17 | 0.7 KB | Module; functionality |
-| `.agents/cache/universal-skills/skills/opencode-platform/references/config/README.md` | 16 | 0.6 KB | Module; functionality |
 | `.agents/cache/universal-skills/skills/react-skill/references/performance/metadata.json` | 15 | 0.9 KB | Module; functionality |
-| `.agents/cache/universal-skills/skills/opencode-platform/references/operations/configuration.md` | 14 | 0.4 KB | Module; functionality |
-| `.agents/cache/universal-skills/skills/opencode-platform/references/tools/configuration.md` | 14 | 0.4 KB | Module; functionality |
-| `.agents/cache/universal-skills/skills/opencode-platform/references/config/gotchas.md` | 12 | 0.5 KB | Module; functionality |
-| `.agents/cache/universal-skills/skills/opencode-platform/references/config/patterns.md` | 12 | 0.5 KB | Module; functionality |
+| `.agents/arc/map/extra/phase5/data-models.json` | 10 | 0.2 KB | Module; functionality |
 
 ---
 *Generated by `agents-structure-map.py`*
