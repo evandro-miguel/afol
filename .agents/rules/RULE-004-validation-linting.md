@@ -187,9 +187,9 @@ python -m json.tool .agents/tools.json
 
 ## References
 
-- `.agents/a-docs/agentic/agents-doctor.md` - doctor docs
-- `.agents/a-docs/agentic/agents-lint-docs.md` - lint-docs docs
-- `.agents/a-docs/agentic/verify-tasks.md` - verify-tasks docs
+- `docs/agentic/agents-doctor.md` - doctor docs
+- `docs/agentic/agents-lint-docs.md` - lint-docs docs
+- `docs/agentic/verify-tasks.md` - verify-tasks docs
 - RULE-003 - Documentation Standards
 
 ---

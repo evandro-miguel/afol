@@ -24,14 +24,5 @@ jobs:
       - name: Sync script environment
         run: cd .agents/scripts && uv sync
 
-      - name: Lint scripts
-        run: make lint-scripts
-
-      - name: Lint docs
-        run: make lint
-
-      - name: Test scripts
-        run: make test-scripts
-
       - name: Validate scaffold
-        run: make doctor
+        run: make all

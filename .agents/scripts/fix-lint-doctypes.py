@@ -157,7 +157,7 @@ def main():
         print("Could not find validator script.")
         print("Searched in:")
         print("  - .agents/scripts/agents-lint-docs.py")
-        print("  - .agents/a-docs/standards/lint-validator.py")
+        print("  - docs/standards/lint-validator.py")
         return 1
 
     print(f"Found: {validator_path}")

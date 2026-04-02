@@ -20,14 +20,13 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 
 ## Repo Structure
 
+- `docs/`: project-owned documentation, repository mapping, and other non-agent project docs
 - `.agents/scripts/`: implementation of CLI commands (telemetry, patterns, linting, workbench updates)
-- `.agents/a-docs/`: documentation standards, templates, patterns, rules, telemetry documentation
 - `.agents/wb/`: workbench sessions (plan/task/log/report/research/spec/...) and active session state
 - `.agents/rules/`: operational guardrail files
 - `.agents/data/`: telemetry data and JSON schemas
 - `.agents/skills/`: project skills and workflows
 - `.agents/cache/`: cached remote skill/tool metadata
-- `.agents/templates/`: local documentation templates and reusable agent instructions
 - `.agents/agents.config`: configuration for wrappers, sync, and runtime defaults
 - `.opencode/`: OpenCode-specific project adapter folder
 - `opencode.json`: committed OpenCode project configuration entrypoint (must remain secret-free)
@@ -35,18 +34,19 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 
 ## Important Files
 
+- `docs/map/` (current-state repository maps and analysis evidence)
 - `.agents/agents` (CLI entrypoint)
 - `.agents/scripts/agents-*.py` (command implementations)
-- `.agents/a-docs/templates/` (doc/workbench templates)
+- `docs/templates/` (doc/workbench templates)
 - `.agents/wb/` and `.agents/z-arq/` (active and archived workstreams)
-- `Makefile` (delegates to `.agents/a-docs/standards/Makefile`)
+- `Makefile` (delegates to `docs/standards/Makefile`)
 - `.agents/agents.config` (source/target config for sync and runtime)
 
 ## General Rules
 
 ### Self-Improvement Loop
 
-- After any user correction, create one lesson file in `.agents/a-docs/lessons/entries/`
+- After any user correction, create one lesson file in `docs/lessons/entries/`
 - Add a prevention rule to avoid repeating the same mistake
 - Add guardrails when feasible (tests, assertions, lint rules, CI checks)
 - Review relevant lessons before starting significant work
@@ -69,14 +69,14 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
   - one knowledge/learned entry if a correction, bug, or process gap was found
 - Any tool/command change must have its canonical command reference updated in:
   - `README.md`
-  - `.agents/a-docs/standards/`
+  - `docs/standards/`
   - runtime mirrors when behavior/usage changed
 - Do not finish a workstream without explicitly checking the documentation freshness requirement in the final report.
 
 ### Roadmap-First Delivery (Mandatory)
 
-- Every meaningful feature must exist in `.agents/arc/GENERAL-ROADMAP.md`
-- Every roadmap feature must link to one governing parent spec in `.agents/arc/SPECS/`
+- Every meaningful feature must exist in `docs/arc/GENERAL-ROADMAP.md`
+- Every roadmap feature must link to one governing parent spec in `docs/arc/SPECS/`
 - Use child specs when they improve clarity, coordination, or reviewability for a feature
 - Workstreams must carry `roadmap_feature` and `parent_spec` context
 - Specs define philosophy, expected behavior, user journey, boundaries, and acceptance
@@ -118,11 +118,24 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - Do not add dependencies without clear justification
 - Archive before delete under `.agents/z-arq/YYYYMMDD_<description>/`
 
-### a-docs Boundary Rule
+### Docs Boundary Rule
 
-- `.agents/a-docs/` is documentation-only
-- Do not use `.agents/a-docs/` for runtime state, caches, mirrors, or generated artifacts
-- Operational state must live outside `.agents/a-docs/` (for example: `.agents/cache/`, `.agents/wb/`, `.agents/tmp/`)
+- `docs/` is the project-owned documentation surface
+- Do not use `docs/` for runtime state, caches, mirrors, or generated operational artifacts
+- Operational state must live outside `docs/` (for example: `.agents/cache/`, `.agents/wb/`, `.agents/tmp/`)
+
+### Project vs Agent Boundary
+
+- Reserve `.agents/` for agent-system surfaces such as workbench state, rules,
+  skills, telemetry, and runtime automation.
+- Keep project-owned documentation under `docs/` at the repository root when
+  the documentation is about the repository rather than the agent system.
+- Use `docs/map/` for current-state repository mapping, architecture snapshots,
+  hooks, APIs, ABIs, frontend and backend structure, and analysis evidence.
+- Use `docs/arc/`, `docs/standards/`, `docs/templates/`, `docs/telemetry/`,
+  `docs/patterns/`, `docs/knowledge/`, and `docs/lessons/` for project-facing
+  canon that should live with the repository instead of the agent runtime.
+- Workbench sessions, runtime rules, and agent memory remain under `.agents/`.
 
 ### Temporary Workspace Rule
 
@@ -162,8 +175,11 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 
 - Prefer project-local skills under `.agents/skills/` as the main skill surface for Codex, OpenCode, Qwen, Claude Code, and Gemini CLI in this repo.
 - Keep global Codex skills lean; do not rely on a large machine-global skill set as the primary source of project behavior.
-- Use the sibling `../universal-skills` checkout as the reusable upstream source when the repo lives under an `apps/` workspace.
+- Prefer a repo-local universal-skills source checkout at `.agents/source/universal-skills`.
+- Keep `.agents/cache/universal-skills` only as a compatibility fallback for older repos.
 - Bootstrap and `skills-sync` should prepare the project-local skill surface so each repository carries only the subset it actually needs.
+- Treat `skills-sync sync` / `skills-sync update` as the simple path that refreshes `.agents/skills/` from the configured universal-skills git source.
+- Treat `skills-sync pull` as the source-refresh step for the git-backed checkout or mirror, and `skills-sync push` as the explicit publish path for selected local skill edits.
 
 ### Optional External Memory
 

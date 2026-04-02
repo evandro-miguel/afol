@@ -139,8 +139,8 @@ Content here.
 
 | Location | Content |
 |----------|---------|
-| `.agents/a-docs/agentic/` | Tool documentation |
-| `.agents/a-docs/standards/` | Human standards |
+| `docs/agentic/` | Tool documentation |
+| `docs/standards/` | Human standards |
 | `.agents/tools.json` | Tool catalog |
 | `.agents/agents.config` | Central config |
 

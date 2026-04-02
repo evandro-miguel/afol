@@ -13,7 +13,7 @@ Usage:
 
 Examples:
     python agents-structure-map.py .
-    python agents-structure-map.py /home/ozy/apps/my-project --output .agents/arc/structure/
+    python agents-structure-map.py /home/ozy/apps/my-project --output docs/arc/structure/
 """
 
 import os
@@ -77,6 +77,11 @@ IGNORED_DIRS = {
     ".ruff_cache",
     ".tox",
     ".cache",
+    "cache",
+    "source",
+    "tmp",
+    "wb",
+    "z-arq",
 }
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
@@ -247,6 +252,7 @@ class StructureMapper:
         print()
 
         sections: Dict[str, List[FileInfo]] = {name: [] for name in DEFAULT_SECTIONS}
+        next_cache: Dict[str, Any] = {}
 
         # Walk through project directory
         for root, dirs, files in os.walk(self.project_path):
@@ -291,13 +297,11 @@ class StructureMapper:
                     ))
 
                     # Update cache
-                    if 'files' not in self.cache:
-                        self.cache['files'] = {}
-                    self.cache['files'][cache_key] = {
-                        'hash': file_hash,
-                        'description': description,
-                        'section': section,
-                    }
+                next_cache[cache_key] = {
+                    'hash': file_hash,
+                    'description': description,
+                    'section': section,
+                }
 
                 file_info = FileInfo(
                     path=str(file_path),
@@ -314,6 +318,8 @@ class StructureMapper:
                 self.stats["total_files"] += 1
                 self.stats["total_lines"] += lines
                 self.stats["sections"][section] = self.stats["sections"].get(section, 0) + 1
+
+        self.cache['files'] = next_cache
 
         # Build section stats
         result = {}
@@ -478,7 +484,7 @@ def main():
         print()
         print("Examples:")
         print("  python agents-structure-map.py .")
-        print("  python agents-structure-map.py /home/ozy/apps/my-project --output .agents/arc/structure/")
+        print("  python agents-structure-map.py /home/ozy/apps/my-project --output docs/arc/structure/")
         sys.exit(1)
 
     project_path = Path(sys.argv[1])
@@ -495,7 +501,7 @@ def main():
         if project_path.resolve() == ROOT_DIR.resolve():
             output_path = DEFAULT_OUTPUT_DIR
         else:
-            output_path = project_path / ".agents" / "arc" / "structure"
+            output_path = project_path / "docs" / "arc" / "structure"
 
     # Run mapper
     mapper = StructureMapper(project_path, output_path)

@@ -37,7 +37,6 @@ from lib.agents_config import (
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 SCRIPTS_DIR = Path(__file__).resolve().parent
-AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
@@ -341,7 +340,7 @@ def _build_template_replacements(session_id: str, args: Dict[str, object]) -> Di
         "<parent_spec_id>": str(args.get("parent_spec") or ""),
         "<parent_spec_id_or_empty>": str(args.get("parent_spec") or ""),
         "<child_spec_id_or_empty>": str(args.get("child_spec") or ""),
-        "<roadmap_path>": f".agents/arc/{ROADMAP_FILE.name}",
+        "<roadmap_path>": f"docs/arc/{ROADMAP_FILE.name}",
         "<brainstorm_doc_id>": f"{doc_prefix}_brainstorm_01",
         "<explorer_check_doc_id>": f"{doc_prefix}_explorer-check_01",
         "<research_doc_id>": f"{doc_prefix}_research_01",

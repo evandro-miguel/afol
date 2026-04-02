@@ -1,0 +1,10 @@
+{
+  "name": "core",
+  "skills": [
+    "writing-skills",
+    "bun-skill",
+    "typescript-skill",
+    "markdownlint-skill",
+    "llm-markdown-skill"
+  ]
+}

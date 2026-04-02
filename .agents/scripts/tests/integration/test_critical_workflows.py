@@ -12,84 +12,158 @@ import pytest
 
 
 ROOT_DIR = Path(__file__).parent.parent.parent.parent.parent
-AGENTS_WRAPPER = ROOT_DIR / ".agents" / "agents"
-ACTIVE_SESSION_FILE = ROOT_DIR / ".agents" / "wb" / ".active_session"
+SESSION_ID = "260402_0000_integration"
 pytestmark = pytest.mark.integration
 
 
-def run_command(cmd, cwd=None):
+def isolated_env(repo_root: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env["AGENTS_ACTIVE_SESSION_FILE"] = str(repo_root / ".agents" / "wb" / ".active_session")
+    env["AGENTS_UV_CACHE_DIR"] = str(repo_root / ".agents" / "cache" / "uv")
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["PATH"] = f"{ROOT_DIR / '.agents' / 'scripts' / '.venv' / 'bin'}:{env.get('PATH', '')}"
+    return env
+
+
+def run_command(repo_root: Path, cmd):
     """Run command and return completed process."""
     return subprocess.run(
-        cmd,
-        cwd=cwd or ROOT_DIR,
+        [str(repo_root / ".agents" / "agents"), *cmd],
+        cwd=repo_root,
+        env=isolated_env(repo_root),
         capture_output=True,
         text=True,
-        shell=isinstance(cmd, str),
     )
 
 
-def require_active_session() -> str:
-    """Return active session or skip the test."""
-    if not ACTIVE_SESSION_FILE.exists():
-        pytest.skip("No active session for workflow integration test")
-    active_session = ACTIVE_SESSION_FILE.read_text().strip()
-    if not active_session:
-        pytest.skip("Active session pointer is empty")
-    if not (ROOT_DIR / ".agents" / "wb" / active_session).exists():
-        pytest.skip("Active session folder not found")
-    return active_session
+def build_isolated_repo(tmp_root: Path) -> Path:
+    repo_root = tmp_root / ROOT_DIR.name
+    shutil.copytree(
+        ROOT_DIR,
+        repo_root,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".coverage",
+            ".pytest_cache",
+            "__pycache__",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".venv",
+            ".agents/cache",
+            ".agents/wb",
+            ".agents/z-arq",
+            ".agents/tmp",
+            "docs/map",
+            "docs/arc/structure",
+        ),
+    )
+
+    session_dir = repo_root / ".agents" / "wb" / SESSION_ID
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (repo_root / ".agents" / "wb" / ".active_session").write_text(f"{SESSION_ID}\n", encoding="utf-8")
+    (session_dir / f"{SESSION_ID}_plan_01.md").write_text(
+        "---\n"
+        "doc_type: plan\n"
+        "id: integration-plan\n"
+        "status: active\n"
+        "theme: integration-workflow\n"
+        "roadmap_feature: F-10\n"
+        "parent_spec: 260323_1704_universal-skills-runtime-integration_spec_01\n"
+        "updated_at: '2026-04-02T00:00:00-03:00'\n"
+        "---\n\n"
+        "# Plan\n",
+        encoding="utf-8",
+    )
+    (session_dir / f"{SESSION_ID}_task_01.md").write_text(
+        "---\n"
+        "doc_type: task\n"
+        "id: integration-task\n"
+        "status: active\n"
+        "theme: integration-workflow\n"
+        "roadmap_feature: F-10\n"
+        "updated_at: '2026-04-02T00:00:00-03:00'\n"
+        "---\n\n"
+        "# Tasks\n\n"
+        "## Task List\n\n"
+        "- [ ] T-01 seed integration session\n",
+        encoding="utf-8",
+    )
+    (session_dir / f"{SESSION_ID}_log_01.md").write_text(
+        "---\n"
+        "doc_type: log\n"
+        "status: active\n"
+        "updated_at: '2026-04-02T00:00:00-03:00'\n"
+        "---\n\n"
+        "# Log\n\n"
+        "## Timeline\n\n"
+        "- 2026-04-02T00:00:00-03:00 - seeded integration repo\n",
+        encoding="utf-8",
+    )
+    (session_dir / f"{SESSION_ID}_report_01.md").write_text(
+        "---\n"
+        "doc_type: report\n"
+        "status: active\n"
+        "theme: integration-workflow\n"
+        "updated_at: '2026-04-02T00:00:00-03:00'\n"
+        "---\n\n"
+        "# Report\n",
+        encoding="utf-8",
+    )
+    return repo_root
 
 
-def test_new_quick_workflow():
+@pytest.fixture
+def isolated_repo() -> Path:
+    with tempfile.TemporaryDirectory() as td:
+        yield build_isolated_repo(Path(td))
+
+
+def test_new_quick_workflow(isolated_repo: Path):
     """`.agents/agents new <theme> --quick` should append a task to the active session."""
-    require_active_session()
-
-    result = run_command([str(AGENTS_WRAPPER), "new", "integration-test-task", "--quick"])
+    result = run_command(isolated_repo, ["new", "integration-test-task", "--quick"])
 
     assert result.returncode == 0, result.stderr
     assert "✓ Added task:" in result.stdout
 
 
-def test_wb_update_task_workflow():
+def test_wb_update_task_workflow(isolated_repo: Path):
     """`.agents/agents wb-update touch` should succeed for an active session."""
-    active_session = require_active_session()
-
-    result = run_command([str(AGENTS_WRAPPER), "wb-update", "touch", "--session", active_session])
+    result = run_command(isolated_repo, ["wb-update", "touch", "--session", SESSION_ID])
 
     assert result.returncode == 0, result.stderr
     assert "updated_at touched" in result.stdout
 
 
-def test_doctor_workflow():
+def test_doctor_workflow(isolated_repo: Path):
     """`.agents/agents doctor` should pass in the scaffold repo."""
-    result = run_command([str(AGENTS_WRAPPER), "doctor"])
+    result = run_command(isolated_repo, ["doctor"])
 
     assert result.returncode == 0, result.stderr
     assert "VALIDATION REPORT" in result.stdout
 
 
-def test_lint_workflow():
+def test_lint_workflow(isolated_repo: Path):
     """`.agents/agents lint-docs` should pass for `.agents`."""
-    result = run_command([str(AGENTS_WRAPPER), "lint-docs", ".agents"])
+    result = run_command(isolated_repo, ["lint-docs", ".agents"])
 
     assert result.returncode == 0, result.stderr
     assert "Issues found: 0" in result.stdout
 
 
-def test_tools_workflow():
+def test_tools_workflow(isolated_repo: Path):
     """`.agents/agents tools list/validate` should both succeed."""
-    list_result = run_command([str(AGENTS_WRAPPER), "tools", "list"])
+    list_result = run_command(isolated_repo, ["tools", "list"])
     assert list_result.returncode == 0, list_result.stderr
     assert "Total:" in list_result.stdout
 
-    validate_result = run_command([str(AGENTS_WRAPPER), "tools", "validate"])
+    validate_result = run_command(isolated_repo, ["tools", "validate"])
     assert validate_result.returncode == 0, validate_result.stderr
     assert "✅ Catalog is valid" in validate_result.stdout
 
 
 def test_session_catchup_temp_repo_scenarios():
     """`agents-session.py catchup` should behave coherently across isolated repo scenarios."""
-    with tempfile.TemporaryDirectory(dir=ROOT_DIR) as td:
+    with tempfile.TemporaryDirectory() as td:
         temp_root = Path(td) / "repo"
         temp_root.mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
@@ -107,21 +181,24 @@ def test_session_catchup_temp_repo_scenarios():
             shutil.copy2(ROOT_DIR / rel, dst)
 
         (temp_root / ".agents/wb").mkdir(parents=True, exist_ok=True)
-        (temp_root / ".agents/a-docs/standards").mkdir(parents=True, exist_ok=True)
-        (temp_root / ".agents/a-docs/knowledge").mkdir(parents=True, exist_ok=True)
-        (temp_root / ".agents/arc/SPECS").mkdir(parents=True, exist_ok=True)
-        (temp_root / ".agents/arc/DECISIONS").mkdir(parents=True, exist_ok=True)
+        (temp_root / "docs/standards").mkdir(parents=True, exist_ok=True)
+        (temp_root / "docs/knowledge").mkdir(parents=True, exist_ok=True)
+        (temp_root / "docs/arc/SPECS").mkdir(parents=True, exist_ok=True)
+        (temp_root / "docs/arc/DECISIONS").mkdir(parents=True, exist_ok=True)
         (temp_root / ".agents/agents.config").write_text(
             "version: 1\n"
             "paths:\n"
             "  agents_dir: .agents\n"
+            "  docs_dir: docs\n"
             "  wb_dir: .agents/wb\n"
             "  active_session_file: .agents/wb/.active_session\n"
-            "  templates_dir: .agents/a-docs/templates\n"
-            "  arc_dir: .agents/arc\n"
-            "  roadmap_file: .agents/arc/GENERAL-ROADMAP.md\n"
-            "  specs_dir: .agents/arc/SPECS\n"
-            "  decisions_dir: .agents/arc/DECISIONS\n"
+            "  templates_dir: docs/templates\n"
+            "  standards_dir: docs/standards\n"
+            "  knowledge_dir: docs/knowledge\n"
+            "  arc_dir: docs/arc\n"
+            "  roadmap_file: docs/arc/GENERAL-ROADMAP.md\n"
+            "  specs_dir: docs/arc/SPECS\n"
+            "  decisions_dir: docs/arc/DECISIONS\n"
             "time:\n"
             "  default_offset: \"+00:00\"\n"
             "  wb_offset: \"-03:00\"\n"
@@ -129,12 +206,12 @@ def test_session_catchup_temp_repo_scenarios():
             "  feature_id_pattern: \"^F-[0-9]{2,3}$\"\n",
             encoding="utf-8",
         )
-        (temp_root / ".agents/a-docs/standards/workflow.md").write_text("# workflow\n", encoding="utf-8")
-        (temp_root / ".agents/a-docs/knowledge/INDEX.md").write_text("# knowledge\n", encoding="utf-8")
-        (temp_root / ".agents/arc/PROJECT-BRIEF.md").write_text("# brief\n", encoding="utf-8")
-        (temp_root / ".agents/arc/ENGINEERING-GUIDELINES.md").write_text("# guidelines\n", encoding="utf-8")
-        (temp_root / ".agents/arc/TECH-STACK.md").write_text("# stack\n", encoding="utf-8")
-        (temp_root / ".agents/arc/GENERAL-ROADMAP.md").write_text("# roadmap\n", encoding="utf-8")
+        (temp_root / "docs/standards/workflow.md").write_text("# workflow\n", encoding="utf-8")
+        (temp_root / "docs/knowledge/INDEX.md").write_text("# knowledge\n", encoding="utf-8")
+        (temp_root / "docs/arc/PROJECT-BRIEF.md").write_text("# brief\n", encoding="utf-8")
+        (temp_root / "docs/arc/ENGINEERING-GUIDELINES.md").write_text("# guidelines\n", encoding="utf-8")
+        (temp_root / "docs/arc/TECH-STACK.md").write_text("# stack\n", encoding="utf-8")
+        (temp_root / "docs/arc/GENERAL-ROADMAP.md").write_text("# roadmap\n", encoding="utf-8")
 
         def write_session(name: str, *, with_plan=True, with_research=True, with_log=True, with_report=True, research_link=False):
             session = temp_root / ".agents/wb" / name

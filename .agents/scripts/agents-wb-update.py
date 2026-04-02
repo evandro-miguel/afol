@@ -179,6 +179,13 @@ def latest_doc_file(session_dir: Path, alias: str) -> Path:
     return files[-1]
 
 
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT_DIR))
+    except ValueError:
+        return str(path)
+
+
 def _report_status(session_dir: Path) -> str:
     try:
         report_file = latest_doc_file(session_dir, "report")
@@ -495,9 +502,9 @@ def validate_evidence_reference(session_dir: Path, evidence_id: str, task_id: st
             )
         return
 
-    raise ValueError(
-        f"Evidence '{evidence_id}' not found in {_session_ledger_file(session_dir).relative_to(ROOT_DIR)}"
-    )
+        raise ValueError(
+        f"Evidence '{evidence_id}' not found in {display_path(_session_ledger_file(session_dir))}"
+        )
 
 
 def append_timeline(log_file: Path, message: str):
@@ -545,7 +552,7 @@ def cmd_touch(args: argparse.Namespace):
     files = sorted(session_dir.rglob("*.md"))
     count = touch_targets(files)
     maybe_record_session_end(session_dir, "wb-update touch")
-    print(f"✓ updated_at touched in {count} file(s) under {session_dir.relative_to(ROOT_DIR)}")
+    print(f"✓ updated_at touched in {count} file(s) under {display_path(session_dir)}")
 
 
 def cmd_normalize_time(args: argparse.Namespace):
@@ -568,7 +575,7 @@ def cmd_normalize_time(args: argparse.Namespace):
     elif args.all_wb:
         scope = ".agents/wb"
     else:
-        scope = str(resolve_session(args.session).relative_to(ROOT_DIR))
+        scope = display_path(resolve_session(args.session))
     print(f"✓ normalized timestamps in {changed} file(s) under {scope}")
 
 
@@ -581,7 +588,7 @@ def cmd_files_changed(args: argparse.Namespace):
         report_file = latest_doc_file(session_dir, "report")
 
     count = update_files_changed(report_file, include_wb=args.include_wb)
-    print(f"✓ Files Changed updated in {report_file.relative_to(ROOT_DIR)} ({count} entries)")
+    print(f"✓ Files Changed updated in {display_path(report_file)} ({count} entries)")
 
 
 def cmd_status(args: argparse.Namespace):
@@ -601,7 +608,7 @@ def cmd_link(args: argparse.Namespace):
     session_dir = resolve_session(args.session)
     target = latest_doc_file(session_dir, args.file)
     update_link(target, args.key, args.value)
-    print(f"✓ link '{args.key}' updated in {target.relative_to(ROOT_DIR)}")
+    print(f"✓ link '{args.key}' updated in {display_path(target)}")
 
 
 def cmd_timeline(args: argparse.Namespace):
@@ -609,7 +616,7 @@ def cmd_timeline(args: argparse.Namespace):
     session_dir = resolve_session(args.session)
     log_file = latest_doc_file(session_dir, "log")
     append_timeline(log_file, args.message)
-    print(f"✓ timeline appended in {log_file.relative_to(ROOT_DIR)}")
+    print(f"✓ timeline appended in {display_path(log_file)}")
 
 
 def cmd_task(args: argparse.Namespace):
@@ -641,7 +648,7 @@ def cmd_task(args: argparse.Namespace):
 
     marker, state = TASK_ACTIONS[action]
     update_task_markers(task_file, args.task_id, marker, state, evidence_id=args.evidence_id)
-    print(f"✓ {args.task_id} updated to {state} in {task_file.relative_to(ROOT_DIR)}")
+    print(f"✓ {args.task_id} updated to {state} in {display_path(task_file)}")
 
 
 def cmd_evidence(args: argparse.Namespace):
@@ -655,7 +662,7 @@ def cmd_evidence(args: argparse.Namespace):
         artifacts=args.artifact,
         note=args.note,
     )
-    ledger = _session_ledger_file(session_dir).relative_to(ROOT_DIR)
+    ledger = display_path(_session_ledger_file(session_dir))
     print(
         f"✓ evidence recorded: {record['id']} for {record['task_id']} "
         f"in {ledger}"

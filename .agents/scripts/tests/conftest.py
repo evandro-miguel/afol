@@ -1,16 +1,54 @@
 # -*- coding: utf-8 -*-
 """
-Fixtures globais para testes do update system.
+Global fixtures for the `.agents/scripts` test suite.
 
-Este arquivo contém as fixtures principais utilizadas em todos os
-testes (unit, integration, e2e).
+This file provides shared helpers for unit and integration coverage and keeps
+temporary writes outside the canonical repository checkout.
 """
 
-import pytest
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
+
+import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+_ORIGINAL_TEMPORARY_DIRECTORY = tempfile.TemporaryDirectory
+_ORIGINAL_MKDTEMP = tempfile.mkdtemp
+
+
+def _redirect_repo_local_temp_dir(raw_dir):
+    """Avoid temp writes inside the repo during tests."""
+    if raw_dir is None:
+        return None
+
+    try:
+        candidate = Path(raw_dir).expanduser().resolve()
+    except OSError:
+        return raw_dir
+
+    if candidate == REPO_ROOT or REPO_ROOT in candidate.parents:
+        return None
+    return raw_dir
+
+
+def _repo_safe_temporary_directory(*args, **kwargs):
+    if "dir" in kwargs:
+        kwargs["dir"] = _redirect_repo_local_temp_dir(kwargs["dir"])
+    return _ORIGINAL_TEMPORARY_DIRECTORY(*args, **kwargs)
+
+
+def _repo_safe_mkdtemp(*args, **kwargs):
+    if "dir" in kwargs:
+        kwargs["dir"] = _redirect_repo_local_temp_dir(kwargs["dir"])
+    return _ORIGINAL_MKDTEMP(*args, **kwargs)
+
+
+tempfile.TemporaryDirectory = _repo_safe_temporary_directory
+tempfile.mkdtemp = _repo_safe_mkdtemp
 
 
 # ═══════════════════════════════════════════════════════════════

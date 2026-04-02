@@ -30,13 +30,15 @@ except ImportError:
 
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
-AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
+TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")
 REQUIRED_FOLDERS = CONFIG.get("doctor", {}).get("required_folders", [])
 REQUIRED_TEMPLATES = CONFIG.get("doctor", {}).get("required_templates", [])
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
+ARC_DIR = get_cfg_path(ROOT_DIR, CONFIG, "arc_dir")
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
 SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
+MAP_DIR = get_cfg_path(ROOT_DIR, CONFIG, "map_dir")
 
 VALID_DOC_TYPES = [
     "plan",
@@ -104,6 +106,7 @@ class AgentsDoctor:
         self.check_workbench_sessions()
         self.check_active_session_pointer()
         self.check_arc_docs()
+        self.check_current_state_map_dir()
         self.check_roadmap_governance()
         self.check_primary_runtime_compatibility()
 
@@ -118,7 +121,7 @@ class AgentsDoctor:
 
         for folder in REQUIRED_FOLDERS:
             self.stats["folders_checked"] += 1
-            folder_path = AGENTS_DIR / folder
+            folder_path = (ROOT_DIR / folder).resolve()
 
             if not folder_path.exists():
                 self.issues.append(Issue(
@@ -141,11 +144,9 @@ class AgentsDoctor:
         """Check if all required templates exist."""
         print("Checking templates...")
 
-        templates_dir = AGENTS_DIR / "a-docs" / "templates"
-
         for template in REQUIRED_TEMPLATES:
             self.stats["templates_checked"] += 1
-            template_path = templates_dir / template
+            template_path = TEMPLATES_DIR / template
 
             if not template_path.exists():
                 self.issues.append(Issue(
@@ -167,11 +168,33 @@ class AgentsDoctor:
 
         print()
 
+    def check_current_state_map_dir(self):
+        """Check the configured current-state map directory."""
+        print("Checking current-state map directory...")
+
+        self.stats["folders_checked"] += 1
+        if not MAP_DIR.exists():
+            self.issues.append(Issue(
+                "error",
+                str(MAP_DIR),
+                "Configured current-state map directory missing"
+            ))
+        elif not MAP_DIR.is_dir():
+            self.issues.append(Issue(
+                "error",
+                str(MAP_DIR),
+                "Configured current-state map path exists but is not a directory"
+            ))
+        else:
+            print(f"  ✓ {MAP_DIR.relative_to(ROOT_DIR)}")
+
+        print()
+
     def check_workbench_sessions(self):
         """Check workbench sessions for valid structure."""
         print("Checking workbench sessions...")
 
-        wb_dir = AGENTS_DIR / "wb"
+        wb_dir = WB_DIR
         if not wb_dir.exists():
             return
 
@@ -251,7 +274,7 @@ class AgentsDoctor:
         """Check architecture docs."""
         print("Checking architecture docs...")
 
-        arc_dir = AGENTS_DIR / "arc"
+        arc_dir = ARC_DIR
         if not arc_dir.exists():
             return
 
@@ -440,7 +463,7 @@ class AgentsDoctor:
                 "OpenCode adapter must define an instructions array"
             ))
         else:
-            required_refs = {"AGENTS.md", ".agents/arc/GENERAL-ROADMAP.md"}
+            required_refs = {"AGENTS.md", "docs/arc/GENERAL-ROADMAP.md"}
             missing_refs = sorted(required_refs - set(instructions))
             if missing_refs:
                 self.issues.append(Issue(

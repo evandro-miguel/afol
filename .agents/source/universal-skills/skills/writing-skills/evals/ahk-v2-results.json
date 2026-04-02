@@ -1,0 +1,271 @@
+{
+  "skill_name": "ahk-v2",
+  "results": [
+    {
+      "eval_id": 4,
+      "prompt": "What is the capital of Brazil?",
+      "should_trigger": false,
+      "triggered": false,
+      "passed": true,
+      "evidence": "Skill correctly not triggered",
+      "runs": 1
+    },
+    {
+      "eval_id": 5,
+      "prompt": "My AHK script has COM error with Excel, how to fix?",
+      "should_trigger": true,
+      "triggered": true,
+      "passed": true,
+      "evidence": "Skill triggered as expected",
+      "runs": 1
+    },
+    {
+      "eval_id": 2,
+      "prompt": "How do I migrate my AHK v1 script to v2?",
+      "should_trigger": true,
+      "triggered": true,
+      "passed": true,
+      "evidence": "Skill triggered as expected",
+      "runs": 1
+    },
+    {
+      "eval_id": 3,
+      "prompt": "Create a GUI with a button that shows a message",
+      "should_trigger": true,
+      "triggered": false,
+      "passed": false,
+      "evidence": "Failed to trigger: skill should have activated",
+      "runs": 1
+    },
+    {
+      "eval_id": 1,
+      "prompt": "Create a hotkey to launch Calculator with Ctrl+Alt+C",
+      "should_trigger": true,
+      "triggered": false,
+      "passed": false,
+      "evidence": "Failed to trigger: skill should have activated",
+      "runs": 1
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "passed": 3,
+    "failed": 2,
+    "pass_rate": 0.6
+  },
+  "grader_results": [
+    {
+      "expectations": [
+        {
+          "text": "The agent does NOT load ahk-v2 skill",
+          "passed": false,
+          "evidence": "Only found 0/3 keywords",
+          "category": "other"
+        },
+        {
+          "text": "The agent responds with general knowledge",
+          "passed": false,
+          "evidence": "Only found 0/4 keywords",
+          "category": "other"
+        },
+        {
+          "text": "Agent respected progressive disclosure",
+          "passed": true,
+          "evidence": "Read 0 files appropriately",
+          "category": "progressive_disclosure"
+        }
+      ],
+      "summary": {
+        "passed": 1,
+        "failed": 1,
+        "total": 2,
+        "pass_rate": 0.5
+      },
+      "file_reads": [],
+      "tools_used": [],
+      "progressive_disclosure": {
+        "respected": true,
+        "issues": [],
+        "read_count": 0
+      },
+      "tier": 2
+    },
+    {
+      "expectations": [
+        {
+          "text": "The agent reads SKILL.md first",
+          "passed": false,
+          "evidence": "Only found 0/4 keywords",
+          "category": "other"
+        },
+        {
+          "text": "The agent checks references/troubleshooting.md or windows-api.md",
+          "passed": true,
+          "evidence": "Found 2/4 keywords in transcript",
+          "category": "other"
+        },
+        {
+          "text": "The agent provides Try/Catch error handling pattern",
+          "passed": true,
+          "evidence": "Found 3/6 keywords in transcript",
+          "category": "other"
+        },
+        {
+          "text": "Agent respected progressive disclosure",
+          "passed": false,
+          "evidence": "Agent didn't read SKILL.md first",
+          "category": "progressive_disclosure"
+        }
+      ],
+      "summary": {
+        "passed": 2,
+        "failed": 2,
+        "total": 4,
+        "pass_rate": 0.5
+      },
+      "file_reads": [
+        "windows-api.md",
+        "troubleshooting.md"
+      ],
+      "tools_used": [],
+      "progressive_disclosure": {
+        "respected": false,
+        "issues": [
+          "Agent didn't read SKILL.md first"
+        ],
+        "read_count": 2
+      },
+      "tier": 2
+    },
+    {
+      "expectations": [
+        {
+          "text": "The agent reads SKILL.md first",
+          "passed": false,
+          "evidence": "Only found 1/4 keywords",
+          "category": "other"
+        },
+        {
+          "text": "The agent references migration.md for v1 to v2 changes",
+          "passed": true,
+          "evidence": "Found 3/4 keywords in transcript",
+          "category": "other"
+        },
+        {
+          "text": "The agent mentions key differences like function call syntax",
+          "passed": false,
+          "evidence": "Only found 2/5 keywords",
+          "category": "other"
+        },
+        {
+          "text": "Agent respected progressive disclosure",
+          "passed": false,
+          "evidence": "Agent didn't read SKILL.md first",
+          "category": "progressive_disclosure"
+        }
+      ],
+      "summary": {
+        "passed": 1,
+        "failed": 3,
+        "total": 4,
+        "pass_rate": 0.25
+      },
+      "file_reads": [
+        "migration.md"
+      ],
+      "tools_used": [],
+      "progressive_disclosure": {
+        "respected": false,
+        "issues": [
+          "Agent didn't read SKILL.md first"
+        ],
+        "read_count": 1
+      },
+      "tier": 2
+    },
+    {
+      "expectations": [
+        {
+          "text": "The agent reads SKILL.md first",
+          "passed": false,
+          "evidence": "Only found 0/4 keywords",
+          "category": "other"
+        },
+        {
+          "text": "The agent checks references/gui.md for GUI syntax",
+          "passed": false,
+          "evidence": "Only found 0/4 keywords",
+          "category": "other"
+        },
+        {
+          "text": "The output uses AHK v2 GUI class syntax",
+          "passed": false,
+          "evidence": "No file creation detected",
+          "category": "output_structure"
+        },
+        {
+          "text": "Agent respected progressive disclosure",
+          "passed": true,
+          "evidence": "Read 0 files appropriately",
+          "category": "progressive_disclosure"
+        }
+      ],
+      "summary": {
+        "passed": 1,
+        "failed": 2,
+        "total": 3,
+        "pass_rate": 0.3333333333333333
+      },
+      "file_reads": [],
+      "tools_used": [],
+      "progressive_disclosure": {
+        "respected": true,
+        "issues": [],
+        "read_count": 0
+      },
+      "tier": 2
+    },
+    {
+      "expectations": [
+        {
+          "text": "The agent reads SKILL.md first",
+          "passed": false,
+          "evidence": "Only found 0/4 keywords",
+          "category": "other"
+        },
+        {
+          "text": "The agent provides valid AHK v2 syntax",
+          "passed": false,
+          "evidence": "Only found 0/4 keywords",
+          "category": "other"
+        },
+        {
+          "text": "The script uses #Requires AutoHotkey v2.0+",
+          "passed": false,
+          "evidence": "No tool usage detected in transcript",
+          "category": "script_usage"
+        },
+        {
+          "text": "Agent respected progressive disclosure",
+          "passed": true,
+          "evidence": "Read 0 files appropriately",
+          "category": "progressive_disclosure"
+        }
+      ],
+      "summary": {
+        "passed": 1,
+        "failed": 2,
+        "total": 3,
+        "pass_rate": 0.3333333333333333
+      },
+      "file_reads": [],
+      "tools_used": [],
+      "progressive_disclosure": {
+        "respected": true,
+        "issues": [],
+        "read_count": 0
+      },
+      "tier": 2
+    }
+  ]
+}

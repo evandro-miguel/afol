@@ -53,7 +53,7 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 ```
 1. Discover → .agents/agents tools list
 2. Learn    → .agents/agents tools info <tool-id>
-3. Read     → .agents/a-docs/agentic/<tool>.md
+3. Read     → docs/agentic/<tool>.md
 4. Execute  → .agents/agents <command> [args]
 5. Verify   → Check output and exit code
 ```
@@ -120,7 +120,7 @@ make dr                # doctor (alias)
 **DO:**
 - ✅ Run `tools list` before starting work
 - ✅ Use `tools info <tool>` to learn about tools
-- ✅ Read `.agents/a-docs/agentic/<tool>.md` for details
+- ✅ Read `docs/agentic/<tool>.md` for details
 - ✅ Run `make doctor` + `make lint` + `make verify` before commits
 
 **DON'T:**
@@ -148,8 +148,8 @@ python -m json.tool .agents/tools.json
 
 ## References
 
-- `.agents/a-docs/agentic/agents-tools.md` - Tool discovery docs
-- `.agents/a-docs/agentic/tools-json.md` - tools.json structure
+- `docs/agentic/agents-tools.md` - Tool discovery docs
+- `docs/agentic/tools-json.md` - tools.json structure
 - `.agents/tools.json` - Tool catalog
 
 ---

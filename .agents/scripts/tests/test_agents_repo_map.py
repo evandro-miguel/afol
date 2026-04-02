@@ -49,6 +49,7 @@ class AgentsRepoMapTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertIn(str(repo_dir), output)
             self.assertIn(str(runner), output)
+            self.assertIn(str(repo_dir / "docs" / "map"), output)
 
     def test_run_succeeds_when_runner_writes_required_readme(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -71,6 +72,10 @@ class AgentsRepoMapTests(unittest.TestCase):
                 "---\n"
                 "\n"
                 "# Map\n"
+                "\n"
+                "## Major Runtime Surfaces\n"
+                "\n"
+                "- `.agents/scripts`\n"
                 "EOF\n",
             )
 
@@ -83,7 +88,7 @@ class AgentsRepoMapTests(unittest.TestCase):
             output = buf.getvalue()
             self.assertEqual(code, 0)
             self.assertIn("generated_artifacts:", output)
-            readme_path = repo_dir / ".agents/arc/map/README.md"
+            readme_path = repo_dir / "docs" / "map" / "README.md"
             self.assertTrue(readme_path.exists())
             self.assertIn("current-state, descriptive", readme_path.read_text(encoding="utf-8"))
 
@@ -103,6 +108,49 @@ class AgentsRepoMapTests(unittest.TestCase):
             output = buf.getvalue()
             self.assertEqual(code, 1)
             self.assertIn("required map docs are missing", output)
+
+    def test_run_fails_when_dependency_graph_is_degenerate(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            temp_root = Path(td)
+            repo_dir = temp_root / "repo"
+            repo_dir.mkdir()
+            runner = make_runner(
+                temp_root / "run-repo-map.sh",
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "mkdir -p \"$2\"\n"
+                "cat > \"$2/README.md\" <<'EOF'\n"
+                "---\n"
+                "title: \"Map\"\n"
+                "description: \"x\"\n"
+                "doc_kind: \"map\"\n"
+                "version: \"v2026-03-23_1\"\n"
+                "created_at: \"2026-03-23T00:00:00Z\"\n"
+                "updated_at: \"2026-03-23T00:00:00Z\"\n"
+                "---\n"
+                "\n"
+                "# Map\n"
+                "\n"
+                "## Major Runtime Surfaces\n"
+                "\n"
+                "- `.agents/scripts`\n"
+                "EOF\n"
+                "cat > \"$2/DEPENDENCY_GRAPH.md\" <<'EOF'\n"
+                "# Dependency Graph\n"
+                "\n"
+                "- `Processed 0 files (897ms) (16 warnings)`\n"
+                "EOF\n",
+            )
+
+            buf = io.StringIO()
+            argv = ["agents-repo-map.py", str(repo_dir)]
+            with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False):
+                with contextlib.redirect_stdout(buf):
+                    code = self.repo_map.main()
+
+            output = buf.getvalue()
+            self.assertEqual(code, 1)
+            self.assertIn("semantic validation failed", output)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ Usage:
     python fix-lint-checkboxes.py [--dry-run] [file_or_directory...]
 
 Examples:
-    python fix-lint-checkboxes.py .agents/a-docs/standards/checkbox-protocol.md
+    python fix-lint-checkboxes.py docs/standards/checkbox-protocol.md
     python fix-lint-checkboxes.py --dry-run .agents/
     python fix-lint-checkboxes.py .agents/rules/
 """

@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from lib.agents_config import load_agents_config, resolve_repo_path
 
@@ -21,7 +21,7 @@ DEFAULTS = {
     "enabled": False,
     "upstream_repo_url": "",
     "upstream_branch": "main",
-    "source_dir": "../universal-skills",
+    "source_dir": ".agents/source/universal-skills",
     "pool_dir": ".agents/cache/universal-skills",
     "project_dir": "skills",
     "mode": "copy",
@@ -149,13 +149,14 @@ def _default_manifest() -> Dict[str, Any]:
     installs = []
     if default_profile:
         installs.append({"app": SPECIAL_APP_ALL, "profile": default_profile})
-    else:
+    if default_skills:
         installs.append({"app": SPECIAL_APP_ALL, "skills": default_skills})
 
     return {
         "version": MANIFEST_VERSION,
         "repo": str(cfg("upstream_repo_url")).strip(),
         "ref": str(cfg("upstream_branch")).strip(),
+        "source_dir": str(cfg("source_dir")).strip(),
         "mode": str(cfg("mode")).strip() or "copy",
         "installs": installs,
     }
@@ -251,6 +252,7 @@ def _normalize_manifest(data: Any) -> Dict[str, Any]:  # noqa: C901
             "version": MANIFEST_VERSION,
             "repo": str(data.get("repo", cfg("upstream_repo_url"))),
             "ref": str(data.get("ref", data.get("upstream_branch", cfg("upstream_branch")))),
+            "source_dir": str(data.get("source_dir", cfg("source_dir"))).strip() or str(cfg("source_dir")).strip(),
             "mode": str(data.get("mode", cfg("mode"))).strip() or "copy",
             "installs": legacy_installs,
         }
@@ -273,6 +275,7 @@ def _normalize_manifest(data: Any) -> Dict[str, Any]:  # noqa: C901
         "version": MANIFEST_VERSION,
         "repo": str(data.get("repo", cfg("upstream_repo_url"))).strip(),
         "ref": str(data.get("ref", cfg("upstream_branch"))).strip(),
+        "source_dir": str(data.get("source_dir", cfg("source_dir"))).strip() or str(cfg("source_dir")).strip(),
         "mode": str(data.get("mode", cfg("mode"))).strip() or "copy",
         "installs": normalized_installs,
     }
@@ -281,6 +284,8 @@ def _normalize_manifest(data: Any) -> Dict[str, Any]:  # noqa: C901
         manifest["repo"] = str(cfg("upstream_repo_url")).strip()
     if not manifest["ref"]:
         manifest["ref"] = str(cfg("upstream_branch")).strip()
+    if not manifest["source_dir"]:
+        manifest["source_dir"] = str(cfg("source_dir")).strip()
 
     profiles = data.get("profiles")
     if isinstance(profiles, dict):
@@ -323,6 +328,14 @@ def save_manifest(manifest: Dict[str, Any]):
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
+def skills_root_for_repo(repo: Path) -> Path:
+    return repo / str(cfg("upstream_skills_dir"))
+
+
+def profiles_root_for_repo(repo: Path) -> Path:
+    return repo / "profiles"
+
+
 def upstream_skills_root() -> Path:
     return source_repo_path() / str(cfg("upstream_skills_dir"))
 
@@ -343,8 +356,246 @@ def resolve_project_target(args: argparse.Namespace) -> str:
 
 
 def _is_valid_source_repo(path: Path) -> bool:
-    skills_dir = path / str(cfg("upstream_skills_dir"))
-    return path.exists() and skills_dir.exists() and skills_dir.is_dir()
+    skills_dir = skills_root_for_repo(path)
+    profiles_dir = profiles_root_for_repo(path)
+    has_profile_files = profiles_dir.is_dir() and any(profiles_dir.glob("*.json"))
+    if not (
+        path.exists()
+        and skills_dir.exists()
+        and skills_dir.is_dir()
+        and (path / "index.json").exists()
+        and has_profile_files
+    ):
+        return False
+
+    available = set(_repo_skill_names(path))
+    if not available:
+        return False
+
+    for profile_file in profiles_dir.glob("*.json"):
+        try:
+            raw_profile = json.loads(profile_file.read_text())
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(raw_profile, dict):
+            return False
+        referenced = dedupe(_normalize_string_list(raw_profile.get("skills")))
+        if any(name not in available for name in referenced):
+            return False
+
+    return True
+
+
+def _remove_path(path: Path):
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+        return
+    if path.exists():
+        shutil.rmtree(path)
+
+
+def _copy_tree(src: Path, dst: Path):
+    if dst.exists() or dst.is_symlink():
+        _remove_path(dst)
+    shutil.copytree(src, dst)
+
+
+def _copy_skill_dir(src_root: Path, dst_root: Path, name: str):
+    src = skills_root_for_repo(src_root) / name
+    if not (src / "SKILL.md").exists():
+        raise RuntimeError(f"Source skill missing SKILL.md: {src}")
+
+    dst_root.mkdir(parents=True, exist_ok=True)
+    _copy_tree(src, dst_root / name)
+
+
+def _ensure_source_repo_layout(repo: Path):
+    skills_root_for_repo(repo).mkdir(parents=True, exist_ok=True)
+    profiles_root_for_repo(repo).mkdir(parents=True, exist_ok=True)
+    index_path = repo / "index.json"
+    if not index_path.exists():
+        index_path.write_text("{}\n", encoding="utf-8")
+
+
+def _repo_skill_names(repo: Path) -> List[str]:
+    root = skills_root_for_repo(repo)
+    if not root.exists():
+        return []
+    return sorted(
+        [d.name for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
+    )
+
+
+def _read_profile_skills(repo: Path, profile_name: str) -> List[str]:
+    profile_path = profiles_root_for_repo(repo) / f"{profile_name}.json"
+    if not profile_path.exists():
+        return []
+    try:
+        raw_profile = json.loads(profile_path.read_text())
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(raw_profile, dict):
+        return []
+    return dedupe(_normalize_string_list(raw_profile.get("skills")))
+
+
+def _configured_profile_names(manifest: Dict[str, Any] | None = None) -> List[str]:
+    manifest = manifest or {}
+    profile_names: List[str] = []
+    installs = manifest.get("installs")
+    if isinstance(installs, list):
+        for entry in installs:
+            if not isinstance(entry, dict):
+                continue
+            profile = entry.get("profile")
+            if isinstance(profile, str) and profile.strip():
+                profile_names.append(profile.strip())
+
+    if profile_names:
+        return dedupe(profile_names)
+
+    default_profile = str(cfg("default_profile")).strip()
+    return [default_profile] if default_profile else []
+
+
+def _write_local_profile(profile_path: Path, profile_name: str, skills: Sequence[str]):
+    profile_path.write_text(
+        json.dumps({"name": profile_name, "skills": list(skills)}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_local_index(index_path: Path, skills: Sequence[str], profiles: Sequence[str]):
+    payload = {
+        "generated_by": "agents-skills-sync local source",
+        "profiles": list(profiles),
+        "skills": [
+            {
+                "name": name,
+                "path": f"{cfg('upstream_skills_dir')}/{name}",
+            }
+            for name in skills
+        ],
+    }
+    index_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _sync_local_source_metadata(local_source: Path, source_repo: Path, manifest: Dict[str, Any] | None = None):
+    manifest = manifest or {}
+    local_skills = _repo_skill_names(local_source)
+    profile_names = _configured_profile_names(manifest)
+    profiles_root = profiles_root_for_repo(local_source)
+    profiles_root.mkdir(parents=True, exist_ok=True)
+
+    keep_profiles = set(profile_names)
+    for profile_file in profiles_root.glob("*.json"):
+        if profile_file.stem not in keep_profiles:
+            profile_file.unlink()
+
+    for profile_name in profile_names:
+        source_profile_skills = _read_profile_skills(source_repo, profile_name)
+        if source_profile_skills:
+            filtered = [name for name in source_profile_skills if name in local_skills]
+        else:
+            filtered = list(local_skills)
+        _write_local_profile(profiles_root / f"{profile_name}.json", profile_name, filtered)
+
+    _write_local_index(local_source / "index.json", local_skills, profile_names)
+
+
+def preferred_local_source_repo_path() -> Path:
+    return preferred_source_repo_path()
+
+
+def existing_git_sync_repo_path() -> Path | None:
+    preferred = preferred_local_source_repo_path()
+    if _is_valid_source_repo(preferred) and (preferred / ".git").exists():
+        return preferred
+
+    pool = cfg_path("pool_dir")
+    if _is_valid_source_repo(pool) and (pool / ".git").exists():
+        return pool
+
+    return None
+
+
+def git_sync_repo_path() -> Path:
+    return existing_git_sync_repo_path() or cfg_path("pool_dir")
+
+
+def ensure_git_sync_repo(manifest: Dict[str, Any] | None = None) -> Path | None:
+    manifest = manifest or {}
+    preferred = preferred_local_source_repo_path()
+    if _is_valid_source_repo(preferred) and (preferred / ".git").exists():
+        return preferred
+
+    pool = cfg_path("pool_dir")
+    if _is_valid_source_repo(pool) and (pool / ".git").exists():
+        return pool
+
+    url = str(manifest.get("repo") or cfg("upstream_repo_url")).strip()
+    ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
+    if not url:
+        return None
+
+    if pool.exists():
+        try:
+            has_entries = any(pool.iterdir())
+        except OSError:
+            has_entries = True
+        if has_entries and not (pool / ".git").exists():
+            raise RuntimeError(
+                f"Cannot initialize git skills mirror at {pool}: path exists and is not a git checkout"
+            )
+
+    pool.parent.mkdir(parents=True, exist_ok=True)
+    if not pool.exists():
+        run(["git", "clone", "--branch", ref, url, str(pool)], cwd=ROOT_DIR)
+    return pool
+
+
+def refresh_git_sync_repo(manifest: Dict[str, Any]) -> Path | None:
+    repo = ensure_git_sync_repo(manifest)
+    if repo is None:
+        return None
+
+    ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
+    if not (repo / ".git").exists():
+        return None
+
+    run(["git", "fetch", "origin"], cwd=repo)
+    run(["git", "checkout", ref], cwd=repo)
+    run(["git", "pull", "--ff-only", "origin", ref], cwd=repo)
+    return repo
+
+
+def mirror_skills_to_local_source(source_repo: Path, skills: Sequence[str], manifest: Dict[str, Any] | None = None):
+    local_source = preferred_local_source_repo_path()
+    if local_source.resolve() == source_repo.resolve():
+        return
+
+    _ensure_source_repo_layout(local_source)
+
+    for name in skills:
+        _copy_skill_dir(source_repo, skills_root_for_repo(local_source), name)
+
+    _sync_local_source_metadata(local_source, source_repo, manifest)
+
+
+def publish_skill_from_project(name: str, target_repo: Path) -> bool:
+    src = project_skills_root() / name
+    if not (src / "SKILL.md").exists():
+        raise RuntimeError(f"Project skill missing SKILL.md: {src}")
+
+    _ensure_source_repo_layout(target_repo)
+    skills_root = skills_root_for_repo(target_repo)
+    dst = skills_root / name
+    if (dst / "SKILL.md").exists() and skill_digest(src) == skill_digest(dst):
+        return False
+
+    skills_root.mkdir(parents=True, exist_ok=True)
+    _copy_tree(src, dst)
+    return True
 
 
 def source_repo_candidates() -> List[Path]:
@@ -355,11 +606,21 @@ def source_repo_candidates() -> List[Path]:
         if not raw:
             continue
         candidate = resolve_repo_path(ROOT_DIR, raw)
+        if not _is_repo_local_path(candidate):
+            continue
         if candidate in seen:
             continue
         seen.add(candidate)
         candidates.append(candidate)
     return candidates
+
+
+def _is_repo_local_path(path: Path) -> bool:
+    try:
+        path.resolve().relative_to(ROOT_DIR.resolve())
+    except ValueError:
+        return False
+    return True
 
 
 def preferred_source_repo_path() -> Path:
@@ -380,7 +641,11 @@ def source_repo_path() -> Path:
     active = active_source_repo_path()
     if active is not None:
         return active
-    return preferred_source_repo_path()
+    return git_sync_repo_path()
+
+
+def catalog_source_repo_path() -> Path:
+    return existing_git_sync_repo_path() or source_repo_path()
 
 
 def validate_project_structure() -> List[str]:
@@ -416,8 +681,8 @@ def skill_digest(skill_dir: Path) -> str:
     return h.hexdigest()
 
 
-def available_skills() -> List[str]:
-    root = upstream_skills_root()
+def available_skills(source_repo: Path | None = None) -> List[str]:
+    root = skills_root_for_repo(source_repo or source_repo_path())
     if not root.exists():
         return []
     return sorted(
@@ -425,12 +690,13 @@ def available_skills() -> List[str]:
     )
 
 
-def _skill_doc_path(name: str) -> Path:
-    return upstream_skills_root() / name / "SKILL.md"
+def _skill_doc_path(name: str, source_repo: Path | None = None) -> Path:
+    root = skills_root_for_repo(source_repo or source_repo_path())
+    return root / name / "SKILL.md"
 
 
-def _skill_search_blob(name: str) -> str:
-    doc_path = _skill_doc_path(name)
+def _skill_search_blob(name: str, source_repo: Path | None = None) -> str:
+    doc_path = _skill_doc_path(name, source_repo=source_repo)
     if not doc_path.exists():
         return name.lower()
     try:
@@ -440,13 +706,13 @@ def _skill_search_blob(name: str) -> str:
     return f"{name.lower()}\n{body}"
 
 
-def _matching_skills(query: str, *, skills: Iterable[str]) -> List[str]:
+def _matching_skills(query: str, *, skills: Iterable[str], source_repo: Path | None = None) -> List[str]:
     wanted = query.strip().lower()
     if not wanted:
         return list(skills)
     matches: List[str] = []
     for name in skills:
-        if wanted in _skill_search_blob(name):
+        if wanted in _skill_search_blob(name, source_repo=source_repo):
             matches.append(name)
     return matches
 
@@ -519,16 +785,16 @@ def _selected_skills_for_args(args: argparse.Namespace) -> List[str]:
 
 
 def ensure_repo_cloned(manifest: Dict[str, Any] | None = None):
-    pool = active_source_repo_path() or preferred_source_repo_path()
+    pool = active_source_repo_path() or git_sync_repo_path()
     manifest = manifest or {}
     url = str(manifest.get("repo") or cfg("upstream_repo_url")).strip()
     ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
 
-    if not url:
-        raise RuntimeError("skills_sync.upstream_repo_url is required")
-
     if _is_valid_source_repo(pool) or (pool / ".git").exists():
         return
+
+    if not url:
+        raise RuntimeError("skills_sync.upstream_repo_url is required")
 
     pool.parent.mkdir(parents=True, exist_ok=True)
     run(["git", "clone", "--branch", ref, url, str(pool)], cwd=ROOT_DIR)
@@ -551,13 +817,16 @@ def cmd_pull(args: argparse.Namespace):
         return
 
     manifest = load_manifest()
-    ensure_repo_cloned(manifest)
-    pool = source_repo_path()
+    repo = refresh_git_sync_repo(manifest)
+    if repo is None:
+        print(f"OK: source refresh skipped for repo-local skills source at {source_repo_path()}")
+        return
+
     ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
-    run(["git", "fetch", "origin"], cwd=pool)
-    run(["git", "checkout", ref], cwd=pool)
-    run(["git", "pull", "--ff-only", "origin", ref], cwd=pool)
-    print(f"OK: updated source checkout at {pool} (ref={ref})")
+    print(f"OK: updated git skills source at {repo} (ref={ref})")
+    if repo != source_repo_path():
+        print(f"- local source remains at {source_repo_path()}")
+        print("- use `skills-sync sync` (or `skills-sync update`) to install refreshed skills into .agents/skills")
 
 
 def _compare(skills: Iterable[str], mode: str) -> Tuple[List[str], List[str], List[str]]:
@@ -612,18 +881,20 @@ def cmd_list(args: argparse.Namespace):
     if not ensure_enabled():
         return
 
+    source_repo = source_repo_path()
     if getattr(args, "selected", False):
         skills = _selected_skills_for_args(args)
     elif getattr(args, "installed", False):
         skills = installed_skills()
     else:
-        skills = available_skills()
+        source_repo = catalog_source_repo_path()
+        skills = available_skills(source_repo=source_repo)
 
     installed = set(installed_skills())
     runtime = resolve_project_target(args) if hasattr(args, "runtime") else SPECIAL_APP_ALL
 
     print("SKILLS")
-    print(f"- source: {source_repo_path()}")
+    print(f"- source: {source_repo}")
     print(f"- runtime: {runtime}")
     print(f"- count: {len(skills)}")
     for name in skills:
@@ -636,16 +907,18 @@ def cmd_search(args: argparse.Namespace):
         return
 
     limit = max(1, int(getattr(args, "limit", 20)))
+    source_repo = source_repo_path()
     if getattr(args, "selected", False):
         base_skills = _selected_skills_for_args(args)
     else:
-        base_skills = available_skills()
+        source_repo = catalog_source_repo_path()
+        base_skills = available_skills(source_repo=source_repo)
 
-    matches = _matching_skills(args.query, skills=base_skills)[:limit]
+    matches = _matching_skills(args.query, skills=base_skills, source_repo=source_repo)[:limit]
     installed = set(installed_skills())
 
     print("SKILL SEARCH")
-    print(f"- source: {source_repo_path()}")
+    print(f"- source: {source_repo}")
     print(f"- query: {args.query}")
     print(f"- matches: {len(matches)}")
     for name in matches:
@@ -655,8 +928,9 @@ def cmd_search(args: argparse.Namespace):
         print("  - none")
 
 
-def apply_skill(name: str):
-    src = upstream_skills_root() / name
+def apply_skill(name: str, source_repo: Path | None = None):
+    source_root = source_repo or source_repo_path()
+    src = skills_root_for_repo(source_root) / name
     dst = project_skills_root() / name
 
     if not (src / "SKILL.md").exists():
@@ -677,6 +951,12 @@ def apply_skill(name: str):
         shutil.copytree(src, dst)
     else:
         raise RuntimeError(f"Invalid skills_sync.mode: {mode} (expected copy|link)")
+
+
+def apply_skills_from_repo(skills: Sequence[str], source_repo: Path | None = None):
+    for name in skills:
+        apply_skill(name, source_repo=source_repo)
+        print(f"APPLIED: {name}")
 
 
 def _persist_explicit_skill_selection(
@@ -752,12 +1032,10 @@ def cmd_apply(args: argparse.Namespace):
 
     if not upstream_skills_root().exists():
         raise RuntimeError(
-            f"skills pool not initialized: {source_repo_path()}"
+            f"skills source not initialized: {source_repo_path()}"
         )
 
-    for name in skills:
-        apply_skill(name)
-        print(f"APPLIED: {name}")
+    apply_skills_from_repo(skills)
 
     if cli_skills:
         _persist_explicit_skill_selection(
@@ -780,8 +1058,9 @@ def cmd_ensure(args: argparse.Namespace):
         return
 
     manifest = load_manifest()
+    refreshed_repo: Path | None = None
     if getattr(args, "pull", False):
-        cmd_pull(args)
+        refreshed_repo = refresh_git_sync_repo(manifest)
     else:
         ensure_repo_cloned(manifest)
 
@@ -789,9 +1068,22 @@ def cmd_ensure(args: argparse.Namespace):
     if not skill:
         raise RuntimeError("Skill name is required")
 
-    source_doc = _skill_doc_path(skill)
+    source_repo = refreshed_repo or source_repo_path()
+    if refreshed_repo is not None:
+        mirror_skills_to_local_source(refreshed_repo, [skill], manifest)
+
+    source_doc = _skill_doc_path(skill, source_repo=source_repo)
+    catalog_repo = existing_git_sync_repo_path()
+    if not source_doc.exists() and catalog_repo is not None and catalog_repo != source_repo:
+        source_repo = catalog_repo
+        source_doc = _skill_doc_path(skill, source_repo=source_repo)
+
     if not source_doc.exists():
-        raise RuntimeError(f"Skill '{skill}' not found in source: {source_repo_path()}")
+        hint = ""
+        repo = str(manifest.get("repo") or cfg("upstream_repo_url")).strip()
+        if repo and refreshed_repo is None:
+            hint = " Use --pull or run `skills-sync pull` first to fetch the git-backed source."
+        raise RuntimeError(f"Skill '{skill}' not found in source: {source_repo}.{hint}")
 
     destination = project_skills_root() / skill / "SKILL.md"
     if destination.exists():
@@ -800,10 +1092,10 @@ def cmd_ensure(args: argparse.Namespace):
         if source_digest == dest_digest:
             print(f"OK: skill already installed and aligned: {skill}")
         else:
-            apply_skill(skill)
+            apply_skill(skill, source_repo=source_repo)
             print(f"UPDATED: {skill}")
     else:
-        apply_skill(skill)
+        apply_skill(skill, source_repo=source_repo)
         print(f"APPLIED: {skill}")
 
     if getattr(args, "persist", False):
@@ -825,7 +1117,7 @@ def cmd_check(args: argparse.Namespace):
     manifest = load_manifest()
     required = bool(cfg("required"))
     if not upstream_skills_root().exists():
-        msg = f"skills pool not initialized: {source_repo_path()}"
+        msg = f"skills source not initialized: {source_repo_path()}"
         if required:
             raise RuntimeError(msg)
         print(f"WARN: {msg}")
@@ -869,6 +1161,8 @@ def cmd_check(args: argparse.Namespace):
 def cmd_status(args: argparse.Namespace):
     manifest = load_manifest()
     active_source = active_source_repo_path()
+    git_source = existing_git_sync_repo_path()
+    catalog_source = catalog_source_repo_path()
     print("SKILLS SYNC STATUS")
     print(f"- enabled: {cfg('enabled')}")
     print(f"- required: {cfg('required')}")
@@ -878,19 +1172,131 @@ def cmd_status(args: argparse.Namespace):
     print(f"- mode: {manifest.get('mode', cfg('mode'))}")
     print(f"- source_dir: {preferred_source_repo_path()}")
     print(f"- active_source: {active_source or 'missing'}")
-    print(f"- fallback_pool_dir: {cfg_path('pool_dir')}")
+    print(f"- git_sync_source: {git_source or 'none'}")
+    print(f"- catalog_source: {catalog_source}")
+    print(f"- fallback_cache_dir: {cfg_path('pool_dir')}")
     print(f"- project_dir: {project_skills_root()}")
     print(f"- manifest: {cfg_path('manifest_file')}")
     print(f"- installs: {len(manifest.get('installs', []))}")
-    print(f"- available in source: {len(available_skills())}")
+    print(f"- available in active source: {len(available_skills(source_repo=active_source)) if active_source else 0}")
+    print(f"- available in catalog source: {len(available_skills(source_repo=catalog_source))}")
 
 
 def cmd_sync(args: argparse.Namespace):
     if not ensure_enabled():
         return
-    cmd_pull(args)
-    cmd_apply(args)
+    manifest = load_manifest()
+    cli_skills = parse_csv(getattr(args, "skills", None))
+    runtime = resolve_project_target(args)
+    profile = getattr(args, "profile", None)
+    skills = resolve_skills_for_request(
+        manifest,
+        cli_skills=cli_skills,
+        runtime=runtime,
+        profile=profile,
+    )
+    if not skills:
+        raise RuntimeError("No selected skills. Provide --skills or update manifest.")
+
+    refreshed_repo = refresh_git_sync_repo(manifest)
+    source_repo = refreshed_repo or source_repo_path()
+    if refreshed_repo is not None:
+        mirror_skills_to_local_source(refreshed_repo, skills, manifest)
+
+    problems = validate_project_structure()
+    if problems:
+        raise RuntimeError("; ".join(problems))
+
+    if not skills_root_for_repo(source_repo).exists():
+        raise RuntimeError(f"skills source not initialized: {source_repo}")
+
+    apply_skills_from_repo(skills, source_repo=source_repo)
+
+    if cli_skills:
+        _persist_explicit_skill_selection(
+            manifest,
+            runtime=runtime,
+            skills=skills,
+            profile=profile,
+        )
+
+    manifest["version"] = MANIFEST_VERSION
+    manifest["repo"] = str(manifest.get("repo", cfg("upstream_repo_url")).strip())
+    manifest["ref"] = str(manifest.get("ref", cfg("upstream_branch")).strip())
+    manifest["mode"] = str(manifest.get("mode", cfg("mode"))).strip() or "copy"
+    save_manifest(manifest)
     cmd_check(args)
+
+
+def _push_skill_names(args: argparse.Namespace) -> List[str]:
+    candidates = [*parse_csv(getattr(args, "skills", None))]
+    single = getattr(args, "skill", None)
+    if isinstance(single, str) and single.strip():
+        candidates.append(single.strip())
+    explicit = dedupe(_normalize_string_list(candidates))
+    if not explicit:
+        raise RuntimeError("Provide a skill name or --skills for push")
+    return explicit
+
+
+def _default_push_message(skills: Sequence[str]) -> str:
+    if len(skills) == 1:
+        return f"skills-sync: publish {skills[0]}"
+    return f"skills-sync: publish {len(skills)} skills"
+
+
+def cmd_push(args: argparse.Namespace):
+    if not ensure_enabled():
+        return
+
+    manifest = load_manifest()
+    git_repo = ensure_git_sync_repo(manifest)
+    if git_repo is None or not (git_repo / ".git").exists():
+        raise RuntimeError("Git-backed skills source is required for push")
+
+    skills = _push_skill_names(args)
+    changed: List[str] = []
+    unchanged: List[str] = []
+    local_source = preferred_local_source_repo_path()
+
+    for name in skills:
+        if publish_skill_from_project(name, git_repo):
+            changed.append(name)
+            print(f"PUBLISHED: {name} -> {git_repo}")
+        else:
+            unchanged.append(name)
+            print(f"UNCHANGED: {name}")
+
+    if local_source.resolve() != git_repo.resolve():
+        mirror_skills_to_local_source(git_repo, skills, manifest)
+
+    if unchanged and not changed:
+        print("OK: no source changes detected")
+        return
+
+    pathspecs = [f"{cfg('upstream_skills_dir')}/{name}" for name in changed]
+    if getattr(args, "commit", False) or getattr(args, "push", False):
+        run(["git", "add", "--", *pathspecs], cwd=git_repo)
+        run(
+            [
+                "git",
+                "commit",
+                "-m",
+                getattr(args, "message", None) or _default_push_message(changed),
+                "--only",
+                "--",
+                *pathspecs,
+            ],
+            cwd=git_repo,
+        )
+        print(f"COMMITTED: {', '.join(changed)}")
+
+    if getattr(args, "push", False):
+        ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
+        if not ref:
+            raise RuntimeError("Manifest ref/upstream_branch is required for push")
+        run(["git", "push", "origin", f"HEAD:{ref}"], cwd=git_repo)
+        print(f"PUSHED: {', '.join(changed)} -> origin/{ref}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -908,9 +1314,11 @@ def build_parser() -> argparse.ArgumentParser:
         ("ensure", cmd_ensure),
         ("check", cmd_check),
         ("sync", cmd_sync),
+        ("update", cmd_sync),
+        ("push", cmd_push),
     ]:
         sp = sub.add_parser(name)
-        if name in {"list", "search", "plan", "apply", "ensure", "check", "sync"}:
+        if name in {"list", "search", "plan", "apply", "ensure", "check", "sync", "update", "push"}:
             sp.add_argument("--skills", help="CSV list of skill names")
             sp.add_argument("--runtime", dest="runtime", help="Target runtime/app")
             sp.add_argument("--app", dest="runtime", help="Alias for --runtime")
@@ -926,6 +1334,11 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("skill", help="Skill name to ensure in the project")
             sp.add_argument("--persist", action="store_true", help="Persist the ensured skill into the manifest for the selected runtime")
             sp.add_argument("--pull", action="store_true", help="Refresh the source checkout before ensuring the skill")
+        if name == "push":
+            sp.add_argument("skill", nargs="?", help="Single skill name to publish back to the git source")
+            sp.add_argument("--commit", action="store_true", help="Create a git commit for the published skill changes")
+            sp.add_argument("--push", action="store_true", help="Push the published commit to origin/<ref>")
+            sp.add_argument("--message", help="Commit message to use with --commit/--push")
         sp.set_defaults(func=fn)
 
     return parser

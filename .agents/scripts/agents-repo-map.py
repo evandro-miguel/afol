@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Generate or refresh the full repository codemap under `.agents/arc/map/`."""
+"""Generate or refresh the full repository codemap under `docs/map/`."""
 
 from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Iterable, List
 
@@ -15,7 +17,7 @@ from lib.agents_config import load_agents_config
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 MAP_CFG = CONFIG.get("repo_map", {})
 PATHS_CFG = CONFIG.get("paths", {})
-DEFAULT_OUTPUT_DIR = str(PATHS_CFG.get("map_dir", ".agents/arc/map")).strip() or ".agents/arc/map"
+DEFAULT_OUTPUT_DIR = str(PATHS_CFG.get("map_dir", "docs/map")).strip() or "docs/map"
 DEFAULT_IMAGE = str(MAP_CFG.get("docker_image", "docker-analisys-tools:latest")).strip() or "docker-analisys-tools:latest"
 DEFAULT_REQUIRED_DOCS = [str(item) for item in MAP_CFG.get("required_root_docs", ["README.md"]) if str(item).strip()]
 DEFAULT_RUNNER_HINT = Path.home() / "apps" / "docker-analisys-tools" / "scripts" / "run-repo-map.sh"
@@ -24,18 +26,37 @@ SCAFFOLD_CONTRACT_BLOCK = "\n".join(
     [
         SCAFFOLD_CONTRACT_HEADING,
         "",
-        "- `.agents/arc/map/` is the current-state, descriptive evidence surface for repository mapping.",
-        "- Goal-state canon stays outside this folder in `.agents/arc/`, roadmap, specs, ADRs, and related architecture docs.",
+        "- `docs/map/` is the current-state, descriptive evidence surface for repository mapping.",
+        "- Goal-state canon stays outside this folder in `docs/arc/`, roadmap, specs, ADRs, and related architecture docs.",
         "- Use this map for refreshable observation and analysis, not as approval authority for desired-state decisions.",
         "",
     ]
 )
+ANALYSIS_EXCLUDES = {
+    ".git",
+    ".coverage",
+    ".pytest_cache",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    ".agents/.cache",
+    ".agents/cache",
+    ".agents/wb",
+    ".agents/z-arq",
+    ".agents/tmp",
+    "docs/map",
+    "docs/arc/structure",
+}
+DEGENERATE_MARKERS = {
+    "DEPENDENCY_GRAPH.md": ["Processed 0 files"],
+}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate or refresh the repository codemap under .agents/arc/map")
+    parser = argparse.ArgumentParser(description="Generate or refresh the repository codemap under docs/map")
     parser.add_argument("repo", nargs="?", default=".", help="Repository root to analyze (default: current directory)")
-    parser.add_argument("--output", help="Map output directory (default: <repo>/.agents/arc/map)")
+    parser.add_argument("--output", help="Map output directory (default: <repo>/docs/map)")
     parser.add_argument("--runner", help="Path to run-repo-map.sh")
     parser.add_argument("--image", default=DEFAULT_IMAGE, help=f"Docker image tag (default: {DEFAULT_IMAGE})")
     parser.add_argument("--dry-run", action="store_true", help="Print the resolved command without executing it")
@@ -101,6 +122,152 @@ def _validate_generated_docs(output_root: Path, required_docs: list[str]) -> lis
     return generated
 
 
+def _extract_section_body(path: Path, heading: str) -> str:
+    if not path.exists():
+        return ""
+
+    capture = False
+    body: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip() == heading:
+            capture = True
+            continue
+        if capture and line.startswith("## "):
+            break
+        if capture:
+            body.append(line)
+    return "\n".join(body).strip()
+
+
+def _replace_section(path: Path, heading: str, new_body_lines: list[str]) -> None:
+    if not path.exists():
+        return
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    output: list[str] = []
+    i = 0
+    replaced = False
+    while i < len(lines):
+        line = lines[i]
+        output.append(line)
+        if line.strip() == heading:
+            replaced = True
+            output.extend(new_body_lines)
+            i += 1
+            while i < len(lines) and not lines[i].startswith("## "):
+                i += 1
+            continue
+        i += 1
+
+    if replaced:
+        path.write_text("\n".join(output).rstrip() + "\n", encoding="utf-8")
+
+
+def _replace_first_line_with_prefix(path: Path, prefix: str, replacement: str) -> None:
+    if not path.exists():
+        return
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for idx, line in enumerate(lines):
+        if line.startswith(prefix):
+            lines[idx] = replacement
+            path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+            return
+
+
+def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
+    if not (repo_root / ".agents" / "scripts").exists():
+        return
+
+    runtime_surfaces = [
+        "",
+        "- `.agents/scripts`: Python command surface for governance, validation, bootstrap, repo maps, and runtime adapters.",
+        "- `docs/`: Canonical project documentation surface for standards, architecture, patterns, templates, and telemetry guidance.",
+        "- `.agents/skills`: Project-local skill surface synced into the repository for interactive runtimes.",
+        "- `AGENTS.md`, `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`: Operator/runtime instruction entrypoints mirrored from the canonical contract.",
+    ]
+    _replace_section(output_root / "README.md", "## Major Runtime Surfaces", runtime_surfaces)
+
+    architecture_intro = [
+        "",
+        "- Python utilities or service-side scripts are present and should be considered part of the operating surface.",
+        "- Dominant feature clusters: `.agents/scripts, docs, .agents/skills`.",
+        "- Public boundaries currently concentrate in `.agents/agents`, `Makefile`, and the runtime instruction entrypoints.",
+    ]
+    _replace_section(output_root / "ARCHITECTURE.md", "## What This System Appears To Do", architecture_intro)
+
+    domain_bullets = [
+        "",
+        "- `.agents/scripts`: Operational Python command family for doctor, bootstrap, sync, repo-map, workbench, and validation flows.",
+        "- `docs/`: Standards, templates, goal-state canon, patterns, telemetry docs, and other project-facing documentation surfaces.",
+        "- `.agents/skills`: Repo-local skill payloads selected for interactive runtimes.",
+        "- Runtime instruction entrypoints (`AGENTS.md`, mirrors, and adapter files): Thin contract surfaces for Codex, OpenCode, Qwen, Claude, and Gemini style runtimes.",
+    ]
+    _replace_section(output_root / "ARCHITECTURE.md", "## Why The Main Domains Exist", domain_bullets)
+
+    cli_entrypoints = [item for item in [repo_root / ".agents" / "agents", repo_root / "Makefile"] if item.exists()]
+    runtime_docs = [
+        path
+        for path in [
+            repo_root / "AGENTS.md",
+            repo_root / "OPENCODE.md",
+            repo_root / "QWEN.md",
+            repo_root / "CLAUDE.md",
+            repo_root / "GEMINI.md",
+        ]
+        if path.exists()
+    ]
+    command_scripts = sorted((repo_root / ".agents" / "scripts").glob("agents-*.py"))
+
+    api_counts = [
+        "",
+        f"- CLI entrypoints: `{len(cli_entrypoints)}`",
+        f"- Runtime instruction entrypoints: `{len(runtime_docs)}`",
+        f"- Command script boundaries: `{len(command_scripts)}`",
+    ]
+    _replace_section(output_root / "API_MAP.md", "## Public Boundary Counts", api_counts)
+
+    api_boundaries = [""] + [f"- `{path.relative_to(repo_root)}`" for path in [*cli_entrypoints, *runtime_docs]]
+    _replace_section(output_root / "API_MAP.md", "## Public Boundary Files", api_boundaries)
+
+    supporting_surfaces = [
+        "",
+        "- `.agents/agents.config`: Repository-local runtime, path, and skills-sync contract.",
+        "- `.agents/tools.json`: Tool catalog surfaced by the wrapper and tools commands.",
+        "- `.agents/skills-sync.manifest.json`: Pinned project-local skills selection and source contract.",
+        "- `opencode.json`: Secret-free OpenCode adapter entrypoint committed with the scaffold.",
+    ]
+    _replace_section(output_root / "API_MAP.md", "## Supporting Integration And Contract Surfaces", supporting_surfaces)
+
+    _replace_first_line_with_prefix(
+        output_root / "LLM_QUICKSTART.md",
+        "- Runtime surfaces:",
+        "- Runtime surfaces: `.agents/scripts`, `docs/`, `.agents/skills`, `AGENTS.md`, `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`",
+    )
+
+
+def _validate_semantic_signals(output_root: Path) -> None:
+    problems: list[str] = []
+
+    for rel_path, markers in DEGENERATE_MARKERS.items():
+        path = output_root / rel_path
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker in content:
+                problems.append(f"{rel_path} contains degenerate marker: {marker}")
+
+    readme_body = _extract_section_body(output_root / "README.md", "## Major Runtime Surfaces")
+    if not readme_body:
+        problems.append("README.md is missing Major Runtime Surfaces content")
+    if ".agents/scripts" not in readme_body:
+        problems.append("README.md does not mention .agents/scripts in Major Runtime Surfaces")
+
+    if problems:
+        raise RuntimeError("Repo map run completed but semantic validation failed:\n- " + "\n- ".join(problems))
+
+
 def _print_summary(repo_root: Path, output_root: Path, runner: Path, image: str, generated: list[Path]) -> None:
     print("Agents Repo Map")
     print(f"repo: {repo_root}")
@@ -132,12 +299,43 @@ def _normalize_map_readme(output_root: Path) -> None:
             SCAFFOLD_CONTRACT_HEADING,
             (
                 f"{SCAFFOLD_CONTRACT_HEADING}\n\n"
-                "- `.agents/arc/map/` is the current-state, descriptive evidence surface for repository mapping."
+                "- `docs/map/` is the current-state, descriptive evidence surface for repository mapping."
             ),
             1,
         )
 
     readme_path.write_text(content.rstrip() + "\n", encoding="utf-8")
+
+
+def _analysis_ignore(repo_root: Path):
+    def _ignore(current_dir: str, names: list[str]) -> set[str]:
+        current = Path(current_dir)
+        ignored: set[str] = set()
+        for name in names:
+            candidate = current / name
+            rel = candidate.relative_to(repo_root).as_posix()
+            if name in ANALYSIS_EXCLUDES or rel in ANALYSIS_EXCLUDES:
+                ignored.add(name)
+                continue
+            if any(rel.startswith(f"{prefix}/") for prefix in ANALYSIS_EXCLUDES if "/" in prefix):
+                ignored.add(name)
+        return ignored
+
+    return _ignore
+
+
+def _prepare_shadow_repo(repo_root: Path) -> tuple[Path, Path]:
+    staging_root = Path(tempfile.mkdtemp(prefix=f"agents-repo-map-{repo_root.name}-"))
+    shadow_repo = staging_root / repo_root.name
+    shutil.copytree(repo_root, shadow_repo, ignore=_analysis_ignore(repo_root))
+    return staging_root, shadow_repo
+
+
+def _sync_generated_output(src: Path, dest: Path) -> None:
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
 
 
 def main() -> int:
@@ -150,27 +348,35 @@ def main() -> int:
         print(f"❌ {exc}")
         return 1
 
-    output_root.mkdir(parents=True, exist_ok=True)
-    (output_root / "extra" / "changelogs").mkdir(parents=True, exist_ok=True)
-
-    cmd = [str(runner), str(repo_root), str(output_root), str(args.image)]
+    staging_root, shadow_repo = _prepare_shadow_repo(repo_root)
+    shadow_output = staging_root / "map-output"
+    cmd = [str(runner), str(shadow_repo), str(shadow_output), str(args.image)]
+    print(f"Source repo: {repo_root}")
+    print(f"Final output root: {output_root}")
+    print(f"Analysis shadow repo: {shadow_repo}")
     print("Resolved repo-map command:")
     print(" ".join(cmd))
 
     if args.dry_run:
+        shutil.rmtree(staging_root, ignore_errors=True)
         return 0
 
-    result = subprocess.run(cmd, cwd=repo_root)
-    if result.returncode != 0:
-        print(f"❌ repo-map runner failed with exit code {result.returncode}")
-        return result.returncode
-
     try:
-        generated = _validate_generated_docs(output_root, DEFAULT_REQUIRED_DOCS)
-        _normalize_map_readme(output_root)
+        result = subprocess.run(cmd, cwd=shadow_repo)
+        if result.returncode != 0:
+            print(f"❌ repo-map runner failed with exit code {result.returncode}")
+            return result.returncode
+
+        generated = _validate_generated_docs(shadow_output, DEFAULT_REQUIRED_DOCS)
+        _normalize_map_readme(shadow_output)
+        _augment_scaffold_map(repo_root, shadow_output)
+        _validate_semantic_signals(shadow_output)
+        _sync_generated_output(shadow_output, output_root)
     except Exception as exc:
         print(f"❌ {exc}")
         return 1
+    finally:
+        shutil.rmtree(staging_root, ignore_errors=True)
 
     _print_summary(repo_root, output_root, runner, args.image, generated)
     return 0

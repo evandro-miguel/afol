@@ -3,12 +3,12 @@
 Agents Index - Update INDEX.md files for SPECS and ADRs.
 
 Scans:
-- .agents/arc/SPECS/ for spec files
-- .agents/arc/DECISIONS/ for adr files
+- docs/arc/SPECS/ for spec files
+- docs/arc/DECISIONS/ for adr files
 
 Updates:
-- .agents/arc/SPECS/INDEX.md
-- .agents/arc/DECISIONS/INDEX.md
+- docs/arc/SPECS/INDEX.md
+- docs/arc/DECISIONS/INDEX.md
 
 Usage:
     python agents-index.py [--dry-run]
@@ -132,7 +132,8 @@ def generate_index(entries: List[DocEntry], doc_type: str) -> str:
     frontmatter_doc_type = "specs_index" if doc_type == "spec" else "adr_index"
     index_id = "specs_index" if doc_type == "spec" else "adr_index"
     title = "SPECS" if doc_type == "spec" else "ADRS"
-    path_label = ".agents/arc/SPECS/INDEX.md" if doc_type == "spec" else ".agents/arc/DECISIONS/INDEX.md"
+    target_dir = SPECS_DIR if doc_type == "spec" else DECISIONS_DIR
+    path_label = str((target_dir / "INDEX.md").resolve().relative_to(ROOT_DIR.resolve()))
 
     content = f"""---
 doc_type: {frontmatter_doc_type}

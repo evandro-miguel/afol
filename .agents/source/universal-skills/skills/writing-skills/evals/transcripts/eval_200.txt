@@ -1,0 +1,212 @@
+[0m
+> build · k2p5
+[0m
+I'll help you migrate your AHK v1 script to v2. Let me load the AHK v2 skill for comprehensive guidance.
+[0m→ [0mSkill "ahk-v2"
+Let me read the full migration guide to give you comprehensive guidance.
+[0m→ [0mRead ahk-v2/references/migration.md
+## AHK v1 to v2 Migration Guide
+
+Migrating from AutoHotkey v1 to v2 involves significant syntax changes. Here's the complete guide:
+
+---
+
+### Quick Start
+
+Add this to the top of every v2 script:
+```autohotkey
+#Requires AutoHotkey v2.0
+```
+
+---
+
+### Key Changes at a Glance
+
+| Change | v1 | v2 |
+|--------|-----|-----|
+| **Commands** | `MsgBox, text` | `MsgBox("text")` |
+| **Assignment** | `var = text` | `var := "text"` |
+| **Expressions** | `MsgBox, % var` | `MsgBox(var)` |
+| **Error handling** | `if ErrorLevel` | `try/catch` |
+| **GUI** | `Gui, Add...` | `gui.Add(...)` |
+| **Output vars** | `WinGetPos, x, y` | `WinGetPos(&x, &y)` |
+
+---
+
+### 1. Commands → Functions
+
+```autohotkey
+; v1
+WinActivate, Notepad
+MsgBox, 4, Title, Text
+Run, notepad.exe
+
+; v2
+WinActivate("Notepad")
+MsgBox("Text", "Title", 4)  ; Note: text is first!
+Run("notepad.exe")
+```
+
+---
+
+### 2. Variable Assignment
+
+```autohotkey
+; v1
+var = legacy text
+var := expression
+
+; v2 (:= only)
+var := "text with quotes"
+var := 1 + 2
+```
+
+---
+
+### 3. No More Percent Signs
+
+```autohotkey
+; v1
+if (%var% = "test")
+MsgBox % "Hello " name
+
+; v2
+if (var = "test")
+MsgBox("Hello " name)
+```
+
+---
+
+### 4. Error Handling
+
+```autohotkey
+; v1
+FileRead, content, file.txt
+if ErrorLevel
+    MsgBox, Error
+
+; v2
+try {
+    content := FileRead("file.txt")
+}
+catch as e {
+    MsgBox("Error: " e.Message)
+}
+```
+
+---
+
+### 5. GUI is Object-Oriented
+
+```autohotkey
+; v1
+Gui, Add, Text,, Hello
+Gui, Add, Button, gButtonClick, OK
+Gui, Show
+return
+
+ButtonClick:
+MsgBox, Clicked!
+return
+
+; v2
+MyGui := Gui()
+MyGui.Add("Text",, "Hello")
+MyGui.Add("Button",, "OK").OnEvent("Click", ButtonClick)
+MyGui.Show()
+
+ButtonClick(*) {
+    MsgBox("Clicked!")
+}
+```
+
+---
+
+### 6. Multi-Line Hotkeys Need Braces
+
+```autohotkey
+; v1
+^b::
+Send, Line 1
+Send, Line 2
+return
+
+; v2
+^b::
+{
+    Send("Line 1")
+    Send("Line 2")
+}
+```
+
+---
+
+### 7. Loops
+
+```autohotkey
+; v1
+Loop, 5
+    MsgBox, % A_Index
+
+Loop, Parse, str, `,
+    MsgBox, % A_LoopField
+
+; v2
+Loop 5
+    MsgBox(A_Index)
+
+Loop Parse, str, ","
+    MsgBox(A_LoopField)
+```
+
+---
+
+### 8. Common Renames
+
+| v1 | v2 |
+|----|-----|
+| `FileCreateDir` | `DirCreate` |
+| `FileRemoveDir` | `DirDelete` |
+| `FileSelectFile` | `FileSelect` |
+| `FileSelectFolder` | `DirSelect` |
+| `#IfWinActive` | `#HotIf WinActive()` |
+
+---
+
+### Automatic Converter Tool
+
+The community provides a converter script that handles most of the tedious work:
+
+```bash
+# Download from:
+# https://github.com/mmikeww/AHK-v2-script-converter
+```
+
+**Important:** The converter handles ~80% of cases. Always review the output manually!
+
+---
+
+### Migration Checklist
+
+1. ✅ Add `#Requires AutoHotkey v2.0`
+2. ✅ Convert commands to functions with `()`
+3. ✅ Replace `=` with `:=` for assignments
+4. ✅ Remove `%` from expressions
+5. ✅ Update MsgBox, InputBox, ToolTip calls (text first!)
+6. ✅ Rewrite GUI code using objects
+7. ✅ Replace ErrorLevel with try/catch
+8. ✅ Add braces `{}` to multi-line hotkeys
+9. ✅ Update Loop syntax
+10. ✅ Test thoroughly
+
+---
+
+### VSCode Extension for v2
+
+Install: `thqby.vscode-autohotkey2-lsp`
+
+Provides IntelliSense, debugging, and syntax highlighting for v2.
+
+---
+
+**Skill used:** ahk-v2

@@ -46,7 +46,7 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 
 `agents-wb-update.py` supports task/status/timeline/link automation with explicit `--session` scope for write safety.
 `agents-knowledge.py` provides low-token list/search/pull/show/index over research, brainstorm, explorer-check, report, and postmortem docs.
-`agents-repo-map.py` wraps the external `docker-analisys-tools` runner so `.agents/arc/map/` can be refreshed through a project-local command instead of ad-hoc shell usage.
+`agents-repo-map.py` wraps the external `docker-analisys-tools` runner so `docs/map/` can be refreshed through a project-local command instead of ad-hoc shell usage.
 For per-process isolation, set `AGENTS_ACTIVE_SESSION_FILE` to use a custom active-session pointer.
 
 Tools catalog source: `.agents/tools.json`.
@@ -56,9 +56,9 @@ Catalog validation: `./.agents/agents tools validate`.
 
 ## Documentation
 
-Full usage documentation: `.agents/a-docs/standards/scripts-usage.md`
+Full usage documentation: `docs/standards/scripts-usage.md`
 
-Quick reference: `.agents/a-docs/standards/scripts-quickstart.md`
+Quick reference: `docs/standards/scripts-quickstart.md`
 
 ## Setup
 
@@ -71,8 +71,14 @@ The scaffold uses a repo-local UV cache during setup and validation: `.agents/ca
 
 Bootstrap exports are sanitized by design: the target repo gets generic roadmap/spec baselines and empty knowledge indexes, not this scaffold's local `wb/`, lessons history, telemetry reports, or live roadmap/spec backlog.
 Bootstrap also copies the root `PLANS.md` file so downstream repos inherit the same ExecPlan contract used by this scaffold.
+For full bootstrap, the target directory is created automatically when missing.
 For existing projects, use `--partial` so bootstrap fills only the missing scaffold surface and leaves project-owned files intact.
-The preferred upstream source checkout is a sibling repository at `../universal-skills`. The legacy repo-local cache path `.agents/cache/universal-skills/` remains a compatibility fallback for older repos.
+The preferred upstream source checkout is `.agents/source/universal-skills/` inside the repo. The legacy repo-local cache path `.agents/cache/universal-skills/` remains a compatibility fallback for older repos.
+Bootstrap seeds `.agents/source/universal-skills/` from committed `.agents/skills/` content, so the default downstream install path is self-contained.
+`skills-sync pull` refreshes the git-backed source or git mirror only.
+`skills-sync list` / `skills-sync search` prefer the git-backed catalog when a mirror already exists.
+`skills-sync sync` / `skills-sync update` are the one-step paths that actually refresh `.agents/skills/`.
+`skills-sync push` publishes selected local skill edits back to the git-backed source with explicit commit/push flags.
 The skills baseline is intentionally generic here; downstream repos should keep their own selection/pin model while the universal-skills contract evolves.
 
 Discovery examples:
@@ -80,15 +86,19 @@ Discovery examples:
 ```bash
 ./.agents/agents skills-sync list --runtime codex
 ./.agents/agents skills-sync search markdown --runtime codex
+./.agents/agents skills-sync sync --runtime codex
 ./.agents/agents skills-sync ensure writing-skills --runtime codex
+./.agents/agents skills-sync push writing-skills --commit --push
 ```
 
-Use `./.agents/agents bootstrap /path/to/existing-project --partial` when adopting the scaffold into an existing repo. Existing files stay in place unless `--force` is used. If that repo already has its own `make all`, use `make agents-all` for the scaffold aggregate validation. See `.agents/a-docs/standards/bootstrap-other-repo.md` for the full/partial install split and limitations.
+Use `./.agents/agents bootstrap /path/to/existing-project --partial` when adopting the scaffold into an existing repo. Existing files stay in place unless `--force` is used. If that repo already has its own `make all`, use `make agents-all` for the scaffold aggregate validation. See `docs/standards/bootstrap-other-repo.md` for the full/partial install split and limitations.
 
 ## Tests
 
 ```bash
 make test-scripts
+make test-scripts-integration
+make test-scripts-all
 make lint-scripts
 ```
 

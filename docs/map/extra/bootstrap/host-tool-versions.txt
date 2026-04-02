@@ -1,0 +1,2 @@
+repomix 1.13.1
+ctags Universal Ctags 6.2.0(db5c5e0), Copyright (C) 2015-2025 Universal Ctags Team

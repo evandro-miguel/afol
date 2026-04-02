@@ -230,7 +230,7 @@ Examples:
   python fix-lint-all.py --check       Check for issues without fixing
   python fix-lint-all.py --dry-run     Preview fixes
   python fix-lint-all.py               Apply all fixes
-  python fix-lint-all.py .agents/a-docs/standards/  Fix specific directory
+  python fix-lint-all.py docs/standards/  Fix specific directory
         """
     )
     parser.add_argument(

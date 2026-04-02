@@ -1,0 +1,77 @@
+{
+  "repo": "agentic_start_folder",
+  "version": "v2026-04-02_1",
+  "summary": {
+    "candidate_count": 8,
+    "by_kind": {
+      "model-like": 4,
+      "dataclass": 2,
+      "migration": 2
+    },
+    "by_signal": {
+      "name-match": 6,
+      "dataclass": 2,
+      "migration": 2
+    }
+  },
+  "candidates": [
+    {
+      "path": ".claude/skills/writing-skills/scripts/check-tier-migration.js",
+      "kind": "migration",
+      "signals": [
+        "name-match",
+        "migration"
+      ]
+    },
+    {
+      "path": ".qwen/skills/writing-skills/scripts/check-tier-migration.js",
+      "kind": "migration",
+      "signals": [
+        "name-match",
+        "migration"
+      ]
+    },
+    {
+      "path": ".claude/skills/typescript-skill/references/utility-types.ts",
+      "kind": "model-like",
+      "signals": [
+        "name-match"
+      ]
+    },
+    {
+      "path": ".claude/skills/typescript-skill/scripts/ts_diagnostic.py",
+      "kind": "model-like",
+      "signals": [
+        "name-match"
+      ]
+    },
+    {
+      "path": ".claude/skills/writing-skills/scripts/run_eval.py",
+      "kind": "dataclass",
+      "signals": [
+        "dataclass"
+      ]
+    },
+    {
+      "path": ".qwen/skills/typescript-skill/references/utility-types.ts",
+      "kind": "model-like",
+      "signals": [
+        "name-match"
+      ]
+    },
+    {
+      "path": ".qwen/skills/typescript-skill/scripts/ts_diagnostic.py",
+      "kind": "model-like",
+      "signals": [
+        "name-match"
+      ]
+    },
+    {
+      "path": ".qwen/skills/writing-skills/scripts/run_eval.py",
+      "kind": "dataclass",
+      "signals": [
+        "dataclass"
+      ]
+    }
+  ]
+}

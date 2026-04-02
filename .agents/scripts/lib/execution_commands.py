@@ -26,13 +26,13 @@ from .agents_config import (
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
-WORKFLOW_DOC = ROOT_DIR / ".agents/a-docs/standards/workflow.md"
-ARCHIVE_KNOWLEDGE = ROOT_DIR / ".agents/a-docs/knowledge"
-PRODUCT_BRIEF = ROOT_DIR / ".agents/arc/PROJECT-BRIEF.md"
-ENGINEERING_GUIDELINES = ROOT_DIR / ".agents/arc/ENGINEERING-GUIDELINES.md"
-TECH_STACK = ROOT_DIR / ".agents/arc/TECH-STACK.md"
-ARCHITECTURE_DOC = ROOT_DIR / ".agents/arc/ARCHITECTURE.md"
-GOAL_STATE_CANON = ROOT_DIR / ".agents/arc/README.md"
+WORKFLOW_DOC = ROOT_DIR / "docs/standards/workflow.md"
+ARCHIVE_KNOWLEDGE = ROOT_DIR / "docs/knowledge"
+PRODUCT_BRIEF = ROOT_DIR / "docs/arc/PROJECT-BRIEF.md"
+ENGINEERING_GUIDELINES = ROOT_DIR / "docs/arc/ENGINEERING-GUIDELINES.md"
+TECH_STACK = ROOT_DIR / "docs/arc/TECH-STACK.md"
+ARCHITECTURE_DOC = ROOT_DIR / "docs/arc/ARCHITECTURE.md"
+GOAL_STATE_CANON = ROOT_DIR / "docs/arc/README.md"
 CURRENT_STATE_MAP = get_cfg_path(ROOT_DIR, CONFIG, "map_dir") / "README.md"
 WB_TZ = CONFIG.get("time", {}).get("wb_offset", "-03:00")
 

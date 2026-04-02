@@ -15,20 +15,18 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 ## Required Structure
 
 ```
+docs/
+├── arc/                    # Goal-state canon and architecture docs
+├── map/                    # Current-state repository mapping
+├── standards/              # Human-readable standards
+├── templates/              # Document templates
+├── lessons/                # Lessons learned
+└── agentic/                # Tool documentation
+
 .agents/
 ├── agents.config           # Central configuration (YAML)
 ├── tools.json              # Tool catalog (JSON)
 ├── agents                  # CLI wrapper (bash)
-├── a-docs/
-│   ├── templates/          # Document templates
-│   ├── standards/          # Human-readable standards
-│   ├── agentic/            # Tool documentation
-│   ├── lessons/            # Lessons learned
-│   └── specs/              # Specifications
-├── arc/
-│   ├── SPECS/              # Technical specifications
-│   ├── DECISIONS/          # Architecture decisions (ADRs)
-│   └── structure/          # Auto-generated structure docs
 ├── wb/                     # Workstreams (sessions)
 │   ├── .active_session     # Pointer to current session
 │   └── YYMMDD_HHMM_<theme>/
@@ -45,13 +43,14 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 
 | Folder | Purpose |
 |--------|---------|
-| `a-docs/templates/` | Document templates |
-| `a-docs/standards/` | Human standards |
-| `a-docs/lessons/` | Lessons learned |
-| `a-docs/specs/` | Specifications |
-| `arc/` | Architecture docs |
-| `arc/SPECS/` | Technical specifications |
-| `arc/DECISIONS/` | Architecture decisions |
+| `docs/templates/` | Document templates |
+| `docs/standards/` | Human standards |
+| `docs/lessons/` | Lessons learned |
+| `docs/agentic/` | Tool documentation |
+| `docs/arc/` | Architecture docs |
+| `docs/arc/SPECS/` | Technical specifications |
+| `docs/arc/DECISIONS/` | Architecture decisions |
+| `docs/map/` | Current-state repository mapping |
 | `wb/` | Workstreams |
 | `rules/` | Agent rules |
 | `scripts/` | Tool scripts |
@@ -74,9 +73,10 @@ version: 1
 
 paths:
   agents_dir: .agents
+  docs_dir: docs
   wb_dir: .agents/wb
-  templates_dir: .agents/a-docs/templates
-  arc_dir: .agents/arc
+  templates_dir: docs/templates
+  arc_dir: docs/arc
 
 time:
   default_offset: "+00:00"
@@ -84,8 +84,8 @@ time:
 
 lint:
   excluded_path_prefixes:
-    - a-docs/
-    - arc/structure/
+    - docs/map/extra/
+    - docs/arc/structure/
 
 doctor:
   required_folders: [...]
@@ -151,14 +151,14 @@ python -m json.tool .agents/tools.json
 
 | Type | Location |
 |------|----------|
-| Tool documentation | `.agents/a-docs/agentic/` |
-| Human standards | `.agents/a-docs/standards/` |
-| Templates | `.agents/a-docs/templates/` |
-| Lessons learned | `.agents/a-docs/lessons/` |
-| Architecture | `.agents/arc/` |
-| Structure docs | `.agents/arc/structure/` |
-| Specifications | `.agents/arc/SPECS/` |
-| Decisions (ADRs) | `.agents/arc/DECISIONS/` |
+| Tool documentation | `docs/agentic/` |
+| Human standards | `docs/standards/` |
+| Templates | `docs/templates/` |
+| Lessons learned | `docs/lessons/` |
+| Architecture | `docs/arc/` |
+| Structure docs | `docs/arc/structure/` |
+| Specifications | `docs/arc/SPECS/` |
+| Decisions (ADRs) | `docs/arc/DECISIONS/` |
 | Agent rules | `.agents/rules/` |
 
 ---
@@ -186,8 +186,8 @@ python -m json.tool .agents/tools.json
 **DO:**
 - ✅ Use `.agents/` as root for all agent files
 - ✅ Keep configuration in `.agents/agents.config`
-- ✅ Store tool docs in `.agents/a-docs/agentic/`
-- ✅ Store human docs in `.agents/a-docs/standards/`
+- ✅ Store tool docs in `docs/agentic/`
+- ✅ Store human docs in `docs/standards/`
 - ✅ Validate structure with `make doctor`
 
 **DON'T:**
@@ -221,8 +221,8 @@ cat .agents/wb/.active_session
 
 ## References
 
-- `.agents/a-docs/agentic/agents-config.md` - Config loader docs
-- `.agents/a-docs/agentic/tools-json.md` - tools.json docs
+- `docs/agentic/agents-config.md` - Config loader docs
+- `docs/agentic/tools-json.md` - tools.json docs
 - RULE-001 - Tool Discovery & Usage
 
 ---

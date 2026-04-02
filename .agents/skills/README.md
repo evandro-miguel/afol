@@ -23,6 +23,18 @@ Skills are modular definitions that provide:
 
 ## Available Skills
 
+### agentic-system-workflow
+
+Operational entrypoint for installing, upgrading, validating, and operating the
+scaffold.
+
+**Capabilities:**
+- Bootstrap a new or existing repo with the scaffold
+- Run the git-backed skills refresh and publish flow
+- Follow governed workbench execution and validation
+
+**Location:** `.agents/skills/agentic-system-workflow/`
+
 ### writing-skills
 
 Writing and documentation skills.
@@ -57,12 +69,19 @@ Markdown linting and validation.
 ### Via Skills Sync
 
 ```bash
-# Sync from universal-skills
+# One-step update from universal-skills into .agents/skills/
 make skills-sync SKILLS=new-skill
+make skills-update SKILLS=new-skill
+
+# Ensure the scaffold-operating skill is available locally
+./.agents/agents skills-sync ensure agentic-system-workflow --runtime codex --pull
 
 # Or individual commands
 ./.agents/agents skills-sync pull
 ./.agents/agents skills-sync apply --skills=new-skill
+
+# Publish a locally edited skill back to the git-backed source
+./.agents/agents skills-sync push new-skill --commit --push
 ```
 
 ## Skill Definition Format
@@ -90,6 +109,7 @@ Usage examples.
 ## Related
 
 - [agents-skills-sync.md](../agentic/agents-skills-sync.md) - Skills synchronization
+- `.agents/skills/agentic-system-workflow/` - Canonical scaffold operation skill
 - `.agents/agents.config` - Skills configuration
 
 ---

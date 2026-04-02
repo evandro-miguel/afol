@@ -160,8 +160,8 @@ links:
 
 ## References
 
-- `.agents/a-docs/agentic/agents-lint-docs.md` - Linting docs
-- `.agents/a-docs/standards/frontmatter.md` - Frontmatter standards
+- `docs/agentic/agents-lint-docs.md` - Linting docs
+- `docs/standards/frontmatter.md` - Frontmatter standards
 - RULE-004 - Validation & Linting
 
 ---

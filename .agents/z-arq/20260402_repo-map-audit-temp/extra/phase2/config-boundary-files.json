@@ -1,0 +1,22 @@
+[
+  {
+    "file": ".claude/settings.local.json",
+    "surface": "config",
+    "reason": "conventional config prefix"
+  },
+  {
+    "file": ".opencode/package.json",
+    "surface": "config",
+    "reason": "conventional config filename"
+  },
+  {
+    "file": "Makefile",
+    "surface": "config",
+    "reason": "conventional config filename"
+  },
+  {
+    "file": "docs/standards/Makefile",
+    "surface": "config",
+    "reason": "conventional config filename"
+  }
+]

@@ -14,8 +14,7 @@ from typing import Callable, Dict, List, Sequence, Set, Tuple
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-DEFAULT_UNIVERSAL_SKILLS_REPO = "https://github.com/evandro-miguel/skill-universal.git"
-DEFAULT_UNIVERSAL_SKILLS_REF = "main"
+LOCAL_UNIVERSAL_SKILLS_DIR = Path(".agents/source/universal-skills")
 
 MANDATORY_FILES_TO_COPY = [
     Path("AGENTS.md"),
@@ -29,12 +28,13 @@ MANDATORY_FILES_TO_COPY = [
     Path(".agents/agents.config"),
     Path(".agents/tools.json"),
     Path(".agents/skills-sync.manifest.json"),
-    Path(".agents/arc/README.md"),
-    Path(".agents/arc/map/README.md"),
-    Path(".agents/arc/SPECS/README.md"),
-    Path(".agents/arc/SPECS/TEMPLATE_spec.md"),
-    Path(".agents/arc/SPECS/TEMPLATE_spec-lite.md"),
-    Path(".agents/arc/DECISIONS/TEMPLATE_adr.md"),
+    Path("docs/arc/README.md"),
+    Path("docs/arc/SPECS/README.md"),
+    Path("docs/arc/SPECS/TEMPLATE_spec.md"),
+    Path("docs/arc/SPECS/TEMPLATE_spec-lite.md"),
+    Path("docs/arc/DECISIONS/TEMPLATE_adr.md"),
+    Path("docs/arc/structure/README.md"),
+    Path("docs/arc/structure/TEMPLATE_structure.md"),
 ]
 
 OPTIONAL_FILES_TO_COPY = [
@@ -49,18 +49,25 @@ OPTIONAL_FILES_TO_COPY = [
 
 MANDATORY_DIRS_TO_COPY = [
     Path(".agents/scripts"),
-    Path(".agents/a-docs"),
     Path(".agents/rules"),
     Path(".agents/skills"),
-    Path(".agents/templates"),
     Path(".agents/data/telemetry/schemas"),
+    Path("docs/agentic"),
+    Path("docs/knowledge"),
+    Path("docs/lessons"),
+    Path("docs/patterns"),
+    Path("docs/standards"),
+    Path("docs/telemetry"),
+    Path("docs/templates"),
 ]
 
 ENSURE_DIRS = [
-    Path(".agents/arc"),
-    Path(".agents/arc/SPECS"),
-    Path(".agents/arc/DECISIONS"),
-    Path(".agents/arc/map"),
+    Path("docs"),
+    Path("docs/arc"),
+    Path("docs/arc/SPECS"),
+    Path("docs/arc/DECISIONS"),
+    Path("docs/arc/structure"),
+    Path("docs/map"),
     Path(".agents/tmp"),
     Path(".agents/wb"),
     Path(".agents/skills"),
@@ -75,12 +82,12 @@ ENSURE_DIRS = [
     Path(".gemini"),
 ]
 
-MAKEFILE_INCLUDE_MARKER = "include .agents/a-docs/standards/Makefile"
+MAKEFILE_INCLUDE_MARKER = "include docs/standards/Makefile"
 MAKEFILE_INCLUDE = (
     "AGENTS_PRESERVE_LOCAL_ALL ?= 1\n"
-    "include .agents/a-docs/standards/Makefile"
+    "include docs/standards/Makefile"
 )
-MAKEFILE_WRAPPER = """# Makefile wrapper - delegates to .agents/a-docs/standards/Makefile\n# This keeps the root clean while maintaining make functionality\n\n# Include the actual Makefile from a-docs\ninclude .agents/a-docs/standards/Makefile\n"""
+MAKEFILE_WRAPPER = """# Makefile wrapper - delegates to docs/standards/Makefile\n# This keeps the root clean while maintaining make functionality\n\n# Include the actual Makefile from docs\ninclude docs/standards/Makefile\n"""
 
 COMMON_COPY_IGNORES = {".venv", "__pycache__", ".structure-cache.json"}
 IgnoreFn = Callable[[str, List[str]], Set[str]]
@@ -88,14 +95,14 @@ INSTALL_MODE_FULL = "full"
 INSTALL_MODE_PARTIAL = "partial"
 FULL_STARTER_PARENT_SPECS = [
     {
-        "file": Path(".agents/arc/SPECS/000000_0000_feature-f01-parent_spec_01.md"),
+        "file": Path("docs/arc/SPECS/000000_0000_feature-f01-parent_spec_01.md"),
         "id": "000000_0000_feature-f01-parent_spec_01",
         "theme": "feature-f01-parent",
         "title": "Feature F-01 Parent",
         "feature_id": "F-01",
     },
     {
-        "file": Path(".agents/arc/SPECS/000000_0000_feature-f02-parent_spec_01.md"),
+        "file": Path("docs/arc/SPECS/000000_0000_feature-f02-parent_spec_01.md"),
         "id": "000000_0000_feature-f02-parent_spec_01",
         "theme": "feature-f02-parent",
         "title": "Feature F-02 Parent",
@@ -104,14 +111,14 @@ FULL_STARTER_PARENT_SPECS = [
 ]
 PARTIAL_STARTER_PARENT_SPECS = [
     {
-        "file": Path(".agents/arc/SPECS/000000_0000_existing-project-adoption_spec_01.md"),
+        "file": Path("docs/arc/SPECS/000000_0000_existing-project-adoption_spec_01.md"),
         "id": "000000_0000_existing-project-adoption_spec_01",
         "theme": "existing-project-adoption",
         "title": "Existing Project Adoption",
         "feature_id": "F-01",
     },
     {
-        "file": Path(".agents/arc/SPECS/000000_0000_existing-backlog-alignment_spec_01.md"),
+        "file": Path("docs/arc/SPECS/000000_0000_existing-backlog-alignment_spec_01.md"),
         "id": "000000_0000_existing-backlog-alignment_spec_01",
         "theme": "existing-backlog-alignment",
         "title": "Existing Backlog Alignment",
@@ -219,18 +226,20 @@ def _common_ignored_names(names: List[str]) -> Set[str]:
     return {name for name in names if name in COMMON_COPY_IGNORES or name.endswith(".pyc")}
 
 
-def _ignore_sanitized_adocs(src_path: str, names: List[str]) -> Set[str]:
+def _ignore_sanitized_docs(src_path: str, names: List[str]) -> Set[str]:
     ignored = _common_ignored_names(names)
     rel = Path(src_path).resolve().relative_to(ROOT_DIR)
 
-    if rel == Path(".agents/a-docs/knowledge"):
+    if rel == Path("docs/knowledge"):
         ignored.add("INDEX.md")
-    elif rel == Path(".agents/a-docs/lessons"):
+    elif rel == Path("docs/lessons"):
         ignored.add("general-lessons.md")
-    elif rel == Path(".agents/a-docs/lessons/entries"):
+    elif rel == Path("docs/lessons/entries"):
         ignored.update(name for name in names if name.endswith(".md") and name != "README.md")
-    elif rel == Path(".agents/a-docs/telemetry"):
+    elif rel == Path("docs/telemetry"):
         ignored.add("reports")
+    elif rel == Path("docs/arc/structure"):
+        ignored.update(name for name in names if name not in {"README.md", "TEMPLATE_structure.md"})
 
     return ignored
 
@@ -240,8 +249,13 @@ def _ignore_default(_src_path: str, names: List[str]) -> Set[str]:
 
 
 def _ignore_for_dir(rel: Path) -> IgnoreFn:
-    if rel == Path(".agents/a-docs"):
-        return _ignore_sanitized_adocs
+    if rel in {
+        Path("docs/knowledge"),
+        Path("docs/lessons"),
+        Path("docs/telemetry"),
+        Path("docs/arc/structure"),
+    }:
+        return _ignore_sanitized_docs
     return _ignore_default
 
 
@@ -304,11 +318,11 @@ def roadmap_specs_for_mode(install_mode: str) -> List[Dict[str, str]]:
 
 
 def build_full_roadmap(timestamp: str, starter_specs: Sequence[Dict[str, str]]) -> str:
-    roadmap = render_template(Path(".agents/a-docs/templates/roadmap.md"), timestamp)
+    roadmap = render_template(Path("docs/templates/roadmap.md"), timestamp)
     roadmap = roadmap.replace('id: "ROADMAP_general"', 'id: "000000_0000_general-roadmap_roadmap_01"', 1)
     for spec in starter_specs:
         roadmap = roadmap.replace(
-            ".agents/arc/SPECS/<parent-spec-file>.md",
+            "docs/arc/SPECS/<parent-spec-file>.md",
             spec["file"].as_posix(),
             1,
         )
@@ -337,7 +351,7 @@ def build_partial_roadmap(timestamp: str, starter_specs: Sequence[Dict[str, str]
             "",
             "## 2) Mandatory Operating Model",
             "- Existing project work should migrate into this roadmap before new non-trivial implementation starts.",
-            "- Every roadmap feature must reference a governing parent spec under `.agents/arc/SPECS/`.",
+            "- Every roadmap feature must reference a governing parent spec under `docs/arc/SPECS/`.",
             "- Workstreams remain execution artifacts and should link back to roadmap and spec context.",
             "",
             "## 3) Current Phase",
@@ -416,12 +430,12 @@ def build_project_brief(timestamp: str) -> str:
             "- <outcome 3>",
             "",
             "## Canonical Sources",
-            "- Roadmap: `.agents/arc/GENERAL-ROADMAP.md`",
-            "- Goal-state canon: `.agents/arc/README.md`, `PROJECT-BRIEF.md`, `ARCHITECTURE.md`, `TECH-STACK.md`, `SPECS/`, and `DECISIONS/`",
-            "- Current-state evidence: `.agents/arc/map/` when the repo adopts repository maps or analysis surfaces",
-            "- Primary workflow standard: `.agents/a-docs/standards/workflow.md`",
+            "- Roadmap: `docs/arc/GENERAL-ROADMAP.md`",
+            "- Goal-state canon: `docs/arc/README.md`, `PROJECT-BRIEF.md`, `ARCHITECTURE.md`, `TECH-STACK.md`, `SPECS/`, and `DECISIONS/`",
+            "- Current-state evidence: `docs/map/` when the repo adopts repository maps or analysis surfaces",
+            "- Primary workflow standard: `docs/standards/workflow.md`",
             "- Runtime governance source: `AGENTS.md`",
-            "- Skills baseline: `.agents/skills-sync.manifest.json` and `.agents/a-docs/standards/skills-sync.md`",
+            "- Skills baseline: `.agents/skills-sync.manifest.json` and `docs/standards/skills-sync.md`",
             "",
             "---",
             "*Generated by `.agents/scripts/agents-bootstrap.py`*",
@@ -467,6 +481,37 @@ def build_tech_stack(timestamp: str) -> str:
     )
 
 
+def build_current_state_map_readme(timestamp: str) -> str:
+    return "\n".join(
+        [
+            "---",
+            'title: "Current-State Map"',
+            'description: "Refreshable repository-map surface for current-state evidence"',
+            'doc_kind: "map"',
+            'version: "bootstrap-baseline"',
+            f'created_at: "{timestamp}"',
+            f'updated_at: "{timestamp}"',
+            "---",
+            "",
+            "# Current-State Map",
+            "",
+            "- `docs/map/` is the current-state, descriptive evidence surface.",
+            "- Run `./.agents/agents repo-map .` to refresh repository-wide map artifacts.",
+            "- Keep goal-state canon in `docs/arc/` and execution history in `.agents/wb/`.",
+            "- Bootstrap ships only this generic entrypoint, not source-repo-specific current-state artifacts.",
+            "",
+            "## Expected Surface",
+            "",
+            "- Root docs like `README.md`, `ARCHITECTURE.md`, `FEATURES.md`, `API_MAP.md`, and related codemap artifacts may appear here after `repo-map` runs.",
+            "- Raw or machine-generated evidence should live under `docs/map/extra/`.",
+            "",
+            "---",
+            "*Generated by `.agents/scripts/agents-bootstrap.py`*",
+            "",
+        ]
+    )
+
+
 def build_engineering_guidelines(timestamp: str) -> str:
     return "\n".join(
         [
@@ -487,7 +532,7 @@ def build_engineering_guidelines(timestamp: str) -> str:
             "",
             "## Documentation Rules",
             "- Keep `AGENTS.md` and `.agents/*` canonical.",
-            "- Keep `arc/map/` descriptive and refreshable; keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder.",
+            "- Keep `docs/map/` descriptive and refreshable; keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder.",
             "- Update runtime mirrors when canonical runtime guidance changes.",
             "- Use automation for managed metadata such as `updated_at`.",
             "- Treat skills sync as an adoption baseline: fresh installs may initialize a new contract, while partial installs preserve existing project files and add only missing scaffold surface.",
@@ -536,14 +581,14 @@ def build_specs_index(timestamp: str, starter_specs: Sequence[Dict[str, str]]) -
     for spec in starter_specs:
         lines.append(
             f"| {spec['id']} | {spec['theme']} | draft | orchestrator | "
-            f"roadmap: .agents/arc/GENERAL-ROADMAP.md |"
+            f"roadmap: docs/arc/GENERAL-ROADMAP.md |"
         )
 
     lines.extend(
         [
             "",
             "---",
-            "*Index: `.agents/arc/SPECS/INDEX.md`*",
+            "*Index: `docs/arc/SPECS/INDEX.md`*",
             "",
         ]
     )
@@ -581,7 +626,7 @@ def build_decisions_index(timestamp: str) -> str:
             "| - | - | - | - | - |",
             "",
             "---",
-            "*Index: `.agents/arc/DECISIONS/INDEX.md`*",
+            "*Index: `docs/arc/DECISIONS/INDEX.md`*",
             "",
         ]
     )
@@ -631,7 +676,7 @@ def build_parent_spec(timestamp: str, spec: Dict[str, str]) -> str:
             'spec_role: "parent"',
             'parent_spec: ""',
             "links:",
-            '  roadmap: ".agents/arc/GENERAL-ROADMAP.md"',
+            '  roadmap: "docs/arc/GENERAL-ROADMAP.md"',
             '  plan: ""',
             '  task: ""',
             '  report: ""',
@@ -715,14 +760,15 @@ def build_parent_spec(timestamp: str, spec: Dict[str, str]) -> str:
 def generated_baseline_content(timestamp: str, install_mode: str = INSTALL_MODE_FULL) -> Dict[Path, str]:
     starter_specs = roadmap_specs_for_mode(install_mode)
     baseline = {
-        Path(".agents/arc/ARCHITECTURE.md"): render_template(Path(".agents/a-docs/templates/architecture.md"), timestamp),
-        Path(".agents/arc/GENERAL-ROADMAP.md"): build_roadmap(timestamp, install_mode, starter_specs),
-        Path(".agents/arc/PROJECT-BRIEF.md"): build_project_brief(timestamp),
-        Path(".agents/arc/ENGINEERING-GUIDELINES.md"): build_engineering_guidelines(timestamp),
-        Path(".agents/arc/TECH-STACK.md"): build_tech_stack(timestamp),
-        Path(".agents/arc/SPECS/INDEX.md"): build_specs_index(timestamp, starter_specs),
-        Path(".agents/arc/DECISIONS/INDEX.md"): build_decisions_index(timestamp),
-        Path(".agents/a-docs/knowledge/INDEX.md"): build_knowledge_index(timestamp),
+        Path("docs/arc/ARCHITECTURE.md"): render_template(Path("docs/templates/architecture.md"), timestamp),
+        Path("docs/arc/GENERAL-ROADMAP.md"): build_roadmap(timestamp, install_mode, starter_specs),
+        Path("docs/arc/PROJECT-BRIEF.md"): build_project_brief(timestamp),
+        Path("docs/arc/ENGINEERING-GUIDELINES.md"): build_engineering_guidelines(timestamp),
+        Path("docs/arc/TECH-STACK.md"): build_tech_stack(timestamp),
+        Path("docs/arc/SPECS/INDEX.md"): build_specs_index(timestamp, starter_specs),
+        Path("docs/arc/DECISIONS/INDEX.md"): build_decisions_index(timestamp),
+        Path("docs/knowledge/INDEX.md"): build_knowledge_index(timestamp),
+        Path("docs/map/README.md"): build_current_state_map_readme(timestamp),
     }
     for spec in starter_specs:
         baseline[spec["file"]] = build_parent_spec(timestamp, spec)
@@ -749,7 +795,7 @@ def write_generated_baseline(target: Path, force: bool, dry_run: bool, install_m
 
 
 def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: bool, install_mode: str):
-    out = target / ".agents" / "a-docs" / "standards" / "bootstrap-adaptation.md"
+    out = target / "docs" / "standards" / "bootstrap-adaptation.md"
     install_label = "partial install for an existing project" if install_mode == INSTALL_MODE_PARTIAL else "full bootstrap for a fresh repo"
     body = [
         "---",
@@ -766,9 +812,9 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
         f"- {install_label}",
         "",
         "## Current State vs Goal State",
-        "- Goal-state canon lives outside `.agents/arc/map/` in docs such as `PROJECT-BRIEF.md`, `ARCHITECTURE.md`, `TECH-STACK.md`, `GENERAL-ROADMAP.md`, and `SPECS/`.",
-        "- Current-state evidence belongs in `.agents/arc/map/` when the target repo adopts repository maps or analysis surfaces.",
-        "- Workbench sessions remain the execution surface; `arc/map/` is never the approval source for roadmap or spec intent.",
+        "- Goal-state canon lives outside `docs/map/` in docs such as `PROJECT-BRIEF.md`, `ARCHITECTURE.md`, `TECH-STACK.md`, `GENERAL-ROADMAP.md`, and `SPECS/`.",
+        "- Current-state evidence belongs in `docs/map/` when the target repo adopts repository maps or analysis surfaces.",
+        "- Workbench sessions remain the execution surface; `docs/map/` is never the approval source for roadmap or spec intent.",
         "",
         "## Detected Stack Signals",
     ]
@@ -794,13 +840,13 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
             "- Existing projects should install skills without clobbering project-owned files; use the partial path when the target repo already has live content.",
             "- Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and avoid using them as the primary project skill surface.",
             "- When the upstream contract becomes repo/ref/profile-based, bootstrap should still only prepare the baseline and leave project-specific selection to the target repo owners.",
-            f"- Preferred shared source checkout for apps-style repos: `{(target.parent / 'universal-skills').resolve()}` when the target lives under an `apps/` directory.",
+            f"- Preferred repo-local universal-skills checkout: `{(target / LOCAL_UNIVERSAL_SKILLS_DIR).resolve()}`.",
             "",
             "## Mandatory Adaptations",
             "",
             "1. Fill placeholders in `AGENTS.md` for project goal, stack, and structure.",
             "2. Replace the generated starter roadmap/spec placeholders with the real feature backlog for the target project.",
-            "3. Create or adapt the governing parent spec in `.agents/arc/SPECS/` before starting non-trivial implementation.",
+            "3. Create or adapt the governing parent spec in `docs/arc/SPECS/` before starting non-trivial implementation.",
             "4. Confirm exported docs are generic baselines only; do not treat scaffold-local workbench, lessons, or knowledge history as project history.",
             "5. Treat skills sync as a baseline install step, not a source of project history.",
             "6. Update `.agents/agents.config` timezone/path settings if needed.",
@@ -827,58 +873,172 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
         out.write_text("\n".join(body))
 
 
-def load_universal_skills_source_contract() -> Tuple[str, str]:
+def load_local_skills_manifest() -> Dict[str, object]:
     manifest_path = ROOT_DIR / ".agents" / "skills-sync.manifest.json"
-    if manifest_path.exists():
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            manifest = {}
-        if isinstance(manifest, dict):
-            repo = str(manifest.get("repo") or DEFAULT_UNIVERSAL_SKILLS_REPO).strip()
-            ref = str(manifest.get("ref") or DEFAULT_UNIVERSAL_SKILLS_REF).strip()
-            return repo or DEFAULT_UNIVERSAL_SKILLS_REPO, ref or DEFAULT_UNIVERSAL_SKILLS_REF
-    return DEFAULT_UNIVERSAL_SKILLS_REPO, DEFAULT_UNIVERSAL_SKILLS_REF
+    if not manifest_path.exists():
+        return {}
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def is_valid_universal_skills_checkout(path: Path) -> bool:
-    return (
+    profiles_dir = path / "profiles"
+    expected_profiles = profile_names_for_local_seed()
+    skills_dir = path / "skills"
+    if not (
         path.exists()
-        and (path / "skills").is_dir()
-        and (path / "profiles").is_dir()
+        and skills_dir.is_dir()
+        and profiles_dir.is_dir()
         and (path / "index.json").exists()
+        and all((profiles_dir / f"{name}.json").exists() for name in expected_profiles)
+    ):
+        return False
+
+    available_skills = {
+        item.name
+        for item in skills_dir.iterdir()
+        if item.is_dir() and (item / "SKILL.md").exists()
+    }
+    if not available_skills:
+        return False
+
+    for profile_file in profiles_dir.glob("*.json"):
+        try:
+            payload = json.loads(profile_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(payload, dict):
+            return False
+        skills = payload.get("skills")
+        if not isinstance(skills, list):
+            return False
+        if any(not isinstance(name, str) or name not in available_skills for name in skills):
+            return False
+
+    return True
+
+
+def local_project_skills_root() -> Path:
+    return ROOT_DIR / ".agents" / "skills"
+
+
+def local_project_skill_names() -> List[str]:
+    skills_root = local_project_skills_root()
+    if not skills_root.exists():
+        return []
+    return sorted(
+        item.name
+        for item in skills_root.iterdir()
+        if item.is_dir() and (item / "SKILL.md").exists()
     )
 
 
+def profile_names_for_local_seed() -> List[str]:
+    manifest = load_local_skills_manifest()
+    profile_names: Set[str] = set()
+
+    installs = manifest.get("installs")
+    if isinstance(installs, list):
+        for entry in installs:
+            if not isinstance(entry, dict):
+                continue
+            profile = entry.get("profile")
+            if isinstance(profile, str) and profile.strip():
+                profile_names.add(profile.strip())
+
+    if not profile_names:
+        profile_names.add("core")
+    return sorted(profile_names)
+
+
+def write_local_seed_profile(profile_path: Path, skills: Sequence[str]):
+    payload = {"name": profile_path.stem, "skills": list(skills)}
+    profile_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def write_local_seed_index(index_path: Path, skills: Sequence[str], profiles: Sequence[str]):
+    payload = {
+        "generated_by": "agents-bootstrap local seed",
+        "generated_at": current_timestamp(),
+        "profiles": list(profiles),
+        "skills": [
+            {
+                "name": name,
+                "path": f"skills/{name}",
+            }
+            for name in skills
+        ],
+    }
+    index_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def copy_repo_local_universal_skills_checkout(source: Path, checkout: Path):
+    shutil.copytree(
+        source,
+        checkout,
+        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"),
+    )
+
+
+def seed_repo_local_universal_skills_checkout(checkout: Path) -> bool:
+    local_source = ROOT_DIR / LOCAL_UNIVERSAL_SKILLS_DIR
+    if is_valid_universal_skills_checkout(local_source):
+        copy_repo_local_universal_skills_checkout(local_source, checkout)
+        return True
+
+    skill_names = local_project_skill_names()
+    if not skill_names:
+        return False
+
+    skills_root = checkout / "skills"
+    profiles_root = checkout / "profiles"
+    skills_root.mkdir(parents=True, exist_ok=True)
+    profiles_root.mkdir(parents=True, exist_ok=True)
+
+    source_skills_root = local_project_skills_root()
+    for name in skill_names:
+        shutil.copytree(source_skills_root / name, skills_root / name)
+
+    profile_names = profile_names_for_local_seed()
+    for profile_name in profile_names:
+        write_local_seed_profile(profiles_root / f"{profile_name}.json", skill_names)
+
+    write_local_seed_index(checkout / "index.json", skill_names, profile_names)
+    return True
+
+
 def should_prepare_sibling_universal_skills(target: Path) -> bool:
-    return target.parent.name == "apps" and target.name != "universal-skills"
+    return target.name != "universal-skills"
 
 
 def prepare_sibling_universal_skills_checkout(target: Path, dry_run: bool):
     if not should_prepare_sibling_universal_skills(target):
         return
 
-    sibling = target.parent / "universal-skills"
-    if is_valid_universal_skills_checkout(sibling):
-        print_action("reuse sibling universal-skills source", sibling)
+    checkout = target / LOCAL_UNIVERSAL_SKILLS_DIR
+    if is_valid_universal_skills_checkout(checkout):
+        print_action("reuse repo-local universal-skills source", checkout)
         return
 
-    if sibling.exists():
-        print_action("skip sibling universal-skills prep (path already exists)", sibling)
+    if checkout.exists():
+        print_action("skip repo-local universal-skills prep (path already exists)", checkout)
         return
 
-    repo, ref = load_universal_skills_source_contract()
-    print_action("prepare sibling universal-skills source", sibling)
+    print_action("prepare repo-local universal-skills source", checkout)
     if dry_run:
         return
 
-    sibling.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
-        ["git", "clone", "--branch", ref, repo, str(sibling)],
-        cwd=target.parent,
+    checkout.parent.mkdir(parents=True, exist_ok=True)
+    if seed_repo_local_universal_skills_checkout(checkout):
+        print_action("seeded repo-local universal-skills source", checkout)
+        return
+
+    raise RuntimeError(
+        "Failed to prepare repo-local universal-skills checkout from committed project assets"
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to prepare sibling universal-skills checkout: {sibling}")
 
 
 def run_post_checks(target: Path):
@@ -900,12 +1060,12 @@ def run_post_checks(target: Path):
         ),
         (
             "doctor",
-            ["make", "-f", ".agents/a-docs/standards/Makefile", "doctor"],
+            ["make", "-f", "docs/standards/Makefile", "doctor"],
             True,
         ),
-        ("lint", ["make", "-f", ".agents/a-docs/standards/Makefile", "lint"], True),
-        ("test-scripts", ["make", "-f", ".agents/a-docs/standards/Makefile", "test-scripts"], True),
-        ("all", ["make", "-f", ".agents/a-docs/standards/Makefile", "all"], True),
+        ("lint", ["make", "-f", "docs/standards/Makefile", "lint"], True),
+        ("test-scripts", ["make", "-f", "docs/standards/Makefile", "test-scripts"], True),
+        ("all", ["make", "-f", "docs/standards/Makefile", "all"], True),
     ]
 
     for name, cmd, required in commands:
@@ -919,7 +1079,7 @@ def run_post_checks(target: Path):
 
 def validate_target(target: Path, dry_run: bool, install_mode: str):
     if not target.exists():
-        if dry_run:
+        if dry_run or install_mode == INSTALL_MODE_FULL:
             target.mkdir(parents=True, exist_ok=True)
         elif install_mode == INSTALL_MODE_PARTIAL:
             raise FileNotFoundError(f"Partial install requires an existing target directory: {target}")
@@ -971,7 +1131,7 @@ def main() -> int:
         if args.dry_run:
             print("Dry-run only: no files were written")
         else:
-            print("Next: open `.agents/a-docs/standards/bootstrap-adaptation.md` in target repo")
+            print("Next: open `docs/standards/bootstrap-adaptation.md` in target repo")
         return 0
 
     except Exception as exc:

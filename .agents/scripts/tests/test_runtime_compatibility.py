@@ -49,13 +49,13 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("OPENCODE.md", mandatory_files)
         self.assertIn("PLANS.md", mandatory_files)
         self.assertIn("opencode.json", mandatory_files)
-        self.assertIn(".agents/arc/SPECS/README.md", mandatory_files)
+        self.assertIn("docs/arc/SPECS/README.md", mandatory_files)
         self.assertIn(".agents/tmp", ensure_dirs)
         self.assertIn(".opencode", ensure_dirs)
         self.assertIn(".opencode/agent", ensure_dirs)
-        self.assertIn(".agents/arc/GENERAL-ROADMAP.md", generated_files)
-        self.assertIn(".agents/arc/SPECS/INDEX.md", generated_files)
-        self.assertNotIn(".agents/arc/SPECS", mandatory_dirs)
+        self.assertIn("docs/arc/GENERAL-ROADMAP.md", generated_files)
+        self.assertIn("docs/arc/SPECS/INDEX.md", generated_files)
+        self.assertNotIn("docs/arc/SPECS", mandatory_dirs)
 
     def test_bootstrap_tolerates_optional_skills_sync_failure(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -79,14 +79,14 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 agents_bootstrap.run_post_checks(target)
 
             self.assertIn(["./.agents/agents", "skills-sync", "sync"], calls)
-            self.assertIn(["make", "-f", ".agents/a-docs/standards/Makefile", "all"], calls)
+            self.assertIn(["make", "-f", "docs/standards/Makefile", "all"], calls)
 
     def test_opencode_project_config_is_secret_free_and_points_to_canonical_docs(self):
         config = json.loads(Path("opencode.json").read_text())
 
         self.assertEqual(config["$schema"], "https://opencode.ai/config.json")
         self.assertIn("AGENTS.md", config["instructions"])
-        self.assertIn(".agents/arc/GENERAL-ROADMAP.md", config["instructions"])
+        self.assertIn("docs/arc/GENERAL-ROADMAP.md", config["instructions"])
         self.assertEqual(config["permission"]["edit"], "ask")
         self.assertEqual(config["permission"]["bash"], "ask")
         self.assertEqual(config["permission"]["webfetch"], "ask")
@@ -108,6 +108,10 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_lint_config_excludes_synced_skills_docs(self):
         config_text = Path(".agents/agents.config").read_text(encoding="utf-8")
         self.assertIn("- skills/", config_text)
+        self.assertIn("- source/", config_text)
+        self.assertIn('source_dir: ".agents/source/universal-skills"', config_text)
+        self.assertNotIn('source_dir: "../universal-skills"', config_text)
+        self.assertIn('"agentic-system-workflow"', config_text)
 
     def test_wrapper_uses_local_venv_without_uv_on_path(self):
         wrapper_src = Path(".agents/agents").resolve()
@@ -166,24 +170,26 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 install_mode=agents_bootstrap.INSTALL_MODE_FULL,
             )
 
-            roadmap = (target / ".agents/arc/GENERAL-ROADMAP.md").read_text(encoding="utf-8")
-            project_brief = (target / ".agents/arc/PROJECT-BRIEF.md").read_text(encoding="utf-8")
-            specs_index = (target / ".agents/arc/SPECS/INDEX.md").read_text(encoding="utf-8")
-            knowledge_index = (target / ".agents/a-docs/knowledge/INDEX.md").read_text(encoding="utf-8")
-            map_readme = (target / ".agents/arc/map/README.md").read_text(encoding="utf-8")
+            roadmap = (target / "docs/arc/GENERAL-ROADMAP.md").read_text(encoding="utf-8")
+            project_brief = (target / "docs/arc/PROJECT-BRIEF.md").read_text(encoding="utf-8")
+            specs_index = (target / "docs/arc/SPECS/INDEX.md").read_text(encoding="utf-8")
+            knowledge_index = (target / "docs/knowledge/INDEX.md").read_text(encoding="utf-8")
+            map_readme = (target / "docs/map/README.md").read_text(encoding="utf-8")
 
             self.assertFalse((target / ".agents/wb/.active_session").exists())
+            self.assertTrue((target / ".agents/wb").exists())
+            self.assertFalse(any((target / ".agents/wb").iterdir()))
             self.assertFalse(
-                (target / ".agents/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md").exists()
+                (target / "docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md").exists()
             )
             self.assertFalse(
-                (target / ".agents/a-docs/telemetry/reports/implementation_report.md").exists()
+                (target / "docs/telemetry/reports/implementation_report.md").exists()
             )
             self.assertFalse(
-                (target / ".agents/a-docs/lessons/entries/20260224_2036_bootstrap-must-provision-full-agent-runtime.md").exists()
+                (target / "docs/lessons/entries/20260224_2036_bootstrap-must-provision-full-agent-runtime.md").exists()
             )
             self.assertTrue(
-                (target / ".agents/arc/SPECS/000000_0000_feature-f01-parent_spec_01.md").exists()
+                (target / "docs/arc/SPECS/000000_0000_feature-f01-parent_spec_01.md").exists()
             )
             self.assertIn("<feature title>", roadmap)
             self.assertNotIn("F-01 Roadmap-First Governance", roadmap)
@@ -193,6 +199,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("| Total | 2 |", specs_index)
             self.assertIn("- Total indexed docs: 0", knowledge_index)
             self.assertIn("current-state, descriptive", map_readme)
+            self.assertFalse((target / ".agents/arc/map").exists())
+            self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
 
     def test_partial_bootstrap_generates_existing_project_adoption_baseline(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -204,13 +212,13 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             agents_bootstrap.INSTALL_MODE_PARTIAL,
         )
 
-        roadmap = baseline[Path(".agents/arc/GENERAL-ROADMAP.md")]
-        specs_index = baseline[Path(".agents/arc/SPECS/INDEX.md")]
+        roadmap = baseline[Path("docs/arc/GENERAL-ROADMAP.md")]
+        specs_index = baseline[Path("docs/arc/SPECS/INDEX.md")]
 
         self.assertIn("Existing Project Adoption", roadmap)
         self.assertIn("existing-backlog-alignment", specs_index)
         self.assertIn(
-            Path(".agents/arc/SPECS/000000_0000_existing-project-adoption_spec_01.md"),
+            Path("docs/arc/SPECS/000000_0000_existing-project-adoption_spec_01.md"),
             baseline,
         )
 
@@ -224,8 +232,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             agents_bootstrap.INSTALL_MODE_PARTIAL,
         )
 
-        project_brief = baseline[Path(".agents/arc/PROJECT-BRIEF.md")]
-        engineering_guidelines = baseline[Path(".agents/arc/ENGINEERING-GUIDELINES.md")]
+        project_brief = baseline[Path("docs/arc/PROJECT-BRIEF.md")]
+        engineering_guidelines = baseline[Path("docs/arc/ENGINEERING-GUIDELINES.md")]
 
         self.assertIn("Skills baseline", project_brief)
         self.assertIn("adoption baseline", engineering_guidelines)
@@ -247,7 +255,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 install_mode=agents_bootstrap.INSTALL_MODE_PARTIAL,
             )
 
-            adaptation_doc = (target / ".agents/a-docs/standards/bootstrap-adaptation.md").read_text(encoding="utf-8")
+            adaptation_doc = (target / "docs/standards/bootstrap-adaptation.md").read_text(encoding="utf-8")
 
             self.assertIn("## Skills Baseline", adaptation_doc)
             self.assertIn("## Current State vs Goal State", adaptation_doc)
@@ -255,43 +263,64 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("repo/ref/profile", adaptation_doc)
             self.assertIn("Prefer repo-local skills under `.agents/skills/`", adaptation_doc)
 
-    def test_bootstrap_prepares_sibling_universal_skills_checkout_for_apps_target(self):
+    def test_bootstrap_seeds_repo_local_universal_skills_checkout_without_network(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_sibling_checkout_test", script_path)
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            apps_root = Path(td) / "apps"
-            target = apps_root / "demo-repo"
+            target = Path(td) / "demo-repo"
             target.mkdir(parents=True, exist_ok=True)
-            calls = []
-
-            def fake_run(cmd, cwd=None):
-                calls.append((cmd, cwd))
-                return mock.Mock(returncode=0)
-
-            with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
+            with mock.patch.object(agents_bootstrap.subprocess, "run") as patched_run:
                 agents_bootstrap.prepare_sibling_universal_skills_checkout(target, dry_run=False)
 
-            expected = target.parent / "universal-skills"
-            self.assertIn(
-                (["git", "clone", "--branch", "main", "https://github.com/evandro-miguel/skill-universal.git", str(expected)], target.parent),
-                calls,
+            checkout = target / ".agents/source/universal-skills"
+            self.assertTrue(agents_bootstrap.is_valid_universal_skills_checkout(checkout))
+            self.assertTrue((checkout / "skills" / "agentic-system-workflow" / "SKILL.md").exists())
+            self.assertTrue((checkout / "skills" / "writing-skills" / "SKILL.md").exists())
+            self.assertEqual(
+                json.loads((checkout / "profiles" / "core.json").read_text(encoding="utf-8"))["skills"],
+                json.loads(
+                    (Path(".agents/source/universal-skills/profiles/core.json")).read_text(encoding="utf-8")
+                )["skills"],
             )
+            self.assertIn(
+                "agentic-system-workflow",
+                [entry["name"] for entry in json.loads((checkout / "index.json").read_text(encoding="utf-8"))["skills"]],
+            )
+            checkout.resolve().relative_to(target.resolve())
+            patched_run.assert_not_called()
 
-    def test_bootstrap_does_not_prepare_sibling_checkout_outside_apps(self):
+    def test_bootstrap_skips_repo_local_checkout_for_universal_skills_repo(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_no_apps_checkout_test", script_path)
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            target = Path(td) / "demo-repo"
+            target = Path(td) / "universal-skills"
             target.mkdir(parents=True, exist_ok=True)
 
             with mock.patch.object(agents_bootstrap.subprocess, "run") as patched_run:
                 agents_bootstrap.prepare_sibling_universal_skills_checkout(target, dry_run=False)
 
             patched_run.assert_not_called()
+
+    def test_full_bootstrap_creates_missing_target_directory(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_create_target_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td) / "new-project"
+
+            agents_bootstrap.validate_target(
+                target,
+                dry_run=False,
+                install_mode=agents_bootstrap.INSTALL_MODE_FULL,
+            )
+
+            self.assertTrue(target.exists())
+            self.assertTrue(target.is_dir())
 
     def test_existing_project_makefile_include_preserves_local_all(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -307,12 +336,12 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
             content = makefile.read_text(encoding="utf-8")
             self.assertIn("AGENTS_PRESERVE_LOCAL_ALL ?= 1", content)
-            self.assertIn("include .agents/a-docs/standards/Makefile", content)
+            self.assertIn("include docs/standards/Makefile", content)
 
     def test_standard_makefile_exposes_agents_all_aggregate(self):
-        makefile_text = Path(".agents/a-docs/standards/Makefile").read_text(encoding="utf-8")
+        makefile_text = Path("docs/standards/Makefile").read_text(encoding="utf-8")
 
-        self.assertIn("agents-all: doctor structure index knowledge-index sync lint lint-scripts skills-check tools-check telemetry-validate test-scripts", makefile_text)
+        self.assertIn("agents-all: doctor structure index knowledge-index sync lint lint-scripts skills-check tools-check telemetry-validate test-scripts-all", makefile_text)
         self.assertIn("ifndef AGENTS_PRESERVE_LOCAL_ALL", makefile_text)
         self.assertIn("all: agents-all", makefile_text)
 

@@ -1,0 +1,37 @@
+               
+               
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 593 files tracked by git with 1063 Code rules:
+                                                                                                                        
+  Language      Rules   Files          Origin      Rules                                                                
+ ─────────────────────────────        ───────────────────                                                               
+  <multilang>      60     593          Community    1063                                                                
+  json              4      39                                                                                           
+  js              156      36                                                                                           
+  python          243      32                                                                                           
+  ts              166       4                                                                                           
+  bash              4       4                                                                                           
+  html              1       4                                                                                           
+  yaml             31       1                                                                                           
+                                                                                                                        
+                
+                
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 260 (260 blocking)
+ • Rules run: 505
+ • Targets scanned: 593
+ • Parsed lines: ~100.0%
+ • Scan skipped: 
+   ◦ Matching --exclude patterns: 2
+ • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
+Ran 505 rules on 593 files: 260 findings.
+
+A new version of Semgrep is available. See https://semgrep.dev/docs/upgrading
+
+📢 Too many findings? Try Semgrep Pro for more powerful queries and less noise.
+   See https://sg.run/false-positives.

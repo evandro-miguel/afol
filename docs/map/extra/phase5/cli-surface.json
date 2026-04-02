@@ -1,0 +1,79 @@
+{
+  "repo": "agentic_start_folder",
+  "version": "v2026-04-02_1",
+  "summary": {
+    "command_count": 10,
+    "by_source": {
+      "pyproject.project.scripts": 8,
+      "shell": 2
+    },
+    "files": [
+      ".claude/skills/writing-skills/pyproject.toml",
+      ".claude/skills/writing-skills/scripts/sync-skill.sh",
+      ".qwen/skills/writing-skills/pyproject.toml",
+      ".qwen/skills/writing-skills/scripts/sync-skill.sh"
+    ]
+  },
+  "commands": [
+    {
+      "name": "aggregate-benchmark",
+      "source": "pyproject.project.scripts",
+      "file": ".claude/skills/writing-skills/pyproject.toml",
+      "command": "scripts.aggregate_benchmark:main"
+    },
+    {
+      "name": "aggregate-benchmark",
+      "source": "pyproject.project.scripts",
+      "file": ".qwen/skills/writing-skills/pyproject.toml",
+      "command": "scripts.aggregate_benchmark:main"
+    },
+    {
+      "name": "improve-description",
+      "source": "pyproject.project.scripts",
+      "file": ".claude/skills/writing-skills/pyproject.toml",
+      "command": "scripts.improve_description:main"
+    },
+    {
+      "name": "improve-description",
+      "source": "pyproject.project.scripts",
+      "file": ".qwen/skills/writing-skills/pyproject.toml",
+      "command": "scripts.improve_description:main"
+    },
+    {
+      "name": "run-eval",
+      "source": "pyproject.project.scripts",
+      "file": ".claude/skills/writing-skills/pyproject.toml",
+      "command": "scripts.run_eval:main"
+    },
+    {
+      "name": "run-eval",
+      "source": "pyproject.project.scripts",
+      "file": ".qwen/skills/writing-skills/pyproject.toml",
+      "command": "scripts.run_eval:main"
+    },
+    {
+      "name": "run-loop",
+      "source": "pyproject.project.scripts",
+      "file": ".claude/skills/writing-skills/pyproject.toml",
+      "command": "scripts.run_loop:main"
+    },
+    {
+      "name": "run-loop",
+      "source": "pyproject.project.scripts",
+      "file": ".qwen/skills/writing-skills/pyproject.toml",
+      "command": "scripts.run_loop:main"
+    },
+    {
+      "name": "sync-skill",
+      "source": "shell",
+      "file": ".claude/skills/writing-skills/scripts/sync-skill.sh",
+      "command": ""
+    },
+    {
+      "name": "sync-skill",
+      "source": "shell",
+      "file": ".qwen/skills/writing-skills/scripts/sync-skill.sh",
+      "command": ""
+    }
+  ]
+}

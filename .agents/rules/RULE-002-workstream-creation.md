@@ -100,9 +100,9 @@ make wb-task TASK_ID=T-01 ACTION=done
 ### Standard Workflow
 
 ```bash
-# 1. Define or update roadmap feature in .agents/arc/GENERAL-ROADMAP.md
+# 1. Define or update roadmap feature in docs/arc/GENERAL-ROADMAP.md
 
-# 2. Define or update parent spec in .agents/arc/SPECS/
+# 2. Define or update parent spec in docs/arc/SPECS/
 
 # 3. Create workstream linked to approved strategic docs
 make new THEME=feature-name FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
@@ -191,8 +191,8 @@ make verify
 
 ## References
 
-- `.agents/a-docs/agentic/agents-new.md` - agents-new.py docs
-- `.agents/a-docs/agentic/agents-wb-update.md` - wb-update docs
+- `docs/agentic/agents-new.md` - agents-new.py docs
+- `docs/agentic/agents-wb-update.md` - wb-update docs
 - RULE-003 - Documentation Standards
 - RULE-004 - Validation & Linting
 

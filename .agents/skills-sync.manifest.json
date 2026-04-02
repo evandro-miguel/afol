@@ -2,11 +2,20 @@
   "version": 2,
   "repo": "https://github.com/evandro-miguel/skill-universal.git",
   "ref": "main",
+  "source_dir": ".agents/source/universal-skills",
   "mode": "copy",
   "installs": [
     {
       "app": "all",
       "profile": "core"
+    },
+    {
+      "app": "all",
+      "skills": [
+        "agentic-system-workflow",
+        "writing-skills",
+        "markdownlint-skill"
+      ]
     }
   ]
 }

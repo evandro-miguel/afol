@@ -1,0 +1,12 @@
+[
+  {
+    "file": ".claude/settings.local.json",
+    "surface": "cli",
+    "reason": "settings boundary"
+  },
+  {
+    "file": "docs/standards/Makefile",
+    "surface": "cli",
+    "reason": "command recipe file"
+  }
+]

@@ -27,6 +27,8 @@ addopts = [
     "-v",
     "--strict-markers",
     "--tb=short",
+    "-p",
+    "no:cacheprovider",
 ]
 markers = [
     "unit: Unit tests",
@@ -37,7 +39,7 @@ markers = [
 
 [tool.coverage.run]
 source = [".agents/scripts"]
-omit = ["tests/*", "**/__pycache__/*", "**/.venv/*"]
+omit = ["tests/*", "*/tests/*", "**/__pycache__/*", "**/.venv/*"]
 
 [tool.coverage.report]
 fail_under = 15
@@ -63,8 +65,6 @@ ignore = ["E501"]
 "agents-new.py" = ["C901"]
 "agents-telemetry.py" = ["C901"]
 "agents-tools.py" = ["C901"]
-"agents-update/agents-update.py" = ["C901"]
-"agents-update/manifest.py" = ["C901"]
 "check-links.py" = ["C901"]
 "sync-agent-docs.py" = ["C901"]
 "verify-tasks.py" = ["C901"]

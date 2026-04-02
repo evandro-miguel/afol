@@ -21,6 +21,16 @@ This scaffold is built for interactive, terminal-first agent sessions. It is not
 ## 📁 Repository Structure
 
 ```
+docs/
+├── arc/                     # Roadmap, specs, decisions, structure canon
+├── map/                     # Current-state repository map and analysis evidence
+├── standards/               # Canonical process and command standards
+├── templates/               # Reusable doc and workbench templates
+├── telemetry/               # Telemetry docs and reports
+├── patterns/                # Pattern catalog and anti-patterns
+├── knowledge/               # Indexed knowledge summaries
+└── lessons/                 # Lessons learned
+ 
 .agents/
 ├── scripts/                 # Operational scripts
 │   ├── agents-telemetry.py  # Telemetry and heat scoring
@@ -34,20 +44,6 @@ This scaffold is built for interactive, terminal-first agent sessions. It is not
 │       ├── events.jsonl     # Telemetry events
 │       └── schemas/
 │           └── event.json   # Event schema
-│
-├── a-docs/                  # Documentation only
-│   ├── telemetry/           # Telemetry docs
-│   │   ├── README.md
-│   │   ├── HEAT_SCORING.md
-│   │   └── dashboard.md
-│   ├── patterns/            # Pattern catalog
-│   │   ├── INDEX.md
-│   │   ├── success/
-│   │   ├── anti/
-│   │   └── templates/
-│   ├── lessons/             # Lessons learned
-│   ├── templates/           # Doc templates
-│   └── arc/                 # Architecture
 │
 ├── wb/                      # Active workstreams
 │   ├── .active_session      # Current session
@@ -75,9 +71,9 @@ make doctor
 ### 2. Create Workstream
 
 ```bash
-# 1. Define or update the roadmap feature in .agents/arc/GENERAL-ROADMAP.md
+# 1. Define or update the roadmap feature in docs/arc/GENERAL-ROADMAP.md
 
-# 2. Define or update the governing parent spec in .agents/arc/SPECS/
+# 2. Define or update the governing parent spec in docs/arc/SPECS/
 
 # 3. Create the workstream with mandatory governance linkage
 .agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --spec-lite
@@ -93,13 +89,16 @@ make doctor
 
 ```bash
 # Full bootstrap for a new or mostly empty repo
+# The target directory is created automatically if it does not exist yet.
 ./.agents/agents bootstrap /path/to/target-repo
 
 # Partial install for an existing project with live content
 ./.agents/agents bootstrap /path/to/existing-project --partial
 
-# If the target lives under .../apps/<repo>, bootstrap also prepares
-# .../apps/universal-skills as the sibling upstream source checkout.
+# Bootstrap prepares a repo-local upstream source checkout at
+# .agents/source/universal-skills inside the target repository.
+# The default bootstrap path seeds that source from committed repo assets,
+# so downstream installs do not need a network clone.
 ```
 
 ### Runtime Entry Points
@@ -108,9 +107,10 @@ make doctor
 - `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, and `GEMINI.md` are runtime-facing mirrors generated from it.
 - `opencode.json` is the committed OpenCode project adapter and must remain secret-free.
 - Runtime folders such as `.opencode/`, `.codex/`, and `.qwen/` should only contain project-safe adapters and docs.
+- Project-owned documentation belongs under `docs/`; `.agents/` is reserved for agent-system surfaces such as workbench, skills, telemetry, and runtime automation.
 - The scaffold should be optimized for interactive CLI agent execution paths first; embedded SDK/server use cases are secondary and should not drive the default structure.
 - Bootstrap exports a generic, history-free baseline for downstream repos and supports a partial install mode that preserves existing project-owned files.
-- The exported baseline separates goal-state canon in `.agents/arc/` from optional current-state evidence in `.agents/arc/map/`.
+- The exported baseline keeps current-state repository mapping in `docs/map/` and avoids publishing repo-map artifacts inside `.agents/`.
 - The skills baseline is treated as an adoption artifact, not as scaffold-local history; downstream repos should pin their own selection and evolve it from there.
 
 ### Skills Source and Discovery
@@ -119,18 +119,34 @@ make doctor
 # Show the active upstream source checkout and manifest state
 ./.agents/agents skills-sync status
 
-# List available upstream skills from the local source checkout
+# List available upstream skills from the git-backed catalog when available,
+# otherwise from the repo-local source seed
 ./.agents/agents skills-sync list --runtime codex
 
 # Search by keyword across skill names and SKILL.md content
 ./.agents/agents skills-sync search markdown --runtime codex
 
+# One-step update from git-backed source into .agents/skills/
+./.agents/agents skills-sync sync --runtime codex
+
+# Ensure the scaffold-operating skill is installed locally
+./.agents/agents skills-sync ensure agentic-system-workflow --runtime codex --pull
+
 # Ensure one skill is installed in .agents/skills/
 ./.agents/agents skills-sync ensure writing-skills --runtime codex
+
+# Publish one locally edited skill back to the git-backed universal-skills source
+./.agents/agents skills-sync push writing-skills --commit --push
 ```
 
-- Preferred upstream source checkout: `../universal-skills` relative to the repo root.
-- Compatibility fallback: `.agents/cache/universal-skills` if an older repo still has the legacy cache clone.
+- Preferred upstream source checkout: `.agents/source/universal-skills` inside the repo root.
+- Git mirror / compatibility fallback: `.agents/cache/universal-skills` when the preferred local source is only a seed copy.
+- Bootstrap seeds `.agents/source/universal-skills` from committed repo skills by default.
+- `skills-sync list` and `skills-sync search` prefer the git-backed catalog when a mirror already exists, while local install/apply paths still keep repo-local source semantics.
+- `skills-sync pull` refreshes the git-backed source or git mirror only; it does not overwrite `.agents/skills/` by itself.
+- `skills-sync sync` and `skills-sync update` are the simple one-step paths to refresh `.agents/skills/` from the configured git source.
+- `skills-sync push` publishes selected local skills back to the git-backed source; commit/push remain explicit opt-ins.
+- Keep `agentic-system-workflow` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, and git-backed skills flow.
 - The scaffold should not depend on global Codex skills for universal-skills content.
 - Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and project-agnostic.
 
@@ -203,7 +219,7 @@ Before ending work, close the documentation loop first:
 - align impacted specs/roadmap entries and standards/standards templates
 - refresh runtime mirrors if canonical behavior changed
 - keep required metadata updates (`updated_at`) automation-driven
-- if a defect is found and fixed, add a lesson entry in `.agents/a-docs/lessons/entries/`
+- if a defect is found and fixed, add a lesson entry in `docs/lessons/entries/`
 
 ## 🔥 Automated Telemetry
 
@@ -354,7 +370,7 @@ make setup          # Setup UV virtualenv
 make doctor         # Validate .agents structure
 make clean          # Clean caches
 make lint-scripts   # Lint Python operational scripts
-make all            # Bootstrap-safe full validation
+make all            # Bootstrap-safe full validation (unit + integration, no e2e)
 ```
 
 ### Workflows
@@ -466,8 +482,6 @@ jq '.patterns | sort_by(.heat_score) | reverse' sprint.json
 ```bash
 # Cold tools this month
 make telemetry-cold PERIOD=monthly TYPE=tools
-
-# Investigate: obsolete? new? forgotten?
 ```
 
 ## 🎓 Core Principles
@@ -480,17 +494,17 @@ make telemetry-cold PERIOD=monthly TYPE=tools
 
 ## 📖 Documentation
 
-- `.agents/a-docs/telemetry/README.md` - Telemetry guide
-- `.agents/a-docs/telemetry/HEAT_SCORING.md` - Heat scoring details
-- `.agents/a-docs/patterns/INDEX.md` - Pattern catalog
-- `.agents/a-docs/lessons/` - Lessons learned
+- `docs/telemetry/README.md` - Telemetry guide
+- `docs/telemetry/HEAT_SCORING.md` - Heat scoring details
+- `docs/patterns/INDEX.md` - Pattern catalog
+- `docs/lessons/` - Lessons learned
 
 ## 🤝 Contributing
 
 1. Create workstream: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite`
-2. Follow templates from `a-docs/templates/`
+2. Follow templates from `docs/templates/`
 3. Apply relevant patterns
-4. Validate: `make lint && make lint-scripts && make test-scripts && make all`
+4. Validate: `make all`
 5. Report: `make wb-files-changed`
 
 ## 📄 License

@@ -286,7 +286,7 @@ class TestStrictVerification(unittest.TestCase):
 
     def _install_governance_context(self):
         """Create a minimal roadmap/spec context for strict governance checks."""
-        arc_dir = self.session_dir / ".agents" / "arc"
+        arc_dir = self.session_dir / "docs" / "arc"
         specs_dir = arc_dir / "SPECS"
         specs_dir.mkdir(parents=True)
 
@@ -294,7 +294,7 @@ class TestStrictVerification(unittest.TestCase):
         roadmap_file.write_text(
             "# General Roadmap\n\n"
             "### F-01 Governance-Aware Feature\n"
-            "- Governing spec: `.agents/arc/SPECS/test-parent-spec_01.md`\n"
+            "- Governing spec: `docs/arc/SPECS/test-parent-spec_01.md`\n"
         )
         (specs_dir / "test-parent-spec_01.md").write_text(
             "---\n"

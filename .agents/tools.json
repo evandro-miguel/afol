@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated_at": "2026-02-23T00:00:00-03:00",
+  "updated_at": "2026-04-02T15:05:32-03:00",
   "description": "Tool catalog for .agents system autonomous agents",
   "tools": [
     {
@@ -107,7 +107,7 @@
       ],
       "options": [
         "--feature-id: Mandatory roadmap feature identifier (for example F-01)",
-        "--parent-spec: Mandatory parent spec id or file under .agents/arc/SPECS/",
+        "--parent-spec: Mandatory parent spec id or file under docs/arc/SPECS/",
         "--child-spec: Optional child spec id or file for large features",
         "--spec: Includes file spec.md completo",
         "--spec-lite: Includes file spec-lite.md simplificado",
@@ -184,12 +184,12 @@
         "As part of de manutencao de documentacao"
       ],
       "scans": [
-        ".agents/arc/SPECS/ para arquivos spec",
-        ".agents/arc/DECISIONS/ para arquivos adr"
+        "docs/arc/SPECS/ para arquivos spec",
+        "docs/arc/DECISIONS/ para arquivos adr"
       ],
       "updates": [
-        ".agents/arc/SPECS/INDEX.md",
-        ".agents/arc/DECISIONS/INDEX.md"
+        "docs/arc/SPECS/INDEX.md",
+        "docs/arc/DECISIONS/INDEX.md"
       ],
       "output": "Indices atualizados com lista de documentos, status, owners e links",
       "dry_run": "--dry-run para visualizar sem aplicar"
@@ -263,10 +263,10 @@
         "config: Configuracoes e manifests",
         "docs: Documentacao markdown"
       ],
-      "output": "Arquivos .md em .agents/arc/structure/ com inventario detalhado",
+      "output": "Arquivos .md em docs/arc/structure/ com inventario detalhado",
       "cache": "Usa cache para atualizacoes incrementais",
       "options": [
-        "--output <dir>: Diretorio de saida (padrao: .agents/arc/structure/)",
+        "--output <dir>: Diretorio de saida (padrao: docs/arc/structure/)",
         "--no-cache: Ignora cache e recria tudo"
       ]
     },
@@ -275,14 +275,14 @@
       "name": "Agents Repo Map",
       "tool": "agents-repo-map.py",
       "wrapper_command": ".agents/agents repo-map [path] [--output <dir>] [--runner <path>] [--image <tag>] [--dry-run]",
-      "make_command": "make repo-map [TARGET_PATH=. OUTPUT_DIR=.agents/arc/map RUNNER=/path/to/run-repo-map.sh IMAGE=docker-analisys-tools:latest DRY=1]",
+      "make_command": "make repo-map [TARGET_PATH=. OUTPUT_DIR=docs/map RUNNER=/path/to/run-repo-map.sh IMAGE=docker-analisys-tools:latest DRY=1]",
       "type": "documentation",
       "execution_mode": "on-demand",
       "created_at": "2026-03-23",
       "updated_at": "2026-03-23",
-      "description": "Runs the deep repository analysis pipeline and refreshes the full current-state codemap under .agents/arc/map using the external docker-analisys-tools runner.",
+      "description": "Runs the deep repository analysis pipeline and refreshes the full current-state codemap under docs/map using the external docker-analisys-tools runner.",
       "when_to_use": [
-        "When .agents/arc/map needs a fresh repository-wide codemap",
+        "When docs/map needs a fresh repository-wide codemap",
         "After major architectural refactors, file moves, or domain boundary changes",
         "Before deep architecture analysis that should rely on generated artifacts instead of broad manual reading",
         "When onboarding a repo that needs current-state maps beyond the lightweight structure map"
@@ -297,10 +297,10 @@
       "checks": [
         "Resolves repo root and map output path deterministically",
         "Finds the external run-repo-map.sh runner via CLI flag, env var, config, or default hint",
-        "Ensures the output root exists before execution",
+        "Runs analysis in a temporary shadow copy before syncing the output into the configured map root",
         "Fails if required root codemap docs are missing after the run"
       ],
-      "output": "Generated or refreshed codemap markdown files and raw evidence under .agents/arc/map and .agents/arc/map/extra"
+      "output": "Generated or refreshed codemap markdown files and raw evidence under docs/map and docs/map/extra"
     },
     {
       "id": "sync",
@@ -532,14 +532,15 @@
       "type": "synchronization",
       "execution_mode": "on-demand",
       "created_at": "2026-02-23",
-      "updated_at": "2026-02-23",
-      "description": "Synchronize project skills from universal-skills while enforcing strict skills/<name>/SKILL.md structure.",
+      "updated_at": "2026-04-02",
+      "description": "Synchronize project skills from universal-skills while enforcing strict skills/<name>/SKILL.md structure, including git-backed refresh and explicit publish flows.",
       "when_to_use": [
         "Set up project skill subset from universal-skills",
         "Update local project skills after upstream changes",
         "Discover available upstream skills from the project itself",
         "Search skill content before deciding what to install",
         "Ensure one missing skill into the local project on demand",
+        "Publish selected local skill edits back to the git-backed source checkout",
         "Validate skill drift and structure contract",
         "Gate full validation with required skills sync checks"
       ],
@@ -552,7 +553,7 @@
         {
           "name": "pull",
           "usage": "skills-sync pull",
-          "description": "Update the active local universal-skills source checkout"
+          "description": "Refresh the git-backed source checkout or git mirror only"
         },
         {
           "name": "list",
@@ -587,7 +588,17 @@
         {
           "name": "sync",
           "usage": "skills-sync sync --skills a,b,c",
-          "description": "pull + apply + check"
+          "description": "One-step refresh into .agents/skills (pull git source + apply + check)"
+        },
+        {
+          "name": "update",
+          "usage": "skills-sync update --skills a,b,c",
+          "description": "Alias for sync"
+        },
+        {
+          "name": "push",
+          "usage": "skills-sync push <skill>|--skills a,b [--commit] [--push]",
+          "description": "Publish selected local skills back to the git-backed source checkout"
         }
       ],
       "checks": [
@@ -641,7 +652,7 @@
           "description": "Validate telemetry events against schema"
         }
       ],
-      "output": "Events recorded to .agents/a-docs/telemetry/data/events.jsonl",
+      "output": "Events recorded to .agents/data/telemetry/events.jsonl",
       "side_effect": "Appends event to JSONL telemetry log"
     },
     {
@@ -732,7 +743,7 @@
         {
           "name": "index",
           "usage": "knowledge index",
-          "description": "Generate .agents/a-docs/knowledge/INDEX.md"
+          "description": "Generate docs/knowledge/INDEX.md"
         }
       ],
       "output": "Concise knowledge hits, compact reuse digests, or generated index"
@@ -841,12 +852,14 @@
     "clean": "Remove .venv e caches",
     "bootstrap": "Install .agents system in another repository (TARGET required)",
     "skills-init": "Initialize universal skills sync",
-    "skills-pull": "Update universal skills mirror",
+    "skills-pull": "Refresh the git-backed universal-skills source or mirror only",
+    "skills-update": "Refresh .agents/skills from the configured git source",
     "skills-plan": "Preview selected skills drift/missing state",
     "skills-apply": "Apply selected skills to project skills/",
+    "skills-push": "Publish selected local skills back to the git-backed source",
     "skills-status": "Show skills sync status/config",
     "skills-check": "Validate skills structure and sync state",
-    "skills-sync": "Run pull + apply + check sequence",
+    "skills-sync": "Refresh .agents/skills from the configured git source",
     "test-scripts": "Run Python unit tests for operational scripts"
   },
   "tool_categories": {

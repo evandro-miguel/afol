@@ -28,7 +28,6 @@ Options:
 """
 
 import json
-import os
 import sys
 import subprocess
 from datetime import datetime, timezone
@@ -36,14 +35,14 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import argparse
 
+from lib.agents_config import get_active_session_file_path, get_cfg_path, load_agents_config
+
 
 # Configuration
-PATTERNS_DIR = Path(__file__).parent.parent / "a-docs" / "patterns"
+ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+PATTERNS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "patterns_dir")
 TELEMETRY_SCRIPT = Path(__file__).parent / "agents-telemetry.py"
-ACTIVE_SESSION_FILE = Path(__file__).parent.parent / "wb" / ".active_session"
-ACTIVE_SESSION_FILE = Path(
-    os.environ.get("AGENTS_ACTIVE_SESSION_FILE", str(ACTIVE_SESSION_FILE))
-)
+ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 
 # Pattern subdirectories by type
 PATTERN_SUBDIRS = {

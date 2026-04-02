@@ -22,7 +22,7 @@ ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 DEFAULT_OFFSET = CONFIG.get("time", {}).get("default_offset", "+00:00")
 DEFAULT_TZ = parse_offset(DEFAULT_OFFSET)
-KNOWLEDGE_DIR = ROOT_DIR / ".agents" / "a-docs" / "knowledge"
+KNOWLEDGE_DIR = get_cfg_path(ROOT_DIR, CONFIG, "knowledge_dir")
 INDEX_FILE = KNOWLEDGE_DIR / "INDEX.md"
 DOC_TYPES = {"research", "brainstorm", "explorer-check", "postmortem", "report"}
 
@@ -120,7 +120,10 @@ def extract_matching_snippets(path: Path, query: str, limit: int = 2) -> List[Ma
 
 
 def relative(path: Path) -> str:
-    return str(path.relative_to(ROOT_DIR))
+    try:
+        return str(path.relative_to(ROOT_DIR))
+    except ValueError:
+        return str(path)
 
 
 def cmd_list(args: argparse.Namespace) -> int:

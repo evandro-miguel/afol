@@ -13,7 +13,7 @@ Do not store skills directly in this folder.
 ## Canonical Contract
 
 - `QWEN.md` is the runtime-facing instruction mirror for Qwen and must derive from `AGENTS.md`.
-- `.agents/arc/GENERAL-ROADMAP.md` and `.agents/arc/SPECS/` remain the strategic source of truth.
+- `docs/arc/GENERAL-ROADMAP.md` and `docs/arc/SPECS/` remain the strategic source of truth.
 - `.agents/wb/` remains the execution source of truth.
 
 ## Secret Boundary

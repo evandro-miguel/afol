@@ -13,7 +13,7 @@ Do not store skills directly in this folder.
 ## Canonical Contract
 
 - `AGENTS.md` is the canonical repo instruction source for Codex.
-- `.agents/arc/GENERAL-ROADMAP.md` and `.agents/arc/SPECS/` remain the strategic source of truth.
+- `docs/arc/GENERAL-ROADMAP.md` and `docs/arc/SPECS/` remain the strategic source of truth.
 - `.agents/wb/` remains the execution source of truth.
 
 ## Secret Boundary

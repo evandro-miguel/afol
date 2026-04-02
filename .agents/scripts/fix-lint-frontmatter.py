@@ -6,8 +6,8 @@ Usage:
     python fix-lint-frontmatter.py <file> [file...]
 
 Examples:
-    python fix-lint-frontmatter.py .agents/a-docs/standards/scripts-usage.md
-    python fix-lint-frontmatter.py --doc-type tool-doc .agents/a-docs/agentic/*.md
+    python fix-lint-frontmatter.py docs/standards/scripts-usage.md
+    python fix-lint-frontmatter.py --doc-type tool-doc docs/agentic/*.md
 """
 
 import argparse

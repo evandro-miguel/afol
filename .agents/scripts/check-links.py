@@ -8,8 +8,8 @@ Usage:
     python check-links.py [options] [directories...]
 
 Examples:
-    python check-links.py                          # Check .agents/a-docs/
-    python check-links.py .agents/a-docs/          # Check specific directory
+    python check-links.py                          # Check docs/
+    python check-links.py docs/                    # Check specific directory
     python check-links.py --verbose                # Show all links checked
     python check-links.py --fix                    # Generate fix report
 """
@@ -305,8 +305,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                          # Check .agents/a-docs/
-  %(prog)s .agents/a-docs/          # Check specific directory
+  %(prog)s                          # Check docs/
+  %(prog)s docs/                    # Check specific directory
   %(prog)s --verbose                # Show all links checked
   %(prog)s --fix                    # Generate fix report
   %(prog)s --output report.txt      # Save report to file
@@ -316,8 +316,8 @@ Examples:
     parser.add_argument(
         'directories',
         nargs='*',
-        default=['.agents/a-docs/'],
-        help='Directories or files to check (default: .agents/a-docs/)'
+        default=['docs/'],
+        help='Directories or files to check (default: docs/)'
     )
 
     parser.add_argument(

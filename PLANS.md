@@ -32,7 +32,7 @@ Do not use an ExecPlan as a replacement for roadmap or parent spec governance. I
 
 ## Required structure in this scaffold
 
-The canonical template is `.agents/a-docs/templates/plan.md`. It must include, at minimum:
+The canonical template is `docs/templates/plan.md`. It must include, at minimum:
 
 - `Purpose / Big Picture`
 - `Progress`

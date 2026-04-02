@@ -1,0 +1,192 @@
+[
+  {
+    "file": ".claude/settings.local.json",
+    "surface": "cli",
+    "reason": "settings boundary"
+  },
+  {
+    "file": ".claude/skills/typescript-skill/scripts/ts_diagnostic.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".claude/skills/writing-skills/eval-viewer/generate_review.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".claude/skills/writing-skills/pyproject.toml",
+    "surface": "cli",
+    "reason": "pyproject console scripts"
+  },
+  {
+    "file": ".claude/skills/writing-skills/scripts/aggregate_benchmark.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".claude/skills/writing-skills/scripts/improve_description.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".claude/skills/writing-skills/scripts/run_eval.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".claude/skills/writing-skills/scripts/run_grader.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".claude/skills/writing-skills/scripts/run_loop.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".claude/skills/writing-skills/scripts/sync-skill.sh",
+    "surface": "cli",
+    "reason": "shell script entrypoint"
+  },
+  {
+    "file": ".codex/skills/typescript-skill/scripts/ts_diagnostic.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".codex/skills/writing-skills/eval-viewer/generate_review.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".codex/skills/writing-skills/pyproject.toml",
+    "surface": "cli",
+    "reason": "pyproject console scripts"
+  },
+  {
+    "file": ".codex/skills/writing-skills/scripts/aggregate_benchmark.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".codex/skills/writing-skills/scripts/improve_description.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".codex/skills/writing-skills/scripts/run_eval.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".codex/skills/writing-skills/scripts/run_grader.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".codex/skills/writing-skills/scripts/run_loop.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".codex/skills/writing-skills/scripts/sync-skill.sh",
+    "surface": "cli",
+    "reason": "shell script entrypoint"
+  },
+  {
+    "file": ".opencode/skills/typescript-skill/scripts/ts_diagnostic.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".opencode/skills/writing-skills/eval-viewer/generate_review.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".opencode/skills/writing-skills/pyproject.toml",
+    "surface": "cli",
+    "reason": "pyproject console scripts"
+  },
+  {
+    "file": ".opencode/skills/writing-skills/scripts/aggregate_benchmark.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".opencode/skills/writing-skills/scripts/improve_description.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".opencode/skills/writing-skills/scripts/run_eval.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".opencode/skills/writing-skills/scripts/run_grader.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".opencode/skills/writing-skills/scripts/run_loop.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".opencode/skills/writing-skills/scripts/sync-skill.sh",
+    "surface": "cli",
+    "reason": "shell script entrypoint"
+  },
+  {
+    "file": ".qwen/skills/typescript-skill/scripts/ts_diagnostic.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".qwen/skills/writing-skills/eval-viewer/generate_review.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".qwen/skills/writing-skills/pyproject.toml",
+    "surface": "cli",
+    "reason": "pyproject console scripts"
+  },
+  {
+    "file": ".qwen/skills/writing-skills/scripts/aggregate_benchmark.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".qwen/skills/writing-skills/scripts/improve_description.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".qwen/skills/writing-skills/scripts/run_eval.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".qwen/skills/writing-skills/scripts/run_grader.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".qwen/skills/writing-skills/scripts/run_loop.py",
+    "surface": "cli",
+    "reason": "command-line entrypoint marker"
+  },
+  {
+    "file": ".qwen/skills/writing-skills/scripts/sync-skill.sh",
+    "surface": "cli",
+    "reason": "shell script entrypoint"
+  },
+  {
+    "file": "docs/standards/Makefile",
+    "surface": "cli",
+    "reason": "command recipe file"
+  }
+]

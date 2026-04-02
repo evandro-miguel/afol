@@ -1,0 +1,7 @@
+{
+    "ts_diagnostic.py": {
+        "bacon": 0,
+        "name": "ts_diagnostic.py",
+        "path": null
+    }
+}
