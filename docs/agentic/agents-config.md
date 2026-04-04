@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: 2026-02-20 00:00:00-03:00
-updated_at: '2026-03-23T20:38:52-03:00'
+updated_at: '2026-04-04T10:08:10-03:00'
 links:
   tools_json: ./tools-json.md
   config_file: ../agents.config
@@ -33,6 +33,9 @@ Provides:
 4. **Timezone parsing** - Offset to datetime
 5. **Time helpers** - Correct timestamp format
 6. **Provider defaults** - Stable defaults for optional integrations such as external memory
+7. **Workflow manifest defaults** - Shared artifact catalog for workstream docs
+8. **Workflow policy defaults** - Shared intent-based creation/context rules
+9. **Lint exclusions** - Canonical skip list for temporary or imported content
 
 ## What It Touches
 
@@ -80,9 +83,45 @@ time:
 
 lint:
   excluded_path_prefixes:
-    - arc/structure/
+    - .agents/tmp/
+    - .tmp/
+    - tmp/
+    - .agents/arc/map/extra/
+    - docs/arc/structure/
     - scripts/.agent/docs/
     - z-arq/
+
+workflow:
+  artifact_manifest:
+    version: 1
+    artifacts:
+      - doc_type: brainstorm
+        template: brainstorm.md
+        phase: planning
+        purpose: Capture real option analysis before committing to a direction.
+      - doc_type: plan
+        template: plan.md
+        phase: planning
+        depends_on:
+          - brainstorm
+          - research
+          - explorer-check
+      - doc_type: report
+        template: report.md
+        phase: delivery
+        id_placeholder: "<report_doc_id_or_empty>"
+        depends_on:
+          - task
+          - log
+  artifact_policy:
+    default_intent: delivery
+    intents:
+      delivery:
+        create: [task]
+      research:
+        create: [research]
+      closure:
+        create: [report]
 
 memory:
   enabled: true
@@ -92,6 +131,10 @@ memory:
   project: "main"
   runtime_server: "basic_memory"
 ```
+
+Temporary folders are intentionally excluded from markdown lint. Anything under
+`.agents/tmp/`, `.tmp/`, or a repo-local `tmp/` path is treated as disposable
+workspace, not canonical documentation.
 
 ## How to Use
 
@@ -132,6 +175,7 @@ def parse_offset(offset_str: str) -> timezone:
 2. Add default in `load_agents_config()`
 3. Update this document
 4. If the option feeds a user-facing command, update the corresponding tool doc and standards usage docs
+5. If the option changes workflow artifact behavior, keep `lib/workflow_manifest.py` aligned with the same catalog/policy contract
 
 ## How to Test
 

@@ -1,18 +1,23 @@
 ---
 doc_type: task
-id: "YYMMDD_HHMM_<theme>_task_01"
-theme: "<theme>"
+id: YYMMDD_HHMM_<theme>_task_01
+theme: <theme>
 status: active
-owners: ["worker", "tester"]
-created_at: "YYYY-MM-DDTHH:MM:SSZ"
-updated_at: "YYYY-MM-DDTHH:MM:SSZ"
-roadmap_feature: "<feature_id>"
-parent_spec: "<parent_spec_id>"
-child_spec: "<child_spec_id_or_empty>"
-depends_on: ["<plan_doc_id>"]
+owners:
+- worker
+- tester
+workstream_intent: <workstream_intent>
+artifact_purpose: <artifact_purpose>
+created_at: YYYY-MM-DDTHH:MM:SSZ
+updated_at: '2026-04-04T10:08:12-03:00'
+roadmap_feature: <feature_id>
+parent_spec: <parent_spec_id>
+child_spec: <child_spec_id_or_empty>
+depends_on:
+- <plan_doc_id>
 links:
-  plan: "<plan_doc_id>"
-  roadmap: "<roadmap_path>"
+  plan: <plan_doc_id>
+  roadmap: <roadmap_path>
 ---
 
 # Tasks: <theme>

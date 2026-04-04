@@ -3,7 +3,7 @@ doc_type: standard
 id: 000000_000000_frontmatter-standard_standard_01
 status: active
 created_at: 2026-02-23 00:00:00+00:00
-updated_at: '2026-03-06T20:23:51-03:00'
+updated_at: '2026-04-04T10:08:11-03:00'
 title: Frontmatter Standard
 ---
 
@@ -44,6 +44,8 @@ title: "<short title>"
 | `theme` | string | Theme or feature name |
 | `owners` | array | List of owners |
 | `links` | array | Related document links |
+| `workstream_intent` | string | Governing session intent when the doc is materialized |
+| `artifact_purpose` | string | Why the artifact deserves to exist in the session |
 
 ### Optional Fields
 

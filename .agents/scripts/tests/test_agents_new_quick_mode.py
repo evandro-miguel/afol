@@ -28,9 +28,11 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             "plan_only": False,
             "force_new": True,
             "quick_mode": False,
+            "intent": "delivery",
             "feature_id": "F-01",
             "parent_spec": "260306_roadmap-first-delivery-system_spec_01",
             "child_spec": "",
+            "with_artifacts": [],
         }
 
         with (
@@ -109,7 +111,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         with mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True):
             agents_new._validate_governance_requirements(args)
 
-    def test_add_quick_task_updates_task_and_log(self):
+    def test_add_quick_task_updates_task_and_materializes_log_when_needed(self):
         script_path = Path(".agents/scripts/agents-new.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_test", script_path)
@@ -122,23 +124,18 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             session_dir.mkdir(parents=True)
 
             task_file = session_dir / f"{session_id}_task_01.md"
-            log_file = session_dir / f"{session_id}_log_01.md"
 
             task_file.write_text(
                 "---\n"
                 "doc_type: task\n"
+                "theme: sample-theme\n"
+                "roadmap_feature: F-08\n"
+                "parent_spec: 260306_context-driven-execution-commands_spec_01\n"
+                "workstream_intent: delivery\n"
                 "---\n\n"
                 "# Tasks\n\n"
                 "## Task List\n"
                 "- [ ] T-01 existing task\n"
-            )
-            log_file.write_text(
-                "---\n"
-                "doc_type: log\n"
-                "---\n\n"
-                "# Log\n\n"
-                "## Timeline\n"
-                "- 2026-02-23T12:00:00-03:00 - Started - ok\n"
             )
 
             agents_new.ROOT_DIR = root
@@ -152,12 +149,13 @@ class AgentsNewQuickModeTests(unittest.TestCase):
 
             self.assertEqual(task_id, "T-02")
             self.assertEqual(task_path, task_file)
-            self.assertEqual(log_path, log_file)
+            self.assertTrue(log_path.exists())
 
             task_content = task_file.read_text()
             self.assertIn("- [ ] T-02 quick-fix", task_content)
 
-            log_content = log_file.read_text()
+            log_content = log_path.read_text()
+            self.assertIn("doc_type: log", log_content)
             self.assertIn(
                 "- 2026-02-23T12:34:56-03:00 - Added quick task T-02: quick-fix - pending",
                 log_content,
@@ -170,7 +168,13 @@ class AgentsNewQuickModeTests(unittest.TestCase):
 
         replacements = agents_new._build_template_replacements(
             "260306_2002_execution-intelligence-system",
-            {"feature_id": "F-07", "parent_spec": "parent", "child_spec": "", "pack": "api-cleanup"},
+            {
+                "feature_id": "F-07",
+                "parent_spec": "parent",
+                "child_spec": "",
+                "pack": "api-cleanup",
+                "intent": "research",
+            },
         )
 
         self.assertEqual(
@@ -185,6 +189,141 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             replacements["<postmortem_doc_id>"],
             "260306_2002_execution-intelligence-system-api-cleanup_postmortem_01",
         )
+        self.assertEqual(
+            replacements["<report_doc_id_or_empty>"],
+            "260306_2002_execution-intelligence-system-api-cleanup_report_01",
+        )
+        self.assertEqual(replacements["<workstream_intent>"], "research")
+
+    def test_iter_workstream_artifacts_uses_intent_policy(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_manifest_test", script_path)
+
+        planning_only = agents_new._iter_workstream_artifacts(
+            {
+                "intent": "delivery",
+                "plan_only": True,
+                "use_spec": False,
+                "use_spec_lite": False,
+                "with_artifacts": [],
+            }
+        )
+        self.assertEqual([entry["doc_type"] for entry in planning_only], ["plan"])
+
+        delivery_with_spec = agents_new._iter_workstream_artifacts(
+            {
+                "intent": "delivery",
+                "plan_only": False,
+                "use_spec": True,
+                "use_spec_lite": False,
+                "with_artifacts": [],
+            }
+        )
+        self.assertEqual(
+            [entry["doc_type"] for entry in delivery_with_spec],
+            ["task", "spec"],
+        )
+
+        research_only = agents_new._iter_workstream_artifacts(
+            {
+                "intent": "research",
+                "plan_only": False,
+                "use_spec": False,
+                "use_spec_lite": False,
+                "with_artifacts": [],
+            }
+        )
+        self.assertEqual([entry["doc_type"] for entry in research_only], ["research"])
+
+        research_with_log = agents_new._iter_workstream_artifacts(
+            {
+                "intent": "research",
+                "plan_only": False,
+                "use_spec": False,
+                "use_spec_lite": False,
+                "with_artifacts": ["log"],
+            }
+        )
+        self.assertEqual(
+            [entry["doc_type"] for entry in research_with_log],
+            ["research", "log"],
+        )
+
+    def test_parse_args_infers_research_intent_from_theme_when_not_explicit(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_intent_inference_test", script_path)
+
+        argv = ["agents-new.py", "auth-investigation"]
+        with mock.patch.object(sys, "argv", argv):
+            parsed = agents_new._parse_args()
+
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["intent"], "research")
+
+    def test_ordered_selected_doc_types_rejects_disallowed_artifacts_for_intent(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_policy_validation_test", script_path)
+
+        with self.assertRaises(ValueError):
+            agents_new._ordered_selected_doc_types(
+                {
+                    "intent": "research",
+                    "plan_only": False,
+                    "use_spec": False,
+                    "use_spec_lite": False,
+                    "with_artifacts": ["task"],
+                }
+            )
+
+    def test_coerce_artifact_manifest_fallbacks_to_default(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_manifest_fallback_test", script_path)
+
+        fallback = agents_new._coerce_artifact_manifest({})
+        self.assertEqual(
+            [entry["doc_type"] for entry in fallback],
+            [
+                "brainstorm",
+                "research",
+                "explorer-check",
+                "plan",
+                "task",
+                "spec",
+                "spec-lite",
+                "log",
+                "report",
+                "postmortem",
+            ],
+        )
+
+    def test_coerce_artifact_manifest_uses_only_valid_entries(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_manifest_valid_entries_test", script_path)
+
+        manifest = agents_new._coerce_artifact_manifest(
+            {
+                "artifacts": [
+                    {
+                        "doc_type": "plan",
+                        "template": "plan.md",
+                        "phase": "planning",
+                        "depends_on": ["brainstorm"],
+                    },
+                    {"doc_type": "", "template": "task.md", "phase": "delivery"},
+                    {"doc_type": "report", "template": "report.md", "phase": "delivery"},
+                ]
+            }
+        )
+
+        self.assertEqual([entry["doc_type"] for entry in manifest], ["plan", "report"])
+        self.assertEqual(manifest[0]["template"], "plan.md")
+        self.assertEqual(manifest[1]["template"], "report.md")
+        self.assertEqual(manifest[0]["depends_on"], ["brainstorm"])
 
 
 if __name__ == "__main__":

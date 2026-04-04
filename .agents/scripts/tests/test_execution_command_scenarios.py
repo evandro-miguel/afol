@@ -46,8 +46,15 @@ def write_plan_file(session_dir: Path) -> Path:
         "doc_type: plan\n"
         "id: scenario-plan\n"
         "roadmap_feature: F-08\n"
+        "workstream_intent: delivery\n"
         "---\n\n"
-        "# Plan\n",
+        "# Plan\n\n"
+        "## Progress\n"
+        "- [x] 2026-03-06 21:20Z - Established the workstream path.\n\n"
+        "## Concrete Steps\n"
+        "1. Update workflow policy.\n\n"
+        "## Validation and Acceptance\n"
+        "- Unit: pytest targeted suite.\n",
         encoding="utf-8",
     )
     return plan_file
@@ -61,7 +68,13 @@ def write_report_file(session_dir: Path, status: str = "active") -> Path:
         f"status: {status}\n"
         "updated_at: '2026-03-06T21:28:26-03:00'\n"
         "---\n\n"
-        "# Report\n",
+        "# Report\n\n"
+        "## Summary\n"
+        "- Implemented the workflow change.\n\n"
+        "## Delivered Changes\n"
+        "- Updated artifact creation policy.\n\n"
+        "## Verification\n"
+        "- Unit tests: `pytest` -> pass -> Evidence: targeted suite green\n",
         encoding="utf-8",
     )
     return report_file
@@ -75,10 +88,64 @@ def write_log_file(session_dir: Path) -> Path:
         "updated_at: '2026-03-06T21:28:26-03:00'\n"
         "---\n\n"
         "# Log\n\n"
-        "## Timeline\n",
+        "## Timeline\n"
+        "- 2026-03-06 21:28 - Recorded implementation progress - ok\n",
         encoding="utf-8",
     )
     return log_file
+
+
+def write_doc_file(session_dir: Path, doc_type: str, status: str = "draft") -> Path:
+    bodies = {
+        "brainstorm": (
+            "# Brainstorm\n\n"
+            "## Problem Statement\n- Reduce workbench sprawl.\n\n"
+            "## Options\n1. Keep current flow.\n2. Create artifacts by intent.\n\n"
+            "## Preferred Direction\n- Selected: create by intent and utility.\n"
+        ),
+        "research": (
+            "# Research\n\n"
+            "## Findings\n- The current flow overcreates artifacts.\n\n"
+            "## Sources\n- .agents/scripts/agents-new.py | credibility: high | notes: creation entrypoint\n"
+        ),
+        "explorer-check": (
+            "# Explorer Check\n\n"
+            "## Scope Reviewed\n- Paths inspected:\n  - .agents/scripts/agents-new.py\n\n"
+            "## Findings\n- Artifact creation is currently package-based.\n\n"
+            "## Impact on the Plan\n- Switch to intent-based creation.\n"
+        ),
+        "plan": (
+            "# Plan\n\n"
+            "## Progress\n- [x] 2026-03-06 21:00Z - Captured the workstream.\n\n"
+            "## Concrete Steps\n1. Update policy.\n\n"
+            "## Validation and Acceptance\n- Unit: pytest targeted suite.\n"
+        ),
+        "postmortem": (
+            "# Postmortem\n\n"
+            "## What Was Achieved\n- Landed the policy change.\n\n"
+            "## Root Causes\n- Package-oriented creation caused sprawl.\n\n"
+            "## Follow-ups for Next Rounds\n- Expand intent-aware review.\n"
+        ),
+        "spec-lite": (
+            "# SPEC LITE\n\n"
+            "## Intent\n- Outcome: only useful artifacts are created.\n\n"
+            "## Why Lite Is Enough\n- Scope is limited to workflow policy.\n\n"
+            "## User or Operator Impact\n- Operators stop seeing empty artifacts.\n"
+        ),
+    }
+    default_body = f"# {doc_type}\n"
+    file_path = session_dir / f"{session_dir.name}_{doc_type}_01.md"
+    file_path.write_text(
+        "---\n"
+        f"doc_type: {doc_type}\n"
+        f"id: scenario-{doc_type}\n"
+        f"status: {status}\n"
+        "updated_at: '2026-03-06T21:28:26-03:00'\n"
+        "---\n\n"
+        f"{bodies.get(doc_type, default_body)}\n",
+        encoding="utf-8",
+    )
+    return file_path
 
 
 def write_global_context(root: Path) -> dict[str, Path]:
@@ -221,9 +288,6 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             ready, missing = self.execution_commands.context_readiness(session_dir)
             self.assertFalse(ready)
             self.assertIn("task", missing)
-            self.assertIn("plan", missing)
-            self.assertIn("report", missing)
-            self.assertIn("log", missing)
 
     def test_resolve_artifact_tech_stack_alias_variants(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -236,6 +300,60 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
                 b = self.execution_commands.resolve_artifact(session_dir, "tech_stack")
             self.assertIsNotNone(a)
             self.assertEqual(a, b)
+
+    def test_resolve_artifact_spec_falls_back_to_spec_lite(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260307_0108_spec-lite"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            spec_lite = write_doc_file(session_dir, "spec-lite", status="draft")
+
+            resolved = self.execution_commands.resolve_artifact(session_dir, "spec")
+            self.assertEqual(resolved, spec_lite)
+
+    def test_workflow_artifact_states_include_only_present_optional_variant(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260307_0108a_spec-lite-state"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_doc_file(session_dir, "spec-lite", status="draft")
+
+            states = self.execution_commands.workflow_artifact_states(session_dir)
+            doc_types = [item["doc_type"] for item in states]
+
+            self.assertIn("spec-lite", doc_types)
+            self.assertNotIn("spec", doc_types)
+
+    def test_workflow_artifact_states_use_manifest_dependencies(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260307_0109_manifest"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_doc_file(session_dir, "brainstorm", status="active")
+            write_doc_file(session_dir, "research", status="active")
+            write_doc_file(session_dir, "explorer-check", status="draft")
+            write_doc_file(session_dir, "plan", status="draft")
+            write_task_file(
+                session_dir,
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | pending | worker | first |",
+            )
+            write_log_file(session_dir)
+            write_report_file(session_dir, status="final")
+            write_doc_file(session_dir, "postmortem", status="draft")
+
+            states = self.execution_commands.workflow_artifact_states(session_dir)
+            by_doc_type = {item["doc_type"]: item for item in states}
+
+            self.assertEqual(by_doc_type["brainstorm"]["state"], "ready")
+            self.assertEqual(by_doc_type["explorer-check"]["state"], "ready")
+            self.assertEqual(by_doc_type["plan"]["state"], "blocked")
+            self.assertIn("explorer-check: draft", by_doc_type["plan"]["blockers"])
+            self.assertEqual(by_doc_type["task"]["state"], "blocked")
+            self.assertIn("plan: draft", by_doc_type["task"]["blockers"])
+            self.assertEqual(by_doc_type["report"]["state"], "done")
+
+            next_artifact = self.execution_commands.next_workflow_artifact(states)
+            self.assertIsNotNone(next_artifact)
+            self.assertEqual(next_artifact["doc_type"], "plan")
 
 
 class ImplementAndReviewScenarioTests(unittest.TestCase):

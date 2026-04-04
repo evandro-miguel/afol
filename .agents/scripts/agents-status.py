@@ -14,9 +14,11 @@ from lib.execution_commands import (
     context_readiness,
     find_session,
     next_task,
+    next_workflow_artifact,
     parse_state_summary,
     resolve_artifact,
     split_frontmatter,
+    workflow_artifact_states,
 )
 
 _, CONFIG = load_agents_config(Path(__file__).resolve().parent)
@@ -54,10 +56,22 @@ def print_status(data: Dict[str, object]) -> None:
     print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
     if tasks['next']:
         print(f"next_task: {tasks['next']}")
+    if data["workflow_next"]:
+        print(f"next_artifact: {data['workflow_next']}")
     if data['blocked_tasks']:
         print("blocked_tasks:")
         for line in data['blocked_tasks']:
             print(f" - {line}")
+    if data["workflow_artifacts"]:
+        print("workflow_artifacts:")
+        for item in data["workflow_artifacts"]:
+            status = item["status"] or "n/a"
+            blockers = f" blockers={'; '.join(item['blockers'])}" if item["blockers"] else ""
+            utility = item.get("utility", {})
+            utility_notes = ""
+            if item["state"] == "invalid" and utility.get("reasons"):
+                utility_notes = f" reasons={'; '.join(utility['reasons'])}"
+            print(f" - {item['doc_type']}: {item['state']} (status={status}){blockers}{utility_notes}")
 
     print(f"plan: {data['artifacts'].get('plan', '')}")
     print(f"task: {data['artifacts'].get('task', '')}")
@@ -96,6 +110,8 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
     context_ready, missing_context = context_readiness(session_path)
     if not check_context:
         missing_context = []
+    manifest_states = workflow_artifact_states(session_path)
+    next_artifact = next_workflow_artifact(manifest_states)
 
     return {
         "session": session_path.name,
@@ -112,6 +128,8 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
         "generated_at": now_iso_with_offset(WB_TZ),
         "context_ready": context_ready,
         "missing_context": missing_context,
+        "workflow_artifacts": manifest_states,
+        "workflow_next": _format_next_artifact(next_artifact),
     }
 
 
@@ -122,6 +140,16 @@ def _format_next_task(rows):
     if next_row.state == "in_progress":
         return f"{next_row.task_id} currently in progress ({next_row.owner}): {next_row.notes}"
     return f"{next_row.task_id} {next_row.state} ({next_row.owner}): {next_row.notes}"
+
+
+def _format_next_artifact(item):
+    if not item:
+        return None
+    if item["blockers"]:
+        return f"{item['doc_type']} {item['state']}: {'; '.join(item['blockers'])}"
+    if item.get("utility", {}).get("reasons") and item["state"] == "invalid":
+        return f"{item['doc_type']} invalid: {'; '.join(item['utility']['reasons'])}"
+    return f"{item['doc_type']} {item['state']}"
 
 
 def parse_args() -> argparse.Namespace:

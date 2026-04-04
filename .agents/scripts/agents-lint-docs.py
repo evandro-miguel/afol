@@ -403,6 +403,8 @@ class DocLinter:
             return True
 
         resolved = file_path.resolve()
+        if any(part in {"tmp", ".tmp"} for part in resolved.parts):
+            return True
         try:
             rel = resolved.relative_to(AGENTS_DIR.resolve()).as_posix()
         except Exception:
@@ -413,7 +415,21 @@ class DocLinter:
             else:
                 rel = resolved.as_posix().lstrip("/")
 
-        return any(rel.startswith(prefix) for prefix in EXCLUDED_PATH_PREFIXES)
+        normalized_candidates = {
+            rel,
+            rel.lstrip("./"),
+            f".agents/{rel}".lstrip("./"),
+        }
+        normalized_prefixes = {
+            prefix.strip().lstrip("./").rstrip("/")
+            for prefix in EXCLUDED_PATH_PREFIXES
+            if str(prefix).strip()
+        }
+        return any(
+            candidate == prefix or candidate.startswith(f"{prefix}/")
+            for candidate in normalized_candidates
+            for prefix in normalized_prefixes
+        )
 
     def print_report(self):
         """Print lint report."""

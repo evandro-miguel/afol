@@ -12,6 +12,7 @@ from typing import Dict, List, Tuple
 from lib.execution_commands import (
     build_session_catchup,
     find_session,
+    infer_session_intent,
     parse_task_rows,
     split_frontmatter,
 )
@@ -43,17 +44,17 @@ def _inspect_plan_and_task(
     plan_file: Path | None,
     task_file: Path | None,
 ) -> None:
+    if task_file is None:
+        _append_issue(findings, "task", "error", "No task artifact found")
+        return
+
     if plan_file is None:
-        _append_issue(findings, "plan", "error", "No plan artifact found")
+        _append_issue(findings, "plan", "info", "No plan artifact found; session is using minimal delivery mode")
         return
 
     plan_fm, _ = split_frontmatter(plan_file.read_text(encoding="utf-8"))
     if not plan_fm:
         _append_issue(findings, "plan", "error", "Plan file missing frontmatter")
-
-    if task_file is None:
-        _append_issue(findings, "task", "error", "No task artifact found")
-        return
 
     task_fm, _ = split_frontmatter(task_file.read_text(encoding="utf-8"))
     if str(task_fm.get("roadmap_feature", "")).strip() != str(plan_fm.get("roadmap_feature", "")).strip():
@@ -104,12 +105,21 @@ def _inspect_catchup(findings: List[Dict[str, str]], session_dir: Path) -> None:
 
 def inspect_artifacts(session_dir: Path) -> List[Dict[str, str]]:
     findings: List[Dict[str, str]] = []
+    intent = infer_session_intent(session_dir)
 
     plan_file = _latest_artifact(session_dir, "*_plan_*.md")
     task_file = _latest_artifact(session_dir, "*_task_*.md")
-    _inspect_plan_and_task(findings, plan_file, task_file)
-    if plan_file is None:
-        return findings
+    if intent == "delivery" or task_file is not None:
+        _inspect_plan_and_task(findings, plan_file, task_file)
+    elif intent == "planning" or plan_file is not None:
+        if plan_file is None:
+            _append_issue(findings, "plan", "error", "No plan artifact found")
+            return findings
+        plan_fm, _ = split_frontmatter(plan_file.read_text(encoding="utf-8"))
+        if not plan_fm:
+            _append_issue(findings, "plan", "error", "Plan file missing frontmatter")
+    elif plan_file is not None or task_file is not None:
+        _inspect_plan_and_task(findings, plan_file, task_file)
 
     _inspect_optional_artifacts(
         findings,

@@ -208,32 +208,34 @@ ifndef THEME
 	@echo "╠═══════════════════════════════════════════════════════════╣"
 	@echo "║  Usage: make new THEME=<theme> FEATURE_ID=F-01            ║"
 	@echo "║         PARENT_SPEC=<parent-spec-id> [SPEC=1|lite]        ║"
+	@echo "║         [INTENT=delivery|research|...] [WITH=a,b]         ║"
 	@echo "║                                                           ║"
 	@echo "║  Examples:                                                ║"
 	@echo "║    make new THEME=auth-refactor FEATURE_ID=F-01          ║"
 	@echo "║      PARENT_SPEC=my-parent-spec                           ║"
 	@echo "║    make new THEME=api-endpoint FEATURE_ID=F-02           ║"
 	@echo "║      PARENT_SPEC=my-parent-spec SPEC=1                    ║"
-	@echo "║    make new THEME=bugfix-login FEATURE_ID=F-03           ║"
-	@echo "║      PARENT_SPEC=my-parent-spec SPEC=lite                 ║"
+	@echo "║    make new THEME=auth-investigation FEATURE_ID=F-03     ║"
+	@echo "║      PARENT_SPEC=my-parent-spec INTENT=research           ║"
 	@echo "╚═══════════════════════════════════════════════════════════╝"
 	@exit 1
 else
 ifndef FEATURE_ID
-	@echo "Usage: make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id> [SPEC=1|lite] [CHILD_SPEC=<child-spec-id>]"
+	@echo "Usage: make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id> [SPEC=1|lite] [INTENT=delivery|research|planning|brainstorming|exploration|specification|closure] [WITH=doc1,doc2] [CHILD_SPEC=<child-spec-id>]"
 	@exit 1
 else
 ifndef PARENT_SPEC
-	@echo "Usage: make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id> [SPEC=1|lite] [CHILD_SPEC=<child-spec-id>]"
+	@echo "Usage: make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id> [SPEC=1|lite] [INTENT=delivery|research|planning|brainstorming|exploration|specification|closure] [WITH=doc1,doc2] [CHILD_SPEC=<child-spec-id>]"
 	@exit 1
 else
 	@echo "→ Creating workstream: $(THEME)..."
+	@WITH_FLAGS=$$(printf '%s' "$(WITH)" | tr ',' '\n' | sed '/^$$/d' | sed 's#^# --with "#' | sed 's#$$#"##' | tr -d '\n'); \
 	@if [ "$(SPEC)" = "1" ]; then \
-		./.agents/agents new $(THEME) --feature-id "$(FEATURE_ID)" --parent-spec "$(PARENT_SPEC)" $(if $(CHILD_SPEC),--child-spec "$(CHILD_SPEC)",) --spec; \
+		eval ./.agents/agents new $(THEME) --feature-id "$(FEATURE_ID)" --parent-spec "$(PARENT_SPEC)" $(if $(CHILD_SPEC),--child-spec "$(CHILD_SPEC)",) $(if $(INTENT),--intent "$(INTENT)",) $$WITH_FLAGS --spec; \
 	elif [ "$(SPEC)" = "lite" ]; then \
-		./.agents/agents new $(THEME) --feature-id "$(FEATURE_ID)" --parent-spec "$(PARENT_SPEC)" $(if $(CHILD_SPEC),--child-spec "$(CHILD_SPEC)",) --spec-lite; \
+		eval ./.agents/agents new $(THEME) --feature-id "$(FEATURE_ID)" --parent-spec "$(PARENT_SPEC)" $(if $(CHILD_SPEC),--child-spec "$(CHILD_SPEC)",) $(if $(INTENT),--intent "$(INTENT)",) $$WITH_FLAGS --spec-lite; \
 	else \
-		./.agents/agents new $(THEME) --feature-id "$(FEATURE_ID)" --parent-spec "$(PARENT_SPEC)" $(if $(CHILD_SPEC),--child-spec "$(CHILD_SPEC)",); \
+		eval ./.agents/agents new $(THEME) --feature-id "$(FEATURE_ID)" --parent-spec "$(PARENT_SPEC)" $(if $(CHILD_SPEC),--child-spec "$(CHILD_SPEC)",) $(if $(INTENT),--intent "$(INTENT)",) $$WITH_FLAGS; \
 	fi
 	@echo "✓ Workstream created: $(THEME)"
 endif

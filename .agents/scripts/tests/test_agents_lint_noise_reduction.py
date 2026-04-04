@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -70,6 +71,21 @@ updated_at: 2026-02-24T00:00:00Z
                 if "Unknown doc_type" in issue.message
             ]
             self.assertEqual(unknown_doc_type_warnings, [])
+
+    def test_tmp_folders_are_excluded_from_lint_scope(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            agents_dir = repo_root / ".agents"
+            tmp_file = agents_dir / "tmp" / "imported" / "README.md"
+            tmp_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp_file.write_text("# imported\n", encoding="utf-8")
+
+            with (
+                mock.patch.object(self.lint_docs, "AGENTS_DIR", agents_dir),
+                mock.patch.object(self.lint_docs, "EXCLUDED_PATH_PREFIXES", (".agents/tmp/", "tmp/")),
+            ):
+                linter = self.lint_docs.DocLinter(fix=False)
+                self.assertTrue(linter.should_skip_file(tmp_file))
 
 
 if __name__ == "__main__":

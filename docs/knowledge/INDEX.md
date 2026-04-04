@@ -1,16 +1,16 @@
 ---
 doc_type: index
-id: "knowledge_index"
+id: knowledge_index
 status: active
-created_at: "2026-04-02T23:35:58+00:00"
-updated_at: "2026-04-02T23:35:58+00:00"
+created_at: '2026-04-04T13:04:33+00:00'
+updated_at: '2026-04-04T10:08:11-03:00'
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 110
+- Total indexed docs: 130
 
 ## Brainstorm
 
@@ -34,6 +34,10 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260402_1828_docs-map-contract-migration_brainstorm_01` | `.agents/wb/260402_1828_docs-map-contract-migration/260402_1828_docs-map-contract-migration_brainstorm_01.md` | - Current-state map artifacts should move to docs/map/ so they live at the
 - `260402_1847_global-docs-surface-propagation_brainstorm_01` | `.agents/wb/260402_1847_global-docs-surface-propagation/260402_1847_global-docs-surface-propagation_brainstorm_01.md` | - Global Codex guidance, skills, and plugin references still teach mixed repo
 - `260402_1858_project-docs-root-migration_brainstorm_01` | `.agents/wb/260402_1858_project-docs-root-migration/260402_1858_project-docs-root-migration_brainstorm_01.md` | - The scaffold still mixed project-owned docs with agent runtime state under .agents/, which made downstream bootstrap semantics blurry and left multiple legacy path contracts acti
+- `260402_2317_final-audit-sweep_brainstorm_01` | `.agents/wb/260402_2317_final-audit-sweep/260402_2317_final-audit-sweep_brainstorm_01.md` | - <what needs to be solved>
+- `260404_0843_workflow-manifest-externalization_brainstorm_01` | `.agents/wb/260404_0843_workflow-manifest-externalization/260404_0843_workflow-manifest-externalization_brainstorm_01.md` | - <what needs to be solved>
+- `260404_0854_artifact-manifest-readiness_brainstorm_01` | `.agents/wb/260404_0854_artifact-manifest-readiness/260404_0854_artifact-manifest-readiness_brainstorm_01.md` | - <what needs to be solved>
+- `260404_0927_artifact-utility-enforcement_brainstorm_01` | `.agents/wb/260404_0927_artifact-utility-enforcement/260404_0927_artifact-utility-enforcement_brainstorm_01.md` | - The scaffold still materializes too many workbench artifacts by default.
 
 ## Explorer-Check
 
@@ -57,6 +61,10 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260402_1828_docs-map-contract-migration_explorer-check_01` | `.agents/wb/260402_1828_docs-map-contract-migration/260402_1828_docs-map-contract-migration_explorer-check_01.md` | - rg confirmed runtime defaults and docs still reference .agents/arc/map/
 - `260402_1847_global-docs-surface-propagation_explorer-check_01` | `.agents/wb/260402_1847_global-docs-surface-propagation/260402_1847_global-docs-surface-propagation_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
 - `260402_1858_project-docs-root-migration_explorer-check_01` | `.agents/wb/260402_1858_project-docs-root-migration/260402_1858_project-docs-root-migration_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
+- `260402_2317_final-audit-sweep_explorer-check_01` | `.agents/wb/260402_2317_final-audit-sweep/260402_2317_final-audit-sweep_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
+- `260404_0843_workflow-manifest-externalization_explorer-check_01` | `.agents/wb/260404_0843_workflow-manifest-externalization/260404_0843_workflow-manifest-externalization_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
+- `260404_0854_artifact-manifest-readiness_explorer-check_01` | `.agents/wb/260404_0854_artifact-manifest-readiness/260404_0854_artifact-manifest-readiness_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
+- `260404_0927_artifact-utility-enforcement_explorer-check_01` | `.agents/wb/260404_0927_artifact-utility-enforcement/260404_0927_artifact-utility-enforcement_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
 
 ## Postmortem
 
@@ -77,6 +85,10 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260402_1828_docs-map-contract-migration_postmortem_01` | `.agents/wb/260402_1828_docs-map-contract-migration/260402_1828_docs-map-contract-migration_postmortem_01.md` | - Retargeting the map contract through config first kept the command/runtime
 - `260402_1847_global-docs-surface-propagation_postmortem_01` | `.agents/wb/260402_1847_global-docs-surface-propagation/260402_1847_global-docs-surface-propagation_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real outcome instead of reconstructing it.
 - `260402_1858_project-docs-root-migration_postmortem_01` | `.agents/wb/260402_1858_project-docs-root-migration/260402_1858_project-docs-root-migration_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real outcome instead of reconstructing it.
+- `260402_2317_final-audit-sweep_postmortem_01` | `.agents/wb/260402_2317_final-audit-sweep/260402_2317_final-audit-sweep_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real outcome instead of reconstructing it.
+- `260404_0843_workflow-manifest-externalization_postmortem_01` | `.agents/wb/260404_0843_workflow-manifest-externalization/260404_0843_workflow-manifest-externalization_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real outcome instead of reconstructing it.
+- `260404_0854_artifact-manifest-readiness_postmortem_01` | `.agents/wb/260404_0854_artifact-manifest-readiness/260404_0854_artifact-manifest-readiness_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real outcome instead of reconstructing it.
+- `260404_0927_artifact-utility-enforcement_postmortem_01` | `.agents/wb/260404_0927_artifact-utility-enforcement/260404_0927_artifact-utility-enforcement_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real outcome instead of reconstructing it.
 
 ## Report
 
@@ -113,6 +125,10 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260402_1828_docs-map-contract-migration_report_01` | `.agents/wb/260402_1828_docs-map-contract-migration/260402_1828_docs-map-contract-migration_report_01.md` | - The scaffold now uses docs/map/ as the canonical current-state map surface.
 - `260402_1847_global-docs-surface-propagation_report_01` | `.agents/wb/260402_1847_global-docs-surface-propagation/260402_1847_global-docs-surface-propagation_report_01.md` | - Roadmap feature: F-11
 - `260402_1858_project-docs-root-migration_report_01` | `.agents/wb/260402_1858_project-docs-root-migration/260402_1858_project-docs-root-migration_report_01.md` | - Roadmap feature: F-11
+- `260402_2317_final-audit-sweep_report_01` | `.agents/wb/260402_2317_final-audit-sweep/260402_2317_final-audit-sweep_report_01.md` | - Roadmap feature: F-05
+- `260404_0843_workflow-manifest-externalization_report_01` | `.agents/wb/260404_0843_workflow-manifest-externalization/260404_0843_workflow-manifest-externalization_report_01.md` | - Roadmap feature: F-11
+- `260404_0854_artifact-manifest-readiness_report_01` | `.agents/wb/260404_0854_artifact-manifest-readiness/260404_0854_artifact-manifest-readiness_report_01.md` | - Roadmap feature: F-08
+- `260404_0927_artifact-utility-enforcement_report_01` | `.agents/wb/260404_0927_artifact-utility-enforcement/260404_0927_artifact-utility-enforcement_report_01.md` | - Roadmap feature: F-08
 
 ## Research
 
@@ -136,3 +152,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260402_1613_scaffold-ops-skill_research_01` | `.agents/wb/260402_1613_scaffold-ops-skill/260402_1613_scaffold-ops-skill_research_01.md` | - Which runtime surfaces still prevent the scaffold from feeling easy and
 - `260402_1847_global-docs-surface-propagation_research_01` | `.agents/wb/260402_1847_global-docs-surface-propagation/260402_1847_global-docs-surface-propagation_research_01.md` | - Which global Codex surfaces still encode the old repo-map destinations?
 - `260402_1858_project-docs-root-migration_research_01` | `.agents/wb/260402_1858_project-docs-root-migration/260402_1858_project-docs-root-migration_research_01.md` | - Which files still hardcode .agents/a-docs, .agents/arc, or .agents/templates after the folder move?
+- `260402_2317_final-audit-sweep_research_01` | `.agents/wb/260402_2317_final-audit-sweep/260402_2317_final-audit-sweep_research_01.md` | - <question 1>
+- `260404_0843_workflow-manifest-externalization_research_01` | `.agents/wb/260404_0843_workflow-manifest-externalization/260404_0843_workflow-manifest-externalization_research_01.md` | - <question 1>
+- `260404_0854_artifact-manifest-readiness_research_01` | `.agents/wb/260404_0854_artifact-manifest-readiness/260404_0854_artifact-manifest-readiness_research_01.md` | - <question 1>
+- `260404_0927_artifact-utility-enforcement_research_01` | `.agents/wb/260404_0927_artifact-utility-enforcement/260404_0927_artifact-utility-enforcement_research_01.md` | - Where does the current scaffold still create artifacts as a fixed package?

@@ -78,6 +78,11 @@ make doctor
 # 3. Create the workstream with mandatory governance linkage
 .agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --spec-lite
 
+# Research-only workstream
+.agents/agents new auth-investigation --feature-id F-02 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --intent research
+
+# The same theme would also infer `research` safely if --intent is omitted
+
 # Optional: add a pack for another major track inside an existing session
 .agents/agents new api-follow-up --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec
 
@@ -323,10 +328,10 @@ make patterns-apply PATTERN_ID=PAT-001
 - `log.md` - Decision timeline
 - `report.md` - Outcome report
 - `spec.md` / `spec-lite.md` - Local workstream refinements chosen as needed
-- `brainstorm.md` - Ideation
-- `explorer-check.md` - Current-project exploration proof
-- `research.md` - Research
-- `postmortem.md` - Mandatory final session closure artifact
+- `brainstorm.md` - Ideation when real option analysis happened
+- `explorer-check.md` - Current-project exploration proof when repo inspection is needed
+- `research.md` - Research when durable findings are needed
+- `postmortem.md` - Final session closure artifact when a real outcome exists
 
 ### ExecPlans
 
@@ -379,7 +384,7 @@ make all            # Bootstrap-safe full validation (unit + integration, no e2e
 make new THEME=x FEATURE_ID=F-01 PARENT_SPEC=<spec-id>  # Create governed workstream
 make quick THEME=x  # Quick task
 make verify         # Verify tasks
-make lint           # Lint markdown
+make lint           # Lint markdown, excluding tmp workspaces
 make structure      # Generate structure
 make index          # Update indexes
 make sync           # Sync AGENTS.md
@@ -411,9 +416,9 @@ make patterns-rate      # Rate pattern
 ```bash
 # Main tools
 .agents/agents doctor           # Validate structure
-.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id>  # Create workstream
+.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id>  # Create minimal delivery workstream (task by default)
 .agents/agents verify-tasks     # Verify tasks
-.agents/agents status           # Show session status
+.agents/agents status           # Show session status + workflow artifact readiness
 .agents/agents wb-update touch  # Update session
 .agents/agents bootstrap /path/to/target-repo --dry-run  # Preview generic export to another repo
 .agents/agents bootstrap /path/to/existing-project --partial  # Partial install for a live repo
@@ -501,7 +506,7 @@ make telemetry-cold PERIOD=monthly TYPE=tools
 
 ## 🤝 Contributing
 
-1. Create workstream: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite`
+1. Create only the workstream artifacts you need: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite`
 2. Follow templates from `docs/templates/`
 3. Apply relevant patterns
 4. Validate: `make all`

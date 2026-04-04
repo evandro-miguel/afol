@@ -71,7 +71,13 @@ def build_isolated_repo(tmp_root: Path) -> Path:
         "parent_spec: 260323_1704_universal-skills-runtime-integration_spec_01\n"
         "updated_at: '2026-04-02T00:00:00-03:00'\n"
         "---\n\n"
-        "# Plan\n",
+        "# Plan\n\n"
+        "## Progress\n"
+        "- [x] 2026-04-02 00:00Z - Seeded integration fixture.\n\n"
+        "## Concrete Steps\n"
+        "1. Exercise the wrapper commands.\n\n"
+        "## Validation and Acceptance\n"
+        "- Integration tests should run cleanly.\n",
         encoding="utf-8",
     )
     (session_dir / f"{SESSION_ID}_task_01.md").write_text(
@@ -106,7 +112,13 @@ def build_isolated_repo(tmp_root: Path) -> Path:
         "theme: integration-workflow\n"
         "updated_at: '2026-04-02T00:00:00-03:00'\n"
         "---\n\n"
-        "# Report\n",
+        "# Report\n\n"
+        "## Summary\n"
+        "- Seeded the integration workflow fixture.\n\n"
+        "## Delivered Changes\n"
+        "- Prepared the isolated repo.\n\n"
+        "## Verification\n"
+        "- Fixture boot: `pytest` -> pass -> Evidence: repo ready\n",
         encoding="utf-8",
     )
     return repo_root
@@ -173,7 +185,9 @@ def test_session_catchup_temp_repo_scenarios():
         for rel in [
             ".agents/scripts/agents-session.py",
             ".agents/scripts/lib/agents_config.py",
+            ".agents/scripts/lib/artifact_utility.py",
             ".agents/scripts/lib/execution_commands.py",
+            ".agents/scripts/lib/workflow_manifest.py",
             ".agents/scripts/lib/__init__.py",
         ]:
             dst = temp_root / rel
@@ -213,7 +227,16 @@ def test_session_catchup_temp_repo_scenarios():
         (temp_root / "docs/arc/TECH-STACK.md").write_text("# stack\n", encoding="utf-8")
         (temp_root / "docs/arc/GENERAL-ROADMAP.md").write_text("# roadmap\n", encoding="utf-8")
 
-        def write_session(name: str, *, with_plan=True, with_research=True, with_log=True, with_report=True, research_link=False):
+        def write_session(
+            name: str,
+            *,
+            with_plan=True,
+            with_task=True,
+            with_research=True,
+            with_log=True,
+            with_report=True,
+            research_link=False,
+        ):
             session = temp_root / ".agents/wb" / name
             session.mkdir(parents=True, exist_ok=True)
             if with_plan:
@@ -226,21 +249,22 @@ def test_session_catchup_temp_repo_scenarios():
                     "roadmap_feature: F-09\n"
                     f"{links}"
                     "updated_at: '2026-03-07T18:00:00-03:00'\n"
-                    "---\n\n# Plan\n",
+                    "---\n\n# Plan\n\n## Progress\n- [x] 2026-03-07 18:00Z - Session scaffolded.\n\n## Concrete Steps\n1. Continue the governed workflow.\n\n## Validation and Acceptance\n- Catchup should reflect current state.\n",
                     encoding="utf-8",
                 )
-            (session / f"{name}_task_01.md").write_text(
-                "---\n"
-                "doc_type: task\n"
-                "id: test-task\n"
-                "roadmap_feature: F-09\n"
-                "updated_at: '2026-03-07T18:00:00-03:00'\n"
-                "---\n\n# Tasks\n\n## State Board\n\n"
-                "| Task | State | Owner | Notes |\n"
-                "|------|-------|-------|-------|\n"
-                "| T-01 | pending | worker | first |\n",
-                encoding="utf-8",
-            )
+            if with_task:
+                (session / f"{name}_task_01.md").write_text(
+                    "---\n"
+                    "doc_type: task\n"
+                    "id: test-task\n"
+                    "roadmap_feature: F-09\n"
+                    "updated_at: '2026-03-07T18:00:00-03:00'\n"
+                    "---\n\n# Tasks\n\n## State Board\n\n"
+                    "| Task | State | Owner | Notes |\n"
+                    "|------|-------|-------|-------|\n"
+                    "| T-01 | pending | worker | first |\n",
+                    encoding="utf-8",
+                )
             if with_research:
                 (session / f"{name}_research_01.md").write_text(
                     "---\n"
@@ -249,7 +273,7 @@ def test_session_catchup_temp_repo_scenarios():
                     "status: active\n"
                     "roadmap_feature: F-09\n"
                     "updated_at: '2026-03-07T18:00:00-03:00'\n"
-                    "---\n\n# Research\n",
+                    "---\n\n# Research\n\n## Findings\n- The session has repo context to reuse.\n\n## Sources\n- local repo | credibility: high | notes: fixture setup\n",
                     encoding="utf-8",
                 )
             if with_log:
@@ -257,7 +281,7 @@ def test_session_catchup_temp_repo_scenarios():
                     "---\n"
                     "doc_type: log\n"
                     "updated_at: '2026-03-07T18:00:00-03:00'\n"
-                    "---\n\n# Log\n\n## Timeline\n",
+                    "---\n\n# Log\n\n## Timeline\n- 2026-03-07 18:00 - Session created - ok\n",
                     encoding="utf-8",
                 )
             if with_report:
@@ -266,13 +290,20 @@ def test_session_catchup_temp_repo_scenarios():
                     "doc_type: report\n"
                     "status: active\n"
                     "updated_at: '2026-03-07T18:00:00-03:00'\n"
-                    "---\n\n# Report\n",
+                    "---\n\n# Report\n\n## Summary\n- Session baseline exists.\n\n## Delivered Changes\n- Catchup fixture prepared.\n\n## Verification\n- Fixture setup: `git commit` -> pass -> Evidence: repo baseline created\n",
                     encoding="utf-8",
                 )
             return session
 
         clean = write_session("260307_2300_clean")
-        missing = write_session("260307_2301_missing-context", with_plan=False, with_log=False, with_report=False, with_research=False)
+        missing = write_session(
+            "260307_2301_missing-context",
+            with_plan=False,
+            with_task=False,
+            with_log=False,
+            with_report=False,
+            with_research=False,
+        )
         missing_research = write_session("260307_2302_missing-research", with_research=False, research_link=True)
 
         subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
@@ -300,7 +331,7 @@ def test_session_catchup_temp_repo_scenarios():
 
         missing_payload = run_catchup(missing)
         assert missing_payload["catchup_required"] is True
-        assert set(missing_payload["missing_context"]) >= {"plan", "report", "log"}
+        assert set(missing_payload["missing_context"]) >= {"task"}
 
         missing_research_payload = run_catchup(missing_research)
         assert missing_research_payload["catchup_required"] is True

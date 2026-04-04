@@ -4,7 +4,7 @@ id: scripts-reference
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-02T15:21:56-03:00'
+updated_at: '2026-04-04T10:08:11-03:00'
 ---
 
 # Agents System - Quick Reference
@@ -88,7 +88,7 @@ make all           # Full validation workflow (unit + integration, no e2e)
 ### Create New Workstream
 
 ```bash
-# Basic (plan + task + log)
+# Basic minimal delivery (task only by default)
 make new THEME=auth-refactor
 
 # With full spec

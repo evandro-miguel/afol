@@ -22,8 +22,11 @@ from .agents_config import (
     load_agents_config,
     now_iso_with_offset,
 )
+from .artifact_utility import analyze_artifact_utility
+from .workflow_manifest import load_artifact_manifest, load_artifact_policy
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+WORKFLOW_CFG = CONFIG.get("workflow", {})
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
 WORKFLOW_DOC = ROOT_DIR / "docs/standards/workflow.md"
@@ -35,6 +38,9 @@ ARCHITECTURE_DOC = ROOT_DIR / "docs/arc/ARCHITECTURE.md"
 GOAL_STATE_CANON = ROOT_DIR / "docs/arc/README.md"
 CURRENT_STATE_MAP = get_cfg_path(ROOT_DIR, CONFIG, "map_dir") / "README.md"
 WB_TZ = CONFIG.get("time", {}).get("wb_offset", "-03:00")
+ARTIFACT_MANIFEST = load_artifact_manifest(WORKFLOW_CFG)
+DEFAULT_WORKSTREAM_INTENT, ARTIFACT_POLICY = load_artifact_policy(WORKFLOW_CFG, ARTIFACT_MANIFEST)
+TERMINAL_ARTIFACT_STATUSES = {"approved", "accepted", "final", "done", "superseded", "deprecated"}
 
 DOC_PATTERNS: dict[str, str] = {
     "plan": "*_plan_*.md",
@@ -197,6 +203,8 @@ def find_session(session: Optional[str]) -> Path:
 def resolve_artifact(session_dir: Path, artifact: str) -> Optional[Path]:
     if artifact in {"session", "active_session"}:
         return session_dir
+    if artifact in {"spec", "active_spec"}:
+        return latest_file(session_dir, "spec") or latest_file(session_dir, "spec-lite")
     if artifact in SESSION_ARTIFACT_ALIASES:
         return latest_file(session_dir, SESSION_ARTIFACT_ALIASES[artifact])
     if artifact in GLOBAL_ARTIFACT_PATHS:
@@ -227,9 +235,12 @@ def artifact_snapshot(path: Optional[Path]) -> Dict[str, Any]:
             "status": "",
             "updated_at": "",
             "mtime": None,
+            "utility": {"useful": False, "placeholder_count": 0, "substantive_line_count": 0, "reasons": ["missing"]},
         }
 
-    fm, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+    fm, body = split_frontmatter(path.read_text(encoding="utf-8"))
+    doc_type = str(fm.get("doc_type", "")).strip()
+    utility = analyze_artifact_utility(doc_type, body, fm)
     return {
         "exists": True,
         "path": relative_to_root(path),
@@ -239,7 +250,148 @@ def artifact_snapshot(path: Optional[Path]) -> Dict[str, Any]:
         "mtime": path.stat().st_mtime,
         "links": fm.get("links", {}) if isinstance(fm.get("links", {}), dict) else {},
         "roadmap_feature": str(fm.get("roadmap_feature", "")).strip(),
+        "workstream_intent": str(fm.get("workstream_intent", "")).strip(),
+        "doc_type": doc_type,
+        "utility": utility,
     }
+
+
+def _dependency_ready(snapshot: Dict[str, Any]) -> bool:
+    if not snapshot.get("exists"):
+        return False
+    status = str(snapshot.get("status") or "").strip()
+    utility = snapshot.get("utility", {})
+    if not utility.get("useful"):
+        return False
+    if not status:
+        return True
+    return status != "draft"
+
+
+def _artifact_done(snapshot: Dict[str, Any]) -> bool:
+    status = str(snapshot.get("status") or "").strip()
+    utility = snapshot.get("utility", {})
+    return bool(snapshot.get("exists")) and bool(utility.get("useful")) and status in TERMINAL_ARTIFACT_STATUSES
+
+
+def infer_session_intent(session_dir: Path) -> str:
+    """Infer the governing workstream intent from frontmatter or present artifacts."""
+    for doc_file in sorted(session_dir.rglob("*.md")):
+        snapshot = artifact_snapshot(doc_file)
+        candidate = str(snapshot.get("workstream_intent") or "").strip()
+        if candidate in ARTIFACT_POLICY:
+            return candidate
+
+    present_doc_types = {
+        entry["doc_type"]
+        for entry in ARTIFACT_MANIFEST
+        if latest_file(session_dir, entry["doc_type"])
+    }
+    if "task" in present_doc_types:
+        return "delivery"
+    if {"report", "postmortem"} & present_doc_types:
+        return "closure"
+    if "plan" in present_doc_types:
+        return "planning"
+    if "research" in present_doc_types:
+        return "research"
+    if "brainstorm" in present_doc_types:
+        return "brainstorming"
+    if "explorer-check" in present_doc_types:
+        return "exploration"
+    if {"spec", "spec-lite"} & present_doc_types:
+        return "specification"
+    return DEFAULT_WORKSTREAM_INTENT
+
+
+def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
+    """Return manifest-backed readiness state for session artifacts."""
+    intent = infer_session_intent(session_dir)
+    profile = ARTIFACT_POLICY.get(intent, {})
+    default_doc_types = set(profile.get("create", []))
+    optional_doc_types = {
+        entry["doc_type"]
+        for entry in ARTIFACT_MANIFEST
+        if entry.get("flag")
+    }
+    present_doc_types = {
+        entry["doc_type"]
+        for entry in ARTIFACT_MANIFEST
+        if latest_file(session_dir, entry["doc_type"])
+    }
+    present_optional_doc_types = {
+        entry["doc_type"]
+        for entry in ARTIFACT_MANIFEST
+        if entry["doc_type"] in optional_doc_types and latest_file(session_dir, entry["doc_type"])
+    }
+    selected_doc_types = default_doc_types | present_doc_types
+    manifest_entries = [
+        entry
+        for entry in ARTIFACT_MANIFEST
+        if entry["doc_type"] in selected_doc_types
+        and (entry["doc_type"] not in optional_doc_types or entry["doc_type"] in present_optional_doc_types)
+    ]
+    snapshots = {
+        entry["doc_type"]: artifact_snapshot(latest_file(session_dir, entry["doc_type"]))
+        for entry in manifest_entries
+    }
+    states: List[Dict[str, Any]] = []
+
+    for entry in manifest_entries:
+        doc_type = entry["doc_type"]
+        snapshot = snapshots[doc_type]
+        depends_on = list(entry.get("depends_on", []))
+        blockers: List[str] = []
+        for dependency in depends_on:
+            dependency_snapshot = snapshots.get(dependency, {"exists": False, "status": ""})
+            if not dependency_snapshot.get("exists"):
+                blockers.append(f"{dependency}: missing")
+                continue
+            if not _dependency_ready(dependency_snapshot):
+                utility = dependency_snapshot.get("utility", {})
+                if dependency_snapshot.get("exists") and not utility.get("useful"):
+                    blockers.append(f"{dependency}: invalid")
+                else:
+                    blockers.append(f"{dependency}: {dependency_snapshot.get('status') or 'unknown'}")
+
+        state = "ready"
+        if not snapshot.get("exists"):
+            state = "missing"
+        elif _artifact_done(snapshot):
+            state = "done"
+        elif not snapshot.get("utility", {}).get("useful"):
+            state = "invalid"
+        elif blockers:
+            state = "blocked"
+
+        states.append(
+            {
+                "doc_type": doc_type,
+                "phase": entry.get("phase", "delivery"),
+                "state": state,
+                "status": snapshot.get("status", ""),
+                "path": snapshot.get("path"),
+                "id": snapshot.get("id", ""),
+                "exists": bool(snapshot.get("exists")),
+                "updated_at": snapshot.get("updated_at", ""),
+                "depends_on": depends_on,
+                "blockers": blockers,
+                "intent": intent,
+                "utility": snapshot.get("utility", {}),
+            }
+        )
+
+    return states
+
+
+def next_workflow_artifact(states: Iterable[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Return the next actionable or blocking artifact from manifest state."""
+    ranked = list(states)
+    for desired in ("invalid", "blocked", "missing", "ready"):
+        for item in ranked:
+            if item.get("state") == desired:
+                return item
+    return None
 
 
 def git_status_entries(root_dir: Path = ROOT_DIR) -> Tuple[bool, List[Dict[str, Any]]]:
@@ -615,7 +767,25 @@ def evidence_count(session_dir: Path, task_id: str) -> int:
 
 
 def context_readiness(session_dir: Path) -> Tuple[bool, List[str]]:
-    required = ["roadmap", "plan", "task", "report", "log", "workflow", "product", "guidelines", "tech-stack"]
+    intent = infer_session_intent(session_dir)
+    profile = ARTIFACT_POLICY.get(intent, {})
+    required = list(profile.get("required_context", [])) or [
+        "roadmap",
+        "plan",
+        "task",
+        "workflow",
+        "product",
+        "guidelines",
+        "tech-stack",
+    ]
     checks = resolve_context(session_dir, required)
-    missing = [name for name, value in checks.items() if value is None]
+    missing: List[str] = []
+    for name, value in checks.items():
+        if value is None:
+            missing.append(name)
+            continue
+        if name in DOC_PATTERNS or name in SESSION_ARTIFACT_ALIASES:
+            snapshot = artifact_snapshot(value)
+            if not snapshot.get("utility", {}).get("useful"):
+                missing.append(f"{name}: invalid")
     return (len(missing) == 0, missing)

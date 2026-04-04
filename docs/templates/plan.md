@@ -5,8 +5,10 @@ theme: <theme>
 status: draft
 owners:
 - orchestrator
+workstream_intent: <workstream_intent>
+artifact_purpose: <artifact_purpose>
 created_at: YYYY-MM-DDTHH:MM:SSZ
-updated_at: '2026-03-23T18:05:33-03:00'
+updated_at: '2026-04-04T10:08:11-03:00'
 roadmap_feature: <feature_id>
 parent_spec: <parent_spec_id>
 child_spec: <child_spec_id_or_empty>

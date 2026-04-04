@@ -4,9 +4,9 @@ id: 260306_session-pack-structure-and-postmortem_spec_01
 theme: session-pack-structure-and-postmortem
 status: active
 owners:
-  - orchestrator
+- orchestrator
 created_at: '2026-03-06T23:05:00+00:00'
-updated_at: '2026-03-06T23:05:00+00:00'
+updated_at: '2026-04-04T10:08:10-03:00'
 roadmap_feature: F-07
 spec_role: child
 parent_spec: 260306_execution-intelligence-and-knowledge-system_spec_01
@@ -14,13 +14,13 @@ links:
   roadmap: 260223_0000_arc_roadmap_01
 scope:
   repo_areas:
-    - .agents/wb
-    - .agents/scripts/agents-new.py
-    - .agents/scripts/agents-wb-update.py
-    - .agents/scripts/verify-tasks.py
+  - .agents/wb
+  - .agents/scripts/agents-new.py
+  - .agents/scripts/agents-wb-update.py
+  - .agents/scripts/verify-tasks.py
   packages:
-    - session structure
-    - closure discipline
+  - session structure
+  - closure discipline
 risk_level: medium
 ---
 
@@ -43,7 +43,7 @@ risk_level: medium
 ## Acceptance
 - [ ] `agents-new` supports optional pack creation.
 - [ ] Workbench tools operate recursively inside sessions.
-- [ ] A post-mortem template exists and is created by default for governed sessions.
+- [ ] A post-mortem template exists and can be materialized when real closure analysis starts.
 - [ ] `wb-update status --file report --value final` fails without a post-mortem.
 
 ---

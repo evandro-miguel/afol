@@ -1,18 +1,21 @@
 ---
 doc_type: explorer-check
-id: "YYMMDD_HHMM_<theme>_explorer-check_01"
-theme: "<theme>"
+id: YYMMDD_HHMM_<theme>_explorer-check_01
+theme: <theme>
 status: draft
-owners: ["explorer"]
-created_at: "YYYY-MM-DDTHH:MM:SSZ"
-updated_at: "YYYY-MM-DDTHH:MM:SSZ"
-roadmap_feature: "<feature_id>"
-parent_spec: "<parent_spec_id>"
-child_spec: "<child_spec_id_or_empty>"
+owners:
+- explorer
+workstream_intent: <workstream_intent>
+artifact_purpose: <artifact_purpose>
+created_at: YYYY-MM-DDTHH:MM:SSZ
+updated_at: '2026-04-04T10:08:11-03:00'
+roadmap_feature: <feature_id>
+parent_spec: <parent_spec_id>
+child_spec: <child_spec_id_or_empty>
 links:
-  roadmap: "<roadmap_path>"
-  brainstorm: "<brainstorm_doc_id>"
-  plan: "<plan_doc_id>"
+  roadmap: <roadmap_path>
+  brainstorm: <brainstorm_doc_id>
+  plan: <plan_doc_id>
 ---
 
 # Explorer Check: <theme>

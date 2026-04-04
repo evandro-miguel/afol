@@ -51,7 +51,13 @@ def write_session_plan(session_dir: Path) -> None:
         "id: test-plan\n"
         "roadmap_feature: F-08\n"
         "---\n\n"
-        "# Plan\n",
+        "# Plan\n\n"
+        "## Progress\n"
+        "- [x] 2026-03-06 21:20Z - Established the execution path.\n\n"
+        "## Concrete Steps\n"
+        "1. Update the workflow logic.\n\n"
+        "## Validation and Acceptance\n"
+        "- Unit: targeted pytest suite.\n",
         encoding="utf-8",
     )
 
@@ -64,7 +70,8 @@ def write_session_log(session_dir: Path) -> None:
         "updated_at: '2026-03-06T21:28:26-03:00'\n"
         "---\n\n"
         "# Log\n\n"
-        "## Timeline\n",
+        "## Timeline\n"
+        "- 2026-03-06 21:28 - Recorded session activity - ok\n",
         encoding="utf-8",
     )
 
@@ -77,7 +84,13 @@ def write_session_report(session_dir: Path, status: str = "final") -> None:
         f"status: {status}\n"
         "updated_at: '2026-03-06T21:28:26-03:00'\n"
         "---\n\n"
-        "# Report\n",
+        "# Report\n\n"
+        "## Summary\n"
+        "- Completed the scoped workflow change.\n\n"
+        "## Delivered Changes\n"
+        "- Updated the session behavior.\n\n"
+        "## Verification\n"
+        "- Unit tests: `pytest` -> pass -> Evidence: targeted suite green\n",
         encoding="utf-8",
     )
 
@@ -89,7 +102,11 @@ def write_session_research(session_dir: Path) -> None:
         "doc_type: research\n"
         "updated_at: '2026-03-06T21:28:26-03:00'\n"
         "---\n\n"
-        "# Research\n",
+        "# Research\n\n"
+        "## Findings\n"
+        "- The workflow currently overcreates artifacts.\n\n"
+        "## Sources\n"
+        "- .agents/scripts/agents-new.py | credibility: high | notes: creation path\n",
         encoding="utf-8",
     )
 

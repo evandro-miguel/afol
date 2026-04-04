@@ -29,6 +29,7 @@ from typing import List, Tuple, Dict, Any
 from datetime import datetime, timedelta
 
 from lib.agents_config import get_cfg_path, load_agents_config
+from lib.artifact_utility import analyze_artifact_utility
 
 try:
     import yaml
@@ -674,6 +675,71 @@ def check_postmortem_closure(session_dir: Path) -> List[Dict[str, Any]]:
     return issues
 
 
+def check_artifact_utility(session_dir: Path) -> List[Dict[str, Any]]:
+    """Reject artifacts that exist but still contain only template scaffolding."""
+    issues: List[Dict[str, Any]] = []
+    if yaml is None:
+        return issues
+
+    for doc in load_frontmatter_docs(session_dir):
+        fm = doc["fm"]
+        doc_type = str(fm.get("doc_type", "")).strip()
+        if not doc_type:
+            continue
+
+        utility = analyze_artifact_utility(doc_type, doc["body"], fm)
+        if utility["useful"]:
+            continue
+
+        status = str(fm.get("status", "")).strip().lower()
+        severity = "warning" if status in {"", "draft"} else "error"
+        issues.append(
+            {
+                "type": "artifact_utility",
+                "severity": severity,
+                "document": doc["name"],
+                "description": f"{doc_type} artifact exists but is not useful: {'; '.join(utility['reasons'])}",
+            }
+        )
+
+    return issues
+
+
+def check_delivery_closure_readiness(session_dir: Path, completed_tasks: int) -> List[Dict[str, Any]]:
+    """Require a useful report when executable work has actually been completed."""
+    issues: List[Dict[str, Any]] = []
+    if yaml is None or completed_tasks <= 0:
+        return issues
+
+    docs = load_frontmatter_docs(session_dir)
+    reports = [d for d in docs if "_report_" in d["name"]]
+    if not reports:
+        issues.append(
+            {
+                "type": "closure_artifacts",
+                "severity": "error",
+                "description": "Completed tasks exist but no report document was found",
+            }
+        )
+        return issues
+
+    useful_reports = [
+        d
+        for d in reports
+        if analyze_artifact_utility(str(d["fm"].get("doc_type", "")).strip(), d["body"], d["fm"]).get("useful")
+    ]
+    if not useful_reports:
+        issues.append(
+            {
+                "type": "closure_artifacts",
+                "severity": "error",
+                "description": "Completed tasks exist but the report artifact still lacks concrete summary/change/verification content",
+            }
+        )
+
+    return issues
+
+
 def check_final_docs_for_open_checklists(session_dir: Path) -> List[Dict[str, Any]]:
     """Fail strict mode when a status=final doc still has open checklist markers."""
     issues: List[Dict[str, Any]] = []
@@ -816,6 +882,8 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
         'execplan_issues': [],
         'postmortem_issues': [],
         'final_doc_issues': [],
+        'artifact_utility_issues': [],
+        'closure_issues': [],
     }
 
     if not session_path.exists():
@@ -826,8 +894,9 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
     task_files = list(session_path.rglob('*task*.md'))
 
     if not task_files:
-        results['issues'].append("No task files found in session")
-        return True, results  # No tasks = vacuously true
+        if not strict:
+            results['issues'].append("No task files found in session")
+            return True, results  # No tasks = vacuously true in non-strict mode
 
     all_completed = True
 
@@ -956,6 +1025,18 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
             if issue.get('severity') == 'error':
                 all_completed = False
 
+        artifact_utility_issues = check_artifact_utility(session_path)
+        results['artifact_utility_issues'] = artifact_utility_issues
+        for issue in artifact_utility_issues:
+            if issue.get('severity') == 'error':
+                all_completed = False
+
+        closure_issues = check_delivery_closure_readiness(session_path, results['completed'])
+        results['closure_issues'] = closure_issues
+        for issue in closure_issues:
+            if issue.get('severity') == 'error':
+                all_completed = False
+
     return all_completed, results
 
 
@@ -1055,6 +1136,20 @@ def print_report(all_completed: bool, results: Dict) -> None:
         else:
             print("  ✓ Postmortem closure checks passed")
 
+        if results.get('artifact_utility_issues'):
+            print(f"\n❌ Artifact Utility Issues: {len(results['artifact_utility_issues'])}")
+            for issue in results['artifact_utility_issues']:
+                print(f"  ⚠️  [{issue.get('severity', 'error').upper()}] {issue['description']}")
+        else:
+            print("  ✓ Artifact utility checks passed")
+
+        if results.get('closure_issues'):
+            print(f"\n❌ Closure Artifact Issues: {len(results['closure_issues'])}")
+            for issue in results['closure_issues']:
+                print(f"  ⚠️  [{issue.get('severity', 'error').upper()}] {issue['description']}")
+        else:
+            print("  ✓ Closure artifact checks passed")
+
         # Final docs checklist issues
         if results.get('final_doc_issues'):
             print(f"\n❌ Final Doc Checklist Issues: {len(results['final_doc_issues'])}")
@@ -1130,6 +1225,10 @@ def print_report(all_completed: bool, results: Dict) -> None:
                 print(f"  - {len(results['execplan_issues'])} ExecPlan issue(s) found")
             if results.get('postmortem_issues'):
                 print(f"  - {len(results['postmortem_issues'])} postmortem issue(s) found")
+            if results.get('artifact_utility_issues'):
+                print(f"  - {len(results['artifact_utility_issues'])} artifact utility issue(s) found")
+            if results.get('closure_issues'):
+                print(f"  - {len(results['closure_issues'])} closure artifact issue(s) found")
             if results.get('final_doc_issues'):
                 print(f"  - {len(results['final_doc_issues'])} final-doc checklist issue(s) found")
         else:

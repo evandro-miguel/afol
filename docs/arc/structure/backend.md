@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-04-02T23:35:58+00:00
+**Generated:** 2026-04-04T13:04:33+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,30 +9,31 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 48 files, 16,713 lines, 627.0 KB
+**Stats:** 50 files, 17,666 lines, 668.8 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
+| `.agents/scripts/verify-tasks.py` | 1,109 | 47.5 KB | Module; functionality |
 | `.agents/scripts/agents-skills-sync.py` | 1,078 | 43.4 KB | Module; functionality |
-| `.agents/scripts/verify-tasks.py` | 1,025 | 43.7 KB | Module; functionality |
 | `.agents/scripts/agents-bootstrap.py` | 999 | 41.0 KB | Module; functionality |
+| `.agents/scripts/agents-new.py` | 763 | 33.1 KB | Module; functionality |
+| `.agents/scripts/lib/execution_commands.py` | 679 | 27.7 KB | Module; functionality |
 | `.agents/scripts/agents-telemetry.py` | 677 | 29.3 KB | Module; functionality |
-| `.agents/scripts/agents-new.py` | 638 | 27.6 KB | Module; functionality |
 | `.agents/scripts/agents-wb-update.py` | 635 | 25.3 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/create-skill.js` | 630 | 16.3 KB | Module; functionality |
 | `.agents/scripts/agents-doctor.py` | 587 | 22.9 KB | Module; functionality |
-| `.agents/scripts/lib/execution_commands.py` | 524 | 21.3 KB | Module; functionality |
 | `.agents/scripts/agents-tools.py` | 516 | 19.2 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/check-skill.js` | 465 | 13.8 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/run_eval.py` | 450 | 15.1 KB | Module; functionality |
+| `.agents/scripts/agents-lint-docs.py` | 426 | 16.6 KB | Module; functionality |
 | `.agents/skills/writing-skills/eval-viewer/generate_review.py` | 418 | 13.5 KB | Module; functionality |
 | `.agents/scripts/agents-structure-map.py` | 418 | 16.3 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/skill-advisor.js` | 417 | 12.0 KB | Module; functionality |
-| `.agents/scripts/agents-lint-docs.py` | 410 | 16.1 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/check-tier-migration.js` | 408 | 13.4 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/run_loop.py` | 392 | 14.5 KB | Module; functionality |
+| `.agents/scripts/lib/agents_config.py` | 376 | 14.5 KB | Module; functionality |
 | `.agents/scripts/agents-patterns.py` | 353 | 13.8 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/fix-skill.js` | 339 | 9.9 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/check-universal-skills-sync.js` | 330 | 9.9 KB | Module; functionality |
@@ -42,8 +43,8 @@ Services, utilities, and business logic.
 | `.agents/scripts/agents-memory.py` | 288 | 11.7 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/skill-read.js` | 280 | 8.4 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/skill-files.js` | 280 | 8.9 KB | Module; functionality |
+| `.agents/scripts/lib/workflow_manifest.py` | 253 | 10.1 KB | Module; functionality |
 | `.agents/scripts/agents-knowledge.py` | 238 | 9.3 KB | Module; functionality |
-| `.agents/scripts/lib/agents_config.py` | 220 | 7.8 KB | Module; functionality |
 | `.agents/scripts/fix-lint-all.py` | 212 | 8.3 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/improve_description.py` | 209 | 7.7 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/aggregate_benchmark.py` | 192 | 7.8 KB | Module; functionality |
@@ -52,12 +53,13 @@ Services, utilities, and business logic.
 | `.agents/scripts/sync-agent-docs.py` | 183 | 7.4 KB | Module; functionality |
 | `.agents/scripts/agents-revert.py` | 167 | 7.2 KB | Module; functionality |
 | `.agents/skills/typescript-skill/scripts/ts_diagnostic.py` | 166 | 6.1 KB | Module; functionality |
+| `.agents/scripts/agents-status.py` | 160 | 6.3 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/cleanup-empty-folders.js` | 159 | 4.3 KB | Module; functionality |
 | `.agents/scripts/agents-session.py` | 146 | 6.3 KB | Module; functionality |
+| `.agents/scripts/agents-review.py` | 142 | 6.4 KB | Module; functionality |
 | `.agents/scripts/agents-implement.py` | 139 | 6.0 KB | Module; functionality |
 | `.agents/scripts/fix-lint-doctypes.py` | 137 | 5.4 KB | Module; functionality |
-| `.agents/scripts/agents-status.py` | 134 | 5.0 KB | Module; functionality |
-| `.agents/scripts/agents-review.py` | 132 | 5.8 KB | Module; functionality |
+| `.agents/scripts/lib/artifact_utility.py` | 128 | 6.8 KB | Module; functionality |
 | `.agents/scripts/fix-lint-checkboxes.py` | 122 | 4.3 KB | Module; functionality |
 | `.agents/scripts/fix-lint-frontmatter.py` | 112 | 3.9 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/utils.py` | 96 | 3.7 KB | Module; functionality |

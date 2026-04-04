@@ -402,8 +402,13 @@ class TestStrictVerification(unittest.TestCase):
             "  plan: test_plan_01\n"
             "  task: test_task_01\n"
             "---\n\n"
-            "# Report\n"
+            "# Report\n\n"
+            "## Summary\n"
             f"{report_body}"
+            "\n## Delivered Changes\n"
+            "- Updated the governed workflow behavior.\n\n"
+            "## Verification\n"
+            "- Unit tests: `python3 -m unittest` -> pass -> Evidence: output reviewed.\n"
         )
         log_content = (
             "---\n"
@@ -415,7 +420,9 @@ class TestStrictVerification(unittest.TestCase):
             "  plan: test_plan_01\n"
             "  task: test_task_01\n"
             "---\n\n"
-            "# Log\n"
+            "# Log\n\n"
+            "## Timeline\n"
+            "- 2026-03-23 18:00 - Established the strict verification baseline - ok\n"
         )
         brainstorm_content = (
             "---\n"
@@ -424,7 +431,14 @@ class TestStrictVerification(unittest.TestCase):
             "status: final\n"
             f"{governance}"
             "---\n\n"
-            "# Brainstorm\n"
+            "# Brainstorm\n\n"
+            "## Problem Statement\n"
+            "- Need a strict verification baseline.\n\n"
+            "## Options\n"
+            "1. Keep the current workflow.\n"
+            "2. Enforce stronger verification.\n\n"
+            "## Preferred Direction\n"
+            "- Selected: stronger verification with evidence.\n"
         )
         explorer_content = (
             "---\n"
@@ -433,7 +447,14 @@ class TestStrictVerification(unittest.TestCase):
             "status: final\n"
             f"{governance}"
             "---\n\n"
-            "# Explorer Check\n"
+            "# Explorer Check\n\n"
+            "## Scope Reviewed\n"
+            "- Paths inspected:\n"
+            "  - .agents/scripts/verify-tasks.py\n\n"
+            "## Findings\n"
+            "- The repo already validates evidence and coherence.\n\n"
+            "## Impact on the Plan\n"
+            "- Keep strict verification central.\n"
         )
 
         (self.session_dir / "test_plan_01.md").write_text(plan_content)
@@ -664,6 +685,80 @@ class TestStrictVerification(unittest.TestCase):
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
         self.assertGreater(len(results["postmortem_issues"]), 0)
+
+    def test_strict_mode_fails_when_active_artifact_is_placeholder_only(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            ),
+        )
+        (self.session_dir / "test_log_01.md").write_text(
+            "---\n"
+            "doc_type: log\n"
+            "id: test_log_01\n"
+            "status: active\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            'child_spec: ""\n'
+            "---\n\n"
+            "# Log\n"
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results["artifact_utility_issues"]), 0)
+
+    def test_strict_mode_checks_utility_even_without_task_files(self):
+        research_content = (
+            "---\n"
+            "doc_type: research\n"
+            "id: test_research_01\n"
+            "status: active\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            'child_spec: ""\n'
+            "---\n\n"
+            "# Research\n"
+        )
+        (self.session_dir / "test_research_01.md").write_text(research_content)
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results["artifact_utility_issues"]), 0)
+
+    def test_strict_mode_requires_useful_report_when_tasks_are_done(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            ),
+        )
+        (self.session_dir / "test_report_01.md").write_text(
+            "---\n"
+            "doc_type: report\n"
+            "id: test_report_01\n"
+            "status: active\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            'child_spec: ""\n'
+            "---\n\n"
+            "# Report\n"
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results["closure_issues"]), 0)
 
     def test_non_strict_mode_ignores_evidence(self):
         """Non-strict mode passes without evidence checks."""

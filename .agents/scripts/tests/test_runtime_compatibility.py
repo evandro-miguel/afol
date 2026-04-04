@@ -107,6 +107,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
     def test_lint_config_excludes_synced_skills_docs(self):
         config_text = Path(".agents/agents.config").read_text(encoding="utf-8")
+        self.assertIn("- .agents/tmp/", config_text)
+        self.assertIn("- tmp/", config_text)
         self.assertIn("- skills/", config_text)
         self.assertIn("- source/", config_text)
         self.assertIn('source_dir: ".agents/source/universal-skills"', config_text)

@@ -4,7 +4,7 @@ id: scripts-usage
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-03-07T18:19:40-03:00'
+updated_at: '2026-04-04T10:08:11-03:00'
 ---
 
 # Scripts Usage
@@ -165,20 +165,27 @@ python .agents/scripts/agents-doctor.py --fix
 ---
 
 ### agents-new.py
-Creates new workstream with all required files.
+Creates or extends a workstream with only the artifacts justified by the selected intent.
 
 **Creates:**
 - Session folder with proper naming
-- Plan file
-- Task file
-- Spec file (optional: `--spec` or `--spec-lite`)
-- Log file
+- Only the artifacts justified by the chosen `--intent`
+- Optional spec file (`--spec` or `--spec-lite`)
+
+**Catalog + policy contract:**
+- The artifact order is declared in `.agents/agents.config` under `workflow.artifact_manifest`.
+- The manifest is an ordered `artifacts:` list with `doc_type`, `template`, `phase`, `purpose`, optional `depends_on`, and optional flag metadata.
+- `workflow.artifact_policy` defines which artifacts each intent creates by default.
+- The default `delivery` flow now creates only `task`; `plan`, `report`, and `postmortem` are materialized only when explicitly requested or justified.
+- When `--intent` is omitted, obvious themes such as `investigation`, `brainstorm`, `explore`, and `postmortem` are inferred into a safer non-delivery intent.
+- The same catalog + policy is reused by `agents-status.py` to report workflow artifact readiness and invalid placeholder-only artifacts.
 
 **Usage:**
 ```bash
 python .agents/scripts/agents-new.py <theme>
 python .agents/scripts/agents-new.py auth-refactor --spec
 python .agents/scripts/agents-new.py bugfix-login --spec-lite
+python .agents/scripts/agents-new.py investigate-auth --intent research
 python .agents/scripts/agents-new.py quick-fix --plan-only
 ```
 
@@ -231,6 +238,8 @@ Validates markdown docs for consistency.
 - State values are valid
 - Required frontmatter fields exist
 - Cross-references are valid
+- Temporary folders such as `.agents/tmp/`, `.tmp/`, and repo-local `tmp/` are always excluded
+- Raw codemap evidence under `.agents/arc/map/extra/` and `docs/map/extra/` is excluded from markdown lint
 
 **Usage:**
 ```bash
@@ -327,6 +336,7 @@ Displays current execution state for the active or explicitly-selected session.
 **Features:**
 - Resolves key canonical artifacts (`plan`, `task`, `spec`, `report`, `roadmap`)
 - Shows total/done progress with next task and blockers
+- Reuses the artifact manifest to surface workflow artifact readiness and blockers
 - Supports artifact-only output via `--artifact`
 - Optional JSON mode with `--json`
 

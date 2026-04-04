@@ -3,7 +3,7 @@ doc_type: standard
 id: agents-usage-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-02T15:21:56-03:00'
+updated_at: '2026-04-04T10:08:11-03:00'
 ---
 
 # Agents System Usage
@@ -17,6 +17,9 @@ This document describes how to use the `.agents/` operational system.
 All scripts load settings from `.agents/agents.config` (preferred).
 Legacy fallback: `agents.config` in the repository root.
 Use this file to adjust paths, timezone offsets, lint exclusions, doctor requirements, and sync targets for each project.
+It also holds the declarative `workflow.artifact_manifest` catalog and the
+`workflow.artifact_policy` intent rules for workstream creation, readiness, and
+future policy-backed command behavior.
 
 ## Quick Start
 
@@ -156,15 +159,22 @@ uv run --with pyyaml .agents/scripts/agents-doctor.py
 
 ### agents-new.py
 
-Creates new workstream with all required files.
+Creates or extends a workstream with only the artifacts justified by the selected intent.
 
 **Creates:**
 - Session folder with proper naming
-- Plan file
-- Task file
-- Spec file (optional)
-- Log file
+- Only the artifacts justified by the selected intent
+- Optional spec file (`--spec` or `--spec-lite`)
 - Sets `.agents/wb/.active_session`
+
+**Catalog + policy contract:**
+- The generated artifact order is declared in `.agents/agents.config` under `workflow.artifact_manifest`.
+- The catalog is an ordered `artifacts:` list with `doc_type`, `template`, `phase`, `purpose`, optional `depends_on`, and optional `flag` / `id_placeholder` / `replacements`.
+- `workflow.artifact_policy` defines which artifacts are created by default for each intent.
+- The default `delivery` intent creates only `task`; `plan`, `report`, and `postmortem` are materialized only when explicitly needed.
+- When `--intent` is omitted, obvious themes such as `investigation`, `brainstorm`, `explore`, and `postmortem` are inferred into a safer non-delivery intent.
+- `--with <doc-type>` adds specific justified artifacts instead of forcing the full package.
+- `agents-status` reads the same catalog + policy to summarize which artifacts are missing, blocked, invalid, ready, or done.
 
 **Policy:**
 - One active workstream at a time
@@ -173,8 +183,11 @@ Creates new workstream with all required files.
 
 **Usage:**
 ```bash
-# Basic (plan + task + log)
+# Basic delivery (task only by default)
 make new THEME=auth-refactor SPEC=lite
+
+# Research-only workstream
+make new THEME=auth-investigation INTENT=research
 
 # With full spec
 make new THEME=api-endpoint SPEC=1
@@ -188,6 +201,7 @@ make quick THEME=small-fix
 # Direct
 .agents/agents new auth-refactor --spec
 .agents/agents new api-endpoint --spec-lite
+.agents/agents new auth-investigation --intent research
 .agents/agents new tiny-fix --quick
 .agents/agents new major-refactor --force-new --spec
 ```
@@ -224,6 +238,8 @@ Validates markdown docs for consistency.
 - Status fields are valid
 - State values are valid
 - Required frontmatter fields exist
+- Temporary folders such as `.agents/tmp/`, `.tmp/`, and repo-local `tmp/` are always excluded
+- Raw codemap evidence under `.agents/arc/map/extra/` and `docs/map/extra/` is excluded from markdown lint
 
 **Usage:**
 ```bash
@@ -341,6 +357,7 @@ Shows current execution state for active or selected workstream session.
 **Checks:**
 - Resolves canonical artifacts (`plan`, `task`, `spec`, `report`, `roadmap`, `session`)
 - Summarizes task progress and identifies next task
+- Reuses the artifact manifest to show workflow artifact readiness and blockers
 - Exposes blockers and artifact pointers
 - Supports `--json` output
 

@@ -3,7 +3,7 @@ doc_type: standard
 id: 000000_000000_workflow-standard_standard_01
 status: active
 created_at: 2026-02-23 00:00:00+00:00
-updated_at: '2026-03-23T18:06:20-03:00'
+updated_at: '2026-04-04T10:08:11-03:00'
 title: Workflow Standards
 ---
 
@@ -28,23 +28,24 @@ Create or update the governing feature spec in `docs/arc/SPECS/`
 - Keep current-state evidence in `docs/map/` when needed, and keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder
 
 ### Step 3: Plan
-Create a plan file using `docs/templates/plan.md`
+Create a plan file using `docs/templates/plan.md` only when the work actually needs an execution plan
 
 - Link the plan to `roadmap_feature` and `parent_spec`
 - Treat the plan as an ExecPlan: a living execution document, not a static memo
 - Follow `PLANS.md` from the repo root when authoring or updating the plan
 - Use the plan to organize delivery, not to invent feature philosophy
 - Keep progress, discoveries, decisions, outcomes, and validation current while work proceeds
+- Do not create a plan only to justify creating another plan or to wrap a pure research-only request
 
 ### Step 4: Tasks
-Create task files using `docs/templates/task.md`
+Create task files using `docs/templates/task.md` only when there is executable work to track
 
 - One task per logical unit
 - Track execution state
 - Keep task work aligned to the approved roadmap/spec context
 
 ### Step 5: Execution + Log
-Update log as work progresses
+Materialize and update log only after real execution starts or a real decision/blocker exists
 
 - Timestamp each entry (UTC with Z suffix)
 - Record decisions and findings
@@ -54,7 +55,7 @@ Update log as work progresses
 - Use `docs/map/` as descriptive input evidence only; do not treat map artifacts as substitutes for roadmap/spec/workbench authority
 
 ### Step 6: Report
-Create report using `docs/templates/report.md`
+Create report using `docs/templates/report.md` only after there is a real delivered outcome or verified finding to summarize
 
 - Summarize changes
 - Include verification evidence
@@ -77,6 +78,13 @@ For trivial changes requested by user:
 - Still perform steps 5 and 6
 - Log the change
 - Report with verification
+
+## Artifact Utility Rule
+
+- A workbench artifact may exist only if it has a concrete purpose in the current session.
+- Placeholder-only artifacts do not count as valid progress, even if their frontmatter status is `active` or `final`.
+- If brainstorming did not happen, do not materialize `brainstorm.md`.
+- If the request is only research, do not create `plan.md` or `task.md` unless execution work is actually being staged.
 
 For a new non-trivial feature:
 

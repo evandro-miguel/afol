@@ -1,16 +1,20 @@
 ---
 doc_type: brainstorm
-id: "YYMMDD_HHMM_<theme>_brainstorm_01"
-theme: "<theme>"
+id: YYMMDD_HHMM_<theme>_brainstorm_01
+theme: <theme>
 status: draft
-roadmap_feature: "<feature_id>"
-parent_spec: "<parent_spec_id>"
-child_spec: "<child_spec_id_or_empty>"
+owners:
+- orchestrator
+workstream_intent: <workstream_intent>
+artifact_purpose: <artifact_purpose>
+roadmap_feature: <feature_id>
+parent_spec: <parent_spec_id>
+child_spec: <child_spec_id_or_empty>
 links:
-  roadmap: "<roadmap_path>"
-  plan: "<plan_doc_id>"
-created_at: "YYYY-MM-DDTHH:MM:SSZ"
-updated_at: "YYYY-MM-DDTHH:MM:SSZ"
+  roadmap: <roadmap_path>
+  plan: <plan_doc_id>
+created_at: YYYY-MM-DDTHH:MM:SSZ
+updated_at: '2026-04-04T10:08:11-03:00'
 ---
 
 # Brainstorm: <theme>

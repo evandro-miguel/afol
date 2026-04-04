@@ -1,18 +1,21 @@
 ---
 doc_type: spec-lite
-id: "YYMMDD_HHMM_<theme>_spec-lite_01"
-theme: "<theme>"
+id: YYMMDD_HHMM_<theme>_spec-lite_01
+theme: <theme>
 status: draft
-owners: ["orchestrator"]
-created_at: "YYYY-MM-DDTHH:MM:SSZ"
-updated_at: "YYYY-MM-DDTHH:MM:SSZ"
-roadmap_feature: "<feature_id>"
-spec_role: "workstream"
-parent_spec: "<parent_spec_id>"
+owners:
+- orchestrator
+workstream_intent: <workstream_intent>
+artifact_purpose: <artifact_purpose>
+created_at: YYYY-MM-DDTHH:MM:SSZ
+updated_at: '2026-04-04T10:08:11-03:00'
+roadmap_feature: <feature_id>
+spec_role: workstream
+parent_spec: <parent_spec_id>
 links:
-  roadmap: "<roadmap_path>"
-  task: "<task_doc_id>"
-risk_level: low # low|medium|high
+  roadmap: <roadmap_path>
+  task: <task_doc_id>
+risk_level: low
 ---
 
 # SPEC LITE: <theme>
