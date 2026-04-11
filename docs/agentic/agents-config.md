@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Multiple Python scripts need to:
+
 - Read central configuration
 - Resolve relative paths
 - Parse timestamps and timezones
@@ -194,4 +195,5 @@ assert 'time' in config
 - `.agents/agents.config` - Configuration file
 
 ---
+
 *Document: `docs/agentic/agents-config.md`*

@@ -60,6 +60,7 @@ status: superseded  # Replaced by newer version
 ```
 
 **Set status:**
+
 ```bash
 ./.agents/agents wb-update status --value active --file plan
 make wb-status STATUS=active
@@ -77,11 +78,13 @@ updated_at: 2026-02-23T14:30:00-03:00
 ```
 
 **Timezone offsets:**
+
 - `-03:00` - Brazil/WSL (WB_OFFSET)
 - `+00:00` - UTC (default)
 - `Z` - UTC (alternative)
 
 **Normalize timestamps:**
+
 ```bash
 ./.agents/agents wb-update normalize-time --all-wb
 ```
@@ -103,6 +106,7 @@ links:
 ```
 
 **Set link:**
+
 ```bash
 ./.agents/agents wb-update link --file plan --key related --value "260220_1000_other"
 ```
@@ -112,15 +116,16 @@ links:
 ## Task Markers
 
 ```markdown
-- [ ] T-01 Description      # pending
-- [/] T-02 Description      # in_progress
-- [%] T-03 Description      # ready_for_test
-- [!] T-04 Description      # blocked
-- [>] T-05 Description      # skipped
-- [x] T-06 Description      # completed
+- [ ] T-01 Description # pending
+- [/] T-02 Description # in_progress
+- [%] T-03 Description # ready_for_test
+- [!] T-04 Description # blocked
+- [>] T-05 Description # skipped
+- [x] T-06 Description # completed
 ```
 
 **Format rules:**
+
 - Use lowercase `x` for completed: `- [x]`
 - Use forward slash for in-progress: `- [/]`
 - Use space for pending: `- [ ]`
@@ -131,6 +136,7 @@ links:
 ## Best Practices
 
 **DO:**
+
 - ✅ Always include frontmatter
 - ✅ Use valid status values
 - ✅ Include timezone in timestamps
@@ -138,6 +144,7 @@ links:
 - ✅ Use consistent task marker format
 
 **DON'T:**
+
 - ❌ Skip frontmatter
 - ❌ Use invalid status values
 - ❌ Use timestamps without timezone

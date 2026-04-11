@@ -7,29 +7,29 @@ created_at: "2026-04-02T23:28:28Z"
 updated_at: "2026-04-02T23:28:28Z"
 ---
 
-# LLM Quick Start Guide
+## LLM Quick Start Guide
 
 Read this first. This document is the orientation layer for agents entering the repository.
 
-## What This Repo Is
+### What This Repo Is
 
 - Repository: `agentic_start_folder`
 - Analysis mode: `standard`
 - Runtime surfaces: `.agents/scripts`, `docs/`, `.agents/skills`, `AGENTS.md`, `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`
 - Stack signals: `none detected`
 
-## Start Here
+### Start Here
 
 - Read `README.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` first.
 - Use `API_MAP.md` and `BACKEND.md` to navigate backend route handlers, CLI entrypoints, MCP servers, and config boundaries.
 - Use `FRONTEND.md` when the change touches client-side routes or UI wiring.
 - Use `HOTSPOTS.md` and `SYMBOLS.md` when choosing where to implement or debug changes.
 
-## Public Boundaries
+### Public Boundaries
 
 - No public boundaries were detected.
 
-## Boundary Families
+### Boundary Families
 
 - Backend route files: none detected
 - No backend route boundaries were detected.
@@ -52,10 +52,10 @@ Read this first. This document is the orientation layer for agents entering the 
 - External fetch files: none detected
 - No outbound fetch boundaries were detected.
 
-## Risk-Heavy Files
+### Risk-Heavy Files
 
 - No hotspots were ranked.
 
-## Key Working Rule
+### Key Working Rule
 
 - Prefer the codemap and artifacts first. Only widen into raw source when a boundary, hotspot, or missing contract requires it.

@@ -8,6 +8,7 @@ updated: 2026-02-23T00:00:00Z
 # Verification Standards
 
 ## Purpose
+
 Define the commands and processes for verifying changes in this repository.
 
 ## Standard commands
@@ -49,4 +50,5 @@ If verification is blocked:
 3. Add diagnostics to unblock future work
 
 ---
+
 *Standard: `docs/standards/verification.md`*

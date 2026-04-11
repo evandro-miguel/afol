@@ -4,11 +4,12 @@
 
 Skills are symlinked from `.agents/skills/` - the mandatory skills folder.
 
-```
+```text
 .opencode/skills -> ../.agents/skills
 ```
 
 Do not store skills directly in this folder.
 
 ---
+
 *Agent folder: `.opencode/`*

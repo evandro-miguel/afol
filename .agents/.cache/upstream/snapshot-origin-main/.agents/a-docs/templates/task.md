@@ -12,15 +12,18 @@ depends_on: ["<optional_plan_id>"]
 # Tasks: <theme>
 
 ## Task List
+
 - [ ] T-01 <task description>
 - [ ] T-02 <task description>
 
 ## State Board
+
 | Task | Checklist | State | Owner | Notes |
 |------|----------:|-------|-------|-------|
 | T-01 | - [ ] | pending | build | <note> |
 
 State values:
+
 - pending
 - in_progress
 - ready_for_test
@@ -29,6 +32,7 @@ State values:
 - blocked
 
 Task ID format:
+
 - `T-01`, `T-02`, ... (or `T-001`, `T-002` for larger boards)
 
 ## State Marker Rules
@@ -40,9 +44,11 @@ See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/
 Before starting work, consult relevant resources:
 
 ### Prevention Rules
+
 - [ ] Check relevant lesson entries in [`.agents/a-docs/lessons/entries/`](.agents/a-docs/lessons/entries/)
 
 ### Useful Resources
+
 - Rules useful for this task:
   - [ ] <rule-1>
 - Docs useful for this task:
@@ -53,19 +59,23 @@ Before starting work, consult relevant resources:
   - [ ] <integracao-1>
 
 ## Implementation Checkpoint
+
 - Files touched:
   - <path>
 - Key decisions:
   - <decision>
 
 ## Test Gate
+
 - Move to `ready_for_test` only after implementation checkpoint.
 - Record command, result, and evidence before marking done.
 
 ### Test Evidence
+
 - Command: `<command>`
 - Result: <pass/fail>
 - Evidence: <paste output snippet or link>
 
 ---
+
 *Template: `.agents/a-docs/templates/task.md`*

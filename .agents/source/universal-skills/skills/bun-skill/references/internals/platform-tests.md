@@ -53,7 +53,7 @@ devTest("hmr updates content", {
     await client.expectReload(async () => {
       await dev.write("index.html", "<h1>World</h1>");
     });
-    
+
     await dev.fetch("/").expect.toInclude("<h1>World</h1>");
   }
 });

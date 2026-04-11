@@ -97,6 +97,7 @@ make all
 Validates `.agents` folder structure and integrity.
 
 **Checks:**
+
 - Required folders exist
 - Templates are present
 - YAML frontmatter is valid
@@ -104,6 +105,7 @@ Validates `.agents` folder structure and integrity.
 - Timestamps are ISO 8601 with Z suffix
 
 **Usage:**
+
 ```bash
 make doctor
 # OR
@@ -119,6 +121,7 @@ uv run --with pyyaml .agents/scripts/agents-doctor.py
 Creates new workstream with all required files.
 
 **Creates:**
+
 - Session folder with proper naming
 - Plan file
 - Task file
@@ -127,11 +130,13 @@ Creates new workstream with all required files.
 - Sets `.agents/wb/.active_session`
 
 **Policy:**
+
 - One active workstream at a time
 - Use `--quick` for non-significant tasks (no new folder)
 - Use `--force-new` only for significant new streams
 
 **Usage:**
+
 ```bash
 # Basic (plan + task + log)
 make new THEME=auth-refactor SPEC=lite
@@ -159,14 +164,17 @@ make quick THEME=small-fix
 Updates INDEX.md files for SPECS and ADRs.
 
 **Scans:**
+
 - `.agents/arc/SPECS/` for spec files
 - `.agents/arc/DECISIONS/` for adr files
 
 **Updates:**
+
 - `.agents/arc/SPECS/INDEX.md`
 - `.agents/arc/DECISIONS/INDEX.md`
 
 **Usage:**
+
 ```bash
 make index
 # OR
@@ -180,12 +188,14 @@ make index
 Validates markdown docs for consistency.
 
 **Checks:**
+
 - Checkbox markers are consistent (`- [X]` format)
 - Status fields are valid
 - State values are valid
 - Required frontmatter fields exist
 
 **Usage:**
+
 ```bash
 make lint
 # OR
@@ -201,12 +211,14 @@ make lint
 Auto-generates project structure documentation.
 
 **Features:**
+
 - Scans project and categorizes files
 - Generates markdown with file inventory
 - Incremental updates via cache
 - Descriptions for each file
 
 **Usage:**
+
 ```bash
 make structure
 # OR
@@ -216,6 +228,7 @@ make structure
 ```
 
 **Output:**
+
 - `README.md` - Overview with metrics
 - `frontend.md` - Components, hooks, UI
 - `backend.md` - Services, utils, API
@@ -231,11 +244,13 @@ make structure
 Syncs AGENTS.md content to QWEN.md, CLAUDE.md, GEMINI.md.
 
 **Features:**
+
 - Detects local modifications
 - Asks before overwriting
 - `--force` to overwrite without asking
 
 **Usage:**
+
 ```bash
 make sync
 # OR
@@ -251,6 +266,7 @@ make sync
 Verifies all tasks in a session are completed.
 
 **Checks:**
+
 - Task lines with IDs in format `- [ ] T-01 ...` (supports `T-001` too)
 - All parsed tasks marked with `- [x]`
 - Reports status of each task
@@ -258,6 +274,7 @@ Verifies all tasks in a session are completed.
 - Returns error if incomplete
 
 **Usage:**
+
 ```bash
 make verify
 # OR
@@ -336,6 +353,7 @@ cd .agents/scripts && uv sync
 ```
 
 This creates:
+
 - `.venv/` - Isolated Python virtualenv
 - `uv.lock` - Locked dependencies
 
@@ -366,6 +384,7 @@ This creates:
 Automates common metadata edits to avoid manual WB file editing.
 
 **Commands:**
+
 - `touch` -> update `updated_at` in session files (supports `--all-wb`)
 - `files-changed` -> refresh report `## Files Changed` from git status
 - `task` -> mark task by ID (`T-01`/`T-001`) and sync state board row
@@ -374,6 +393,7 @@ Automates common metadata edits to avoid manual WB file editing.
 - `link` -> set frontmatter `links.<key>` value
 
 **Examples:**
+
 ```bash
 make wb-touch
 make wb-files-changed
@@ -388,11 +408,13 @@ make wb-link FILE=report KEY=spec VALUE=260223_1855_task-id-standardization_spec
 ```
 
 ---
+
 ### agents-tools.py
 
 Discovers and validates the tools catalog used by autonomous agents.
 
 **Commands:**
+
 - `list` -> list tools (optional `--type`)
 - `info` -> detailed tool metadata and subcommands
 - `search` -> keyword lookup across descriptions/usages
@@ -400,6 +422,7 @@ Discovers and validates the tools catalog used by autonomous agents.
 - `help` -> CLI help
 
 **Examples:**
+
 ```bash
 .agents/agents tools list
 .agents/agents tools info wb-update
@@ -427,4 +450,5 @@ Detailed playbook: `.agents/a-docs/standards/bootstrap-other-repo.md`
 ---
 
 ---
+
 *Standard: `.agents/a-docs/standards/agents-usage.md`*

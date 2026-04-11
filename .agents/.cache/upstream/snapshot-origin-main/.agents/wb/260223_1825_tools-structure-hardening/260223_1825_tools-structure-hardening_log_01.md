@@ -10,6 +10,7 @@ updated_at: '2026-02-23T16:12:49-03:00'
 # Log: tools-structure-hardening
 
 ## Timeline
+
 - 2026-02-23 18:21Z - Executado `make doctor/lint/verify/structure` - Reproduzidos dois problemas reais (`lint` crash, `structure` sem arquivos).
 - 2026-02-23 18:26Z - Corrigidos scripts de lint/map/new - Falhas de execução removidas.
 - 2026-02-23 18:27Z - Reexecutado `make lint` e `make structure` - Ambos concluíram com sucesso.
@@ -18,14 +19,18 @@ updated_at: '2026-02-23T16:12:49-03:00'
 - 2026-02-23 18:30Z - Ajustado `verify-tasks.py` para busca recursiva e executado `make all` com sucesso.
 
 ## Decisions
+
 - Corrigir apenas bugs com impacto direto no fluxo padrão (`make lint`, `make structure`, `make new`) para minimizar blast radius.
 - Manter warnings de lint como não-bloqueantes; foco foi estabilidade operacional.
 
 ## Blockers
+
 - None.
 
 ## Next Step
+
 - Consolidar evidências no report e compartilhar recomendações estruturais adicionais com o usuário.
 
 ---
+
 *Template: `.agents/a-docs/templates/log.md`*

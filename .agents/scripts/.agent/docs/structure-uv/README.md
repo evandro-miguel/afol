@@ -19,13 +19,14 @@
 ## 🔄 Change Detection
 
 This documentation uses **incremental updates**:
+
 - ✅ Descriptions cached to avoid regenerating everything
 - ✅ Only new/changed files get new descriptions
 - ✅ Detects when file purpose changes
 
 ## 🌳 Quick Directory Tree
 
-```
+```text
 scripts/
 ├── 📁 tests/
 ```

@@ -28,8 +28,11 @@ Tier 2 (complex) skills must split content into modular reference files. The dis
 # SKILL.md (2000+ lines)
 
 ## Section 1: Topic A
+
 ### Subsection 1.1
+
 ### Subsection 1.2
+
 ...
 
 ## Section 20: Topic Z
@@ -37,7 +40,7 @@ Tier 2 (complex) skills must split content into modular reference files. The dis
 
 ### Correct
 
-```
+```text
 skill/
 ├── SKILL.md              # Dispatcher (decision trees only)
 └── references/
@@ -47,6 +50,7 @@ skill/
 ```
 
 **SKILL.md:**
+
 ```markdown
 ---
 description: "Use when working with complex X"

@@ -20,6 +20,7 @@ Whenever a command is documented in README or agentic docs, verify that the wrap
 ## Guardrail
 
 Add a command-parity smoke check to CI that:
+
 - parses documented `.agents/agents <command>` examples from README
 - runs each command with `--help` or a safe subcommand
 - fails if any documented command is not recognized

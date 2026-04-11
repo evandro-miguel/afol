@@ -18,6 +18,7 @@ links:
 **Problem:** Autonomous agents need to discover which tools are available, when to use them, and how to get details about subcommands and options.
 
 **Solution:** A centralized JSON file that documents all `.agents` system tools with:
+
 - Clear descriptions
 - Use cases (when_to_use)
 - Commands and options
@@ -177,4 +178,5 @@ Describes when each tool runs:
 - [agents-config.md](./agents-config.md) - Configuration
 
 ---
+
 *Document: `docs/agentic/tools-json.md`*

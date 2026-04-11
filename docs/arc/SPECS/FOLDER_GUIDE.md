@@ -17,14 +17,17 @@ They should not be code-heavy implementation documents.
 ## Spec Types
 
 ### Parent Specs
+
 - One parent spec governs one roadmap feature.
 - It captures philosophy, scope, user journey, constraints, and acceptance.
 
 ### Child Specs
+
 - Child specs decompose large parent features into bounded objectives.
 - They inherit the parent feature goal but narrow the delivery focus.
 
 ### Workstream Specs
+
 - A local workstream `spec` or `spec-lite` can refine delivery context.
 - It never replaces the parent strategic spec in `docs/arc/SPECS/`.
 
@@ -52,28 +55,33 @@ created_at: "YYYY-MM-DDTHH:MM:SSZ"
 updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 ---
 
-# Specification: <title>
+## Specification: <title>
 
-## Feature Intent
+### Feature Intent
+
 - <what changes>
 
-## Users and User Journey
+### Users and User Journey
+
 - <who and what experience changes>
 
-## Scope
+### Scope
+
 - <in scope>
 - <out of scope>
 
-## Child Spec Strategy
+### Child Spec Strategy
+
 - <when decomposition is required>
 
-## Acceptance
+### Acceptance
+
 - [ ] <criterion>
 ```
 
 ## Status Workflow
 
-```
+```text
 draft -> active -> final -> deprecated
 ```
 
@@ -84,4 +92,5 @@ draft -> active -> final -> deprecated
 - Child specs should reference the parent spec in frontmatter.
 
 ---
+
 *Specifications folder: `docs/specs/`*

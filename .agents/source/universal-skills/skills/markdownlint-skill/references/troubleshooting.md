@@ -14,6 +14,7 @@ metadata:
 **Cause**: Package not installed or not in PATH
 
 **Solution**:
+
 ```bash
 # Install dependencies
 bun install
@@ -29,11 +30,13 @@ bunx markdownlint-cli2 "**/*.md"
 **Cause**: markdownlint not installed
 
 **Solution**:
+
 ```bash
 bun add -d markdownlint-cli2
 ```
 
 Verify installation:
+
 ```bash
 ls node_modules/markdownlint/style/
 ```
@@ -47,11 +50,13 @@ ls node_modules/markdownlint/style/
 **Solutions**:
 
 1. **Auto-fix what you can**:
+
 ```bash
 bun run lint:md:fix
 ```
 
 2. **Gradual adoption** - Temporarily disable problematic rules:
+
 ```jsonc
 {
   "config": {
@@ -63,6 +68,7 @@ bun run lint:md:fix
 ```
 
 3. **Ignore legacy files**:
+
 ```jsonc
 {
   "ignores": [
@@ -104,6 +110,7 @@ markdownlint-cli2 --fix "**/*.md"
 **Solution**: Use lint-staged:
 
 **package.json**:
+
 ```json
 {
   "lint-staged": {
@@ -113,6 +120,7 @@ markdownlint-cli2 --fix "**/*.md"
 ```
 
 **.husky/pre-commit**:
+
 ```bash
 bunx lint-staged
 ```
@@ -185,6 +193,7 @@ Or use reference-style links:
 **Solution**:
 
 1. Lock versions in package.json:
+
 ```json
 {
   "devDependencies": {
@@ -194,6 +203,7 @@ Or use reference-style links:
 ```
 
 2. Use exact same Node/Bun version:
+
 ```yaml
 # .github/workflows/ci.yml
 - uses: oven-sh/setup-bun@v1
@@ -202,6 +212,7 @@ Or use reference-style links:
 ```
 
 3. Clear cache:
+
 ```bash
 rm -rf node_modules bun.lockb
 bun install
@@ -224,6 +235,7 @@ cat .markdownlint-cli2.jsonc | sed 's|//.*||g' | jq .
 ```
 
 Common issues:
+
 - Trailing commas (not allowed in JSON, allowed in JSONC)
 - Comments (use `//` not `#`)
 - Missing quotes around keys

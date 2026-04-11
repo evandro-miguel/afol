@@ -14,28 +14,35 @@ risk_level: low # low|medium|high
 # SPEC LITE: <theme>
 
 ## Objective
+
 - <outcome>
 
 ## Change Summary
+
 - <what changes>
 
 ## Files and Areas
+
 - <path>
 - <path>
 
 ## Risks
+
 - <risk> -> <mitigation>
 
 ## Verification
+
 - Commands:
   - `<command>`
 - Evidence:
   - <snippet or link in report>
 
 ## Done When
+
 - [ ] Verified with commands
 - [ ] No regressions observed
 - [ ] Report updated with evidence
 
 ---
+
 *Template: `docs/arc/SPECS/TEMPLATE_spec-lite.md`*

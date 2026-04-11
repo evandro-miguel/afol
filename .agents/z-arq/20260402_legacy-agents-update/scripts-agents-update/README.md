@@ -52,7 +52,7 @@ Update system for the agentic system that allows repositories to pull updates fr
 
 ### Update Flow
 
-```
+```text
 1. Pre-flight (lock, permissions)
 2. Download upstream → .cache/upstream/
 3. Conflict detection (three-way)
@@ -74,7 +74,7 @@ Update system for the agentic system that allows repositories to pull updates fr
 
 Backups are created in `.agents/z-arq/`:
 
-```
+```text
 .agents/z-arq/
 └── backup-20260223_1800_v1.0.0/
     ├── skeleton.txt    # List of all files
@@ -104,11 +104,13 @@ Rollback restores from backup:
 ### Common Issues
 
 **Lock file stuck:**
+
 ```bash
 ./.agents/agents-update doctor --fix
 ```
 
 **Conflict detected:**
+
 ```bash
 # Review conflicts
 cat .agents/.update/conflicts.md
@@ -118,6 +120,7 @@ cat .agents/.update/conflicts.md
 ```
 
 **Backup missing:**
+
 ```bash
 # Cannot rollback without backup
 # Re-run update with --force
@@ -129,4 +132,5 @@ cat .agents/.update/conflicts.md
 - `.agents/z-arq/` - Backup storage
 
 ---
+
 *Document: `.agents/scripts/agents-update/README.md`*

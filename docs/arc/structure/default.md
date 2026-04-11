@@ -18,7 +18,7 @@ updated_at: "2026-02-23T00:00:00Z"
 
 ## Directory Tree
 
-```
+```text
 project-root/
 ├── docs/                     # Project-owned documentation
 │   ├── arc/                  # Goal-state canon (roadmap, specs, ADRs)
@@ -82,7 +82,7 @@ Files that should be colocated:
 
 ## Import Conventions
 
-```
+```text
 # Internal imports
 import { X } from './module'
 
@@ -97,4 +97,5 @@ import { Y } from '../sibling'
 - Workbench: `.agents/wb/`
 
 ---
+
 *Structure: `docs/arc/structure/default.md`*

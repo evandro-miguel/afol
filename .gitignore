@@ -20,6 +20,11 @@ uv.lock
 
 # Local temporary/reference workspace
 .agents/.tmp/
+.agents/tmp/*
+!.agents/tmp/README.md
+
+# Legacy/generated local map output; current-state repo maps live in docs/map/
+.agents/arc/map/
 
 # Workbench sessions (operational state; should not be cloned)
 .agents/wb/

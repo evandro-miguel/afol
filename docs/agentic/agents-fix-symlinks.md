@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** On Windows/WSL, symlinks can break due to:
+
 - Permission issues
 - File system differences
 - Git checkout problems
@@ -107,7 +108,8 @@ def report_status(repairs):
 ## Output Examples
 
 ### Dry Run
-```
+
+```text
 → Scanning for broken symlinks...
 
 Found 3 broken symlinks:
@@ -119,7 +121,8 @@ Run without --dry-run to fix.
 ```
 
 ### Repair
-```
+
+```text
 → Fixing symlinks...
 
 ✓ Fixed: .agents/scripts/lib/utils
@@ -135,4 +138,5 @@ Run without --dry-run to fix.
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/agents-fix-symlinks.md`*

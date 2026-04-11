@@ -5,13 +5,14 @@ Skills define capabilities and behaviors for AI agents operating in this reposit
 ## Overview
 
 Skills are modular definitions that provide:
+
 - **Prompt templates** - Standardized prompts for specific tasks
 - **Rules** - Operational rules for agents
 - **Examples** - Usage examples and best practices
 
 ## Structure
 
-```
+```text
 .agents/skills/
 ├── README.md                 # This file
 ├── <skill-name>/
@@ -29,6 +30,7 @@ Operational entrypoint for installing, upgrading, validating, and operating the
 scaffold.
 
 **Capabilities:**
+
 - Bootstrap a new or existing repo with the scaffold
 - Run the git-backed skills refresh and publish flow
 - Follow governed workbench execution and validation
@@ -40,6 +42,7 @@ scaffold.
 Writing and documentation skills.
 
 **Capabilities:**
+
 - Technical writing
 - Documentation standards
 - Markdown formatting
@@ -51,6 +54,7 @@ Writing and documentation skills.
 Markdown linting and validation.
 
 **Capabilities:**
+
 - Markdown linting
 - Format validation
 - Auto-fix capabilities
@@ -90,19 +94,24 @@ make skills-update SKILLS=new-skill
 # Skill: <name>
 
 ## Purpose
+
 What this skill enables.
 
 ## Capabilities
+
 - Capability 1
 - Capability 2
 
 ## Prompts
+
 Prompt templates for common tasks.
 
 ## Rules
+
 Operational rules for agents.
 
 ## Examples
+
 Usage examples.
 ```
 
@@ -113,4 +122,5 @@ Usage examples.
 - `.agents/agents.config` - Skills configuration
 
 ---
+
 *Document: `.agents/skills/README.md`*

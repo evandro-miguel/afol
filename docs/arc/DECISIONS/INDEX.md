@@ -6,20 +6,21 @@ created_at: '2026-02-23T00:00:00-03:00'
 updated_at: '2026-02-23T00:00:00-03:00'
 ---
 
-# Architecture Decision Records (ADRs)
+## Architecture Decision Records (ADRs)
 
 Architecture decision records capture significant architectural choices made for this project.
 
-## Purpose
+### Purpose
 
 ADRs document:
+
 - **Context** - Situation and problem
 - **Decision** - What was decided
 - **Consequences** - Results and trade-offs
 
-## Structure
+### Structure
 
-```
+```text
 docs/arc/DECISIONS/
 ├── INDEX.md           # This file - ADR index
 ├── TEMPLATE_adr.md    # ADR template
@@ -28,7 +29,7 @@ docs/arc/DECISIONS/
 └── ...
 ```
 
-## Available ADRs
+### Available ADRs
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
@@ -36,22 +37,23 @@ docs/arc/DECISIONS/
 
 *No ADRs created yet.*
 
-## Creating an ADR
+### Creating an ADR
 
 1. Copy `TEMPLATE_adr.md`
 2. Fill in sections
 3. Name: `ADR-NNN-<short-title>.md`
 4. Update this INDEX.md
 
-## ADR Template
+### ADR Template
 
 See `TEMPLATE_adr.md` for the standard format.
 
-## Related
+### Related
 
 - `docs/arc/ARCHITECTURE.md` - Root architecture
 - `docs/arc/SPECS/` - Technical specifications
 - [agents-index.md](../agentic/agents-index.md) - Index generation
 
 ---
+
 *Document: `docs/arc/DECISIONS/INDEX.md`*

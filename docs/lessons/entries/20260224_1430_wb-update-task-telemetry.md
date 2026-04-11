@@ -13,6 +13,7 @@ related_session: 260224_1030_scripts-lean-efficiency
 ## Correction
 
 All task state changes were done via direct `edit` tool on markdown files, bypassing `.agents/agents wb-update task`. This means:
+
 - ❌ No telemetry recorded for task completions
 - ❌ No audit trail in session log
 - ❌ No automatic timeline updates
@@ -59,7 +60,7 @@ All task state changes were done via direct `edit` tool on markdown files, bypas
 
 ### Telemetry Event Flow
 
-```
+```text
 User runs: wb-update task T-03 --mark-done
     ↓
 Script updates: task_03.md checkbox - [ ] → - [x]

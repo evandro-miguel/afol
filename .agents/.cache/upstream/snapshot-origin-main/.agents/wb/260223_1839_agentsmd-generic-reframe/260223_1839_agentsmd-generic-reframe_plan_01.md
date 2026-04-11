@@ -17,9 +17,11 @@ links:
 # Plan: agentsmd-generic-reframe
 
 ## Objective
+
 - Reframe root `AGENTS.md` to a generic reusable project contract while reflecting the current repository state.
 
 ## Scope
+
 - In scope:
   - Rewrite `AGENTS.md` with the requested canonical sections.
   - Fill sections with current repo information (stack, structure, key files, commands, skills, MCPs).
@@ -28,16 +30,19 @@ links:
   - Large refactors in scripts or standards content outside AGENTS alignment.
 
 ## Success Criteria
+
 - `AGENTS.md` matches requested generic-first structure.
 - `make sync` propagates AGENTS changes to agent files.
 - `make lint` and `make verify` pass after updates.
 
 ## Delivery Strategy
+
 1. Gather current repo facts and requested layout.
 2. Rewrite root `AGENTS.md`.
 3. Sync agent docs and verify workflow commands.
 
 ## Critical Dependencies
+
 - Tools:
   - `make`
   - `.agents/agents`
@@ -49,13 +54,16 @@ links:
   - Prefer minimal diffs and keep root contract generic-first.
 
 ## Large Plan Handling
+
 - If this plan exceeds 500 lines, split into phases.
 - Create one task file per phase.
 
 ## Risks and Mitigations
+
 - Risk: Over-specializing AGENTS to this repo -> Mitigation: keep explicit reusable section scaffold and concise repo-specific fills.
 
 ## Verification Plan
+
 - Unit: `N/A`
 - E2E: `N/A`
 - Typecheck: `N/A`
@@ -65,4 +73,5 @@ links:
   - `make verify` to ensure workbench task closure.
 
 ---
+
 *Template: `.agents/a-docs/templates/plan.md`*

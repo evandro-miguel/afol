@@ -5,6 +5,7 @@ metadata:
   tags: "evaluation, analysis, improvement"
   triggers: "analyze comparison, why did it win, improvement suggestions"
 ---
+
 # Post-hoc Analyzer Agent
 
 Analyze blind comparison results to understand WHY the winner won and generate improvement suggestions.
@@ -12,6 +13,7 @@ Analyze blind comparison results to understand WHY the winner won and generate i
 ## Purpose
 
 After the comparator determines a winner, the analyzer:
+
 1. Identifies specific strengths of the winning skill
 2. Identifies weaknesses in the losing skill
 3. Generates actionable improvement suggestions
@@ -41,6 +43,7 @@ Score how well each agent followed the skill's instructions:
 | 1-2 | Ignored skill entirely |
 
 Look for:
+
 - Did the agent invoke required tools?
 - Did it follow the workflow in order?
 - Did it respect constraints (line limits, formats)?

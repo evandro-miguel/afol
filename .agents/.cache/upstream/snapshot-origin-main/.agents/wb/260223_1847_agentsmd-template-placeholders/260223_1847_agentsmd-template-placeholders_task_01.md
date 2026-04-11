@@ -18,16 +18,19 @@ links:
 # Tasks: agentsmd-template-placeholders
 
 ## Task List
+
 - [x] T-001 Reescrever AGENTS.md como template puro com placeholders.
 - [x] T-002 Sincronizar e validar (`make sync`, `make lint`, `make verify`).
 
 ## State Board
+
 | Task | Checklist | State | Owner | Notes |
 |------|----------:|-------|-------|-------|
 | T-001 | - [x] | done | worker | Template puro aplicado sem preenchimento de tools/MCP/skills. |
 | T-002 | - [x] | done | worker | Sync e checks executados com sucesso. |
 
 State values:
+
 - pending
 - in_progress
 - ready_for_test
@@ -44,9 +47,11 @@ See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/
 Before starting work, consult relevant resources:
 
 ### Prevention Rules
+
 - [x] Check: [`.agents/a-docs/lessons/general-lessons.md`](.agents/a-docs/lessons/general-lessons.md)
 
 ### Useful Resources
+
 - Rules useful for this task:
   - [x] `AGENTS.md` generic-first template rule
 - Docs useful for this task:
@@ -57,6 +62,7 @@ Before starting work, consult relevant resources:
   - [>] None
 
 ## Implementation Checkpoint
+
 - Files touched:
   - `AGENTS.md`
   - `QWEN.md`
@@ -67,13 +73,16 @@ Before starting work, consult relevant resources:
   - Keep root contract as template, not prefilled repository playbook.
 
 ## Test Gate
+
 - Move to `ready_for_test` only after implementation checkpoint.
 - Record command, result, and evidence before marking done.
 
 ### Test Evidence
+
 - Command: `<command>`
 - Result: pass
 - Evidence: `make sync` and `make lint` passed; `make verify` passed after task completion.
 
 ---
+
 *Template: `.agents/a-docs/templates/task.md`*

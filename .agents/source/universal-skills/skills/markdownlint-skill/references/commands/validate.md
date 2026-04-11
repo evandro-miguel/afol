@@ -18,6 +18,7 @@ validate-md [options]
 ## Description
 
 Runs comprehensive tests to verify:
+
 - markdownlint-cli2 is installed
 - Configuration files exist
 - Commands work correctly
@@ -26,9 +27,11 @@ Runs comprehensive tests to verify:
 ## Options
 
 ### `-h, --help`
+
 Show help message and exit.
 
 ### `-v, --verbose`
+
 Show detailed system information.
 
 ```bash
@@ -36,6 +39,7 @@ validate-md --verbose
 ```
 
 ### `--version`
+
 Show version information.
 
 ## Tests Performed
@@ -66,7 +70,8 @@ Show version information.
 ## Output
 
 ### Success
-```
+
+```text
 🔍 Validating markdownlint-skill installation...
 
 Testing: markdownlint-cli2 installation
@@ -86,7 +91,8 @@ Testing: Global configuration
 ```
 
 ### Failure
-```
+
+```text
 🔍 Validating markdownlint-skill installation...
 
 Testing: markdownlint-cli2 installation
@@ -103,6 +109,7 @@ Testing: markdownlint-cli2 installation
 ## Verbose Output
 
 With `--verbose`, shows:
+
 - Global config path and status
 - Local config path and status
 - CLI version
@@ -116,18 +123,21 @@ With `--verbose`, shows:
 ## When to Use
 
 ### First Time Setup
+
 ```bash
 # After installation
 validate-md
 ```
 
 ### Troubleshooting
+
 ```bash
 # Check if everything works
 validate-md --verbose
 ```
 
 ### CI/CD
+
 ```bash
 # Ensure tools are available
 validate-md || exit 1
@@ -136,12 +146,14 @@ validate-md || exit 1
 ## Fixing Issues
 
 ### markdownlint-cli2 not found
+
 ```bash
 # Install globally
 bun add -g markdownlint-cli2
 ```
 
 ### Global config not found
+
 ```bash
 # Create config directory
 mkdir -p ~/.config/llm-markdown

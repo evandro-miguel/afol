@@ -7,25 +7,23 @@ created_at: "2026-04-02T23:17:01Z"
 updated_at: "2026-04-02T23:17:01Z"
 ---
 
-# Architecture
+## Architecture
 
-## What This System Appears To Do
+### What This System Appears To Do
 
 - The repository profile is mixed or minimal; the main shape must be inferred from dependencies, symbols, and hotspots.
 - Dominant feature clusters: `not enough signal yet`
 - Public boundaries currently concentrate in `no public boundaries detected in scope`.
 
-## Runtime Topology
+### Runtime Topology
 
 - Cross-domain flows must be inferred from the available route, symbol, and dependency artifacts.
 
-## Why The Main Domains Exist
+### Why The Main Domains Exist
 
+### Core Boundaries And Why They Matter
 
-## Core Boundaries And Why They Matter
-
-
-## Structural Signals
+### Structural Signals
 
 - Primary dependency source: `dependency-cruiser`
 - Modules analyzed: `43`
@@ -35,15 +33,14 @@ updated_at: "2026-04-02T23:17:01Z"
 - Files with external fetch calls: `0`
 - Orphan modules: `1`
 
-## Top Dependency Hubs
+### Top Dependency Hubs
 
 | Path | Ca | Ce | I |
 | --- | ---: | ---: | ---: |
 
-## Primary Risks To Understand First
+### Primary Risks To Understand First
 
-
-## Critical Static Findings
+### Critical Static Findings
 
 - Auto findings: `0`
 - Custom findings: `0`

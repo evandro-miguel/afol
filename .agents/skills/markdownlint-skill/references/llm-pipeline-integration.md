@@ -29,28 +29,28 @@ export interface ProcessOptions {
 
 export async function processLLMMarkdown(options: ProcessOptions) {
   const { content, autoFix = true, strict = false } = options;
-  
+
   const tempFile = `/tmp/llm-${Date.now()}.md`;
   await Bun.write(tempFile, content);
-  
+
   try {
     if (autoFix) {
       await $`markdownlint-cli2 --fix ${tempFile}`;
     }
-    
+
     await $`markdownlint-cli2 ${tempFile}`;
-    
+
     const processed = await Bun.file(tempFile).text();
     await $`rm ${tempFile}`;
-    
+
     return { success: true, content: processed };
   } catch (error) {
     await $`rm -f ${tempFile}`;
-    
+
     if (strict) {
       throw new Error('Markdown validation failed');
     }
-    
+
     return { success: false, content };
   }
 }
@@ -77,6 +77,7 @@ if (result.success) {
 Automatically fix markdown on commit:
 
 **.husky/pre-commit**:
+
 ```bash
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
@@ -85,6 +86,7 @@ bunx lint-staged
 ```
 
 **package.json**:
+
 ```json
 {
   "lint-staged": {
@@ -101,6 +103,7 @@ bunx lint-staged
 Block PRs with invalid markdown:
 
 **.github/workflows/markdown.yml**:
+
 ```yaml
 name: Markdown Lint
 on: [push, pull_request]
@@ -121,6 +124,7 @@ jobs:
 Include in Docker build:
 
 **Dockerfile**:
+
 ```dockerfile
 FROM oven/bun:1
 
@@ -154,18 +158,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-      
+
       - name: Install dependencies
         run: bun install
-      
+
       - name: Run markdownlint
         run: bun run lint:md
-      
+
       - name: Validate configuration
         run: bun run lint:md:check
 ```

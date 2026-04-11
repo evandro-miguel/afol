@@ -7,20 +7,20 @@ created_at: "2026-04-02T23:17:01Z"
 updated_at: "2026-04-02T23:17:01Z"
 ---
 
-# Connections
+## Connections
 
 Use this file when you need a fast answer to `what depends on what` or `which files move together`.
 
-## System-Level Linkage
+### System-Level Linkage
 
 - Cross-domain flows must be inferred from the available route, symbol, and dependency artifacts.
 
-## Highest Fan-In Files
+### Highest Fan-In Files
 
 | Path | Ca | Ce | I |
 | --- | ---: | ---: | ---: |
 
-## Highest Fan-Out Or Instability
+### Highest Fan-Out Or Instability
 
 | Path | Ca | Ce | I |
 | --- | ---: | ---: | ---: |
@@ -35,7 +35,7 @@ Use this file when you need a fast answer to `what depends on what` or `which fi
 | .claude/skills/writing-skills/scripts/skill-files.js | 0.00 | 0.00 | 0.00 |
 | .claude/skills/writing-skills/scripts/skill-read.js | 0.00 | 0.00 | 0.00 |
 
-## Co-Change Pairs
+### Co-Change Pairs
 
 | File A | File B | Co-change | Confidence |
 | --- | ---: | ---: | ---: |
@@ -52,8 +52,8 @@ Use this file when you need a fast answer to `what depends on what` or `which fi
 | .agents/arc/structure/README.md | .agents/scripts/verify-tasks.py | 7 | 1.00 |
 | .agents/arc/structure/backend.md | .agents/arc/structure/types.md | 7 | 1.00 |
 
-## Cycle Chains
+### Cycle Chains
 
 - No cycles detected
 
-## Representative Direct Links
+### Representative Direct Links

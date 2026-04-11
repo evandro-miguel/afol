@@ -13,6 +13,7 @@ related_session: 260224_1253_execution-integrity-hardening
 ## Correction
 
 The session was reported as complete while one success criterion from the plan remained unimplemented:
+
 - `wb-update evidence` command and `mark-done` evidence-gating in `agents-wb-update.py`
 
 Task checkboxes and report summary were green, but plan-level delivery was incomplete.
@@ -20,6 +21,7 @@ Task checkboxes and report summary were green, but plan-level delivery was incom
 ## Prevention Rule
 
 Before declaring completion, validate all three layers:
+
 1. Plan success criteria -> implemented in code
 2. Task checklist state -> consistent with code and tests
 3. Verification evidence -> command output linked to task closure
@@ -36,11 +38,13 @@ python3 -m unittest discover -s .agents/scripts/tests -p "test_*.py" -v
 ```
 
 And explicitly confirm in report:
+
 - each success criterion mapped to file-level implementation
 - remaining gaps = 0
 
 ## Operational Standard
 
 For `wb-update task --mark-done`:
+
 - Evidence ID is required by default
 - Unsafe bypass (`--allow-unsafe-done`) must be exceptional and auditable

@@ -109,12 +109,14 @@ python .agents/scripts/fix-lint-doctypes.py
 ### Missing Checkbox Separator
 
 **Before:**
+
 ```text
 - [x]Task without space
 - [ ]Another task
 ```
 
 **After:**
+
 ```text
 - [x] Task with space
 - [ ] Another task
@@ -123,6 +125,7 @@ python .agents/scripts/fix-lint-doctypes.py
 ### Missing Frontmatter
 
 **Before:**
+
 ```markdown
 # My Document
 
@@ -130,6 +133,7 @@ Content here...
 ```
 
 **After:**
+
 ```markdown
 ---
 doc_type: standard
@@ -150,11 +154,13 @@ Content here...
 ### Recommended Workflow
 
 1. **Before fixing:**
+
    ```bash
    make lint-fix-check
    ```
 
 2. **Preview changes:**
+
    ```bash
    make lint-fix-dry
    ```
@@ -162,11 +168,13 @@ Content here...
 3. **Review the files that will change**
 
 4. **Apply fixes:**
+
    ```bash
    make lint-fix
    ```
 
 5. **Verify:**
+
    ```bash
    make lint
    ```
@@ -184,6 +192,7 @@ Use `--check` mode in CI to fail if lint issues exist:
 ## Exclusions
 
 The scripts automatically exclude:
+
 - `.venv/`
 - `node_modules/`
 - `.git/`
@@ -202,6 +211,7 @@ The scripts automatically exclude:
 ### Script not found
 
 Ensure you're in the project root:
+
 ```bash
 cd /path/to/project
 python .agents/scripts/fix-lint-all.py --check
@@ -210,6 +220,7 @@ python .agents/scripts/fix-lint-all.py --check
 ### Permission denied
 
 Make scripts executable:
+
 ```bash
 chmod +x .agents/scripts/fix-lint-*.py
 ```
@@ -217,6 +228,7 @@ chmod +x .agents/scripts/fix-lint-*.py
 ### False positives in code examples
 
 The checkbox fixer may modify code blocks. Review changes before committing:
+
 ```bash
 git diff
 ```
@@ -228,4 +240,5 @@ git diff
 - [Makefile](../../standards/Makefile) - Command reference
 
 ---
+
 *Document: `docs/standards/lint-fix-scripts.md`*

@@ -17,9 +17,11 @@ risk_level: low
 # SPEC LITE: task-id-standardization
 
 ## Objective
+
 - Enforce task IDs in checklist lines and improve verification traceability (ID, file, line).
 
 ## Change Summary
+
 - `verify-tasks.py` now parses only ID-based checklist tasks.
 - Verification output shows open tasks with location.
 - Task template documents canonical ID format.
@@ -27,6 +29,7 @@ risk_level: low
 - `agents-wb-update.py` automates `updated_at` and `## Files Changed` updates.
 
 ## Files and Areas
+
 - `.agents/scripts/verify-tasks.py`
 - `.agents/scripts/agents-new.py`
 - `.agents/scripts/agents-wb-update.py`
@@ -38,10 +41,12 @@ risk_level: low
 - `AGENTS.md`
 
 ## Risks
+
 - Legacy task lines without IDs are ignored by parser -> mitigated by template + standards update.
 - New session creation is stricter by default -> mitigated with `--quick` and explicit `--force-new` path.
 
 ## Verification
+
 - Commands:
   - `python3 -m py_compile .agents/scripts/verify-tasks.py`
   - `python3 -m py_compile .agents/scripts/agents-new.py`
@@ -56,9 +61,11 @@ risk_level: low
   - Captured in `260223_1855_task-id-standardization_report_01`.
 
 ## Done When
+
 - [x] Verified with commands
 - [x] No regressions observed
 - [x] Report updated with evidence
 
 ---
+
 *Template: `.agents/a-docs/templates/spec-lite.md`*

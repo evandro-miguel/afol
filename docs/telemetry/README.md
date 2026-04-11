@@ -8,6 +8,7 @@ updated_at: "2026-02-23T00:00:00Z"
 # Telemetry Guide
 
 ## Purpose
+
 Track and analyze .agents system usage, session metrics, and work patterns.
 
 ## Quick Start
@@ -15,6 +16,7 @@ Track and analyze .agents system usage, session metrics, and work patterns.
 **Telemetry is fully automated!** No manual recording needed.
 
 Every time you use `.agents/agents <command>`, telemetry is captured automatically:
+
 - Tool usage
 - Session start/end
 - Task completion
@@ -48,6 +50,7 @@ python3 .agents/scripts/agents-telemetry.py query --limit=20
 ## Commands
 
 ### Query Events
+
 ```bash
 # All events
 python3 .agents/scripts/agents-telemetry.py query
@@ -66,6 +69,7 @@ python3 .agents/scripts/agents-telemetry.py query --format=json --limit=50
 ```
 
 ### Generate Report
+
 ```bash
 # Weekly report (default)
 make telemetry-report
@@ -81,6 +85,7 @@ make telemetry-report PERIOD=all
 ```
 
 ### Export Data
+
 ```bash
 # JSON export
 make telemetry-export FORMAT=json
@@ -93,6 +98,7 @@ make telemetry-export OUTPUT=/path/to/backup.json
 ```
 
 ### Validate
+
 ```bash
 # Validate all events against schema
 make telemetry-validate
@@ -101,7 +107,8 @@ make telemetry-validate
 ## Data Storage
 
 Events are stored in:
-```
+
+```text
 .agents/data/telemetry/events.jsonl
 ```
 
@@ -137,12 +144,14 @@ python3 .agents/scripts/agents-telemetry.py record error \
 ## Privacy & Security
 
 **What is NOT collected:**
+
 - Code content
 - File contents
 - Secrets or credentials
 - User input data
 
 **What IS collected:**
+
 - Event timestamps
 - Session IDs
 - Event types
@@ -152,18 +161,21 @@ python3 .agents/scripts/agents-telemetry.py record error \
 ## Analysis Examples
 
 ### Session Duration Trend
+
 ```bash
 python3 .agents/scripts/agents-telemetry.py query --event-type=session_end --format=json | \
   jq '.[] | {session: .session_id, duration: .metadata.duration_seconds}'
 ```
 
 ### Tool Usage Frequency
+
 ```bash
 python3 .agents/scripts/agents-telemetry.py query --event-type=tool_exec --format=json | \
   jq -r '.[].metadata.tool_name' | sort | uniq -c | sort -rn
 ```
 
 ### Success Rate
+
 ```bash
 make telemetry-report PERIOD=weekly FORMAT=json | \
   jq '.summary.success_rate'
@@ -172,16 +184,19 @@ make telemetry-report PERIOD=weekly FORMAT=json | \
 ## Troubleshooting
 
 ### No events recorded
+
 - Check if `events.jsonl` exists: `ls -la .agents/data/telemetry/`
 - Verify write permissions
 - Check event schema: `python3 .agents/scripts/agents-telemetry.py validate`
 
 ### Invalid JSON
+
 - Run validation: `make telemetry-validate`
 - Check for manual edits to `events.jsonl`
 - Restore from backup if needed
 
 ### Missing metadata
+
 - Review event type requirements in schema
 - Ensure all required fields are provided
 - Check script integration points
@@ -193,4 +208,5 @@ make telemetry-report PERIOD=weekly FORMAT=json | \
 - `.agents/tools.json` - Tool catalog
 
 ---
+
 *Telemetry Guide: `docs/telemetry/README.md`*

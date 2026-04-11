@@ -114,7 +114,7 @@ updated_at: <date>
 
 ## Architecture
 
-```
+```text
 .agents/
 ├── agents              # Bash wrapper (CLI entry point)
 ├── tools.json          # Tool catalog (JSON)
@@ -142,7 +142,7 @@ updated_at: <date>
 
 ## Typical Agent Flow
 
-```
+```text
 1. Agent receives task
    ↓
 2. Unsure which tool to use?

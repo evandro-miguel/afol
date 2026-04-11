@@ -19,6 +19,7 @@ lint-md [options] [files/globs]
 
 Runs markdownlint-cli2 on specified files with LLM-optimized configuration.
 Automatically detects and uses configuration in priority order:
+
 1. Command-line `--config` option
 2. `MARKDOWNLINT_CONFIG` environment variable
 3. Local `.markdownlint-cli2.jsonc`
@@ -27,9 +28,11 @@ Automatically detects and uses configuration in priority order:
 ## Options
 
 ### `-h, --help`
+
 Show help message and exit.
 
 ### `-c, --config FILE`
+
 Use specific configuration file.
 
 ```bash
@@ -37,6 +40,7 @@ lint-md -c my-config.json README.md
 ```
 
 ### `-s, --strict`
+
 Exit with error code if any violations found.
 
 ```bash
@@ -45,6 +49,7 @@ lint-md "**/*.md" --strict
 ```
 
 ### `-q, --quiet`
+
 Only show errors, suppress success messages.
 
 ```bash
@@ -52,16 +57,19 @@ lint-md "**/*.md" --quiet
 ```
 
 ### `--version`
+
 Show version information.
 
 ## Arguments
 
 ### `files/globs`
+
 Files or glob patterns to lint.
 
 Default: `**/*.md` (all markdown files)
 
 Common patterns:
+
 - `README.md` - Single file
 - `"**/*.md"` - All markdown files recursively
 - `docs/` - All files in directory
@@ -114,6 +122,7 @@ lint-md README.md CONTRIBUTING.md --quiet
 ## Output Format
 
 Default output shows:
+
 - File path
 - Line and column numbers
 - Rule code (e.g., MD013)
@@ -121,13 +130,15 @@ Default output shows:
 - Context
 
 Example:
-```
+
+```text
 README.md:10:81 MD013/line-length Line length [Expected: 100; Actual: 150]
 ```
 
 ## Environment
 
 ### `MARKDOWNLINT_CONFIG`
+
 Path to default configuration file.
 
 ```bash

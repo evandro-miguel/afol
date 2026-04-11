@@ -50,7 +50,7 @@ Valida a estrutura do diretório `.agents`:
 
 ### Output
 
-```
+```text
 ✓ a-docs/templates
 ✓ a-docs/standards
 ✓ wb

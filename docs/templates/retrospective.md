@@ -10,42 +10,42 @@ owners: []
 links: []
 ---
 
-# Retrospective: <theme>
+## Retrospective: <theme>
 
-## Context
+### Context
 
 <!-- Link to original plan/spec -->
 <!-- Brief description of what was accomplished -->
 
-## Summary
+### Summary
 
 <!-- High-level summary of the work done -->
 
-## What Worked
+### What Worked
 
 <!-- What went well and should be repeated -->
 
-- 
+-
 
-## What Did Not Work
+### What Did Not Work
 
 <!-- Problems encountered, mistakes made, things to avoid -->
 
-- 
+-
 
-## Lessons Identified
+### Lessons Identified
 
 <!-- New insights to capture as one-file-per-lesson in docs/lessons/entries/ -->
 
-### For This Project
+#### For This Project
 
-- 
+-
 
-### For Future Projects
+#### For Future Projects
 
-- 
+-
 
-## Action Items
+### Action Items
 
 <!-- Specific actions for future work -->
 
@@ -54,13 +54,13 @@ links: []
 | | | high/medium/low |
 | | | high/medium/low |
 
-## Metrics (Optional)
+### Metrics (Optional)
 
 <!-- If available, include relevant metrics -->
 
-- Time spent: 
-- Tasks completed: 
-- Bugs found: 
+- Time spent:
+- Tasks completed:
+- Bugs found:
 
 ---
 

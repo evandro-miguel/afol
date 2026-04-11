@@ -32,9 +32,10 @@ description: "Platform dispatcher"
 # Platform Skill
 
 ## Decision Tree
+
 ...
 
-## API Reference  # ❌ WRONG! This should be in references/
+## API Reference # ❌ WRONG! This should be in references/
 
 ### Method: processData
 
@@ -42,6 +43,7 @@ Accepts: `{ input: string, timeout: number }`
 Returns: `{ result: any, status: 'success' | 'error' }`
 
 Example:
+
 ```typescript
 const result = await processData({
   input: 'test',
@@ -53,6 +55,7 @@ const result = await processData({
 ### Correct
 
 **SKILL.md:**
+
 ```markdown
 ---
 description: "Platform dispatcher"
@@ -66,6 +69,7 @@ Need to process data? -> references/api.md
 ```
 
 **references/api.md:**
+
 ```markdown
 ---
 description: "API reference for processing"

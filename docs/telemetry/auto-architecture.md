@@ -14,7 +14,7 @@ Telemetry system for .agents is **fully automated** - no manual recording requir
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    User runs command                         │
 │              .agents/agents <tool> [args]                    │
@@ -55,7 +55,7 @@ Telemetry system for .agents is **fully automated** - no manual recording requir
 
 When creating a new workstream:
 
-```
+```text
 .agents/agents new auth-refactor
                      │
                      ▼
@@ -79,7 +79,7 @@ When creating a new workstream:
 
 ## Data Flow
 
-```
+```text
 User Command
     │
     ▼
@@ -101,7 +101,7 @@ User Command
 
 ## File Structure
 
-```
+```text
 .agents/
 ├── agents                      # Wrapper with auto-telemetry
 ├── scripts/
@@ -127,21 +127,25 @@ docs/                           # ← Project-owned documentation
 ## Key Design Decisions
 
 ### 1. Zero Manual Recording
+
 - User never calls `telemetry-record`
 - All capture is automatic via wrapper
 - Manual recording only for edge cases (blockers, custom events)
 
 ### 2. Silent Failures
+
 - Telemetry errors are swallowed (`2>/dev/null || true`)
 - System must not interfere with primary tool function
 - Telemetry is observability, not core functionality
 
 ### 3. Separation of Concerns
+
 - `.agents/data/` - Operational data (events, schemas)
 - `.agents/scripts/` - Executable code
 - `docs/` - Documentation only
 
 ### 4. Pattern Integration
+
 - Auto-suggest on session creation
 - Apply records in telemetry
 - Effectiveness tracked via usage correlation
@@ -149,11 +153,13 @@ docs/                           # ← Project-owned documentation
 ## Reports & Analysis
 
 ### Weekly Report
+
 ```bash
 make telemetry-report PERIOD=weekly
 ```
 
 Output includes:
+
 - Total sessions, events
 - Tool usage breakdown
 - Success rate
@@ -161,18 +167,22 @@ Output includes:
 - Pattern applications
 
 ### Dashboard
+
 Auto-populated from reports:
+
 - `docs/telemetry/dashboard.md`
 
 ## Privacy
 
 **Not collected:**
+
 - Code content
 - File contents
 - Command arguments
 - User input
 
 **Collected:**
+
 - Tool names
 - Timestamps
 - Session IDs
@@ -184,6 +194,7 @@ Auto-populated from reports:
 ### Adding New Auto-Capture
 
 1. **New tool**: Add to `.agents/agents` wrapper:
+
    ```bash
    my-tool)
        uv run scripts/agents-my-tool.py "$@"
@@ -192,10 +203,11 @@ Auto-populated from reports:
    ```
 
 2. **Custom events**: In your script:
+
    ```python
    from pathlib import Path
    import subprocess
-   
+
    TELEMETRY = Path(__file__).parent / "agents-telemetry.py"
    subprocess.run([TELEMETRY, "record", "custom_event", ...])
    ```
@@ -213,4 +225,5 @@ python3 .agents/scripts/agents-telemetry.py query \
 ```
 
 ---
+
 *Architecture: `docs/telemetry/auto-architecture.md`*

@@ -7,6 +7,6 @@ created_at: "2026-04-02T23:28:28Z"
 updated_at: "2026-04-02T23:28:28Z"
 ---
 
-# Domain Index
+## Domain Index
 
 Each file in this folder explains a major domain's purpose, key files, and risks.

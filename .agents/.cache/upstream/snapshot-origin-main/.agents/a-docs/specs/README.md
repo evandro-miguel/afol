@@ -8,7 +8,7 @@ Specifications define **what** the system should do, without prescribing **how**
 
 ## Structure
 
-```
+```text
 specs/
 ├── <domain>/
 │   ├── README.md          # Overview of domain specs
@@ -21,18 +21,21 @@ specs/
 ## Spec types
 
 ### Functional specifications
+
 - User stories
 - Use cases
 - Business rules
 - Data requirements
 
 ### Non-functional specifications
+
 - Performance requirements
 - Security requirements
 - Scalability requirements
 - Compliance requirements
 
 ### API specifications
+
 - Endpoints
 - Request/response schemas
 - Authentication
@@ -51,22 +54,27 @@ created_at: "YYYY-MM-DDTHH:MM:SSZ"
 updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 ---
 
-# Specification: <title>
+## Specification: <title>
 
-## Overview
+### Overview
+
 - <brief description>
 
-## Requirements
+### Requirements
+
 - REQ-001: <requirement>
 - REQ-002: <requirement>
 
-## Acceptance Criteria
+### Acceptance Criteria
+
 - [ ] <criterion>
 
-## Dependencies
+### Dependencies
+
 - <related specs or systems>
 
-## Change Log
+### Change Log
+
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0.0 | YYYY-MM-DD | <author> | Initial |
@@ -74,17 +82,20 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 ## Status workflow
 
-```
+```text
 draft → review → approved → deprecated
 ```
 
 ## Linking to work
 
 Plans should reference spec IDs:
+
 ```markdown
 ## Objective
+
 - Implement SPEC-AUTH-001: OAuth2 authentication
 ```
 
 ---
+
 *Specifications folder: `.agents/a-docs/specs/`*

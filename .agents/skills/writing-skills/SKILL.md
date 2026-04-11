@@ -7,6 +7,7 @@ metadata:
   triggers: "new skill, create skill, update skill, skill template, standardize skill, tier 1, tier 2, tier 3, agent, prompt engineering, skill evaluation"
   references: "standards, cso, anti-rationalization, testing, templates, tier-1-simple, tier-2-expanded, tier-3-platform, schemas"
 ---
+
 # Writing Skills
 
 Dispatcher for skill creation, maintenance, and evaluation with a strict tier-based workflow and comprehensive testing capabilities.
@@ -21,6 +22,7 @@ Dispatcher for skill creation, maintenance, and evaluation with a strict tier-ba
 - Script examples and scaffolds must be Bun-first (`bun <script>`), not `node <script>`.
 - Do not document static "preferred model" lists for agents; use dynamic discovery via `opencode models`.
 - Before creating or modifying skills, the universal mirror must be in sync:
+
 ```bash
 bun .agents/skills/writing-skills/scripts/check-universal-skills-sync.js
 ```
@@ -41,6 +43,7 @@ Ask clarifying questions to understand what the skill should do:
 - **Test cases**: Does the skill have objectively verifiable outputs?
 
 **Test case suitability:**
+
 - Skills with transforms, data extraction, or code generation benefit from test cases.
 - Skills with subjective outputs (writing style, creativity) generally don't need them.
 
@@ -54,6 +57,7 @@ Gather comprehensive requirements before writing:
 - Come prepared with context to reduce burden on the user
 
 Research existing patterns:
+
 ```bash
 # Check for overlap with existing skills
 bun skills/writing-skills/scripts/skill-advisor.js candidate --name my-skill --tier 2
@@ -91,6 +95,7 @@ Structure content in three levels:
 | Bundled resources | Detailed references | Unlimited, on demand |
 
 **Key patterns:**
+
 - Keep SKILL.md between 250-800 lines; if approaching 800, add hierarchy
 - Files ≥800 lines must migrate to Tier 2 structure
 - Prefer splitting into smaller files over summarizing content
@@ -123,6 +128,7 @@ bun skills/writing-skills/scripts/create-skill.js --name my-platform --tier 3 --
 ```
 
 Creation flags:
+
 - `--advice warn` (default): show merge/combine suggestions
 - `--advice enforce`: block creation on high duplicate risk
 - `--advice off`: skip advisor
@@ -160,6 +166,7 @@ After writing a draft, create 2-3 realistic test prompts. Save to `evals/evals.j
 ```
 
 **Process:**
+
 1. Write prompts first, don't write assertions yet
 2. Run evaluation with `run_eval.py`
 3. Draft assertions while runs are in progress
@@ -173,7 +180,7 @@ See [Schemas](./references/schemas.md) for complete JSON schema definitions.
 
 Systematic improvement workflow:
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │  1. Apply improvements to the skill     │
 │  2. Rerun all test cases               │
@@ -203,6 +210,7 @@ python scripts/run_loop.py \
 ```
 
 **How it works:**
+
 1. Splits eval set into train (60%) and test (40%)
 2. Evaluates current description on all queries
 3. If not all pass and iterations remain, uses AI to improve
@@ -254,6 +262,7 @@ python scripts/run_eval.py \
 ```
 
 **Platform support:**
+
 - `--cli-tool opencode`: OpenCode CLI
 - `--cli-tool claude`: Claude Code CLI
 - `--cli-tool codex`: Codex CLI
@@ -273,6 +282,7 @@ python scripts/run_loop.py \
 ```
 
 See [Agents](./agents/README.md) for specialized evaluation agents:
+
 - [grader.md](./agents/grader.md): Evaluate expectations against execution
 - [comparator.md](./agents/comparator.md): Blind A/B comparison
 - [analyzer.md](./agents/analyzer.md): Post-hoc analysis of why one won
@@ -317,6 +327,7 @@ bun skills/writing-skills/scripts/fix-skill.js skills/<skill-name> --all-md
 7. Run validation and fixers until clean
 8. Test skill behavior with RED-GREEN-REFACTOR scenarios
 9. If changes touch agent models in OpenCode repos, validate against runtime catalog:
+
 ```bash
 python3 scripts/check-agent-models.py --base .
 ```
@@ -392,6 +403,7 @@ bun test tests/skills/scripts/check-skill.test.js
 ```
 
 Test coverage is tracked for:
+
 - `check-skill.js` - Frontmatter and tier validation
 - `check-tier-migration.js` - Size limit and empty folder detection
 - `cleanup-empty-folders.js` - Empty folder removal

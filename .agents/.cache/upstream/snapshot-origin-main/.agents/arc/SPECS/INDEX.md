@@ -13,4 +13,5 @@ updated_at: "2026-02-23T00:00:00Z"
 | <id> | <theme> | <draft/active/final> | <name> | <plan/task/report> |
 
 ---
+
 *Index: `.agents/arc/SPECS/INDEX.md`*

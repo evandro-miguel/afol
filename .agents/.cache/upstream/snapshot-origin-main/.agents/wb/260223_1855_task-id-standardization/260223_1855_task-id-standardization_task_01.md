@@ -18,20 +18,23 @@ links:
 # Tasks: task-id-standardization
 
 ## Task List
+
 - [x] T-01 Implementar parser de tasks por ID no `verify-tasks.py`.
 - [x] T-02 Atualizar template/docs para exigir ID e validar fluxo.
 - [x] T-03 Implementar politica de sessao ativa unica + quick mode para evitar proliferacao de pastas.
 - [x] T-04 Criar automacao para `updated_at` e `Files Changed` sem editar docs manualmente.
 
 ## State Board
-| Task | Checklist | State | Owner | Notes |
-|------|----------:|-------|-------|-------|
+
+| Task | Checklist | State | Owner | Notes
+|------|----------:|-------|-------|-------
 | T-01 | - [x] | done | worker | Parser atualizado para formato `- [ ] T-01 ...`/`T-001`.
 | T-02 | - [x] | done | worker | Template + docs atualizados e validados.
 | T-03 | - [x] | done | worker | `agents-new.py` com `--quick` e bloqueio de novo stream sem `--force-new`.
 | T-04 | - [x] | done | worker | Novo `agents-wb-update.py` + `make wb-touch`/`make wb-files-changed`.
 
 State values:
+
 - pending
 - in_progress
 - ready_for_test
@@ -48,9 +51,11 @@ See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/
 Before starting work, consult relevant resources:
 
 ### Prevention Rules
+
 - [x] Check: [`.agents/a-docs/lessons/general-lessons.md`](.agents/a-docs/lessons/general-lessons.md)
 
 ### Useful Resources
+
 - Rules useful for this task:
   - [x] Task IDs required in checklist lines
 - Docs useful for this task:
@@ -61,6 +66,7 @@ Before starting work, consult relevant resources:
   - [>] None
 
 ## Implementation Checkpoint
+
 - Files touched:
   - `.agents/scripts/verify-tasks.py`
   - `.agents/scripts/agents-new.py`
@@ -77,13 +83,16 @@ Before starting work, consult relevant resources:
   - Enforce one active workstream and use quick mode for non-significant changes.
 
 ## Test Gate
+
 - Move to `ready_for_test` only after implementation checkpoint.
 - Record command, result, and evidence before marking done.
 
 ### Test Evidence
+
 - Command: `<command>`
 - Result: pass
 - Evidence: `make verify`, `make lint`, `make all` passed with new parser behavior.
 
 ---
+
 *Template: `.agents/a-docs/templates/task.md`*

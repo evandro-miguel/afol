@@ -16,6 +16,7 @@ metadata:
 **Cause**: `~/.local/bin` not in PATH
 
 **Solution**:
+
 ```bash
 # Add to shell profile (~/.bashrc, ~/.zshrc, etc.)
 export PATH="$HOME/.local/bin:$PATH"
@@ -25,6 +26,7 @@ source ~/.bashrc  # or ~/.zshrc
 ```
 
 **Alternative**: Use full path
+
 ```bash
 ~/.local/bin/lint-md README.md
 ```
@@ -40,6 +42,7 @@ source ~/.bashrc  # or ~/.zshrc
 **Cause**: Wrong config file being used
 
 **Solution**: Check which config is active
+
 ```bash
 # Check with verbose flag
 validate-md --verbose
@@ -55,12 +58,14 @@ lint-md -c ~/.config/llm-markdown/.markdownlint-cli2.jsonc README.md
 **Cause**: Priority order not understood
 
 **Priority** (highest to lowest):
+
 1. `--config` flag
 2. `MARKDOWNLINT_CONFIG` env var
 3. Local `.markdownlint-cli2.jsonc`
 4. Global `~/.config/llm-markdown/.markdownlint-cli2.jsonc`
 
 **Solution**: Be explicit when testing
+
 ```bash
 # Force global config
 lint-md -c ~/.config/llm-markdown/.markdownlint-cli2.jsonc README.md
@@ -80,11 +85,13 @@ lint-md -c ./.markdownlint-cli2.jsonc README.md
 **Solutions**:
 
 1. **Auto-fix first**:
+
 ```bash
 fix-md "**/*.md"
 ```
 
 2. **Gradual adoption** - Create permissive local config:
+
 ```json
 {
   "config": {
@@ -96,6 +103,7 @@ fix-md "**/*.md"
 ```
 
 3. **Ignore legacy files**:
+
 ```json
 {
   "ignores": [
@@ -110,6 +118,7 @@ fix-md "**/*.md"
 **Problem**: Long URLs trigger MD013
 
 **Solution**: Use reference-style links
+
 ```markdown
 // Instead of:
 Check out [this link](https://very-long-url-that-exceeds-the-line-length-limit.com/path/to/resource)
@@ -121,6 +130,7 @@ Check out [this link][1]
 ```
 
 Or disable strict mode:
+
 ```json
 "line-length": {
   "strict": false,
@@ -133,6 +143,7 @@ Or disable strict mode:
 **Problem**: Prettier and markdownlint fight each other
 
 **Solution**: Use Prettier-compatible base
+
 ```json
 {
   "config": {
@@ -142,6 +153,7 @@ Or disable strict mode:
 ```
 
 Run Prettier first, then markdownlint:
+
 ```bash
 prettier --write "**/*.md"
 lint-md "**/*.md"
@@ -158,6 +170,7 @@ lint-md "**/*.md"
 **Cause**: Errors are not auto-fixable
 
 **Check**: Which rules are fixable
+
 - MD004, MD007, MD009, MD012, MD018, MD019, MD049, MD050 = Fixable
 - MD013, MD024, MD041, MD042 = Not fixable
 
@@ -168,11 +181,13 @@ lint-md "**/*.md"
 **Problem**: Auto-fix changes formatting unexpectedly
 
 **Solution**: Preview first
+
 ```bash
 fix-md "**/*.md" --dry-run
 ```
 
 Or disable specific rules in config:
+
 ```json
 {
   "config": {
@@ -192,12 +207,14 @@ Or disable specific rules in config:
 **Solutions**:
 
 1. **Lint only changed files**:
+
 ```bash
 # In pre-commit hook
 lint-md $(git diff --cached --name-only --diff-filter=ACM | grep '\.md$')
 ```
 
 2. **Exclude directories**:
+
 ```json
 {
   "ignores": [
@@ -210,6 +227,7 @@ lint-md $(git diff --cached --name-only --diff-filter=ACM | grep '\.md$')
 ```
 
 3. **Use quiet mode**:
+
 ```bash
 lint-md "**/*.md" --quiet
 ```
@@ -223,6 +241,7 @@ lint-md "**/*.md" --quiet
 **Problem**: GitHub Actions fails, local machine passes
 
 **Causes**:
+
 1. Different markdownlint-cli2 versions
 2. Different configs being used
 3. File path differences
@@ -230,16 +249,19 @@ lint-md "**/*.md" --quiet
 **Solutions**:
 
 1. **Pin version**:
+
 ```yaml
 - run: bun add -g markdownlint-cli2@0.20.0
 ```
 
 2. **Explicit config**:
+
 ```yaml
 - run: lint-md -c .markdownlint-cli2.jsonc "**/*.md"
 ```
 
 3. **Validate first**:
+
 ```yaml
 - run: validate-md --verbose
 - run: lint-md "**/*.md" --strict
@@ -256,7 +278,8 @@ lint-md "**/*.md" --quiet
 **Solutions**:
 
 1. **Add to system prompt**:
-```
+
+```text
 Always format markdown with:
 - Max 100 chars per line
 - Use dashes for lists (-)
@@ -266,6 +289,7 @@ Always format markdown with:
 ```
 
 2. **Post-process all output**:
+
 ```bash
 # Wrapper script
 process_llm_output() {
@@ -287,6 +311,7 @@ Provide examples of valid/invalid markdown in prompt.
 **Cause**: markdownlint-cli2 not properly installed
 
 **Solution**:
+
 ```bash
 bun add -g markdownlint-cli2
 validate-md
@@ -297,6 +322,7 @@ validate-md
 **Cause**: Glob pattern not matching files
 
 **Solution**: Check pattern syntax
+
 ```bash
 # Wrong
 lint-md *.md  # Shell expands before command
@@ -310,6 +336,7 @@ lint-md "*.md"  # Quotes prevent shell expansion
 **Cause**: Commands not executable
 
 **Solution**:
+
 ```bash
 chmod +x ~/.local/bin/lint-md
 chmod +x ~/.local/bin/fix-md
@@ -329,6 +356,7 @@ chmod +x ~/.local/bin/validate-md
 **Solution**: Configure nvim-lint to use your global config
 
 Create `~/.config/nvim/lua/plugins/markdownlint.lua`:
+
 ```lua
 return {
   {
@@ -359,6 +387,7 @@ Then restart Neovim or run `:Lazy reload`
 **Cause**: VS Code link checker prefers explicit relative paths
 
 **Solution**: Add `./` prefix to all relative links
+
 ```markdown
 <!-- Instead of: -->
 `[Link](references/file.md)`
@@ -372,11 +401,13 @@ Then restart Neovim or run `:Lazy reload`
 **Problem**: Editor reports `link to non existent document` for local markdown links
 
 **Cause**:
+
 - Link path is wrong relative to the current file
 - Target file was renamed or removed
 - Link points to a directory instead of an explicit file (`README.md` or `SKILL.md`)
 
 **Solution**:
+
 ```markdown
 <!-- Prefer explicit relative links -->
 `[Windows API](./references/windows-api.md)`
@@ -384,12 +415,14 @@ Then restart Neovim or run `:Lazy reload`
 ```
 
 Quick check for broken local links in one skill:
+
 ```bash
 skill_dir="skills/markdownlint-skill"
 rg -n --pcre2 '\]\((?!https?://|mailto:|#)[^)]+\)' "$skill_dir"
 ```
 
 If a directory is linked, change it to an explicit target file:
+
 ```markdown
 <!-- Avoid -->
 `Commands -> ./references/commands/`
@@ -405,6 +438,7 @@ If a directory is linked, change it to an explicit target file:
 **Cause**: strict guard blocks raw wikilinks outside code contexts.
 
 **Solution**:
+
 ```bash
 # Day-to-day pipeline (recommended for mixed repositories)
 bun run lint:docs:full
@@ -414,6 +448,7 @@ bun run lint:docs:full:strict
 ```
 
 If wikilinks are documentation examples, wrap as inline code:
+
 ```markdown
 Use `[[Note]]` for examples in generic markdown docs.
 ```
@@ -425,6 +460,7 @@ Use `[[Note]]` for examples in generic markdown docs.
 **Cause**: Emacs may use `markdownlint` npm package directly instead of `markdownlint-cli2`
 
 **Solution**: Configure flycheck/flymake to use `markdownlint-cli2`:
+
 ```elisp
 (setq flycheck-markdown-markdownlint-executable "markdownlint-cli2")
 (setq flycheck-markdown-markdownlint-config "~/.config/llm-markdown/.markdownlint-cli2.jsonc")

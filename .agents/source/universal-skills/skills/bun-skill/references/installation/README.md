@@ -17,6 +17,7 @@ curl -fsSL https://bun.com/install | bash
 ```
 
 **Requirements:**
+
 - `unzip` package installed
 - Linux Kernel 5.6+ (minimum 5.1)
 - Check kernel: `uname -r`
@@ -28,6 +29,7 @@ powershell -c "irm bun.sh/install.ps1|iex"
 ```
 
 **Requirements:**
+
 - Windows 10 version 1809 or later
 
 ### Package Managers
@@ -85,6 +87,7 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 ```
 
 Then reload:
+
 ```bash
 source ~/.bashrc  # or ~/.zshrc
 ```
@@ -115,6 +118,7 @@ bun upgrade --stable
 ```
 
 **Note:** Use package manager commands if installed via Homebrew/Scoop:
+
 - Homebrew: `brew upgrade bun`
 - Scoop: `scoop update bun`
 
@@ -153,6 +157,7 @@ For older CPUs without AVX2:
 **Warning:** Baseline builds are slower. Use only if you encounter "Illegal Instruction" errors.
 
 **Minimum Requirements:**
+
 - SSE4.2 extension required
 - macOS 13.0+ required for Apple Silicon
 
@@ -204,6 +209,7 @@ scoop uninstall bun
 ### "Illegal Instruction" error
 
 Your CPU doesn't support AVX2. Use baseline build:
+
 ```bash
 curl -fsSL https://bun.com/install | bash -s "bun-v1.3.3"
 # Download x64-baseline variant manually
@@ -212,6 +218,7 @@ curl -fsSL https://bun.com/install | bash -s "bun-v1.3.3"
 ### GLIBC version errors (Linux)
 
 Use musl binary for distributions without glibc:
+
 ```bash
 # Download musl variant from releases page
 ```

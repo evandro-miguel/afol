@@ -12,7 +12,7 @@ All agent-specific skills should be stored here and symlinked from agent config 
 
 ## Structure
 
-```
+```text
 .agents/skills/
 ├── <skill-name>/
 │   ├── __init__.py
@@ -24,6 +24,7 @@ All agent-specific skills should be stored here and symlinked from agent config 
 ## Usage
 
 Agents access skills via symlinks:
+
 - `.qwen/skills` → `.agents/skills`
 - `.opencode/skills` → `.agents/skills`
 - `.codex/skills` → `.agents/skills`
@@ -43,4 +44,5 @@ Agents access skills via symlinks:
 - Test across all agent platforms
 
 ---
+
 *Mandatory skills folder: `.agents/skills/`*

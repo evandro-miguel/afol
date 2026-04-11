@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Documentos markdown podem ter inconsistências:
+
 - Checkboxes em formatos diferentes
 - Status inválidos no frontmatter
 - IDs de tarefa fora do padrão

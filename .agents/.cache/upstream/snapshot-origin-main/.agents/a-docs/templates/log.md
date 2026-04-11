@@ -10,17 +10,22 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 # Log: <theme>
 
 ## Timeline
+
 - YYYY-MM-DD HH:MMZ - <action> - <result>
 - YYYY-MM-DD HH:MMZ - <action> - <result>
 
 ## Decisions
+
 - <decision> -> <reason>
 
 ## Blockers
+
 - <blocker or none>
 
 ## Next Step
+
 - <next action>
 
 ---
+
 *Template: `.agents/a-docs/templates/log.md`*

@@ -20,6 +20,7 @@ fix-md [options] [files/globs]
 Runs markdownlint-cli2 with `--fix` flag to automatically correct fixable issues.
 
 Fixable issues include:
+
 - List indentation (MD007)
 - List style (MD004)
 - Emphasis style (MD049)
@@ -32,9 +33,11 @@ Fixable issues include:
 ## Options
 
 ### `-h, --help`
+
 Show help message and exit.
 
 ### `-c, --config FILE`
+
 Use specific configuration file.
 
 ```bash
@@ -42,6 +45,7 @@ fix-md -c my-config.json README.md
 ```
 
 ### `-n, --dry-run`
+
 Preview what would be fixed without making changes.
 
 ```bash
@@ -49,6 +53,7 @@ fix-md "**/*.md" --dry-run
 ```
 
 ### `-q, --quiet`
+
 Only show summary, suppress detailed output.
 
 ```bash
@@ -56,11 +61,13 @@ fix-md "**/*.md" --quiet
 ```
 
 ### `--version`
+
 Show version information.
 
 ## Arguments
 
 ### `files/globs`
+
 Files or glob patterns to fix.
 
 Default: `**/*.md` (all markdown files)
@@ -97,12 +104,14 @@ fix-md -c relaxed.json "**/*.md"
 ## Fix Statistics
 
 After running, shows:
+
 - Number of files processed
 - Number of fixes applied
 - Remaining unfixable issues
 
 Example output:
-```
+
+```text
 🔧 Auto-fixing Markdown files...
    Config: /home/user/.config/llm-markdown/.markdownlint-cli2.jsonc
 
@@ -112,6 +121,7 @@ Example output:
 ## Non-Fixable Issues
 
 Some issues require manual correction:
+
 - Line length violations (MD013)
 - Missing headings (MD041)
 - Duplicate headings (MD024)

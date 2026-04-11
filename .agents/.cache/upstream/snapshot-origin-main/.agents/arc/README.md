@@ -16,7 +16,7 @@ Architecture documents define **how** the system is structured and how component
 
 ## Structure
 
-```
+```text
 arc/
 ├── ARCHITECTURE.md      # Root architecture document
 ├── GENERAL-ROADMAP.md   # North star and milestones
@@ -37,6 +37,7 @@ arc/
 ## Document types
 
 ### ARCHITECTURE.md
+
 - System overview and context
 - High-level architecture
 - Technology stack
@@ -44,22 +45,26 @@ arc/
 - Layering rules
 
 ### GENERAL-ROADMAP.md
+
 - North star direction
 - Current phase
 - Milestones
 - Prioritization rules
 
 ### structure/
+
 - Physical directory layout
 - Folder conventions
 - Entry points
 - Import conventions
 
 ### Specifications (SPECS/)
+
 - Full SPEC: new features, architectural changes
 - SPEC LITE: small changes, localized fixes
 
 ### Architecture Decision Records (DECISIONS/)
+
 - Context and problem statement
 - Decision and rationale
 - Consequences (positive/negative)
@@ -68,8 +73,10 @@ arc/
 ## Linking to work
 
 Plans and tasks should reference architecture docs:
+
 ```markdown
 ## Approach
+
 - Follow ADR-003: Event-driven architecture
 - Implement SPEC-AUTH-001: OAuth2 authentication
 ```
@@ -82,4 +89,5 @@ Plans and tasks should reference architecture docs:
 - Update SPECS INDEX for every new spec
 
 ---
+
 *Architecture folder: `.agents/arc/`*

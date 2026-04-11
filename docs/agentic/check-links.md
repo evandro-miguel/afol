@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Markdown documentation can accumulate broken links over time:
+
 - Files moved or renamed
 - Directories restructured
 - Typos in link paths
@@ -95,7 +96,8 @@ check-links-verbose:
 ## Output Examples
 
 ### Success
-```
+
+```text
 Checking docs/...
 
 ============================================================
@@ -111,7 +113,8 @@ Broken links: 0
 ```
 
 ### Broken Links Found
-```
+
+```text
 Checking docs/...
 
 ============================================================
@@ -137,7 +140,8 @@ docs/templates/task.md:
 ```
 
 ### Verbose Mode
-```
+
+```text
 Checking docs/agentic/...
   ✓ docs/agentic/agents-tools.md:25 ./tools-json.md (File exists)
   ✓ docs/agentic/agents-doctor.md:30 ./agents-config.md (File exists)
@@ -243,4 +247,5 @@ python3 .agents/scripts/check-links.py --quiet
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/check-links.md`*

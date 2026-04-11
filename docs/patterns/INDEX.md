@@ -8,6 +8,7 @@ updated_at: "2026-02-23T00:00:00Z"
 # Pattern Catalog
 
 ## Purpose
+
 Central catalog of patterns, anti-patterns, and best practices for .agents system usage.
 
 ## Pattern Types
@@ -62,16 +63,19 @@ Central catalog of patterns, anti-patterns, and best practices for .agents syste
 ## How to Use Patterns
 
 ### During Planning
+
 1. Check pattern catalog for relevant patterns
 2. Apply success patterns to your approach
 3. Avoid anti-patterns in your plan
 
 ### During Execution
+
 1. Reference patterns when making decisions
 2. Record when you apply a pattern (telemetry)
 3. Note if pattern was effective
 
 ### After Completion
+
 1. Report pattern effectiveness in `report.md`
 2. Suggest new patterns if you discover something
 3. Update pattern evidence links
@@ -96,4 +100,5 @@ Central catalog of patterns, anti-patterns, and best practices for .agents syste
 - `.agents/rules/` - Operational rules
 
 ---
+
 *Pattern Catalog: `docs/patterns/INDEX.md`*

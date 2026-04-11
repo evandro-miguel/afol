@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Manter workbench atualizado requer tarefas repetitivas de baixo valor:
+
 - Atualizar `updated_at` no frontmatter
 - Normalizar timestamps
 - Atualizar lista de arquivos modificados

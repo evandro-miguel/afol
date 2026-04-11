@@ -4,7 +4,7 @@
 
 Skills are symlinked from `.agents/skills/` - the mandatory skills folder.
 
-```
+```text
 .claude/skills -> ../.agents/skills
 ```
 
@@ -37,4 +37,5 @@ This command repairs `.claude/skills` and `.claude/rules/default`.
 When symlink creation is unavailable, it replicates content from `.agents/skills` and `.agents/rules`.
 
 ---
+
 *Agent folder: `.claude/`*

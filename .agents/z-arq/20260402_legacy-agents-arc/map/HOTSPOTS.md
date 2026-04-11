@@ -7,22 +7,21 @@ created_at: "2026-04-02T23:17:01Z"
 updated_at: "2026-04-02T23:17:01Z"
 ---
 
-# Hotspots
+## Hotspots
 
-## Why These Files Matter
+### Why These Files Matter
 
 - Hotspots combine complexity and change frequency.
 - These files are where regressions, architectural drift, or refactor pain are most likely to surface first.
 
-## Hotspot Ranking
+### Hotspot Ranking
 
 | Path | MCC | Avg Churn | Commits | Risk |
 | --- | ---: | ---: | ---: | ---: |
 
-## Why The Top Hotspots Are Risky
+### Why The Top Hotspots Are Risky
 
-
-## Co-Change Signals
+### Co-Change Signals
 
 | File A | File B | Co-change | Confidence |
 | --- | ---: | ---: | ---: |
@@ -39,19 +38,17 @@ updated_at: "2026-04-02T23:17:01Z"
 | .agents/arc/structure/README.md | .agents/scripts/verify-tasks.py | 7 | 1.00 |
 | .agents/arc/structure/backend.md | .agents/arc/structure/types.md | 7 | 1.00 |
 
-## Static Findings Worth Attention
+### Static Findings Worth Attention
 
 - Semgrep auto findings: `0`
 - Semgrep custom findings: `0`
 
-### Severity Distribution
+#### Severity Distribution
 
-
-### Files With The Most Findings
+#### Files With The Most Findings
 
 - No Semgrep findings detected.
 
-### Representative Auto Findings
+#### Representative Auto Findings
 
-
-### Representative Custom Findings
+#### Representative Custom Findings

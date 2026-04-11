@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Setting up `.agents` system manually in another repository requires:
+
 - Copying multiple files and folders
 - Creating required directory structure
 - Configuring Makefile wrapper
@@ -39,16 +40,19 @@ Installs `.agents` system in another repository:
 7. **Validates** - Runs doctor and tools checks
 
 Sanitization rule:
+
 - Bootstrap must not leak this scaffold's local workbench sessions, knowledge index content, lesson-entry history, telemetry reports, or the scaffold's live roadmap/spec backlog into the target repository.
 - The target repo should start with generic placeholders and empty indexes where project-specific history would otherwise be misleading.
 - Skills configuration is treated as a compatibility baseline that downstream repos can evolve into a pinned source/ref/profile contract.
 
 Primary runtime baseline:
+
 - OpenCode
 - Codex
 - Qwen
 
 Compatibility mirrors kept for broader reuse:
+
 - Claude
 - Gemini
 
@@ -108,15 +112,18 @@ Bootstrap also runs:
 - `.agents/agents fix-symlinks --force`
 
 Primary-vs-compatibility rule:
+
 - OpenCode, Codex, and Qwen are the primary supported runtimes for this scaffold.
 - Claude and Gemini remain compatibility mirrors and portability adapters.
 - Bootstrap keeps all committed mirrors/adapters present, but governance and validation should prioritize the primary runtime set first.
 
 Installer resilience rule:
+
 - Bootstrap must succeed in a clean external repository using committed repo assets even if network access or optional upstream skills sync is unavailable.
 - Optional sync failures should be surfaced as warnings, not installation blockers.
 
 Generic-export rule:
+
 - `.agents/wb/` is created as an empty working area; active sessions and historical plans/reports are not copied.
 - `docs/knowledge/INDEX.md` is regenerated empty.
 - `docs/lessons/entries/` keeps only reusable scaffolding such as `README.md`; historical lesson entries are not copied.
@@ -124,6 +131,7 @@ Generic-export rule:
 - `docs/arc/GENERAL-ROADMAP.md`, `docs/arc/PROJECT-BRIEF.md`, `docs/arc/TECH-STACK.md`, `docs/arc/ENGINEERING-GUIDELINES.md`, and specs indexes are generated as target-project starters, not copied from this repository's live state.
 
 Installation modes:
+
 - Full bootstrap: target repo is new or mostly empty, so the scaffold provisions the full `.agents` runtime and generic governance baseline.
 - Partial install: target repo already exists, so bootstrap preserves existing files by default and fills only the missing scaffold files and directories.
 - `--force` converts the partial path into an overwrite path for files that already exist.
@@ -162,6 +170,7 @@ Installation modes:
 | `--skip-checks` | Skip doctor/tools-check |
 
 Usage notes:
+
 - Existing repos should use `--partial`; the command skips files that already exist unless `--force` is set.
 - The generated roadmap/spec baseline is generic; project owners should replace the placeholders with the real backlog before non-trivial work starts.
 - Optional upstream skills sync warnings are non-blocking and do not mean the bootstrap failed.
@@ -218,7 +227,7 @@ For a live project, the partial-install expectation is that pre-existing files r
 
 ## Output
 
-```
+```text
 → Bootstrapping .agents system into: /path/to/target
 → Detected stack: Python
 → Copying files...
@@ -235,4 +244,5 @@ For a live project, the partial-install expectation is that pre-existing files r
 - [bootstrap-other-repo.md](../standards/bootstrap-other-repo.md) - Full and partial install playbook
 
 ---
+
 *Document: `docs/agentic/agents-bootstrap.md`*

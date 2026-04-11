@@ -54,6 +54,7 @@ uv sync
 ```
 
 This creates:
+
 - `.venv/` - Isolated Python virtualenv
 - `uv.lock` - Locked dependencies
 
@@ -96,9 +97,11 @@ python .agents/scripts/agents-doctor.py
 ## Available scripts
 
 ### agents-doctor.py
+
 Validates `.agents` folder structure and integrity.
 
 **Checks:**
+
 - Required folders exist
 - Templates are present
 - YAML frontmatter is valid
@@ -107,6 +110,7 @@ Validates `.agents` folder structure and integrity.
 - Cross-links between docs are valid
 
 **Usage:**
+
 ```bash
 python .agents/scripts/agents-doctor.py
 python .agents/scripts/agents-doctor.py --fix
@@ -115,9 +119,11 @@ python .agents/scripts/agents-doctor.py --fix
 ---
 
 ### agents-new.py
+
 Creates new workstream with all required files.
 
 **Creates:**
+
 - Session folder with proper naming
 - Plan file
 - Task file
@@ -125,6 +131,7 @@ Creates new workstream with all required files.
 - Log file
 
 **Usage:**
+
 ```bash
 python .agents/scripts/agents-new.py <theme>
 python .agents/scripts/agents-new.py auth-refactor --spec
@@ -135,17 +142,21 @@ python .agents/scripts/agents-new.py quick-fix --plan-only
 ---
 
 ### agents-index.py
+
 Updates INDEX.md files for SPECS and ADRs.
 
 **Scans:**
+
 - `.agents/arc/SPECS/` for spec files
 - `.agents/arc/DECISIONS/` for adr files
 
 **Updates:**
+
 - `.agents/arc/SPECS/INDEX.md`
 - `.agents/arc/DECISIONS/INDEX.md`
 
 **Usage:**
+
 ```bash
 python .agents/scripts/agents-index.py
 python .agents/scripts/agents-index.py --dry-run
@@ -154,9 +165,11 @@ python .agents/scripts/agents-index.py --dry-run
 ---
 
 ### agents-lint-docs.py
+
 Validates markdown docs for consistency.
 
 **Checks:**
+
 - Checkbox markers are consistent (`- [X]` format)
 - Status fields are valid
 - State values are valid
@@ -164,6 +177,7 @@ Validates markdown docs for consistency.
 - Cross-references are valid
 
 **Usage:**
+
 ```bash
 python .agents/scripts/agents-lint-docs.py
 python .agents/scripts/agents-lint-docs.py .agents/wb/260223_1200_auth-refactor/
@@ -173,14 +187,17 @@ python .agents/scripts/agents-lint-docs.py .agents/wb --fix
 ---
 
 ### sync-agent-docs.py
+
 Syncs AGENTS.md content to QWEN.md, CLAUDE.md, GEMINI.md.
 
 **Features:**
+
 - Detects local modifications
 - Asks before overwriting
 - `--force` to overwrite without asking
 
 **Usage:**
+
 ```bash
 python .agents/scripts/sync-agent-docs.py
 python .agents/scripts/sync-agent-docs.py --force
@@ -189,14 +206,17 @@ python .agents/scripts/sync-agent-docs.py --force
 ---
 
 ### verify-tasks.py
+
 Verifies all tasks in a session are completed.
 
 **Checks:**
+
 - All tasks marked with `- [x]`
 - Reports status of each task
 - Returns error if incomplete
 
 **Usage:**
+
 ```bash
 python .agents/scripts/verify-tasks.py .agents/wb/260223_1200_auth-refactor/
 python .agents/scripts/verify-tasks.py .
@@ -205,21 +225,25 @@ python .agents/scripts/verify-tasks.py .
 ---
 
 ### agents-structure-map.py
+
 Auto-generates project structure documentation.
 
 **Features:**
+
 - Scans project and categorizes files
 - Generates markdown with file inventory
 - Incremental updates via cache
 - Descriptions for each file
 
 **Usage:**
+
 ```bash
 python .agents/scripts/agents-structure-map.py .
 python .agents/scripts/agents-structure-map.py /path/to/project --output .agents/arc/structure/
 ```
 
 **Output:**
+
 - `README.md` - Overview with metrics
 - `frontend.md` - Components, hooks, UI
 - `backend.md` - Services, utils, API
@@ -233,6 +257,7 @@ python .agents/scripts/agents-structure-map.py /path/to/project --output .agents
 ## Workflow
 
 ### Starting new work
+
 ```bash
 # 1. Create workstream
 python .agents/scripts/agents-new.py my-feature --spec
@@ -246,6 +271,7 @@ python .agents/scripts/agents-doctor.py
 ```
 
 ### During work
+
 ```bash
 # 1. Lint docs
 python .agents/scripts/agents-lint-docs.py .agents/wb/YYMMDD_HHMM_my-feature/
@@ -255,6 +281,7 @@ python .agents/scripts/agents-index.py
 ```
 
 ### Completing work
+
 ```bash
 # 1. Verify all tasks done
 python .agents/scripts/verify-tasks.py .agents/wb/YYMMDD_HHMM_my-feature/
@@ -276,4 +303,5 @@ pip install pyyaml
 Scripts will work without it but with reduced validation.
 
 ---
+
 *Scripts folder: `.agents/scripts/`*

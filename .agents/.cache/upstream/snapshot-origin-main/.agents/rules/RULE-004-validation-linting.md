@@ -28,6 +28,7 @@ make verify
 ```
 
 **OR full validation:**
+
 ```bash
 make all
 # Equivalent to: doctor + structure + index + verify
@@ -45,6 +46,7 @@ make doctor
 ```
 
 **Checks:**
+
 - ✓ Required folders exist
 - ✓ Templates are present
 - ✓ Frontmatter YAML is valid
@@ -53,6 +55,7 @@ make doctor
 - ✓ Cross-links between documents are valid
 
 **Exit codes:**
+
 - `0` = All valid
 - `1` = Errors found
 
@@ -75,6 +78,7 @@ make lint
 ```
 
 **Checks:**
+
 - ✓ Checkbox markers format (`- [X]`, `- [/]`, `- [ ]`)
 - ✓ Status fields in frontmatter
 - ✓ State values are valid
@@ -98,6 +102,7 @@ make verify
 ```
 
 **Exit codes:**
+
 - `0` = All tasks complete
 - `1` = Pending tasks found
 
@@ -156,6 +161,7 @@ Before marking task complete:
 ## Best Practices
 
 **DO:**
+
 - ✅ Run `make doctor` before starting work
 - ✅ Run `make lint` after editing docs
 - ✅ Run `make verify` before marking complete
@@ -163,6 +169,7 @@ Before marking task complete:
 - ✅ Use `--fix` when available
 
 **DON'T:**
+
 - ❌ Commit without validation
 - ❌ Ignore validation errors
 - ❌ Skip `make verify` for workstreams

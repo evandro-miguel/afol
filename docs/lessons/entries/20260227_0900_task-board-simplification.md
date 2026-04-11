@@ -21,6 +21,7 @@ Os arquivos de task tinham duplicação desnecessária:
 2. **State Board** - tabela detalhada (`| T-01 | done | worker | notes |`)
 
 Ambas as seções continham as mesmas tarefas, gerando:
+
 - Redundância de informação
 - Maior esforço de manutenção (atualizar dois lugares)
 - Risco de inconsistência entre as seções
@@ -30,6 +31,7 @@ Ambas as seções continham as mesmas tarefas, gerando:
 Migramos para **apenas o State Board** (tabela), que é mais rico em informação:
 
 ### Formato Antigo (Duplicado)
+
 - **Task List**
   - [x] T-01 Descrição da task
   - [x] T-02 Outra task
@@ -38,6 +40,7 @@ Migramos para **apenas o State Board** (tabela), que é mais rico em informaçã
   - Task: `T-02`, Checklist: `- [x]`, State: `done`, Owner: `worker`, Notes: `Nota`
 
 ### Formato Novo (Simplificado)
+
 - **State Board**
   - Task: `T-01`, State: `done`, Owner: `worker`, Notes: `Nota`
   - Task: `T-02`, State: `done`, Owner: `worker`, Notes: `Nota`
@@ -121,4 +124,5 @@ make test-scripts
 - Verify updater: `.agents/scripts/verify-tasks.py`
 
 ---
+
 *Lesson created: 2026-02-27 | Migration: 14 files | Lines saved: ~10-20 per file | Tests: 68 passed*

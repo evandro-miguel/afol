@@ -18,6 +18,7 @@ links:
 **Problema:** Agentes autônomos precisam descobrir quais ferramentas estão disponíveis, quando usá-las, e como obter detalhes sobre subcomandos e opções.
 
 **Solução:** Um arquivo JSON centralizado que documenta todas as ferramentas do sistema `.agents` com:
+
 - Descrições claras
 - Casos de uso (when_to_use)
 - Comandos e opções

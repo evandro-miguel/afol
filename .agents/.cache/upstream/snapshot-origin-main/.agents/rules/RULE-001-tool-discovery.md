@@ -50,7 +50,7 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 
 ## Tool Usage Pattern
 
-```
+```text
 1. Discover → .agents/agents tools list
 2. Learn    → .agents/agents tools info <tool-id>
 3. Read     → .agents/a-docs/agentic/<tool>.md
@@ -63,39 +63,49 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 ## Common Tools Quick Reference
 
 ### doctor (validation)
+
 ```bash
 ./.agents/agents doctor
 make doctor
 ```
+
 **When:** Before starting work, after structural changes
 
 ### new (creation)
+
 ```bash
 ./.agents/agents new <theme> --spec
 make new THEME=<theme>
 ```
+
 **When:** Starting new feature/bugfix
 
 ### verify-tasks (verification)
+
 ```bash
 ./.agents/agents verify-tasks .agents/wb/<session>/
 make verify
 ```
+
 **When:** Before marking workstream complete
 
 ### wb-update (automation)
+
 ```bash
 ./.agents/agents wb-update touch
 ./.agents/agents wb-update task T-01 --mark-done
 ./.agents/agents wb-update timeline --message "done"
 ```
+
 **When:** Updating workbench metadata
 
 ### lint-docs (validation)
+
 ```bash
 ./.agents/agents lint-docs .agents/wb/
 make lint
 ```
+
 **When:** Before commits, after editing docs
 
 ---
@@ -118,12 +128,14 @@ make dr                # doctor (alias)
 ## Best Practices
 
 **DO:**
+
 - ✅ Run `tools list` before starting work
 - ✅ Use `tools info <tool>` to learn about tools
 - ✅ Read `.agents/a-docs/agentic/<tool>.md` for details
 - ✅ Run `make doctor` + `make lint` + `make verify` before commits
 
 **DON'T:**
+
 - ❌ Skip tool discovery
 - ❌ Use tools without reading docs
 - ❌ Commit without validation

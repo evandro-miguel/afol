@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Workstreams podem ter tarefas pendentes sem aviso claro. Antes de marcar workstream como completa, é necessário:
+
 - Verificar se todas tarefas estão completas
 - Identificar tarefas bloqueadas
 - Reportar status geral

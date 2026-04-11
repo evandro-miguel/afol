@@ -85,16 +85,16 @@ make doctor
 ```python
 def validate_folders() -> List[str]:
     """Check required folders exist."""
-    
+
 def validate_templates() -> List[str]:
     """Check required templates exist."""
-    
+
 def validate_frontmatter(filepath: Path) -> List[str]:
     """Validate YAML frontmatter syntax."""
-    
+
 def validate_ids(filepath: Path) -> List[str]:
     """Check ID convention."""
-    
+
 def validate_timestamps(filepath: Path) -> List[str]:
     """Validate ISO 8601 timestamps."""
 ```
@@ -117,7 +117,8 @@ make doctor
 ## Output
 
 ### Success
-```
+
+```text
 ✓ All required folders exist
 ✓ All required templates present
 ✓ Frontmatter YAML valid
@@ -127,7 +128,8 @@ make doctor
 ```
 
 ### Errors
-```
+
+```text
 ❌ Missing folder: .agents/wb
 ❌ Missing template: plan.md
 ❌ Invalid frontmatter in file.md: missing 'id' field
@@ -139,4 +141,5 @@ make doctor
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/agents-doctor.md`*

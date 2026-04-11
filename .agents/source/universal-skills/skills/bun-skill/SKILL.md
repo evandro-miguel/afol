@@ -8,6 +8,7 @@ metadata:
   references: "installation, usage, typescript, testing, bundling, internals, best-practices"
   version: 1.0.1
 ---
+
 # Bun Skill 🥟
 
 Consolidated skill for building with Bun runtime. Use decision trees below to find the right workflow, then load detailed references.
@@ -16,7 +17,7 @@ Consolidated skill for building with Bun runtime. Use decision trees below to fi
 
 ### "I need to run JavaScript/TypeScript"
 
-```
+```text
 Need to run code?
 ├─ Run a script file → bun run script.ts
 ├─ Run package.json scripts → bun run dev
@@ -28,7 +29,7 @@ Need to run code?
 
 ### "I need to manage dependencies"
 
-```
+```text
 Need package management?
 ├─ Install all dependencies → bun install
 ├─ Add a dependency → bun add package-name
@@ -40,7 +41,7 @@ Need package management?
 
 ### "I need to test my code"
 
-```
+```text
 Need testing?
 ├─ Logic / Backend / Utils?
 │  └─ Use Bun Test (Native)
@@ -62,7 +63,7 @@ Need testing?
 
 ### "I need to build for production"
 
-```
+```text
 Need bundling?
 ├─ Bundle for Bun runtime → bun build ./index.ts --outdir ./out
 ├─ Bundle for browser → bun build ./index.tsx --outdir ./out --target browser
@@ -74,7 +75,7 @@ Need bundling?
 
 ### "I need to configure TypeScript"
 
-```
+```text
 Need TypeScript setup?
 ├─ Initialize new project → bun init my-app
 ├─ Install types for Bun → bun add -d @types/bun
@@ -85,7 +86,7 @@ Need TypeScript setup?
 
 ### "I need to contribute to Bun"
 
-```
+```text
 Contributing to Bun core?
 ├─ Work on Zig bindings → references/internals/zig.md
 ├─ Work on C++ bindings → references/internals/cpp.md
@@ -96,6 +97,7 @@ Contributing to Bun core?
 ## Product Index
 
 ### Runtime & CLI
+
 | Product | Reference |
 |---------|-----------|
 | Installation | `references/installation/` |
@@ -104,6 +106,7 @@ Contributing to Bun core?
 | TypeScript Support | `references/typescript/` |
 
 ### Testing
+
 | Product | Reference |
 |---------|-----------|
 | Test Runner | `references/testing/` |
@@ -112,6 +115,7 @@ Contributing to Bun core?
 | Snapshots | `references/testing/` |
 
 ### Build Tools
+
 | Product | Reference |
 |---------|-----------|
 | Bundler | `references/bundling/` |
@@ -120,6 +124,7 @@ Contributing to Bun core?
 | Executables | `references/bundling/` |
 
 ### Best Practices
+
 | Product | Reference | Impact |
 |---------|-----------|--------|
 | Memory Management | `references/best-practices/` | CRITICAL |
@@ -129,6 +134,7 @@ Contributing to Bun core?
 | Build Optimization | `references/best-practices/` | MEDIUM |
 
 ### Internals (Contributors)
+
 | Product | Reference |
 |---------|-----------|
 | Zig Bindings | `references/internals/zig.md` |
@@ -138,21 +144,22 @@ Contributing to Bun core?
 ## Core Templates
 
 ### 1. Fast HTTP Server
+
 ```typescript
 // server.ts
 const server = Bun.serve({
   port: 3000,
   fetch(req) {
     const url = new URL(req.url);
-    
+
     if (url.pathname === '/') {
       return new Response('Hello World!');
     }
-    
+
     if (url.pathname === '/api/users') {
       return Response.json({ users: [] });
     }
-    
+
     return new Response('Not Found', { status: 404 });
   },
 });
@@ -161,6 +168,7 @@ console.log(`Server running at http://localhost:${server.port}`);
 ```
 
 ### 2. File Operations
+
 ```typescript
 // Read file
 const file = Bun.file('./data.txt');
@@ -176,21 +184,23 @@ const stream = file.stream();
 ```
 
 ### 3. Environment Variables
+
 ```typescript
 // Access env vars
-const apiKey = Bun.env.API_KEY;
+const configValue = Bun.env.APP_CONFIG_VALUE;
 const port = Bun.env.PORT || '3000';
 
 // Type-safe env (define in env.d.ts)
 declare module 'bun' {
   interface Env {
-    API_KEY: string;
+    APP_CONFIG_VALUE: string;
     DATABASE_URL: string;
   }
 }
 ```
 
 ### 4. Test with bun:test
+
 ```typescript
 import { test, expect, describe, beforeEach } from 'bun:test';
 
@@ -198,7 +208,7 @@ describe('Math operations', () => {
   test('adds 1 + 2 to equal 3', () => {
     expect(1 + 2).toBe(3);
   });
-  
+
   test('async operation', async () => {
     const result = await fetchData();
     expect(result).toBeDefined();
@@ -207,6 +217,7 @@ describe('Math operations', () => {
 ```
 
 ### 5. Bundle Configuration
+
 ```typescript
 // build.ts
 const result = await Bun.build({
@@ -303,6 +314,7 @@ bun --version              # Show version
 Project-specific contexts live in dedicated project skills.
 
 If you are in a multi-app repo, consult:
+
 - `project-context-catalog`
 - the matching project context skill (example: `project-minha-biblioteca-digital`)
 

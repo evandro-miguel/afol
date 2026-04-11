@@ -12,15 +12,18 @@ depends_on: ["<optional_plan_id>"]
 # Tasks: id-fix-check
 
 ## Task List
+
 - [ ] T-001 <task description>
 - [ ] T-002 <task description>
 
 ## State Board
+
 | Task | Checklist | State | Owner | Notes |
 |------|----------:|-------|-------|-------|
 | T-001 | - [ ] | pending | build | <note> |
 
 State values:
+
 - pending
 - in_progress
 - ready_for_test
@@ -37,9 +40,11 @@ See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/
 Before starting work, consult relevant resources:
 
 ### Prevention Rules
+
 - [ ] Check: [`.agents/a-docs/lessons/general-lessons.md`](.agents/a-docs/lessons/general-lessons.md)
 
 ### Useful Resources
+
 - Rules useful for this task:
   - [ ] <rule-1>
 - Docs useful for this task:
@@ -50,19 +55,23 @@ Before starting work, consult relevant resources:
   - [ ] <integracao-1>
 
 ## Implementation Checkpoint
+
 - Files touched:
   - <path>
 - Key decisions:
   - <decision>
 
 ## Test Gate
+
 - Move to `ready_for_test` only after implementation checkpoint.
 - Record command, result, and evidence before marking done.
 
 ### Test Evidence
+
 - Command: `<command>`
 - Result: <pass/fail>
 - Evidence: <paste output snippet or link>
 
 ---
+
 *Template: `.agents/a-docs/templates/task.md`*

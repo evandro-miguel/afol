@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Understanding how the `.agents` system is used requires tracking:
+
 - Which tools are used most
 - Session patterns and duration
 - Success/failure rates
@@ -145,7 +146,7 @@ def calculate_heat_scores(period):
 
 ### Formula
 
-```
+```text
 heat_score = (frequency × 0.5) + (recency × 0.3) + (success × 0.2)
 ```
 
@@ -169,7 +170,8 @@ heat_score = (frequency × 0.5) + (recency × 0.3) + (success × 0.2)
 ## Output Examples
 
 ### Heat Map
-```
+
+```text
 ======================================================================
 🔥 HEAT MAP - Element Usage & Engagement (weekly)
 ======================================================================
@@ -182,7 +184,8 @@ Total Elements: 6
 ```
 
 ### Report
-```
+
+```text
 ======================================================================
 TELEMETRY REPORT
 ======================================================================
@@ -203,4 +206,5 @@ SUMMARY
 - [agents-new.md](./agents-new.md) - Session creation
 
 ---
+
 *Document: `docs/agentic/agents-telemetry.md`*

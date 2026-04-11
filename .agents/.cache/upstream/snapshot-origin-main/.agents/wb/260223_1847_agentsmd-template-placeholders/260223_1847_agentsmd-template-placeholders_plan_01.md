@@ -17,9 +17,11 @@ links:
 # Plan: agentsmd-template-placeholders
 
 ## Objective
+
 - Convert root `AGENTS.md` into a pure generic template with placeholders only.
 
 ## Scope
+
 - In scope:
   - Remove repo-specific filled values from AGENTS sections.
   - Keep only template placeholders for tools, MCPs, skills, stack, and structure.
@@ -29,16 +31,19 @@ links:
   - Broader documentation refactors outside AGENTS and workstream docs.
 
 ## Success Criteria
+
 - `AGENTS.md` contains placeholders instead of concrete stack/tools/MCP/skills values.
 - `make sync` propagates template to `QWEN.md`, `CLAUDE.md`, and `GEMINI.md`.
 - `make lint` and `make verify` pass.
 
 ## Delivery Strategy
+
 1. Rewrite AGENTS as a template-only document.
 2. Sync replicated agent docs.
 3. Validate and document evidence.
 
 ## Critical Dependencies
+
 - Tools:
   - `make`
 - MCPs:
@@ -49,13 +54,16 @@ links:
   - Keep wording generic and avoid filling operational placeholders.
 
 ## Large Plan Handling
+
 - If this plan exceeds 500 lines, split into phases.
 - Create one task file per phase.
 
 ## Risks and Mitigations
+
 - Risk: accidentally reintroducing repo-specific values -> Mitigation: explicit placeholder blocks in all variable sections.
 
 ## Verification Plan
+
 - Unit: `N/A`
 - E2E: `N/A`
 - Typecheck: `N/A`
@@ -65,4 +73,5 @@ links:
   - `make verify`
 
 ---
+
 *Template: `.agents/a-docs/templates/plan.md`*

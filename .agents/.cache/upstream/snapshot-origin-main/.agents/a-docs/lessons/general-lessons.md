@@ -8,6 +8,7 @@ updated_at: '2026-02-23T17:54:59-03:00'
 # General Lessons
 
 ## Purpose
+
 Central repository of learnings and prevention rules.
 Updated after every user correction.
 
@@ -22,6 +23,7 @@ Lessons should be reviewed periodically:
 ## Lessons log
 
 ### 2026-02-23 - Initial setup
+
 **Context:** Creating standard agentic folder structure
 
 **Lesson:** Establish clear templates and standards upfront
@@ -31,6 +33,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** Template files include footer referencing their source path
 
 ### 2026-02-23 - Task marker format
+
 **Context:** Task markers were inconsistent in documentation
 
 **Lesson:** All task markers must follow `- [X]` format consistently
@@ -40,6 +43,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** Templates and AGENTS.md aligned to use consistent format
 
 ### 2026-02-23 - Lint scope for teaching docs
+
 **Context:** User clarified that `a-docs` and orientation docs are instructional and should not pollute lint signal.
 
 **Lesson:** Lint must prioritize operational artifacts and skip pedagogical documentation by default.
@@ -49,6 +53,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** Added `EXCLUDED_PATH_PREFIXES` and `should_skip_file()` in `.agents/scripts/agents-lint-docs.py`.
 
 ### 2026-02-23 - AGENTS.md must stay generic-first
+
 **Context:** User corrected direction: root `AGENTS.md` should remain a reusable generic project contract, not overfitted to one repository.
 
 **Lesson:** Keep root contract template-oriented with clear placeholders/sections for project overview, stack, structure, skills, and MCPs.
@@ -58,6 +63,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** Reframed root `AGENTS.md` with fixed section layout and current-repo-filled content blocks.
 
 ### 2026-02-23 - AGENTS.md must be placeholder-only template
+
 **Context:** User clarified the contract must be a pure template, not partially pre-filled.
 
 **Lesson:** For template repos, root `AGENTS.md` should keep placeholders in variable sections (stack, structure, skills, MCPs, tools).
@@ -67,6 +73,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** Rewrote `AGENTS.md` with `{...}` placeholders and removed concrete lists for tools/MCPs/skills.
 
 ### 2026-02-23 - Mandatory task IDs in checklists
+
 **Context:** User requested every checklist task to include an explicit task ID to improve automation and traceability.
 
 **Lesson:** Scripts should parse task items by canonical ID format, not only by checkbox markers.
@@ -76,6 +83,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** Updated `verify-tasks.py` to parse ID-based tasks and report open tasks with `ID + file + line`.
 
 ### 2026-02-23 - Avoid workbench folder sprawl
+
 **Context:** User requested reducing unnecessary creation of new workstream folders and creating full plan stacks only for significant changes.
 
 **Lesson:** Session lifecycle needs explicit "quick vs significant" intake and a single active session policy.
@@ -85,6 +93,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** `agents-new.py` now enforces one active session via `.agents/wb/.active_session` and provides `--quick` mode.
 
 ### 2026-02-23 - Centralize tool config in one file
+
 **Context:** User requested that tool behaviors be configurable per project through a single file instead of hardcoded values across scripts.
 
 **Lesson:** Operational scripts must share one configuration source for paths/timezone/exclusions/targets.
@@ -94,6 +103,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** Added shared loader (`.agents/scripts/lib/agents_config.py`) and root `agents.config`; migrated core scripts to read from it.
 
 ### 2026-02-23 - AGENTS.md must remain template-first
+
 **Context:** User requested AGENTS.md to stay generic, with placeholders and operational management tool guidance.
 
 **Lesson:** Root AGENTS contract should be reusable across projects and avoid overfitting concrete project values.
@@ -103,6 +113,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** Keep AGENTS sections for placeholders, management workflows, verification, and tools discovery/operations.
 
 ### 2026-02-23 - Keep AGENTS tools section concise and discovery-first
+
 **Context:** User requested listing only main tools and delegating command details to tool discovery.
 
 **Lesson:** Template AGENTS should avoid long static command inventories that get stale.
@@ -112,6 +123,7 @@ Lessons should be reviewed periodically:
 **Guardrail:** Use a short `Main Tools` section and a `Discovery-First Rule` block in template AGENTS.
 
 ### 2026-02-23 - Default repository language must be English
+
 **Context:** User requested an explicit language rule for repository content.
 
 **Lesson:** Language consistency is part of repository quality and collaboration standards.
@@ -158,4 +170,5 @@ Lessons should be reviewed periodically:
 - Root `AGENTS.md` includes explicit `Language Policy` enforcing English as default
 
 ---
+
 *Lessons: `.agents/a-docs/lessons/general-lessons.md`*

@@ -7,11 +7,11 @@ updated_at: 2026-02-23T00:00:00Z
 title: "Checkbox Protocol Standard"
 ---
 
-# Checkbox Protocol
+## Checkbox Protocol
 
 This document defines the standard checklist markers used across all agent documentation.
 
-## State Markers
+### State Markers
 
 | Marker | Meaning | When to Use |
 |--------|---------|-------------|
@@ -22,7 +22,7 @@ This document defines the standard checklist markers used across all agent docum
 | `- [>]` | Skipped | Skipped by user request (requires log entry) |
 | `- [x]` | Done | Tested and verified |
 
-## Marker Authorization Rules
+### Marker Authorization Rules
 
 | Marker | Who can set | Requires log |
 |--------|-------------|--------------|
@@ -35,12 +35,13 @@ This document defines the standard checklist markers used across all agent docum
 
 **Agents MUST NOT set `- [>]` without explicit user authorization.**
 
-### Fallback for Unsupported Tools
+#### Fallback for Unsupported Tools
 
 If a tool cannot parse `- [/]` or `- [%]`, it must fall back to:
+
 - `- [ ]` with a `state: in_progress` or `ready_for_test` in the State Board.
 
-## Blocked Tasks Protocol
+### Blocked Tasks Protocol
 
 When marking a task with `- [!]`:
 
@@ -51,7 +52,7 @@ When marking a task with `- [!]`:
 
 See: `docs/templates/blocks.md`
 
-## Skipped Tasks Protocol
+### Skipped Tasks Protocol
 
 When a task is marked with `- [>]`:
 

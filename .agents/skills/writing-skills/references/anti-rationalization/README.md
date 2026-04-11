@@ -129,7 +129,7 @@ You should write tests first.
 Generally, test before code.
 It's better to test first.
 
-# Strong
+## Strong
 
 ALWAYS write test first.
 NEVER write code before test.

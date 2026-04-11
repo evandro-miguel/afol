@@ -10,11 +10,13 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 # GENERAL ROADMAP
 
 ## 1) North Star
+
 - <long-term product direction>
 - <why this repository exists>
 - <what success looks like for users and maintainers>
 
 ## 2) Mandatory Operating Model
+
 - Every meaningful feature must exist in this roadmap before implementation starts.
 - Every roadmap feature must link to one parent spec.
 - Large features must declare child specs before execution starts.
@@ -23,6 +25,7 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 - Execution artifacts define delivery, verification, and outcomes.
 
 ## 3) Current Phase
+
 - Phase: <current phase>
 - Goal: <phase goal>
 - Definition of done:
@@ -31,6 +34,7 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 ## 4) Feature Portfolio
 
 ### F-01 <feature title>
+
 - Status: planned
 - Why: <why this feature matters>
 - Governing spec: `docs/arc/SPECS/<parent-spec-file>.md`
@@ -47,6 +51,7 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
   - [ ] Implement through linked workstreams
 
 ### F-02 <feature title>
+
 - Status: planned
 - Why: <why this feature matters>
 - Governing spec: `docs/arc/SPECS/<parent-spec-file>.md`
@@ -60,6 +65,7 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
   - [ ] <task>
 
 ## 5) Backlog Rules
+
 - No non-trivial implementation without a roadmap feature.
 - No roadmap feature without a governing parent spec.
 - No large feature without child-spec decomposition.
@@ -67,7 +73,9 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 - Close roadmap tasks only when linked work and verification are complete.
 
 ## 6) Prioritization
+
 Score inputs:
+
 - User impact
 - Strategic leverage
 - Risk reduction
@@ -75,13 +83,16 @@ Score inputs:
 - Effort
 
 Tie-breaker:
+
 - Prefer features that unblock other roadmap items.
 
 ## 7) Risks
+
 - <risk> -> <mitigation>
 - <risk> -> <mitigation>
 
 ## 8) Operating Cadence
+
 - Weekly review:
   - roadmap status changes
   - new features added or removed
@@ -90,4 +101,5 @@ Tie-breaker:
   - blocked features and follow-ups
 
 ---
+
 *Template: `docs/templates/roadmap.md`*

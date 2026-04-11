@@ -18,7 +18,7 @@ updated_at: "2026-02-23T00:00:00Z"
 
 ## Directory Tree
 
-```
+```text
 project-root/
 ├── .agents/                  # Agentic system
 │   ├── a-docs/               # Documentation
@@ -81,7 +81,7 @@ Files that should be colocated:
 
 ## Import Conventions
 
-```
+```text
 # Internal imports
 import { X } from './module'
 
@@ -96,4 +96,5 @@ import { Y } from '../sibling'
 - Workbench: `.agents/wb/`
 
 ---
+
 *Structure: `.agents/arc/structure/default.md`*

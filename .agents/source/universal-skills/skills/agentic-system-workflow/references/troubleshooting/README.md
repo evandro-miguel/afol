@@ -12,9 +12,11 @@ unclear.
 ## 1. Bootstrap Fails on a New Path
 
 Symptom:
+
 - `Target directory not found`
 
 Cause:
+
 - the target path points to a file, or the bootstrap path is malformed
 
 Fix:
@@ -28,21 +30,26 @@ Full bootstrap creates the target directory when it is missing.
 ## 2. Partial Install Fails
 
 Symptom:
+
 - `Partial install requires an existing target directory`
 
 Cause:
+
 - `--partial` is only for an already existing repo
 
 Fix:
+
 - create the repo first
 - use full bootstrap for a new repo
 
 ## 3. Pull Did Not Update Installed Skills
 
 Symptom:
+
 - upstream refresh ran, but `.agents/skills/` did not change
 
 Cause:
+
 - `skills-sync pull` only refreshed the source or git mirror
 
 Fix:

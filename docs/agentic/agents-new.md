@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Creating a governed workstream manually requires:
+
 - Naming folder correctly (YYMMDD_HHMM_theme_type_N)
 - Copying templates
 - Filling frontmatter
@@ -31,9 +32,10 @@ Creates or extends a workstream with:
 1. **Session folder** - Standardized name
 2. **Intent-selected artifacts** - only the docs required by the chosen intent or explicit `--with` flags
 3. **Spec file** (optional) - Full or lite specification
-5. **Updates .active_session** - Points to new session
+4. **Updates .active_session** - Points to new session
 
 Artifact creation now has two layers:
+
 - `workflow.artifact_manifest`: catalog of supported artifact types
 - `workflow.artifact_policy`: intent-based policy for what should actually be materialized
 
@@ -59,7 +61,8 @@ distinguishes missing artifacts from invalid placeholder-only artifacts.
 ### Files Created
 
 Delivery default:
-```
+
+```text
 .agents/wb/
 └── YYMMDD_HHMM_<theme>/
     ├── YYMMDD_HHMM_<theme>_task_01.md
@@ -67,12 +70,14 @@ Delivery default:
 ```
 
 Research example:
+
 ```text
 .agents/wb/YYMMDD_HHMM_<theme>/
 └── YYMMDD_HHMM_<theme>_research_01.md
 ```
 
 Closure example:
+
 ```text
 .agents/wb/YYMMDD_HHMM_<theme>/
 └── YYMMDD_HHMM_<theme>_report_01.md
@@ -248,7 +253,7 @@ cat .agents/wb/.active_session
 
 ## Output
 
-```
+```text
 ============================================================
 Creating new workstream: auth-refactor
 ============================================================
@@ -278,4 +283,5 @@ Next steps:
 - `docs/templates/` - Template files
 
 ---
+
 *Document: `docs/agentic/agents-new.md`*

@@ -24,22 +24,27 @@ links:
 # Report: <theme>
 
 ## Governance Context
+
 - Roadmap feature: `<feature_id>`
 - Parent spec: `<parent_spec_id>`
 - Child spec: `<child_spec_id_or_empty>`
 
 ## Summary
+
 - <high-level outcome>
 
 ## Delivered Changes
+
 - <change 1>
 - <change 2>
 
 ## Files Changed
+
 - <path>
 - <path>
 
 ## Verification
+
 - Unit tests: `<command>` -> <pass/fail> -> Evidence: <snippet/link>
 - E2E tests: `<command>` -> <pass/fail> -> Evidence: <snippet/link>
 - Typecheck: `<command>` -> <pass/fail> -> Evidence: <snippet/link>
@@ -48,13 +53,17 @@ links:
   - <check> -> <result> -> Evidence: <snippet/link>
 
 ## Risks / Follow-ups
+
 - <open item>
 
 ## Postmortem Link
+
 - Postmortem: `<postmortem_doc_id>`
 
 ## Lessons (if any)
+
 - <what to avoid next time>
 
 ---
+
 *Template: `docs/templates/report.md`*

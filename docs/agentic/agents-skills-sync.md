@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Projects need consistent skill definitions across repositories. Manual skill management leads to:
+
 - Inconsistent skill definitions
 - Outdated skill versions
 - Missing skill dependencies
@@ -38,6 +39,7 @@ Synchronizes project skills:
 10. **Push** - Publish selected local skills back to the git-backed source
 
 Current contract note:
+
 - The scaffold currently uses a compatibility manifest with selected skills and mode.
 - F-10 evolves that contract toward pinned repo/ref/profile semantics without turning the scaffold into a second skills distribution system.
 - Bootstrapped repos receive a repo-local source seed under `.agents/source/universal-skills`, so the default sync path is local-first.
@@ -83,6 +85,7 @@ skills_sync:
 ```
 
 Partial-install note:
+
 - Existing repositories should adopt the scaffold with `bootstrap --partial` so the skills surface is added without overwriting project-owned files.
 - The bootstrap baseline is generic and history-free; do not copy scaffold-local workbench history into downstream repos.
 
@@ -175,7 +178,7 @@ flow from the project-local skill surface.
 
 ## Skill Structure
 
-```
+```text
 .agents/skills/
 └── <skill-name>/
     ├── SKILL.md           # Skill definition
@@ -187,7 +190,8 @@ flow from the project-local skill surface.
 ## Output Examples
 
 ### Init
-```
+
+```text
 → Initializing skills sync...
 ✓ Resolved local source directory
 ✓ Found repo-local source seed
@@ -195,7 +199,8 @@ flow from the project-local skill surface.
 ```
 
 ### Plan
-```
+
+```text
 → Planning skills sync...
 
 Skills to sync:
@@ -208,7 +213,8 @@ Changes:
 ```
 
 ### Apply
-```
+
+```text
 → Applying skills...
 ✓ Applied writing-skills
 ✓ Applied markdownlint-skill
@@ -221,4 +227,5 @@ Changes:
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/agents-skills-sync.md`*

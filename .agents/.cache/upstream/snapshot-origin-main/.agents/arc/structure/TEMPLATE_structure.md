@@ -18,7 +18,7 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 ## Directory Tree
 
-```
+```text
 <project-root>/
 ├── <dir>/                    # <purpose>
 │   ├── <subdir>/             # <purpose>
@@ -63,7 +63,7 @@ Files that should be colocated:
 
 ## Import Conventions
 
-```
+```text
 # Internal imports
 import { X } from '@scope/module'
 
@@ -87,4 +87,5 @@ import { Z } from './sibling'
 - Architecture: `.agents/arc/ARCHITECTURE.md`
 
 ---
+
 *Template: `.agents/arc/structure/TEMPLATE_structure.md`*

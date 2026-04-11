@@ -14,10 +14,12 @@ links:
 # Report: agentsmd-generic-reframe
 
 ## Summary
+
 - Root `AGENTS.md` was rewritten into a generic-first project contract format.
 - The new version keeps reusable sections and fills them with current repo context.
 
 ## Delivered Changes
+
 - Reframed `AGENTS.md` to the requested structure:
   - Project overview
   - Current stack
@@ -34,6 +36,7 @@ links:
 - Added lesson entry for "generic-first AGENTS contract" correction pattern.
 
 ## Files Changed
+
 - `AGENTS.md`
 - `QWEN.md`
 - `CLAUDE.md`
@@ -46,17 +49,21 @@ links:
 - `.agents/wb/260223_1839_agentsmd-generic-reframe/260223_1839_agentsmd-generic-reframe_report_01.md`
 
 ## Verification
+
 - `make sync` -> pass -> 3 files updated (`QWEN.md`, `CLAUDE.md`, `GEMINI.md`).
 - `make lint` -> pass -> 26 files checked, 0 issues.
 - `make verify` -> pass -> all task files completed/skipped as expected.
 - `make all` -> pass -> doctor + structure + index + verify completed.
 
 ## Risks / Follow-ups
+
 - Commands section intentionally marks dev/test/build as `N/A` for this baseline repo. If the repo evolves into runnable software, update those commands.
 
 ## Spec Evidence
+
 - Spec ID: `260223_1839_agentsmd-generic-reframe_spec-lite_01`
 - Evidence: verification commands above satisfy spec done criteria.
 
 ---
+
 *Template: `.agents/a-docs/templates/report.md`*

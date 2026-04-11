@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** `.agents/agents` commands are verbose for frequent use. Developers prefer:
+
 - Short commands
 - Shell autocomplete
 - Composed workflows
@@ -114,7 +115,7 @@ make new THEME=test
 
 ## Output
 
-```
+```text
 ╔═══════════════════════════════════════════════════════════╗
 ║         Agents System - Available Commands                ║
 ╠═══════════════════════════════════════════════════════════╣
@@ -131,4 +132,5 @@ make new THEME=test
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/makefile.md`*

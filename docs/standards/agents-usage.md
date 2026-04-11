@@ -51,6 +51,7 @@ make all
 ```
 
 Wrapper contract:
+
 - Use `.agents/scripts/.venv` directly for normal command execution when it exists.
 - Require `uv` only for setup or environment refresh.
 - Keep UV cache writes inside `.agents/cache/uv/` so the scaffold remains usable in isolated workspaces.
@@ -125,10 +126,12 @@ Wrapper contract:
 | `make init` | Setup + doctor |
 
 Bootstrap workflow note:
+
 - Fresh repos use the full bootstrap path.
 - Existing repos should use the partial install path so the scaffold adds missing files without overwriting the live project unless `--force` is intentionally supplied.
 
 External memory workflow note:
+
 - Start with repo-local `knowledge` for project history.
 - Use `memory` when cross-project or durable external context is still needed.
 - Do not treat external memory results as authoritative plan/task/report state for the current repo.
@@ -140,6 +143,7 @@ External memory workflow note:
 Validates `.agents` folder structure and integrity.
 
 **Checks:**
+
 - Required folders exist
 - Templates are present
 - YAML frontmatter is valid
@@ -147,6 +151,7 @@ Validates `.agents` folder structure and integrity.
 - Timestamps are ISO 8601 with Z suffix
 
 **Usage:**
+
 ```bash
 make doctor
 # OR
@@ -162,12 +167,14 @@ uv run --with pyyaml .agents/scripts/agents-doctor.py
 Creates or extends a workstream with only the artifacts justified by the selected intent.
 
 **Creates:**
+
 - Session folder with proper naming
 - Only the artifacts justified by the selected intent
 - Optional spec file (`--spec` or `--spec-lite`)
 - Sets `.agents/wb/.active_session`
 
 **Catalog + policy contract:**
+
 - The generated artifact order is declared in `.agents/agents.config` under `workflow.artifact_manifest`.
 - The catalog is an ordered `artifacts:` list with `doc_type`, `template`, `phase`, `purpose`, optional `depends_on`, and optional `flag` / `id_placeholder` / `replacements`.
 - `workflow.artifact_policy` defines which artifacts are created by default for each intent.
@@ -177,11 +184,13 @@ Creates or extends a workstream with only the artifacts justified by the selecte
 - `agents-status` reads the same catalog + policy to summarize which artifacts are missing, blocked, invalid, ready, or done.
 
 **Policy:**
+
 - One active workstream at a time
 - Use `--quick` for non-significant tasks (no new folder)
 - Use `--force-new` only for significant new streams
 
 **Usage:**
+
 ```bash
 # Basic delivery (task only by default)
 make new THEME=auth-refactor SPEC=lite
@@ -213,14 +222,17 @@ make quick THEME=small-fix
 Updates INDEX.md files for SPECS and ADRs.
 
 **Scans:**
+
 - `docs/arc/SPECS/` for spec files
 - `docs/arc/DECISIONS/` for adr files
 
 **Updates:**
+
 - `docs/arc/SPECS/INDEX.md`
 - `docs/arc/DECISIONS/INDEX.md`
 
 **Usage:**
+
 ```bash
 make index
 # OR
@@ -234,6 +246,7 @@ make index
 Validates markdown docs for consistency.
 
 **Checks:**
+
 - Checkbox markers are consistent (`- [X]` format)
 - Status fields are valid
 - State values are valid
@@ -242,6 +255,7 @@ Validates markdown docs for consistency.
 - Raw codemap evidence under `.agents/arc/map/extra/` and `docs/map/extra/` is excluded from markdown lint
 
 **Usage:**
+
 ```bash
 make lint
 # OR
@@ -257,12 +271,14 @@ make lint
 Auto-generates project structure documentation.
 
 **Features:**
+
 - Scans project and categorizes files
 - Generates markdown with file inventory
 - Incremental updates via cache
 - Descriptions for each file
 
 **Usage:**
+
 ```bash
 make structure
 # OR
@@ -272,6 +288,7 @@ make structure
 ```
 
 **Output:**
+
 - `README.md` - Overview with metrics
 - `frontend.md` - Components, hooks, UI
 - `backend.md` - Services, utils, API
@@ -287,6 +304,7 @@ make structure
 Runs the full repository codemap pipeline for `docs/map/`.
 
 **Features:**
+
 - Wraps the external `run-repo-map.sh` runner with project-local command semantics
 - Resolves output root, Docker image, and runner path deterministically
 - Runs analysis against a temporary shadow copy of the repo so generated map artifacts do not self-pollute the scan
@@ -294,6 +312,7 @@ Runs the full repository codemap pipeline for `docs/map/`.
 - Keeps full current-state mapping separate from lightweight `structure-map`
 
 **Usage:**
+
 ```bash
 make repo-map
 # OR
@@ -303,6 +322,7 @@ make repo-map
 ```
 
 **Output:**
+
 - `docs/map/*.md` - Distilled repository codemap docs
 - `docs/map/extra/` - Raw evidence and machine-readable artifacts
 
@@ -313,11 +333,13 @@ make repo-map
 Syncs AGENTS.md content to QWEN.md, CLAUDE.md, GEMINI.md.
 
 **Features:**
+
 - Detects local modifications
 - Asks before overwriting
 - `--force` to overwrite without asking
 
 **Usage:**
+
 ```bash
 make sync
 # OR
@@ -333,6 +355,7 @@ make sync
 Verifies all tasks in a session are completed.
 
 **Checks:**
+
 - Task lines with IDs in format `- [ ] T-01 ...` (supports `T-001` too)
 - All parsed tasks marked with `- [x]`
 - Reports status of each task
@@ -340,6 +363,7 @@ Verifies all tasks in a session are completed.
 - Returns error if incomplete
 
 **Usage:**
+
 ```bash
 make verify
 # OR
@@ -355,6 +379,7 @@ make verify
 Shows current execution state for active or selected workstream session.
 
 **Checks:**
+
 - Resolves canonical artifacts (`plan`, `task`, `spec`, `report`, `roadmap`, `session`)
 - Summarizes task progress and identifies next task
 - Reuses the artifact manifest to show workflow artifact readiness and blockers
@@ -362,6 +387,7 @@ Shows current execution state for active or selected workstream session.
 - Supports `--json` output
 
 **Usage:**
+
 ```bash
 .agents/agents status
 .agents/agents status --session .agents/wb/260306_2128_context-driven-execution-commands
@@ -373,16 +399,19 @@ Shows current execution state for active or selected workstream session.
 Closes a session after strict verification passes and optionally repoints the active-session pointer.
 
 **Catchup behavior:**
+
 - Summarizes working-tree drift inside and outside the target session
 - Flags missing or stale `plan`/`research`/`log`/`report` artifacts
 - Recommends the next safe step before implementation continues
 
 **Checks:**
+
 - Runs strict task/workbench verification before closure
 - Refuses closure if the session is not in a final, coherent state
 - Supports reassigning `.agents/wb/.active_session` to another session
 
 **Usage:**
+
 ```bash
 .agents/agents session catchup
 .agents/agents session catchup --session .agents/wb/260306_2128_context-driven-execution-commands
@@ -462,6 +491,7 @@ cd .agents/scripts && uv sync
 ```
 
 This creates:
+
 - `.venv/` - Isolated Python virtualenv
 - `uv.lock` - Locked dependencies
 
@@ -493,6 +523,7 @@ This creates:
 Automates common metadata edits to avoid manual WB file editing.
 
 **Commands:**
+
 - `touch` -> update `updated_at` in session files (supports `--all-wb`)
 - `files-changed` -> refresh report `## Files Changed` from git status
 - `task` -> mark task by ID (`T-01`/`T-001`) and sync state board row
@@ -501,6 +532,7 @@ Automates common metadata edits to avoid manual WB file editing.
 - `link` -> set frontmatter `links.<key>` value
 
 **Examples:**
+
 ```bash
 make wb-touch
 make wb-files-changed
@@ -515,11 +547,13 @@ make wb-link FILE=report KEY=spec VALUE=260223_1855_task-id-standardization_spec
 ```
 
 ---
+
 ### agents-tools.py
 
 Discovers and validates the tools catalog used by autonomous agents.
 
 **Commands:**
+
 - `list` -> list tools (optional `--type`)
 - `info` -> detailed tool metadata and subcommands
 - `search` -> keyword lookup across descriptions/usages
@@ -527,6 +561,7 @@ Discovers and validates the tools catalog used by autonomous agents.
 - `help` -> CLI help
 
 **Examples:**
+
 ```bash
 .agents/agents tools list
 .agents/agents tools info wb-update
@@ -564,4 +599,5 @@ Detailed playbook: `docs/standards/bootstrap-other-repo.md`
 ---
 
 ---
+
 *Standard: `docs/standards/agents-usage.md`*

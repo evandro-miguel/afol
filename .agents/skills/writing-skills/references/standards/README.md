@@ -71,7 +71,7 @@ bun .agents/skills/writing-skills/scripts/check-universal-skills-sync.js
 
 ## Directory Structure
 
-```
+```text
 ~/.config/opencode/skills/
   {skill-name}/           # kebab-case, matches `name` field
     SKILL.md              # Required: main skill definition
@@ -81,7 +81,8 @@ bun .agents/skills/writing-skills/scripts/check-universal-skills-sync.js
 ```
 
 **Project-local alternative:**
-```
+
+```text
 .agents/skills/{skill-name}/SKILL.md
 ```
 
@@ -157,6 +158,7 @@ metadata:
 ```
 
 **Rules:**
+
 - Start with "Use when..."
 - Put triggers under `metadata.triggers`
 - Keep under 500 characters
@@ -184,7 +186,7 @@ Skills load into context on-demand. Optimize for token usage:
 
 For complex skills, use additional files:
 
-```
+```text
 my-skill/
   SKILL.md              # Overview + navigation
   patterns.md           # Detailed patterns
@@ -206,6 +208,7 @@ metadata:
 This frontmatter helps the LLM locate the right file when referenced from `SKILL.md`.
 
 Reference from SKILL.md:
+
 ```markdown
 ## Detailed Reference
 

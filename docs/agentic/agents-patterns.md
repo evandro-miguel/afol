@@ -17,6 +17,7 @@ links:
 ## Why It Exists
 
 **Problem:** Developers and agents need guidance on best practices. Without a pattern catalog:
+
 - Same mistakes repeated
 - Best practices not shared
 - No tracking of what works
@@ -151,25 +152,31 @@ effectiveness: high|medium|low
 # Pattern: Name
 
 ## Context
+
 When does this apply?
 
 ## Pattern
+
 What is the approach?
 
 ## Why It Works
+
 Rationale and evidence.
 
 ## Examples
+
 Good and bad examples.
 
 ## Evidence
+
 Links to sessions/reports.
 ```
 
 ## Output Examples
 
 ### Suggest
-```
+
+```text
 Suggested patterns for theme='auth-refactor':
 
 ID         Type       Name                           Effectiveness   Tags
@@ -179,7 +186,8 @@ PAT-002    success    Single Active Session          high            process, wo
 ```
 
 ### List
-```
+
+```text
 ID         Type       Name                           Effectiveness   Tags
 ------------------------------------------------------------------------------------------
 PAT-001    success    Discovery-First Tool Usage     high            process, tools
@@ -188,7 +196,8 @@ PAT-101    anti       Workbench Sprawl               high            process, wo
 ```
 
 ### Show
-```
+
+```text
 ============================================================
 PATTERN: PAT-001
 ============================================================
@@ -209,6 +218,7 @@ Always discover tools before using them...
 ## Heat Integration
 
 Patterns are tracked in telemetry:
+
 - `pattern_applied` event when applied
 - Heat score calculated by period
 - Effectiveness tracked over time
@@ -220,4 +230,5 @@ Patterns are tracked in telemetry:
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/agents-patterns.md`*

@@ -7,31 +7,29 @@ created_at: "2026-04-02T23:17:01Z"
 updated_at: "2026-04-02T23:17:01Z"
 ---
 
-# Backend
+## Backend
 
-## Backend Shape
+### Backend Shape
 
 - This file focuses on server-side logic, public request boundaries, jobs, scripts, data access, and outbound integrations.
 - Use it to answer which runtime surface owns a workflow, where data crosses trust boundaries, and which files coordinate backend behavior.
 
-## Backend Domains
+### Backend Domains
 
+### High-Leverage Backend Files
 
-## High-Leverage Backend Files
-
-
-## Backend Public Boundaries
+### Backend Public Boundaries
 
 - No public backend boundary files were detected in the scanned scope.
 
-## Structural Support Surfaces
+### Structural Support Surfaces
 
 - No additional backend support surfaces were detected beyond dependency and symbol signals.
 
-## Integration Surfaces
+### Integration Surfaces
 
 - No external fetch surfaces detected in the scanned scope.
 
-## Backend Risk Signals
+### Backend Risk Signals
 
 - No Semgrep findings detected in the analyzed backend surfaces.

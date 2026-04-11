@@ -134,4 +134,5 @@ After initial setup in each repository:
 - Drift issues and resolution notes
 
 ---
+
 *Standard: `docs/standards/skills-sync.md`*

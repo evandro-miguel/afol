@@ -17,6 +17,7 @@ links:
 ## Why It Exists
 
 **Problem:** Interactive agent runtimes can use external memory MCP servers, but the scaffold previously had no governed way to:
+
 - distinguish repo-local `knowledge` from external memory
 - tell an agent which server and tool to call
 - express the correct boundary between auxiliary retrieval and canonical project state
@@ -34,6 +35,7 @@ links:
 5. **Protects governance** - explicitly keeps `.agents/wb/` and repo-local `knowledge` canonical
 
 Important constraint:
+
 - This tool does **not** execute MCP tool calls from shell.
 - It tells the host runtime what to call.
 
@@ -83,6 +85,7 @@ memory:
 ```
 
 Meaning of the key fields:
+
 - `provider`: logical provider id understood by the scaffold
 - `mode`: currently `contract`; the scaffold emits runtime contracts rather than executing MCP itself
 - `authority`: should remain `auxiliary`, because external memory is not canonical workbench state
@@ -117,6 +120,7 @@ Meaning of the key fields:
 3. Only then widen repo rereads or other exploration.
 
 This preserves:
+
 - `.agents/wb/` as canonical execution state
 - repo-local `knowledge` as canonical reusable project history
 - external memory as auxiliary retrieval
@@ -159,6 +163,7 @@ def cmd_context(args: argparse.Namespace) -> int:
 ## Output Characteristics
 
 Expected output includes:
+
 - exact server name
 - exact tool name
 - exact JSON arguments
@@ -172,4 +177,5 @@ Expected output includes:
 - [../standards/agents-usage.md](../standards/agents-usage.md) - operator usage
 
 ---
+
 *Document: `docs/agentic/agents-memory.md`*

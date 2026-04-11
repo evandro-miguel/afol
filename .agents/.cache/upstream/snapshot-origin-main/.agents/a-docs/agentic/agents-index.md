@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Specs e ADRs são criados em diretórios separados. Sem um índice centralizado, é difícil:
+
 - Descobrir documentos existentes
 - Ver status de cada documento
 - Navegar entre documentos relacionados
@@ -30,6 +31,7 @@ Escaneia diretórios e gera índices:
 2. **DECISIONS/INDEX.md** - Lista todas as decisões de arquitetura
 
 Extrai do frontmatter:
+
 - ID, tema, status
 - Owner, created_at, updated_at
 - Links relacionados

@@ -13,23 +13,27 @@ Patterns for writing skills that perform consistently across different model siz
 Control how much autonomy you give the agent. Calibrate based on task criticality.
 
 ### Low Freedom (Strict)
+
 Use when precision is critical. Agent follows exact steps.
 
 ```markdown
 ## Deploy Process
+
 1. Run `bun run build`
 2. Run `bun run test`
 3. If tests pass, run `bun run deploy`
-4. Verify deployment at https://example.com/health
+4. Verify deployment at <https://example.com/health>
 ```
 
 **When to use:** CI/CD, database migrations, security-critical operations.
 
 ### Medium Freedom (Guided)
+
 Provide structure but allow agent judgment for implementation details.
 
 ```markdown
 ## API Integration
+
 1. Create auth client using project credentials
 2. Implement retry logic (3 attempts, exponential backoff)
 3. Add error handling for rate limits and auth failures
@@ -39,13 +43,16 @@ Provide structure but allow agent judgment for implementation details.
 **When to use:** Feature implementation, refactoring, integrations.
 
 ### High Freedom (Autonomous)
+
 Define the outcome, let agent determine approach.
 
 ```markdown
 ## Goal
+
 Improve page load time by 40%.
 
 ## Constraints
+
 - Maintain visual parity
 - No breaking changes to public API
 - Changes must pass existing tests
@@ -60,17 +67,19 @@ Improve page load time by 40%.
 Keep SKILL.md under 500 lines. Use these patterns to manage complexity.
 
 ### Pattern 1: Simple (Single File)
+
 Everything in one SKILL.md. Best for Tier 1 skills.
 
-```
+```text
 skill-name/
 └── SKILL.md  (< 200 lines)
 ```
 
 ### Pattern 2: Bundled (Reference Files)
+
 Main file + supporting docs. Best for Tier 2 skills.
 
-```
+```text
 skill-name/
 ├── SKILL.md  (< 300 lines, links to references)
 └── references/
@@ -79,9 +88,10 @@ skill-name/
 ```
 
 ### Pattern 3: Conditional (Decision Tree)
+
 Load only what's needed. Best for Tier 3 skills.
 
-```
+```text
 skill-name/
 ├── SKILL.md  (decision tree only, < 100 lines)
 └── references/
@@ -97,11 +107,13 @@ skill-name/
 The `description` field is critical for discovery. Follow these rules:
 
 ### Format
+
 ```yaml
 description: Use when [specific trigger condition].
 ```
 
 ### Examples
+
 ```yaml
 # ✅ GOOD
 description: Use when deploying Cloudflare Workers with wrangler and environment bindings.
@@ -115,6 +127,7 @@ description: >-
 ```
 
 ### Checklist
+
 - [ ] Starts with "Use when..."
 - [ ] Contains trigger conditions, not workflow summary
 - [ ] Under 1024 characters

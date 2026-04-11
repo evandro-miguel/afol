@@ -12,6 +12,7 @@ updated_at: "2026-02-23T00:00:00Z"
 **No manual recording needed!** Telemetry is automatic.
 
 Every time you run `.agents/agents <command>`, the system captures:
+
 - Tool usage (`tool_exec`)
 - Session start/end
 - Task completion
@@ -33,6 +34,7 @@ make telemetry-report
 ```
 
 ### Query Events
+
 ```bash
 # Recent events
 python3 .agents/scripts/agents-telemetry.py query --limit=20
@@ -51,6 +53,7 @@ python3 .agents/scripts/agents-telemetry.py query --format=json --limit=100
 ```
 
 ### Reports
+
 ```bash
 # Weekly report
 make telemetry-report
@@ -66,6 +69,7 @@ make telemetry-report PERIOD=all
 ```
 
 ### Export & Validate
+
 ```bash
 # Export to JSON
 make telemetry-export FORMAT=json OUTPUT=backup.json
@@ -82,6 +86,7 @@ make telemetry-validate
 ## Patterns Commands
 
 ### Discover Patterns
+
 ```bash
 # Suggest by theme
 make patterns-suggest THEME=auth-refactor
@@ -100,6 +105,7 @@ make patterns-show PATTERN_ID=PAT-001
 ```
 
 ### Apply & Rate
+
 ```bash
 # Apply pattern (records in telemetry)
 make patterns-apply PATTERN_ID=PAT-001
@@ -138,6 +144,7 @@ make patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high
 ## Common Workflows
 
 ### Start Work Session
+
 ```bash
 # 1. Get pattern suggestions
 make patterns-suggest THEME=my-feature
@@ -150,6 +157,7 @@ make telemetry-record EVENT_TYPE=session_start METADATA='{"theme":"my-feature"}'
 ```
 
 ### During Work
+
 ```bash
 # Record tool usage
 make telemetry-record EVENT_TYPE=tool_exec METADATA='{"tool_name":"agents-new","outcome":"success"}'
@@ -159,6 +167,7 @@ make telemetry-record EVENT_TYPE=blocker METADATA='{"blocker_reason":"need clari
 ```
 
 ### Complete Session
+
 ```bash
 # Record session end
 make telemetry-record EVENT_TYPE=session_end OUTCOME=success METADATA='{"duration_seconds":3600}'
@@ -168,6 +177,7 @@ make telemetry-report
 ```
 
 ### Weekly Review
+
 ```bash
 # Generate weekly report
 make telemetry-report PERIOD=weekly
@@ -183,7 +193,7 @@ make telemetry-export FORMAT=json OUTPUT=weekly_backup.json
 
 ## File Locations
 
-```
+```text
 .agents/
 ├── scripts/
 │   ├── agents-telemetry.py      # Telemetry CLI

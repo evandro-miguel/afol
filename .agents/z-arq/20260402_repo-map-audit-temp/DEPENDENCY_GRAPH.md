@@ -7,34 +7,34 @@ created_at: "2026-04-02T23:17:11Z"
 updated_at: "2026-04-02T23:17:11Z"
 ---
 
-# Dependency Graph
+## Dependency Graph
 
-## How To Read This File
+### How To Read This File
 
 - Fan-in (`Ca`) highlights files other code depends on heavily.
 - Fan-out (`Ce`) highlights files that coordinate many downstream concerns.
 - Instability near `1.00` often marks orchestration or test entry surfaces; interpret it with role context.
 
-## Graph Source
+### Graph Source
 
 - Primary summary source: `extra/phase1/depcruise.json`
 
-## Cycle Summary
+### Cycle Summary
 
 - Cycles detected: `0`
 
 - No cycles detected
 
-## Orphan Modules
+### Orphan Modules
 
 - `Processed 0 files (1.1s) (16 warnings)`
 
-## Files That Other Code Relies On
+### Files That Other Code Relies On
 
 | Path | Ca | Ce | I |
 | --- | ---: | ---: | ---: |
 
-## Files That Orchestrate Many Downstream Concerns
+### Files That Orchestrate Many Downstream Concerns
 
 | Path | Ca | Ce | I |
 | --- | ---: | ---: | ---: |

@@ -76,7 +76,7 @@ python .agents/scripts/agents-structure-map.py /home/ozy/apps/gre-test-app --out
 | frontend | components, hooks, pages, views, ui, screens, features | .tsx, .jsx, .vue, .svelte |
 | backend | services, api, controllers, routes, utils, lib, core, domain | .ts, .js, .py, .go, .rs, .java |
 | types | types, interfaces, models, schemas, entities | .ts, .tsx, .d.ts |
-| tests | tests, specs, __tests__, e2e, integration | .test.ts, .test.tsx, .spec.ts, .test.py |
+| tests | tests, specs, **tests**, e2e, integration | .test.ts, .test.tsx, .spec.ts, .test.py |
 | data | data, constants, config, fixtures, mocks | .json, .ts, .js |
 
 ### Description Generation
@@ -238,6 +238,7 @@ Modify `classify_file()` method in the script.
 **Cause**: Wrong path or running from inside `.agents/`
 
 **Fix**:
+
 ```bash
 # Run from project root
 cd /path/to/project
@@ -249,6 +250,7 @@ python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
 **Cause**: Cache file missing or corrupted
 
 **Fix**:
+
 ```bash
 # Delete cache and regenerate
 rm docs/arc/structure/.structure-cache.json
@@ -258,6 +260,7 @@ python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
 ### Wrong Classification
 
 **Options**:
+
 1. Manually edit the `.md` file
 2. Modify `classify_file()` logic in script
 3. Add custom section for project-specific patterns
@@ -270,4 +273,5 @@ python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
 - `docs/standards/workflow.md` - General workflow standard
 
 ---
+
 *Standard: `docs/standards/structure-map.md`*

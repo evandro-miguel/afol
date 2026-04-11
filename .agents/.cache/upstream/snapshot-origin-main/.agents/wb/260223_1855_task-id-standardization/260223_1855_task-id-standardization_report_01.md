@@ -15,12 +15,14 @@ links:
 # Report: task-id-standardization
 
 ## Summary
+
 - Checklist tasks now have a formal ID pattern (`T-01`/`T-001`) for reliable automation.
 - Verification now reports open tasks with exact `ID + file + line`.
 - Session intake now supports `quick` tasks in one active session, reducing WB folder sprawl.
 - WB metadata updates are now automatable (`updated_at` and `Files Changed`) without manual file edits.
 
 ## Delivered Changes
+
 - Updated `.agents/scripts/verify-tasks.py`:
   - parse only checklist lines with explicit task IDs (`T-01` and `T-001`)
   - ignore table checkbox noise
@@ -59,7 +61,9 @@ links:
 - `.agents/scripts/agents-bootstrap.py`
 - `.agents/tools.json`
 - `AGENTS.md`
+
 ## Verification
+
 - `python3 -m py_compile .agents/scripts/verify-tasks.py` -> pass.
 - `python3 -m py_compile .agents/scripts/agents-new.py` -> pass.
 - `python3 -m py_compile .agents/scripts/agents-wb-update.py` -> pass.
@@ -72,13 +76,16 @@ links:
 - `make all` -> pass.
 
 ## Risks / Follow-ups
+
 - Legacy task lines without IDs are no longer parsed as tasks. Keep templates and reviews enforcing ID format.
 - Teams must manage `.active_session` lifecycle intentionally (clear/set when changing primary stream).
 - `wb-files-changed` currently reflects full repo git state; teams can filter or post-edit for narrower scope.
 
 ## Spec Evidence
+
 - Spec ID: `260223_1855_task-id-standardization_spec-lite_01`
 - Evidence: command outputs above satisfy done criteria.
 
 ---
+
 *Template: `.agents/a-docs/templates/report.md`*

@@ -14,12 +14,15 @@ related_lessons:
 # Pattern: Single Active Session
 
 ## Type
+
 success
 
 ## Context
+
 When managing multiple tasks or workstreams in the .agents system.
 
 ## Pattern
+
 **Maintain only one active workstream at a time (recommended for focus):**
 
 1. Use `.agents/wb/.active_session` to track current focus
@@ -30,6 +33,7 @@ When managing multiple tasks or workstreams in the .agents system.
 **Multiple sessions are allowed, but avoid workbench folder sprawl.**
 
 ## Why It Works
+
 - Forces focus on one problem at a time
 - Reduces context switching overhead
 - Makes progress tracking clearer
@@ -39,6 +43,7 @@ When managing multiple tasks or workstreams in the .agents system.
 ## Examples
 
 ### Good Example
+
 ```bash
 # Working on auth-refactor
 cat .agents/wb/.active_session
@@ -55,6 +60,7 @@ cat .agents/wb/.active_session
 ```
 
 ### Multi-Session Example (When Needed)
+
 ```bash
 # Independent workstreams - both can coexist
 ./.agents/agents new feature-a          # Session A created
@@ -66,6 +72,7 @@ cat .agents/wb/.active_session
 ```
 
 ### Bad Example
+
 ```bash
 # Creates parallel sessions without finishing
 ./.agents/agents new auth-refactor
@@ -75,28 +82,33 @@ cat .agents/wb/.active_session
 ```
 
 ## Evidence
+
 - Lesson: "Avoid workbench folder sprawl"
 - `agents-new.py` allows multiple sessions (non-blocking warning since 2026-02-26)
 - `.active_session` file tracks current focus
 - `--session <id>` flag enables targeting specific sessions
 
 ## Related Patterns
+
 - PAT-001: Discovery-First Tool Usage
 - PAT-004: Quick vs Significant Intake
 - PAT-101: Anti-Pattern Workbench Sprawl (what to avoid)
 
 ## When to Use
+
 - Starting any new work
 - Already have an active session
 - Tempted to create parallel workstream
 - Managing multiple related tasks
 
 ## When NOT to Use
+
 - Genuinely independent workstreams (different epics) - ✅ OK to create new session
 - Team collaboration requiring parallel tracks - ✅ OK to create new session
 - Emergency production fixes - ✅ OK to create new session
 
 ## Implementation Notes
+
 - Check `.active_session` before creating new session
 - Use `--quick` for minor tasks under the same theme
 - Multiple sessions are **allowed** but use discipline to avoid sprawl
@@ -105,4 +117,5 @@ cat .agents/wb/.active_session
 - Review `.agents/wb/` folder weekly for orphaned sessions
 
 ---
+
 *Pattern: `docs/patterns/success/PAT-002_single-active-session.md`*

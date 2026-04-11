@@ -11,6 +11,7 @@ Como integrar o grader para verificar se agentes estão lendo os arquivos corret
 ## Visão Geral
 
 O grader verifica:
+
 1. ✅ **File Reading** - Quais arquivos o agente leu
 2. ✅ **Workflow Following** - Se seguiu os passos do workflow
 3. ✅ **Script Usage** - Se usou os scripts bundlados
@@ -42,6 +43,7 @@ python scripts/run_eval.py \
 ```
 
 Output inclui:
+
 ```json
 {
   "results": [...],  // Trigger results
@@ -96,14 +98,17 @@ O grader reconhece automaticamente:
 ## Tier-Specific Checks
 
 ### Tier 1
+
 - Deve ler **apenas** SKILL.md (e talvez examples.md)
 - Erro: Ler arquivos desnecessários
 
 ### Tier 2
+
 - Deve ler SKILL.md primeiro
 - Pode ler referências específicas sob demanda
 
 ### Tier 3
+
 - Deve ler SKILL.md primeiro
 - Pode ler arquivos do produto relevante
 
@@ -140,11 +145,12 @@ O grader reconhece automaticamente:
 
 O `run_loop.py` usa **combined score**:
 
-```
+```text
 combined = (trigger_score * 0.5) + (grader_score * 0.5)
 ```
 
 Isso garante que:
+
 - Skill trigger corretamente (50%)
 - Agente use a skill corretamente (50%)
 
@@ -169,17 +175,20 @@ python scripts/run_loop.py \
 ## Debugging
 
 ### Ver transcripts
+
 ```bash
 ls evals/transcripts/
 cat evals/transcripts/eval_1.txt
 ```
 
 ### Ver grading detalhado
+
 ```bash
 cat evals/grader/grading_eval_1.json | jq
 ```
 
 ### Rodar grader manualmente
+
 ```bash
 python scripts/run_grader.py \
   --transcript evals/transcripts/eval_1.txt \

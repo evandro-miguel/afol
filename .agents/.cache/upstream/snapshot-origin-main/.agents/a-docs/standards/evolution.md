@@ -7,35 +7,35 @@ updated_at: 2026-02-23T00:00:00Z
 title: "Standard Evolution Policy"
 ---
 
-# Standard Evolution Policy
+## Standard Evolution Policy
 
 This document defines how the agent system standards evolve over time.
 
-## Update Process
+### Update Process
 
-### When to Update Standards
+#### When to Update Standards
 
 1. **Bug fixes** - Immediately when inconsistencies are found
 2. **New templates** - When a new document type is needed
 3. **Process changes** - When workflow needs adjustment
 4. **User feedback** - After any user correction
 
-### Update Steps
+#### Update Steps
 
 1. Update the source of truth (templates/standards)
 2. Run sync script: `python .agents/scripts/sync-agent-docs.py`
 3. Verify all agent files are updated
 4. Add lesson if change was triggered by user correction
 
-## Compatibility Policy
+### Compatibility Policy
 
-### Backward Compatibility
+#### Backward Compatibility
 
 - Existing documents remain valid
 - Tools must accept legacy field names during transition
 - Migration warnings should be helpful, not blocking
 
-### Legacy Field Mapping
+#### Legacy Field Mapping
 
 | Legacy | Canonical | Status |
 |--------|-----------|--------|
@@ -45,21 +45,21 @@ This document defines how the agent system standards evolve over time.
 | `topic` | `theme` | Accept with warning |
 | `spec_lite` | `spec-lite` | Accept with warning |
 
-### Transition Period
+#### Transition Period
 
 - **Warning period**: 30 days after new standard is introduced
 - **Hard deprecation**: After transition period, tools may reject legacy fields
 
-## Deprecation Process
+### Deprecation Process
 
-### When to Deprecate
+#### When to Deprecate
 
 1. Feature not used in 3+ months
 2. Better alternative exists
 3. Security concern
 4. Maintenance burden outweighs value
 
-### Deprecation Steps
+#### Deprecation Steps
 
 1. Mark as `deprecated` in frontmatter status
 2. Add deprecation notice to document
@@ -67,7 +67,7 @@ This document defines how the agent system standards evolve over time.
 4. Move to `.agents/z-arq/` archive folder
 5. Update any references
 
-## Versioning
+### Versioning
 
 Standards do not use explicit version numbers. Instead:
 
@@ -75,7 +75,7 @@ Standards do not use explicit version numbers. Instead:
 - **Frontmatter dates** - `created_at` and `updated_at` track history
 - **Archive folder** - Old versions preserved in `.agents/z-arq/`
 
-## Archive Process
+### Archive Process
 
 Before deleting any file:
 

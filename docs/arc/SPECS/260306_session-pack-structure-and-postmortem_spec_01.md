@@ -27,24 +27,29 @@ risk_level: medium
 # SPEC: Session Pack Structure and Postmortem
 
 ## Intent
+
 - Support multiple major plan tracks inside one session while making final session closure require a post-mortem.
 
 ## Expected Behavior
+
 - Sessions may contain pack folders for separate major plan tracks.
 - Tooling works recursively across session roots and pack folders.
 - Final report closure is blocked until a post-mortem exists.
 
 ## User Journey
+
 1. A session is created.
 2. If the session splits into multiple major efforts, each effort gets its own pack folder.
 3. Execution proceeds with recursive tooling support.
 4. Before marking the report final, a post-mortem is completed.
 
 ## Acceptance
+
 - [ ] `agents-new` supports optional pack creation.
 - [ ] Workbench tools operate recursively inside sessions.
 - [ ] A post-mortem template exists and can be materialized when real closure analysis starts.
 - [ ] `wb-update status --file report --value final` fails without a post-mortem.
 
 ---
+
 *Child Spec: `docs/arc/SPECS/260306_session-pack-structure-and-postmortem_spec_01.md`*

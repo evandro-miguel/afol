@@ -35,6 +35,7 @@ links:
 **State marker rules:** See [../standards/checkbox-protocol.md](../standards/checkbox-protocol.md)
 
 ## Governance Context
+
 - Roadmap feature: `<feature_id>`
 - Parent spec: `<parent_spec_id>`
 - Child spec: `<child_spec_id_or_empty>`
@@ -46,10 +47,12 @@ links:
 Before starting work, consult relevant resources:
 
 ### Prevention Rules
+
 - [ ] Check [../lessons/general-lessons.md](../lessons/general-lessons.md)
 - [ ] Check lesson entries in [../lessons/entries/](../lessons/entries/)
 
 ### Useful Resources
+
 - Rules useful for this task:
   - [ ] <rule-1>
 - Docs useful for this task:
@@ -60,19 +63,23 @@ Before starting work, consult relevant resources:
   - [ ] <integration-1>
 
 ## Implementation Checkpoint
+
 - Files touched:
   - <path>
 - Key decisions:
   - <decision>
 
 ## Test Gate
+
 - Move to `ready_for_test` only after implementation checkpoint.
 - Record command, result, and evidence before marking done.
 
 ### Test Evidence
+
 - Command: `<command>`
 - Result: <pass/fail>
 - Evidence: <paste output snippet or link>
 
 ---
+
 *Template: `docs/templates/task.md`*

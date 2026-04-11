@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Workstreams can have pending tasks without clear warning. Before marking workstream as complete, it's necessary to:
+
 - Verify all tasks are complete
 - Identify blocked tasks
 - Report overall status
@@ -96,12 +97,14 @@ make verify
 ## Output
 
 ### All Complete
-```
+
+```text
 ✓ All tasks complete (5/5)
 ```
 
 ### Pending Tasks
-```
+
+```text
 ❌ Pending tasks found:
 
 T-01: Implement login - pending (file.md:15)
@@ -122,4 +125,5 @@ Complete: 3/5 (60%)
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/verify-tasks.md`*

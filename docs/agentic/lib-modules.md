@@ -19,11 +19,13 @@ Configuration loader for `.agents` system.
 **Purpose:** Centralized configuration management.
 
 **Functions:**
+
 - `load_agents_config(script_path)` - Load and parse `agents.config`
 - `get_cfg_path(root, config, key)` - Resolve config path to absolute
 - `parse_offset(offset_str)` - Parse ISO timezone offset
 
 **Usage:**
+
 ```python
 from lib.agents_config import load_agents_config, get_cfg_path, parse_offset
 
@@ -35,6 +37,7 @@ WB_TZ = parse_offset(WB_OFFSET)
 
 **Configuration:**
 Reads from `.agents/agents.config`:
+
 ```yaml
 paths:
   agents_dir: .agents
@@ -48,7 +51,7 @@ time:
 
 ## Module Structure
 
-```
+```text
 .agents/scripts/lib/
 ├── __init__.py          # Package init
 └── agents_config.py     # Configuration loader
@@ -67,4 +70,5 @@ time:
 - `agents-wrapper.md` - CLI wrapper
 
 ---
+
 *Document: `docs/agentic/lib-modules.md`*

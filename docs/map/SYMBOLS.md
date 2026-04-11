@@ -7,29 +7,29 @@ created_at: "2026-04-02T23:28:28Z"
 updated_at: "2026-04-02T23:28:28Z"
 ---
 
-# Symbols
+## Symbols
 
 Use this file to understand where the repository's named structure lives: functions, classes, interfaces, constants, and other high-signal definitions.
 
-## Highest-Signal Files By Symbol Count
+### Highest-Signal Files By Symbol Count
 
 | Path | Symbols | Language | Sample |
 | --- | ---: | ---: | ---: |
 
-## Files With The Most Classes
+### Files With The Most Classes
 
 - No class-heavy files detected.
 
-## Files With The Most Functions
+### Files With The Most Functions
 
 - No function-heavy files detected.
 
-## Files With The Most Interfaces Or Types
+### Files With The Most Interfaces Or Types
 
 - No interface/type-heavy files detected.
 
-## Files With The Most Constants Or Variables
+### Files With The Most Constants Or Variables
 
 - No constant/variable-heavy files detected.
 
-## Symbol Kind Breakdown For Top Files
+### Symbol Kind Breakdown For Top Files

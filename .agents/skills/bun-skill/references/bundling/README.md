@@ -49,6 +49,7 @@ await Bun.build({
 ```
 
 Multiple entrypoints:
+
 ```typescript
 await Bun.build({
   entrypoints: [
@@ -70,6 +71,7 @@ await Bun.build({
 ```
 
 Without `outdir`, returns artifacts in memory:
+
 ```typescript
 const result = await Bun.build({
   entrypoints: ['./index.ts'],
@@ -136,6 +138,7 @@ await Bun.build({
 ```
 
 CLI:
+
 ```bash
 bun build ./index.ts --outdir ./out --minify
 bun build ./index.ts --outdir ./out --minify-whitespace --minify-identifiers --minify-syntax
@@ -187,6 +190,7 @@ await Bun.build({
 ```
 
 CLI:
+
 ```bash
 bun build ./index.ts --outdir ./out --external react --external react-dom
 bun build ./index.ts --outdir ./out --external '*'
@@ -226,6 +230,7 @@ await Bun.build({
 ```
 
 Tokens:
+
 - `[name]` - File name without extension
 - `[ext]` - File extension
 - `[hash]` - Content hash
@@ -242,6 +247,7 @@ await Bun.build({
 ```
 
 Output:
+
 ```javascript
 // Before
 import logo from "./logo.svg";
@@ -265,6 +271,7 @@ await Bun.build({
 ```
 
 CLI:
+
 ```bash
 bun build ./index.ts --outdir ./out --define process.env.NODE_ENV='"production"'
 ```
@@ -346,6 +353,7 @@ await Bun.build({
 ```
 
 Type safety:
+
 ```typescript
 // env.d.ts
 declare module "bun:bundle" {
@@ -369,7 +377,7 @@ if (result.metafile) {
   for (const [path, meta] of Object.entries(result.metafile.inputs)) {
     console.log(`${path}: ${meta.bytes} bytes`);
   }
-  
+
   // Save for analysis tools
   await Bun.write('./dist/meta.json', JSON.stringify(result.metafile));
 }
@@ -469,6 +477,7 @@ const result = await Bun.build({
 ```
 
 Override disk files:
+
 ```typescript
 await Bun.build({
   entrypoints: ['./src/index.ts'],
@@ -532,6 +541,7 @@ interface BuildArtifact extends Blob {
 ```
 
 Usage:
+
 ```typescript
 const build = await Bun.build({ /* ... */ });
 
@@ -539,7 +549,7 @@ for (const output of build.outputs) {
   const text = await output.text();
   const bytes = await output.bytes();
   const buffer = await output.arrayBuffer();
-  
+
   // Can be used directly in Response
   return new Response(output);
 }

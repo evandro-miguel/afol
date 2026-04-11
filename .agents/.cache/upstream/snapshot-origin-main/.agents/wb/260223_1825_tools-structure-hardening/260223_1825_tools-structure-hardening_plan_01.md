@@ -17,9 +17,11 @@ links:
 # Plan: tools-structure-hardening
 
 ## Objective
+
 - Restore reliability of core `.agents` operational commands (`lint`, `structure`, `new`) with minimal code changes and deterministic verification.
 
 ## Scope
+
 - In scope:
   - Fix crash paths in `agents-lint-docs.py`.
   - Fix hidden-directory scan behavior in `agents-structure-map.py` for repos centered on `.agents/`.
@@ -30,16 +32,19 @@ links:
   - Any behavior change in non-related scripts.
 
 ## Success Criteria
+
 - `make lint` completes without Python exceptions.
 - `make structure` generates section files in `.agents/arc/structure/`.
 - `make new ...` creates IDs/links with resolved session IDs (no `YYMMDD_HHMM_*` leftovers).
 
 ## Delivery Strategy
+
 1. Reproduce failures and isolate root causes.
 2. Patch scripts with focused fixes.
 3. Re-run make targets and document evidence in report.
 
 ## Critical Dependencies
+
 - Tools:
   - `make`
   - `.agents/agents`
@@ -52,14 +57,17 @@ links:
   - Preserve compatibility with existing markdown corpus and avoid breaking templates.
 
 ## Large Plan Handling
+
 - If this plan exceeds 500 lines, split into phases.
 - Create one task file per phase.
 
 ## Risks and Mitigations
+
 - Risk: Linter fixes change warning counts unexpectedly -> Mitigation: keep exit behavior unchanged (errors still fail, warnings informational).
 - Risk: Structure scan includes noisy hidden paths -> Mitigation: allowlist only `.agents/.agent/.github` and keep ignore list for heavy dirs.
 
 ## Verification Plan
+
 - Unit: `N/A` (no test suite for scripts present).
 - E2E: `N/A`.
 - Typecheck: `N/A`.
@@ -69,4 +77,5 @@ links:
   - `make new THEME=id-fix-check SPEC=lite` and inspect generated frontmatter IDs.
 
 ---
+
 *Template: `.agents/a-docs/templates/plan.md`*

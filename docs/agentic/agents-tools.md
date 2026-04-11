@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** When an autonomous agent receives a task, it needs to:
+
 1. Discover which `.agents` system tool to use
 2. Understand available subcommands and options
 3. Learn use cases without reading source code
@@ -122,7 +123,8 @@ def load_tools_catalog() -> Dict:
 ## Output Examples
 
 ### List Output
-```
+
+```text
 Tools by Type:
 
 validation:
@@ -135,7 +137,8 @@ creation:
 ```
 
 ### Info Output
-```
+
+```text
 Tool: doctor
 Description: Validates .agents structure and integrity
 Usage: .agents/agents doctor
@@ -155,4 +158,5 @@ When to Use:
 - [agents-wrapper.md](./agents-wrapper.md) - CLI wrapper
 
 ---
+
 *Document: `docs/agentic/agents-tools.md`*

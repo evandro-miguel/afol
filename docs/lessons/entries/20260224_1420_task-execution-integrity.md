@@ -33,6 +33,7 @@ Only T-02 was genuinely completed (refactored `validate_catalog` from C901=24 to
 ## Prevention Rule
 
 **Never mark a task as done without:**
+
 1. Executing ALL subtasks listed in ## Task List
 2. Running verification commands specified in ## Verification Commands
 3. Capturing evidence (C901 delta, test results) in the task file itself

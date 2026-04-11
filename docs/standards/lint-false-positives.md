@@ -138,4 +138,5 @@ make verify
 - [agents-lint-docs.py](../../scripts/agents-lint-docs.py) - Validator script
 
 ---
+
 *Document: `docs/standards/lint-false-positives.md`*

@@ -41,11 +41,11 @@ const numberContainer: Container<number> = {
 ```typescript
 class Stack<T> {
   private items: T[] = [];
-  
+
   push(item: T) {
     this.items.push(item);
   }
-  
+
   pop(): T | undefined {
     return this.items.pop();
   }
@@ -142,11 +142,11 @@ interface Entity {
 
 class Repository<T extends Entity> {
   private items: T[] = [];
-  
+
   findById(id: string): T | undefined {
     return this.items.find(item => item.id === id);
   }
-  
+
   save(item: T): void {
     const index = this.items.findIndex(i => i.id === item.id);
     if (index >= 0) {
@@ -246,14 +246,14 @@ interface EventMap {
 
 class TypedEmitter<Events extends Record<string, any>> {
   private listeners: { [K in keyof Events]?: Array<(data: Events[K]) => void> } = {};
-  
+
   on<K extends keyof Events>(event: K, listener: (data: Events[K]) => void) {
     if (!this.listeners[event]) {
       this.listeners[event] = [];
     }
     this.listeners[event]!.push(listener);
   }
-  
+
   emit<K extends keyof Events>(event: K, data: Events[K]) {
     this.listeners[event]?.forEach(listener => listener(data));
   }

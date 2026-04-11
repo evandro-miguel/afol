@@ -121,8 +121,8 @@ All scripts use `.agents/agents.config` as single source of configuration.
 Legacy fallback: `agents.config` at repository root.
 
 ---
-*Reference: `.agents/scripts/QUICKSTART.md`*
 
+*Reference: `.agents/scripts/QUICKSTART.md`*
 
 ### Bootstrap in Another Repo
 

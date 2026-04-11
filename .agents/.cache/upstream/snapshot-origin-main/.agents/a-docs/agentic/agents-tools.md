@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Quando um agente autônomo recebe uma tarefa, ele precisa:
+
 1. Descobrir qual ferramenta do sistema `.agents` usar
 2. Entender os subcomandos e opções disponíveis
 3. Aprender casos de uso sem ler código fonte
@@ -114,7 +115,7 @@ def search_tools(tools_data: Dict[str, Any], query: str) -> None:
     # - tool["when_to_use"]
     # - tool["id"]
     # - tool["name"]
-    
+
     # Score:
     # +5 para match em id
     # +4 para match em name
@@ -217,10 +218,10 @@ def load_tools() -> Dict[str, Any]:
 def list_tools(tools_data: Dict[str, Any], filter_type: Optional[str] = None) -> None:
     """List all available tools with descriptions."""
     tools = tools_data["tools"]
-    
+
     if filter_type:
         tools = [t for t in tools if t["type"] == filter_type]
-    
+
     # Group by type
     by_type: Dict[str, List[Dict]] = {}
     for tool in tools:
@@ -228,7 +229,7 @@ def list_tools(tools_data: Dict[str, Any], filter_type: Optional[str] = None) ->
         if t not in by_type:
             by_type[t] = []
         by_type[t].append(tool)
-    
+
     # Print grouped output
     for tool_type, type_tools in sorted(by_type.items()):
         print(f"\n{format_type_badge(tool_type)}")
@@ -241,11 +242,11 @@ def list_tools(tools_data: Dict[str, Any], filter_type: Optional[str] = None) ->
 def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> None:
     """Show detailed information about a specific tool."""
     tool = next((t for t in tools if t["id"] == tool_id), None)
-    
+
     if not tool:
         print(f"❌ Tool not found: {tool_id}")
         return
-    
+
     # Print sections:
     # - ID, Type, Execution, Updated
     # - DESCRIPTION
@@ -264,43 +265,43 @@ def search_tools(tools_data: Dict[str, Any], query: str) -> None:
     """Search tools by query in description and when_to_use."""
     query_lower = query.lower()
     matches = []
-    
+
     for tool in tools:
         score = 0
         matched_fields = []
-        
+
         # Search in description (+3 points)
         if query_lower in tool["description"].lower():
             score += 3
             matched_fields.append("description")
-        
+
         # Search in when_to_use (+2 points)
         for use in tool.get("when_to_use", []):
             if query_lower in use.lower():
                 score += 2
                 matched_fields.append("when_to_use")
                 break
-        
+
         # Search in id (+5 points)
         if query_lower in tool["id"].lower():
             score += 5
             matched_fields.append("id")
-        
+
         # Search in name (+4 points)
         if query_lower in tool["name"].lower():
             score += 4
             matched_fields.append("name")
-        
+
         if score > 0:
             matches.append((score, tool, matched_fields))
-    
+
     # Sort by score (descending)
     matches.sort(key=lambda x: x[0], reverse=True)
 ```
 
 ### Algoritmo de Search
 
-```
+```text
 Input: query string
 For each tool:
   - Check id (weight: 5)
@@ -314,7 +315,7 @@ Return matches with score > 0
 
 ## Fluxo do Agente
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │  Agente recebe tarefa                                   │
 │  Ex: "Valide a estrutura do projeto"                    │

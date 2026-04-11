@@ -19,11 +19,13 @@ metadata:
 ## Common Patterns
 
 **Pattern A:**
+
 ```bash
 example command
 ```
 
 **Pattern B:**
+
 ```bash
 another example
 ```
@@ -31,5 +33,6 @@ another example
 ## Detailed Docs
 
 For more options, run `--help` or see:
+
 - [pattern.md](./pattern.md)
 - [examples.md](../../examples.md)

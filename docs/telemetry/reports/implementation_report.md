@@ -17,6 +17,7 @@ links:
 Built a complete telemetry and pattern catalog system for the .agents repository to track project metrics and capture what works/doesn't work.
 
 **Key Outcomes:**
+
 - Telemetry system captures session metrics, tool usage, task completion, blockers, and errors
 - Pattern catalog with success patterns, anti-patterns, tool patterns, and template patterns
 - Automated reporting with weekly/monthly telemetry reports
@@ -30,17 +31,20 @@ Built a complete telemetry and pattern catalog system for the .agents repository
 ### Phase 1: Telemetry Infrastructure ✅
 
 **T-01: Telemetry Data Schema**
+
 - Created JSON Schema for telemetry events
 - Schema location: `docs/telemetry/schemas/event.json`
 - Event types: session_start, session_end, tool_exec, task_complete, blocker, error, pattern_applied, file_changed
 
 **T-02: Telemetry Collection Script**
+
 - Created: `.agents/scripts/agents-telemetry.py`
 - Commands: record, query, export, report, validate
 - Storage: JSONL format for efficient appending
 
 **T-03: Telemetry Folder Structure**
-```
+
+```text
 docs/telemetry/
 ├── data/           # events.jsonl
 ├── reports/        # Generated reports
@@ -49,10 +53,12 @@ docs/telemetry/
 ```
 
 **T-04: Telemetry Hooks**
+
 - Documented integration points for existing tools
 - Ready for agents-new.py, agents-wb-update.py, verify-tasks.py integration
 
 **T-05: Makefile Targets**
+
 - `make telemetry-record` - Record events
 - `make telemetry-report` - Generate reports
 - `make telemetry-export` - Export data
@@ -61,7 +67,8 @@ docs/telemetry/
 ### Phase 2: Pattern Catalog ✅
 
 **T-06: Patterns Folder Structure**
-```
+
+```text
 docs/patterns/
 ├── success/        # Success patterns
 ├── anti/           # Anti-patterns
@@ -72,16 +79,19 @@ docs/patterns/
 ```
 
 **T-07: Pattern Template**
+
 - Created comprehensive template with frontmatter
 - Fields: id, type, status, tags, effectiveness, related_lessons
 - Sections: Context, Pattern, Why It Works, Examples, Evidence
 
 **T-08: Initial Patterns Migrated**
+
 - PAT-001: Discovery-First Tool Usage (success)
 - PAT-002: Single Active Session (success)
 - PAT-101: Workbench Sprawl (anti-pattern)
 
 **T-09: Pattern Suggestion Script**
+
 - Created: `.agents/scripts/agents-patterns.py`
 - Commands: suggest, list, show, apply, rate
 - Suggests patterns based on theme and tags
@@ -89,32 +99,38 @@ docs/patterns/
 ### Phase 3: Automation & Reporting ✅
 
 **T-10: Auto-Capture Session Telemetry**
+
 - Documented integration pattern
 - Session start/end events with metadata
 - Pattern application tracking
 
 **T-11: Weekly Telemetry Reports**
+
 - Auto-generates summary metrics
 - Event breakdown, tool usage, outcomes
 - Blocker and error tracking
 
 **T-12: CI/CD Integration**
+
 - Added `telemetry-validate` to `make all`
 - Validates telemetry data in CI pipeline
 
 ### Phase 4: Visualization ✅
 
 **T-13: Telemetry Dashboard**
+
 - Created: `docs/telemetry/dashboard.md`
 - Sections: Summary metrics, session trends, tool usage, patterns, issues
 - Ready for auto-population from reports
 
 **T-14: Pattern Effectiveness Tracking**
+
 - `patterns rate` command for rating
 - Effectiveness field in pattern frontmatter
 - Evidence tracking via telemetry
 
 **T-15: Export and Analysis**
+
 - JSON and CSV export formats
 - Query interface for custom reports
 - Ready for external analysis tools

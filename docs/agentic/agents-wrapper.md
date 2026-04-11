@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Python scripts require:
+
 - Configured virtualenv
 - Installed dependencies
 - Consistent command routing
@@ -118,7 +119,7 @@ declare -A COMMAND_MAP=(
 
 ## Output
 
-```
+```text
 Agents CLI - Operational scripts for .agents system
 
 Usage:
@@ -136,4 +137,5 @@ Commands:
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/agents-wrapper.md`*

@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Scripts Python requerem:
+
 - Virtualenv configurado
 - Dependências instaladas
 - Comando uv run correto

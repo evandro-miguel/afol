@@ -7,21 +7,21 @@ updated_at: 2026-02-23T00:00:00Z
 title: "Metrics and Logging Standard"
 ---
 
-# Metrics and Logging Standard
+## Metrics and Logging Standard
 
 This document defines the standard for capturing usage metrics and events in the agent system.
 
-## Event Log Format
+### Event Log Format
 
 Simple append-only log format for tracking execution events.
 
-### Format
+#### Format
 
-```
+```text
 <timestamp> | <session_id> | <doc_type> | <event> | <result> | <duration_min>
 ```
 
-### Fields
+#### Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -32,38 +32,38 @@ Simple append-only log format for tracking execution events.
 | result | string | Outcome (pass, fail, skipped) |
 | duration_min | integer | Optional: Duration in minutes |
 
-### Example
+#### Example
 
-```
+```text
 2026-02-23T14:30:00Z | 260223_1430_auth-refactor | task | completed | pass | 18
 2026-02-23T14:45:00Z | 260223_1430_auth-refactor | report | created | pass | 5
 2026-02-23T15:00:00Z | 260223_1500_bug-fix | task | failed | fail | 12
 ```
 
-## Log Location
+### Log Location
 
 Event logs should be stored in:
 
-```
+```text
 .agents/logs/usage.log
 ```
 
 Or in session-specific logs:
 
-```
+```text
 .agents/wb/<session_id>/session.log
 ```
 
-## Session Analysis
+### Session Analysis
 
-### Metrics to Collect
+#### Metrics to Collect
 
 1. **Count by doc_type**: How many plans/tasks/reports created
 2. **Completion rate**: Tasks completed vs abandoned
 3. **Duration**: Average time per session
 4. **Result distribution**: pass/fail/skipped ratios
 
-### Analysis Commands
+#### Analysis Commands
 
 ```bash
 # Count by document type
@@ -76,17 +76,18 @@ grep -c "completed.*pass" .agents/logs/usage.log
 awk -F'|' '{sum+=$6; count++} END {print sum/count}' .agents/logs/usage.log
 ```
 
-## Integration with Task Workflow
+### Integration with Task Workflow
 
 When completing a task, agents should optionally log:
 
 ```markdown
 ## Session Log Entry
 <!-- After completing task, add entry to session log -->
+
 - [timestamp] Task <task_id> completed: <result>
 ```
 
-## Guidelines
+### Guidelines
 
 - Logs are append-only
 - Do not modify historical entries

@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Configurar o sistema `.agents` manualmente em outro repositório requer:
+
 - Copiar múltiplos arquivos e pastas
 - Criar estrutura de diretórios obrigatória
 - Configurar Makefile wrapper
@@ -195,20 +196,20 @@ run_tools_check()         # Verifica tools
 def detect_stack(target: Path) -> Dict[str, List[str]]:
     """Detecta stack do projeto alvo."""
     stack = {"signals": [], "commands": []}
-    
+
     # Node.js
     if (target / "package.json").exists():
         stack["signals"].append("Node.js")
         # Detecta npm scripts
-    
+
     # Python
     if (target / "pyproject.toml").exists():
         stack["signals"].append("Python")
-    
+
     # Go
     if (target / "go.mod").exists():
         stack["signals"].append("Go")
-    
+
     return stack
 ```
 
@@ -220,11 +221,11 @@ def copy_files(source: Path, target: Path, force: bool):
     for file_path in FILES_TO_COPY:
         src = source / file_path
         dst = target / file_path
-        
+
         if dst.exists() and not force:
             print(f"⚠️  {file_path} exists, skip")
             continue
-        
+
         shutil.copy2(src, dst)
         print(f"✓ {file_path}")
 ```
@@ -242,7 +243,7 @@ def ensure_structure(target: Path):
 
 ## Fluxo de Bootstrap
 
-```
+```text
 1. Parse argumentos (--force, --dry-run, --skip-checks)
    ↓
 2. Detectar stack do projeto alvo

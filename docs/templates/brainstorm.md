@@ -20,39 +20,47 @@ updated_at: '2026-04-04T10:08:11-03:00'
 # Brainstorm: <theme>
 
 ## Problem Statement
+
 - <what needs to be solved>
 
 ## Repo Context to Validate
+
 - Files/areas likely involved:
   - <path>
 - Existing patterns or constraints to confirm:
   - <constraint>
 
 ## Assumptions
+
 - <assumption 1>
 - <assumption 2>
 
 ## Options
+
 1. Option A - <summary>
 2. Option B - <summary>
 3. Option C - <summary>
 
 ## Tradeoffs
+
 | Option | Pros | Cons | Risk | Complexity |
 |--------|------|------|------|------------|
 | A | <pros> | <cons> | <risk> | <low/med/high> |
 
 ## Preferred Direction
+
 - Selected: <option>
 - Why: <rationale>
 - Rejected options:
   - <option> -> <reason>
 
 ## Decision Criteria
+
 - <criterion>
 - <criterion>
 
 ## Planning Readiness
+
 - Ready for explorer-check: <yes/no>
 - Unknowns that must be verified against the current repo:
   - <unknown>
@@ -60,4 +68,5 @@ updated_at: '2026-04-04T10:08:11-03:00'
   - <existing doc/tool/search to check>
 
 ---
+
 *Template: `docs/templates/brainstorm.md`*

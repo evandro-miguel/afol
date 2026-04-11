@@ -11,6 +11,7 @@ metadata:
 Do not edit workbench timestamps manually.
 
 Always update metadata via scripts:
+
 - `make wb-touch`
 - `./.agents/agents wb-update touch`
 
@@ -51,6 +52,7 @@ root. Use `./.agents/agents repo-map .` or `make repo-map` so the map stays in
 `docs/map/` instead of legacy locations.
 
 ## 9. Safety Rules
+
 - Never expose secrets in code, logs, docs, or commits.
 - Avoid destructive operations unless explicitly authorized. Do not delete logic, only refactor.
 - Archive before delete under `.agents/z-arq/YYYYMMDD_<description>/`.

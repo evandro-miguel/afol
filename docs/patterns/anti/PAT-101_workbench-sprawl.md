@@ -16,12 +16,15 @@ related_patterns:
 # Anti-Pattern: Workbench Sprawl
 
 ## Type
+
 anti-pattern
 
 ## Context
+
 Creating multiple parallel workstreams without completing current ones.
 
 ## Anti-Pattern
+
 **Creating new workstream folders without finishing current work:**
 
 ```bash
@@ -38,6 +41,7 @@ Creating multiple parallel workstreams without completing current ones.
 ```
 
 ## Why It Doesn't Work
+
 - Context gets split across multiple workstreams
 - Hard to track what's actually done
 - Workbench becomes cluttered with orphaned folders
@@ -46,6 +50,7 @@ Creating multiple parallel workstreams without completing current ones.
 - Increases cognitive load
 
 ## Symptoms
+
 - More than 3 sessions with `status: active`
 - Sessions older than 1 week without progress
 - `.agents/wb/` has 10+ folders from current month
@@ -53,6 +58,7 @@ Creating multiple parallel workstreams without completing current ones.
 - Multiple sessions reference each other as "related"
 
 ## Better Approach
+
 Use **PAT-002: Single Active Session**:
 
 1. Finish current session before starting new one
@@ -63,6 +69,7 @@ Use **PAT-002: Single Active Session**:
 ## Examples
 
 ### What NOT to Do
+
 ```bash
 # Parallel sessions without completion
 .agents/wb/
@@ -73,6 +80,7 @@ Use **PAT-002: Single Active Session**:
 ```
 
 ### What TO Do
+
 ```bash
 # Focused completion
 .agents/wb/
@@ -89,26 +97,32 @@ Use **PAT-002: Single Active Session**:
 ```
 
 ## Evidence
+
 - User correction: "reduce unnecessary creation of new workstream folders"
 - `agents-new.py` now enforces one active session policy
 - Lesson added to `general-lessons.md`
 
 ## Related Patterns
+
 - PAT-002: Single Active Session (solution)
 - PAT-004: Quick vs Significant Intake
 
 ## Prevention
+
 - Check `.agents/wb/.active_session` before creating new
 - Run `.agents/agents verify-tasks` on current session
 - Ask: "Can this be a quick task in current session?"
 - Weekly review: archive or complete old sessions
 
 ## Recovery
+
 If you already have sprawl:
+
 1. List all active sessions: `find .agents/wb -name "task*.md" -exec grep -l "status: active" {} \;`
 2. Pick one to complete
 3. Mark others as `status: blocked` or `deprecated`
 4. Archive completed ones to `.agents/z-arq/`
 
 ---
+
 *Pattern: `docs/patterns/anti/PAT-101_workbench-sprawl.md`*

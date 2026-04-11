@@ -120,4 +120,5 @@ Central index for all `.agents` system documentation.
 - [Workbench](../../../.agents/wb/) - Active workstreams
 
 ---
+
 *Document: `docs/agentic/INDEX.md`*

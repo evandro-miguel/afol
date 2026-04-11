@@ -7,15 +7,15 @@ created_at: "2026-04-02T23:17:01Z"
 updated_at: "2026-04-02T23:17:01Z"
 ---
 
-# Changelog
+## Changelog
 
-## Version Transition
+### Version Transition
 
 - Current version: `v2026-04-02_1`
 - Previous version: `none`
 - Updated at: `2026-04-02T23:17:01Z`
 
-## Initial Snapshot
+### Initial Snapshot
 
 - This is the first structured codemap snapshot with versioned frontmatter and changelog support.
 - Domains detected: ``

@@ -8,7 +8,7 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 
 ## Structure
 
-```
+```text
 .agents/rules/
 ├── README.md
 ├── RULE-001-tool-discovery.md
@@ -121,15 +121,18 @@ Content here.
 ## Enforcement
 
 **Automated:**
+
 - `make doctor` - Structure validation
 - `make lint` - Documentation linting
 - `make verify` - Task completion check
 
 **Self-check:**
+
 - Agents should validate before commits
 - Report validation results
 
 **Human review:**
+
 - Pre-merge validation gates
 - CI/CD pipelines
 

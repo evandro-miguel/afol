@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Projetos crescem e a estrutura fica complexa. Novos desenvolvedores (ou agentes) precisam:
+
 - Entender organização de arquivos
 - Saber onde cada tipo de código vive
 - Ter visão geral do código

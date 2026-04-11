@@ -28,28 +28,35 @@ risk_level: low
 # SPEC: <theme>
 
 ## 1) Feature Intent
+
 - Outcome: <what changes for the user or system>
 - Why now: <why this feature matters now>
 - Roadmap feature: `<feature_id>`
 - Role of this spec: <parent, child, or workstream refinement>
 
 ## 2) Problem
+
 - <what is missing or unclear today>
 - <why the current state is insufficient>
 
 ## 3) Users and User Journey
+
 Primary users:
+
 - <user type>
 
 User journey:
+
 1. <starting point>
 2. <interaction or decision>
 3. <expected outcome>
 
 Failure or friction points:
+
 - <problem> -> <expected handling>
 
 ## 4) Experience and Behavior
+
 - Expected behavior:
   - <behavior>
   - <behavior>
@@ -58,15 +65,19 @@ Failure or friction points:
   - <what remains out of scope>
 
 ## 5) Scope
+
 In scope:
+
 - <item>
 - <item>
 
 Out of scope:
+
 - <item>
 - <item>
 
 ## 6) Child Spec Strategy
+
 - Child specs required: <yes/no>
 - Decomposition rule:
   - <when this spec must split into child specs>
@@ -74,6 +85,7 @@ Out of scope:
   - <child spec + purpose>
 
 ## 7) Constraints and Assumptions
+
 - Assumptions:
   - <assumption>
 - Constraints:
@@ -82,6 +94,7 @@ Out of scope:
   - Security/privacy: <constraint>
 
 ## 8) Acceptance
+
 - Success looks like:
   - <acceptance statement>
   - <acceptance statement>
@@ -90,10 +103,12 @@ Out of scope:
   - Can an executor understand the user journey from this document alone?
 
 ## 9) Risks and Tradeoffs
+
 - Risk: <risk> -> Mitigation: <mitigation>
 - Tradeoff: <tradeoff> -> Why accepted: <reason>
 
 ## 10) Rollout and Lifecycle
+
 - Rollout approach:
   - <how this enters delivery>
 - Workstream linkage:
@@ -102,6 +117,7 @@ Out of scope:
   - <how scope can be safely reduced or deferred>
 
 ## 11) Verification Philosophy
+
 - Evidence expected from delivery:
   - <kind of proof>
   - <kind of proof>
@@ -110,6 +126,7 @@ Out of scope:
   - Q-02 <question>
 
 ## 12) Acceptance Checklist
+
 - [ ] User journey is explicit
 - [ ] Scope and non-goals are explicit
 - [ ] Child-spec policy is defined
@@ -117,4 +134,5 @@ Out of scope:
 - [ ] Feature intent is understandable without implementation detail
 
 ---
+
 *Template: `docs/templates/spec.md`*

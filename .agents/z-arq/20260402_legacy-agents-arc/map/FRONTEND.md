@@ -7,16 +7,16 @@ created_at: "2026-04-02T23:17:01Z"
 updated_at: "2026-04-02T23:17:01Z"
 ---
 
-# Frontend
+## Frontend
 
-## Frontend Stack Signals
+### Frontend Stack Signals
 
 - React: `no`
 - Vite: `no`
 - TanStack: `no`
 - shadcn/ui: `no`
 
-## Frontend-Oriented Surfaces
+### Frontend-Oriented Surfaces
 
 - No dedicated frontend domain was detected in the scanned targets.
 - If frontend code exists elsewhere in the monorepo, it was outside the current analysis scope.

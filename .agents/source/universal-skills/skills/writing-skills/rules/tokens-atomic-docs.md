@@ -34,14 +34,14 @@ Rough approximation: ~1.3 tokens per word (English text)
 
 ### Incorrect
 
-```
+```text
 references/
 └── huge-api-reference.md  # 3000+ lines, covers everything
 ```
 
 ### Correct
 
-```
+```text
 references/
 ├── api-overview.md       # High-level concepts (~300 words)
 ├── api-authentication.md # Auth specifics (~250 words)

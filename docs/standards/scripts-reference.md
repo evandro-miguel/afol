@@ -166,13 +166,14 @@ make memory-show NOTE="projects/260311-basic-memory-implementation/current-state
 ```
 
 The `memory` command family is contract-only in the scaffold:
+
 - it emits exact MCP server/tool/argument guidance for interactive runtimes
 - it does not execute MCP calls from shell
 - it complements repo-local `knowledge` instead of replacing canonical workbench state
 
 ---
-*Reference: `.agents/scripts/QUICKSTART.md`*
 
+*Reference: `.agents/scripts/QUICKSTART.md`*
 
 ### Bootstrap in Another Repo
 
@@ -191,7 +192,6 @@ The skills baseline is intentionally generic here; the upstream universal-skills
 For an existing project, use `--partial`. The installer preserves files that already exist unless `--force` is used. If the target repo already owns `make all`, use `make agents-all` for the scaffold's aggregate validation target.
 
 See: `docs/standards/bootstrap-other-repo.md`
-
 
 ### Skills Sync
 

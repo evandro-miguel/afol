@@ -1,5 +1,7 @@
 # .agents - Agentic Workflow System
 
+<!-- markdownlint-disable MD013 -->
+
 Operating system for interactive agentic CLI workflows with automated telemetry and element heat scoring.
 
 Primary supported runtimes: OpenCode, Codex, Qwen, Gemini CLI, and Claude Code style interactive agents.
@@ -20,7 +22,7 @@ This scaffold is built for interactive, terminal-first agent sessions. It is not
 
 ## 📁 Repository Structure
 
-```
+```text
 docs/
 ├── arc/                     # Roadmap, specs, decisions, structure canon
 ├── map/                     # Current-state repository map and analysis evidence
@@ -30,7 +32,7 @@ docs/
 ├── patterns/                # Pattern catalog and anti-patterns
 ├── knowledge/               # Indexed knowledge summaries
 └── lessons/                 # Lessons learned
- 
+
 .agents/
 ├── scripts/                 # Operational scripts
 │   ├── agents-telemetry.py  # Telemetry and heat scoring
@@ -255,7 +257,7 @@ make telemetry-cold
 make telemetry-heat TYPE=patterns PERIOD=monthly
 ```
 
-**Score = (frequency × 0.5) + (recency × 0.3) + (success × 0.2)**
+Score formula: (frequency × 0.5) + (recency × 0.3) + (success × 0.2)
 
 - 🔴 **Hot** (70-100): Heavily used in period
 - 🟡 **Warm** (40-69): Moderate usage
@@ -263,7 +265,7 @@ make telemetry-heat TYPE=patterns PERIOD=monthly
 
 ### Heat Map Example
 
-```
+```text
 ======================================================================
 🔥 HEAT MAP - Element Usage & Engagement (weekly)
 ======================================================================

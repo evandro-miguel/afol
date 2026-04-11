@@ -17,14 +17,17 @@ risk_level: low
 # SPEC LITE: agentsmd-template-placeholders
 
 ## Objective
+
 - Ensure root AGENTS is template-only, with placeholders and no concrete repo tooling catalog.
 
 ## Change Summary
+
 - Rewrote `AGENTS.md` as generic scaffold.
 - Removed populated entries for stack, tools, skills, and MCPs.
 - Kept section structure requested by the user.
 
 ## Files and Areas
+
 - `AGENTS.md`
 - `QWEN.md`
 - `CLAUDE.md`
@@ -32,9 +35,11 @@ risk_level: low
 - `.agents/a-docs/lessons/general-lessons.md`
 
 ## Risks
+
 - Template may drift to filled content in future edits -> mitigated with added lessons/prevention rule.
 
 ## Verification
+
 - Commands:
   - `make sync`
   - `make lint`
@@ -43,9 +48,11 @@ risk_level: low
   - Captured in `260223_1847_agentsmd-template-placeholders_report_01`.
 
 ## Done When
+
 - [x] Verified with commands
 - [x] No regressions observed
 - [x] Report updated with evidence
 
 ---
+
 *Template: `.agents/a-docs/templates/spec-lite.md`*

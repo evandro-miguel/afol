@@ -15,12 +15,15 @@ related_lessons:
 # Pattern: Discovery-First Tool Usage
 
 ## Type
+
 success
 
 ## Context
+
 When starting work with the .agents system or when unsure which tool to use for a task.
 
 ## Pattern
+
 **Always discover tools before using them:**
 
 1. Run `.agents/agents tools list` to see all available tools
@@ -31,6 +34,7 @@ When starting work with the .agents system or when unsure which tool to use for 
 **Never guess tool commands or rely on memory.**
 
 ## Why It Works
+
 - Tools evolve and commands change
 - Discovery ensures you have current information
 - Prevents errors from outdated knowledge
@@ -40,6 +44,7 @@ When starting work with the .agents system or when unsure which tool to use for 
 ## Examples
 
 ### Good Example
+
 ```bash
 # Agent needs to create a new workstream
 ./.agents/agents tools list
@@ -50,6 +55,7 @@ When starting work with the .agents system or when unsure which tool to use for 
 ```
 
 ### Bad Example
+
 ```bash
 # Agent guesses command based on memory
 mkdir -p .agents/wb/260223_1800_auth-refactor
@@ -58,28 +64,34 @@ mkdir -p .agents/wb/260223_1800_auth-refactor
 ```
 
 ## Evidence
+
 - Lesson: "Keep AGENTS tools section concise and discovery-first"
 - Tool catalog: `.agents/tools.json` with 10+ tools
 - Reduced tool usage errors after pattern adoption
 
 ## Related Patterns
+
 - PAT-002: Single Active Session
 - PAT-003: Template-First Documentation
 
 ## When to Use
+
 - Starting any new workstream
 - Unsure which tool solves your problem
 - Tool command doesn't work as expected
 - Onboarding to .agents system
 
 ## When NOT to Use
+
 - Emergency hotfixes (use quick mode)
 - You've used the exact same tool command <5 minutes ago
 
 ## Implementation Notes
+
 - Add discovery step to your mental checklist
 - Keep `.agents/agents tools help` handy
 - Consider aliasing: `alias aget='.agents/agents tools'`
 
 ---
+
 *Pattern: `docs/patterns/success/PAT-001_discovery-first.md`*

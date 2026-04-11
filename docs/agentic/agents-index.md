@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Specs and ADRs are created in separate directories. Without a centralized index, it's difficult to:
+
 - Discover existing documents
 - See status of each document
 - Navigate between related documents
@@ -30,6 +31,7 @@ Scans directories and generates indexes:
 2. **DECISIONS/INDEX.md** - Lists all architecture decisions
 
 Extracts from frontmatter:
+
 - ID, theme, status
 - Owner, created_at, updated_at
 - Related links
@@ -100,4 +102,5 @@ cat docs/arc/DECISIONS/INDEX.md
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/agents-index.md`*

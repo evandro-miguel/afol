@@ -7,11 +7,13 @@ metadata:
   triggers: "typescript, generic, type guard, narrowing, utility types, partial, pick, omit, record, discriminated union, type predicate, satisfies, const assertion"
   references: "generics, narrowing, utility-types, discriminated-unions, type-guards"
 ---
+
 # TypeScript Skill 📘
 
 Mastery of TypeScript type system, patterns, and best practices based on official TypeScript documentation.
 
 ## When to Use
+
 - Writing or debugging TypeScript type definitions
 - Implementing generics for reusable components
 - Creating type guards for narrowing unions
@@ -20,18 +22,21 @@ Mastery of TypeScript type system, patterns, and best practices based on officia
 - Optimizing type inference and constraints
 
 ## How It Works
+
 - Identify the type system challenge you're facing
 - Choose the appropriate pattern from the decision tree
 - Apply the reference documentation for your specific use case
 - Follow best practices for type safety
 
 ## Examples
+
 - Create a generic repository pattern with proper constraints
 - Build a type-safe state machine with discriminated unions
 - Implement custom type guards for API response validation
 - Use utility types to derive variants from base interfaces
 
 ## Common Mistakes
+
 - Using `any` instead of `unknown` for unknown values
 - Not leveraging type inference when TypeScript can infer
 - Missing exhaustiveness checks in switch statements

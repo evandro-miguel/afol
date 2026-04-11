@@ -24,7 +24,7 @@ All internal links must use relative paths that resolve from the current file's 
 
 ### Path Reference
 
-```
+```text
 skill/
 ├── SKILL.md                          # Root level
 ├── references/

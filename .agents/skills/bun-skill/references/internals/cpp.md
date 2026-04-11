@@ -9,8 +9,8 @@ metadata:
 
 **Context**: Deep integration with JavaScriptCore.
 
-1.  **Class**: Inherit `JSC::DestructibleObject`.
-2.  **Prototype**: Inherit `JSC::JSNonFinalObject`.
-3.  **Constructor**: Inherit `JSC::InternalFunction`.
+1. **Class**: Inherit `JSC::DestructibleObject`.
+2. **Prototype**: Inherit `JSC::JSNonFinalObject`.
+3. **Constructor**: Inherit `JSC::InternalFunction`.
 
 **Macros**: `JSC_DEFINE_HOST_FUNCTION`, `JSC_DEFINE_CUSTOM_GETTER`.

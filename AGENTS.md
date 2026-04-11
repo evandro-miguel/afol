@@ -130,12 +130,23 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
   skills, telemetry, and runtime automation.
 - Keep project-owned documentation under `docs/` at the repository root when
   the documentation is about the repository rather than the agent system.
-- Use `docs/map/` for current-state repository mapping, architecture snapshots,
-  hooks, APIs, ABIs, frontend and backend structure, and analysis evidence.
+- **`docs/map/` is the current-state, descriptive, non-governance surface.**
+  It holds repository maps, codemaps, dependency graphs, API/ABI snapshots,
+  and analysis evidence generated from tooling. It describes what the repo
+  looks like right now, not what it should become.
+- **`docs/map/` must never contain:** roadmap entries, feature specs, ADRs,
+  project briefs, architecture intent, or any document that defines desired
+  behavior or product philosophy. Those belong under `docs/arc/`.
+- **`docs/arc/` is the goal-state, prescriptive, governance surface.**
+  It holds roadmap, specs, decisions, architecture, project brief, tech stack,
+  and engineering guidelines. It defines what the repo should become.
 - Use `docs/arc/`, `docs/standards/`, `docs/templates/`, `docs/telemetry/`,
   `docs/patterns/`, `docs/knowledge/`, and `docs/lessons/` for project-facing
   canon that should live with the repository instead of the agent runtime.
 - Workbench sessions, runtime rules, and agent memory remain under `.agents/`.
+- Workstreams may reference `docs/map/` as evidence of current state, but must
+  never promote map artifacts to governance sources. When map evidence conflicts
+  with roadmap/spec intent, the roadmap/spec wins.
 
 ### Temporary Workspace Rule
 

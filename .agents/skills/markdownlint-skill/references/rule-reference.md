@@ -14,6 +14,7 @@ metadata:
 **Purpose**: Ensure consistent line wrapping
 
 **Configuration**:
+
 ```jsonc
 "line-length": {
   "line_length": 100,
@@ -33,12 +34,16 @@ metadata:
 **Purpose**: Headings must increment by one level
 
 **Example**:
+
 ```markdown
 # Level 1 ✓
+
 ## Level 2 ✓
+
 ### Level 3 ✓
 
-# Level 1 ✓
+## Level 1 ✓
+
 ### Level 3 ✗ (skips Level 2)
 ```
 
@@ -51,6 +56,7 @@ metadata:
 **Purpose**: First line must be a top-level heading
 
 **Example**:
+
 ```markdown
 # Document Title ✓
 
@@ -68,15 +74,23 @@ This is content without heading ✗
 **Purpose**: Code blocks must specify language
 
 **Example**:
+
 ```markdown
 ```javascript ✓
 const x = 1;
 ```
+```
+
+
+```text
+
+```text
 
 ``` ✗ (missing language)
 some code
 ```
-```
+
+```text
 
 **Why for LLMs**: Enables syntax highlighting and better code understanding.
 
@@ -94,12 +108,13 @@ some code
 ```
 
 **Example**:
+
 ```markdown
 - Item one ✓
 - Item two ✓
 
-* Item one ✗
-+ Item one ✗
+- Item one ✗
+- Item one ✗
 ```
 
 **Why for LLMs**: Consistent list formatting across all outputs.
@@ -111,6 +126,7 @@ some code
 **Purpose**: Consistent emphasis markers
 
 **Configuration**:
+
 ```jsonc
 "emphasis-style": {
   "style": "asterisk"  // Use * instead of _
@@ -118,9 +134,10 @@ some code
 ```
 
 **Example**:
+
 ```markdown
 *emphasis* ✓
-_emphasis_ ✗
+*emphasis* ✗
 ```
 
 ---
@@ -130,6 +147,7 @@ _emphasis_ ✗
 **Purpose**: Consistent strong markers
 
 **Configuration**:
+
 ```jsonc
 "strong-style": {
   "style": "asterisk"  // Use ** instead of __
@@ -137,9 +155,10 @@ _emphasis_ ✗
 ```
 
 **Example**:
+
 ```markdown
 **strong** ✓
-__strong__ ✗
+**strong** ✗
 ```
 
 ---
@@ -149,6 +168,7 @@ __strong__ ✗
 **Purpose**: Limit consecutive blank lines
 
 **Configuration**:
+
 ```jsonc
 "no-multiple-blanks": {
   "maximum": 1
@@ -156,11 +176,11 @@ __strong__ ✗
 ```
 
 **Example**:
+
 ```markdown
 Paragraph one
 
 Paragraph two ✓
-
 
 Paragraph three ✗ (two blank lines)
 ```
@@ -172,6 +192,7 @@ Paragraph three ✗ (two blank lines)
 **Purpose**: Headings must have blank lines around them
 
 **Example**:
+
 ```markdown
 Text
 
@@ -180,6 +201,7 @@ Text
 More text
 
 Text
+
 ## Heading ✗ (missing blank line before)
 ```
 

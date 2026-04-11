@@ -17,19 +17,24 @@ risk_level: low
 # SPEC LITE: lint-doc-exclusions
 
 ## Objective
+
 - Reduce lint noise by ignoring docs meant to teach/guide tool usage.
 
 ## Change Summary
+
 - Add explicit path exclusions in lint scan for `a-docs` and orientation/generated docs.
 
 ## Files and Areas
+
 - `.agents/scripts/agents-lint-docs.py`
 - `.agents/a-docs/lessons/general-lessons.md`
 
 ## Risks
+
 - Exclusions may hide useful checks in docs -> limited to user-requested areas only.
 
 ## Verification
+
 - Commands:
   - `make lint`
   - `make verify`
@@ -38,9 +43,11 @@ risk_level: low
   - Captured in `260223_1834_lint-doc-exclusions_report_01`.
 
 ## Done When
+
 - [x] Verified with commands
 - [x] No regressions observed
 - [x] Report updated with evidence
 
 ---
+
 *Template: `.agents/a-docs/templates/spec-lite.md`*

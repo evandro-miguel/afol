@@ -17,9 +17,11 @@ links:
 # Plan: lint-doc-exclusions
 
 ## Objective
+
 - Make `make lint` focus on actionable operational docs by excluding teaching/orientation docs from lint scope.
 
 ## Scope
+
 - In scope:
   - Exclude `.agents/a-docs/**` from `agents-lint-docs.py`.
   - Exclude orientation/generated docs (`.agents/arc/structure/**`, `.agents/scripts/.agent/docs/**`) from lint.
@@ -29,15 +31,18 @@ links:
   - Broad markdown cleanup in excluded docs.
 
 ## Success Criteria
+
 - `make lint` returns exit 0 with no errors and no irrelevant warnings from excluded docs.
 - `make all` still passes end-to-end.
 
 ## Delivery Strategy
+
 1. Update exclusion rules in `agents-lint-docs.py`.
 2. Re-run lint and full validation targets.
 3. Record evidence in report and lessons.
 
 ## Critical Dependencies
+
 - Tools:
   - `make`
   - `.agents/agents`
@@ -49,13 +54,16 @@ links:
   - Keep changes minimal and avoid touching unrelated docs.
 
 ## Large Plan Handling
+
 - If this plan exceeds 500 lines, split into phases.
 - Create one task file per phase.
 
 ## Risks and Mitigations
+
 - Risk: Excluding too much hides relevant issues -> Mitigation: exclude only folders explicitly requested (teaching/orientation).
 
 ## Verification Plan
+
 - Unit: `N/A`
 - E2E: `N/A`
 - Typecheck: `N/A`
@@ -65,4 +73,5 @@ links:
   - `python3 -m py_compile .agents/scripts/agents-lint-docs.py` for syntax validation.
 
 ---
+
 *Template: `.agents/a-docs/templates/plan.md`*

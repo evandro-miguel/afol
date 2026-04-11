@@ -22,6 +22,7 @@ skill({ name: "markdownlint-skill" })
 ```
 
 The new skill includes:
+
 - Global commands (lint-md, fix-md, validate-md)
 - LLM pipeline integration patterns
 - CI/CD setup

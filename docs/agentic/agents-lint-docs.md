@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Markdown documents can have inconsistencies:
+
 - Checkboxes in different formats
 - Invalid status in frontmatter
 - Task IDs outside convention
@@ -101,12 +102,14 @@ make lint
 ## Output
 
 ### Success
-```
+
+```text
 ✓ All documents valid
 ```
 
 ### Errors Found
-```
+
+```text
 file.md:15 - Invalid checkbox format: use '- [x]' not '- [X]'
 file.md:23 - Invalid status: 'inprogress' not in valid statuses
 file.md:45 - Missing frontmatter field: 'updated_at'
@@ -118,4 +121,5 @@ file.md:45 - Missing frontmatter field: 'updated_at'
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/agents-lint-docs.md`*

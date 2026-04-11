@@ -7,18 +7,18 @@ created_at: "2026-04-02T23:17:01Z"
 updated_at: "2026-04-02T23:17:01Z"
 ---
 
-# Repository Map
+## Repository Map
 
 This folder is the distilled architecture view of the repository.
 
-## Read This First
+### Read This First
 
 - Repo: `agentic_start_folder`
 - Current version: `v2026-04-02_1`
 - Targets analyzed: `.`
 - Raw evidence: `extra/`
 
-## What This Map Is Supposed To Answer
+### What This Map Is Supposed To Answer
 
 - Which domains exist and why they exist.
 - Which files define the public boundaries and integration points.
@@ -26,7 +26,7 @@ This folder is the distilled architecture view of the repository.
 - Which hotspots and static findings deserve attention first.
 - Where the main classes, functions, interfaces, and constants live.
 
-## Recommended Reading Order
+### Recommended Reading Order
 
 - `README.md`
 - `CHANGELOG.md`
@@ -42,28 +42,27 @@ This folder is the distilled architecture view of the repository.
 - `domains/`
 - `extra/`
 
-## What Lives Where
+### What Lives Where
 
 - Root `.md` files: distilled explanations for agents and humans.
 - `domains/`: domain-focused breakdowns with responsibilities, key files, and risks.
 - `extra/`: raw tool outputs, logs, and machine-readable evidence.
 
-## System Overview
+### System Overview
 
 - No concise README system summary was extracted; rely on the domain and architecture docs below.
 
-## Major Runtime Surfaces
+### Major Runtime Surfaces
 
-
-## Cross-Domain Flow
+### Cross-Domain Flow
 
 - Cross-domain flows must be inferred from the available route, symbol, and dependency artifacts.
 
-## Product And Platform Signals
+### Product And Platform Signals
 
 - No feature bullets were extracted from the repo README.
 
-## Current System Shape
+### Current System Shape
 
 - Stack signals: `none detected`
 - Runtime versions: `not declared`
@@ -75,7 +74,7 @@ This folder is the distilled architecture view of the repository.
 - Public boundary files: `0`
 - Hotspots ranked: `50`
 
-## Critical Signals
+### Critical Signals
 
 - Top hotspot: `n/a`
 - Circular dependencies: `0`

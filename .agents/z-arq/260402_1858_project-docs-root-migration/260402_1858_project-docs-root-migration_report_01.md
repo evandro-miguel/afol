@@ -1,0 +1,374 @@
+---
+doc_type: report
+id: 260402_1858_project-docs-root-migration_report_01
+theme: project-docs-root-migration
+status: final
+created_at: '2026-04-02T18:58:13-03:00'
+updated_at: '2026-04-02T20:36:36-03:00'
+roadmap_feature: F-11
+parent_spec: 260323_1741_current-state-maps-and-goal-state-governance_spec_01
+child_spec: ''
+related_tasks:
+- T-01
+links:
+  roadmap: docs/arc/GENERAL-ROADMAP.md
+  plan: 260402_1858_project-docs-root-migration_plan_01
+  task: 260402_1858_project-docs-root-migration_task_01
+  postmortem: 260402_1858_project-docs-root-migration_postmortem_01
+---
+
+# Report: project-docs-root-migration
+
+## Governance Context
+- Roadmap feature: `F-11`
+- Parent spec: `260323_1741_current-state-maps-and-goal-state-governance_spec_01`
+- Child spec: ``
+
+## Summary
+- Migrated project-owned documentation from legacy `.agents/a-docs` and `.agents/arc` surfaces into `docs/`, retargeted the scaffold runtime to the new contract, and revalidated bootstrap plus the full script/test pipeline.
+- Closed the final drift findings from mini-agent audit: runtime rules, adapter READMEs, stale structure/map artifacts, temporary repo-map leftovers, and the unsupported legacy `agents-update` updater surface.
+
+## Delivered Changes
+- Moved standards, templates, patterns, lessons, telemetry docs, goal-state canon, and structure docs into `docs/`.
+- Updated `.agents/agents.config`, the Python config loader, command modules, bootstrap logic, wrappers, root Makefile, `opencode.json`, and tests to use the new `docs/` paths.
+- Regenerated `docs/arc/structure`, `docs/map`, spec indexes, and the reusable knowledge index, then synced runtime mirrors from `AGENTS.md`.
+- Retargeted `.agents/rules/*` and runtime adapter READMEs so live guidance now points at `docs/arc/`, `docs/map/`, `docs/agentic/`, and `docs/standards/`.
+- Archived the unsupported legacy `agents-update` mechanism under `.agents/z-arq/20260402_legacy-agents-update/` and removed its active wrapper/config references from the supported runtime surface.
+- Hardened `agents-structure-map.py` so archive/workbench/tmp/cache/source surfaces stay out of current-state structure docs and stale cache entries are dropped on refresh.
+
+## Files Changed
+
+- `.agents/a-docs/agentic/INDEX.md`
+- `.agents/a-docs/agentic/README.md`
+- `.agents/a-docs/agentic/agents-bootstrap.md`
+- `.agents/a-docs/agentic/agents-config.md`
+- `.agents/a-docs/agentic/agents-doctor.md`
+- `.agents/a-docs/agentic/agents-fix-symlinks.md`
+- `.agents/a-docs/agentic/agents-index.md`
+- `.agents/a-docs/agentic/agents-lint-docs.md`
+- `.agents/a-docs/agentic/agents-memory.md`
+- `.agents/a-docs/agentic/agents-new.md`
+- `.agents/a-docs/agentic/agents-patterns.md`
+- `.agents/a-docs/agentic/agents-skills-sync.md`
+- `.agents/a-docs/agentic/agents-structure-map.md`
+- `.agents/a-docs/agentic/agents-telemetry.md`
+- `.agents/a-docs/agentic/agents-tools-smoke.md`
+- `.agents/a-docs/agentic/agents-tools.md`
+- `.agents/a-docs/agentic/agents-wb-update.md`
+- `.agents/a-docs/agentic/agents-wrapper.md`
+- `.agents/a-docs/agentic/check-links.md`
+- `.agents/a-docs/agentic/lib-modules.md`
+- `.agents/a-docs/agentic/makefile.md`
+- `.agents/a-docs/agentic/sync-agent-docs.md`
+- `.agents/a-docs/agentic/tools-json.md`
+- `.agents/a-docs/agentic/verify-tasks.md`
+- `.agents/a-docs/arc/README.md`
+- `.agents/a-docs/knowledge/INDEX.md`
+- `.agents/a-docs/knowledge/README.md`
+- `.agents/a-docs/lessons/README.md`
+- `.agents/a-docs/lessons/entries/20260223_1720_updated-at-script-only-and-per-file-lessons.md`
+- `.agents/a-docs/lessons/entries/20260223_1735_adocs-documentation-boundary.md`
+- `.agents/a-docs/lessons/entries/20260223_1905_script-corrections-from-review.md`
+- `.agents/a-docs/lessons/entries/20260223_1935_cli-doc-command-parity.md`
+- `.agents/a-docs/lessons/entries/20260224_1420_task-execution-integrity.md`
+- `.agents/a-docs/lessons/entries/20260224_1425_task-list-vs-state-board.md`
+- `.agents/a-docs/lessons/entries/20260224_1430_wb-update-task-telemetry.md`
+- `.agents/a-docs/lessons/entries/20260224_1555_plan-success-criteria-crosscheck.md`
+- `.agents/a-docs/lessons/entries/20260224_1832_enforce-rules-with-executable-gates.md`
+- `.agents/a-docs/lessons/entries/20260224_2036_bootstrap-must-provision-full-agent-runtime.md`
+- `.agents/a-docs/lessons/entries/20260227_0900_task-board-simplification.md`
+- `.agents/a-docs/lessons/entries/20260306_2157_use-apply-patch-tool-not-shell.md`
+- `.agents/a-docs/lessons/entries/20260306_2352_spec-lite-is-flexible-and-tmp-needs-a-home.md`
+- `.agents/a-docs/lessons/entries/20260323_1310_wrapper-must-be-hermetic-in-isolated-runtimes.md`
+- `.agents/a-docs/lessons/entries/20260323_1420_bootstrap-must-export-generic-project-state.md`
+- `.agents/a-docs/lessons/entries/20260323_1705_scaffold-positioning-must-stay-cli-interactive.md`
+- `.agents/a-docs/lessons/entries/20260323_1800_orchestrator-must-track-worker-lifecycle-end-to-end.md`
+- `.agents/a-docs/lessons/entries/20260323_1847_follow-explicit-deletion-policy-for-reproducible-assets.md`
+- `.agents/a-docs/lessons/entries/README.md`
+- `.agents/a-docs/lessons/general-lessons.md`
+- `.agents/a-docs/patterns/INDEX.md`
+- `.agents/a-docs/patterns/TEMPLATE_pattern.md`
+- `.agents/a-docs/patterns/anti/PAT-101_workbench-sprawl.md`
+- `.agents/a-docs/patterns/success/PAT-001_discovery-first.md`
+- `.agents/a-docs/patterns/success/PAT-002_single-active-session.md`
+- `.agents/a-docs/specs/README.md`
+- `.agents/a-docs/standards/Makefile`
+- `.agents/a-docs/standards/agents-usage.md`
+- `.agents/a-docs/standards/bootstrap-other-repo.md`
+- `.agents/a-docs/standards/checkbox-protocol.md`
+- `.agents/a-docs/standards/evolution.md`
+- `.agents/a-docs/standards/frontmatter.md`
+- `.agents/a-docs/standards/lint-false-positives.md`
+- `.agents/a-docs/standards/lint-fix-scripts.md`
+- `.agents/a-docs/standards/metrics.md`
+- `.agents/a-docs/standards/primary-runtime-compatibility.md`
+- `.agents/a-docs/standards/repo-map.md`
+- `.agents/a-docs/standards/scripts-reference.md`
+- `.agents/a-docs/standards/scripts-usage.md`
+- `.agents/a-docs/standards/skills-sync.md`
+- `.agents/a-docs/standards/structure-map.md`
+- `.agents/a-docs/standards/template-standards.md`
+- `.agents/a-docs/standards/verification.md`
+- `.agents/a-docs/standards/workflow.md`
+- `.agents/a-docs/telemetry/HEAT_SCORING.md`
+- `.agents/a-docs/telemetry/QUICK_REFERENCE.md`
+- `.agents/a-docs/telemetry/README.md`
+- `.agents/a-docs/telemetry/auto-architecture.md`
+- `.agents/a-docs/telemetry/dashboard.md`
+- `.agents/a-docs/telemetry/reports/implementation_report.md`
+- `.agents/a-docs/templates/adr.md`
+- `.agents/a-docs/templates/architecture.md`
+- `.agents/a-docs/templates/blocks.md`
+- `.agents/a-docs/templates/brainstorm.md`
+- `.agents/a-docs/templates/explorer-check.md`
+- `.agents/a-docs/templates/log.md`
+- `.agents/a-docs/templates/plan.md`
+- `.agents/a-docs/templates/postmortem.md`
+- `.agents/a-docs/templates/report.md`
+- `.agents/a-docs/templates/research.md`
+- `.agents/a-docs/templates/retrospective.md`
+- `.agents/a-docs/templates/roadmap.md`
+- `.agents/a-docs/templates/spec-lite.md`
+- `.agents/a-docs/templates/spec.md`
+- `.agents/a-docs/templates/task.md`
+- `.agents/agents`
+- `.agents/agents-update`
+- `.agents/agents.config`
+- `.agents/arc/ARCHITECTURE.md`
+- `.agents/arc/DECISIONS/INDEX.md`
+- `.agents/arc/DECISIONS/TEMPLATE_adr.md`
+- `.agents/arc/ENGINEERING-GUIDELINES.md`
+- `.agents/arc/GENERAL-ROADMAP.md`
+- `.agents/arc/PROJECT-BRIEF.md`
+- `.agents/arc/README.md`
+- `.agents/arc/SPECS/260306_artifact-resolution-layer_spec_01.md`
+- `.agents/arc/SPECS/260306_context-driven-execution-commands_spec_01.md`
+- `.agents/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md`
+- `.agents/arc/SPECS/260306_guided-status-and-implementation_spec_01.md`
+- `.agents/arc/SPECS/260306_knowledge-reuse-and-token-efficiency_spec_01.md`
+- `.agents/arc/SPECS/260306_planning-rigor-and-explorer-gates_spec_01.md`
+- `.agents/arc/SPECS/260306_primary-agent-runtime-compatibility_spec_01.md`
+- `.agents/arc/SPECS/260306_project-context-canon-and-setup_spec_01.md`
+- `.agents/arc/SPECS/260306_review-and-logical-revert_spec_01.md`
+- `.agents/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md`
+- `.agents/arc/SPECS/260306_runtime-command-parity_spec_01.md`
+- `.agents/arc/SPECS/260306_session-pack-structure-and-postmortem_spec_01.md`
+- `.agents/arc/SPECS/260307_persistent-planning-memory_spec_01.md`
+- `.agents/arc/SPECS/260323_1704_universal-skills-runtime-integration_spec_01.md`
+- `.agents/arc/SPECS/260323_1741_current-state-maps-and-goal-state-governance_spec_01.md`
+- `.agents/arc/SPECS/260323_1750_current-state-map-contract_spec_01.md`
+- `.agents/arc/SPECS/260323_1751_goal-state-canon_spec_01.md`
+- `.agents/arc/SPECS/260323_1752_workflow-and-bootstrap-integration_spec_01.md`
+- `.agents/arc/SPECS/260323_1815_execplan-native-planning-system_spec_01.md`
+- `.agents/arc/SPECS/INDEX.md`
+- `.agents/arc/SPECS/README.md`
+- `.agents/arc/SPECS/TEMPLATE_spec-lite.md`
+- `.agents/arc/SPECS/TEMPLATE_spec.md`
+- `.agents/arc/TECH-STACK.md`
+- `.agents/arc/map/API_MAP.md`
+- `.agents/arc/map/ARCHITECTURE.md`
+- `.agents/arc/map/BACKEND.md`
+- `.agents/arc/map/CHANGELOG.md`
+- `.agents/arc/map/CLI_REFERENCE.md`
+- `.agents/arc/map/CONNECTIONS.md`
+- `.agents/arc/map/DEPENDENCY_GRAPH.md`
+- `.agents/arc/map/FEATURES.md`
+- `.agents/arc/map/FRONTEND.md`
+- `.agents/arc/map/HOTSPOTS.md`
+- `.agents/arc/map/LLM_QUICKSTART.md`
+- `.agents/arc/map/README.md`
+- `.agents/arc/map/SYMBOLS.md`
+- `.agents/arc/map/domains/.agents.md`
+- `.agents/arc/map/domains/README.md`
+- `.agents/arc/map/extra/README.md`
+- `.agents/arc/map/extra/bootstrap/host-tool-versions.txt`
+- `.agents/arc/map/extra/bootstrap/repo-profile.json`
+- `.agents/arc/map/extra/bootstrap/snapshot.xml`
+- `.agents/arc/map/extra/bootstrap/symbols.json`
+- `.agents/arc/map/extra/bootstrap/token-count-tree.txt`
+- `.agents/arc/map/extra/changelogs/changelog_v2026-03-23_1.md`
+- `.agents/arc/map/extra/changelogs/symbols_v2026-03-23_1.jsonl`
+- `.agents/arc/map/extra/logs/ast-grep-exports.log`
+- `.agents/arc/map/extra/logs/ast-grep-fetch.log`
+- `.agents/arc/map/extra/logs/ast-grep-routes-app.log`
+- `.agents/arc/map/extra/logs/ast-grep-routes-router.log`
+- `.agents/arc/map/extra/logs/ccsh-unifiedparser.log`
+- `.agents/arc/map/extra/logs/depcruise-dot.log`
+- `.agents/arc/map/extra/logs/depcruise-json.log`
+- `.agents/arc/map/extra/logs/depcruise-svg.log`
+- `.agents/arc/map/extra/logs/git-diff-name-status.log`
+- `.agents/arc/map/extra/logs/git-diff-summary.log`
+- `.agents/arc/map/extra/logs/git-log-name-only.log`
+- `.agents/arc/map/extra/logs/git-log.log`
+- `.agents/arc/map/extra/logs/madge-circular.log`
+- `.agents/arc/map/extra/logs/madge-graph.log`
+- `.agents/arc/map/extra/logs/madge-orphans.log`
+- `.agents/arc/map/extra/logs/repo-profile.json`
+- `.agents/arc/map/extra/logs/repomix-stderr.log`
+- `.agents/arc/map/extra/logs/repomix-stdout.log`
+- `.agents/arc/map/extra/logs/semgrep-stack-patterns-stderr.log`
+- `.agents/arc/map/extra/logs/semgrep-stack-patterns-stdout.log`
+- `.agents/arc/map/extra/logs/semgrep-stderr.log`
+- `.agents/arc/map/extra/logs/semgrep-stdout.log`
+- `.agents/arc/map/extra/metadata.json`
+- `.agents/arc/map/extra/phase1/depcruise-metrics-summary.md`
+- `.agents/arc/map/extra/phase1/depcruise-metrics.json`
+- `.agents/arc/map/extra/phase1/depcruise.dot`
+- `.agents/arc/map/extra/phase1/depcruise.json`
+- `.agents/arc/map/extra/phase1/depcruise.svg`
+- `.agents/arc/map/extra/phase1/madge-circular.txt`
+- `.agents/arc/map/extra/phase1/madge-graph.json`
+- `.agents/arc/map/extra/phase1/madge-orphans.txt`
+- `.agents/arc/map/extra/phase1/pydeps.txt`
+- `.agents/arc/map/extra/phase2/convex-actions.json`
+- `.agents/arc/map/extra/phase2/convex-http-actions.json`
+- `.agents/arc/map/extra/phase2/convex-mutations.json`
+- `.agents/arc/map/extra/phase2/convex-queries.json`
+- `.agents/arc/map/extra/phase2/exports.json`
+- `.agents/arc/map/extra/phase2/fetch-calls.json`
+- `.agents/arc/map/extra/phase2/frontend-react-routes.json`
+- `.agents/arc/map/extra/phase2/frontend-route-files.json`
+- `.agents/arc/map/extra/phase2/routes-app.json`
+- `.agents/arc/map/extra/phase2/routes-router.json`
+- `.agents/arc/map/extra/phase2/sqlite-usage.json`
+- `.agents/arc/map/extra/phase2/tanstack-query-usage.json`
+- `.agents/arc/map/extra/phase2/tanstack-routes.json`
+- `.agents/arc/map/extra/phase2/zod-schemas.json`
+- `.agents/arc/map/extra/phase3/semgrep-auto.json`
+- `.agents/arc/map/extra/phase3/semgrep-stack-patterns.json`
+- `.agents/arc/map/extra/phase4/agentic_start_folder-hotspots.cc.json.gz`
+- `.agents/arc/map/extra/phase4/git-log-name-only.txt`
+- `.agents/arc/map/extra/phase4/git-log-numstat.txt`
+- `.agents/arc/map/extra/phase4/hotspots-summary.md`
+- `.agents/arc/map/extra/phase4/hotspots.csv`
+- `.agents/arc/map/extra/phase4/hotspots.json`
+- `.agents/arc/map/extra/phase4/temporal-coupling-summary.md`
+- `.agents/arc/map/extra/phase4/temporal-coupling.json`
+- `.agents/arc/map/extra/phase4/worktree-name-status.txt`
+- `.agents/arc/map/extra/phase4/worktree-summary.txt`
+- `.agents/arc/map/extra/phase5/cli-surface.json`
+- `.agents/arc/map/extra/phase5/data-models.json`
+- `.agents/arc/map/extra/previous-metadata.json`
+- `.agents/arc/map/extra/tool-versions.txt`
+- `.agents/arc/structure/README.md`
+- `.agents/arc/structure/TEMPLATE_structure.md`
+- `.agents/arc/structure/backend.md`
+- `.agents/arc/structure/data.md`
+- `.agents/arc/structure/default.md`
+- `.agents/arc/structure/tests.md`
+- `.agents/arc/structure/types.md`
+- `.agents/cache/universal-skills`
+- `.agents/rules/README.md`
+- `.agents/rules/RULE-001-tool-discovery.md`
+- `.agents/rules/RULE-002-workstream-creation.md`
+- `.agents/rules/RULE-003-documentation-standards.md`
+- `.agents/rules/RULE-004-validation-linting.md`
+- `.agents/rules/RULE-005-folder-structure.md`
+- `.agents/scripts/README.md`
+- `.agents/scripts/agents-bootstrap.py`
+- `.agents/scripts/agents-doctor.py`
+- `.agents/scripts/agents-index.py`
+- `.agents/scripts/agents-knowledge.py`
+- `.agents/scripts/agents-new.py`
+- `.agents/scripts/agents-patterns.py`
+- `.agents/scripts/agents-repo-map.py`
+- `.agents/scripts/agents-skills-sync.py`
+- `.agents/scripts/agents-structure-map.py`
+- `.agents/scripts/agents-update/README.md`
+- `.agents/scripts/agents-update/agents-update.py`
+- `.agents/scripts/agents-update/backup.py`
+- `.agents/scripts/agents-update/conflict.py`
+- `.agents/scripts/agents-update/lock.py`
+- `.agents/scripts/agents-update/manifest.py`
+- `.agents/scripts/agents-update/ownership.py`
+- `.agents/scripts/agents-update/staging.py`
+- `.agents/scripts/agents-update/swap.py`
+- `.agents/scripts/agents-update/upstream.py`
+- `.agents/scripts/agents-update/version.py`
+- `.agents/scripts/agents-wb-update.py`
+- `.agents/scripts/check-links.py`
+- `.agents/scripts/fix-lint-all.py`
+- `.agents/scripts/fix-lint-checkboxes.py`
+- `.agents/scripts/fix-lint-doctypes.py`
+- `.agents/scripts/fix-lint-frontmatter.py`
+- `.agents/scripts/lib/agents_config.py`
+- `.agents/scripts/lib/execution_commands.py`
+- `.agents/scripts/migrate-task-board.py`
+- `.agents/scripts/pyproject.toml`
+- `.agents/scripts/tests/TEST_STRATEGY.md`
+- `.agents/scripts/tests/conftest.py`
+- `.agents/scripts/tests/e2e/__init__.py`
+- `.agents/scripts/tests/integration/test_critical_workflows.py`
+- `.agents/scripts/tests/test_agents_repo_map.py`
+- `.agents/scripts/tests/test_agents_skills_sync.py`
+- `.agents/scripts/tests/test_data/scenarios.yaml`
+- `.agents/scripts/tests/test_runtime_compatibility.py`
+- `.agents/scripts/tests/test_verify_tasks_strict.py`
+- `.agents/skills-sync.manifest.json`
+- `.agents/skills/README.md`
+- `.agents/skills/agentic-system-workflow/SKILL.md`
+- `.agents/skills/agentic-system-workflow/gotchas.md`
+- `.agents/skills/agentic-system-workflow/references/core/README.md`
+- `.agents/skills/agentic-system-workflow/references/patterns/README.md`
+- `.agents/skills/agentic-system-workflow/references/troubleshooting/README.md`
+- `.agents/skills/writing-skills/SKILL.md`
+- `.agents/skills/writing-skills/agents/README.md`
+- `.agents/skills/writing-skills/references/GRADER.md`
+- `.agents/skills/writing-skills/references/best-practices/checklist.md`
+- `.agents/skills/writing-skills/references/schemas.md`
+- `.agents/skills/writing-skills/references/standards/README.md`
+- `.agents/skills/writing-skills/scripts/check-universal-skills-sync.js`
+- `.agents/source/`
+- `.agents/templates/AGENTS_TEMPLATE.md`
+- `.agents/tools.json`
+- `.agents/update-ownership.json`
+- `.agents/wb/.active_session`
+- `.agents/z-arq/20260402_legacy-agents-arc/`
+- `.agents/z-arq/20260402_legacy-agents-update/`
+- `.agents/z-arq/20260402_repo-map-audit-temp/`
+- `.codex/README.md`
+- `.coverage`
+- `.github/workflows/agents-scaffold-ci.yml`
+- `.opencode/README.md`
+- `.qwen/README.md`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `GEMINI.md`
+- `Makefile`
+- `OPENCODE.md`
+- `PLANS.md`
+- `QWEN.md`
+- `README.md`
+- `docs/`
+- `opencode.json`
+## Verification
+- Unit tests: `uv run --project .agents/scripts pytest .agents/scripts/tests/test_runtime_compatibility.py .agents/scripts/tests/integration/test_critical_workflows.py .agents/scripts/tests/test_verify_tasks_strict.py .agents/scripts/tests/test_agents_repo_map.py -q` -> pass -> Evidence: `53 passed in 4.05s`
+- E2E tests: `N/A` -> not required -> Evidence: `integration harness and bootstrap/runtime tests covered the contract`
+- Typecheck: `N/A` -> not required -> Evidence: `Python scaffold uses lint + pytest as the canonical gate`
+- Lint: `make lint-scripts` -> pass -> Evidence: `All checks passed!`
+- Additional checks:
+  - `make doctor` -> pass -> `No issues found`
+  - `make lint` -> pass -> `Issues found: 0`
+  - `./.agents/agents skills-sync check` -> pass -> `PASS: skills structure and sync are valid`
+  - `bun .agents/skills/writing-skills/scripts/check-universal-skills-sync.js --skill agentic-system-workflow,writing-skills --sync` -> pass -> `STATUS: PASS`
+  - `./.agents/agents verify-tasks --strict .agents/wb/260402_1858_project-docs-root-migration` -> pass -> `All tasks completed`
+  - `make all` -> pass -> `164 passed`
+  - `./.agents/agents sync --force` -> pass -> Evidence: `4 file(s) updated`
+  - `make structure` -> pass -> Evidence: `✓ Structure docs generated`
+  - `make index` -> pass -> Evidence: `✓ Indexes updated`
+  - `make knowledge-index` -> pass -> Evidence: `docs/knowledge/INDEX.md (110 docs)`
+  - `make repo-map` -> pass -> Evidence: `✓ Repository codemap completed`
+  - `make doctor` -> pass -> Evidence: `✅ No issues found!`
+  - `make all` -> pass -> Evidence: `164 passed`
+
+## Risks / Follow-ups
+- Historical knowledge summaries may still mention legacy paths because they index past sessions; this is acceptable as historical evidence, not runtime contract.
+
+## Postmortem Link
+- Postmortem: `260402_1858_project-docs-root-migration_postmortem_01`
+
+## Lessons (if any)
+- For path-contract migrations, move the canon once, then immediately retarget config/bootstrap/tests before trusting any generated documentation.
+
+---
+*Template: `docs/templates/report.md`*

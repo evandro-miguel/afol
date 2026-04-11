@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Keeping workbench updated requires repetitive low-value tasks:
+
 - Update `updated_at` in frontmatter
 - Normalize timestamps
 - Update list of modified files
@@ -109,4 +110,5 @@ make wb-timeline MSG="Implemented login"
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/agents-wb-update.md`*

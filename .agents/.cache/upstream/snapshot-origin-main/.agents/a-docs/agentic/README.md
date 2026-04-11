@@ -113,7 +113,7 @@ updated_at: <date>
 
 ## Arquitetura
 
-```
+```text
 .agents/
 ├── agents              # Wrapper bash (CLI entry point)
 ├── tools.json          # Catálogo de ferramentas (JSON)
@@ -138,7 +138,7 @@ updated_at: <date>
 
 ## Fluxo Típico do Agente
 
-```
+```text
 1. Agente recebe tarefa
    ↓
 2. Não sabe qual ferramenta usar?

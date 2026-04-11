@@ -10,6 +10,7 @@ updated_at: '2026-02-23T18:00:21-03:00'
 # Log: task-id-standardization
 
 ## Timeline
+
 - 2026-02-23 18:55Z - Opened workstream for task ID standardization.
 - 2026-02-23 18:56Z - Updated `verify-tasks.py` to parse ID-based checklist lines only.
 - 2026-02-23 18:56Z - Updated `task.md` template and usage docs with task ID format.
@@ -28,15 +29,20 @@ updated_at: '2026-02-23T18:00:21-03:00'
 - 2026-02-23 17:50-03 - Added AGENTS language policy: English default, Portuguese only when explicitly requested
 - 2026-02-23 17:53-03 - Added mandatory script-only updated_at rule and switched lessons policy to one-file-per-lesson
 - 2026-02-23 18:00-03 - Implemented bootstrap command for installing .agents into another repo with adaptation checklist and docs
+
 ## Decisions
+
 - Enforce ID-based parsing to guarantee deterministic `task -> file -> line` mapping.
 - Enforce "one active session + quick mode" to avoid unnecessary WB folder creation.
 
 ## Blockers
+
 - None.
 
 ## Next Step
+
 - None.
 
 ---
+
 *Template: `.agents/a-docs/templates/log.md`*

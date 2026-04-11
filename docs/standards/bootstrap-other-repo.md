@@ -11,6 +11,7 @@ updated_at: '2026-04-02T15:21:56-03:00'
 ## Purpose
 
 Define how to install the `.agents` scaffold into another repository, including:
+
 - full bootstrap for a fresh repo
 - partial installation for an existing repo
 - limitations and safe usage notes
@@ -24,6 +25,7 @@ Define how to install the `.agents` scaffold into another repository, including:
 Use full bootstrap when the target repo is new or mostly empty.
 
 What it does:
+
 - creates the target directory when it does not exist yet
 - installs the `.agents` runtime surface
 - generates the generic governance baseline
@@ -44,6 +46,7 @@ Recommended command:
 Use partial installation when the target repo already exists and has project content.
 
 Behavior:
+
 - existing files are preserved by default
 - missing `.agents` files and folders are added
 - generated governance files are written only where the target does not already have a file
@@ -98,4 +101,5 @@ PATH=/usr/bin:/bin ./.agents/agents doctor
 ```
 
 ---
+
 *Standard: `docs/standards/bootstrap-other-repo.md`*

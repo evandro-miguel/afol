@@ -25,10 +25,12 @@ During execution, the **State Board** (table) was used exclusively while the **T
 
 **Task List (what to execute):**
 `- [ ]` task item:
+
 - [ ] T-03 Refactor `agents-telemetry.py` hotspots (`calculate_heat_scores`, `generate_report`, `main`).
 
 **State Board (status tracking):**
 State row fields:
+
 - Task: `T-03`
 - Checklist: `- [ ]` (for execution record)
 - State: `pending`
@@ -38,11 +40,13 @@ State row fields:
 ### Why Task List Matters
 
 The **Task List** contains:
+
 - ✅ **Specific function names** (`calculate_heat_scores`, `generate_report`, `main`)
 - ✅ **Target script** (`agents-telemetry.py`)
 - ✅ **Action verb** (`Refactor`)
 
 The **State Board** Notes column only said:
+
 - ⚠️ "Highest ROI area #2" - **vago, não executável**
 
 ## Prevention Rule
@@ -51,6 +55,7 @@ The **State Board** Notes column only said:
 **State Board = Visão gerencial para acompanhamento**
 
 **Sempre atualizar AMBOS:**
+
 1. Execute task item from Task List
 2. Mark `- [ ]` → `- [x]` in Task List
 3. Update State column in State Board: `pending` → `in_progress` → `done`
@@ -60,7 +65,7 @@ The **State Board** Notes column only said:
 
 ### Task Execution Flow (Mandatory Order)
 
-```
+```text
 1. Read ## Task List for specific work items
 2. Execute the work
 3. Update Task List: - [ ] → - [x]
@@ -74,10 +79,12 @@ The **State Board** Notes column only said:
 Both sections must exist and be consistent:
 
 **Task List example**
+
 - [x] T-01 Specific actionable item with details.
 
 **State Board example**
 Task row:
+
 - Task: `T-01`
 - Checklist: `- [x]`
 - State: `done`

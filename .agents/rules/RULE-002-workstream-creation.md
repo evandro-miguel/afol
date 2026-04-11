@@ -64,12 +64,12 @@ Quick mode is only valid when the work is already inside an approved feature con
 ## Task Status Markers
 
 ```markdown
-- [ ] T-01 Description      # pending
-- [/] T-02 Description      # in_progress
-- [%] T-03 Description      # ready_for_test
-- [!] T-04 Description      # blocked
-- [>] T-05 Description      # skipped
-- [x] T-06 Description      # completed
+- [ ] T-01 Description # pending
+- [/] T-02 Description # in_progress
+- [%] T-03 Description # ready_for_test
+- [!] T-04 Description # blocked
+- [>] T-05 Description # skipped
+- [x] T-06 Description # completed
 ```
 
 ---
@@ -159,6 +159,7 @@ make verify
 ```
 
 **Add timeline entry:**
+
 ```bash
 ./.agents/agents wb-update timeline --message "Implementation started"
 ```
@@ -168,6 +169,7 @@ make verify
 ## Best Practices
 
 **DO:**
+
 - ✅ Use descriptive theme names (kebab-case)
 - ✅ Create or update the roadmap feature before new non-trivial work
 - ✅ Link each workstream to `--feature-id` and `--parent-spec`
@@ -181,6 +183,7 @@ make verify
 - ✅ Add timeline entries for major steps
 
 **DON'T:**
+
 - ❌ Create folders manually (use `agents-new`)
 - ❌ Start non-trivial implementation without roadmap + parent spec
 - ❌ Use spaces in theme names

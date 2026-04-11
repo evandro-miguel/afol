@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Comandos `.agents/agents` são verbosos para uso frequente. Desenvolvedores preferem:
+
 - Comandos curtos
 - Autocomplete do shell
 - Workflows compostos

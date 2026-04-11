@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Múltiplos scripts Python precisam:
+
 - Ler configuração centralizada
 - Resolver caminhos relativos
 - Parsear timestamps e timezones
@@ -188,11 +189,11 @@ def load_agents_config(repo_root: Path | None = None) -> tuple[Path, Dict[str, A
     root = find_repo_root(repo_root)
     config = DEFAULT_CONFIG
     cfg_path = root / CONFIG_FILENAME
-    
+
     if cfg_path.exists():
         loaded = yaml.safe_load(cfg_path.read_text()) or {}
         config = _deep_merge(DEFAULT_CONFIG, loaded)
-    
+
     return root, config
 ```
 

@@ -171,6 +171,7 @@ if (condition) {
 ### "Cannot find module 'bun'"
 
 **Solution:** Install type definitions
+
 ```bash
 bun add -d @types/bun
 ```
@@ -178,6 +179,7 @@ bun add -d @types/bun
 ### "Bun is not defined"
 
 **Solution:** Ensure tsconfig.json has proper lib settings:
+
 ```json
 {
   "compilerOptions": {
@@ -190,6 +192,7 @@ bun add -d @types/bun
 ### Import path errors
 
 **Solution:** Use bundler module resolution:
+
 ```json
 {
   "compilerOptions": {
@@ -216,6 +219,7 @@ bun add -d @types/bun
 ```
 
 Usage:
+
 ```typescript
 import { Button } from "@components/Button";
 import { utils } from "@/utils";
@@ -245,7 +249,7 @@ Extend Bun's types:
 declare module "bun" {
   interface Env {
     MY_CUSTOM_VAR: string;
-    API_KEY: string;
+    APP_CONFIG_VALUE: string;
   }
 }
 ```

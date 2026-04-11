@@ -16,12 +16,15 @@ commands and docs over ad hoc shell conventions.
 ## Decision Tree
 
 Need to install or upgrade the scaffold in another repo?
+
 - Start with [Core](./references/core/README.md)
 
 Need the git-backed skill refresh or publish flow?
+
 - Open [Patterns](./references/patterns/README.md)
 
 Need to verify, recover from drift, or resolve a failed operation?
+
 - Open [Troubleshooting](./references/troubleshooting/README.md)
 
 Before finalizing, scan [Gotchas](./gotchas.md).

@@ -32,7 +32,7 @@ Based on `cloudflare-skill` by Dillon Mulroy.
 
 ### Structure
 
-```
+```text
 my-platform/
 ├── SKILL.md                  # Decision trees only
 └── references/

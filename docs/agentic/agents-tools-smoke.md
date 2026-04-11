@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** The tools catalog (`tools.json`) and CLI tools need validation to ensure:
+
 - JSON schema is valid
 - All referenced tools exist
 - CLI commands work end-to-end
@@ -122,7 +123,8 @@ def check_integration():
 ## Output
 
 ### Success
-```
+
+```text
 ✓ tools.json schema valid
 ✓ All tool references exist
 ✓ CLI smoke tests passed
@@ -130,7 +132,8 @@ def check_integration():
 ```
 
 ### Failure
-```
+
+```text
 ❌ tools.json: Missing field 'description'
 ❌ Tool 'missing-tool': Script not found
 ❌ CLI test failed: 'agents tools info x' returned 1
@@ -142,4 +145,5 @@ def check_integration():
 - [agents-tools.md](./agents-tools.md) - Tool discovery
 
 ---
+
 *Document: `docs/agentic/agents-tools-smoke.md`*

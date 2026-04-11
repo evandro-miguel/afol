@@ -7,18 +7,20 @@ updated_at: '2026-04-04T10:08:11-03:00'
 title: Workflow Standards
 ---
 
-# Workflow Standards
+## Workflow Standards
 
-## Mandatory workflow for non-trivial work
+### Mandatory workflow for non-trivial work
 
-### Step 1: Roadmap
+#### Step 1: Roadmap
+
 Create or update the roadmap feature in `docs/arc/GENERAL-ROADMAP.md`
 
 - Every meaningful feature must have a roadmap entry
 - The roadmap is the source of truth for feature inventory and status
 - No non-trivial implementation starts before this exists
 
-### Step 2: Parent Spec
+#### Step 2: Parent Spec
+
 Create or update the governing feature spec in `docs/arc/SPECS/`
 
 - Define feature intent, user journey, constraints, and acceptance
@@ -27,7 +29,8 @@ Create or update the governing feature spec in `docs/arc/SPECS/`
 - Local workstreams may choose `spec` or `spec-lite` as needed after the parent spec exists
 - Keep current-state evidence in `docs/map/` when needed, and keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder
 
-### Step 3: Plan
+#### Step 3: Plan
+
 Create a plan file using `docs/templates/plan.md` only when the work actually needs an execution plan
 
 - Link the plan to `roadmap_feature` and `parent_spec`
@@ -37,14 +40,16 @@ Create a plan file using `docs/templates/plan.md` only when the work actually ne
 - Keep progress, discoveries, decisions, outcomes, and validation current while work proceeds
 - Do not create a plan only to justify creating another plan or to wrap a pure research-only request
 
-### Step 4: Tasks
+#### Step 4: Tasks
+
 Create task files using `docs/templates/task.md` only when there is executable work to track
 
 - One task per logical unit
 - Track execution state
 - Keep task work aligned to the approved roadmap/spec context
 
-### Step 5: Execution + Log
+#### Step 5: Execution + Log
+
 Materialize and update log only after real execution starts or a real decision/blocker exists
 
 - Timestamp each entry (UTC with Z suffix)
@@ -54,7 +59,8 @@ Materialize and update log only after real execution starts or a real decision/b
 - Keep this section as the canonical place for execution narrative so agents do not reconstruct work from terminal history alone
 - Use `docs/map/` as descriptive input evidence only; do not treat map artifacts as substitutes for roadmap/spec/workbench authority
 
-### Step 6: Report
+#### Step 6: Report
+
 Create report using `docs/templates/report.md` only after there is a real delivered outcome or verified finding to summarize
 
 - Summarize changes
@@ -63,14 +69,15 @@ Create report using `docs/templates/report.md` only after there is a real delive
 - Include a documentation-drift check and the files updated to keep the scaffold documentation current
 - If runtime guidance changed, include a mirror sync status (`AGENTS.md` -> `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`)
 
-### Step 7: Retrospective (Optional but Recommended)
+#### Step 7: Retrospective (Optional but Recommended)
+
 Create retrospective using `docs/templates/retrospective.md`
 
 - Document what worked and what didn't
 - Identify lessons for future work
 - Capture actionable improvements
 
-## Quick changes
+### Quick changes
 
 For trivial changes requested by user:
 
@@ -79,7 +86,7 @@ For trivial changes requested by user:
 - Log the change
 - Report with verification
 
-## Artifact Utility Rule
+### Artifact Utility Rule
 
 - A workbench artifact may exist only if it has a concrete purpose in the current session.
 - Placeholder-only artifacts do not count as valid progress, even if their frontmatter status is `active` or `final`.
@@ -92,13 +99,13 @@ For a new non-trivial feature:
 - Create or update roadmap + parent spec first
 - Then create the workstream
 
-## ExecPlan expectation
+### ExecPlan expectation
 
 - For non-trivial work, the workbench plan file is the canonical ExecPlan for that session.
 - It must be self-contained enough that a new contributor can resume from the plan and repo alone.
 - Finalized plans must keep the required living sections and a checkbox-based progress trail.
 
-### Documentation-First Completion Rule
+#### Documentation-First Completion Rule
 
 - No task is complete until documentation is current.
 - Documentation artifacts include, at minimum:
@@ -107,14 +114,14 @@ For a new non-trivial feature:
   - process/policy changed → roadmap/spec/operational standards updated
   - runtime adapter changed → runtime-facing mirrors updated
 
-## Temporary files
+### Temporary files
 
 - Use `.agents/tmp/` for temporary files that do not yet belong in the durable scaffold structure
 - Move durable artifacts out of `.agents/tmp/` once they become real project assets
 
-## File naming
+### File naming
 
-```
+```text
 .agents/wb/YYMMDD_HHMM_<theme>/
   ├── YYMMDD_HHMM_<theme>_plan_01.md
   ├── YYMMDD_HHMM_<theme>_task_01.md
@@ -125,4 +132,5 @@ For a new non-trivial feature:
 ```
 
 ---
+
 *Standard: `docs/standards/workflow.md`*

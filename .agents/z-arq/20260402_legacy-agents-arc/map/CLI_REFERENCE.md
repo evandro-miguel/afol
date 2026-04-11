@@ -7,20 +7,20 @@ created_at: "2026-04-02T23:17:01Z"
 updated_at: "2026-04-02T23:17:01Z"
 ---
 
-# CLI Command Reference
+## CLI Command Reference
 
-## Purpose
+### Purpose
 
 - This document lists discovered command surfaces and the files that likely define them.
 
-## Command Files
+### Command Files
 
 - No CLI command files were detected.
 
-## Command Sources
+### Command Sources
 
 - No structured command sources were extracted.
 
-## Discovered Commands
+### Discovered Commands
 
 - No commands were extracted by the minimal Phase 5 scan.

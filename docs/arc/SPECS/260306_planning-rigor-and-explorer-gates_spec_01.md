@@ -25,24 +25,29 @@ risk_level: medium
 # SPEC: Planning Rigor and Explorer Gates
 
 ## Intent
+
 - Require structured brainstorming and explicit repo exploration before a major plan can be treated as complete.
 
 ## Expected Behavior
+
 - Major plans must link to a brainstorm artifact.
 - Major plans must link to an explorer-check artifact documenting current-project review.
 - Verification must flag missing mandatory exploration artifacts for governed work.
 
 ## User Journey
+
 1. Create a governed session.
 2. Fill brainstorm and explorer-check.
 3. Complete the plan with links to those artifacts.
 4. Verify the session; missing gates are flagged.
 
 ## Acceptance
+
 - [ ] Brainstorm template captures options, assumptions, and preferred direction.
 - [ ] Explorer-check template captures inspected paths, commands, findings, and plan-readiness.
 - [ ] New workstreams create both artifacts by default.
 - [ ] Strict verification catches missing exploration gates.
 
 ---
+
 *Child Spec: `docs/arc/SPECS/260306_planning-rigor-and-explorer-gates_spec_01.md`*

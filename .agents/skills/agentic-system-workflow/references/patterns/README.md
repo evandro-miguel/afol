@@ -21,6 +21,7 @@ Use this when the project already has the scaffold and you want the installed
 skills under `.agents/skills/` to reflect the current upstream git source.
 
 Rule:
+
 - `skills-sync pull` refreshes the git-backed source or mirror only.
 - `skills-sync sync` / `skills-sync update` refresh the actual project skill
   copies under `.agents/skills/`.
@@ -54,6 +55,7 @@ When the change is non-trivial, use the scaffold's workbench flow:
 ```
 
 State rules:
+
 - use the task state board as the source of truth
 - move to `ready_for_test` only after implementation is in place
 - mark `done` only after evidence exists

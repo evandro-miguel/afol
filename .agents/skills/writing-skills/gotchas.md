@@ -47,7 +47,7 @@ description: Use when creating or updating skills. Triggers for new skill, updat
 
 ### Directory Must Match `name` Field
 
-```
+```text
 # ❌ BAD
 directory: my-skill/
 name: mySkill  # Mismatch!
@@ -59,7 +59,7 @@ name: my-skill  # Exact match
 
 ### SKILL.md Must Be ALL CAPS
 
-```
+```text
 # ❌ BAD
 skill.md
 Skill.md
@@ -103,7 +103,8 @@ description: Use when implementing any feature, before writing code
 ```markdown
 # ❌ BAD: 50 lines documenting all flags
 
-# ✅ GOOD: One line
+## ✅ GOOD: One line
+
 Run `mytool --help` for all options.
 ```
 
@@ -113,12 +114,15 @@ Run `mytool --help` for all options.
 
 ```markdown
 # ❌ BAD: Trust agents will "get the spirit"
+
 Write test before code.
 
-# ✅ GOOD: Close every loophole explicitly
+## ✅ GOOD: Close every loophole explicitly
+
 Write test before code.
 
 **No exceptions:**
+
 - Don't keep code as "reference"
 - Don't "adapt" existing code
 - Delete means delete
@@ -139,9 +143,11 @@ Every excuse from baseline testing goes in the table:
 
 ```markdown
 # ❌ BAD: Nested chain (A → B → C)
+
 See [patterns.md] → which links to [advanced.md] → which links to [deep.md]
 
-# ✅ GOOD: Flat (A → B, A → C)
+## ✅ GOOD: Flat (A → B, A → C)
+
 See [patterns.md] and [advanced.md]
 ```
 
@@ -149,9 +155,11 @@ See [patterns.md] and [advanced.md]
 
 ```markdown
 # ❌ BAD: Burns context immediately
+
 @skills/my-skill/SKILL.md
 
-# ✅ GOOD: Agent loads when needed
+## ✅ GOOD: Agent loads when needed
+
 See [my-skill] for details.
 ```
 
@@ -171,9 +179,11 @@ See [my-skill] for details.
 
 ```markdown
 # ❌ BAD: File path (fragile)
+
 See /home/user/.config/opencode/skills/my-skill/SKILL.md
 
-# ✅ GOOD: Skill protocol
+## ✅ GOOD: Skill protocol
+
 See [my-skill](skill://my-skill)
 ```
 
@@ -183,10 +193,12 @@ See [my-skill](skill://my-skill)
 
 ```markdown
 # ❌ BAD: Starting with Tier 3 "just in case"
-# Result: Wasted effort, empty reference files
 
-# ✅ GOOD: Start with Tier 1, upgrade when needed
-# Can always add references/ later
+## Result: Wasted effort, empty reference files
+
+## ✅ GOOD: Start with Tier 1, upgrade when needed
+
+## Can always add references/ later
 ```
 
 ### Signals You Need to Upgrade
@@ -204,9 +216,11 @@ See [my-skill](skill://my-skill)
 
 ```markdown
 # ❌ BAD: Breaks on Unix systems
+
 See `reference\guide.md`
 
-# ✅ GOOD: Cross-platform
+## ✅ GOOD: Cross-platform
+
 See `reference/guide.md`
 ```
 
@@ -214,9 +228,11 @@ See `reference/guide.md`
 
 ```markdown
 # ❌ BAD: Tool not found errors
+
 Use the `create_issue` tool
 
-# ✅ GOOD: Fully qualified name
+## ✅ GOOD: Fully qualified name
+
 Use the `GitHub:create_issue` tool
 ```
 
@@ -224,9 +240,11 @@ Use the `GitHub:create_issue` tool
 
 ```markdown
 # ❌ BAD: Confusing, no clear default
+
 "You can use pypdf, or pdfplumber, or PyMuPDF, or pdf2image..."
 
-# ✅ GOOD: Default with escape hatch
+## ✅ GOOD: Default with escape hatch
+
 "Use pdfplumber for text extraction.
 For scanned PDFs requiring OCR, use pdf2image with pytesseract instead."
 ```
@@ -235,11 +253,14 @@ For scanned PDFs requiring OCR, use pdf2image with pytesseract instead."
 
 ```markdown
 # ❌ BAD: Will fail if not installed
+
 "Use the pdf library to process the file."
 
-# ✅ GOOD: Explicit installation
+## ✅ GOOD: Explicit installation
+
 "Install required package: `pip install pypdf`
 Then use:
+
 ```python
 from pypdf import PdfReader
 reader = PdfReader('file.pdf')

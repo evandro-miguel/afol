@@ -8,6 +8,7 @@ metadata:
 # Link Health
 
 Use this reference when editors report:
+
 - `ambiguous link to document`
 - `link to non existent document`
 

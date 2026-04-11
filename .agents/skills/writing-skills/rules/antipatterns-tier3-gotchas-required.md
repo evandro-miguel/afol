@@ -25,7 +25,7 @@ Every product in a Tier 3 skill must have a `gotchas.md` file. This file documen
 
 ### Incorrect
 
-```
+```text
 references/
 └── kv/
     ├── README.md
@@ -41,9 +41,12 @@ references/
 # gotchas.md
 
 ---
+
 description: "KV pitfalls and limits"
 metadata:
-  tags: "kv, limits, errors, gotchas"
+
+## tags: "kv, limits, errors, gotchas"
+
 ---
 
 ## Rate Limits
@@ -54,6 +57,7 @@ metadata:
 ## Common Errors
 
 **Error: "KV request failed"**
+
 - Cause: Missing permission in token
 - Fix: Add `kv:read` and `kv:write` permissions
 

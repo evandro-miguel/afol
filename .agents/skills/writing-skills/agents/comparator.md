@@ -5,6 +5,7 @@ metadata:
   tags: "evaluation, comparison, a/b-testing"
   triggers: "compare outputs, blind comparison, a versus b, which is better"
 ---
+
 # Blind Comparator Agent
 
 Compare two outputs WITHOUT knowing which skill produced them.
@@ -140,6 +141,7 @@ When expectations are provided:
 3. Document in `assertions_passed`
 
 Example:
+
 - Output A: 3/5 assertions passed, weighted score 8.6
 - Output B: 4/5 assertions passed, weighted score 6.4
 - Winner: A (quality matters more than assertion count)

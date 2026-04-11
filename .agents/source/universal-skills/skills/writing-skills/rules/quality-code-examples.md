@@ -19,7 +19,7 @@ Every rule, pattern, or API reference must include practical, copy-pasteable cod
 
 - Include code examples for every non-trivial concept
 - Examples must be syntactically valid and runnable
-- Use fenced code blocks with language tags (```typescript, ```bash, etc.)
+- Use fenced code blocks with language tags (```typescript,```bash, etc.)
 - Show both correct AND incorrect patterns when helpful
 - Keep examples focused on the single concept being explained
 

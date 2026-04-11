@@ -13,39 +13,51 @@ superseded_by: ""
 # ADR: <topic>
 
 ## Context
+
 - <why this decision exists>
 - <constraints that matter>
 
 ## Decision
+
 - <what we decided>
 
 ## Options Considered
+
 1) Option A
+
 - Pros:
 - Cons:
 - Risks:
 
 2) Option B
+
 - Pros:
 - Cons:
 - Risks:
 
 ## Rationale
+
 - <why this decision wins>
 
 ## Consequences
+
 Positive:
+
 - <benefit>
 
 Negative:
+
 - <cost>
 
 ## Verification
+
 - How we will validate this decision:
   - <test, metric, benchmark, devex>
 
 ## Status
+
 - <draft|accepted|superseded>
 
 ---
+
 *Template: `.agents/a-docs/templates/adr.md`*

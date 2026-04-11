@@ -37,6 +37,7 @@ metadata:
 - [Error message text]
 
 **NOT for:**
+
 - [When to avoid]
 
 ## The Problem
@@ -47,6 +48,12 @@ function badCode() {
   // problematic pattern
 }
 ```
+```
+
+
+```text
+
+```text
 
 ## The Solution
 
@@ -73,9 +80,11 @@ function goodCode() {
 ## Common Mistakes
 
 **Mistake 1:** [Description]
+
 - Wrong: `bad code`
 - Right: `good code`
-```
+
+```text
 
 ---
 
@@ -110,6 +119,7 @@ example command
 ```
 
 **Pattern B:**
+
 ```bash
 another example
 ```
@@ -117,9 +127,11 @@ another example
 ## Detailed Docs
 
 For more options, run `--help` or see:
+
 - [pattern.md](./references/templates/pattern.md)
 - [examples.md](./examples.md)
-```
+
+```text
 
 ---
 
@@ -220,6 +232,12 @@ function before() {
   // nested, confusing
 }
 ```
+```
+
+
+```text
+
+```text
 
 ## After
 
@@ -239,7 +257,8 @@ function after() {
 
 **Before:** [Problem metric]
 **After:** [Improved metric]
-```
+
+```text
 
 ---
 
@@ -280,9 +299,16 @@ expect(element).toBeVisible();
 await waitFor(() => element.isVisible(), { timeout: 5000 });
 expect(element).toBeVisible();
 ```
+```
+
+
+```text
+
+```text
 
 ## Impact
 
 - Flaky tests: 15/100 → 0/100
 - Speed: 40% faster (no over-waiting)
-```
+
+```text

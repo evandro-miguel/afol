@@ -27,6 +27,7 @@ function process(value: string | number) {
 ```
 
 **Valid typeof checks:**
+
 - `"string"`
 - `"number"`
 - `"bigint"`
@@ -258,13 +259,13 @@ function process(value: string | number | boolean) {
     // value is string
     return value.length;
   }
-  
+
   // value is number | boolean
   if (typeof value === 'number') {
     // value is number
     return value.toFixed(2);
   }
-  
+
   // value is boolean
   return value ? 'yes' : 'no';
 }

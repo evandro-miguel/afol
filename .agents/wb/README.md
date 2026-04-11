@@ -4,7 +4,7 @@ All active workstreams live here in session folders.
 
 ## Naming convention
 
-```
+```text
 wb/YYMMDD_HHMM_<theme>/
 ```
 
@@ -38,4 +38,5 @@ Optional pack folders for multiple major tracks:
 Completed sessions should be marked complete in their report frontmatter.
 
 ---
+
 *Workbench: `.agents/wb/`*

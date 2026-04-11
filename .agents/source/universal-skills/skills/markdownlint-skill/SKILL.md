@@ -6,6 +6,7 @@ metadata:
   tags: "markdown, linting, markdownlint, documentation, formatting, bun, global-commands, llm, standardization, ai-pipeline"
   triggers: "lint markdown, fix markdown, validate markdown, markdown errors, standardize markdown, check markdown, markdownlint, .md lint, format markdown, markdown style, standardize llm markdown output, lint markdown from ai, bun markdownlint setup, llm markdown consistency, validate ai generated markdown"
 ---
+
 # Markdownlint Skill 📝
 
 Global markdown quality system for formatting + link integrity across all projects and LLM outputs.
@@ -109,26 +110,31 @@ lint-md README.md
 ## Examples
 
 ### Lint Specific Files
+
 ```bash
 lint-md README.md CONTRIBUTING.md
 ```
 
 ### Fix All Markdown in Project
+
 ```bash
 fix-md "**/*.md"
 ```
 
 ### Strict CI Check
+
 ```bash
 lint-md "**/*.md" --strict || exit 1
 ```
 
 ### Check Before Commit
+
 ```bash
 bun run lint:docs:full
 ```
 
 ### Strict Gate
+
 ```bash
 bun run lint:docs:full:strict
 ```
@@ -136,6 +142,7 @@ bun run lint:docs:full:strict
 ## Integration with LLMs
 
 ### Post-process LLM Output
+
 ```bash
 echo "$LLM_OUTPUT" > output.md
 fix-md output.md
@@ -143,7 +150,8 @@ lint-md output.md --strict
 ```
 
 ### System Prompt Addition
-```
+
+```text
 Format all markdown with:
 - Max 100 chars per line
 - Use dashes for lists (-)
@@ -156,7 +164,7 @@ Format all markdown with:
 
 ### ⚡ Quick Decision Tree
 
-```
+```text
 Need to standardize LLM markdown?
 ├── Setting up new project?
 │   └── Follow "Bun Setup" in ./references/bun-setup.md

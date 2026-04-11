@@ -4,7 +4,7 @@
 
 Skills are symlinked from `.agents/skills/` - the mandatory skills folder.
 
-```
+```text
 .opencode/skills -> ../.agents/skills
 ```
 
@@ -32,4 +32,5 @@ Do not commit:
 - machine-specific personal config
 
 ---
+
 *Agent folder: `.opencode/`*

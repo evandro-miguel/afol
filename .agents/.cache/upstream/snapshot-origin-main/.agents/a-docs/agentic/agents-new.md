@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Criar workstream manualmente requer:
+
 - Nomear pasta corretamente (YYMMDD_HHMM_theme_type_N)
 - Copiar templates
 - Preencher frontmatter
@@ -45,7 +46,7 @@ Cria nova workstream com:
 
 ### Arquivos Criados
 
-```
+```text
 .agents/wb/
 └── YYMMDD_HHMM_<theme>/
     ├── YYMMDD_HHMM_<theme>_plan_01.md

@@ -79,7 +79,7 @@ search-conversations supports multiple modes. Run --help for details.
 When searching, dispatch agent with template...
 [20 lines of repeated instructions]
 
-# ✅ GOOD: Reference other skill
+## ✅ GOOD: Reference other skill
 
 Use subagents for searches. See [delegating-to-subagents] for workflow.
 ```
@@ -93,7 +93,7 @@ Partner: "How did we handle auth errors in React Router?"
 You: I'll search past conversations for patterns.
 [Dispatch subagent with query: "React Router authentication error handling 401"]
 
-# ✅ GOOD: Minimal (20 words)
+## ✅ GOOD: Minimal (20 words)
 
 Partner: "Auth errors in React Router?"
 You: Searching...
@@ -210,11 +210,11 @@ Use skill name only, with explicit requirement markers:
 
 **REQUIRED SUB-SKILL**: Use defensive-programming for error handling.
 
-# ❌ BAD: Unclear if required
+## ❌ BAD: Unclear if required
 
 See test-driven-development skill for context.
 
-# ❌ NEVER: Force-loads (burns context)
+## ❌ NEVER: Force-loads (burns context)
 
 @skills/testing/test-driven-development/SKILL.md
 ```

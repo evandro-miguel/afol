@@ -14,7 +14,10 @@
       "skills": [
         "agentic-system-workflow",
         "writing-skills",
-        "markdownlint-skill"
+        "markdownlint-skill",
+        "bun-skill",
+        "typescript-skill",
+        "workbench-agent-teams"
       ]
     }
   ]

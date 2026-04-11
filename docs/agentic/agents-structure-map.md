@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Projects grow and structure becomes complex. New developers (or agents) need to:
+
 - Understand file organization
 - Know where each type of code lives
 - Have code overview
@@ -103,12 +104,14 @@ cat docs/arc/structure/README.md
 # Project Structure
 
 ## Frontend
+
 | File | Lines | Description |
 |------|-------|-------------|
 | src/components/Button.tsx | 150 | Reusable button component |
 | src/hooks/useAuth.ts | 80 | Authentication hook |
 
 ## Backend
+
 | File | Lines | Description |
 |------|-------|-------------|
 | src/api/users.py | 200 | User API endpoints |
@@ -120,4 +123,5 @@ cat docs/arc/structure/README.md
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---
+
 *Document: `docs/agentic/agents-structure-map.md`*

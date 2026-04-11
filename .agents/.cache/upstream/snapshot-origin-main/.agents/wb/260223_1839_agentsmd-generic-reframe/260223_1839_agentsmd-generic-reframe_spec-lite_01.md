@@ -17,22 +17,27 @@ risk_level: low
 # SPEC LITE: agentsmd-generic-reframe
 
 ## Objective
+
 - Rebuild root `AGENTS.md` into a reusable generic template structure with current repo values.
 
 ## Change Summary
+
 - Replaced root `AGENTS.md` with requested section flow and updated rules.
 - Preserved operational constraints and current command set.
 - Added explicit skills/MCP/tooling sections in a reusable format.
 
 ## Files and Areas
+
 - `AGENTS.md`
 - `.agents/a-docs/lessons/general-lessons.md`
 - `.agents/wb/260223_1839_agentsmd-generic-reframe/*`
 
 ## Risks
+
 - Future edits may drift from generic-first approach -> mitigated by lesson/prevention rule update.
 
 ## Verification
+
 - Commands:
   - `make lint`
   - `make sync`
@@ -41,9 +46,11 @@ risk_level: low
   - Captured in `260223_1839_agentsmd-generic-reframe_report_01`.
 
 ## Done When
+
 - [x] Verified with commands
 - [x] No regressions observed
 - [x] Report updated with evidence
 
 ---
+
 *Template: `.agents/a-docs/templates/spec-lite.md`*

@@ -96,7 +96,7 @@ Different skill types need different test approaches.
 
 **Example Baseline**:
 
-```
+```text
 Scenario: Implement feature under time pressure
 Pressure: "You have 10 minutes"
 Agent response: "Since we're short on time, I'll implement the feature first

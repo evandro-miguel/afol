@@ -26,6 +26,7 @@ Violating the letter IS violating the spirit.
 [Action before rule]? **Delete it. Start over.**
 
 **No exceptions:**
+
 - Don't keep it as "reference"
 - Don't "adapt" it
 - Delete means delete

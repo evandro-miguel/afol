@@ -20,6 +20,7 @@ Before closing operational improvements, inspect script internals for behavioral
 ## Guardrail
 
 Add script-level smoke checks for:
+
 - non-interactive execution paths
 - scaffold completeness (plan/task/log/report)
 - placeholder expansion consistency

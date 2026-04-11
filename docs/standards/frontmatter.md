@@ -7,11 +7,11 @@ updated_at: '2026-04-04T10:08:11-03:00'
 title: Frontmatter Standard
 ---
 
-# Frontmatter Standard
+## Frontmatter Standard
 
 This document defines the canonical frontmatter schema for all agent documentation files.
 
-## Canonical Schema
+### Canonical Schema
 
 All documents MUST include the following fields:
 
@@ -26,7 +26,7 @@ title: "<short title>"
 ---
 ```
 
-### Required Fields
+#### Required Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -36,7 +36,7 @@ title: "<short title>"
 | `created_at` | string | Creation timestamp in ISO 8601 UTC format |
 | `updated_at` | string | Last update timestamp in ISO 8601 UTC format |
 
-### Recommended Fields
+#### Recommended Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -47,16 +47,17 @@ title: "<short title>"
 | `workstream_intent` | string | Governing session intent when the doc is materialized |
 | `artifact_purpose` | string | Why the artifact deserves to exist in the session |
 
-### Optional Fields
+#### Optional Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `repo` | string | Repository name |
 | `branch` | string | Branch or worktree name |
 
-## Document Types
+### Document Types
 
-### Workbench Types (wb)
+#### Workbench Types (wb)
+
 - `plan` - Planning document
 - `task` - Task checklist
 - `log` - Execution log
@@ -68,18 +69,20 @@ title: "<short title>"
 - `blocks` - Blockers documentation
 - `retrospective` - Retrospective notes
 
-### Architecture Types (arc)
+#### Architecture Types (arc)
+
 - `spec` - Full specification
 - `spec-lite` - Lightweight specification
 - `adr` - Architecture decision record
 - `architecture` - Architecture documentation
 - `roadmap` - Roadmap planning
 
-### Meta Types (standards)
+#### Meta Types (standards)
+
 - `standard` - Standard documents
 - `index` - Index documents
 
-## Legacy Compatibility
+### Legacy Compatibility
 
 The following legacy field names are accepted during the transition period:
 

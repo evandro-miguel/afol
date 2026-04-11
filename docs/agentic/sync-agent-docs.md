@@ -16,6 +16,7 @@ links:
 ## Why It Exists
 
 **Problem:** Multiple runtimes and agents (OPENCODE, QWEN, CLAUDE, GEMINI) have separate instruction files. Keeping them synchronized manually is:
+
 - Error-prone
 - Laborious
 - Causes inconsistency between agents
@@ -96,7 +97,7 @@ make sync
 
 ## Output
 
-```
+```text
 → Syncing AGENTS.md to agent files...
 QWEN.md: No local modifications detected
 CLAUDE.md: 3 differences found
@@ -111,4 +112,5 @@ Sync complete.
 - `AGENTS.md` - Central template
 
 ---
+
 *Document: `docs/agentic/sync-agent-docs.md`*

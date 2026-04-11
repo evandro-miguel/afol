@@ -18,16 +18,19 @@ links:
 # Tasks: lint-doc-exclusions
 
 ## Task List
+
 - [x] T-001 Excluir docs de ensino/orientação do escopo do lint.
 - [x] T-002 Validar fluxo completo e registrar evidências.
 
 ## State Board
+
 | Task | Checklist | State | Owner | Notes |
 |------|----------:|-------|-------|-------|
 | T-001 | - [x] | done | worker | Exclusions adicionadas no scanner do linter. |
 | T-002 | - [x] | done | worker | `make lint` e validações finais executadas. |
 
 State values:
+
 - pending
 - in_progress
 - ready_for_test
@@ -44,9 +47,11 @@ See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/
 Before starting work, consult relevant resources:
 
 ### Prevention Rules
+
 - [x] Check: [`.agents/a-docs/lessons/general-lessons.md`](.agents/a-docs/lessons/general-lessons.md)
 
 ### Useful Resources
+
 - Rules useful for this task:
   - [x] `.agents/a-docs/standards/workflow.md`
 - Docs useful for this task:
@@ -57,6 +62,7 @@ Before starting work, consult relevant resources:
   - [>] None
 
 ## Implementation Checkpoint
+
 - Files touched:
   - `.agents/scripts/agents-lint-docs.py`
   - `.agents/a-docs/lessons/general-lessons.md`
@@ -65,13 +71,16 @@ Before starting work, consult relevant resources:
   - Ignore docs meant for learning/orientation by default in lint scope.
 
 ## Test Gate
+
 - Move to `ready_for_test` only after implementation checkpoint.
 - Record command, result, and evidence before marking done.
 
 ### Test Evidence
+
 - Command: `<command>`
 - Result: pass
 - Evidence: `make lint` -> 21 files checked, 0 issues.
 
 ---
+
 *Template: `.agents/a-docs/templates/task.md`*

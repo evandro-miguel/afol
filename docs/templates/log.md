@@ -21,22 +21,28 @@ links:
 # Log: <theme>
 
 ## Governance Context
+
 - Roadmap feature: `<feature_id>`
 - Parent spec: `<parent_spec_id>`
 - Child spec: `<child_spec_id_or_empty>`
 
 ## Timeline
+
 - YYYY-MM-DD HH:MMZ - <action> - <result>
 - YYYY-MM-DD HH:MMZ - <action> - <result>
 
 ## Decisions
+
 - <decision> -> <reason>
 
 ## Blockers
+
 - <blocker or none>
 
 ## Next Step
+
 - <next action>
 
 ---
+
 *Template: `docs/templates/log.md`*

@@ -8,19 +8,19 @@ owner: orchestrator
 related_session: 260323_1827_universal-skills-local-source-and-discovery
 ---
 
-# Lesson: Follow explicit deletion policy for reproducible mirrored assets
+## Lesson: Follow explicit deletion policy for reproducible mirrored assets
 
-## What happened
+### What happened
 
 - I removed overlapping `universal-skills` content from the global Codex skills path, but I first kept an archive copy even though the assets were fully reproducible from the sibling upstream checkout.
 - The user clarified that those overlapping assets did not need archival and could be removed outright.
 
-## Prevention Rule
+### Prevention Rule
 
 - When the user explicitly approves deletion of reproducible mirrored assets, do not keep an extra archive by default.
 - Only preserve an archive when the user asks for rollback safety or when the asset is not trivially recoverable from a declared source of truth.
 
-## Guardrail
+### Guardrail
 
 - Before performing cleanup of duplicated assets, explicitly classify them as either `reproducible from source` or `unique/local`.
 - For `reproducible from source`, prefer direct removal once the user policy is clear.

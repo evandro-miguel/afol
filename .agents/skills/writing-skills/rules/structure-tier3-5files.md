@@ -29,7 +29,7 @@ All five files must exist for every product.
 
 ### Incorrect
 
-```
+```text
 references/
 └── kv/
     └── README.md
@@ -39,7 +39,7 @@ references/
 
 ### Correct
 
-```
+```text
 references/
 └── kv/
     ├── README.md

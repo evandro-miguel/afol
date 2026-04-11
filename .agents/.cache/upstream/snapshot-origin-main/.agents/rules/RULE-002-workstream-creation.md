@@ -54,12 +54,12 @@ make new THEME=<theme-name>
 ## Task Status Markers
 
 ```markdown
-- [ ] T-01 Description      # pending
-- [/] T-02 Description      # in_progress
-- [%] T-03 Description      # ready_for_test
-- [!] T-04 Description      # blocked
-- [>] T-05 Description      # skipped
-- [x] T-06 Description      # completed
+- [ ] T-01 Description # pending
+- [/] T-02 Description # in_progress
+- [%] T-03 Description # ready_for_test
+- [!] T-04 Description # blocked
+- [>] T-05 Description # skipped
+- [x] T-06 Description # completed
 ```
 
 ---
@@ -132,6 +132,7 @@ make verify
 ```
 
 **Add timeline entry:**
+
 ```bash
 ./.agents/agents wb-update timeline --message "Implementation started"
 ```
@@ -141,6 +142,7 @@ make verify
 ## Best Practices
 
 **DO:**
+
 - ✅ Use descriptive theme names (kebab-case)
 - ✅ Include `--spec` for complex features
 - ✅ Use `--spec-lite` for bug fixes
@@ -148,6 +150,7 @@ make verify
 - ✅ Add timeline entries for major steps
 
 **DON'T:**
+
 - ❌ Create folders manually (use `agents-new`)
 - ❌ Use spaces in theme names
 - ❌ Skip task IDs (always use T-NN)

@@ -20,6 +20,7 @@ git -C /path/to/new-project init  # optional but recommended
 ```
 
 What this does:
+
 - installs the `.agents` runtime surface
 - writes the generic governance baseline
 - keeps project-owned repository mapping under `docs/map/`
@@ -35,6 +36,7 @@ For a live project, use partial mode so project-owned files are preserved.
 ```
 
 Important notes:
+
 - `--partial` is the safe default for repos with live content.
 - If the target repo already owns `make all`, use `make agents-all` for the
   scaffold aggregate validation.

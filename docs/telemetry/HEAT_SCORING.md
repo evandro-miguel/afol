@@ -24,7 +24,7 @@ Heat scoring tracks which elements (tools, patterns, templates, documents) are m
 
 ## Heat Score Formula (per period)
 
-```
+```text
 heat_score = (frequency_score × 0.5) + (recency_score × 0.3) + (success_score × 0.2)
 ```
 
@@ -113,7 +113,7 @@ python3 .agents/scripts/agents-telemetry.py hot --type=patterns
 
 ### Weekly Heat Map
 
-```
+```text
 ======================================================================
 🔥 HEAT MAP - Element Usage & Engagement (weekly)
 ======================================================================
@@ -175,6 +175,7 @@ make telemetry-heat PERIOD=monthly FORMAT=json | jq '.all[] | select(.heat_level
 ```
 
 **Insight:** Elements that are hot weekly but cold daily may indicate:
+
 - Tools used only in specific sprint phases
 - Patterns applied during planning, not execution
 - Seasonal/cyclical usage patterns
@@ -192,6 +193,7 @@ make telemetry-heat PERIOD=weekly
 ```
 
 **Example:**
+
 - Daily: 2 elements, 5 accesses
 - Weekly: 15 elements, 100 accesses
 - **Conclusion:** Active early in week, gap in last 24h
@@ -223,6 +225,7 @@ done
 ### Cold Element Investigation
 
 **Cold elements can mean:**
+
 1. **Obsolete** - Should be deprecated
 2. **New** - Not yet adopted
 3. **Niche** - Used only in specific contexts
@@ -266,7 +269,8 @@ python3 .agents/scripts/agents-telemetry.py record element_apply \
 ## Interpreting Scores
 
 ### High Frequency, Low Recency
-```
+
+```text
 Element: old-tool
 frequency_score: 95 (used a lot historically)
 recency_score: 10 (not used in 30+ days)
@@ -276,7 +280,8 @@ recency_score: 10 (not used in 30+ days)
 **Action**: Check if replaced by newer tool, consider deprecation.
 
 ### High Recency, Low Frequency
-```
+
+```text
 Element: new-feature
 frequency_score: 15 (few uses)
 recency_score: 100 (used today)
@@ -286,7 +291,8 @@ recency_score: 100 (used today)
 **Action**: Monitor growth, promote adoption.
 
 ### Low Success Rate
-```
+
+```text
 Element: flaky-tool
 success_score: 45 (55% failure rate)
 → Reliability issues
@@ -327,6 +333,15 @@ Embed heat map in dashboard:
 make telemetry-heat MIN_SCORE=50
 ```
 ```
+
+
+```text
+
+
+```text
+
+
+```text
 
 ---
 *Heat Scoring: `docs/telemetry/HEAT_SCORING.md`*

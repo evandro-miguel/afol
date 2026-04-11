@@ -4,7 +4,7 @@
 
 Skills are symlinked from `.agents/skills/` - the mandatory skills folder.
 
-```
+```text
 .qwen/skills -> ../.agents/skills
 ```
 
@@ -28,4 +28,5 @@ Do not commit:
 Keep `.qwen/` thin, portable, and traceable back to the canonical governance files.
 
 ---
+
 *Agent folder: `.qwen/`*

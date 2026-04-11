@@ -101,19 +101,19 @@ function handleValue(value: unknown) {
   if (typeof value === 'string') {
     // value is string
   }
-  
+
   if (typeof value === 'number') {
     // value is number
   }
-  
+
   if (Array.isArray(value)) {
     // value is unknown[]
   }
-  
+
   if (value instanceof Date) {
     // value is Date
   }
-  
+
   if (value && typeof value === 'object') {
     // value is object (not null)
   }

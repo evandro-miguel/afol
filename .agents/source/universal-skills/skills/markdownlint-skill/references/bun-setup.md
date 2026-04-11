@@ -139,6 +139,7 @@ bun run lint:md
 Create test fixtures to verify configuration:
 
 **tests/fixtures/valid.md**:
+
 ```markdown
 # Valid Document
 
@@ -153,6 +154,13 @@ This is a properly formatted document.
 const x = 1;
 ```
 ```
+
+
+```text
+
+```text
+
+```text
 
 **tests/fixtures/invalid.md**:
 ```markdown

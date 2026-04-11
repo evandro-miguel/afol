@@ -17,7 +17,7 @@ Single-file skills for focused, specific purposes.
 
 ## Structure
 
-```
+```text
 my-skill/
 └── SKILL.md          # Everything in one file
 ```
@@ -47,16 +47,21 @@ Replace nested conditions with early returns and flag variables.
 function process(data) {
   if (data) {
     if (data.valid) {
-      if (data.ready) {
-        return doWork(data);
-      }
-    }
+```
+
+if (data.ready) {
+return doWork(data);
+}
+}
+
+```text
   }
   return null;
 }
 ```
 
 ## After
+
 ```javascript
 function process(data) {
   if (!data) return null;
@@ -65,7 +70,9 @@ function process(data) {
   return doWork(data);
 }
 ```
-```
+
+
+```text
 
 ## Checklist
 

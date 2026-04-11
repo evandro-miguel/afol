@@ -436,6 +436,7 @@ REPL_ID=1 bun test
 ```
 
 When enabled:
+
 - Only failures displayed in detail
 - Passing tests hidden
 - Summary statistics preserved
@@ -478,9 +479,9 @@ const fetchMock = mock();
 
 test("api call", async () => {
   fetchMock.mockReturnValue(Promise.resolve({ json: () => ({ data: [] }) }));
-  
+
   const result = await apiCall();
-  
+
   expect(fetchMock).toHaveBeenCalledWith("/api/data");
   expect(result).toEqual({ data: [] });
 });

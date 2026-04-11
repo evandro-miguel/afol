@@ -8,7 +8,7 @@ Architecture documents define **how** the system is structured and how component
 
 ## Structure
 
-```
+```text
 arc/
 ├── overview.md          # System overview and context
 ├── decisions/           # Architecture Decision Records (ADRs)
@@ -25,24 +25,28 @@ arc/
 ## Document types
 
 ### Overview
+
 - System context diagram
 - High-level architecture
 - Technology stack
 - Deployment model
 
 ### Architecture Decision Records (ADRs)
+
 - Context and problem statement
 - Decision and rationale
 - Consequences (positive/negative)
 - Status (proposed/accepted/deprecated)
 
 ### Component documentation
+
 - Responsibility
 - Interfaces
 - Dependencies
 - Data model
 
 ### Diagrams
+
 - C4 model diagrams (Context, Container, Component, Code)
 - Sequence diagrams
 - Data flow diagrams
@@ -60,44 +64,54 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 supersedes: ["ADR-<number>"]  # if applicable
 ---
 
-# ADR <number>: <title>
+## ADR <number>: <title>
 
-## Status
+### Status
+
 <status>
 
-## Context
+### Context
+
 - <problem statement>
 - <constraints>
 - <assumptions>
 
-## Decision
+### Decision
+
 - <the decision made>
 - <rationale>
 
-## Consequences
+### Consequences
 
-### Positive
+#### Positive
+
 - <benefit>
 
-### Negative
+#### Negative
+
 - <trade-off>
 
-### Neutral
+#### Neutral
+
 - <implication>
 
-## Compliance
+### Compliance
+
 - [ ] Architecture follows this decision
 - [ ] Code reviewed for compliance
 
-## References
+### References
+
 - <related docs>
 ```
 
 ## Linking to work
 
 Plans should reference architecture docs:
+
 ```markdown
 ## Approach
+
 - Follow ADR-003: Event-driven architecture
 - Component: auth-service (see arc/components/auth.md)
 ```
@@ -109,4 +123,5 @@ Plans should reference architecture docs:
 - Link ADRs to implementation tasks
 
 ---
+
 *Architecture folder: `.agents/a-docs/arc/`*

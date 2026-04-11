@@ -14,7 +14,7 @@ Tier 3 templates separate routing (`SKILL.md`) from product knowledge (`referenc
 
 ## Directory Structure
 
-```
+```text
 <platform-skill>/
 ├── SKILL.md                  # Dispatcher (decision trees only)
 └── references/
@@ -67,10 +67,12 @@ metadata:
 # <Product>
 
 ## When to Use
+
 - <intent-based trigger>
 - <intent-based trigger>
 
 ## Task Routing
+
 - New setup -> `configuration.md`
 - Feature implementation -> `api.md` + `patterns.md`
 - Incident/debugging -> `gotchas.md`

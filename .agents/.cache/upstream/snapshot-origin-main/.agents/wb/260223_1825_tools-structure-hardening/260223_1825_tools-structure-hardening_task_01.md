@@ -18,16 +18,19 @@ links:
 # Tasks: tools-structure-hardening
 
 ## Task List
+
 - [x] T-001 Reproduzir falhas de `make lint` e `make structure` e documentar causa raiz.
 - [x] T-002 Corrigir scripts e revalidar comandos de ponta a ponta.
 
 ## State Board
+
 | Task | Checklist | State | Owner | Notes |
 |------|----------:|-------|-------|-------|
 | T-001 | - [x] | done | worker | Causa raiz identificada em parser de frontmatter e filtro de diretórios ocultos. |
 | T-002 | - [x] | done | worker | Correções aplicadas e verificadas com comandos reais. |
 
 State values:
+
 - pending
 - in_progress
 - ready_for_test
@@ -44,9 +47,11 @@ See: [`.agents/a-docs/standards/checkbox-protocol.md`](.agents/a-docs/standards/
 Before starting work, consult relevant resources:
 
 ### Prevention Rules
+
 - [x] Check: [`.agents/a-docs/lessons/general-lessons.md`](.agents/a-docs/lessons/general-lessons.md)
 
 ### Useful Resources
+
 - Rules useful for this task:
   - [x] `.agents/a-docs/standards/structure-map.md`
 - Docs useful for this task:
@@ -57,6 +62,7 @@ Before starting work, consult relevant resources:
   - [>] None
 
 ## Implementation Checkpoint
+
 - Files touched:
   - `.agents/scripts/agents-lint-docs.py`
   - `.agents/scripts/agents-structure-map.py`
@@ -69,13 +75,16 @@ Before starting work, consult relevant resources:
   - Archive temporary validation workstream under `.agents/z-arq/`.
 
 ## Test Gate
+
 - Move to `ready_for_test` only after implementation checkpoint.
 - Record command, result, and evidence before marking done.
 
 ### Test Evidence
+
 - Command: `<command>`
 - Result: pass
 - Evidence: `make lint` (exit 0), `make structure` generated `backend.md/tests.md`, `make new THEME=id-fix-check SPEC=lite` created resolved IDs.
 
 ---
+
 *Template: `.agents/a-docs/templates/task.md`*

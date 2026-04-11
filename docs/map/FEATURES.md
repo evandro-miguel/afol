@@ -7,12 +7,12 @@ created_at: "2026-04-02T23:28:28Z"
 updated_at: "2026-04-02T23:28:28Z"
 ---
 
-# Features
+## Features
 
 This file groups the repository by feature or concern, not by raw directory listing.
 
-## Feature Themes From The Product README
+### Feature Themes From The Product README
 
 - No README feature bullets were extracted.
 
-## Feature Clusters
+### Feature Clusters

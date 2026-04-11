@@ -20,6 +20,7 @@ metadata:
 - [Error message text]
 
 **NOT for:**
+
 - [When to avoid]
 
 ## The Problem
@@ -56,5 +57,6 @@ function goodCode() {
 ## Common Mistakes
 
 **Mistake 1:** [Description]
+
 - Wrong: `bad code`
 - Right: `good code`

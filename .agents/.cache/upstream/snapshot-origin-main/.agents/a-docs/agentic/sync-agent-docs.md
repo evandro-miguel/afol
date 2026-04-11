@@ -16,6 +16,7 @@ links:
 ## Por Que Existe
 
 **Problema:** Múltiplos agentes (QWEN, CLAUDE, GEMINI) têm arquivos de instruções separados. Manter sincronizado manualmente é:
+
 - Propenso a erros
 - Trabalhoso
 - Causa inconsistência entre agentes

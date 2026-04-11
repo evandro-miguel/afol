@@ -21,9 +21,11 @@ links:
 # Explorer Check: <theme>
 
 ## Goal
+
 - Prove the plan was checked against the current project instead of being written from assumptions.
 
 ## Scope Reviewed
+
 - Paths inspected:
   - <path>
 - Existing docs inspected:
@@ -32,27 +34,33 @@ links:
   - <path>
 
 ## Commands Used
+
 ```bash
 <command>
 ```
 
 ## Findings
+
 - <finding 1>
 - <finding 2>
 
 ## Contradictions or Drift Found
+
 - <doc/code mismatch or none>
 
 ## Impact on the Plan
+
 - What changed in the plan because of exploration:
   - <change>
 - What remains uncertain:
   - <unknown>
 
 ## Readiness
+
 - Plan grounded in current repo state: <yes/no>
 - Additional exploration still required:
   - <item or none>
 
 ---
+
 *Template: `docs/templates/explorer-check.md`*

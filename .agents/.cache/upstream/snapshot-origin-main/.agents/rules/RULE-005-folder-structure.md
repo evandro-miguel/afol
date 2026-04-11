@@ -14,7 +14,7 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 
 ## Required Structure
 
-```
+```text
 .agents/
 ├── agents.config           # Central configuration (YAML)
 ├── tools.json              # Tool catalog (JSON)
@@ -59,6 +59,7 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 | `z-arq/` | Architecture notes |
 
 **Validate:**
+
 ```bash
 make doctor
 ```
@@ -124,6 +125,7 @@ sync:
 **Location:** `.agents/tools.json`
 
 **Validate:**
+
 ```bash
 python -m json.tool .agents/tools.json
 ```
@@ -132,7 +134,7 @@ python -m json.tool .agents/tools.json
 
 ### .active_session
 
-```
+```text
 .agents/wb/260223_1800_auth-refactor/
 ```
 
@@ -141,6 +143,7 @@ python -m json.tool .agents/tools.json
 **Location:** `.agents/wb/.active_session`
 
 **Update automatically:**
+
 ```bash
 ./.agents/agents new <theme>
 ```
@@ -165,7 +168,7 @@ python -m json.tool .agents/tools.json
 
 ## Workstream Structure
 
-```
+```text
 .agents/wb/
 └── 260223_1800_auth-refactor/
     ├── 260223_1800_auth-refactor_plan_01.md
@@ -175,6 +178,7 @@ python -m json.tool .agents/tools.json
 ```
 
 **Create with:**
+
 ```bash
 ./.agents/agents new auth-refactor --spec-lite
 ```
@@ -184,6 +188,7 @@ python -m json.tool .agents/tools.json
 ## Best Practices
 
 **DO:**
+
 - ✅ Use `.agents/` as root for all agent files
 - ✅ Keep configuration in `.agents/agents.config`
 - ✅ Store tool docs in `.agents/a-docs/agentic/`
@@ -191,6 +196,7 @@ python -m json.tool .agents/tools.json
 - ✅ Validate structure with `make doctor`
 
 **DON'T:**
+
 - ❌ Create folders outside `.agents/` for agent work
 - ❌ Edit `agents.config` without validating YAML
 - ❌ Edit `tools.json` without validating JSON

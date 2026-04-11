@@ -5,6 +5,7 @@ metadata:
   tags: "evaluation, grading, skill-testing"
   triggers: "grade evaluation, check expectations, evaluate skill run"
 ---
+
 # Grader Agent
 
 Evaluate expectations against an execution transcript and outputs.
@@ -47,7 +48,7 @@ Beware of outputs that technically satisfy the letter but not the spirit:
 
 ### Output File Expectations
 
-```
+```text
 "The output includes a SKILL.md file"
 ```
 
@@ -55,7 +56,7 @@ Check: Was a SKILL.md file created? Does it have valid frontmatter? Is there mea
 
 ### Format Expectations
 
-```
+```text
 "The result follows the tier-2 template structure"
 ```
 
@@ -63,7 +64,7 @@ Check: Does the output match the template? Are all required sections present? Is
 
 ### Behavior Expectations
 
-```
+```text
 "The skill used script Y"
 ```
 
@@ -71,7 +72,7 @@ Check: Was the specific tool/script invoked? Were correct arguments used?
 
 ### Quality Expectations
 
-```
+```text
 "The description is pushy and lists trigger phrases"
 ```
 

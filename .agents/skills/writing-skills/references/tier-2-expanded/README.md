@@ -19,7 +19,7 @@ Multi-file skills for complex topics with multiple sub-concepts.
 
 ## Structure
 
-```
+```text
 my-skill/
 ├── SKILL.md              # Overview + navigation
 └── references/
@@ -36,7 +36,7 @@ my-skill/
 
 The `writing-skills` skill itself is Tier 2:
 
-```
+```text
 writing-skills/
 ├── SKILL.md              # Decision tree + navigation
 ├── gotchas.md            # Tribal knowledge

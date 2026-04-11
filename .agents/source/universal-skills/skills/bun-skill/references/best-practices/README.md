@@ -30,12 +30,14 @@ metadata:
 **Impact: CRITICAL** - Prevents memory exhaustion
 
 **❌ Incorrect: loads entire file into memory**
+
 ```typescript
 const fs = require('fs');
 const content = fs.readFileSync('./large-file.zip'); // Loads entire file
 ```
 
 **✅ Correct: streams file efficiently**
+
 ```typescript
 const file = Bun.file('./large-file.zip');
 const stream = file.stream(); // Lazy streaming
@@ -50,11 +52,13 @@ for await (const chunk of stream) {
 **Impact: HIGH** - Efficient binary handling
 
 **❌ Incorrect: string manipulation on binary**
+
 ```typescript
 const data = fs.readFileSync('./image.png', 'utf8'); // Corrupts binary
 ```
 
 **✅ Correct: preserve binary integrity**
+
 ```typescript
 const file = Bun.file('./image.png');
 const arrayBuffer = await file.arrayBuffer();
@@ -66,6 +70,7 @@ const uint8Array = new Uint8Array(arrayBuffer);
 **Impact: CRITICAL** - Prevents server crashes
 
 **❌ Incorrect: unbounded array growth**
+
 ```typescript
 const connections = [];
 
@@ -82,6 +87,7 @@ Bun.serve({
 ```
 
 **✅ Correct: proper cleanup**
+
 ```typescript
 const connections = new Set();
 
@@ -115,6 +121,7 @@ function processObject(obj) {
 **Impact: HIGH** - Reduces allocation overhead
 
 **❌ Incorrect: creating new objects per request**
+
 ```typescript
 Bun.serve({
   fetch(req) {
@@ -125,6 +132,7 @@ Bun.serve({
 ```
 
 **✅ Correct: reuse buffers**
+
 ```typescript
 const bufferPool = [];
 
@@ -146,12 +154,14 @@ function releaseBuffer(buf) {
 **Impact: HIGH** - 2-3× faster
 
 **❌ Incorrect: Node.js API**
+
 ```typescript
 import { writeFile } from 'fs/promises';
 await writeFile('./output.txt', 'Hello');
 ```
 
 **✅ Correct: Bun native API**
+
 ```typescript
 await Bun.write('./output.txt', 'Hello');
 ```
@@ -161,6 +171,7 @@ await Bun.write('./output.txt', 'Hello');
 **Impact: CRITICAL** - Prevents memory issues
 
 **❌ Incorrect: buffering entire content**
+
 ```typescript
 const chunks = [];
 for (const item of largeDataset) {
@@ -170,6 +181,7 @@ await Bun.write('./output.json', chunks.join('\n'));
 ```
 
 **✅ Correct: stream writing**
+
 ```typescript
 const file = Bun.file('./output.json');
 const writer = file.writer();
@@ -185,12 +197,14 @@ await writer.end();
 **Impact: MEDIUM** - No external dependency
 
 **❌ Incorrect: external library**
+
 ```typescript
 import TOML from '@iarna/toml';
 const config = TOML.parse(await fs.readFile('./config.toml', 'utf8'));
 ```
 
 **✅ Correct: native support**
+
 ```typescript
 const config = await Bun.file('./config.toml').toml();
 ```
@@ -200,11 +214,13 @@ const config = await Bun.file('./config.toml').toml();
 **Impact: LOW** - Micro-optimization
 
 **❌ Incorrect: manual string concatenation**
+
 ```typescript
 const path = __dirname + '/' + filename;
 ```
 
 **✅ Correct: Bun.pathToFileURL**
+
 ```typescript
 import { pathToFileURL } from 'bun';
 const path = pathToFileURL(filename);
@@ -235,6 +251,7 @@ async function getFile(path: string) {
 **Impact: HIGH** - Proper content-type
 
 **❌ Incorrect: manual JSON stringify**
+
 ```typescript
 return new Response(JSON.stringify({ success: true }), {
   headers: { 'Content-Type': 'application/json' }
@@ -242,6 +259,7 @@ return new Response(JSON.stringify({ success: true }), {
 ```
 
 **✅ Correct: built-in helper**
+
 ```typescript
 return Response.json({ success: true });
 ```
@@ -251,12 +269,14 @@ return Response.json({ success: true });
 **Impact: CRITICAL** - Prevents memory issues
 
 **❌ Incorrect: buffering entire response**
+
 ```typescript
 const data = await fetchLargeDataset();
 return Response.json(data); // May be huge
 ```
 
 **✅ Correct: streaming**
+
 ```typescript
 const stream = new ReadableStream({
   async start(controller) {
@@ -281,7 +301,7 @@ Bun.serve({
   fetch(req) {
     const text = generateLargeResponse();
     const compressed = gzipSync(text);
-    
+
     return new Response(compressed, {
       headers: {
         'Content-Encoding': 'gzip',
@@ -303,7 +323,7 @@ Bun.serve({
   fetch(req) {
     const ip = req.headers.get('x-forwarded-for') || 'unknown';
     const now = Date.now();
-    
+
     if (rateLimit.has(ip)) {
       const { count, resetTime } = rateLimit.get(ip);
       if (now < resetTime && count > 100) {
@@ -317,7 +337,7 @@ Bun.serve({
     } else {
       rateLimit.set(ip, { count: 1, resetTime: now + 60000 });
     }
-    
+
     // ... handle request
   }
 });
@@ -359,6 +379,7 @@ Bun.serve({
 **Impact: HIGH** - 10× faster than Jest
 
 **❌ Incorrect: Jest setup**
+
 ```json
 {
   "scripts": {
@@ -368,6 +389,7 @@ Bun.serve({
 ```
 
 **✅ Correct: bun:test**
+
 ```json
 {
   "scripts": {
@@ -432,6 +454,7 @@ test('processes file correctly', async () => {
 **Impact: HIGH** - Smaller bundles
 
 **❌ Incorrect: wrong target**
+
 ```typescript
 await Bun.build({
   entrypoints: ['./src/index.ts'],
@@ -441,6 +464,7 @@ await Bun.build({
 ```
 
 **✅ Correct: specify target**
+
 ```typescript
 await Bun.build({
   entrypoints: ['./src/index.ts'],
