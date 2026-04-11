@@ -2,8 +2,8 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-04-11T20:35:19+00:00"
-updated_at: "2026-04-11T20:35:19+00:00"
+created_at: "2026-04-11T21:20:00+00:00"
+updated_at: "2026-04-11T21:20:00+00:00"
 ---
 
 # Knowledge Index

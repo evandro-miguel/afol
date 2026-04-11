@@ -1,8 +1,0 @@
-
-  WARNING: You're running a globally installed dependency-cruiser.
-
-           We recommend to install and run it as a local devDependency in
-           your project instead. There it has your project's environment and
-           transpilers at its disposal. That will ensure it can find e.g.
-           TypeScript, Vue or Svelte modules and dependencies.
-

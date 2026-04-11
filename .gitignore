@@ -18,6 +18,9 @@ uv.lock
 # Runtime telemetry events (operational data)
 .agents/data/telemetry/events.jsonl
 
+# Runtime/cache snapshots
+.agents/.cache/
+
 # Universal-skills must not be a repo-local git cache or nested checkout.
 .agents/cache/universal-skills/
 
@@ -26,8 +29,18 @@ uv.lock
 .agents/tmp/*
 !.agents/tmp/README.md
 
+# Archived workstream payloads; keep the placeholder only.
+.agents/z-arq/*
+!.agents/z-arq/README.md
+
 # Legacy/generated local map output; current-state repo maps live in docs/map/
 .agents/arc/map/
+
+# Generated repo-map evidence; regenerate on demand instead of committing.
+docs/map/extra/
+
+# Legacy implementation report generated during migration work.
+docs/telemetry/reports/implementation_report.md
 
 # Workbench sessions (operational state; should not be cloned)
 .agents/wb/
