@@ -300,7 +300,7 @@ else
 endif
 
 skills-push:
-	@./.agents/agents skills-sync push $(if $(SKILL),"$(SKILL)",) $(if $(SKILLS),--skills "$(SKILLS)",) $(if $(COMMIT),--commit,) $(if $(PUSH),--push,) $(if $(MESSAGE),--message "$(MESSAGE)",)
+	@./.agents/agents skills-sync push $(if $(SKILL),"$(SKILL)",) $(if $(SKILLS),--skills "$(SKILLS)",) $(if $(BRANCH),--branch "$(BRANCH)",) $(if $(BASE),--base "$(BASE)",) $(if $(COMMIT),--commit,) $(if $(PUSH),--push,) $(if $(PR),--pr,) $(if $(MESSAGE),--message "$(MESSAGE)",) $(if $(TITLE),--title "$(TITLE)",)
 
 skills-status:
 	@./.agents/agents skills-sync status

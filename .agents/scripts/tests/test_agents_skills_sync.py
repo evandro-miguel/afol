@@ -27,7 +27,7 @@ def base_config() -> dict:
             "upstream_branch": "main",
             "source_dir": ".agents/source/universal-skills",
             "external_source_dir": "",
-            "publish_enabled": False,
+            "proposal_branch_prefix": "skills-sync",
             "project_dir": ".agents/skills",
             "manifest_file": ".agents/skills-sync.manifest.json",
             "upstream_skills_dir": "skills",
@@ -628,7 +628,7 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 (root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md").read_text(encoding="utf-8"),
             )
 
-    def test_cmd_push_is_disabled_by_default(self):
+    def test_cmd_push_requires_external_git_source(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
             module = self._load_with_root(root)
@@ -664,17 +664,16 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 },
             )()
 
-            with self.assertRaisesRegex(RuntimeError, "disabled"):
+            with self.assertRaisesRegex(RuntimeError, "external skills source"):
                 module.cmd_push(args)
 
-    def test_cmd_push_can_commit_and_push_selected_skill_when_explicitly_enabled_with_external_source(self):
+    def test_cmd_push_commits_and_pushes_proposal_branch_not_main(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td) / "repo"
             root.mkdir()
             external_root = Path(td) / "external-universal-skills"
             module = self._load_with_root(root)
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
-            module.CONFIG["skills_sync"]["publish_enabled"] = True
 
             project_skill = root / ".agents/skills/writing-skills"
             project_skill.mkdir(parents=True, exist_ok=True)
@@ -716,34 +715,124 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                     "skills": None,
                     "runtime": None,
                     "profile": None,
+                    "base": None,
+                    "branch": "skills-sync/propose-writing-skills",
                     "commit": True,
                     "push": True,
+                    "pr": False,
                     "message": "Publish writing skill",
+                    "title": None,
+                    "body": None,
                 },
             )()
 
-            with mock.patch.object(module, "run") as patched_run:
+            with (
+                mock.patch.object(module, "run") as patched_run,
+                mock.patch.object(module, "_git_ref_exists", return_value=False),
+            ):
                 module.cmd_push(args)
 
             self.assertEqual(
                 patched_run.call_args_list,
                 [
+                    mock.call(["git", "fetch", "origin"], cwd=external_root),
+                    mock.call(
+                        ["git", "checkout", "-b", "skills-sync/propose-writing-skills", "origin/main"],
+                        cwd=external_root,
+                    ),
                     mock.call(["git", "add", "--", "skills/writing-skills"], cwd=external_root),
                     mock.call(
                         [
                             "git",
                             "commit",
                             "-m",
-                            "Publish writing skill",
+                            "Publish writing skill\n\nCo-authored-by: Codex <noreply@openai.com>",
                             "--only",
                             "--",
                             "skills/writing-skills",
                         ],
                         cwd=external_root,
                     ),
-                    mock.call(["git", "push", "origin", "HEAD:main"], cwd=external_root),
+                    mock.call(
+                        ["git", "push", "-u", "origin", "HEAD:skills-sync/propose-writing-skills"],
+                        cwd=external_root,
+                    ),
                 ],
             )
+
+    def test_cmd_push_rejects_protected_branch_target(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+
+            project_skill = root / ".agents/skills/writing-skills"
+            project_skill.mkdir(parents=True, exist_ok=True)
+            (project_skill / "SKILL.md").write_text(
+                "---\nname: writing-skills\ndescription: Edited locally\n---\n\n# writing-skills\n\nEdited locally\n",
+                encoding="utf-8",
+            )
+            self._make_source_skill(
+                Path(td),
+                "writing-skills",
+                description="Old external source",
+                source_dir="external-universal-skills",
+            )
+            self._make_profile(
+                Path(td),
+                "core",
+                ["writing-skills"],
+                source_dir="external-universal-skills",
+            )
+            (external_root / "index.json").write_text("{}\n", encoding="utf-8")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type(
+                "Args",
+                (),
+                {
+                    "skill": "writing-skills",
+                    "skills": None,
+                    "runtime": None,
+                    "profile": None,
+                    "base": None,
+                    "branch": "main",
+                    "commit": True,
+                    "push": True,
+                    "pr": False,
+                    "message": None,
+                    "title": None,
+                    "body": None,
+                },
+            )()
+
+            with self.assertRaisesRegex(RuntimeError, "protected branch"):
+                module.cmd_push(args)
+
+    def test_checkout_proposal_branch_preserves_existing_local_branch(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+
+            with (
+                mock.patch.object(module, "_git_ref_exists", side_effect=[True]),
+                mock.patch.object(module, "run") as patched_run,
+            ):
+                module._checkout_proposal_branch(root, "skills-sync/writing-skills", "main")
+
+            patched_run.assert_called_once_with(["git", "checkout", "skills-sync/writing-skills"], cwd=root)
 
 
 if __name__ == "__main__":

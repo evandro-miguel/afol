@@ -1,6 +1,6 @@
 # 🎨 Data Structure
 
-**Generated:** 2026-04-11T20:14:42+00:00
+**Generated:** 2026-04-11T20:35:19+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -9,13 +9,13 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 13 files, 3,646 lines, 678.2 KB
+**Stats:** 13 files, 3,689 lines, 689.5 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/data/telemetry/events.jsonl` | 2,466 | 645.6 KB | Module; functionality |
+| `.agents/data/telemetry/events.jsonl` | 2,509 | 657.0 KB | Module; functionality |
 | `.agents/agents.config` | 332 | 8.0 KB | Module; functionality |
 | `docs/agentic/agents-config.md` | 156 | 4.7 KB | Module; functionality |
 | `.agents/arc/map/extra/metadata.json` | 147 | 4.0 KB | Module; functionality |

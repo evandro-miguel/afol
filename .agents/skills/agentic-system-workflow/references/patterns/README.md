@@ -1,5 +1,5 @@
 ---
-description: Operational playbooks for skills refresh, publish, and workbench execution
+description: Operational playbooks for skills refresh, upstream PR proposals, and workbench execution
 metadata:
   tags: "agentic-system, skills-sync, git, workbench, operational-playbooks"
 ---
@@ -36,15 +36,17 @@ Rule:
 Use this when the repo needs the scaffold-operating skill available locally
 without doing a broader skill refresh.
 
-## 3. Publish a Local Skill Change Back to Universal-Skills
+## 3. Propose a Local Skill Change Back to Universal-Skills
 
 ```bash
-# In the external universal-skills repository:
-bun scripts/publish-skill.js agentic-system-workflow
+./.agents/agents skills-sync push agentic-system-workflow \
+  --branch skills-sync/agentic-system-workflow \
+  --commit --push --pr
 ```
 
-Use the upstream repository's own tools when the local skill change is ready to
-become upstream state. `skills-sync push` is disabled by default in the scaffold.
+Use this only with an external universal-skills checkout configured. The command
+creates a proposal branch and can open a PR; it must never push directly to
+universal `main`.
 
 ## 4. Governed Workbench Execution
 

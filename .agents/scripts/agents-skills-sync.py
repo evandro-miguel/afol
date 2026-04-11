@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -24,7 +26,7 @@ DEFAULTS = {
     "upstream_branch": "main",
     "source_dir": ".agents/source/universal-skills",
     "external_source_dir": "",
-    "publish_enabled": False,
+    "proposal_branch_prefix": "skills-sync",
     "project_dir": "skills",
     "mode": "copy",
     "required": False,
@@ -559,7 +561,7 @@ def mirror_skills_to_local_source(source_repo: Path, skills: Sequence[str], mani
     _sync_local_source_metadata(local_source, source_repo, manifest)
 
 
-def publish_skill_from_project(name: str, target_repo: Path) -> bool:
+def stage_skill_for_proposal(name: str, target_repo: Path) -> bool:
     src = project_skills_root() / name
     if not (src / "SKILL.md").exists():
         raise RuntimeError(f"Project skill missing SKILL.md: {src}")
@@ -1163,7 +1165,7 @@ def cmd_status(args: argparse.Namespace):
     print(f"- active_source: {active_source or 'missing'}")
     print(f"- git_sync_source: {git_source or 'none'}")
     print(f"- catalog_source: {catalog_source}")
-    print(f"- publish_enabled: {cfg('publish_enabled')}")
+    print(f"- proposal_branch_prefix: {cfg('proposal_branch_prefix')}")
     print(f"- project_dir: {project_skills_root()}")
     print(f"- manifest: {cfg_path('manifest_file')}")
     print(f"- installs: {len(manifest.get('installs', []))}")
@@ -1224,41 +1226,102 @@ def _push_skill_names(args: argparse.Namespace) -> List[str]:
         candidates.append(single.strip())
     explicit = dedupe(_normalize_string_list(candidates))
     if not explicit:
-        raise RuntimeError("Provide a skill name or --skills for push")
+        raise RuntimeError("Provide a skill name or --skills for the upstream proposal")
     return explicit
 
 
 def _default_push_message(skills: Sequence[str]) -> str:
     if len(skills) == 1:
-        return f"skills-sync: publish {skills[0]}"
-    return f"skills-sync: publish {len(skills)} skills"
+        return f"skills-sync: propose {skills[0]}"
+    return f"skills-sync: propose {len(skills)} skills"
+
+
+def _append_codex_trailer(message: str) -> str:
+    trailer = "Co-authored-by: Codex <noreply@openai.com>"
+    normalized = message.strip()
+    if trailer in normalized.splitlines():
+        return normalized
+    return f"{normalized}\n\n{trailer}"
+
+
+def _slugify_branch_part(value: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9._/-]+", "-", value.strip().lower())
+    slug = re.sub(r"-+", "-", slug).strip("-/")
+    return slug or "skills"
+
+
+def _default_proposal_branch(skills: Sequence[str]) -> str:
+    prefix = _slugify_branch_part(str(cfg("proposal_branch_prefix")).strip() or "skills-sync")
+    label = _slugify_branch_part(skills[0]) if len(skills) == 1 else f"{len(skills)}-skills"
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d%H%M%S")
+    return f"{prefix}/{stamp}-{label}"
+
+
+def _validate_proposal_branch(branch: str, base: str):
+    normalized_branch = branch.strip().removeprefix("refs/heads/").removeprefix("origin/")
+    normalized_base = base.strip().removeprefix("refs/heads/").removeprefix("origin/")
+    protected = {normalized_base, "main", "master"}
+    if not normalized_branch or normalized_branch in protected:
+        raise RuntimeError(
+            f"Refusing to push universal-skills proposal directly to protected branch '{branch}'. "
+            "Use a feature branch and open a PR."
+        )
+    if branch.startswith("-") or ".." in branch or branch.endswith(".lock") or " " in branch:
+        raise RuntimeError(f"Unsafe git branch name for skills proposal: {branch}")
+
+
+def _default_pr_body(skills: Sequence[str]) -> str:
+    return (
+        "Proposes updates from the project-local skills surface.\n\n"
+        "Skills:\n"
+        + "\n".join(f"- {name}" for name in skills)
+    )
+
+
+def _git_ref_exists(repo: Path, ref: str) -> bool:
+    result = subprocess.run(["git", "show-ref", "--verify", "--quiet", ref], cwd=repo)
+    return result.returncode == 0
+
+
+def _checkout_proposal_branch(repo: Path, branch: str, base: str):
+    local_ref = f"refs/heads/{branch}"
+    remote_ref = f"refs/remotes/origin/{branch}"
+    if _git_ref_exists(repo, local_ref):
+        run(["git", "checkout", branch], cwd=repo)
+        return
+    if _git_ref_exists(repo, remote_ref):
+        run(["git", "checkout", "-b", branch, f"origin/{branch}"], cwd=repo)
+        return
+    run(["git", "checkout", "-b", branch, f"origin/{base}"], cwd=repo)
 
 
 def cmd_push(args: argparse.Namespace):
     if not ensure_enabled():
         return
 
-    if not bool(cfg("publish_enabled")):
-        raise RuntimeError(
-            "skills-sync push is disabled in this scaffold. Publish from the external "
-            "universal-skills repository with its own tools, or explicitly enable "
-            "skills_sync.publish_enabled for a controlled maintenance session."
-        )
-
     manifest = load_manifest()
     git_repo = ensure_git_sync_repo(manifest)
     if git_repo is None or not (git_repo / ".git").exists():
-        raise RuntimeError("Git-backed skills source is required for push")
+        raise RuntimeError("Git-backed external skills source is required to propose upstream skill changes")
 
     skills = _push_skill_names(args)
+    base = str(getattr(args, "base", None) or manifest.get("ref") or cfg("upstream_branch")).strip()
+    if not base:
+        raise RuntimeError("Manifest ref/upstream_branch is required for an upstream skill proposal")
+    branch = str(getattr(args, "branch", None) or _default_proposal_branch(skills)).strip()
+    _validate_proposal_branch(branch, base)
+
+    run(["git", "fetch", "origin"], cwd=git_repo)
+    _checkout_proposal_branch(git_repo, branch, base)
+
     changed: List[str] = []
     unchanged: List[str] = []
     local_source = preferred_local_source_repo_path()
 
     for name in skills:
-        if publish_skill_from_project(name, git_repo):
+        if stage_skill_for_proposal(name, git_repo):
             changed.append(name)
-            print(f"PUBLISHED: {name} -> {git_repo}")
+            print(f"PROPOSED: {name} -> {git_repo}")
         else:
             unchanged.append(name)
             print(f"UNCHANGED: {name}")
@@ -1271,14 +1334,17 @@ def cmd_push(args: argparse.Namespace):
         return
 
     pathspecs = [f"{cfg('upstream_skills_dir')}/{name}" for name in changed]
-    if getattr(args, "commit", False) or getattr(args, "push", False):
+    should_commit = bool(getattr(args, "commit", False) or getattr(args, "push", False) or getattr(args, "pr", False))
+    should_push = bool(getattr(args, "push", False) or getattr(args, "pr", False))
+    if should_commit:
+        commit_message = _append_codex_trailer(getattr(args, "message", None) or _default_push_message(changed))
         run(["git", "add", "--", *pathspecs], cwd=git_repo)
         run(
             [
                 "git",
                 "commit",
                 "-m",
-                getattr(args, "message", None) or _default_push_message(changed),
+                commit_message,
                 "--only",
                 "--",
                 *pathspecs,
@@ -1287,12 +1353,15 @@ def cmd_push(args: argparse.Namespace):
         )
         print(f"COMMITTED: {', '.join(changed)}")
 
-    if getattr(args, "push", False):
-        ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
-        if not ref:
-            raise RuntimeError("Manifest ref/upstream_branch is required for push")
-        run(["git", "push", "origin", f"HEAD:{ref}"], cwd=git_repo)
-        print(f"PUSHED: {', '.join(changed)} -> origin/{ref}")
+    if should_push:
+        run(["git", "push", "-u", "origin", f"HEAD:{branch}"], cwd=git_repo)
+        print(f"PUSHED: {', '.join(changed)} -> origin/{branch}")
+
+    if getattr(args, "pr", False):
+        title = getattr(args, "title", None) or _default_push_message(changed)
+        body = getattr(args, "body", None) or _default_pr_body(changed)
+        run(["gh", "pr", "create", "--base", base, "--head", branch, "--title", title, "--body", body], cwd=git_repo)
+        print(f"PR REQUESTED: {branch} -> {base}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1331,10 +1400,15 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--persist", action="store_true", help="Persist the ensured skill into the manifest for the selected runtime")
             sp.add_argument("--pull", action="store_true", help="Refresh the source checkout before ensuring the skill")
         if name == "push":
-            sp.add_argument("skill", nargs="?", help="Single skill name to publish back to the git source")
-            sp.add_argument("--commit", action="store_true", help="Create a git commit for the published skill changes")
-            sp.add_argument("--push", action="store_true", help="Push the published commit to origin/<ref>")
+            sp.add_argument("skill", nargs="?", help="Single skill name to propose back to the external git source")
+            sp.add_argument("--base", help="Base branch for the upstream PR proposal")
+            sp.add_argument("--branch", help="Proposal branch name to create/update")
+            sp.add_argument("--commit", action="store_true", help="Create a git commit for the proposed skill changes")
+            sp.add_argument("--push", action="store_true", help="Push the proposal branch to origin/<branch>")
+            sp.add_argument("--pr", action="store_true", help="Push the proposal branch and open a GitHub PR")
             sp.add_argument("--message", help="Commit message to use with --commit/--push")
+            sp.add_argument("--title", help="PR title to use with --pr")
+            sp.add_argument("--body", help="PR body to use with --pr")
         sp.set_defaults(func=fn)
 
     return parser

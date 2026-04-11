@@ -1,6 +1,6 @@
 ---
 name: agentic-system-workflow
-description: Use when installing, upgrading, validating, or operating this `.agents` scaffold in the current repository or another repository. Activate whenever the user wants to bootstrap a project, adopt or update the framework in an existing repo, refresh project-local skills from the git-backed universal-skills source, publish skill changes, or run the governed workbench flow.
+description: Use when installing, upgrading, validating, or operating this `.agents` scaffold in the current repository or another repository. Activate whenever the user wants to bootstrap a project, adopt or update the framework in an existing repo, refresh project-local skills from the git-backed universal-skills source, propose skill changes upstream, or run the governed workbench flow.
 metadata:
   category: agentic
   tags: "agentic-system, workflow, bootstrap, upgrade, skills-sync, workbench, git"
@@ -19,7 +19,7 @@ Need to install or upgrade the scaffold in another repo?
 
 - Start with [Core](./references/core/README.md)
 
-Need the git-backed skill refresh or publish flow?
+Need the git-backed skill refresh or upstream PR proposal flow?
 
 - Open [Patterns](./references/patterns/README.md)
 
@@ -43,8 +43,8 @@ Before finalizing, scan [Gotchas](./gotchas.md).
   project; it must not be a nested git checkout.
 - Treat `skills-sync pull` as source refresh only. Use `skills-sync sync` or
   `skills-sync update` to actually refresh `.agents/skills/`.
-- `skills-sync push` is disabled by default; publish from the external
-  universal-skills repository with its own tools.
+- Use `skills-sync push` only as a branch/PR proposal flow from an external
+  universal-skills checkout; never push directly to universal `main`.
 - Prefer `make agents-all` in adopted repos when the project already owns
   `make all`.
 - Verify behavior with repo commands before reporting completion.

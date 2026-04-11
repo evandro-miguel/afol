@@ -32,7 +32,7 @@ scaffold.
 **Capabilities:**
 
 - Bootstrap a new or existing repo with the scaffold
-- Run the git-backed skills refresh and publish flow
+- Run the git-backed skills refresh and upstream PR proposal flow
 - Follow governed workbench execution and validation
 
 **Location:** `.agents/skills/agentic-system-workflow/`
@@ -84,8 +84,8 @@ make skills-update SKILLS=new-skill
 ./.agents/agents skills-sync pull
 ./.agents/agents skills-sync apply --skills=new-skill
 
-# Publish a locally edited skill back to the git-backed source
-./.agents/agents skills-sync push new-skill --commit --push
+# Propose a locally edited skill back through a branch/PR
+./.agents/agents skills-sync push new-skill --branch skills-sync/new-skill --commit --push --pr
 ```
 
 ## Skill Definition Format

@@ -36,14 +36,14 @@ Synchronizes project skills:
 7. **Ensure** - Install or refresh one skill on demand
 8. **Check** - Validate structure
 9. **Sync / Update** - One-step refresh into `.agents/skills/`
-10. **Push** - Disabled by default; publish via the external universal-skills repository's own tools
+10. **Push** - Propose upstream changes through an external checkout branch/PR; never push to universal `main`
 
 Current contract note:
 
 - The scaffold currently uses a compatibility manifest with selected skills and mode.
 - F-10 evolves that contract toward pinned repo/ref/profile semantics without turning the scaffold into a second skills distribution system.
 - Bootstrapped repos receive a repo-local source seed under `.agents/source/universal-skills`, so the default sync path is local-first.
-- When that repo-local source is only a seed, git refresh and publish operations must use an external universal-skills checkout, not a nested `.agents/cache/universal-skills` checkout.
+- When that repo-local source is only a seed, git refresh and upstream proposal operations must use an external universal-skills checkout, not a nested `.agents/cache/universal-skills` checkout.
 
 ## What It Touches
 
@@ -74,7 +74,7 @@ skills_sync:
   upstream_branch: "main"
   source_dir: ".agents/source/universal-skills"
   external_source_dir: ""
-  publish_enabled: false
+  proposal_branch_prefix: "skills-sync"
   project_dir: "skills"
   mode: "copy"
   required: false
@@ -126,7 +126,8 @@ Partial-install note:
 # Full sync
 ./.agents/agents skills-sync sync --skills writing-skills,markdownlint-skill
 
-# Publishing is disabled by default here; use the upstream universal-skills repo.
+# Propose upstream skill changes through a branch/PR; never push to main.
+./.agents/agents skills-sync push writing-skills --branch skills-sync/writing-skills --commit --push --pr
 ```
 
 ### Via Makefile

@@ -193,7 +193,7 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - Do not create or use `.agents/cache/universal-skills`; Git-backed universal-skills work must happen in an external checkout configured via `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`.
 - Bootstrap and `skills-sync` should prepare the project-local skill surface so each repository carries only the subset it actually needs.
 - Treat `skills-sync sync` / `skills-sync update` as the simple path that refreshes `.agents/skills/` from the configured universal-skills source.
-- Treat `skills-sync pull` as a refresh step only for an external git checkout; `skills-sync push` is disabled by default and should be replaced by the upstream universal-skills repository's own publish tools.
+- Treat `skills-sync pull` as a refresh step only for an external git checkout; `skills-sync push` is only a branch/PR proposal flow and must never push directly to universal `main`.
 
 ### Optional External Memory
 

@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-04-11T20:14:42+00:00
+**Generated:** 2026-04-11T20:35:19+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,14 +9,14 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 50 files, 17,665 lines, 668.9 KB
+**Stats:** 50 files, 17,723 lines, 672.3 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
+| `.agents/scripts/agents-skills-sync.py` | 1,135 | 46.9 KB | Module; functionality |
 | `.agents/scripts/verify-tasks.py` | 1,109 | 47.5 KB | Module; functionality |
-| `.agents/scripts/agents-skills-sync.py` | 1,077 | 43.5 KB | Module; functionality |
 | `.agents/scripts/agents-bootstrap.py` | 999 | 41.0 KB | Module; functionality |
 | `.agents/scripts/agents-new.py` | 763 | 33.1 KB | Module; functionality |
 | `.agents/scripts/lib/execution_commands.py` | 679 | 27.7 KB | Module; functionality |

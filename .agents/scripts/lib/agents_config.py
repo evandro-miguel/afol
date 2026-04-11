@@ -282,7 +282,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "upstream_branch": "main",
         "source_dir": ".agents/source/universal-skills",
         "external_source_dir": "",
-        "publish_enabled": False,
+        "proposal_branch_prefix": "skills-sync",
         "project_dir": ".agents/skills",
         "mode": "copy",
         "required": False,

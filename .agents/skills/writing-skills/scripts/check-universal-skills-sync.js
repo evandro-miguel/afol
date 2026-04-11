@@ -391,7 +391,7 @@ function main() {
 
   if (errors.length) {
     console.log(
-      "\nAction: rerun this script with `--sync`, or publish from the external universal-skills repository with its own tools"
+      "\nAction: rerun this script with `--sync`, or propose an upstream change with `skills-sync push --branch <branch> --commit --push --pr`"
     );
     process.exit(1);
   }

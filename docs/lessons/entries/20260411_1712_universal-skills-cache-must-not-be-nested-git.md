@@ -13,14 +13,14 @@ Workbench context: `260411_1559_uv-fastapi-script-refactor`.
 
 ### What happened
 
-- I treated `.agents/cache/universal-skills` as a publishable git checkout while working inside the scaffold repository.
+- I treated `.agents/cache/universal-skills` as if it were a safe upstream git checkout while working inside the scaffold repository.
 - That path was a broken gitlink without `.gitmodules`, which made it easy to confuse scaffold state with the upstream universal-skills repository.
 
 ### Prevention Rule
 
 - Never create, refresh, commit, or push a universal-skills git checkout under `.agents/cache/universal-skills`.
 - Keep `.agents/source/universal-skills` as a repo-local seed only; if Git is needed, use an explicit external checkout through `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`.
-- Keep `skills-sync push` disabled by default and publish through the upstream universal-skills repository's own tools.
+- Keep `skills-sync push` as a branch/PR proposal flow only; never publish directly to universal `main`.
 
 ### Guardrail
 

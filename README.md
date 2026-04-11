@@ -142,8 +142,8 @@ make doctor
 # Ensure one skill is installed in .agents/skills/
 ./.agents/agents skills-sync ensure writing-skills --runtime codex
 
-# Publishing belongs in the external universal-skills repo by default.
-# skills-sync push is disabled unless skills_sync.publish_enabled=true.
+# Propose upstream skill changes through a branch/PR; never push to main.
+./.agents/agents skills-sync push writing-skills --branch skills-sync/writing-skills --commit --push --pr
 ```
 
 - Preferred repo-local source seed: `.agents/source/universal-skills` inside the repo root. It must not be a nested git checkout.
@@ -152,7 +152,7 @@ make doctor
 - `skills-sync list` and `skills-sync search` prefer the configured external catalog when present; otherwise they use the repo-local source seed.
 - `skills-sync pull` refreshes only an external git checkout; it does not clone into `.agents/cache/` and does not overwrite `.agents/skills/` by itself.
 - `skills-sync sync` and `skills-sync update` are the simple one-step paths to refresh `.agents/skills/` from the configured source.
-- `skills-sync push` is disabled by default; publish skill changes from the external universal-skills repository with its own tools.
+- `skills-sync push` is a branch/PR proposal flow. It requires an external universal-skills checkout and refuses direct pushes to `main`.
 - Keep `agentic-system-workflow` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, and git-backed skills flow.
 - The scaffold should not depend on global Codex skills for universal-skills content.
 - Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and project-agnostic.

@@ -78,7 +78,7 @@ Bootstrap seeds `.agents/source/universal-skills/` from committed `.agents/skill
 `skills-sync pull` refreshes an external git checkout only when `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir` is configured.
 `skills-sync list` / `skills-sync search` prefer that external catalog when configured.
 `skills-sync sync` / `skills-sync update` are the one-step paths that actually refresh `.agents/skills/`.
-`skills-sync push` is disabled by default; publish from the external universal-skills repository with its own tools.
+`skills-sync push` is a branch/PR proposal flow. It requires an external universal-skills checkout and refuses direct pushes to `main`.
 The skills baseline is intentionally generic here; downstream repos should keep their own selection/pin model while the universal-skills contract evolves.
 
 Discovery examples:

@@ -19,7 +19,7 @@ Standardize how project repositories consume relevant skills from a repo-local o
 - The preferred repo-local source seed must live outside `skills/` (default: `.agents/source/universal-skills`) and must not be a nested git checkout
 - Do not create or use `.agents/cache/universal-skills`
 - Bootstrapped repos must be able to resolve their selected skills from the repo-local source seed without network access
-- When a repo-local source is only a bootstrap seed, Git-backed refresh/publish must use an external universal-skills checkout configured with `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`
+- When a repo-local source is only a bootstrap seed, Git-backed refresh and upstream proposal work must use an external universal-skills checkout configured with `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`
 - Treat the current manifest as the scaffold-side adapter over the richer universal-skills repo/ref/profile contract
 - Prefer project-local skills under `.agents/skills/`; keep global Codex skills minimal and avoid using them as the primary project skill surface
 
@@ -34,7 +34,7 @@ skills_sync:
   upstream_branch: "main"
   source_dir: ".agents/source/universal-skills"
   external_source_dir: "" # optional external checkout; env AGENTS_UNIVERSAL_SKILLS_SOURCE also works
-  publish_enabled: false
+  proposal_branch_prefix: "skills-sync"
   project_dir: "skills"
   mode: "copy"          # copy | link
   required: true
@@ -91,13 +91,13 @@ make skills-sync SKILLS=writing-skills,markdownlint-skill
 make skills-update SKILLS=writing-skills,markdownlint-skill
 ```
 
-8. Publish one locally edited skill back to universal-skills only from a controlled external checkout:
+8. Propose one locally edited skill back to universal-skills only through a branch:
 
 ```bash
-make skills-push SKILL=writing-skills COMMIT=1 PUSH=1
+make skills-push SKILL=writing-skills BRANCH=skills-sync/writing-skills COMMIT=1 PUSH=1 PR=1
 ```
 
-This command is disabled by default through `skills_sync.publish_enabled=false`. Prefer the upstream universal-skills repository's own `publish-skill`, `skillpool`, and validation tools for publishing.
+This command must never push to `main` directly. It requires an external universal-skills checkout and pushes only a proposal branch; use `PR=1` when the change should be opened as a GitHub pull request.
 
 9. Verify sync and structure:
 
@@ -126,7 +126,7 @@ After initial setup in each repository:
 7. For live repos, use bootstrap `--partial` so skills and scaffold files are added without clobbering project-owned content
 8. Ensure bootstrap provisions `.agents/source/universal-skills` before expecting `skills-sync sync` to use a local-first source
 9. Treat repo/ref/profile fields as the canonical upgrade path for F-10 rather than inventing another local skills contract
-10. Use `skills-sync push` only when `publish_enabled=true` and an external universal-skills checkout is configured; otherwise publish from the universal-skills repo itself
+10. Use `skills-sync push` only as a branch/PR proposal flow with an external universal-skills checkout; never push local skill edits directly to universal `main`
 11. Keep `agentic-system-workflow` available locally so agents can discover the canonical scaffold install and upgrade flow from inside the repo
 
 ## Evidence to record in report

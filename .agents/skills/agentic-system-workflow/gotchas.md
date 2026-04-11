@@ -25,11 +25,12 @@ still requires an existing repository path.
 Use `skills-sync sync` or `skills-sync update` to refresh the installed project
 skills.
 
-## 4. Git Is the Refresh and Publish Truth
+## 4. Git Refreshes, PRs Propose
 
 Treat the repo-local seed under `.agents/source/universal-skills` as the local
 baseline. Treat a configured external universal-skills checkout as the refresh
-path, and publish from that external repository with its own tools.
+path. Any upstream skill change must go through a proposal branch and PR, never
+a direct push to universal `main`.
 
 ## 5. Use `--partial` for Live Repositories
 
