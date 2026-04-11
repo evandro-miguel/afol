@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-04-11T18:27:22+00:00
+**Generated:** 2026-04-11T20:14:42+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,14 +9,14 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 50 files, 17,666 lines, 668.8 KB
+**Stats:** 50 files, 17,665 lines, 668.9 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
 | `.agents/scripts/verify-tasks.py` | 1,109 | 47.5 KB | Module; functionality |
-| `.agents/scripts/agents-skills-sync.py` | 1,078 | 43.4 KB | Module; functionality |
+| `.agents/scripts/agents-skills-sync.py` | 1,077 | 43.5 KB | Module; functionality |
 | `.agents/scripts/agents-bootstrap.py` | 999 | 41.0 KB | Module; functionality |
 | `.agents/scripts/agents-new.py` | 763 | 33.1 KB | Module; functionality |
 | `.agents/scripts/lib/execution_commands.py` | 679 | 27.7 KB | Module; functionality |
@@ -33,10 +33,10 @@ Services, utilities, and business logic.
 | `.agents/skills/writing-skills/scripts/skill-advisor.js` | 417 | 12.0 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/check-tier-migration.js` | 408 | 13.4 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/run_loop.py` | 392 | 14.5 KB | Module; functionality |
-| `.agents/scripts/lib/agents_config.py` | 376 | 14.5 KB | Module; functionality |
+| `.agents/scripts/lib/agents_config.py` | 377 | 14.5 KB | Module; functionality |
 | `.agents/scripts/agents-patterns.py` | 353 | 13.8 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/fix-skill.js` | 339 | 9.9 KB | Module; functionality |
-| `.agents/skills/writing-skills/scripts/check-universal-skills-sync.js` | 330 | 9.9 KB | Module; functionality |
+| `.agents/skills/writing-skills/scripts/check-universal-skills-sync.js` | 329 | 9.9 KB | Module; functionality |
 | `.agents/skills/writing-skills/scripts/run_grader.py` | 321 | 12.2 KB | Module; functionality |
 | `.agents/scripts/check-links.py` | 319 | 11.0 KB | Module; functionality |
 | `.agents/scripts/agents-repo-map.py` | 318 | 14.6 KB | Module; functionality |

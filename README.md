@@ -126,14 +126,14 @@ make doctor
 # Show the active upstream source checkout and manifest state
 ./.agents/agents skills-sync status
 
-# List available upstream skills from the git-backed catalog when available,
-# otherwise from the repo-local source seed
+# List available upstream skills from the configured external catalog when available,
+# otherwise from the repo-local source seed.
 ./.agents/agents skills-sync list --runtime codex
 
 # Search by keyword across skill names and SKILL.md content
 ./.agents/agents skills-sync search markdown --runtime codex
 
-# One-step update from git-backed source into .agents/skills/
+# One-step update from the configured source into .agents/skills/
 ./.agents/agents skills-sync sync --runtime codex
 
 # Ensure the scaffold-operating skill is installed locally
@@ -142,17 +142,17 @@ make doctor
 # Ensure one skill is installed in .agents/skills/
 ./.agents/agents skills-sync ensure writing-skills --runtime codex
 
-# Publish one locally edited skill back to the git-backed universal-skills source
-./.agents/agents skills-sync push writing-skills --commit --push
+# Publishing belongs in the external universal-skills repo by default.
+# skills-sync push is disabled unless skills_sync.publish_enabled=true.
 ```
 
-- Preferred upstream source checkout: `.agents/source/universal-skills` inside the repo root.
-- Git mirror / compatibility fallback: `.agents/cache/universal-skills` when the preferred local source is only a seed copy.
+- Preferred repo-local source seed: `.agents/source/universal-skills` inside the repo root. It must not be a nested git checkout.
+- Optional external catalog: set `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir` to a separate universal-skills checkout when the full upstream catalog or Git refresh is needed.
 - Bootstrap seeds `.agents/source/universal-skills` from committed repo skills by default.
-- `skills-sync list` and `skills-sync search` prefer the git-backed catalog when a mirror already exists, while local install/apply paths still keep repo-local source semantics.
-- `skills-sync pull` refreshes the git-backed source or git mirror only; it does not overwrite `.agents/skills/` by itself.
-- `skills-sync sync` and `skills-sync update` are the simple one-step paths to refresh `.agents/skills/` from the configured git source.
-- `skills-sync push` publishes selected local skills back to the git-backed source; commit/push remain explicit opt-ins.
+- `skills-sync list` and `skills-sync search` prefer the configured external catalog when present; otherwise they use the repo-local source seed.
+- `skills-sync pull` refreshes only an external git checkout; it does not clone into `.agents/cache/` and does not overwrite `.agents/skills/` by itself.
+- `skills-sync sync` and `skills-sync update` are the simple one-step paths to refresh `.agents/skills/` from the configured source.
+- `skills-sync push` is disabled by default; publish skill changes from the external universal-skills repository with its own tools.
 - Keep `agentic-system-workflow` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, and git-backed skills flow.
 - The scaffold should not depend on global Codex skills for universal-skills content.
 - Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and project-agnostic.

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -22,7 +23,8 @@ DEFAULTS = {
     "upstream_repo_url": "",
     "upstream_branch": "main",
     "source_dir": ".agents/source/universal-skills",
-    "pool_dir": ".agents/cache/universal-skills",
+    "external_source_dir": "",
+    "publish_enabled": False,
     "project_dir": "skills",
     "mode": "copy",
     "required": False,
@@ -504,54 +506,29 @@ def _sync_local_source_metadata(local_source: Path, source_repo: Path, manifest:
 
 
 def preferred_local_source_repo_path() -> Path:
-    return preferred_source_repo_path()
+    return cfg_path("source_dir")
 
 
 def existing_git_sync_repo_path() -> Path | None:
-    preferred = preferred_local_source_repo_path()
-    if _is_valid_source_repo(preferred) and (preferred / ".git").exists():
-        return preferred
-
-    pool = cfg_path("pool_dir")
-    if _is_valid_source_repo(pool) and (pool / ".git").exists():
-        return pool
-
+    external = external_source_repo_path()
+    if external and _is_valid_source_repo(external) and (external / ".git").exists():
+        return external
     return None
 
 
 def git_sync_repo_path() -> Path:
-    return existing_git_sync_repo_path() or cfg_path("pool_dir")
+    repo = existing_git_sync_repo_path()
+    if repo is None:
+        raise RuntimeError(
+            "Git-backed universal-skills source is not configured. "
+            "Set AGENTS_UNIVERSAL_SKILLS_SOURCE or skills_sync.external_source_dir "
+            "to an external checkout when a Git refresh is required."
+        )
+    return repo
 
 
 def ensure_git_sync_repo(manifest: Dict[str, Any] | None = None) -> Path | None:
-    manifest = manifest or {}
-    preferred = preferred_local_source_repo_path()
-    if _is_valid_source_repo(preferred) and (preferred / ".git").exists():
-        return preferred
-
-    pool = cfg_path("pool_dir")
-    if _is_valid_source_repo(pool) and (pool / ".git").exists():
-        return pool
-
-    url = str(manifest.get("repo") or cfg("upstream_repo_url")).strip()
-    ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
-    if not url:
-        return None
-
-    if pool.exists():
-        try:
-            has_entries = any(pool.iterdir())
-        except OSError:
-            has_entries = True
-        if has_entries and not (pool / ".git").exists():
-            raise RuntimeError(
-                f"Cannot initialize git skills mirror at {pool}: path exists and is not a git checkout"
-            )
-
-    pool.parent.mkdir(parents=True, exist_ok=True)
-    if not pool.exists():
-        run(["git", "clone", "--branch", ref, url, str(pool)], cwd=ROOT_DIR)
-    return pool
+    return existing_git_sync_repo_path()
 
 
 def refresh_git_sync_repo(manifest: Dict[str, Any]) -> Path | None:
@@ -601,18 +578,29 @@ def publish_skill_from_project(name: str, target_repo: Path) -> bool:
 def source_repo_candidates() -> List[Path]:
     candidates: List[Path] = []
     seen: set[Path] = set()
-    for key in ("source_dir", "pool_dir"):
-        raw = str(cfg(key)).strip()
-        if not raw:
-            continue
-        candidate = resolve_repo_path(ROOT_DIR, raw)
-        if not _is_repo_local_path(candidate):
+    for candidate in [external_source_repo_path(), cfg_path("source_dir")]:
+        if candidate is None:
             continue
         if candidate in seen:
             continue
         seen.add(candidate)
+        if _is_forbidden_repo_local_git_source(candidate):
+            raise RuntimeError(
+                f"Repo-local universal-skills source must not be a git checkout: {candidate}. "
+                "Use a plain seed under .agents/source/universal-skills, or set "
+                "AGENTS_UNIVERSAL_SKILLS_SOURCE to an external checkout."
+            )
         candidates.append(candidate)
     return candidates
+
+
+def external_source_repo_path() -> Path | None:
+    raw = os.environ.get("AGENTS_UNIVERSAL_SKILLS_SOURCE", "").strip()
+    if not raw:
+        raw = str(cfg("external_source_dir")).strip()
+    if not raw:
+        return None
+    return resolve_repo_path(ROOT_DIR, raw)
 
 
 def _is_repo_local_path(path: Path) -> bool:
@@ -623,11 +611,15 @@ def _is_repo_local_path(path: Path) -> bool:
     return True
 
 
+def _is_forbidden_repo_local_git_source(path: Path) -> bool:
+    return _is_repo_local_path(path) and (path / ".git").exists()
+
+
 def preferred_source_repo_path() -> Path:
-    candidates = source_repo_candidates()
-    if candidates:
-        return candidates[0]
-    return cfg_path("pool_dir")
+    external = external_source_repo_path()
+    if external is not None and _is_valid_source_repo(external):
+        return external
+    return cfg_path("source_dir")
 
 
 def active_source_repo_path() -> Path | None:
@@ -641,7 +633,7 @@ def source_repo_path() -> Path:
     active = active_source_repo_path()
     if active is not None:
         return active
-    return git_sync_repo_path()
+    return cfg_path("source_dir")
 
 
 def catalog_source_repo_path() -> Path:
@@ -785,19 +777,15 @@ def _selected_skills_for_args(args: argparse.Namespace) -> List[str]:
 
 
 def ensure_repo_cloned(manifest: Dict[str, Any] | None = None):
-    pool = active_source_repo_path() or git_sync_repo_path()
-    manifest = manifest or {}
-    url = str(manifest.get("repo") or cfg("upstream_repo_url")).strip()
-    ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
-
-    if _is_valid_source_repo(pool) or (pool / ".git").exists():
+    source = active_source_repo_path()
+    if source is not None:
         return
 
-    if not url:
-        raise RuntimeError("skills_sync.upstream_repo_url is required")
-
-    pool.parent.mkdir(parents=True, exist_ok=True)
-    run(["git", "clone", "--branch", ref, url, str(pool)], cwd=ROOT_DIR)
+    raise RuntimeError(
+        f"skills source not initialized: {cfg_path('source_dir')}. "
+        "Seed .agents/source/universal-skills or set AGENTS_UNIVERSAL_SKILLS_SOURCE "
+        "to an external universal-skills checkout."
+    )
 
 
 def cmd_init(args: argparse.Namespace):
@@ -1171,10 +1159,11 @@ def cmd_status(args: argparse.Namespace):
     print(f"- ref: {manifest.get('ref', cfg('upstream_branch'))}")
     print(f"- mode: {manifest.get('mode', cfg('mode'))}")
     print(f"- source_dir: {preferred_source_repo_path()}")
+    print(f"- external_source_dir: {external_source_repo_path() or 'none'}")
     print(f"- active_source: {active_source or 'missing'}")
     print(f"- git_sync_source: {git_source or 'none'}")
     print(f"- catalog_source: {catalog_source}")
-    print(f"- fallback_cache_dir: {cfg_path('pool_dir')}")
+    print(f"- publish_enabled: {cfg('publish_enabled')}")
     print(f"- project_dir: {project_skills_root()}")
     print(f"- manifest: {cfg_path('manifest_file')}")
     print(f"- installs: {len(manifest.get('installs', []))}")
@@ -1248,6 +1237,13 @@ def _default_push_message(skills: Sequence[str]) -> str:
 def cmd_push(args: argparse.Namespace):
     if not ensure_enabled():
         return
+
+    if not bool(cfg("publish_enabled")):
+        raise RuntimeError(
+            "skills-sync push is disabled in this scaffold. Publish from the external "
+            "universal-skills repository with its own tools, or explicitly enable "
+            "skills_sync.publish_enabled for a controlled maintenance session."
+        )
 
     manifest = load_manifest()
     git_repo = ensure_git_sync_repo(manifest)

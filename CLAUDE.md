@@ -189,11 +189,11 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 
 - Prefer project-local skills under `.agents/skills/` as the main skill surface for Codex, OpenCode, Qwen, Claude Code, and Gemini CLI in this repo.
 - Keep global Codex skills lean; do not rely on a large machine-global skill set as the primary source of project behavior.
-- Prefer a repo-local universal-skills source checkout at `.agents/source/universal-skills`.
-- Keep `.agents/cache/universal-skills` only as a compatibility fallback for older repos.
+- Prefer a repo-local universal-skills source seed at `.agents/source/universal-skills`; it must not be a nested git checkout.
+- Do not create or use `.agents/cache/universal-skills`; Git-backed universal-skills work must happen in an external checkout configured via `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`.
 - Bootstrap and `skills-sync` should prepare the project-local skill surface so each repository carries only the subset it actually needs.
-- Treat `skills-sync sync` / `skills-sync update` as the simple path that refreshes `.agents/skills/` from the configured universal-skills git source.
-- Treat `skills-sync pull` as the source-refresh step for the git-backed checkout or mirror, and `skills-sync push` as the explicit publish path for selected local skill edits.
+- Treat `skills-sync sync` / `skills-sync update` as the simple path that refreshes `.agents/skills/` from the configured universal-skills source.
+- Treat `skills-sync pull` as a refresh step only for an external git checkout; `skills-sync push` is disabled by default and should be replaced by the upstream universal-skills repository's own publish tools.
 
 ### Optional External Memory
 

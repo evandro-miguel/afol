@@ -22,7 +22,8 @@ skills under `.agents/skills/` to reflect the current upstream git source.
 
 Rule:
 
-- `skills-sync pull` refreshes the git-backed source or mirror only.
+- `skills-sync pull` refreshes only an external git-backed source when one is
+  configured.
 - `skills-sync sync` / `skills-sync update` refresh the actual project skill
   copies under `.agents/skills/`.
 
@@ -35,14 +36,15 @@ Rule:
 Use this when the repo needs the scaffold-operating skill available locally
 without doing a broader skill refresh.
 
-## 3. Publish a Local Skill Change Back to Git
+## 3. Publish a Local Skill Change Back to Universal-Skills
 
 ```bash
-./.agents/agents skills-sync push agentic-system-workflow --commit --push
+# In the external universal-skills repository:
+bun scripts/publish-skill.js agentic-system-workflow
 ```
 
-Use this only when the local skill change is ready to become upstream state.
-Commit and push remain explicit so the agent does not publish by accident.
+Use the upstream repository's own tools when the local skill change is ready to
+become upstream state. `skills-sync push` is disabled by default in the scaffold.
 
 ## 4. Governed Workbench Execution
 

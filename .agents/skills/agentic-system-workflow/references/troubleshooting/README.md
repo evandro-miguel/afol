@@ -50,7 +50,7 @@ Symptom:
 
 Cause:
 
-- `skills-sync pull` only refreshed the source or git mirror
+- `skills-sync pull` only refreshed the external source when one was configured
 
 Fix:
 

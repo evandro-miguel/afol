@@ -88,7 +88,7 @@ Wrapper contract:
 | `make verify` | Check task completion | - |
 | `make lint` | Validate markdown docs | - |
 | `make skills-init` | Initialize universal skills sync | - |
-| `make skills-pull` | Refresh git-backed skills source/mirror only | - |
+| `make skills-pull` | Refresh configured external git-backed skills source only | - |
 | `make skills-update` | Refresh `.agents/skills/` from the configured git source | `SKILLS=a,b,c`, `RUNTIME=codex`, `PROFILE=x` |
 | `make skills-list` | List available or selected upstream skills | `RUNTIME=codex`, `PROFILE=x`, `SELECTED=1`, `INSTALLED=1` |
 | `make skills-search` | Search upstream skills by keyword | `QUERY=x`, `RUNTIME=codex`, `PROFILE=x`, `LIMIT=20`, `SELECTED=1` |

@@ -81,7 +81,7 @@ Recommended command:
 - Optional upstream skills sync may emit warnings; those warnings are non-blocking.
 - Bootstrap does not copy scaffold-local skill history; it only prepares the baseline needed for the target repo to own its selection and upgrade path.
 - Bootstrap should reinforce project-local skills, not turn global Codex skills into a second project contract.
-- `skills-sync pull` refreshes the git-backed source or git mirror only; use `skills-sync sync` / `skills-sync update` to actually refresh `.agents/skills/` in the target repo.
+- `skills-sync pull` refreshes only a configured external git-backed source; use `skills-sync sync` / `skills-sync update` to actually refresh `.agents/skills/` in the target repo.
 
 ## Verification
 

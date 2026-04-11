@@ -138,4 +138,4 @@ status: draft
 - Prefer a repo-local universal-skills source checkout at `.agents/source/universal-skills`.
 - Bootstrap should seed `.agents/source/universal-skills` from committed repo assets by default, so downstream installs stay local-first.
 - Treat `skills-sync sync` / `skills-sync update` as the simple path that refreshes `.agents/skills/` from the configured universal-skills git source.
-- Treat `skills-sync pull` as the source-refresh step for the git-backed checkout or mirror, and `skills-sync push` as the explicit publish path for selected local skill edits.
+- Treat `skills-sync pull` as a source-refresh step only for an external universal-skills checkout, and keep `skills-sync push` disabled unless a controlled maintenance session explicitly enables publishing.

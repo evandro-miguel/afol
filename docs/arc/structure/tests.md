@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-04-11T18:27:22+00:00
+**Generated:** 2026-04-11T20:14:42+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,14 +9,14 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 57 files, 8,011 lines, 367.2 KB
+**Stats:** 57 files, 7,957 lines, 364.6 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
 | `.agents/scripts/tests/test_verify_tasks_strict.py` | 861 | 31.9 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_skills_sync.py` | 712 | 32.0 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_skills_sync.py` | 658 | 29.4 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_scenarios.py` | 499 | 25.1 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_flow.py` | 427 | 21.7 KB | Test file; unit tests |
 | `.agents/scripts/tests/conftest.py` | 315 | 13.4 KB | Test file; unit tests |

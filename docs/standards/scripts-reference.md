@@ -43,7 +43,7 @@ make all           # Full validation workflow (unit + integration, no e2e)
 | `make test-scripts-integration` | Run isolated script integration tests | - |
 | `make test-scripts-all` | Run script unit + integration tests | - |
 | `make skills-init` | Initialize universal skills sync | - |
-| `make skills-pull` | Refresh git-backed skills source/mirror only | - |
+| `make skills-pull` | Refresh configured external git-backed skills source only | - |
 | `make skills-update` | Refresh `.agents/skills/` from the configured git source | `SKILLS=a,b,c`, `RUNTIME=codex`, `PROFILE=x` |
 | `make skills-list` | List available or selected upstream skills | `RUNTIME=codex`, `PROFILE=x`, `SELECTED=1`, `INSTALLED=1` |
 | `make skills-search` | Search upstream skills by keyword | `QUERY=x`, `RUNTIME=codex`, `PROFILE=x`, `LIMIT=20`, `SELECTED=1` |
@@ -206,6 +206,6 @@ make skills-ensure SKILL=writing-skills RUNTIME=codex
 make skills-check
 ```
 
-`make skills-pull` refreshes the git-backed source or git mirror only. Use `make skills-sync` or `make skills-update` when you want `.agents/skills/` refreshed too.
+`make skills-pull` refreshes only a configured external git-backed source. It never creates `.agents/cache/universal-skills`. Use `make skills-sync` or `make skills-update` when you want `.agents/skills/` refreshed too.
 
 See: `docs/standards/skills-sync.md`

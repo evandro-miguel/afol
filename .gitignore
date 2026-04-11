@@ -18,6 +18,9 @@ uv.lock
 # Runtime telemetry events (operational data)
 .agents/data/telemetry/events.jsonl
 
+# Universal-skills must not be a repo-local git cache or nested checkout.
+.agents/cache/universal-skills/
+
 # Local temporary/reference workspace
 .agents/.tmp/
 .agents/tmp/*

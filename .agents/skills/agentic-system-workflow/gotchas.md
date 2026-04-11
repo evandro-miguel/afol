@@ -28,8 +28,8 @@ skills.
 ## 4. Git Is the Refresh and Publish Truth
 
 Treat the repo-local seed under `.agents/source/universal-skills` as the local
-baseline. Treat the configured git-backed source or mirror as the refresh and
-publish path.
+baseline. Treat a configured external universal-skills checkout as the refresh
+path, and publish from that external repository with its own tools.
 
 ## 5. Use `--partial` for Live Repositories
 

@@ -3,7 +3,7 @@
  * Guard script: verify local skills mirror is in sync with universal-skills pool.
  *
  * Compares:
- *   .agents/skills/<skill-name> <-> .agents/source|cache/universal-skills/skills/<skill-name>
+ *   .agents/skills/<skill-name> <-> .agents/source/universal-skills/skills/<skill-name>
  */
 
 const fs = require("fs");
@@ -19,7 +19,7 @@ Usage:
 
 Options:
   --source <dir>      Source skills dir (default: auto-detect .agents/skills)
-  --mirror <dir>      Mirror skills dir (default: auto-detect .agents/source or .agents/cache)
+  --mirror <dir>      Mirror skills dir (default: auto-detect .agents/source or external apps/universal-skills)
   --skill <csv>       Check only selected skill(s)
   --sync              Run sync command before checking
   --help              Show help
@@ -91,7 +91,6 @@ const SOURCE_CANDIDATES = [
 ];
 
 const MIRROR_CANDIDATES = [
-  ".agents/cache/universal-skills/skills",
   ".agents/source/universal-skills/skills",
   "apps/universal-skills/skills",
 ];
@@ -235,7 +234,7 @@ function runSync(sourceRoot, selectedSkills) {
   const wrapper = path.resolve(".agents/agents");
 
   if (fs.existsSync(wrapper)) {
-    const args = [wrapper, "skills-sync", "push"];
+    const args = [wrapper, "skills-sync", "sync"];
     const skills = selectedSkills.length ? selectedSkills : listSkillDirs(sourceRoot);
     if (skills.length) {
       args.push("--skills", skills.join(","));
@@ -392,7 +391,7 @@ function main() {
 
   if (errors.length) {
     console.log(
-      "\nAction: run `./.agents/agents skills-sync push --skills <skill-name>` or rerun this script with `--sync`"
+      "\nAction: rerun this script with `--sync`, or publish from the external universal-skills repository with its own tools"
     );
     process.exit(1);
   }

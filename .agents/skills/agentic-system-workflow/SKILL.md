@@ -37,13 +37,14 @@ Before finalizing, scan [Gotchas](./gotchas.md).
   intact.
 - Keep project-owned repository docs outside `.agents/`; use `docs/map/` for
   current-state repository mapping and analysis evidence.
-- Treat git as the upstream source of truth for universal-skills refresh and
-  publish operations.
-- Treat `.agents/source/universal-skills` as the repo-local seed and preferred
-  local source checkout inside each project.
+- Treat git as the upstream source of truth for universal-skills, but keep that
+  checkout outside the project scaffold.
+- Treat `.agents/source/universal-skills` as the repo-local seed inside each
+  project; it must not be a nested git checkout.
 - Treat `skills-sync pull` as source refresh only. Use `skills-sync sync` or
   `skills-sync update` to actually refresh `.agents/skills/`.
-- Use `skills-sync push` only with explicit `--commit` and `--push` intent.
+- `skills-sync push` is disabled by default; publish from the external
+  universal-skills repository with its own tools.
 - Prefer `make agents-all` in adopted repos when the project already owns
   `make all`.
 - Verify behavior with repo commands before reporting completion.

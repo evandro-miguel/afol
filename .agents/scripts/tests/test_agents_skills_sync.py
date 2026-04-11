@@ -26,7 +26,8 @@ def base_config() -> dict:
             "upstream_repo_url": "https://github.com/example/skill-universal.git",
             "upstream_branch": "main",
             "source_dir": ".agents/source/universal-skills",
-            "pool_dir": ".agents/cache/universal-skills",
+            "external_source_dir": "",
+            "publish_enabled": False,
             "project_dir": ".agents/skills",
             "manifest_file": ".agents/skills-sync.manifest.json",
             "upstream_skills_dir": "skills",
@@ -253,7 +254,7 @@ class AgentsSkillsSyncTests(unittest.TestCase):
 
             patched_run.assert_not_called()
 
-    def test_cmd_pull_clones_git_mirror_for_repo_local_source_seed_when_remote_exists(self):
+    def test_cmd_pull_skips_when_only_repo_local_seed_exists(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
             module = self._load_with_root(root)
@@ -270,54 +271,18 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             }
 
             buffer = io.StringIO()
-            mirror_root = root / ".agents/cache/universal-skills"
-
-            def fake_run(cmd, cwd=None):
-                if cmd[:2] == ["git", "clone"]:
-                    (mirror_root / ".git").mkdir(parents=True, exist_ok=True)
-                    self._make_source_skill(
-                        root,
-                        "writing-skills",
-                        description="Mirror version",
-                        source_dir=".agents/cache/universal-skills",
-                    )
-                    self._make_profile(
-                        root,
-                        "core",
-                        ["writing-skills"],
-                        source_dir=".agents/cache/universal-skills",
-                    )
-                    (mirror_root / "index.json").write_text("{}\n", encoding="utf-8")
 
             with (
                 mock.patch.object(module, "load_manifest", return_value=manifest),
-                mock.patch.object(module, "run", side_effect=fake_run) as patched_run,
+                mock.patch.object(module, "run") as patched_run,
                 redirect_stdout(buffer),
             ):
                 module.cmd_pull(type("Args", (), {})())
 
-            self.assertEqual(
-                patched_run.call_args_list,
-                [
-                    mock.call(
-                        [
-                            "git",
-                            "clone",
-                            "--branch",
-                            "main",
-                            "https://github.com/example/skill-universal.git",
-                            str(mirror_root),
-                        ],
-                        cwd=root,
-                    ),
-                    mock.call(["git", "fetch", "origin"], cwd=mirror_root),
-                    mock.call(["git", "checkout", "main"], cwd=mirror_root),
-                    mock.call(["git", "pull", "--ff-only", "origin", "main"], cwd=mirror_root),
-                ],
-            )
-            self.assertIn("updated git skills source", buffer.getvalue())
+            patched_run.assert_not_called()
+            self.assertIn("source refresh skipped", buffer.getvalue())
 
-    def test_active_source_prefers_local_checkout_over_pool(self):
+    def test_active_source_uses_repo_local_seed_without_cache_fallback(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
             module = self._load_with_root(root)
@@ -325,37 +290,35 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self._make_profile(root, "core", ["writing-skills"])
             (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
 
-            fallback_skill_dir = root / ".agents/cache/universal-skills/skills/writing-skills"
-            fallback_skill_dir.mkdir(parents=True, exist_ok=True)
-            (fallback_skill_dir / "SKILL.md").write_text("# fallback\n", encoding="utf-8")
-
             self.assertEqual(module.active_source_repo_path(), root / ".agents/source/universal-skills")
 
-    def test_active_source_ignores_partial_local_source_and_uses_pool(self):
+    def test_active_source_uses_external_source_when_repo_local_seed_is_partial(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            root = Path(td)
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
             module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
 
             self._make_source_skill(root, "writing-skills", description="Partial local source")
             (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
 
             self._make_source_skill(
-                root,
+                Path(td),
                 "writing-skills",
-                description="Git source",
-                source_dir=".agents/cache/universal-skills",
+                description="External source",
+                source_dir="external-universal-skills",
             )
             self._make_profile(
-                root,
+                Path(td),
                 "core",
                 ["writing-skills"],
-                source_dir=".agents/cache/universal-skills",
+                source_dir="external-universal-skills",
             )
-            (root / ".agents/cache/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
-            (root / ".agents/cache/universal-skills/.git").mkdir(parents=True, exist_ok=True)
+            (external_root / "index.json").write_text("{}\n", encoding="utf-8")
 
-            self.assertEqual(module.active_source_repo_path(), root / ".agents/cache/universal-skills")
-            self.assertEqual(module.source_repo_path(), root / ".agents/cache/universal-skills")
+            self.assertEqual(module.active_source_repo_path(), external_root)
+            self.assertEqual(module.source_repo_path(), external_root)
 
     def test_search_matches_name_and_body(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -379,35 +342,37 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertIn("markdownlint-skill", output)
             self.assertNotIn("writing-skills [", output)
 
-    def test_search_prefers_existing_git_catalog_over_seed_subset(self):
+    def test_search_prefers_configured_external_catalog_over_seed_subset(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            root = Path(td)
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
             module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
 
             self._seed_source_repo(root)
             self._make_source_skill(root, "writing-skills", description="Local seed only")
             self._make_profile(root, "core", ["writing-skills"])
 
-            self._seed_source_repo(root, source_dir=".agents/cache/universal-skills")
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
             self._make_source_skill(
-                root,
+                Path(td),
                 "writing-skills",
-                description="Git catalog support",
-                source_dir=".agents/cache/universal-skills",
+                description="External catalog support",
+                source_dir="external-universal-skills",
             )
             self._make_source_skill(
-                root,
+                Path(td),
                 "markdownlint-skill",
                 description="Lint markdown docs",
-                source_dir=".agents/cache/universal-skills",
+                source_dir="external-universal-skills",
             )
             self._make_profile(
-                root,
+                Path(td),
                 "core",
                 ["writing-skills", "markdownlint-skill"],
-                source_dir=".agents/cache/universal-skills",
+                source_dir="external-universal-skills",
             )
-            (root / ".agents/cache/universal-skills/.git").mkdir(parents=True, exist_ok=True)
 
             buffer = io.StringIO()
             args = type(
@@ -420,7 +385,7 @@ class AgentsSkillsSyncTests(unittest.TestCase):
 
             output = buffer.getvalue()
             self.assertIn("markdownlint-skill", output)
-            self.assertIn(str(root / ".agents/cache/universal-skills"), output)
+            self.assertIn(str(external_root), output)
 
     def test_ensure_installs_missing_skill_without_persisting_manifest(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -460,35 +425,37 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             loaded = module.load_manifest()
             self.assertEqual(loaded["installs"], [{"app": "all", "profile": "core"}])
 
-    def test_ensure_falls_back_to_existing_git_catalog_when_seed_lacks_skill(self):
+    def test_ensure_uses_external_catalog_when_seed_lacks_skill(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            root = Path(td)
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
             module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
 
             self._seed_source_repo(root)
             self._make_source_skill(root, "writing-skills", description="Local seed only")
             self._make_profile(root, "core", ["writing-skills"])
 
-            self._seed_source_repo(root, source_dir=".agents/cache/universal-skills")
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
             self._make_source_skill(
-                root,
+                Path(td),
                 "writing-skills",
-                description="Git catalog support",
-                source_dir=".agents/cache/universal-skills",
+                description="External catalog support",
+                source_dir="external-universal-skills",
             )
             self._make_source_skill(
-                root,
+                Path(td),
                 "markdownlint-skill",
                 description="Lint markdown docs",
-                source_dir=".agents/cache/universal-skills",
+                source_dir="external-universal-skills",
             )
             self._make_profile(
-                root,
+                Path(td),
                 "core",
                 ["writing-skills", "markdownlint-skill"],
-                source_dir=".agents/cache/universal-skills",
+                source_dir="external-universal-skills",
             )
-            (root / ".agents/cache/universal-skills/.git").mkdir(parents=True, exist_ok=True)
 
             module.save_manifest(
                 {
@@ -520,29 +487,31 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertTrue((root / ".agents/skills/markdownlint-skill/SKILL.md").exists())
             self.assertIn("APPLIED: markdownlint-skill", buffer.getvalue())
 
-    def test_cmd_pull_refreshes_git_mirror_when_local_source_is_seeded(self):
+    def test_cmd_pull_refreshes_external_git_source_when_configured(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            root = Path(td)
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
             module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._make_source_skill(root, "writing-skills", description="Local seed")
             self._make_profile(root, "core", ["writing-skills"])
             (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
 
             self._make_source_skill(
-                root,
+                Path(td),
                 "writing-skills",
-                description="Mirror version",
-                source_dir=".agents/cache/universal-skills",
+                description="External version",
+                source_dir="external-universal-skills",
             )
             self._make_profile(
-                root,
+                Path(td),
                 "core",
                 ["writing-skills"],
-                source_dir=".agents/cache/universal-skills",
+                source_dir="external-universal-skills",
             )
-            mirror_root = root / ".agents/cache/universal-skills"
-            (mirror_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
-            (mirror_root / ".git").mkdir(parents=True, exist_ok=True)
+            (external_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
 
             module.save_manifest(
                 {
@@ -565,38 +534,39 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertEqual(
                 patched_run.call_args_list,
                 [
-                    mock.call(["git", "fetch", "origin"], cwd=mirror_root),
-                    mock.call(["git", "checkout", "main"], cwd=mirror_root),
-                    mock.call(["git", "pull", "--ff-only", "origin", "main"], cwd=mirror_root),
+                    mock.call(["git", "fetch", "origin"], cwd=external_root),
+                    mock.call(["git", "checkout", "main"], cwd=external_root),
+                    mock.call(["git", "pull", "--ff-only", "origin", "main"], cwd=external_root),
                 ],
             )
             output = buffer.getvalue()
             self.assertIn("updated git skills source", output)
-            self.assertIn("local source remains", output)
 
-    def test_cmd_sync_updates_project_from_git_mirror_and_mirrors_local_source(self):
+    def test_cmd_sync_updates_project_from_external_source_and_mirrors_local_source(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            root = Path(td)
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
             module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._make_source_skill(root, "writing-skills", description="Local seed")
             self._make_profile(root, "core", ["writing-skills"])
             (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
 
             self._make_source_skill(
-                root,
+                Path(td),
                 "writing-skills",
-                description="Git version",
-                source_dir=".agents/cache/universal-skills",
+                description="External version",
+                source_dir="external-universal-skills",
             )
             self._make_profile(
-                root,
+                Path(td),
                 "core",
                 ["writing-skills"],
-                source_dir=".agents/cache/universal-skills",
+                source_dir="external-universal-skills",
             )
-            mirror_root = root / ".agents/cache/universal-skills"
-            (mirror_root / "index.json").write_text("{}\n", encoding="utf-8")
-            (mirror_root / ".git").mkdir(parents=True, exist_ok=True)
+            (external_root / "index.json").write_text("{}\n", encoding="utf-8")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
 
             module.save_manifest(
                 {
@@ -617,31 +587,31 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             source_doc = (root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md").read_text(
                 encoding="utf-8"
             )
-            self.assertIn("Git version", project_doc)
-            self.assertIn("Git version", source_doc)
+            self.assertIn("External version", project_doc)
+            self.assertIn("External version", source_doc)
 
     def test_mirror_skills_to_local_source_copies_index_and_profiles(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            root = Path(td)
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
             module = self._load_with_root(root)
 
             self._make_source_skill(
-                root,
+                Path(td),
                 "writing-skills",
-                description="Git version",
-                source_dir=".agents/cache/universal-skills",
+                description="External version",
+                source_dir="external-universal-skills",
             )
             self._make_profile(
-                root,
+                Path(td),
                 "core",
                 ["writing-skills"],
-                source_dir=".agents/cache/universal-skills",
+                source_dir="external-universal-skills",
             )
-            mirror_root = root / ".agents/cache/universal-skills"
-            (mirror_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
-            (mirror_root / ".git").mkdir(parents=True, exist_ok=True)
+            (external_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
 
-            module.mirror_skills_to_local_source(mirror_root, ["writing-skills"])
+            module.mirror_skills_to_local_source(external_root, ["writing-skills"])
 
             mirrored_index = json.loads(
                 (root / ".agents/source/universal-skills/index.json").read_text(encoding="utf-8")
@@ -654,11 +624,11 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertEqual([entry["name"] for entry in mirrored_index["skills"]], ["writing-skills"])
             self.assertEqual(mirrored_profile, {"name": "core", "skills": ["writing-skills"]})
             self.assertIn(
-                "Git version",
+                "External version",
                 (root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md").read_text(encoding="utf-8"),
             )
 
-    def test_cmd_push_publishes_project_skill_to_git_source_and_local_source(self):
+    def test_cmd_push_is_disabled_by_default(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
             module = self._load_with_root(root)
@@ -669,26 +639,6 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 "---\nname: writing-skills\ndescription: Edited locally\n---\n\n# writing-skills\n\nEdited locally\n",
                 encoding="utf-8",
             )
-
-            self._make_source_skill(root, "writing-skills", description="Old local source")
-            self._make_profile(root, "core", ["writing-skills"])
-            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
-
-            self._make_source_skill(
-                root,
-                "writing-skills",
-                description="Old git source",
-                source_dir=".agents/cache/universal-skills",
-            )
-            self._make_profile(
-                root,
-                "core",
-                ["writing-skills"],
-                source_dir=".agents/cache/universal-skills",
-            )
-            mirror_root = root / ".agents/cache/universal-skills"
-            (mirror_root / "index.json").write_text("{}\n", encoding="utf-8")
-            (mirror_root / ".git").mkdir(parents=True, exist_ok=True)
 
             module.save_manifest(
                 {
@@ -714,25 +664,17 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 },
             )()
 
-            buffer = io.StringIO()
-            with redirect_stdout(buffer):
+            with self.assertRaisesRegex(RuntimeError, "disabled"):
                 module.cmd_push(args)
 
-            output = buffer.getvalue()
-            self.assertIn("PUBLISHED: writing-skills", output)
-            self.assertIn(
-                "Edited locally",
-                (root / ".agents/cache/universal-skills/skills/writing-skills/SKILL.md").read_text(encoding="utf-8"),
-            )
-            self.assertIn(
-                "Edited locally",
-                (root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md").read_text(encoding="utf-8"),
-            )
-
-    def test_cmd_push_can_commit_and_push_selected_skill(self):
+    def test_cmd_push_can_commit_and_push_selected_skill_when_explicitly_enabled_with_external_source(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            root = Path(td)
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
             module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            module.CONFIG["skills_sync"]["publish_enabled"] = True
 
             project_skill = root / ".agents/skills/writing-skills"
             project_skill.mkdir(parents=True, exist_ok=True)
@@ -742,20 +684,19 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             )
 
             self._make_source_skill(
-                root,
+                Path(td),
                 "writing-skills",
-                description="Old git source",
-                source_dir=".agents/cache/universal-skills",
+                description="Old external source",
+                source_dir="external-universal-skills",
             )
             self._make_profile(
-                root,
+                Path(td),
                 "core",
                 ["writing-skills"],
-                source_dir=".agents/cache/universal-skills",
+                source_dir="external-universal-skills",
             )
-            mirror_root = root / ".agents/cache/universal-skills"
-            (mirror_root / "index.json").write_text("{}\n", encoding="utf-8")
-            (mirror_root / ".git").mkdir(parents=True, exist_ok=True)
+            (external_root / "index.json").write_text("{}\n", encoding="utf-8")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
 
             module.save_manifest(
                 {
@@ -787,7 +728,7 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertEqual(
                 patched_run.call_args_list,
                 [
-                    mock.call(["git", "add", "--", "skills/writing-skills"], cwd=mirror_root),
+                    mock.call(["git", "add", "--", "skills/writing-skills"], cwd=external_root),
                     mock.call(
                         [
                             "git",
@@ -798,9 +739,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                             "--",
                             "skills/writing-skills",
                         ],
-                        cwd=mirror_root,
+                        cwd=external_root,
                     ),
-                    mock.call(["git", "push", "origin", "HEAD:main"], cwd=mirror_root),
+                    mock.call(["git", "push", "origin", "HEAD:main"], cwd=external_root),
                 ],
             )
 

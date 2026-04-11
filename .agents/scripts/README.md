@@ -73,12 +73,12 @@ Bootstrap exports are sanitized by design: the target repo gets generic roadmap/
 Bootstrap also copies the root `PLANS.md` file so downstream repos inherit the same ExecPlan contract used by this scaffold.
 For full bootstrap, the target directory is created automatically when missing.
 For existing projects, use `--partial` so bootstrap fills only the missing scaffold surface and leaves project-owned files intact.
-The preferred upstream source checkout is `.agents/source/universal-skills/` inside the repo. The legacy repo-local cache path `.agents/cache/universal-skills/` remains a compatibility fallback for older repos.
+The preferred source seed is `.agents/source/universal-skills/` inside the repo. It must not be a nested git checkout.
 Bootstrap seeds `.agents/source/universal-skills/` from committed `.agents/skills/` content, so the default downstream install path is self-contained.
-`skills-sync pull` refreshes the git-backed source or git mirror only.
-`skills-sync list` / `skills-sync search` prefer the git-backed catalog when a mirror already exists.
+`skills-sync pull` refreshes an external git checkout only when `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir` is configured.
+`skills-sync list` / `skills-sync search` prefer that external catalog when configured.
 `skills-sync sync` / `skills-sync update` are the one-step paths that actually refresh `.agents/skills/`.
-`skills-sync push` publishes selected local skill edits back to the git-backed source with explicit commit/push flags.
+`skills-sync push` is disabled by default; publish from the external universal-skills repository with its own tools.
 The skills baseline is intentionally generic here; downstream repos should keep their own selection/pin model while the universal-skills contract evolves.
 
 Discovery examples:
@@ -88,7 +88,6 @@ Discovery examples:
 ./.agents/agents skills-sync search markdown --runtime codex
 ./.agents/agents skills-sync sync --runtime codex
 ./.agents/agents skills-sync ensure writing-skills --runtime codex
-./.agents/agents skills-sync push writing-skills --commit --push
 ```
 
 Use `./.agents/agents bootstrap /path/to/existing-project --partial` when adopting the scaffold into an existing repo. Existing files stay in place unless `--force` is used. If that repo already has its own `make all`, use `make agents-all` for the scaffold aggregate validation. See `docs/standards/bootstrap-other-repo.md` for the full/partial install split and limitations.

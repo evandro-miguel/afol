@@ -28,7 +28,7 @@ links:
 Synchronizes project skills:
 
 1. **Init** - Initialize sync state
-2. **Pull** - Refresh the git-backed source checkout or mirror
+2. **Pull** - Refresh an external git-backed source checkout when configured
 3. **List** - Show available or selected skills
 4. **Search** - Search the local source checkout
 5. **Plan** - Preview changes
@@ -36,14 +36,14 @@ Synchronizes project skills:
 7. **Ensure** - Install or refresh one skill on demand
 8. **Check** - Validate structure
 9. **Sync / Update** - One-step refresh into `.agents/skills/`
-10. **Push** - Publish selected local skills back to the git-backed source
+10. **Push** - Disabled by default; publish via the external universal-skills repository's own tools
 
 Current contract note:
 
 - The scaffold currently uses a compatibility manifest with selected skills and mode.
 - F-10 evolves that contract toward pinned repo/ref/profile semantics without turning the scaffold into a second skills distribution system.
 - Bootstrapped repos receive a repo-local source seed under `.agents/source/universal-skills`, so the default sync path is local-first.
-- When that repo-local source is only a seed, git refresh and publish operations use the git-backed mirror in `.agents/cache/universal-skills`.
+- When that repo-local source is only a seed, git refresh and publish operations must use an external universal-skills checkout, not a nested `.agents/cache/universal-skills` checkout.
 
 ## What It Touches
 
@@ -52,8 +52,8 @@ Current contract note:
 | File | Purpose |
 |------|---------|
 | `.agents/agents.config` | Sync configuration |
-| `.agents/source/universal-skills/` | Preferred upstream source checkout |
-| `.agents/cache/universal-skills/` | Git-backed mirror / compatibility fallback source |
+| `.agents/source/universal-skills/` | Preferred repo-local source seed |
+| `AGENTS_UNIVERSAL_SKILLS_SOURCE` / `skills_sync.external_source_dir` | Optional external universal-skills checkout |
 | `.agents/skills/` | Local skills |
 
 ### Files Written
@@ -73,7 +73,8 @@ skills_sync:
   upstream_repo_url: "{UNIVERSAL_SKILLS_GIT_URL}"
   upstream_branch: "main"
   source_dir: ".agents/source/universal-skills"
-  pool_dir: ".agents/cache/universal-skills"
+  external_source_dir: ""
+  publish_enabled: false
   project_dir: "skills"
   mode: "copy"
   required: false
@@ -97,14 +98,14 @@ Partial-install note:
 # Initialize sync
 ./.agents/agents skills-sync init
 
-# Refresh the git-backed source checkout or mirror
+# Refresh an external git-backed source checkout when configured
 ./.agents/agents skills-sync pull
 
 # One-step refresh into .agents/skills/
 ./.agents/agents skills-sync sync --runtime codex
 ./.agents/agents skills-sync update --runtime codex
 
-# List available skills from the git-backed catalog when it already exists
+# List available skills from the external catalog when configured
 ./.agents/agents skills-sync list --runtime codex
 
 # Search upstream skills from the catalog or repo-local seed
@@ -125,8 +126,7 @@ Partial-install note:
 # Full sync
 ./.agents/agents skills-sync sync --skills writing-skills,markdownlint-skill
 
-# Publish one edited local skill back to the git-backed source
-./.agents/agents skills-sync push writing-skills --commit --push
+# Publishing is disabled by default here; use the upstream universal-skills repo.
 ```
 
 ### Via Makefile
@@ -142,7 +142,8 @@ make skills-apply SKILLS=writing-skills
 make skills-ensure SKILL=writing-skills RUNTIME=codex
 make skills-check SKILLS=writing-skills
 make skills-sync SKILLS=writing-skills,markdownlint-skill
-make skills-push SKILL=writing-skills COMMIT=1 PUSH=1
+# Disabled by default in this scaffold:
+# make skills-push SKILL=writing-skills COMMIT=1 PUSH=1
 ```
 
 ## How to Modify
@@ -151,10 +152,10 @@ make skills-push SKILL=writing-skills COMMIT=1 PUSH=1
 
 ```python
 def init_sync():
-    """Initialize sync state and local mirror."""
+    """Initialize sync state and local source seed."""
 
 def pull_upstream():
-    """Update local mirror from upstream."""
+    """Update external git source when configured."""
 
 def plan_sync(skills):
     """Preview missing/drift state."""
@@ -173,7 +174,7 @@ def check_structure(skills):
 3. Verify structure in `.agents/skills/new-skill/`
 
 For the scaffold itself, keep `agentic-system-workflow` available so agents can
-discover the canonical install, upgrade, validation, and git-backed publish
+discover the canonical install, upgrade, validation, and source sync
 flow from the project-local skill surface.
 
 ## Skill Structure
