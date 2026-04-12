@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-04-12T17:15:08+00:00
+**Generated:** 2026-04-12T21:36:04+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -68,7 +68,7 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/README.md` | 45 | 1.5 KB | Module; functionality |
 | `.agents/runtime/tests/test_mcp.py` | 44 | 1.9 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_session-pack-structure-and-postmortem_spec_01.md` | 44 | 1.6 KB | Module; functionality |
-| `docs/arc/SPECS/INDEX.md` | 43 | 4.0 KB | Module; functionality |
+| `docs/arc/SPECS/INDEX.md` | 43 | 4.1 KB | Module; functionality |
 | `docs/arc/SPECS/260306_knowledge-reuse-and-token-efficiency_spec_01.md` | 42 | 1.6 KB | Module; functionality |
 | `docs/arc/SPECS/260306_planning-rigor-and-explorer-gates_spec_01.md` | 42 | 1.5 KB | Module; functionality |
 | `docs/arc/SPECS/TEMPLATE_spec-child.md` | 41 | 0.9 KB | Module; functionality |
