@@ -2,15 +2,15 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-04-12T21:36:05+00:00"
-updated_at: "2026-04-12T21:36:05+00:00"
+created_at: "2026-04-12T22:48:31+00:00"
+updated_at: "2026-04-12T22:48:31+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 20
+- Total indexed docs: 24
 
 ## Brainstorm
 
@@ -19,6 +19,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260411_2214_agentic-runtime-restructure_brainstorm_01` | `.agents/wb/260411_2214_agentic-runtime-restructure/260411_2214_agentic-runtime-restructure_brainstorm_01.md` | - The scaffold needs a total runtime restructure, not a narrow MCP overlay.
 - `260412_1130_spec-child-and-spec-test-governance_brainstorm_01` | `.agents/wb/260412_1130_spec-child-and-spec-test-governance/260412_1130_spec-child-and-spec-test-governance_brainstorm_01.md` | - The roadmap now requires spec-child as the canonical child/local feature
 - `260412_1245_roadmap-backlog-closure_brainstorm_01` | `.agents/wb/260412_1245_roadmap-backlog-closure/260412_1245_roadmap-backlog-closure_brainstorm_01.md` | - The roadmap still had open planned/active items after the F-14 slice was
+- `260412_1910_scripts-coverage-80_brainstorm_01` | `.agents/wb/260412_1910_scripts-coverage-80/260412_1910_scripts-coverage-80_brainstorm_01.md` | - The scaffold needed an evidence-backed answer to whether scripts were tested and whether coverage reached 80%.
 
 ## Explorer-Check
 
@@ -27,10 +28,12 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260411_2214_agentic-runtime-restructure_explorer-check_01` | `.agents/wb/260411_2214_agentic-runtime-restructure/260411_2214_agentic-runtime-restructure_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
 - `260412_1130_spec-child-and-spec-test-governance_explorer-check_01` | `.agents/wb/260412_1130_spec-child-and-spec-test-governance/260412_1130_spec-child-and-spec-test-governance_explorer-check_01.md` | - rg -n "spec-lite|spec_child|spec-child|spec-test|doc_type.*spec|VALID.*doc|artifact"
 - `260412_1245_roadmap-backlog-closure_explorer-check_01` | `.agents/wb/260412_1245_roadmap-backlog-closure/260412_1245_roadmap-backlog-closure_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
+- `260412_1910_scripts-coverage-80_explorer-check_01` | `.agents/wb/260412_1910_scripts-coverage-80/260412_1910_scripts-coverage-80_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
 
 ## Postmortem
 
 - `260411_2214_agentic-runtime-restructure_postmortem_01` | `.agents/wb/260411_2214_agentic-runtime-restructure/260411_2214_agentic-runtime-restructure_postmortem_01.md` | - Restructure the scaffold around a central .agents/runtime/ package while preserving the existing .agents/agents command surface.
+- `260412_1910_scripts-coverage-80_postmortem_01` | `.agents/wb/260412_1910_scripts-coverage-80/260412_1910_scripts-coverage-80_postmortem_01.md` | - Add executable tests and prove the scripts suite reaches an enforced 80% coverage gate.
 
 ## Report
 
@@ -38,6 +41,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260411_2214_agentic-runtime-restructure_report_01` | `.agents/wb/260411_2214_agentic-runtime-restructure/260411_2214_agentic-runtime-restructure_report_01.md` | - Roadmap feature: F-13
 - `260412_1130_spec-child-and-spec-test-governance_report_01` | `.agents/wb/260412_1130_spec-child-and-spec-test-governance/260412_1130_spec-child-and-spec-test-governance_report_01.md` | - Implemented F-14 governance support for spec-child and spec-test.
 - `260412_1245_roadmap-backlog-closure_report_01` | `.agents/wb/260412_1245_roadmap-backlog-closure/260412_1245_roadmap-backlog-closure_report_01.md` | - Roadmap feature: F-13
+- `260412_1910_scripts-coverage-80_report_01` | `.agents/wb/260412_1910_scripts-coverage-80/260412_1910_scripts-coverage-80_report_01.md` | - Roadmap feature: F-05
 
 ## Research
 

@@ -509,9 +509,9 @@ def validate_evidence_reference(session_dir: Path, evidence_id: str, task_id: st
             )
         return
 
-        raise ValueError(
+    raise ValueError(
         f"Evidence '{evidence_id}' not found in {display_path(_session_ledger_file(session_dir))}"
-        )
+    )
 
 
 def append_timeline(log_file: Path, message: str):

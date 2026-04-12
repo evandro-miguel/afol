@@ -41,7 +41,7 @@ make all           # Full validation workflow (unit + integration, no e2e)
 | `make lint` | Lint markdown docs | - |
 | `make test-scripts` | Run script unit tests | - |
 | `make test-scripts-integration` | Run isolated script integration tests | - |
-| `make test-scripts-all` | Run script unit + integration tests | - |
+| `make test-scripts-all` | Run script unit + integration tests with the 80% scripts coverage gate | - |
 | `make skills-init` | Initialize universal skills sync | - |
 | `make skills-pull` | Refresh configured external git-backed skills source only | - |
 | `make skills-update` | Refresh `.agents/skills/` from the configured git source | `SKILLS=a,b,c`, `RUNTIME=codex`, `PROFILE=x` |

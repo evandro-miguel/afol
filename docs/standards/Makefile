@@ -82,7 +82,7 @@ help:
 	@echo "║    make test-runtime - Run central runtime tests          ║"
 	@echo "║    make runtime-mcp-smoke - Smoke runtime and MCP CLI     ║"
 	@echo "║    make test-scripts-integration - Run isolated integration tests ║"
-	@echo "║    make test-scripts-all - Run unit + integration tests   ║"
+	@echo "║    make test-scripts-all - Run unit + integration + cov   ║"
 	@echo "║                                                           ║"
 	@echo "║  Telemetry & Patterns                                     ║"
 	@echo "║    make telemetry-record  - Record telemetry event        ║"
@@ -536,10 +536,10 @@ test-scripts-integration:
 	@echo "✓ Script integration tests passed"
 
 test-scripts-all:
-	@echo "→ Running full script test suite..."
+	@echo "→ Running full script test suite with 80% coverage gate..."
 	@mkdir -p "$(UV_CACHE_DIR)"
-	@$(UV) run --project .agents/scripts pytest .agents/scripts/tests -m "not e2e"
-	@echo "✓ Full script test suite passed"
+	@$(UV) run --project .agents/scripts pytest .agents/scripts/tests -m "not e2e" --cov=.agents/scripts --cov-config=.agents/scripts/pyproject.toml --cov-report=term-missing --cov-fail-under=80
+	@echo "✓ Full script test suite and coverage gate passed"
 
 lint-scripts:
 	@echo "→ Linting Python scripts..."

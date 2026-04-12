@@ -90,7 +90,7 @@ Equivalent direct pytest commands:
 ```bash
 uv run --project .agents/scripts pytest .agents/scripts/tests -m "not integration and not e2e"
 uv run --project .agents/scripts pytest .agents/scripts/tests/integration
-uv run --project .agents/scripts pytest .agents/scripts/tests -m "not e2e"
+uv run --project .agents/scripts pytest .agents/scripts/tests -m "not e2e" --cov=.agents/scripts --cov-config=.agents/scripts/pyproject.toml --cov-report=term-missing --cov-fail-under=80
 ```
 
 ## Isolation Rules

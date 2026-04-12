@@ -45,6 +45,7 @@ make lint-fix-frontmatter # Add missing frontmatter
 
 # Tests
 make test-scripts      # Run unit tests
+make test-scripts-all  # Run unit + integration tests with the 80% scripts coverage gate
 make lint-scripts      # Lint Python code
 
 # Workbench updates

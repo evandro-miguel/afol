@@ -113,7 +113,7 @@ Wrapper contract:
 | `make wb-link` | Set frontmatter link field | `FILE=<doc>` `KEY=<k>` `VALUE=<v>` |
 | `make test-scripts` | Run script unit tests | - |
 | `make test-scripts-integration` | Run isolated integration tests | - |
-| `make test-scripts-all` | Run unit + integration tests | - |
+| `make test-scripts-all` | Run unit + integration tests with the 80% scripts coverage gate | - |
 
 ### Quick Workflows
 

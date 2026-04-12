@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-04-12T21:36:04+00:00
+**Generated:** 2026-04-12T22:48:30+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,12 +9,13 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 65 files, 8,794 lines, 405.5 KB
+**Stats:** 66 files, 9,934 lines, 461.9 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
+| `.agents/scripts/tests/test_cli_utility_coverage.py` | 1,139 | 56.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_verify_tasks_strict.py` | 861 | 31.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_skills_sync.py` | 739 | 32.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_scenarios.py` | 520 | 26.3 KB | Test file; unit tests |
@@ -46,13 +47,13 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260323_1815_execplan-native-planning-system_spec_01.md` | 101 | 5.0 KB | Module; functionality |
 | `docs/arc/SPECS/260307_persistent-planning-memory_spec_01.md` | 101 | 6.0 KB | Module; functionality |
 | `docs/arc/SPECS/260306_artifact-resolution-layer_spec_01.md` | 93 | 4.0 KB | Module; functionality |
-| `.agents/scripts/tests/TEST_STRATEGY.md` | 92 | 3.8 KB | Test file; unit tests |
+| `.agents/scripts/tests/TEST_STRATEGY.md` | 92 | 3.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_telemetry.py` | 88 | 4.3 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_bootstrap.py` | 86 | 4.8 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_project-context-canon-and-setup_spec_01.md` | 85 | 3.6 KB | Module; functionality |
 | `.agents/runtime/tests/test_changes.py` | 84 | 3.6 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_guided-status-and-implementation_spec_01.md` | 82 | 3.1 KB | Module; functionality |
-| `docs/arc/structure/tests.md` | 77 | 6.5 KB | Test file; unit tests |
+| `docs/arc/structure/tests.md` | 78 | 6.6 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_review-and-logical-revert_spec_01.md` | 76 | 2.8 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_lint_noise_reduction.py` | 74 | 3.2 KB | Test file; unit tests |
 | `docs/arc/SPECS/FOLDER_GUIDE.md` | 72 | 2.5 KB | Module; functionality |

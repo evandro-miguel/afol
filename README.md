@@ -382,10 +382,11 @@ make setup-runtime  # Setup central runtime environment
 make doctor         # Validate .agents structure
 make clean          # Clean caches
 make lint-scripts   # Lint Python operational scripts
+make test-scripts-all # Run script unit + integration tests with 80% coverage gate
 make lint-runtime   # Lint central runtime package
 make test-runtime   # Run central runtime tests
 make runtime-mcp-smoke # Smoke runtime and MCP CLIs
-make all            # Bootstrap-safe full validation (unit + integration, no e2e)
+make all            # Bootstrap-safe full validation, including scripts 80% coverage gate
 ```
 
 ### Workflows

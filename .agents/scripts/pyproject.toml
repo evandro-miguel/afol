@@ -39,10 +39,27 @@ markers = [
 
 [tool.coverage.run]
 source = [".agents/scripts"]
-omit = ["tests/*", "*/tests/*", "**/__pycache__/*", "**/.venv/*"]
+omit = [
+    ".agents/scripts/tests/*",
+    ".agents/scripts/tests/**",
+    "tests/*",
+    "*/tests/*",
+    "**/tests/*",
+    "**/tests/**",
+    "**/__pycache__/*",
+    "**/.venv/*",
+]
 
 [tool.coverage.report]
-fail_under = 15
+fail_under = 80
+omit = [
+    ".agents/scripts/tests/*",
+    ".agents/scripts/tests/**",
+    "tests/*",
+    "*/tests/*",
+    "**/tests/*",
+    "**/tests/**",
+]
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
