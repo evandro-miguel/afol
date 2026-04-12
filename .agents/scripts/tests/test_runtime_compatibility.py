@@ -113,9 +113,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("- source/", config_text)
         self.assertIn('source_dir: ".agents/source/universal-skills"', config_text)
         self.assertNotIn('source_dir: "../universal-skills"', config_text)
-        self.assertIn('"agentic-system-workflow"', config_text)
+        self.assertIn('"agentic-folder-sys"', config_text)
 
-    def test_wrapper_uses_local_venv_without_uv_on_path(self):
+    def test_wrapper_requires_uv_for_runtime_registry_commands(self):
         wrapper_src = Path(".agents/agents").resolve()
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -151,8 +151,15 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 check=False,
             )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("wrapper-local-venv-ok", result.stdout)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("uv not found", result.stdout)
+
+    def test_runtime_launchers_use_locked_runtime_environment(self):
+        agents_wrapper = Path(".agents/agents").read_text(encoding="utf-8")
+        mcp_wrapper = Path(".agents/agents-mcp").read_text(encoding="utf-8")
+
+        self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked', agents_wrapper)
+        self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp', mcp_wrapper)
 
     def test_bootstrap_exports_generic_baseline_without_scaffold_history(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -278,8 +285,11 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
             checkout = target / ".agents/source/universal-skills"
             self.assertTrue(agents_bootstrap.is_valid_universal_skills_checkout(checkout))
-            self.assertTrue((checkout / "skills" / "agentic-system-workflow" / "SKILL.md").exists())
-            self.assertTrue((checkout / "skills" / "writing-skills" / "SKILL.md").exists())
+            self.assertTrue((checkout / "skills" / "agentic-folder-sys" / "SKILL.md").exists())
+            self.assertTrue((checkout / "skills" / "agentic-scaffold-mcp" / "SKILL.md").exists())
+            self.assertFalse((checkout / "skills" / "agentic-system-workflow" / "SKILL.md").exists())
+            self.assertFalse((checkout / "skills" / "workbench-agent-teams" / "SKILL.md").exists())
+            self.assertFalse((checkout / "skills" / "writing-skills" / "SKILL.md").exists())
             self.assertEqual(
                 json.loads((checkout / "profiles" / "core.json").read_text(encoding="utf-8"))["skills"],
                 json.loads(
@@ -287,7 +297,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 )["skills"],
             )
             self.assertIn(
-                "agentic-system-workflow",
+                "agentic-folder-sys",
                 [entry["name"] for entry in json.loads((checkout / "index.json").read_text(encoding="utf-8"))["skills"]],
             )
             checkout.resolve().relative_to(target.resolve())
@@ -343,7 +353,26 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_standard_makefile_exposes_agents_all_aggregate(self):
         makefile_text = Path("docs/standards/Makefile").read_text(encoding="utf-8")
 
-        self.assertIn("agents-all: doctor structure index knowledge-index sync lint lint-scripts skills-check tools-check telemetry-validate test-scripts-all", makefile_text)
+        agents_all_line = next(
+            line for line in makefile_text.splitlines() if line.startswith("agents-all:")
+        )
+        for target in [
+            "doctor",
+            "structure",
+            "index",
+            "knowledge-index",
+            "sync",
+            "lint",
+            "lint-scripts",
+            "lint-runtime",
+            "skills-check",
+            "tools-check",
+            "telemetry-validate",
+            "test-scripts-all",
+            "test-runtime",
+            "runtime-mcp-smoke",
+        ]:
+            self.assertIn(target, agents_all_line)
         self.assertIn("ifndef AGENTS_PRESERVE_LOCAL_ALL", makefile_text)
         self.assertIn("all: agents-all", makefile_text)
 

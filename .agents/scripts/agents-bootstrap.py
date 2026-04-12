@@ -31,6 +31,8 @@ MANDATORY_FILES_TO_COPY = [
     Path("docs/arc/README.md"),
     Path("docs/arc/SPECS/README.md"),
     Path("docs/arc/SPECS/TEMPLATE_spec.md"),
+    Path("docs/arc/SPECS/TEMPLATE_spec-child.md"),
+    Path("docs/arc/SPECS/TEMPLATE_spec-test.md"),
     Path("docs/arc/SPECS/TEMPLATE_spec-lite.md"),
     Path("docs/arc/DECISIONS/TEMPLATE_adr.md"),
     Path("docs/arc/structure/README.md"),

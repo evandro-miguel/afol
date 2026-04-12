@@ -132,6 +132,18 @@ def write_doc_file(session_dir: Path, doc_type: str, status: str = "draft") -> P
             "## Why Lite Is Enough\n- Scope is limited to workflow policy.\n\n"
             "## User or Operator Impact\n- Operators stop seeing empty artifacts.\n"
         ),
+        "spec-child": (
+            "# SPEC CHILD\n\n"
+            "## Intent\n- Outcome: child scope keeps delivery bounded.\n\n"
+            "## Why Child Is Enough\n- Scope is limited to one governed slice.\n\n"
+            "## User or Operator Impact\n- Operators see canonical child specs.\n"
+        ),
+        "spec-test": (
+            "# SPEC TEST\n\n"
+            "## Intent\n- Outcome: test strategy is explicit before execution.\n\n"
+            "## Scope\n- Validate scripts, config, and compatibility aliases.\n\n"
+            "## Verification\n- Targeted unit suites capture regressions early.\n"
+        ),
     }
     default_body = f"# {doc_type}\n"
     file_path = session_dir / f"{session_dir.name}_{doc_type}_01.md"
@@ -310,6 +322,15 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             resolved = self.execution_commands.resolve_artifact(session_dir, "spec")
             self.assertEqual(resolved, spec_lite)
 
+    def test_resolve_artifact_spec_child_does_not_mask_historical_spec_lite(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260307_0108b_spec-lite-child-alias"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_doc_file(session_dir, "spec-lite", status="draft")
+
+            resolved = self.execution_commands.resolve_artifact(session_dir, "spec-child")
+            self.assertIsNone(resolved)
+
     def test_workflow_artifact_states_include_only_present_optional_variant(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260307_0108a_spec-lite-state"
@@ -320,6 +341,8 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             doc_types = [item["doc_type"] for item in states]
 
             self.assertIn("spec-lite", doc_types)
+            self.assertNotIn("spec-test", doc_types)
+            self.assertNotIn("spec-child", doc_types)
             self.assertNotIn("spec", doc_types)
 
     def test_workflow_artifact_states_use_manifest_dependencies(self):
@@ -534,11 +557,11 @@ class SessionCloseScenarioTests(unittest.TestCase):
     def test_close_repoint_from_unset_active(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td) / "260307_0303_close-target"
-            next_session = Path(td) / "260307_0304_close-next"
+            next_target = Path(td) / "260307_0304_close-next"
             target.mkdir(parents=True, exist_ok=True)
-            next_session.mkdir(parents=True, exist_ok=True)
+            next_target.mkdir(parents=True, exist_ok=True)
             active_file = Path(td) / ".active_session"
-            args = argparse.Namespace(session=str(target), next_session=str(next_session), json=False)
+            args = argparse.Namespace(**{"session": str(target), "next_session": str(next_target), "json": False})
             verify = mock.Mock(returncode=0, stdout="ok\n", stderr="")
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", active_file):
@@ -546,7 +569,7 @@ class SessionCloseScenarioTests(unittest.TestCase):
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_session.cmd_close(args)
             self.assertEqual(code, 0)
-            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), next_session.name)
+            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), next_target.name)
             self.assertIn("active_session: unset ->", buf.getvalue())
 
 

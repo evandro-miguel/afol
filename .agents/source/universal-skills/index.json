@@ -5,28 +5,12 @@
   ],
   "skills": [
     {
-      "name": "agentic-system-workflow",
-      "path": "skills/agentic-system-workflow"
+      "name": "agentic-scaffold-mcp",
+      "path": "skills/agentic-scaffold-mcp"
     },
     {
-      "name": "bun-skill",
-      "path": "skills/bun-skill"
-    },
-    {
-      "name": "llm-markdown-skill",
-      "path": "skills/llm-markdown-skill"
-    },
-    {
-      "name": "markdownlint-skill",
-      "path": "skills/markdownlint-skill"
-    },
-    {
-      "name": "typescript-skill",
-      "path": "skills/typescript-skill"
-    },
-    {
-      "name": "writing-skills",
-      "path": "skills/writing-skills"
+      "name": "agentic-folder-sys",
+      "path": "skills/agentic-folder-sys"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated_at": "2026-04-02T15:05:32-03:00",
+  "updated_at": "2026-04-11T22:20:58-03:00",
   "description": "Tool catalog for .agents system autonomous agents",
   "tools": [
     {
@@ -58,6 +58,58 @@
         "2. Agente identifica ferramenta de interesse",
         "3. Agente executa 'tools info <tool-id>' para detalhes",
         "4. Agente recebe subcomandos, opcoes e exemplos de uso"
+      ]
+    },
+    {
+      "id": "agentic-runtime",
+      "name": "Agentic Runtime",
+      "tool": ".agents/runtime",
+      "wrapper_command": ".agents/agents runtime <command> [args]",
+      "make_command": "make lint-runtime | make test-runtime | make runtime-mcp-smoke",
+      "type": "runtime",
+      "execution_mode": "on-demand",
+      "created_at": "2026-04-11",
+      "updated_at": "2026-04-11",
+      "description": "Central Python runtime and FastMCP adapter for bounded scaffold inspection, search, validation, journaling, reversible writes, and MCP resources.",
+      "when_to_use": [
+        "Need a compact manifest before broader repository work",
+        "Need agent-native scaffold inspection or document search",
+        "Need to validate scaffold structure from the runtime package",
+        "Need a safe archive, write, patch, or undo operation through the MCP-compatible adapter"
+      ],
+      "commands": [
+        {
+          "name": "manifest",
+          "usage": ".agents/agents runtime manifest",
+          "description": "Generate a compact repository manifest"
+        },
+        {
+          "name": "validate",
+          "usage": ".agents/agents runtime validate",
+          "description": "Validate required scaffold folders, templates, and runtime docs"
+        },
+        {
+          "name": "search",
+          "usage": ".agents/agents runtime search <query>",
+          "description": "Search docs, workbench artifacts, map docs, and skills"
+        },
+        {
+          "name": "inspect",
+          "usage": ".agents/agents runtime inspect --depth 2",
+          "description": "Inspect a bounded workspace tree"
+        },
+        {
+          "name": "serve",
+          "usage": ".agents/agents mcp serve",
+          "description": "Run the FastMCP server using stdio transport"
+        }
+      ],
+      "output": "JSON payloads suitable for agent consumption",
+      "workflow": [
+        "1. Run manifest before broad repo reads",
+        "2. Search docs for roadmap, spec, rule, and workbench context",
+        "3. Validate structure before and after mutations",
+        "4. Use archive, write, patch, and undo only for bounded reversible changes"
       ]
     },
     {
@@ -823,6 +875,7 @@
   ],
   "makefile_targets": {
     "setup": "Inicializa virtualenv com uv",
+    "setup-runtime": "Initialize central runtime environment",
     "doctor": "Valida estrutura .agents",
     "new": "Creates new workstream (THEME=required)",
     "quick": "Registers quick task rapida na sessao ativa",
@@ -847,7 +900,7 @@
     "wb-status": "Seta status no frontmatter (STATUS required)",
     "wb-timeline": "Adiciona entrada timeline (MSG required)",
     "wb-link": "Seta links.frontmatter (FILE + KEY + VALUE required)",
-    "all": "Run doctor + structure + index + knowledge-index + sync + lint + tools-check + telemetry-validate + test-scripts",
+    "all": "Run doctor + structure + index + knowledge-index + sync + lint + runtime lint/tests + tools-check + telemetry-validate + test-scripts",
     "refresh": "Clean + setup + structure",
     "clean": "Remove .venv e caches",
     "bootstrap": "Install .agents system in another repository (TARGET required)",
@@ -860,7 +913,10 @@
     "skills-status": "Show skills sync status/config",
     "skills-check": "Validate skills structure and sync state",
     "skills-sync": "Refresh .agents/skills from the configured git source",
-    "test-scripts": "Run Python unit tests for operational scripts"
+    "test-scripts": "Run Python unit tests for operational scripts",
+    "lint-runtime": "Lint the central runtime package",
+    "test-runtime": "Run central runtime tests",
+    "runtime-mcp-smoke": "Smoke the runtime and MCP CLI routes"
   },
   "tool_categories": {
     "validation": {
@@ -913,9 +969,17 @@
     "infrastructure": {
       "description": "Support and wrappers for execution",
       "tools": [
-        "agents"
+        "agents",
+        "agentic-runtime"
       ],
       "usage_pattern": "Primary interface for all tools"
+    },
+    "runtime": {
+      "description": "Central runtime packages and agent-native adapters",
+      "tools": [
+        "agentic-runtime"
+      ],
+      "usage_pattern": "Use for bounded scaffold inspection, validation, MCP exposure, and reversible maintenance"
     },
     "discovery": {
       "description": "Discovers and explores available tools",
@@ -981,6 +1045,7 @@
         "patterns",
         "knowledge",
         "memory",
+        "agentic-runtime",
         "check-links"
       ]
     },

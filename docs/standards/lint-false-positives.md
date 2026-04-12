@@ -57,7 +57,7 @@ Find the validator script and add to the allowed list:
 # .agents/scripts/agents-lint-docs.py
 VALID_DOC_TYPES = [
     'plan', 'task', 'report', 'log', 'research', 'brainstorm',
-    'blocks', 'spec', 'spec-lite', 'spec_lite', 'adr', 'architecture',
+    'blocks', 'spec', 'spec-child', 'spec-test', 'spec-lite', 'spec_lite', 'adr', 'architecture',
     'roadmap', 'specs_index', 'adr_index', 'standard', 'index',
     'structure', 'lessons', 'retrospective', 'specs_readme',
     # Add new types:

@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-03-23T18:05:33-03:00'
+updated_at: '2026-04-12T13:01:37-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -67,7 +67,7 @@ updated_at: '2026-03-23T18:05:33-03:00'
 
 ### F-03 Child Spec Decomposition
 
-- Status: planned
+- Status: done
 - Why: Large features need sub-specifications so teams can execute in bounded objectives without losing the parent feature narrative.
 - Governing spec: `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md`
 - Exit criteria:
@@ -76,8 +76,8 @@ updated_at: '2026-03-23T18:05:33-03:00'
   - Teams can trace execution from roadmap feature -> parent spec -> child spec -> workstream.
 - Delivery tasks:
   - [x] Define the parent/child spec relationship.
-  - [ ] Add naming and linking rules for child specs.
-  - [ ] Define the threshold that requires decomposition.
+  - [x] Add naming and linking rules for child specs.
+  - [x] Define the threshold that requires decomposition.
 
 ### F-04 Workflow Enforcement
 
@@ -216,7 +216,7 @@ updated_at: '2026-03-23T18:05:33-03:00'
 
 ### F-11 Current-State Maps and Goal-State Governance
 
-- Status: planned
+- Status: done
 - Why: The scaffold already distinguishes roadmap/spec/workbench governance from execution, but it still lacks an explicit contract for separating descriptive current-state project maps from goal-state product and architecture intent. As downstream repos adopt heavier codemap and analysis surfaces under `docs/map/`, the scaffold needs to prevent those artifacts from being mistaken for roadmap/spec governance sources.
 - Governing spec: `docs/arc/SPECS/260323_1741_current-state-maps-and-goal-state-governance_spec_01.md`
 - Exit criteria:
@@ -225,14 +225,14 @@ updated_at: '2026-03-23T18:05:33-03:00'
   - Workstreams and operator docs explain when to consume `docs/map/` as evidence and when to use roadmap/specs as the governing source of truth.
   - Bootstrap and project documentation can explain the split without introducing a second planning or verification system.
 - Delivery tasks:
-  - [ ] Define the document taxonomy for current-state vs goal-state artifacts.
-  - [ ] Define `docs/map/` boundaries, ownership, and refresh semantics.
-  - [ ] Define how roadmap/spec/workbench flows may reference maps without promoting them to governance sources.
-  - [ ] Plan the documentation, bootstrap, and command changes needed to adopt the split safely.
+  - [x] Define the document taxonomy for current-state vs goal-state artifacts.
+  - [x] Define `docs/map/` boundaries, ownership, and refresh semantics.
+  - [x] Define how roadmap/spec/workbench flows may reference maps without promoting them to governance sources.
+  - [x] Plan the documentation, bootstrap, and command changes needed to adopt the split safely.
 
 ### F-12 ExecPlan-Native Planning System
 
-- Status: planned
+- Status: done
 - Why: The scaffold already requires plans for major work, but the current `plan.md` is still too static and governance-oriented compared with the stronger ExecPlan pattern described for Codex. Plans should be living, self-contained, novice-guiding documents that remain executable from the plan file alone while still fitting this repo's roadmap/spec/workbench model.
 - Governing spec: `docs/arc/SPECS/260323_1815_execplan-native-planning-system_spec_01.md`
 - Exit criteria:
@@ -241,10 +241,67 @@ updated_at: '2026-03-23T18:05:33-03:00'
   - The plan template is upgraded with required living-document sections such as progress, discoveries, decisions, and outcomes.
   - Strict verification can detect final plans that lack required ExecPlan sections or a maintained progress checklist.
 - Delivery tasks:
-  - [ ] Define the adapted ExecPlan contract for this scaffold and how it maps into roadmap/spec/workbench artifacts.
-  - [ ] Update `AGENTS.md`, README, workflow docs, and the plan template to reflect the ExecPlan model.
-  - [ ] Add strict verification for required ExecPlan sections and living-plan progress tracking.
-  - [ ] Add tests proving the new plan requirements are enforced and the template remains usable.
+  - [x] Define the adapted ExecPlan contract for this scaffold and how it maps into roadmap/spec/workbench artifacts.
+  - [x] Update `AGENTS.md`, README, workflow docs, and the plan template to reflect the ExecPlan model.
+  - [x] Add strict verification for required ExecPlan sections and living-plan progress tracking.
+  - [x] Add tests proving the new plan requirements are enforced and the template remains usable.
+
+### F-13 Agentic Runtime Restructure
+
+- Status: done
+- Why: The scaffold has outgrown a collection of standalone Python scripts, manually mirrored tool metadata, and documentation-only discovery. Operators need one coherent agentic runtime with a shared service layer, stable CLI compatibility, MCP-native tool access, reversible mutation primitives, and generated/validated documentation surfaces.
+- Governing spec: `docs/arc/SPECS/260411_agentic-runtime-restructure_spec_01.md`
+- Exit criteria:
+  - The operational implementation lives in a single UV-managed runtime package under `.agents/runtime/`.
+  - `.agents/agents <command>` remains the stable public CLI while delegating to the new runtime.
+  - MCP tools/resources/prompts are exposed from the same runtime service layer as the CLI.
+  - Tool catalog, docs, skills, current-state maps, Make targets, and CI all describe and validate the new runtime.
+  - Legacy standalone scripts are either compatibility shims or archived after parity is proven.
+- Delivery tasks:
+  - [x] Define the parent feature philosophy and migration boundaries for the total runtime restructure.
+  - [x] Build the shared runtime package and compatibility CLI adapter.
+  - [x] Integrate MCP-native tools, resources, prompts, journaling, and undo support.
+  - [x] Migrate or wrap every existing `.agents/agents` command through the shared registry.
+    - [x] Start with `status`, `knowledge pull`, and `session catchup`, matching the source-kit phase-2 recommendation.
+    - [x] Add parity tests before redirecting each legacy alias through the runtime registry.
+    - [x] Promote the proven wrapper pattern to all public command aliases, including `implement`, `review`, `revert`, and `skills-sync`.
+  - [x] Update docs, skills, current-state maps, Make targets, and CI gates.
+  - [x] Archive superseded standalone script surfaces only after command parity and strict verification pass.
+    - [x] No standalone script was archived in this batch because public commands remain compatibility delegates; archive only per script after a future native port fully supersedes it.
+
+### F-14 Spec Child And Spec Test Strategy Artifacts
+
+- Status: done
+- Why: `spec-lite` no longer communicates the intended rigor of local feature
+  decomposition, and test work needs a written strategy artifact before agents
+  start creating or running tests. The scaffold should make child feature
+  refinement explicit through `spec-child` and require `spec-test` to record
+  what a test must prove before implementation.
+- Governing spec: `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md`
+- Exit criteria:
+  - `spec-child` is the canonical future name for child/local feature
+    specification artifacts that refine a parent spec.
+  - `spec-test` is defined as a mutable test strategy artifact, not test code,
+    that captures user journeys, click paths, performance expectations, target
+    tooling, construction notes, expected results, and evidence criteria before
+    testing starts.
+  - Feature-level planning has a durable folder convention for one or more
+    `spec-test` artifacts per feature, while workbench sessions can link to the
+    relevant strategy.
+  - Historical `spec-lite` artifacts remain readable during migration, with a
+    planned compatibility alias instead of an immediate breaking rename.
+- Delivery tasks:
+  - [x] Define the naming, frontmatter, link, and folder convention for
+    `spec-child` and `spec-test`.
+  - [x] Update future templates and governance docs to replace `spec-lite`
+    with `spec-child` as the canonical child-spec artifact.
+  - [x] Add a `spec-test` template that records the expected journey,
+    clicks/actions, performance expectations, target technology, test
+    construction strategy, expected output, and evidence format.
+  - [x] Plan validation so test-focused workstreams link to a `spec-test`
+    before test implementation begins.
+  - [x] Keep `spec-lite` as a backwards-compatible historical alias until
+    migration and documentation parity are proven.
 
 ## 5) Prioritization
 

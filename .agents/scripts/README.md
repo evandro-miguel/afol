@@ -87,7 +87,7 @@ Discovery examples:
 ./.agents/agents skills-sync list --runtime codex
 ./.agents/agents skills-sync search markdown --runtime codex
 ./.agents/agents skills-sync sync --runtime codex
-./.agents/agents skills-sync ensure writing-skills --runtime codex
+./.agents/agents skills-sync ensure agentic-folder-sys --runtime codex
 ```
 
 Use `./.agents/agents bootstrap /path/to/existing-project --partial` when adopting the scaffold into an existing repo. Existing files stay in place unless `--force` is used. If that repo already has its own `make all`, use `make agents-all` for the scaffold aggregate validation. See `docs/standards/bootstrap-other-repo.md` for the full/partial install split and limitations.

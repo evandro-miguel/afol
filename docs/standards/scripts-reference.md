@@ -4,7 +4,7 @@ id: scripts-reference
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-04T10:08:11-03:00'
+updated_at: '2026-04-12T13:01:37-03:00'
 ---
 
 # Agents System - Quick Reference
@@ -63,7 +63,7 @@ make all           # Full validation workflow (unit + integration, no e2e)
 | `make wb-normalize-time` | Normalize WB timestamps to configured offset | - |
 | `make wb-files-changed` | Refresh report `Files Changed` from git | `SESSION_ID=<session-id>` or `REPORT=<report-file>` |
 | `make wb-task` | Mark task by ID in one session | `SESSION_ID=<session-id>` `TASK_ID=T-01 ACTION=done\|in_progress\|pending\|ready\|blocked\|skipped` |
-| `make wb-status` | Set frontmatter status in one session docs | `SESSION_ID=<session-id>` `STATUS=<value>` `FILE=plan\|task\|spec-lite\|report\|log\|all` |
+| `make wb-status` | Set frontmatter status in one session docs | `SESSION_ID=<session-id>` `STATUS=<value>` `FILE=plan\|task\|spec-lite\|report\|log\|all` (`spec-lite` is the current compatibility key for child specs) |
 | `make wb-timeline` | Append timeline entry in one session log | `SESSION_ID=<session-id>` `MSG=\"text\"` |
 | `make wb-link` | Set `links.<key>` in one session doc frontmatter | `SESSION_ID=<session-id>` `FILE=<doc>` `KEY=<k>` `VALUE=<v>` |
 | `make all` | Full scaffold validation (includes `test-scripts-all`) | - |
@@ -94,9 +94,11 @@ make new THEME=auth-refactor
 # With full spec
 make new THEME=api-endpoint SPEC=1
 
-# With lite spec
+# With lite spec (legacy compatibility alias for spec-child)
 make new THEME=bugfix-login SPEC=lite
 ```
+
+`SPEC=lite` remains the current CLI compatibility option while governance docs use `spec-child` as the canonical future artifact name.
 
 ### Generate Documentation
 
@@ -138,9 +140,14 @@ Alternative to Makefile:
 .agents/agents structure-map . --output docs/arc/structure/
 .agents/agents repo-map .
 .agents/agents status --session <session-id>
+.agents/agents runtime command-registry
 .agents/agents memory status
 .agents/agents memory search "agent memory" --runtime codex
 ```
+
+Public wrapper aliases route through the runtime command registry and remain
+compatibility delegates while individual commands are ported to native runtime
+services.
 
 ## UV Scripts
 
@@ -200,9 +207,9 @@ make skills-init
 make skills-pull
 make skills-list RUNTIME=codex
 make skills-search QUERY=markdown RUNTIME=codex
-make skills-sync SKILLS=writing-skills,markdownlint-skill
-make skills-push SKILL=writing-skills COMMIT=1
-make skills-ensure SKILL=writing-skills RUNTIME=codex
+make skills-sync SKILLS=agentic-folder-sys
+make skills-push SKILL=agentic-folder-sys COMMIT=1
+make skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
 make skills-check
 ```
 

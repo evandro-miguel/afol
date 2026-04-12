@@ -142,8 +142,12 @@ Out of scope:
   - roadmap/spec/docs updates that explain the split clearly
   - workbench plan/report evidence showing the model can be used without mixing governance layers
 - Open questions:
-  - Q-01 Which `docs/map/` artifacts should be mandatory, optional, or generated on demand?
-  - Q-02 How much of the map contract belongs in bootstrap for fresh repos versus downstream adoption guidance?
+  - Q-01 Answered: bootstrap must create `docs/map/README.md` as the mandatory
+    current-state entrypoint, while detailed codemap/API/dependency artifacts
+    remain optional and refreshable on demand.
+  - Q-02 Answered: bootstrap should teach the boundary and create the empty map
+    surface; full map generation remains a downstream adoption or explicit
+    `repo-map` workflow.
 
 ## 12) Acceptance Checklist
 

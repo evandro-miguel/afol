@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: 2026-02-20 00:00:00-03:00
-updated_at: '2026-03-23T20:38:52-03:00'
+updated_at: '2026-04-11T22:27:09-03:00'
 links:
   tools_json: ./tools-json.md
   wrapper: ./agents-wrapper.md
@@ -31,7 +31,7 @@ Provides:
 2. **Short aliases** - `st`, `ix`, `sy`, `vf`, `dr`
 3. **Composed workflows** - `make all`, `make refresh`
 4. **Variables** - `THEME=`, `TASK_ID=`, etc.
-5. **Runtime contract helpers** - command shortcuts for skills and optional external memory
+5. **Runtime contract helpers** - command shortcuts for skills, optional external memory, and the central agentic runtime
 
 ## What It Touches
 
@@ -41,6 +41,7 @@ Provides:
 |------|---------|
 | `docs/standards/Makefile` | Main Makefile |
 | `.agents/agents.config` | Configuration |
+| `.agents/runtime/pyproject.toml` | Runtime package project file |
 
 ### Files Executed
 
@@ -49,6 +50,9 @@ Provides:
 | `make doctor` | `.agents/agents doctor` |
 | `make new THEME=x` | `.agents/agents new x` |
 | `make verify` | `.agents/agents verify-tasks` |
+| `make lint-runtime` | `uv run --project .agents/runtime --locked ruff check .agents/runtime` |
+| `make test-runtime` | `uv run --project .agents/runtime --locked pytest .agents/runtime/tests` |
+| `make runtime-mcp-smoke` | `.agents/agents runtime ...` and `.agents/agents-mcp ...` smoke checks |
 
 ## How to Configure
 
@@ -56,6 +60,7 @@ Provides:
 
 ```makefile
 make setup        # Virtualenv setup
+make setup-runtime # Central runtime environment setup
 make doctor       # Structure validation
 make new          # Create workstream (THEME=required)
 make structure    # Generate structure docs
@@ -65,8 +70,13 @@ make verify       # Verify tasks
 make lint         # Markdown lint
 make memory-status  # Show external memory provider config
 make memory-search QUERY=x  # Emit memory MCP contract
+make lint-runtime # Lint central runtime package
+make test-runtime # Run central runtime tests
+make runtime-mcp-smoke # Smoke runtime and MCP CLIs
 make all          # Full validation
 ```
+
+Runtime setup and validation use the checked-in `.agents/runtime/uv.lock` through `uv --locked`.
 
 ### Short Aliases
 

@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from agentic_scaffold.config import RuntimeConfig, build_runtime_config
+from agentic_scaffold.models import RepoManifest, SkillSummary, UndoResult
+from agentic_scaffold.registry import RuntimeRegistry
+from agentic_scaffold.services.changes import ChangeService
+from agentic_scaffold.services.journal import JournalStore
+from agentic_scaffold.services.search import KnowledgeSearchService
+from agentic_scaffold.services.validation import StructureValidator
+from agentic_scaffold.services.workspace import WorkspaceInspector
+
+
+class AgenticRuntime:
+    def __init__(self, config: RuntimeConfig) -> None:
+        self.config = config
+        self.journal = JournalStore(config.journal_root)
+        self.workspace = WorkspaceInspector(config.repo_root)
+        self.search = KnowledgeSearchService(config.repo_root, config.search_roots)
+        self.validator = StructureValidator(config)
+        self.changes = ChangeService(config, self.journal)
+        self.registry = RuntimeRegistry(config)
+
+    @classmethod
+    def from_repo_root(cls, repo_root: Path | None = None) -> "AgenticRuntime":
+        return cls(build_runtime_config(repo_root))
+
+    def generate_manifest(self) -> RepoManifest:
+        repo_root = self.config.repo_root
+        docs_md = len(list((repo_root / "docs").rglob("*.md"))) if (repo_root / "docs").exists() else 0
+        script_files = len(list((repo_root / ".agents" / "scripts").glob("*.py"))) if (repo_root / ".agents" / "scripts").exists() else 0
+        test_files = len(list((repo_root / ".agents" / "scripts" / "tests").rglob("test_*.py"))) if (repo_root / ".agents" / "scripts" / "tests").exists() else 0
+        skills_dir = repo_root / ".agents" / "skills"
+        skills = []
+        if skills_dir.exists():
+            for skill_dir in sorted(path for path in skills_dir.iterdir() if path.is_dir()):
+                skills.append(SkillSummary(name=skill_dir.name, path=skill_dir.relative_to(repo_root).as_posix()))
+        tool_catalog_count = 0
+        tools_path = repo_root / ".agents" / "tools.json"
+        if tools_path.exists():
+            try:
+                payload = json.loads(tools_path.read_text(encoding="utf-8"))
+                tool_catalog_count = len(payload.get("tools", []))
+            except Exception:
+                tool_catalog_count = 0
+        return RepoManifest(
+            repo_root=str(repo_root),
+            docs_markdown_files=docs_md,
+            script_files=script_files,
+            test_files=test_files,
+            skill_count=len(skills),
+            skills=skills,
+            runtime_docs={
+                name: (repo_root / name).exists()
+                for name in ["AGENTS.md", "OPENCODE.md", "QWEN.md", "CLAUDE.md", "GEMINI.md"]
+            },
+            tool_catalog_count=tool_catalog_count,
+            major_surfaces=[
+                "docs/",
+                "docs/arc/",
+                "docs/map/",
+                ".agents/scripts/",
+                ".agents/skills/",
+                ".agents/wb/",
+                ".agents/runtime/",
+            ],
+            search_roots=[root.relative_to(repo_root).as_posix() for root in self.config.search_roots],
+            write_blocklist=list(self.config.write_blocklist),
+        )
+
+    def command_registry_resource(self) -> dict[str, Any]:
+        return {"available": True, "commands": self.registry.manifest()}
+
+    def tool_catalog_resource(self) -> dict[str, Any]:
+        path = self.config.repo_root / ".agents" / "tools.json"
+        if not path.exists():
+            return {"available": False, "tools": []}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return {
+            "available": True,
+            "tool_count": len(payload.get("tools", [])),
+            "tools": [
+                {
+                    "id": item.get("id"),
+                    "type": item.get("type"),
+                    "wrapper_command": item.get("wrapper_command"),
+                }
+                for item in payload.get("tools", [])
+            ],
+        }
+
+    def undo_last_change(self) -> UndoResult:
+        return self.journal.undo_latest(self.config.repo_root)

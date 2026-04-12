@@ -80,9 +80,13 @@ Out of scope:
 
 - Child specs required: <yes/no>
 - Decomposition rule:
-  - <when this spec must split into child specs>
+  - Use child specs when the feature crosses multiple architectural surfaces,
+    needs independent agent/team ownership, has distinct acceptance journeys, or
+    has migration phases with different rollback paths.
+  - Keep the work in the parent spec plus workbench plan when the scope is small,
+    local to one module, and reviewable as one objective.
 - Planned child specs:
-  - <child spec + purpose>
+  - `<child-spec-doc-id-or-path>` -> <bounded objective and purpose>
 
 ## 7) Constraints and Assumptions
 

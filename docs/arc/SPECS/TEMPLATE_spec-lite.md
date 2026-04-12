@@ -11,7 +11,12 @@ links:
 risk_level: low # low|medium|high
 ---
 
-# SPEC LITE: <theme>
+# SPEC LITE (LEGACY ALIAS): <theme>
+
+## Migration Note
+
+- `spec-child` is the canonical future child-spec artifact name.
+- Keep `spec-lite` for backward compatibility while migration is in progress.
 
 ## Objective
 

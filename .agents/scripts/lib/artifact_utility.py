@@ -135,7 +135,7 @@ def _check_postmortem(body: str, reasons: List[str]) -> None:
 
 
 def _check_spec(doc_type: str, substantive_lines: List[str], reasons: List[str]) -> None:
-    if doc_type in {"spec", "spec-lite"} and len(substantive_lines) < 4:
+    if doc_type in {"spec", "spec-child", "spec-lite", "spec-test"} and len(substantive_lines) < 4:
         reasons.append("spec content is still too thin to guide implementation")
 
 

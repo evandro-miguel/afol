@@ -30,7 +30,7 @@ title: "<short title>"
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `doc_type` | string | Document type (plan, task, report, log, brainstorm, explorer-check, research, postmortem, blocks, spec, spec-lite, adr, architecture, roadmap, retrospective) |
+| `doc_type` | string | Document type (plan, task, report, log, brainstorm, explorer-check, research, postmortem, blocks, spec, spec-child, spec-test, spec-lite [legacy], adr, architecture, roadmap, retrospective) |
 | `id` | string | Unique identifier in format `YYMMDD_HHMM_<theme>_<doc_type>_NN` |
 | `status` | string | Current status (draft, active, done, blocked) |
 | `created_at` | string | Creation timestamp in ISO 8601 UTC format |
@@ -72,7 +72,9 @@ title: "<short title>"
 #### Architecture Types (arc)
 
 - `spec` - Full specification
-- `spec-lite` - Lightweight specification
+- `spec-child` - Child/local feature specification
+- `spec-test` - Journey-first test strategy specification
+- `spec-lite` - Legacy alias for `spec-child` during migration
 - `adr` - Architecture decision record
 - `architecture` - Architecture documentation
 - `roadmap` - Roadmap planning

@@ -4,8 +4,8 @@ theme: tools-json
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-23 00:00:00-03:00
+updated_at: '2026-04-11T22:27:09-03:00'
 links:
   agents_config: ../agents.config
   agents_tools: ./agents-tools.md
@@ -148,6 +148,18 @@ Describes when each tool runs:
 3. Add to appropriate category in `tool_categories`
 4. Add to `execution_modes.on-demand.tools`
 5. Run `./.agents/agents tools validate`
+
+### Runtime Tool Entry
+
+The central runtime is cataloged as `agentic-runtime`:
+
+```bash
+.agents/agents tools info agentic-runtime
+.agents/agents runtime manifest
+.agents/agents mcp validate
+```
+
+Its catalog entry points to `.agents/runtime/`, the `.agents/agents runtime` wrapper route, and the `make lint-runtime`, `make test-runtime`, and `make runtime-mcp-smoke` validation gates.
 
 ### Update Existing Tool
 

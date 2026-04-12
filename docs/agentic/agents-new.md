@@ -31,7 +31,7 @@ Creates or extends a workstream with:
 
 1. **Session folder** - Standardized name
 2. **Intent-selected artifacts** - only the docs required by the chosen intent or explicit `--with` flags
-3. **Spec file** (optional) - Full or lite specification
+3. **Spec file** (optional) - Full or child specification (current CLI compatibility flag: `--spec-lite`)
 4. **Updates .active_session** - Points to new session
 
 Artifact creation now has two layers:
@@ -84,7 +84,8 @@ Closure example:
 ```
 
 `--plan-only` now means exactly `plan` only. `--spec` and `--spec-lite`
-select the spec variant, and `--with <doc-type>` can materialize specific
+select the spec variant (`--spec-lite` currently maps the legacy alias while
+`spec-child` is the canonical future artifact name), and `--with <doc-type>` can materialize specific
 artifacts later in the same session without forcing a pack. A postmortem is
 typically added later with `--with postmortem` once real closure work exists.
 
@@ -108,7 +109,7 @@ typically added later with `--with postmortem` once real closure work exists.
 # With full spec
 ./.agents/agents new api-endpoint --feature-id F-02 --parent-spec my-parent-spec --spec
 
-# With spec-lite
+# With spec-lite (legacy compatibility alias for spec-child)
 ./.agents/agents new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --spec-lite
 
 # Plan only

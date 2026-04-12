@@ -80,7 +80,7 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - Use child specs when they improve clarity, coordination, or reviewability for a feature
 - Workstreams must carry `roadmap_feature` and `parent_spec` context
 - Specs define philosophy, expected behavior, user journey, boundaries, and acceptance
-- Local workstreams may choose `spec` or `spec-lite` as needed; the parent spec remains mandatory
+- Local workstreams may choose `spec` or `spec-child`; keep `spec-lite` as a legacy alias during migration. The parent spec remains mandatory.
 - Workstreams define delivery and verification; they do not replace strategic feature definition
 
 ### Planning Intelligence (Mandatory For Major Work)

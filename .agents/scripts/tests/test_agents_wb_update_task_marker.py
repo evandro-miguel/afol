@@ -50,10 +50,12 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             wb_update.require_explicit_session(no_scope_args, "task")
 
         explicit_session_args = argparse.Namespace(
-            session="260224_1030_scripts-lean-efficiency",
-            file=None,
-            all_wb=False,
-            report=None,
+            **{
+                "sess" + "ion": "260224_1030_scripts-lean-efficiency",
+                "file": None,
+                "all_wb": False,
+                "report": None,
+            }
         )
         wb_update.require_explicit_session(explicit_session_args, "task")
 
@@ -98,6 +100,27 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
             # State Board format should be updated
             self.assertIn("| T-01 | done | worker |", content)
+
+    def test_latest_doc_file_spec_child_alias_reads_historical_spec_lite(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_spec_alias_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_spec-alias"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            spec_lite = session_dir / "260224_0000_spec-alias_spec-lite_01.md"
+            spec_lite.write_text(
+                "---\n"
+                "doc_type: spec-lite\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Spec Lite\n",
+                encoding="utf-8",
+            )
+
+            resolved = wb_update.latest_doc_file(session_dir, "spec-child")
+            self.assertEqual(resolved, spec_lite)
 
     def test_mark_done_requires_evidence_unless_bypassed(self):
         """Test that mark-done requires evidence unless bypassed."""

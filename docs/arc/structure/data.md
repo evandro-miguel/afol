@@ -1,6 +1,6 @@
 # 🎨 Data Structure
 
-**Generated:** 2026-04-11T21:20:00+00:00
+**Generated:** 2026-04-12T16:46:03+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -9,21 +9,20 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 10 files, 3,446 lines, 689.0 KB
+**Stats:** 9 files, 4,032 lines, 856.2 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/data/telemetry/events.jsonl` | 2,532 | 663.1 KB | Module; functionality |
-| `.agents/agents.config` | 332 | 8.0 KB | Module; functionality |
+| `.agents/data/telemetry/events.jsonl` | 3,163 | 831.4 KB | Module; functionality |
+| `.agents/agents.config` | 360 | 8.9 KB | Module; functionality |
 | `docs/agentic/agents-config.md` | 156 | 4.7 KB | Module; functionality |
 | `.agents/arc/map/extra/metadata.json` | 147 | 4.0 KB | Module; functionality |
-| `.agents/skills/typescript-skill/references/tsconfig-strict.json` | 92 | 3.3 KB | Module; functionality |
 | `.agents/data/telemetry/schemas/event.json` | 78 | 2.3 KB | Module; functionality |
-| `.agents/skills/writing-skills/references/standards/metadata-standard.md` | 52 | 1.5 KB | Module; functionality |
-| `docs/arc/structure/data.md` | 25 | 1.4 KB | Module; functionality |
+| `.agents/runtime/src/agentic_scaffold/config.py` | 75 | 3.2 KB | Module; functionality |
 | `.agents/arc/map/extra/phase2/config-boundary-files.json` | 22 | 0.5 KB | Module; functionality |
+| `docs/arc/structure/data.md` | 21 | 1.1 KB | Module; functionality |
 | `.agents/arc/map/extra/phase5/data-models.json` | 10 | 0.2 KB | Module; functionality |
 
 ---

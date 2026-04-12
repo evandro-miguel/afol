@@ -45,16 +45,18 @@ WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
 WB_TZ = parse_offset(WB_OFFSET)
 
 DOC_ALIAS_TO_GLOB = {
-    "plan": "*_plan_*.md",
-    "task": "*_task_*.md",
-    "spec": "*_spec_*.md",
-    "spec-lite": "*_spec-lite_*.md",
-    "brainstorm": "*_brainstorm_*.md",
-    "research": "*_research_*.md",
-    "explorer-check": "*_explorer-check_*.md",
-    "report": "*_report_*.md",
-    "log": "*_log_*.md",
-    "postmortem": "*_postmortem_*.md",
+    "plan": ("*_plan_*.md",),
+    "task": ("*_task_*.md",),
+    "spec": ("*_spec_*.md",),
+    "spec-child": ("*_spec-child_*.md",),
+    "spec-lite": ("*_spec-lite_*.md",),
+    "spec-test": ("*_spec-test_*.md",),
+    "brainstorm": ("*_brainstorm_*.md",),
+    "research": ("*_research_*.md",),
+    "explorer-check": ("*_explorer-check_*.md",),
+    "report": ("*_report_*.md",),
+    "log": ("*_log_*.md",),
+    "postmortem": ("*_postmortem_*.md",),
 }
 
 TASK_ACTIONS = {
@@ -166,14 +168,19 @@ def write_frontmatter(path: Path, fm: dict, body: str):
 def doc_files(session_dir: Path, alias: str) -> List[Path]:
     if alias == "all":
         return sorted(session_dir.rglob("*.md"))
-    pattern = DOC_ALIAS_TO_GLOB.get(alias)
-    if not pattern:
+    patterns = DOC_ALIAS_TO_GLOB.get(alias)
+    if not patterns:
         raise ValueError(f"Unknown doc alias: {alias}")
-    return sorted(session_dir.rglob(pattern))
+    files: list[Path] = []
+    for pattern in patterns:
+        files.extend(session_dir.rglob(pattern))
+    return sorted(set(files))
 
 
 def latest_doc_file(session_dir: Path, alias: str) -> Path:
     files = doc_files(session_dir, alias)
+    if not files and alias == "spec-child":
+        files = doc_files(session_dir, "spec-lite")
     if not files:
         raise FileNotFoundError(f"No {alias} file found in {session_dir}")
     return files[-1]
@@ -725,7 +732,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("--session", help="session id/path (required)")
     p_status.add_argument(
         "--file",
-        choices=["plan", "task", "spec", "spec-lite", "brainstorm", "research", "explorer-check", "report", "log", "postmortem", "all"],
+        choices=[
+            "plan",
+            "task",
+            "spec",
+            "spec-child",
+            "spec-lite",
+            "spec-test",
+            "brainstorm",
+            "research",
+            "explorer-check",
+            "report",
+            "log",
+            "postmortem",
+            "all",
+        ],
         default="all",
     )
     p_status.add_argument("--value", required=True, help="new status value")
@@ -740,7 +761,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_link.add_argument("--session", help="session id/path (required)")
     p_link.add_argument(
         "--file",
-        choices=["plan", "task", "spec", "spec-lite", "brainstorm", "research", "explorer-check", "report", "log", "postmortem"],
+        choices=[
+            "plan",
+            "task",
+            "spec",
+            "spec-child",
+            "spec-lite",
+            "spec-test",
+            "brainstorm",
+            "research",
+            "explorer-check",
+            "report",
+            "log",
+            "postmortem",
+        ],
         required=True,
     )
     p_link.add_argument("--key", required=True, help="links key")

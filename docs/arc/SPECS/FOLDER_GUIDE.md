@@ -28,7 +28,9 @@ They should not be code-heavy implementation documents.
 
 ### Workstream Specs
 
-- A local workstream `spec` or `spec-lite` can refine delivery context.
+- A local workstream `spec` or `spec-child` can refine delivery context.
+- Keep `spec-lite` as a historical compatibility alias while migration remains in progress.
+- Use `spec-test` when a feature needs a durable, journey-first testing strategy artifact.
 - It never replaces the parent strategic spec in `docs/arc/SPECS/`.
 
 ## Required Content

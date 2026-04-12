@@ -1,10 +1,11 @@
 ---
-title: "Dependency Graph"
-description: "Dependency-centric view of cycles, orphan modules, major hubs, and orchestrator files."
-doc_kind: "dependency-graph"
-version: "v2026-04-02_1"
-created_at: "2026-04-02T23:28:28Z"
-updated_at: "2026-04-02T23:28:28Z"
+title: Dependency Graph
+description: Dependency-centric view of cycles, orphan modules, major hubs, and orchestrator
+  files.
+doc_kind: dependency-graph
+version: v2026-04-02_1
+created_at: '2026-04-02T23:28:28Z'
+updated_at: '2026-04-12T13:42:43-03:00'
 ---
 
 ## Dependency Graph
@@ -18,6 +19,11 @@ updated_at: "2026-04-02T23:28:28Z"
 ### Graph Source
 
 - Primary summary source: `extra/phase1/depcruise.json`
+- Refresh note: the 2026-04-12 refresh attempt produced a degenerate
+  `Processed 0 files` dependency artifact, so stale references to removed
+  runtime skill mirrors were removed here instead of publishing invalid graph
+  rows. Re-run `.agents/agents repo-map .` after the analyzer emits a
+  non-degenerate dependency graph for hidden runtime folders.
 
 ### Cycle Summary
 
@@ -27,26 +33,9 @@ updated_at: "2026-04-02T23:28:28Z"
 
 ### Orphan Modules
 
-- `Processed 40 files (788ms) (11 warnings)`
-- `.claude/skills/typescript-skill/references/utility-types.ts`
-- `.claude/skills/writing-skills/scripts/check-skill.js`
-- `.claude/skills/writing-skills/scripts/check-tier-migration.js`
-- `.claude/skills/writing-skills/scripts/check-universal-skills-sync.js`
-- `.claude/skills/writing-skills/scripts/cleanup-empty-folders.js`
-- `.claude/skills/writing-skills/scripts/create-skill.js`
-- `.claude/skills/writing-skills/scripts/fix-skill.js`
-- `.claude/skills/writing-skills/scripts/skill-advisor.js`
-- `.claude/skills/writing-skills/scripts/skill-files.js`
-- `.claude/skills/writing-skills/scripts/skill-read.js`
-- `.codex/skills/typescript-skill/references/utility-types.ts`
-- `.codex/skills/writing-skills/scripts/check-skill.js`
-- `.codex/skills/writing-skills/scripts/check-tier-migration.js`
-- `.codex/skills/writing-skills/scripts/check-universal-skills-sync.js`
-- `.codex/skills/writing-skills/scripts/cleanup-empty-folders.js`
-- `.codex/skills/writing-skills/scripts/create-skill.js`
-- `.codex/skills/writing-skills/scripts/fix-skill.js`
-- `.codex/skills/writing-skills/scripts/skill-advisor.js`
-- `.codex/skills/writing-skills/scripts/skill-files.js`
+- No current orphan-module list is published because the latest dependency
+  analyzer output was degenerate and the prior list referenced removed skill
+  mirrors.
 
 ### Files That Other Code Relies On
 
@@ -57,15 +46,3 @@ updated_at: "2026-04-02T23:28:28Z"
 
 | Path | Ca | Ce | I |
 | --- | ---: | ---: | ---: |
-| .claude/skills/typescript-skill/references/utility-types.ts | 0.00 | 0.00 | 0.00 |
-| .claude/skills/writing-skills/scripts/check-skill.js | 0.00 | 0.00 | 0.00 |
-| .claude/skills/writing-skills/scripts/check-tier-migration.js | 0.00 | 0.00 | 0.00 |
-| .claude/skills/writing-skills/scripts/check-universal-skills-sync.js | 0.00 | 0.00 | 0.00 |
-| .claude/skills/writing-skills/scripts/cleanup-empty-folders.js | 0.00 | 0.00 | 0.00 |
-| .claude/skills/writing-skills/scripts/create-skill.js | 0.00 | 0.00 | 0.00 |
-| .claude/skills/writing-skills/scripts/fix-skill.js | 0.00 | 0.00 | 0.00 |
-| .claude/skills/writing-skills/scripts/skill-advisor.js | 0.00 | 0.00 | 0.00 |
-| .claude/skills/writing-skills/scripts/skill-files.js | 0.00 | 0.00 | 0.00 |
-| .claude/skills/writing-skills/scripts/skill-read.js | 0.00 | 0.00 | 0.00 |
-| .codex/skills/typescript-skill/references/utility-types.ts | 0.00 | 0.00 | 0.00 |
-| .codex/skills/writing-skills/scripts/check-skill.js | 0.00 | 0.00 | 0.00 |

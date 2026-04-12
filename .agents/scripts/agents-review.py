@@ -30,6 +30,14 @@ def _latest_artifact(session_dir: Path, pattern: str) -> Path | None:
     return matches[-1] if matches else None
 
 
+def _latest_spec_artifact(session_dir: Path) -> Path | None:
+    for pattern in ("*_spec-child_*.md", "*_spec_*.md", "*_spec-lite_*.md"):
+        match = _latest_artifact(session_dir, pattern)
+        if match is not None:
+            return match
+    return None
+
+
 def run_verify_tasks(session_dir: Path) -> Tuple[int, str, str]:
     proc = subprocess.run(
         [sys.executable, str(ROOT_DIR / ".agents/scripts/verify-tasks.py"), str(session_dir)],
@@ -123,7 +131,7 @@ def inspect_artifacts(session_dir: Path) -> List[Dict[str, str]]:
 
     _inspect_optional_artifacts(
         findings,
-        _latest_artifact(session_dir, "*_spec*.md"),
+        _latest_spec_artifact(session_dir),
         _latest_artifact(session_dir, "*_report_*.md"),
     )
     _inspect_task_rows(findings, task_file)

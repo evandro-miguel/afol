@@ -111,7 +111,9 @@ Location: `docs/templates/`
 Location: `docs/templates/`
 
 - spec.md
-- spec-lite.md
+- spec-child.md
+- spec-test.md
+- spec-lite.md (legacy alias)
 - adr.md
 - architecture.md
 - roadmap.md

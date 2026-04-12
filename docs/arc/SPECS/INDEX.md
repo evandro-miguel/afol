@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-04-11T21:20:00+00:00"
-updated_at: "2026-04-11T21:20:00+00:00"
+created_at: "2026-04-12T16:46:04+00:00"
+updated_at: "2026-04-12T16:46:04+00:00"
 ---
 
 # SPECS INDEX
@@ -14,9 +14,9 @@ updated_at: "2026-04-11T21:20:00+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 20 |
+| Total | 22 |
 | Draft | 1 |
-| Active | 18 |
+| Active | 20 |
 | Final | 0 |
 
 ## Index
@@ -38,11 +38,13 @@ updated_at: "2026-04-11T21:20:00+00:00"
 | 260306_project-context-canon-and-setup_spec_01 |  | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260306_2128_context-driven-execution-commands_plan_01, task: 260306_2128_context-driven-execution-commands_task_01 |
 | 260307_persistent-planning-memory_spec_01 | persistent-planning-memory | active | orchestrator | roadmap: 260223_0000_arc_roadmap_01 |
 | 260323_1704_universal-skills-runtime-integration_spec_01 | universal-skills-runtime-integration | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
-| 260323_1815_execplan-native-planning-system_spec_01 | execplan-native-planning-system | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260323_1815_execplan-native-planning-system_spec_01 | execplan-native-planning-system | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260323_1741_current-state-maps-and-goal-state-governance_spec_01 | current-state-maps-and-goal-state-governance | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260323_1750_current-state-map-contract_spec_01 | current-state-map-contract | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260323_1751_goal-state-canon_spec_01 |  | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260323_1752_workflow-and-bootstrap-integration_spec_01 | workflow-and-bootstrap-integration | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260411_agentic-runtime-restructure_spec_01 | agentic-runtime-restructure | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260412_1110_spec-child-and-spec-test-governance_spec_01 | spec-child-and-spec-test-governance | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 
 ---
 *Index: `docs/arc/SPECS/INDEX.md`*

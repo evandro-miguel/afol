@@ -26,7 +26,9 @@ Create or update the governing feature spec in `docs/arc/SPECS/`
 - Define feature intent, user journey, constraints, and acceptance
 - Keep implementation detail out of the spec
 - Use child specs when decomposition improves clarity or coordination
-- Local workstreams may choose `spec` or `spec-lite` as needed after the parent spec exists
+- Local workstreams may choose `spec` or `spec-child` as needed after the parent spec exists
+- Keep `spec-lite` as a historical compatibility alias while migration remains in progress
+- Test-focused workstreams should link a `spec-test` strategy artifact before implementing or changing tests
 - Keep current-state evidence in `docs/map/` when needed, and keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder
 
 #### Step 3: Plan

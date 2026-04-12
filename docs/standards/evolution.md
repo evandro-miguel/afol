@@ -44,6 +44,7 @@ This document defines how the agent system standards evolve over time.
 | `updated` | `updated_at` | Accept with warning |
 | `topic` | `theme` | Accept with warning |
 | `spec_lite` | `spec-lite` | Accept with warning |
+| `spec-lite` | `spec-child` | Accept as compatibility alias during migration |
 
 #### Transition Period
 

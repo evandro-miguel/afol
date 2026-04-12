@@ -3,7 +3,7 @@ doc_type: standard
 id: skills-sync-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-02T15:21:56-03:00'
+updated_at: '2026-04-12T10:43:14-03:00'
 ---
 
 # Skills Sync Standard
@@ -69,32 +69,32 @@ When an external universal-skills checkout is configured, discovery commands pre
 4. Plan selected subset impact:
 
 ```bash
-make skills-plan SKILLS=writing-skills,markdownlint-skill
+make skills-plan SKILLS=agentic-folder-sys
 ```
 
 5. Apply selected skills to project:
 
 ```bash
-make skills-apply SKILLS=writing-skills,markdownlint-skill
+make skills-apply SKILLS=agentic-folder-sys
 ```
 
 6. Ensure one skill on demand:
 
 ```bash
-make skills-ensure SKILL=writing-skills RUNTIME=codex
+make skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
 ```
 
 7. Run the one-step update flow into `.agents/skills/`:
 
 ```bash
-make skills-sync SKILLS=writing-skills,markdownlint-skill
-make skills-update SKILLS=writing-skills,markdownlint-skill
+make skills-sync SKILLS=agentic-folder-sys
+make skills-update SKILLS=agentic-folder-sys
 ```
 
 8. Propose one locally edited skill back to universal-skills only through a branch:
 
 ```bash
-make skills-push SKILL=writing-skills BRANCH=skills-sync/writing-skills COMMIT=1 PUSH=1 PR=1
+make skills-push SKILL=agentic-folder-sys BRANCH=skills-sync/agentic-folder-sys COMMIT=1 PUSH=1 PR=1
 ```
 
 This command must never push to `main` directly. It requires an external universal-skills checkout and pushes only a proposal branch; use `PR=1` when the change should be opened as a GitHub pull request.
@@ -102,16 +102,15 @@ This command must never push to `main` directly. It requires an external univers
 9. Verify sync and structure:
 
 ```bash
-make skills-check SKILLS=writing-skills,markdownlint-skill
+make skills-check SKILLS=agentic-folder-sys
 ```
 
 ## Default Template Skills
 
-- `agentic-system-workflow`
-- `writing-skills`
-- `markdownlint-skill`
+- `agentic-folder-sys`
+- `agentic-scaffold-mcp`
 
-These are preconfigured as default selected skills in the template manifest/config. The default manifest keeps the configured default profile and also pins the explicit default skills so scaffold-operating skills such as `agentic-system-workflow` remain available even when the upstream profile omits them.
+These are preconfigured as default selected skills in the template manifest/config. The repo-local seed intentionally avoids mirroring universal core skills that are already available globally, keeping only scaffold-specific skills needed by this repository.
 
 ## Mandatory Project Adaptations
 
@@ -127,7 +126,7 @@ After initial setup in each repository:
 8. Ensure bootstrap provisions `.agents/source/universal-skills` before expecting `skills-sync sync` to use a local-first source
 9. Treat repo/ref/profile fields as the canonical upgrade path for F-10 rather than inventing another local skills contract
 10. Use `skills-sync push` only as a branch/PR proposal flow with an external universal-skills checkout; never push local skill edits directly to universal `main`
-11. Keep `agentic-system-workflow` available locally so agents can discover the canonical scaffold install and upgrade flow from inside the repo
+11. Keep `agentic-folder-sys` available locally so agents can discover the canonical scaffold install, upgrade, and workbench flow from inside the repo
 
 ## Evidence to record in report
 

@@ -54,6 +54,7 @@ docs/
 ├── tmp/                     # Temporary non-canonical artifacts
 │
 ├── rules/                   # Operational rules
+├── runtime/                 # Central Python runtime and FastMCP adapter
 ├── skills/                  # Project skills
 └── tools.json               # Tool catalog
 ```
@@ -79,6 +80,7 @@ make doctor
 
 # 3. Create the workstream with mandatory governance linkage
 .agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --spec-lite
+# `--spec-lite` is the current CLI compatibility flag while `spec-child` is the canonical future doc name.
 
 # Research-only workstream
 .agents/agents new auth-investigation --feature-id F-02 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --intent research
@@ -137,13 +139,10 @@ make doctor
 ./.agents/agents skills-sync sync --runtime codex
 
 # Ensure the scaffold-operating skill is installed locally
-./.agents/agents skills-sync ensure agentic-system-workflow --runtime codex --pull
-
-# Ensure one skill is installed in .agents/skills/
-./.agents/agents skills-sync ensure writing-skills --runtime codex
+./.agents/agents skills-sync ensure agentic-folder-sys --runtime codex --pull
 
 # Propose upstream skill changes through a branch/PR; never push to main.
-./.agents/agents skills-sync push writing-skills --branch skills-sync/writing-skills --commit --push --pr
+./.agents/agents skills-sync push agentic-folder-sys --branch skills-sync/agentic-folder-sys --commit --push --pr
 ```
 
 - Preferred repo-local source seed: `.agents/source/universal-skills` inside the repo root. It must not be a nested git checkout.
@@ -153,7 +152,7 @@ make doctor
 - `skills-sync pull` refreshes only an external git checkout; it does not clone into `.agents/cache/` and does not overwrite `.agents/skills/` by itself.
 - `skills-sync sync` and `skills-sync update` are the simple one-step paths to refresh `.agents/skills/` from the configured source.
 - `skills-sync push` is a branch/PR proposal flow. It requires an external universal-skills checkout and refuses direct pushes to `main`.
-- Keep `agentic-system-workflow` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, and git-backed skills flow.
+- Keep `agentic-folder-sys` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, git-backed skills flow, and governed workbench sessions.
 - The scaffold should not depend on global Codex skills for universal-skills content.
 - Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and project-agnostic.
 
@@ -234,7 +233,7 @@ Before ending work, close the documentation loop first:
 
 | Event | When | Source |
 |-------|------|--------|
-| `tool_exec` | Every `.agents/agents <tool>` attempt | `.agents/agents` wrapper |
+| `tool_exec` | Every `.agents/agents <tool>` attempt | `.agents/agents` wrapper and runtime registry delegate |
 | `session_start` | Creating workstream | `agents-new.py` |
 | `pattern_applied` | Applying pattern | `agents-patterns.py` |
 | `session_end` | Finalizing a session report, or touching a session whose report is already final | `agents-wb-update.py` |
@@ -329,7 +328,9 @@ make patterns-apply PATTERN_ID=PAT-001
 - `task.md` - Task list with IDs
 - `log.md` - Decision timeline
 - `report.md` - Outcome report
-- `spec.md` / `spec-lite.md` - Local workstream refinements chosen as needed
+- `spec.md` / `spec-child.md` - Local workstream refinements chosen as needed
+- `spec-lite.md` - Legacy compatibility alias for `spec-child`
+- `spec-test.md` - Journey-first testing strategy artifact before test implementation
 - `brainstorm.md` - Ideation when real option analysis happened
 - `explorer-check.md` - Current-project exploration proof when repo inspection is needed
 - `research.md` - Research when durable findings are needed
@@ -374,9 +375,13 @@ updated_at: "2026-02-23T00:00:00-03:00"
 
 ```bash
 make setup          # Setup UV virtualenv
+make setup-runtime  # Setup central runtime environment
 make doctor         # Validate .agents structure
 make clean          # Clean caches
 make lint-scripts   # Lint Python operational scripts
+make lint-runtime   # Lint central runtime package
+make test-runtime   # Run central runtime tests
+make runtime-mcp-smoke # Smoke runtime and MCP CLIs
 make all            # Bootstrap-safe full validation (unit + integration, no e2e)
 ```
 
@@ -428,6 +433,10 @@ make agents-all  # Aggregate scaffold validations when local Makefile already ow
 .agents/agents tools list       # List tools
 .agents/agents structure-map .  # Map structure
 .agents/agents repo-map .       # Refresh full repository codemap
+.agents/agents runtime manifest # Generate central runtime manifest
+.agents/agents runtime validate # Validate scaffold through central runtime
+.agents/agents mcp serve        # Run FastMCP server over stdio
+.agents/agents-mcp manifest     # Compatibility launcher for MCP-oriented commands
 
 # Telemetry
 .agents/agents telemetry heat   # Heat map
@@ -508,7 +517,7 @@ make telemetry-cold PERIOD=monthly TYPE=tools
 
 ## 🤝 Contributing
 
-1. Create only the workstream artifacts you need: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite`
+1. Create only the workstream artifacts you need: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite` (`--spec-lite` remains the current compatibility flag for `spec-child`)
 2. Follow templates from `docs/templates/`
 3. Apply relevant patterns
 4. Validate: `make all`

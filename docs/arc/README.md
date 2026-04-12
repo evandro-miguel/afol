@@ -29,6 +29,8 @@ arc/
 │   ├── README.md
 │   ├── INDEX.md
 │   ├── TEMPLATE_spec.md
+│   ├── TEMPLATE_spec-child.md
+│   ├── TEMPLATE_spec-test.md
 │   └── TEMPLATE_spec-lite.md
 ├── DECISIONS/           # Architecture Decision Records (ADRs)
 │   └── TEMPLATE_adr.md
@@ -69,7 +71,9 @@ arc/
 ### Specifications (SPECS/)
 
 - Full SPEC: new features, architectural changes
-- SPEC LITE: small changes, localized fixes
+- SPEC CHILD: child/local feature refinement
+- SPEC TEST: journey-first testing strategy before test implementation
+- SPEC LITE: legacy compatibility alias during migration to SPEC CHILD
 
 ### Architecture Decision Records (DECISIONS/)
 

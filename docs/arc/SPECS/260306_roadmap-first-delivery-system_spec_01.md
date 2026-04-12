@@ -117,6 +117,11 @@ Dependency rules:
 
 - Roadmap feature -> must link to parent spec
 - Parent spec -> may require child specs before implementation
+- Parent specs that declare required child specs must list each child spec by stable
+  `doc_id` or repository path under the `Child Spec Strategy` section.
+- Child spec frontmatter must carry `parent_spec`, `roadmap_feature`, and
+  `spec_role: child`, and the child spec body must name the narrowed objective
+  and boundaries that distinguish it from sibling child specs.
 - Workstream plan/task/report -> must link back to roadmap/spec context
 - Workstream local refinement -> may use `spec` or `spec-lite` at team discretion; neither replaces the governing parent spec
 - Execution work -> must not become the first place where a feature is defined
@@ -174,6 +179,18 @@ Error paths:
 - E-02 Feature has no governing spec -> do not allow non-trivial implementation to proceed.
 - E-03 A feature clearly needs decomposition but has no child specs -> flag for review before implementation.
 - E-04 Roadmap and spec drift apart -> require reconciliation before marking work complete.
+
+Child-spec decomposition threshold:
+
+- Required when a feature crosses more than one architectural surface such as
+  CLI, runtime, MCP, docs/bootstrap, or validation.
+- Required when independent teams or agents can safely own separate objectives.
+- Required when a feature has distinct acceptance journeys that would make one
+  parent spec too broad to review.
+- Recommended when the parent spec has more than one risky migration phase or
+  when rollback differs by phase.
+- Not required for a small workstream refinement that stays in one module and
+  can be fully explained in the parent spec plus workbench plan.
 
 ## 13) Error Handling
 
@@ -263,7 +280,10 @@ Evidence required:
 
 - Q-01 Answered: `spec-lite` remains a discretionary option whenever a lighter local refinement is enough; the mandatory artifact is the governing parent spec, not a specific local spec depth.
 - Q-02 How strict should roadmap/spec gating be for quick tasks in an active session?
-- Q-03 Should child specs live only in `docs/arc/SPECS/` or also have indexed groupings by parent feature?
+- Q-03 Answered: child specs live in `docs/arc/SPECS/` by default and may also
+  use feature-level subfolders such as `docs/arc/SPECS/F-14/` when a feature
+  owns multiple strategy artifacts; indexes must keep the stable doc IDs
+  discoverable either way.
 
 ## 21) Acceptance Checklist
 

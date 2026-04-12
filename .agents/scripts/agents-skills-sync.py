@@ -42,7 +42,7 @@ DEFAULTS = {
         "qwen",
         "antigravity",
     ],
-    "default_skills": ["writing-skills", "markdownlint-skill"],
+    "default_skills": ["agentic-folder-sys", "agentic-scaffold-mcp"],
 }
 
 MANIFEST_VERSION = 2

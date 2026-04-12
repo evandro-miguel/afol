@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: 2026-02-20 00:00:00-03:00
-updated_at: '2026-03-23T20:38:52-03:00'
+updated_at: '2026-04-12T10:07:09-03:00'
 links:
   tools_json: ./tools-json.md
   makefile: ./makefile.md
@@ -34,6 +34,7 @@ Bash wrapper that:
 4. **Preserves context** - Maintains working directory
 5. **Unified interface** - `.agents/agents <command>`
 6. **Command-map dispatch** - Efficient routing for scripts such as `knowledge`, `skills-sync`, and `memory`
+7. **Runtime dispatch** - Routes `runtime` and `mcp` directly to `.agents/runtime/` through `uv run --project --locked`
 
 ## What It Touches
 
@@ -43,6 +44,7 @@ Bash wrapper that:
 |------|---------|
 | `.agents/scripts/.venv/` | Virtualenv |
 | `.agents/scripts/*.py` | Python scripts |
+| `.agents/runtime/` | Central runtime package |
 
 ### Files Executed
 
@@ -54,6 +56,8 @@ Bash wrapper that:
 | `agents-wb-update.py` | `.agents/agents wb-update ...` |
 | `agents-telemetry.py` | `.agents/agents telemetry ...` |
 | `agents-memory.py` | `.agents/agents memory ...` |
+| `agentic_scaffold.cli` | `.agents/agents runtime ...` |
+| `agentic_scaffold.cli` | `.agents/agents mcp ...` |
 | `agents-lint-docs.py` | `.agents/agents lint-docs` |
 | ... | ... |
 
@@ -74,6 +78,8 @@ tools               # Tool discovery
 telemetry           # Heat scoring
 patterns            # Pattern suggestions
 memory              # External memory MCP contracts
+runtime             # Central runtime CLI
+mcp                 # FastMCP-backed runtime CLI
 bootstrap           # Install in another repo
 skills-sync         # Sync skills
 fix-symlinks        # Repair symlinks
@@ -113,6 +119,12 @@ declare -A COMMAND_MAP=(
 # Test contract-only external memory command
 .agents/agents memory status
 
+# Test central runtime command
+.agents/agents runtime manifest
+
+# Test MCP adapter command
+.agents/agents mcp validate
+
 # Test with args
 .agents/agents new test-workstream
 ```
@@ -134,6 +146,8 @@ Commands:
 ## Related
 
 - [makefile.md](./makefile.md) - Makefile targets
+- [agents-runtime.md](./agents-runtime.md) - Central runtime package
+- [agents-mcp.md](./agents-mcp.md) - FastMCP adapter
 - [tools-json.md](./tools-json.md) - Tool catalog
 
 ---

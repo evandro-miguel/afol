@@ -1,10 +1,7 @@
 {
   "name": "core",
   "skills": [
-    "writing-skills",
-    "bun-skill",
-    "typescript-skill",
-    "markdownlint-skill",
-    "llm-markdown-skill"
+    "agentic-folder-sys",
+    "agentic-scaffold-mcp"
   ]
 }

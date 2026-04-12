@@ -3,7 +3,7 @@ doc_type: index
 id: agentic-docs-index
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-03-23T20:38:52-03:00'
+updated_at: '2026-04-12T10:43:14-03:00'
 ---
 
 # Documentation Index
@@ -39,6 +39,8 @@ Central index for all `.agents` system documentation.
 | `patterns` | [agents-patterns.md](./agents-patterns.md) | Pattern catalog |
 | `knowledge` | [../knowledge/README.md](../knowledge/README.md) | Reusable knowledge layer |
 | `memory` | [agents-memory.md](./agents-memory.md) | External memory contract adapter |
+| `runtime` | [agents-runtime.md](./agents-runtime.md) | Central runtime package and CLI adapter |
+| `mcp` | [agents-mcp.md](./agents-mcp.md) | FastMCP adapter for agent-native scaffold operations |
 | `bootstrap` | [agents-bootstrap.md](./agents-bootstrap.md) | Repository bootstrap |
 | `skills-sync` | [agents-skills-sync.md](./agents-skills-sync.md) | Skills sync |
 | `tools-smoke` | [agents-tools-smoke.md](./agents-tools-smoke.md) | Smoke tests |
@@ -49,6 +51,7 @@ Central index for all `.agents` system documentation.
 | Component | Document | Description |
 |-----------|----------|-------------|
 | CLI Wrapper | [agents-wrapper.md](./agents-wrapper.md) | Bash wrapper |
+| Central Runtime | [agents-runtime.md](./agents-runtime.md) | Python runtime package and FastMCP adapter |
 | Makefile | [makefile.md](./makefile.md) | Make targets |
 | Config | [agents-config.md](./agents-config.md) | Config loader |
 | Library | [lib-modules.md](./lib-modules.md) | Internal modules |
@@ -83,7 +86,9 @@ Central index for all `.agents` system documentation.
 | [report.md](../templates/report.md) | Outcome report |
 | [log.md](../templates/log.md) | Activity log |
 | [spec.md](../templates/spec.md) | Full specification |
-| [spec-lite.md](../templates/spec-lite.md) | Lite specification |
+| [spec-child.md](../templates/spec-child.md) | Child/local feature specification |
+| [spec-test.md](../templates/spec-test.md) | Journey-first testing strategy artifact |
+| [spec-lite.md](../templates/spec-lite.md) | Legacy compatibility alias for child spec |
 | [adr.md](../templates/adr.md) | Architecture decision |
 | [brainstorm.md](../templates/brainstorm.md) | Ideation |
 | [explorer-check.md](../templates/explorer-check.md) | Current-project exploration proof |
@@ -109,8 +114,8 @@ Central index for all `.agents` system documentation.
 | Document | Location |
 |----------|----------|
 | Skills README | [../../skills/README.md](../../skills/README.md) |
-| Writing Skills | [../../skills/writing-skills/](../../skills/writing-skills/) |
-| Markdownlint | [../../skills/markdownlint-skill/](../../skills/markdownlint-skill/) |
+| Agentic Folder Sys | [../../skills/agentic-folder-sys/](../../skills/agentic-folder-sys/) |
+| Agentic Scaffold MCP | [../../skills/agentic-scaffold-mcp/](../../skills/agentic-scaffold-mcp/) |
 
 ## Quick Links
 

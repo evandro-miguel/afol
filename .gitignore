@@ -4,6 +4,7 @@
 # UV lock files (optional: commit for reproducible builds)
 .agents/scripts/uv.lock
 uv.lock
+!.agents/runtime/uv.lock
 
 # Python cache
 .agents/scripts/__pycache__/
@@ -20,6 +21,7 @@ uv.lock
 
 # Runtime/cache snapshots
 .agents/.cache/
+.agents/journal/
 
 # Universal-skills must not be a repo-local git cache or nested checkout.
 .agents/cache/universal-skills/

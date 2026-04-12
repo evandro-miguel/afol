@@ -108,7 +108,7 @@ Wrapper contract:
 | `make wb-normalize-time` | Normalize `created_at`/`updated_at` to configured WB offset | - |
 | `make wb-files-changed` | Refresh report `Files Changed` section | - |
 | `make wb-task` | Mark task by ID in active session | `TASK_ID=T-01 ACTION=done\|in_progress\|pending\|ready\|blocked\|skipped` |
-| `make wb-status` | Set frontmatter status | `STATUS=<value>` `FILE=plan\|task\|spec-lite\|report\|log\|all` |
+| `make wb-status` | Set frontmatter status | `STATUS=<value>` `FILE=plan\|task\|spec-lite\|report\|log\|all` (`spec-lite` remains the current compatibility key for child specs) |
 | `make wb-timeline` | Append log timeline entry | `MSG=\"text\"` |
 | `make wb-link` | Set frontmatter link field | `FILE=<doc>` `KEY=<k>` `VALUE=<v>` |
 | `make test-scripts` | Run script unit tests | - |
@@ -170,7 +170,7 @@ Creates or extends a workstream with only the artifacts justified by the selecte
 
 - Session folder with proper naming
 - Only the artifacts justified by the selected intent
-- Optional spec file (`--spec` or `--spec-lite`)
+- Optional spec file (`--spec` or `--spec-lite`; `--spec-lite` is the current compatibility alias while docs move to `spec-child`)
 - Sets `.agents/wb/.active_session`
 
 **Catalog + policy contract:**
@@ -201,7 +201,7 @@ make new THEME=auth-investigation INTENT=research
 # With full spec
 make new THEME=api-endpoint SPEC=1
 
-# With lite spec
+# With lite spec (legacy compatibility alias for spec-child)
 make new THEME=bugfix-login SPEC=lite
 
 # Quick task in current active session
@@ -214,6 +214,8 @@ make quick THEME=small-fix
 .agents/agents new tiny-fix --quick
 .agents/agents new major-refactor --force-new --spec
 ```
+
+`--spec-lite` remains the current command flag for compatibility. Canonical governance wording now uses `spec-child`.
 
 ---
 

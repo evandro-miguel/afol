@@ -262,6 +262,21 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         self.assertIsNotNone(parsed)
         self.assertEqual(parsed["intent"], "research")
 
+    def test_parse_args_keeps_spec_lite_legacy_and_accepts_spec_test(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_spec_alias_parse_test", script_path)
+
+        argv = ["agents-new.py", "workflow-hardening", "--spec-lite", "--spec-test", "--with", "spec_lite"]
+        with mock.patch.object(sys, "argv", argv):
+            parsed = agents_new._parse_args()
+
+        self.assertIsNotNone(parsed)
+        self.assertFalse(parsed["use_spec_child"])
+        self.assertTrue(parsed["use_spec_lite"])
+        self.assertTrue(parsed["use_spec_test"])
+        self.assertIn("spec-lite", parsed["with_artifacts"])
+
     def test_ordered_selected_doc_types_rejects_disallowed_artifacts_for_intent(self):
         script_path = Path(".agents/scripts/agents-new.py").resolve()
         sys.path.insert(0, str(script_path.parent))
@@ -273,10 +288,51 @@ class AgentsNewQuickModeTests(unittest.TestCase):
                     "intent": "research",
                     "plan_only": False,
                     "use_spec": False,
+                    "use_spec_child": False,
                     "use_spec_lite": False,
+                    "use_spec_test": False,
                     "with_artifacts": ["task"],
                 }
             )
+
+    def test_ordered_selected_doc_types_keeps_spec_lite_legacy_artifact(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_spec_alias_selection_test", script_path)
+
+        selected = agents_new._ordered_selected_doc_types(
+            {
+                "intent": "delivery",
+                "plan_only": False,
+                "use_spec": False,
+                "use_spec_child": False,
+                "use_spec_lite": False,
+                "use_spec_test": False,
+                "with_artifacts": ["spec-lite"],
+            }
+        )
+        self.assertIn("spec-lite", selected)
+        self.assertNotIn("spec-child", selected)
+
+    def test_ordered_selected_doc_types_selects_spec_child_and_spec_test(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_spec_child_selection_test", script_path)
+
+        selected = agents_new._ordered_selected_doc_types(
+            {
+                "intent": "delivery",
+                "plan_only": False,
+                "use_spec": False,
+                "use_spec_child": True,
+                "use_spec_lite": False,
+                "use_spec_test": True,
+                "with_artifacts": [],
+            }
+        )
+        self.assertIn("spec-child", selected)
+        self.assertIn("spec-test", selected)
+        self.assertNotIn("spec-lite", selected)
 
     def test_coerce_artifact_manifest_fallbacks_to_default(self):
         script_path = Path(".agents/scripts/agents-new.py").resolve()
@@ -293,6 +349,8 @@ class AgentsNewQuickModeTests(unittest.TestCase):
                 "plan",
                 "task",
                 "spec",
+                "spec-child",
+                "spec-test",
                 "spec-lite",
                 "log",
                 "report",

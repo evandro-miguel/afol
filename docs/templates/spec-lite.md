@@ -8,7 +8,7 @@ owners:
 workstream_intent: <workstream_intent>
 artifact_purpose: <artifact_purpose>
 created_at: YYYY-MM-DDTHH:MM:SSZ
-updated_at: '2026-04-04T10:08:11-03:00'
+updated_at: YYYY-MM-DDTHH:MM:SSZ
 roadmap_feature: <feature_id>
 spec_role: workstream
 parent_spec: <parent_spec_id>
@@ -18,7 +18,12 @@ links:
 risk_level: low
 ---
 
-# SPEC LITE: <theme>
+# SPEC LITE (LEGACY ALIAS): <theme>
+
+## Migration Note
+
+- `spec-child` is the canonical future child-spec name.
+- Keep `spec-lite` only for historical compatibility or toolchains that still emit `spec-lite`.
 
 ## Intent
 
@@ -26,10 +31,10 @@ risk_level: low
 - Roadmap feature: `<feature_id>`
 - Parent spec: `<parent_spec_id>`
 
-## Why Lite Is Enough
+## Why This Scope Is Small
 
 - <why this work is localized or low risk>
-- <why a full child spec is not needed>
+- <why a full parent-level spec is not needed>
 
 ## User or Operator Impact
 
@@ -50,9 +55,9 @@ risk_level: low
 
 ## Acceptance
 
-- [ ] Intent is clear without code
-- [ ] Scope boundaries are explicit
-- [ ] Linked parent spec remains the source of full feature philosophy
+- [ ] Scope is explicit and bounded
+- [ ] Parent spec linkage is explicit
+- [ ] Migration note is explicit
 - [ ] Delivery evidence will be recorded in the report
 
 ---

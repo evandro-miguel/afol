@@ -22,11 +22,22 @@ Write SPEC when:
 - architectural change
 - changes that can break users
 
-Write SPEC LITE when:
+Write SPEC CHILD when:
 
-- small changes
-- localized fixes
-- low risk work
+- a large parent feature needs a bounded objective under the same roadmap goal
+- multiple agents or teams can own separate slices
+- the work crosses several architectural surfaces or rollout phases
+- one parent spec would be too broad to review or verify cleanly
+
+Write SPEC TEST when:
+
+- test implementation is planned but strategy is not yet documented
+- a feature has one or more critical journeys that need explicit evidence criteria
+- testing technology choice and construction approach must be agreed before coding tests
+
+Legacy compatibility note:
+
+- `spec-lite` remains accepted as a historical alias while migration to `spec-child` is in progress.
 
 ## Folder rules
 
@@ -34,6 +45,8 @@ Write SPEC LITE when:
 - Use IDs consistently.
 - Link specs from plan and tasks.
 - Keep specs updated when scope changes.
+- Child specs must carry `parent_spec`, `roadmap_feature`, and `spec_role: child`.
+- Parent specs must list required child specs in `Child Spec Strategy`.
 
 ## Required sections
 

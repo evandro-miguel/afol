@@ -42,18 +42,20 @@ ARTIFACT_MANIFEST = load_artifact_manifest(WORKFLOW_CFG)
 DEFAULT_WORKSTREAM_INTENT, ARTIFACT_POLICY = load_artifact_policy(WORKFLOW_CFG, ARTIFACT_MANIFEST)
 TERMINAL_ARTIFACT_STATUSES = {"approved", "accepted", "final", "done", "superseded", "deprecated"}
 
-DOC_PATTERNS: dict[str, str] = {
-    "plan": "*_plan_*.md",
-    "task": "*_task_*.md",
-    "spec": "*_spec_*.md",
-    "spec-lite": "*_spec-lite_*.md",
-    "brainstorm": "*_brainstorm_*.md",
-    "research": "*_research_*.md",
-    "explorer-check": "*_explorer-check_*.md",
-    "report": "*_report_*.md",
-    "log": "*_log_*.md",
-    "postmortem": "*_postmortem_*.md",
-    "pack": "packs/*",
+DOC_PATTERNS: dict[str, tuple[str, ...]] = {
+    "plan": ("*_plan_*.md",),
+    "task": ("*_task_*.md",),
+    "spec": ("*_spec_*.md",),
+    "spec-child": ("*_spec-child_*.md",),
+    "spec-lite": ("*_spec-lite_*.md",),
+    "spec-test": ("*_spec-test_*.md",),
+    "brainstorm": ("*_brainstorm_*.md",),
+    "research": ("*_research_*.md",),
+    "explorer-check": ("*_explorer-check_*.md",),
+    "report": ("*_report_*.md",),
+    "log": ("*_log_*.md",),
+    "postmortem": ("*_postmortem_*.md",),
+    "pack": ("packs/*",),
 }
 
 SESSION_ARTIFACT_ALIASES: dict[str, str] = {
@@ -175,7 +177,10 @@ def write_frontmatter(path: Path, fm: Dict[str, Any], body: str) -> None:
 def latest_file(session_dir: Path, alias: str) -> Optional[Path]:
     if alias not in DOC_PATTERNS:
         return None
-    files = sorted(session_dir.glob(DOC_PATTERNS[alias]))
+    files: list[Path] = []
+    for pattern in DOC_PATTERNS[alias]:
+        files.extend(session_dir.glob(pattern))
+    files = sorted(set(files))
     if not files:
         return None
     return files[-1]
@@ -204,7 +209,13 @@ def resolve_artifact(session_dir: Path, artifact: str) -> Optional[Path]:
     if artifact in {"session", "active_session"}:
         return session_dir
     if artifact in {"spec", "active_spec"}:
-        return latest_file(session_dir, "spec") or latest_file(session_dir, "spec-lite")
+        return (
+            latest_file(session_dir, "spec-child")
+            or latest_file(session_dir, "spec")
+            or latest_file(session_dir, "spec-lite")
+        )
+    if artifact in {"spec-child", "active_spec_child", "spec_child"}:
+        return latest_file(session_dir, "spec-child")
     if artifact in SESSION_ARTIFACT_ALIASES:
         return latest_file(session_dir, SESSION_ARTIFACT_ALIASES[artifact])
     if artifact in GLOBAL_ARTIFACT_PATHS:
@@ -299,7 +310,7 @@ def infer_session_intent(session_dir: Path) -> str:
         return "brainstorming"
     if "explorer-check" in present_doc_types:
         return "exploration"
-    if {"spec", "spec-lite"} & present_doc_types:
+    if {"spec", "spec-child", "spec-lite", "spec-test"} & present_doc_types:
         return "specification"
     return DEFAULT_WORKSTREAM_INTENT
 

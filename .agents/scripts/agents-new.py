@@ -6,16 +6,16 @@ Creates:
 - Session folder with proper naming
 - Plan file
 - Task file
-- Spec file (or spec-lite)
+- Spec file (or spec-child/spec-lite alias)
 - Log file
 
 Usage:
-    python agents-new.py <theme> [--spec | --spec-lite] [--plan-only]
+    python agents-new.py <theme> [--spec | --spec-child | --spec-lite] [--spec-test] [--plan-only]
 
 Examples:
     python agents-new.py auth-refactor
     python agents-new.py api-endpoint --spec
-    python agents-new.py bugfix-login --spec-lite
+    python agents-new.py bugfix-login --spec-child
 """
 
 import re
@@ -92,6 +92,22 @@ THEME_INTENT_HINTS = {
     "exploration": ("explore", "exploration", "inventory", "audit", "survey", "repo-map", "codemap"),
     "closure": ("closure", "wrap-up", "postmortem", "retro", "retrospective"),
 }
+DOC_TYPE_ALIASES = {
+    "spec-lite": "spec-lite",
+    "spec_lite": "spec-lite",
+    "spec-child": "spec-child",
+    "spec_child": "spec-child",
+    "spec-test": "spec-test",
+    "spec_test": "spec-test",
+}
+
+
+def _normalize_doc_type_alias(doc_type: str) -> str:
+    """Normalize historical and underscore aliases to canonical doc types."""
+    cleaned = str(doc_type).strip().lower()
+    if not cleaned:
+        return ""
+    return DOC_TYPE_ALIASES.get(cleaned, cleaned)
 
 
 def get_timestamp() -> str:
@@ -262,7 +278,19 @@ def _infer_theme_from_session(session_path: Path) -> str:
 
 def _session_seed_args(session_path: Path) -> Dict[str, object]:
     """Rebuild minimal template args from an existing session."""
-    for doc_type in ("task", "plan", "research", "brainstorm", "explorer-check", "spec", "spec-lite", "report", "log"):
+    for doc_type in (
+        "task",
+        "plan",
+        "research",
+        "brainstorm",
+        "explorer-check",
+        "spec",
+        "spec-child",
+        "spec-lite",
+        "spec-test",
+        "report",
+        "log",
+    ):
         doc_path = find_primary_doc(session_path, doc_type)
         if not doc_path:
             continue
@@ -522,15 +550,19 @@ def _ordered_selected_doc_types(args: Dict[str, object]) -> list[str]:
     selected = list(_intent_profile(intent).get("create", []))
     if args.get("plan_only"):
         selected = ["plan"]
-    selected.extend(str(doc_type).strip() for doc_type in args.get("with_artifacts") or [])
+    selected.extend(_normalize_doc_type_alias(str(doc_type)) for doc_type in args.get("with_artifacts") or [])
 
     selected_set = {doc_type for doc_type in selected if doc_type in VALID_ARTIFACT_DOC_TYPES}
     if args.get("use_spec"):
+        selected_set.discard("spec-child")
         selected_set.discard("spec-lite")
         selected_set.add("spec")
-    elif args.get("use_spec_lite"):
+    elif args.get("use_spec_child") or args.get("use_spec_lite"):
         selected_set.discard("spec")
-        selected_set.add("spec-lite")
+        selected_set.discard("spec-lite")
+        selected_set.add("spec-child")
+    if args.get("use_spec_test"):
+        selected_set.add("spec-test")
 
     if not selected_set:
         raise ValueError(
@@ -581,8 +613,13 @@ def _create_manifest_artifacts(
 
 def find_primary_doc(session_path: Path, doc_type: str) -> Path | None:
     """Find the first workstream document by type."""
-    matches = sorted(session_path.rglob(f"*_{doc_type}_*.md"))
-    return matches[0] if matches else None
+    normalized = _normalize_doc_type_alias(doc_type)
+    patterns = [f"*_{normalized}_*.md"]
+    matches: list[Path] = []
+    for pattern in patterns:
+        matches.extend(session_path.rglob(pattern))
+    ordered = sorted(set(matches))
+    return ordered[0] if ordered else None
 
 
 def next_task_id(task_content: str) -> str:
@@ -672,7 +709,9 @@ def _parse_args():
     raw_args = {
         "theme": theme,
         "use_spec": "--spec" in sys.argv,
+        "use_spec_child": "--spec-child" in sys.argv,
         "use_spec_lite": "--spec-lite" in sys.argv,
+        "use_spec_test": "--spec-test" in sys.argv,
         "plan_only": "--plan-only" in sys.argv,
         "force_new": "--force-new" in sys.argv,
         "quick_mode": "--quick" in sys.argv,
@@ -682,7 +721,11 @@ def _parse_args():
         "child_spec": _get_cli_flag_value("--child-spec"),
         "pack": sanitize_theme(_get_cli_flag_value("--pack")) if _get_cli_flag_value("--pack") else "",
         "into_session": _get_cli_flag_value("--into-session"),
-        "with_artifacts": [value.strip() for value in _get_cli_flag_values("--with") if value.strip()],
+        "with_artifacts": [
+            _normalize_doc_type_alias(value)
+            for value in _get_cli_flag_values("--with")
+            if _normalize_doc_type_alias(value)
+        ],
     }
     raw_args["intent"] = str(raw_args["intent"] or _infer_intent(theme, raw_args))
     return raw_args
@@ -694,14 +737,15 @@ def _print_usage():
         "Usage: python agents-new.py <theme> "
         "[--feature-id F-01 --parent-spec <spec-id> [--child-spec <spec-id>]] "
         "[--intent delivery|planning|research|brainstorming|exploration|specification|closure] "
-        "[--with <doc-type>] [--spec | --spec-lite] [--pack <pack-slug>] "
+        "[--with <doc-type>] [--spec | --spec-child | --spec-lite] [--spec-test] [--pack <pack-slug>] "
         "[--into-session <session-id>] [--plan-only] [--force-new | --quick]"
     )
     print()
     print("Examples:")
     print("  python agents-new.py auth-refactor --feature-id F-01 --parent-spec my-parent-spec")
     print("  python agents-new.py api-endpoint --feature-id F-02 --parent-spec my-parent-spec --spec")
-    print("  python agents-new.py bugfix-login --feature-id F-03 --parent-spec my-parent-spec --spec-lite")
+    print("  python agents-new.py bugfix-login --feature-id F-03 --parent-spec my-parent-spec --spec-child")
+    print("  python agents-new.py hardening-tests --feature-id F-03 --parent-spec my-parent-spec --spec-test")
     print("  python agents-new.py investigate-auth --feature-id F-03 --parent-spec my-parent-spec --intent research")
     print("  python agents-new.py api-follow-up --feature-id F-07 --parent-spec parent --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec")
     print("  python agents-new.py tiny-fix --quick")
@@ -716,7 +760,7 @@ def _handle_quick_mode(args: Dict, active_session: str) -> bool:
     if not active_session:
         print("❌ No active session found for quick mode.")
         print("Create one significant workstream first with:")
-        print("  .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> [--spec|--spec-lite]")
+        print("  .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> [--spec|--spec-child|--spec-lite]")
         sys.exit(1)
 
     print("=" * 60)
@@ -807,7 +851,7 @@ def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) 
     record_session_start(
         session_id,
         theme,
-        args["use_spec"] or args["use_spec_lite"],
+        any(doc_type in {"spec", "spec-child", "spec-test"} for doc_type in created_doc_types),
         args=args,
     )
     # Auto-suggest patterns

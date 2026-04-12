@@ -7,17 +7,9 @@
   "installs": [
     {
       "app": "all",
-      "profile": "core"
-    },
-    {
-      "app": "all",
       "skills": [
-        "agentic-system-workflow",
-        "writing-skills",
-        "markdownlint-skill",
-        "bun-skill",
-        "typescript-skill",
-        "workbench-agent-teams"
+        "agentic-folder-sys",
+        "agentic-scaffold-mcp"
       ]
     }
   ]

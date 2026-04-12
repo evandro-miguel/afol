@@ -4,7 +4,7 @@ id: scripts-usage
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-04T10:08:11-03:00'
+updated_at: '2026-04-12T13:01:37-03:00'
 ---
 
 # Scripts Usage
@@ -71,8 +71,13 @@ make wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with e
 .agents/agents session close --session <session-id>
 ```
 
-The wrapper uses the local `.agents/scripts/.venv` interpreter directly when available.
-`uv` stays on the setup path only, and UV cache writes are redirected to `.agents/cache/uv/`.
+The wrapper routes public commands through the runtime command registry, which
+currently delegates to the existing `.agents/scripts/` command bodies for
+compatibility. Use `.agents/agents runtime command-registry` to inspect the
+registered public aliases.
+
+`uv` stays on the setup path and runtime launch path, and UV cache writes are
+redirected to `.agents/cache/uv/`.
 
 ## Setup (One Time)
 
@@ -176,7 +181,7 @@ Creates or extends a workstream with only the artifacts justified by the selecte
 
 - Session folder with proper naming
 - Only the artifacts justified by the chosen `--intent`
-- Optional spec file (`--spec` or `--spec-lite`)
+- Optional spec file (`--spec` or `--spec-lite`; `--spec-lite` is the current compatibility alias while docs move to `spec-child`)
 
 **Catalog + policy contract:**
 
@@ -196,6 +201,8 @@ python .agents/scripts/agents-new.py bugfix-login --spec-lite
 python .agents/scripts/agents-new.py investigate-auth --intent research
 python .agents/scripts/agents-new.py quick-fix --plan-only
 ```
+
+`--spec-lite` remains the current CLI flag for compatibility with historical workbench naming. Canonical governance wording now refers to this child-spec artifact as `spec-child`.
 
 ---
 

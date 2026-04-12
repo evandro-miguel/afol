@@ -10,7 +10,7 @@
 #   make structure
 #   make all
 
-.PHONY: help setup doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-update skills-list skills-search skills-plan skills-apply skills-ensure skills-push skills-status skills-check skills-sync memory-status memory-search memory-context memory-recent memory-show wb-touch wb-normalize-time wb-files-changed wb-evidence wb-task wb-status wb-timeline wb-link structure repo-map index knowledge-index knowledge-list knowledge-search knowledge-pull sync verify verify-session verify-active verify-active-if-present verify-strict-if-present lint tools-check test-scripts test-scripts-integration test-scripts-all lint-scripts lint-fix lint-fix-dry lint-fix-check lint-fix-checkboxes lint-fix-frontmatter telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
+.PHONY: help setup setup-runtime doctor new quick bootstrap fix-symlinks skills-init skills-pull skills-update skills-list skills-search skills-plan skills-apply skills-ensure skills-push skills-status skills-check skills-sync memory-status memory-search memory-context memory-recent memory-show wb-touch wb-normalize-time wb-files-changed wb-evidence wb-task wb-status wb-timeline wb-link structure repo-map index knowledge-index knowledge-list knowledge-search knowledge-pull sync verify verify-session verify-active verify-active-if-present verify-strict-if-present lint tools-check test-scripts test-scripts-integration test-scripts-all lint-scripts lint-runtime test-runtime runtime-mcp-smoke lint-fix lint-fix-dry lint-fix-check lint-fix-checkboxes lint-fix-frontmatter telemetry-record telemetry-report telemetry-export telemetry-validate patterns-suggest patterns-list patterns-show clean all
 
 # Use local virtualenv python when available for reproducible script execution
 PYTHON := .agents/scripts/.venv/bin/python3
@@ -30,6 +30,7 @@ help:
 	@echo "╠═══════════════════════════════════════════════════════════╣"
 	@echo "║  Setup & Maintenance                                      ║"
 	@echo "║    make setup        - Initialize UV virtualenv           ║"
+	@echo "║    make setup-runtime - Initialize central runtime env    ║"
 	@echo "║    make clean        - Remove .venv and cache files       ║"
 	@echo "║    make doctor       - Validate .agents structure         ║"
 	@echo "║                                                           ║"
@@ -77,6 +78,9 @@ help:
 	@echo "║    make lint-fix-frontmatter - Add missing frontmatter    ║"
 	@echo "║    make lint-scripts - Lint Python scripts                ║"
 	@echo "║    make test-scripts - Run Python unit tests for scripts  ║"
+	@echo "║    make lint-runtime - Lint central runtime package       ║"
+	@echo "║    make test-runtime - Run central runtime tests          ║"
+	@echo "║    make runtime-mcp-smoke - Smoke runtime and MCP CLI     ║"
 	@echo "║    make test-scripts-integration - Run isolated integration tests ║"
 	@echo "║    make test-scripts-all - Run unit + integration tests   ║"
 	@echo "║                                                           ║"
@@ -106,6 +110,12 @@ setup:
 	@mkdir -p "$(UV_CACHE_DIR)"
 	@cd .agents/scripts && $(UV) sync
 	@echo "✓ Setup complete"
+
+setup-runtime:
+	@echo "→ Setting up central runtime environment..."
+	@mkdir -p "$(UV_CACHE_DIR)"
+	@cd .agents/runtime && $(UV) sync --locked
+	@echo "✓ Runtime setup complete"
 
 doctor:
 	@echo "→ Validating .agents structure..."
@@ -537,6 +547,27 @@ lint-scripts:
 	@cd .agents/scripts && $(UV) run ruff check .
 	@echo "✓ Python scripts linted"
 
+lint-runtime:
+	@echo "→ Linting central runtime package..."
+	@mkdir -p "$(UV_CACHE_DIR)"
+	@$(UV) run --project .agents/runtime --locked ruff check .agents/runtime
+	@echo "✓ Central runtime linted"
+
+test-runtime:
+	@echo "→ Running central runtime tests..."
+	@mkdir -p "$(UV_CACHE_DIR)"
+	@$(UV) run --project .agents/runtime --locked pytest .agents/runtime/tests
+	@echo "✓ Central runtime tests passed"
+
+runtime-mcp-smoke:
+	@echo "→ Running central runtime and MCP smoke checks..."
+	@./.agents/agents runtime manifest >/dev/null
+	@./.agents/agents runtime command-registry >/dev/null
+	@./.agents/agents mcp validate >/dev/null
+	@./.agents/agents status --json >/dev/null
+	@./.agents/agents-mcp inspect --depth 1 --max-entries 50 >/dev/null
+	@echo "✓ Central runtime and MCP smoke checks passed"
+
 # ==============================================================================
 # TELEMETRY & PATTERNS
 # ==============================================================================
@@ -610,7 +641,7 @@ endif
 # QUICK WORKFLOWS
 # ==============================================================================
 
-agents-all: doctor structure index knowledge-index sync lint lint-scripts skills-check tools-check telemetry-validate test-scripts-all
+agents-all: doctor structure index knowledge-index sync lint lint-scripts lint-runtime skills-check tools-check telemetry-validate test-scripts-all test-runtime runtime-mcp-smoke
 	@echo ""
 	@echo "╔═══════════════════════════════════════════════════════════╗"
 	@echo "║  ✓ All validations passed                                 ║"

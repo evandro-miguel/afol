@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: 2026-02-23 00:00:00-03:00
-updated_at: '2026-04-02T15:21:56-03:00'
+updated_at: '2026-04-12T10:43:14-03:00'
 links:
   tools_json: ./tools-json.md
   skills_readme: ../../skills/README.md
@@ -80,9 +80,8 @@ skills_sync:
   required: false
   manifest_file: ".agents/skills-sync.manifest.json"
   default_skills:
-    - "agentic-system-workflow"
-    - "writing-skills"
-    - "markdownlint-skill"
+    - "agentic-folder-sys"
+    - "agentic-scaffold-mcp"
 ```
 
 Partial-install note:
@@ -112,22 +111,22 @@ Partial-install note:
 ./.agents/agents skills-sync search markdown --runtime codex
 
 # Preview changes
-./.agents/agents skills-sync plan --skills writing-skills,markdownlint-skill
+./.agents/agents skills-sync plan --skills agentic-folder-sys
 
 # Apply skills
-./.agents/agents skills-sync apply --skills writing-skills
+./.agents/agents skills-sync apply --skills agentic-folder-sys
 
 # Ensure one skill is installed
-./.agents/agents skills-sync ensure writing-skills --runtime codex
+./.agents/agents skills-sync ensure agentic-folder-sys --runtime codex
 
 # Check structure
-./.agents/agents skills-sync check --skills writing-skills
+./.agents/agents skills-sync check --skills agentic-folder-sys
 
 # Full sync
-./.agents/agents skills-sync sync --skills writing-skills,markdownlint-skill
+./.agents/agents skills-sync sync --skills agentic-folder-sys
 
 # Propose upstream skill changes through a branch/PR; never push to main.
-./.agents/agents skills-sync push writing-skills --branch skills-sync/writing-skills --commit --push --pr
+./.agents/agents skills-sync push agentic-folder-sys --branch skills-sync/agentic-folder-sys --commit --push --pr
 ```
 
 ### Via Makefile
@@ -135,16 +134,16 @@ Partial-install note:
 ```bash
 make skills-init
 make skills-pull
-make skills-update SKILLS=writing-skills,markdownlint-skill
+make skills-update SKILLS=agentic-folder-sys
 make skills-list RUNTIME=codex
 make skills-search QUERY=markdown RUNTIME=codex
-make skills-plan SKILLS=writing-skills,markdownlint-skill
-make skills-apply SKILLS=writing-skills
-make skills-ensure SKILL=writing-skills RUNTIME=codex
-make skills-check SKILLS=writing-skills
-make skills-sync SKILLS=writing-skills,markdownlint-skill
+make skills-plan SKILLS=agentic-folder-sys
+make skills-apply SKILLS=agentic-folder-sys
+make skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
+make skills-check SKILLS=agentic-folder-sys
+make skills-sync SKILLS=agentic-folder-sys
 # Disabled by default in this scaffold:
-# make skills-push SKILL=writing-skills COMMIT=1 PUSH=1
+# make skills-push SKILL=agentic-folder-sys COMMIT=1 PUSH=1
 ```
 
 ## How to Modify
@@ -174,8 +173,8 @@ def check_structure(skills):
 2. Run `make skills-sync SKILLS=new-skill`
 3. Verify structure in `.agents/skills/new-skill/`
 
-For the scaffold itself, keep `agentic-system-workflow` available so agents can
-discover the canonical install, upgrade, validation, and source sync
+For the scaffold itself, keep `agentic-folder-sys` available so agents can
+discover the canonical install, upgrade, validation, source sync, and workbench
 flow from the project-local skill surface.
 
 ## Skill Structure
@@ -206,20 +205,17 @@ flow from the project-local skill surface.
 → Planning skills sync...
 
 Skills to sync:
-  - writing-skills (new)
-  - markdownlint-skill (update)
+  - agentic-folder-sys (new)
 
 Changes:
-  + writing-skills/SKILL.md
-  ~ markdownlint-skill/prompts/main.md
+  + agentic-folder-sys/SKILL.md
 ```
 
 ### Apply
 
 ```text
 → Applying skills...
-✓ Applied writing-skills
-✓ Applied markdownlint-skill
+✓ Applied agentic-folder-sys
 ✓ Skills sync complete
 ```
 

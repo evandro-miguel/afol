@@ -24,5 +24,8 @@ jobs:
       - name: Sync script environment
         run: cd .agents/scripts && uv sync
 
+      - name: Sync central runtime environment
+        run: cd .agents/runtime && uv sync --locked
+
       - name: Validate scaffold
         run: make all

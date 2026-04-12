@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260323_1815_execplan-native-planning-system_spec_01
 theme: execplan-native-planning-system
-status: draft
+status: active
 owners:
 - orchestrator
 created_at: '2026-03-23T18:15:00Z'
@@ -113,3 +113,16 @@ Out of scope:
 - Review questions:
   - Does the system now distinguish a static planning memo from a living ExecPlan?
   - Can a later contributor restart from the plan with minimal missing context?
+
+## 9) Delivery Evidence
+
+- `PLANS.md` exists at the repository root and defines the scaffold-specific
+  ExecPlan contract.
+- `docs/templates/plan.md` includes the required living sections and points
+  authors to `PLANS.md`.
+- `AGENTS.md`, `README.md`, and `docs/standards/workflow.md` describe the
+  canonical workbench ExecPlan path.
+- `verify-tasks.py --strict` checks final plans for required ExecPlan sections
+  and a maintained `Progress` checklist.
+- `test_verify_tasks_strict.py` covers missing ExecPlan sections and missing
+  progress checklist entries.

@@ -34,7 +34,7 @@ def base_config() -> dict:
             "default_profile": "core",
             "runtime_targets": ["all", "opencode", "codex"],
             "mode": "copy",
-            "default_skills": ["agentic-system-workflow", "writing-skills", "markdownlint-skill"],
+            "default_skills": ["agentic-folder-sys", "agentic-scaffold-mcp"],
         }
     }
 
@@ -137,7 +137,7 @@ class AgentsSkillsSyncTests(unittest.TestCase):
 
             self.assertIn({"app": "all", "profile": "core"}, manifest["installs"])
             self.assertIn(
-                {"app": "all", "skills": ["agentic-system-workflow", "writing-skills", "markdownlint-skill"]},
+                {"app": "all", "skills": ["agentic-folder-sys", "agentic-scaffold-mcp"]},
                 manifest["installs"],
             )
 
