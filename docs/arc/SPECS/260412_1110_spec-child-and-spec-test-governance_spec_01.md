@@ -6,7 +6,7 @@ status: draft
 owners:
 - orchestrator
 created_at: '2026-04-12T11:10:00-03:00'
-updated_at: '2026-04-12T11:14:56-03:00'
+updated_at: '2026-04-12T13:58:05-03:00'
 roadmap_feature: F-14
 spec_role: parent
 parent_spec: ''
@@ -158,7 +158,8 @@ Out of scope for this planning record:
 ## 8) Acceptance
 
 - Success looks like:
-  - The roadmap has a planned F-14 entry linked to this spec.
+  - The roadmap has an F-14 entry linked to this spec, and F-14 is marked
+    complete.
   - New governance docs define `spec-child` and `spec-test` without starting implementation.
   - A future implementation plan can enumerate exact doc, template, script, and
     validation changes without re-discovering the philosophy.
