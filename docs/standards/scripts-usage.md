@@ -4,7 +4,7 @@ id: scripts-usage
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-12T13:01:37-03:00'
+updated_at: '2026-04-12T14:11:34-03:00'
 ---
 
 # Scripts Usage
@@ -189,6 +189,7 @@ Creates or extends a workstream with only the artifacts justified by the selecte
 - The manifest is an ordered `artifacts:` list with `doc_type`, `template`, `phase`, `purpose`, optional `depends_on`, and optional flag metadata.
 - `workflow.artifact_policy` defines which artifacts each intent creates by default.
 - The default `delivery` flow now creates only `task`; `plan`, `report`, and `postmortem` are materialized only when explicitly requested or justified.
+- The default `planning` flow now creates `brainstorm`, `explorer-check`, and `plan`; use `--plan-only` or narrower intents when intentionally staying lightweight.
 - When `--intent` is omitted, obvious themes such as `investigation`, `brainstorm`, `explore`, and `postmortem` are inferred into a safer non-delivery intent.
 - The same catalog + policy is reused by `agents-status.py` to report workflow artifact readiness and invalid placeholder-only artifacts.
 

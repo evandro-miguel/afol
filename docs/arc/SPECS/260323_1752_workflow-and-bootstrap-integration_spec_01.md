@@ -6,7 +6,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-03-23T21:02:00Z'
-updated_at: '2026-03-23T21:02:00Z'
+updated_at: '2026-04-12T14:03:47-03:00'
 roadmap_feature: F-11
 spec_role: child
 parent_spec: 260323_1741_current-state-maps-and-goal-state-governance_spec_01
@@ -291,8 +291,8 @@ Evidence required:
 
 ## 21) Acceptance Checklist
 
-- [ ] Bootstrap explains the state-vs-goal split
-- [ ] Status points to active workbench and canonical governance docs
-- [ ] Review preserves the governance hierarchy
-- [ ] Resolver routes evidence questions and intent questions differently
-- [ ] No second governance tree is introduced
+- [x] Bootstrap explains the state-vs-goal split
+- [x] Status points to active workbench and canonical governance docs
+- [x] Review preserves the governance hierarchy
+- [x] Resolver routes evidence questions and intent questions differently
+- [x] No second governance tree is introduced

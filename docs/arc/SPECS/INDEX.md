@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-04-12T16:56:25+00:00"
-updated_at: "2026-04-12T16:56:25+00:00"
+created_at: "2026-04-12T17:15:09+00:00"
+updated_at: "2026-04-12T17:15:09+00:00"
 ---
 
 # SPECS INDEX
@@ -16,14 +16,13 @@ updated_at: "2026-04-12T16:56:25+00:00"
 |--------|-------|
 | Total | 22 |
 | Draft | 1 |
-| Active | 20 |
+| Active | 21 |
 | Final | 0 |
 
 ## Index
 
 | SPEC ID | Theme | Status | Owner | Links |
 |--------:|-------|--------|-------|------|
-|  |  |  |  |  |
 | 260306_roadmap-first-delivery-system_spec_01 | roadmap-first-delivery-system | active | orchestrator | roadmap: 260223_0000_arc_roadmap_01, plan: 260306_1815_roadmap-first-governance_plan_01, task: 260306_1815_roadmap-first-governance_task_01 |
 | 260306_primary-agent-runtime-compatibility_spec_01 | primary-agent-runtime-compatibility | active | orchestrator | roadmap: 260223_0000_arc_roadmap_01 |
 | 260306_execution-intelligence-and-knowledge-system_spec_01 | execution-intelligence-and-knowledge-system | active | orchestrator | roadmap: 260223_0000_arc_roadmap_01 |
@@ -44,6 +43,7 @@ updated_at: "2026-04-12T16:56:25+00:00"
 | 260323_1751_goal-state-canon_spec_01 |  | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260323_1752_workflow-and-bootstrap-integration_spec_01 | workflow-and-bootstrap-integration | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260411_agentic-runtime-restructure_spec_01 | agentic-runtime-restructure | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260412_0000_specs-folder-guide_spec_01 |  | active |  |  |
 | 260412_1110_spec-child-and-spec-test-governance_spec_01 | spec-child-and-spec-test-governance | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 
 ---

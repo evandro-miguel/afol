@@ -3,7 +3,7 @@ doc_type: standard
 id: agents-usage-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-04T10:08:11-03:00'
+updated_at: '2026-04-12T14:11:34-03:00'
 ---
 
 # Agents System Usage
@@ -179,6 +179,7 @@ Creates or extends a workstream with only the artifacts justified by the selecte
 - The catalog is an ordered `artifacts:` list with `doc_type`, `template`, `phase`, `purpose`, optional `depends_on`, and optional `flag` / `id_placeholder` / `replacements`.
 - `workflow.artifact_policy` defines which artifacts are created by default for each intent.
 - The default `delivery` intent creates only `task`; `plan`, `report`, and `postmortem` are materialized only when explicitly needed.
+- The default `planning` intent now creates `brainstorm`, `explorer-check`, and `plan`; use `--plan-only` or narrower intents when intentionally staying lightweight.
 - When `--intent` is omitted, obvious themes such as `investigation`, `brainstorm`, `explore`, and `postmortem` are inferred into a safer non-delivery intent.
 - `--with <doc-type>` adds specific justified artifacts instead of forcing the full package.
 - `agents-status` reads the same catalog + policy to summarize which artifacts are missing, blocked, invalid, ready, or done.

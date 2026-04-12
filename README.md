@@ -87,6 +87,9 @@ make doctor
 
 # The same theme would also infer `research` safely if --intent is omitted
 
+# Governed planning workstream (seeds brainstorm + explorer-check + plan by default)
+.agents/agents new planning-track --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --intent planning
+
 # Optional: add a pack for another major track inside an existing session
 .agents/agents new api-follow-up --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec
 
@@ -424,6 +427,7 @@ make patterns-rate      # Rate pattern
 # Main tools
 .agents/agents doctor           # Validate structure
 .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id>  # Create minimal delivery workstream (task by default)
+.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --intent planning  # Create governed planning bundle (brainstorm + explorer-check + plan)
 .agents/agents verify-tasks     # Verify tasks
 .agents/agents status           # Show session status + workflow artifact readiness
 .agents/agents wb-update touch  # Update session

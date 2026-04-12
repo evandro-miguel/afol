@@ -200,6 +200,31 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_manifest_test", script_path)
 
+        planning_default = agents_new._iter_workstream_artifacts(
+            {
+                "intent": "planning",
+                "plan_only": False,
+                "use_spec": False,
+                "use_spec_lite": False,
+                "with_artifacts": [],
+            }
+        )
+        self.assertEqual(
+            [entry["doc_type"] for entry in planning_default],
+            ["brainstorm", "explorer-check", "plan"],
+        )
+
+        planning_plan_only = agents_new._iter_workstream_artifacts(
+            {
+                "intent": "planning",
+                "plan_only": True,
+                "use_spec": False,
+                "use_spec_lite": False,
+                "with_artifacts": [],
+            }
+        )
+        self.assertEqual([entry["doc_type"] for entry in planning_plan_only], ["plan"])
+
         planning_only = agents_new._iter_workstream_artifacts(
             {
                 "intent": "delivery",

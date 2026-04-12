@@ -4,9 +4,9 @@ id: 260306_knowledge-reuse-and-token-efficiency_spec_01
 theme: knowledge-reuse-and-token-efficiency
 status: active
 owners:
-  - orchestrator
+- orchestrator
 created_at: '2026-03-06T23:05:00+00:00'
-updated_at: '2026-03-06T23:05:00+00:00'
+updated_at: '2026-04-12T14:03:16-03:00'
 roadmap_feature: F-07
 spec_role: child
 parent_spec: 260306_execution-intelligence-and-knowledge-system_spec_01
@@ -14,12 +14,12 @@ links:
   roadmap: 260223_0000_arc_roadmap_01
 scope:
   repo_areas:
-    - docs/knowledge
-    - .agents/scripts/agents-knowledge.py
-    - .agents/tools.json
-    - docs/standards
+  - docs/knowledge
+  - .agents/scripts/agents-knowledge.py
+  - .agents/tools.json
+  - docs/standards
   packages:
-    - knowledge reuse
+  - knowledge reuse
 risk_level: medium
 ---
 
@@ -44,9 +44,9 @@ risk_level: medium
 
 ## Acceptance
 
-- [ ] A repo-local knowledge tool exists for list/search/show/index.
-- [ ] Knowledge index includes research, brainstorm, explorer-check, reports, and post-mortems.
-- [ ] README and standards recommend low-token discovery before large reads.
+- [x] A repo-local knowledge tool exists for list/search/show/index.
+- [x] Knowledge index includes research, brainstorm, explorer-check, reports, and post-mortems.
+- [x] README and standards recommend low-token discovery before large reads.
 
 ---
 

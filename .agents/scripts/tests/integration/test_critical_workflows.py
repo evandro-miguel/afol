@@ -138,6 +138,34 @@ def test_new_quick_workflow(isolated_repo: Path):
     assert "✓ Added task:" in result.stdout
 
 
+def test_new_planning_workflow_creates_brainstorm_and_explorer_check(isolated_repo: Path):
+    """`--intent planning` should materialize the governed planning artifact bundle."""
+    result = run_command(
+        isolated_repo,
+        [
+            "new",
+            "integration-planning-track",
+            "--feature-id",
+            "F-10",
+            "--parent-spec",
+            "260323_1704_universal-skills-runtime-integration_spec_01",
+            "--intent",
+            "planning",
+        ],
+    )
+
+    assert result.returncode == 0, result.stderr
+
+    session_dirs = sorted((isolated_repo / ".agents" / "wb").glob("*_integration-planning-track"))
+    assert session_dirs, "Expected a new planning session directory."
+    session_dir = session_dirs[-1]
+    session_id = session_dir.name
+
+    assert (session_dir / f"{session_id}_brainstorm_01.md").exists()
+    assert (session_dir / f"{session_id}_explorer-check_01.md").exists()
+    assert (session_dir / f"{session_id}_plan_01.md").exists()
+
+
 def test_wb_update_task_workflow(isolated_repo: Path):
     """`.agents/agents wb-update touch` should succeed for an active session."""
     result = run_command(isolated_repo, ["wb-update", "touch", "--session", SESSION_ID])

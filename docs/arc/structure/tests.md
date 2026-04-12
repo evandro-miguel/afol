@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-04-12T16:56:24+00:00
+**Generated:** 2026-04-12T17:15:08+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 65 files, 8,739 lines, 403.5 KB
+**Stats:** 65 files, 8,794 lines, 405.5 KB
 
 ### Files
 
@@ -19,16 +19,16 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_skills_sync.py` | 739 | 32.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_scenarios.py` | 520 | 26.3 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_flow.py` | 427 | 21.7 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_new_quick_mode.py` | 335 | 15.3 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_new_quick_mode.py` | 358 | 16.1 KB | Test file; unit tests |
+| `.agents/scripts/tests/integration/test_critical_workflows.py` | 327 | 14.6 KB | Test file; unit tests |
 | `.agents/scripts/tests/conftest.py` | 315 | 13.4 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_runtime_compatibility.py` | 314 | 17.7 KB | Test file; unit tests |
-| `.agents/scripts/tests/integration/test_critical_workflows.py` | 304 | 13.6 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_wb_update_task_marker.py` | 245 | 11.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260323_1752_workflow-and-bootstrap-integration_spec_01.md` | 211 | 12.2 KB | Module; functionality |
 | `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md` | 211 | 12.0 KB | Module; functionality |
 | `.agents/scripts/tests/unit/test_version.py` | 189 | 9.3 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_primary-agent-runtime-compatibility_spec_01.md` | 171 | 8.4 KB | Module; functionality |
-| `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md` | 148 | 6.9 KB | Test file; unit tests |
+| `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md` | 149 | 6.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_repo_map.py` | 137 | 6.0 KB | Test file; unit tests |
 | `docs/arc/SPECS/TEMPLATE_spec.md` | 133 | 2.9 KB | Module; functionality |
 | `docs/arc/SPECS/260323_1741_current-state-maps-and-goal-state-governance_spec_01.md` | 125 | 7.2 KB | Module; functionality |
@@ -55,10 +55,10 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/structure/tests.md` | 77 | 6.5 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_review-and-logical-revert_spec_01.md` | 76 | 2.8 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_lint_noise_reduction.py` | 74 | 3.2 KB | Test file; unit tests |
+| `docs/arc/SPECS/FOLDER_GUIDE.md` | 72 | 2.5 KB | Module; functionality |
 | `docs/arc/SPECS/260306_runtime-command-parity_spec_01.md` | 71 | 2.6 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_doctor.py` | 68 | 3.6 KB | Test file; unit tests |
 | `docs/arc/SPECS/F-14/spec-tests/260412_1130_spec-child-and-spec-test-governance_spec-test_01.md` | 67 | 3.0 KB | Test file; unit tests |
-| `docs/arc/SPECS/FOLDER_GUIDE.md` | 64 | 2.3 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_lint_state_board.py` | 58 | 2.7 KB | Test file; unit tests |
 | `.agents/runtime/tests/test_cli.py` | 56 | 2.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_doctor_fix.py` | 53 | 2.5 KB | Test file; unit tests |

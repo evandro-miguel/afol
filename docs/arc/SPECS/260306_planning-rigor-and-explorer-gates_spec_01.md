@@ -4,9 +4,9 @@ id: 260306_planning-rigor-and-explorer-gates_spec_01
 theme: planning-rigor-and-explorer-gates
 status: active
 owners:
-  - orchestrator
+- orchestrator
 created_at: '2026-03-06T23:05:00+00:00'
-updated_at: '2026-03-06T23:05:00+00:00'
+updated_at: '2026-04-12T14:11:34-03:00'
 roadmap_feature: F-07
 spec_role: child
 parent_spec: 260306_execution-intelligence-and-knowledge-system_spec_01
@@ -14,11 +14,11 @@ links:
   roadmap: 260223_0000_arc_roadmap_01
 scope:
   repo_areas:
-    - docs/templates
-    - .agents/scripts/agents-new.py
-    - .agents/scripts/verify-tasks.py
+  - docs/templates
+  - .agents/scripts/agents-new.py
+  - .agents/scripts/verify-tasks.py
   packages:
-    - planning rigor
+  - planning rigor
 risk_level: medium
 ---
 
@@ -43,10 +43,10 @@ risk_level: medium
 
 ## Acceptance
 
-- [ ] Brainstorm template captures options, assumptions, and preferred direction.
-- [ ] Explorer-check template captures inspected paths, commands, findings, and plan-readiness.
-- [ ] New workstreams create both artifacts by default.
-- [ ] Strict verification catches missing exploration gates.
+- [x] Brainstorm template captures options, assumptions, and preferred direction.
+- [x] Explorer-check template captures inspected paths, commands, findings, and plan-readiness.
+- [x] New workstreams create both artifacts by default.
+- [x] Strict verification catches missing exploration gates.
 
 ---
 

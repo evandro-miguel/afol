@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-04-12T16:56:24+00:00
+**Generated:** 2026-04-12T17:15:08+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,7 +9,7 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 45 files, 13,323 lines, 543.7 KB
+**Stats:** 45 files, 13,323 lines, 543.8 KB
 
 ### Files
 
@@ -31,7 +31,7 @@ Services, utilities, and business logic.
 | `.agents/scripts/check-links.py` | 319 | 11.0 KB | Module; functionality |
 | `.agents/scripts/agents-repo-map.py` | 318 | 14.6 KB | Module; functionality |
 | `.agents/scripts/agents-memory.py` | 288 | 11.7 KB | Module; functionality |
-| `.agents/scripts/lib/workflow_manifest.py` | 282 | 11.0 KB | Module; functionality |
+| `.agents/scripts/lib/workflow_manifest.py` | 282 | 11.1 KB | Module; functionality |
 | `.agents/scripts/agents-knowledge.py` | 238 | 9.3 KB | Module; functionality |
 | `.agents/scripts/fix-lint-all.py` | 212 | 8.3 KB | Module; functionality |
 | `.agents/scripts/agents-fix-symlinks.py` | 192 | 6.7 KB | Module; functionality |

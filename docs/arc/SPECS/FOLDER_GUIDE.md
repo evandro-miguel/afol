@@ -1,3 +1,12 @@
+---
+doc_type: spec
+id: 260412_0000_specs-folder-guide_spec_01
+status: active
+created_at: '2026-04-12T00:00:00Z'
+updated_at: '2026-04-12T14:16:32-03:00'
+title: Specifications Folder Guide
+---
+
 # Specifications
 
 This folder contains the strategic feature specifications for the project.
@@ -95,4 +104,4 @@ draft -> active -> final -> deprecated
 
 ---
 
-*Specifications folder: `docs/specs/`*
+*Specifications folder: `docs/arc/SPECS/`*

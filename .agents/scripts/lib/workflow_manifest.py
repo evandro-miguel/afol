@@ -143,7 +143,7 @@ DEFAULT_ARTIFACT_POLICY: Dict[str, Any] = {
             "required_context": ["roadmap", "task", "workflow", "product", "guidelines", "tech-stack"],
         },
         "planning": {
-            "create": ["plan"],
+            "create": ["brainstorm", "explorer-check", "plan"],
             "allow": [
                 "brainstorm",
                 "research",

@@ -6,7 +6,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-03-06T23:05:00+00:00'
-updated_at: '2026-04-04T10:08:10-03:00'
+updated_at: '2026-04-12T14:03:16-03:00'
 roadmap_feature: F-07
 spec_role: child
 parent_spec: 260306_execution-intelligence-and-knowledge-system_spec_01
@@ -45,10 +45,10 @@ risk_level: medium
 
 ## Acceptance
 
-- [ ] `agents-new` supports optional pack creation.
-- [ ] Workbench tools operate recursively inside sessions.
-- [ ] A post-mortem template exists and can be materialized when real closure analysis starts.
-- [ ] `wb-update status --file report --value final` fails without a post-mortem.
+- [x] `agents-new` supports optional pack creation.
+- [x] Workbench tools operate recursively inside sessions.
+- [x] A post-mortem template exists and can be materialized when real closure analysis starts.
+- [x] `wb-update status --file report --value final` fails without a post-mortem.
 
 ---
 
