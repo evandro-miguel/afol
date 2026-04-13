@@ -134,6 +134,8 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
   It holds repository maps, codemaps, dependency graphs, API/ABI snapshots,
   and analysis evidence generated from tooling. It describes what the repo
   looks like right now, not what it should become.
+- Treat legacy `docs/arc/structure/` outputs as archived compatibility
+  material, not as a second durable current-state map surface.
 - **`docs/map/` must never contain:** roadmap entries, feature specs, ADRs,
   project briefs, architecture intent, or any document that defines desired
   behavior or product philosophy. Those belong under `docs/arc/`.

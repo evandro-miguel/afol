@@ -1207,6 +1207,7 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     (target / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
 
     monkeypatch.setattr(bootstrap, "ROOT_DIR", source)
+    monkeypatch.setattr(bootstrap, "TEMPLATE_ROOT", source)
     monkeypatch.setattr(bootstrap, "MANDATORY_FILES_TO_COPY", [Path("AGENTS.md")])
     monkeypatch.setattr(bootstrap, "MANDATORY_DIRS_TO_COPY", [Path("docs/templates")])
     monkeypatch.setattr(bootstrap, "OPTIONAL_FILES_TO_COPY", [Path("missing.md")])

@@ -36,6 +36,7 @@ from lib.agents_config import (
     load_agents_config,
     parse_offset,
 )
+from lib.markdown_docs import split_markdown_frontmatter as split_frontmatter
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
@@ -145,19 +146,6 @@ def require_explicit_session(args: argparse.Namespace, command: str) -> None:
         f"Command '{command}' requires --session for write safety. "
         "Use explicit --session <id/path> (or --file/--all-wb/--report where supported)."
     )
-
-
-def split_frontmatter(content: str) -> tuple[dict, str] | None:
-    if not content.startswith("---\n"):
-        return None
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        return None
-    data = yaml.safe_load(parts[1].strip())
-    if not isinstance(data, dict):
-        return None
-    body = parts[2].lstrip("\n")
-    return data, body
 
 
 def write_frontmatter(path: Path, fm: dict, body: str):

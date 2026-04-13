@@ -47,9 +47,10 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         generated_files = {str(path) for path in agents_bootstrap.generated_baseline_content("2026-03-23T00:00:00Z")}
 
         self.assertIn("OPENCODE.md", mandatory_files)
-        self.assertIn("PLANS.md", mandatory_files)
+        self.assertNotIn("PLANS.md", mandatory_files)
         self.assertIn("opencode.json", mandatory_files)
         self.assertIn("docs/arc/SPECS/README.md", mandatory_files)
+        self.assertIn(".agents/runtime", mandatory_dirs)
         self.assertIn(".agents/tmp", ensure_dirs)
         self.assertIn(".opencode", ensure_dirs)
         self.assertIn(".opencode/agent", ensure_dirs)
@@ -210,6 +211,78 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("current-state, descriptive", map_readme)
             self.assertFalse((target / ".agents/arc/map").exists())
             self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
+
+    def test_project_template_stays_generic_and_history_free(self):
+        template_root = Path("src/project-template")
+        generic_files = [
+            template_root / "AGENTS.md",
+            template_root / "OPENCODE.md",
+            template_root / "QWEN.md",
+            template_root / "CLAUDE.md",
+            template_root / "GEMINI.md",
+            template_root / "docs/knowledge/INDEX.md",
+            template_root / "docs/knowledge/README.md",
+            template_root / "docs/lessons/README.md",
+            template_root / "docs/lessons/general-lessons.md",
+            template_root / "docs/map/structure/README.md",
+            template_root / "docs/templates/adr.md",
+            template_root / "docs/templates/pattern.md",
+            template_root / "docs/templates/spec.md",
+            template_root / "docs/templates/spec-child.md",
+            template_root / "docs/templates/spec-test.md",
+            template_root / "docs/templates/spec-lite.md",
+        ]
+
+        forbidden_tokens = [
+            "agentic_start_folder",
+            "project-template-source-separation",
+            "F-15",
+            "F-16",
+            "/home/ozy/",
+            "gre-test-app",
+            "scaffold repository",
+        ]
+
+        generated_names = {".agent", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
+        generated_artifacts = [
+            path
+            for path in template_root.rglob("*")
+            if path.name in generated_names or path.name in {"events.jsonl", "settings.local.json", ".structure-cache.json"}
+        ]
+        self.assertEqual(generated_artifacts, [])
+
+        text_suffixes = {".md", ".json", ".toml", ".yaml", ".yml", ".py", ".sh"}
+        text_files = [
+            path
+            for path in template_root.rglob("*")
+            if path.is_file() and path.suffix in text_suffixes
+        ]
+        for path in sorted(set(generic_files + text_files)):
+            content = path.read_text(encoding="utf-8")
+            for token in forbidden_tokens:
+                self.assertNotIn(token, content, f"{path} should not contain {token!r}")
+
+        agents_md = (template_root / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertNotIn("This template", agents_md)
+        self.assertNotIn("template defines", agents_md)
+        self.assertIn("## Project Goal", agents_md)
+        self.assertIn("## Project Structure", agents_md)
+        self.assertIn("## Mandatory Rules", agents_md)
+        self.assertIn(".agents/rules/RULE-001-tool-discovery.md", agents_md)
+        self.assertFalse((template_root / "PLANS.md").exists())
+
+        template_files_outside_templates = [
+            path
+            for path in template_root.joinpath("docs").rglob("*.md")
+            if "template" in path.name.lower() and "docs/templates" not in path.as_posix()
+        ]
+        self.assertEqual(template_files_outside_templates, [])
+
+        lesson_entries = sorted((template_root / "docs/lessons/entries").glob("*.md"))
+        self.assertEqual([path.name for path in lesson_entries], ["README.md"])
+
+        structure_files = sorted((template_root / "docs/map/structure").glob("*.md"))
+        self.assertEqual([path.name for path in structure_files], ["README.md"])
 
     def test_partial_bootstrap_generates_existing_project_adoption_baseline(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()

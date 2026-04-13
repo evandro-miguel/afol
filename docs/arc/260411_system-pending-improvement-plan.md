@@ -1,7 +1,7 @@
 ---
 doc_type: plan
 id: 260411_1415_system-pending-improvement-plan_plan_01
-status: active
+status: superseded
 created_at: '2026-04-11T14:11:00-03:00'
 updated_at: '2026-04-11T14:24:25-03:00'
 title: System Pending Improvement Plan
@@ -13,6 +13,12 @@ parent_spec: 260323_1741_current-state-maps-and-goal-state-governance_spec_01
 ---
 
 ## System Pending Improvement Plan
+
+> Superseded by F-15 workstreams
+> `260412_2006_repo-wide-simplification-runtime-parity` and
+> `260412_2115_project-finalization-orchestration`.
+> This artifact is retained as historical context for the 2026-04-11
+> read-only environment check and is not the live improvement plan.
 
 ## Context
 

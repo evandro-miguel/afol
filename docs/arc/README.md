@@ -3,7 +3,7 @@ doc_type: architecture
 id: 260223_0000_arc_architecture_01
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-03-23T18:06:20-03:00'
+updated_at: '2026-04-13T13:36:55-03:00'
 ---
 
 # Architecture
@@ -20,22 +20,16 @@ Architecture documents define **how** the system is structured and how component
 arc/
 ├── ARCHITECTURE.md      # Root architecture document
 ├── GENERAL-ROADMAP.md   # North star and milestones
-├── map/                 # Current-state descriptive maps and analysis surfaces
-├── structure/           # Project structure maps
-│   ├── README.md
-│   ├── TEMPLATE_structure.md
-│   └── default.md
 ├── SPECS/               # Technical specifications
 │   ├── README.md
-│   ├── INDEX.md
-│   ├── TEMPLATE_spec.md
-│   ├── TEMPLATE_spec-child.md
-│   ├── TEMPLATE_spec-test.md
-│   └── TEMPLATE_spec-lite.md
+│   └── INDEX.md
 ├── DECISIONS/           # Architecture Decision Records (ADRs)
-│   └── TEMPLATE_adr.md
 └── README.md            # This file
 ```
+
+Current-state map evidence lives outside `docs/arc/` under `docs/map/`,
+including the structure files in `docs/map/structure/`.
+Reusable templates live only under `docs/templates/`.
 
 ## Document types
 
@@ -56,10 +50,9 @@ arc/
 
 ### structure/
 
-- Physical directory layout
-- Folder conventions
-- Entry points
-- Import conventions
+- Physical directory layout under `docs/map/structure/`
+- Folder conventions for the current-state structure view
+- Entry points and import conventions for the map surface
 
 ### map/
 
@@ -67,6 +60,7 @@ arc/
 - Analysis evidence and codemap-style surfaces
 - Refreshable operator references
 - Never the approval source for roadmap/spec intent
+- Includes the canonical structure index in `docs/map/structure/`
 
 ### Specifications (SPECS/)
 
@@ -75,12 +69,16 @@ arc/
 - SPEC TEST: journey-first testing strategy before test implementation
 - SPEC LITE: legacy compatibility alias during migration to SPEC CHILD
 
+Template files for these spec types live in `docs/templates/`.
+
 ### Architecture Decision Records (DECISIONS/)
 
 - Context and problem statement
 - Decision and rationale
 - Consequences (positive/negative)
 - Status (proposed/accepted/deprecated)
+
+The reusable ADR template lives in `docs/templates/adr.md`.
 
 ## Linking to work
 
@@ -100,6 +98,7 @@ Plans and tasks should reference architecture docs:
 - Link ADRs to implementation tasks
 - Update SPECS INDEX for every new spec
 - Keep `map/` descriptive and refreshable; keep desired-state decisions in roadmap/spec/ADR docs outside that folder
+- Keep the structure view in `docs/map/structure/`; do not recreate `docs/arc/structure/` as a second current-state surface
 
 ---
 

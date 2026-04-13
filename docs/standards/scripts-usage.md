@@ -120,7 +120,7 @@ This creates:
 .agents/agents new auth-refactor --spec
 
 # Generate structure docs
-.agents/agents structure-map . --output docs/arc/structure/
+.agents/agents structure-map . --output docs/map/structure/
 
 # Verify tasks
 .agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/
@@ -265,7 +265,7 @@ Validates markdown docs for consistency.
 - Required frontmatter fields exist
 - Cross-references are valid
 - Temporary folders such as `.agents/tmp/`, `.tmp/`, and repo-local `tmp/` are always excluded
-- Raw codemap evidence under `.agents/arc/map/extra/` and `docs/map/extra/` is excluded from markdown lint
+- Raw codemap evidence under `docs/map/extra/` is excluded from markdown lint
 
 **Usage:**
 
@@ -330,7 +330,7 @@ Auto-generates project structure documentation.
 
 ```bash
 python .agents/scripts/agents-structure-map.py .
-python .agents/scripts/agents-structure-map.py /path/to/project --output docs/arc/structure/
+python .agents/scripts/agents-structure-map.py /path/to/project --output docs/map/structure/
 ```
 
 **Output:**

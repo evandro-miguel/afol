@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-04-12T22:48:31+00:00"
-updated_at: "2026-04-12T22:48:31+00:00"
+created_at: "2026-04-13T16:11:24+00:00"
+updated_at: "2026-04-13T16:11:24+00:00"
 ---
 
 # SPECS INDEX
@@ -14,10 +14,10 @@ updated_at: "2026-04-12T22:48:31+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 22 |
+| Total | 25 |
 | Draft | 1 |
-| Active | 21 |
-| Final | 0 |
+| Active | 23 |
+| Final | 1 |
 
 ## Index
 
@@ -45,6 +45,9 @@ updated_at: "2026-04-12T22:48:31+00:00"
 | 260411_agentic-runtime-restructure_spec_01 | agentic-runtime-restructure | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260412_0000_specs-folder-guide_spec_01 |  | active |  |  |
 | 260412_1110_spec-child-and-spec-test-governance_spec_01 | spec-child-and-spec-test-governance | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260412_2004_repo-wide-simplification-runtime-parity_spec_01 | repo-wide-simplification-runtime-parity | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260413_1250_project-template-source-separation_spec_01 | project-template-source-separation | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260413_1250_project-template-source-separation_spec-child_01 | project-template-source-separation | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260413_1250_project-template-source-separation_plan_01, task: 260413_1250_project-template-source-separation_task_01, report: 260413_1250_project-template-source-separation_report_01 |
 
 ---
 *Index: `docs/arc/SPECS/INDEX.md`*

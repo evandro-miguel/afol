@@ -13,7 +13,7 @@ Usage:
 
 Examples:
     python agents-structure-map.py .
-    python agents-structure-map.py /home/ozy/apps/my-project --output docs/arc/structure/
+    python agents-structure-map.py /home/ozy/apps/my-project --output docs/map/structure/
 """
 
 import os
@@ -85,8 +85,8 @@ IGNORED_DIRS = {
 }
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
-ARC_DIR = get_cfg_path(ROOT_DIR, CONFIG, "arc_dir")
-DEFAULT_OUTPUT_DIR = ARC_DIR / "structure"
+MAP_DIR = get_cfg_path(ROOT_DIR, CONFIG, "map_dir")
+DEFAULT_OUTPUT_DIR = MAP_DIR / "structure"
 DEFAULT_OFFSET = CONFIG.get("time", {}).get("default_offset", "+00:00")
 DEFAULT_TZ = parse_offset(DEFAULT_OFFSET)
 
@@ -484,7 +484,7 @@ def main():
         print()
         print("Examples:")
         print("  python agents-structure-map.py .")
-        print("  python agents-structure-map.py /home/ozy/apps/my-project --output docs/arc/structure/")
+        print("  python agents-structure-map.py /home/ozy/apps/my-project --output docs/map/structure/")
         sys.exit(1)
 
     project_path = Path(sys.argv[1])
@@ -501,7 +501,7 @@ def main():
         if project_path.resolve() == ROOT_DIR.resolve():
             output_path = DEFAULT_OUTPUT_DIR
         else:
-            output_path = project_path / "docs" / "arc" / "structure"
+            output_path = project_path / "docs" / "map" / "structure"
 
     # Run mapper
     mapper = StructureMapper(project_path, output_path)

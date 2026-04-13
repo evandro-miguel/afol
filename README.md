@@ -57,6 +57,9 @@ docs/
 ├── runtime/                 # Central Python runtime and FastMCP adapter
 ├── skills/                  # Project skills
 └── tools.json               # Tool catalog
+
+src/
+└── project-template/        # Exportable default project baseline source
 ```
 
 ## 🚀 Quick Start
@@ -111,6 +114,8 @@ make doctor
 # .agents/source/universal-skills inside the target repository.
 # The default bootstrap path seeds that source from committed repo assets,
 # so downstream installs do not need a network clone.
+# The exportable project baseline is sourced from `src/project-template/`
+# inside this repo, not from the live development root.
 ```
 
 ### Runtime Entry Points

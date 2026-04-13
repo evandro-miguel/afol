@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: '2026-02-23T00:00:00-03:00'
-updated_at: '2026-04-02T14:34:51-03:00'
+updated_at: '2026-04-13T13:36:56-03:00'
 links:
   tools_json: ./tools-json.md
   wrapper: ./agents-wrapper.md
@@ -63,7 +63,6 @@ Compatibility mirrors kept for broader reuse:
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Canonical instruction template |
-| `PLANS.md` | Canonical ExecPlan contract |
 | `OPENCODE.md` | Mandatory OpenCode instruction replica |
 | `QWEN.md` | Mandatory agent instruction replica |
 | `CLAUDE.md` | Mandatory agent instruction replica |
@@ -75,8 +74,8 @@ Compatibility mirrors kept for broader reuse:
 | `.agents/skills-sync.manifest.json` | Skills sync state |
 | `docs/arc/README.md` | Arc folder overview |
 | `docs/arc/SPECS/README.md` | Specs folder guidance |
-| `docs/arc/SPECS/TEMPLATE_*.md` | Spec templates |
-| `docs/arc/DECISIONS/TEMPLATE_adr.md` | ADR template |
+| `docs/templates/spec*.md` | Spec templates |
+| `docs/templates/adr.md` | ADR template |
 | `.agents/scripts/` | Python scripts |
 | `docs/` | Documentation, copied with history/report sanitization |
 | `.agents/rules/` | Agent rules |
@@ -88,7 +87,6 @@ Compatibility mirrors kept for broader reuse:
 | Location | Action |
 |----------|--------|
 | `<target>/AGENTS.md` | Copied |
-| `<target>/PLANS.md` | Copied |
 | `<target>/OPENCODE.md` | Copied |
 | `<target>/QWEN.md` | Copied |
 | `<target>/CLAUDE.md` | Copied |
@@ -189,7 +187,6 @@ Edit `agents-bootstrap.py`:
 ```python
 MANDATORY_FILES_TO_COPY = [
     "AGENTS.md",
-    "PLANS.md",
     "OPENCODE.md",
     "QWEN.md",
     "CLAUDE.md",
@@ -200,7 +197,7 @@ MANDATORY_FILES_TO_COPY = [
     ".agents/tools.json",
     ".agents/skills-sync.manifest.json",
     "docs/arc/SPECS/README.md",
-    "docs/arc/SPECS/TEMPLATE_spec.md",
+    "docs/templates/spec.md",
 ]
 ```
 

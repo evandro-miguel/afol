@@ -27,6 +27,7 @@ docs/
 ├── agents.config           # Central configuration (YAML)
 ├── tools.json              # Tool catalog (JSON)
 ├── agents                  # CLI wrapper (bash)
+├── runtime/                # Runtime package mirror and adapters
 ├── wb/                     # Workstreams (sessions)
 │   ├── .active_session     # Pointer to current session
 │   └── YYMMDD_HHMM_<theme>/
@@ -35,6 +36,9 @@ docs/
 │   └── lib/
 │       └── agents_config.py
 └── rules/                  # Agent rules
+
+src/
+└── project-template/       # Exportable default project baseline
 ```
 
 ---
@@ -51,6 +55,7 @@ docs/
 | `docs/arc/SPECS/` | Technical specifications |
 | `docs/arc/DECISIONS/` | Architecture decisions |
 | `docs/map/` | Current-state repository mapping |
+| `src/project-template/` | Exportable scaffold baseline source |
 | `wb/` | Workstreams |
 | `rules/` | Agent rules |
 | `scripts/` | Tool scripts |
@@ -86,7 +91,7 @@ time:
 lint:
   excluded_path_prefixes:
     - docs/map/extra/
-    - docs/arc/structure/
+    - docs/map/structure/
 
 doctor:
   required_folders: [...]
@@ -159,7 +164,7 @@ python -m json.tool .agents/tools.json
 | Templates | `docs/templates/` |
 | Lessons learned | `docs/lessons/` |
 | Architecture | `docs/arc/` |
-| Structure docs | `docs/arc/structure/` |
+| Structure docs | `docs/map/structure/` |
 | Specifications | `docs/arc/SPECS/` |
 | Decisions (ADRs) | `docs/arc/DECISIONS/` |
 | Agent rules | `.agents/rules/` |

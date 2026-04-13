@@ -18,7 +18,7 @@ Use this standard when the project needs more than a lightweight file inventory.
 
 - Project-owned documentation belongs under `docs/` at the repository root.
 - `docs/map/` is the current-state, descriptive evidence surface.
-- `docs/arc/structure/` is the lightweight physical layout view.
+- `docs/map/structure/` is the lightweight physical layout view.
 - `docs/arc/README.md`, `PROJECT-BRIEF.md`, `ARCHITECTURE.md`, `TECH-STACK.md`, `GENERAL-ROADMAP.md`, `SPECS/`, and `DECISIONS/` remain the goal-state canon.
 - Workbench artifacts remain the execution surface.
 - `.agents/` remains the agent-system surface for workbench, runtime rules,
@@ -65,7 +65,7 @@ The scaffold command delegates the heavy analysis work to the external runner:
 
 The scaffold does not install the toolbox automatically and must not try to install host-global tools on its own.
 
-Before invoking the runner, the scaffold prepares a temporary shadow copy of the repository for analysis. That shadow excludes non-canonical or derived surfaces such as `.git/`, `.agents/cache/`, `.agents/.cache/`, `.agents/wb/`, `.agents/z-arq/`, `.agents/tmp/`, previously generated `docs/map/`, legacy `docs/map/`, and `docs/arc/structure/` output.
+Before invoking the runner, the scaffold prepares a temporary shadow copy of the repository for analysis. That shadow excludes non-canonical or derived surfaces such as `.git/`, `.agents/cache/`, `.agents/.cache/`, `.agents/wb/`, `.agents/z-arq/`, `.agents/tmp/`, previously generated `docs/map/`, legacy `docs/map/`, and `docs/map/structure/` output.
 
 ## Output Contract
 

@@ -14,11 +14,11 @@ from typing import Callable, Dict, List, Sequence, Set, Tuple
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+TEMPLATE_ROOT = ROOT_DIR / "src" / "project-template"
 LOCAL_UNIVERSAL_SKILLS_DIR = Path(".agents/source/universal-skills")
 
 MANDATORY_FILES_TO_COPY = [
     Path("AGENTS.md"),
-    Path("PLANS.md"),
     Path("OPENCODE.md"),
     Path("QWEN.md"),
     Path("CLAUDE.md"),
@@ -30,13 +30,7 @@ MANDATORY_FILES_TO_COPY = [
     Path(".agents/skills-sync.manifest.json"),
     Path("docs/arc/README.md"),
     Path("docs/arc/SPECS/README.md"),
-    Path("docs/arc/SPECS/TEMPLATE_spec.md"),
-    Path("docs/arc/SPECS/TEMPLATE_spec-child.md"),
-    Path("docs/arc/SPECS/TEMPLATE_spec-test.md"),
-    Path("docs/arc/SPECS/TEMPLATE_spec-lite.md"),
-    Path("docs/arc/DECISIONS/TEMPLATE_adr.md"),
-    Path("docs/arc/structure/README.md"),
-    Path("docs/arc/structure/TEMPLATE_structure.md"),
+    Path("docs/map/structure/README.md"),
 ]
 
 OPTIONAL_FILES_TO_COPY = [
@@ -53,6 +47,7 @@ MANDATORY_DIRS_TO_COPY = [
     Path(".agents/scripts"),
     Path(".agents/rules"),
     Path(".agents/skills"),
+    Path(".agents/runtime"),
     Path(".agents/data/telemetry/schemas"),
     Path("docs/agentic"),
     Path("docs/knowledge"),
@@ -68,7 +63,7 @@ ENSURE_DIRS = [
     Path("docs/arc"),
     Path("docs/arc/SPECS"),
     Path("docs/arc/DECISIONS"),
-    Path("docs/arc/structure"),
+    Path("docs/map/structure"),
     Path("docs/map"),
     Path(".agents/tmp"),
     Path(".agents/wb"),
@@ -91,7 +86,16 @@ MAKEFILE_INCLUDE = (
 )
 MAKEFILE_WRAPPER = """# Makefile wrapper - delegates to docs/standards/Makefile\n# This keeps the root clean while maintaining make functionality\n\n# Include the actual Makefile from docs\ninclude docs/standards/Makefile\n"""
 
-COMMON_COPY_IGNORES = {".venv", "__pycache__", ".structure-cache.json"}
+COMMON_COPY_IGNORES = {
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".structure-cache.json",
+    "node_modules",
+    "events.jsonl",
+    "settings.local.json",
+}
 IgnoreFn = Callable[[str, List[str]], Set[str]]
 INSTALL_MODE_FULL = "full"
 INSTALL_MODE_PARTIAL = "partial"
@@ -129,9 +133,13 @@ PARTIAL_STARTER_PARENT_SPECS = [
 ]
 
 
+def _template_source(rel: Path) -> Path:
+    return TEMPLATE_ROOT / rel
+
+
 def copy_required_files(target: Path, force: bool, dry_run: bool):
     for rel in MANDATORY_FILES_TO_COPY:
-        src = ROOT_DIR / rel
+        src = _template_source(rel)
         if not src.exists():
             raise FileNotFoundError(f"Mandatory source file missing: {src}")
         dst = target / rel
@@ -140,7 +148,7 @@ def copy_required_files(target: Path, force: bool, dry_run: bool):
 
 def copy_required_dirs(target: Path, force: bool, dry_run: bool):
     for rel in MANDATORY_DIRS_TO_COPY:
-        src = ROOT_DIR / rel
+        src = _template_source(rel)
         if not src.exists():
             raise FileNotFoundError(f"Mandatory source directory missing: {src}")
         dst = target / rel
@@ -149,7 +157,7 @@ def copy_required_dirs(target: Path, force: bool, dry_run: bool):
 
 def copy_optional_files(target: Path, force: bool, dry_run: bool):
     for rel in OPTIONAL_FILES_TO_COPY:
-        src = ROOT_DIR / rel
+        src = _template_source(rel)
         if not src.exists():
             print_action("skip optional (missing in source)", src)
             continue
@@ -230,7 +238,7 @@ def _common_ignored_names(names: List[str]) -> Set[str]:
 
 def _ignore_sanitized_docs(src_path: str, names: List[str]) -> Set[str]:
     ignored = _common_ignored_names(names)
-    rel = Path(src_path).resolve().relative_to(ROOT_DIR)
+    rel = Path(src_path).resolve().relative_to(TEMPLATE_ROOT)
 
     if rel == Path("docs/knowledge"):
         ignored.add("INDEX.md")
@@ -240,8 +248,6 @@ def _ignore_sanitized_docs(src_path: str, names: List[str]) -> Set[str]:
         ignored.update(name for name in names if name.endswith(".md") and name != "README.md")
     elif rel == Path("docs/telemetry"):
         ignored.add("reports")
-    elif rel == Path("docs/arc/structure"):
-        ignored.update(name for name in names if name not in {"README.md", "TEMPLATE_structure.md"})
 
     return ignored
 
@@ -255,7 +261,7 @@ def _ignore_for_dir(rel: Path) -> IgnoreFn:
         Path("docs/knowledge"),
         Path("docs/lessons"),
         Path("docs/telemetry"),
-        Path("docs/arc/structure"),
+        Path("docs/map/structure"),
     }:
         return _ignore_sanitized_docs
     return _ignore_default
@@ -312,7 +318,7 @@ def current_timestamp() -> str:
 
 
 def render_template(template_rel: Path, timestamp: str) -> str:
-    return (ROOT_DIR / template_rel).read_text(encoding="utf-8").replace("YYYY-MM-DDTHH:MM:SSZ", timestamp)
+    return _template_source(template_rel).read_text(encoding="utf-8").replace("YYYY-MM-DDTHH:MM:SSZ", timestamp)
 
 
 def roadmap_specs_for_mode(install_mode: str) -> List[Dict[str, str]]:
@@ -886,6 +892,29 @@ def load_local_skills_manifest() -> Dict[str, object]:
     return data if isinstance(data, dict) else {}
 
 
+def _checkout_skill_names(skills_dir: Path) -> Set[str]:
+    return {
+        item.name
+        for item in skills_dir.iterdir()
+        if item.is_dir() and (item / "SKILL.md").exists()
+    }
+
+
+def _profile_skill_names(profile_file: Path) -> List[str] | None:
+    try:
+        payload = json.loads(profile_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    skills = payload.get("skills")
+    if not isinstance(skills, list):
+        return None
+    if any(not isinstance(name, str) for name in skills):
+        return None
+    return skills
+
+
 def is_valid_universal_skills_checkout(path: Path) -> bool:
     profiles_dir = path / "profiles"
     expected_profiles = profile_names_for_local_seed()
@@ -899,25 +928,15 @@ def is_valid_universal_skills_checkout(path: Path) -> bool:
     ):
         return False
 
-    available_skills = {
-        item.name
-        for item in skills_dir.iterdir()
-        if item.is_dir() and (item / "SKILL.md").exists()
-    }
+    available_skills = _checkout_skill_names(skills_dir)
     if not available_skills:
         return False
 
     for profile_file in profiles_dir.glob("*.json"):
-        try:
-            payload = json.loads(profile_file.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+        skills = _profile_skill_names(profile_file)
+        if skills is None:
             return False
-        if not isinstance(payload, dict):
-            return False
-        skills = payload.get("skills")
-        if not isinstance(skills, list):
-            return False
-        if any(not isinstance(name, str) or name not in available_skills for name in skills):
+        if any(name not in available_skills for name in skills):
             return False
 
     return True
@@ -938,18 +957,22 @@ def local_project_skill_names() -> List[str]:
     )
 
 
+def _profile_names_from_installs(installs: object) -> Set[str]:
+    profile_names: Set[str] = set()
+    if not isinstance(installs, list):
+        return profile_names
+    for entry in installs:
+        if not isinstance(entry, dict):
+            continue
+        profile = entry.get("profile")
+        if isinstance(profile, str) and profile.strip():
+            profile_names.add(profile.strip())
+    return profile_names
+
+
 def profile_names_for_local_seed() -> List[str]:
     manifest = load_local_skills_manifest()
-    profile_names: Set[str] = set()
-
-    installs = manifest.get("installs")
-    if isinstance(installs, list):
-        for entry in installs:
-            if not isinstance(entry, dict):
-                continue
-            profile = entry.get("profile")
-            if isinstance(profile, str) and profile.strip():
-                profile_names.add(profile.strip())
+    profile_names = _profile_names_from_installs(manifest.get("installs"))
 
     if not profile_names:
         profile_names.add("core")
@@ -1100,7 +1123,7 @@ def main() -> int:
     print("=" * 70)
     print("AGENTS BOOTSTRAP")
     print("=" * 70)
-    print(f"Source: {ROOT_DIR}")
+    print(f"Source: {TEMPLATE_ROOT}")
     print(f"Target: {target}")
     install_mode = INSTALL_MODE_PARTIAL if args.partial else INSTALL_MODE_FULL
     print(f"Mode:   {'dry-run' if args.dry_run else 'apply'} ({install_mode})")

@@ -33,6 +33,7 @@ from lib.agents_config import (
     load_agents_config,
     parse_offset,
 )
+from lib.markdown_docs import split_markdown_frontmatter
 from lib.workflow_manifest import (
     ArtifactManifestEntry,
     ArtifactIntentProfile,
@@ -251,14 +252,11 @@ def _read_frontmatter(path: Path) -> Dict[str, object]:
         content = path.read_text()
     except FileNotFoundError:
         return {}
-
-    if not content.startswith("---\n"):
+    parsed = split_markdown_frontmatter(content)
+    if parsed is None:
         return {}
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        return {}
-    loaded = yaml.safe_load(parts[1].strip()) or {}
-    return loaded if isinstance(loaded, dict) else {}
+    loaded, _ = parsed
+    return loaded
 
 
 def _doc_id_from_path(path: Path) -> str:

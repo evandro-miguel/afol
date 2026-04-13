@@ -1,8 +1,13 @@
 # Archive
 
-This folder stores files and folders that have been deleted from the project.
+This folder stores finalized workbench sessions and other removed project
+artifacts that may still be useful for recovery, lessons, or audit history.
 
 ## Purpose
+
+Use this folder to preserve history when something is removed from the active
+project surface. The retention policy lives in
+[`docs/standards/Z_ARQ_RETENTION.md`](../../docs/standards/Z_ARQ_RETENTION.md).
 
 Instead of permanently deleting files, move them here to:
 
@@ -28,9 +33,9 @@ z-arq/20260223_old_auth_module/
 
 When deleting a file or folder:
 
-1. Create archive folder: `mkdir z-arq/YYYYMMDD_<description>`
-2. Move the file: `mv <path> z-arq/YYYYMMDD_<description>/`
-3. Document in `.agents/a-docs/lessons/general-lessons.md` or a report
+1. Create archive folder: `mkdir .agents/z-arq/YYYYMMDD_<description>`
+2. Move the file: `mv <path> .agents/z-arq/YYYYMMDD_<description>/`
+3. Document the reason in a workbench report, lesson, or related governed doc
 4. Optionally add a README explaining why it was archived
 
 ## Archive README template
@@ -50,14 +55,18 @@ When deleting a file or folder:
 
 ## Recovery
 
-To restore: `mv z-arq/YYYYMMDD_<description>/<file> <original_path>`
+To restore: `mv .agents/z-arq/YYYYMMDD_<description>/<file> <original_path>`
 ```
 
 ## Retention policy
 
-- Keep archived files for: <define your policy>
-- Review archives quarterly
-- Permanently delete only after confirmation
+- Archived sessions stay in `.agents/z-arq/` until the retention policy says
+  they can be reviewed for removal.
+- Review archives before deletion so lessons, specs, or decisions can be
+  preserved elsewhere.
+- Keep active sessions in `.agents/wb/`; do not archive live work.
+- If an archive payload is only scratch material, copy any useful evidence out
+  first and only then delete the disposable remainder.
 
 ---
 

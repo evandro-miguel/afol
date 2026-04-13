@@ -137,7 +137,7 @@ Alternative to Makefile:
 .agents/agents help
 .agents/agents doctor
 .agents/agents new auth-refactor --spec
-.agents/agents structure-map . --output docs/arc/structure/
+.agents/agents structure-map . --output docs/map/structure/
 .agents/agents repo-map .
 .agents/agents status --session <session-id>
 .agents/agents runtime command-registry
@@ -191,7 +191,7 @@ The `memory` command family is contract-only in the scaffold:
 ```
 
 Bootstrap writes a generic baseline for the target repo and intentionally omits scaffold-local `wb/` history, generated knowledge indexes, telemetry reports, and the scaffold's own roadmap/spec backlog.
-Bootstrap also copies `PLANS.md` so the target repo inherits the canonical ExecPlan contract.
+Bootstrap copies `docs/templates/plan.md` as the reusable ExecPlan starter for target repos.
 Bootstrap seeds `.agents/source/universal-skills` from committed repo assets, so the default downstream install path does not require a network clone.
 Use the partial install path for already-live projects so existing files remain intact and the bootstrap only fills missing scaffold surface.
 The skills baseline is intentionally generic here; the upstream universal-skills contract should evolve without turning bootstrap into a second skills distribution system.

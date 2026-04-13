@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-12T13:01:37-03:00'
+updated_at: '2026-04-13T12:53:44-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -302,6 +302,66 @@ updated_at: '2026-04-12T13:01:37-03:00'
     before test implementation begins.
   - [x] Keep `spec-lite` as a backwards-compatible historical alias until
     migration and documentation parity are proven.
+
+### F-15 Repo-Wide Simplification and Runtime Parity Cleanup
+
+- Status: complete
+- Why: The scaffold now has a central runtime, an 80% scripts coverage gate, and
+  clear current-state vs goal-state documentation rules, but the repo still has
+  stale current-state maps, a legacy generated structure surface that belongs in
+  `docs/map/structure/`, compatibility command metadata that can drift, and
+  several Python command modules that still need complexity reduction under
+  proven parity.
+- Governing spec: `docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md`
+- Child spec policy:
+  - Required: yes
+  - Child specs should isolate map boundary cleanup, runtime registry parity,
+    and Python command simplification when each slice begins execution.
+- Exit criteria:
+  - `docs/map/` is the only durable current-state repository map surface.
+  - `docs/map/structure/` is the canonical current-state structure index and
+    `docs/arc/structure/` is no longer maintained as a competing current-state
+    surface.
+  - `.agents/agents` and `.agents/agents-mcp` remain stable thin launchers while
+    command metadata and compatibility behavior are validated from a single
+    runtime registry path where practical.
+  - Complexity reductions land in small batches with focused parity tests and no
+    reduction below the 80% scripts coverage gate.
+  - Legacy script paths are archived only after replacement behavior has
+    executable parity evidence.
+- Delivery tasks:
+  - [x] Create the F-15 governed parent spec and workbench execution session.
+  - [x] Sync root runtime mirrors from `AGENTS.md` after the F-15 governance
+    update.
+  - [x] Reconcile current-state documentation so `docs/map/` owns map evidence.
+  - [x] Consolidate runtime command metadata and wrapper parity without changing
+    public command semantics.
+  - [x] Reduce Python command complexity in bounded, tested slices.
+  - [x] Refresh docs, indexes, and maps after code behavior is proven.
+  - [x] Close with strict workbench verification, `make lint`, and the relevant
+    Python/runtime gates.
+
+### F-16 Project Template Source Separation
+
+- Status: planned
+- Why: The scaffold needs one visible, sanitized source tree for the default
+  project folder installed into downstream repos, separate from this repository's
+  development workbench, tests, maps, caches, and historical governance.
+- Governing spec: `docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md`
+- Exit criteria:
+  - `src/project-template/` is the canonical downstream project baseline.
+  - Bootstrap copies from the template source instead of directly from the live
+    development repo root.
+  - Export tests prove local history, caches, telemetry events, and generated
+    repo-specific artifacts are not shipped to downstream projects.
+  - The final script refactor pass removes duplicate responsibilities and keeps
+    every public script purpose-defined.
+- Delivery tasks:
+  - [ ] Create the sanitized project-template source tree.
+  - [ ] Rewire bootstrap and tests around the template source.
+  - [ ] Update only the minimal operator docs for the new boundary.
+  - [ ] Run the final `refactor-workflows` script simplification pass.
+  - [ ] Verify with lint, focused tests, and a dry-run bootstrap.
 
 ## 5) Prioritization
 

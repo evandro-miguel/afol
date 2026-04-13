@@ -1,8 +1,8 @@
 ---
 doc_type: quick_reference
 status: active
-created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-02-23T00:00:00Z"
+created_at: '2026-02-23T00:00:00Z'
+updated_at: '2026-04-13T13:36:58-03:00'
 ---
 
 # Telemetry & Patterns Quick Reference
@@ -213,9 +213,10 @@ docs/
 └── patterns/
     ├── success/                 # Success patterns
     ├── anti/                    # Anti-patterns
-    ├── INDEX.md                 # Catalog
-    └── TEMPLATE_pattern.md      # Template
+    └── INDEX.md                 # Catalog
 ```
+
+Template source: `docs/templates/pattern.md`.
 
 ---
 

@@ -107,7 +107,7 @@ Central index for all `.agents` system documentation.
 | Roadmap | [../../arc/GENERAL-ROADMAP.md](../../arc/GENERAL-ROADMAP.md) |
 | Specs | [../../arc/SPECS/INDEX.md](../../arc/SPECS/INDEX.md) |
 | ADRs | [../../arc/DECISIONS/INDEX.md](../../arc/DECISIONS/INDEX.md) |
-| Structure | [../../arc/structure/](../../arc/structure/) |
+| Structure | [../../map/structure/](../../map/structure/) |
 
 ## Skills
 

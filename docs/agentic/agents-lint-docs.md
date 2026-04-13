@@ -60,7 +60,7 @@ Validates markdown documents:
 lint:
   excluded_path_prefixes:
     - docs/map/extra/
-    - docs/arc/structure/
+    - docs/map/structure/
     - scripts/.agent/docs/
     - z-arq/
 ```

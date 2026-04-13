@@ -45,9 +45,18 @@ class BootstrapTests(unittest.TestCase):
         """Bootstrap must declare mandatory directories."""
         self.assertGreater(len(self.bootstrap.MANDATORY_DIRS_TO_COPY), 0)
 
+    def test_mandatory_dirs_include_runtime_package(self):
+        """The runtime package must be part of the bootstrap surface."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_DIRS_TO_COPY}
+        self.assertIn(".agents/runtime", mandatory)
+
     def test_ensure_dirs_list_is_non_empty(self):
         """Bootstrap must declare directories to ensure exist."""
         self.assertGreater(len(self.bootstrap.ENSURE_DIRS), 0)
+
+    def test_template_root_points_to_src_project_template(self):
+        """Bootstrap should read the export source from src/project-template."""
+        self.assertEqual(self.bootstrap.TEMPLATE_ROOT, self.bootstrap.ROOT_DIR / "src" / "project-template")
 
     def test_makefile_wrapper_contains_include_marker(self):
         """The Makefile wrapper must contain the include marker."""

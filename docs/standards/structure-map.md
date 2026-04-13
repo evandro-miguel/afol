@@ -3,7 +3,7 @@ doc_type: standard
 id: structure-map-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-03-23T18:06:20-03:00'
+updated_at: '2026-04-13T13:36:54-03:00'
 ---
 
 # Structure Map Standard
@@ -12,7 +12,7 @@ updated_at: '2026-03-23T18:06:20-03:00'
 
 Define the strategy for auto-generating project structure documentation using `agents-structure-map.py`.
 
-This standard covers the lightweight physical layout view under `docs/arc/structure/`.
+This standard covers the lightweight physical layout view under `docs/map/structure/`.
 If a repository also adopts `docs/map/`, treat `structure/` as one current-state input surface among others, not as the goal-state canon.
 
 ## Overview
@@ -22,11 +22,11 @@ This standard establishes a **hybrid approach**:
 | Approach | Tool | Purpose | When |
 |----------|------|---------|------|
 | **Auto-generated** | `agents-structure-map.py` | File inventory, line counts, descriptions | Large projects (200+ files) |
-| **Manual** | `TEMPLATE_structure.md` | Conventions, rules, import patterns | All projects |
+| **Manual** | `docs/templates/structure.md` | Conventions, rules, import patterns | All projects |
 
 ## Relationship to `docs/map/`
 
-- `docs/arc/structure/` documents the **physical structure** of the current repository.
+- `docs/map/structure/` documents the **physical structure** of the current repository.
 - `docs/map/` may hold a broader **current-state** surface, such as module maps, API maps, dependency views, and codemap-style artifacts.
 - Use `.agents/agents repo-map` for the full codemap workflow described in [repo-map.md](repo-map.md).
 - Neither `structure/` nor `map/` replaces roadmap/spec governance.
@@ -51,10 +51,10 @@ This standard establishes a **hybrid approach**:
 python .agents/scripts/agents-structure-map.py <project-path> --output <output-dir>
 
 # Example: Current project
-python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
+python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
 
 # Example: External project
-python .agents/scripts/agents-structure-map.py /home/ozy/apps/gre-test-app --output docs/arc/structure/
+python .agents/scripts/agents-structure-map.py /path/to/example-project --output docs/map/structure/
 ```
 
 ### Output Files
@@ -120,7 +120,7 @@ The script uses a cache system:
 
 ### Where to Store
 
-**Default**: `docs/arc/structure/`
+**Default**: `docs/map/structure/`
 
 **Alternative**: `<project>/.agent/docs/structure/` (project-specific)
 
@@ -139,7 +139,7 @@ python .agents/scripts/agents-new.py my-feature --spec
 # 2. Implement feature...
 
 # 3. After major changes, update structure
-python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
+python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
 
 # 4. Validate
 python .agents/scripts/agents-doctor.py
@@ -168,10 +168,10 @@ Sections:
   tests: 3 files
 ```
 
-### Example 2: Large Project (gre-test-app)
+### Example 2: Large Project
 
 ```bash
-$ python .agents/scripts/agents-structure-map.py /home/ozy/apps/gre-test-app --output .agent/docs/structure-auto/
+$ python .agents/scripts/agents-structure-map.py /path/to/example-project --output .agent/docs/structure-auto/
 
 ============================================================
 SUMMARY
@@ -190,10 +190,10 @@ Sections:
 ### Example 3: Incremental Update
 
 ```bash
-$ python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
+$ python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
 
 ✓ Loaded cache: 719 entries
-Scanning: /home/ozy/apps/gre-test-app
+Scanning: /path/to/example-project
 ✓ Created: README.md
 ✓ Created: frontend.md
 ...
@@ -242,7 +242,7 @@ Modify `classify_file()` method in the script.
 ```bash
 # Run from project root
 cd /path/to/project
-python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
+python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
 ```
 
 ### Cache Not Working
@@ -253,8 +253,8 @@ python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
 
 ```bash
 # Delete cache and regenerate
-rm docs/arc/structure/.structure-cache.json
-python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
+rm docs/map/structure/.structure-cache.json
+python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
 ```
 
 ### Wrong Classification
@@ -267,8 +267,8 @@ python .agents/scripts/agents-structure-map.py . --output docs/arc/structure/
 
 ## Related Documents
 
-- `docs/arc/structure/README.md` - Structure folder overview
-- `docs/arc/structure/TEMPLATE_structure.md` - Manual structure template
+- `docs/map/structure/README.md` - Structure folder overview
+- `docs/templates/structure.md` - Manual structure template
 - `.agents/scripts/README.md` - All available scripts
 - `docs/standards/workflow.md` - General workflow standard
 

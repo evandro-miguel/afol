@@ -36,6 +36,7 @@ from typing import Any, Dict, List, Optional
 import argparse
 
 from lib.agents_config import get_active_session_file_path, get_cfg_path, load_agents_config
+from lib.markdown_docs import split_markdown_frontmatter
 
 
 # Configuration
@@ -68,29 +69,10 @@ def get_active_session() -> Optional[str]:
 
 def parse_frontmatter(content: str) -> Dict[str, Any]:
     """Parse YAML frontmatter from markdown content."""
-    import re
-
-    # Simple YAML frontmatter parser (avoids external dependency)
-    match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
-    if not match:
+    parsed = split_markdown_frontmatter(content)
+    if parsed is None:
         return {}
-
-    frontmatter = {}
-    for line in match.group(1).split('\n'):
-        if ':' in line:
-            key, value = line.split(':', 1)
-            key = key.strip()
-            value = value.strip().strip('"\'')
-
-            # Handle lists
-            if value == '':
-                continue
-            # Handle arrays in single line
-            if value.startswith('[') and value.endswith(']'):
-                value = [v.strip().strip('"\'') for v in value[1:-1].split(',')]
-
-            frontmatter[key] = value
-
+    frontmatter, _ = parsed
     return frontmatter
 
 
@@ -106,9 +88,10 @@ def load_pattern(file_path: Path) -> Optional[Dict[str, Any]]:
     if not frontmatter:
         return None
 
-    # Extract body
-    body_start = content.find('---', content.find('---') + 3) + 3
-    body = content[body_start:].strip()
+    parsed = split_markdown_frontmatter(content)
+    if parsed is None:
+        return None
+    frontmatter, body = parsed
 
     frontmatter['file_path'] = str(file_path)
     frontmatter['body'] = body

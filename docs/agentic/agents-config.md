@@ -87,8 +87,7 @@ lint:
     - .agents/tmp/
     - .tmp/
     - tmp/
-    - .agents/arc/map/extra/
-    - docs/arc/structure/
+    - docs/map/structure/
     - scripts/.agent/docs/
     - z-arq/
 

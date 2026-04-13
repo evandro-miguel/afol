@@ -4,8 +4,8 @@ theme: agents-patterns
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-23 00:00:00-03:00
+updated_at: '2026-04-13T13:36:57-03:00'
 links:
   tools_json: ./tools-json.md
   patterns_index: ../patterns/INDEX.md
@@ -123,7 +123,7 @@ def rate_pattern(pattern_id, effectiveness):
 
 ### Add New Pattern
 
-1. Copy `TEMPLATE_pattern.md`
+1. Copy `docs/templates/pattern.md`
 2. Fill frontmatter (id, type, tags, effectiveness)
 3. Write pattern content
 4. Place in correct subdirectory

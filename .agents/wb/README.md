@@ -2,6 +2,9 @@
 
 All active workstreams live here in session folders.
 
+The `.active_session` file points to the live session folder and should be
+treated as the source of truth when the table and folders drift.
+
 ## Naming convention
 
 ```text
@@ -31,11 +34,22 @@ Optional pack folders for multiple major tracks:
 
 | Session | Theme | Status |
 |---------|-------|--------|
-| - | - | - |
+| `260412_2115_project-finalization-orchestration` | `project-finalization-orchestration` | active |
 
 ## Archive
 
 Completed sessions should be marked complete in their report frontmatter.
+
+Session folders usually contain:
+
+- `*_plan_*.md` - planning documents
+- `*_task_*.md` - task tracking
+- `*_log_*.md` - progress logs
+- `*_report_*.md` - final or interim reports
+- `*_research_*.md` - research documents
+- `*_brainstorm_*.md` - ideation notes
+- `*_explorer-check_*.md` - proof that the plan was checked against the current repo
+- `*_postmortem_*.md` - final closure artifact required before report finalization
 
 ---
 

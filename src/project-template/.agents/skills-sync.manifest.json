@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "repo": "https://github.com/evandro-miguel/skill-universal.git",
+  "ref": "main",
+  "source_dir": ".agents/source/universal-skills",
+  "mode": "copy",
+  "installs": [
+    {
+      "app": "all",
+      "skills": [
+        "agentic-folder-sys",
+        "agentic-scaffold-mcp"
+      ]
+    }
+  ]
+}

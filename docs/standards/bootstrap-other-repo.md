@@ -17,6 +17,7 @@ Define how to install the `.agents` scaffold into another repository, including:
 - limitations and safe usage notes
 - the skills baseline that should be prepared for future universal-skills contract evolution
 - the preferred project-local skill model, where each repo carries its own `.agents/skills` subset instead of depending on many global Codex skills
+- the export source boundary, where the reusable baseline lives under `src/project-template/` in this repo instead of the live development root
 
 ## Modes
 
@@ -54,6 +55,7 @@ Behavior:
 - `--force` is required to overwrite existing files
 - if the target repo already owns `make all`, the scaffold preserves that target and exposes the aggregate scaffold validation as `make agents-all`
 - the current skills manifest is treated as a compatibility baseline, not as a copy of scaffold-local history
+- bootstrap copies from `src/project-template/`, so downstream output stays clean even if the development workspace contains extra local-only files
 - the target repo should remain ready for repo/ref/profile-based skill installs when the upstream contract lands
 - repo-local skills remain the primary contract; Codex global skills should stay lean
 

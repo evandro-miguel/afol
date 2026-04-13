@@ -19,6 +19,10 @@ PYTHON := python3
 endif
 UV_CACHE_DIR ?= $(CURDIR)/.agents/cache/uv
 UV := UV_CACHE_DIR="$(UV_CACHE_DIR)" uv
+WB_EVIDENCE_USAGE := Usage: make wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD=\"...\" RESULT=\"...\" [ARTIFACT=<path>] [NOTE=\"...\"]
+WB_TASK_USAGE := Usage: make wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped [EVIDENCE_ID=E-...] [ALLOW_UNSAFE_DONE=1]
+WB_STATUS_USAGE := Usage: make wb-status SESSION_ID=<session-id> STATUS=<value> [FILE=plan|task|spec-lite|report|log|all]
+WB_LINK_USAGE := Usage: make wb-link SESSION_ID=<session-id> FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>
 
 # ==============================================================================
 # HELP
@@ -135,7 +139,7 @@ clean:
 
 structure:
 	@echo "→ Generating project structure documentation..."
-	@./.agents/agents structure-map . --output docs/arc/structure/
+	@./.agents/agents structure-map . --output docs/map/structure/
 	@echo "✓ Structure docs generated"
 
 repo-map:
@@ -361,19 +365,19 @@ endif
 
 wb-evidence:
 ifndef SESSION_ID
-	@echo "Usage: make wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD=\"...\" RESULT=\"...\" [ARTIFACT=<path>] [NOTE=\"...\"]"
+	@echo "$(WB_EVIDENCE_USAGE)"
 	@exit 1
 else
 ifndef TASK_ID
-	@echo "Usage: make wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD=\"...\" RESULT=\"...\" [ARTIFACT=<path>] [NOTE=\"...\"]"
+	@echo "$(WB_EVIDENCE_USAGE)"
 	@exit 1
 else
 ifndef CMD
-	@echo "Usage: make wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD=\"...\" RESULT=\"...\" [ARTIFACT=<path>] [NOTE=\"...\"]"
+	@echo "$(WB_EVIDENCE_USAGE)"
 	@exit 1
 else
 ifndef RESULT
-	@echo "Usage: make wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD=\"...\" RESULT=\"...\" [ARTIFACT=<path>] [NOTE=\"...\"]"
+	@echo "$(WB_EVIDENCE_USAGE)"
 	@exit 1
 else
 	@./.agents/agents wb-update evidence "$(TASK_ID)" --session "$(SESSION_ID)" --command "$(CMD)" --result "$(RESULT)" $(if $(ARTIFACT),--artifact "$(ARTIFACT)",) $(if $(NOTE),--note "$(NOTE)",)
@@ -384,11 +388,11 @@ endif
 
 wb-task:
 ifndef SESSION_ID
-	@echo "Usage: make wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped [EVIDENCE_ID=E-...] [ALLOW_UNSAFE_DONE=1]"
+	@echo "$(WB_TASK_USAGE)"
 	@exit 1
 else
 ifndef TASK_ID
-	@echo "Usage: make wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped [EVIDENCE_ID=E-...] [ALLOW_UNSAFE_DONE=1]"
+	@echo "$(WB_TASK_USAGE)"
 	@exit 1
 else
 	@if [ "$(ACTION)" = "done" ]; then \
@@ -420,11 +424,11 @@ endif
 
 wb-status:
 ifndef SESSION_ID
-	@echo "Usage: make wb-status SESSION_ID=<session-id> STATUS=<value> [FILE=plan|task|spec-lite|report|log|all]"
+	@echo "$(WB_STATUS_USAGE)"
 	@exit 1
 else
 ifndef STATUS
-	@echo "Usage: make wb-status SESSION_ID=<session-id> STATUS=<value> [FILE=plan|task|spec-lite|report|log|all]"
+	@echo "$(WB_STATUS_USAGE)"
 	@exit 1
 else
 	@./.agents/agents wb-update status --session "$(SESSION_ID)" --value "$(STATUS)" --file "$(if $(FILE),$(FILE),all)"
@@ -446,19 +450,19 @@ endif
 
 wb-link:
 ifndef SESSION_ID
-	@echo "Usage: make wb-link SESSION_ID=<session-id> FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
+	@echo "$(WB_LINK_USAGE)"
 	@exit 1
 endif
 ifndef FILE
-	@echo "Usage: make wb-link SESSION_ID=<session-id> FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
+	@echo "$(WB_LINK_USAGE)"
 	@exit 1
 endif
 ifndef KEY
-	@echo "Usage: make wb-link SESSION_ID=<session-id> FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
+	@echo "$(WB_LINK_USAGE)"
 	@exit 1
 endif
 ifndef VALUE
-	@echo "Usage: make wb-link SESSION_ID=<session-id> FILE=plan|task|spec-lite|report|log KEY=<key> VALUE=<value>"
+	@echo "$(WB_LINK_USAGE)"
 	@exit 1
 endif
 	@./.agents/agents wb-update link --session "$(SESSION_ID)" --file "$(FILE)" --key "$(KEY)" --value "$(VALUE)"

@@ -23,6 +23,7 @@ from .agents_config import (
     now_iso_with_offset,
 )
 from .artifact_utility import analyze_artifact_utility
+from .markdown_docs import split_markdown_frontmatter
 from .workflow_manifest import load_artifact_manifest, load_artifact_policy
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
@@ -143,17 +144,10 @@ class ExecutionError(RuntimeError):
 
 
 def split_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
-    if not text.startswith("---\n"):
+    parsed = split_markdown_frontmatter(text)
+    if parsed is None:
         return {}, text
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return {}, text
-    raw = parts[1].strip()
-    body = parts[2].lstrip("\n")
-    parsed = yaml.safe_load(raw) or {}
-    if isinstance(parsed, dict):
-        return parsed, body
-    return {}, body
+    return parsed
 
 
 def parse_iso_timestamp(value: str) -> Optional[datetime]:

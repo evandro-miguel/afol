@@ -255,7 +255,7 @@ Validates markdown docs for consistency.
 - State values are valid
 - Required frontmatter fields exist
 - Temporary folders such as `.agents/tmp/`, `.tmp/`, and repo-local `tmp/` are always excluded
-- Raw codemap evidence under `.agents/arc/map/extra/` and `docs/map/extra/` is excluded from markdown lint
+- Raw codemap evidence under `docs/map/extra/` is excluded from markdown lint
 
 **Usage:**
 
@@ -285,7 +285,7 @@ Auto-generates project structure documentation.
 ```bash
 make structure
 # OR
-.agents/agents structure-map . --output docs/arc/structure/
+.agents/agents structure-map . --output docs/map/structure/
 # OR
 .agents/agents structure-map /path/to/project --output docs/
 ```

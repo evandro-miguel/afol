@@ -1,9 +1,9 @@
 ---
 doc_type: index
-id: "260223_0000_decisions_index_01"
+id: 260223_0000_decisions_index_01
 title: Architecture Decision Records Index
 created_at: '2026-02-23T00:00:00-03:00'
-updated_at: '2026-02-23T00:00:00-03:00'
+updated_at: '2026-04-13T13:36:56-03:00'
 ---
 
 ## Architecture Decision Records (ADRs)
@@ -23,7 +23,6 @@ ADRs document:
 ```text
 docs/arc/DECISIONS/
 ├── INDEX.md           # This file - ADR index
-├── TEMPLATE_adr.md    # ADR template
 ├── ADR-001-<title>.md
 ├── ADR-002-<title>.md
 └── ...
@@ -39,14 +38,14 @@ docs/arc/DECISIONS/
 
 ### Creating an ADR
 
-1. Copy `TEMPLATE_adr.md`
+1. Copy `docs/templates/adr.md`
 2. Fill in sections
 3. Name: `ADR-NNN-<short-title>.md`
 4. Update this INDEX.md
 
 ### ADR Template
 
-See `TEMPLATE_adr.md` for the standard format.
+See `docs/templates/adr.md` for the standard format.
 
 ### Related
 

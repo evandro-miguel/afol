@@ -70,7 +70,7 @@ cd .agents/scripts && uv sync
 The scaffold uses a repo-local UV cache during setup and validation: `.agents/cache/uv/`.
 
 Bootstrap exports are sanitized by design: the target repo gets generic roadmap/spec baselines and empty knowledge indexes, not this scaffold's local `wb/`, lessons history, telemetry reports, or live roadmap/spec backlog.
-Bootstrap also copies the root `PLANS.md` file so downstream repos inherit the same ExecPlan contract used by this scaffold.
+Bootstrap also copies `docs/templates/plan.md` so downstream repos inherit the reusable ExecPlan starter.
 For full bootstrap, the target directory is created automatically when missing.
 For existing projects, use `--partial` so bootstrap fills only the missing scaffold surface and leaves project-owned files intact.
 The preferred source seed is `.agents/source/universal-skills/` inside the repo. It must not be a nested git checkout.

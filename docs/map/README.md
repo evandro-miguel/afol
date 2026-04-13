@@ -13,8 +13,10 @@ This folder is the distilled architecture view of the repository.
 
 ### Scaffold Contract
 
-- `docs/map/` is the current-state, descriptive evidence surface for repository mapping.
+- `docs/map/` is the only durable current-state, descriptive evidence surface for repository mapping.
 - Goal-state canon stays outside this folder in `docs/arc/`, roadmap, specs, ADRs, and related architecture docs.
+- `docs/map/structure/` is the canonical current-state structure index for physical layout and folder-convention evidence.
+- `docs/arc/structure/` is a legacy generated surface and is retired rather than maintained as a second current-state map.
 - Use this map for refreshable observation and analysis, not as approval authority for desired-state decisions.
 
 ### Read This First
@@ -52,6 +54,7 @@ This folder is the distilled architecture view of the repository.
 
 - Root `.md` files: distilled explanations for agents and humans.
 - `domains/`: domain-focused breakdowns with responsibilities, key files, and risks.
+- `structure/`: the current-state physical layout view and section files.
 - `extra/`: raw tool outputs, logs, and machine-readable evidence.
 
 ### System Overview

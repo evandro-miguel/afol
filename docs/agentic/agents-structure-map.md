@@ -46,10 +46,10 @@ Scans project and generates documentation:
 
 | File | Purpose |
 |------|---------|
-| `docs/arc/structure/README.md` | Overview |
-| `docs/arc/structure/frontend.md` | Frontend |
-| `docs/arc/structure/backend.md` | Backend |
-| `docs/arc/structure/tests.md` | Tests |
+| `docs/map/structure/README.md` | Overview |
+| `docs/map/structure/frontend.md` | Frontend |
+| `docs/map/structure/backend.md` | Backend |
+| `docs/map/structure/tests.md` | Tests |
 | ... | Other categories |
 
 ## How to Configure
@@ -83,19 +83,19 @@ DEFAULT_SECTIONS = {
 
 1. Add to `DEFAULT_SECTIONS` dict
 2. Define patterns and extensions
-3. Create template in `docs/arc/structure/`
+3. Create template in `docs/map/structure/`
 
 ## How to Test
 
 ```bash
 # Generate structure docs
-./.agents/agents structure-map . --output docs/arc/structure/
+./.agents/agents structure-map . --output docs/map/structure/
 
 # Via Makefile
 make structure
 
 # Verify output
-cat docs/arc/structure/README.md
+cat docs/map/structure/README.md
 ```
 
 ## Output Example

@@ -1,8 +1,8 @@
 ---
 doc_type: pattern_index
 status: active
-created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-02-23T00:00:00Z"
+created_at: '2026-02-23T00:00:00Z'
+updated_at: '2026-04-13T13:36:58-03:00'
 ---
 
 # Pattern Catalog
@@ -82,7 +82,7 @@ Central catalog of patterns, anti-patterns, and best practices for .agents syste
 
 ## Suggesting New Patterns
 
-1. Create pattern file using `TEMPLATE_pattern.md`
+1. Create pattern file using `docs/templates/pattern.md`
 2. Include evidence from actual sessions
 3. Tag appropriately for discoverability
 4. Set initial effectiveness to `medium` until proven
