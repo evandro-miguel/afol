@@ -15,7 +15,8 @@ from lib.execution_commands import ExecutionError, build_session_catchup, find_s
 
 try:
     from lib.process_utils import run_command
-except Exception:
+except ImportError:
+
     def run_command(
         cmd,
         *,
