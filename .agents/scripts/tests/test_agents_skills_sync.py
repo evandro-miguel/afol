@@ -834,6 +834,98 @@ class AgentsSkillsSyncTests(unittest.TestCase):
 
             patched_run.assert_called_once_with(["git", "checkout", "skills-sync/writing-skills"], cwd=root)
 
+    def test_append_codex_trailer_is_idempotent(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            module = self._load_with_root(Path(td))
+            base = "Publish writing skill"
+            with_trailer = "Publish writing skill\n\nCo-authored-by: Codex <noreply@openai.com>"
+
+            self.assertEqual(
+                module._append_codex_trailer(base),
+                with_trailer,
+            )
+            self.assertEqual(
+                module._append_codex_trailer(with_trailer),
+                with_trailer,
+            )
+
+    def test_cmd_push_keeps_existing_codex_trailer(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+
+            project_skill = root / ".agents/skills/writing-skills"
+            project_skill.mkdir(parents=True, exist_ok=True)
+            (project_skill / "SKILL.md").write_text(
+                "---\nname: writing-skills\ndescription: Edited locally\n---\n\n# writing-skills\n\nEdited locally\n",
+                encoding="utf-8",
+            )
+            self._make_source_skill(
+                Path(td),
+                "writing-skills",
+                description="Old external source",
+                source_dir="external-universal-skills",
+            )
+            self._make_profile(
+                Path(td),
+                "core",
+                ["writing-skills"],
+                source_dir="external-universal-skills",
+            )
+            (external_root / "index.json").write_text("{}\n", encoding="utf-8")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type(
+                "Args",
+                (),
+                {
+                    "skill": "writing-skills",
+                    "skills": None,
+                    "runtime": None,
+                    "profile": None,
+                    "base": None,
+                    "branch": "skills-sync/propose-writing-skills",
+                    "commit": True,
+                    "push": False,
+                    "pr": False,
+                    "message": "Publish writing skill\n\nCo-authored-by: Codex <noreply@openai.com>",
+                    "title": None,
+                    "body": None,
+                },
+            )()
+
+            with (
+                mock.patch.object(module, "run") as patched_run,
+                mock.patch.object(module, "_git_ref_exists", return_value=False),
+            ):
+                module.cmd_push(args)
+
+            self.assertEqual(
+                patched_run.call_args_list[3].args[0],
+                [
+                    "git",
+                    "commit",
+                    "-m",
+                    "Publish writing skill\n\nCo-authored-by: Codex <noreply@openai.com>",
+                    "--only",
+                    "--",
+                    "skills/writing-skills",
+                ],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,9 @@
 import importlib.util
+import io
 import tempfile
 import unittest
 from pathlib import Path
+from contextlib import redirect_stdout
 from unittest import mock
 
 
@@ -21,6 +23,13 @@ class BootstrapTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.bootstrap = load_module("agents_bootstrap_tests", SCRIPT_PATH)
+
+    @staticmethod
+    def _load_with_root(root: Path):
+        module = load_module(f"agents_bootstrap_tests_{id(root)}", SCRIPT_PATH)
+        module.ROOT_DIR = root
+        module.TEMPLATE_ROOT = root / "src" / "project-template"
+        return module
 
     def test_mandatory_files_list_is_non_empty(self):
         """Bootstrap must declare a non-empty list of mandatory files."""
@@ -93,6 +102,12 @@ class BootstrapTests(unittest.TestCase):
             f"Roadmap not found in generated content: {generated_paths}",
         )
 
+    def test_current_timestamp_uses_agents_config_clock(self):
+        """Bootstrap timestamp helper should use the shared timezone helper."""
+        with mock.patch.object(self.bootstrap, "now_iso_with_offset", return_value="2026-01-01T00:00:00Z") as patched:
+            self.assertEqual(self.bootstrap.current_timestamp(), "2026-01-01T00:00:00Z")
+            patched.assert_called_once_with("Z")
+
     def test_roadmap_specs_for_mode_returns_full_specs(self):
         """Full install mode should return full starter parent specs."""
         specs = self.bootstrap.roadmap_specs_for_mode(self.bootstrap.INSTALL_MODE_FULL)
@@ -112,3 +127,26 @@ class BootstrapTests(unittest.TestCase):
         ):
             args = self.bootstrap.parse_args()
             self.assertEqual(args.target, "/tmp/test")
+
+    def test_prepare_sibling_universal_skills_checkout_dry_run_does_not_raise(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td) / "project"
+            target.mkdir()
+            module = self._load_with_root(target)
+
+            with io.StringIO() as buffer:
+                with redirect_stdout(buffer):
+                    module.prepare_sibling_universal_skills_checkout(target, dry_run=True)
+                self.assertIn("prepare repo-local universal-skills source", buffer.getvalue())
+
+    def test_prepare_sibling_universal_skills_checkout_raises_when_seed_fails(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td) / "project"
+            target.mkdir()
+            module = self._load_with_root(target)
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Failed to prepare repo-local universal-skills checkout",
+            ):
+                module.prepare_sibling_universal_skills_checkout(target, dry_run=False)

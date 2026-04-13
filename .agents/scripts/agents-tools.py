@@ -60,11 +60,18 @@ def _reject_duplicate_object_keys(pairs: List[tuple[str, Any]]) -> Dict[str, Any
     return obj
 
 
+def _load_json_dict(value: str) -> Dict[str, Any]:
+    payload = json.loads(value, object_pairs_hook=_reject_duplicate_object_keys)
+    if not isinstance(payload, dict):
+        raise ValueError("Tools catalog must be a JSON object")
+    return payload
+
+
 def load_tools() -> Dict[str, Any]:
     """Load tools.json configuration."""
     if not TOOLS_JSON.exists():
         raise FileNotFoundError(f"Tools catalog not found: {TOOLS_JSON}")
-    return json.loads(TOOLS_JSON.read_text(), object_pairs_hook=_reject_duplicate_object_keys)
+    return _load_json_dict(TOOLS_JSON.read_text())
 
 
 def format_type_badge(tool_type: str) -> str:

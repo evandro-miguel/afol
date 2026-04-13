@@ -92,6 +92,47 @@ class AgentsRepoMapTests(unittest.TestCase):
             self.assertTrue(readme_path.exists())
             self.assertIn("current-state, descriptive", readme_path.read_text(encoding="utf-8"))
 
+    def test_run_overwrites_existing_output_root(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            temp_root = Path(td)
+            repo_dir = temp_root / "repo"
+            repo_dir.mkdir()
+            output_root = repo_dir / "docs" / "map"
+            output_root.mkdir(parents=True)
+            stale_file = output_root / "OLD.md"
+            stale_file.write_text("stale", encoding="utf-8")
+            runner = make_runner(
+                temp_root / "run-repo-map.sh",
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "mkdir -p \"$2\"\n"
+                "rm -f \"$2/OLD.md\"\n"
+                "cat > \"$2/README.md\" <<'EOF'\n"
+                "---\n"
+                "title: \"Map\"\n"
+                "description: \"x\"\n"
+                "doc_kind: \"map\"\n"
+                "version: \"v2026-03-23_1\"\n"
+                "created_at: \"2026-03-23T00:00:00Z\"\n"
+                "updated_at: \"2026-03-23T00:00:00Z\"\n"
+                "---\n"
+                "\n"
+                "# Map\n"
+                "\n"
+                "## Major Runtime Surfaces\n"
+                "\n"
+                "- `.agents/scripts`\n"
+                "EOF\n",
+            )
+
+            argv = ["agents-repo-map.py", str(repo_dir)]
+            with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False):
+                code = self.repo_map.main()
+
+            self.assertEqual(code, 0)
+            self.assertFalse(stale_file.exists())
+            self.assertTrue((output_root / "README.md").exists())
+
     def test_run_fails_when_required_docs_are_missing(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)

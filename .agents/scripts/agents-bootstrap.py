@@ -8,9 +8,10 @@ import json
 import subprocess
 import shutil
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Sequence, Set, Tuple
+
+from lib.agents_config import now_iso_with_offset
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -300,7 +301,7 @@ def ensure_makefile(target: Path, dry_run: bool):
 
 
 def current_timestamp() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return now_iso_with_offset("Z")
 
 
 def render_template(template_rel: Path, timestamp: str) -> str:
