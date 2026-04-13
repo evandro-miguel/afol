@@ -57,7 +57,6 @@ Use model critique to find problems and improvement opportunities. Do not use it
 <project-root>/
 |-- AGENTS.md                 # Agent operating contract for this project
 |-- Makefile                  # Wrapper that delegates to docs/standards/Makefile
-|-- opencode.json             # OpenCode project entrypoint, secret-free
 |-- docs/
 |   |-- arc/                  # Goal-state governance: roadmap, specs, decisions
 |   |   |-- GENERAL-ROADMAP.md
@@ -85,11 +84,7 @@ Use model critique to find problems and improvement opportunities. Do not use it
 |   |-- tmp/                  # Disposable workspace
 |   |-- data/                 # Schemas and runtime data
 |   `-- z-arq/                # Archived work and notes
-|-- .opencode/                # OpenCode adapter
-|-- .codex/                   # Codex adapter
-|-- .qwen/                    # Qwen adapter
-|-- .claude/                  # Claude adapter
-`-- .gemini/                  # Gemini adapter
+`-- .claude/                  # Claude adapter
 ```
 
 ## Documentation Boundaries

@@ -18,10 +18,7 @@ DEFAULT_BLOCKLIST = (
 
 RUNTIME_DOC_FILENAMES = (
     "AGENTS.md",
-    "OPENCODE.md",
-    "QWEN.md",
     "CLAUDE.md",
-    "GEMINI.md",
 )
 
 MANIFEST_MAJOR_SURFACES = (

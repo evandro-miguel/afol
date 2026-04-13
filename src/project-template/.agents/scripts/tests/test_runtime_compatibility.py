@@ -21,22 +21,22 @@ def load_module(module_name: str, file_path: Path):
 
 
 class RuntimeCompatibilityTests(unittest.TestCase):
-    def test_sync_targets_include_opencode(self):
+    def test_sync_targets_only_include_claude_mirror(self):
         script_path = Path(".agents/scripts/sync-agent-docs.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         sync_agent_docs = load_module("sync_agent_docs_runtime_test", script_path)
 
         target_names = [path.name for path in sync_agent_docs.AGENT_FILES]
-        self.assertIn("OPENCODE.md", target_names)
+        self.assertEqual(target_names, ["CLAUDE.md"])
 
-    def test_fix_symlinks_includes_opencode_runtime(self):
+    def test_fix_symlinks_targets_only_committed_claude_adapter(self):
         script_path = Path(".agents/scripts/agents-fix-symlinks.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         fix_symlinks = load_module("agents_fix_symlinks_runtime_test", script_path)
 
-        self.assertIn(".opencode", fix_symlinks.AGENT_DIRS)
+        self.assertEqual(fix_symlinks.AGENT_DIRS, [".claude"])
 
-    def test_bootstrap_mandatory_files_include_opencode_adapter(self):
+    def test_bootstrap_mandatory_files_use_minimal_root_runtime_docs(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_runtime_test", script_path)
@@ -46,13 +46,20 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         ensure_dirs = {str(path) for path in agents_bootstrap.ENSURE_DIRS}
         generated_files = {str(path) for path in agents_bootstrap.generated_baseline_content("2026-03-23T00:00:00Z")}
 
-        self.assertIn("OPENCODE.md", mandatory_files)
+        self.assertIn("AGENTS.md", mandatory_files)
+        self.assertIn("CLAUDE.md", mandatory_files)
+        self.assertNotIn("OPENCODE.md", mandatory_files)
+        self.assertNotIn("QWEN.md", mandatory_files)
+        self.assertNotIn("GEMINI.md", mandatory_files)
         self.assertNotIn("PLANS.md", mandatory_files)
-        self.assertIn("opencode.json", mandatory_files)
+        self.assertNotIn("opencode.json", mandatory_files)
         self.assertIn("docs/arc/SPECS/README.md", mandatory_files)
         self.assertIn(".agents/tmp", ensure_dirs)
-        self.assertIn(".opencode", ensure_dirs)
-        self.assertIn(".opencode/agent", ensure_dirs)
+        self.assertNotIn(".opencode", ensure_dirs)
+        self.assertNotIn(".qwen", ensure_dirs)
+        self.assertNotIn(".gemini", ensure_dirs)
+        self.assertIn(".claude", ensure_dirs)
+        self.assertNotIn(".codex", ensure_dirs)
         self.assertIn("docs/arc/GENERAL-ROADMAP.md", generated_files)
         self.assertIn("docs/arc/SPECS/INDEX.md", generated_files)
         self.assertNotIn("docs/arc/SPECS", mandatory_dirs)
@@ -81,15 +88,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn(["./.agents/agents", "skills-sync", "sync"], calls)
             self.assertIn(["make", "-f", "docs/standards/Makefile", "all"], calls)
 
-    def test_opencode_project_config_is_secret_free_and_points_to_canonical_docs(self):
-        config = json.loads(Path("opencode.json").read_text())
-
-        self.assertEqual(config["$schema"], "https://opencode.ai/config.json")
-        self.assertIn("AGENTS.md", config["instructions"])
-        self.assertIn("docs/arc/GENERAL-ROADMAP.md", config["instructions"])
-        self.assertEqual(config["permission"]["edit"], "ask")
-        self.assertEqual(config["permission"]["bash"], "ask")
-        self.assertEqual(config["permission"]["webfetch"], "ask")
+    def test_removed_root_runtime_mirrors_are_absent(self):
+        for path in ["OPENCODE.md", "QWEN.md", "GEMINI.md", "opencode.json"]:
+            self.assertFalse(Path(path).exists())
 
     def test_doctor_runtime_compatibility_check_has_no_runtime_errors(self):
         script_path = Path(".agents/scripts/agents-doctor.py").resolve()
@@ -101,7 +102,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         runtime_issues = [
             issue for issue in doctor.issues
-            if any(token in issue.path for token in ("OPENCODE.md", "QWEN.md", ".opencode", ".qwen", ".codex", "opencode.json"))
+            if any(token in issue.path for token in ("AGENTS.md", "CLAUDE.md", ".claude"))
         ]
         self.assertEqual(runtime_issues, [])
 

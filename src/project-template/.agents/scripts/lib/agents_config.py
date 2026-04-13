@@ -299,7 +299,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     },
     "sync": {
         "source_file": "AGENTS.md",
-        "target_files": ["OPENCODE.md", "QWEN.md", "CLAUDE.md", "GEMINI.md"],
+        "target_files": ["CLAUDE.md"],
     },
     "telemetry": {
         "enabled": True,

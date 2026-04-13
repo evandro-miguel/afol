@@ -546,7 +546,7 @@ def test_sync_agent_docs_hash_status_force_and_noninteractive(tmp_path, monkeypa
     sync_docs = load_module("sync_agent_docs_coverage_test", "sync-agent-docs.py")
     source = tmp_path / "AGENTS.md"
     source.write_text("# Canonical\n", encoding="utf-8")
-    target = tmp_path / "OPENCODE.md"
+    target = tmp_path / "CLAUDE.md"
     monkeypatch.setattr(sync_docs, "AGENTS_FILE", source)
     monkeypatch.setattr(sync_docs, "AGENT_FILES", [target])
 
@@ -575,7 +575,6 @@ def test_fix_symlinks_targets_modes_and_failures(tmp_path, monkeypatch, capsys):
     (root / ".agents" / "skills").mkdir(parents=True)
     (root / ".agents" / "rules").mkdir(parents=True)
     (root / ".agents" / "skills" / "SKILL.md").write_text("skill\n", encoding="utf-8")
-    (root / ".opencode").mkdir()
     (root / ".claude" / "rules").mkdir(parents=True)
 
     assert fix_symlinks.parse_targets("") == {"skills", "rules"}
@@ -583,7 +582,7 @@ def test_fix_symlinks_targets_modes_and_failures(tmp_path, monkeypatch, capsys):
     with pytest.raises(ValueError):
         fix_symlinks.parse_targets("bad")
     mappings = fix_symlinks.list_mappings(root, {"skills", "rules"})
-    assert any(label == ".opencode/skills" for label, *_ in mappings)
+    assert any(label == ".claude/skills" for label, *_ in mappings)
 
     label, src, target, link_target = mappings[0]
     assert fix_symlinks.process_mapping(label, src, target, link_target, "copy", False, False) == 0
@@ -592,7 +591,7 @@ def test_fix_symlinks_targets_modes_and_failures(tmp_path, monkeypatch, capsys):
     assert fix_symlinks.same_symlink(target, link_target) is False
 
     monkeypatch.setattr(fix_symlinks, "ROOT_DIR", root)
-    monkeypatch.setattr(fix_symlinks, "AGENT_DIRS", [".opencode"])
+    monkeypatch.setattr(fix_symlinks, "AGENT_DIRS", [".claude"])
     monkeypatch.setattr(sys, "argv", ["agents-fix-symlinks.py", "--mode", "copy", "--targets", "skills"])
     assert fix_symlinks.main() == 0
     monkeypatch.setattr(sys, "argv", ["agents-fix-symlinks.py", "--targets", "bad"])
@@ -812,25 +811,12 @@ def test_doctor_run_checks_success_and_error_branches(tmp_path, monkeypatch, cap
     arc = root / "docs" / "arc"
     specs = arc / "SPECS"
     map_dir = root / "docs" / "map"
-    for path in (wb, templates, specs, arc / "DECISIONS", map_dir, root / ".opencode", root / ".qwen", root / ".codex"):
+    for path in (wb, templates, specs, arc / "DECISIONS", map_dir, root / ".claude"):
         path.mkdir(parents=True, exist_ok=True)
-    (root / ".opencode" / "skills").symlink_to("../.agents/skills", target_is_directory=True)
-    (root / ".qwen" / "skills").symlink_to("../.agents/skills", target_is_directory=True)
-    (root / ".codex" / "skills").symlink_to("../.agents/skills", target_is_directory=True)
+    (root / ".claude" / "skills").symlink_to("../.agents/skills", target_is_directory=True)
     (root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
     (root / "AGENTS.md").write_text("# Agents\n", encoding="utf-8")
-    (root / "OPENCODE.md").write_text("# OpenCode\n", encoding="utf-8")
-    (root / "QWEN.md").write_text("# Qwen\n", encoding="utf-8")
-    (root / "opencode.json").write_text(
-        json.dumps(
-            {
-                "$schema": "https://opencode.ai/config.json",
-                "instructions": ["AGENTS.md", "docs/arc/GENERAL-ROADMAP.md"],
-                "permission": {"edit": "ask", "bash": "ask", "webfetch": "ask"},
-            }
-        ),
-        encoding="utf-8",
-    )
+    (root / "CLAUDE.md").write_text("# Claude\n", encoding="utf-8")
     template = templates / "plan.md"
     template.write_text("---\ndoc_type: plan\n---\n# Template\n", encoding="utf-8")
     doctor_wb_dir = wb / "260101_0100_doctor-session"

@@ -17,10 +17,7 @@ def test_runtime_config_uses_shared_surface_contract(scaffold_repo):
     ]
     assert runtime.config.runtime_docs == (
         "AGENTS.md",
-        "OPENCODE.md",
-        "QWEN.md",
         "CLAUDE.md",
-        "GEMINI.md",
     )
     assert runtime.config.manifest_major_surfaces == (
         "docs/",

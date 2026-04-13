@@ -14,7 +14,6 @@ Usage:
     python agents-doctor.py [--fix]
 """
 
-import json
 import re
 import sys
 from pathlib import Path
@@ -375,9 +374,8 @@ class AgentsDoctor:
         print("Checking primary runtime compatibility...")
 
         runtime_docs = {
-            "OpenCode": ROOT_DIR / "OPENCODE.md",
-            "Qwen": ROOT_DIR / "QWEN.md",
             "Codex": ROOT_DIR / "AGENTS.md",
+            "Claude": ROOT_DIR / "CLAUDE.md",
         }
         for runtime_name, path in runtime_docs.items():
             if not path.exists():
@@ -390,9 +388,7 @@ class AgentsDoctor:
                 print(f"  ✓ {runtime_name} entrypoint -> {path.name}")
 
         runtime_dirs = {
-            "OpenCode": ROOT_DIR / ".opencode",
-            "Codex": ROOT_DIR / ".codex",
-            "Qwen": ROOT_DIR / ".qwen",
+            "Claude": ROOT_DIR / ".claude",
         }
         for runtime_name, path in runtime_dirs.items():
             if not path.exists() or not path.is_dir():
@@ -427,79 +423,7 @@ class AgentsDoctor:
                     f"Runtime skills path for {runtime_name} is not a symlink to .agents/skills"
                 ))
 
-        self._check_opencode_project_adapter()
         print()
-
-    def _check_opencode_project_adapter(self):
-        """Validate committed OpenCode adapter shape and secret boundary."""
-        adapter_path = ROOT_DIR / "opencode.json"
-        if not adapter_path.exists():
-            self.issues.append(Issue(
-                "error",
-                str(adapter_path),
-                "OpenCode project adapter missing"
-            ))
-            return
-
-        try:
-            config = json.loads(adapter_path.read_text())
-        except json.JSONDecodeError as exc:
-            self.issues.append(Issue(
-                "error",
-                str(adapter_path),
-                f"Invalid JSON: {exc}"
-            ))
-            return
-
-        schema_value = config.get("$schema")
-        if schema_value != "https://opencode.ai/config.json":
-            self.issues.append(Issue(
-                "warning",
-                str(adapter_path),
-                "Expected OpenCode schema https://opencode.ai/config.json"
-            ))
-
-        instructions = config.get("instructions")
-        if not isinstance(instructions, list):
-            self.issues.append(Issue(
-                "error",
-                str(adapter_path),
-                "OpenCode adapter must define an instructions array"
-            ))
-        else:
-            required_refs = {"AGENTS.md", "docs/arc/GENERAL-ROADMAP.md"}
-            missing_refs = sorted(required_refs - set(instructions))
-            if missing_refs:
-                self.issues.append(Issue(
-                    "error",
-                    str(adapter_path),
-                    f"OpenCode adapter is missing canonical references: {', '.join(missing_refs)}"
-                ))
-
-        permission = config.get("permission", {})
-        if not isinstance(permission, dict):
-            self.issues.append(Issue(
-                "error",
-                str(adapter_path),
-                "OpenCode adapter permission block must be a JSON object"
-            ))
-        else:
-            for key in ("edit", "bash", "webfetch"):
-                if permission.get(key) != "ask":
-                    self.issues.append(Issue(
-                        "warning",
-                        str(adapter_path),
-                        f"OpenCode permission '{key}' should default to 'ask'"
-                    ))
-
-        serialized = json.dumps(config).lower()
-        banned_tokens = ("token", "secret", "password", "api_key", "apikey", "bearer", "auth")
-        if any(token in serialized for token in banned_tokens):
-            self.issues.append(Issue(
-                "warning",
-                str(adapter_path),
-                "OpenCode adapter appears to contain credential-like fields; review secret boundary"
-            ))
 
     def _validate_frontmatter_fields(self, file_path: Path, fm: Dict):
         """Validate frontmatter field values."""

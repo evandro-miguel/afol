@@ -11,7 +11,7 @@ def scaffold_repo(tmp_path: Path) -> Path:
     repo.mkdir()
 
     (repo / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
-    for runtime_doc in ["OPENCODE.md", "QWEN.md", "CLAUDE.md", "GEMINI.md"]:
+    for runtime_doc in ["CLAUDE.md"]:
         (repo / runtime_doc).write_text(f"# {runtime_doc}\n", encoding="utf-8")
 
     for rel in [

@@ -121,9 +121,9 @@ make doctor
 ### Runtime Entry Points
 
 - `AGENTS.md` is the canonical instruction source.
-- `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, and `GEMINI.md` are runtime-facing mirrors generated from it.
-- `opencode.json` is the committed OpenCode project adapter and must remain secret-free.
-- Runtime folders such as `.opencode/`, `.codex/`, and `.qwen/` should only contain project-safe adapters and docs.
+- `CLAUDE.md` is the only committed runtime-facing mirror generated from it.
+- OpenCode, Qwen, Gemini, and Codex do not need committed root mirrors in this scaffold; they use `AGENTS.md` directly or global runtime configuration.
+- `.claude/` should only contain project-safe adapter notes and links.
 - Project-owned documentation belongs under `docs/`; `.agents/` is reserved for agent-system surfaces such as workbench, skills, telemetry, and runtime automation.
 - The scaffold should be optimized for interactive CLI agent execution paths first; embedded SDK/server use cases are secondary and should not drive the default structure.
 - Bootstrap exports a generic, history-free baseline for downstream repos and supports a partial install mode that preserves existing project-owned files.

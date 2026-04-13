@@ -518,7 +518,7 @@ verify-strict-if-present:
 
 lint:
 	@echo "→ Linting markdown docs..."
-	@./.agents/agents lint-docs .agents/ docs/ README.md AGENTS.md OPENCODE.md QWEN.md CLAUDE.md GEMINI.md
+	@./.agents/agents lint-docs .agents/ docs/ README.md AGENTS.md CLAUDE.md
 
 tools-check:
 	@echo "→ Validating tools catalog..."

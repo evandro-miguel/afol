@@ -3,7 +3,7 @@
 Sync agent documentation files from AGENTS.md template.
 
 This script:
-1. Copies AGENTS.md content to OPENCODE.md, QWEN.md, CLAUDE.md, GEMINI.md
+1. Copies AGENTS.md content to CLAUDE.md
 2. Detects if any target file has local modifications
 3. Reports differences and asks for user decision
 
@@ -26,7 +26,7 @@ SYNC_CFG = CONFIG.get("sync", {})
 AGENTS_FILE = resolve_repo_path(ROOT_DIR, SYNC_CFG.get("source_file", "AGENTS.md"))
 AGENT_FILES = [
     resolve_repo_path(ROOT_DIR, p)
-    for p in SYNC_CFG.get("target_files", ["OPENCODE.md", "QWEN.md", "CLAUDE.md", "GEMINI.md"])
+    for p in SYNC_CFG.get("target_files", ["CLAUDE.md"])
 ]
 
 # Header that should be preserved in target files

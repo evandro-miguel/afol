@@ -364,19 +364,16 @@
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
       "updated_at": "2026-03-06",
-      "description": "Sync agent documentation (OPENCODE.md, QWEN.md, CLAUDE.md, GEMINI.md) from the canonical AGENTS.md source, preserving local modifications when detected.",
+      "description": "Sync agent documentation (CLAUDE.md) from the canonical AGENTS.md source, preserving local modifications when detected.",
       "when_to_use": [
         "After updating AGENTS.md with new repository instructions",
         "Keep primary runtime entrypoints aligned with canonical governance",
-        "Propagate standard instruction changes across supported runtimes",
-        "Before working with multiple agent runtimes in the same repo"
+        "Propagate standard instruction changes to the committed Claude mirror",
+        "Before using Claude against the repo-local mirror"
       ],
       "source": "AGENTS.md",
       "targets": [
-        "OPENCODE.md",
-        "QWEN.md",
-        "CLAUDE.md",
-        "GEMINI.md"
+        "CLAUDE.md"
       ],
       "behavior": [
         "Detect local modifications in target files",

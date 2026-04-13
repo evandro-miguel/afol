@@ -15,7 +15,7 @@ Read this first. This document is the orientation layer for agents entering the 
 
 - Repository: `agentic_start_folder`
 - Analysis mode: `standard`
-- Runtime surfaces: `.agents/scripts`, `docs/`, `.agents/skills`, `AGENTS.md`, `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`
+- Runtime surfaces: `.agents/scripts`, `docs/`, `.agents/skills`, `AGENTS.md`, `CLAUDE.md`
 - Stack signals: `none detected`
 
 ### Start Here

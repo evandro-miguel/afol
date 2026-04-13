@@ -69,7 +69,7 @@ Create report using `docs/templates/report.md` only after there is a real delive
 - Include verification evidence
 - Document lessons learned
 - Include a documentation-drift check and the files updated to keep the scaffold documentation current
-- If runtime guidance changed, include a mirror sync status (`AGENTS.md` -> `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`)
+- If runtime guidance changed, include a mirror sync status (`AGENTS.md` -> `CLAUDE.md`)
 
 #### Step 7: Retrospective (Optional but Recommended)
 

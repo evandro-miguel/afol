@@ -333,7 +333,7 @@ make repo-map
 
 ### sync-agent-docs.py
 
-Syncs AGENTS.md content to QWEN.md, CLAUDE.md, GEMINI.md.
+Syncs AGENTS.md content to CLAUDE.md.
 
 **Features:**
 

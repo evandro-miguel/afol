@@ -11,7 +11,7 @@ from typing import List, Tuple
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-AGENT_DIRS = [".opencode", ".claude", ".qwen", ".codex", ".gemini"]
+AGENT_DIRS = [".claude"]
 
 
 def parse_args() -> argparse.Namespace:

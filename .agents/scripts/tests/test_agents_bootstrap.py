@@ -36,10 +36,10 @@ class BootstrapTests(unittest.TestCase):
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn(".agents/agents.config", mandatory)
 
-    def test_mandatory_files_include_opencode_json(self):
-        """opencode.json must be in the mandatory files list."""
+    def test_mandatory_files_exclude_opencode_json(self):
+        """opencode.json should not be in the minimal root bootstrap surface."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
-        self.assertIn("opencode.json", mandatory)
+        self.assertNotIn("opencode.json", mandatory)
 
     def test_mandatory_dirs_list_is_non_empty(self):
         """Bootstrap must declare mandatory directories."""

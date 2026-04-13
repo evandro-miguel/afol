@@ -66,7 +66,7 @@ This folder is the distilled architecture view of the repository.
 - `.agents/scripts`: Python command surface for governance, validation, bootstrap, repo maps, and runtime adapters.
 - `docs/`: Canonical project documentation surface for standards, architecture, patterns, templates, and telemetry guidance.
 - `.agents/skills`: Project-local skill surface synced into the repository for interactive runtimes.
-- `AGENTS.md`, `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`: Operator/runtime instruction entrypoints mirrored from the canonical contract.
+- `AGENTS.md`, `CLAUDE.md`: Operator/runtime instruction entrypoints; other runtimes use `AGENTS.md` directly or global runtime config.
 
 ### Cross-Domain Flow
 

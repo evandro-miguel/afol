@@ -31,14 +31,11 @@ updated_at: "2026-04-02T23:28:28Z"
 - `.agents/agents`
 - `Makefile`
 - `AGENTS.md`
-- `OPENCODE.md`
-- `QWEN.md`
 - `CLAUDE.md`
-- `GEMINI.md`
 
 ### Supporting Integration And Contract Surfaces
 
 - `.agents/agents.config`: Repository-local runtime, path, and skills-sync contract.
 - `.agents/tools.json`: Tool catalog surfaced by the wrapper and tools commands.
 - `.agents/skills-sync.manifest.json`: Pinned project-local skills selection and source contract.
-- `opencode.json`: Secret-free OpenCode adapter entrypoint committed with the scaffold.
+- `.claude/`: Secret-free Claude adapter notes and rule links committed with the scaffold.

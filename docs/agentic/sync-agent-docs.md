@@ -40,19 +40,13 @@ Synchronizes agent files:
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Central template |
-| `OPENCODE.md` | OpenCode instructions |
-| `QWEN.md` | QWEN instructions |
 | `CLAUDE.md` | CLAUDE instructions |
-| `GEMINI.md` | GEMINI instructions |
 
 ### Files Written
 
 | File | Purpose |
 |------|---------|
-| `OPENCODE.md` | Updated from template |
-| `QWEN.md` | Updated from template |
 | `CLAUDE.md` | Updated from template |
-| `GEMINI.md` | Updated from template |
 
 ## How to Configure
 
@@ -62,10 +56,7 @@ Synchronizes agent files:
 sync:
   source_file: AGENTS.md
   target_files:
-    - OPENCODE.md
-    - QWEN.md
     - CLAUDE.md
-    - GEMINI.md
 ```
 
 ### Header Template
@@ -99,9 +90,7 @@ make sync
 
 ```text
 → Syncing AGENTS.md to agent files...
-QWEN.md: No local modifications detected
 CLAUDE.md: 3 differences found
-GEMINI.md: No local modifications detected
 
 Sync complete.
 ```

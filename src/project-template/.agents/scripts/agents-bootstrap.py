@@ -19,11 +19,7 @@ LOCAL_UNIVERSAL_SKILLS_DIR = Path(".agents/source/universal-skills")
 
 MANDATORY_FILES_TO_COPY = [
     Path("AGENTS.md"),
-    Path("OPENCODE.md"),
-    Path("QWEN.md"),
     Path("CLAUDE.md"),
-    Path("GEMINI.md"),
-    Path("opencode.json"),
     Path(".agents/agents"),
     Path(".agents/agents.config"),
     Path(".agents/tools.json"),
@@ -34,13 +30,8 @@ MANDATORY_FILES_TO_COPY = [
 ]
 
 OPTIONAL_FILES_TO_COPY = [
-    Path(".opencode/README.md"),
-    Path(".opencode/agent/README.md"),
     Path(".claude/README.md"),
     Path(".claude/rules/README.md"),
-    Path(".qwen/README.md"),
-    Path(".codex/README.md"),
-    Path(".gemini/README.md"),
 ]
 
 MANDATORY_DIRS_TO_COPY = [
@@ -70,13 +61,8 @@ ENSURE_DIRS = [
     Path(".agents/skills"),
     Path(".agents/z-arq"),
     Path(".agents/data/telemetry"),
-    Path(".opencode"),
-    Path(".opencode/agent"),
     Path(".claude"),
     Path(".claude/rules"),
-    Path(".qwen"),
-    Path(".codex"),
-    Path(".gemini"),
 ]
 
 MAKEFILE_INCLUDE_MARKER = "include docs/standards/Makefile"
@@ -859,7 +845,7 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
             "5. Treat skills sync as a baseline install step, not a source of project history.",
             "6. Update `.agents/agents.config` timezone/path settings if needed.",
             "7. Define real verification commands in repo docs (`install/dev/lint/typecheck/test/build`).",
-            "8. Confirm mirror docs (`OPENCODE.md`/`QWEN.md`/`CLAUDE.md`/`GEMINI.md`) and runtime folders (`.opencode/.claude/.qwen/.codex/.gemini`) are present.",
+            "8. Confirm `AGENTS.md`, `CLAUDE.md`, and the `.claude/` runtime folder are present.",
             "9. Run `make doctor`, `make lint`, `make test-scripts`, and `make all`.",
             "10. Create the first workstream with `make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<spec-id>`.",
             "",

@@ -63,11 +63,7 @@ Compatibility mirrors kept for broader reuse:
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Canonical instruction template |
-| `OPENCODE.md` | Mandatory OpenCode instruction replica |
-| `QWEN.md` | Mandatory agent instruction replica |
 | `CLAUDE.md` | Mandatory agent instruction replica |
-| `GEMINI.md` | Mandatory agent instruction replica |
-| `opencode.json` | OpenCode project adapter |
 | `.agents/agents` | CLI wrapper |
 | `.agents/agents.config` | Configuration |
 | `.agents/tools.json` | Tool catalog |
@@ -87,13 +83,10 @@ Compatibility mirrors kept for broader reuse:
 | Location | Action |
 |----------|--------|
 | `<target>/AGENTS.md` | Copied |
-| `<target>/OPENCODE.md` | Copied |
-| `<target>/QWEN.md` | Copied |
 | `<target>/CLAUDE.md` | Copied |
-| `<target>/GEMINI.md` | Copied |
 | `<target>/.agents/` | Complete structure |
 | `<target>/.agents/tmp/` | Temporary non-canonical workspace |
-| `<target>/.opencode/.claude/.qwen/.codex/.gemini` | Runtime folders ensured |
+| `<target>/.claude/` | Runtime folder ensured |
 | `<target>/Makefile` | Wrapper configured |
 | `<target>/docs/arc/` | Folders created |
 | `<target>/.agents/wb/` | Folders created |
@@ -187,11 +180,7 @@ Edit `agents-bootstrap.py`:
 ```python
 MANDATORY_FILES_TO_COPY = [
     "AGENTS.md",
-    "OPENCODE.md",
-    "QWEN.md",
     "CLAUDE.md",
-    "GEMINI.md",
-    "opencode.json",
     ".agents/agents",
     ".agents/agents.config",
     ".agents/tools.json",

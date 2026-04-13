@@ -31,38 +31,17 @@ Runtime-specific files must adapt this canonical layer, not redefine it.
 
 ## Committed Runtime Adapters
 
-Primary runtimes:
+Primary runtime contract:
 
-### OpenCode
-
-- `OPENCODE.md`
-- `opencode.json`
-- `.opencode/README.md`
-- `.opencode/agent/README.md`
-
-### Codex
+### Canonical Instructions
 
 - `AGENTS.md`
-- `.codex/README.md`
-- `.codex/skills` -> `.agents/skills`
-
-### Qwen
-
-- `QWEN.md`
-- `.qwen/README.md`
-- `.qwen/skills` -> `.agents/skills`
-
-Compatibility runtimes:
-
-### Claude
-
 - `CLAUDE.md`
 - `.claude/README.md`
 
-### Gemini
-
-- `GEMINI.md`
-- `.gemini/README.md`
+OpenCode, Qwen, Gemini, and Codex do not require committed root mirrors or
+project-local adapter folders in this scaffold. They should use `AGENTS.md`
+directly or host-level global runtime configuration.
 
 ## Secret Boundary
 
@@ -78,20 +57,16 @@ Committed runtime config must stay safe to review publicly inside the repository
 
 ## Runtime-Specific Rules
 
-### OpenCode
+### Codex, OpenCode, Qwen, and Gemini
 
-- Use `opencode.json` only for project-safe defaults such as instructions and conservative permission policy.
-- Keep project-local agent definitions under `.opencode/agent/` only when they add narrow runtime-specific behavior.
+- Treat `AGENTS.md` as the repo-facing contract.
+- Keep user-local or global runtime configuration outside the repository unless
+  a future project explicitly justifies a portable, secret-free adapter.
 
-### Codex
+### Claude
 
-- Treat `AGENTS.md` plus `.codex/README.md` as the repo-facing contract.
-- Keep any user-local Codex machine configuration outside the repository unless it is explicitly secret-free and portable.
-
-### Qwen
-
-- Treat `QWEN.md` plus `.qwen/README.md` as the repo-facing contract.
-- Keep runtime-specific Qwen agent/config files out of the repo unless they are secret-free, portable, and clearly justified.
+- Treat `CLAUDE.md` as the committed mirror of `AGENTS.md`.
+- Keep `.claude/` thin and secret-free.
 
 ## Drift Control
 

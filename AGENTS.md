@@ -15,7 +15,7 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 
 - This scaffold is for interactive agent execution environments, not for embedding a general-purpose agent SDK into an application runtime.
 - The primary execution model is: an operator opens a repository in an interactive CLI agent, and the scaffold provides the governance, docs, tools, telemetry, and runtime adapters that the agent uses while working.
-- Runtime folders such as `.opencode/`, `.codex/`, `.qwen/`, `.claude/`, and `.gemini/` should stay thin and focused on adapter/configuration concerns for those interactive CLIs.
+- Runtime folders should stay thin and focused on adapter/configuration concerns. Only `.claude/` is committed as a local runtime adapter; Codex uses `AGENTS.md` directly and OpenCode, Qwen, and Gemini use global runtime configuration.
 - Do not redesign the scaffold around long-lived backend agent services unless the roadmap explicitly introduces that use case.
 
 ## Repo Structure
@@ -28,8 +28,6 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - `.agents/skills/`: project skills and workflows
 - `.agents/cache/`: cached remote skill/tool metadata
 - `.agents/agents.config`: configuration for wrappers, sync, and runtime defaults
-- `.opencode/`: OpenCode-specific project adapter folder
-- `opencode.json`: committed OpenCode project configuration entrypoint (must remain secret-free)
 - `README.md`: onboarding and command reference for the scaffold
 
 ## Important Files
@@ -173,7 +171,8 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 
 ### Agent Sync
 
-- `AGENTS.md` is the source for `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, and `GEMINI.md`
+- `AGENTS.md` is the canonical runtime instruction source
+- `CLAUDE.md` is the only committed root mirror generated from `AGENTS.md`
 - Keep generic operating guidance in sync here and add repository-specific detail in this file
 
 ### Primary Runtime Compatibility

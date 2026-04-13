@@ -184,7 +184,7 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
         "- `.agents/scripts`: Python command surface for governance, validation, bootstrap, repo maps, and runtime adapters.",
         "- `docs/`: Canonical project documentation surface for standards, architecture, patterns, templates, and telemetry guidance.",
         "- `.agents/skills`: Project-local skill surface synced into the repository for interactive runtimes.",
-        "- `AGENTS.md`, `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`: Operator/runtime instruction entrypoints mirrored from the canonical contract.",
+        "- `AGENTS.md` and `CLAUDE.md`: Operator/runtime instruction entrypoints; OpenCode, Qwen, Gemini, and Codex use `AGENTS.md` directly or global runtime config.",
     ]
     _replace_section(output_root / "README.md", "## Major Runtime Surfaces", runtime_surfaces)
 
@@ -201,7 +201,7 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
         "- `.agents/scripts`: Operational Python command family for doctor, bootstrap, sync, repo-map, workbench, and validation flows.",
         "- `docs/`: Standards, templates, goal-state canon, patterns, telemetry docs, and other project-facing documentation surfaces.",
         "- `.agents/skills`: Repo-local skill payloads selected for interactive runtimes.",
-        "- Runtime instruction entrypoints (`AGENTS.md`, mirrors, and adapter files): Thin contract surfaces for Codex, OpenCode, Qwen, Claude, and Gemini style runtimes.",
+        "- Runtime instruction entrypoints (`AGENTS.md` and the Claude mirror): Thin contract surfaces for interactive runtimes.",
     ]
     _replace_section(output_root / "ARCHITECTURE.md", "## Why The Main Domains Exist", domain_bullets)
 
@@ -210,10 +210,7 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
         path
         for path in [
             repo_root / "AGENTS.md",
-            repo_root / "OPENCODE.md",
-            repo_root / "QWEN.md",
             repo_root / "CLAUDE.md",
-            repo_root / "GEMINI.md",
         ]
         if path.exists()
     ]
@@ -235,14 +232,14 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
         "- `.agents/agents.config`: Repository-local runtime, path, and skills-sync contract.",
         "- `.agents/tools.json`: Tool catalog surfaced by the wrapper and tools commands.",
         "- `.agents/skills-sync.manifest.json`: Pinned project-local skills selection and source contract.",
-        "- `opencode.json`: Secret-free OpenCode adapter entrypoint committed with the scaffold.",
+        "- `.claude/`: Secret-free Claude adapter notes and rule links committed with the scaffold.",
     ]
     _replace_section(output_root / "API_MAP.md", "## Supporting Integration And Contract Surfaces", supporting_surfaces)
 
     _replace_first_line_with_prefix(
         output_root / "LLM_QUICKSTART.md",
         "- Runtime surfaces:",
-        "- Runtime surfaces: `.agents/scripts`, `docs/`, `.agents/skills`, `AGENTS.md`, `OPENCODE.md`, `QWEN.md`, `CLAUDE.md`, `GEMINI.md`",
+        "- Runtime surfaces: `.agents/scripts`, `docs/`, `.agents/skills`, `AGENTS.md`, `CLAUDE.md`",
     )
 
 

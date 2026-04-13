@@ -198,7 +198,7 @@ status: draft
 
 ## Agent Sync
 
-- This file is the source for generated agent docs in this repo (`QWEN.md`, `CLAUDE.md`, `GEMINI.md`).
+- This file is the source for generated Claude mirror docs in this repo (`CLAUDE.md`).
 - Keep generic operational guidance in sync here and add repo-specific detail in this file.
 
 ## Project-Local Skills Preferred
