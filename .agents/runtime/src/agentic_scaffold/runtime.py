@@ -30,22 +30,35 @@ class AgenticRuntime:
 
     def generate_manifest(self) -> RepoManifest:
         repo_root = self.config.repo_root
-        docs_md = len(list((repo_root / "docs").rglob("*.md"))) if (repo_root / "docs").exists() else 0
-        script_files = len(list((repo_root / ".agents" / "scripts").glob("*.py"))) if (repo_root / ".agents" / "scripts").exists() else 0
-        test_files = len(list((repo_root / ".agents" / "scripts" / "tests").rglob("test_*.py"))) if (repo_root / ".agents" / "scripts" / "tests").exists() else 0
+        docs_md = sum(1 for _ in (repo_root / "docs").rglob("*.md")) if (repo_root / "docs").exists() else 0
+        script_files = (
+            sum(1 for _ in (repo_root / ".agents" / "scripts").glob("*.py"))
+            if (repo_root / ".agents" / "scripts").exists()
+            else 0
+        )
+        test_files = (
+            sum(1 for _ in (repo_root / ".agents" / "scripts" / "tests").rglob("test_*.py"))
+            if (repo_root / ".agents" / "scripts" / "tests").exists()
+            else 0
+        )
         skills_dir = repo_root / ".agents" / "skills"
         skills = []
         if skills_dir.exists():
             for skill_dir in sorted(path for path in skills_dir.iterdir() if path.is_dir()):
                 skills.append(SkillSummary(name=skill_dir.name, path=skill_dir.relative_to(repo_root).as_posix()))
         tool_catalog_count = 0
+        tool_catalog_tools = []
         tools_path = repo_root / ".agents" / "tools.json"
         if tools_path.exists():
             try:
                 payload = json.loads(tools_path.read_text(encoding="utf-8"))
-                tool_catalog_count = len(payload.get("tools", []))
+                raw_tools = payload.get("tools")
+                if isinstance(payload, dict) and isinstance(raw_tools, list):
+                    tool_catalog_tools = [tool for tool in raw_tools if isinstance(tool, dict)]
+                    tool_catalog_count = len(tool_catalog_tools)
             except Exception:
                 tool_catalog_count = 0
+                tool_catalog_tools = []
         return RepoManifest(
             repo_root=str(repo_root),
             docs_markdown_files=docs_md,
@@ -67,17 +80,25 @@ class AgenticRuntime:
         path = self.config.repo_root / ".agents" / "tools.json"
         if not path.exists():
             return {"available": False, "tools": []}
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        tool_catalog_tools: list[dict[str, object]] = []
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            raw_tools = payload.get("tools") if isinstance(payload, dict) else []
+            if isinstance(raw_tools, list):
+                tool_catalog_tools = [tool for tool in raw_tools if isinstance(tool, dict)]
+        except (OSError, json.JSONDecodeError, AttributeError):
+            return {"available": False, "tools": []}
+
         return {
             "available": True,
-            "tool_count": len(payload.get("tools", [])),
+            "tool_count": len(tool_catalog_tools),
             "tools": [
                 {
                     "id": item.get("id"),
                     "type": item.get("type"),
                     "wrapper_command": item.get("wrapper_command"),
                 }
-                for item in payload.get("tools", [])
+                for item in tool_catalog_tools
             ],
         }
 

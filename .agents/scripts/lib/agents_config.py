@@ -421,10 +421,18 @@ def parse_offset(offset: str) -> timezone:
         return timezone.utc
     if len(value) != 6 or value[0] not in {"+", "-"} or value[3] != ":":
         raise ValueError(f"Invalid timezone offset format: {offset}")
-    hours = int(value[1:3])
-    minutes = int(value[4:6])
+    sign = value[0]
+    try:
+        hours = int(value[1:3])
+        minutes = int(value[4:6])
+    except ValueError as exc:
+        raise ValueError(f"Invalid timezone offset format: {offset}") from exc
+    if not (0 <= hours <= 23):
+        raise ValueError(f"Invalid timezone offset format: {offset}")
+    if not (0 <= minutes <= 59):
+        raise ValueError(f"Invalid timezone offset format: {offset}")
     delta = timedelta(hours=hours, minutes=minutes)
-    if value[0] == "-":
+    if sign == "-":
         delta = -delta
     return timezone(delta)
 

@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import re
 import shutil
-import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 from agentic_scaffold.config import RuntimeConfig
 from agentic_scaffold.models import ArchiveResult, ChangeRecord, FileWriteResult
+from agentic_scaffold.process_utils import (
+    DEFAULT_COMMAND_TIMEOUT_SECONDS,
+    ProcessError,
+    run_command,
+)
 from agentic_scaffold.services.journal import JournalStore
 
 
@@ -79,7 +83,7 @@ class ChangeService:
             handle.write(diff_text)
             temp_patch_path = Path(handle.name)
         try:
-            completed = subprocess.run(
+            completed = run_command(
                 [
                     "patch",
                     "--silent",
@@ -91,7 +95,10 @@ class ChangeService:
                 check=False,
                 capture_output=True,
                 text=True,
+                timeout=DEFAULT_COMMAND_TIMEOUT_SECONDS,
             )
+        except ProcessError as exc:
+            raise RuntimeError(f"Patch command failed to execute: {exc}") from exc
         finally:
             temp_patch_path.unlink(missing_ok=True)
 

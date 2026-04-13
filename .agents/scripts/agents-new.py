@@ -19,10 +19,9 @@ Examples:
 """
 
 import re
+import subprocess
 import sys
 import json
-import subprocess
-import yaml
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Optional
@@ -44,7 +43,6 @@ from lib.workflow_manifest import (
     load_artifact_policy,
     manifest_id_placeholders as _manifest_id_placeholders_impl,
 )
-
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 SCRIPTS_DIR = Path(__file__).resolve().parent

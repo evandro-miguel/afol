@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import subprocess
 import json
 import re
-import subprocess
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -16,15 +16,48 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("PyYAML is required") from exc
 
-from .agents_config import (
-    get_active_session_file_path,
-    get_cfg_path,
-    load_agents_config,
-    now_iso_with_offset,
-)
-from .artifact_utility import analyze_artifact_utility
-from .markdown_docs import split_markdown_frontmatter
-from .workflow_manifest import load_artifact_manifest, load_artifact_policy
+try:
+    from .agents_config import (
+        get_active_session_file_path,
+        get_cfg_path,
+        load_agents_config,
+        now_iso_with_offset,
+    )
+    from .artifact_utility import analyze_artifact_utility
+    from .markdown_docs import split_markdown_frontmatter
+    from .workflow_manifest import load_artifact_manifest, load_artifact_policy
+except ImportError:
+    from lib.agents_config import (
+        get_active_session_file_path,
+        get_cfg_path,
+        load_agents_config,
+        now_iso_with_offset,
+    )
+    from lib.artifact_utility import analyze_artifact_utility
+    from lib.markdown_docs import split_markdown_frontmatter
+    from lib.workflow_manifest import load_artifact_manifest, load_artifact_policy
+
+try:
+    from .process_utils import run_command
+except Exception:
+    try:
+        from lib.process_utils import run_command
+    except Exception:
+        def run_command(
+            cmd,
+            *,
+            cwd: Path | None = None,
+            timeout: int = 120,
+            **kwargs,
+        ):
+            run_kwargs = dict(kwargs)
+            run_kwargs_no_timeout = dict(run_kwargs)
+            try:
+                return subprocess.run(list(cmd), cwd=cwd, timeout=timeout, **run_kwargs)
+            except TypeError as exc:
+                if "unexpected keyword argument 'timeout'" not in str(exc):
+                    raise
+                return subprocess.run(list(cmd), cwd=cwd, **run_kwargs_no_timeout)
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
@@ -400,7 +433,7 @@ def next_workflow_artifact(states: Iterable[Dict[str, Any]]) -> Optional[Dict[st
 
 
 def git_status_entries(root_dir: Path = ROOT_DIR) -> Tuple[bool, List[Dict[str, Any]]]:
-    proc = subprocess.run(
+    proc = run_command(
         ["git", "-C", str(root_dir), "status", "--porcelain"],
         capture_output=True,
         text=True,

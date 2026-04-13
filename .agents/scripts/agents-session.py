@@ -4,14 +4,26 @@
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
+import json
 import sys
 from pathlib import Path
 from typing import Dict, Optional
 
 from lib.agents_config import get_active_session_file_path, load_agents_config
 from lib.execution_commands import ExecutionError, build_session_catchup, find_session
+
+try:
+    from lib.process_utils import run_command
+except Exception:
+    def run_command(
+        cmd,
+        *,
+        cwd: Path | None = None,
+        timeout: int = 120,
+        **kwargs,
+    ):
+        return subprocess.run(list(cmd), cwd=cwd, timeout=timeout, **kwargs)
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
@@ -37,7 +49,7 @@ def _print_items(label: str, items: list[str]) -> None:
 
 
 def _run_strict_verify(session_dir: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return run_command(
         [sys.executable, str(VERIFY_TASKS_SCRIPT), "--strict", str(session_dir)],
         capture_output=True,
         text=True,

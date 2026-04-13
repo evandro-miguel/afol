@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import subprocess
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path

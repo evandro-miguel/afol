@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-import subprocess
 import sys
 from dataclasses import dataclass
 
 from agentic_scaffold.config import RuntimeConfig
+from agentic_scaffold.process_utils import (
+    DEFAULT_COMMAND_TIMEOUT_SECONDS,
+    ProcessError,
+    run_command,
+)
 
 
 @dataclass(frozen=True)
@@ -101,13 +105,17 @@ class RuntimeRegistry:
         script = self.config.repo_root / ".agents" / "scripts" / command.script_name
         if not script.exists():
             raise FileNotFoundError(f"Registered command script not found: {script}")
-        proc = subprocess.run(
-            [sys.executable, str(script), *args],
-            cwd=self.config.repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            proc = run_command(
+                [sys.executable, str(script), *args],
+                cwd=self.config.repo_root,
+                capture_output=True,
+                check=False,
+                timeout=DEFAULT_COMMAND_TIMEOUT_SECONDS,
+            )
+        except ProcessError as exc:
+            print(f"Runtime command timed out: {exc}", file=sys.stderr)
+            return 124
         if proc.stdout:
             sys.stdout.write(proc.stdout)
         if proc.stderr:

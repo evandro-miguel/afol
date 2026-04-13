@@ -10,12 +10,12 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from lib.agents_config import load_agents_config, resolve_repo_path
+from lib.process_utils import run_command
 
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
@@ -77,7 +77,7 @@ def cfg_path(key: str) -> Path:
 
 
 def run(cmd: List[str], cwd: Path | None = None):
-    result = subprocess.run(cmd, cwd=cwd or ROOT_DIR, text=True)
+    result = run_command(cmd, cwd=cwd or ROOT_DIR, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"Command failed ({result.returncode}): {' '.join(cmd)}")
 
@@ -1301,7 +1301,7 @@ def _default_pr_body(skills: Sequence[str]) -> str:
 
 
 def _git_ref_exists(repo: Path, ref: str) -> bool:
-    result = subprocess.run(["git", "show-ref", "--verify", "--quiet", ref], cwd=repo)
+    result = run_command(["git", "show-ref", "--verify", "--quiet", ref], cwd=repo)
     return result.returncode == 0
 
 

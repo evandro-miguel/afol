@@ -85,9 +85,11 @@ class KnowledgeSearchService:
 
     def search(self, query: str, limit: int = 8) -> SearchResponse:
         normalized = query.strip()
-        candidates = [self._extract(path) for path in self._iter_markdown_files()]
+        total_candidates = 0
         hits: list[SearchHit] = []
-        for candidate in candidates:
+        for path in self._iter_markdown_files():
+            total_candidates += 1
+            candidate = self._extract(path)
             score = max(
                 fuzz.token_set_ratio(normalized, candidate.searchable_text),
                 fuzz.partial_ratio(normalized, candidate.searchable_text),
@@ -107,6 +109,6 @@ class KnowledgeSearchService:
         return SearchResponse(
             query=normalized,
             searched_roots=[root.relative_to(self.repo_root).as_posix() for root in self.search_roots],
-            total_candidates=len(candidates),
+            total_candidates=total_candidates,
             hits=hits[:limit],
         )

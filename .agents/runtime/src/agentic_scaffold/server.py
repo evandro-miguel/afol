@@ -45,10 +45,18 @@ def _json_resource(payload: object) -> str:
 def _register_tools(mcp: FastMCP, runtime: AgenticRuntime) -> None:
     @mcp.tool(description="Inspect the repository tree with bounded depth and entry limits.")
     def inspect_workspace(depth: int = 3, include_hidden: bool = False, max_entries: int = 500) -> WorkspaceSummary:
+        if depth < 0 or depth > 10:
+            raise ValueError("depth must be between 0 and 10")
+        if max_entries < 1 or max_entries > 5000:
+            raise ValueError("max_entries must be between 1 and 5000")
         return runtime.workspace.inspect(depth=depth, include_hidden=include_hidden, max_entries=max_entries)
 
     @mcp.tool(description="Search markdown docs, workbench artifacts, map docs, and skills with fuzzy ranking.")
     def search_docs(query: str, limit: int = 8) -> SearchResponse:
+        if not query.strip():
+            raise ValueError("query must be a non-empty string")
+        if limit < 1 or limit > 50:
+            raise ValueError("limit must be between 1 and 50")
         return runtime.search.search(query=query, limit=limit)
 
     @mcp.tool(description="Validate required scaffold folders, templates, and runtime docs. Optionally create missing directories.")

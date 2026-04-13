@@ -99,10 +99,10 @@ class JournalStore:
             existed_before = bool(payload.get("existed_before", False))
             if backup:
                 restored_path = self.restore_backup(repo_root, backup, target)
-                restored.append(str(restored_path.relative_to(repo_root)))
+                restored.append(restored_path.relative_to(repo_root).as_posix())
             elif not existed_before:
                 self.delete_if_exists(repo_root, target)
-                restored.append(target)
+                restored.append(str(target))
         elif record.action == "archive":
             archive_root = payload["archive_root"]
             for item in payload.get("moves", []):

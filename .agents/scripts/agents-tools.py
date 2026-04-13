@@ -19,11 +19,12 @@ Examples:
 
 import json
 import re
-import subprocess
 import sys
+import subprocess
 import unicodedata
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, Tuple
+
 
 # Configuration
 SCRIPT_DIR = Path(__file__).resolve().parent

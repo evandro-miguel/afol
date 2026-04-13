@@ -6,12 +6,12 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Iterable, List
 
 from lib.agents_config import load_agents_config
+from lib.process_utils import run_command
 
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
@@ -359,7 +359,7 @@ def main() -> int:
         return 0
 
     try:
-        result = subprocess.run(cmd, cwd=shadow_repo)
+        result = run_command(cmd, cwd=shadow_repo)
         if result.returncode != 0:
             print(f"❌ repo-map runner failed with exit code {result.returncode}")
             return result.returncode

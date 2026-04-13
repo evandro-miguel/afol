@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
 from agentic_scaffold.server import build_mcp
 
@@ -81,3 +83,19 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
     assert {"status", "knowledge", "session", "doctor", "skills-sync", "verify-tasks"} <= set(commands)
     assert commands["status"]["script_name"] == "agents-status.py"
     assert commands["verify"]["alias_of"] == "verify-tasks"
+
+
+async def test_mcp_inspect_workspace_rejects_invalid_depth(scaffold_repo):
+    mcp = build_mcp(scaffold_repo)
+
+    async with Client(mcp) as client:
+        with pytest.raises(ToolError, match="depth must be between 0 and 10"):
+            await client.call_tool("inspect_workspace", {"depth": 99})
+
+
+async def test_mcp_search_docs_rejects_empty_query(scaffold_repo):
+    mcp = build_mcp(scaffold_repo)
+
+    async with Client(mcp) as client:
+        with pytest.raises(ToolError, match="query must be a non-empty string"):
+            await client.call_tool("search_docs", {"query": "", "limit": 2})

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+
+from agentic_scaffold.config import find_repo_root
 from agentic_scaffold.runtime import AgenticRuntime
 
 
@@ -49,6 +52,42 @@ def test_search_docs_finds_roadmap(scaffold_repo):
 
     assert response.hits
     assert any("knowledge/INDEX.md" in hit.path or "GENERAL-ROADMAP.md" in hit.path for hit in response.hits)
+
+
+def test_tool_catalog_resource_handles_corrupt_json(scaffold_repo):
+    tool_catalog = scaffold_repo / ".agents" / "tools.json"
+    tool_catalog.write_text("{bad-json", encoding="utf-8")
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+
+    catalog = runtime.tool_catalog_resource()
+    assert catalog["available"] is False
+    assert catalog["tools"] == []
+
+
+def test_search_tracks_total_candidates(scaffold_repo):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    response = runtime.search.search("unlikely-term-xyzw", limit=3)
+
+    assert response.total_candidates > 0
+    assert response.hits == []
+
+
+def test_find_repo_root_prefers_explicit_env(scaffold_repo, tmp_path, monkeypatch):
+    fake_repo = tmp_path / "alternate_repo"
+    fake_repo.mkdir(parents=True, exist_ok=True)
+    (fake_repo / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
+    (fake_repo / ".agents").mkdir()
+
+    monkeypatch.setenv("AGENTIC_REPO_ROOT", str(fake_repo))
+    assert find_repo_root(fake_repo / "nested" / "dir") == fake_repo
+
+
+def test_find_repo_root_rejects_invalid_env_root(scaffold_repo, tmp_path, monkeypatch):
+    invalid = tmp_path / "not-a-repo"
+    monkeypatch.setenv("AGENTIC_REPO_ROOT", str(invalid))
+
+    with pytest.raises(FileNotFoundError, match="AGENTIC_REPO_ROOT"):
+        find_repo_root(scaffold_repo / "docs")
 
 
 def test_validate_structure_ok(scaffold_repo):
