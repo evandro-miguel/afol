@@ -39,25 +39,29 @@ except ImportError:
 
 try:
     from .process_utils import run_command
-except Exception:
+except ImportError:
     try:
         from lib.process_utils import run_command
-    except Exception:
-        def run_command(
-            cmd,
-            *,
-            cwd: Path | None = None,
-            timeout: int = 120,
-            **kwargs,
-        ):
-            run_kwargs = dict(kwargs)
-            run_kwargs_no_timeout = dict(run_kwargs)
-            try:
-                return subprocess.run(list(cmd), cwd=cwd, timeout=timeout, **run_kwargs)
-            except TypeError as exc:
-                if "unexpected keyword argument 'timeout'" not in str(exc):
-                    raise
-                return subprocess.run(list(cmd), cwd=cwd, **run_kwargs_no_timeout)
+    except ImportError:
+        pass
+
+
+if "run_command" not in globals():
+
+    def run_command(
+        cmd,
+        *,
+        cwd: Path | None = None,
+        timeout: int = 120,
+        **kwargs,
+    ):
+        run_kwargs = dict(kwargs)
+        try:
+            return subprocess.run(list(cmd), cwd=cwd, timeout=timeout, **run_kwargs)
+        except TypeError as exc:
+            if "unexpected keyword argument 'timeout'" not in str(exc):
+                raise
+            return subprocess.run(list(cmd), cwd=cwd, **kwargs)
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
