@@ -51,6 +51,62 @@ Runtime MCP lane for compact scaffold inspection, search, validation, safe archi
 
 **Location:** `.agents/skills/agentic-scaffold-mcp/`
 
+## Python Script Improvement Skills
+
+These project-local skills support maintenance of the scaffold's Python scripts
+and runtime. They are installed directly in `.agents/skills/` and are not part
+of the universal `skills-sync` manifest.
+
+### async-python-patterns
+
+Asyncio and async/await guidance for non-blocking Python paths.
+
+**Location:** `.agents/skills/async-python-patterns/`
+
+### python-code-style
+
+Python style, linting, naming, and documentation guidance.
+
+**Location:** `.agents/skills/python-code-style/`
+
+### python-design-patterns
+
+Minimal Python design principles for cohesive, testable components.
+
+**Location:** `.agents/skills/python-design-patterns/`
+
+### python-mcp-server-generator
+
+Python MCP server guidance, useful for the scaffold runtime and FastMCP
+surface.
+
+**Location:** `.agents/skills/python-mcp-server-generator/`
+
+### python-performance-optimization
+
+Profiling and optimization guidance for slow or memory-heavy Python code.
+
+**Location:** `.agents/skills/python-performance-optimization/`
+
+### python-resource-management
+
+Context manager, cleanup, streaming, and deterministic resource handling
+guidance.
+
+**Location:** `.agents/skills/python-resource-management/`
+
+### python-testing-patterns
+
+Pytest, fixtures, mocking, and focused Python testing guidance.
+
+**Location:** `.agents/skills/python-testing-patterns/`
+
+### python-type-safety
+
+Type hints, generics, protocols, and static checking guidance.
+
+**Location:** `.agents/skills/python-type-safety/`
+
 ## Adding New Skills
 
 ### Manual Addition
