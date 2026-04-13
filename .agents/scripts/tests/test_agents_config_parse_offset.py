@@ -26,4 +26,3 @@ def test_parse_offset_rejects_invalid_shape():
 def test_parse_offset_rejects_hour_out_of_range():
     with pytest.raises(ValueError, match="Invalid timezone offset format"):
         parse_offset("+99:00")
-

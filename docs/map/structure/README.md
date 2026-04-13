@@ -1,22 +1,22 @@
 # 📁 Project Structure - Complete Index
 
-**Generated:** 2026-04-13T01:27:05+00:00
+**Generated:** 2026-04-13T21:24:17+00:00
 **Last Update:** First run
 
 ## 📊 Overview
 
 | Metric | Value |
 |--------|-------|
-| **Total Files** | 119 |
-| **Total Lines** | 28,305 |
+| **Total Files** | 209 |
+| **Total Lines** | 50,030 |
 
 ## 📂 Documentation Sections
 
 | Section | Description | Files |
 |---------|-------------|-------|
-| [Backend](./backend.md) | Services, utilities, and business logic | 46 |
-| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 67 |
-| [Data](./data.md) | Data files, constants, and configuration | 6 |
+| [Backend](./backend.md) | Services, utilities, and business logic | 94 |
+| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 106 |
+| [Data](./data.md) | Data files, constants, and configuration | 9 |
 
 ## 🔄 Change Detection
 
@@ -30,6 +30,7 @@ This documentation uses **incremental updates**:
 ```
 agentic_start_folder/
 ├── 📁 docs/
+├── 📁 src/
 ```
 
 ---
