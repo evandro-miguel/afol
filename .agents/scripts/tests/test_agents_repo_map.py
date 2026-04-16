@@ -51,6 +51,23 @@ class AgentsRepoMapTests(unittest.TestCase):
             self.assertIn(str(runner), output)
             self.assertIn(str(repo_dir / "docs" / "map"), output)
 
+    def test_dry_run_does_not_prepare_shadow_repo(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            temp_root = Path(td)
+            repo_dir = temp_root / "repo"
+            repo_dir.mkdir()
+            runner = make_runner(temp_root / "run-repo-map.sh", "#!/usr/bin/env bash\nexit 0\n")
+
+            argv = ["agents-repo-map.py", str(repo_dir), "--dry-run"]
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False),
+                mock.patch.object(self.repo_map, "_prepare_shadow_repo", side_effect=AssertionError("should not copy")),
+            ):
+                code = self.repo_map.main()
+
+            self.assertEqual(code, 0)
+
     def test_run_succeeds_when_runner_writes_required_readme(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)
@@ -149,6 +166,40 @@ class AgentsRepoMapTests(unittest.TestCase):
             output = buf.getvalue()
             self.assertEqual(code, 1)
             self.assertIn("required map docs are missing", output)
+
+    def test_run_fails_fast_when_standard_runner_prerequisites_are_missing(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            temp_root = Path(td)
+            repo_dir = temp_root / "repo"
+            repo_dir.mkdir()
+            runner = make_runner(temp_root / "run-repo-map.sh", "#!/usr/bin/env bash\nexit 0\n")
+
+            buf = io.StringIO()
+            argv = ["agents-repo-map.py", str(repo_dir)]
+
+            def fake_which(command: str):
+                if command in {"ctags", "docker"}:
+                    return None
+                return f"/usr/bin/{command}"
+
+            original_hint = self.repo_map.DEFAULT_RUNNER_HINT
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False),
+                mock.patch.object(self.repo_map.shutil, "which", side_effect=fake_which),
+                contextlib.redirect_stdout(buf),
+            ):
+                self.repo_map.DEFAULT_RUNNER_HINT = runner
+                try:
+                    code = self.repo_map.main()
+                finally:
+                    self.repo_map.DEFAULT_RUNNER_HINT = original_hint
+
+            output = buf.getvalue()
+            self.assertEqual(code, 1)
+            self.assertIn("Repo map prerequisites missing", output)
+            self.assertIn("ctags", output)
+            self.assertIn("docker", output)
 
     def test_run_fails_when_dependency_graph_is_degenerate(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:

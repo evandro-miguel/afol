@@ -164,7 +164,7 @@ if [ ! -d "${SCRIPTS_DIR}/.venv" ]; then
 fi
 
 if [ -z "${PYTHON_BIN}" ]; then
-    echo "❌ Python interpreter not found. Run 'make setup' to provision .agents/scripts/.venv."
+    echo "❌ Python interpreter not found. Run 'just setup' to provision .agents/scripts/.venv."
     exit 1
 fi
 
@@ -287,7 +287,7 @@ show_help() {
     echo "  .agents/agents session catchup --session 260306_2128_context-driven-execution-commands"
     echo "  .agents/agents session close --session 260306_2128_context-driven-execution-commands --next-session 260306_2240_session-close-command"
     echo "  .agents/agents wb-update touch"
-    echo "  .agents/agents wb-update evidence T-01 --session <id> --command \"make test-scripts\" --result \"passed\""
+    echo "  .agents/agents wb-update evidence T-01 --session <id> --command \"just test-scripts\" --result \"passed\""
     echo "  .agents/agents wb-update task T-01 --session <id> --mark-done --evidence-id E-YYYY..."
     echo "  .agents/agents tools list"
     echo "  .agents/agents tools info doctor"

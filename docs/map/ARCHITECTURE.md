@@ -13,7 +13,7 @@ updated_at: "2026-04-02T23:28:28Z"
 
 - Python utilities or service-side scripts are present and should be considered part of the operating surface.
 - Dominant feature clusters: `.agents/scripts, docs, .agents/skills`.
-- Public boundaries currently concentrate in `.agents/agents`, `Makefile`, and the runtime instruction entrypoints.
+- Public boundaries currently concentrate in `.agents/agents`, `Justfile`, and the runtime instruction entrypoints.
 
 ### Runtime Topology
 

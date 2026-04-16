@@ -253,9 +253,9 @@ Backout:
 
 Commands:
 
-- Lint: `make lint`
+- Lint: `just lint`
 - Typecheck: `N/A`
-- Unit: `UV_CACHE_DIR=/tmp/uvcache make test-scripts`
+- Unit: `just test-scripts`
 - E2E: `N/A` for this planning phase
 
 Validation cases:

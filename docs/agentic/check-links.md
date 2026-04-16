@@ -4,8 +4,8 @@ theme: check-links
 type: tool-doc
 status: active
 owner: system
-created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-02-23T00:00:00Z"
+created_at: '2026-02-23T00:00:00Z'
+updated_at: '2026-04-13T19:36:54-03:00'
 links:
   tools_json: ./tools-json.md
   lint_docs: ./agents-lint-docs.md
@@ -82,15 +82,15 @@ python3 .agents/scripts/check-links.py --fix
 python3 .agents/scripts/check-links.py --output report.txt
 ```
 
-### Via Makefile (add target)
+### Via Justfile (add target)
 
-```bash
-# Add to Makefile:
+```just
+# Add to Justfile:
 check-links:
-	@python3 .agents/scripts/check-links.py
+  python3 .agents/scripts/check-links.py
 
 check-links-verbose:
-	@python3 .agents/scripts/check-links.py --verbose
+  python3 .agents/scripts/check-links.py --verbose
 ```
 
 ## Output Examples

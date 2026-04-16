@@ -4,6 +4,7 @@ theme: documentation-standards
 version: 1.0
 created: 2026-02-23
 applies_to: All agents (QWEN, CLAUDE, GEMINI)
+updated_at: '2026-04-13T19:36:40-03:00'
 ---
 
 # Documentation Standards
@@ -63,7 +64,7 @@ status: superseded  # Replaced by newer version
 
 ```bash
 ./.agents/agents wb-update status --value active --file plan
-make wb-status STATUS=active
+just wb-status STATUS=active
 ```
 
 ---

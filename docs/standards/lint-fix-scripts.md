@@ -4,7 +4,7 @@ id: lint-fix-scripts
 theme: standards
 status: active
 created_at: '2026-02-24T00:00:00-03:00'
-updated_at: '2026-02-24T00:00:00-03:00'
+updated_at: '2026-04-13T19:37:00-03:00'
 ---
 
 # Lint Fix Scripts
@@ -23,24 +23,24 @@ The lint fix scripts automatically resolve the most common markdown validation w
 
 ```bash
 # Check for issues (no modifications)
-make lint-fix-check
+just lint-fix-check
 
 # Preview fixes (dry run)
-make lint-fix-dry
+just lint-fix-dry
 
 # Apply all fixes
-make lint-fix
+just lint-fix
 ```
 
 ## Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `make lint-fix` | Apply all lint fixes |
-| `make lint-fix-dry` | Preview fixes without modifying |
-| `make lint-fix-check` | Check if fixes needed (exit 1 if yes) |
-| `make lint-fix-checkboxes` | Fix checkbox separators only |
-| `make lint-fix-frontmatter` | Add frontmatter to specific files |
+| `just lint-fix` | Apply all lint fixes |
+| `just lint-fix-dry` | Preview fixes without modifying |
+| `just lint-fix-check` | Check if fixes needed (exit 1 if yes) |
+| `just lint-fix-checkboxes` | Fix checkbox separators only |
+| `just lint-fix-frontmatter` | Add frontmatter to specific files |
 
 ## Scripts
 
@@ -156,13 +156,13 @@ Content here...
 1. **Before fixing:**
 
    ```bash
-   make lint-fix-check
+   just lint-fix-check
    ```
 
 2. **Preview changes:**
 
    ```bash
-   make lint-fix-dry
+   just lint-fix-dry
    ```
 
 3. **Review the files that will change**
@@ -170,13 +170,13 @@ Content here...
 4. **Apply fixes:**
 
    ```bash
-   make lint-fix
+   just lint-fix
    ```
 
 5. **Verify:**
 
    ```bash
-   make lint
+   just lint
    ```
 
 ### CI/CD Integration
@@ -185,7 +185,7 @@ Use `--check` mode in CI to fail if lint issues exist:
 
 ```yaml
 - name: Check lint issues
-  run: make lint-fix-check
+  run: just lint-fix-check
   continue-on-error: false
 ```
 
@@ -237,7 +237,7 @@ git diff
 
 - [`lint.md`](./lint.md) - Lint validation standards
 - [`checkbox-protocol.md`](./checkbox-protocol.md) - Checkbox state markers
-- [Makefile](../../standards/Makefile) - Command reference
+- [Justfile](./Justfile) - Canonical command reference
 
 ---
 

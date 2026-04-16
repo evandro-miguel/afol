@@ -4,8 +4,8 @@ theme: agents-lint-docs
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-20T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-20 00:00:00-03:00
+updated_at: '2026-04-13T19:36:48-03:00'
 links:
   tools_json: ./tools-json.md
   doctor: ./agents-doctor.md
@@ -95,8 +95,8 @@ def validate_new_thing(filepath: Path) -> List[str]:
 # Fix issues
 ./.agents/agents lint-docs .agents/wb/ --fix
 
-# Via Makefile
-make lint
+# Via Justfile
+just lint
 ```
 
 ## Output

@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Sequence, Set, Tuple
+
+from lib.agents_config import now_iso_with_offset
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -20,6 +22,7 @@ LOCAL_UNIVERSAL_SKILLS_DIR = Path(".agents/source/universal-skills")
 MANDATORY_FILES_TO_COPY = [
     Path("AGENTS.md"),
     Path("CLAUDE.md"),
+    Path("Justfile"),
     Path(".agents/agents"),
     Path(".agents/agents.config"),
     Path(".agents/tools.json"),
@@ -65,12 +68,23 @@ ENSURE_DIRS = [
     Path(".claude/rules"),
 ]
 
-MAKEFILE_INCLUDE_MARKER = "include docs/standards/Makefile"
-MAKEFILE_INCLUDE = (
-    "AGENTS_PRESERVE_LOCAL_ALL ?= 1\n"
-    "include docs/standards/Makefile"
-)
-MAKEFILE_WRAPPER = """# Makefile wrapper - delegates to docs/standards/Makefile\n# This keeps the root clean while maintaining make functionality\n\n# Include the actual Makefile from docs\ninclude docs/standards/Makefile\n"""
+JUSTFILE_STANDARDS_PATH = "docs/standards/Justfile"
+JUSTFILE_IMPORT_MARKER = f"import '{JUSTFILE_STANDARDS_PATH}'"
+JUSTFILE_IMPORT_MARKER_DOUBLE = f'import "{JUSTFILE_STANDARDS_PATH}"'
+JUSTFILE_MODULE_MARKER = f"mod agents_scaffold '{JUSTFILE_STANDARDS_PATH}'"
+JUSTFILE_MODULE_MARKER_DOUBLE = f'mod agents_scaffold "{JUSTFILE_STANDARDS_PATH}"'
+JUSTFILE_WRAPPER = """set unstable := true
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+set working-directory := "."
+
+# .agents scaffold module (safe default for downstream recipe overrides)
+mod agents_scaffold 'docs/standards/Justfile'
+"""
+JUSTFILE_MODULE_APPEND = """# .agents scaffold module (collision-safe namespaced recipes)
+mod agents_scaffold 'docs/standards/Justfile'
+"""
+JUSTFILE_IMPORT_RE = re.compile(r'^\s*import\s+["\']docs/standards/Justfile["\']\s*$')
+JUSTFILE_MODULE_RE = re.compile(r'^\s*mod\s+agents_scaffold\s+["\']docs/standards/Justfile["\']\s*$')
 
 COMMON_COPY_IGNORES = {
     ".venv",
@@ -278,29 +292,57 @@ def ensure_dirs(target: Path, dry_run: bool):
             p.mkdir(parents=True, exist_ok=True)
 
 
-def ensure_makefile(target: Path, dry_run: bool):
-    makefile = target / "Makefile"
-    if not makefile.exists():
-        print_action("create", makefile)
+def _justfile_has_scaffold_reference(content: str) -> bool:
+    return any(
+        JUSTFILE_IMPORT_RE.match(line) or JUSTFILE_MODULE_RE.match(line)
+        for line in _iter_justfile_directives(content)
+    )
+
+
+def _iter_justfile_directives(content: str) -> List[str]:
+    directives: List[str] = []
+    for raw_line in content.splitlines():
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        directives.append(stripped)
+    return directives
+
+
+def _justfile_uses_scaffold_module(content: str) -> bool:
+    return any(JUSTFILE_MODULE_RE.match(line) for line in _iter_justfile_directives(content))
+
+
+def _justfile_uses_root_wrapper(content: str) -> bool:
+    return any(JUSTFILE_IMPORT_RE.match(line) for line in _iter_justfile_directives(content))
+
+
+def ensure_justfile(target: Path, dry_run: bool):
+    justfile = target / "Justfile"
+    if not justfile.exists():
+        print_action("create", justfile)
         if not dry_run:
-            makefile.write_text(MAKEFILE_WRAPPER)
+            justfile.write_text(JUSTFILE_WRAPPER, encoding="utf-8")
         return
 
-    content = makefile.read_text()
-    if MAKEFILE_INCLUDE_MARKER in content:
-        print_action("makefile include already present", makefile)
+    content = justfile.read_text(encoding="utf-8")
+    if _justfile_has_scaffold_reference(content):
+        print_action("justfile scaffold import/module already present", justfile)
         return
 
-    print_action("append include", makefile)
+    print_action("append scaffold module", justfile)
     if dry_run:
         return
-    with makefile.open("a") as f:
-        f.write("\n\n# .agents include\n")
-        f.write(MAKEFILE_INCLUDE + "\n")
+
+    with justfile.open("a", encoding="utf-8") as handle:
+        if not content.endswith("\n"):
+            handle.write("\n")
+        handle.write("\n")
+        handle.write(JUSTFILE_MODULE_APPEND)
 
 
 def current_timestamp() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return now_iso_with_offset("Z")
 
 
 def render_template(template_rel: Path, timestamp: str) -> str:
@@ -466,7 +508,7 @@ def build_tech_stack(timestamp: str) -> str:
             "- <lint command>",
             "- <typecheck command or N/A>",
             "- <unit/integration test command>",
-            "- `make lint`, `make test-scripts`, and `make all` for scaffold validation",
+            "- `just lint`, `just test-scripts`, and `just all` for scaffold validation",
             "",
             "---",
             "*Generated by `.agents/scripts/agents-bootstrap.py`*",
@@ -846,8 +888,8 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
             "6. Update `.agents/agents.config` timezone/path settings if needed.",
             "7. Define real verification commands in repo docs (`install/dev/lint/typecheck/test/build`).",
             "8. Confirm `AGENTS.md`, `CLAUDE.md`, and the `.claude/` runtime folder are present.",
-            "9. Run `make doctor`, `make lint`, `make test-scripts`, and `make all`.",
-            "10. Create the first workstream with `make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<spec-id>`.",
+            "9. Run `just --fmt --check`, `just --list`, and the scaffold validation recipes exposed by the root `Justfile` (fresh baselines use `just --justfile Justfile agents_scaffold::doctor`, `agents_scaffold::lint`, `agents_scaffold::test-scripts`, and `agents_scaffold::all`).",
+            "10. Create the first workstream with `.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --spec`.",
             "",
             "## Verification Evidence",
             "",
@@ -1052,7 +1094,31 @@ def prepare_sibling_universal_skills_checkout(target: Path, dry_run: bool):
     )
 
 
-def run_post_checks(target: Path):
+def _just_post_check_command(*args: str) -> List[str]:
+    return ["just", "--justfile", "Justfile", *args]
+
+
+def _just_recipe_prefix(target: Path) -> str:
+    justfile = target / "Justfile"
+    if not justfile.exists():
+        return ""
+
+    content = justfile.read_text(encoding="utf-8")
+    if _justfile_uses_root_wrapper(content):
+        return ""
+    if _justfile_uses_scaffold_module(content):
+        return "agents_scaffold::"
+    return ""
+
+
+def post_checks_use_just(target: Path) -> bool:
+    return shutil.which("just") is not None and (target / "Justfile").exists()
+
+
+def build_post_check_commands(target: Path) -> List[Tuple[str, List[str], bool]]:
+    recipe_prefix = _just_recipe_prefix(target)
+    if not post_checks_use_just(target):
+        raise RuntimeError("just is required for post-bootstrap checks")
     commands: List[Tuple[str, List[str], bool]] = [
         (
             "sync-agent-docs",
@@ -1069,15 +1135,21 @@ def run_post_checks(target: Path):
             ["./.agents/agents", "fix-symlinks", "--force"],
             True,
         ),
-        (
-            "doctor",
-            ["make", "-f", "docs/standards/Makefile", "doctor"],
-            True,
-        ),
-        ("lint", ["make", "-f", "docs/standards/Makefile", "lint"], True),
-        ("test-scripts", ["make", "-f", "docs/standards/Makefile", "test-scripts"], True),
-        ("all", ["make", "-f", "docs/standards/Makefile", "all"], True),
     ]
+    commands.extend(
+        [
+            ("fmt-check", _just_post_check_command("--fmt", "--check"), True),
+            ("list", _just_post_check_command("--list"), True),
+            ("doctor", _just_post_check_command(f"{recipe_prefix}doctor"), True),
+            ("lint", _just_post_check_command(f"{recipe_prefix}lint"), True),
+            ("test-scripts", _just_post_check_command(f"{recipe_prefix}test-scripts"), True),
+            ("all", _just_post_check_command(f"{recipe_prefix}all"), True),
+        ]
+    )
+    return commands
+
+def run_post_checks(target: Path):
+    commands = build_post_check_commands(target)
 
     for name, cmd, required in commands:
         print(f"\n→ Running post-bootstrap check: {name}")
@@ -1109,7 +1181,7 @@ def main() -> int:
     print("=" * 70)
     print("AGENTS BOOTSTRAP")
     print("=" * 70)
-    print(f"Source: {ROOT_DIR}")
+    print(f"Source: {TEMPLATE_ROOT}")
     print(f"Target: {target}")
     install_mode = INSTALL_MODE_PARTIAL if args.partial else INSTALL_MODE_FULL
     print(f"Mode:   {'dry-run' if args.dry_run else 'apply'} ({install_mode})")
@@ -1132,7 +1204,7 @@ def main() -> int:
 
         ensure_dirs(target, args.dry_run)
         write_generated_baseline(target, args.force, args.dry_run, install_mode)
-        ensure_makefile(target, args.dry_run)
+        ensure_justfile(target, args.dry_run)
         write_adaptation_doc(target, stack, args.dry_run, install_mode)
 
         if not args.dry_run and not args.skip_checks:

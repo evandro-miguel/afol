@@ -52,7 +52,7 @@ Central index for all `.agents` system documentation.
 |-----------|----------|-------------|
 | CLI Wrapper | [agents-wrapper.md](./agents-wrapper.md) | Bash wrapper |
 | Central Runtime | [agents-runtime.md](./agents-runtime.md) | Python runtime package and FastMCP adapter |
-| Makefile | [makefile.md](./makefile.md) | Make targets |
+| Justfile | [justfile.md](./justfile.md) | Just targets |
 | Config | [agents-config.md](./agents-config.md) | Config loader |
 | Library | [lib-modules.md](./lib-modules.md) | Internal modules |
 | Catalog | [tools-json.md](./tools-json.md) | Tool catalog |

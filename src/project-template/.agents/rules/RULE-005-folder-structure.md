@@ -4,6 +4,7 @@ theme: folder-structure
 version: 1.0
 created: 2026-02-23
 applies_to: All agents (QWEN, CLAUDE, GEMINI)
+updated_at: '2026-04-13T19:37:12-03:00'
 ---
 
 # Folder Structure
@@ -60,7 +61,7 @@ docs/
 **Validate:**
 
 ```bash
-make doctor
+just doctor
 ```
 
 ---
@@ -193,7 +194,7 @@ python -m json.tool .agents/tools.json
 - ✅ Keep configuration in `.agents/agents.config`
 - ✅ Store tool docs in `docs/agentic/`
 - ✅ Store human docs in `docs/standards/`
-- ✅ Validate structure with `make doctor`
+- ✅ Validate structure with `just doctor`
 
 **DON'T:**
 
@@ -208,7 +209,7 @@ python -m json.tool .agents/tools.json
 
 ```bash
 # Check structure
-make doctor
+just doctor
 
 # Check config
 python -c "import yaml; yaml.safe_load(open('.agents/agents.config'))"

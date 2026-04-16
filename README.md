@@ -68,7 +68,7 @@ src/
 
 ```bash
 # Validate .agents structure
-make doctor
+just doctor
 
 # List available tools
 .agents/agents tools list
@@ -198,7 +198,7 @@ make doctor
 .agents/agents structure
 
 # View heat map of what's being used
-make telemetry-heat PERIOD=daily
+just telemetry-heat PERIOD=daily
 ```
 
 ### 4. Complete
@@ -219,10 +219,10 @@ make telemetry-heat PERIOD=daily
 .agents/agents session close --session <session-id> --next-session <next-session-id>
 
 # Generate report
-make wb-files-changed
+just wb-files-changed
 
 # View session telemetry
-make telemetry-report PERIOD=weekly
+just telemetry-report PERIOD=weekly
 ```
 
 ### Documentation Currency (Required)
@@ -252,16 +252,16 @@ Heat score identifies most/least used elements:
 
 ```bash
 # Heat map this week
-make telemetry-heat PERIOD=weekly
+just telemetry-heat PERIOD=weekly
 
 # Hottest elements (top 10)
-make telemetry-hot
+just telemetry-hot
 
 # Coldest elements (top 10)
-make telemetry-cold
+just telemetry-cold
 
 # By type
-make telemetry-heat TYPE=patterns PERIOD=monthly
+just telemetry-heat TYPE=patterns PERIOD=monthly
 ```
 
 Score formula: (frequency × 0.5) + (recency × 0.3) + (success × 0.2)
@@ -310,16 +310,16 @@ Catalog of patterns and anti-patterns with automatic suggestions.
 
 ```bash
 # Suggest patterns for theme
-make patterns-suggest THEME=auth-refactor
+just patterns-suggest THEME=auth-refactor
 
 # List patterns
-make patterns-list
+just patterns-list
 
 # Show pattern details
-make patterns-show PATTERN_ID=PAT-001
+just patterns-show PATTERN_ID=PAT-001
 
 # Apply pattern (records in telemetry)
-make patterns-apply PATTERN_ID=PAT-001
+just patterns-apply PATTERN_ID=PAT-001
 ```
 
 ### Included Patterns
@@ -377,54 +377,55 @@ updated_at: "2026-02-23T00:00:00-03:00"
 - [x] T-06 Completed
 ```
 
-## 🛠️ Makefile Targets
+## 🛠️ Justfile Targets
 
 ### Setup & Validation
 
 ```bash
-make setup          # Setup UV virtualenv
-make setup-runtime  # Setup central runtime environment
-make doctor         # Validate .agents structure
-make clean          # Clean caches
-make lint-scripts   # Lint Python operational scripts
-make test-scripts-all # Run script unit + integration tests with 80% coverage gate
-make lint-runtime   # Lint central runtime package
-make test-runtime   # Run central runtime tests
-make runtime-mcp-smoke # Smoke runtime and MCP CLIs
-make all            # Bootstrap-safe full validation, including scripts 80% coverage gate
+just setup          # Setup UV virtualenv
+just setup-runtime  # Setup central runtime environment
+just doctor         # Validate .agents structure
+just clean          # Clean caches
+just lint-scripts   # Lint Python operational scripts
+just test-scripts-all # Run script unit + integration tests with 80% coverage gate
+just lint-runtime   # Lint central runtime package
+just test-runtime   # Run central runtime tests
+just runtime-mcp-smoke # Smoke runtime and MCP CLIs
+just agents-all     # Full scaffold validation, including docs, scripts, runtime, tools, telemetry, and MCP smoke
+just all            # Alias for just agents-all
 ```
 
 ### Workflows
 
 ```bash
-make new THEME=x FEATURE_ID=F-01 PARENT_SPEC=<spec-id>  # Create governed workstream
-make quick THEME=x  # Quick task
-make verify         # Verify tasks
-make lint           # Lint markdown, excluding tmp workspaces
-make structure      # Generate structure
-make index          # Update indexes
-make sync           # Sync AGENTS.md
+just new THEME=x FEATURE_ID=F-01 PARENT_SPEC=<spec-id>  # Create governed workstream
+just quick THEME=x  # Quick task
+just verify         # Verify tasks
+just lint           # Lint markdown, excluding tmp workspaces
+just structure      # Generate structure
+just index          # Update indexes
+just sync           # Sync AGENTS.md
 ```
 
 ### Telemetry
 
 ```bash
-make telemetry-heat     # Heat map
-make telemetry-hot      # Hot elements
-make telemetry-cold     # Cold elements
-make telemetry-report   # Weekly report
-make telemetry-export   # Export data
-make telemetry-validate # Validate schema
+just telemetry-heat     # Heat map
+just telemetry-hot      # Hot elements
+just telemetry-cold     # Cold elements
+just telemetry-report   # Weekly report
+just telemetry-export   # Export data
+just telemetry-validate # Validate schema
 ```
 
 ### Patterns
 
 ```bash
-make patterns-suggest   # Suggest patterns
-make patterns-list      # List patterns
-make patterns-show      # Pattern details
-make patterns-apply     # Apply pattern
-make patterns-rate      # Rate pattern
+just patterns-suggest   # Suggest patterns
+just patterns-list      # List patterns
+just patterns-show      # Pattern details
+just patterns-apply     # Apply pattern
+just patterns-rate      # Rate pattern
 ```
 
 ## 📊 .agents Commands
@@ -439,7 +440,7 @@ make patterns-rate      # Rate pattern
 .agents/agents wb-update touch  # Update session
 .agents/agents bootstrap /path/to/target-repo --dry-run  # Preview generic export to another repo
 .agents/agents bootstrap /path/to/existing-project --partial  # Partial install for a live repo
-make agents-all  # Aggregate scaffold validations when local Makefile already owns `all`
+just agents-all  # Aggregate scaffold validations when the target Justfile already owns `all`
 .agents/agents tools list       # List tools
 .agents/agents structure-map .  # Map structure
 .agents/agents repo-map .       # Refresh full repository codemap
@@ -485,10 +486,10 @@ patterns:
 
 ```bash
 # What was hot during sprint?
-make telemetry-heat PERIOD=weekly
+just telemetry-heat PERIOD=weekly
 
 # What's hot today?
-make telemetry-heat PERIOD=daily
+just telemetry-heat PERIOD=daily
 
 # Detect gap: daily << weekly
 ```
@@ -497,7 +498,7 @@ make telemetry-heat PERIOD=daily
 
 ```bash
 # Export sprint heat
-make telemetry-heat PERIOD=weekly FORMAT=json > sprint.json
+just telemetry-heat PERIOD=weekly FORMAT=json > sprint.json
 
 # Analyze patterns used
 jq '.patterns | sort_by(.heat_score) | reverse' sprint.json
@@ -507,7 +508,7 @@ jq '.patterns | sort_by(.heat_score) | reverse' sprint.json
 
 ```bash
 # Cold tools this month
-make telemetry-cold PERIOD=monthly TYPE=tools
+just telemetry-cold PERIOD=monthly TYPE=tools
 ```
 
 ## 🎓 Core Principles
@@ -530,8 +531,8 @@ make telemetry-cold PERIOD=monthly TYPE=tools
 1. Create only the workstream artifacts you need: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite` (`--spec-lite` remains the current compatibility flag for `spec-child`)
 2. Follow templates from `docs/templates/`
 3. Apply relevant patterns
-4. Validate: `make all`
-5. Report: `make wb-files-changed`
+4. Validate: `just all`
+5. Report: `just wb-files-changed`
 
 ## 📄 License
 

@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-13T12:53:44-03:00'
+updated_at: '2026-04-13T19:36:57-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -112,7 +112,7 @@ updated_at: '2026-04-13T12:53:44-03:00'
   - Test automation is trustworthy for adopters of the scaffold.
 - Delivery tasks:
   - [x] Fix telemetry parity gaps (`tool_exec`, `session_end`, failure capture).
-  - [x] Make `make all` a truthful full-validation command.
+  - [x] Make `just all` a truthful full-validation command.
   - [x] Align the test strategy, actual test runner, and CI baseline.
 
 ### F-06 Primary Runtime Compatibility
@@ -338,12 +338,12 @@ updated_at: '2026-04-13T12:53:44-03:00'
     public command semantics.
   - [x] Reduce Python command complexity in bounded, tested slices.
   - [x] Refresh docs, indexes, and maps after code behavior is proven.
-  - [x] Close with strict workbench verification, `make lint`, and the relevant
+  - [x] Close with strict workbench verification, `just lint`, and the relevant
     Python/runtime gates.
 
 ### F-16 Project Template Source Separation
 
-- Status: planned
+- Status: complete
 - Why: The scaffold needs one visible, sanitized source tree for the default
   project folder installed into downstream repos, separate from this repository's
   development workbench, tests, maps, caches, and historical governance.
@@ -362,6 +362,38 @@ updated_at: '2026-04-13T12:53:44-03:00'
   - [ ] Update only the minimal operator docs for the new boundary.
   - [ ] Run the final `refactor-workflows` script simplification pass.
   - [ ] Verify with lint, focused tests, and a dry-run bootstrap.
+
+### F-17 Just Command Runner Migration
+
+- Status: planned
+- Why: The scaffold currently exposes operator workflows through Make targets,
+  but `just` is already available locally and better matches the repo's
+  command-runner use case. The migration must preserve bootstrap, CI, template,
+  documentation, and 80% script coverage behavior while removing Make as a
+  required command surface.
+- Governing spec: `docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md`
+- Child spec policy:
+  - Required: yes
+  - Child specs should isolate command parity, bootstrap/template wiring, and
+    documentation/catalog cleanup when each slice begins execution.
+- Exit criteria:
+  - `just` is the canonical command runner for scaffold operations.
+  - Every former Make target has a tested `just` equivalent or an explicitly
+    documented replacement.
+  - Bootstrap and `src/project-template/` generate and validate the Just-based
+    command surface without relying on Make.
+  - CI and operator docs use `just all` as the full-validation command.
+  - Script tests keep the 80% coverage gate and the migrated commands run with
+    behavior equivalent to the previous Make targets.
+- Delivery tasks:
+  - [x] Create a governed workbench session and execution plan for the Just
+        migration.
+  - [x] Add Justfile command parity for the existing scaffold targets.
+  - [x] Update bootstrap, template, tests, and CI to prefer Just.
+  - [x] Clean Make references from canonical docs, catalog metadata, and runtime
+        mirrors after command parity is proven.
+  - [x] Verify with `just all`, focused bootstrap/template tests, and the 80%
+        scripts coverage gate.
 
 ## 5) Prioritization
 

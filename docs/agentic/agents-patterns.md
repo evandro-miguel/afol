@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: 2026-02-23 00:00:00-03:00
-updated_at: '2026-04-13T13:36:57-03:00'
+updated_at: '2026-04-13T19:36:49-03:00'
 links:
   tools_json: ./tools-json.md
   patterns_index: ../patterns/INDEX.md
@@ -90,14 +90,14 @@ patterns:
 ./.agents/agents patterns rate PAT-001 --effectiveness=high
 ```
 
-### Via Makefile
+### Via Justfile
 
 ```bash
-make patterns-suggest THEME=auth-refactor
-make patterns-list TYPE=success
-make patterns-show PATTERN_ID=PAT-001
-make patterns-apply PATTERN_ID=PAT-001
-make patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high
+just patterns-suggest THEME=auth-refactor
+just patterns-list TYPE=success
+just patterns-show PATTERN_ID=PAT-001
+just patterns-apply PATTERN_ID=PAT-001
+just patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high
 ```
 
 ## How to Modify

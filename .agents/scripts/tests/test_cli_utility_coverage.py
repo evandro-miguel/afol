@@ -66,7 +66,7 @@ def tool_catalog() -> dict:
                 "type": "validation",
                 "tool": "agents-doctor.py",
                 "wrapper_command": ".agents/agents doctor",
-                "make_command": "make doctor",
+                "just_command": "just doctor",
                 "execution_mode": "on-demand",
                 "updated_at": "2026-01-01",
                 "description": "Validate repository state",
@@ -82,7 +82,7 @@ def tool_catalog() -> dict:
                 "type": "automation",
                 "tool": "agents-wb-update.py",
                 "wrapper_command": ".agents/agents wb-update",
-                "make_command": "make wb-update",
+                "just_command": "just wb-update",
                 "execution_mode": "on-demand",
                 "updated_at": "2026-01-01",
                 "description": "Automate workbench maintenance",
@@ -94,7 +94,8 @@ def tool_catalog() -> dict:
             "validation": {"tools": ["doctor"]},
             "automation": {"tools": ["wb-update"]},
         },
-        "makefile_targets": {"doctor": "make doctor", "wb-update": "make wb-update"},
+        "justfile_targets": {"doctor": "just doctor", "wb-update": "just wb-update"},
+        "justfile_aliases": {"dr": "doctor", "wb": "wb-update"},
         "execution_modes": {"on-demand": {"tools": ["doctor", "wb-update"]}},
     }
 
@@ -254,6 +255,36 @@ def test_structure_mapper_scans_cache_generates_and_cli(tmp_path, monkeypatch):
     assert (cli_output / "README.md").exists()
 
 
+def test_structure_mapper_scan_uses_single_pass_metrics(tmp_path, monkeypatch):
+    struct = load_module("agents_structure_map_single_pass_test", "agents-structure-map.py")
+    project = tmp_path / "project"
+    output = project / "docs" / "map" / "structure"
+    (project / "services").mkdir(parents=True)
+    (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
+
+    mapper = struct.StructureMapper(project, output)
+
+    monkeypatch.setattr(
+        mapper,
+        "count_lines",
+        lambda _path: (_ for _ in ()).throw(AssertionError("legacy count_lines path should not run")),
+    )
+    monkeypatch.setattr(
+        mapper,
+        "get_file_size_kb",
+        lambda _path: (_ for _ in ()).throw(AssertionError("legacy size path should not run")),
+    )
+    monkeypatch.setattr(
+        mapper,
+        "compute_file_hash",
+        lambda _path: (_ for _ in ()).throw(AssertionError("legacy hash path should not run")),
+    )
+
+    sections = mapper.scan_files()
+    assert "backend" in sections
+    assert sections["backend"].files[0].lines == 2
+
+
 def test_tools_catalog_display_validation_and_cli(monkeypatch, capsys):
     tools = load_module("agents_tools_coverage_test", "agents-tools.py")
     catalog = tool_catalog()
@@ -299,8 +330,15 @@ def test_tools_catalog_display_validation_and_cli(monkeypatch, capsys):
 
 def test_tools_smoke_runner_success_and_failure(monkeypatch, capsys):
     smoke = load_module("agents_tools_smoke_coverage_test", "agents-tools-smoke.py")
-    monkeypatch.setattr(smoke, "WRAPPER", Path("/tmp/fake-agents"))
-    monkeypatch.setattr(Path, "exists", lambda self: True)
+    wrapper = Path("/tmp/fake-agents")
+    original_exists = Path.exists
+    monkeypatch.setattr(smoke, "WRAPPER", wrapper)
+    monkeypatch.setattr(Path, "exists", lambda self: False if self == wrapper else original_exists(self))
+
+    assert smoke.main() == 1
+    assert "wrapper not found" in capsys.readouterr().out
+
+    monkeypatch.setattr(Path, "exists", lambda self: True if self == wrapper else original_exists(self))
 
     def fake_run(cmd, cwd, capture_output, text):
         if "missing-tool" in cmd:
@@ -318,6 +356,15 @@ def test_tools_smoke_runner_success_and_failure(monkeypatch, capsys):
     assert smoke.run_case((["fake", "tools", "bad"], 0, ["missing-token"]))[0] is False
     assert smoke.main() == 0
     assert "tools smoke passed" in capsys.readouterr().out
+
+    def fake_run_failure(cmd, cwd, capture_output, text):
+        return SimpleNamespace(returncode=2, stdout="broken", stderr="boom")
+
+    monkeypatch.setattr(smoke.subprocess, "run", fake_run_failure)
+    assert smoke.main() == 1
+    failure_output = capsys.readouterr().out
+    assert "tools smoke failed" in failure_output
+    assert "expected exit" in failure_output
 
 
 def test_telemetry_storage_reports_heat_and_cli(tmp_path, monkeypatch, capsys):
@@ -1230,7 +1277,7 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     bootstrap.safe_copy_dir(source / "docs" / "templates", dst_dir, force=False, dry_run=False, ignore=bootstrap._ignore_default)
     bootstrap.safe_copy_dir(source / "docs" / "templates", dst_dir, force=True, dry_run=True, ignore=bootstrap._ignore_default)
     bootstrap.ensure_dirs(target, dry_run=True)
-    bootstrap.ensure_makefile(target, dry_run=True)
+    bootstrap.ensure_justfile(target, dry_run=True)
     bootstrap.safe_write_file(target / "generated.md", "generated\n", force=False, dry_run=False)
     bootstrap.write_generated_baseline(target, force=False, dry_run=True, install_mode=bootstrap.INSTALL_MODE_FULL)
     bootstrap.write_adaptation_doc(target, stack, dry_run=False, install_mode=bootstrap.INSTALL_MODE_PARTIAL)

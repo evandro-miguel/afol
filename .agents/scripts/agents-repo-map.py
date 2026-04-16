@@ -113,6 +113,30 @@ def _resolve_runner(cli_runner: str | None) -> Path:
     )
 
 
+def _runner_requires_standard_host_tools(runner: Path) -> bool:
+    try:
+        return runner.resolve() == DEFAULT_RUNNER_HINT.resolve()
+    except FileNotFoundError:
+        return False
+
+
+def _ensure_host_prerequisites(runner: Path) -> None:
+    if not _runner_requires_standard_host_tools(runner):
+        return
+
+    missing: list[str] = []
+    for command in ("ctags", "docker"):
+        if shutil.which(command) is None:
+            missing.append(command)
+
+    if missing:
+        missing_block = ", ".join(missing)
+        raise RuntimeError(
+            "Repo map prerequisites missing for the standard run-repo-map.sh runner: "
+            f"{missing_block}. Install the missing host tool(s) or point --runner at a compatible alternative."
+        )
+
+
 def _validate_generated_docs(output_root: Path, required_docs: list[str]) -> list[Path]:
     generated = sorted(path for path in output_root.glob("*.md") if path.is_file())
     missing = [doc for doc in required_docs if not (output_root / doc).exists()]
@@ -192,7 +216,7 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
         "",
         "- Python utilities or service-side scripts are present and should be considered part of the operating surface.",
         "- Dominant feature clusters: `.agents/scripts, docs, .agents/skills`.",
-        "- Public boundaries currently concentrate in `.agents/agents`, `Makefile`, and the runtime instruction entrypoints.",
+        "- Public boundaries currently concentrate in `.agents/agents`, `Justfile`, and the runtime instruction entrypoints.",
     ]
     _replace_section(output_root / "ARCHITECTURE.md", "## What This System Appears To Do", architecture_intro)
 
@@ -205,7 +229,7 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
     ]
     _replace_section(output_root / "ARCHITECTURE.md", "## Why The Main Domains Exist", domain_bullets)
 
-    cli_entrypoints = [item for item in [repo_root / ".agents" / "agents", repo_root / "Makefile"] if item.exists()]
+    cli_entrypoints = [item for item in [repo_root / ".agents" / "agents", repo_root / "Justfile"] if item.exists()]
     runtime_docs = [
         path
         for path in [
@@ -345,18 +369,29 @@ def main() -> int:
         print(f"❌ {exc}")
         return 1
 
+    print(f"Source repo: {repo_root}")
+    print(f"Final output root: {output_root}")
+
+    if args.dry_run:
+        cmd = [str(runner), str(repo_root), str(output_root), str(args.image)]
+        print("Analysis shadow repo: <dry-run skipped>")
+        print("Resolved repo-map command:")
+        print(" ".join(cmd))
+        return 0
+
     staging_root, shadow_repo = _prepare_shadow_repo(repo_root)
     shadow_output = staging_root / "map-output"
     cmd = [str(runner), str(shadow_repo), str(shadow_output), str(args.image)]
-    print(f"Source repo: {repo_root}")
-    print(f"Final output root: {output_root}")
     print(f"Analysis shadow repo: {shadow_repo}")
     print("Resolved repo-map command:")
     print(" ".join(cmd))
 
-    if args.dry_run:
+    try:
+        _ensure_host_prerequisites(runner)
+    except Exception as exc:
+        print(f"❌ {exc}")
         shutil.rmtree(staging_root, ignore_errors=True)
-        return 0
+        return 1
 
     try:
         result = run_command(cmd, cwd=shadow_repo)

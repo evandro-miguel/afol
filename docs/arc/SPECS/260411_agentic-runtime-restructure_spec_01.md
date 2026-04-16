@@ -75,7 +75,7 @@ Failure or friction points:
   - `.agents/agents-mcp` remains a thin convenience wrapper for MCP-oriented usage.
   - A UV-managed package under `.agents/runtime/` owns runtime logic.
   - MCP tools/resources/prompts are available from the same runtime services as the CLI.
-  - `make all` and CI validate the runtime, MCP surface, docs, and tool catalog.
+  - `just all` and CI validate the runtime, MCP surface, docs, and tool catalog.
 - Boundaries:
   - The restructure does not create a public long-lived backend service.
   - FastAPI/OpenAPI is not required for this feature; MCP is the agent-native interface.
@@ -126,7 +126,7 @@ Out of scope:
   - `./.agents/agents help` and representative existing commands work through the new runtime.
   - MCP client tests list and call the expected tools/resources/prompts.
   - The tool catalog and docs are aligned with the runtime registry.
-  - `make all` passes with runtime tests included.
+  - `just all` passes with runtime tests included.
   - The workbench report records verification evidence and a postmortem captures lessons.
 - Review questions:
   - Did the runtime become the source of operational behavior rather than another parallel layer?

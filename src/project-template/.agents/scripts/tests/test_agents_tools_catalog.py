@@ -29,7 +29,7 @@ class AgentsToolsCatalogTests(unittest.TestCase):
                 '  "description": "x",\n'
                 '  "tools": [],\n'
                 '  "tool_categories": {},\n'
-                '  "makefile_targets": {},\n'
+                '  "justfile_targets": {},\n'
                 '  "tools": [{"id": "duplicate"}]\n'
                 '}\n'
             )

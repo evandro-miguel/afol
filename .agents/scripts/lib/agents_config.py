@@ -368,11 +368,6 @@ def find_repo_root(start: Path | None = None) -> Path:
         # Backward compatibility: root-level agents.config plus .agents folder.
         if (candidate / "agents.config").exists() and (candidate / ".agents").exists():
             return candidate
-        # If caller starts under .agents/, map back to parent repo root.
-        if candidate.name == ".agents" and (candidate / "agents.config").exists():
-            return candidate.parent
-        if (candidate / ".agents").exists() and candidate.name != ".agents":
-            return candidate
     return current
 
 

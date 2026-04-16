@@ -29,7 +29,7 @@ updated_at: "2026-04-02T23:28:28Z"
 ### Public Boundary Files
 
 - `.agents/agents`
-- `Makefile`
+- `Justfile`
 - `AGENTS.md`
 - `CLAUDE.md`
 

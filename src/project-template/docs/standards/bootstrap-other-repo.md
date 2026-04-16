@@ -3,7 +3,7 @@ doc_type: standard
 id: 000000_000000_bootstrap-other-repo_standard_01
 status: active
 created_at: '2026-03-23T00:00:00Z'
-updated_at: '2026-04-02T15:21:56-03:00'
+updated_at: '2026-04-13T19:37:13-03:00'
 ---
 
 # Bootstrap Other Repo
@@ -52,7 +52,7 @@ Behavior:
 - generated governance files are written only where the target does not already have a file
 - the target receives the state-vs-goal split without adding a second planning tree
 - `--force` is required to overwrite existing files
-- if the target repo already owns `make all`, the scaffold preserves that target and exposes the aggregate scaffold validation as `make agents-all`
+- if the target repo already owns `just all`, the scaffold preserves that target and exposes the aggregate scaffold validation as `just agents-all`
 - the current skills manifest is treated as a compatibility baseline, not as a copy of scaffold-local history
 - the target repo should remain ready for repo/ref/profile-based skill installs when the upstream contract lands
 - repo-local skills remain the primary contract; Codex global skills should stay lean
@@ -77,7 +77,7 @@ Recommended command:
 - Bootstrap does not generate current-state repository maps; it only provisions the place and rules for them.
 - Bootstrap does not copy source-repo workbench sessions, active-session pointers, or source-repo current-state map artifacts into the target repo.
 - Existing project governance should be reviewed after install before non-trivial work begins.
-- If the target repo already has its own `AGENTS.md`, `Makefile`, or runtime adapter files, review the merge outcome before accepting the install.
+- If the target repo already has its own `AGENTS.md`, `Justfile`, or runtime adapter files, review the merge outcome before accepting the install.
 - Optional upstream skills sync may emit warnings; those warnings are non-blocking.
 - Bootstrap does not copy scaffold-local skill history; it only prepares the baseline needed for the target repo to own its selection and upgrade path.
 - Bootstrap should reinforce project-local skills, not turn global Codex skills into a second project contract.
@@ -88,11 +88,17 @@ Recommended command:
 After install, validate the target repo with:
 
 ```bash
-make doctor
-make lint
-make test-scripts
-make agents-all
+just --list
+just --justfile Justfile agents_scaffold::doctor
+just --justfile Justfile agents_scaffold::lint
+just --justfile Justfile agents_scaffold::test-scripts
+just --justfile Justfile agents_scaffold::all
 ```
+
+If the target repo uses a root `Justfile` that imports scaffold recipes directly
+instead of the default namespaced module wrapper, use the exposed root recipe
+names (`just doctor`, `just lint`, `just test-scripts`, `just agents-all`)
+instead.
 
 For isolated environments, also confirm the wrapper works without `uv` on `PATH`:
 

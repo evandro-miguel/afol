@@ -1,8 +1,8 @@
 ---
 doc_type: telemetry_feature
 status: active
-created_at: "2026-02-23T22:00:00Z"
-updated_at: "2026-02-23T22:15:00Z"
+created_at: '2026-02-23T22:00:00Z'
+updated_at: '2026-04-13T19:37:04-03:00'
 ---
 
 # Heat Scoring - Element Engagement by Period
@@ -50,46 +50,46 @@ heat_score = (frequency_score × 0.5) + (recency_score × 0.3) + (success_score 
 
 ```bash
 # Current week (default)
-make telemetry-heat
+just telemetry-heat
 
 # Different periods
-make telemetry-heat PERIOD=daily
-make telemetry-heat PERIOD=weekly
-make telemetry-heat PERIOD=monthly
-make telemetry-heat PERIOD=all
+just telemetry-heat PERIOD=daily
+just telemetry-heat PERIOD=weekly
+just telemetry-heat PERIOD=monthly
+just telemetry-heat PERIOD=all
 
 # Filter by type
-make telemetry-heat TYPE=tools
-make telemetry-heat TYPE=patterns
+just telemetry-heat TYPE=tools
+just telemetry-heat TYPE=patterns
 
 # Minimum score filter
-make telemetry-heat MIN_SCORE=50
+just telemetry-heat MIN_SCORE=50
 
 # JSON output
-make telemetry-heat FORMAT=json PERIOD=weekly
+just telemetry-heat FORMAT=json PERIOD=weekly
 ```
 
 ### Show Hottest Elements
 
 ```bash
 # Top 10 hot elements this week (default)
-make telemetry-hot
+just telemetry-hot
 
 # Top 5 hot elements today
-make telemetry-hot LIMIT=5 PERIOD=daily
+just telemetry-hot LIMIT=5 PERIOD=daily
 
 # Hot patterns this month
-make telemetry-hot TYPE=patterns PERIOD=monthly LIMIT=5
+just telemetry-hot TYPE=patterns PERIOD=monthly LIMIT=5
 ```
 
 ### Show Coldest Elements
 
 ```bash
 # Top 10 cold elements this week (default)
-make telemetry-cold
+just telemetry-cold
 
 # Top 5 cold patterns this month
-make telemetry-cold TYPE=patterns PERIOD=monthly LIMIT=5
+just telemetry-cold TYPE=patterns PERIOD=monthly LIMIT=5
 ```
 
 ### Direct Python Commands
@@ -148,13 +148,13 @@ Element                      Score    Level   Access     Last    Success
 
 ```bash
 # Compare this week vs last week
-make telemetry-heat PERIOD=weekly FORMAT=json > this_week.json
+just telemetry-heat PERIOD=weekly FORMAT=json > this_week.json
 # ... wait a week ...
-make telemetry-heat PERIOD=weekly FORMAT=json > last_week.json
+just telemetry-heat PERIOD=weekly FORMAT=json > last_week.json
 
 # Compare daily vs weekly
-make telemetry-heat PERIOD=daily
-make telemetry-heat PERIOD=weekly
+just telemetry-heat PERIOD=daily
+just telemetry-heat PERIOD=weekly
 ```
 
 ## Use Cases
@@ -165,13 +165,13 @@ make telemetry-heat PERIOD=weekly
 
 ```bash
 # What was hot during last sprint?
-make telemetry-heat PERIOD=weekly
+just telemetry-heat PERIOD=weekly
 
 # What's hot in current session (today)?
-make telemetry-heat PERIOD=daily
+just telemetry-heat PERIOD=daily
 
 # Elements that were hot but now cold (abandoned between sprints)
-make telemetry-heat PERIOD=monthly FORMAT=json | jq '.all[] | select(.heat_level=="cold")'
+just telemetry-heat PERIOD=monthly FORMAT=json | jq '.all[] | select(.heat_level=="cold")'
 ```
 
 **Insight:** Elements that are hot weekly but cold daily may indicate:
@@ -184,10 +184,10 @@ make telemetry-heat PERIOD=monthly FORMAT=json | jq '.all[] | select(.heat_level
 
 ```bash
 # Daily heat (active today)
-make telemetry-heat PERIOD=daily
+just telemetry-heat PERIOD=daily
 
 # Weekly heat (active this week)
-make telemetry-heat PERIOD=weekly
+just telemetry-heat PERIOD=weekly
 
 # If daily << weekly, session gap detected
 ```
@@ -202,7 +202,7 @@ make telemetry-heat PERIOD=weekly
 
 ```bash
 # End of sprint: export weekly heat
-make telemetry-heat PERIOD=weekly FORMAT=json > sprint_heat.json
+just telemetry-heat PERIOD=weekly FORMAT=json > sprint_heat.json
 
 # Analyze: what tools/patterns were most used?
 jq '.tools | sort_by(.heat_score) | reverse' sprint_heat.json
@@ -216,7 +216,7 @@ jq '.patterns[] | select(.heat_level=="cold")' sprint_heat.json
 ```bash
 # Daily trend: is engagement increasing?
 for i in 1 2 3 4 5; do
-  make telemetry-heat PERIOD=daily FORMAT=json | \
+  just telemetry-heat PERIOD=daily FORMAT=json | \
     jq '.summary.total_accesses'
   sleep 86400  # wait 1 day
 done
@@ -233,7 +233,7 @@ done
 
 ```bash
 # Find cold elements this month
-make telemetry-cold PERIOD=monthly TYPE=tools
+just telemetry-cold PERIOD=monthly TYPE=tools
 
 # Investigate each:
 # - Check if tool still works
@@ -330,7 +330,7 @@ Embed heat map in dashboard:
 ## Element Heat Summary
 
 ```bash
-make telemetry-heat MIN_SCORE=50
+just telemetry-heat MIN_SCORE=50
 ```
 ```
 

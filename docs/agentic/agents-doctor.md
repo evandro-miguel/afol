@@ -4,8 +4,8 @@ theme: agents-doctor
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-20T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-20 00:00:00-03:00
+updated_at: '2026-04-13T19:36:46-03:00'
 links:
   tools_json: ./tools-json.md
   lint_docs: ./agents-lint-docs.md
@@ -74,8 +74,8 @@ doctor:
 # Validate structure
 .agents/agents doctor
 
-# Via Makefile
-make doctor
+# Via Justfile
+just doctor
 ```
 
 ## How to Modify
@@ -109,7 +109,7 @@ def validate_timestamps(filepath: Path) -> List[str]:
 
 ```bash
 # Run validation
-make doctor
+just doctor
 
 # Expected: Exit code 0 if valid, 1 if errors
 ```

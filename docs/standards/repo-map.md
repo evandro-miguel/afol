@@ -3,7 +3,7 @@ doc_type: standard
 id: repo-map-standard
 status: active
 created_at: '2026-03-23T00:00:00Z'
-updated_at: '2026-04-02T14:01:56-03:00'
+updated_at: '2026-04-13T19:37:01-03:00'
 ---
 
 # Repo Map Standard
@@ -34,10 +34,10 @@ Primary wrapper:
 ./.agents/agents repo-map .
 ```
 
-Make target:
+Just target:
 
 ```bash
-make repo-map
+just repo-map
 ```
 
 Useful variants:
@@ -64,6 +64,11 @@ The scaffold command delegates the heavy analysis work to the external runner:
   - `repo_map.runner_path` in `.agents/agents.config`
 
 The scaffold does not install the toolbox automatically and must not try to install host-global tools on its own.
+
+The standard `run-repo-map.sh` runner also expects these host tools to be available before execution:
+
+- `ctags` in `PATH` (Universal Ctags compatible CLI)
+- `docker` in `PATH`
 
 Before invoking the runner, the scaffold prepares a temporary shadow copy of the repository for analysis. That shadow excludes non-canonical or derived surfaces such as `.git/`, `.agents/cache/`, `.agents/.cache/`, `.agents/wb/`, `.agents/z-arq/`, `.agents/tmp/`, previously generated `docs/map/`, legacy `docs/map/`, and `docs/map/structure/` output.
 
@@ -123,18 +128,18 @@ Prefer `structure-map` when you only need a quick physical file inventory.
 After a `repo-map` refresh:
 
 ```bash
-make doctor
-make lint
+just doctor
+just lint
 ```
 
-`make lint` validates the canonical `.agents` governance docs. The map surface under `docs/map/` is validated primarily by the `repo-map` command itself, while raw evidence under `docs/map/extra/` remains pipeline-owned output and should not be treated like hand-maintained governance docs.
+`just lint` validates the canonical `.agents` governance docs. The map surface under `docs/map/` is validated primarily by the `repo-map` command itself, while raw evidence under `docs/map/extra/` remains pipeline-owned output and should not be treated like hand-maintained governance docs.
 
 The wrapper also rejects semantically degenerate output, not only missing files. At minimum, `README.md` must contain `Major Runtime Surfaces`, and the dependency graph must not collapse to markers like `Processed 0 files`.
 
 If the work also changes the scripts or command surface:
 
 ```bash
-make test-scripts
+just test-scripts
 ```
 
 ## Rules

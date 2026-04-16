@@ -6,7 +6,7 @@ Python operational scripts for the `.agents/` system.
 
 Scripts are stored in `.agents/scripts/` and executed via:
 
-- **Makefile** (recommended): `make doctor`, `make new THEME=x`
+- **Justfile** (canonical): `just doctor`, `just new THEME=x`
 - **Wrapper**: `.agents/agents doctor`
 - **UV direct**: `uv run --with pyyaml .agents/scripts/agents-doctor.py`
 
@@ -90,15 +90,15 @@ Discovery examples:
 ./.agents/agents skills-sync ensure agentic-folder-sys --runtime codex
 ```
 
-Use `./.agents/agents bootstrap /path/to/existing-project --partial` when adopting the scaffold into an existing repo. Existing files stay in place unless `--force` is used. If that repo already has its own `make all`, use `make agents-all` for the scaffold aggregate validation. See `docs/standards/bootstrap-other-repo.md` for the full/partial install split and limitations.
+Use `./.agents/agents bootstrap /path/to/existing-project --partial` when adopting the scaffold into an existing repo. Existing files stay in place unless `--force` is used. If that repo already has its own `just all`, use `just agents-all` for the scaffold aggregate validation. See `docs/standards/bootstrap-other-repo.md` for the full/partial install split and limitations.
 
 ## Tests
 
 ```bash
-make test-scripts
-make test-scripts-integration
-make test-scripts-all
-make lint-scripts
+just test-scripts
+just test-scripts-integration
+just test-scripts-all
+just lint-scripts
 ```
 
 ## Session Lifecycle

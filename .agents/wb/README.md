@@ -34,7 +34,7 @@ Optional pack folders for multiple major tracks:
 
 | Session | Theme | Status |
 |---------|-------|--------|
-| `260412_2115_project-finalization-orchestration` | `project-finalization-orchestration` | active |
+| `260413_1851_just-command-runner-migration` | `just-command-runner-migration` | active |
 
 ## Archive
 

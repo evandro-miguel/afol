@@ -2,7 +2,7 @@
 doc_type: quick_reference
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-13T13:36:58-03:00'
+updated_at: '2026-04-13T19:37:04-03:00'
 ---
 
 # Telemetry & Patterns Quick Reference
@@ -30,7 +30,7 @@ Every time you run `.agents/agents <command>`, the system captures:
 .agents/agents structure
 
 # Generate report (view collected data)
-make telemetry-report
+just telemetry-report
 ```
 
 ### Query Events
@@ -56,29 +56,29 @@ python3 .agents/scripts/agents-telemetry.py query --format=json --limit=100
 
 ```bash
 # Weekly report
-make telemetry-report
+just telemetry-report
 
 # Monthly report
-make telemetry-report PERIOD=monthly
+just telemetry-report PERIOD=monthly
 
 # JSON format
-make telemetry-report FORMAT=json
+just telemetry-report FORMAT=json
 
 # All time
-make telemetry-report PERIOD=all
+just telemetry-report PERIOD=all
 ```
 
 ### Export & Validate
 
 ```bash
 # Export to JSON
-make telemetry-export FORMAT=json OUTPUT=backup.json
+just telemetry-export FORMAT=json OUTPUT=backup.json
 
 # Export to CSV
-make telemetry-export FORMAT=csv
+just telemetry-export FORMAT=csv
 
 # Validate schema
-make telemetry-validate
+just telemetry-validate
 ```
 
 ---
@@ -89,29 +89,29 @@ make telemetry-validate
 
 ```bash
 # Suggest by theme
-make patterns-suggest THEME=auth-refactor
+just patterns-suggest THEME=auth-refactor
 
 # Suggest by tags
-make patterns-suggest TAGS=process,tools
+just patterns-suggest TAGS=process,tools
 
 # List all
-make patterns-list
+just patterns-list
 
 # Filter by type
-make patterns-list TYPE=success
+just patterns-list TYPE=success
 
 # Show details
-make patterns-show PATTERN_ID=PAT-001
+just patterns-show PATTERN_ID=PAT-001
 ```
 
 ### Apply & Rate
 
 ```bash
 # Apply pattern (records in telemetry)
-make patterns-apply PATTERN_ID=PAT-001
+just patterns-apply PATTERN_ID=PAT-001
 
 # Rate effectiveness
-make patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high
+just patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high
 ```
 
 ---
@@ -147,46 +147,46 @@ make patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high
 
 ```bash
 # 1. Get pattern suggestions
-make patterns-suggest THEME=my-feature
+just patterns-suggest THEME=my-feature
 
 # 2. Apply relevant pattern
-make patterns-apply PATTERN_ID=PAT-001
+just patterns-apply PATTERN_ID=PAT-001
 
 # 3. Record session start
-make telemetry-record EVENT_TYPE=session_start METADATA='{"theme":"my-feature"}'
+just telemetry-record EVENT_TYPE=session_start METADATA='{"theme":"my-feature"}'
 ```
 
 ### During Work
 
 ```bash
 # Record tool usage
-make telemetry-record EVENT_TYPE=tool_exec METADATA='{"tool_name":"agents-new","outcome":"success"}'
+just telemetry-record EVENT_TYPE=tool_exec METADATA='{"tool_name":"agents-new","outcome":"success"}'
 
 # Record blocker
-make telemetry-record EVENT_TYPE=blocker METADATA='{"blocker_reason":"need clarification"}'
+just telemetry-record EVENT_TYPE=blocker METADATA='{"blocker_reason":"need clarification"}'
 ```
 
 ### Complete Session
 
 ```bash
 # Record session end
-make telemetry-record EVENT_TYPE=session_end OUTCOME=success METADATA='{"duration_seconds":3600}'
+just telemetry-record EVENT_TYPE=session_end OUTCOME=success METADATA='{"duration_seconds":3600}'
 
 # Generate report
-make telemetry-report
+just telemetry-report
 ```
 
 ### Weekly Review
 
 ```bash
 # Generate weekly report
-make telemetry-report PERIOD=weekly
+just telemetry-report PERIOD=weekly
 
 # Review patterns applied
 python3 .agents/scripts/agents-telemetry.py query --event-type=pattern_applied --since=2026-02-17
 
 # Export for analysis
-make telemetry-export FORMAT=json OUTPUT=weekly_backup.json
+just telemetry-export FORMAT=json OUTPUT=weekly_backup.json
 ```
 
 ---
@@ -251,9 +251,9 @@ record_event("tool_exec", session_id, {
 | Issue | Solution |
 |-------|----------|
 | No events recorded | Check `events.jsonl` exists and is writable |
-| Invalid JSON | Run `make telemetry-validate` |
+| Invalid JSON | Run `just telemetry-validate` |
 | Pattern not found | Check ID format: `PAT-001` |
-| Make target fails | Verify syntax: `make telemetry-report PERIOD=weekly` |
+| Just recipe fails | Verify syntax: `just telemetry-report PERIOD=weekly` |
 
 ---
 

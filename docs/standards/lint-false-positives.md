@@ -4,7 +4,7 @@ id: lint-false-positives
 theme: standards
 status: active
 created_at: '2026-02-24T00:00:00-03:00'
-updated_at: '2026-02-24T00:00:00-03:00'
+updated_at: '2026-04-13T19:36:59-03:00'
 ---
 
 # Lint False Positives
@@ -122,13 +122,13 @@ After updates, verify:
 
 ```bash
 # Check for real issues
-make lint-fix-check
+just lint-fix-check
 
 # Run full lint
-make lint
+just lint
 
 # Verify no new errors
-make verify
+just verify
 ```
 
 ## Related

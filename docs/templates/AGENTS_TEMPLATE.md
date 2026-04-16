@@ -2,7 +2,7 @@
 doc_type: standard
 id: agents-template-01
 created_at: YYYY-MM-DDTHH:MM:SSZ
-updated_at: '2026-04-13T13:36:51-03:00'
+updated_at: '2026-04-13T19:37:08-03:00'
 status: draft
 ---
 
@@ -129,7 +129,7 @@ status: draft
 - Never mark work complete without proof
 - Compare intended behavior vs actual behavior
 - Run verification commands and capture evidence
-- Mandatory gate: `make lint` must pass before considering the task complete
+- Mandatory gate: `just lint` must pass before considering the task complete
 - Ask: `Would this pass a strict senior/staff review?`
 - Deterministic verification: evidence over assumptions
 
@@ -192,7 +192,7 @@ status: draft
 - Never edit `updated_at` manually in managed docs
 - Always update `updated_at` via automation commands/scripts
 - Preferred commands:
-  - `make wb-touch`
+  - `just wb-touch`
   - `./.agents/agents wb-update touch`
   - `./.agents/agents wb-update touch --file <path>`
 

@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: '2026-02-23T00:00:00-03:00'
-updated_at: '2026-04-13T13:36:56-03:00'
+updated_at: '2026-04-13T19:36:46-03:00'
 links:
   tools_json: ./tools-json.md
   wrapper: ./agents-wrapper.md
@@ -19,7 +19,7 @@ links:
 
 - Copying multiple files and folders
 - Creating required directory structure
-- Configuring Makefile wrapper
+- Configuring Justfile
 - Detecting target project stack
 - Validating installation
 
@@ -35,7 +35,7 @@ Installs `.agents` system in another repository:
 2. **Copies reusable system assets** - Core configs, scripts, docs, rules, templates, mirror docs, OpenCode adapter
 3. **Generates clean governance baseline** - Starter roadmap, architecture, project brief, tech stack, guidelines, and empty indexes
 4. **Creates folders** - Required structure and runtime agent folders
-5. **Configures Makefile** - Wrapper in target repo
+5. **Configures command runner surface** - Justfile canonical
 6. **Runs system setup** - Sync docs, optional skills sync, and symlink repair
 7. **Validates** - Runs doctor and tools checks
 
@@ -87,7 +87,7 @@ Compatibility mirrors kept for broader reuse:
 | `<target>/.agents/` | Complete structure |
 | `<target>/.agents/tmp/` | Temporary non-canonical workspace |
 | `<target>/.claude/` | Runtime folder ensured |
-| `<target>/Makefile` | Wrapper configured |
+| `<target>/Justfile` | Canonical command runner configured |
 | `<target>/docs/arc/` | Folders created |
 | `<target>/.agents/wb/` | Folders created |
 | `<target>/docs/arc/*.md` | Generic baseline generated for the target repo |
@@ -218,7 +218,7 @@ For a live project, the partial-install expectation is that pre-existing files r
 → Detected stack: Python
 → Copying files...
 → Creating directories...
-→ Configuring Makefile...
+→ Configuring Justfile...
 → Running validation...
 ✓ Bootstrap complete
 ```

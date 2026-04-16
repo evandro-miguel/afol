@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-04-13T16:11:24+00:00"
-updated_at: "2026-04-13T16:11:24+00:00"
+created_at: "2026-04-16T00:37:58+00:00"
+updated_at: "2026-04-16T00:37:58+00:00"
 ---
 
 # SPECS INDEX
@@ -14,9 +14,9 @@ updated_at: "2026-04-13T16:11:24+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 25 |
+| Total | 27 |
 | Draft | 1 |
-| Active | 23 |
+| Active | 25 |
 | Final | 1 |
 
 ## Index
@@ -48,6 +48,8 @@ updated_at: "2026-04-13T16:11:24+00:00"
 | 260412_2004_repo-wide-simplification-runtime-parity_spec_01 | repo-wide-simplification-runtime-parity | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260413_1250_project-template-source-separation_spec_01 | project-template-source-separation | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260413_1250_project-template-source-separation_spec-child_01 | project-template-source-separation | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260413_1250_project-template-source-separation_plan_01, task: 260413_1250_project-template-source-separation_task_01, report: 260413_1250_project-template-source-separation_report_01 |
+| 260413_1849_just-command-runner-migration_spec_01 | just-command-runner-migration | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260415_2121_scripts-cleanup-optimization_spec-child_01 | scripts-cleanup-optimization | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md |
 
 ---
 *Index: `docs/arc/SPECS/INDEX.md`*

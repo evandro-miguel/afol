@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: 2026-02-20 00:00:00-03:00
-updated_at: '2026-03-23T18:05:33-03:00'
+updated_at: '2026-04-13T19:36:56-03:00'
 links:
   tools_json: ./tools-json.md
   lint_docs: ./agents-lint-docs.md
@@ -87,8 +87,8 @@ Edit regex `TASK_LINE_RE`.
 # Verify all
 ./.agents/agents verify-tasks .agents/wb/
 
-# Via Makefile
-make verify
+# Via Justfile
+just verify
 
 # Strict verification for session closure
 ./.agents/scripts/.venv/bin/python .agents/scripts/verify-tasks.py --strict .agents/wb/<session>/

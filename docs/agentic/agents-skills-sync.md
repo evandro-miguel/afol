@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: 2026-02-23 00:00:00-03:00
-updated_at: '2026-04-12T10:43:14-03:00'
+updated_at: '2026-04-13T19:36:50-03:00'
 links:
   tools_json: ./tools-json.md
   skills_readme: ../../skills/README.md
@@ -129,21 +129,21 @@ Partial-install note:
 ./.agents/agents skills-sync push agentic-folder-sys --branch skills-sync/agentic-folder-sys --commit --push --pr
 ```
 
-### Via Makefile
+### Via Justfile
 
 ```bash
-make skills-init
-make skills-pull
-make skills-update SKILLS=agentic-folder-sys
-make skills-list RUNTIME=codex
-make skills-search QUERY=markdown RUNTIME=codex
-make skills-plan SKILLS=agentic-folder-sys
-make skills-apply SKILLS=agentic-folder-sys
-make skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
-make skills-check SKILLS=agentic-folder-sys
-make skills-sync SKILLS=agentic-folder-sys
+just skills-init
+just skills-pull
+just skills-update SKILLS=agentic-folder-sys
+just skills-list RUNTIME=codex
+just skills-search QUERY=markdown RUNTIME=codex
+just skills-plan SKILLS=agentic-folder-sys
+just skills-apply SKILLS=agentic-folder-sys
+just skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
+just skills-check SKILLS=agentic-folder-sys
+just skills-sync SKILLS=agentic-folder-sys
 # Disabled by default in this scaffold:
-# make skills-push SKILL=agentic-folder-sys COMMIT=1 PUSH=1
+# just skills-push SKILL=agentic-folder-sys COMMIT=1 PUSH=1
 ```
 
 ## How to Modify
@@ -170,7 +170,7 @@ def check_structure(skills):
 ### Add New Skill
 
 1. Add to `default_skills` in config
-2. Run `make skills-sync SKILLS=new-skill`
+2. Run `just skills-sync SKILLS=new-skill`
 3. Verify structure in `.agents/skills/new-skill/`
 
 For the scaffold itself, keep `agentic-folder-sys` available so agents can

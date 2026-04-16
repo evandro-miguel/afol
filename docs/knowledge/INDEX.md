@@ -2,15 +2,15 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-04-13T01:14:03+00:00"
-updated_at: "2026-04-13T01:14:03+00:00"
+created_at: "2026-04-16T00:32:56+00:00"
+updated_at: "2026-04-16T00:32:56+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 34
+- Total indexed docs: 55
 
 ## Brainstorm
 
@@ -22,6 +22,11 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260412_1910_scripts-coverage-80_brainstorm_01` | `.agents/wb/260412_1910_scripts-coverage-80/260412_1910_scripts-coverage-80_brainstorm_01.md` | - The scaffold needed an evidence-backed answer to whether scripts were tested and whether coverage reached 80%.
 - `260412_2006_repo-wide-simplification-runtime-parity_brainstorm_01` | `.agents/wb/260412_2006_repo-wide-simplification-runtime-parity/260412_2006_repo-wide-simplification-runtime-parity_brainstorm_01.md` | - The repo-wide refactor must simplify the scaffold without changing public CLI
 - `260412_2115_project-finalization-orchestration_brainstorm_01` | `.agents/wb/260412_2115_project-finalization-orchestration/260412_2115_project-finalization-orchestration_brainstorm_01.md` | - The first F-15 slice is complete and verified, but the project is not yet
+- `260412_2232_python-scripts-refactor-followup_brainstorm_01` | `.agents/wb/260412_2232_python-scripts-refactor-followup/260412_2232_python-scripts-refactor-followup_brainstorm_01.md` | - The user asked to use skills and RAG Projects to improve the project Python
+- `260413_1250_project-template-source-separation_brainstorm_01` | `.agents/wb/260413_1250_project-template-source-separation/260413_1250_project-template-source-separation_brainstorm_01.md` | - The scaffold's downstream project baseline is not directly visible as a
+- `260413_1551_python-runtime-hardening_brainstorm_01` | `.agents/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_brainstorm_01.md` | The runtime and Python scripts had recent hardening work, but closure required
+- `260413_1851_just-command-runner-migration_brainstorm_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_brainstorm_01.md` | - Replace Make as the required command runner for the scaffold with just
+- `260415_2121_scripts-cleanup-optimization_brainstorm_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_brainstorm_01.md` | - The script suite is green, but several F-15 Python hotspots still carry
 
 ## Explorer-Check
 
@@ -33,6 +38,11 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260412_1910_scripts-coverage-80_explorer-check_01` | `.agents/wb/260412_1910_scripts-coverage-80/260412_1910_scripts-coverage-80_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
 - `260412_2006_repo-wide-simplification-runtime-parity_explorer-check_01` | `.agents/wb/260412_2006_repo-wide-simplification-runtime-parity/260412_2006_repo-wide-simplification-runtime-parity_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
 - `260412_2115_project-finalization-orchestration_explorer-check_01` | `.agents/wb/260412_2115_project-finalization-orchestration/260412_2115_project-finalization-orchestration_explorer-check_01.md` | - Ground the continuation plan in current repo state after the completed F-15
+- `260412_2232_python-scripts-refactor-followup_explorer-check_01` | `.agents/wb/260412_2232_python-scripts-refactor-followup/260412_2232_python-scripts-refactor-followup_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
+- `260413_1250_project-template-source-separation_explorer-check_01` | `.agents/wb/260413_1250_project-template-source-separation/260413_1250_project-template-source-separation_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being
+- `260413_1551_python-runtime-hardening_explorer-check_01` | `.agents/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_explorer-check_01.md` | - Latest commit range for the Python runtime hardening work:
+- `260413_1851_just-command-runner-migration_explorer-check_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being
+- `260415_2121_scripts-cleanup-optimization_explorer-check_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
 
 ## Postmortem
 
@@ -40,6 +50,10 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260412_1910_scripts-coverage-80_postmortem_01` | `.agents/wb/260412_1910_scripts-coverage-80/260412_1910_scripts-coverage-80_postmortem_01.md` | - Add executable tests and prove the scripts suite reaches an enforced 80% coverage gate.
 - `260412_2006_repo-wide-simplification-runtime-parity_postmortem_01` | `.agents/wb/260412_2006_repo-wide-simplification-runtime-parity/260412_2006_repo-wide-simplification-runtime-parity_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real outcome instead of reconstructing it.
 - `260412_2115_project-finalization-orchestration_postmortem_01` | `.agents/wb/260412_2115_project-finalization-orchestration/260412_2115_project-finalization-orchestration_postmortem_01.md` | - Capture the outcome after T-01 through T-10 execute.
+- `260412_2232_python-scripts-refactor-followup_postmortem_01` | `.agents/wb/260412_2232_python-scripts-refactor-followup/260412_2232_python-scripts-refactor-followup_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real outcome instead of reconstructing it.
+- `260413_1250_project-template-source-separation_postmortem_01` | `.agents/wb/260413_1250_project-template-source-separation/260413_1250_project-template-source-separation_postmortem_01.md` | - Separate the exportable project baseline from the live scaffold development
+- `260413_1851_just-command-runner-migration_postmortem_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real
+- `260415_2121_scripts-cleanup-optimization_postmortem_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_postmortem_01.md` | - Capture what this bounded F-15 cleanup slice changed and what should be reused later.
 
 ## Report
 
@@ -50,6 +64,11 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260412_1910_scripts-coverage-80_report_01` | `.agents/wb/260412_1910_scripts-coverage-80/260412_1910_scripts-coverage-80_report_01.md` | - Roadmap feature: F-05
 - `260412_2006_repo-wide-simplification-runtime-parity_report_01` | `.agents/wb/260412_2006_repo-wide-simplification-runtime-parity/260412_2006_repo-wide-simplification-runtime-parity_report_01.md` | - Roadmap feature: F-15
 - `260412_2115_project-finalization-orchestration_report_01` | `.agents/wb/260412_2115_project-finalization-orchestration/260412_2115_project-finalization-orchestration_report_01.md` | - Roadmap feature: F-15
+- `260412_2232_python-scripts-refactor-followup_report_01` | `.agents/wb/260412_2232_python-scripts-refactor-followup/260412_2232_python-scripts-refactor-followup_report_01.md` | - Roadmap feature: F-15
+- `260413_1250_project-template-source-separation_report_01` | `.agents/wb/260413_1250_project-template-source-separation/260413_1250_project-template-source-separation_report_01.md` | - Roadmap feature: F-16
+- `260413_1551_python-runtime-hardening_report_01` | `.agents/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_report_01.md` | The Python runtime hardening work is code-complete and passed the full aggregate
+- `260413_1851_just-command-runner-migration_report_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_report_01.md` | - Roadmap feature: F-17
+- `260415_2121_scripts-cleanup-optimization_report_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_report_01.md` | - Draft until implementation and validation complete.
 
 ## Research
 
@@ -60,3 +79,5 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260412_1245_roadmap-backlog-closure_research_01` | `.agents/wb/260412_1245_roadmap-backlog-closure/260412_1245_roadmap-backlog-closure_research_01.md` | - Which roadmap tasks remain open after F-14?
 - `260412_2006_repo-wide-simplification-runtime-parity_research_01` | `.agents/wb/260412_2006_repo-wide-simplification-runtime-parity/260412_2006_repo-wide-simplification-runtime-parity_research_01.md` | - What prior repo evidence and local capability constraints should shape the
 - `260412_2115_project-finalization-orchestration_research_01` | `.agents/wb/260412_2115_project-finalization-orchestration/260412_2115_project-finalization-orchestration_research_01.md` | - What is still unfinished after the first F-15 slice?
+- `260413_1551_python-runtime-hardening_research_01` | `.agents/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_research_01.md` | - git diff --check found a real whitespace issue in
+- `260413_1851_just-command-runner-migration_research_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_research_01.md` | - What is the actual current command surface and where does the canonical

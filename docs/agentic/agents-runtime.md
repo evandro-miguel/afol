@@ -3,7 +3,7 @@ doc_type: standard
 id: 260411_agentic-runtime_standard_01
 status: active
 created_at: '2026-04-11T22:20:58-03:00'
-updated_at: '2026-04-12T13:01:37-03:00'
+updated_at: '2026-04-13T19:36:49-03:00'
 ---
 
 # Agentic Runtime
@@ -37,14 +37,14 @@ The wrapper keeps the existing `.agents/agents <legacy-command>` surface intact 
 ## Commands
 
 ```bash
-make setup-runtime
-make lint-runtime
-make test-runtime
-make runtime-mcp-smoke
+just setup-runtime
+just lint-runtime
+just test-runtime
+just runtime-mcp-smoke
 ```
 
-`make all` includes the runtime lint, runtime test, and runtime MCP smoke gates.
-Runtime setup, Make validation, CI, and runtime launchers use the checked-in `uv.lock` through `uv --locked`.
+`just all` includes the runtime lint, runtime test, and runtime MCP smoke gates.
+Runtime setup, validation, CI, and runtime launchers use the checked-in `uv.lock` through `uv --locked`.
 
 ## Safety Model
 

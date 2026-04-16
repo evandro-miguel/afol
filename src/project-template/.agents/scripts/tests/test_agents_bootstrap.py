@@ -36,6 +36,11 @@ class BootstrapTests(unittest.TestCase):
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn(".agents/agents.config", mandatory)
 
+    def test_mandatory_files_include_just_wrapper(self):
+        """The Justfile wrapper must be in the mandatory files list."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn("Justfile", mandatory)
+
     def test_mandatory_files_exclude_opencode_json(self):
         """opencode.json should not be in the minimal root bootstrap surface."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
@@ -49,31 +54,47 @@ class BootstrapTests(unittest.TestCase):
         """Bootstrap must declare directories to ensure exist."""
         self.assertGreater(len(self.bootstrap.ENSURE_DIRS), 0)
 
-    def test_makefile_wrapper_contains_include_marker(self):
-        """The Makefile wrapper must contain the include marker."""
-        self.assertIn(self.bootstrap.MAKEFILE_INCLUDE_MARKER, self.bootstrap.MAKEFILE_WRAPPER)
+    def test_justfile_wrapper_contains_module_marker(self):
+        """The Justfile wrapper must contain the scaffold module marker."""
+        self.assertIn(self.bootstrap.JUSTFILE_MODULE_MARKER, self.bootstrap.JUSTFILE_WRAPPER)
 
-    def test_ensure_makefile_creates_wrapper_when_missing(self):
-        """ensure_makefile must create the wrapper when Makefile is missing."""
+    def test_ensure_justfile_creates_wrapper_when_missing(self):
+        """ensure_justfile must create the wrapper when Justfile is missing."""
         with tempfile.TemporaryDirectory() as tmpdir:
             target = Path(tmpdir)
-            self.bootstrap.ensure_makefile(target, dry_run=False)
-            makefile = target / "Makefile"
-            self.assertTrue(makefile.exists())
-            content = makefile.read_text()
-            self.assertIn(self.bootstrap.MAKEFILE_INCLUDE_MARKER, content)
+            self.bootstrap.ensure_justfile(target, dry_run=False)
+            justfile = target / "Justfile"
+            self.assertTrue(justfile.exists())
+            content = justfile.read_text()
+            self.assertIn(self.bootstrap.JUSTFILE_MODULE_MARKER, content)
 
-    def test_ensure_makefile_skips_when_marker_present(self):
-        """ensure_makefile must not modify Makefile when marker is already present."""
+    def test_ensure_justfile_skips_when_marker_present(self):
+        """ensure_justfile must not modify Justfile when marker is already present."""
         with tempfile.TemporaryDirectory() as tmpdir:
             target = Path(tmpdir)
-            makefile = target / "Makefile"
-            makefile.write_text("# existing\ninclude docs/standards/Makefile\n")
+            justfile = target / "Justfile"
+            justfile.write_text("# existing\nmod agents_scaffold 'docs/standards/Justfile'\n")
             with mock.patch.object(self.bootstrap, "print_action") as mock_print:
-                self.bootstrap.ensure_makefile(target, dry_run=False)
+                self.bootstrap.ensure_justfile(target, dry_run=False)
             actions = [call[0][0] for call in mock_print.call_args_list]
-            self.assertNotIn("append include", actions)
+            self.assertNotIn("append scaffold module", actions)
             self.assertNotIn("create", actions)
+
+    def test_ensure_justfile_ignores_comment_only_marker_mentions(self):
+        """Comment-only marker mentions must not suppress scaffold module append."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir)
+            justfile = target / "Justfile"
+            justfile.write_text(
+                "# import 'docs/standards/Justfile'\n"
+                "default:\n"
+                "  @echo custom\n",
+                encoding="utf-8",
+            )
+            self.bootstrap.ensure_justfile(target, dry_run=False)
+            content = justfile.read_text(encoding="utf-8")
+            self.assertIn("default:", content)
+            self.assertIn(self.bootstrap.JUSTFILE_MODULE_MARKER, content)
 
     def test_generated_baseline_content_includes_roadmap(self):
         """Generated baseline must include the roadmap file."""

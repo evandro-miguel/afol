@@ -16,6 +16,32 @@ SESSION_ID = "260402_0000_integration"
 pytestmark = pytest.mark.integration
 
 
+def _copytree_ignore_runtime_state(src: str, names: list[str]) -> set[str]:
+    """Exclude generated runtime/state folders from isolated repo copies."""
+    rel_src = Path(src).resolve().relative_to(ROOT_DIR)
+    ignored = {
+        name
+        for name in names
+        if name
+        in {
+            ".git",
+            ".coverage",
+            ".pytest_cache",
+            "__pycache__",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".venv",
+        }
+    }
+
+    if rel_src == Path(".agents"):
+        ignored.update({"cache", "wb", "z-arq", "tmp"})
+    elif rel_src == Path("docs"):
+        ignored.add("map")
+
+    return ignored
+
+
 def isolated_env(repo_root: Path) -> dict[str, str]:
     env = os.environ.copy()
     env["AGENTS_ACTIVE_SESSION_FILE"] = str(repo_root / ".agents" / "wb" / ".active_session")
@@ -41,22 +67,12 @@ def build_isolated_repo(tmp_root: Path) -> Path:
     shutil.copytree(
         ROOT_DIR,
         repo_root,
-        ignore=shutil.ignore_patterns(
-            ".git",
-            ".coverage",
-            ".pytest_cache",
-            "__pycache__",
-            ".mypy_cache",
-            ".ruff_cache",
-            ".venv",
-            ".agents/cache",
-            ".agents/wb",
-            ".agents/z-arq",
-            ".agents/tmp",
-            "docs/map",
-            "docs/map/structure",
-        ),
+        ignore=_copytree_ignore_runtime_state,
     )
+
+    (repo_root / "docs" / "map" / "structure").mkdir(parents=True, exist_ok=True)
+    (repo_root / ".agents" / "z-arq").mkdir(parents=True, exist_ok=True)
+    (repo_root / ".agents" / "tmp").mkdir(parents=True, exist_ok=True)
 
     session_dir = repo_root / ".agents" / "wb" / SESSION_ID
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -199,6 +215,15 @@ def test_tools_workflow(isolated_repo: Path):
     validate_result = run_command(isolated_repo, ["tools", "validate"])
     assert validate_result.returncode == 0, validate_result.stderr
     assert "✅ Catalog is valid" in validate_result.stdout
+
+
+def test_repo_map_dry_run_workflow(isolated_repo: Path):
+    """`.agents/agents repo-map . --dry-run` should preview without shadow-copying."""
+    result = run_command(isolated_repo, ["repo-map", ".", "--dry-run"])
+
+    assert result.returncode == 0, result.stderr
+    assert "Analysis shadow repo: <dry-run skipped>" in result.stdout
+    assert str(isolated_repo / "docs" / "map") in result.stdout
 
 
 def test_session_catchup_temp_repo_scenarios():

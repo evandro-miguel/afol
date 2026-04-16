@@ -29,10 +29,10 @@ cannot accept new workbench artifacts.
 ## Evidence
 
 - `./.agents/agents doctor` passed with no issues.
-- `make lint` passed with 0 issues across the configured lint scope.
-- `make test-scripts` passed with 201 tests selected, 201 passed, and 6 deselected.
-- `make verify-active` passed for `.agents/wb/260404_1558_repo-quality-and-governance`.
-- `make verify-strict-if-present` failed because completed tasks exist but no report
+- `just lint` passed with 0 issues across the configured lint scope.
+- `just test-scripts` passed with 201 tests selected, 201 passed, and 6 deselected.
+- `just verify-active` passed for `.agents/wb/260404_1558_repo-quality-and-governance`.
+- `just verify-strict-if-present` failed because completed tasks exist but no report
   document was found.
 - `./.agents/agents status --json` reports the active plan blocked by missing
   `brainstorm`, `research`, and `explorer-check` dependencies, while the task board is
@@ -77,7 +77,7 @@ cannot accept new workbench artifacts.
    Create `260404_1558_repo-quality-and-governance_report_01.md` inside it.
 
    Add the existing validation evidence from the plan/task artifacts, then rerun
-   `make verify-strict-if-present`.
+   `just verify-strict-if-present`.
 
 3. Resolve artifact-state drift.
    Either materialize useful `brainstorm`, `research`, and `explorer-check` artifacts
@@ -98,12 +98,12 @@ cannot accept new workbench artifacts.
 
 6. Add a guardrail for direct verification ergonomics.
    Consider teaching `./.agents/agents verify-tasks <session-id>` to resolve
-   `.agents/wb/<session-id>` automatically, matching the Makefile wrapper behavior and
+   `.agents/wb/<session-id>` automatically, matching the Justfile wrapper behavior and
    avoiding false "session folder not found" failures.
 
 ## Acceptance Criteria
 
-- `make verify-strict-if-present` passes.
+- `just verify-strict-if-present` passes.
 - `./.agents/agents status` reports no blocked active plan for completed work.
 - The active `spec-lite` has no placeholder fields, or the session no longer carries an
   unnecessary `spec-lite`.

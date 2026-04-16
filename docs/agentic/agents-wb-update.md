@@ -4,8 +4,8 @@ theme: agents-wb-update
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-23 00:00:00-03:00
+updated_at: '2026-04-13T19:36:53-03:00'
 links:
   tools_json: ./tools-json.md
   new: ./agents-new.md
@@ -97,11 +97,11 @@ def cmd_new_command(args):
 # Update files changed
 ./.agents/agents wb-update files-changed
 
-# Via Makefile
-make wb-touch
-make wb-task TASK_ID=T-01 ACTION=done
-make wb-status STATUS=active
-make wb-timeline MSG="Implemented login"
+# Via Justfile
+just wb-touch
+just wb-task TASK_ID=T-01 ACTION=done
+just wb-status STATUS=active
+just wb-timeline MSG="Implemented login"
 ```
 
 ## Related

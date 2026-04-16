@@ -4,8 +4,8 @@ theme: agents-tools
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-23 00:00:00-03:00
+updated_at: '2026-04-13T19:36:53-03:00'
 links:
   tools_json: ./tools-json.md
   wrapper: ./agents-wrapper.md
@@ -142,7 +142,7 @@ creation:
 Tool: doctor
 Description: Validates .agents structure and integrity
 Usage: .agents/agents doctor
-Make: make doctor
+Just: just doctor
 
 Commands:
   doctor [args]  - Run validation

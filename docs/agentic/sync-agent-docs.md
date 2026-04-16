@@ -4,8 +4,8 @@ theme: sync-agent-docs
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-20T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-20 00:00:00-03:00
+updated_at: '2026-04-13T19:36:55-03:00'
 links:
   tools_json: ./tools-json.md
   agents_md: ../../AGENTS.md
@@ -82,8 +82,8 @@ HEADER_TEMPLATE = """# Agent-specific instructions for {agent_name}
 # Sync all agents
 ./.agents/agents sync --force
 
-# Via Makefile
-make sync
+# Via Justfile
+just sync
 ```
 
 ## Output

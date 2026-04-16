@@ -3,7 +3,7 @@ doc_type: standard
 id: skills-sync-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-12T10:43:14-03:00'
+updated_at: '2026-04-13T19:37:14-03:00'
 ---
 
 # Skills Sync Standard
@@ -46,22 +46,22 @@ skills_sync:
 1. Initialize sync state:
 
 ```bash
-make skills-init
+just skills-init
 ```
 
 2. Refresh the external git-backed universal-skills source when configured:
 
 ```bash
-make skills-pull
+just skills-pull
 ```
 
-If only the repo-local bootstrap seed exists, `make skills-pull` is a no-op. It never creates a git checkout under `.agents/cache/`.
+If only the repo-local bootstrap seed exists, `just skills-pull` is a no-op. It never creates a git checkout under `.agents/cache/`.
 
 3. Discover what is available:
 
 ```bash
-make skills-list RUNTIME=codex
-make skills-search QUERY=markdown RUNTIME=codex
+just skills-list RUNTIME=codex
+just skills-search QUERY=markdown RUNTIME=codex
 ```
 
 When an external universal-skills checkout is configured, discovery commands prefer that full catalog. The repo-local source seed remains the default offline install/apply baseline.
@@ -69,32 +69,32 @@ When an external universal-skills checkout is configured, discovery commands pre
 4. Plan selected subset impact:
 
 ```bash
-make skills-plan SKILLS=agentic-folder-sys
+just skills-plan SKILLS=agentic-folder-sys
 ```
 
 5. Apply selected skills to project:
 
 ```bash
-make skills-apply SKILLS=agentic-folder-sys
+just skills-apply SKILLS=agentic-folder-sys
 ```
 
 6. Ensure one skill on demand:
 
 ```bash
-make skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
+just skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
 ```
 
 7. Run the one-step update flow into `.agents/skills/`:
 
 ```bash
-make skills-sync SKILLS=agentic-folder-sys
-make skills-update SKILLS=agentic-folder-sys
+just skills-sync SKILLS=agentic-folder-sys
+just skills-update SKILLS=agentic-folder-sys
 ```
 
 8. Propose one locally edited skill back to universal-skills only through a branch:
 
 ```bash
-make skills-push SKILL=agentic-folder-sys BRANCH=skills-sync/agentic-folder-sys COMMIT=1 PUSH=1 PR=1
+just skills-push SKILL=agentic-folder-sys BRANCH=skills-sync/agentic-folder-sys COMMIT=1 PUSH=1 PR=1
 ```
 
 This command must never push to `main` directly. It requires an external universal-skills checkout and pushes only a proposal branch; use `PR=1` when the change should be opened as a GitHub pull request.
@@ -102,7 +102,7 @@ This command must never push to `main` directly. It requires an external univers
 9. Verify sync and structure:
 
 ```bash
-make skills-check SKILLS=agentic-folder-sys
+just skills-check SKILLS=agentic-folder-sys
 ```
 
 ## Default Template Skills
@@ -121,7 +121,7 @@ After initial setup in each repository:
 3. Choose `mode` (`copy` recommended for template repos)
 4. Define selected skills via `SKILLS=...` and persist in manifest when needed
 5. Enable gate with `skills_sync.required=true`
-6. Ensure `make all` passes with `skills-check`
+6. Ensure `just all` passes with `skills-check`
 7. For live repos, use bootstrap `--partial` so skills and scaffold files are added without clobbering project-owned content
 8. Ensure bootstrap provisions `.agents/source/universal-skills` before expecting `skills-sync sync` to use a local-first source
 9. Treat repo/ref/profile fields as the canonical upgrade path for F-10 rather than inventing another local skills contract

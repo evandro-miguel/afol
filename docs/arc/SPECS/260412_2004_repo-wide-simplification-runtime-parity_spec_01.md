@@ -140,7 +140,7 @@ Out of scope:
 - Assumptions:
   - The repo-local universal-skills source contains only `agentic-folder-sys` and
     `agentic-scaffold-mcp`; Python validation comes from repo tests and lint.
-  - `make test-scripts-all` currently enforces the 80% coverage gate.
+  - `just test-scripts-all` currently enforces the 80% coverage gate.
   - Current route, fetch, and SQLite surfaces are absent and should remain out of
     scope.
 - Constraints:
@@ -163,8 +163,8 @@ Out of scope:
   - Runtime command metadata and wrapper behavior are easier to verify from one
     registry path.
   - Complexity hotspots are reduced only where focused tests prove behavior.
-  - Final gates pass: `make lint`, `make test-scripts-all`, `make test-runtime`,
-    `make runtime-mcp-smoke`, and strict workbench verification.
+  - Final gates pass: `just lint`, `just test-scripts-all`, `just test-runtime`,
+    `just runtime-mcp-smoke`, and strict workbench verification.
 - Review questions:
   - Did every refactor preserve the interactive CLI scaffold contract?
   - Is every archived or moved artifact backed by updated references and
@@ -205,7 +205,7 @@ Out of scope:
 - Test philosophy:
   - Prefer focused unit/parity checks first.
   - Run broad gates before closing the workstream.
-  - Treat `make lint` and strict workbench verification as mandatory closure
+  - Treat `just lint` and strict workbench verification as mandatory closure
     gates.
 - Open questions:
   - None. Execution slices may add child-spec decisions if new evidence appears.

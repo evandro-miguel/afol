@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-04-13T21:24:17+00:00
+**Generated:** 2026-04-16T00:32:54+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,7 +9,7 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 94 files, 26,992 lines, 1092.0 KB
+**Stats:** 94 files, 27,170 lines, 1099.3 KB
 
 ### Files
 
@@ -17,10 +17,10 @@ Services, utilities, and business logic.
 |------|-------|------|-------------|
 | `.agents/scripts/agents-skills-sync.py` | 1,147 | 47.4 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-skills-sync.py` | 1,147 | 47.4 KB | Module; functionality |
-| `.agents/scripts/verify-tasks.py` | 1,121 | 44.5 KB | Module; functionality |
-| `src/project-template/.agents/scripts/verify-tasks.py` | 1,121 | 44.5 KB | Module; functionality |
-| `.agents/scripts/agents-bootstrap.py` | 1,003 | 40.9 KB | Module; functionality |
-| `src/project-template/.agents/scripts/agents-bootstrap.py` | 1,003 | 40.9 KB | Module; functionality |
+| `.agents/scripts/verify-tasks.py` | 1,117 | 43.8 KB | Module; functionality |
+| `src/project-template/.agents/scripts/verify-tasks.py` | 1,117 | 43.8 KB | Module; functionality |
+| `.agents/scripts/agents-bootstrap.py` | 1,056 | 43.6 KB | Module; functionality |
+| `src/project-template/.agents/scripts/agents-bootstrap.py` | 1,056 | 43.6 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-new.py` | 805 | 34.5 KB | Module; functionality |
 | `.agents/scripts/agents-new.py` | 801 | 34.4 KB | Module; functionality |
 | `.agents/scripts/agents-telemetry.py` | 728 | 30.7 KB | Module; functionality |
@@ -29,22 +29,22 @@ Services, utilities, and business logic.
 | `src/project-template/.agents/scripts/lib/execution_commands.py` | 690 | 28.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-wb-update.py` | 669 | 26.0 KB | Module; functionality |
 | `.agents/scripts/agents-wb-update.py` | 659 | 25.7 KB | Module; functionality |
-| `.agents/scripts/agents-tools.py` | 539 | 20.0 KB | Module; functionality |
-| `src/project-template/.agents/scripts/agents-tools.py` | 534 | 19.8 KB | Module; functionality |
+| `.agents/scripts/agents-tools.py` | 543 | 20.2 KB | Module; functionality |
+| `src/project-template/.agents/scripts/agents-tools.py` | 543 | 20.2 KB | Module; functionality |
 | `.agents/scripts/agents-doctor.py` | 521 | 20.1 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-doctor.py` | 521 | 20.1 KB | Module; functionality |
 | `.agents/scripts/agents-lint-docs.py` | 430 | 16.6 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-lint-docs.py` | 430 | 16.6 KB | Module; functionality |
-| `.agents/scripts/lib/agents_config.py` | 422 | 16.3 KB | Module; functionality |
-| `.agents/scripts/agents-structure-map.py` | 418 | 16.3 KB | Module; functionality |
-| `src/project-template/.agents/scripts/agents-structure-map.py` | 418 | 16.3 KB | Module; functionality |
+| `.agents/scripts/agents-structure-map.py` | 427 | 16.7 KB | Module; functionality |
+| `src/project-template/.agents/scripts/agents-structure-map.py` | 427 | 16.7 KB | Module; functionality |
+| `.agents/scripts/lib/agents_config.py` | 417 | 16.0 KB | Module; functionality |
 | `src/project-template/.agents/scripts/lib/agents_config.py` | 414 | 16.0 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-patterns.py` | 353 | 13.8 KB | Module; functionality |
+| `.agents/scripts/agents-repo-map.py` | 342 | 15.5 KB | Module; functionality |
+| `src/project-template/.agents/scripts/agents-repo-map.py` | 342 | 15.5 KB | Module; functionality |
 | `.agents/scripts/agents-patterns.py` | 341 | 13.3 KB | Module; functionality |
 | `.agents/scripts/check-links.py` | 331 | 11.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/check-links.py` | 331 | 11.2 KB | Module; functionality |
-| `.agents/scripts/agents-repo-map.py` | 315 | 14.4 KB | Module; functionality |
-| `src/project-template/.agents/scripts/agents-repo-map.py` | 315 | 14.4 KB | Module; functionality |
 | `.agents/scripts/agents-memory.py` | 288 | 11.7 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-memory.py` | 288 | 11.7 KB | Module; functionality |
 | `.agents/scripts/lib/workflow_manifest.py` | 282 | 11.1 KB | Module; functionality |

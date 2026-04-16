@@ -72,7 +72,7 @@ risk_level: medium
 
 - Workbench evidence IDs from `./.agents/agents wb-update evidence`.
 - Test command names and pass/fail summaries in the F-14 report.
-- Final `make lint` and strict F-14 workbench verification output summaries.
+- Final `just lint` and strict F-14 workbench verification output summaries.
 
 ## 7) Open Risks
 

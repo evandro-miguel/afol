@@ -3,7 +3,7 @@ doc_type: standard
 id: primary-runtime-compatibility
 status: active
 created_at: '2026-03-06T22:36:20+00:00'
-updated_at: '2026-03-06T19:48:51-03:00'
+updated_at: '2026-04-13T19:37:00-03:00'
 ---
 
 # Primary Runtime Compatibility
@@ -77,10 +77,10 @@ Committed runtime config must stay safe to review publicly inside the repository
 
 ## Verification
 
-- `make sync`
-- `make lint`
-- `make doctor`
-- `make all`
+- `just sync`
+- `just lint`
+- `just doctor`
+- `just all`
 
 ## Acceptance
 

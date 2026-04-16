@@ -4,8 +4,8 @@ theme: agents-fix-symlinks
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-23 00:00:00-03:00
+updated_at: '2026-04-13T19:36:47-03:00'
 links:
   tools_json: ./tools-json.md
   wrapper: ./agents-wrapper.md
@@ -74,11 +74,10 @@ fix_symlinks:
 ./.agents/agents fix-symlinks --verbose
 ```
 
-### Via Makefile
+### Via Justfile
 
 ```bash
-# Not in Makefile by default (maintenance tool)
-python3 .agents/scripts/agents-fix-symlinks.py --dry-run
+just fix-symlinks DRY=1
 ```
 
 ## How to Modify

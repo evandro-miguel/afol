@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: 2026-02-23 00:00:00-03:00
-updated_at: '2026-04-11T22:27:09-03:00'
+updated_at: '2026-04-13T19:36:55-03:00'
 links:
   agents_config: ../agents.config
   agents_tools: ./agents-tools.md
@@ -65,10 +65,10 @@ links:
   "updated_at": "2026-02-23T00:00:00-03:00",
   "description": "Tool catalog...",
   "tools": [...],
-  "makefile_targets": {...},
+  "justfile_targets": {...},
+  "justfile_aliases": {...},
   "tool_categories": {...},
   "execution_modes": {...},
-  "makefile_aliases": {...},
   "best_practices": [...]
 }
 ```
@@ -85,7 +85,7 @@ List of all tools. Each tool has:
   "name": "Agents Doctor",
   "tool": "agents-doctor.py",
   "wrapper_command": ".agents/agents doctor",
-  "make_command": "make doctor",
+  "just_command": "just doctor",
   "type": "validation",
   "execution_mode": "on-demand",
   "description": "Validates .agents structure...",
@@ -159,7 +159,7 @@ The central runtime is cataloged as `agentic-runtime`:
 .agents/agents mcp validate
 ```
 
-Its catalog entry points to `.agents/runtime/`, the `.agents/agents runtime` wrapper route, and the `make lint-runtime`, `make test-runtime`, and `make runtime-mcp-smoke` validation gates.
+Its catalog entry points to `.agents/runtime/`, the `.agents/agents runtime` wrapper route, and the `just lint-runtime`, `just test-runtime`, and `just runtime-mcp-smoke` validation gates.
 
 ### Update Existing Tool
 

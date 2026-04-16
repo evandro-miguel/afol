@@ -38,7 +38,7 @@ def test_validate_catalog_helpers():
             "type": "validation",
             "tool": "test",
             "wrapper_command": "test",
-            "make_command": "test",
+            "just_command": "test",
             "execution_mode": "on-demand",
             "updated_at": "2026-01-01",
             "description": "Test tool",

@@ -285,7 +285,7 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             self.execution_commands.append_evidence(
                 session_dir,
                 "T-01",
-                command="make test-scripts",
+                command="just test-scripts",
                 result="passed",
             )
             evidence_path = session_dir / ".evidence.jsonl"
@@ -433,7 +433,7 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
             args = argparse.Namespace(
                 session=str(session_dir),
                 task_id="T-01",
-                command="make test-scripts",
+                command="just test-scripts",
                 result="passed",
                 artifact=[".agents/scripts/tests"],
                 note="scenario",
@@ -448,7 +448,7 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
             data = [json.loads(line) for line in evidence_path.read_text(encoding="utf-8").splitlines() if line.strip()]
             self.assertEqual(len(data), 1)
             self.assertEqual(data[0]["task_id"], "T-01")
-            self.assertEqual(data[0]["command"], "make test-scripts")
+            self.assertEqual(data[0]["command"], "just test-scripts")
 
     def test_review_scope_verify_success(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:

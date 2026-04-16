@@ -8,7 +8,6 @@
       "name": "Agents Tools Discovery",
       "tool": "agents-tools.py",
       "wrapper_command": ".agents/agents tools <command> [args]",
-      "make_command": "N/A",
       "type": "discovery",
       "execution_mode": "on-demand",
       "created_at": "2026-02-23",
@@ -58,14 +57,14 @@
         "2. Agente identifica ferramenta de interesse",
         "3. Agente executa 'tools info <tool-id>' para detalhes",
         "4. Agente recebe subcomandos, opcoes e exemplos de uso"
-      ]
+      ],
+      "just_command": "N/A"
     },
     {
       "id": "agentic-runtime",
       "name": "Agentic Runtime",
       "tool": ".agents/runtime",
       "wrapper_command": ".agents/agents runtime <command> [args]",
-      "make_command": "make lint-runtime | make test-runtime | make runtime-mcp-smoke",
       "type": "runtime",
       "execution_mode": "on-demand",
       "created_at": "2026-04-11",
@@ -110,14 +109,14 @@
         "2. Search docs for roadmap, spec, rule, and workbench context",
         "3. Validate structure before and after mutations",
         "4. Use archive, write, patch, and undo only for bounded reversible changes"
-      ]
+      ],
+      "just_command": "just lint-runtime | just test-runtime | just runtime-mcp-smoke"
     },
     {
       "id": "doctor",
       "name": "Agents Doctor",
       "tool": "agents-doctor.py",
       "wrapper_command": ".agents/agents doctor",
-      "make_command": "make doctor",
       "type": "validation",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
@@ -138,14 +137,14 @@
         "Cross-links between documentos sao valids"
       ],
       "output": "Report with erros, avisos e informacoes",
-      "exit_code": "0 if valid, 1 if has erros"
+      "exit_code": "0 if valid, 1 if has erros",
+      "just_command": "just doctor"
     },
     {
       "id": "new",
       "name": "Agents New",
       "tool": "agents-new.py",
       "wrapper_command": ".agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> [options]",
-      "make_command": "make new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<spec-id> [SPEC=1|lite] [CHILD_SPEC=<spec-id>]",
       "type": "creation",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
@@ -174,14 +173,14 @@
         "YYMMDD_HHMM_<theme>_spec-lite_01.md (optional)"
       ],
       "output": "Session folder em .agents/wb/ with files inicializados",
-      "side_effect": "Updates .agents/wb/.active_session pointing to nova sessao"
+      "side_effect": "Updates .agents/wb/.active_session pointing to nova sessao",
+      "just_command": "just new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<spec-id> [SPEC=1|lite] [CHILD_SPEC=<spec-id>]"
     },
     {
       "id": "bootstrap",
       "name": "Agents Bootstrap",
       "tool": "agents-bootstrap.py",
       "wrapper_command": ".agents/agents bootstrap <target-path> [--force] [--dry-run] [--skip-checks]",
-      "make_command": "make bootstrap TARGET=/path/to/repo [FORCE=1] [DRY=1] [SKIP_CHECKS=1]",
       "type": "creation",
       "execution_mode": "on-demand",
       "created_at": "2026-02-23",
@@ -216,14 +215,14 @@
         "Writes adaptation checklist for target project",
         "Runs post-bootstrap checks unless --skip-checks"
       ],
-      "output": "Installed .agents system in target repo and generated bootstrap-adaptation checklist"
+      "output": "Installed .agents system in target repo and generated bootstrap-adaptation checklist",
+      "just_command": "just bootstrap TARGET=/path/to/repo [FORCE=1] [DRY=1] [SKIP_CHECKS=1]"
     },
     {
       "id": "index",
       "name": "Agents Index",
       "tool": "agents-index.py",
       "wrapper_command": ".agents/agents index",
-      "make_command": "make index",
       "type": "documentation",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
@@ -244,14 +243,14 @@
         "docs/arc/DECISIONS/INDEX.md"
       ],
       "output": "Indices atualizados com lista de documentos, status, owners e links",
-      "dry_run": "--dry-run para visualizar sem aplicar"
+      "dry_run": "--dry-run para visualizar sem aplicar",
+      "just_command": "just index"
     },
     {
       "id": "lint-docs",
       "name": "Agents Lint Docs",
       "tool": "agents-lint-docs.py",
       "wrapper_command": ".agents/agents lint-docs [folder] [--fix]",
-      "make_command": "make lint",
       "type": "validation",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
@@ -288,14 +287,14 @@
         "z-arq/"
       ],
       "output": "Relatorio de issues encontradas",
-      "fix_mode": "--fix tenta corrigir automaticamente"
+      "fix_mode": "--fix tenta corrigir automaticamente",
+      "just_command": "just lint"
     },
     {
       "id": "structure-map",
       "name": "Agents Structure Map",
       "tool": "agents-structure-map.py",
       "wrapper_command": ".agents/agents structure-map <path> [--output <dir>]",
-      "make_command": "make structure",
       "type": "documentation",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
@@ -320,14 +319,14 @@
       "options": [
         "--output <dir>: Diretorio de saida (padrao: docs/map/structure/)",
         "--no-cache: Ignora cache e recria tudo"
-      ]
+      ],
+      "just_command": "just structure"
     },
     {
       "id": "repo-map",
       "name": "Agents Repo Map",
       "tool": "agents-repo-map.py",
       "wrapper_command": ".agents/agents repo-map [path] [--output <dir>] [--runner <path>] [--image <tag>] [--dry-run]",
-      "make_command": "make repo-map [TARGET_PATH=. OUTPUT_DIR=docs/map RUNNER=/path/to/run-repo-map.sh IMAGE=docker-analisys-tools:latest DRY=1]",
       "type": "documentation",
       "execution_mode": "on-demand",
       "created_at": "2026-03-23",
@@ -352,14 +351,14 @@
         "Runs analysis in a temporary shadow copy before syncing the output into the configured map root",
         "Fails if required root codemap docs are missing after the run"
       ],
-      "output": "Generated or refreshed codemap markdown files and raw evidence under docs/map and docs/map/extra"
+      "output": "Generated or refreshed codemap markdown files and raw evidence under docs/map and docs/map/extra",
+      "just_command": "just repo-map [TARGET_PATH=. OUTPUT_DIR=docs/map RUNNER=/path/to/run-repo-map.sh IMAGE=docker-analisys-tools:latest DRY=1]"
     },
     {
       "id": "sync",
       "name": "Sync Agent Docs",
       "tool": "sync-agent-docs.py",
       "wrapper_command": ".agents/agents sync [--force]",
-      "make_command": "make sync",
       "type": "synchronization",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
@@ -384,14 +383,14 @@
       "options": [
         "--force: Overwrite without prompting"
       ],
-      "output": "Updated runtime instruction files or a diff report"
+      "output": "Updated runtime instruction files or a diff report",
+      "just_command": "just sync"
     },
     {
       "id": "verify-tasks",
       "name": "Verify Tasks",
       "tool": "verify-tasks.py",
       "wrapper_command": ".agents/agents verify-tasks <session-folder>",
-      "make_command": "make verify",
       "type": "verification",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
@@ -413,14 +412,14 @@
       },
       "scans": "Arquivos *_task_*.md na session folder",
       "output": "Relatorio de status por tarefa (ID, descricao, status)",
-      "exit_code": "0 se todas completas, 1 if has pendencias"
+      "exit_code": "0 se todas completas, 1 if has pendencias",
+      "just_command": "just verify"
     },
     {
       "id": "session",
       "name": "Agents Session",
       "tool": "agents-session.py",
       "wrapper_command": ".agents/agents session <catchup|close> [options]",
-      "make_command": "N/A",
       "type": "workflow",
       "execution_mode": "on-demand",
       "created_at": "2026-03-06",
@@ -467,14 +466,14 @@
         "Requires the target session folder to exist",
         "Refuses to repoint to the same session being closed"
       ],
-      "output": "Catchup summary or closure summary, depending on subcommand"
+      "output": "Catchup summary or closure summary, depending on subcommand",
+      "just_command": "N/A"
     },
     {
       "id": "wb-update",
       "name": "Agents Workbench Update",
       "tool": "agents-wb-update.py",
       "wrapper_command": ".agents/agents wb-update <command> [options]",
-      "make_command": "make wb-<command> [ARGS...]",
       "type": "automation",
       "execution_mode": "on-demand",
       "created_at": "2026-02-23",
@@ -526,14 +525,14 @@
         }
       ],
       "active_session": "Le .agents/wb/.active_session para determinar sessao alvo",
-      "offset": "Usa WB_OFFSET do config para timestamps"
+      "offset": "Usa WB_OFFSET do config para timestamps",
+      "just_command": "just wb-<command> [ARGS...]"
     },
     {
       "id": "agents",
       "name": "Agents CLI Wrapper",
       "tool": "agents (bash script)",
       "wrapper_command": ".agents/agents <command> [args]",
-      "make_command": "N/A (e o proprio wrapper)",
       "type": "infrastructure",
       "execution_mode": "on-demand",
       "created_at": "2026-02-20",
@@ -570,14 +569,14 @@
         "Cria .venv se nao existir",
         "Executa com uv run --with pyyaml",
         "Preserva diretorio de trabalho original"
-      ]
+      ],
+      "just_command": "N/A (e o proprio wrapper)"
     },
     {
       "id": "skills-sync",
       "name": "Skills Sync",
       "tool": "agents-skills-sync.py",
       "wrapper_command": ".agents/agents skills-sync <command> [args]",
-      "make_command": "make skills-sync [SKILLS=a,b,c]",
       "type": "synchronization",
       "execution_mode": "on-demand",
       "created_at": "2026-02-23",
@@ -654,14 +653,14 @@
         "No forbidden cache/pool directories inside skills/",
         "Every selected skill contains skills/<name>/SKILL.md",
         "Drift detection between source repo and project skills"
-      ]
+      ],
+      "just_command": "just skills-sync [SKILLS=a,b,c]"
     },
     {
       "id": "telemetry",
       "name": "Agents Telemetry",
       "tool": "agents-telemetry.py",
       "wrapper_command": ".agents/agents telemetry <command> [args]",
-      "make_command": "make telemetry-record|telemetry-report|telemetry-export|telemetry-validate",
       "type": "observability",
       "execution_mode": "on-demand",
       "created_at": "2026-02-23",
@@ -702,14 +701,14 @@
         }
       ],
       "output": "Events recorded to .agents/data/telemetry/events.jsonl",
-      "side_effect": "Appends event to JSONL telemetry log"
+      "side_effect": "Appends event to JSONL telemetry log",
+      "just_command": "just telemetry-record|telemetry-report|telemetry-export|telemetry-validate"
     },
     {
       "id": "patterns",
       "name": "Agents Patterns",
       "tool": "agents-patterns.py",
       "wrapper_command": ".agents/agents patterns <command> [args]",
-      "make_command": "make patterns-suggest|patterns-list|patterns-show|patterns-apply|patterns-rate",
       "type": "knowledge",
       "execution_mode": "on-demand",
       "created_at": "2026-02-23",
@@ -750,14 +749,14 @@
         }
       ],
       "output": "Pattern suggestions or details",
-      "side_effect": "Apply records pattern usage in telemetry"
+      "side_effect": "Apply records pattern usage in telemetry",
+      "just_command": "just patterns-suggest|patterns-list|patterns-show|patterns-apply|patterns-rate"
     },
     {
       "id": "knowledge",
       "name": "Agents Knowledge",
       "tool": "agents-knowledge.py",
       "wrapper_command": ".agents/agents knowledge <command> [args]",
-      "make_command": "make knowledge-index|knowledge-list|knowledge-search|knowledge-pull",
       "type": "knowledge",
       "execution_mode": "on-demand",
       "created_at": "2026-03-06",
@@ -795,14 +794,14 @@
           "description": "Generate docs/knowledge/INDEX.md"
         }
       ],
-      "output": "Concise knowledge hits, compact reuse digests, or generated index"
+      "output": "Concise knowledge hits, compact reuse digests, or generated index",
+      "just_command": "just knowledge-index|knowledge-list|knowledge-search|knowledge-pull"
     },
     {
       "id": "memory",
       "name": "Agents Memory",
       "tool": "agents-memory.py",
       "wrapper_command": ".agents/agents memory <command> [args]",
-      "make_command": "make memory-status|memory-search|memory-context|memory-recent|memory-show",
       "type": "knowledge",
       "execution_mode": "on-demand",
       "created_at": "2026-03-23",
@@ -840,14 +839,14 @@
           "description": "Emit the exact MCP contract for loading one memory note"
         }
       ],
-      "output": "Provider-aware MCP contracts and boundary guidance for external memory usage"
+      "output": "Provider-aware MCP contracts and boundary guidance for external memory usage",
+      "just_command": "just memory-status|memory-search|memory-context|memory-recent|memory-show"
     },
     {
       "id": "check-links",
       "name": "Check Links",
       "tool": "check-links.py",
       "wrapper_command": "python3 .agents/scripts/check-links.py [directories...]",
-      "make_command": "N/A (add custom target to Makefile)",
       "type": "validation",
       "execution_mode": "on-demand",
       "created_at": "2026-02-23",
@@ -867,54 +866,10 @@
         }
       ],
       "output": "Report of broken links with file, line number, and reason",
-      "exit_code": "0 if all links valid, 1 if broken links found"
+      "exit_code": "0 if all links valid, 1 if broken links found",
+      "just_command": "N/A (add custom target to Justfile)"
     }
   ],
-  "makefile_targets": {
-    "setup": "Inicializa virtualenv com uv",
-    "setup-runtime": "Initialize central runtime environment",
-    "doctor": "Valida estrutura .agents",
-    "new": "Creates new workstream (THEME=required)",
-    "quick": "Registers quick task rapida na sessao ativa",
-    "structure": "Gera docs de estrutura do projeto",
-    "index": "Updates indices SPECS/ADRS",
-    "knowledge-index": "Build reusable knowledge index",
-    "knowledge-list": "List knowledge artifacts",
-    "knowledge-search": "Search prior findings",
-    "memory-status": "Show external memory provider status",
-    "memory-search": "Emit MCP contract for external memory search",
-    "memory-context": "Emit MCP contract for external memory context expansion",
-    "memory-recent": "Emit MCP contract for recent external memory activity",
-    "memory-show": "Emit MCP contract for one external memory note",
-    "sync": "Sincroniza AGENTS.md para agentes",
-    "verify": "Verifica conclusao de tarefas",
-    "lint": "Valida docs markdown",
-    "tools-check": "Valida tools.json e executa smoke tests da CLI tools",
-    "wb-touch": "Updates updated_at na sessao ativa",
-    "wb-normalize-time": "Normaliza timestamps WB",
-    "wb-files-changed": "Updates Files Changed no report",
-    "wb-task": "Marca tarefa por ID (TASK_ID + ACTION required)",
-    "wb-status": "Seta status no frontmatter (STATUS required)",
-    "wb-timeline": "Adiciona entrada timeline (MSG required)",
-    "wb-link": "Seta links.frontmatter (FILE + KEY + VALUE required)",
-    "all": "Run doctor + structure + index + knowledge-index + sync + lint + runtime lint/tests + tools-check + telemetry-validate + test-scripts",
-    "refresh": "Clean + setup + structure",
-    "clean": "Remove .venv e caches",
-    "bootstrap": "Install .agents system in another repository (TARGET required)",
-    "skills-init": "Initialize universal skills sync",
-    "skills-pull": "Refresh the git-backed universal-skills source or mirror only",
-    "skills-update": "Refresh .agents/skills from the configured git source",
-    "skills-plan": "Preview selected skills drift/missing state",
-    "skills-apply": "Apply selected skills to project skills/",
-    "skills-push": "Publish selected local skills back to the git-backed source",
-    "skills-status": "Show skills sync status/config",
-    "skills-check": "Validate skills structure and sync state",
-    "skills-sync": "Refresh .agents/skills from the configured git source",
-    "test-scripts": "Run Python unit tests for operational scripts",
-    "lint-runtime": "Lint the central runtime package",
-    "test-runtime": "Run central runtime tests",
-    "runtime-mcp-smoke": "Smoke the runtime and MCP CLI routes"
-  },
   "tool_categories": {
     "validation": {
       "description": "Validam estrutura, sintaxe e compliance",
@@ -1009,17 +964,6 @@
       "usage_pattern": "When moving a session through explicit operational checkpoints"
     }
   },
-  "makefile_aliases": {
-    "note": "Shortcut aliases in Makefile. Use full names for clarity.",
-    "aliases": {
-      "st": "structure (do NOT use doc - that would be documents)",
-      "ix": "index",
-      "sy": "sync",
-      "vf": "verify",
-      "dr": "doctor (abbreviation for doctor, NOT doc)"
-    },
-    "warning": "doc is NOT a valid alias. Use 'dr' for doctor or full names."
-  },
   "execution_modes": {
     "on-demand": {
       "description": "Execucao manual sob comando do usuario/agente",
@@ -1074,20 +1018,75 @@
       "time": "Timezones (default_offset, wb_offset)",
       "lint": "Exclusoes para validation de docs",
       "doctor": "Pastas e templates obrigatorios",
-      "sync": "Arquivos source e target para sincronizacao"
-      ,
+      "sync": "Arquivos source e target para sincronizacao",
       "memory": "Optional external-memory provider config and MCP contract defaults"
     }
   },
   "best_practices": [
-    "Sempre execute make doctor antes de iniciar trabalho",
-    "Use make new THEME=x para criar workstreams padronizadas",
-    "Execute make verify antes de marcar tarefa como completa",
-    "Mantenha docs sincronizados com make sync apos mudar AGENTS.md",
+    "Sempre execute just doctor antes de iniciar trabalho",
+    "Use just new THEME=x para criar workstreams padronizadas",
+    "Execute just verify antes de marcar tarefa como completa",
+    "Mantenha docs sincronizados com just sync apos mudar AGENTS.md",
     "Use wb-update para automatizar atualizacoes de baixo valor",
-    "Rode make all como validation completa antes de commits",
+    "Rode just all como validation completa antes de commits",
     "Prefira wrapper .agents/agents para execucao direta",
     "Consulte tools.json para entender quando usar cada ferramenta",
     "Use repo-local knowledge first and external memory second; keep workbench artifacts canonical"
-  ]
+  ],
+  "justfile_targets": {
+    "setup": "Inicializa virtualenv com uv",
+    "setup-runtime": "Initialize central runtime environment",
+    "doctor": "Valida estrutura .agents",
+    "new": "Creates new workstream (THEME=required)",
+    "quick": "Registers quick task rapida na sessao ativa",
+    "structure": "Gera docs de estrutura do projeto",
+    "index": "Updates indices SPECS/ADRS",
+    "knowledge-index": "Build reusable knowledge index",
+    "knowledge-list": "List knowledge artifacts",
+    "knowledge-search": "Search prior findings",
+    "memory-status": "Show external memory provider status",
+    "memory-search": "Emit MCP contract for external memory search",
+    "memory-context": "Emit MCP contract for external memory context expansion",
+    "memory-recent": "Emit MCP contract for recent external memory activity",
+    "memory-show": "Emit MCP contract for one external memory note",
+    "sync": "Sincroniza AGENTS.md para agentes",
+    "verify": "Verifica conclusao de tarefas",
+    "lint": "Valida docs markdown",
+    "tools-check": "Valida tools.json e executa smoke tests da CLI tools",
+    "wb-touch": "Updates updated_at na sessao ativa",
+    "wb-normalize-time": "Normaliza timestamps WB",
+    "wb-files-changed": "Updates Files Changed no report",
+    "wb-task": "Marca tarefa por ID (TASK_ID + ACTION required)",
+    "wb-status": "Seta status no frontmatter (STATUS required)",
+    "wb-timeline": "Adiciona entrada timeline (MSG required)",
+    "wb-link": "Seta links.frontmatter (FILE + KEY + VALUE required)",
+    "all": "Run doctor + structure + index + knowledge-index + sync + lint + runtime lint/tests + tools-check + telemetry-validate + test-scripts",
+    "refresh": "Clean + setup + structure",
+    "clean": "Remove .venv e caches",
+    "bootstrap": "Install .agents system in another repository (TARGET required)",
+    "skills-init": "Initialize universal skills sync",
+    "skills-pull": "Refresh the git-backed universal-skills source or mirror only",
+    "skills-update": "Refresh .agents/skills from the configured git source",
+    "skills-plan": "Preview selected skills drift/missing state",
+    "skills-apply": "Apply selected skills to project skills/",
+    "skills-push": "Publish selected local skills back to the git-backed source",
+    "skills-status": "Show skills sync status/config",
+    "skills-check": "Validate skills structure and sync state",
+    "skills-sync": "Refresh .agents/skills from the configured git source",
+    "test-scripts": "Run Python unit tests for operational scripts",
+    "lint-runtime": "Lint the central runtime package",
+    "test-runtime": "Run central runtime tests",
+    "runtime-mcp-smoke": "Smoke the runtime and MCP CLI routes"
+  },
+  "justfile_aliases": {
+    "note": "Shortcut aliases in Justfile. Use full names for clarity.",
+    "aliases": {
+      "st": "structure (do NOT use doc - that would be documents)",
+      "ix": "index",
+      "sy": "sync",
+      "vf": "verify",
+      "dr": "doctor (abbreviation for doctor, NOT doc)"
+    },
+    "warning": "These aliases are canonical in Justfile."
+  }
 }

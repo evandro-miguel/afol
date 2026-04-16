@@ -17,20 +17,20 @@ Some environments do not preserve symlinks correctly (for example, Git on Window
 If links break, run:
 
 ```bash
-make fix-symlinks
+just fix-symlinks
 ```
 
 Useful options:
 
 ```bash
 # Preview only
-make fix-symlinks DRY=1
+just fix-symlinks DRY=1
 
 # Force replacement of conflicting paths
-make fix-symlinks FORCE=1
+just fix-symlinks FORCE=1
 
 # Enforce copy fallback only (no symlink creation)
-make fix-symlinks MODE=copy
+just fix-symlinks MODE=copy
 ```
 
 This command repairs `.claude/skills` and `.claude/rules/default`.

@@ -71,6 +71,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
+            (target / "Justfile").write_text("import 'docs/standards/Justfile'\n", encoding="utf-8")
             calls = []
 
             def fake_run(cmd, cwd=None):
@@ -86,7 +87,30 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 agents_bootstrap.run_post_checks(target)
 
             self.assertIn(["./.agents/agents", "skills-sync", "sync"], calls)
-            self.assertIn(["make", "-f", "docs/standards/Makefile", "all"], calls)
+            self.assertIn(["just", "--justfile", "Justfile", "all"], calls)
+
+    def test_bootstrap_post_checks_use_namespaced_recipe_when_justfile_is_module(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_namespaced_just_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td)
+            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
+            calls = []
+
+            def fake_run(cmd, cwd=None):
+                calls.append(cmd)
+                result = mock.Mock()
+                result.returncode = 0
+                return result
+
+            with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
+                agents_bootstrap.run_post_checks(target)
+
+            self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::doctor"], calls)
+            self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::lint"], calls)
+            self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
 
     def test_removed_root_runtime_mirrors_are_absent(self):
         for path in ["OPENCODE.md", "QWEN.md", "GEMINI.md", "opencode.json"]:
@@ -335,27 +359,27 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertTrue(target.exists())
             self.assertTrue(target.is_dir())
 
-    def test_existing_project_makefile_include_preserves_local_all(self):
+    def test_existing_project_justfile_import_preserves_local_all(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
-        agents_bootstrap = load_module("agents_bootstrap_makefile_test", script_path)
+        agents_bootstrap = load_module("agents_bootstrap_justfile_test", script_path)
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
-            makefile = target / "Makefile"
-            makefile.write_text("all:\n\t@echo existing\n", encoding="utf-8")
+            justfile = target / "Justfile"
+            justfile.write_text("default:\n\t@echo existing\n", encoding="utf-8")
 
-            agents_bootstrap.ensure_makefile(target, dry_run=False)
+            agents_bootstrap.ensure_justfile(target, dry_run=False)
 
-            content = makefile.read_text(encoding="utf-8")
-            self.assertIn("AGENTS_PRESERVE_LOCAL_ALL ?= 1", content)
-            self.assertIn("include docs/standards/Makefile", content)
+            content = justfile.read_text(encoding="utf-8")
+            self.assertIn("default:", content)
+            self.assertIn("mod agents_scaffold 'docs/standards/Justfile'", content)
 
-    def test_standard_makefile_exposes_agents_all_aggregate(self):
-        makefile_text = Path("docs/standards/Makefile").read_text(encoding="utf-8")
+    def test_standard_justfile_exposes_agents_all_aggregate(self):
+        justfile_text = Path("docs/standards/Justfile").read_text(encoding="utf-8")
 
         agents_all_line = next(
-            line for line in makefile_text.splitlines() if line.startswith("agents-all:")
+            line for line in justfile_text.splitlines() if line.startswith("agents-all:")
         )
         for target in [
             "doctor",
@@ -374,8 +398,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             "runtime-mcp-smoke",
         ]:
             self.assertIn(target, agents_all_line)
-        self.assertIn("ifndef AGENTS_PRESERVE_LOCAL_ALL", makefile_text)
-        self.assertIn("all: agents-all", makefile_text)
+        self.assertIn("just", justfile_text)
+        self.assertIn("all: agents-all", justfile_text)
 
 
 if __name__ == "__main__":

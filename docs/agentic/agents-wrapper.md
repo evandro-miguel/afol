@@ -8,7 +8,7 @@ created_at: 2026-02-20 00:00:00-03:00
 updated_at: '2026-04-12T10:07:09-03:00'
 links:
   tools_json: ./tools-json.md
-  makefile: ./makefile.md
+  justfile: ./justfile.md
 ---
 
 # agents (Bash Wrapper) - CLI Entry Point
@@ -145,7 +145,7 @@ Commands:
 
 ## Related
 
-- [makefile.md](./makefile.md) - Makefile targets
+- [justfile.md](./justfile.md) - Justfile targets
 - [agents-runtime.md](./agents-runtime.md) - Central runtime package
 - [agents-mcp.md](./agents-mcp.md) - FastMCP adapter
 - [tools-json.md](./tools-json.md) - Tool catalog

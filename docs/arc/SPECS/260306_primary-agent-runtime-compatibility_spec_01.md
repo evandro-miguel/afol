@@ -216,10 +216,10 @@ Backout:
 
 Commands:
 
-- Lint: `make lint`
-- Unit: `make test-scripts`
-- Validation: `make doctor`
-- Full baseline: `make all`
+- Lint: `just lint`
+- Unit: `just test-scripts`
+- Validation: `just doctor`
+- Full baseline: `just all`
 
 Validation cases:
 

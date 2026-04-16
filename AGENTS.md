@@ -37,7 +37,8 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - `.agents/scripts/agents-*.py` (command implementations)
 - `docs/templates/` (doc/workbench templates)
 - `.agents/wb/` and `.agents/z-arq/` (active and archived workstreams)
-- `Makefile` (delegates to `docs/standards/Makefile`)
+- `Justfile` (canonical command runner; imports `docs/standards/Justfile`)
+- `Justfile` (temporary compatibility bridge to `docs/standards/Justfile`)
 - `.agents/agents.config` (source/target config for sync and runtime)
 
 ## General Rules
@@ -54,7 +55,7 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - Never mark work complete without proof
 - Compare intended behavior vs actual behavior
 - Run verification commands and capture evidence
-- Mandatory gate: `make lint` must pass before any task/session can be marked as complete
+- Mandatory gate: `just lint` must pass before any task/session can be marked as complete
 - Ask: `Would this pass a strict senior/staff review?`
 - Deterministic verification: evidence over assumptions
 
@@ -165,7 +166,7 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - Never edit `updated_at` manually in managed docs
 - Always update `updated_at` via automation commands/scripts
 - Preferred commands:
-  - `make wb-touch`
+  - `just wb-touch`
   - `./.agents/agents wb-update touch`
   - `./.agents/agents wb-update touch --file <path>`
 

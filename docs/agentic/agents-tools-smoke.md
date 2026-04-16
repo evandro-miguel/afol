@@ -4,8 +4,8 @@ theme: agents-tools-smoke
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-23 00:00:00-03:00
+updated_at: '2026-04-13T19:36:52-03:00'
 links:
   tools_json: ./tools-json.md
   agents_tools: ./agents-tools.md
@@ -57,17 +57,17 @@ Validates tools system:
 python3 .agents/scripts/agents-tools-smoke.py
 ```
 
-### Via Makefile
+### Via Justfile
 
 ```bash
-make tools-check
+just tools-check
 ```
 
 ### In CI/CD
 
 ```bash
 # Add to CI pipeline
-make tools-check
+just tools-check
 ```
 
 ## How to Modify
@@ -108,7 +108,7 @@ def check_integration():
 
 ```python
 # Check each tool's script file exists
-# Check Makefile targets exist
+# Check Make bridge targets exist
 # Check wrapper commands work
 ```
 

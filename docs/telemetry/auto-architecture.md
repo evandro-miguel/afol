@@ -1,9 +1,9 @@
 ---
 doc_type: architecture
-id: "telemetry-auto-architecture"
+id: telemetry-auto-architecture
 status: active
-created_at: "2026-02-23T21:45:00Z"
-updated_at: "2026-02-23T21:45:00Z"
+created_at: '2026-02-23T21:45:00Z'
+updated_at: '2026-04-13T19:37:07-03:00'
 ---
 
 # Telemetry Automation Architecture
@@ -155,7 +155,7 @@ docs/                           # ← Project-owned documentation
 ### Weekly Report
 
 ```bash
-make telemetry-report PERIOD=weekly
+just telemetry-report PERIOD=weekly
 ```
 
 Output includes:
@@ -216,7 +216,7 @@ Auto-populated from reports:
 
 ```bash
 # Export to external BI tool
-make telemetry-export FORMAT=json OUTPUT=/tmp/telemetry.json
+just telemetry-export FORMAT=json OUTPUT=/tmp/telemetry.json
 
 # Query specific patterns
 python3 .agents/scripts/agents-telemetry.py query \

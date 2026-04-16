@@ -4,6 +4,7 @@ theme: validation-linting
 version: 1.0
 created: 2026-02-23
 applies_to: All agents (QWEN, CLAUDE, GEMINI)
+updated_at: '2026-04-13T19:36:41-03:00'
 ---
 
 # Validation & Linting
@@ -18,19 +19,19 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 
 ```bash
 # 1. Validate structure
-make doctor
+just doctor
 
 # 2. Lint documentation
-make lint
+just lint
 
 # 3. Verify tasks complete
-make verify
+just verify
 ```
 
 **OR full validation:**
 
 ```bash
-make all
+just all
 # Equivalent to: doctor + structure + index + verify
 ```
 
@@ -42,7 +43,7 @@ make all
 
 ```bash
 ./.agents/agents doctor
-make doctor
+just doctor
 ```
 
 **Checks:**
@@ -73,8 +74,8 @@ make doctor
 # Auto-fix issues
 ./.agents/agents lint-docs .agents/wb --fix
 
-# Via Makefile
-make lint
+# Via Justfile
+just lint
 ```
 
 **Checks:**
@@ -97,8 +98,8 @@ make lint
 # Verify current directory
 ./.agents/agents verify-tasks .
 
-# Via Makefile
-make verify
+# Via Justfile
+just verify
 ```
 
 **Exit codes:**
@@ -138,9 +139,9 @@ make verify
 
 Before marking task complete:
 
-- [ ] `make doctor` passes (all ✓)
-- [ ] `make lint` passes (no issues)
-- [ ] `make verify` passes (all tasks [x])
+- [ ] `just doctor` passes (all ✓)
+- [ ] `just lint` passes (no issues)
+- [ ] `just verify` passes (all tasks [x])
 - [ ] Frontmatter is valid
 - [ ] Task markers are correct
 - [ ] Timestamps have timezone
@@ -151,9 +152,9 @@ Before marking task complete:
 
 | Metric | Command | Healthy |
 |--------|---------|---------|
-| Structure valid | `make doctor` | All ✓ |
-| Docs linted | `make lint` | No issues |
-| Tasks complete | `make verify` | All [x] |
+| Structure valid | `just doctor` | All ✓ |
+| Docs linted | `just lint` | No issues |
+| Tasks complete | `just verify` | All [x] |
 | Config valid | `python -m json.tool .agents/tools.json` | Valid JSON |
 
 ---
@@ -162,9 +163,9 @@ Before marking task complete:
 
 **DO:**
 
-- ✅ Run `make doctor` before starting work
-- ✅ Run `make lint` after editing docs
-- ✅ Run `make verify` before marking complete
+- ✅ Run `just doctor` before starting work
+- ✅ Run `just lint` after editing docs
+- ✅ Run `just verify` before marking complete
 - ✅ Fix issues immediately
 - ✅ Use `--fix` when available
 
@@ -172,7 +173,7 @@ Before marking task complete:
 
 - ❌ Commit without validation
 - ❌ Ignore validation errors
-- ❌ Skip `make verify` for workstreams
+- ❌ Skip `just verify` for workstreams
 - ❌ Leave tasks in `[ ]` when done
 
 ---

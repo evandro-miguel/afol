@@ -4,6 +4,7 @@ theme: workstream-creation
 version: 1.0
 created: 2026-02-23
 applies_to: All agents (QWEN, CLAUDE, GEMINI)
+updated_at: '2026-04-13T19:37:10-03:00'
 ---
 
 # Workstream Creation
@@ -32,8 +33,8 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 # With a pack folder for another major track inside an existing session
 ./.agents/agents new <theme-name> --feature-id F-07 --parent-spec <parent-spec-id> --pack <pack-slug> --into-session <session-id> --spec
 
-# Via Makefile
-make new THEME=<theme-name> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
+# Via Justfile
+just new THEME=<theme-name> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 ```
 
 ### Quick Task (in active session)
@@ -89,8 +90,8 @@ Quick mode is only valid when the work is already inside an approved feature con
 # Mark blocked
 ./.agents/agents wb-update task T-04 --mark-blocked
 
-# Via Makefile
-make wb-task TASK_ID=T-01 ACTION=done
+# Via Justfile
+just wb-task TASK_ID=T-01 ACTION=done
 ```
 
 ---
@@ -105,7 +106,7 @@ make wb-task TASK_ID=T-01 ACTION=done
 # 2. Define or update parent spec in docs/arc/SPECS/
 
 # 3. Create workstream linked to approved strategic docs
-make new THEME=feature-name FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
+just new THEME=feature-name FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 
 # 4. Complete brainstorm + explorer-check before treating the plan as complete
 
@@ -123,9 +124,9 @@ make new THEME=feature-name FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 ./.agents/agents wb-update status --session <session-id> --file report --value final
 
 # 9. Validate
-make doctor
-make lint
-make verify
+just doctor
+just lint
+just verify
 ```
 
 ### Bug Fix Workflow
@@ -143,7 +144,7 @@ make verify
 # 5. Implement fix
 
 # 6. Validate
-make verify
+just verify
 ```
 
 ---

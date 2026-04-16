@@ -16,16 +16,19 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
+      - name: Install just
+        uses: taiki-e/install-action@just
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Sync script environment
-        run: cd .agents/scripts && uv sync
+      - name: Validate setup recipe
+        run: just setup
 
-      - name: Sync central runtime environment
-        run: cd .agents/runtime && uv sync --locked
+      - name: Validate runtime setup recipe
+        run: just setup-runtime
 
       - name: Validate scaffold
-        run: make all
+        run: just all

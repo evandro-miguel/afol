@@ -4,6 +4,7 @@ theme: tool-discovery-usage
 version: 1.0
 created: 2026-02-23
 applies_to: All agents (QWEN, CLAUDE, GEMINI)
+updated_at: '2026-04-13T19:37:09-03:00'
 ---
 
 # Tool Discovery & Usage
@@ -66,7 +67,7 @@ applies_to: All agents (QWEN, CLAUDE, GEMINI)
 
 ```bash
 ./.agents/agents doctor
-make doctor
+just doctor
 ```
 
 **When:** Before starting work, after structural changes
@@ -75,7 +76,7 @@ make doctor
 
 ```bash
 ./.agents/agents new <theme> --spec
-make new THEME=<theme>
+just new THEME=<theme>
 ```
 
 **When:** Starting new feature/bugfix
@@ -84,7 +85,7 @@ make new THEME=<theme>
 
 ```bash
 ./.agents/agents verify-tasks .agents/wb/<session>/
-make verify
+just verify
 ```
 
 **When:** Before marking workstream complete
@@ -103,24 +104,24 @@ make verify
 
 ```bash
 ./.agents/agents lint-docs .agents/wb/
-make lint
+just lint
 ```
 
 **When:** Before commits, after editing docs
 
 ---
 
-## Makefile Quick Reference
+## Justfile Quick Reference
 
 ```bash
-make help              # Show all commands
-make doctor            # Validate structure
-make new THEME=x       # Create workstream
-make verify            # Verify tasks complete
-make lint              # Lint markdown docs
-make all               # Full validation
-make st                # structure (alias)
-make dr                # doctor (alias)
+just help              # Show all commands
+just doctor            # Validate structure
+just new THEME=x       # Create workstream
+just verify            # Verify tasks complete
+just lint              # Lint markdown docs
+just all               # Full validation
+just st                # structure (alias)
+just dr                # doctor (alias)
 ```
 
 ---
@@ -132,7 +133,7 @@ make dr                # doctor (alias)
 - ✅ Run `tools list` before starting work
 - ✅ Use `tools info <tool>` to learn about tools
 - ✅ Read `docs/agentic/<tool>.md` for details
-- ✅ Run `make doctor` + `make lint` + `make verify` before commits
+- ✅ Run `just doctor` + `just lint` + `just verify` before commits
 
 **DON'T:**
 

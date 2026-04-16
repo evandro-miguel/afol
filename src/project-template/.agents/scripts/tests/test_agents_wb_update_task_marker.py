@@ -187,7 +187,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             record = wb_update.append_evidence_record(
                 session_dir=session_dir,
                 task_id="T-01",
-                command="make verify-strict",
+                command="just verify-strict",
                 result="passed",
                 artifacts=[".agents/scripts/verify-tasks.py"],
                 note="strict run evidence",

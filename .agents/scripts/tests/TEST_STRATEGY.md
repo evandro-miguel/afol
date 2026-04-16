@@ -26,7 +26,7 @@ It reflects the suite that actually exists in the repository today.
 ## Source of Truth
 
 - Pytest configuration: `.agents/scripts/pyproject.toml`
-- Test commands: `docs/standards/Makefile`
+- Test commands: `docs/standards/Justfile`
 - Global fixtures and tempdir guards: `.agents/scripts/tests/conftest.py`
 
 ## Suite Layout
@@ -79,10 +79,10 @@ executable tests behind them.
 ## Canonical Commands
 
 ```bash
-make test-scripts
-make test-scripts-integration
-make test-scripts-all
-make all
+just test-scripts
+just test-scripts-integration
+just test-scripts-all
+just all
 ```
 
 Equivalent direct pytest commands:
@@ -118,5 +118,5 @@ uv run --project .agents/scripts pytest .agents/scripts/tests -m "not e2e" --cov
 The test strategy is current when:
 
 - the file tree described above matches the committed test tree,
-- the Makefile commands still map to the suite described here, and
+- the Justfile commands still map to the suite described here, and
 - no placeholder directories or data files remain without executable coverage.

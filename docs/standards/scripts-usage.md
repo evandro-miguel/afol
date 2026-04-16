@@ -4,7 +4,7 @@ id: scripts-usage
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-12T14:11:34-03:00'
+updated_at: '2026-04-13T19:37:02-03:00'
 ---
 
 # Scripts Usage
@@ -15,43 +15,43 @@ This document contains detailed script documentation.
 
 ## Quick Reference
 
-### Using Makefile (Recommended)
+### Using Justfile (Canonical)
 
 ```bash
 # Show all commands
-make help
+just help
 
 # Setup (first time)
-make setup
+just setup
 
 # Validate structure
-make doctor
+just doctor
 
 # Create workstream
-make new THEME=auth-refactor
+just new THEME=auth-refactor
 
 # Generate structure docs
-make structure
+just structure
 
 # Full validation
-make all
+just all
 
 # Lint fixes
-make lint-fix          # Fix common issues
-make lint-fix-dry      # Preview fixes
-make lint-fix-check    # Check for issues
-make lint-fix-checkboxes  # Fix checkbox separators
-make lint-fix-frontmatter # Add missing frontmatter
+just lint-fix          # Fix common issues
+just lint-fix-dry      # Preview fixes
+just lint-fix-check    # Check for issues
+just lint-fix-checkboxes  # Fix checkbox separators
+just lint-fix-frontmatter # Add missing frontmatter
 
 # Tests
-make test-scripts      # Run unit tests
-make test-scripts-all  # Run unit + integration tests with the 80% scripts coverage gate
-make lint-scripts      # Lint Python code
+just test-scripts      # Run unit tests
+just test-scripts-all  # Run unit + integration tests with the 80% scripts coverage gate
+just lint-scripts      # Lint Python code
 
 # Workbench updates
-make wb-touch          # Update timestamps
-make wb-evidence SESSION_ID=<id> TASK_ID=T-01 CMD="make verify-strict" RESULT="passed"
-make wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with evidence
+just wb-touch          # Update timestamps
+just wb-evidence SESSION_ID=<id> TASK_ID=T-01 CMD="just verify-strict" RESULT="passed"
+just wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with evidence
 ```
 
 ### Using Wrapper
@@ -61,7 +61,7 @@ make wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with e
 .agents/agents doctor
 .agents/agents new auth-refactor --spec
 .agents/agents wb-update touch
-.agents/agents wb-update evidence T-01 --session <id> --command "make verify-strict" --result "passed"
+.agents/agents wb-update evidence T-01 --session <id> --command "just verify-strict" --result "passed"
 .agents/agents tools list
 .agents/agents telemetry heat --period weekly
 .agents/agents status
@@ -410,7 +410,7 @@ Executes guided task transitions.
 ```bash
 python .agents/scripts/agents-implement.py next
 python .agents/scripts/agents-implement.py start --task-id T-01
-python .agents/scripts/agents-implement.py complete --task-id T-01 --command "make test-scripts" --result "passed"
+python .agents/scripts/agents-implement.py complete --task-id T-01 --command "just test-scripts" --result "passed"
 ```
 
 ### agents-review.py

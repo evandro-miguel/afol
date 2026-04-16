@@ -1,8 +1,8 @@
 ---
 doc_type: telemetry_guide
 status: active
-created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-02-23T00:00:00Z"
+created_at: '2026-02-23T00:00:00Z'
+updated_at: '2026-04-13T19:37:15-03:00'
 ---
 
 # Telemetry Guide
@@ -26,10 +26,10 @@ Every time you use `.agents/agents <command>`, telemetry is captured automatical
 
 ```bash
 # Generate weekly report
-make telemetry-report PERIOD=weekly
+just telemetry-report PERIOD=weekly
 
 # Export all data
-make telemetry-export FORMAT=json OUTPUT=telemetry_backup.json
+just telemetry-export FORMAT=json OUTPUT=telemetry_backup.json
 
 # Query events
 python3 .agents/scripts/agents-telemetry.py query --limit=20
@@ -72,36 +72,36 @@ python3 .agents/scripts/agents-telemetry.py query --format=json --limit=50
 
 ```bash
 # Weekly report (default)
-make telemetry-report
+just telemetry-report
 
 # Monthly report
-make telemetry-report PERIOD=monthly
+just telemetry-report PERIOD=monthly
 
 # JSON format
-make telemetry-report FORMAT=json
+just telemetry-report FORMAT=json
 
 # All time
-make telemetry-report PERIOD=all
+just telemetry-report PERIOD=all
 ```
 
 ### Export Data
 
 ```bash
 # JSON export
-make telemetry-export FORMAT=json
+just telemetry-export FORMAT=json
 
 # CSV export
-make telemetry-export FORMAT=csv
+just telemetry-export FORMAT=csv
 
 # Custom output path
-make telemetry-export OUTPUT=/path/to/backup.json
+just telemetry-export OUTPUT=/path/to/backup.json
 ```
 
 ### Validate
 
 ```bash
 # Validate all events against schema
-make telemetry-validate
+just telemetry-validate
 ```
 
 ## Data Storage
@@ -177,7 +177,7 @@ python3 .agents/scripts/agents-telemetry.py query --event-type=tool_exec --forma
 ### Success Rate
 
 ```bash
-make telemetry-report PERIOD=weekly FORMAT=json | \
+just telemetry-report PERIOD=weekly FORMAT=json | \
   jq '.summary.success_rate'
 ```
 
@@ -191,7 +191,7 @@ make telemetry-report PERIOD=weekly FORMAT=json | \
 
 ### Invalid JSON
 
-- Run validation: `make telemetry-validate`
+- Run validation: `just telemetry-validate`
 - Check for manual edits to `events.jsonl`
 - Restore from backup if needed
 

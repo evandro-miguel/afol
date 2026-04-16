@@ -1,6 +1,6 @@
 ---
 id: TOOL-012
-theme: makefile
+theme: justfile
 type: tool-doc
 status: active
 owner: system
@@ -11,7 +11,7 @@ links:
   wrapper: ./agents-wrapper.md
 ---
 
-# Makefile - Targets and Aliases
+# Justfile - Targets and Aliases
 
 ## Why It Exists
 
@@ -21,15 +21,15 @@ links:
 - Shell autocomplete
 - Composed workflows
 
-**Solution:** Makefile with named targets and short aliases.
+**Solution:** Justfile with named targets and short aliases.
 
 ## Function
 
 Provides:
 
-1. **Named targets** - `make doctor`, `make new`
+1. **Named targets** - `just doctor`, `just new`
 2. **Short aliases** - `st`, `ix`, `sy`, `vf`, `dr`
-3. **Composed workflows** - `make all`, `make refresh`
+3. **Composed workflows** - `just all`, `just refresh`
 4. **Variables** - `THEME=`, `TASK_ID=`, etc.
 5. **Runtime contract helpers** - command shortcuts for skills, optional external memory, and the central agentic runtime
 
@@ -39,7 +39,7 @@ Provides:
 
 | File | Purpose |
 |------|---------|
-| `docs/standards/Makefile` | Main Makefile |
+| `docs/standards/Justfile` | Main Justfile |
 | `.agents/agents.config` | Configuration |
 | `.agents/runtime/pyproject.toml` | Runtime package project file |
 
@@ -47,40 +47,40 @@ Provides:
 
 | Target | Command Executed |
 |--------|------------------|
-| `make doctor` | `.agents/agents doctor` |
-| `make new THEME=x` | `.agents/agents new x` |
-| `make verify` | `.agents/agents verify-tasks` |
-| `make lint-runtime` | `uv run --project .agents/runtime --locked ruff check .agents/runtime` |
-| `make test-runtime` | `uv run --project .agents/runtime --locked pytest .agents/runtime/tests` |
-| `make runtime-mcp-smoke` | `.agents/agents runtime ...` and `.agents/agents-mcp ...` smoke checks |
+| `just doctor` | `.agents/agents doctor` |
+| `just new THEME=x` | `.agents/agents new x` |
+| `just verify` | `.agents/agents verify-tasks` |
+| `just lint-runtime` | `uv run --project .agents/runtime --locked ruff check .agents/runtime` |
+| `just test-runtime` | `uv run --project .agents/runtime --locked pytest .agents/runtime/tests` |
+| `just runtime-mcp-smoke` | `.agents/agents runtime ...` and `.agents/agents-mcp ...` smoke checks |
 
 ## How to Configure
 
 ### Main Targets
 
-```makefile
-make setup        # Virtualenv setup
-make setup-runtime # Central runtime environment setup
-make doctor       # Structure validation
-make new          # Create workstream (THEME=required)
-make structure    # Generate structure docs
-make index        # Update indexes
-make sync         # Sync agent docs
-make verify       # Verify tasks
-make lint         # Markdown lint
-make memory-status  # Show external memory provider config
-make memory-search QUERY=x  # Emit memory MCP contract
-make lint-runtime # Lint central runtime package
-make test-runtime # Run central runtime tests
-make runtime-mcp-smoke # Smoke runtime and MCP CLIs
-make all          # Full validation
+```justfile
+just setup        # Virtualenv setup
+just setup-runtime # Central runtime environment setup
+just doctor       # Structure validation
+just new          # Create workstream (THEME=required)
+just structure    # Generate structure docs
+just index        # Update indexes
+just sync         # Sync agent docs
+just verify       # Verify tasks
+just lint         # Markdown lint
+just memory-status  # Show external memory provider config
+just memory-search QUERY=x  # Emit memory MCP contract
+just lint-runtime # Lint central runtime package
+just test-runtime # Run central runtime tests
+just runtime-mcp-smoke # Smoke runtime and MCP CLIs
+just all          # Full validation
 ```
 
 Runtime setup and validation use the checked-in `.agents/runtime/uv.lock` through `uv --locked`.
 
 ### Short Aliases
 
-```makefile
+```justfile
 st: structure     # structure
 ix: index         # index
 sy: sync          # sync
@@ -90,21 +90,21 @@ dr: doctor        # doctor (do NOT use doc!)
 
 ### Targets with Variables
 
-```makefile
-make new THEME=auth-refactor
-make wb-task TASK_ID=T-01 ACTION=done
-make wb-status STATUS=active
-make wb-timeline MSG="Implemented login"
-make memory-search QUERY="agent memory" RUNTIME=codex
+```justfile
+just new THEME=auth-refactor
+just wb-task TASK_ID=T-01 ACTION=done
+just wb-status STATUS=active
+just wb-timeline MSG="Implemented login"
+just memory-search QUERY="agent memory" RUNTIME=codex
 ```
 
 ## How to Modify
 
 ### Add New Target
 
-Edit `docs/standards/Makefile`:
+Edit `docs/standards/Justfile`:
 
-```makefile
+```justfile
 new-target:
 	@echo "→ Running new target..."
 	@./.agents/agents new-command
@@ -114,13 +114,13 @@ new-target:
 
 ```bash
 # List targets
-make help
+just help
 
 # Run target
-make doctor
+just doctor
 
 # Run with variable
-make new THEME=test
+just new THEME=test
 ```
 
 ## Output
@@ -130,8 +130,8 @@ make new THEME=test
 ║         Agents System - Available Commands                ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Setup & Maintenance                                      ║
-║    make setup        - Initialize UV virtualenv           ║
-║    make doctor       - Validate .agents structure         ║
+║    just setup        - Initialize UV virtualenv           ║
+║    just doctor       - Validate .agents structure         ║
 ║    ...                                                    ║
 ╚═══════════════════════════════════════════════════════════╝
 ```
@@ -143,4 +143,4 @@ make new THEME=test
 
 ---
 
-*Document: `docs/agentic/makefile.md`*
+*Document: `docs/agentic/justfile.md`*

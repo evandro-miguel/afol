@@ -19,11 +19,12 @@ Examples:
 
 import json
 import re
-import subprocess
 import sys
+import subprocess
 import unicodedata
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, Tuple
+
 
 # Configuration
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -34,7 +35,8 @@ REQUIRED_TOP_LEVEL_KEYS = {
     "description",
     "tools",
     "tool_categories",
-    "makefile_targets",
+    "justfile_targets",
+    "justfile_aliases",
 }
 REQUIRED_TOOL_KEYS = {
     "id",
@@ -42,7 +44,7 @@ REQUIRED_TOOL_KEYS = {
     "type",
     "tool",
     "wrapper_command",
-    "make_command",
+    "just_command",
     "execution_mode",
     "updated_at",
     "description",
@@ -59,11 +61,18 @@ def _reject_duplicate_object_keys(pairs: List[tuple[str, Any]]) -> Dict[str, Any
     return obj
 
 
+def _load_json_dict(value: str) -> Dict[str, Any]:
+    payload = json.loads(value, object_pairs_hook=_reject_duplicate_object_keys)
+    if not isinstance(payload, dict):
+        raise ValueError("Tools catalog must be a JSON object")
+    return payload
+
+
 def load_tools() -> Dict[str, Any]:
     """Load tools.json configuration."""
     if not TOOLS_JSON.exists():
         raise FileNotFoundError(f"Tools catalog not found: {TOOLS_JSON}")
-    return json.loads(TOOLS_JSON.read_text(), object_pairs_hook=_reject_duplicate_object_keys)
+    return _load_json_dict(TOOLS_JSON.read_text())
 
 
 def format_type_badge(tool_type: str) -> str:
@@ -194,7 +203,7 @@ def show_tool_info(tools_data: Dict[str, Any], tool_id: str) -> bool:
     print("COMMANDS")
     print("-" * 70)
     print(f"  Wrapper:  {tool['wrapper_command']}")
-    print(f"  Make:     {tool['make_command']}")
+    print(f"  Just:     {tool['just_command']}")
     print()
 
     _print_optional_tool_sections(tool)
@@ -533,10 +542,14 @@ def validate_catalog(tools_data: Dict[str, Any]) -> int:
     categories = tools_data.get("tool_categories", {})
     _validate_categories(categories, type_set, set(ids), errors)
 
-    # Validate makefile_targets
-    make_targets = tools_data.get("makefile_targets", {})
-    if not isinstance(make_targets, dict):
-        errors.append("`makefile_targets` must be an object")
+    # Validate justfile_targets
+    just_targets = tools_data.get("justfile_targets", {})
+    if not isinstance(just_targets, dict):
+        errors.append("`justfile_targets` must be an object")
+
+    just_aliases = tools_data.get("justfile_aliases", {})
+    if not isinstance(just_aliases, dict):
+        errors.append("`justfile_aliases` must be an object")
 
     # Validate execution_modes
     execution_modes = tools_data.get("execution_modes", {})

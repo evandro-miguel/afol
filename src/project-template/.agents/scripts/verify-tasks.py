@@ -957,6 +957,30 @@ def _issues_have_errors(issues: List[Dict[str, Any]]) -> bool:
     return any(issue.get("severity") == "error" for issue in issues)
 
 
+def _run_strict_session_checks(session_path: Path, results: Dict[str, Any]) -> bool:
+    """Populate strict-mode issue buckets and report whether they are all clear."""
+    checks = (
+        ("contradictions", lambda: _collect_report_contradictions(session_path)),
+        ("temporal_issues", lambda: check_temporal_consistency(session_path)),
+        ("coherence_issues", lambda: check_plan_task_coherence(session_path)),
+        ("governance_issues", lambda: check_governance_coherence(session_path)),
+        ("planning_gate_issues", lambda: check_planning_intelligence_gates(session_path)),
+        ("execplan_issues", lambda: check_execplan_requirements(session_path)),
+        ("postmortem_issues", lambda: check_postmortem_closure(session_path)),
+        ("final_doc_issues", lambda: check_final_docs_for_open_checklists(session_path)),
+        ("artifact_utility_issues", lambda: check_artifact_utility(session_path)),
+        ("closure_issues", lambda: check_delivery_closure_readiness(session_path, results["completed"])),
+    )
+
+    all_clear = True
+    for key, supplier in checks:
+        issues = supplier()
+        results[key] = issues
+        all_clear = all_clear and not _issues_have_errors(issues)
+
+    return all_clear
+
+
 def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict]:
     """
     Verify all tasks in a session folder are completed.
@@ -1041,41 +1065,8 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
 
         results['task_files'].append(file_result)
 
-    # Strict mode: additional checks
     if strict:
-        # Check report contradictions
-        results["contradictions"] = _collect_report_contradictions(session_path)
-        all_completed = all_completed and not _issues_have_errors(results["contradictions"])
-
-        # Check temporal consistency
-        results["temporal_issues"] = check_temporal_consistency(session_path)
-        all_completed = all_completed and not _issues_have_errors(results["temporal_issues"])
-
-        # Validate latest plan/task linkage coherence
-        results["coherence_issues"] = check_plan_task_coherence(session_path)
-        all_completed = all_completed and not _issues_have_errors(results["coherence_issues"])
-
-        results["governance_issues"] = check_governance_coherence(session_path)
-        all_completed = all_completed and not _issues_have_errors(results["governance_issues"])
-
-        results["planning_gate_issues"] = check_planning_intelligence_gates(session_path)
-        all_completed = all_completed and not _issues_have_errors(results["planning_gate_issues"])
-
-        results["execplan_issues"] = check_execplan_requirements(session_path)
-        all_completed = all_completed and not _issues_have_errors(results["execplan_issues"])
-
-        results["postmortem_issues"] = check_postmortem_closure(session_path)
-        all_completed = all_completed and not _issues_have_errors(results["postmortem_issues"])
-
-        # Final documents must not have open checklist markers
-        results["final_doc_issues"] = check_final_docs_for_open_checklists(session_path)
-        all_completed = all_completed and not _issues_have_errors(results["final_doc_issues"])
-
-        results["artifact_utility_issues"] = check_artifact_utility(session_path)
-        all_completed = all_completed and not _issues_have_errors(results["artifact_utility_issues"])
-
-        results["closure_issues"] = check_delivery_closure_readiness(session_path, results["completed"])
-        all_completed = all_completed and not _issues_have_errors(results["closure_issues"])
+        all_completed = all_completed and _run_strict_session_checks(session_path, results)
 
     return all_completed, results
 

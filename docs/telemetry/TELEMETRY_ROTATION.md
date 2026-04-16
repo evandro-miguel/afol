@@ -1,8 +1,8 @@
 ---
 doc_type: telemetry_feature
 status: active
-created_at: "2026-04-04T16:00:00Z"
-updated_at: "2026-04-04T16:00:00Z"
+created_at: '2026-04-04T16:00:00Z'
+updated_at: '2026-04-13T19:37:06-03:00'
 ---
 
 # Telemetry Rotation Policy
@@ -34,7 +34,7 @@ touch .agents/data/telemetry/events.jsonl
 ## Automated Rotation (Future)
 
 When scaffolding supports it, rotation should be triggered by:
-- `make doctor` checking file size/age
+- `just doctor` checking file size/age
 - `agents-telemetry.py` checking before each write batch
 - A cron-like hook in the wrapper script
 

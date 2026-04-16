@@ -59,7 +59,9 @@ This folder is the distilled architecture view of the repository.
 
 ### System Overview
 
-- No concise README system summary was extracted; rely on the domain and architecture docs below.
+- The root README describes `.agents` as a terminal-first operating system for
+  interactive agentic CLI workflows with planning rigor, telemetry, reusable
+  knowledge, and standardized documentation.
 
 ### Major Runtime Surfaces
 
@@ -74,7 +76,9 @@ This folder is the distilled architecture view of the repository.
 
 ### Product And Platform Signals
 
-- No feature bullets were extracted from the repo README.
+- README feature signals: consistent documentation, planning rigor, knowledge
+  reuse, automated telemetry, heat scoring, pattern catalog, and
+  self-improvement.
 
 ### Current System Shape
 

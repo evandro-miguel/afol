@@ -61,7 +61,7 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 
 ```bash
 # RULE-004: Validate
-make doctor && make lint && make verify
+just doctor && just lint && just verify
 ```
 
 ### Structure
@@ -122,9 +122,9 @@ Content here.
 
 **Automated:**
 
-- `make doctor` - Structure validation
-- `make lint` - Documentation linting
-- `make verify` - Task completion check
+- `just doctor` - Structure validation
+- `just lint` - Documentation linting
+- `just verify` - Task completion check
 
 **Self-check:**
 

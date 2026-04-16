@@ -85,7 +85,7 @@ Out of scope:
 - Tests prove history/caches are not exported.
 - Script cleanup produces fewer duplicated code paths without changing public CLI
   behavior.
-- Verification includes `make lint`, focused bootstrap/runtime tests, and a
+- Verification includes `just lint`, focused bootstrap/runtime tests, and a
   dry-run bootstrap into a temporary target.
 
 ---

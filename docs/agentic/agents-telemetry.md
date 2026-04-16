@@ -4,8 +4,8 @@ theme: agents-telemetry
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-23 00:00:00-03:00
+updated_at: '2026-04-13T19:36:51-03:00'
 links:
   tools_json: ./tools-json.md
   heat_scoring: ../telemetry/HEAT_SCORING.md
@@ -94,15 +94,15 @@ python3 .agents/scripts/agents-telemetry.py export --format=json
 python3 .agents/scripts/agents-telemetry.py validate
 ```
 
-### Via Makefile
+### Via Justfile
 
 ```bash
-make telemetry-heat
-make telemetry-hot LIMIT=5
-make telemetry-cold PERIOD=monthly
-make telemetry-report PERIOD=weekly
-make telemetry-export FORMAT=json
-make telemetry-validate
+just telemetry-heat
+just telemetry-hot LIMIT=5
+just telemetry-cold PERIOD=monthly
+just telemetry-report PERIOD=weekly
+just telemetry-export FORMAT=json
+just telemetry-validate
 ```
 
 ## How to Modify

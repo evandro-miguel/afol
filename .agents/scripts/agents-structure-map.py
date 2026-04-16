@@ -13,7 +13,7 @@ Usage:
 
 Examples:
     python agents-structure-map.py .
-    python agents-structure-map.py /home/ozy/apps/my-project --output docs/map/structure/
+    python agents-structure-map.py /path/to/my-project --output docs/map/structure/
 """
 
 import os
@@ -181,6 +181,19 @@ class StructureMapper:
         except Exception:
             return 0.0
 
+    def collect_file_metrics(self, file_path: Path) -> tuple[int, float, str]:
+        """Read a file once and derive line count, size, and content hash."""
+        try:
+            raw = file_path.read_bytes()
+        except Exception:
+            return 0, 0.0, ""
+
+        size_kb = len(raw) / 1024
+        file_hash = hashlib.md5(raw).hexdigest()
+        text = raw.decode(errors="ignore")
+        lines = sum(1 for line in text.splitlines() if line.strip())
+        return lines, size_kb, file_hash
+
     def classify_file(self, rel_path: str, extension: str) -> str:
         """Classify file into a section based on path and extension."""
         rel_path_lower = rel_path.lower()
@@ -274,9 +287,7 @@ class StructureMapper:
                     continue
 
                 # Get file info
-                lines = self.count_lines(file_path)
-                size_kb = self.get_file_size_kb(file_path)
-                file_hash = self.compute_file_hash(file_path)
+                lines, size_kb, file_hash = self.collect_file_metrics(file_path)
 
                 # Check cache for existing description
                 cache_key = rel_path
@@ -484,7 +495,7 @@ def main():
         print()
         print("Examples:")
         print("  python agents-structure-map.py .")
-        print("  python agents-structure-map.py /home/ozy/apps/my-project --output docs/map/structure/")
+        print("  python agents-structure-map.py /path/to/my-project --output docs/map/structure/")
         sys.exit(1)
 
     project_path = Path(sys.argv[1])

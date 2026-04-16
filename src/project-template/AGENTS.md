@@ -56,7 +56,7 @@ Use model critique to find problems and improvement opportunities. Do not use it
 ```text
 <project-root>/
 |-- AGENTS.md                 # Agent operating contract for this project
-|-- Makefile                  # Wrapper that delegates to docs/standards/Makefile
+|-- Justfile                  # Wrapper that delegates to docs/standards/Justfile
 |-- docs/
 |   |-- arc/                  # Goal-state governance: roadmap, specs, decisions
 |   |   |-- GENERAL-ROADMAP.md

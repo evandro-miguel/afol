@@ -4,8 +4,8 @@ theme: agents-structure-map
 type: tool-doc
 status: active
 owner: system
-created_at: 2026-02-20T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
+created_at: 2026-02-20 00:00:00-03:00
+updated_at: '2026-04-13T19:36:51-03:00'
 links:
   tools_json: ./tools-json.md
   index: ./agents-index.md
@@ -91,8 +91,8 @@ DEFAULT_SECTIONS = {
 # Generate structure docs
 ./.agents/agents structure-map . --output docs/map/structure/
 
-# Via Makefile
-make structure
+# Via Justfile
+just structure
 
 # Verify output
 cat docs/map/structure/README.md
