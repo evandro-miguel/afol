@@ -3,13 +3,33 @@ doc_type: standard
 id: 000000_000000_workflow-standard_standard_01
 status: active
 created_at: 2026-02-23 00:00:00+00:00
-updated_at: '2026-04-04T10:08:11-03:00'
+updated_at: '2026-04-19T18:34:47-03:00'
 title: Workflow Standards
 ---
 
 ## Workflow Standards
 
 ### Mandatory workflow for non-trivial work
+
+#### Step 0: Decision Intake
+
+For ambiguous, product-shaped, benchmark-heavy, or prioritization-heavy work,
+run the smallest useful decision-intake lane before benchmark, planning,
+delegation, or implementation.
+
+- Frame the user, behavior evidence, observable outcome, constraints,
+  non-goals, reversibility, and first-slice appetite.
+- Treat intake as a ladder, not a mandatory pipeline; keep the fast lane
+  conversational when the user wants speed.
+- Run a challenge checkpoint with critical assumption, rival hypothesis,
+  pre-mortem failure mode, simpler alternative, and scope cut.
+- Benchmark only after the frame and first solution hypothesis exist.
+- Prioritize qualitatively by default; ask before formal scoring when the user
+  wants speed.
+- If formal scoring is used, separate importance, sequence, and friction with
+  evidence notes.
+- Cut fixed-appetite vertical slices before expanding scope.
+- Use `docs/standards/decision-intake.md` for the full contract.
 
 #### Step 1: Roadmap
 

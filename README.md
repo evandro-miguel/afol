@@ -81,7 +81,12 @@ just doctor
 
 # 2. Define or update the governing parent spec in docs/arc/SPECS/
 
-# 3. Create the workstream with mandatory governance linkage
+# 3. For ambiguous/product-shaped work, run the smallest useful
+#    docs/standards/decision-intake.md lane before benchmark, planning,
+#    delegation, or implementation. Use formal scoring only when it helps or
+#    the user asks.
+
+# 4. Create the workstream with mandatory governance linkage
 .agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --spec-lite
 # `--spec-lite` is the current CLI compatibility flag while `spec-child` is the canonical future doc name.
 

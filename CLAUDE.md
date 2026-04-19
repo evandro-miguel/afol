@@ -104,6 +104,23 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 
 ### Planning Intelligence (Mandatory For Major Work)
 
+- For ambiguous, product-shaped, benchmark-heavy, or prioritization-heavy work,
+  run `docs/standards/decision-intake.md` before benchmark, planning,
+  delegation, or implementation.
+- Treat decision intake as a ladder, not a mandatory pipeline: use the smallest
+  subset that resolves the uncertainty, and keep the fast lane conversational
+  when the user wants speed.
+- Decision intake must frame the user, behavior evidence, observable outcome,
+  constraints, non-goals, reversibility, assumptions, and first-slice appetite.
+- Challenge must happen before committing to a substantial solution: critical
+  assumption, rival hypothesis, pre-mortem failure mode, simpler alternative,
+  and scope cut.
+- Benchmarking must happen after the problem frame and first solution
+  hypothesis exist unless explicitly labeled as exploratory context.
+- Prioritize qualitatively by default based on the user's repeated emphasis,
+  blockers, risk, reversibility, and validation speed.
+- Ask before introducing formal scoring when the user wants speed; if scoring is
+  used, separate importance, sequence, and friction with evidence notes.
 - For major work, the workbench plan file is an ExecPlan and must follow `PLANS.md`
 - The canonical ExecPlan path is `.agents/wb/<session_id>/<session_id>_plan_01.md`
 - ExecPlans must stay self-contained and living: keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current while work proceeds

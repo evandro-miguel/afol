@@ -6,8 +6,8 @@ metadata:
   tags: "agentic-folder-sys, agentic-system, workflow, bootstrap, upgrade, skills-sync, workbench, wb, git, validation"
   triggers: "agentic folder sys, agentic-folder-sys, .agents scaffold, bootstrap repo, install scaffold, update framework, upgrade scaffold, skills-sync, universal-skills, workbench, wb-update, verify-tasks, reporting, planning, execution"
   references: "core, patterns, troubleshooting, workbench, templates, gotchas"
-  version: "1.0.0"
-  updated_at: "2026-04-18T21:39:30-03:00"
+  version: "1.0.1"
+  updated_at: "2026-04-19T18:54:42Z"
   target_provider: universal
 ---
 
@@ -62,6 +62,10 @@ Before finalizing, scan [Gotchas](./gotchas.md).
 - Before touching any file or artifact, resolve the applicable rule, standard,
   template, skill, and spec for that element. Apply all cumulative guidance for
   the element type and work intent, such as TypeScript plus feature plus spec.
+- For ambiguous, product-shaped, benchmark-heavy, or prioritization-heavy work,
+  run the smallest useful decision-intake lane before creating plans,
+  delegating agents, benchmarking, or implementing.
+  Treat it as a ladder, not a mandatory pipeline.
 - For every feature addition or meaningful feature behavior change, update the
   affected project-local skill under `.agents/skills/`, update the affected
   project docs, and record a pending item to propose the relevant skill change
@@ -76,15 +80,18 @@ Before finalizing, scan [Gotchas](./gotchas.md).
 1. Create or target a session through `./.agents/agents new ...` so
    `.active_session` stays accurate.
 2. Keep `roadmap_feature` and `parent_spec` context on major workstreams.
-3. Resolve the applicable rules for each element the workstream will touch.
-4. For feature work, keep local skills and docs in sync with behavior changes
+3. Run the smallest useful decision-intake lane when the request needs problem
+   framing, challenge, benchmark order, qualitative prioritization, optional
+   scoring, or fixed-appetite slicing.
+4. Resolve the applicable rules for each element the workstream will touch.
+5. For feature work, keep local skills and docs in sync with behavior changes
    and leave a universal-skills propagation pending item.
-5. Start with `plan` and `task`; add `brainstorm` and `explorer-check` before
+6. Start with `plan` and `task`; add `brainstorm` and `explorer-check` before
    execution for major work.
-6. Execute the change and record progress in `log`.
-7. Record validation with `./.agents/agents wb-update evidence ...`.
-8. Run repo checks and strict session verification before closure.
-9. Close with `report` and, for major workstreams, `postmortem`.
+7. Execute the change and record progress in `log`.
+8. Record validation with `./.agents/agents wb-update evidence ...`.
+9. Run repo checks and strict session verification before closure.
+10. Close with `report` and, for major workstreams, `postmortem`.
 
 ## Workbench Artifacts
 

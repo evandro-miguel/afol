@@ -4,7 +4,7 @@ theme: workstream-creation
 version: 1.0
 created: 2026-02-23
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
-updated_at: '2026-04-18T22:35:01-03:00'
+updated_at: '2026-04-19T18:08:11-03:00'
 ---
 
 # Workstream Creation
@@ -98,6 +98,25 @@ just wb-task TASK_ID=T-01 ACTION=done
 
 ## Workflow Patterns
 
+### Decision Intake Before Workstreams
+
+Before creating or executing a governed workstream for ambiguous,
+product-shaped, benchmark-heavy, or prioritization-heavy work:
+
+- Treat decision intake as a ladder, not a mandatory pipeline. Use the smallest
+  subset that resolves the uncertainty, and keep the fast lane conversational
+  when the user wants speed.
+- Frame the user, behavior evidence, observable outcome, constraints,
+  non-goals, reversibility, and first-slice appetite.
+- Run challenge before committing to the solution: critical assumption, rival
+  hypothesis, pre-mortem failure mode, simpler alternative, and first scope cut.
+- Benchmark only after the frame and first solution hypothesis exist.
+- Prioritize qualitatively by default. Ask before formal scoring when the user
+  wants speed; if scoring is useful, separate importance, sequence, and
+  friction.
+- Cut the first plan into fixed-appetite vertical slices.
+- Use `docs/standards/decision-intake.md` as the canonical standard.
+
 ### Standard Workflow
 
 ```bash
@@ -105,29 +124,33 @@ just wb-task TASK_ID=T-01 ACTION=done
 
 # 2. Define or update parent spec in docs/arc/SPECS/
 
-# 3. For feature work, update affected project-local skills and docs
+# 3. Run the smallest useful decision-intake lane when the request is
+#    ambiguous, product-shaped, benchmark-heavy, or prioritization-heavy. Use
+#    formal scoring only when it helps the decision or the user asks.
 
-# 4. Add a pending universal-skills propagation item when a local skill changed
+# 4. For feature work, update affected project-local skills and docs
 
-# 5. Create workstream linked to approved strategic docs
+# 5. Add a pending universal-skills propagation item when a local skill changed
+
+# 6. Create workstream linked to approved strategic docs
 just new THEME=feature-name FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 
-# 6. Complete brainstorm + explorer-check before treating the plan as complete
+# 7. Complete brainstorm + explorer-check before treating the plan as complete
 
-# 7. Reuse prior findings when relevant
+# 8. Reuse prior findings when relevant
 ./.agents/agents knowledge search <query>
 
-# 8. Work on tasks (edit files, implement)
+# 9. Work on tasks (edit files, implement)
 
-# 9. Update workbench
+# 10. Update workbench
 ./.agents/agents wb-update touch --session <session-id>
 ./.agents/agents wb-update task T-01 --session <session-id> --mark-done
 
-# 10. Finalize postmortem before closing report
+# 11. Finalize postmortem before closing report
 ./.agents/agents wb-update status --session <session-id> --file postmortem --value final
 ./.agents/agents wb-update status --session <session-id> --file report --value final
 
-# 11. Validate
+# 12. Validate
 just doctor
 just lint
 just verify
@@ -193,6 +216,8 @@ just verify
 **DO:**
 
 - ✅ Use descriptive theme names (kebab-case)
+- ✅ Run the smallest useful decision-intake lane before benchmark, planning, or execution for ambiguous/product-shaped work
+- ✅ Use qualitative prioritization by default and ask before formal scoring when the user wants speed
 - ✅ Create or update the roadmap feature before new non-trivial work
 - ✅ Link each workstream to `--feature-id` and `--parent-spec`
 - ✅ Update affected project-local skills and docs for every feature addition
@@ -210,6 +235,8 @@ just verify
 
 - ❌ Create folders manually (use `agents-new`)
 - ❌ Start non-trivial implementation without roadmap + parent spec
+- ❌ Benchmark a product-shaped idea before framing the user, outcome, non-goals, assumptions, and first slice
+- ❌ Force formal scoring when the user wants a fast qualitative decision
 - ❌ Close feature work with stale local skills, stale docs, or no universal-skills propagation pending item
 - ❌ Use spaces in theme names
 - ❌ Skip task IDs (always use T-NN)

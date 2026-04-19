@@ -116,6 +116,27 @@ Agents must follow the applicable rule file, not only this summary.
 - Track plan, task, log, report, and postmortem artifacts where applicable.
 - Use `./.agents/agents wb-update ...` for managed timestamps, task state, links, file lists, and evidence when available.
 
+## Decision Intake
+
+For ambiguous, product-shaped, benchmark-heavy, or prioritization-heavy work,
+frame the decision before benchmark, planning, delegation, or
+implementation.
+
+- Treat decision intake as a ladder, not a mandatory pipeline: use the smallest
+  subset that resolves the uncertainty, and keep the fast lane conversational
+  when the user wants speed.
+- Identify the user, behavior evidence, observable outcome, constraints,
+  non-goals, reversibility, assumptions, and first-slice appetite.
+- Run a challenge checkpoint before committing to a solution: critical
+  assumption, rival hypothesis, pre-mortem failure mode, simpler alternative,
+  and scope cut.
+- Benchmark after the problem frame and first solution hypothesis exist.
+- Prioritize qualitatively by default based on repeated user emphasis, blockers,
+  risk, reversibility, and validation speed.
+- Ask before introducing formal scoring when the user wants speed; when scoring
+  is needed, separate importance, sequence, and friction with evidence notes.
+- Prefer fixed-appetite vertical slices before broader scope.
+
 ## Reuse and Minimality
 
 - First search for an existing pattern, helper, module, test, or documentation that can be reused.

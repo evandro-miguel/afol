@@ -9,7 +9,7 @@ workstream_intent: feature
 artifact_purpose: Define the plan/spec preflight, recurring-problem escalation, similar-system
   discovery, and rule-enforcement contract for agents.
 created_at: '2026-04-18T21:15:13-03:00'
-updated_at: '2026-04-18T22:35:01-03:00'
+updated_at: '2026-04-19T18:07:45-03:00'
 roadmap_feature: F-18
 spec_role: parent
 parent_spec: ''
@@ -30,6 +30,9 @@ scope:
   - planning rigor
   - recurring problem prevention
   - similar system discovery
+  - decision intake
+  - adversarial challenge
+  - optional priority scoring
 risk_level: medium
 ---
 
@@ -57,6 +60,11 @@ risk_level: medium
   already exists, increasing duplication and future refactor cost.
 - The orchestrator can route work to agents without explicitly loading and
   enforcing every applicable `.agents/rules/` file.
+- Product-shaped or ambiguous work can jump to benchmark, plan, or
+  implementation before the agent has framed the user, outcome, non-goals,
+  assumptions, and decision appetite.
+- Prioritization can become either too fuzzy or too ceremonial: agents may hide
+  trade-offs in intuition, or force a score when the user asked for speed.
 
 ## 3) Users and User Journey
 
@@ -94,6 +102,35 @@ Expected behavior:
 
 - Before every non-trivial plan, the agent checks `docs/arc/GENERAL-ROADMAP.md`
   and `docs/arc/SPECS/` for an existing roadmap feature and parent spec.
+- Before benchmark or execution for ambiguous or product-shaped work,
+  the agent creates a compact decision intake: user, behavior or evidence,
+  observable outcome, constraints, non-goals, reversibility, assumptions, and
+  appetite for the first slice.
+- When evidence is fragmented, the agent builds or requests a short signal pack
+  from interviews or user notes, analytics, support/sales/operator reports,
+  prior lessons/issues/workbench notes, and external signals.
+- The agent separates opportunity from solution: opportunity is judged by pain,
+  frequency, customer relevance, strategic fit, and evidence strength; solution
+  is judged only after by impact, validation speed, confidence, reversibility,
+  dependencies, maintenance, and debt.
+- Before choosing a build path, the agent maps assumptions for desirability,
+  usability, feasibility, and viability, then targets the riskiest assumption
+  first when possible.
+- Benchmarking must happen after the problem frame and first solution
+  hypothesis exist. If benchmark must happen earlier, the agent labels it as
+  exploratory context and does not let it replace user/outcome framing.
+- A challenge checkpoint is mandatory before shaping a substantial plan:
+  critical assumption, rival hypothesis, pre-mortem failure mode, simpler
+  manual alternative, one-way/two-way-door classification, and scope cut.
+- Prioritization defaults to qualitative agent judgment based on repeated user
+  emphasis, blockers, risk, reversibility, and validation speed. Formal scoring
+  is optional and should be used only when the user asks for it or when
+  trade-offs remain unclear.
+- When formal scoring is used, it separates importance from sequence and
+  includes rubrics and evidence notes, not only ordinal preferences.
+- Slices must be cut by fixed appetite and vertical proof of value. One-day and
+  three-day slices are preferred planning cuts when the user asks for a lean MVP
+  or fast validation.
 - Before fixing a user-reported recurring problem, the agent searches
   `docs/lessons/`, `.agents/rules/`, active workbench artifacts, and knowledge
   surfaces for prior occurrences.
@@ -146,6 +183,12 @@ or extended carefully during implementation:
   already requires brainstorm and explorer-check artifacts for major plans.
 - `docs/arc/SPECS/260307_persistent-planning-memory_spec_01.md` already covers
   catchup and durable planning memory.
+- `docs/standards/workflow.md` already defines the roadmap -> spec -> plan ->
+  task -> execution -> report sequence that decision intake should strengthen,
+  not replace.
+- `docs/standards/decision-intake.md` defines the lightweight operating
+  standard for diagnosis, signal pack, opportunity/solution separation,
+  assumption mapping, challenge, optional scoring, and fixed-appetite slices.
 
 Future refactor pending items:
 
@@ -155,6 +198,8 @@ Future refactor pending items:
   MCP, and orchestrator flows load rules identically.
 - Consider a single "similar system evidence" artifact field shared by
   explorer-check, plan, report, and spec-test templates.
+- Consider a runtime helper that emits a filled decision-intake checklist from
+  roadmap/spec/workbench context before a CLI scoring engine is introduced.
 
 ## 6) Scope
 
@@ -165,6 +210,13 @@ In scope:
 - Similar-system discovery before new function work.
 - Applicable-rule resolution for every touched element type, including
   feature, spec, workbench, skill, runtime, docs, and code surfaces.
+- Decision-intake and challenge gates for ambiguous, product-shaped,
+  benchmark-heavy, or prioritization-heavy work.
+- Signal packs and evidence-led opportunity mapping for discovery-heavy work.
+- Assumption mapping across desirability, usability, feasibility, and viability.
+- Lightweight prioritization guidance that uses qualitative judgment by default
+  and separates importance, sequence, and friction only when formal scoring is
+  helpful.
 - Future-refactor debt capture in specs, workbench artifacts, and narrowly
   placed code comments when needed.
 - Orchestrator rule loading and delegated-agent instruction injection.
@@ -191,6 +243,10 @@ Out of scope:
     enforcement.
 - Planned child specs:
   - `plan-spec-preflight` -> roadmap/spec lookup before planning.
+  - `decision-intake-and-challenge` -> problem framing, signal packs,
+    opportunity mapping, assumption mapping, challenge gates, benchmark order,
+    qualitative prioritization, optional scoring rubric, and fixed-appetite
+    slice cuts.
   - `recurring-problem-guardrails` -> prior incident lookup, heavy
     verification, and rule/lesson capture.
   - `similar-system-discovery` -> code/spec similarity evidence and future
@@ -204,26 +260,30 @@ Out of scope:
    surfaces that already satisfy part of the requested behavior.
 2. Define the preflight data contract: searched paths, evidence fields,
    missing-governance outcomes, and when quick mode is exempt.
-3. Define element-to-rule routing for feature, spec, workbench, skill, runtime,
+3. Define the decision-intake contract: problem frame, behavior evidence,
+   signal pack, opportunity/solution separation, assumptions, rival hypotheses,
+   benchmark boundary, qualitative prioritization, optional score rubrics, and
+   slice appetite.
+4. Define element-to-rule routing for feature, spec, workbench, skill, runtime,
    docs, Python, TypeScript, and JavaScript surfaces.
-4. Implement roadmap/spec lookup before non-trivial planning in the relevant
+5. Implement roadmap/spec lookup before non-trivial planning in the relevant
    CLI/runtime/orchestrator path.
-5. Implement recurring-problem detection by searching lessons, rules, active
+6. Implement recurring-problem detection by searching lessons, rules, active
    workbench artifacts, and knowledge outputs before bug-fix planning.
-6. Implement similar-system discovery for new function work using exact search
+7. Implement similar-system discovery for new function work using exact search
    first, semantic/indexed retrieval where available, and explicit code/spec
    citations in plan or explorer-check evidence.
-7. Add future-refactor debt capture to workbench/report/spec outputs, plus
+8. Add future-refactor debt capture to workbench/report/spec outputs, plus
    optional narrow code comments only where the future refactor must stay
    visible to maintainers.
-8. Implement orchestrator rule loading so all applicable `.agents/rules/` are
+9. Implement orchestrator rule loading so all applicable `.agents/rules/` are
    read before routing and summarized into delegated-agent task instructions.
-9. Update affected project-local skills and docs, then record a pending item to
+10. Update affected project-local skills and docs, then record a pending item to
    propagate the skill change back to universal-skills through the branch/PR
    flow.
-10. Add validation tests for missing preflight evidence, repeated-problem
+11. Add validation tests for missing preflight evidence, repeated-problem
    escalation, similar-system evidence, and rule-context propagation.
-11. Update operator docs and templates only after behavior and validation pass.
+12. Update operator docs and templates only after behavior and validation pass.
 
 ## 9) Constraints and Assumptions
 
@@ -233,6 +293,8 @@ Assumptions:
   are sufficient for the first implementation.
 - Similar-system detection can start with exact and path-aware search before
   adding heavier semantic retrieval.
+- Decision-intake can start as documented workflow and skill behavior before any
+  command-native helper exists. A scoring tool is not required for fast paths.
 - The orchestrator can pass rule obligations as concise task context without
   pasting entire rule files into every delegated prompt.
 
@@ -250,6 +312,15 @@ Success looks like:
 
 - A plan for non-trivial work records the governing feature/spec found, or
   records the governance gap and blocks implementation until resolved.
+- A plan for ambiguous or product-shaped work records user, outcome, non-goals,
+  critical assumptions, rival hypothesis, reversibility, benchmark boundary,
+  and first slice appetite before benchmark-driven planning.
+- Prioritization records either qualitative weighting or, when formal scoring is
+  used, importance, sequence, and friction with evidence-backed rubrics.
+- Discovery-heavy work records the signal pack or the evidence gap before
+  solution comparison.
+- Product-shaped work does not mix opportunity scoring with solution effort
+  until at least one simpler/manual solution path has been considered.
 - A recurring problem report records prior occurrences, heavier verification,
   and the prevention rule or lesson update created from the recurrence.
 - Feature work records local skill/docs updates and a universal-skills
@@ -269,6 +340,10 @@ Review questions:
 - Does the evidence prove the agent looked for an existing spec before planning?
 - Does recurrence handling produce a prevention mechanism, not just another
   fix?
+- Did challenge happen before the agent committed to the solution?
+- Did the agent separate opportunity from solution before bringing effort into
+  the decision?
+- Did benchmark inform the plan without replacing problem framing?
 - Does similar-system evidence prevent accidental duplication without forcing
   a risky refactor?
 - Can a reviewer see which rules the orchestrator enforced for each agent?
@@ -285,6 +360,12 @@ Review questions:
 - Risk: rule context becomes too large for delegated agents -> Mitigation:
   summarize obligations and link rule files instead of copying full text when
   not needed.
+- Risk: scoring creates false precision or slows fast decisions -> Mitigation:
+  make scoring optional, ask before using it when the user wants speed, and
+  require rubrics/evidence notes when formal scores are used.
+- Risk: challenge becomes performative -> Mitigation: treat missing assumptions,
+  rival hypothesis, or slice appetite as a stop condition for substantial
+  planning.
 
 ## 12) Verification Philosophy
 
@@ -295,6 +376,9 @@ Evidence expected from delivery:
 - Tests proving similar-system evidence is recorded without modifying the
   existing similar system.
 - Tests proving orchestrator/delegation instructions include applicable rules.
+- Documentation or skill checks proving decision-intake, challenge, benchmark
+  order, qualitative prioritization, optional scoring, and slice-cutting
+  guidance is reachable by future agents.
 - Strict workbench validation and `just lint`.
 
 Open questions:
@@ -305,6 +389,8 @@ Open questions:
   explorer-check, plan, report, or a dedicated debt section?
 - Q-03 Should all delegated agents receive all rules, or only a resolved subset
   plus links to the full rule files?
+- Q-04 Should decision-intake become a runtime command, a workbench template, or
+  remain a skill/workflow rule until repeated usage proves the right shape?
 
 ## 13) Acceptance Checklist
 

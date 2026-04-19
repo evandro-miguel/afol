@@ -3,7 +3,7 @@ id: RULE-006
 theme: applicable-rule-resolution
 version: 1.0
 created: 2026-04-18
-updated_at: '2026-04-18T22:35:01-03:00'
+updated_at: '2026-04-19T18:08:11-03:00'
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 ---
 
@@ -38,6 +38,7 @@ follow-up if the gap is likely to recur.
 
 | Element touched | Required guidance |
 |-----------------|-------------------|
+| Ambiguous/product-shaped request | `docs/standards/decision-intake.md`, parent spec, RULE-002 |
 | Feature | `docs/arc/GENERAL-ROADMAP.md`, parent spec, RULE-002 |
 | Spec or roadmap | `docs/templates/spec.md`, `docs/arc/SPECS/`, RULE-003 |
 | Workbench artifact | `agentic-folder-sys`, RULE-002, RULE-004 |
@@ -65,6 +66,26 @@ When creating a new function, command, workflow, or artifact type:
   includes that refactor.
 - Record future refactor debt for both the existing and new code paths when
   duplication or convergence is likely.
+
+---
+
+## Decision Intake
+
+When the work is ambiguous, product-shaped, benchmark-heavy, or
+prioritization-heavy:
+
+- Resolve `docs/standards/decision-intake.md` before planning, benchmark,
+  delegation, or implementation.
+- Treat decision intake as a ladder, not a mandatory pipeline. Use the smallest
+  subset that resolves the uncertainty, and keep the fast lane conversational
+  when the user wants speed.
+- Record the user, behavior evidence, observable outcome, constraints,
+  non-goals, reversibility, assumptions, and first-slice appetite.
+- Run a challenge checkpoint before committing to a solution.
+- Keep benchmark after framing unless explicitly labeled as exploratory
+  context.
+- Prioritize qualitatively by default. Ask before formal scoring when the user
+  wants speed; if scoring is used, separate importance, sequence, and friction.
 
 ---
 

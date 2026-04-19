@@ -24,13 +24,13 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 
 | ID | Rule | Lines | Purpose |
 |----|------|-------|---------|
-| **RULE-002** | [workstream-creation](./RULE-002-workstream-creation.md) | ~140 | Creating workstreams & tasks |
+| **RULE-002** | [workstream-creation](./RULE-002-workstream-creation.md) | ~160 | Creating workstreams, decision intake & tasks |
 | **RULE-003** | [documentation-standards](./RULE-003-documentation-standards.md) | ~150 | Frontmatter & markdown standards |
 | **RULE-004** | [validation-linting](./RULE-004-validation-linting.md) | ~160 | Pre-commit validation |
 | **RULE-005** | [folder-structure](./RULE-005-folder-structure.md) | ~160 | Required folder structure |
-| **RULE-006** | [applicable-rule-resolution](./RULE-006-applicable-rule-resolution.md) | ~130 | Required rule/skill/spec routing by touched element |
+| **RULE-006** | [applicable-rule-resolution](./RULE-006-applicable-rule-resolution.md) | ~150 | Required rule/skill/spec routing by touched element |
 
-**Total:** ~740 lines across 5 focused rules (max 250 each)
+**Total:** ~780 lines across 5 focused rules (max 250 each)
 
 ---
 
@@ -40,6 +40,7 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 
 ```bash
 # RULE-006: Identify element type and applicable rules before edits
+# Use docs/standards/decision-intake.md before benchmark/planning for ambiguous or product-shaped work
 ```
 
 ### Creating New Work

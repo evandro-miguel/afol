@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-18T22:35:01-03:00'
+updated_at: '2026-04-19T16:38:36-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -408,6 +408,11 @@ updated_at: '2026-04-18T22:35:01-03:00'
   - Child specs should isolate plan/spec preflight, recurring-problem
     escalation, similar-system detection, and orchestrator rule enforcement.
 - Exit criteria:
+  - Ambiguous or product-shaped work runs a compact decision intake before
+    benchmark, planning, or implementation.
+  - Decision intake records user, behavior evidence, observable outcome,
+    constraints, non-goals, reversibility, assumptions, and first-slice
+    appetite.
   - Every non-trivial plan begins by checking whether a governing roadmap
     feature and parent spec already exist.
   - User-reported repeated problems trigger prior-lesson lookup, heavier
@@ -421,6 +426,8 @@ updated_at: '2026-04-18T22:35:01-03:00'
     and passes enforceable rule context to every agent it coordinates.
 - Delivery tasks:
   - [ ] Define the preflight contract and acceptance checks in the parent spec.
+  - [ ] Add decision-intake, challenge, qualitative prioritization, optional
+        scoring, benchmark-order, and fixed-appetite slice guidance.
   - [ ] Add implementation support for roadmap/spec lookup before planning.
   - [ ] Add recurring-problem lookup and heavy verification escalation.
   - [ ] Add similar-system discovery and future-refactor debt capture.
