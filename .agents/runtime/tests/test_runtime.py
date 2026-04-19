@@ -54,6 +54,19 @@ def test_search_docs_finds_roadmap(scaffold_repo):
     assert any("knowledge/INDEX.md" in hit.path or "GENERAL-ROADMAP.md" in hit.path for hit in response.hits)
 
 
+def test_search_docs_ignores_malformed_frontmatter(scaffold_repo):
+    broken_doc = scaffold_repo / "docs" / "knowledge" / "BROKEN-FRONTMATTER.md"
+    broken_doc.write_text(
+        "---\ntitle: [unterminated\n---\n# Broken Metadata\nmalformed frontmatter search sentinel\n",
+        encoding="utf-8",
+    )
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+
+    response = runtime.search.search("malformed frontmatter sentinel", limit=5)
+
+    assert any(hit.path == "docs/knowledge/BROKEN-FRONTMATTER.md" for hit in response.hits)
+
+
 def test_tool_catalog_resource_handles_corrupt_json(scaffold_repo):
     tool_catalog = scaffold_repo / ".agents" / "tools.json"
     tool_catalog.write_text("{bad-json", encoding="utf-8")
