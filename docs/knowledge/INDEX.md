@@ -2,15 +2,15 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-04-16T00:32:56+00:00"
-updated_at: "2026-04-16T00:32:56+00:00"
+created_at: "2026-04-19T18:29:31+00:00"
+updated_at: "2026-04-19T18:29:31+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 55
+- Total indexed docs: 60
 
 ## Brainstorm
 
@@ -27,6 +27,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260413_1551_python-runtime-hardening_brainstorm_01` | `.agents/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_brainstorm_01.md` | The runtime and Python scripts had recent hardening work, but closure required
 - `260413_1851_just-command-runner-migration_brainstorm_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_brainstorm_01.md` | - Replace Make as the required command runner for the scaffold with just
 - `260415_2121_scripts-cleanup-optimization_brainstorm_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_brainstorm_01.md` | - The script suite is green, but several F-15 Python hotspots still carry
+- `260416_1922_update-safe-adoption-mcp-first_brainstorm_01` | `.agents/wb/260416_1922_update-safe-adoption-mcp-first/260416_1922_update-safe-adoption-mcp-first_brainstorm_01.md` | - Updating the scaffold into an existing downstream repository is still too
 
 ## Explorer-Check
 
@@ -43,6 +44,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260413_1551_python-runtime-hardening_explorer-check_01` | `.agents/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_explorer-check_01.md` | - Latest commit range for the Python runtime hardening work:
 - `260413_1851_just-command-runner-migration_explorer-check_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being
 - `260415_2121_scripts-cleanup-optimization_explorer-check_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_explorer-check_01.md` | - Prove the plan was checked against the current project instead of being written from assumptions.
+- `260416_1922_update-safe-adoption-mcp-first_explorer-check_01` | `.agents/wb/260416_1922_update-safe-adoption-mcp-first/260416_1922_update-safe-adoption-mcp-first_explorer-check_01.md` | - Prove the plan was checked against the current scaffold implementation and
 
 ## Postmortem
 
@@ -68,7 +70,8 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260413_1250_project-template-source-separation_report_01` | `.agents/wb/260413_1250_project-template-source-separation/260413_1250_project-template-source-separation_report_01.md` | - Roadmap feature: F-16
 - `260413_1551_python-runtime-hardening_report_01` | `.agents/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_report_01.md` | The Python runtime hardening work is code-complete and passed the full aggregate
 - `260413_1851_just-command-runner-migration_report_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_report_01.md` | - Roadmap feature: F-17
-- `260415_2121_scripts-cleanup-optimization_report_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_report_01.md` | - Draft until implementation and validation complete.
+- `260415_2121_scripts-cleanup-optimization_report_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_report_01.md` | - Completed a bounded F-15 script cleanup/optimization slice on the already-dirty
+- `260416_1922_update-safe-adoption-mcp-first_report_01` | `.agents/wb/260416_1922_update-safe-adoption-mcp-first/260416_1922_update-safe-adoption-mcp-first_report_01.md` | - Roadmap feature: F-16
 
 ## Research
 
@@ -81,3 +84,5 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260412_2115_project-finalization-orchestration_research_01` | `.agents/wb/260412_2115_project-finalization-orchestration/260412_2115_project-finalization-orchestration_research_01.md` | - What is still unfinished after the first F-15 slice?
 - `260413_1551_python-runtime-hardening_research_01` | `.agents/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_research_01.md` | - git diff --check found a real whitespace issue in
 - `260413_1851_just-command-runner-migration_research_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_research_01.md` | - What is the actual current command surface and where does the canonical
+- `260415_2121_scripts-cleanup-optimization_research_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_research_01.md` | - docs/arc/GENERAL-ROADMAP.md
+- `260416_1922_update-safe-adoption-mcp-first_research_01` | `.agents/wb/260416_1922_update-safe-adoption-mcp-first/260416_1922_update-safe-adoption-mcp-first_research_01.md` | - Which existing roadmap/spec intent governs downstream update safety?

@@ -8,6 +8,8 @@ from fastmcp.server.middleware.response_limiting import ResponseLimitingMiddlewa
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
 
 from agentic_scaffold.models import (
+    AdoptionInspection,
+    AdoptionPlan,
     ArchiveResult,
     FileWriteResult,
     RepoManifest,
@@ -67,6 +69,14 @@ def _register_tools(mcp: FastMCP, runtime: AgenticRuntime) -> None:
     def generate_manifest() -> RepoManifest:
         return runtime.generate_manifest()
 
+    @mcp.tool(description="Inspect the target repository for scaffold adoption readiness and compatibility signals.")
+    def inspect_target_scaffold() -> AdoptionInspection:
+        return runtime.adoption.inspect()
+
+    @mcp.tool(description="Plan a non-destructive overlay update for an existing repository.")
+    def plan_scaffold_update() -> AdoptionPlan:
+        return runtime.adoption.plan()
+
     @mcp.tool(description="Archive one or more repository paths into .agents/z-arq/<timestamp>_<slug> with undo support.")
     def archive_paths(paths: list[str], slug: str, reason: str = "archive for safe organization") -> ArchiveResult:
         return runtime.changes.archive_paths(relative_paths=paths, slug=slug, reason=reason)
@@ -96,6 +106,10 @@ def _register_resources(mcp: FastMCP, runtime: AgenticRuntime) -> None:
     @mcp.resource("repo://tool-catalog", name="Tool catalog summary", mime_type="application/json")
     def tool_catalog_resource() -> str:
         return _json_resource(runtime.tool_catalog_resource())
+
+    @mcp.resource("repo://adoption-plan", name="Scaffold adoption plan", mime_type="application/json")
+    def adoption_plan_resource() -> str:
+        return runtime.adoption.plan().model_dump_json(indent=2)
 
     @mcp.resource("repo://command-registry", name="Runtime command registry", mime_type="application/json")
     def command_registry_resource() -> str:

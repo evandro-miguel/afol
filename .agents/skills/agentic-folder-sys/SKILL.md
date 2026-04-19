@@ -7,7 +7,7 @@ metadata:
   triggers: "agentic folder sys, agentic-folder-sys, .agents scaffold, bootstrap repo, install scaffold, update framework, upgrade scaffold, skills-sync, universal-skills, workbench, wb-update, verify-tasks, reporting, planning, execution"
   references: "core, patterns, troubleshooting, workbench, templates, gotchas"
   version: "1.0.0"
-  updated_at: "2026-04-12T13:16:50Z"
+  updated_at: "2026-04-18T21:39:30-03:00"
   target_provider: universal
 ---
 
@@ -59,6 +59,13 @@ Before finalizing, scan [Gotchas](./gotchas.md).
 - Treat `.agents/wb/.active_session` as canonical when it exists.
 - Use standardized workbench artifacts: `plan`, `task`, `log`, and `report`.
 - For major work, also use `brainstorm`, `explorer-check`, and `postmortem`.
+- Before touching any file or artifact, resolve the applicable rule, standard,
+  template, skill, and spec for that element. Apply all cumulative guidance for
+  the element type and work intent, such as TypeScript plus feature plus spec.
+- For every feature addition or meaningful feature behavior change, update the
+  affected project-local skill under `.agents/skills/`, update the affected
+  project docs, and record a pending item to propose the relevant skill change
+  back to universal-skills through the approved branch/PR flow.
 - Prefer `./.agents/agents wb-update ...` over manual timestamp, task-state,
   evidence, and file-list edits.
 - Mark tasks done only after evidence exists and strict verification passes.
@@ -69,12 +76,15 @@ Before finalizing, scan [Gotchas](./gotchas.md).
 1. Create or target a session through `./.agents/agents new ...` so
    `.active_session` stays accurate.
 2. Keep `roadmap_feature` and `parent_spec` context on major workstreams.
-3. Start with `plan` and `task`; add `brainstorm` and `explorer-check` before
+3. Resolve the applicable rules for each element the workstream will touch.
+4. For feature work, keep local skills and docs in sync with behavior changes
+   and leave a universal-skills propagation pending item.
+5. Start with `plan` and `task`; add `brainstorm` and `explorer-check` before
    execution for major work.
-4. Execute the change and record progress in `log`.
-5. Record validation with `./.agents/agents wb-update evidence ...`.
-6. Run repo checks and strict session verification before closure.
-7. Close with `report` and, for major workstreams, `postmortem`.
+6. Execute the change and record progress in `log`.
+7. Record validation with `./.agents/agents wb-update evidence ...`.
+8. Run repo checks and strict session verification before closure.
+9. Close with `report` and, for major workstreams, `postmortem`.
 
 ## Workbench Artifacts
 

@@ -3,8 +3,8 @@ id: RULE-004
 theme: validation-linting
 version: 1.0
 created: 2026-02-23
-applies_to: All agents (QWEN, CLAUDE, GEMINI)
-updated_at: '2026-04-13T19:36:41-03:00'
+applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
+updated_at: '2026-04-18T22:35:01-03:00'
 ---
 
 # Validation & Linting
@@ -13,9 +13,10 @@ updated_at: '2026-04-13T19:36:41-03:00'
 
 ---
 
-## Pre-Commit Validation (MANDATORY)
+## Completion Validation (MANDATORY)
 
-**BEFORE EVERY COMMIT:**
+Before marking work complete, run the validation required by the elements
+touched. At minimum for scaffold changes:
 
 ```bash
 # 1. Validate structure
@@ -24,7 +25,7 @@ just doctor
 # 2. Lint documentation
 just lint
 
-# 3. Verify tasks complete
+# 3. Verify tasks/session state when a workstream is active
 just verify
 ```
 
@@ -32,7 +33,7 @@ just verify
 
 ```bash
 just all
-# Equivalent to: doctor + structure + index + verify
+# Aggregate scaffold validation when available
 ```
 
 ---
@@ -141,7 +142,8 @@ Before marking task complete:
 
 - [ ] `just doctor` passes (all ✓)
 - [ ] `just lint` passes (no issues)
-- [ ] `just verify` passes (all tasks [x])
+- [ ] `just verify` passes when task/session state is in scope
+- [ ] Relevant tests for touched code pass
 - [ ] Frontmatter is valid
 - [ ] Task markers are correct
 - [ ] Timestamps have timezone
@@ -171,7 +173,7 @@ Before marking task complete:
 
 **DON'T:**
 
-- ❌ Commit without validation
+- ❌ Mark work complete without validation
 - ❌ Ignore validation errors
 - ❌ Skip `just verify` for workstreams
 - ❌ Leave tasks in `[ ]` when done

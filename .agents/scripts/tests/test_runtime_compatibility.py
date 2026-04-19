@@ -197,7 +197,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertNotIn('source_dir: "../universal-skills"', config_text)
         self.assertIn('"agentic-folder-sys"', config_text)
 
-    def test_wrapper_requires_uv_for_runtime_registry_commands(self):
+    def test_wrapper_keeps_legacy_commands_on_local_script_runtime(self):
         wrapper_src = Path(".agents/agents").resolve()
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -233,8 +233,101 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 check=False,
             )
 
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("wrapper-local-venv-ok", result.stdout)
+
+    def test_wrapper_requires_uv_for_runtime_native_commands(self):
+        wrapper_src = Path(".agents/agents").resolve()
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            agents_dir = root / ".agents"
+            scripts_dir = agents_dir / "scripts"
+            runtime_dir = agents_dir / "runtime"
+            venv_bin = scripts_dir / ".venv" / "bin"
+            venv_bin.mkdir(parents=True, exist_ok=True)
+            runtime_dir.mkdir(parents=True, exist_ok=True)
+
+            wrapper_dst = agents_dir / "agents"
+            wrapper_dst.parent.mkdir(parents=True, exist_ok=True)
+            wrapper_dst.write_text(wrapper_src.read_text(encoding="utf-8"), encoding="utf-8")
+            wrapper_dst.chmod(wrapper_dst.stat().st_mode | stat.S_IXUSR)
+
+            python_link = venv_bin / "python3"
+            try:
+                python_link.symlink_to(Path(sys.executable))
+            except OSError:
+                shutil.copy2(Path(sys.executable), python_link)
+                python_link.chmod(python_link.stat().st_mode | stat.S_IXUSR)
+
+            env = os.environ.copy()
+            env["PATH"] = "/usr/bin:/bin"
+            result = subprocess.run(
+                [str(wrapper_dst), "adoption-plan"],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
             self.assertEqual(result.returncode, 1)
             self.assertIn("uv not found", result.stdout)
+
+    def test_wrapper_routes_runtime_adoption_commands_directly(self):
+        wrapper_src = Path(".agents/agents").resolve()
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            agents_dir = root / ".agents"
+            scripts_dir = agents_dir / "scripts"
+            runtime_dir = agents_dir / "runtime"
+            venv_bin = scripts_dir / ".venv" / "bin"
+            venv_bin.mkdir(parents=True, exist_ok=True)
+            runtime_dir.mkdir(parents=True, exist_ok=True)
+
+            wrapper_dst = agents_dir / "agents"
+            wrapper_dst.parent.mkdir(parents=True, exist_ok=True)
+            wrapper_dst.write_text(wrapper_src.read_text(encoding="utf-8"), encoding="utf-8")
+            wrapper_dst.chmod(wrapper_dst.stat().st_mode | stat.S_IXUSR)
+
+            python_link = venv_bin / "python3"
+            try:
+                python_link.symlink_to(Path(sys.executable))
+            except OSError:
+                shutil.copy2(Path(sys.executable), python_link)
+                python_link.chmod(python_link.stat().st_mode | stat.S_IXUSR)
+
+            telemetry_script = scripts_dir / "agents-telemetry.py"
+            telemetry_script.write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+            telemetry_script.chmod(telemetry_script.stat().st_mode | stat.S_IXUSR)
+
+            fake_uv_dir = root / "bin"
+            fake_uv_dir.mkdir(parents=True, exist_ok=True)
+            fake_uv = fake_uv_dir / "uv"
+            fake_uv.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "print('FAKE_UV:' + ' '.join(sys.argv[1:]))\n",
+                encoding="utf-8",
+            )
+            fake_uv.chmod(fake_uv.stat().st_mode | stat.S_IXUSR)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{fake_uv_dir}:/usr/bin:/bin"
+            result = subprocess.run(
+                [str(wrapper_dst), "adoption-plan"],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("FAKE_UV:run --project", result.stdout)
+            self.assertIn("agentic adoption-plan", result.stdout)
+            self.assertNotIn("agentic run adoption-plan", result.stdout)
 
     def test_runtime_launchers_use_locked_runtime_environment(self):
         agents_wrapper = Path(".agents/agents").read_text(encoding="utf-8")
@@ -242,6 +335,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked', agents_wrapper)
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp', mcp_wrapper)
+        self.assertIn('adoption-plan|inspect-target', agents_wrapper)
 
     def test_bootstrap_exports_generic_baseline_without_scaffold_history(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -291,7 +385,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("| Total | 2 |", specs_index)
             self.assertIn("- Total indexed docs: 0", knowledge_index)
             self.assertIn("current-state, descriptive", map_readme)
-            self.assertIn("mod agents_scaffold 'docs/standards/Justfile'", root_justfile)
+            self.assertIn("import 'docs/standards/Justfile'", root_justfile)
             self.assertTrue((target / "docs/standards/Justfile").exists())
             self.assertFalse((target / ".agents/arc/map").exists())
             self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
@@ -351,11 +445,11 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("## Project Goal", agents_md)
         self.assertIn("## Project Structure", agents_md)
         self.assertIn("## Mandatory Rules", agents_md)
-        self.assertIn(".agents/rules/RULE-001-tool-discovery.md", agents_md)
+        self.assertIn(".agents/rules/RULE-006-applicable-rule-resolution.md", agents_md)
         self.assertTrue((template_root / "Justfile").exists())
         self.assertTrue((template_root / "docs/standards/Justfile").exists())
         self.assertIn(
-            "mod agents_scaffold 'docs/standards/Justfile'",
+            "import 'docs/standards/Justfile'",
             (template_root / "Justfile").read_text(encoding="utf-8"),
         )
         self.assertFalse((template_root / "PLANS.md").exists())

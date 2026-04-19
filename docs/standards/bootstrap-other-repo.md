@@ -3,7 +3,7 @@ doc_type: standard
 id: 000000_000000_bootstrap-other-repo_standard_01
 status: active
 created_at: '2026-03-23T00:00:00Z'
-updated_at: '2026-04-13T19:36:58-03:00'
+updated_at: '2026-04-16T23:01:19-03:00'
 ---
 
 # Bootstrap Other Repo
@@ -67,6 +67,47 @@ Recommended command:
 ./.agents/agents bootstrap /path/to/existing-project --partial
 ```
 
+## Update Contract
+
+When bootstrap/adoption runs against an existing repository, the default
+behavior is an overlay update, not a replacement update.
+
+### Guaranteed Defaults
+
+- preserve project-owned files by default
+- add missing scaffold-managed files and directories
+- skip existing files unless a managed patch is explicitly required
+- keep target docs, skills, workbench, and local runtime choices intact unless
+  the operator explicitly asks for a replacement
+- prefer MCP/runtime planning and validation, with script wrappers as fallback
+
+### Update Action Taxonomy
+
+Bootstrap and the runtime update flow should classify each candidate path as
+one of:
+
+- `create` - file or folder is missing and can be added safely
+- `skip` - target already owns the path and no managed change is required
+- `patch-managed` - scaffold-owned file can be updated in place
+- `adapt-config` - target config needs a compatibility translation, not a rewrite
+- `add-wrapper` - a missing adapter file should be added for runtime or MCP
+- `reconcile-skills` - skills manifest/source mismatch needs classification
+- `conflict` - target-owned content differs and must be reviewed before overwrite
+- `benchmark` - record timing, warnings, and validation evidence for the update
+- `rollback-record` - capture undo metadata for any mutating batch
+
+### Conflict Rule
+
+If a target file is project-owned and the scaffold wants to change it, the
+default outcome is `conflict`, not overwrite. The operator must opt into a
+reviewed replacement path before the file can be changed.
+
+### Idempotence Rule
+
+Running the same update twice must not create new diffs after the first safe
+apply. Repeated runs may emit `skip` or `benchmark` results, but they must not
+silently replace additional project content.
+
 ## Safe Usage
 
 - Use `--dry-run` before applying changes to a production repo.
@@ -102,10 +143,13 @@ instead of the default namespaced module wrapper, use the exposed root recipe
 names (`just doctor`, `just lint`, `just test-scripts`, `just agents-all`)
 instead.
 
-For isolated environments, also confirm the wrapper works without `uv` on `PATH`:
+For isolated environments, point the wrapper at a known-good script interpreter
+and confirm it works without `uv` on `PATH`:
 
 ```bash
-PATH=/usr/bin:/bin ./.agents/agents doctor
+AGENTS_SCRIPT_PYTHON=/path/to/.agents/scripts/.venv/bin/python3 \
+PATH=/usr/bin:/bin \
+./.agents/agents doctor
 ```
 
 ---

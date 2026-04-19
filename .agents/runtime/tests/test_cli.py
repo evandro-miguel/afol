@@ -26,6 +26,27 @@ def test_cli_validate(scaffold_repo):
     assert payload["ok"] is True
 
 
+def test_cli_adoption_plan(scaffold_repo):
+    result = runner.invoke(app, ["adoption-plan", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["repo_root"] == str(scaffold_repo)
+    assert payload["inspection"]["has_runtime_wrapper"] is False
+    kinds = [item["kind"] for item in payload["actions"]]
+    assert "add-wrapper" in kinds
+    assert "reconcile-skills" in kinds
+    assert "benchmark" in kinds
+
+
+def test_cli_inspect_target(scaffold_repo):
+    result = runner.invoke(app, ["inspect-target", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["repo_root"] == str(scaffold_repo)
+    assert payload["has_justfile"] is False
+    assert payload["has_mcp_wrapper"] is False
+
+
 def _write_argv_script(scaffold_repo, script_name: str, label: str) -> None:
     script = scaffold_repo / ".agents" / "scripts" / script_name
     script.write_text(

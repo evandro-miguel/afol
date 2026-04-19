@@ -28,13 +28,14 @@ links:
 
 Bash wrapper that:
 
-1. **Prefers local venv Python** - Uses `.agents/scripts/.venv/bin/python*` when present
-2. **Uses `uv` only for setup** - Provisions the environment when `.venv` is missing
-3. **Executes with isolation** - Keeps cache writes inside `.agents/cache/uv`
-4. **Preserves context** - Maintains working directory
-5. **Unified interface** - `.agents/agents <command>`
-6. **Command-map dispatch** - Efficient routing for scripts such as `knowledge`, `skills-sync`, and `memory`
-7. **Runtime dispatch** - Routes `runtime` and `mcp` directly to `.agents/runtime/` through `uv run --project --locked`
+1. **Honors explicit script Python** - Uses `AGENTS_SCRIPT_PYTHON` when set to an executable interpreter, mainly for isolated validation repos
+2. **Prefers local venv Python** - Uses `.agents/scripts/.venv/bin/python*` when present
+3. **Uses `uv` only for setup** - Provisions the environment when `.venv` is missing and no explicit script Python is set
+4. **Executes with isolation** - Keeps cache writes inside `.agents/cache/uv`
+5. **Preserves context** - Maintains working directory
+6. **Unified interface** - `.agents/agents <command>`
+7. **Command-map dispatch** - Efficient routing for scripts such as `knowledge`, `skills-sync`, and `memory`
+8. **Runtime dispatch** - Routes `runtime` and `mcp` directly to `.agents/runtime/` through `uv run --project --locked`
 
 ## What It Touches
 
@@ -45,6 +46,13 @@ Bash wrapper that:
 | `.agents/scripts/.venv/` | Virtualenv |
 | `.agents/scripts/*.py` | Python scripts |
 | `.agents/runtime/` | Central runtime package |
+
+### Environment Overrides
+
+| Variable | Purpose |
+|----------|---------|
+| `AGENTS_SCRIPT_PYTHON` | Explicit Python interpreter for legacy script commands; when set, the wrapper skips local `.venv` bootstrap. |
+| `AGENTS_UV_CACHE_DIR` | Overrides the `uv` cache path used by wrapper setup and runtime routes. |
 
 ### Files Executed
 

@@ -162,6 +162,9 @@ just doctor
 - `skills-sync push` is a branch/PR proposal flow. It requires an external universal-skills checkout and refuses direct pushes to `main`.
 - Keep `agentic-folder-sys` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, git-backed skills flow, and governed workbench sessions.
 - The scaffold should not depend on global Codex skills for universal-skills content.
+- Feature additions and meaningful behavior changes must update affected
+  project-local skills and docs, then leave a pending item to propose the skill
+  change back to universal-skills through the branch/PR flow.
 - Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and project-agnostic.
 
 ### Optional External Memory

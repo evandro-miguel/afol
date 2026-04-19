@@ -3,8 +3,8 @@ id: RULE-002
 theme: workstream-creation
 version: 1.0
 created: 2026-02-23
-applies_to: All agents (QWEN, CLAUDE, GEMINI)
-updated_at: '2026-04-13T19:36:40-03:00'
+applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
+updated_at: '2026-04-18T22:35:01-03:00'
 ---
 
 # Workstream Creation
@@ -105,29 +105,50 @@ just wb-task TASK_ID=T-01 ACTION=done
 
 # 2. Define or update parent spec in docs/arc/SPECS/
 
-# 3. Create workstream linked to approved strategic docs
+# 3. For feature work, update affected project-local skills and docs
+
+# 4. Add a pending universal-skills propagation item when a local skill changed
+
+# 5. Create workstream linked to approved strategic docs
 just new THEME=feature-name FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 
-# 4. Complete brainstorm + explorer-check before treating the plan as complete
+# 6. Complete brainstorm + explorer-check before treating the plan as complete
 
-# 5. Reuse prior findings when relevant
+# 7. Reuse prior findings when relevant
 ./.agents/agents knowledge search <query>
 
-# 6. Work on tasks (edit files, implement)
+# 8. Work on tasks (edit files, implement)
 
-# 7. Update workbench
+# 9. Update workbench
 ./.agents/agents wb-update touch --session <session-id>
 ./.agents/agents wb-update task T-01 --session <session-id> --mark-done
 
-# 8. Finalize postmortem before closing report
+# 10. Finalize postmortem before closing report
 ./.agents/agents wb-update status --session <session-id> --file postmortem --value final
 ./.agents/agents wb-update status --session <session-id> --file report --value final
 
-# 9. Validate
+# 11. Validate
 just doctor
 just lint
 just verify
 ```
+
+### Feature Skill and Documentation Propagation
+
+For every feature addition or meaningful feature behavior change:
+
+- Update the affected project-local skill under `.agents/skills/` when future
+  agents must follow the new behavior.
+- Update affected project docs, command references, standards, roadmap, and
+  specs so operator-facing guidance matches the behavior.
+- Add a visible pending item in the roadmap, spec, task, plan, or report to
+  propose the relevant project-local skill change back to the external
+  `universal-skills` checkout.
+- Propagate skills only through the approved branch/PR flow, such as
+  `./.agents/agents skills-sync push <skill> --branch <branch> --commit --push --pr`;
+  never push directly to universal `main`.
+- Do not mark the feature fully closed unless local skill/docs updates are
+  complete and the universal-skills propagation pending item is recorded.
 
 ### Bug Fix Workflow
 
@@ -174,6 +195,8 @@ just verify
 - ✅ Use descriptive theme names (kebab-case)
 - ✅ Create or update the roadmap feature before new non-trivial work
 - ✅ Link each workstream to `--feature-id` and `--parent-spec`
+- ✅ Update affected project-local skills and docs for every feature addition
+- ✅ Record a pending universal-skills propagation item for every relevant local skill change
 - ✅ Use child specs when a feature benefits from clearer decomposition
 - ✅ Use brainstorm + explorer-check before calling a major plan complete
 - ✅ Reuse `.agents/agents knowledge` before repeating research
@@ -187,6 +210,7 @@ just verify
 
 - ❌ Create folders manually (use `agents-new`)
 - ❌ Start non-trivial implementation without roadmap + parent spec
+- ❌ Close feature work with stale local skills, stale docs, or no universal-skills propagation pending item
 - ❌ Use spaces in theme names
 - ❌ Skip task IDs (always use T-NN)
 - ❌ Mix marker formats (use `- [x]` not `- [X]`)

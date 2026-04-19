@@ -103,11 +103,11 @@ Use model critique to find problems and improvement opportunities. Do not use it
 
 Read `.agents/rules/README.md` first when rule coverage is unclear.
 
-- `.agents/rules/RULE-001-tool-discovery.md`: use before relying on unfamiliar tools or wrappers.
 - `.agents/rules/RULE-002-workstream-creation.md`: use before creating or updating workbench sessions.
 - `.agents/rules/RULE-003-documentation-standards.md`: use before adding or editing managed Markdown docs.
 - `.agents/rules/RULE-004-validation-linting.md`: use before marking work complete.
 - `.agents/rules/RULE-005-folder-structure.md`: use when adding, moving, or validating project folders.
+- `.agents/rules/RULE-006-applicable-rule-resolution.md`: use before touching any element to resolve the applicable rule, skill, spec, and validation.
 
 Agents must follow the applicable rule file, not only this summary.
 

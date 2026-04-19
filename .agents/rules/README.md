@@ -11,11 +11,11 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 ```text
 .agents/rules/
 ├── README.md
-├── RULE-001-tool-discovery.md
 ├── RULE-002-workstream-creation.md
 ├── RULE-003-documentation-standards.md
 ├── RULE-004-validation-linting.md
-└── RULE-005-folder-structure.md
+├── RULE-005-folder-structure.md
+└── RULE-006-applicable-rule-resolution.md
 ```
 
 ---
@@ -24,13 +24,13 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 
 | ID | Rule | Lines | Purpose |
 |----|------|-------|---------|
-| **RULE-001** | [tool-discovery](./RULE-001-tool-discovery.md) | ~150 | Tool discovery & usage patterns |
 | **RULE-002** | [workstream-creation](./RULE-002-workstream-creation.md) | ~140 | Creating workstreams & tasks |
 | **RULE-003** | [documentation-standards](./RULE-003-documentation-standards.md) | ~150 | Frontmatter & markdown standards |
 | **RULE-004** | [validation-linting](./RULE-004-validation-linting.md) | ~160 | Pre-commit validation |
 | **RULE-005** | [folder-structure](./RULE-005-folder-structure.md) | ~160 | Required folder structure |
+| **RULE-006** | [applicable-rule-resolution](./RULE-006-applicable-rule-resolution.md) | ~130 | Required rule/skill/spec routing by touched element |
 
-**Total:** ~760 lines across 5 focused rules (max 250 each)
+**Total:** ~740 lines across 5 focused rules (max 250 each)
 
 ---
 
@@ -39,8 +39,7 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 ### Before Starting Work
 
 ```bash
-# RULE-001: Discover tools
-./.agents/agents tools list
+# RULE-006: Identify element type and applicable rules before edits
 ```
 
 ### Creating New Work
@@ -143,10 +142,11 @@ Content here.
 | Location | Content |
 |----------|---------|
 | `docs/agentic/` | Tool documentation |
+| `docs/agentic/agents-tools.md` | Optional tool discovery reference |
 | `docs/standards/` | Human standards |
 | `.agents/tools.json` | Tool catalog |
 | `.agents/agents.config` | Central config |
 
 ---
 
-*Last updated: 2026-02-23 | Rules: 5 | Total lines: ~760*
+*Last updated: 2026-04-18 | Rules: 5 | Total lines: ~740*

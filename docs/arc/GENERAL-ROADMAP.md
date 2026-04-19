@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-13T19:36:57-03:00'
+updated_at: '2026-04-18T22:35:01-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -394,6 +394,42 @@ updated_at: '2026-04-13T19:36:57-03:00'
         mirrors after command parity is proven.
   - [x] Verify with `just all`, focused bootstrap/template tests, and the 80%
         scripts coverage gate.
+
+### F-18 Agent Governance Preflight and Recurrence Guardrails
+
+- Status: planned
+- Why: Agents still rely on manual discipline to check whether a requested plan
+  already has a governing spec, whether a user-reported problem has happened
+  before, whether similar implementation already exists, and whether delegated
+  agents actually received and followed all applicable `.agents/rules/`.
+- Governing spec: `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md`
+- Child spec policy:
+  - Required: yes
+  - Child specs should isolate plan/spec preflight, recurring-problem
+    escalation, similar-system detection, and orchestrator rule enforcement.
+- Exit criteria:
+  - Every non-trivial plan begins by checking whether a governing roadmap
+    feature and parent spec already exist.
+  - User-reported repeated problems trigger prior-lesson lookup, heavier
+    verification, and a new or updated general/specific rule when prevention is
+    feasible.
+  - New function work includes similar-system discovery; when a similar system
+    exists, the agent points to it in code and spec evidence, avoids modifying
+    it by default, and records future refactor debt for both the old and new
+    code paths.
+  - The orchestrator loads all applicable `.agents/rules/` before routing work
+    and passes enforceable rule context to every agent it coordinates.
+- Delivery tasks:
+  - [ ] Define the preflight contract and acceptance checks in the parent spec.
+  - [ ] Add implementation support for roadmap/spec lookup before planning.
+  - [ ] Add recurring-problem lookup and heavy verification escalation.
+  - [ ] Add similar-system discovery and future-refactor debt capture.
+  - [ ] Add applicable-rule resolution by touched element type, including
+        feature/spec/workbench/skill/runtime/code surfaces.
+  - [ ] Add orchestrator rule-loading and delegated-agent enforcement.
+  - [ ] Update affected project-local skills/docs and leave a pending
+        universal-skills propagation item for the new agent behavior.
+  - [ ] Verify with focused tests, strict workbench validation, and `just lint`.
 
 ## 5) Prioritization
 

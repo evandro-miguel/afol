@@ -45,6 +45,7 @@ def _copytree_ignore_runtime_state(src: str, names: list[str]) -> set[str]:
 def isolated_env(repo_root: Path) -> dict[str, str]:
     env = os.environ.copy()
     env["AGENTS_ACTIVE_SESSION_FILE"] = str(repo_root / ".agents" / "wb" / ".active_session")
+    env["AGENTS_SCRIPT_PYTHON"] = str(ROOT_DIR / ".agents" / "scripts" / ".venv" / "bin" / "python3")
     env["AGENTS_UV_CACHE_DIR"] = str(repo_root / ".agents" / "cache" / "uv")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PATH"] = f"{ROOT_DIR / '.agents' / 'scripts' / '.venv' / 'bin'}:{env.get('PATH', '')}"

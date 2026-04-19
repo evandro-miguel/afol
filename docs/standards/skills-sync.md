@@ -3,7 +3,7 @@ doc_type: standard
 id: skills-sync-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-13T19:37:03-03:00'
+updated_at: '2026-04-18T21:39:30-03:00'
 ---
 
 # Skills Sync Standard
@@ -22,6 +22,39 @@ Standardize how project repositories consume relevant skills from a repo-local o
 - When a repo-local source is only a bootstrap seed, Git-backed refresh and upstream proposal work must use an external universal-skills checkout configured with `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`
 - Treat the current manifest as the scaffold-side adapter over the richer universal-skills repo/ref/profile contract
 - Prefer project-local skills under `.agents/skills/`; keep global Codex skills minimal and avoid using them as the primary project skill surface
+
+## Classification Model
+
+Skills sync must distinguish these cases:
+
+- `source-drift` - the selected universal-skills source/ref/profile changed
+- `stale-manifest-entry` - the local manifest still requests a skill that is no
+  longer required for the selected source/profile
+- `local-extra` - the repo intentionally keeps a project-specific skill outside
+  the universal source contract
+- `install-update` - the requested skill is part of the active selection and
+  should be refreshed in `.agents/skills/`
+- `proposal-update` - the skill should be proposed back to the external
+  universal-skills checkout through the branch/PR flow
+
+The default check should report stale entries and local extras separately from
+real source drift. That keeps existing repos from treating intentional local
+customization as a universal-source failure.
+
+## Feature-Driven Skill Propagation
+
+Every feature addition or meaningful feature behavior change must keep the
+agent-facing skill surface current:
+
+- Update affected project-local skills under `.agents/skills/` as part of the
+  feature work.
+- Update README, standards, specs, command references, and runtime mirrors when
+  their guidance changes.
+- Record a visible pending item in the roadmap, spec, workbench task, plan, or
+  report to propose the same skill change back to the external universal-skills
+  checkout.
+- Use only the branch/PR proposal flow for upstream propagation. Do not push
+  directly to universal `main`.
 
 ## Configuration
 

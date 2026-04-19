@@ -221,7 +221,7 @@ lint-runtime:
 test-runtime:
   @echo "→ Running central runtime tests..."
   @mkdir -p "{{uv_cache_dir}}"
-  @UV_CACHE_DIR="{{uv_cache_dir}}" uv run --project .agents/runtime --locked pytest .agents/runtime/tests
+  @uv run --project .agents/runtime --locked pytest .agents/runtime/tests
   @echo "✓ Central runtime tests passed"
 
 runtime-mcp-smoke:

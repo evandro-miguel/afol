@@ -109,3 +109,28 @@ def test_command_registry_resource_includes_help_manifest(scaffold_repo):
 
     help_commands = {item["name"]: item for item in help_manifest}
     assert help_commands["wb-update"]["aliases"] == ["wb"]
+
+
+def test_adoption_inspection_detects_missing_overlay_surfaces(scaffold_repo):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    inspection = runtime.adoption.inspect()
+
+    assert inspection.repo_root == str(scaffold_repo)
+    assert inspection.has_justfile is False
+    assert inspection.has_runtime_wrapper is False
+    assert inspection.has_mcp_wrapper is False
+    assert inspection.has_skills_manifest is False
+    assert inspection.has_docs_map is True
+
+
+def test_adoption_plan_classifies_overlay_actions(scaffold_repo):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    plan = runtime.adoption.plan()
+
+    kinds = [action.kind for action in plan.actions]
+    assert "create" in kinds
+    assert "add-wrapper" in kinds
+    assert "reconcile-skills" in kinds
+    assert "benchmark" in kinds
+    assert "rollback-record" in kinds
+    assert plan.summary

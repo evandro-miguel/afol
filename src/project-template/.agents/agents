@@ -20,7 +20,9 @@ fi
 ORIGINAL_PWD="$(pwd)"
 
 resolve_python_bin() {
-    if [ -x "${SCRIPTS_DIR}/.venv/bin/python3" ]; then
+    if [ -n "${AGENTS_SCRIPT_PYTHON:-}" ] && [ -x "${AGENTS_SCRIPT_PYTHON}" ]; then
+        echo "${AGENTS_SCRIPT_PYTHON}"
+    elif [ -x "${SCRIPTS_DIR}/.venv/bin/python3" ]; then
         echo "${SCRIPTS_DIR}/.venv/bin/python3"
     elif [ -x "${SCRIPTS_DIR}/.venv/bin/python" ]; then
         echo "${SCRIPTS_DIR}/.venv/bin/python"
@@ -35,7 +37,37 @@ resolve_python_bin() {
 
 PYTHON_BIN="$(resolve_python_bin)"
 UV_BIN="$(command -v uv 2>/dev/null || true)"
-export UV_CACHE_DIR="${AGENTS_UV_CACHE_DIR:-${SCRIPT_DIR}/cache/uv}"
+
+if [ -n "${AGENTS_SCRIPT_PYTHON:-}" ] && [ ! -x "${AGENTS_SCRIPT_PYTHON}" ]; then
+    echo "❌ AGENTS_SCRIPT_PYTHON is not executable: ${AGENTS_SCRIPT_PYTHON}"
+    exit 1
+fi
+
+resolve_uv_cache_dir() {
+    if [ -n "${AGENTS_UV_CACHE_DIR:-}" ]; then
+        echo "${AGENTS_UV_CACHE_DIR}"
+        return 0
+    fi
+
+    if [ -n "${UV_CACHE_DIR:-}" ]; then
+        echo "${UV_CACHE_DIR}"
+        return 0
+    fi
+
+    local local_cache="${SCRIPT_DIR}/cache/uv"
+    if mkdir -p "${local_cache}" >/dev/null 2>&1 && [ -w "${local_cache}" ]; then
+        echo "${local_cache}"
+        return 0
+    fi
+
+    local project_name
+    project_name="$(basename "$(cd "${SCRIPT_DIR}/.." && pwd)")"
+    local fallback_cache="${TMPDIR:-/tmp}/agents-uv-cache/${project_name}"
+    mkdir -p "${fallback_cache}"
+    echo "${fallback_cache}"
+}
+
+export UV_CACHE_DIR="$(resolve_uv_cache_dir)"
 
 TELEMETRY_SCRIPT="${SCRIPTS_DIR}/agents-telemetry.py"
 ACTIVE_SESSION_FILE="${AGENTS_ACTIVE_SESSION_FILE:-${SCRIPT_DIR}/wb/.active_session}"
@@ -132,19 +164,19 @@ if [ "$#" -gt 0 ]; then
             run_runtime_and_record "mcp" "agentic-mcp" "$@"
             exit "$?"
             ;;
-        help|-h|--help)
-            ;;
-        *)
+        adoption-plan|inspect-target)
             COMMAND_NAME="$1"
             shift
-            run_runtime_and_record "${COMMAND_NAME}" "agentic" "run" "${COMMAND_NAME}" "$@"
+            run_runtime_and_record "${COMMAND_NAME}" "agentic" "${COMMAND_NAME}" "$@"
             exit "$?"
+            ;;
+        help|-h|--help)
             ;;
     esac
 fi
 
 # Check if .venv exists
-if [ ! -d "${SCRIPTS_DIR}/.venv" ]; then
+if [ ! -d "${SCRIPTS_DIR}/.venv" ] && [ -z "${AGENTS_SCRIPT_PYTHON:-}" ]; then
     if [ -z "${UV_BIN}" ]; then
         echo "❌ uv not found. Install with:"
         echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"

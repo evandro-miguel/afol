@@ -73,7 +73,24 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
   - `README.md`
   - `docs/standards/`
   - runtime mirrors when behavior/usage changed
+- Any feature addition or meaningful feature behavior change must update the
+  affected project-local skill under `.agents/skills/`, update affected docs,
+  and record an explicit pending item to propagate relevant skill changes back
+  to universal-skills.
 - Do not finish a workstream without explicitly checking the documentation freshness requirement in the final report.
+
+### Applicable Rule Resolution (Mandatory)
+
+- Before touching any file or artifact, identify the element type and follow
+  the applicable project rule, standard, template, skill, and spec.
+- Element-specific guidance is cumulative: for example, TypeScript feature work
+  must follow TypeScript/project code guidance plus roadmap/spec/workstream
+  rules.
+- If no project-specific rule exists for the element, state the gap, use the
+  closest local or global language/framework skill, and record a follow-up when
+  the gap is likely to recur.
+- The orchestrator must pass applicable rule obligations to delegated agents;
+  delegated agents must not proceed without the relevant rule context.
 
 ### Roadmap-First Delivery (Mandatory)
 
@@ -104,6 +121,20 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - If the solution is hacky, refactor to a maintainable one
 - Avoid over-engineering simple tasks / Simplicity first: minimal necessary change
 - Keep diffs small, clear, and reviewable
+
+### Folder Cleanup and Currency (Mandatory)
+
+- When cleaning, updating, or reorganizing the scaffold folder, inspect whether
+  any rule, doc, workflow element, generated artifact, cache, or adapter no
+  longer makes sense.
+- If an element is obsolete, duplicated, misleading, or only adds folder
+  pollution, ask the user whether to remove it or adapt it to an existing
+  project surface before changing it.
+- If the user already explicitly authorized removal or adaptation in the current
+  request, proceed with archive-before-delete discipline and summarize what was
+  removed or adapted.
+- Prefer adapting into an existing project rule, doc, skill, or standard over
+  adding a parallel surface.
 
 ### Autonomous Bug Fixing
 
@@ -196,6 +227,10 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - Bootstrap and `skills-sync` should prepare the project-local skill surface so each repository carries only the subset it actually needs.
 - Treat `skills-sync sync` / `skills-sync update` as the simple path that refreshes `.agents/skills/` from the configured universal-skills source.
 - Treat `skills-sync pull` as a refresh step only for an external git checkout; `skills-sync push` is only a branch/PR proposal flow and must never push directly to universal `main`.
+- When feature work changes agent behavior, update the project-local skill
+  first, then leave a workstream/roadmap/spec pending item to push the same
+  skill improvement to universal-skills through the approved branch/PR flow so
+  it can propagate to global skill directories.
 
 ### Optional External Memory
 

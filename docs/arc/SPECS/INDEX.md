@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-04-16T00:37:58+00:00"
-updated_at: "2026-04-16T00:37:58+00:00"
+created_at: "2026-04-19T18:29:31+00:00"
+updated_at: "2026-04-19T18:29:31+00:00"
 ---
 
 # SPECS INDEX
@@ -14,9 +14,9 @@ updated_at: "2026-04-16T00:37:58+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 27 |
+| Total | 28 |
 | Draft | 1 |
-| Active | 25 |
+| Active | 26 |
 | Final | 1 |
 
 ## Index
@@ -50,6 +50,7 @@ updated_at: "2026-04-16T00:37:58+00:00"
 | 260413_1250_project-template-source-separation_spec-child_01 | project-template-source-separation | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260413_1250_project-template-source-separation_plan_01, task: 260413_1250_project-template-source-separation_task_01, report: 260413_1250_project-template-source-separation_report_01 |
 | 260413_1849_just-command-runner-migration_spec_01 | just-command-runner-migration | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260415_2121_scripts-cleanup-optimization_spec-child_01 | scripts-cleanup-optimization | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md |
+| 260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01 | agent-governance-preflight-and-recurrence-guardrails | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 
 ---
 *Index: `docs/arc/SPECS/INDEX.md`*

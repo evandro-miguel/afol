@@ -1,0 +1,319 @@
+---
+doc_type: spec
+id: 260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01
+theme: agent-governance-preflight-and-recurrence-guardrails
+status: active
+owners:
+- orchestrator
+workstream_intent: feature
+artifact_purpose: Define the plan/spec preflight, recurring-problem escalation, similar-system
+  discovery, and rule-enforcement contract for agents.
+created_at: '2026-04-18T21:15:13-03:00'
+updated_at: '2026-04-18T22:35:01-03:00'
+roadmap_feature: F-18
+spec_role: parent
+parent_spec: ''
+links:
+  roadmap: docs/arc/GENERAL-ROADMAP.md
+scope:
+  repo_areas:
+  - AGENTS.md
+  - .agents/rules
+  - .agents/scripts
+  - .agents/runtime
+  - .agents/skills
+  - docs/arc
+  - docs/lessons
+  - docs/templates
+  packages:
+  - orchestration
+  - planning rigor
+  - recurring problem prevention
+  - similar system discovery
+risk_level: medium
+---
+
+# SPEC: Agent Governance Preflight and Recurrence Guardrails
+
+## 1) Feature Intent
+
+- Outcome: agents must prove they checked existing governance, prior problems,
+  similar implementation, and applicable rules before creating plans,
+  escalating recurring bugs, adding new functions, or delegating work.
+- Why now: the scaffold already has roadmap/spec governance, lessons, rules,
+  workbench verification, and knowledge reuse, but those surfaces are still easy
+  for an agent to skip unless the operator reminds it.
+- Roadmap feature: `F-18`
+- Role of this spec: parent feature spec for enforcement behavior.
+
+## 2) Problem
+
+- Planning can start without checking whether the requested work already has a
+  governing spec or belongs under an existing roadmap feature.
+- A user can report a problem that happened before, but the agent may treat it
+  like a one-off bug instead of searching lessons, applying heavier
+  verification, and adding a prevention rule.
+- Agents can implement a new function without checking whether a similar system
+  already exists, increasing duplication and future refactor cost.
+- The orchestrator can route work to agents without explicitly loading and
+  enforcing every applicable `.agents/rules/` file.
+
+## 3) Users and User Journey
+
+Primary users:
+
+- Project operators who expect governed agent behavior without repeated manual
+  reminders.
+- Orchestrator agents coordinating implementation, review, and verification.
+- Execution agents receiving delegated work.
+
+User journey:
+
+1. The user asks for a plan, reports a bug, or requests a new function.
+2. The orchestrator runs the relevant governance preflight before planning or
+   routing execution.
+3. The agent cites existing specs, prior lessons, similar systems, and rules in
+   the workstream evidence or explains why none were found.
+4. Execution proceeds with the required guardrails already attached to the task.
+
+Failure or friction points:
+
+- Missing spec -> the agent must point to the gap and either update/create the
+  governing spec or keep the plan in conversation until governance exists.
+- Repeated problem -> the agent must run heavier verification, add or update a
+  prevention rule when feasible, and capture a lesson.
+- Similar system found -> the agent must cite it and record refactor debt, but
+  must not modify that existing system unless the user explicitly scopes that
+  refactor.
+- Delegated agent lacks rules -> the orchestrator must stop routing and resend
+  the full applicable rule context.
+
+## 4) Experience and Behavior
+
+Expected behavior:
+
+- Before every non-trivial plan, the agent checks `docs/arc/GENERAL-ROADMAP.md`
+  and `docs/arc/SPECS/` for an existing roadmap feature and parent spec.
+- Before fixing a user-reported recurring problem, the agent searches
+  `docs/lessons/`, `.agents/rules/`, active workbench artifacts, and knowledge
+  surfaces for prior occurrences.
+- If the problem has happened before, the agent uses a heavier verification
+  path than a normal one-off fix and adds a general or specific prevention rule
+  when feasible.
+- Before adding a new function, the agent searches for similar code,
+  workflows, command handlers, rules, and specs; the evidence must cite both
+  code and spec surfaces when they exist.
+- For every feature addition or meaningful feature behavior change, the agent
+  updates affected project-local skills and docs, then records a pending item
+  to propose the relevant skill change back to universal-skills.
+- When similar code exists, the agent records a future-refactor pending item for
+  the existing code and the new code. The default implementation must not
+  modify the existing similar system.
+- Code comments may be added only at the exact lines where future refactor debt
+  must be discoverable from the code itself.
+- The orchestrator loads all applicable `.agents/rules/` files before routing
+  governed work and includes the relevant rule obligations in the delegated
+  agent's task instructions.
+- Before touching any file or artifact, the agent resolves the applicable rule,
+  standard, template, skill, and spec for that element type and work intent.
+- Element-specific guidance is cumulative. TypeScript feature work, for
+  example, must follow code/language guidance plus roadmap/spec/workstream
+  governance.
+
+Boundaries:
+
+- This feature does not require every tiny quick task to create a new spec.
+- This feature does not authorize broad refactors of similar systems by default.
+- This feature does not replace roadmap/spec/workbench governance; it makes
+  existing governance harder to skip.
+- This feature does not require external memory when repo-local lessons and
+  knowledge are enough.
+
+## 5) Existing Similar Systems
+
+These systems already cover parts of the desired behavior and should be reused
+or extended carefully during implementation:
+
+- `AGENTS.md` already requires roadmap-first delivery, lesson capture after user
+  correction, prevention rules, and verification before done.
+- `.agents/rules/RULE-002-workstream-creation.md` already defines roadmap/spec
+  workstream creation and brainstorm/explorer-check gates.
+- `.agents/rules/RULE-004-validation-linting.md` already defines validation
+  expectations before completion.
+- `docs/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md`
+  already governs exploration, reusable knowledge, and session closure.
+- `docs/arc/SPECS/260306_planning-rigor-and-explorer-gates_spec_01.md`
+  already requires brainstorm and explorer-check artifacts for major plans.
+- `docs/arc/SPECS/260307_persistent-planning-memory_spec_01.md` already covers
+  catchup and durable planning memory.
+
+Future refactor pending items:
+
+- Consolidate overlapping preflight language across `AGENTS.md`,
+  `RULE-002`, and the planning-rigor specs after F-18 behavior is proven.
+- Consider a single rule-resolution service in `.agents/runtime` so CLI,
+  MCP, and orchestrator flows load rules identically.
+- Consider a single "similar system evidence" artifact field shared by
+  explorer-check, plan, report, and spec-test templates.
+
+## 6) Scope
+
+In scope:
+
+- Governance preflight before non-trivial plans.
+- Recurring-problem lookup and escalation rules.
+- Similar-system discovery before new function work.
+- Applicable-rule resolution for every touched element type, including
+  feature, spec, workbench, skill, runtime, docs, and code surfaces.
+- Future-refactor debt capture in specs, workbench artifacts, and narrowly
+  placed code comments when needed.
+- Orchestrator rule loading and delegated-agent instruction injection.
+- Project-local skill/docs updates plus universal-skills propagation pending
+  items for feature behavior changes.
+- Validation that catches missing evidence for governed work.
+
+Out of scope:
+
+- Automatic large-scale deduplication or refactoring of existing systems.
+- A new standalone planning tree outside roadmap/spec/workbench.
+- Mandatory external memory lookup for every task.
+- Replacing human review of whether a similar system should be refactored now.
+
+## 7) Child Spec Strategy
+
+- Child specs required: yes
+- Decomposition rule:
+  - Use one child spec for plan/spec preflight.
+  - Use one child spec for recurring-problem escalation and lessons/rules
+    capture.
+  - Use one child spec for similar-system detection and refactor-debt handling.
+  - Use one child spec for orchestrator rule loading and delegated-agent
+    enforcement.
+- Planned child specs:
+  - `plan-spec-preflight` -> roadmap/spec lookup before planning.
+  - `recurring-problem-guardrails` -> prior incident lookup, heavy
+    verification, and rule/lesson capture.
+  - `similar-system-discovery` -> code/spec similarity evidence and future
+    refactor debt capture.
+  - `orchestrator-rule-enforcement` -> rule loading, routing, and delegated
+    instruction enforcement.
+
+## 8) Delivery Plan
+
+1. Inventory current rule, lesson, roadmap/spec, knowledge, and workbench
+   surfaces that already satisfy part of the requested behavior.
+2. Define the preflight data contract: searched paths, evidence fields,
+   missing-governance outcomes, and when quick mode is exempt.
+3. Define element-to-rule routing for feature, spec, workbench, skill, runtime,
+   docs, Python, TypeScript, and JavaScript surfaces.
+4. Implement roadmap/spec lookup before non-trivial planning in the relevant
+   CLI/runtime/orchestrator path.
+5. Implement recurring-problem detection by searching lessons, rules, active
+   workbench artifacts, and knowledge outputs before bug-fix planning.
+6. Implement similar-system discovery for new function work using exact search
+   first, semantic/indexed retrieval where available, and explicit code/spec
+   citations in plan or explorer-check evidence.
+7. Add future-refactor debt capture to workbench/report/spec outputs, plus
+   optional narrow code comments only where the future refactor must stay
+   visible to maintainers.
+8. Implement orchestrator rule loading so all applicable `.agents/rules/` are
+   read before routing and summarized into delegated-agent task instructions.
+9. Update affected project-local skills and docs, then record a pending item to
+   propagate the skill change back to universal-skills through the branch/PR
+   flow.
+10. Add validation tests for missing preflight evidence, repeated-problem
+   escalation, similar-system evidence, and rule-context propagation.
+11. Update operator docs and templates only after behavior and validation pass.
+
+## 9) Constraints and Assumptions
+
+Assumptions:
+
+- Repo-local `rg`, roadmap/spec docs, lessons, rules, and workbench artifacts
+  are sufficient for the first implementation.
+- Similar-system detection can start with exact and path-aware search before
+  adding heavier semantic retrieval.
+- The orchestrator can pass rule obligations as concise task context without
+  pasting entire rule files into every delegated prompt.
+
+Constraints:
+
+- Compatibility: existing quick-mode and workbench flows must keep working.
+- Operational: generated or managed timestamps must be updated through existing
+  automation where applicable.
+- Safety: similar existing systems must not be modified unless the user has
+  explicitly scoped that refactor.
+
+## 10) Acceptance
+
+Success looks like:
+
+- A plan for non-trivial work records the governing feature/spec found, or
+  records the governance gap and blocks implementation until resolved.
+- A recurring problem report records prior occurrences, heavier verification,
+  and the prevention rule or lesson update created from the recurrence.
+- Feature work records local skill/docs updates and a universal-skills
+  propagation pending item when agent-facing behavior changes.
+- Work touching a specific element type records which rule/skill/spec applied,
+  or records a rule gap and a follow-up when no project-specific guidance
+  exists.
+- New function work records the similar-system search result and cites the
+  closest code/spec matches when they exist.
+- Similar systems are not modified by default; any refactor is captured as a
+  future pending item unless explicitly approved for the current workstream.
+- Delegated agents receive the applicable rule obligations from the
+  orchestrator and verification can detect when that did not happen.
+
+Review questions:
+
+- Does the evidence prove the agent looked for an existing spec before planning?
+- Does recurrence handling produce a prevention mechanism, not just another
+  fix?
+- Does similar-system evidence prevent accidental duplication without forcing
+  a risky refactor?
+- Can a reviewer see which rules the orchestrator enforced for each agent?
+
+## 11) Risks and Tradeoffs
+
+- Risk: preflight becomes too heavy for small tasks -> Mitigation: keep quick
+  mode exempt when already inside approved context.
+- Risk: similar-system search creates noisy false positives -> Mitigation:
+  require the agent to label results as direct match, related pattern, or noise.
+- Risk: agents overuse code comments for refactor debt -> Mitigation: prefer
+  workbench/spec/report debt capture and allow code comments only on exact debt
+  lines.
+- Risk: rule context becomes too large for delegated agents -> Mitigation:
+  summarize obligations and link rule files instead of copying full text when
+  not needed.
+
+## 12) Verification Philosophy
+
+Evidence expected from delivery:
+
+- Unit or integration tests for plan/spec preflight outcomes.
+- Tests or fixtures for recurring-problem lookup against lessons and rules.
+- Tests proving similar-system evidence is recorded without modifying the
+  existing similar system.
+- Tests proving orchestrator/delegation instructions include applicable rules.
+- Strict workbench validation and `just lint`.
+
+Open questions:
+
+- Q-01 Should recurring-problem detection be command-driven, prompt-driven, or
+  both?
+- Q-02 Which artifact should be canonical for future-refactor debt:
+  explorer-check, plan, report, or a dedicated debt section?
+- Q-03 Should all delegated agents receive all rules, or only a resolved subset
+  plus links to the full rule files?
+
+## 13) Acceptance Checklist
+
+- [x] User journey is explicit
+- [x] Scope and non-goals are explicit
+- [x] Child-spec policy is defined
+- [x] Constraints and risks are explicit
+- [x] Feature intent is understandable without implementation detail
+
+---
+
+*Spec: `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md`*

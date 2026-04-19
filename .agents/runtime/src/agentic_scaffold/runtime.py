@@ -7,6 +7,7 @@ from typing import Any
 from agentic_scaffold.config import RuntimeConfig, build_runtime_config
 from agentic_scaffold.models import RepoManifest, SkillSummary, UndoResult
 from agentic_scaffold.registry import RuntimeRegistry
+from agentic_scaffold.services.adoption import AdoptionPlanner
 from agentic_scaffold.services.changes import ChangeService
 from agentic_scaffold.services.journal import JournalStore
 from agentic_scaffold.services.search import KnowledgeSearchService
@@ -21,6 +22,7 @@ class AgenticRuntime:
         self.workspace = WorkspaceInspector(config.repo_root)
         self.search = KnowledgeSearchService(config.repo_root, config.search_roots)
         self.validator = StructureValidator(config)
+        self.adoption = AdoptionPlanner(config)
         self.changes = ChangeService(config, self.journal)
         self.registry = RuntimeRegistry(config)
 
