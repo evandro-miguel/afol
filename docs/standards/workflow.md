@@ -55,11 +55,14 @@ Create or update the governing feature spec in `docs/arc/SPECS/`
 
 Create a plan file using `docs/templates/plan.md` only when the work actually needs an execution plan
 
+- `plan + task` is the core tracked-work pair for substantial execution
 - Link the plan to `roadmap_feature` and `parent_spec`
 - Treat the plan as an ExecPlan: a living execution document, not a static memo
 - Follow `PLANS.md` from the repo root when authoring or updating the plan
 - Use the plan to organize delivery, not to invent feature philosophy
 - Keep progress, discoveries, decisions, outcomes, and validation current while work proceeds
+- Do not create `brainstorm`, `research`, `explorer-check`, or `postmortem` artifacts automatically
+- If optional artifacts are created, they must be marked `final` before session closure
 - Do not create a plan only to justify creating another plan or to wrap a pure research-only request
 
 #### Step 4: Tasks
@@ -69,6 +72,7 @@ Create task files using `docs/templates/task.md` only when there is executable w
 - One task per logical unit
 - Track execution state
 - Keep task work aligned to the approved roadmap/spec context
+- The task file is the required partner to the plan file for non-trivial work
 
 #### Step 5: Execution + Log
 
@@ -90,13 +94,15 @@ Create report using `docs/templates/report.md` only after there is a real delive
 - Document lessons learned
 - Include a documentation-drift check and the files updated to keep the scaffold documentation current
 - If runtime guidance changed, include a mirror sync status (`AGENTS.md` -> `CLAUDE.md`)
+- List any optional artifacts that were created for the workstream and whether each one is `final`
 
-#### Step 7: Retrospective (Optional but Recommended)
+#### Step 7: Postmortem (Optional but Recommended)
 
-Create retrospective using `docs/templates/retrospective.md`
+Create postmortem using `docs/templates/postmortem.md` when a closure analysis would add value
 
 - Document what worked and what didn't
 - Identify lessons for future work
+- Inventory optional artifacts created in the workstream and state whether each one was finalized
 - Capture actionable improvements
 
 ### Quick changes

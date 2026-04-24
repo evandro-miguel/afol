@@ -196,7 +196,7 @@ if [ ! -d "${SCRIPTS_DIR}/.venv" ] && [ -z "${AGENTS_SCRIPT_PYTHON:-}" ]; then
 fi
 
 if [ -z "${PYTHON_BIN}" ]; then
-    echo "❌ Python interpreter not found. Run 'just setup' to provision .agents/scripts/.venv."
+    echo "❌ Python interpreter not found. Install Python 3.11+ and rerun the scaffold bootstrap to provision .agents/scripts/.venv."
     exit 1
 fi
 
@@ -204,6 +204,7 @@ fi
 # Aliases are handled in the case statement below
 declare -A COMMAND_MAP=(
     ["doctor"]="agents-doctor"
+    ["benchmark"]="agents-benchmark"
     ["new"]="agents-new"
     ["index"]="agents-index"
     ["lint-docs"]="agents-lint-docs"
@@ -280,6 +281,7 @@ show_help() {
     echo "Commands:"
     if ! render_registry_help_commands; then
         echo "  doctor              Validate .agents structure and integrity"
+        echo "  benchmark           Run controlled runtime-flow benchmark scenarios"
         echo "  new                 Create new governed workstreams"
         echo "  index               Update specs and decision indexes"
         echo "  lint-docs           Validate markdown docs consistency"
@@ -308,6 +310,8 @@ show_help() {
     echo
     echo "Examples:"
     echo "  .agents/agents doctor"
+    echo "  .agents/agents benchmark list"
+    echo "  .agents/agents benchmark run --save"
     echo "  .agents/agents new auth-refactor --feature-id F-01 --parent-spec my-parent-spec --spec"
     echo "  .agents/agents structure-map . --output docs/map/structure/"
     echo "  .agents/agents repo-map ."

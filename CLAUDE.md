@@ -61,6 +61,18 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - Mandatory gate: `just lint` must pass before any task/session can be marked as complete
 - Ask: `Would this pass a strict senior/staff review?`
 - Deterministic verification: evidence over assumptions
+- When a change touches runtime adapters, tool routing, prompt/rule loading,
+  agent selection, or other execution-flow surfaces that could break how agents
+  actually operate, prefer running the controlled runtime-flow benchmark family
+  to measure regression risk.
+- Treat runtime-flow benchmarks as targeted regression measurement, not a
+  universal gate for every task.
+- The default benchmark baseline for this family should be `gpt-5.4-mini` with
+  `medium` reasoning unless a governing benchmark spec explicitly says
+  otherwise.
+- Benchmark artifacts should capture, when the runner supports it, pass/fail,
+  timing, tool success/failure, retries/errors, and prompt/context size
+  signals.
 
 ### Documentation Currency (Mandatory)
 
@@ -124,13 +136,14 @@ This repository is a base scaffold for an `AGENTS`-based workflow system used to
 - For major work, the workbench plan file is an ExecPlan and must follow `PLANS.md`
 - The canonical ExecPlan path is `.agents/wb/<session_id>/<session_id>_plan_01.md`
 - ExecPlans must stay self-contained and living: keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current while work proceeds
-- Major plans must link to a brainstorm artifact before the plan can be considered complete
-- Major plans must link to an explorer-check artifact proving the current repo was inspected
+- Workbench minimum required set: `plan` + `task`
+- Do not create optional artifacts (`brainstorm`, `research`, `explorer-check`, `log`, `report`, `postmortem`) by abstract obligation only
+- If optional artifacts exist, they must be finalized before session closure
 - Search prior findings through `.agents/agents knowledge` before broad repo rereads when relevant
 - Prefer `.agents/agents knowledge pull "<topic>"` before opening full historical docs so the first pass stays compact
 - If external memory integration is enabled, use `.agents/agents memory search|context "<topic>"` after repo-local `knowledge` lookup when cross-project context is still needed
 - Treat external memory as auxiliary retrieval only; never replace `.agents/wb/` or repo-local `knowledge` as canonical project state
-- Final session closure requires a finalized postmortem
+- Postmortem is optional; when present, it must be finalized before closure
 
 ### Demand Elegance (Balanced)
 

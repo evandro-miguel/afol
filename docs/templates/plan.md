@@ -14,10 +14,11 @@ parent_spec: <parent_spec_id>
 child_spec: <child_spec_id_or_empty>
 links:
   roadmap: <roadmap_path>
-  brainstorm: <brainstorm_doc_id>
-  explorer_check: <explorer_check_doc_id>
-  research: <research_doc_id>
   task: <task_doc_id>
+  brainstorm: <brainstorm_doc_id_or_empty>
+  explorer_check: <explorer_check_doc_id_or_empty>
+  research: <research_doc_id_or_empty>
+  postmortem: <postmortem_doc_id_or_empty>
 repo: <repo_name>
 branch: <branch_or_worktree>
 ---
@@ -30,6 +31,7 @@ This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, 
 
 - Explain what this change enables for a user or operator.
 - State how someone can see the new behavior working after implementation.
+- `plan + task` is the required execution core for non-trivial work.
 
 ## Progress
 
@@ -63,9 +65,11 @@ This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, 
 
 ## Planning Inputs
 
-- Brainstorm artifact: `<brainstorm_doc_id>`
-- Explorer check artifact: `<explorer_check_doc_id>`
-- Research artifact: `<research_doc_id>`
+- Task artifact: `<task_doc_id>` (required)
+- Brainstorm artifact: `<brainstorm_doc_id_or_empty>` (optional)
+- Explorer check artifact: `<explorer_check_doc_id_or_empty>` (optional)
+- Research artifact: `<research_doc_id_or_empty>` (optional)
+- Postmortem artifact: `<postmortem_doc_id_or_empty>` (optional)
 - Knowledge lookup performed:
   - <command/result or prior docs reviewed>
 
@@ -130,9 +134,9 @@ This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, 
 
 ## Completion Gate
 
-- [ ] Brainstorm exists and reflects real option analysis
-- [ ] Explorer check proves current-project inspection happened
+- [ ] Task exists and tracks the executable work
 - [ ] Relevant prior knowledge was searched or explicitly ruled out
+- [ ] Any optional artifact created for this workstream is `final`
 - [ ] The ExecPlan remains self-contained enough for a new contributor to resume
 - [ ] Progress entries reflect the actual current state
 - [ ] Validation path is concrete enough to execute without guesswork

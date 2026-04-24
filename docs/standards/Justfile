@@ -13,6 +13,7 @@ QUERY := env("QUERY", "")
 RUNTIME := env("RUNTIME", "")
 PROJECT := env("PROJECT", "")
 LIMIT := env("LIMIT", "")
+SCENARIOS := env("SCENARIOS", "")
 TOPIC := env("TOPIC", "")
 URL := env("URL", "")
 DEPTH := env("DEPTH", "")
@@ -66,6 +67,9 @@ OUTCOME := env("OUTCOME", "")
 PERIOD := env("PERIOD", "")
 FORMAT := env("FORMAT", "")
 OUTPUT := env("OUTPUT", "")
+SAVE := env("SAVE", "")
+MODEL := env("MODEL", "")
+REASONING := env("REASONING", "")
 MIN_SCORE := env("MIN_SCORE", "")
 TAGS := env("TAGS", "")
 PATTERN_ID := env("PATTERN_ID", "")
@@ -187,6 +191,17 @@ tools-check:
   @echo "→ Running tools smoke tests..."
   @./.agents/agents tools smoke
   @echo "✓ Tools catalog and CLI smoke validated"
+
+benchmark-runtime-flow:
+  @echo "→ Running controlled runtime-flow benchmarks..."
+  @cmd=(./.agents/agents benchmark run); \
+  if [ -n "${SCENARIOS:-}" ]; then IFS=, read -r -a scenario_list <<< "${SCENARIOS}"; cmd+=("${scenario_list[@]}"); fi; \
+  if [ -n "${MODEL:-}" ]; then cmd+=(--model "${MODEL}"); fi; \
+  if [ -n "${REASONING:-}" ]; then cmd+=(--reasoning-effort "${REASONING}"); fi; \
+  if [ -n "${SAVE:-}" ]; then cmd+=(--save); fi; \
+  if [ -n "${OUTPUT:-}" ]; then cmd+=(--output "${OUTPUT}"); fi; \
+  "${cmd[@]}"
+  @echo "✓ Runtime-flow benchmark run completed"
 
 test-scripts:
   @echo "→ Running script unit tests..."

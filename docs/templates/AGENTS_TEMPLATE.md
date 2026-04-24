@@ -130,6 +130,16 @@ status: draft
 - Compare intended behavior vs actual behavior
 - Run verification commands and capture evidence
 - Mandatory gate: `just lint` must pass before considering the task complete
+- When a change touches runtime adapters, tool routing, prompt/rule loading,
+  agent selection, or other execution-flow surfaces that can silently degrade
+  how agents actually operate, prefer running the controlled runtime-flow
+  benchmark family.
+- The benchmark family is selective, not a universal gate for every task.
+- Default benchmark baseline for this scaffold family: `gpt-5.4-mini` with
+  `medium` reasoning unless a benchmark spec or scenario says otherwise.
+- Benchmark artifacts should capture, when the runner supports it, pass/fail,
+  timing, tool success/failure, retries/errors, and prompt/context size
+  signals.
 - Ask: `Would this pass a strict senior/staff review?`
 - Deterministic verification: evidence over assumptions
 
@@ -155,11 +165,13 @@ status: draft
 - For major work, the workbench plan file is an ExecPlan and must follow `PLANS.md`
 - The canonical ExecPlan path is `.agents/wb/<session_id>/<session_id>_plan_01.md`
 - ExecPlans must stay self-contained and living: keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current while work proceeds
-- Major plans must link to a brainstorm artifact before the plan can be considered complete
-- Major plans must link to an explorer-check artifact proving the current repo was inspected
+- `plan + task` is the core execution pair for tracked work
+- Do not create `brainstorm`, `research`, `explorer-check`, or `postmortem` artifacts automatically
+- If optional artifacts are created, they must be marked `final` before closure
 - Search prior findings through `.agents/agents knowledge` before broad repo rereads when relevant
 - Prefer `.agents/agents knowledge pull "<topic>"` before opening full historical docs so the first pass stays compact
-- Final session closure requires a finalized postmortem
+- When a postmortem is created, use it to inventory which optional artifacts existed and whether each one was finalized
+- Final session closure requires every optional artifact that exists in the workstream to be `final`
 
 ### Demand Elegance (Balanced)
 

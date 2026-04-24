@@ -4,7 +4,7 @@ id: scripts-usage
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-13T19:37:02-03:00'
+updated_at: '2026-04-24T12:29:13-03:00'
 ---
 
 # Scripts Usage
@@ -63,6 +63,8 @@ just wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with e
 .agents/agents wb-update touch
 .agents/agents wb-update evidence T-01 --session <id> --command "just verify-strict" --result "passed"
 .agents/agents tools list
+.agents/agents benchmark list
+.agents/agents benchmark run live-implement-next-governance-preflight --save
 .agents/agents telemetry heat --period weekly
 .agents/agents status
 .agents/agents implement next
@@ -253,6 +255,43 @@ python .agents/scripts/agents-memory.py show projects/260311-basic-memory-implem
 
 ---
 
+### agents-benchmark.py
+
+Runs the controlled live-agent runtime-flow benchmark family for risky scaffold execution
+changes.
+
+**Default benchmark profile:**
+
+- `runtime=codex`
+- `model=gpt-5.4-mini`
+- `reasoning_effort=medium`
+
+**Core metrics:**
+
+- overall and per-scenario `pass` / `fail`
+- duration in milliseconds
+- retries and error counts
+- tool success count and success rate
+- `context_bytes` from declared fixture artifacts
+- observed tool calls and required command matching
+- `checks_total`, `checks_passed`, and `accuracy`
+
+**Usage:**
+
+```bash
+python .agents/scripts/agents-benchmark.py list
+python .agents/scripts/agents-benchmark.py show live-implement-next-governance-preflight
+python .agents/scripts/agents-benchmark.py run
+python .agents/scripts/agents-benchmark.py run live-implement-start-complete-evidence --save
+python .agents/scripts/agents-benchmark.py run live-wb-update-task-evidence-timeline --save
+python .agents/scripts/agents-benchmark.py run live-tools-benchmark-discovery --output .agents/data/benchmarks/results/manual.json
+```
+
+This runner uses isolated temporary fixture repos so benchmark scenarios do not
+mutate the live workbench session of the current repository.
+
+---
+
 ### agents-lint-docs.py
 
 Validates markdown docs for consistency.
@@ -404,6 +443,8 @@ Executes guided task transitions.
 - `next`: show the next active task
 - `start`: move a task to `in_progress`
 - `complete`: mark a task done and write a lightweight evidence record
+- For governed sessions under `.agents/wb/`, the command now loads and prints
+  the active feature/spec/rule bundle before task transitions proceed.
 
 **Usage:**
 

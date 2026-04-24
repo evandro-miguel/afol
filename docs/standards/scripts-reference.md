@@ -4,7 +4,7 @@ id: scripts-reference
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-13T19:37:02-03:00'
+updated_at: '2026-04-24T12:29:13-03:00'
 ---
 
 # Agents System - Quick Reference
@@ -16,6 +16,7 @@ updated_at: '2026-04-13T19:37:02-03:00'
 ```bash
 just help          # Show all commands
 just doctor        # Validate .agents structure
+just benchmark-runtime-flow # Run controlled live-agent runtime-flow benchmarks
 just new THEME=x   # Create workstream
 just structure     # Generate project structure docs
 just agents-all    # Full scaffold validation workflow
@@ -34,6 +35,7 @@ just all           # Alias for just agents-all
 | `just index` | Update SPECS/ADRS indexes | - |
 | `just sync` | Sync AGENTS.md files | - |
 | `just tools-check` | Validate tools catalog + CLI smoke tests | - |
+| `just benchmark-runtime-flow` | Run the controlled live-agent runtime-flow benchmark family | `SCENARIOS=id1,id2`, `MODEL=gpt-5.4-mini`, `REASONING=medium`, `SAVE=1`, `OUTPUT=<path>` |
 | `just new` | Create workstream | `THEME=<name>` `SPEC=1\|lite` |
 | `just bootstrap` | Bootstrap .agents system in another repository | `TARGET=/path/to/repo` |
 | `just verify` | Check task completion across all sessions | - |
@@ -138,6 +140,9 @@ Just wrapper entrypoint:
 ```bash
 .agents/agents help
 .agents/agents doctor
+.agents/agents benchmark list
+.agents/agents benchmark run live-implement-next-governance-preflight --save
+.agents/agents benchmark run live-wb-update-task-evidence-timeline --save
 .agents/agents new auth-refactor --spec
 .agents/agents structure-map . --output docs/map/structure/
 .agents/agents repo-map .

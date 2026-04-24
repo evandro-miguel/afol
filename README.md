@@ -11,8 +11,8 @@ Primary supported runtimes: OpenCode, Codex, Qwen, Gemini CLI, and Claude Code s
 `.agents` is a standardized system for managing LLM-assisted development workflows, focused on:
 
 - **Consistent documentation** - Standardized templates for plans, tasks, reports
-- **Planning rigor** - Brainstorm and explorer-check gates for major plans
-- **Knowledge reuse** - Low-token search over prior research, reports, and postmortems
+- **Planning rigor** - Plan/task first, with optional brainstorm or explorer-check when useful
+- **Knowledge reuse** - Low-token search over prior research, reports, and finalized postmortems when they exist
 - **Automated telemetry** - Tracks tool, pattern, and document usage without manual intervention
 - **Heat scoring** - Identifies hot/cold elements by period (daily, weekly, monthly)
 - **Pattern catalog** - Catalog of patterns and anti-patterns with automatic suggestions
@@ -72,6 +72,9 @@ just doctor
 
 # List available tools
 .agents/agents tools list
+
+# Inspect the controlled live-agent runtime-flow benchmark family
+.agents/agents benchmark list
 ```
 
 ### 2. Create Workstream
@@ -87,15 +90,16 @@ just doctor
 #    the user asks.
 
 # 4. Create the workstream with mandatory governance linkage
-.agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --spec-lite
-# `--spec-lite` is the current CLI compatibility flag while `spec-child` is the canonical future doc name.
+.agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --child-spec 260306_auth_refactor_spec-child_01
+# Use --child-spec <id> to link an existing child spec.
+# Use --spec-lite only when you need to create a local lightweight spec artifact.
 
 # Research-only workstream
 .agents/agents new auth-investigation --feature-id F-02 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --intent research
 
 # The same theme would also infer `research` safely if --intent is omitted
 
-# Governed planning workstream (seeds brainstorm + explorer-check + plan by default)
+# Governed planning workstream (plan/task first; optional brainstorm or explorer-check)
 .agents/agents new planning-track --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --intent planning
 
 # Optional: add a pack for another major track inside an existing session
@@ -218,7 +222,8 @@ just telemetry-heat PERIOD=daily
 # Catch up the active session before resuming after a gap
 .agents/agents session catchup --session <session-id>
 
-# Finalize postmortem before closing the session report
+# Finalize postmortem, if one exists, before closing the session report
+# The final postmortem now requires a completed Governance Promotion Review.
 .agents/agents wb-update status --session <session-id> --file postmortem --value final
 .agents/agents wb-update status --session <session-id> --file report --value final
 
@@ -347,10 +352,10 @@ just patterns-apply PATTERN_ID=PAT-001
 - `spec.md` / `spec-child.md` - Local workstream refinements chosen as needed
 - `spec-lite.md` - Legacy compatibility alias for `spec-child`
 - `spec-test.md` - Journey-first testing strategy artifact before test implementation
-- `brainstorm.md` - Ideation when real option analysis happened
-- `explorer-check.md` - Current-project exploration proof when repo inspection is needed
+- `brainstorm.md` - Optional ideation artifact when real option analysis happened
+- `explorer-check.md` - Optional current-project exploration proof when repo inspection is needed
 - `research.md` - Research when durable findings are needed
-- `postmortem.md` - Final session closure artifact when a real outcome exists
+- `postmortem.md` - Optional final session closure artifact that records optional artifact state and whether the session should promote a lesson, rule, ADR/decision, or skill/doc follow-up
 
 ### ExecPlans
 
@@ -398,6 +403,7 @@ just lint-scripts   # Lint Python operational scripts
 just test-scripts-all # Run script unit + integration tests with 80% coverage gate
 just lint-runtime   # Lint central runtime package
 just test-runtime   # Run central runtime tests
+just benchmark-runtime-flow # Run controlled live-agent runtime-flow benchmarks selectively after risky execution changes
 just runtime-mcp-smoke # Smoke runtime and MCP CLIs
 just agents-all     # Full scaffold validation, including docs, scripts, runtime, tools, telemetry, and MCP smoke
 just all            # Alias for just agents-all
@@ -442,9 +448,12 @@ just patterns-rate      # Rate pattern
 # Main tools
 .agents/agents doctor           # Validate structure
 .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id>  # Create minimal delivery workstream (task by default)
-.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --intent planning  # Create governed planning bundle (brainstorm + explorer-check + plan)
+.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --intent planning  # Create governed planning workstream (plan/task first; optional brainstorm or explorer-check)
 .agents/agents verify-tasks     # Verify tasks
 .agents/agents status           # Show session status + workflow artifact readiness
+.agents/agents benchmark list   # List controlled live-agent runtime-flow benchmark scenarios
+.agents/agents benchmark run live-implement-next-governance-preflight --save  # Run one live benchmark and persist JSON output
+.agents/agents benchmark run live-wb-update-task-evidence-timeline --save  # Measure script-based task/evidence/timeline flow
 .agents/agents wb-update touch  # Update session
 .agents/agents bootstrap /path/to/target-repo --dry-run  # Preview generic export to another repo
 .agents/agents bootstrap /path/to/existing-project --partial  # Partial install for a live repo
@@ -536,7 +545,7 @@ just telemetry-cold PERIOD=monthly TYPE=tools
 
 ## 🤝 Contributing
 
-1. Create only the workstream artifacts you need: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite` (`--spec-lite` remains the current compatibility flag for `spec-child`)
+1. Create only the workstream artifacts you need: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --child-spec <child-spec-id>` when linking an existing child spec; use `--spec-lite` only when creating a local lightweight spec artifact.
 2. Follow templates from `docs/templates/`
 3. Apply relevant patterns
 4. Validate: `just all`

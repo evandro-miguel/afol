@@ -24,6 +24,7 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 | Script | Purpose |
 |--------|---------|
 | `agents-doctor.py` | Validate .agents structure |
+| `agents-benchmark.py` | Run controlled live-agent runtime-flow benchmark scenarios |
 | `agents-tools.py` | Discover and inspect available tools |
 | `agents-tools-smoke.py` | Smoke-test `tools` CLI behavior |
 | `agents-bootstrap.py` | Bootstrap a generic .agents baseline into another repository, including partial install for live projects |
@@ -47,6 +48,7 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 `agents-wb-update.py` supports task/status/timeline/link automation with explicit `--session` scope for write safety.
 `agents-knowledge.py` provides low-token list/search/pull/show/index over research, brainstorm, explorer-check, report, and postmortem docs.
 `agents-repo-map.py` wraps the external `docker-analisys-tools` runner so `docs/map/` can be refreshed through a project-local command instead of ad-hoc shell usage.
+`agents-benchmark.py` runs the standard controlled live-agent runtime-flow benchmark family through `codex exec --json` and can persist JSON outputs under `.agents/data/benchmarks/results/`.
 For per-process isolation, set `AGENTS_ACTIVE_SESSION_FILE` to use a custom active-session pointer.
 
 Tools catalog source: `.agents/tools.json`.
@@ -56,14 +58,9 @@ Catalog validation: `./.agents/agents tools validate`.
 
 ## Documentation
 
-Tool catalog: `.agents/tools.json`
+Full usage documentation: `docs/standards/scripts-usage.md`
 
-Command help:
-
-```bash
-./.agents/agents tools list
-./.agents/agents tools info <tool-id>
-```
+Quick reference: `docs/standards/scripts-quickstart.md`
 
 ## Setup
 

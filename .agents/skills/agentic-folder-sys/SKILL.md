@@ -58,10 +58,13 @@ Before finalizing, scan [Gotchas](./gotchas.md).
 - Workbench lives at `.agents/wb/`; keep one session folder per workstream.
 - Treat `.agents/wb/.active_session` as canonical when it exists.
 - Use standardized workbench artifacts: `plan`, `task`, `log`, and `report`.
-- For major work, also use `brainstorm`, `explorer-check`, and `postmortem`.
+- For major work, `brainstorm`, `research`, `explorer-check`, and `postmortem` are optional companion artifacts when they materially help the workstream.
 - Before touching any file or artifact, resolve the applicable rule, standard,
   template, skill, and spec for that element. Apply all cumulative guidance for
   the element type and work intent, such as TypeScript plus feature plus spec.
+- For governed feature execution, prefer `./.agents/agents implement ...`
+  because it should surface the active feature/spec/rule bundle before task
+  transitions run.
 - For ambiguous, product-shaped, benchmark-heavy, or prioritization-heavy work,
   run the smallest useful decision-intake lane before creating plans,
   delegating agents, benchmarking, or implementing.
@@ -86,12 +89,15 @@ Before finalizing, scan [Gotchas](./gotchas.md).
 4. Resolve the applicable rules for each element the workstream will touch.
 5. For feature work, keep local skills and docs in sync with behavior changes
    and leave a universal-skills propagation pending item.
-6. Start with `plan` and `task`; add `brainstorm` and `explorer-check` before
-   execution for major work.
+6. Start with `plan` and `task`; add `brainstorm`, `research`, or
+   `explorer-check` only when they materially help the work.
 7. Execute the change and record progress in `log`.
 8. Record validation with `./.agents/agents wb-update evidence ...`.
 9. Run repo checks and strict session verification before closure.
-10. Close with `report` and, for major workstreams, `postmortem`.
+10. Close with `report`; if `brainstorm`, `research`, `explorer-check`, or
+    `postmortem` exist, finalize them before closure.
+11. If a `postmortem` exists, complete its governance-promotion review before
+    setting `status=final`.
 
 ## Workbench Artifacts
 
@@ -102,7 +108,7 @@ Minimum artifact set:
 - `log`
 - `report`
 
-Common companion artifacts:
+Common optional companion artifacts:
 
 - `brainstorm`
 - `explorer-check`
@@ -111,7 +117,9 @@ Common companion artifacts:
 - `spec-test` for test-focused strategy work
 - `spec-lite` as a legacy compatibility alias
 - `blocks`
-- `postmortem`
+- `postmortem` - Optional final closure artifact that records which optional
+  artifacts existed, whether they were finalized, and whether the session
+  should promote a lesson, rule, ADR/decision, or skill/doc follow-up
 
 Use templates from `./references/templates/` when creating or repairing
 workbench files.

@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-04-19T18:29:31+00:00"
-updated_at: "2026-04-19T18:29:31+00:00"
+created_at: "2026-04-21T19:07:44+00:00"
+updated_at: "2026-04-21T19:07:44+00:00"
 ---
 
 # SPECS INDEX

@@ -141,6 +141,48 @@
       "just_command": "just doctor"
     },
     {
+      "id": "benchmark",
+      "name": "Agents Runtime Flow Benchmark",
+      "tool": "agents-benchmark.py",
+      "wrapper_command": ".agents/agents benchmark <command> [args]",
+      "type": "verification",
+      "execution_mode": "on-demand",
+      "created_at": "2026-04-23",
+      "updated_at": "2026-04-23",
+      "description": "Runs controlled live-agent runtime-flow benchmark scenarios for risky scaffold execution changes, including scripted flows and autonomous hypothetical delivery tasks, using real `codex exec` tool calls with the default `gpt-5.4-mini` + `medium` baseline and emitting JSON results for pass/fail, timing, tool usage, tool success rate, required/forbidden command matching, retries, accuracy, and context size. Autonomous scenarios should discover operations from AGENTS.md and this catalog and use `.agents/agents` wrappers rather than reading `.agents/scripts/*.py` internals.",
+      "when_to_use": [
+        "After changing governed command routing, runtime registry behavior, or rule/spec visibility",
+        "When a risky execution-flow change needs empirical regression measurement beyond smoke checks",
+        "When comparing scaffold execution behavior with the standard mini baseline profile",
+        "When validating that autonomous prompts discover wrapper-first operations from AGENTS.md and tools.json without explicit scenario command hints"
+      ],
+      "commands": [
+        {
+          "name": "list",
+          "usage": "benchmark list",
+          "description": "List available controlled benchmark scenarios"
+        },
+        {
+          "name": "show",
+          "usage": "benchmark show <scenario-id>",
+          "description": "Show one scenario contract, scope, and context artifacts"
+        },
+        {
+          "name": "run",
+          "usage": "benchmark run [scenario-id ...] [--save] [--output <path>]",
+          "description": "Run one or more scenarios and emit structured JSON results"
+        }
+      ],
+      "output": "JSON benchmark result payload with scenario metrics, observed tool usage, tool_success_rate, required and forbidden command checks, checks_total, checks_passed, accuracy, context_bytes, prompt_bytes, declared benchmark profile, and stable saved snapshots under .agents/benchmarks/current-results.json and .agents/benchmarks/<pack-id>-latest.json when --save is used",
+      "workflow": [
+        "1. Run benchmark list or show to select the right scenario pack",
+        "2. For autonomous scenarios, discover operations from AGENTS.md and tools.json and execute via `.agents/agents` wrappers instead of `.agents/scripts/*.py` internals",
+        "3. Run benchmark run with the default mini profile or an explicit override",
+        "4. Compare pass/fail, timing, retries, tool_success_rate, accuracy, and context_bytes against prior runs"
+      ],
+      "just_command": "just benchmark-runtime-flow [SCENARIOS=id1,id2] [SAVE=1]"
+    },
+    {
       "id": "new",
       "name": "Agents New",
       "tool": "agents-new.py",
@@ -217,6 +259,47 @@
       ],
       "output": "Installed .agents system in target repo and generated bootstrap-adaptation checklist",
       "just_command": "just bootstrap TARGET=/path/to/repo [FORCE=1] [DRY=1] [SKIP_CHECKS=1]"
+    },
+    {
+      "id": "implement",
+      "name": "Agents Implement",
+      "tool": "agents-implement.py",
+      "wrapper_command": ".agents/agents implement <next|start|complete> [args]",
+      "type": "workflow",
+      "execution_mode": "on-demand",
+      "created_at": "2026-04-24",
+      "updated_at": "2026-04-24",
+      "description": "Guides execution of a governed task: inspect the next actionable task, mark a task in progress, and complete it with a verification evidence record.",
+      "when_to_use": [
+        "Before starting a governed task in an existing workbench session",
+        "When recording task completion with evidence in one wrapper command",
+        "When avoiding manual task-state or evidence-ledger edits"
+      ],
+      "commands": [
+        {
+          "name": "next",
+          "usage": "implement next --session <session-id>",
+          "description": "Show the next governed task and applicable context"
+        },
+        {
+          "name": "start",
+          "usage": "implement start --session <session-id> --task-id T-01",
+          "description": "Move a task to in_progress before implementation"
+        },
+        {
+          "name": "complete",
+          "usage": "implement complete --session <session-id> --task-id T-01 --command \"<verification command>\" --result passed [--artifact <path>] [--note <text>]",
+          "description": "Record verification evidence and mark the task done"
+        }
+      ],
+      "workflow": [
+        "1. Use implement next or inspect the task board to select the task",
+        "2. Run implement start before making the task change",
+        "3. Run the verification command",
+        "4. Run implement complete with the verification command, result, and any artifact/note"
+      ],
+      "output": "Updated task state plus evidence record in the target workbench session",
+      "just_command": "N/A; use .agents/agents implement directly"
     },
     {
       "id": "index",
@@ -899,7 +982,8 @@
     "verification": {
       "description": "Verificam estado e conclusao",
       "tools": [
-        "verify-tasks"
+        "verify-tasks",
+        "benchmark"
       ],
       "usage_pattern": "Antes de marcar workstream como completa"
     },
@@ -959,6 +1043,7 @@
     "workflow": {
       "description": "Guided execution and closure actions over workstream state",
       "tools": [
+        "implement",
         "session"
       ],
       "usage_pattern": "When moving a session through explicit operational checkpoints"
@@ -970,7 +1055,9 @@
       "tools": [
         "tools",
         "doctor",
+        "benchmark",
         "new",
+        "implement",
         "index",
         "lint-docs",
         "structure-map",
@@ -1053,6 +1140,7 @@
     "verify": "Verifica conclusao de tarefas",
     "lint": "Valida docs markdown",
     "tools-check": "Valida tools.json e executa smoke tests da CLI tools",
+    "benchmark-runtime-flow": "Run the controlled runtime-flow benchmark family",
     "wb-touch": "Updates updated_at na sessao ativa",
     "wb-normalize-time": "Normaliza timestamps WB",
     "wb-files-changed": "Updates Files Changed no report",

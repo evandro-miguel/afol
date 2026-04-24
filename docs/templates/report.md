@@ -18,7 +18,7 @@ links:
   roadmap: <roadmap_path>
   plan: <plan_doc_id>
   task: <task_doc_id>
-  postmortem: <postmortem_doc_id>
+  postmortem: <postmortem_doc_id_or_empty>
 ---
 
 # Report: <theme>
@@ -43,6 +43,13 @@ links:
 - <path>
 - <path>
 
+## Optional Artifacts
+
+- Brainstorm: `<brainstorm_doc_id_or_empty>` -> `<draft|final|not created>`
+- Research: `<research_doc_id_or_empty>` -> `<draft|final|not created>`
+- Explorer check: `<explorer_check_doc_id_or_empty>` -> `<draft|final|not created>`
+- Postmortem: `<postmortem_doc_id_or_empty>` -> `<draft|final|not created>`
+
 ## Verification
 
 - Unit tests: `<command>` -> <pass/fail> -> Evidence: <snippet/link>
@@ -58,7 +65,7 @@ links:
 
 ## Postmortem Link
 
-- Postmortem: `<postmortem_doc_id>`
+- Postmortem: `<postmortem_doc_id_or_empty>` if created
 
 ## Lessons (if any)
 

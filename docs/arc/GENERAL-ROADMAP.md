@@ -438,6 +438,38 @@ updated_at: '2026-04-19T16:38:36-03:00'
         universal-skills propagation item for the new agent behavior.
   - [ ] Verify with focused tests, strict workbench validation, and `just lint`.
 
+### F-19 Controlled Runtime Flow Benchmarks
+
+- Status: planned
+- Why: The scaffold has smoke checks and strict workbench validation, but it
+  still lacks a standard benchmark family for controlled agent-tool execution
+  flows. When runtime adapters, prompt/rule loading, tool routing, or command
+  orchestration changes, maintainers need a repeatable way to measure whether
+  real execution flows regressed without turning that benchmark into a universal
+  gate for every change.
+- Governing spec: `docs/arc/SPECS/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md`
+- Exit criteria:
+  - The scaffold defines a standard benchmark contract for controlled
+    agent-tool execution flows with fixed scope and expected tools.
+  - The default benchmark tier is documented as `gpt-5.4-mini` with `medium`
+    reasoning unless a benchmark spec explicitly overrides it.
+  - Benchmark results capture pass/fail, timing, tool success/failure, and any
+    available context or prompt-size signal.
+  - AGENTS/rules/skills/docs explain that runtime-flow benchmarks are targeted
+    regression measurement for risky execution changes, not a universal gate
+    for every task.
+- Delivery tasks:
+  - [ ] Define the benchmark contract, scenario shape, and when-to-run policy.
+  - [ ] Define the initial controlled scenario pack for high-value execution
+        flows.
+  - [x] Plan the runtime/CLI surface for running and recording the benchmarks.
+  - [x] Add a live-agent benchmark slice that measures real `codex exec` tool
+        usage in controlled fixture tasks.
+  - [ ] Update governance docs and skills so agents know when benchmark runs are
+        advisable.
+  - [ ] Verify the planning/governance slice with strict workbench validation
+        and `just lint`.
+
 ## 5) Prioritization
 
 Score inputs:

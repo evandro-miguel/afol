@@ -18,6 +18,7 @@ uv.lock
 
 # Runtime telemetry events (operational data)
 .agents/data/telemetry/events.jsonl
+.agents/data/benchmarks/results/*
 
 # Runtime/cache snapshots
 .agents/.cache/

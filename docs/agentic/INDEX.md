@@ -3,7 +3,7 @@ doc_type: index
 id: agentic-docs-index
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-12T10:43:14-03:00'
+updated_at: '2026-04-23T19:08:41-03:00'
 ---
 
 # Documentation Index
@@ -41,6 +41,7 @@ Central index for all `.agents` system documentation.
 | `memory` | [agents-memory.md](./agents-memory.md) | External memory contract adapter |
 | `runtime` | [agents-runtime.md](./agents-runtime.md) | Central runtime package and CLI adapter |
 | `mcp` | [agents-mcp.md](./agents-mcp.md) | FastMCP adapter for agent-native scaffold operations |
+| `benchmark` | [agents-benchmark.md](./agents-benchmark.md) | Controlled runtime-flow benchmark family |
 | `bootstrap` | [agents-bootstrap.md](./agents-bootstrap.md) | Repository bootstrap |
 | `skills-sync` | [agents-skills-sync.md](./agents-skills-sync.md) | Skills sync |
 | `tools-smoke` | [agents-tools-smoke.md](./agents-tools-smoke.md) | Smoke tests |
