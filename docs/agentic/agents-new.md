@@ -147,8 +147,10 @@ typically added later with `--with postmortem` once real closure work exists.
 
 - ⚠️ System shows a warning (non-blocking)
 - ✅ New session is created normally
-- 📌 `.active_session` pointer updates to the new session
-- 🎯 Use `--session <id>` to target specific sessions in `wb-update` commands
+- 📌 `.active_session` pointer updates to the new session for the local
+  operator fast path
+- 🎯 Use `--session <id>` or `AGENTS_SESSION_ID=<id>` to target specific
+  sessions in parallel-agent contexts
 
 ```bash
 # Example: Working with multiple sessions
@@ -158,6 +160,8 @@ typically added later with `--with postmortem` once real closure work exists.
 # Target specific session for operations
 ./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done
 ./.agents/agents wb-update touch --session 260224_1200_feature-b
+# Or set AGENTS_SESSION_ID in the process environment before running status
+./.agents/agents status
 ```
 
 ## ExecPlan Convention

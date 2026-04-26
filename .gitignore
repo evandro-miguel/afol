@@ -5,6 +5,7 @@
 .agents/scripts/uv.lock
 uv.lock
 !.agents/runtime/uv.lock
+!src/project-template/.agents/runtime/uv.lock
 
 # Python cache
 .agents/scripts/__pycache__/

@@ -41,6 +41,18 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(args.command, "close")
         self.assertEqual(args.session, "test-session")
 
+    def test_parse_list_args(self):
+        parser = self.session.build_parser()
+        args = parser.parse_args(["list", "--json"])
+        self.assertEqual(args.command, "list")
+        self.assertTrue(args.json)
+
+    def test_parse_sweep_args(self):
+        parser = self.session.build_parser()
+        args = parser.parse_args(["sweep"])
+        self.assertEqual(args.command, "sweep")
+        self.assertFalse(args.json)
+
 
 class SessionHelperTests(unittest.TestCase):
     @classmethod
@@ -68,6 +80,15 @@ class SessionHelperTests(unittest.TestCase):
             with mock.patch.object(self.session, "ACTIVE_SESSION_FILE", path):
                 self.session._write_active_session("new-session")
         self.assertEqual(path.read_text().strip(), "new-session")
+
+    def test_clear_active_session(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("old\n")
+            f.flush()
+            path = Path(f.name)
+            with mock.patch.object(self.session, "ACTIVE_SESSION_FILE", path):
+                self.session._clear_active_session()
+        self.assertEqual(path.read_text(encoding="utf-8"), "")
 
     def test_print_items_empty(self):
         with mock.patch("builtins.print") as mock_print:
@@ -172,17 +193,133 @@ class SessionCloseTests(unittest.TestCase):
         parsed = json.loads(call_args[0][0])
         self.assertTrue(parsed["closed"])
 
-    def test_cmd_close_retained_pointer(self):
+    def test_cmd_close_clears_active_pointer(self):
         target = Path("/tmp/session-ret")
         with mock.patch.object(self.session, "find_session", return_value=target), \
              mock.patch.object(self.session, "_run_strict_verify",
                                return_value=mock.Mock(returncode=0, stdout="", stderr="")), \
              mock.patch.object(self.session, "_read_active_session", return_value="session-ret"), \
+             mock.patch.object(self.session, "_clear_active_session") as mock_clear, \
              mock.patch("builtins.print") as mock_print:
             result = self.session.cmd_close(self._close_args())
         self.assertEqual(result, 0)
+        mock_clear.assert_called_once_with()
         output = "\n".join(str(c) for c in mock_print.call_args_list)
-        self.assertIn("remains the default pointer", output)
+        self.assertIn("cannot remain the default pointer", output)
+
+
+def write_session_task(session_dir: Path, rows: list[str]) -> None:
+    task_file = session_dir / f"{session_dir.name}_task_01.md"
+    task_file.write_text(
+        "---\n"
+        "doc_type: task\n"
+        "id: task-test\n"
+        "---\n\n"
+        "# Tasks\n\n"
+        "## State Board\n\n"
+        "| Task | State | Owner | Notes |\n"
+        "|------|-------|-------|-------|\n"
+        + "\n".join(rows)
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_session_doc(session_dir: Path, doc_type: str, status: str) -> None:
+    doc_file = session_dir / f"{session_dir.name}_{doc_type}_01.md"
+    doc_file.write_text(
+        "---\n"
+        f"doc_type: {doc_type}\n"
+        f"status: {status}\n"
+        "---\n\n"
+        f"# {doc_type}\n",
+        encoding="utf-8",
+    )
+
+
+class SessionInventoryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.session = load_module("agents_session_inventory_tests", SCRIPT_PATH)
+
+    def _args(self, **overrides):
+        defaults = {"json": False}
+        defaults.update(overrides)
+        return argparse.Namespace(**defaults)
+
+    def test_cmd_list_json_reports_active_and_status(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            wb_dir = root / ".agents" / "wb"
+            wb_dir.mkdir(parents=True, exist_ok=True)
+            active_file = wb_dir / ".active_session"
+
+            open_dir = wb_dir / "260426_1418_open"
+            open_dir.mkdir(parents=True, exist_ok=True)
+            write_session_task(open_dir, ["| T-01 | pending | worker | first |"])
+            write_session_doc(open_dir, "report", "active")
+
+            closed_dir = wb_dir / "260426_1419_closed"
+            closed_dir.mkdir(parents=True, exist_ok=True)
+            write_session_task(closed_dir, ["| T-01 | done | worker | done |"])
+            write_session_doc(closed_dir, "report", "final")
+            write_session_doc(closed_dir, "postmortem", "final")
+
+            active_file.write_text(f"{open_dir.name}\n", encoding="utf-8")
+
+            with mock.patch.object(self.session, "WB_DIR", wb_dir), \
+                 mock.patch.object(self.session, "ACTIVE_SESSION_FILE", active_file), \
+                 mock.patch("builtins.print") as mock_print:
+                result = self.session.cmd_list(self._args(json=True))
+
+            self.assertEqual(result, 0)
+            payload = json.loads(mock_print.call_args_list[0][0][0])
+            self.assertEqual(payload["active_session"], open_dir.name)
+            self.assertEqual(payload["count"], 2)
+            by_session = {entry["session"]: entry for entry in payload["sessions"]}
+            self.assertTrue(by_session[open_dir.name]["active"])
+            self.assertEqual(by_session[open_dir.name]["report_status"], "active")
+            self.assertEqual(by_session[closed_dir.name]["postmortem_status"], "final")
+            self.assertTrue(by_session[open_dir.name]["catchup_signal"])
+            self.assertFalse(by_session[closed_dir.name]["catchup_signal"])
+
+    def test_cmd_sweep_json_classifies_stale_open_and_close_candidate(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            wb_dir = root / ".agents" / "wb"
+            wb_dir.mkdir(parents=True, exist_ok=True)
+            active_file = wb_dir / ".active_session"
+
+            stale_dir = wb_dir / "260426_1420_stale"
+            stale_dir.mkdir(parents=True, exist_ok=True)
+            write_session_task(stale_dir, ["| T-01 | pending | worker | pending |"])
+            write_session_doc(stale_dir, "report", "final")
+
+            open_dir = wb_dir / "260426_1421_open"
+            open_dir.mkdir(parents=True, exist_ok=True)
+            write_session_task(open_dir, ["| T-01 | pending | worker | pending |"])
+            write_session_doc(open_dir, "report", "active")
+
+            close_candidate = wb_dir / "260426_1422_closeable"
+            close_candidate.mkdir(parents=True, exist_ok=True)
+            write_session_task(close_candidate, ["| T-01 | done | worker | done |"])
+            write_session_doc(close_candidate, "report", "final")
+
+            active_file.write_text(f"{open_dir.name}\n", encoding="utf-8")
+
+            with mock.patch.object(self.session, "WB_DIR", wb_dir), \
+                 mock.patch.object(self.session, "ACTIVE_SESSION_FILE", active_file), \
+                 mock.patch("builtins.print") as mock_print:
+                result = self.session.cmd_sweep(self._args(json=True))
+
+            self.assertEqual(result, 0)
+            payload = json.loads(mock_print.call_args_list[0][0][0])
+            self.assertTrue(payload["read_only"])
+            self.assertEqual(payload["active_session"], open_dir.name)
+            self.assertTrue(any(stale_dir.name in item for item in payload["stale"]))
+            self.assertTrue(any(open_dir.name in item for item in payload["open"]))
+            self.assertTrue(any(close_candidate.name in item for item in payload["close_candidates"]))
+            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), open_dir.name)
 
 
 class SessionCatchupTests(unittest.TestCase):

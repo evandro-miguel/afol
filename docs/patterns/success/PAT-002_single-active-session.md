@@ -25,7 +25,7 @@ When managing multiple tasks or workstreams in the .agents system.
 
 **Maintain only one active workstream at a time (recommended for focus):**
 
-1. Use `.agents/wb/.active_session` to track current focus
+1. Use `.agents/wb/.active_session` to track current local-operator focus
 2. For small changes, use quick mode: `.agents/agents new <theme> --quick`
 3. Create new sessions as needed - system allows multiple coexisting sessions
 4. Complete or pause current session before starting another (disciplined workflow)
@@ -69,6 +69,8 @@ cat .agents/wb/.active_session
 # Target specific session for operations
 ./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done
 ./.agents/agents wb-update touch --session 260224_1200_feature-b
+# Or set AGENTS_SESSION_ID in the process environment before running status
+./.agents/agents status
 ```
 
 ### Bad Example
@@ -85,7 +87,7 @@ cat .agents/wb/.active_session
 
 - Lesson: "Avoid workbench folder sprawl"
 - `agents-new.py` allows multiple sessions (non-blocking warning since 2026-02-26)
-- `.active_session` file tracks current focus
+- `.active_session` file tracks current local focus only
 - `--session <id>` flag enables targeting specific sessions
 
 ## Related Patterns

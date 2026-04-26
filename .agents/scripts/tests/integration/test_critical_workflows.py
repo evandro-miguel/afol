@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -141,6 +142,17 @@ def build_isolated_repo(tmp_root: Path) -> Path:
     return repo_root
 
 
+def first_available_feature_and_spec(repo_root: Path) -> tuple[str, str]:
+    roadmap = (repo_root / "docs" / "arc" / "GENERAL-ROADMAP.md").read_text(encoding="utf-8")
+    specs_dir = repo_root / "docs" / "arc" / "SPECS"
+    for spec_file in sorted(specs_dir.glob("*_spec_*.md")):
+        content = spec_file.read_text(encoding="utf-8")
+        match = re.search(r"^roadmap_feature:\s*['\"]?(F-[0-9]+)['\"]?", content, re.MULTILINE)
+        if match and match.group(1) in roadmap:
+            return match.group(1), spec_file.stem
+    raise AssertionError("Expected at least one spec linked to a roadmap feature")
+
+
 @pytest.fixture
 def isolated_repo() -> Path:
     with tempfile.TemporaryDirectory() as td:
@@ -157,15 +169,16 @@ def test_new_quick_workflow(isolated_repo: Path):
 
 def test_new_planning_workflow_creates_minimum_plan_and_task(isolated_repo: Path):
     """`--intent planning` should materialize the minimum mandatory artifact set."""
+    feature_id, parent_spec = first_available_feature_and_spec(isolated_repo)
     result = run_command(
         isolated_repo,
         [
             "new",
             "integration-planning-track",
             "--feature-id",
-            "F-10",
+            feature_id,
             "--parent-spec",
-            "260323_1704_universal-skills-runtime-integration_spec_01",
+            parent_spec,
             "--intent",
             "planning",
         ],

@@ -2,15 +2,15 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-04-26T16:04:48+00:00"
-updated_at: "2026-04-26T16:04:48+00:00"
+created_at: "2026-04-26T18:08:42+00:00"
+updated_at: "2026-04-26T18:08:42+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 70
+- Total indexed docs: 72
 
 ## Brainstorm
 
@@ -57,6 +57,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260413_1851_just-command-runner-migration_postmortem_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real
 - `260415_2121_scripts-cleanup-optimization_postmortem_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_postmortem_01.md` | - Capture what this bounded F-15 cleanup slice changed and what should be reused later.
 - `260419_1554_decision-intake-orchestrator-improvements_postmortem_01` | `.agents/wb/260419_1554_decision-intake-orchestrator-improvements/260419_1554_decision-intake-orchestrator-improvements_postmortem_01.md` | - The research was converted into a lightweight decision-intake standard and
+- `260426_1418_parallel-session-local-management_postmortem_01` | `.agents/wb/260426_1418_parallel-session-local-management/260426_1418_parallel-session-local-management_postmortem_01.md` | - Make parallel workbench sessions safe inside a single project without adding a
 
 ## Report
 
@@ -82,6 +83,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260423_2120_runtime-flow-benchmark-scenario-expansion_report_01` | `.agents/wb/260423_2120_runtime-flow-benchmark-scenario-expansion/260423_2120_runtime-flow-benchmark-scenario-expansion_report_01.md` | - Delivered runtime-flow-live-agent-v2, expanding the live-agent benchmark
 - `260424_1359_benchmark-results-and-hypothesis-improvements_report_01` | `.agents/wb/260424_1359_benchmark-results-and-hypothesis-improvements/260424_1359_benchmark-results-and-hypothesis-improvements_report_01.md` | - Roadmap feature: F-19
 - `260424_1435_benchmark-indicator-improvement-round_report_01` | `.agents/wb/260424_1435_benchmark-indicator-improvement-round/260424_1435_benchmark-indicator-improvement-round_report_01.md` | - Final live autonomous benchmark passed after stabilizing the fixture runtime.
+- `260426_1418_parallel-session-local-management_report_01` | `.agents/wb/260426_1418_parallel-session-local-management/260426_1418_parallel-session-local-management_report_01.md` | - Roadmap feature: F-20
 
 ## Research
 

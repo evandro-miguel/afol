@@ -13,6 +13,7 @@ QUERY := env("QUERY", "")
 RUNTIME := env("RUNTIME", "")
 PROJECT := env("PROJECT", "")
 LIMIT := env("LIMIT", "")
+SCENARIOS := env("SCENARIOS", "")
 TOPIC := env("TOPIC", "")
 URL := env("URL", "")
 DEPTH := env("DEPTH", "")
@@ -66,6 +67,9 @@ OUTCOME := env("OUTCOME", "")
 PERIOD := env("PERIOD", "")
 FORMAT := env("FORMAT", "")
 OUTPUT := env("OUTPUT", "")
+SAVE := env("SAVE", "")
+MODEL := env("MODEL", "")
+REASONING := env("REASONING", "")
 MIN_SCORE := env("MIN_SCORE", "")
 TAGS := env("TAGS", "")
 PATTERN_ID := env("PATTERN_ID", "")
@@ -188,6 +192,17 @@ tools-check:
   @./.agents/agents tools smoke
   @echo "✓ Tools catalog and CLI smoke validated"
 
+benchmark-runtime-flow:
+  @echo "→ Running controlled runtime-flow benchmarks..."
+  @cmd=(./.agents/agents benchmark run); \
+  if [ -n "${SCENARIOS:-}" ]; then IFS=, read -r -a scenario_list <<< "${SCENARIOS}"; cmd+=("${scenario_list[@]}"); fi; \
+  if [ -n "${MODEL:-}" ]; then cmd+=(--model "${MODEL}"); fi; \
+  if [ -n "${REASONING:-}" ]; then cmd+=(--reasoning-effort "${REASONING}"); fi; \
+  if [ -n "${SAVE:-}" ]; then cmd+=(--save); fi; \
+  if [ -n "${OUTPUT:-}" ]; then cmd+=(--output "${OUTPUT}"); fi; \
+  "${cmd[@]}"
+  @echo "✓ Runtime-flow benchmark run completed"
+
 test-scripts:
   @echo "→ Running script unit tests..."
   @mkdir -p "{{uv_cache_dir}}"
@@ -221,7 +236,7 @@ lint-runtime:
 test-runtime:
   @echo "→ Running central runtime tests..."
   @mkdir -p "{{uv_cache_dir}}"
-  @UV_CACHE_DIR="{{uv_cache_dir}}" uv run --project .agents/runtime --locked pytest .agents/runtime/tests
+  @uv run --project .agents/runtime --locked pytest .agents/runtime/tests
   @echo "✓ Central runtime tests passed"
 
 runtime-mcp-smoke:
@@ -229,7 +244,7 @@ runtime-mcp-smoke:
   @./.agents/agents runtime manifest >/dev/null
   @./.agents/agents runtime command-registry >/dev/null
   @./.agents/agents mcp validate >/dev/null
-  @./.agents/agents status --json >/dev/null
+  @./.agents/agents session list --json >/dev/null
   @./.agents/agents-mcp inspect --depth 1 --max-entries 50 >/dev/null
   @echo "✓ Central runtime and MCP smoke checks passed"
 

@@ -41,6 +41,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import argparse
 
+from lib.agents_config import now_iso_with_offset
+
 
 # Configuration
 TELEMETRY_DATA_DIR = Path(
@@ -72,7 +74,7 @@ TELEMETRY_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_iso_timestamp() -> str:
     """Get current timestamp in ISO 8601 format with timezone."""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return now_iso_with_offset("Z")
 
 
 def load_schema() -> Dict[str, Any]:
@@ -699,12 +701,22 @@ def main():
 def _load_json_dict(value: Optional[str]) -> Dict[str, Any]:
     if not value:
         return {}
-    return json.loads(value)
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON value: {value}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError("JSON value must be an object")
+    return parsed
 
 
 def _handle_record(args: argparse.Namespace) -> None:
-    metadata = _load_json_dict(args.metadata)
-    context = _load_json_dict(args.context)
+    try:
+        metadata = _load_json_dict(args.metadata)
+        context = _load_json_dict(args.context)
+    except ValueError as exc:
+        print(f"❌ {exc}", file=sys.stderr)
+        sys.exit(2)
     if args.outcome:
         metadata["outcome"] = args.outcome
 

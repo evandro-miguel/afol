@@ -42,14 +42,16 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 | `agents-implement.py` | Guided task execution (`next/start/complete`) |
 | `agents-review.py` | Review session coherence and workflow constraints |
 | `agents-revert.py` | Logical revert for task/phase/pack/session units with explicit confirmation |
-| `agents-session.py` | Catch up or close a governed session with lifecycle-aware summaries |
+| `agents-session.py` | List, sweep, catch up, or close governed sessions with lifecycle-aware summaries |
 | `agents-wb-update.py` | Automate `updated_at` and report `Files Changed` updates |
 
 `agents-wb-update.py` supports task/status/timeline/link automation with explicit `--session` scope for write safety.
 `agents-knowledge.py` provides low-token list/search/pull/show/index over research, brainstorm, explorer-check, report, and postmortem docs.
 `agents-repo-map.py` wraps the external `docker-analisys-tools` runner so `docs/map/` can be refreshed through a project-local command instead of ad-hoc shell usage.
 `agents-benchmark.py` runs the standard controlled live-agent runtime-flow benchmark family through `codex exec --json` and can persist JSON outputs under `.agents/data/benchmarks/results/`.
-For per-process isolation, set `AGENTS_ACTIVE_SESSION_FILE` to use a custom active-session pointer.
+For per-process isolation, set `AGENTS_SESSION_ID` to target a session directly.
+Set `AGENTS_SESSION_STRICT=1` to reject repository-global active-session fallback.
+`AGENTS_ACTIVE_SESSION_FILE` remains available for custom local convenience pointers.
 
 Tools catalog source: `.agents/tools.json`.
 Catalog validation: `./.agents/agents tools validate`.
@@ -106,6 +108,8 @@ just lint-scripts
 ## Session Lifecycle
 
 ```bash
+python .agents/scripts/agents-session.py list
+python .agents/scripts/agents-session.py sweep
 python .agents/scripts/agents-session.py catchup
 python .agents/scripts/agents-session.py catchup --session .agents/wb/260306_2128_context-driven-execution-commands
 python .agents/scripts/agents-session.py catchup --json

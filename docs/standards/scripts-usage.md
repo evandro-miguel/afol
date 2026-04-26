@@ -483,17 +483,43 @@ python .agents/scripts/agents-revert.py session --confirm
 
 Summarizes catchup/resume state and closes a session only after strict verification succeeds.
 
+Session context:
+
+- `.agents/wb/.active_session` is a project-local convenience pointer for one
+  operator, not a safe synchronization primitive for parallel agents.
+- `AGENTS_SESSION_ID=<session-id>` is the explicit session target for shells
+  or wrappers that honor the session-context contract.
+- `AGENTS_SESSION_STRICT=1` requests strict session handling during sweep,
+  catchup, and close flows.
+
 **Behavior:**
 
+- `list` reports project-local sessions under `.agents/wb/`
+- `sweep` performs a read-only project-local stale/open/close-candidate scan
 - `catchup` reports working-tree drift, stale or missing artifacts, and the next safe resume step
 - Runs `verify-tasks.py --strict` for the target session
 - Refuses closure if strict verification fails
-- Optionally repoints `.agents/wb/.active_session` with `--next-session`
-- Leaves the active pointer unchanged by default
+- Optionally repoints the convenience pointer with `--next-session`
+- Clears the convenience pointer when the closed session was active and no
+  `--next-session` was supplied
+
+Project-local workflow:
+
+1. List local sessions with `list`.
+2. Sweep stale or overlapping sessions with `sweep`.
+3. Catch up the target session with `catchup --session <session-id>` before
+   resuming work.
+4. Close with `close --session <session-id>` only after strict verification
+   passes.
+5. Use `--next-session <next-session-id>` only for an intentional handoff.
 
 **Usage:**
 
 ```bash
+python .agents/scripts/agents-session.py list
+python .agents/scripts/agents-session.py list --json
+python .agents/scripts/agents-session.py sweep
+python .agents/scripts/agents-session.py sweep --json
 python .agents/scripts/agents-session.py catchup
 python .agents/scripts/agents-session.py catchup --session .agents/wb/260306_2128_context-driven-execution-commands
 python .agents/scripts/agents-session.py catchup --json

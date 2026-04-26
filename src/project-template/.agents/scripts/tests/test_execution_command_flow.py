@@ -327,7 +327,7 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             self.assertIn("✓ session closed", output)
             self.assertIn("->", output)
 
-    def test_session_close_keeps_active_pointer_by_default(self):
+    def test_session_close_clears_active_pointer_by_default(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)
             session_dir = temp_root / "260307_0008_close-retain"
@@ -349,8 +349,8 @@ class ExecutionCommandFlowTests(unittest.TestCase):
 
             output = buf.getvalue()
             self.assertEqual(code, 0)
-            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), session_dir.name)
-            self.assertIn("remains the default pointer", output)
+            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), "")
+            self.assertIn("cannot remain the default pointer", output)
 
     def test_session_close_aborts_when_strict_verify_fails(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:

@@ -16,7 +16,7 @@ from lib.agents_config import now_iso_with_offset
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-TEMPLATE_ROOT = ROOT_DIR
+TEMPLATE_ROOT = ROOT_DIR / "src" / "project-template"
 LOCAL_UNIVERSAL_SKILLS_DIR = Path(".agents/source/universal-skills")
 
 MANDATORY_FILES_TO_COPY = [

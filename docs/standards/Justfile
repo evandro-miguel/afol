@@ -244,7 +244,7 @@ runtime-mcp-smoke:
   @./.agents/agents runtime manifest >/dev/null
   @./.agents/agents runtime command-registry >/dev/null
   @./.agents/agents mcp validate >/dev/null
-  @./.agents/agents status --json >/dev/null
+  @./.agents/agents session list --json >/dev/null
   @./.agents/agents-mcp inspect --depth 1 --max-entries 50 >/dev/null
   @echo "✓ Central runtime and MCP smoke checks passed"
 

@@ -58,6 +58,11 @@ Wrapper contract:
 - Use `./.agents/agents bootstrap /path/to/existing-project --partial` for live repos so project-owned files stay intact.
 - Treat the skills baseline as an adoption artifact, not as scaffold-local history.
 - Treat external memory as an optional, auxiliary retrieval layer; repo-local `knowledge` and `.agents/wb/` remain canonical.
+- Treat `.agents/wb/.active_session` as a project-local convenience pointer for
+  one operator; do not use it as shared synchronization for parallel agents.
+- When a shell or wrapper honors the session-context contract, use
+  `AGENTS_SESSION_ID=<session-id>` for explicit targeting and
+  `AGENTS_SESSION_STRICT=1` for strict session handling.
 
 ## Available Commands
 
@@ -138,6 +143,21 @@ External memory workflow note:
 - Use `memory` when cross-project or durable external context is still needed.
 - Do not treat external memory results as authoritative plan/task/report state for the current repo.
 
+Project-local session workflow:
+
+1. List sessions with `./.agents/agents session list`.
+2. Sweep stale or overlapping sessions with `./.agents/agents session sweep`.
+3. Use `AGENTS_SESSION_ID=<session-id>` when the shell or wrapper supports an
+   explicit session target.
+4. Set `AGENTS_SESSION_STRICT=1` when you want strict handling during sweep,
+   catchup, or close flows.
+5. Catch up a target session before resuming with
+   `./.agents/agents session catchup --session <session-id>`.
+6. Close only after strict verification passes with
+   `./.agents/agents session close --session <session-id>`.
+7. Use `--next-session <next-session-id>` only for an intentional handoff to a
+   different session.
+
 ## Scripts Reference
 
 ### agents-doctor.py
@@ -173,7 +193,7 @@ Creates or extends a workstream with only the artifacts justified by the selecte
 - Session folder with proper naming
 - Only the artifacts justified by the selected intent
 - Optional spec file (`--spec` or `--spec-lite`; `--spec-lite` is the current compatibility alias while docs move to `spec-child`)
-- Sets `.agents/wb/.active_session`
+- Sets `.agents/wb/.active_session` for the local operator fast path
 
 **Catalog + policy contract:**
 
@@ -191,6 +211,8 @@ Creates or extends a workstream with only the artifacts justified by the selecte
 - One active workstream at a time
 - Use `--quick` for non-significant tasks (no new folder)
 - Use `--force-new` only for significant new streams
+- Treat `.agents/wb/.active_session` as a convenience pointer, not a
+  parallel-agent synchronization primitive.
 
 **Usage:**
 

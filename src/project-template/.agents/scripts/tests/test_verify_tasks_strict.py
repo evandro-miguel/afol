@@ -268,6 +268,25 @@ status: active
 class TestStrictVerification(unittest.TestCase):
     """Test strict mode verification end-to-end."""
 
+    @staticmethod
+    def _valid_postmortem_body() -> str:
+        return (
+            "# Postmortem\n\n"
+            "## What Was Achieved\n\n"
+            "- Captured the final governance review for the session.\n\n"
+            "## Root Causes\n\n"
+            "- The session needed an explicit promotion review to avoid losing repeat learnings.\n\n"
+            "## Follow-ups for Next Rounds\n\n"
+            "- Keep the governance review section mandatory whenever a postmortem is created.\n\n"
+            "## Governance Promotion Review\n\n"
+            "- Lesson entry needed: no\n"
+            "- Rule update needed: yes\n"
+            "- ADR or decision record needed: no\n"
+            "- Skill or doc update needed: yes\n"
+            "- Evidence reviewed: test_task_01, test_report_01, ./.agents/agents verify-tasks --strict\n"
+            "- Follow-up recorded: yes\n"
+        )
+
     def setUp(self):
         """Create temporary session folder."""
         self.temp_dir = tempfile.mkdtemp()
@@ -529,7 +548,7 @@ class TestStrictVerification(unittest.TestCase):
         self.assertGreater(len(results['contradictions']), 0)
         self.assertEqual(len(results['governance_issues']), 0)
 
-    def test_strict_mode_fails_when_final_plan_lacks_exploration_gates(self):
+    def test_strict_mode_does_not_require_absent_exploration_gates(self):
         governance = self._governance_fields()
         (self.session_dir / "test_plan_01.md").write_text(
             "---\n"
@@ -582,7 +601,7 @@ class TestStrictVerification(unittest.TestCase):
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results["planning_gate_issues"]), 0)
+        self.assertEqual(len(results["planning_gate_issues"]), 0)
 
     def test_strict_mode_fails_when_final_plan_lacks_execplan_sections(self):
         self._write_standard_docs(
@@ -665,7 +684,7 @@ class TestStrictVerification(unittest.TestCase):
         self.assertFalse(all_completed)
         self.assertGreater(len(results["execplan_issues"]), 0)
 
-    def test_strict_mode_fails_when_final_report_lacks_postmortem(self):
+    def test_strict_mode_allows_final_report_without_postmortem_when_absent(self):
         self._write_standard_docs(
             task_body=(
                 "# Tasks\n\n"
@@ -683,8 +702,70 @@ class TestStrictVerification(unittest.TestCase):
         report_file.write_text(report_text)
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["postmortem_issues"]), 0)
+
+    def test_strict_mode_fails_when_final_postmortem_lacks_governance_review(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            ),
+            report_body="Implementation completed and verified.\n",
+        )
+        report_file = self.session_dir / "test_report_01.md"
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
+        (self.session_dir / "test_postmortem_01.md").write_text(
+            "---\n"
+            "doc_type: postmortem\n"
+            "id: test_postmortem_01\n"
+            "status: final\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            "child_spec: \"\"\n"
+            "---\n\n"
+            "# Postmortem\n"
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
         self.assertGreater(len(results["postmortem_issues"]), 0)
+
+    def test_strict_mode_allows_final_postmortem_with_governance_review(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            ),
+            report_body="Implementation completed and verified.\n",
+        )
+        report_file = self.session_dir / "test_report_01.md"
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
+        (self.session_dir / "test_postmortem_01.md").write_text(
+            "---\n"
+            "doc_type: postmortem\n"
+            "id: test_postmortem_01\n"
+            "status: final\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            "child_spec: \"\"\n"
+            "---\n\n"
+            + self._valid_postmortem_body()
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["postmortem_issues"]), 0)
 
     def test_strict_mode_fails_when_active_artifact_is_placeholder_only(self):
         self._write_standard_docs(
@@ -758,7 +839,7 @@ class TestStrictVerification(unittest.TestCase):
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results["closure_issues"]), 0)
+        self.assertGreater(len(results["artifact_utility_issues"]), 0)
 
     def test_non_strict_mode_ignores_evidence(self):
         """Non-strict mode passes without evidence checks."""

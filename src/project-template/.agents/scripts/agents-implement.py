@@ -11,6 +11,7 @@ from lib.execution_commands import (
     append_timeline_entry,
     assert_task_sequence,
     find_session,
+    load_feature_operation_governance,
     find_task_by_id,
     next_task,
     parse_task_rows,
@@ -43,8 +44,27 @@ def _ensure_prerequisites(rows, target: str) -> None:
         raise ExecutionError(f"Task {target} is blocked by prior tasks: {'; '.join(blocking)}")
 
 
+def _emit_feature_operation_governance(session_dir: Path) -> None:
+    bundle = load_feature_operation_governance(session_dir)
+    if not bundle:
+        return
+
+    print("Governance preflight:")
+    print(f"  feature: {bundle['feature_id']}")
+    print(f"  parent_spec: {bundle['parent_spec']} -> {bundle['parent_spec_path']}")
+    if bundle.get("child_spec"):
+        print(f"  child_spec: {bundle['child_spec']} -> {bundle['child_spec_path']}")
+    print(f"  plan: {bundle['plan_path']}")
+    print(f"  task: {bundle['task_path']}")
+    print("  rules loaded:")
+    for rule in bundle["rules"]:
+        print(f"    - {rule['id']} -> {rule['path']}")
+    print()
+
+
 def cmd_next(args: argparse.Namespace) -> int:
     session_dir = find_session(args.session)
+    _emit_feature_operation_governance(session_dir)
     task_file, rows, done, remaining = _get_session_tasks(session_dir)
     _ensure_task_board(task_file, rows)
     nxt = next_task(rows)
@@ -61,6 +81,7 @@ def cmd_next(args: argparse.Namespace) -> int:
 
 def cmd_start(args: argparse.Namespace) -> int:
     session_dir = find_session(args.session)
+    _emit_feature_operation_governance(session_dir)
     task_file, rows, _, _ = _get_session_tasks(session_dir)
     _ensure_task_board(task_file, rows)
 
@@ -95,6 +116,7 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 def cmd_complete(args: argparse.Namespace) -> int:
     session_dir = find_session(args.session)
+    _emit_feature_operation_governance(session_dir)
     task_file, rows, _, _ = _get_session_tasks(session_dir)
     _ensure_task_board(task_file, rows)
 

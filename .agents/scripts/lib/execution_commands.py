@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import subprocess
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -225,14 +226,32 @@ def latest_file(session_dir: Path, alias: str) -> Optional[Path]:
     return files[-1]
 
 
+def _resolve_session_path(session: str, *, source: str) -> Path:
+    candidate = Path(session)
+    if not candidate.is_absolute():
+        candidate = (ROOT_DIR / session).resolve() if "/" in session else (WB_DIR / session).resolve()
+    if candidate.exists() and candidate.is_dir():
+        return candidate
+    raise ExecutionError(f"Session not found ({source}): {session}")
+
+
+def _strict_session_resolution_enabled() -> bool:
+    return os.getenv("AGENTS_SESSION_STRICT", "").strip() == "1"
+
+
 def find_session(session: Optional[str]) -> Path:
     if session:
-        candidate = Path(session)
-        if not candidate.is_absolute():
-            candidate = (ROOT_DIR / session).resolve() if "/" in session else (WB_DIR / session).resolve()
-        if not candidate.exists() or not candidate.is_dir():
-            raise ExecutionError(f"Session not found: {session}")
-        return candidate
+        return _resolve_session_path(session, source="--session")
+
+    env_session = os.getenv("AGENTS_SESSION_ID", "").strip()
+    if env_session:
+        return _resolve_session_path(env_session, source="AGENTS_SESSION_ID")
+
+    if _strict_session_resolution_enabled():
+        raise ExecutionError(
+            "Session resolution strict mode is enabled (AGENTS_SESSION_STRICT=1). "
+            "Pass --session <id/path> or set AGENTS_SESSION_ID."
+        )
 
     active = get_active_session_file_path(ROOT_DIR, CONFIG)
     if active.exists():

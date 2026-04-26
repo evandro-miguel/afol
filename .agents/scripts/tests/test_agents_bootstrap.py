@@ -24,6 +24,10 @@ class BootstrapTests(unittest.TestCase):
     def setUpClass(cls):
         cls.bootstrap = load_module("agents_bootstrap_tests", SCRIPT_PATH)
 
+    def _skip_without_source_template(self):
+        if not self.bootstrap.TEMPLATE_ROOT.exists():
+            self.skipTest("source project template is only present in the source repo")
+
     @staticmethod
     def _load_with_root(root: Path):
         module = load_module(f"agents_bootstrap_tests_{id(root)}", SCRIPT_PATH)
@@ -75,6 +79,7 @@ class BootstrapTests(unittest.TestCase):
 
     def test_template_root_points_to_src_project_template(self):
         """Bootstrap should read the export source from src/project-template."""
+        self._skip_without_source_template()
         self.assertEqual(self.bootstrap.TEMPLATE_ROOT, self.bootstrap.ROOT_DIR / "src" / "project-template")
 
     def test_ensure_justfile_creates_wrapper_when_missing(self):
@@ -128,6 +133,7 @@ class BootstrapTests(unittest.TestCase):
 
     def test_generated_baseline_content_includes_roadmap(self):
         """Generated baseline must include the roadmap file."""
+        self._skip_without_source_template()
         generated = self.bootstrap.generated_baseline_content("2026-01-01T00:00:00Z")
         generated_paths = {str(p) for p in generated}
         self.assertTrue(

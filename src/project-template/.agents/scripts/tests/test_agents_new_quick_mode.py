@@ -111,6 +111,35 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         with mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True):
             agents_new._validate_governance_requirements(args)
 
+    def test_get_timestamp_uses_configured_offset(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_timestamp_test", script_path)
+
+        with mock.patch.object(
+            agents_new,
+            "now_iso_with_offset",
+            return_value="2026-02-24T13:00:00-03:00",
+        ) as mocked:
+            self.assertEqual(agents_new.get_timestamp(), "2026-02-24T13:00:00-03:00")
+            mocked.assert_called_once_with(agents_new.WB_OFFSET)
+
+    def test_get_session_id_uses_compact_session_timestamp_helper(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_session_id_test", script_path)
+
+        with mock.patch.object(
+            agents_new,
+            "now_compact_for_session",
+            return_value="260624_1205",
+        ) as mocked:
+            self.assertEqual(
+                agents_new.get_session_id("my execution test"),
+                "260624_1205_my-execution-test",
+            )
+            mocked.assert_called_once_with(agents_new.WB_OFFSET)
+
     def test_add_quick_task_updates_task_and_materializes_log_when_needed(self):
         script_path = Path(".agents/scripts/agents-new.py").resolve()
         sys.path.insert(0, str(script_path.parent))
@@ -211,7 +240,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["doc_type"] for entry in planning_default],
-            ["brainstorm", "explorer-check", "plan"],
+            ["plan", "task"],
         )
 
         planning_plan_only = agents_new._iter_workstream_artifacts(
@@ -247,7 +276,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["doc_type"] for entry in delivery_with_spec],
-            ["task", "spec"],
+            ["plan", "task", "spec"],
         )
 
         research_only = agents_new._iter_workstream_artifacts(

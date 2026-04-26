@@ -331,6 +331,27 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             resolved = self.execution_commands.resolve_artifact(session_dir, "spec-child")
             self.assertIsNone(resolved)
 
+    def test_artifact_snapshot_normalizes_null_child_spec_to_empty_string(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260307_0108c_null-child-spec"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            plan_file = session_dir / f"{session_dir.name}_plan_01.md"
+            plan_file.write_text(
+                "---\n"
+                "doc_type: plan\n"
+                "id: scenario-plan\n"
+                "roadmap_feature: F-08\n"
+                "parent_spec: parent-spec\n"
+                "child_spec:\n"
+                "workstream_intent: delivery\n"
+                "---\n\n"
+                "# Plan\n",
+                encoding="utf-8",
+            )
+
+            snapshot = self.execution_commands.artifact_snapshot(plan_file)
+            self.assertEqual(snapshot["child_spec"], "")
+
     def test_workflow_artifact_states_include_only_present_optional_variant(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260307_0108a_spec-lite-state"
@@ -366,17 +387,20 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             states = self.execution_commands.workflow_artifact_states(session_dir)
             by_doc_type = {item["doc_type"]: item for item in states}
 
-            self.assertEqual(by_doc_type["brainstorm"]["state"], "ready")
-            self.assertEqual(by_doc_type["explorer-check"]["state"], "ready")
-            self.assertEqual(by_doc_type["plan"]["state"], "blocked")
-            self.assertIn("explorer-check: draft", by_doc_type["plan"]["blockers"])
+            self.assertEqual(by_doc_type["brainstorm"]["state"], "blocked")
+            self.assertIn("closure gate: optional 'brainstorm'", by_doc_type["brainstorm"]["blockers"][0])
+            self.assertEqual(by_doc_type["explorer-check"]["state"], "blocked")
+            self.assertIn("closure gate: optional 'explorer-check'", by_doc_type["explorer-check"]["blockers"][0])
+            self.assertEqual(by_doc_type["plan"]["state"], "ready")
             self.assertEqual(by_doc_type["task"]["state"], "blocked")
             self.assertIn("plan: draft", by_doc_type["task"]["blockers"])
             self.assertEqual(by_doc_type["report"]["state"], "done")
+            self.assertEqual(by_doc_type["postmortem"]["state"], "blocked")
+            self.assertIn("closure gate: optional 'postmortem'", by_doc_type["postmortem"]["blockers"][0])
 
             next_artifact = self.execution_commands.next_workflow_artifact(states)
             self.assertIsNotNone(next_artifact)
-            self.assertEqual(next_artifact["doc_type"], "plan")
+            self.assertEqual(next_artifact["doc_type"], "brainstorm")
 
 
 class ImplementAndReviewScenarioTests(unittest.TestCase):

@@ -19,20 +19,20 @@ Examples:
 """
 
 import re
+import subprocess
 import sys
 import json
-import subprocess
-import yaml
 from pathlib import Path
-from datetime import datetime
 from typing import Dict, Optional
 
 from lib.agents_config import (
     get_active_session_file_path,
     get_cfg_path,
     load_agents_config,
-    parse_offset,
+    now_compact_for_session,
+    now_iso_with_offset,
 )
+from lib.markdown_docs import split_markdown_frontmatter
 from lib.workflow_manifest import (
     ArtifactManifestEntry,
     ArtifactIntentProfile,
@@ -43,7 +43,6 @@ from lib.workflow_manifest import (
     load_artifact_policy,
     manifest_id_placeholders as _manifest_id_placeholders_impl,
 )
-
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -55,7 +54,6 @@ ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 TELEMETRY_SCRIPT = SCRIPTS_DIR / "agents-telemetry.py"
 PATTERNS_SCRIPT = SCRIPTS_DIR / "agents-patterns.py"
 WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
-WB_TZ = parse_offset(WB_OFFSET)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
 MAX_PLAN_LINES_THRESHOLD = int(WORKFLOW_CFG.get("max_plan_lines_threshold", 500))
 GOVERNANCE_REQUIRED = bool(WORKFLOW_CFG.get("governance_required", True))
@@ -112,13 +110,12 @@ def _normalize_doc_type_alias(doc_type: str) -> str:
 
 def get_timestamp() -> str:
     """Get current timestamp in configured workbench timezone."""
-    return datetime.now(WB_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{WB_OFFSET}")
+    return now_iso_with_offset(WB_OFFSET)
 
 
 def get_session_id(theme: str) -> str:
     """Generate session folder ID."""
-    now = datetime.now(WB_TZ)
-    date_part = now.strftime("%y%m%d_%H%M")
+    date_part = now_compact_for_session(WB_OFFSET)
     theme_clean = sanitize_theme(theme)
     return f"{date_part}_{theme_clean}"
 
@@ -251,14 +248,11 @@ def _read_frontmatter(path: Path) -> Dict[str, object]:
         content = path.read_text()
     except FileNotFoundError:
         return {}
-
-    if not content.startswith("---\n"):
+    parsed = split_markdown_frontmatter(content)
+    if parsed is None:
         return {}
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        return {}
-    loaded = yaml.safe_load(parts[1].strip()) or {}
-    return loaded if isinstance(loaded, dict) else {}
+    loaded, _ = parsed
+    return loaded
 
 
 def _doc_id_from_path(path: Path) -> str:

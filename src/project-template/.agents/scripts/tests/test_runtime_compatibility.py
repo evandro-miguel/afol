@@ -21,6 +21,10 @@ def load_module(module_name: str, file_path: Path):
 
 
 class RuntimeCompatibilityTests(unittest.TestCase):
+    def _skip_without_source_template(self, agents_bootstrap):
+        if not agents_bootstrap.TEMPLATE_ROOT.exists():
+            self.skipTest("source project template is only present in the source repo")
+
     def test_sync_targets_only_include_claude_mirror(self):
         script_path = Path(".agents/scripts/sync-agent-docs.py").resolve()
         sys.path.insert(0, str(script_path.parent))
@@ -40,6 +44,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_runtime_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         mandatory_files = {str(path) for path in agents_bootstrap.MANDATORY_FILES_TO_COPY}
         mandatory_dirs = {str(path) for path in agents_bootstrap.MANDATORY_DIRS_TO_COPY}
@@ -48,12 +53,14 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         self.assertIn("AGENTS.md", mandatory_files)
         self.assertIn("CLAUDE.md", mandatory_files)
+        self.assertIn("Justfile", mandatory_files)
         self.assertNotIn("OPENCODE.md", mandatory_files)
         self.assertNotIn("QWEN.md", mandatory_files)
         self.assertNotIn("GEMINI.md", mandatory_files)
         self.assertNotIn("PLANS.md", mandatory_files)
         self.assertNotIn("opencode.json", mandatory_files)
         self.assertIn("docs/arc/SPECS/README.md", mandatory_files)
+        self.assertIn(".agents/runtime", mandatory_dirs)
         self.assertIn(".agents/tmp", ensure_dirs)
         self.assertNotIn(".opencode", ensure_dirs)
         self.assertNotIn(".qwen", ensure_dirs)
@@ -64,7 +71,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("docs/arc/SPECS/INDEX.md", generated_files)
         self.assertNotIn("docs/arc/SPECS", mandatory_dirs)
 
-    def test_bootstrap_tolerates_optional_skills_sync_failure(self):
+    def test_bootstrap_post_checks_prefer_just_when_available(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_optional_sync_test", script_path)
@@ -73,9 +80,11 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             target = Path(td)
             (target / "Justfile").write_text("import 'docs/standards/Justfile'\n", encoding="utf-8")
             calls = []
+            cwds = []
 
             def fake_run(cmd, cwd=None):
                 calls.append(cmd)
+                cwds.append(cwd)
                 result = mock.Mock()
                 if cmd[:3] == ["./.agents/agents", "skills-sync", "sync"]:
                     result.returncode = 1
@@ -83,11 +92,48 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                     result.returncode = 0
                 return result
 
-            with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
-                agents_bootstrap.run_post_checks(target)
+            with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
+                with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
+                    agents_bootstrap.run_post_checks(target)
 
             self.assertIn(["./.agents/agents", "skills-sync", "sync"], calls)
+            self.assertIn(["just", "--justfile", "Justfile", "--fmt", "--check"], calls)
+            self.assertIn(["just", "--justfile", "Justfile", "--list"], calls)
             self.assertIn(["just", "--justfile", "Justfile", "all"], calls)
+            self.assertEqual(cwds, [target] * len(cwds))
+
+    def test_build_post_check_commands_cover_full_validation_contract(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_command_contract_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td)
+            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
+
+            with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
+                commands = agents_bootstrap.build_post_check_commands(target)
+
+        names = [name for name, _, _ in commands]
+        self.assertEqual(
+            names,
+            [
+                "sync-agent-docs",
+                "skills-sync",
+                "fix-symlinks",
+                "fmt-check",
+                "list",
+                "doctor",
+                "lint",
+                "test-scripts",
+                "all",
+            ],
+        )
+        self.assertTrue(all(cmd[0] != "make" for _, cmd, _ in commands))
+        self.assertIn(
+            ["just", "--justfile", "Justfile", "agents_scaffold::all"],
+            [cmd for _, cmd, _ in commands],
+        )
 
     def test_bootstrap_post_checks_use_namespaced_recipe_when_justfile_is_module(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -98,19 +144,23 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             target = Path(td)
             (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
             calls = []
+            cwds = []
 
             def fake_run(cmd, cwd=None):
                 calls.append(cmd)
+                cwds.append(cwd)
                 result = mock.Mock()
                 result.returncode = 0
                 return result
 
-            with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
-                agents_bootstrap.run_post_checks(target)
+            with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
+                with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
+                    agents_bootstrap.run_post_checks(target)
 
             self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::doctor"], calls)
             self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::lint"], calls)
             self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
+            self.assertEqual(cwds, [target] * len(cwds))
 
     def test_partial_bootstrap_post_checks_downgrade_repo_validation_failures(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -128,21 +178,42 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 result.returncode = 1 if cmd[:4] == ["just", "--justfile", "Justfile", "agents_scaffold::lint"] else 0
                 return result
 
-            with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
-                agents_bootstrap.run_post_checks(target, agents_bootstrap.INSTALL_MODE_PARTIAL)
+            with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
+                with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
+                    agents_bootstrap.run_post_checks(target, agents_bootstrap.INSTALL_MODE_PARTIAL)
 
         self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::lint"], calls)
         self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
+
+    def test_bootstrap_post_checks_require_just(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_make_required_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td)
+
+            with mock.patch.object(agents_bootstrap.shutil, "which", return_value=None):
+                with self.assertRaisesRegex(RuntimeError, "just is required for post-bootstrap checks"):
+                    agents_bootstrap.build_post_check_commands(target)
 
     def test_removed_root_runtime_mirrors_are_absent(self):
         for path in ["OPENCODE.md", "QWEN.md", "GEMINI.md", "opencode.json"]:
             self.assertFalse(Path(path).exists())
 
     def test_doctor_runtime_compatibility_check_has_no_runtime_errors(self):
-        template_root = Path("src/project-template")
-        self.assertTrue((template_root / "AGENTS.md").exists())
-        self.assertTrue((template_root / "CLAUDE.md").exists())
-        self.assertTrue((template_root / ".claude").is_dir())
+        script_path = Path(".agents/scripts/agents-doctor.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_doctor = load_module("agents_doctor_runtime_test", script_path)
+
+        doctor = agents_doctor.AgentsDoctor()
+        doctor.check_primary_runtime_compatibility()
+
+        runtime_issues = [
+            issue for issue in doctor.issues
+            if any(token in issue.path for token in ("AGENTS.md", "CLAUDE.md", ".claude"))
+        ]
+        self.assertEqual(runtime_issues, [])
 
     def test_lint_config_excludes_synced_skills_docs(self):
         config_text = Path(".agents/agents.config").read_text(encoding="utf-8")
@@ -154,7 +225,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertNotIn('source_dir: "../universal-skills"', config_text)
         self.assertIn('"agentic-folder-sys"', config_text)
 
-    def test_wrapper_requires_uv_for_runtime_registry_commands(self):
+    def test_wrapper_keeps_legacy_commands_on_local_script_runtime(self):
         wrapper_src = Path(".agents/agents").resolve()
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -182,7 +253,45 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             env = os.environ.copy()
             env["PATH"] = "/usr/bin:/bin"
             result = subprocess.run(
-                [str(wrapper_dst), "runtime", "manifest"],
+                [str(wrapper_dst), "doctor"],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("wrapper-local-venv-ok", result.stdout)
+
+    def test_wrapper_requires_uv_for_runtime_native_commands(self):
+        wrapper_src = Path(".agents/agents").resolve()
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            agents_dir = root / ".agents"
+            scripts_dir = agents_dir / "scripts"
+            runtime_dir = agents_dir / "runtime"
+            venv_bin = scripts_dir / ".venv" / "bin"
+            venv_bin.mkdir(parents=True, exist_ok=True)
+            runtime_dir.mkdir(parents=True, exist_ok=True)
+
+            wrapper_dst = agents_dir / "agents"
+            wrapper_dst.parent.mkdir(parents=True, exist_ok=True)
+            wrapper_dst.write_text(wrapper_src.read_text(encoding="utf-8"), encoding="utf-8")
+            wrapper_dst.chmod(wrapper_dst.stat().st_mode | stat.S_IXUSR)
+
+            python_link = venv_bin / "python3"
+            try:
+                python_link.symlink_to(Path(sys.executable))
+            except OSError:
+                shutil.copy2(Path(sys.executable), python_link)
+                python_link.chmod(python_link.stat().st_mode | stat.S_IXUSR)
+
+            env = os.environ.copy()
+            env["PATH"] = "/usr/bin:/bin"
+            result = subprocess.run(
+                [str(wrapper_dst), "adoption-plan"],
                 cwd=root,
                 env=env,
                 capture_output=True,
@@ -193,17 +302,74 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("uv not found", result.stdout)
 
+    def test_wrapper_routes_runtime_adoption_commands_directly(self):
+        wrapper_src = Path(".agents/agents").resolve()
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            agents_dir = root / ".agents"
+            scripts_dir = agents_dir / "scripts"
+            runtime_dir = agents_dir / "runtime"
+            venv_bin = scripts_dir / ".venv" / "bin"
+            venv_bin.mkdir(parents=True, exist_ok=True)
+            runtime_dir.mkdir(parents=True, exist_ok=True)
+
+            wrapper_dst = agents_dir / "agents"
+            wrapper_dst.parent.mkdir(parents=True, exist_ok=True)
+            wrapper_dst.write_text(wrapper_src.read_text(encoding="utf-8"), encoding="utf-8")
+            wrapper_dst.chmod(wrapper_dst.stat().st_mode | stat.S_IXUSR)
+
+            python_link = venv_bin / "python3"
+            try:
+                python_link.symlink_to(Path(sys.executable))
+            except OSError:
+                shutil.copy2(Path(sys.executable), python_link)
+                python_link.chmod(python_link.stat().st_mode | stat.S_IXUSR)
+
+            telemetry_script = scripts_dir / "agents-telemetry.py"
+            telemetry_script.write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+            telemetry_script.chmod(telemetry_script.stat().st_mode | stat.S_IXUSR)
+
+            fake_uv_dir = root / "bin"
+            fake_uv_dir.mkdir(parents=True, exist_ok=True)
+            fake_uv = fake_uv_dir / "uv"
+            fake_uv.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "print('FAKE_UV:' + ' '.join(sys.argv[1:]))\n",
+                encoding="utf-8",
+            )
+            fake_uv.chmod(fake_uv.stat().st_mode | stat.S_IXUSR)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{fake_uv_dir}:/usr/bin:/bin"
+            result = subprocess.run(
+                [str(wrapper_dst), "adoption-plan"],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("FAKE_UV:run --project", result.stdout)
+            self.assertIn("agentic adoption-plan", result.stdout)
+            self.assertNotIn("agentic run adoption-plan", result.stdout)
+
     def test_runtime_launchers_use_locked_runtime_environment(self):
         agents_wrapper = Path(".agents/agents").read_text(encoding="utf-8")
         mcp_wrapper = Path(".agents/agents-mcp").read_text(encoding="utf-8")
 
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked', agents_wrapper)
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp', mcp_wrapper)
+        self.assertIn('adoption-plan|inspect-target', agents_wrapper)
 
     def test_partial_bootstrap_refreshes_legacy_runtime_wrappers(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_runtime_surface_refresh_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
@@ -228,6 +394,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_generic_export_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
@@ -247,6 +414,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             specs_index = (target / "docs/arc/SPECS/INDEX.md").read_text(encoding="utf-8")
             knowledge_index = (target / "docs/knowledge/INDEX.md").read_text(encoding="utf-8")
             map_readme = (target / "docs/map/README.md").read_text(encoding="utf-8")
+            root_justfile = (target / "Justfile").read_text(encoding="utf-8")
 
             self.assertFalse((target / ".agents/wb/.active_session").exists())
             self.assertTrue((target / ".agents/wb").exists())
@@ -271,13 +439,122 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("| Total | 2 |", specs_index)
             self.assertIn("- Total indexed docs: 0", knowledge_index)
             self.assertIn("current-state, descriptive", map_readme)
+            self.assertIn("import 'docs/standards/Justfile'", root_justfile)
+            self.assertTrue((target / "docs/standards/Justfile").exists())
             self.assertFalse((target / ".agents/arc/map").exists())
             self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
+
+    def test_project_template_stays_generic_and_history_free(self):
+        template_root = Path("src/project-template")
+        if not template_root.exists():
+            self.skipTest("source project template is only present in the source repo")
+        generic_files = [
+            template_root / "AGENTS.md",
+            template_root / "CLAUDE.md",
+            template_root / "docs/knowledge/INDEX.md",
+            template_root / "docs/knowledge/README.md",
+            template_root / "docs/lessons/README.md",
+            template_root / "docs/lessons/general-lessons.md",
+            template_root / "docs/map/structure/README.md",
+            template_root / "docs/templates/adr.md",
+            template_root / "docs/templates/pattern.md",
+            template_root / "docs/templates/spec.md",
+            template_root / "docs/templates/spec-child.md",
+            template_root / "docs/templates/spec-test.md",
+            template_root / "docs/templates/spec-lite.md",
+        ]
+
+        forbidden_tokens = [
+            "agentic_start_folder",
+            "project-template-source-separation",
+            "F-15",
+            "F-16",
+            "/home/ozy/",
+            "gre-test-app",
+            "scaffold repository",
+        ]
+
+        generated_names = {".agent", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
+        ignored_runtime_artifacts = {
+            ".agents/runtime/.venv",
+            ".agents/runtime/uv.lock",
+            ".agents/scripts/.venv",
+        }
+        generated_artifacts = [
+            path
+            for path in template_root.rglob("*")
+            if (
+                path.relative_to(template_root).as_posix() not in ignored_runtime_artifacts
+                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.venv/")
+                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.pytest_cache/")
+                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.ruff_cache/")
+                and not path.relative_to(template_root).as_posix().startswith(".agents/scripts/.venv/")
+                and not (
+                    path.name == "__pycache__"
+                    and path.relative_to(template_root).as_posix().startswith(".agents/scripts/")
+                )
+                and (
+                    path.name in generated_names
+                    or path.name in {"events.jsonl", "settings.local.json", ".structure-cache.json"}
+                    or path.relative_to(template_root).as_posix().startswith(".agents/cache/")
+                )
+            )
+        ]
+        self.assertEqual(generated_artifacts, [])
+
+        text_suffixes = {".md", ".json", ".toml", ".yaml", ".yml", ".py", ".sh"}
+        text_files = [
+            path
+            for path in template_root.rglob("*")
+            if (
+                path.is_file()
+                and path.suffix in text_suffixes
+                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.venv/")
+                and not path.relative_to(template_root).as_posix().startswith(".agents/scripts/.venv/")
+            )
+        ]
+        for path in sorted(set(generic_files + text_files)):
+            if path.relative_to(template_root).as_posix() == ".agents/scripts/tests/test_runtime_compatibility.py":
+                continue
+            content = path.read_text(encoding="utf-8")
+            for token in forbidden_tokens:
+                self.assertNotIn(token, content, f"{path} should not contain {token!r}")
+
+        agents_md = (template_root / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertNotIn("This template", agents_md)
+        self.assertNotIn("template defines", agents_md)
+        self.assertIn("## Project Goal", agents_md)
+        self.assertIn("## Project Structure", agents_md)
+        self.assertIn("## Mandatory Rules", agents_md)
+        self.assertIn(".agents/rules/RULE-006-applicable-rule-resolution.md", agents_md)
+        self.assertTrue((template_root / "Justfile").exists())
+        self.assertTrue((template_root / "docs/standards/Justfile").exists())
+        self.assertIn(
+            "import 'docs/standards/Justfile'",
+            (template_root / "Justfile").read_text(encoding="utf-8"),
+        )
+        self.assertFalse((template_root / "PLANS.md").exists())
+        for path in ["OPENCODE.md", "QWEN.md", "GEMINI.md", "opencode.json", ".opencode", ".qwen", ".gemini", ".codex"]:
+            self.assertFalse((template_root / path).exists())
+
+        template_files_outside_templates = [
+            path
+            for path in template_root.joinpath("docs").rglob("*.md")
+            if "template" in path.name.lower() and "docs/templates" not in path.as_posix()
+        ]
+        self.assertEqual(template_files_outside_templates, [])
+
+        lesson_entries = sorted((template_root / "docs/lessons/entries").glob("*.md"))
+        self.assertEqual([path.name for path in lesson_entries], ["README.md"])
+
+        structure_files = sorted((template_root / "docs/map/structure").glob("*.md"))
+        self.assertEqual([path.name for path in structure_files], ["README.md"])
 
     def test_partial_bootstrap_generates_existing_project_adoption_baseline(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_partial_export_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         baseline = agents_bootstrap.generated_baseline_content(
             "2026-03-23T00:00:00Z",
@@ -298,6 +575,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_skills_baseline_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         baseline = agents_bootstrap.generated_baseline_content(
             "2026-03-23T00:00:00Z",
@@ -334,6 +612,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("partial install", adaptation_doc)
             self.assertIn("repo/ref/profile", adaptation_doc)
             self.assertIn("Prefer repo-local skills under `.agents/skills/`", adaptation_doc)
+            self.assertIn("just --fmt --check", adaptation_doc)
 
     def test_bootstrap_seeds_repo_local_universal_skills_checkout_without_network(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -397,7 +676,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertTrue(target.exists())
             self.assertTrue(target.is_dir())
 
-    def test_existing_project_justfile_import_preserves_local_all(self):
+    def test_existing_project_justfile_appends_scaffold_module(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_justfile_test", script_path)
@@ -405,39 +684,13 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
             justfile = target / "Justfile"
-            justfile.write_text("default:\n\t@echo existing\n", encoding="utf-8")
+            justfile.write_text("default:\n  @echo existing\n", encoding="utf-8")
 
             agents_bootstrap.ensure_justfile(target, dry_run=False)
 
             content = justfile.read_text(encoding="utf-8")
             self.assertIn("default:", content)
             self.assertIn("mod agents_scaffold 'docs/standards/Justfile'", content)
-
-    def test_standard_justfile_exposes_agents_all_aggregate(self):
-        justfile_text = Path("docs/standards/Justfile").read_text(encoding="utf-8")
-
-        agents_all_line = next(
-            line for line in justfile_text.splitlines() if line.startswith("agents-all:")
-        )
-        for target in [
-            "doctor",
-            "structure",
-            "index",
-            "knowledge-index",
-            "sync",
-            "lint",
-            "lint-scripts",
-            "lint-runtime",
-            "skills-check",
-            "tools-check",
-            "telemetry-validate",
-            "test-scripts-all",
-            "test-runtime",
-            "runtime-mcp-smoke",
-        ]:
-            self.assertIn(target, agents_all_line)
-        self.assertIn("just", justfile_text)
-        self.assertIn("all: agents-all", justfile_text)
 
 
 if __name__ == "__main__":

@@ -48,7 +48,7 @@ docs/
 │           └── event.json   # Event schema
 │
 ├── wb/                      # Active workstreams
-│   ├── .active_session      # Current session
+│   ├── .active_session      # Project-local convenience pointer for one operator
 │   └── YYMMDD_HHMM_theme/   # Session folders
 │
 ├── tmp/                     # Temporary non-canonical artifacts
@@ -134,6 +134,9 @@ just doctor
 - OpenCode, Qwen, Gemini, and Codex do not need committed root mirrors in this scaffold; they use `AGENTS.md` directly or global runtime configuration.
 - `.claude/` should only contain project-safe adapter notes and links.
 - Project-owned documentation belongs under `docs/`; `.agents/` is reserved for agent-system surfaces such as workbench, skills, telemetry, and runtime automation.
+- `.agents/wb/.active_session` is a project-local convenience pointer for a
+  single operator; parallel agents should not use it as a shared
+  synchronization primitive.
 - The scaffold should be optimized for interactive CLI agent execution paths first; embedded SDK/server use cases are secondary and should not drive the default structure.
 - Bootstrap exports a generic, history-free baseline for downstream repos and supports a partial install mode that preserves existing project-owned files.
 - The exported baseline keeps current-state repository mapping in `docs/map/` and avoids publishing repo-map artifacts inside `.agents/`.
@@ -227,7 +230,7 @@ just telemetry-heat PERIOD=daily
 .agents/agents wb-update status --session <session-id> --file postmortem --value final
 .agents/agents wb-update status --session <session-id> --file report --value final
 
-# Close the verified session and optionally move the active pointer
+# Close the verified session and optionally move the convenience pointer
 .agents/agents session close --session <session-id>
 .agents/agents session close --session <session-id> --next-session <next-session-id>
 
@@ -237,6 +240,21 @@ just wb-files-changed
 # View session telemetry
 just telemetry-report PERIOD=weekly
 ```
+
+### Project-Local Session Workflow
+
+1. List local sessions with `./.agents/agents session list`.
+2. Sweep stale or overlapping sessions with `./.agents/agents session sweep`.
+3. Use `AGENTS_SESSION_ID=<session-id>` when a shell or wrapper honors the
+   session-context contract and needs an explicit target.
+4. Set `AGENTS_SESSION_STRICT=1` when you want strict session handling for
+   sweep, catchup, or close flows.
+5. Catch up a target session before resuming with
+   `./.agents/agents session catchup --session <session-id>`.
+6. Close only after strict verification passes with
+   `./.agents/agents session close --session <session-id>`.
+7. Use `--next-session <next-session-id>` only for an intentional handoff to a
+   different session.
 
 ### Documentation Currency (Required)
 

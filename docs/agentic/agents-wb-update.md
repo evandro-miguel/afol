@@ -43,7 +43,7 @@ Automates workbench updates:
 
 | File | Purpose |
 |------|---------|
-| `.agents/wb/.active_session` | Active session |
+| `.agents/wb/.active_session` | Project-local convenience pointer |
 | `.agents/wb/*/*.md` | Session documents |
 | `.agents/agents.config` | Config (WB_OFFSET, etc.) |
 
@@ -87,6 +87,13 @@ def cmd_new_command(args):
 
 # Mark task as done
 ./.agents/agents wb-update task T-01 --mark-done
+
+# Target a session through the process environment when the wrapper supports it.
+# Set AGENTS_SESSION_ID before this command.
+./.agents/agents wb-update task T-01 --mark-in-progress
+
+# Use strict mode by also setting AGENTS_SESSION_STRICT before the command.
+./.agents/agents wb-update task T-01 --mark-in-progress
 
 # Set status
 ./.agents/agents wb-update status --value active --file plan

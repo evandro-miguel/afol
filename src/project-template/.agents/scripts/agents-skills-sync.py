@@ -10,12 +10,12 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from lib.agents_config import load_agents_config, resolve_repo_path
+from lib.process_utils import run_command
 
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
@@ -77,7 +77,7 @@ def cfg_path(key: str) -> Path:
 
 
 def run(cmd: List[str], cwd: Path | None = None):
-    result = subprocess.run(cmd, cwd=cwd or ROOT_DIR, text=True)
+    result = run_command(cmd, cwd=cwd or ROOT_DIR, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"Command failed ({result.returncode}): {' '.join(cmd)}")
 
@@ -89,7 +89,7 @@ def parse_csv(value: str | None) -> List[str]:
 
 
 def normalize_runtime(value: str | None) -> str:
-    if not value:
+    if not value or not value.strip():
         return SPECIAL_APP_ALL
     return RUNTIME_ALIASES.get(value.strip().lower(), value.strip().lower())
 
@@ -868,15 +868,6 @@ def _compare(skills: Iterable[str], mode: str) -> Tuple[List[str], List[str], Li
     return missing_source, missing_project, drift
 
 
-def _explicit_manifest_skills(installs: Sequence[Dict[str, Any]]) -> List[str]:
-    explicit: List[str] = []
-    for install in installs:
-        if not isinstance(install, dict):
-            continue
-        explicit.extend(_normalize_string_list(install.get("skills"), []))
-    return dedupe(explicit)
-
-
 def cmd_plan(args: argparse.Namespace):
     if not ensure_enabled():
         return
@@ -1139,9 +1130,18 @@ def _print_project_structure_problems(problems: List[str]) -> None:
         print(f"ERROR: {p}")
 
 
-def _check_drift_state(manifest: Dict[str, Any], skills: List[str], runtime: str) -> Dict[str, List[str]]:
+def _explicit_manifest_skills(manifest: Dict[str, Any], runtime: str) -> set[str]:
     selected_installs = _resolve_targets(manifest, runtime)
-    explicit_skills = set(_explicit_manifest_skills(selected_installs))
+    return {
+        skill
+        for install in selected_installs
+        if isinstance(install, dict)
+        for skill in _normalize_string_list(install.get("skills"), [])
+    }
+
+
+def _check_drift_state(manifest: Dict[str, Any], skills: List[str], runtime: str) -> Dict[str, List[str]]:
+    explicit_skills = _explicit_manifest_skills(manifest, runtime)
     missing_source, missing_project, drift = _compare(skills, manifest.get("mode", cfg("mode")))
     return {
         "stale_manifest_entries": sorted(name for name in missing_source if name in explicit_skills),
@@ -1338,7 +1338,7 @@ def _default_pr_body(skills: Sequence[str]) -> str:
 
 
 def _git_ref_exists(repo: Path, ref: str) -> bool:
-    result = subprocess.run(["git", "show-ref", "--verify", "--quiet", ref], cwd=repo)
+    result = run_command(["git", "show-ref", "--verify", "--quiet", ref], cwd=repo)
     return result.returncode == 0
 
 

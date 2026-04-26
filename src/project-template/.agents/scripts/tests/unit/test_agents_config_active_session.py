@@ -17,6 +17,14 @@ def load_module(module_name: str, file_path: Path):
 
 
 class AgentsConfigActiveSessionOverrideTests(unittest.TestCase):
+    def test_find_repo_root_ignores_nested_scripts_agents_folder(self):
+        script_path = Path(".agents/scripts/lib/agents_config.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_config = load_module("agents_config_root_discovery_test", script_path)
+
+        root = Path.cwd().resolve()
+        self.assertEqual(agents_config.find_repo_root(root / ".agents" / "scripts"), root)
+
     def test_active_session_file_uses_env_override(self):
         script_path = Path(".agents/scripts/lib/agents_config.py").resolve()
         sys.path.insert(0, str(script_path.parent))

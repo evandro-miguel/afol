@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -109,14 +110,37 @@ def get_active_session_id() -> str | None:
     return value
 
 
+def get_env_session_id() -> str | None:
+    value = os.getenv("AGENTS_SESSION_ID", "").strip()
+    return value or None
+
+
+def strict_session_resolution_enabled() -> bool:
+    return os.getenv("AGENTS_SESSION_STRICT", "").strip() == "1"
+
+
+def _resolve_session_path(session: str, *, source: str) -> Path:
+    p = Path(session)
+    if not p.is_absolute():
+        p = (ROOT_DIR / p).resolve() if "/" in session else (WB_DIR / session).resolve()
+    if p.exists() and p.is_dir():
+        return p
+    raise FileNotFoundError(f"Session folder not found ({source}): {session}")
+
+
 def resolve_session(session: str | None) -> Path:
     if session:
-        p = Path(session)
-        if not p.is_absolute():
-            p = (ROOT_DIR / p).resolve() if "/" in session else (WB_DIR / session).resolve()
-        if p.exists() and p.is_dir():
-            return p
-        raise FileNotFoundError(f"Session folder not found: {session}")
+        return _resolve_session_path(session, source="--session")
+
+    env_session = get_env_session_id()
+    if env_session:
+        return _resolve_session_path(env_session, source="AGENTS_SESSION_ID")
+
+    if strict_session_resolution_enabled():
+        raise FileNotFoundError(
+            "Session resolution strict mode is enabled (AGENTS_SESSION_STRICT=1). "
+            "Pass --session <id/path> or set AGENTS_SESSION_ID."
+        )
 
     active = get_active_session_id()
     if not active:
@@ -132,7 +156,7 @@ def require_explicit_session(args: argparse.Namespace, command: str) -> None:
     - touch/normalize-time with --file or --all-wb
     - files-changed with --report
     """
-    if getattr(args, "session", None):
+    if getattr(args, "session", None) or get_env_session_id():
         return
 
     if command in {"touch", "normalize-time"} and (
@@ -145,7 +169,8 @@ def require_explicit_session(args: argparse.Namespace, command: str) -> None:
 
     raise ValueError(
         f"Command '{command}' requires --session for write safety. "
-        "Use explicit --session <id/path> (or --file/--all-wb/--report where supported)."
+        "Use explicit --session <id/path>, set AGENTS_SESSION_ID, "
+        "or use --file/--all-wb/--report where supported."
     )
 
 

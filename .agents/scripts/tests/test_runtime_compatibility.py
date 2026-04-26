@@ -21,6 +21,10 @@ def load_module(module_name: str, file_path: Path):
 
 
 class RuntimeCompatibilityTests(unittest.TestCase):
+    def _skip_without_source_template(self, agents_bootstrap):
+        if not agents_bootstrap.TEMPLATE_ROOT.exists():
+            self.skipTest("source project template is only present in the source repo")
+
     def test_sync_targets_only_include_claude_mirror(self):
         script_path = Path(".agents/scripts/sync-agent-docs.py").resolve()
         sys.path.insert(0, str(script_path.parent))
@@ -40,6 +44,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_runtime_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         mandatory_files = {str(path) for path in agents_bootstrap.MANDATORY_FILES_TO_COPY}
         mandatory_dirs = {str(path) for path in agents_bootstrap.MANDATORY_DIRS_TO_COPY}
@@ -364,6 +369,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_runtime_surface_refresh_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
@@ -388,6 +394,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_generic_export_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
@@ -439,6 +446,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
     def test_project_template_stays_generic_and_history_free(self):
         template_root = Path("src/project-template")
+        if not template_root.exists():
+            self.skipTest("source project template is only present in the source repo")
         generic_files = [
             template_root / "AGENTS.md",
             template_root / "CLAUDE.md",
@@ -505,6 +514,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             )
         ]
         for path in sorted(set(generic_files + text_files)):
+            if path.relative_to(template_root).as_posix() == ".agents/scripts/tests/test_runtime_compatibility.py":
+                continue
             content = path.read_text(encoding="utf-8")
             for token in forbidden_tokens:
                 self.assertNotIn(token, content, f"{path} should not contain {token!r}")
@@ -543,6 +554,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_partial_export_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         baseline = agents_bootstrap.generated_baseline_content(
             "2026-03-23T00:00:00Z",
@@ -563,6 +575,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_skills_baseline_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
 
         baseline = agents_bootstrap.generated_baseline_content(
             "2026-03-23T00:00:00Z",
