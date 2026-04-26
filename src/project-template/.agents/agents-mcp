@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#
+# Thin compatibility launcher for the central agentic runtime MCP CLI.
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UV_BIN="$(command -v uv 2>/dev/null || true)"
+export UV_CACHE_DIR="${AGENTS_UV_CACHE_DIR:-${SCRIPT_DIR}/cache/uv}"
+
+if [ -z "${UV_BIN}" ]; then
+    echo "uv not found. Install with:"
+    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
+
+if [ ! -d "${SCRIPT_DIR}/runtime" ]; then
+    echo "Runtime package not found: ${SCRIPT_DIR}/runtime"
+    exit 1
+fi
+
+mkdir -p "${UV_CACHE_DIR}"
+exec "${UV_BIN}" run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp "$@"

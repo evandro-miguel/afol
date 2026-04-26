@@ -347,7 +347,7 @@ def test_tools_smoke_runner_success_and_failure(monkeypatch, capsys):
             return SimpleNamespace(returncode=1, stdout="Unknown type", stderr="")
         return SimpleNamespace(
             returncode=0,
-            stdout="AGENTS TOOLS - Available Tools wb-update doctor lint-docs TOOL: Agents Doctor CHECKS SUBCOMMANDS normalize-time Catalog Validation Catalog is valid AGENTS TOOLS - Help validate",
+            stdout="AGENTS TOOLS - Available Tools wb-update doctor lint-docs TOOL: Agents Doctor CHECKS TOOL: Agents Runtime Flow Benchmark benchmark run SUBCOMMANDS normalize-time Catalog Validation Catalog is valid AGENTS TOOLS - Help validate",
             stderr="",
         )
 
@@ -772,13 +772,14 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
     )
     wb_update.cmd_status(SimpleNamespace(session=str(wb_case_dir), file="report", value="final"))
     assert wb_update._report_status(wb_case_dir) == "final"
-    wb_update.ensure_postmortem_ready_for_report_final(wb_case_dir)
+    wb_update.ensure_optional_artifacts_ready_for_report_final(wb_case_dir)
 
     no_post = wb_dir / "260101_0200_no-postmortem"
     no_post.mkdir()
     write_wb_doc(no_post, "report", "# Report\n", status="active")
+    write_wb_doc(no_post, "brainstorm", "# Brainstorm\n", status="active")
     with pytest.raises(ValueError):
-        wb_update.ensure_postmortem_ready_for_report_final(no_post)
+        wb_update.ensure_optional_artifacts_ready_for_report_final(no_post)
 
     monkeypatch.setattr(sys, "argv", ["agents-wb-update.py", "timeline", "--session", str(wb_case_dir), "--message", "from main"])
     wb_update.main()

@@ -240,6 +240,75 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             output = buffer.getvalue()
             self.assertIn("WARN: skills source not initialized", output)
 
+    def test_cmd_check_warns_for_stale_manifest_entries_and_local_extras(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            self._make_source_skill(root, "writing-skills")
+            self._make_profile(root, "core", ["writing-skills"])
+
+            project_root = root / ".agents" / "skills"
+            (project_root / "writing-skills").mkdir(parents=True, exist_ok=True)
+            source_skill = root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md"
+            (project_root / "writing-skills" / "SKILL.md").write_text(
+                source_skill.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (project_root / "local-only-skill").mkdir(parents=True, exist_ok=True)
+            (project_root / "local-only-skill" / "SKILL.md").write_text(
+                "---\nname: local-only-skill\ndescription: Local extra\n---\n\n# local-only-skill\n",
+                encoding="utf-8",
+            )
+
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [
+                        {"app": "all", "profile": "core"},
+                        {"app": "all", "skills": ["stale-skill"]},
+                    ],
+                }
+            )
+
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                module.cmd_check(type("Args", (), {"skills": None, "runtime": None, "profile": None})())
+
+            output = buffer.getvalue()
+            self.assertIn("WARN: stale-manifest-entry: stale-skill", output)
+            self.assertIn("WARN: local-extra: local-only-skill", output)
+            self.assertNotIn("ERROR: source-drift (selected set): stale-skill", output)
+            self.assertNotIn("WARN: skills sync is not fully aligned", output)
+
+    def test_cmd_check_keeps_profile_source_drift_as_error(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            self._make_profile(root, "core", ["missing-profile-skill"])
+
+            buffer = io.StringIO()
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            with redirect_stdout(buffer):
+                module.cmd_check(type("Args", (), {"skills": None, "runtime": None, "profile": None})())
+
+            output = buffer.getvalue()
+            self.assertIn("ERROR: source-drift (selected set): missing-profile-skill", output)
+            self.assertIn("WARN: skills sync is not fully aligned", output)
+
     def test_ensure_repo_cloned_accepts_repo_local_source_without_remote(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)

@@ -917,7 +917,7 @@ def _validate_session_create(output: dict[str, Any], repo_root: Path) -> list[st
         failures.append("created session directory missing")
     task_text = task_file.read_text(encoding="utf-8") if task_file.exists() else ""
     evidence_text = evidence_file.read_text(encoding="utf-8") if evidence_file.exists() else ""
-    if f"| T-01 | done | worker |" not in task_text:
+    if "| T-01 | done | worker |" not in task_text:
         failures.append("created session T-01 not marked done")
     if (
         evidence_id not in evidence_text
@@ -925,6 +925,47 @@ def _validate_session_create(output: dict[str, Any], repo_root: Path) -> list[st
         or "benchmark created session scripted progress" not in evidence_text
     ):
         failures.append("created session evidence ledger missing expected T-01 record")
+    return failures
+
+
+def _validate_runtime_policy_file(repo_root: Path) -> list[str]:
+    failures: list[str] = []
+    policy_file = repo_root / "app" / "runtime_policy.json"
+    try:
+        policy = json.loads(policy_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        failures.append(f"runtime policy could not be read: {exc}")
+        policy = {}
+    expected_policy = {
+        "workflow_mode": "agentic-folder",
+        "default_execution": "governed",
+        "evidence_required": True,
+    }
+    for key, value in expected_policy.items():
+        if policy.get(key) != value:
+            failures.append(f"runtime policy {key} != {value!r}")
+    return failures
+
+
+def _validate_governed_session_delivery(session_id: str, repo_root: Path) -> list[str]:
+    failures: list[str] = []
+    session_dir = repo_root / ".agents" / "wb" / session_id
+    plan_files = sorted(session_dir.glob("*_plan_*.md")) if session_dir.exists() else []
+    task_files = sorted(session_dir.glob("*_task_*.md")) if session_dir.exists() else []
+    evidence_file = session_dir / ".evidence.jsonl"
+    if not session_dir.exists():
+        failures.append("created governed session directory missing")
+    if not plan_files:
+        failures.append("created governed plan file missing")
+    if not task_files:
+        failures.append("created governed task file missing")
+
+    task_text = task_files[0].read_text(encoding="utf-8") if task_files else ""
+    evidence_text = evidence_file.read_text(encoding="utf-8") if evidence_file.exists() else ""
+    if "| T-01 | done |" not in task_text and "- [x] T-01" not in task_text:
+        failures.append("created governed task T-01 not marked done")
+    if '"task_id": "T-01"' not in evidence_text or "check_runtime_policy.py" not in evidence_text:
+        failures.append("evidence ledger missing expected verification record")
     return failures
 
 
@@ -948,38 +989,8 @@ def _validate_autonomous_delivery(output: dict[str, Any], repo_root: Path) -> li
     if output.get("manual_wb_task_edit") is not False:
         failures.append("manual_wb_task_edit != false")
 
-    policy_file = repo_root / "app" / "runtime_policy.json"
-    try:
-        policy = json.loads(policy_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        failures.append(f"runtime policy could not be read: {exc}")
-        policy = {}
-    expected_policy = {
-        "workflow_mode": "agentic-folder",
-        "default_execution": "governed",
-        "evidence_required": True,
-    }
-    for key, value in expected_policy.items():
-        if policy.get(key) != value:
-            failures.append(f"runtime policy {key} != {value!r}")
-
-    session_dir = repo_root / ".agents" / "wb" / session_id
-    plan_files = sorted(session_dir.glob("*_plan_*.md")) if session_dir.exists() else []
-    task_files = sorted(session_dir.glob("*_task_*.md")) if session_dir.exists() else []
-    evidence_file = session_dir / ".evidence.jsonl"
-    if not session_dir.exists():
-        failures.append("created governed session directory missing")
-    if not plan_files:
-        failures.append("created governed plan file missing")
-    if not task_files:
-        failures.append("created governed task file missing")
-
-    task_text = task_files[0].read_text(encoding="utf-8") if task_files else ""
-    evidence_text = evidence_file.read_text(encoding="utf-8") if evidence_file.exists() else ""
-    if "| T-01 | done |" not in task_text and "- [x] T-01" not in task_text:
-        failures.append("created governed task T-01 not marked done")
-    if '"task_id": "T-01"' not in evidence_text or "check_runtime_policy.py" not in evidence_text:
-        failures.append("evidence ledger missing expected verification record")
+    failures.extend(_validate_runtime_policy_file(repo_root))
+    failures.extend(_validate_governed_session_delivery(session_id, repo_root))
     return failures
 
 
@@ -1382,7 +1393,7 @@ def _extract_command_excerpt(arguments_raw: str) -> str:
     return _excerpt(arguments_raw)
 
 
-def _parse_observed_tool_data(stdout: str) -> tuple[list[dict[str, Any]], int, int]:
+def _observed_events_from_stdout(stdout: str) -> list[dict[str, Any]]:
     events = []
     for raw_line in stdout.splitlines():
         stripped = raw_line.strip()
@@ -1391,74 +1402,119 @@ def _parse_observed_tool_data(stdout: str) -> tuple[list[dict[str, Any]], int, i
         parsed = _parse_json_line(stripped)
         if parsed is not None:
             events.append(parsed)
+    return events
 
+
+def _observed_command_key(call_entry: dict[str, Any]) -> str:
+    return f"{call_entry['name']}::{call_entry['command_excerpt']}"
+
+
+def _record_observed_call(
+    call_entry: dict[str, Any],
+    tool_calls: list[dict[str, Any]],
+    call_index: dict[str, dict[str, Any]],
+    prior_failures: dict[str, int],
+    *,
+    index_key: str | None,
+) -> int:
+    tool_calls.append(call_entry)
+    if index_key:
+        call_index[index_key] = call_entry
+    return 1 if prior_failures.get(_observed_command_key(call_entry), 0) > 0 else 0
+
+
+def _handle_function_call_payload(
+    payload: dict[str, Any],
+    tool_calls: list[dict[str, Any]],
+    call_index: dict[str, dict[str, Any]],
+    prior_failures: dict[str, int],
+) -> int:
+    arguments_raw = str(payload.get("arguments", ""))
+    call_entry = {
+        "call_id": payload.get("call_id"),
+        "name": str(payload.get("name", "")),
+        "arguments_excerpt": _excerpt(arguments_raw),
+        "command_excerpt": _extract_command_excerpt(arguments_raw),
+    }
+    call_id = payload.get("call_id")
+    return _record_observed_call(
+        call_entry,
+        tool_calls,
+        call_index,
+        prior_failures,
+        index_key=call_id if isinstance(call_id, str) else None,
+    )
+
+
+def _handle_failed_call_output(
+    call_id: Any,
+    call_index: dict[str, dict[str, Any]],
+    prior_failures: dict[str, int],
+) -> int:
+    call_entry = call_index.get(str(call_id)) if call_id is not None else None
+    if call_entry:
+        command_key = _observed_command_key(call_entry)
+        prior_failures[command_key] = prior_failures.get(command_key, 0) + 1
+    return 1
+
+
+def _handle_command_execution_event(
+    event: dict[str, Any],
+    item: dict[str, Any],
+    tool_calls: list[dict[str, Any]],
+    call_index: dict[str, dict[str, Any]],
+    prior_failures: dict[str, int],
+) -> tuple[int, int]:
+    event_type = str(event.get("type", ""))
+    item_id = str(item.get("id", ""))
+    if event_type == "item.started":
+        command_text = str(item.get("command", ""))
+        call_entry = {
+            "call_id": item_id,
+            "name": "command_execution",
+            "arguments_excerpt": _excerpt(command_text, 1000),
+            "command_excerpt": _excerpt(command_text, 1000),
+        }
+        retry_count = _record_observed_call(
+            call_entry,
+            tool_calls,
+            call_index,
+            prior_failures,
+            index_key=item_id,
+        )
+        return 0, retry_count
+    if event_type in {"item.completed", "item.complete"} and item.get("exit_code") not in (None, 0):
+        return _handle_failed_call_output(item_id, call_index, prior_failures), 0
+    return 0, 0
+
+
+def _parse_observed_tool_data(stdout: str) -> tuple[list[dict[str, Any]], int, int]:
     call_index: dict[str, dict[str, Any]] = {}
     tool_calls: list[dict[str, Any]] = []
     error_count = 0
     retry_count = 0
     prior_failures: dict[str, int] = {}
 
-    for event in events:
+    for event in _observed_events_from_stdout(stdout):
         payload = event.get("payload") if event.get("type") == "response_item" else event
-        if not isinstance(payload, dict):
-            continue
-
-        payload_type = payload.get("type")
-        if payload_type == "function_call":
-            arguments_raw = str(payload.get("arguments", ""))
-            call_entry = {
-                "call_id": payload.get("call_id"),
-                "name": str(payload.get("name", "")),
-                "arguments_excerpt": _excerpt(arguments_raw),
-                "command_excerpt": _extract_command_excerpt(arguments_raw),
-            }
-            tool_calls.append(call_entry)
-            call_id = payload.get("call_id")
-            if isinstance(call_id, str):
-                call_index[call_id] = call_entry
-            command_key = f"{call_entry['name']}::{call_entry['command_excerpt']}"
-            if prior_failures.get(command_key, 0) > 0:
-                retry_count += 1
-
-        elif payload_type == "function_call_output":
-            call_id = payload.get("call_id")
-            output_text = str(payload.get("output", ""))
-            match = EXIT_CODE_RE.search(output_text)
-            if match and match.group(1) != "0":
+        if isinstance(payload, dict):
+            payload_type = payload.get("type")
+            if payload_type == "function_call":
+                retry_count += _handle_function_call_payload(payload, tool_calls, call_index, prior_failures)
+            elif payload_type == "function_call_output":
+                output_text = str(payload.get("output", ""))
+                match = EXIT_CODE_RE.search(output_text)
+                if match and match.group(1) != "0":
+                    error_count += _handle_failed_call_output(payload.get("call_id"), call_index, prior_failures)
+            elif payload_type == "error" or event.get("type") == "error":
                 error_count += 1
-                call_entry = call_index.get(str(call_id)) if call_id is not None else None
-                if call_entry:
-                    command_key = f"{call_entry['name']}::{call_entry['command_excerpt']}"
-                    prior_failures[command_key] = prior_failures.get(command_key, 0) + 1
-
-        elif payload_type == "error" or event.get("type") == "error":
-            error_count += 1
-
         item = event.get("item")
         if isinstance(item, dict) and item.get("type") == "command_execution":
-            event_type = str(event.get("type", ""))
-            item_id = str(item.get("id", ""))
-            command_text = str(item.get("command", ""))
-            if event_type == "item.started":
-                call_entry = {
-                    "call_id": item_id,
-                    "name": "command_execution",
-                    "arguments_excerpt": _excerpt(command_text, 1000),
-                    "command_excerpt": _excerpt(command_text, 1000),
-                }
-                tool_calls.append(call_entry)
-                call_index[item_id] = call_entry
-                command_key = f"{call_entry['name']}::{call_entry['command_excerpt']}"
-                if prior_failures.get(command_key, 0) > 0:
-                    retry_count += 1
-            elif event_type in {"item.completed", "item.complete"}:
-                exit_code = item.get("exit_code")
-                if exit_code not in (None, 0):
-                    error_count += 1
-                    call_entry = call_index.get(item_id)
-                    if call_entry:
-                        command_key = f"{call_entry['name']}::{call_entry['command_excerpt']}"
-                        prior_failures[command_key] = prior_failures.get(command_key, 0) + 1
+            event_errors, event_retries = _handle_command_execution_event(
+                event, item, tool_calls, call_index, prior_failures
+            )
+            error_count += event_errors
+            retry_count += event_retries
 
     return tool_calls, error_count, retry_count
 

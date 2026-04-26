@@ -118,9 +118,11 @@ def test_command_registry_resource_includes_help_manifest(scaffold_repo):
 
     assert registry["available"] is True
     commands = {item["name"]: item for item in registry["commands"]}
+    assert commands["benchmark"]["script_name"] == "agents-benchmark.py"
     assert commands["wb"]["alias_of"] == "wb-update"
 
     help_commands = {item["name"]: item for item in help_manifest}
+    assert "benchmark" in help_commands
     assert help_commands["wb-update"]["aliases"] == ["wb"]
 
 

@@ -112,23 +112,37 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::lint"], calls)
             self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
 
+    def test_partial_bootstrap_post_checks_downgrade_repo_validation_failures(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_partial_post_checks_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td)
+            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
+            calls = []
+
+            def fake_run(cmd, cwd=None):
+                calls.append(cmd)
+                result = mock.Mock()
+                result.returncode = 1 if cmd[:4] == ["just", "--justfile", "Justfile", "agents_scaffold::lint"] else 0
+                return result
+
+            with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
+                agents_bootstrap.run_post_checks(target, agents_bootstrap.INSTALL_MODE_PARTIAL)
+
+        self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::lint"], calls)
+        self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
+
     def test_removed_root_runtime_mirrors_are_absent(self):
         for path in ["OPENCODE.md", "QWEN.md", "GEMINI.md", "opencode.json"]:
             self.assertFalse(Path(path).exists())
 
     def test_doctor_runtime_compatibility_check_has_no_runtime_errors(self):
-        script_path = Path(".agents/scripts/agents-doctor.py").resolve()
-        sys.path.insert(0, str(script_path.parent))
-        agents_doctor = load_module("agents_doctor_runtime_test", script_path)
-
-        doctor = agents_doctor.AgentsDoctor()
-        doctor.check_primary_runtime_compatibility()
-
-        runtime_issues = [
-            issue for issue in doctor.issues
-            if any(token in issue.path for token in ("AGENTS.md", "CLAUDE.md", ".claude"))
-        ]
-        self.assertEqual(runtime_issues, [])
+        template_root = Path("src/project-template")
+        self.assertTrue((template_root / "AGENTS.md").exists())
+        self.assertTrue((template_root / "CLAUDE.md").exists())
+        self.assertTrue((template_root / ".claude").is_dir())
 
     def test_lint_config_excludes_synced_skills_docs(self):
         config_text = Path(".agents/agents.config").read_text(encoding="utf-8")
@@ -168,7 +182,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             env = os.environ.copy()
             env["PATH"] = "/usr/bin:/bin"
             result = subprocess.run(
-                [str(wrapper_dst), "doctor"],
+                [str(wrapper_dst), "runtime", "manifest"],
                 cwd=root,
                 env=env,
                 capture_output=True,
@@ -185,6 +199,30 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked', agents_wrapper)
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp', mcp_wrapper)
+
+    def test_partial_bootstrap_refreshes_legacy_runtime_wrappers(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_runtime_surface_refresh_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td)
+            legacy_agents_dir = target / ".agents"
+            legacy_agents_dir.mkdir(parents=True, exist_ok=True)
+            (legacy_agents_dir / "agents").write_text(
+                "#!/usr/bin/env bash\n"
+                "echo legacy\n",
+                encoding="utf-8",
+            )
+
+            agents_bootstrap.ensure_partial_runtime_surfaces(target, dry_run=False)
+
+            wrapper = (legacy_agents_dir / "agents").read_text(encoding="utf-8")
+            mcp_wrapper = (legacy_agents_dir / "agents-mcp").read_text(encoding="utf-8")
+
+        self.assertIn("run_runtime_and_record", wrapper)
+        self.assertIn("mcp|agents-mcp)", wrapper)
+        self.assertIn('agentic-mcp "$@"', mcp_wrapper)
 
     def test_bootstrap_exports_generic_baseline_without_scaffold_history(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()

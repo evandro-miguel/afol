@@ -61,3 +61,98 @@ def test_run_command_propagates_non_timeout_failure(monkeypatch):
 
     with pytest.raises(FileNotFoundError, match="boom"):
         run_command(["this-command-does-not-exist"])
+
+
+def test_run_command_fallback_on_timeout_kwarg_error(monkeypatch):
+    """First call raises TypeError for 'timeout' kwarg; second call succeeds."""
+    call_count = {"n": 0}
+    expected = SimpleNamespace(returncode=0)
+
+    def _fake_run(cmd, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise TypeError("unexpected keyword argument 'timeout'")
+        return expected
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    result = run_command(["echo", "fallback"])
+    assert result.returncode == 0
+    assert call_count["n"] == 2
+
+
+def test_run_command_fallback_on_timeout_kwarg_error_with_cwd(monkeypatch, tmp_path):
+    """First call raises TypeError for 'timeout' kwarg with cwd; second call succeeds."""
+    call_count = {"n": 0}
+    expected = SimpleNamespace(returncode=0)
+
+    def _fake_run(cmd, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise TypeError("unexpected keyword argument 'timeout'")
+        return expected
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    result = run_command(["echo", "fallback"], cwd=tmp_path)
+    assert result.returncode == 0
+
+
+def test_run_command_double_fallback_text_kwarg_error(monkeypatch):
+    """First call raises TypeError for 'timeout', second for 'text', third succeeds."""
+    call_count = {"n": 0}
+    expected = SimpleNamespace(returncode=0)
+
+    def _fake_run(cmd, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise TypeError("unexpected keyword argument 'timeout'")
+        if call_count["n"] == 2:
+            raise TypeError("unexpected keyword argument 'text'")
+        return expected
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    result = run_command(["echo", "double-fallback"])
+    assert result.returncode == 0
+    assert call_count["n"] == 3
+
+
+def test_run_command_double_fallback_text_kwarg_error_with_cwd(monkeypatch, tmp_path):
+    """Double fallback with cwd path."""
+    call_count = {"n": 0}
+    expected = SimpleNamespace(returncode=0)
+
+    def _fake_run(cmd, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise TypeError("unexpected keyword argument 'timeout'")
+        if call_count["n"] == 2:
+            raise TypeError("unexpected keyword argument 'text'")
+        return expected
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    result = run_command(["echo", "double-fallback"], cwd=tmp_path)
+    assert result.returncode == 0
+
+
+def test_run_command_unexpected_typeerror_reraises(monkeypatch):
+    """Non-timeout/non-text TypeError should reraise."""
+    def _fake_run(cmd, **kwargs):
+        raise TypeError("unexpected keyword argument 'capture_output'")
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    with pytest.raises(TypeError, match="capture_output"):
+        run_command(["echo", "bad"])
+
+
+def test_run_command_secondary_unexpected_typeerror_reraises(monkeypatch):
+    """Secondary fallback TypeError that is not 'text' should reraise."""
+    call_count = {"n": 0}
+
+    def _fake_run(cmd, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise TypeError("unexpected keyword argument 'timeout'")
+        raise TypeError("unexpected keyword argument 'encoding'")
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    with pytest.raises(TypeError, match="encoding"):
+        run_command(["echo", "bad-secondary"])

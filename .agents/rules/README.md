@@ -15,7 +15,8 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 ├── RULE-003-documentation-standards.md
 ├── RULE-004-validation-linting.md
 ├── RULE-005-folder-structure.md
-└── RULE-006-applicable-rule-resolution.md
+├── RULE-006-applicable-rule-resolution.md
+└── RULE-007-postmortem-governance-review.md
 ```
 
 ---
@@ -29,8 +30,9 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 | **RULE-004** | [validation-linting](./RULE-004-validation-linting.md) | ~160 | Pre-commit validation |
 | **RULE-005** | [folder-structure](./RULE-005-folder-structure.md) | ~160 | Required folder structure |
 | **RULE-006** | [applicable-rule-resolution](./RULE-006-applicable-rule-resolution.md) | ~150 | Required rule/skill/spec routing by touched element |
+| **RULE-007** | [postmortem-governance-review](./RULE-007-postmortem-governance-review.md) | ~100 | Final postmortem promotion review before closure |
 
-**Total:** ~780 lines across 5 focused rules (max 250 each)
+**Total:** ~880 lines across 6 focused rules (max 250 each)
 
 ---
 
@@ -68,6 +70,13 @@ just doctor && just lint && just verify
 
 ```bash
 # RULE-005: All agent files in .agents/
+```
+
+### Postmortem Closure
+
+```bash
+# RULE-007: Final postmortem must complete Governance Promotion Review
+./.agents/agents wb-update status --session <session-id> --file postmortem --value final
 ```
 
 ---
@@ -150,4 +159,4 @@ Content here.
 
 ---
 
-*Last updated: 2026-04-18 | Rules: 5 | Total lines: ~740*
+*Last updated: 2026-04-23 | Rules: 6 | Total lines: ~840*

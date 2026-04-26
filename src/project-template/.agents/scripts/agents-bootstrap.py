@@ -24,6 +24,7 @@ MANDATORY_FILES_TO_COPY = [
     Path("CLAUDE.md"),
     Path("Justfile"),
     Path(".agents/agents"),
+    Path(".agents/agents-mcp"),
     Path(".agents/agents.config"),
     Path(".agents/tools.json"),
     Path(".agents/skills-sync.manifest.json"),
@@ -163,6 +164,49 @@ def copy_optional_files(target: Path, force: bool, dry_run: bool):
             continue
         dst = target / rel
         safe_copy_file(src, dst, force, dry_run)
+
+
+def _wrapper_needs_runtime_refresh(path: Path, markers: Sequence[str]) -> bool:
+    if not path.exists():
+        return False
+    content = path.read_text(encoding="utf-8")
+    return any(marker not in content for marker in markers)
+
+
+def ensure_partial_runtime_surfaces(target: Path, dry_run: bool):
+    managed_surfaces: Sequence[Tuple[Path, Sequence[str], str]] = [
+        (
+            Path(".agents/agents"),
+            (
+                "run_runtime_and_record",
+                'run --project "${SCRIPT_DIR}/runtime" --locked',
+                "mcp|agents-mcp)",
+                "command-registry",
+            ),
+            "patch managed wrapper",
+        ),
+        (
+            Path(".agents/agents-mcp"),
+            (
+                'run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp',
+            ),
+            "refresh managed mcp wrapper",
+        ),
+    ]
+
+    for rel, markers, action in managed_surfaces:
+        src = _template_source(rel)
+        dst = target / rel
+        if not dst.exists():
+            safe_copy_file(src, dst, force=False, dry_run=dry_run)
+            continue
+        if not _wrapper_needs_runtime_refresh(dst, markers):
+            continue
+        print_action(action, dst)
+        if dry_run:
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
 
 def parse_args() -> argparse.Namespace:
@@ -1115,10 +1159,11 @@ def post_checks_use_just(target: Path) -> bool:
     return shutil.which("just") is not None and (target / "Justfile").exists()
 
 
-def build_post_check_commands(target: Path) -> List[Tuple[str, List[str], bool]]:
+def build_post_check_commands(target: Path, install_mode: str = INSTALL_MODE_FULL) -> List[Tuple[str, List[str], bool]]:
     recipe_prefix = _just_recipe_prefix(target)
     if not post_checks_use_just(target):
         raise RuntimeError("just is required for post-bootstrap checks")
+    repo_validation_required = install_mode != INSTALL_MODE_PARTIAL
     commands: List[Tuple[str, List[str], bool]] = [
         (
             "sync-agent-docs",
@@ -1141,15 +1186,15 @@ def build_post_check_commands(target: Path) -> List[Tuple[str, List[str], bool]]
             ("fmt-check", _just_post_check_command("--fmt", "--check"), True),
             ("list", _just_post_check_command("--list"), True),
             ("doctor", _just_post_check_command(f"{recipe_prefix}doctor"), True),
-            ("lint", _just_post_check_command(f"{recipe_prefix}lint"), True),
-            ("test-scripts", _just_post_check_command(f"{recipe_prefix}test-scripts"), True),
-            ("all", _just_post_check_command(f"{recipe_prefix}all"), True),
+            ("lint", _just_post_check_command(f"{recipe_prefix}lint"), repo_validation_required),
+            ("test-scripts", _just_post_check_command(f"{recipe_prefix}test-scripts"), repo_validation_required),
+            ("all", _just_post_check_command(f"{recipe_prefix}all"), repo_validation_required),
         ]
     )
     return commands
 
-def run_post_checks(target: Path):
-    commands = build_post_check_commands(target)
+def run_post_checks(target: Path, install_mode: str = INSTALL_MODE_FULL):
+    commands = build_post_check_commands(target, install_mode)
 
     for name, cmd, required in commands:
         print(f"\n→ Running post-bootstrap check: {name}")
@@ -1201,6 +1246,8 @@ def main() -> int:
         copy_required_files(target, args.force, args.dry_run)
         copy_required_dirs(target, args.force, args.dry_run)
         copy_optional_files(target, args.force, args.dry_run)
+        if install_mode == INSTALL_MODE_PARTIAL:
+            ensure_partial_runtime_surfaces(target, args.dry_run)
 
         ensure_dirs(target, args.dry_run)
         write_generated_baseline(target, args.force, args.dry_run, install_mode)
@@ -1208,7 +1255,7 @@ def main() -> int:
         write_adaptation_doc(target, stack, args.dry_run, install_mode)
 
         if not args.dry_run and not args.skip_checks:
-            run_post_checks(target)
+            run_post_checks(target, install_mode)
 
         print("\n✅ Bootstrap completed")
         if args.dry_run:

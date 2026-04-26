@@ -65,8 +65,11 @@ if "run_command" not in globals():
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
+AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
+SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
+RULES_DIR = AGENTS_DIR / "rules"
 WORKFLOW_DOC = ROOT_DIR / "docs/standards/workflow.md"
 ARCHIVE_KNOWLEDGE = ROOT_DIR / "docs/knowledge"
 PRODUCT_BRIEF = ROOT_DIR / "docs/arc/PROJECT-BRIEF.md"
@@ -164,6 +167,11 @@ TASK_MARKER_TO_STATE = {
 STATE_TO_MARKER = {v: k for k, v in TASK_MARKER_TO_STATE.items()}
 FORWARD_STATES = {"pending", "ready_for_test", "in_progress", "blocked", "skipped", "done"}
 BLOCKING_STATES = {"blocked", "in_progress"}
+FEATURE_OPERATION_RULE_FILES = (
+    ("RULE-002", "RULE-002-workstream-creation.md"),
+    ("RULE-004", "RULE-004-validation-linting.md"),
+    ("RULE-006", "RULE-006-applicable-rule-resolution.md"),
+)
 
 
 @dataclass(frozen=True)
@@ -268,6 +276,12 @@ def relative_to_root(path: Path) -> str:
         return str(path)
 
 
+def _frontmatter_str(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def artifact_snapshot(path: Optional[Path]) -> Dict[str, Any]:
     if path is None or not path.exists():
         return {
@@ -286,13 +300,15 @@ def artifact_snapshot(path: Optional[Path]) -> Dict[str, Any]:
     return {
         "exists": True,
         "path": relative_to_root(path),
-        "id": str(fm.get("id", "")).strip(),
-        "status": str(fm.get("status", "")).strip(),
-        "updated_at": str(fm.get("updated_at", "")).strip(),
+        "id": _frontmatter_str(fm.get("id", "")),
+        "status": _frontmatter_str(fm.get("status", "")),
+        "updated_at": _frontmatter_str(fm.get("updated_at", "")),
         "mtime": path.stat().st_mtime,
         "links": fm.get("links", {}) if isinstance(fm.get("links", {}), dict) else {},
-        "roadmap_feature": str(fm.get("roadmap_feature", "")).strip(),
-        "workstream_intent": str(fm.get("workstream_intent", "")).strip(),
+        "roadmap_feature": _frontmatter_str(fm.get("roadmap_feature", "")),
+        "parent_spec": _frontmatter_str(fm.get("parent_spec", "")),
+        "child_spec": _frontmatter_str(fm.get("child_spec", "")),
+        "workstream_intent": _frontmatter_str(fm.get("workstream_intent", "")),
         "doc_type": doc_type,
         "utility": utility,
     }
@@ -377,6 +393,13 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
         entry["doc_type"]: artifact_snapshot(latest_file(session_dir, entry["doc_type"]))
         for entry in manifest_entries
     }
+    task_file = resolve_artifact(session_dir, "task")
+    total_tasks, done_tasks, _, _, _ = parse_state_summary(task_file)
+    report_snapshot = snapshots.get("report", {})
+    report_is_final = str(report_snapshot.get("status") or "").strip().lower() == "final"
+    all_tasks_done = total_tasks > 0 and done_tasks == total_tasks
+    is_closure_mode = report_is_final or all_tasks_done
+    closure_optional_doc_types = {"brainstorm", "research", "explorer-check", "postmortem"}
     states: List[Dict[str, Any]] = []
 
     for entry in manifest_entries:
@@ -399,6 +422,16 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
         state = "ready"
         if not snapshot.get("exists"):
             state = "missing"
+        elif (
+            is_closure_mode
+            and doc_type in closure_optional_doc_types
+            and str(snapshot.get("status") or "").strip().lower() != "final"
+        ):
+            blockers.append(
+                f"closure gate: optional '{doc_type}' is present with status="
+                f"'{str(snapshot.get('status') or '').strip() or 'missing'}'; set status=final"
+            )
+            state = "blocked"
         elif _artifact_done(snapshot):
             state = "done"
         elif not snapshot.get("utility", {}).get("useful"):
@@ -469,7 +502,7 @@ def git_status_entries(root_dir: Path = ROOT_DIR) -> Tuple[bool, List[Dict[str, 
 
 
 def _session_artifacts(session_dir: Path) -> Dict[str, Dict[str, Any]]:
-    artifact_names = ["plan", "task", "research", "log", "report", "brainstorm", "explorer-check"]
+    artifact_names = ["plan", "task", "research", "log", "report", "brainstorm", "explorer-check", "postmortem"]
     return {name: artifact_snapshot(resolve_artifact(session_dir, name)) for name in artifact_names}
 
 
@@ -479,6 +512,98 @@ def _session_roadmap_feature(artifacts: Dict[str, Dict[str, Any]]) -> str:
         if feature_id:
             return str(feature_id)
     return ""
+
+
+def _session_governance_value(artifacts: Dict[str, Dict[str, Any]], field: str) -> str:
+    for alias in ("task", "plan", "research", "report", "postmortem"):
+        value = artifacts[alias].get(field, "")
+        if value:
+            return str(value)
+    return ""
+
+
+def _resolve_spec_by_id(spec_id: str) -> Optional[Path]:
+    if not spec_id:
+        return None
+    for spec_file in sorted(SPECS_DIR.rglob("*.md")):
+        if spec_file.name in {"INDEX.md", "README.md"}:
+            continue
+        fm, _ = split_frontmatter(spec_file.read_text(encoding="utf-8"))
+        if str(fm.get("id", "")).strip() == spec_id:
+            return spec_file
+    return None
+
+
+def _is_governed_workbench_session(session_dir: Path) -> bool:
+    try:
+        session_dir.resolve().relative_to(WB_DIR.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, Any]]:
+    """Load the rule/spec bundle that must be visible before feature operations."""
+    if not _is_governed_workbench_session(session_dir):
+        return None
+
+    artifacts = _session_artifacts(session_dir)
+    missing_artifacts = [alias for alias in ("plan", "task") if not artifacts[alias]["exists"]]
+    if missing_artifacts:
+        raise ExecutionError(
+            "Governed feature operations require plan and task artifacts; missing: "
+            + ", ".join(sorted(missing_artifacts))
+        )
+
+    feature_id = _session_roadmap_feature(artifacts)
+    if not feature_id:
+        raise ExecutionError(
+            "Governed feature operations require roadmap_feature in the session plan or task."
+        )
+
+    parent_spec = _session_governance_value(artifacts, "parent_spec")
+    if not parent_spec:
+        raise ExecutionError(
+            "Governed feature operations require parent_spec in the session plan or task."
+        )
+
+    parent_spec_path = _resolve_spec_by_id(parent_spec)
+    if parent_spec_path is None:
+        raise ExecutionError(f"Parent spec not found for governed feature operation: {parent_spec}")
+
+    child_spec = _session_governance_value(artifacts, "child_spec")
+    child_spec_path = None
+    if child_spec:
+        child_spec_path = _resolve_spec_by_id(child_spec)
+        if child_spec_path is None:
+            raise ExecutionError(f"Child spec not found for governed feature operation: {child_spec}")
+
+    rules: List[Dict[str, str]] = []
+    missing_rules: List[str] = []
+    for rule_id, filename in FEATURE_OPERATION_RULE_FILES:
+        rule_path = (RULES_DIR / filename).resolve()
+        if not rule_path.exists():
+            missing_rules.append(filename)
+            continue
+        rules.append({"id": rule_id, "path": relative_to_root(rule_path)})
+
+    if missing_rules:
+        raise ExecutionError(
+            "Governed feature operations require rule files before execution: "
+            + ", ".join(sorted(missing_rules))
+        )
+
+    return {
+        "session": session_dir.name,
+        "feature_id": feature_id,
+        "parent_spec": parent_spec,
+        "parent_spec_path": relative_to_root(parent_spec_path),
+        "child_spec": child_spec,
+        "child_spec_path": None if child_spec_path is None else relative_to_root(child_spec_path),
+        "plan_path": artifacts["plan"]["path"],
+        "task_path": artifacts["task"]["path"],
+        "rules": rules,
+    }
 
 
 def _split_session_git_changes(session_dir: Path) -> Tuple[bool, List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -501,11 +626,7 @@ def _collect_catchup_state(
     stale_artifacts: List[str] = []
 
     plan_links = artifacts["plan"].get("links", {}) if artifacts["plan"]["exists"] else {}
-    expects_research = (
-        bool(plan_links.get("research"))
-        or artifacts["brainstorm"]["exists"]
-        or artifacts["explorer-check"]["exists"]
-    )
+    expects_research = bool(plan_links.get("research"))
     if expects_research and not artifacts["research"]["exists"]:
         warnings.append("Plan context exists but no research artifact is present for durable findings capture.")
 

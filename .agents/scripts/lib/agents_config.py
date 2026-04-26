@@ -61,14 +61,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
                     "doc_type": "explorer-check",
                     "template": "explorer-check.md",
                     "phase": "planning",
-                    "depends_on": ["brainstorm"],
                     "purpose": "Prove the current repo was inspected and the plan is grounded in real code.",
                 },
                 {
                     "doc_type": "plan",
                     "template": "plan.md",
                     "phase": "planning",
-                    "depends_on": ["brainstorm", "research", "explorer-check"],
                     "purpose": "Define the concrete execution path for work that will actually be performed.",
                 },
                 {
@@ -125,7 +123,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
                     "template": "report.md",
                     "phase": "delivery",
                     "id_placeholder": "<report_doc_id_or_empty>",
-                    "depends_on": ["task", "log"],
+                    "depends_on": ["task"],
                     "purpose": "Summarize delivered changes and verification after real work lands.",
                 },
                 {
@@ -167,7 +165,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "default_intent": "delivery",
             "intents": {
                 "delivery": {
-                    "create": ["task"],
+                    "create": ["plan", "task"],
                     "allow": [
                         "brainstorm",
                         "research",
@@ -182,10 +180,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
                         "report",
                         "postmortem",
                     ],
-                    "required_context": ["roadmap", "task", "workflow", "product", "guidelines", "tech-stack"],
+                    "required_context": ["roadmap", "plan", "task", "workflow", "product", "guidelines", "tech-stack"],
                 },
                 "planning": {
-                    "create": ["brainstorm", "explorer-check", "plan"],
+                    "create": ["plan", "task"],
                     "allow": [
                         "brainstorm",
                         "research",
@@ -196,7 +194,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
                         "spec-test",
                         "spec-lite",
                     ],
-                    "required_context": ["roadmap", "plan", "workflow", "product", "guidelines", "tech-stack"],
+                    "required_context": ["roadmap", "plan", "task", "workflow", "product", "guidelines", "tech-stack"],
                 },
                 "research": {
                     "create": ["research"],
@@ -222,6 +220,13 @@ DEFAULT_CONFIG: Dict[str, Any] = {
                     "create": ["report"],
                     "allow": ["log", "report", "postmortem"],
                     "required_context": ["roadmap", "report", "workflow", "product", "guidelines", "tech-stack"],
+                    "require_present_optional_artifacts_final_before_closure": True,
+                    "optional_artifacts_final_before_closure": [
+                        "brainstorm",
+                        "research",
+                        "explorer-check",
+                        "postmortem",
+                    ],
                 },
             },
         },
@@ -229,11 +234,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "governance_required": True,
         "quick_mode_bypasses_governance": True,
         "feature_id_pattern": r"^F-\d{2,3}$",
-        "require_brainstorm_before_plan_final": True,
-        "require_explorer_check_before_plan_final": True,
+        "require_brainstorm_before_plan_final": False,
+        "require_explorer_check_before_plan_final": False,
         "require_execplan_sections_before_plan_final": True,
         "require_execplan_progress_before_plan_final": True,
-        "require_postmortem_before_report_final": True,
+        "require_postmortem_before_report_final": False,
         "pack_dir_name": "packs",
         "knowledge_lookup_required_before_major_plan": True,
     },

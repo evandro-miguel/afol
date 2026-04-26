@@ -2,14 +2,14 @@
 doc_type: plan
 id: 260413_1551_python-runtime-hardening_plan_01
 theme: python-runtime-hardening
-status: active
+status: superseded
 owners:
 - orchestrator
 workstream_intent: delivery
 artifact_purpose: Define the concrete execution path for work that will actually be
   performed.
 created_at: 2026-04-13 15:51:40-03:00
-updated_at: '2026-04-13T15:56:07-03:00'
+updated_at: '2026-04-21T20:52:19-03:00'
 roadmap_feature: F-16
 parent_spec: 260413_1250_project-template-source-separation_spec_01
 child_spec: null

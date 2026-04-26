@@ -155,8 +155,8 @@ def test_new_quick_workflow(isolated_repo: Path):
     assert "✓ Added task:" in result.stdout
 
 
-def test_new_planning_workflow_creates_brainstorm_and_explorer_check(isolated_repo: Path):
-    """`--intent planning` should materialize the governed planning artifact bundle."""
+def test_new_planning_workflow_creates_minimum_plan_and_task(isolated_repo: Path):
+    """`--intent planning` should materialize the minimum mandatory artifact set."""
     result = run_command(
         isolated_repo,
         [
@@ -178,9 +178,8 @@ def test_new_planning_workflow_creates_brainstorm_and_explorer_check(isolated_re
     session_dir = session_dirs[-1]
     session_id = session_dir.name
 
-    assert (session_dir / f"{session_id}_brainstorm_01.md").exists()
-    assert (session_dir / f"{session_id}_explorer-check_01.md").exists()
     assert (session_dir / f"{session_id}_plan_01.md").exists()
+    assert (session_dir / f"{session_id}_task_01.md").exists()
 
 
 def test_wb_update_task_workflow(isolated_repo: Path):

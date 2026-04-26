@@ -1125,6 +1125,50 @@ def cmd_ensure(args: argparse.Namespace):
         print(f"PERSISTED: {skill} -> manifest runtime={runtime}")
 
 
+def _print_project_structure_problems(problems: List[str]) -> None:
+    for p in problems:
+        print(f"ERROR: {p}")
+
+
+def _explicit_manifest_skills(manifest: Dict[str, Any], runtime: str) -> set[str]:
+    selected_installs = _resolve_targets(manifest, runtime)
+    return {
+        skill
+        for install in selected_installs
+        if isinstance(install, dict)
+        for skill in _normalize_string_list(install.get("skills"), [])
+    }
+
+
+def _check_drift_state(manifest: Dict[str, Any], skills: List[str], runtime: str) -> Dict[str, List[str]]:
+    explicit_skills = _explicit_manifest_skills(manifest, runtime)
+    missing_source, missing_project, drift = _compare(skills, manifest.get("mode", cfg("mode")))
+    return {
+        "stale_manifest_entries": sorted(name for name in missing_source if name in explicit_skills),
+        "real_source_drift": sorted(name for name in missing_source if name not in explicit_skills),
+        "missing_project": missing_project,
+        "drift": drift,
+        "local_extras": sorted(set(installed_skills()) - set(skills)),
+    }
+
+
+def _print_check_drift(state: Dict[str, List[str]]) -> None:
+    if state["stale_manifest_entries"]:
+        print(f"WARN: stale-manifest-entry: {', '.join(state['stale_manifest_entries'])}")
+    if state["local_extras"]:
+        print(f"WARN: local-extra: {', '.join(state['local_extras'])}")
+    if state["real_source_drift"]:
+        print(f"ERROR: source-drift (selected set): {', '.join(state['real_source_drift'])}")
+    if state["missing_project"]:
+        print(f"ERROR: missing in project: {', '.join(state['missing_project'])}")
+    if state["drift"]:
+        print(f"ERROR: source-drift (selected set): {', '.join(state['drift'])}")
+
+
+def _has_check_errors(problems: List[str], state: Dict[str, List[str]]) -> bool:
+    return bool(problems or state["real_source_drift"] or state["missing_project"] or state["drift"])
+
+
 def cmd_check(args: argparse.Namespace):
     if not ensure_enabled():
         return
@@ -1139,13 +1183,13 @@ def cmd_check(args: argparse.Namespace):
         return
 
     problems = validate_project_structure()
-    for p in problems:
-        print(f"ERROR: {p}")
+    _print_project_structure_problems(problems)
 
+    runtime = resolve_project_target(args)
     skills = resolve_skills_for_request(
         manifest,
         cli_skills=parse_csv(args.skills),
-        runtime=resolve_project_target(args),
+        runtime=runtime,
         profile=getattr(args, "profile", None),
     )
     if not skills:
@@ -1155,16 +1199,9 @@ def cmd_check(args: argparse.Namespace):
         print(f"WARN: {msg}")
         return
 
-    missing_source, missing_project, drift = _compare(skills, manifest.get("mode", cfg("mode")))
-    if missing_source:
-        print(f"ERROR: missing in source: {', '.join(missing_source)}")
-    if missing_project:
-        print(f"ERROR: missing in project: {', '.join(missing_project)}")
-    if drift:
-        print(f"ERROR: drift detected: {', '.join(drift)}")
-
-    has_errors = bool(problems or missing_source or missing_project or drift)
-    if has_errors:
+    drift_state = _check_drift_state(manifest, skills, runtime)
+    _print_check_drift(drift_state)
+    if _has_check_errors(problems, drift_state):
         if not required:
             print("WARN: skills sync is not fully aligned, but it is optional in this repo")
             return

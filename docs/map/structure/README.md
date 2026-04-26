@@ -1,22 +1,22 @@
 # 📁 Project Structure - Complete Index
 
-**Generated:** 2026-04-19T18:29:31+00:00
+**Generated:** 2026-04-26T14:48:52+00:00
 **Last Update:** First run
 
 ## 📊 Overview
 
 | Metric | Value |
 |--------|-------|
-| **Total Files** | 213 |
-| **Total Lines** | 52,551 |
+| **Total Files** | 270 |
+| **Total Lines** | 71,453 |
 
 ## 📂 Documentation Sections
 
 | Section | Description | Files |
 |---------|-------------|-------|
-| [Backend](./backend.md) | Services, utilities, and business logic | 95 |
-| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 109 |
-| [Data](./data.md) | Data files, constants, and configuration | 9 |
+| [Backend](./backend.md) | Services, utilities, and business logic | 101 |
+| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 121 |
+| [Data](./data.md) | Data files, constants, and configuration | 48 |
 
 ## 🔄 Change Detection
 

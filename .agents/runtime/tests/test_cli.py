@@ -61,7 +61,7 @@ def test_cli_command_registry_manifest(scaffold_repo):
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     commands = {item["name"]: item for item in payload["commands"]}
-    assert {"status", "knowledge", "session", "doctor", "skills-sync", "verify-tasks"} <= set(commands)
+    assert {"status", "knowledge", "session", "doctor", "benchmark", "skills-sync", "verify-tasks"} <= set(commands)
     assert commands["status"]["script_name"] == "agents-status.py"
     assert commands["verify"]["alias_of"] == "verify-tasks"
 
@@ -99,6 +99,13 @@ def test_cli_run_registered_command(scaffold_repo):
     result = runner.invoke(app, ["run", "doctor", "--fix", "--repo-root", str(scaffold_repo)])
     assert result.exit_code == 0
     assert result.stdout == "doctor:--fix\n"
+
+
+def test_cli_run_registered_benchmark_command(scaffold_repo):
+    _write_argv_script(scaffold_repo, "agents-benchmark.py", "benchmark")
+    result = runner.invoke(app, ["run", "benchmark", "list", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    assert result.stdout == "benchmark:list\n"
 
 
 def test_cli_run_forwards_help_to_registered_command(scaffold_repo):

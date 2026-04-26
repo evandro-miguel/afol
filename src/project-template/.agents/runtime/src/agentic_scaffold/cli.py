@@ -58,6 +58,24 @@ def manifest(repo_root: Optional[Path] = typer.Option(None, exists=False, file_o
     console.print_json(data=result.model_dump(mode="json"))
 
 
+@app.command("inspect-target")
+def inspect_target(
+    repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
+) -> None:
+    """Inspect the target repo for adoption readiness signals."""
+    result = _runtime(repo_root).adoption.inspect()
+    console.print_json(data=result.model_dump(mode="json"))
+
+
+@app.command("adoption-plan")
+def adoption_plan(
+    repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
+) -> None:
+    """Generate a non-destructive scaffold update plan for an existing repo."""
+    result = _runtime(repo_root).adoption.plan()
+    console.print_json(data=result.model_dump(mode="json"))
+
+
 @app.command()
 def archive(
     paths: list[str] = typer.Argument(..., help="Relative repository paths to archive."),

@@ -32,6 +32,10 @@ If no project-specific rule exists for the element, the agent must state the
 gap, use the closest language/framework/project standard available, and add a
 follow-up if the gap is likely to recur.
 
+For governed feature operations, the command path itself must load the active
+feature/spec/rule bundle before implementation starts; this step cannot be left
+to chat memory alone.
+
 ---
 
 ## Element Routing

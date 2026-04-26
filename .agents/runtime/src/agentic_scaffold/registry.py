@@ -22,6 +22,7 @@ class RuntimeCommand:
 
 _PRIMARY_COMMAND_SPECS = (
     ("doctor", "agents-doctor.py", "Validate .agents structure and integrity.", ()),
+    ("benchmark", "agents-benchmark.py", "Run controlled runtime-flow benchmark scenarios.", ()),
     ("new", "agents-new.py", "Create new governed workstreams.", ()),
     ("index", "agents-index.py", "Update specs and decision indexes.", ()),
     ("lint-docs", "agents-lint-docs.py", "Validate markdown docs consistency.", ("lint",)),

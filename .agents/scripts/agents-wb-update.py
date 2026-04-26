@@ -37,6 +37,7 @@ from lib.agents_config import (
     parse_offset,
 )
 from lib.markdown_docs import split_markdown_frontmatter as split_frontmatter
+from lib.postmortem_governance import postmortem_governance_review_issues
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
@@ -221,25 +222,41 @@ def maybe_record_session_end(session_dir: Path, source: str) -> None:
         pass
 
 
-def ensure_postmortem_ready_for_report_final(session_dir: Path) -> None:
-    """Require at least one finalized postmortem before final report closure."""
-    postmortems = doc_files(session_dir, "postmortem")
-    if not postmortems:
+def ensure_optional_artifacts_ready_for_report_final(session_dir: Path) -> None:
+    """Block report finalization only when present optional artifacts are not final."""
+    open_optional: list[str] = []
+    for alias in ("brainstorm", "research", "explorer-check", "postmortem"):
+        for doc_path in doc_files(session_dir, alias):
+            parsed = split_frontmatter(doc_path.read_text())
+            status = ""
+            if parsed:
+                fm, _ = parsed
+                status = str(fm.get("status", "")).strip().lower()
+            if status != "final":
+                open_optional.append(f"{alias} ({doc_path.name}) status={status or 'missing'}")
+
+    if open_optional:
         raise ValueError(
-            "Cannot finalize report without a postmortem. Create *_postmortem_*.md first."
+            "Cannot finalize report while optional artifacts remain open: "
+            + "; ".join(open_optional)
         )
 
-    for postmortem in postmortems:
-        parsed = split_frontmatter(postmortem.read_text())
-        if not parsed:
-            continue
-        fm, _ = parsed
-        if str(fm.get("status", "")).strip().lower() == "final":
-            return
 
-    raise ValueError(
-        "Cannot finalize report until at least one postmortem has status=final."
-    )
+def ensure_postmortems_ready_for_final(session_dir: Path) -> None:
+    """Require governance-promotion review before a postmortem becomes final."""
+    issues: list[str] = []
+    for doc_path in doc_files(session_dir, "postmortem"):
+        parsed = split_frontmatter(doc_path.read_text())
+        if not parsed:
+            issues.append(f"{doc_path.name} is missing valid frontmatter")
+            continue
+        _, body = parsed
+        doc_issues = postmortem_governance_review_issues(body)
+        if doc_issues:
+            issues.append(f"{doc_path.name}: {'; '.join(doc_issues)}")
+
+    if issues:
+        raise ValueError("Cannot finalize postmortem without governance review: " + " | ".join(issues))
 
 
 def touch_file(path: Path, timestamp: str) -> bool:
@@ -590,7 +607,9 @@ def cmd_status(args: argparse.Namespace):
     require_explicit_session(args, "status")
     session_dir = resolve_session(args.session)
     if args.value.strip().lower() == "final" and args.file in {"report", "all"}:
-        ensure_postmortem_ready_for_report_final(session_dir)
+        ensure_optional_artifacts_ready_for_report_final(session_dir)
+    if args.value.strip().lower() == "final" and args.file in {"postmortem", "all"}:
+        ensure_postmortems_ready_for_final(session_dir)
     paths = doc_files(session_dir, args.file)
     count = set_status(paths, args.value)
     if args.value.strip().lower() == "final" and args.file in {"report", "all"}:

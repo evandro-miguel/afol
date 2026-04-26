@@ -2,15 +2,15 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-04-19T18:29:31+00:00"
-updated_at: "2026-04-19T18:29:31+00:00"
+created_at: "2026-04-26T14:48:52+00:00"
+updated_at: "2026-04-26T14:48:52+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 60
+- Total indexed docs: 70
 
 ## Brainstorm
 
@@ -56,9 +56,11 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260413_1250_project-template-source-separation_postmortem_01` | `.agents/wb/260413_1250_project-template-source-separation/260413_1250_project-template-source-separation_postmortem_01.md` | - Separate the exportable project baseline from the live scaffold development
 - `260413_1851_just-command-runner-migration_postmortem_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_postmortem_01.md` | - Capture what happened in the session so future agents can reuse the real
 - `260415_2121_scripts-cleanup-optimization_postmortem_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_postmortem_01.md` | - Capture what this bounded F-15 cleanup slice changed and what should be reused later.
+- `260419_1554_decision-intake-orchestrator-improvements_postmortem_01` | `.agents/wb/260419_1554_decision-intake-orchestrator-improvements/260419_1554_decision-intake-orchestrator-improvements_postmortem_01.md` | - The research was converted into a lightweight decision-intake standard and
 
 ## Report
 
+- `260404_1555_repo-quality-and-governance_report_01` | `.agents/wb/260404_1555_repo-quality-and-governance/260404_1555_repo-quality-and-governance_report_01.md` | - Roadmap feature: F-11
 - `260404_1558_repo-quality-and-governance_report_01` | `.agents/wb/260404_1558_repo-quality-and-governance/260404_1558_repo-quality-and-governance_report_01.md` | - Roadmap feature: F-11
 - `260411_2214_agentic-runtime-restructure_report_01` | `.agents/wb/260411_2214_agentic-runtime-restructure/260411_2214_agentic-runtime-restructure_report_01.md` | - Roadmap feature: F-13
 - `260412_1130_spec-child-and-spec-test-governance_report_01` | `.agents/wb/260412_1130_spec-child-and-spec-test-governance/260412_1130_spec-child-and-spec-test-governance_report_01.md` | - Implemented F-14 governance support for spec-child and spec-test.
@@ -72,6 +74,14 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260413_1851_just-command-runner-migration_report_01` | `.agents/wb/260413_1851_just-command-runner-migration/260413_1851_just-command-runner-migration_report_01.md` | - Roadmap feature: F-17
 - `260415_2121_scripts-cleanup-optimization_report_01` | `.agents/wb/260415_2121_scripts-cleanup-optimization/260415_2121_scripts-cleanup-optimization_report_01.md` | - Completed a bounded F-15 script cleanup/optimization slice on the already-dirty
 - `260416_1922_update-safe-adoption-mcp-first_report_01` | `.agents/wb/260416_1922_update-safe-adoption-mcp-first/260416_1922_update-safe-adoption-mcp-first_report_01.md` | - Roadmap feature: F-16
+- `260419_1554_decision-intake-orchestrator-improvements_report_01` | `.agents/wb/260419_1554_decision-intake-orchestrator-improvements/260419_1554_decision-intake-orchestrator-improvements_report_01.md` | - Analyzed the research report and converted its strongest recommendations into
+- `260423_1438_postmortem-governance-rule-preflight_report_01` | `.agents/wb/260423_1438_postmortem-governance-rule-preflight/260423_1438_postmortem-governance-rule-preflight_report_01.md` | - Roadmap feature: F-18
+- `260423_1557_runtime-flow-benchmark-governance_report_01` | `.agents/wb/260423_1557_runtime-flow-benchmark-governance/260423_1557_runtime-flow-benchmark-governance_report_01.md` | - Roadmap feature: F-19
+- `260423_1822_runtime-flow-benchmark-runner_report_01` | `.agents/wb/260423_1822_runtime-flow-benchmark-runner/260423_1822_runtime-flow-benchmark-runner_report_01.md` | - Roadmap feature: F-19
+- `260423_2006_runtime-flow-benchmark-live-agent_report_01` | `.agents/wb/260423_2006_runtime-flow-benchmark-live-agent/260423_2006_runtime-flow-benchmark-live-agent_report_01.md` | - Implemented the missing live-agent slice of F-19: the benchmark runner now
+- `260423_2120_runtime-flow-benchmark-scenario-expansion_report_01` | `.agents/wb/260423_2120_runtime-flow-benchmark-scenario-expansion/260423_2120_runtime-flow-benchmark-scenario-expansion_report_01.md` | - Delivered runtime-flow-live-agent-v2, expanding the live-agent benchmark
+- `260424_1359_benchmark-results-and-hypothesis-improvements_report_01` | `.agents/wb/260424_1359_benchmark-results-and-hypothesis-improvements/260424_1359_benchmark-results-and-hypothesis-improvements_report_01.md` | - Roadmap feature: F-19
+- `260424_1435_benchmark-indicator-improvement-round_report_01` | `.agents/wb/260424_1435_benchmark-indicator-improvement-round/260424_1435_benchmark-indicator-improvement-round_report_01.md` | - Final live autonomous benchmark passed after stabilizing the fixture runtime.
 
 ## Research
 

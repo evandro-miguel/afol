@@ -31,6 +31,11 @@ class BootstrapTests(unittest.TestCase):
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn(".agents/agents", mandatory)
 
+    def test_mandatory_files_include_agents_mcp_wrapper(self):
+        """The MCP wrapper must be in the mandatory files list."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn(".agents/agents-mcp", mandatory)
+
     def test_mandatory_files_include_agents_config(self):
         """The agents config must be in the mandatory files list."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}

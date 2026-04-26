@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from fastmcp import Client
 
 from agentic_scaffold.server import build_mcp
@@ -18,6 +19,8 @@ async def test_mcp_lists_tools_resources_and_prompts(scaffold_repo):
             "search_docs",
             "validate_structure",
             "generate_manifest",
+            "inspect_target_scaffold",
+            "plan_scaffold_update",
             "archive_paths",
             "write_text_file",
             "apply_unified_diff",
@@ -29,6 +32,7 @@ async def test_mcp_lists_tools_resources_and_prompts(scaffold_repo):
         assert "repo://manifest" in resource_uris
         assert "repo://validation" in resource_uris
         assert "repo://tool-catalog" in resource_uris
+        assert "repo://adoption-plan" in resource_uris
         assert any(uri.startswith("skill://demo-skill") for uri in resource_uris)
 
         prompts = await client.list_prompts()
@@ -46,6 +50,12 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
     assert manifest.skill_count == 1
     assert manifest.tool_catalog_count == 1
     assert manifest.runtime_docs["AGENTS.md"] is True
+
+    adoption_plan_tool = await mcp.get_tool("plan_scaffold_update")
+    assert adoption_plan_tool is not None
+    adoption_plan = adoption_plan_tool.fn()
+    assert adoption_plan.repo_root == str(scaffold_repo)
+    assert "add-wrapper" in {action.kind for action in adoption_plan.actions}
 
     validation_resource = await mcp.get_resource("repo://validation")
     assert validation_resource is not None
@@ -81,3 +91,28 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
     assert {"status", "knowledge", "session", "doctor", "skills-sync", "verify-tasks"} <= set(commands)
     assert commands["status"]["script_name"] == "agents-status.py"
     assert commands["verify"]["alias_of"] == "verify-tasks"
+
+    adoption_resource = await mcp.get_resource("repo://adoption-plan")
+    assert adoption_resource is not None
+    assert adoption_resource.name == "Scaffold adoption plan"
+    adoption_payload = json.loads(adoption_resource.fn())
+    assert adoption_payload["repo_root"] == str(scaffold_repo)
+    assert "benchmark" in {action["kind"] for action in adoption_payload["actions"]}
+
+
+async def test_mcp_inspect_workspace_rejects_invalid_depth(scaffold_repo):
+    mcp = build_mcp(scaffold_repo)
+    inspect_tool = await mcp.get_tool("inspect_workspace")
+
+    assert inspect_tool is not None
+    with pytest.raises(ValueError, match="depth must be between 0 and 10"):
+        inspect_tool.fn(depth=99)
+
+
+async def test_mcp_search_docs_rejects_empty_query(scaffold_repo):
+    mcp = build_mcp(scaffold_repo)
+    search_tool = await mcp.get_tool("search_docs")
+
+    assert search_tool is not None
+    with pytest.raises(ValueError, match="query must be a non-empty string"):
+        search_tool.fn(query="", limit=2)

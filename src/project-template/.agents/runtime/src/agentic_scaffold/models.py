@@ -107,4 +107,50 @@ class UndoResult(BaseModel):
     restored_paths: list[str] = Field(default_factory=list)
 
 
+AdoptionActionKind = Literal[
+    "create",
+    "skip",
+    "patch-managed",
+    "adapt-config",
+    "add-wrapper",
+    "reconcile-skills",
+    "conflict",
+    "benchmark",
+    "rollback-record",
+]
+
+
+class AdoptionAction(BaseModel):
+    kind: AdoptionActionKind
+    path: Optional[str] = None
+    status: Literal["ready", "blocked", "observed"] = "ready"
+    reason: str
+    managed: bool = False
+    notes: list[str] = Field(default_factory=list)
+
+
+class AdoptionInspection(BaseModel):
+    repo_root: str
+    has_justfile: bool
+    justfile_uses_direct_import: bool
+    has_runtime_wrapper: bool
+    runtime_wrapper_exposes_runtime: bool
+    has_mcp_wrapper: bool
+    has_legacy_agents_config: bool
+    legacy_agents_layout_detected: bool
+    has_skills_manifest: bool
+    has_repo_local_skills_seed: bool
+    has_docs_map: bool
+    has_docs_arc: bool
+    has_bootstrap_adaptation_doc: bool
+
+
+class AdoptionPlan(BaseModel):
+    repo_root: str
+    inspection: AdoptionInspection
+    actions: list[AdoptionAction]
+    counts: dict[str, int]
+    summary: str
+
+
 TreeNode.model_rebuild()

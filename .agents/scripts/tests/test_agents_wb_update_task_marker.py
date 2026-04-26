@@ -19,6 +19,19 @@ def load_module(module_name: str, file_path: Path):
 
 class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
     @staticmethod
+    def _valid_postmortem_body() -> str:
+        return (
+            "# Postmortem\n\n"
+            "## Governance Promotion Review\n\n"
+            "- Lesson entry needed: no\n"
+            "- Rule update needed: yes\n"
+            "- ADR or decision record needed: no\n"
+            "- Skill or doc update needed: yes\n"
+            "- Evidence reviewed: task_01, report_01, ./.agents/agents verify-tasks --strict\n"
+            "- Follow-up recorded: yes\n"
+        )
+
+    @staticmethod
     def _build_task_args(session: str, task_id: str, **overrides):
         args = {
             "session": session,
@@ -253,15 +266,16 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             self.assertIn("status: final", content)
             record_mock.assert_called_once_with(session_dir, "wb-update status")
 
-    def test_status_final_on_report_requires_final_postmortem(self):
+    def test_status_final_on_report_passes_without_optional_artifacts(self):
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
         sys.path.insert(0, str(script_path.parent))
-        wb_update = load_module("agents_wb_update_postmortem_gate_test", script_path)
+        wb_update = load_module("agents_wb_update_report_final_no_optional_test", script_path)
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            session_dir = Path(td) / "260224_0000_postmortem-gate"
+            session_dir = Path(td) / "260224_0000_report-final-no-optional"
             session_dir.mkdir(parents=True, exist_ok=True)
-            (session_dir / "260224_0000_postmortem-gate_report_01.md").write_text(
+            report_file = session_dir / "260224_0000_report-final-no-optional_report_01.md"
+            report_file.write_text(
                 "---\n"
                 "doc_type: report\n"
                 "status: active\n"
@@ -271,8 +285,89 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             )
 
             args = argparse.Namespace(session=str(session_dir), file="report", value="final")
+            with mock.patch.object(wb_update, "maybe_record_session_end") as record_mock:
+                wb_update.cmd_status(args)
+
+            self.assertIn("status: final", report_file.read_text())
+            record_mock.assert_called_once_with(session_dir, "wb-update status")
+
+    def test_status_final_on_report_blocks_with_active_optional_artifact(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_report_final_block_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_report-final-blocked"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            report_file = session_dir / "260224_0000_report-final-blocked_report_01.md"
+            report_file.write_text(
+                "---\n"
+                "doc_type: report\n"
+                "status: active\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Report\n"
+            )
+            (session_dir / "260224_0000_report-final-blocked_brainstorm_01.md").write_text(
+                "---\n"
+                "doc_type: brainstorm\n"
+                "status: active\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Brainstorm\n"
+            )
+
+            args = argparse.Namespace(session=str(session_dir), file="report", value="final")
             with self.assertRaises(ValueError):
                 wb_update.cmd_status(args)
+            self.assertIn("status: active", report_file.read_text())
+
+    def test_status_final_on_postmortem_blocks_without_governance_review(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_postmortem_final_block_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_postmortem-final-blocked"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            postmortem_file = session_dir / "260224_0000_postmortem-final-blocked_postmortem_01.md"
+            postmortem_file.write_text(
+                "---\n"
+                "doc_type: postmortem\n"
+                "status: active\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Postmortem\n"
+            )
+
+            args = argparse.Namespace(session=str(session_dir), file="postmortem", value="final")
+            with self.assertRaises(ValueError):
+                wb_update.cmd_status(args)
+
+            self.assertIn("status: active", postmortem_file.read_text())
+
+    def test_status_final_on_postmortem_passes_with_governance_review(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_postmortem_final_ok_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_postmortem-final-ok"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            postmortem_file = session_dir / "260224_0000_postmortem-final-ok_postmortem_01.md"
+            postmortem_file.write_text(
+                "---\n"
+                "doc_type: postmortem\n"
+                "status: active\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                + self._valid_postmortem_body()
+            )
+
+            args = argparse.Namespace(session=str(session_dir), file="postmortem", value="final")
+            wb_update.cmd_status(args)
+
+            self.assertIn("status: final", postmortem_file.read_text())
 
 
 if __name__ == "__main__":

@@ -157,6 +157,29 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
             self.assertEqual(cwds, [target] * len(cwds))
 
+    def test_partial_bootstrap_post_checks_downgrade_repo_validation_failures(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_partial_post_checks_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td)
+            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
+            calls = []
+
+            def fake_run(cmd, cwd=None):
+                calls.append(cmd)
+                result = mock.Mock()
+                result.returncode = 1 if cmd[:4] == ["just", "--justfile", "Justfile", "agents_scaffold::lint"] else 0
+                return result
+
+            with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
+                with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
+                    agents_bootstrap.run_post_checks(target, agents_bootstrap.INSTALL_MODE_PARTIAL)
+
+        self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::lint"], calls)
+        self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
+
     def test_bootstrap_post_checks_require_just(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
@@ -337,6 +360,30 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp', mcp_wrapper)
         self.assertIn('adoption-plan|inspect-target', agents_wrapper)
 
+    def test_partial_bootstrap_refreshes_legacy_runtime_wrappers(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_runtime_surface_refresh_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td)
+            legacy_agents_dir = target / ".agents"
+            legacy_agents_dir.mkdir(parents=True, exist_ok=True)
+            (legacy_agents_dir / "agents").write_text(
+                "#!/usr/bin/env bash\n"
+                "echo legacy\n",
+                encoding="utf-8",
+            )
+
+            agents_bootstrap.ensure_partial_runtime_surfaces(target, dry_run=False)
+
+            wrapper = (legacy_agents_dir / "agents").read_text(encoding="utf-8")
+            mcp_wrapper = (legacy_agents_dir / "agents-mcp").read_text(encoding="utf-8")
+
+        self.assertIn("run_runtime_and_record", wrapper)
+        self.assertIn("mcp|agents-mcp)", wrapper)
+        self.assertIn('agentic-mcp "$@"', mcp_wrapper)
+
     def test_bootstrap_exports_generic_baseline_without_scaffold_history(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
@@ -419,12 +466,30 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         ]
 
         generated_names = {".agent", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
+        ignored_runtime_artifacts = {
+            ".agents/runtime/.venv",
+            ".agents/runtime/uv.lock",
+            ".agents/scripts/.venv",
+        }
         generated_artifacts = [
             path
             for path in template_root.rglob("*")
-            if path.name in generated_names
-            or path.name in {"events.jsonl", "settings.local.json", ".structure-cache.json"}
-            or path.relative_to(template_root).as_posix().startswith(".agents/cache/")
+            if (
+                path.relative_to(template_root).as_posix() not in ignored_runtime_artifacts
+                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.venv/")
+                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.pytest_cache/")
+                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.ruff_cache/")
+                and not path.relative_to(template_root).as_posix().startswith(".agents/scripts/.venv/")
+                and not (
+                    path.name == "__pycache__"
+                    and path.relative_to(template_root).as_posix().startswith(".agents/scripts/")
+                )
+                and (
+                    path.name in generated_names
+                    or path.name in {"events.jsonl", "settings.local.json", ".structure-cache.json"}
+                    or path.relative_to(template_root).as_posix().startswith(".agents/cache/")
+                )
+            )
         ]
         self.assertEqual(generated_artifacts, [])
 
@@ -432,7 +497,12 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         text_files = [
             path
             for path in template_root.rglob("*")
-            if path.is_file() and path.suffix in text_suffixes
+            if (
+                path.is_file()
+                and path.suffix in text_suffixes
+                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.venv/")
+                and not path.relative_to(template_root).as_posix().startswith(".agents/scripts/.venv/")
+            )
         ]
         for path in sorted(set(generic_files + text_files)):
             content = path.read_text(encoding="utf-8")

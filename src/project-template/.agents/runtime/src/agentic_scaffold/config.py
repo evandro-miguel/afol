@@ -62,9 +62,17 @@ def _walk_up(start: Path) -> list[Path]:
 
 
 def find_repo_root(start: Path | None = None) -> Path:
+    def _looks_like_repo_root(candidate: Path) -> bool:
+        return (candidate / "AGENTS.md").exists() and (candidate / ".agents").exists()
+
     env_root = os.environ.get("AGENTIC_REPO_ROOT", "").strip()
     if env_root:
-        return Path(env_root).expanduser().resolve()
+        candidate = Path(env_root).expanduser().resolve()
+        if not candidate.exists() or not candidate.is_dir():
+            raise FileNotFoundError(f"AGENTIC_REPO_ROOT does not point to a directory: {env_root}")
+        if not _looks_like_repo_root(candidate):
+            raise FileNotFoundError(f"AGENTIC_REPO_ROOT does not appear to be an AGENTS repo: {candidate}")
+        return candidate
 
     seed = (start or Path.cwd()).resolve()
     if seed.is_file():

@@ -31,6 +31,7 @@ from datetime import datetime, timedelta
 from lib.agents_config import get_cfg_path, load_agents_config
 from lib.artifact_utility import analyze_artifact_utility
 from lib.markdown_docs import parse_markdown_doc
+from lib.postmortem_governance import postmortem_governance_review_issues
 
 try:
     import yaml
@@ -678,35 +679,42 @@ def check_execplan_requirements(session_dir: Path) -> List[Dict[str, Any]]:
 
 
 def check_postmortem_closure(session_dir: Path) -> List[Dict[str, Any]]:
-    """Require a finalized postmortem when the report is final."""
+    """Validate optional postmortem closure rules and final-review completeness."""
     issues: List[Dict[str, Any]] = []
-    if yaml is None or not REQUIRE_POSTMORTEM_BEFORE_REPORT_FINAL:
+    if yaml is None:
         return issues
 
     docs = load_frontmatter_docs(session_dir)
     reports = [d for d in docs if "_report_" in d["name"]]
-    if not reports:
-        return issues
-
-    final_reports = [d for d in reports if str(d["fm"].get("status", "")).strip().lower() == "final"]
-    if not final_reports:
-        return issues
-
     postmortems = [d for d in docs if "_postmortem_" in d["name"]]
-    if not postmortems:
-        issues.append({
-            "type": "postmortem_gate",
-            "severity": "error",
-            "description": "Final report exists but no postmortem document was found",
-        })
-        return issues
+    final_reports = [d for d in reports if str(d["fm"].get("status", "")).strip().lower() == "final"]
+    if final_reports and REQUIRE_POSTMORTEM_BEFORE_REPORT_FINAL:
+        if not postmortems:
+            issues.append({
+                "type": "postmortem_gate",
+                "severity": "error",
+                "description": "Final report exists but no postmortem document was found",
+            })
+            return issues
 
-    if not any(str(d["fm"].get("status", "")).strip().lower() == "final" for d in postmortems):
-        issues.append({
-            "type": "postmortem_gate",
-            "severity": "error",
-            "description": "Final report exists but no postmortem has status=final",
-        })
+        if not any(str(d["fm"].get("status", "")).strip().lower() == "final" for d in postmortems):
+            issues.append({
+                "type": "postmortem_gate",
+                "severity": "error",
+                "description": "Final report exists but no postmortem has status=final",
+            })
+
+    for doc in postmortems:
+        if str(doc["fm"].get("status", "")).strip().lower() != "final":
+            continue
+        review_issues = postmortem_governance_review_issues(doc["body"])
+        for issue in review_issues:
+            issues.append({
+                "type": "postmortem_governance_review",
+                "severity": "error",
+                "document": doc["name"],
+                "description": f"Final postmortem is incomplete: {issue}",
+            })
 
     return issues
 
@@ -742,34 +750,43 @@ def check_artifact_utility(session_dir: Path) -> List[Dict[str, Any]]:
 
 
 def check_delivery_closure_readiness(session_dir: Path, completed_tasks: int) -> List[Dict[str, Any]]:
-    """Require a useful report when executable work has actually been completed."""
+    """Validate closure blockers only for optional artifacts that are present."""
     issues: List[Dict[str, Any]] = []
-    if yaml is None or completed_tasks <= 0:
+    if yaml is None:
         return issues
 
     docs = load_frontmatter_docs(session_dir)
-    reports = [d for d in docs if "_report_" in d["name"]]
-    if not reports:
-        issues.append(
-            {
-                "type": "closure_artifacts",
-                "severity": "error",
-                "description": "Completed tasks exist but no report document was found",
-            }
-        )
+    report_final_exists = any(
+        "_report_" in d["name"] and str(d["fm"].get("status", "")).strip().lower() == "final"
+        for d in docs
+    )
+
+    total_tasks = 0
+    for task_file in sorted(session_dir.rglob("*task*.md")):
+        total_tasks += len(extract_tasks(task_file.read_text(), task_file))
+
+    all_tasks_done = total_tasks > 0 and completed_tasks > 0 and completed_tasks == total_tasks
+    if not (report_final_exists or all_tasks_done):
         return issues
 
-    useful_reports = [
-        d
-        for d in reports
-        if analyze_artifact_utility(str(d["fm"].get("doc_type", "")).strip(), d["body"], d["fm"]).get("useful")
-    ]
-    if not useful_reports:
+    optional_doc_types = {"brainstorm", "research", "explorer-check", "postmortem"}
+    for doc in docs:
+        doc_type = str(doc["fm"].get("doc_type", "")).strip()
+        if doc_type not in optional_doc_types:
+            continue
+
+        status = str(doc["fm"].get("status", "")).strip().lower()
+        if status == "final":
+            continue
+
         issues.append(
             {
                 "type": "closure_artifacts",
                 "severity": "error",
-                "description": "Completed tasks exist but the report artifact still lacks concrete summary/change/verification content",
+                "description": (
+                    f"Optional artifact '{doc_type}' is present ({doc['name']}) with status="
+                    f"'{status or 'missing'}'; closure is blocked until status=final."
+                ),
             }
         )
 

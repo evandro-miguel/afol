@@ -96,11 +96,21 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
     task = resolve_artifact(session_path, "task")
 
     total, done, remaining, blocked_rows, rows = parse_state_summary(task)
-    ready_state = "idle"
-    if task and total and done == total:
-        ready_state = "complete"
-    elif total:
-        ready_state = "ready"
+    manifest_states = workflow_artifact_states(session_path)
+    optional_open_blockers = [
+        item
+        for item in manifest_states
+        if item.get("doc_type") in {"brainstorm", "research", "explorer-check", "postmortem"}
+        and item.get("exists")
+        and str(item.get("status") or "").strip().lower() != "final"
+    ]
+
+    ready_state = "blocked" if optional_open_blockers else "idle"
+    if ready_state != "blocked":
+        if task and total and done == total:
+            ready_state = "complete"
+        elif total:
+            ready_state = "ready"
 
     roadmap_feature = ""
     if task and task.exists():
@@ -110,7 +120,6 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
     context_ready, missing_context = context_readiness(session_path)
     if not check_context:
         missing_context = []
-    manifest_states = workflow_artifact_states(session_path)
     next_artifact = next_workflow_artifact(manifest_states)
 
     return {

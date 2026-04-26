@@ -240,7 +240,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["doc_type"] for entry in planning_default],
-            ["brainstorm", "explorer-check", "plan"],
+            ["plan", "task"],
         )
 
         planning_plan_only = agents_new._iter_workstream_artifacts(
@@ -276,7 +276,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["doc_type"] for entry in delivery_with_spec],
-            ["task", "spec"],
+            ["plan", "task", "spec"],
         )
 
         research_only = agents_new._iter_workstream_artifacts(
