@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-04-26T14:48:52+00:00
+**Generated:** 2026-04-26T15:18:02+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 121 files, 22,511 lines, 1070.8 KB
+**Stats:** 122 files, 22,716 lines, 1080.0 KB
 
 ### Files
 
@@ -24,9 +24,9 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_runtime_compatibility.py` | 576 | 31.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_scenarios.py` | 542 | 27.5 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_execution_command_scenarios.py` | 520 | 26.3 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_skills_sync_extra.py` | 446 | 22.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_flow.py` | 427 | 21.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_execution_command_flow.py` | 427 | 21.7 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_skills_sync_extra.py` | 403 | 20.5 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_new_quick_mode.py` | 383 | 17.3 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_runtime_compatibility.py` | 365 | 20.8 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_new_quick_mode.py` | 358 | 16.1 KB | Test file; unit tests |
@@ -35,9 +35,9 @@ Unit tests, integration tests, and E2E tests.
 | `src/project-template/.agents/scripts/tests/integration/test_critical_workflows.py` | 328 | 14.6 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_wb_update_task_marker.py` | 327 | 15.4 KB | Test file; unit tests |
 | `.agents/scripts/tests/conftest.py` | 315 | 13.4 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_implement.py` | 315 | 18.0 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/conftest.py` | 315 | 13.4 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_implement.py` | 311 | 18.3 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_revert.py` | 269 | 14.6 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_revert.py` | 273 | 14.4 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_benchmark.py` | 261 | 11.0 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_benchmark.py` | 261 | 11.0 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_fix_symlinks.py` | 252 | 12.1 KB | Test file; unit tests |
@@ -46,9 +46,9 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md` | 222 | 10.6 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_repo_map.py` | 218 | 9.8 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_repo_map.py` | 218 | 9.8 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_session.py` | 214 | 11.3 KB | Test file; unit tests |
 | `docs/arc/SPECS/260323_1752_workflow-and-bootstrap-integration_spec_01.md` | 211 | 12.2 KB | Module; functionality |
 | `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md` | 211 | 12.0 KB | Module; functionality |
-| `.agents/scripts/tests/test_agents_session.py` | 210 | 11.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_review.py` | 198 | 11.1 KB | Test file; unit tests |
 | `.agents/scripts/tests/unit/test_version.py` | 189 | 9.3 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/unit/test_version.py` | 189 | 9.3 KB | Test file; unit tests |
@@ -58,6 +58,7 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md` | 161 | 7.2 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_bootstrap.py` | 155 | 8.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md` | 149 | 6.9 KB | Test file; unit tests |
+| `docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md` | 149 | 7.0 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_doctor_fix.py` | 140 | 7.6 KB | Test file; unit tests |
 | `docs/map/structure/tests.md` | 133 | 12.7 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_telemetry.py` | 130 | 6.6 KB | Test file; unit tests |
@@ -111,8 +112,8 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_tools_catalog.py` | 60 | 2.8 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_lint_state_board.py` | 58 | 2.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_lint_state_board.py` | 58 | 2.7 KB | Test file; unit tests |
+| `docs/arc/SPECS/INDEX.md` | 54 | 6.1 KB | Module; functionality |
 | `src/project-template/.agents/scripts/tests/test_agents_doctor_fix.py` | 53 | 2.5 KB | Test file; unit tests |
-| `docs/arc/SPECS/INDEX.md` | 53 | 5.9 KB | Module; functionality |
 | `src/project-template/.agents/scripts/tests/test_agents_status.py` | 52 | 2.3 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_tools_catalog.py` | 48 | 2.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_session-pack-structure-and-postmortem_spec_01.md` | 47 | 2.1 KB | Module; functionality |

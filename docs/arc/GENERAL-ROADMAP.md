@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-19T16:38:36-03:00'
+updated_at: '2026-04-26T12:16:53-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -469,6 +469,36 @@ updated_at: '2026-04-19T16:38:36-03:00'
         advisable.
   - [ ] Verify the planning/governance slice with strict workbench validation
         and `just lint`.
+
+### F-20 Parallel Session Isolation
+
+- Status: planned
+- Why: The scaffold supports multiple workbench sessions, but the operational
+  model still relies on one repository-global `.agents/wb/.active_session`
+  pointer. Remote agents and parallel PRs can contaminate that pointer, as Jules
+  did when several branches tried to fix CI by changing the active session
+  instead of targeting their own session context.
+- Governing spec: `docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md`
+- Exit criteria:
+  - Commands that mutate workbench state can target an explicit or context-local
+    session without relying on the global active pointer.
+  - CI and PR review can detect suspicious `.agents/wb/.active_session` changes
+    without blocking intentional session-management work.
+  - Operators can list, bind, switch, catch up, and close parallel sessions
+    without losing track of branch/worktree context.
+  - Remote-agent review docs explain how to reject active-session contamination
+    while preserving useful code or test ideas.
+- Delivery tasks:
+  - [ ] Inventory all active-session reads and writes across scripts, Just
+        recipes, and runtime docs.
+  - [ ] Define and implement the session resolution order: explicit
+        `--session`, environment override, context-local binding, global
+        pointer fallback.
+  - [ ] Add branch/worktree-aware session context for parallel local and remote
+        work.
+  - [ ] Add CI/review checks for suspicious `.active_session` mutations.
+  - [ ] Update session command UX and docs for Jules-style parallel PR review.
+  - [ ] Verify with focused tests, `just lint`, and strict validation.
 
 ## 5) Prioritization
 

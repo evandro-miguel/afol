@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-04-26T14:48:52+00:00"
-updated_at: "2026-04-26T14:48:52+00:00"
+created_at: "2026-04-26T15:18:02+00:00"
+updated_at: "2026-04-26T15:18:02+00:00"
 ---
 
 # SPECS INDEX
@@ -14,9 +14,9 @@ updated_at: "2026-04-26T14:48:52+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 32 |
+| Total | 33 |
 | Draft | 1 |
-| Active | 30 |
+| Active | 31 |
 | Final | 1 |
 
 ## Index
@@ -55,6 +55,7 @@ updated_at: "2026-04-26T14:48:52+00:00"
 | 260423_1821_runtime-flow-benchmark-runner_spec-child_01 | runtime-flow-benchmark-runner | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260423_2006_runtime-flow-benchmark-live-agent_spec-child_01 | runtime-flow-benchmark-live-agent | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260423_2120_runtime-flow-benchmark-scenarios_spec-child_01 | runtime-flow-benchmark-scenarios | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260426_1215_parallel-session-isolation_spec_01 | parallel-session-isolation | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 
 ---
 *Index: `docs/arc/SPECS/INDEX.md`*

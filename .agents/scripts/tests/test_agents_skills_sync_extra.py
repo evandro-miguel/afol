@@ -35,9 +35,28 @@ class SkillsSyncUtilTests(unittest.TestCase):
     def test_normalize_runtime_none(self):
         self.assertEqual(self.ss.normalize_runtime(None), "all")
 
+    def test_normalize_runtime_aliases_and_spacing(self):
+        self.assertEqual(self.ss.normalize_runtime(""), "all")
+        self.assertEqual(self.ss.normalize_runtime("   "), "")
+        self.assertEqual(self.ss.normalize_runtime("Claude"), "claude-code")
+        self.assertEqual(self.ss.normalize_runtime(" claude_code "), "claude-code")
+        self.assertEqual(self.ss.normalize_runtime("Unknown_App"), "unknown_app")
+
     def test_is_supported_runtime(self):
         self.assertTrue(self.ss.is_supported_runtime("codex"))
         self.assertFalse(self.ss.is_supported_runtime("nonexistent"))
+
+    def test_is_supported_runtime_aliases_and_all_target(self):
+        runtime_targets = ["all", "opencode", "claude-code"]
+        with mock.patch.object(self.ss, "cfg", return_value=runtime_targets):
+            self.assertTrue(self.ss.is_supported_runtime("all"))
+            self.assertTrue(self.ss.is_supported_runtime("opencode"))
+            self.assertTrue(self.ss.is_supported_runtime("  OpenCode  "))
+            self.assertTrue(self.ss.is_supported_runtime("claude"))
+            self.assertTrue(self.ss.is_supported_runtime(""))
+            self.assertTrue(self.ss.is_supported_runtime(None))
+            self.assertFalse(self.ss.is_supported_runtime("unknown"))
+            self.assertFalse(self.ss.is_supported_runtime("codex"))
 
     def test_dedupe(self):
         self.assertEqual(self.ss.dedupe(["a", "b", "a", "c"]), ["a", "b", "c"])
@@ -197,6 +216,11 @@ class SkillsSyncPathTests(unittest.TestCase):
             result = self.ss.skills_root_for_repo(Path("/tmp/repo"))
         self.assertEqual(result, Path("/tmp/repo/skills"))
 
+    def test_skills_root_for_repo_honors_custom_source_dir(self):
+        with mock.patch.object(self.ss, "cfg", return_value="custom_skills"):
+            result = self.ss.skills_root_for_repo(Path("/tmp/repo"))
+        self.assertEqual(result, Path("/tmp/repo/custom_skills"))
+
     def test_profiles_root_for_repo(self):
         result = self.ss.profiles_root_for_repo(Path("/tmp/repo"))
         self.assertEqual(result, Path("/tmp/repo/profiles"))
@@ -210,6 +234,29 @@ class SkillsSyncPathTests(unittest.TestCase):
         with mock.patch.object(self.ss, "cfg_path", return_value=Path("/tmp/proj")):
             result = self.ss.project_skills_root()
         self.assertIsInstance(result, Path)
+
+    def test_project_and_upstream_roots_resolve_from_config(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config = {
+                "skills_sync": {
+                    "project_dir": ".agents/project-skills",
+                    "source_dir": ".agents/source/universal-skills",
+                    "upstream_skills_dir": "custom-skills",
+                }
+            }
+            with mock.patch.object(self.ss, "ROOT_DIR", root), \
+                 mock.patch.object(self.ss, "CONFIG", config), \
+                 mock.patch.object(self.ss, "active_source_repo_path", return_value=None):
+                self.assertEqual(self.ss.project_skills_root(), root / ".agents/project-skills")
+                self.assertEqual(
+                    self.ss.upstream_skills_root(),
+                    root / ".agents/source/universal-skills/custom-skills",
+                )
+                self.assertEqual(
+                    self.ss.upstream_profiles_root(),
+                    root / ".agents/source/universal-skills/profiles",
+                )
 
     def test_is_valid_source_repo(self):
         with tempfile.TemporaryDirectory() as td:
