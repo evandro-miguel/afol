@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-04-26T15:18:02+00:00
+**Generated:** 2026-04-26T16:04:47+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 122 files, 22,716 lines, 1080.0 KB
+**Stats:** 122 files, 22,717 lines, 1080.1 KB
 
 ### Files
 
@@ -60,7 +60,7 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md` | 149 | 6.9 KB | Test file; unit tests |
 | `docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md` | 149 | 7.0 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_doctor_fix.py` | 140 | 7.6 KB | Test file; unit tests |
-| `docs/map/structure/tests.md` | 133 | 12.7 KB | Test file; unit tests |
+| `docs/map/structure/tests.md` | 134 | 12.8 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_telemetry.py` | 130 | 6.6 KB | Test file; unit tests |
 | `docs/arc/SPECS/260323_1741_current-state-maps-and-goal-state-governance_spec_01.md` | 125 | 7.2 KB | Module; functionality |
 | `.agents/runtime/tests/conftest.py` | 124 | 3.8 KB | Test file; unit tests |
