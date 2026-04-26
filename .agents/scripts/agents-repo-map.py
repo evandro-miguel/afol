@@ -390,6 +390,8 @@ def main() -> int:
         runner = _resolve_runner_preview(args.runner)
         cmd = [str(runner), str(repo_root), str(output_root), str(args.image)]
         print("Analysis shadow repo: <dry-run skipped>")
+        if not runner.exists():
+            print(f"WARN: repo-map runner preview path does not exist: {runner}")
         print("Resolved repo-map command:")
         print(" ".join(cmd))
         return 0

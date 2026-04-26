@@ -37,7 +37,7 @@ class SkillsSyncUtilTests(unittest.TestCase):
 
     def test_normalize_runtime_aliases_and_spacing(self):
         self.assertEqual(self.ss.normalize_runtime(""), "all")
-        self.assertEqual(self.ss.normalize_runtime("   "), "")
+        self.assertEqual(self.ss.normalize_runtime("   "), "all")
         self.assertEqual(self.ss.normalize_runtime("Claude"), "claude-code")
         self.assertEqual(self.ss.normalize_runtime(" claude_code "), "claude-code")
         self.assertEqual(self.ss.normalize_runtime("Unknown_App"), "unknown_app")

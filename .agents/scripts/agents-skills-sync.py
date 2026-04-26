@@ -89,7 +89,7 @@ def parse_csv(value: str | None) -> List[str]:
 
 
 def normalize_runtime(value: str | None) -> str:
-    if not value:
+    if not value or not value.strip():
         return SPECIAL_APP_ALL
     return RUNTIME_ALIASES.get(value.strip().lower(), value.strip().lower())
 
