@@ -113,6 +113,21 @@ def _resolve_runner(cli_runner: str | None) -> Path:
     )
 
 
+def _resolve_runner_preview(cli_runner: str | None) -> Path:
+    """Return the runner path to show in dry-run mode without requiring it to exist."""
+    fallback: Path | None = None
+    for candidate in _runner_candidates(cli_runner):
+        resolved = candidate.resolve() if candidate.exists() else candidate.expanduser()
+        if fallback is None:
+            fallback = resolved
+        if resolved.exists() and resolved.is_file():
+            return resolved
+
+    if fallback is None:
+        return DEFAULT_RUNNER_HINT
+    return fallback
+
+
 def _runner_requires_standard_host_tools(runner: Path) -> bool:
     try:
         return runner.resolve() == DEFAULT_RUNNER_HINT.resolve()
@@ -364,7 +379,6 @@ def main() -> int:
     try:
         repo_root = _resolve_repo(args.repo)
         output_root = _resolve_output(repo_root, args.output)
-        runner = _resolve_runner(args.runner)
     except Exception as exc:
         print(f"❌ {exc}")
         return 1
@@ -373,11 +387,18 @@ def main() -> int:
     print(f"Final output root: {output_root}")
 
     if args.dry_run:
+        runner = _resolve_runner_preview(args.runner)
         cmd = [str(runner), str(repo_root), str(output_root), str(args.image)]
         print("Analysis shadow repo: <dry-run skipped>")
         print("Resolved repo-map command:")
         print(" ".join(cmd))
         return 0
+
+    try:
+        runner = _resolve_runner(args.runner)
+    except Exception as exc:
+        print(f"❌ {exc}")
+        return 1
 
     staging_root, shadow_repo = _prepare_shadow_repo(repo_root)
     shadow_output = staging_root / "map-output"

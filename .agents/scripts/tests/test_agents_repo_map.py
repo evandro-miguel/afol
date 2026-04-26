@@ -68,6 +68,27 @@ class AgentsRepoMapTests(unittest.TestCase):
 
             self.assertEqual(code, 0)
 
+    def test_dry_run_does_not_require_runner(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            temp_root = Path(td)
+            repo_dir = temp_root / "repo"
+            repo_dir.mkdir()
+
+            buf = io.StringIO()
+            argv = ["agents-repo-map.py", str(repo_dir), "--dry-run"]
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": ""}, clear=False),
+                mock.patch.object(self.repo_map, "_runner_candidates", return_value=iter([temp_root / "missing-runner.sh"])),
+                contextlib.redirect_stdout(buf),
+            ):
+                code = self.repo_map.main()
+
+            output = buf.getvalue()
+            self.assertEqual(code, 0)
+            self.assertIn("Analysis shadow repo: <dry-run skipped>", output)
+            self.assertIn(str(temp_root / "missing-runner.sh"), output)
+
     def test_run_succeeds_when_runner_writes_required_readme(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)
