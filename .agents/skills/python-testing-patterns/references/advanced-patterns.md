@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: advanced-patterns
+theme: references
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # Python Testing Patterns — Advanced Reference
 
 Advanced testing patterns including async code, monkeypatching, temporary files, conftest setup, property-based testing, database testing, CI/CD integration, and configuration.

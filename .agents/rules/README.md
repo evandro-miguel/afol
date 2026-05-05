@@ -1,3 +1,12 @@
+---
+doc_type: rule
+id: readme
+theme: rules
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # Rules
 
 **Mandatory rules folder for all agents.**

@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: tests
+theme: structure
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # 🎨 Tests Structure
 
 **Generated:** 2026-04-16T00:32:54+00:00

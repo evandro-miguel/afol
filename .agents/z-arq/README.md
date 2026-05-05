@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: readme
+theme: z-arq
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # Archive
 
 This folder stores finalized workbench sessions and other removed project
