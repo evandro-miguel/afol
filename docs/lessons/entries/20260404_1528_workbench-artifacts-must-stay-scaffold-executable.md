@@ -1,5 +1,5 @@
 ---
-doc_type: lesson
+doc_type: lesson_entry
 id: 20260404_1528_workbench-artifacts-must-stay-scaffold-executable
 status: active
 created_at: '2026-04-04T15:28:00-03:00'

@@ -1,3 +1,12 @@
+---
+doc_type: structure
+id: data
+theme: structure
+status: active
+created_at: '2026-05-10T16:27:41+00:00'
+updated_at: '2026-05-10T16:27:41+00:00'
+---
+
 # 🎨 Data Structure
 
 **Generated:** 2026-04-16T00:32:54+00:00
