@@ -21,7 +21,7 @@ def load_module(module_name: str, file_path: Path):
 
 class AgentsTelemetryTests(unittest.TestCase):
     def test_record_event_writes_context_as_top_level_field(self):
-        script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-telemetry.py"
         agents_telemetry = load_module("agents_telemetry_test_record", script_path)
 
         with tempfile.TemporaryDirectory() as td:
@@ -47,7 +47,7 @@ class AgentsTelemetryTests(unittest.TestCase):
             self.assertNotIn("context", saved[0]["metadata"])
 
     def test_main_record_parses_context_flag_into_context_field(self):
-        script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-telemetry.py"
         agents_telemetry = load_module("agents_telemetry_test_main", script_path)
 
         with tempfile.TemporaryDirectory() as td:
@@ -75,7 +75,7 @@ class AgentsTelemetryTests(unittest.TestCase):
             self.assertNotIn("context", saved[0]["metadata"])
 
     def test_wrapper_records_failed_tool_exec_with_exit_code(self):
-        wrapper_path = Path(".agents/agents").resolve()
+        wrapper_path = Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "agents"
 
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -106,7 +106,7 @@ class AgentsTelemetryTests(unittest.TestCase):
             self.assertGreater(last_event["metadata"]["exit_code"], 0)
 
     def test_load_json_dict_rejects_non_object_json(self):
-        script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-telemetry.py"
         agents_telemetry = load_module("agents_telemetry_load_json_dict", script_path)
 
         with self.assertRaises(ValueError) as cm:
@@ -118,7 +118,7 @@ class AgentsTelemetryTests(unittest.TestCase):
         self.assertIn("Invalid JSON value", str(cm.exception))
 
     def test_main_record_rejects_non_object_metadata_and_context_values(self):
-        script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-telemetry.py"
         agents_telemetry = load_module("agents_telemetry_record_guard", script_path)
 
         with tempfile.TemporaryDirectory() as td:
@@ -146,7 +146,7 @@ class AgentsTelemetryTests(unittest.TestCase):
             self.assertFalse(events_file.exists())
 
     def test_get_iso_timestamp_delegates_to_config_timestamp_helper(self):
-        script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-telemetry.py"
         agents_telemetry = load_module("agents_telemetry_get_timestamp", script_path)
 
         with patch.object(

@@ -36,7 +36,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         return argparse.Namespace(**args)
 
     def test_require_explicit_session_for_write_commands(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_require_session_test", script_path)
 
@@ -77,7 +77,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
     def test_update_task_marker_does_not_break_checkbox_format(self):
         """Test that updating task markers preserves State Board format."""
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_test", script_path)
 
@@ -102,7 +102,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             self.assertIn("| T-01 | done | worker |", content)
 
     def test_latest_doc_file_spec_child_alias_reads_historical_spec_lite(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_spec_alias_test", script_path)
 
@@ -124,7 +124,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
     def test_mark_done_requires_evidence_unless_bypassed(self):
         """Test that mark-done requires evidence unless bypassed."""
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_mark_done_gate_test", script_path)
 
@@ -164,7 +164,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
     def test_evidence_ledger_validates_mark_done_reference(self):
         """Test that evidence ledger validates mark-done reference."""
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_evidence_test", script_path)
 
@@ -219,7 +219,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
     def test_status_final_on_report_records_session_end(self):
         """Setting the report to final should emit a session_end telemetry event."""
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_session_end_test", script_path)
 
@@ -254,7 +254,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             record_mock.assert_called_once_with(session_dir, "wb-update status")
 
     def test_status_final_on_report_requires_final_postmortem(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_postmortem_gate_test", script_path)
 

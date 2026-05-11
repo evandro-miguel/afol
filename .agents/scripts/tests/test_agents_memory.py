@@ -17,7 +17,7 @@ def load_module(module_name: str, file_path: Path):
 
 class AgentsMemoryTests(unittest.TestCase):
     def test_status_shows_auxiliary_boundary(self):
-        script_path = Path(".agents/scripts/agents-memory.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-memory.py"
         sys.path.insert(0, str(script_path.parent))
         memory = load_module("agents_memory_status_test", script_path)
 
@@ -46,7 +46,7 @@ class AgentsMemoryTests(unittest.TestCase):
         self.assertIn("repo-local `knowledge` remain canonical", output)
 
     def test_search_emits_basic_memory_contract(self):
-        script_path = Path(".agents/scripts/agents-memory.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-memory.py"
         sys.path.insert(0, str(script_path.parent))
         memory = load_module("agents_memory_search_test", script_path)
 
@@ -71,7 +71,7 @@ class AgentsMemoryTests(unittest.TestCase):
         self.assertIn('"search_type": "hybrid"', output)
 
     def test_context_without_url_emits_two_step_flow(self):
-        script_path = Path(".agents/scripts/agents-memory.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-memory.py"
         sys.path.insert(0, str(script_path.parent))
         memory = load_module("agents_memory_context_test", script_path)
 
@@ -104,7 +104,7 @@ class AgentsMemoryTests(unittest.TestCase):
         self.assertIn("`build_context`", output)
 
     def test_show_rejects_unsupported_provider(self):
-        script_path = Path(".agents/scripts/agents-memory.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-memory.py"
         sys.path.insert(0, str(script_path.parent))
         memory = load_module("agents_memory_provider_test", script_path)
 

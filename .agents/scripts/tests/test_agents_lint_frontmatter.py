@@ -16,7 +16,7 @@ def load_module(module_name: str, file_path: Path):
 
 class AgentsLintFrontmatterTests(unittest.TestCase):
     def test_frontmatter_with_triple_dash_in_scalar_is_valid(self):
-        script_path = Path(".agents/scripts/agents-lint-docs.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-lint-docs.py"
         sys.path.insert(0, str(script_path.parent))
         lint_docs = load_module("agents_lint_docs_frontmatter_test", script_path)
 

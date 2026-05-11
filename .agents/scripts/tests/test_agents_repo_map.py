@@ -28,7 +28,7 @@ def make_runner(path: Path, body: str) -> Path:
 class AgentsRepoMapTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        script_path = Path(".agents/scripts/agents-repo-map.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-repo-map.py"
         sys.path.insert(0, str(script_path.parent))
         cls.repo_map = load_module("agents_repo_map_test", script_path)
 

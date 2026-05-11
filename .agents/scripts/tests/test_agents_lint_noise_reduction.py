@@ -17,7 +17,7 @@ def load_module(module_name: str, file_path: Path):
 
 class AgentsLintNoiseReductionTests(unittest.TestCase):
     def setUp(self):
-        script_path = Path(".agents/scripts/agents-lint-docs.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-lint-docs.py"
         sys.path.insert(0, str(script_path.parent))
         self.lint_docs = load_module("agents_lint_docs_noise_test", script_path)
 

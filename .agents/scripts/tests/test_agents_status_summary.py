@@ -89,7 +89,7 @@ def write_doc(session_dir: Path, doc_type: str, status: str) -> None:
 
 class AgentsStatusSummaryTests(unittest.TestCase):
     def test_summarize_session_includes_workflow_artifact_readiness(self):
-        script_path = Path(".agents/scripts/agents-status.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-status.py"
         sys.path.insert(0, str(script_path.parent))
         agents_status = load_module("agents_status_summary_test", script_path)
 

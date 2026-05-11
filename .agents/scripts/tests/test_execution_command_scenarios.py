@@ -178,7 +178,7 @@ def write_global_context(root: Path) -> dict[str, Path]:
 class ExecutionCommandsScenarioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        scripts_dir = Path(".agents/scripts").resolve()
+        scripts_dir = Path(__file__).resolve().parent.parent
         sys.path.insert(0, str(scripts_dir))
         cls.execution_commands = importlib.import_module("lib.execution_commands")
 
@@ -382,7 +382,7 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
 class ImplementAndReviewScenarioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        scripts_dir = Path(".agents/scripts").resolve()
+        scripts_dir = Path(__file__).resolve().parent.parent
         sys.path.insert(0, str(scripts_dir))
         cls.agents_implement = load_module("agents_implement_scenario_test", scripts_dir / "agents-implement.py")
         cls.agents_review = load_module("agents_review_scenario_test", scripts_dir / "agents-review.py")
@@ -507,7 +507,7 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
 class SessionCloseScenarioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        scripts_dir = Path(".agents/scripts").resolve()
+        scripts_dir = Path(__file__).resolve().parent.parent
         sys.path.insert(0, str(scripts_dir))
         cls.agents_session = load_module("agents_session_scenario_test", scripts_dir / "agents-session.py")
 

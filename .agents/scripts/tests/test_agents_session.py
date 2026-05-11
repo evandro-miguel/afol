@@ -12,7 +12,7 @@ def load_module(module_name: str, file_path: Path):
     return module
 
 
-SCRIPT_PATH = Path(".agents/scripts/agents-session.py").resolve()
+SCRIPT_PATH = Path(__file__).resolve().parent.parent / "agents-session.py"
 
 
 class SessionTests(unittest.TestCase):

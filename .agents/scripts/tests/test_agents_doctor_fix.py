@@ -16,7 +16,7 @@ def load_module(module_name: str, file_path: Path):
 
 class AgentsDoctorFixTests(unittest.TestCase):
     def test_validate_checkboxes_fix_rewrites_tight_markers(self):
-        script_path = Path(".agents/scripts/agents-doctor.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-doctor.py"
         sys.path.insert(0, str(script_path.parent))
         agents_doctor = load_module("agents_doctor_test", script_path)
 
@@ -39,7 +39,7 @@ class AgentsDoctorFixTests(unittest.TestCase):
             )
 
     def test_missing_active_session_is_ok_when_no_sessions_exist(self):
-        script_path = Path(".agents/scripts/agents-doctor.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-doctor.py"
         sys.path.insert(0, str(script_path.parent))
         agents_doctor = load_module("agents_doctor_active_session_test", script_path)
 

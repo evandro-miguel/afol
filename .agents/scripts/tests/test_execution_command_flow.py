@@ -138,7 +138,7 @@ def write_global_context(root: Path) -> dict[str, Path]:
 class ExecutionCommandFlowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        scripts_dir = Path(".agents/scripts").resolve()
+        scripts_dir = Path(__file__).resolve().parent.parent
         sys.path.insert(0, str(scripts_dir))
         cls.execution_commands = importlib.import_module("lib.execution_commands")
         cls.agents_implement = load_module("agents_implement_flow_test", scripts_dir / "agents-implement.py")
