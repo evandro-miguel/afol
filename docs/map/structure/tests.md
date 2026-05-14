@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-04-26T18:08:42+00:00
+**Generated:** 2026-05-14T21:24:25+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,47 +9,50 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 132 files, 26,099 lines, 1257.9 KB
+**Stats:** 133 files, 28,108 lines, 1373.2 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/scripts/tests/test_cli_utility_coverage.py` | 1,165 | 57.5 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_cli_utility_coverage.py` | 1,165 | 57.5 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_verify_tasks_strict.py` | 937 | 35.4 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_verify_tasks_strict.py` | 937 | 35.4 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_skills_sync.py` | 883 | 39.4 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_agents_skills_sync.py` | 883 | 39.4 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_runtime_compatibility.py` | 588 | 32.7 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_runtime_compatibility.py` | 588 | 32.7 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_execution_command_scenarios.py` | 542 | 27.5 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_execution_command_scenarios.py` | 542 | 27.5 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_cli_utility_coverage.py` | 1,190 | 58.7 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_cli_utility_coverage.py` | 1,190 | 58.7 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_verify_tasks_strict.py` | 1,161 | 44.5 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_verify_tasks_strict.py` | 1,161 | 44.5 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_skills_sync.py` | 966 | 43.4 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_agents_skills_sync.py` | 966 | 43.4 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_runtime_compatibility.py` | 790 | 42.9 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_runtime_compatibility.py` | 790 | 42.9 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_execution_command_scenarios.py` | 573 | 29.4 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_execution_command_scenarios.py` | 573 | 29.4 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_new_quick_mode.py` | 463 | 21.6 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_agents_new_quick_mode.py` | 463 | 21.6 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_skills_sync_extra.py` | 446 | 23.0 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_skills_sync_extra.py` | 446 | 23.0 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_flow.py` | 427 | 21.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_execution_command_flow.py` | 427 | 21.7 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_new_quick_mode.py` | 383 | 17.3 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_agents_new_quick_mode.py` | 383 | 17.3 KB | Test file; unit tests |
-| `.agents/scripts/tests/integration/test_critical_workflows.py` | 356 | 16.2 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/integration/test_critical_workflows.py` | 356 | 16.2 KB | Test file; unit tests |
-| `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md` | 353 | 19.3 KB | Module; functionality |
+| `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md` | 422 | 23.3 KB | Module; functionality |
+| `.agents/scripts/tests/test_agents_wb_update_task_marker.py` | 360 | 17.1 KB | Test file; unit tests |
+| `.agents/scripts/tests/integration/test_critical_workflows.py` | 360 | 16.3 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_agents_wb_update_task_marker.py` | 360 | 17.1 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/integration/test_critical_workflows.py` | 360 | 16.3 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_session.py` | 328 | 17.3 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_session.py` | 328 | 17.3 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_wb_update_task_marker.py` | 327 | 15.4 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_agents_wb_update_task_marker.py` | 327 | 15.4 KB | Test file; unit tests |
 | `.agents/scripts/tests/conftest.py` | 315 | 13.4 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_implement.py` | 315 | 18.0 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/conftest.py` | 315 | 13.4 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_agents_implement.py` | 315 | 18.0 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_implement.py` | 312 | 17.9 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_agents_implement.py` | 312 | 17.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_revert.py` | 273 | 14.4 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_revert.py` | 273 | 14.4 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_benchmark.py` | 261 | 11.0 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_agents_benchmark.py` | 261 | 11.0 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_benchmark.py` | 265 | 11.2 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_agents_benchmark.py` | 265 | 11.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_repo_map.py` | 255 | 11.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_repo_map.py` | 255 | 11.7 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_fix_symlinks.py` | 252 | 12.1 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_fix_symlinks.py` | 252 | 12.1 KB | Test file; unit tests |
+| `docs/map/structure/tests.md` | 252 | 31.9 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_bootstrap.py` | 239 | 13.7 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_agents_bootstrap.py` | 239 | 13.7 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_status.py` | 231 | 11.5 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_status.py` | 231 | 11.5 KB | Test file; unit tests |
 | `docs/arc/SPECS/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md` | 222 | 10.6 KB | Module; functionality |
@@ -64,17 +67,17 @@ Unit tests, integration tests, and E2E tests.
 | `src/project-template/.agents/scripts/tests/test_agents_repo_map_extra.py` | 178 | 9.0 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_primary-agent-runtime-compatibility_spec_01.md` | 171 | 8.4 KB | Module; functionality |
 | `docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md` | 161 | 7.2 KB | Module; functionality |
-| `.agents/scripts/tests/test_agents_bootstrap.py` | 160 | 9.0 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_agents_bootstrap.py` | 160 | 9.0 KB | Test file; unit tests |
 | `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md` | 149 | 6.9 KB | Test file; unit tests |
 | `docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md` | 149 | 7.0 KB | Module; functionality |
-| `docs/map/structure/tests.md` | 144 | 13.9 KB | Test file; unit tests |
+| `.agents/runtime/tests/test_changes.py` | 148 | 6.9 KB | Test file; unit tests |
+| `.agents/runtime/tests/conftest.py` | 144 | 4.4 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_telemetry.py` | 144 | 7.5 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_agents_telemetry.py` | 144 | 7.5 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_doctor_fix.py` | 140 | 7.6 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_doctor_fix.py` | 140 | 7.6 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_telemetry.py` | 130 | 6.6 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_agents_telemetry.py` | 130 | 6.6 KB | Test file; unit tests |
+| `src/project-template/.agents/runtime/tests/test_changes.py` | 136 | 6.3 KB | Test file; unit tests |
+| `docs/arc/SPECS/260509_1453_plan-task-execution-integrity-state-model_spec-child_01.md` | 128 | 8.5 KB | Module; functionality |
 | `docs/arc/SPECS/260323_1741_current-state-maps-and-goal-state-governance_spec_01.md` | 125 | 7.2 KB | Module; functionality |
-| `.agents/runtime/tests/conftest.py` | 124 | 3.8 KB | Test file; unit tests |
 | `src/project-template/.agents/runtime/tests/conftest.py` | 124 | 3.8 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_context-driven-execution-commands_spec_01.md` | 124 | 7.7 KB | Module; functionality |
 | `docs/arc/SPECS/260323_1751_goal-state-canon_spec_01.md` | 124 | 6.7 KB | Module; functionality |
@@ -94,22 +97,20 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_status_summary.py` | 109 | 4.5 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_status_summary.py` | 109 | 4.5 KB | Test file; unit tests |
 | `docs/arc/SPECS/260411_agentic-runtime-restructure_spec_01.md` | 109 | 5.8 KB | Module; functionality |
+| `.agents/runtime/tests/test_mcp.py` | 108 | 5.0 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_memory.py` | 107 | 4.4 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_memory.py` | 107 | 4.4 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md` | 105 | 6.1 KB | Module; functionality |
 | `docs/arc/SPECS/260323_1815_execplan-native-planning-system_spec_01.md` | 101 | 5.0 KB | Module; functionality |
 | `docs/arc/SPECS/260307_persistent-planning-memory_spec_01.md` | 101 | 6.0 KB | Module; functionality |
 | `docs/arc/SPECS/260423_2006_runtime-flow-benchmark-live-agent_spec-child_01.md` | 96 | 4.3 KB | Module; functionality |
-| `.agents/runtime/tests/test_mcp.py` | 93 | 4.4 KB | Test file; unit tests |
 | `src/project-template/.agents/runtime/tests/test_mcp.py` | 93 | 4.4 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_artifact-resolution-layer_spec_01.md` | 93 | 4.0 KB | Module; functionality |
 | `.agents/scripts/tests/TEST_STRATEGY.md` | 92 | 3.9 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/TEST_STRATEGY.md` | 92 | 3.9 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_project-context-canon-and-setup_spec_01.md` | 85 | 3.6 KB | Module; functionality |
 | `.agents/runtime/tests/test_cli.py` | 84 | 4.3 KB | Test file; unit tests |
-| `.agents/runtime/tests/test_changes.py` | 84 | 3.6 KB | Test file; unit tests |
 | `src/project-template/.agents/runtime/tests/test_cli.py` | 84 | 4.3 KB | Test file; unit tests |
-| `src/project-template/.agents/runtime/tests/test_changes.py` | 84 | 3.6 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_guided-status-and-implementation_spec_01.md` | 82 | 3.1 KB | Module; functionality |
 | `docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md` | 77 | 3.1 KB | Module; functionality |
 | `docs/arc/SPECS/260306_review-and-logical-revert_spec_01.md` | 76 | 2.8 KB | Module; functionality |
@@ -125,7 +126,7 @@ Unit tests, integration tests, and E2E tests.
 | `src/project-template/.agents/scripts/tests/test_agents_tools_catalog.py` | 60 | 2.8 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_lint_state_board.py` | 58 | 2.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_lint_state_board.py` | 58 | 2.7 KB | Test file; unit tests |
-| `docs/arc/SPECS/INDEX.md` | 54 | 6.1 KB | Module; functionality |
+| `docs/arc/SPECS/INDEX.md` | 55 | 6.6 KB | Module; functionality |
 | `docs/arc/SPECS/260306_session-pack-structure-and-postmortem_spec_01.md` | 47 | 2.1 KB | Module; functionality |
 | `docs/arc/SPECS/260423_2120_runtime-flow-benchmark-scenarios_spec-child_01.md` | 47 | 1.8 KB | Module; functionality |
 | `src/project-template/docs/arc/SPECS/README.md` | 45 | 1.5 KB | Module; functionality |

@@ -1,14 +1,32 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
-from fastmcp import Client
 
-from agentic_scaffold.server import build_mcp
+
+def _urandom_available() -> bool:
+    try:
+        os.urandom(1)
+    except (NotImplementedError, OSError, PermissionError):
+        return False
+    return True
+
+
+def _require_mcp_runtime():
+    if not _urandom_available():
+        pytest.skip("sandbox blocks randomness required by the FastMCP import chain")
+
+    from fastmcp import Client
+
+    from agentic_scaffold.server import build_mcp
+
+    return Client, build_mcp
 
 
 async def test_mcp_lists_tools_resources_and_prompts(scaffold_repo):
+    Client, build_mcp = _require_mcp_runtime()
     mcp = build_mcp(scaffold_repo)
 
     async with Client(mcp) as client:
@@ -41,6 +59,7 @@ async def test_mcp_lists_tools_resources_and_prompts(scaffold_repo):
 
 
 async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
+    _Client, build_mcp = _require_mcp_runtime()
     mcp = build_mcp(scaffold_repo)
     manifest_tool = await mcp.get_tool("generate_manifest")
     assert manifest_tool is not None
@@ -101,6 +120,7 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
 
 
 async def test_mcp_inspect_workspace_rejects_invalid_depth(scaffold_repo):
+    _Client, build_mcp = _require_mcp_runtime()
     mcp = build_mcp(scaffold_repo)
     inspect_tool = await mcp.get_tool("inspect_workspace")
 
@@ -110,6 +130,7 @@ async def test_mcp_inspect_workspace_rejects_invalid_depth(scaffold_repo):
 
 
 async def test_mcp_search_docs_rejects_empty_query(scaffold_repo):
+    _Client, build_mcp = _require_mcp_runtime()
     mcp = build_mcp(scaffold_repo)
     search_tool = await mcp.get_tool("search_docs")
 

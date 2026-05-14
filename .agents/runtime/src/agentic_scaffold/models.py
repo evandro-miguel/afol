@@ -74,6 +74,7 @@ class RepoManifest(BaseModel):
     skills: list[SkillSummary]
     runtime_docs: dict[str, bool]
     tool_catalog_count: int
+    governed_execution_contract: dict[str, object] = Field(default_factory=dict)
     major_surfaces: list[str]
     search_roots: list[str]
     write_blocklist: list[str]

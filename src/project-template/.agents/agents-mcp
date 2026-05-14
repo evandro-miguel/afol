@@ -5,17 +5,43 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-UV_BIN="$(command -v uv 2>/dev/null || true)"
 export UV_CACHE_DIR="${AGENTS_UV_CACHE_DIR:-${SCRIPT_DIR}/cache/uv}"
+export PYTHONHASHSEED="${PYTHONHASHSEED:-0}"
+RUNTIME_BIN="${SCRIPT_DIR}/runtime/.venv/bin/agentic-mcp"
+PROJECT_UV_BIN="${AGENTS_UV_BIN:-${SCRIPT_DIR}/tools/uv/bin/uv}"
 
-if [ -z "${UV_BIN}" ]; then
-    echo "uv not found. Install with:"
-    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
-    exit 1
-fi
+resolve_uv_bin() {
+    if [ -n "${AGENTS_UV_BIN:-}" ] && [ -x "${AGENTS_UV_BIN}" ]; then
+        echo "${AGENTS_UV_BIN}"
+    elif [ -x "${PROJECT_UV_BIN}" ]; then
+        echo "${PROJECT_UV_BIN}"
+    elif [ "${AGENTS_ALLOW_SYSTEM_UV:-}" = "1" ]; then
+        command -v uv || true
+    else
+        echo ""
+    fi
+}
 
 if [ ! -d "${SCRIPT_DIR}/runtime" ]; then
     echo "Runtime package not found: ${SCRIPT_DIR}/runtime"
+    exit 1
+fi
+
+if [ -x "${RUNTIME_BIN}" ]; then
+    exec "${RUNTIME_BIN}" "$@"
+fi
+
+if [ "${AGENTS_RUNTIME_ALLOW_UV_RUN:-}" != "1" ]; then
+    echo "Runtime entrypoint not found: ${RUNTIME_BIN}"
+    echo "   Run ./.agents/agents hydrate to provision the project-local runtime."
+    echo "   Set AGENTS_RUNTIME_ALLOW_UV_RUN=1 to opt in to uv run fallback."
+    exit 1
+fi
+
+UV_BIN="$(resolve_uv_bin)"
+if [ -z "${UV_BIN}" ]; then
+    echo "Project-local uv not found: ${PROJECT_UV_BIN}"
+    echo "   Run ./.agents/agents hydrate-uv first."
     exit 1
 fi
 

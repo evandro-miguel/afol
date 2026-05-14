@@ -3,7 +3,7 @@ doc_type: standard
 id: 260411_agentic-runtime_standard_01
 status: active
 created_at: '2026-04-11T22:20:58-03:00'
-updated_at: '2026-04-16T23:01:19-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Agentic Runtime
@@ -17,8 +17,8 @@ The wrapper keeps the existing `.agents/agents <legacy-command>` surface intact 
 ```bash
 .agents/agents runtime manifest
 .agents/agents runtime validate
-uv run --project .agents/runtime --locked agentic adoption-plan
-uv run --project .agents/runtime --locked agentic inspect-target
+.agents/runtime/.venv/bin/agentic adoption-plan
+.agents/runtime/.venv/bin/agentic inspect-target
 .agents/agents adoption-plan
 .agents/agents inspect-target
 .agents/agents runtime search "roadmap"
@@ -48,7 +48,9 @@ just runtime-mcp-smoke
 ```
 
 `just all` includes the runtime lint, runtime test, and runtime MCP smoke gates.
-Runtime setup, validation, CI, and runtime launchers use the checked-in `uv.lock` through `uv --locked`.
+Runtime setup uses the project-local `.agents/tools/uv/bin/uv` with the checked-in
+`uv.lock`. Normal validation, CI, and runtime launchers execute from
+`.agents/runtime/.venv/` directly so sandboxed runs do not need global `uv`.
 
 ## Safety Model
 

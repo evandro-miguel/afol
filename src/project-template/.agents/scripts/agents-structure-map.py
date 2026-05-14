@@ -83,6 +83,9 @@ IGNORED_DIRS = {
     "wb",
     "z-arq",
 }
+IGNORED_PATH_SUFFIXES = {
+    ".agents/tools/uv",
+}
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 MAP_DIR = get_cfg_path(ROOT_DIR, CONFIG, "map_dir")
@@ -269,11 +272,13 @@ class StructureMapper:
 
         # Walk through project directory
         for root, dirs, files in os.walk(self.project_path):
+            rel_root = Path(root).relative_to(self.project_path)
             # Keep selected hidden dirs like .agents, while ignoring common heavy/cache dirs.
             dirs[:] = [
                 d for d in dirs
                 if (not d.startswith(".") or d in ALLOWED_HIDDEN_DIRS)
                 and d not in IGNORED_DIRS
+                and (rel_root / d).as_posix() not in IGNORED_PATH_SUFFIXES
             ]
 
             for file in files:

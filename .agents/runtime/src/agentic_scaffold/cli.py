@@ -7,7 +7,6 @@ import typer
 from rich.console import Console
 
 from agentic_scaffold.runtime import AgenticRuntime
-from agentic_scaffold.server import build_mcp
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 console = Console()
@@ -125,6 +124,8 @@ def undo(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=
 @app.command()
 def serve(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True)) -> None:
     """Run the FastMCP server using stdio transport."""
+    from agentic_scaffold.server import build_mcp
+
     build_mcp(repo_root).run()
 
 

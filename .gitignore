@@ -1,5 +1,7 @@
 # Agents scripts virtualenv (isolated per project)
 .agents/scripts/.venv/
+.agents/runtime/.venv/
+.agents/scripts/*.egg-info/
 
 # UV lock files (optional: commit for reproducible builds)
 .agents/scripts/uv.lock
@@ -23,6 +25,8 @@ uv.lock
 
 # Runtime/cache snapshots
 .agents/.cache/
+.agents/tools/uv/
+src/project-template/.agents/tmp/
 .agents/journal/
 
 # Universal-skills must not be a repo-local git cache or nested checkout.
@@ -54,3 +58,4 @@ docs/telemetry/reports/implementation_report.md
 
 # Makefile in a-docs (keep root Makefile)
 # .agents/a-docs/standards/Makefile
+.gitnexus

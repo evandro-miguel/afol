@@ -3,7 +3,7 @@ doc_type: standard
 id: 260411_agentic-mcp_standard_01
 status: active
 created_at: '2026-04-11T22:20:58-03:00'
-updated_at: '2026-04-16T23:01:19-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Agentic MCP
@@ -19,7 +19,7 @@ The scaffold MCP surface is the FastMCP adapter inside `.agents/runtime/`. It ex
 .agents/agents mcp validate
 .agents/agents mcp search "roadmap"
 .agents/agents mcp inspect --depth 2
-uv run --project .agents/runtime --locked agentic-mcp manifest
+.agents/runtime/.venv/bin/agentic-mcp manifest
 .agents/agents mcp archive docs/map/extra --slug stale-map --reason "archive generated leftovers"
 .agents/agents mcp undo
 .agents/agents-mcp manifest
@@ -29,14 +29,14 @@ uv run --project .agents/runtime --locked agentic-mcp manifest
 
 ```bash
 cd .agents/runtime
-uv run --locked fastmcp run
+../tools/uv/bin/uv run --locked fastmcp run
 ```
 
 For local HTTP development:
 
 ```bash
 cd .agents/runtime
-uv run --locked fastmcp run dev.fastmcp.json
+../tools/uv/bin/uv run --locked fastmcp run dev.fastmcp.json
 ```
 
 ## Exposed Tools

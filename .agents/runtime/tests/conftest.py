@@ -1,8 +1,34 @@
 from __future__ import annotations
 
+import inspect
+import socket
 from pathlib import Path
 
 import pytest
+
+
+def _socketpair_available() -> bool:
+    try:
+        left, right = socket.socketpair()
+    except (NotImplementedError, OSError, PermissionError):
+        return False
+
+    left.close()
+    right.close()
+    return True
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    if _socketpair_available():
+        return
+
+    skip_asyncio = pytest.mark.skip(
+        reason="sandbox blocks socket.socketpair required by pytest-asyncio event loops"
+    )
+    for item in items:
+        test_obj = getattr(item, "obj", None)
+        if inspect.iscoroutinefunction(test_obj):
+            item.add_marker(skip_asyncio)
 
 
 @pytest.fixture()
