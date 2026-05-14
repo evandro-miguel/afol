@@ -67,7 +67,8 @@ cat .agents/wb/.active_session
 ./.agents/agents new feature-b          # Session B created (warns about A)
 
 # Target specific session for operations
-./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done
+./.agents/agents wb-update evidence T-01 --session 260224_1200_feature-a --command "just lint" --result passed --artifact .agents/wb/260224_1200_feature-a/260224_1200_feature-a_report_01.md
+./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done --evidence-id E-...
 ./.agents/agents wb-update touch --session 260224_1200_feature-b
 # Or set AGENTS_SESSION_ID in the process environment before running status
 ./.agents/agents status

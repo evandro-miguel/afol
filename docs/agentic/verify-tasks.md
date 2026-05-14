@@ -15,23 +15,24 @@ links:
 
 ## Why It Exists
 
-**Problem:** Workstreams can have pending tasks without clear warning. Before marking workstream as complete, it's necessary to:
+**Problem:** Workstreams can have pending tasks or falsely closed tasks without clear warning. Before marking workstream as complete, it's necessary to:
 
 - Verify all tasks are complete
 - Identify blocked tasks
+- Require task-scoped closure evidence for every `done` task in strict mode
 - Report overall status
 
 **Solution:** Automatic verification that scans task files and reports status.
 
 ## Function
 
-Checks task completion:
+Checks evidence-backed task completion:
 
 1. **Scans task files** - `*_task_*.md`
 2. **Extracts tasks** - Regex for markers
 3. **Classifies status** - pending, in_progress, done, etc.
 4. **Reports** - Lists status of each task
-5. **Exit code** - 0 if all complete, 1 if pending
+5. **Exit code** - 0 if all complete with required evidence, 1 if pending or invalid
 6. **Strict plan checks** - Validates final plans against the ExecPlan contract from `PLANS.md`
 
 ## What It Touches
@@ -41,6 +42,7 @@ Checks task completion:
 | File | Purpose |
 |------|---------|
 | `.agents/wb/*/`*`_task_*.md` | Task files to verify |
+| `.agents/wb/*/.evidence.jsonl` | Task-scoped closure evidence ledger in strict mode |
 | `.agents/wb/*/`*`_plan_*.md` | Final ExecPlan sections and progress state in strict mode |
 | `PLANS.md` | Canonical planning contract referenced by docs and templates |
 
@@ -58,10 +60,11 @@ Checks task completion:
 MARKERS = {
     'pending': r'- \[ \]',
     'in_progress': r'- \[/\]',
-    'ready_for_test': r'- \[%\]',
-    'blocked': r'- \[!\]',
-    'skipped': r'- \[>\]',
-    'completed': r'- \[x\]',
+    'implemented_untested': r'- \[%\]',
+    'tested_needs_spec_validation': r'- \[&\]',
+    'problem': r'- \[!\]',
+    'moved': r'- \[>\]',
+    'done': r'- \[x\]',
 }
 ```
 
@@ -115,6 +118,10 @@ Complete: 3/5 (60%)
 
 ## Strict Mode Notes
 
+- A task marked `done` must have valid `.evidence.jsonl` closure evidence for the same task id.
+- The closure evidence must name the real command or gate, a passing or explicit `N/A` result, and an artifact or explanatory note.
+- Generic evidence such as `command: implementation` or `command: implement complete` is not valid closure evidence.
+- Blocking failed evidence keeps the task invalid until a later successful rerun of the same command supersedes it or the failure is explicitly accepted as non-blocking.
 - Final plans must keep the required ExecPlan sections.
 - Final plans must maintain a checkbox-based `Progress` section.
 - Final reports still require a finalized postmortem.

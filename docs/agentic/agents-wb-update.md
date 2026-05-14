@@ -85,8 +85,9 @@ def cmd_new_command(args):
 # Update updated_at
 ./.agents/agents wb-update touch
 
-# Mark task as done
-./.agents/agents wb-update task T-01 --mark-done
+# Mark task as done only after recording passing closure evidence
+./.agents/agents wb-update evidence T-01 --session <session-id> --command "just lint" --result passed --artifact .agents/wb/<session-id>/<session-id>_report_01.md
+./.agents/agents wb-update task T-01 --session <session-id> --mark-done --evidence-id E-...
 
 # Target a session through the process environment when the wrapper supports it.
 # Set AGENTS_SESSION_ID before this command.
@@ -106,7 +107,8 @@ def cmd_new_command(args):
 
 # Via Justfile
 just wb-touch
-just wb-task TASK_ID=T-01 ACTION=done
+just wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD="just lint" RESULT=passed ARTIFACT=.agents/wb/<session-id>/<session-id>_report_01.md
+just wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...
 just wb-status STATUS=active
 just wb-timeline MSG="Implemented login"
 ```

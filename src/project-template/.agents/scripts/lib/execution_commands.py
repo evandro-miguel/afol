@@ -68,6 +68,7 @@ ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
+CANONICAL_WB_DIR = AGENTS_DIR / "wb"
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
 SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
 RULES_DIR = AGENTS_DIR / "rules"
@@ -152,22 +153,56 @@ ALIAS_ARTIFACTS = set(DOC_PATTERNS.keys()) | {
 }
 
 TASK_TABLE_RE = re.compile(r"^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]*)\s*\|\s*([^|]*)\s*\|")
-TASK_CHECKLIST_RE = re.compile(r"^\s*-\s*\[[ /%!>x]\]\s+(T-\d{2,3})\s+(.+)$")
+TASK_CHECKLIST_RE = re.compile(r"^\s*-\s*\[([ /%!>&x])\]\s+(T-\d{2,3})\s+(.+)$")
 TASK_ID_RE = re.compile(r"^T-\d{2,3}$")
-TASK_ROW_RE = re.compile(r"^(\s*-\s*\[)([ /%!>x])(?:\]\s+)(T-\d{2,3})(\s+.+)$")
+TASK_ROW_RE = re.compile(r"^(\s*-\s*\[)([ /%!>&x])(?:\]\s+)(T-\d{2,3})(\s+.+)$")
+EVIDENCE_TAG_RE = re.compile(r"\s+\(evidence:\s*([^)]+)\)\s*$", re.IGNORECASE)
+FAILED_EVIDENCE_RE = re.compile(
+    r"\b(?:fail|failed|failure|error|fatal|blocked|source-drift|no justfile found|exit code [1-9])\b",
+    re.IGNORECASE,
+)
+SUCCESS_EVIDENCE_RE = re.compile(
+    r"\b(?:pass|passed|success|successful|ok|green|valid|validated|verified|resolved|completed|final)\b",
+    re.IGNORECASE,
+)
+ACCEPTED_FAILURE_RE = re.compile(
+    r"\b(?:expected failure|accepted failure|non-blocking|accepted non-blocking|n/a|not applicable|resolves prior failed evidence)\b",
+    re.IGNORECASE,
+)
+GENERIC_CLOSURE_COMMAND_RE = re.compile(
+    r"^(?:implement complete|complete|done|mark done|mark-done|finalize|close task)$",
+    re.IGNORECASE,
+)
 
 TASK_MARKER_TO_STATE = {
     " ": "pending",
     "/": "in_progress",
-    "%": "ready_for_test",
+    "%": "implemented_untested",
+    "&": "tested_needs_spec_validation",
+    "!": "problem",
+    ">": "moved",
     "x": "done",
-    "!": "blocked",
-    ">": "skipped",
 }
 
-STATE_TO_MARKER = {v: k for k, v in TASK_MARKER_TO_STATE.items()}
-FORWARD_STATES = {"pending", "ready_for_test", "in_progress", "blocked", "skipped", "done"}
-BLOCKING_STATES = {"blocked", "in_progress"}
+LEGACY_STATE_ALIASES = {
+    "blocked": "problem",
+    "skipped": "moved",
+    "ready_for_test": "implemented_untested",
+    "testing": "tested_needs_spec_validation",
+    "completed": "done",
+}
+
+STATE_TO_MARKER = {
+    "pending": " ",
+    "in_progress": "/",
+    "implemented_untested": "%",
+    "tested_needs_spec_validation": "&",
+    "problem": "!",
+    "moved": ">",
+    "done": "x",
+}
+FORWARD_STATES = set(STATE_TO_MARKER.keys())
+BLOCKING_STATES = {"problem", "in_progress"}
 FEATURE_OPERATION_RULE_FILES = (
     ("RULE-002", "RULE-002-workstream-creation.md"),
     ("RULE-004", "RULE-004-validation-linting.md"),
@@ -183,6 +218,13 @@ class TaskRow:
     notes: str
     line: int
     line_type: str
+
+
+def canonical_wb_label() -> str:
+    try:
+        return str(CANONICAL_WB_DIR.relative_to(ROOT_DIR))
+    except ValueError:
+        return str(CANONICAL_WB_DIR)
 
 
 class ExecutionError(RuntimeError):
@@ -231,6 +273,20 @@ def _resolve_session_path(session: str, *, source: str) -> Path:
     if not candidate.is_absolute():
         candidate = (ROOT_DIR / session).resolve() if "/" in session else (WB_DIR / session).resolve()
     if candidate.exists() and candidate.is_dir():
+        try:
+            candidate.resolve().relative_to(CANONICAL_WB_DIR.resolve())
+        except ValueError:
+            raise ExecutionError(f"Session must be under {canonical_wb_label()} ({source}): {session}")
+        protected = {
+            item.strip()
+            for item in os.getenv("AGENTS_PROTECTED_SESSION_IDS", "").split(",")
+            if item.strip()
+        }
+        if candidate.name in protected:
+            raise ExecutionError(
+                f"Session is protected/read-only for this run ({source}): {candidate.name}. "
+                "Create or target a different .agents/wb session."
+            )
         return candidate
     raise ExecutionError(f"Session not found ({source}): {session}")
 
@@ -257,9 +313,7 @@ def find_session(session: Optional[str]) -> Path:
     if active.exists():
         active_id = active.read_text().strip()
         if active_id:
-            candidate = (WB_DIR / active_id).resolve()
-            if candidate.exists() and candidate.is_dir():
-                return candidate
+            return _resolve_session_path(active_id, source=".active_session")
     raise ExecutionError("No active session found. Run .agents/agents new and set an active session.")
 
 
@@ -293,6 +347,78 @@ def relative_to_root(path: Path) -> str:
         return str(path.resolve().relative_to(ROOT_DIR.resolve()))
     except ValueError:
         return str(path)
+
+
+def normalize_task_state(state: str) -> str:
+    candidate = str(state or "").strip().lower()
+    return LEGACY_STATE_ALIASES.get(candidate, candidate)
+
+
+def evidence_entry_has_blocking_failure(entry: Dict[str, Any]) -> bool:
+    result = str(entry.get("result", ""))
+    note = str(entry.get("note", ""))
+    combined = f"{result}\n{note}"
+    if not FAILED_EVIDENCE_RE.search(combined):
+        return False
+    return not ACCEPTED_FAILURE_RE.search(combined)
+
+
+def is_successful_evidence_entry(entry: Dict[str, Any]) -> bool:
+    result = str(entry.get("result", ""))
+    note = str(entry.get("note", ""))
+    combined = f"{result}\n{note}"
+    return bool(SUCCESS_EVIDENCE_RE.search(combined)) and not evidence_entry_has_blocking_failure(entry)
+
+
+def closure_evidence_error(
+    *,
+    command: str,
+    result: str,
+    artifacts: Iterable[str] | None = None,
+    note: str | None = None,
+) -> str | None:
+    command_text = str(command or "").strip()
+    result_text = str(result or "").strip()
+    artifact_list = [str(a).strip() for a in artifacts or [] if str(a).strip()]
+    note_text = str(note or "").strip()
+
+    if not command_text:
+        return "closure evidence requires the command or gate that was actually run"
+    if GENERIC_CLOSURE_COMMAND_RE.match(command_text):
+        return "closure evidence command is generic; record the real command or gate"
+    if not result_text:
+        return "closure evidence requires an explicit result"
+
+    entry = {"command": command_text, "result": result_text, "artifacts": artifact_list, "note": note_text}
+    if evidence_entry_has_blocking_failure(entry):
+        return "closure evidence records a blocking failure"
+    if not is_successful_evidence_entry(entry) and not ACCEPTED_FAILURE_RE.search(f"{result_text}\n{note_text}"):
+        return "closure evidence result must show a passed/validated gate or explicit N/A"
+    if not artifact_list and not note_text:
+        return "closure evidence requires an artifact path or explanatory note"
+    return None
+
+
+def validate_closure_evidence(
+    *,
+    command: str,
+    result: str,
+    artifacts: Iterable[str] | None = None,
+    note: str | None = None,
+) -> None:
+    error = closure_evidence_error(command=command, result=result, artifacts=artifacts, note=note)
+    if error:
+        raise ExecutionError(error)
+
+
+def evidence_record_closure_error(record: Dict[str, Any]) -> str | None:
+    artifacts = record.get("artifacts")
+    return closure_evidence_error(
+        command=str(record.get("command", "")),
+        result=str(record.get("result", "")),
+        artifacts=artifacts if isinstance(artifacts, list) else [],
+        note=str(record.get("note", "")),
+    )
 
 
 def _frontmatter_str(value: Any) -> str:
@@ -760,26 +886,22 @@ def parse_task_rows(task_file: Path) -> List[TaskRow]:
         table = TASK_TABLE_RE.match(line.strip())
         if table:
             task_id, state, owner, notes = table.groups()
-            rows.append(TaskRow(task_id=task_id.strip(), state=state.strip().lower(), owner=owner.strip(), notes=notes.strip(), line=idx, line_type="table"))
+            rows.append(
+                TaskRow(
+                    task_id=task_id.strip(),
+                    state=normalize_task_state(state),
+                    owner=owner.strip(),
+                    notes=notes.strip(),
+                    line=idx,
+                    line_type="table",
+                )
+            )
             continue
 
         checklist = TASK_CHECKLIST_RE.match(line)
         if checklist:
-            marker = None
-            if "[x]" in line:
-                marker = "x"
-            elif "[/]" in line:
-                marker = "/"
-            elif "[ ]" in line:
-                marker = " "
-            elif "[%]" in line:
-                marker = "%"
-            elif "[!]" in line:
-                marker = "!"
-            elif ">" in line[:5]:
-                marker = ">"
+            marker, task_id, text = checklist.groups()
             state = TASK_MARKER_TO_STATE.get(marker or " ", "pending")
-            task_id, text = checklist.groups()
             rows.append(TaskRow(task_id=task_id.strip(), state=state, owner="", notes=text.strip(), line=idx, line_type="checklist"))
 
     return rows
@@ -790,18 +912,24 @@ def parse_state_summary(task_file: Optional[Path]) -> Tuple[int, int, int, List[
         return 0, 0, 0, [], []
     rows = parse_task_rows(task_file)
     total = len(rows)
-    done = sum(1 for row in rows if row.state == "done")
-    blocked = [f"{row.task_id}:{row.state}:{row.owner}:{row.notes}" for row in rows if row.state == "blocked"]
+    done = sum(1 for row in rows if normalize_task_state(row.state) == "done")
+    blocked = [
+        f"{row.task_id}:{normalize_task_state(row.state)}:{row.owner}:{row.notes}"
+        for row in rows
+        if normalize_task_state(row.state) == "problem"
+    ]
     remaining = total - done
     return total, done, remaining, blocked, rows
 
 
 def next_task(rows: List[TaskRow]) -> Optional[TaskRow]:
     for row in rows:
-        if row.state == "in_progress":
+        state = normalize_task_state(row.state)
+        if state == "in_progress":
             return row
     for row in rows:
-        if row.state in {"pending", "ready_for_test"}:
+        state = normalize_task_state(row.state)
+        if state in {"pending", "implemented_untested", "tested_needs_spec_validation"}:
             return row
     return None
 
@@ -826,8 +954,15 @@ def assert_task_sequence(task_rows: List[TaskRow], target_id: str) -> List[str]:
 
     return blocking
 
-def update_task_state(task_file: Path, task_id: str, new_state: str) -> bool:
-    target = new_state.strip().lower()
+def _append_evidence_tag(text: str, evidence_id: str | None) -> str:
+    cleaned = EVIDENCE_TAG_RE.sub("", text).rstrip()
+    if evidence_id:
+        return f"{cleaned} (evidence: {evidence_id})"
+    return cleaned
+
+
+def update_task_state(task_file: Path, task_id: str, new_state: str, evidence_id: str | None = None) -> bool:
+    target = normalize_task_state(new_state)
     if target not in FORWARD_STATES:
         raise ExecutionError(f"Invalid task state: {new_state}")
     if not TASK_ID_RE.match(task_id):
@@ -844,7 +979,7 @@ def update_task_state(task_file: Path, task_id: str, new_state: str) -> bool:
             row_id, _, owner, notes = table.groups()
             if row_id.strip() == task_id:
                 owner = owner.strip()
-                notes = notes.strip()
+                notes = _append_evidence_tag(notes.strip(), evidence_id) if target == "done" else notes.strip()
                 lines[i] = f"| {row_id} | {target} | {owner} | {notes} |"
                 changed = True
                 continue
@@ -854,7 +989,8 @@ def update_task_state(task_file: Path, task_id: str, new_state: str) -> bool:
         if m:
             prefix, marker, row_id, text = m.groups()
             if row_id.strip() == task_id:
-                lines[i] = f"{prefix}{STATE_TO_MARKER[target]}] {row_id}{text}"
+                updated_text = _append_evidence_tag(text, evidence_id) if target == "done" else text
+                lines[i] = f"{prefix}{STATE_TO_MARKER[target]}] {row_id}{updated_text}"
                 changed = True
 
     if not changed:

@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-26T12:16:53-03:00'
+updated_at: '2026-05-09T14:59:47-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -135,7 +135,11 @@ updated_at: '2026-04-26T12:16:53-03:00'
 ### F-07 Execution Intelligence and Knowledge System
 
 - Status: done
-- Why: The scaffold still depends too much on agent memory and manual discipline. Planning can finish without structured exploration, sessions cannot reuse prior research efficiently, and final closure does not require a proper post-mortem. That increases token waste, weakens traceability, and makes multi-agent work less reliable.
+- Why: The scaffold needs reusable knowledge and disciplined closure without
+  turning pre-plan exploration into mandatory plan content. Plans should express
+  the execution path for the actual work, while optional exploration artifacts
+  remain sidecars only when they materially reduce risk or are the requested
+  deliverable.
 - Governing spec: `docs/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md`
 - Child spec policy:
   - Required: yes
@@ -144,16 +148,17 @@ updated_at: '2026-04-26T12:16:53-03:00'
     - `260306_knowledge-reuse-and-token-efficiency_spec_01`
     - `260306_session-pack-structure-and-postmortem_spec_01`
 - Exit criteria:
-  - Plans cannot be considered complete without structured pre-plan exploration artifacts.
+  - Plans stay complete with the minimum `plan + task` core when the execution path is clear.
+  - Brainstorm, research, and explorer-check artifacts are optional sidecars, not mandatory pre-plan gates.
   - Agents can quickly find prior research, brainstorms, explorer checks, and post-mortems with low-token discovery paths.
   - Sessions can group multiple major plan tracks in dedicated pack folders without losing verification coverage.
-  - Final session closure requires a completed post-mortem.
+  - Final session closure finalizes every optional artifact that actually exists.
 - Delivery tasks:
   - [x] Define the parent feature philosophy and child spec boundaries.
-  - [x] Make brainstorm and explorer-check artifacts part of the governed planning flow.
+  - [x] Keep brainstorm and explorer-check artifacts available as optional sidecars when they materially help.
   - [x] Add reusable knowledge indexing/search for prior research artifacts.
   - [x] Add optional session pack folders for multiple major plans inside one session.
-  - [x] Require post-mortem completion before final session closure.
+  - [x] Require finalization of optional artifacts that exist before session closure.
 
 ### F-08 Context-Driven Execution Commands
 
@@ -402,6 +407,8 @@ updated_at: '2026-04-26T12:16:53-03:00'
   already has a governing spec, whether a user-reported problem has happened
   before, whether similar implementation already exists, and whether delegated
   agents actually received and followed all applicable `.agents/rules/`.
+  Recurring plan/task drift also allows agents to create work about making a
+  plan instead of executable tasks for the requested work.
 - Governing spec: `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md`
 - Child spec policy:
   - Required: yes
@@ -424,6 +431,10 @@ updated_at: '2026-04-26T12:16:53-03:00'
     code paths.
   - The orchestrator loads all applicable `.agents/rules/` before routing work
     and passes enforceable rule context to every agent it coordinates.
+  - Workbench plans and tasks describe direct execution of the requested work,
+    not tasks to create, draft, or research a later plan.
+  - Task lifecycle markers distinguish problem, moved, implemented-untested,
+    tested-but-needing-spec-validation, and fully done states.
 - Delivery tasks:
   - [ ] Define the preflight contract and acceptance checks in the parent spec.
   - [ ] Add decision-intake, challenge, qualitative prioritization, optional
@@ -434,6 +445,10 @@ updated_at: '2026-04-26T12:16:53-03:00'
   - [ ] Add applicable-rule resolution by touched element type, including
         feature/spec/workbench/skill/runtime/code surfaces.
   - [ ] Add orchestrator rule-loading and delegated-agent enforcement.
+  - [ ] Add direct-execution plan/task integrity validation that rejects obvious
+        meta-planning tasks.
+  - [ ] Add the canonical task state model:
+        `[ ]`, `[/]`, `[!]`, `[>]`, `[%]`, `[&]`, `[x]`.
   - [ ] Update affected project-local skills/docs and leave a pending
         universal-skills propagation item for the new agent behavior.
   - [ ] Verify with focused tests, strict workbench validation, and `just lint`.

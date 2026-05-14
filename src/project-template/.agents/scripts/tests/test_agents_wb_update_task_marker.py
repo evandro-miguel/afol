@@ -37,16 +37,24 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             "session": session,
             "task_id": task_id,
             "evidence_id": None,
-            "allow_unsafe_done": False,
             "mark_done": False,
             "mark_in_progress": False,
             "mark_pending": False,
+            "mark_implemented": False,
+            "mark_tested": False,
+            "mark_problem": False,
+            "mark_moved": False,
             "mark_ready": False,
             "mark_blocked": False,
             "mark_skipped": False,
         }
         args.update(overrides)
         return argparse.Namespace(**args)
+
+    @staticmethod
+    def _allow_temp_workbench(wb_update, session_dir: Path):
+        wb_update.WB_DIR = session_dir.parent
+        wb_update.CANONICAL_WB_DIR = session_dir.parent.resolve()
 
     def test_require_explicit_session_for_write_commands(self):
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
@@ -135,8 +143,8 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             resolved = wb_update.latest_doc_file(session_dir, "spec-child")
             self.assertEqual(resolved, spec_lite)
 
-    def test_mark_done_requires_evidence_unless_bypassed(self):
-        """Test that mark-done requires evidence unless bypassed."""
+    def test_mark_done_rejects_missing_evidence(self):
+        """Test that mark-done requires a valid evidence reference."""
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_mark_done_gate_test", script_path)
@@ -144,6 +152,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260224_0000_gate-test"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
             task_file = session_dir / "260224_0000_gate-test_task_01.md"
             task_file.write_text(
                 "---\n"
@@ -165,16 +174,6 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 wb_update.cmd_task(args_missing)
 
-            args_unsafe = self._build_task_args(
-                session=str(session_dir),
-                task_id="T-01",
-                mark_done=True,
-                allow_unsafe_done=True,
-            )
-            wb_update.cmd_task(args_unsafe)
-            content = task_file.read_text()
-            self.assertIn("| T-01 | done |", content)
-
     def test_evidence_ledger_validates_mark_done_reference(self):
         """Test that evidence ledger validates mark-done reference."""
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
@@ -184,6 +183,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260224_0000_evidence-test"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
             task_file = session_dir / "260224_0000_evidence-test_task_01.md"
             task_file.write_text(
                 "---\n"
@@ -230,6 +230,37 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 wb_update.cmd_task(args_mismatch)
 
+    def test_mark_tested_sets_canonical_state(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_mark_tested_state_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_mark-tested"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
+            task_file = session_dir / "260224_0000_mark-tested_task_01.md"
+            task_file.write_text(
+                "---\n"
+                "doc_type: task\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Tasks\n\n"
+                "## State Board\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | implemented_untested | worker | Validate UX/spec\n"
+            )
+
+            args = self._build_task_args(
+                session=str(session_dir),
+                task_id="T-01",
+                mark_tested=True,
+            )
+            wb_update.cmd_task(args)
+            content = task_file.read_text(encoding="utf-8")
+            self.assertIn("| T-01 | tested_needs_spec_validation |", content)
+
     def test_status_final_on_report_records_session_end(self):
         """Setting the report to final should emit a session_end telemetry event."""
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
@@ -239,6 +270,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260224_0000_report-final"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
             report_file = session_dir / "260224_0000_report-final_report_01.md"
             postmortem_file = session_dir / "260224_0000_report-final_postmortem_01.md"
             report_file.write_text(
@@ -274,6 +306,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260224_0000_report-final-no-optional"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
             report_file = session_dir / "260224_0000_report-final-no-optional_report_01.md"
             report_file.write_text(
                 "---\n"
@@ -299,6 +332,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260224_0000_report-final-blocked"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
             report_file = session_dir / "260224_0000_report-final-blocked_report_01.md"
             report_file.write_text(
                 "---\n"
@@ -330,6 +364,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260224_0000_postmortem-final-blocked"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
             postmortem_file = session_dir / "260224_0000_postmortem-final-blocked_postmortem_01.md"
             postmortem_file.write_text(
                 "---\n"
@@ -354,6 +389,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260224_0000_postmortem-final-ok"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
             postmortem_file = session_dir / "260224_0000_postmortem-final-ok_postmortem_01.md"
             postmortem_file.write_text(
                 "---\n"

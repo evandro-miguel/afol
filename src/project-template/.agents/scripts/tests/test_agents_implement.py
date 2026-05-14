@@ -168,10 +168,10 @@ class ImplementCompleteTests(unittest.TestCase):
              mock.patch.object(self.impl, "_ensure_prerequisites"), \
              mock.patch.object(self.impl, "append_evidence"), \
              mock.patch.object(self.impl, "update_task_state"), \
-             mock.patch("builtins.print"):
+            mock.patch("builtins.print"):
             result = self.impl.cmd_complete(_namespace(
                 task_id="T-01", command="pytest", result="passed",
-                artifact=[], note=None, no_evidence=False, force=False
+                artifact=["pytest.log"], note=None, no_evidence=False, force=False
             ))
         self.assertEqual(result, 0)
 
@@ -189,20 +189,17 @@ class ImplementCompleteTests(unittest.TestCase):
                 ))
 
     def test_cmd_complete_no_evidence_with_force(self):
-        """Complete without evidence with force succeeds."""
+        """Complete without evidence is rejected even with force."""
         row = mock.Mock(task_id="T-01", state="in_progress")
         with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
              mock.patch.object(self.impl, "_get_session_tasks",
                                return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row), \
-             mock.patch.object(self.impl, "_ensure_prerequisites"), \
-             mock.patch.object(self.impl, "update_task_state"), \
-             mock.patch("builtins.print"):
-            result = self.impl.cmd_complete(_namespace(
-                task_id="T-01", command=None, result=None,
-                artifact=None, note=None, no_evidence=True, force=True
-            ))
-        self.assertEqual(result, 0)
+             mock.patch.object(self.impl, "find_task_by_id", return_value=row):
+            with self.assertRaises(self.impl.ExecutionError):
+                self.impl.cmd_complete(_namespace(
+                    task_id="T-01", command=None, result=None,
+                    artifact=None, note=None, no_evidence=True, force=True
+                ))
 
     def test_cmd_complete_already_done_raises(self):
         """Completing a done task raises error."""
@@ -253,10 +250,10 @@ class ImplementCompleteTests(unittest.TestCase):
              mock.patch.object(self.impl, "_ensure_prerequisites"), \
              mock.patch.object(self.impl, "append_evidence"), \
              mock.patch.object(self.impl, "update_task_state"), \
-             mock.patch("builtins.print"):
+            mock.patch("builtins.print"):
             result = self.impl.cmd_complete(_namespace(
                 task_id=None, command="pytest", result="passed",
-                artifact=[], note=None, no_evidence=False, force=False
+                artifact=["pytest.log"], note=None, no_evidence=False, force=False
             ))
         self.assertEqual(result, 0)
 
@@ -284,10 +281,10 @@ class ImplementCompleteTests(unittest.TestCase):
              mock.patch.object(self.impl, "_ensure_prerequisites"), \
              mock.patch.object(self.impl, "append_evidence"), \
              mock.patch.object(self.impl, "update_task_state"), \
-             mock.patch("builtins.print"):
+            mock.patch("builtins.print"):
             result = self.impl.cmd_complete(_namespace(
                 task_id="T-01", command="pytest", result="passed",
-                artifact=[], note=None, no_evidence=False, force=False
+                artifact=["pytest.log"], note=None, no_evidence=False, force=False
             ))
         self.assertEqual(result, 0)
 

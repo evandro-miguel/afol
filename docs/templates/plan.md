@@ -32,6 +32,17 @@ This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, 
 - Explain what this change enables for a user or operator.
 - State how someone can see the new behavior working after implementation.
 - `plan + task` is the required execution core for non-trivial work.
+- This template is for direct execution. Do not add steps whose only purpose
+  is to create another plan, gather broad context, or run generic research.
+
+## Execution Contract
+
+- Every step must be an action an agent can execute now.
+- If discovery is still needed, do it before the plan or reduce it to the
+  smallest blocking proof.
+- Do not use the plan to restate feature philosophy; keep that in roadmap/spec.
+- If a step cannot be executed without more framing, rewrite it until it names
+  a concrete deliverable, decision, or verification.
 
 ## Progress
 
@@ -61,7 +72,8 @@ This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, 
 - Child spec: `<child_spec_id_or_empty>`
 - Planning rule:
   - Do not redefine feature philosophy here; use this file to plan execution of already-defined intent.
-  - A major plan is not complete until brainstorm and explorer-check artifacts exist and are linked here.
+  - This plan must describe the direct execution path for the requested work, not pre-planning or generic research tasks.
+  - Brainstorm, explorer-check, and research artifacts are optional sidecars only when they are the requested deliverable or the smallest blocking proof before safe execution.
 
 ## Planning Inputs
 
@@ -91,10 +103,14 @@ This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, 
 - Describe, in prose, the sequence of edits and additions.
 - For each area, name the file and the concrete location to change.
 - Keep the path minimal and outcome-focused.
+- Do not add a phase whose only purpose is broad research, context gathering, or creating a later plan.
+- Do not add a phase whose only purpose is to prepare a later plan.
+- If a discovery step is unavoidable, make it the smallest blocking proof and
+  state the decision or artifact it must produce.
 
 ## Concrete Steps
 
-1. <exact edit or command, with working directory when relevant>
+1. <exact edit or command, with working directory when relevant; must be directly executable>
 2. <next step>
 3. <validation step>
 
@@ -135,6 +151,7 @@ This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, 
 ## Completion Gate
 
 - [ ] Task exists and tracks the executable work
+- [ ] No step exists only to make another plan or do generic research
 - [ ] Relevant prior knowledge was searched or explicitly ruled out
 - [ ] Any optional artifact created for this workstream is `final`
 - [ ] The ExecPlan remains self-contained enough for a new contributor to resume

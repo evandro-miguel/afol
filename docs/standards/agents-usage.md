@@ -3,7 +3,7 @@ doc_type: standard
 id: agents-usage-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-13T19:36:57-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Agents System Usage
@@ -53,7 +53,9 @@ just all
 Wrapper contract:
 
 - Use `.agents/scripts/.venv` directly for normal command execution when it exists.
-- Require `uv` only for setup or environment refresh.
+- Require project-local `uv` only for setup or environment refresh.
+- Materialize `uv` inside `.agents/tools/uv/bin/uv` with `./.agents/agents hydrate-uv`; host `uv` is only a bootstrap source.
+- Materialize managed Python inside `.agents/tools/uv/python/` during `./.agents/agents hydrate`; stale venvs that resolve to user-global `uv` Python are recreated.
 - Keep UV cache writes inside `.agents/cache/uv/` so the scaffold remains usable in isolated workspaces.
 - Use `./.agents/agents bootstrap /path/to/existing-project --partial` for live repos so project-owned files stay intact.
 - Treat the skills baseline as an adoption artifact, not as scaffold-local history.
@@ -70,7 +72,8 @@ Wrapper contract:
 
 | Command | Description |
 |---------|-------------|
-| `just setup` | Initialize UV virtualenv |
+| `just setup-uv` | Install/copy project-local `uv` |
+| `just setup` | Initialize project-local UV virtualenvs |
 | `just clean` | Remove .venv and cache files |
 | `just doctor` | Validate .agents structure |
 
@@ -112,7 +115,7 @@ Wrapper contract:
 | `just wb-touch` | Update `updated_at` in active session docs | - |
 | `just wb-normalize-time` | Normalize `created_at`/`updated_at` to configured WB offset | - |
 | `just wb-files-changed` | Refresh report `Files Changed` section | - |
-| `just wb-task` | Mark task by ID in active session | `TASK_ID=T-01 ACTION=done\|in_progress\|pending\|ready\|blocked\|skipped` |
+| `just wb-task` | Mark task by ID in active session and sync the board row; `ACTION=done` requires a valid evidence id from `just wb-evidence`; canonical board states are `pending`, `in_progress`, `problem`, `moved`, `implemented_untested`, `tested_needs_spec_validation`, and `done` | `TASK_ID=T-01 ACTION=done\|in_progress\|pending\|implemented\|tested\|problem\|moved` `[EVIDENCE_ID=E-...]` |
 | `just wb-status` | Set frontmatter status | `STATUS=<value>` `FILE=plan\|task\|spec-lite\|report\|log\|all` (`spec-lite` remains the current compatibility key for child specs) |
 | `just wb-timeline` | Append log timeline entry | `MSG=\"text\"` |
 | `just wb-link` | Set frontmatter link field | `FILE=<doc>` `KEY=<k>` `VALUE=<v>` |
@@ -131,6 +134,10 @@ Wrapper contract:
 | `just docs` | Structure + index + sync |
 | `just check` | Doctor + lint + verify |
 | `just init` | Setup + doctor |
+
+The `just wb-task` wrapper row above remains a compatibility surface. Use the
+canonical board states from `docs/standards/checkbox-protocol.md` as the source
+of truth; do not treat `skipped` as the semantic contract for `- [>]`.
 
 Bootstrap workflow note:
 
@@ -179,7 +186,7 @@ just doctor
 # OR
 .agents/agents doctor
 # OR
-uv run --with pyyaml .agents/scripts/agents-doctor.py
+.agents/tools/uv/bin/uv run --with pyyaml .agents/scripts/agents-doctor.py
 ```
 
 ---
@@ -229,6 +236,9 @@ just new THEME=api-endpoint SPEC=1
 # With lite spec (legacy compatibility alias for spec-child)
 just new THEME=bugfix-login SPEC=lite
 
+# Link an existing child spec without creating another spec artifact
+.agents/agents new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --child-spec existing-child-spec
+
 # Quick task in current active session
 just quick THEME=small-fix
 
@@ -240,7 +250,9 @@ just quick THEME=small-fix
 .agents/agents new major-refactor --force-new --spec
 ```
 
-`--spec-lite` remains the current command flag for compatibility. Canonical governance wording now uses `spec-child`.
+`--child-spec` links an existing child spec and does not create another spec artifact.
+`--spec-lite` remains a compatibility flag for creating a new local child-spec artifact.
+Do not combine `--child-spec` with `--spec-child` or `--spec-lite`.
 
 ---
 
@@ -384,7 +396,7 @@ Verifies all tasks in a session are completed.
 **Checks:**
 
 - Task lines with IDs in format `- [ ] T-01 ...` (supports `T-001` too)
-- All parsed tasks marked with `- [x]`
+- All parsed tasks marked with `- [x]` after the applicable validation is complete or explicitly recorded as `N/A`
 - Reports status of each task
 - Shows open tasks with `ID | file:line | status | text`
 - Returns error if incomplete
@@ -409,6 +421,7 @@ Shows current execution state for active or selected workstream session.
 
 - Resolves canonical artifacts (`plan`, `task`, `spec`, `report`, `roadmap`, `session`)
 - Summarizes task progress and identifies next task
+- Recognizes the canonical task states `pending`, `in_progress`, `problem`, `moved`, `implemented_untested`, `tested_needs_spec_validation`, and `done`
 - Reuses the artifact manifest to show workflow artifact readiness and blockers
 - Exposes blockers and artifact pointers
 - Supports `--json` output
@@ -429,6 +442,7 @@ Closes a session after strict verification passes and optionally repoints the ac
 
 - Summarizes working-tree drift inside and outside the target session
 - Flags missing or stale `plan`/`research`/`log`/`report` artifacts
+- Flags task contract drift when a plan contains planning-only or research-only steps
 - Recommends the next safe step before implementation continues
 
 **Checks:**
@@ -503,23 +517,24 @@ just all
 
 ### Prerequisites
 
-Install [uv](https://docs.astral.sh/uv/):
+Install/copy project-local `uv`:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+./.agents/agents hydrate-uv
 ```
 
 ### Initialize
 
 ```bash
 just setup
-# OR manually
-cd .agents/scripts && uv sync
 ```
 
 This creates:
 
-- `.venv/` - Isolated Python virtualenv
+- `.agents/tools/uv/bin/uv` - Project-local `uv` binary
+- `.agents/tools/uv/python/` - Project-local managed CPython install
+- `.agents/scripts/.venv/` - Script virtualenv
+- `.agents/runtime/.venv/` - Runtime virtualenv
 - `uv.lock` - Locked dependencies
 
 ## Aliases
@@ -563,7 +578,8 @@ Automates common metadata edits to avoid manual WB file editing.
 ```bash
 just wb-touch
 just wb-files-changed
-just wb-task TASK_ID=T-01 ACTION=done
+just wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD="just lint" RESULT=passed ARTIFACT=.agents/wb/<session-id>/<session-id>_report_01.md
+just wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...
 just wb-status STATUS=final FILE=report
 just wb-timeline MSG="Ran full validation"
 just wb-link FILE=report KEY=spec VALUE=260223_1855_task-id-standardization_spec-lite_01

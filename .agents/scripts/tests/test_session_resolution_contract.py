@@ -40,6 +40,7 @@ def test_execution_commands_find_session_resolution_order_and_strict(tmp_path, m
 
     monkeypatch.setattr(execution_commands, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(execution_commands, "WB_DIR", wb_dir)
+    monkeypatch.setattr(execution_commands, "CANONICAL_WB_DIR", wb_dir)
     monkeypatch.setattr(
         execution_commands,
         "get_active_session_file_path",
@@ -74,6 +75,7 @@ def test_wb_update_resolve_session_order_and_strict(tmp_path, monkeypatch):
 
     monkeypatch.setattr(wb_update, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(wb_update, "WB_DIR", wb_dir)
+    monkeypatch.setattr(wb_update, "CANONICAL_WB_DIR", wb_dir)
     monkeypatch.setattr(wb_update, "ACTIVE_SESSION_FILE", active_file)
 
     monkeypatch.setenv("AGENTS_SESSION_ID", env_dir.name)

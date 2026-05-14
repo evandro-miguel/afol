@@ -7,9 +7,10 @@ owners:
 - orchestrator
 workstream_intent: feature
 artifact_purpose: Define the plan/spec preflight, recurring-problem escalation, similar-system
-  discovery, and rule-enforcement contract for agents.
+  discovery, direct-execution plan/task integrity, and rule-enforcement contract for
+  agents.
 created_at: '2026-04-18T21:15:13-03:00'
-updated_at: '2026-04-19T18:07:45-03:00'
+updated_at: '2026-05-09T14:59:47-03:00'
 roadmap_feature: F-18
 spec_role: parent
 parent_spec: ''
@@ -30,6 +31,8 @@ scope:
   - planning rigor
   - recurring problem prevention
   - similar system discovery
+  - plan/task execution integrity
+  - task lifecycle state model
   - decision intake
   - adversarial challenge
   - optional priority scoring
@@ -43,6 +46,12 @@ risk_level: medium
 - Outcome: agents must prove they checked existing governance, prior problems,
   similar implementation, and applicable rules before creating plans,
   escalating recurring bugs, adding new functions, or delegating work.
+- Outcome: generated plans and tasks must route agents into direct execution of
+  the requested work, not into tasks whose deliverable is creating, drafting, or
+  researching another plan.
+- Outcome: task states must distinguish blocked work, moved work, implemented
+  but untested work, tested work still awaiting spec/user-experience validation,
+  and fully complete work.
 - Why now: the scaffold already has roadmap/spec governance, lessons, rules,
   workbench verification, and knowledge reuse, but those surfaces are still easy
   for an agent to skip unless the operator reminds it.
@@ -60,6 +69,12 @@ risk_level: medium
   already exists, increasing duplication and future refactor cost.
 - The orchestrator can route work to agents without explicitly loading and
   enforcing every applicable `.agents/rules/` file.
+- Plans and task boards can still encode meta-work such as creating the plan,
+  researching so a later real plan can be made, or assigning subagents to write
+  plan artifacts instead of executing the approved slice.
+- A single done marker can hide materially different states: code written but
+  untested, tests written but spec/user-experience validation missing, moved
+  work, or blocked work.
 - Product-shaped or ambiguous work can jump to benchmark, plan, or
   implementation before the agent has framed the user, outcome, non-goals,
   assumptions, and decision appetite.
@@ -102,6 +117,22 @@ Expected behavior:
 
 - Before every non-trivial plan, the agent checks `docs/arc/GENERAL-ROADMAP.md`
   and `docs/arc/SPECS/` for an existing roadmap feature and parent spec.
+- Workbench plans describe the direct execution path for the requested work.
+  They do not include steps whose only deliverable is making the plan, preparing
+  a later plan, or doing broad research so a future real plan can exist.
+- Workbench task files assign executable work to agents. They do not assign
+  tasks to create/write the plan or research the plan unless research is the
+  user-requested deliverable or the smallest blocking proof before safe
+  execution.
+- Canonical task states are `[ ] pending`, `[/] in_progress`, `[!] problem`,
+  `[>] moved`, `[%] implemented_untested`,
+  `[&] tested_needs_spec_validation`, and `[x] done`.
+- `[>]` always records the destination plan/session/task and reason. It means
+  moved or deferred, not a silent skip.
+- `[x]` is reserved for work that is complete for the task type. Code,
+  user-facing, or UI work requires implementation, test proof, and
+  spec/user-experience validation when applicable; tasks that do not require a
+  test or user-experience check must state the N/A reason.
 - Before benchmark or execution for ambiguous or product-shaped work,
   the agent creates a compact decision intake: user, behavior or evidence,
   observable outcome, constraints, non-goals, reversibility, assumptions, and
@@ -223,6 +254,10 @@ In scope:
 - Project-local skill/docs updates plus universal-skills propagation pending
   items for feature behavior changes.
 - Validation that catches missing evidence for governed work.
+- Direct-execution plan/task validation that catches obvious meta-planning
+  tasks.
+- Canonical task marker and lifecycle state handling across templates, parser,
+  status, and update surfaces.
 
 Out of scope:
 
@@ -236,6 +271,8 @@ Out of scope:
 - Child specs required: yes
 - Decomposition rule:
   - Use one child spec for plan/spec preflight.
+  - Use one child spec for direct-execution plan/task integrity and task state
+    lifecycle.
   - Use one child spec for recurring-problem escalation and lessons/rules
     capture.
   - Use one child spec for similar-system detection and refactor-debt handling.
@@ -243,6 +280,9 @@ Out of scope:
     enforcement.
 - Planned child specs:
   - `plan-spec-preflight` -> roadmap/spec lookup before planning.
+  - `plan-task-execution-integrity-state-model` -> direct-execution plan/task
+    semantics, canonical task states, and strict validation against obvious
+    meta-planning tasks.
   - `decision-intake-and-challenge` -> problem framing, signal packs,
     opportunity mapping, assumption mapping, challenge gates, benchmark order,
     qualitative prioritization, optional scoring rubric, and fixed-appetite
@@ -260,30 +300,35 @@ Out of scope:
    surfaces that already satisfy part of the requested behavior.
 2. Define the preflight data contract: searched paths, evidence fields,
    missing-governance outcomes, and when quick mode is exempt.
-3. Define the decision-intake contract: problem frame, behavior evidence,
+3. Define the direct-execution plan/task integrity contract and canonical task
+   state model.
+4. Define the decision-intake contract: problem frame, behavior evidence,
    signal pack, opportunity/solution separation, assumptions, rival hypotheses,
    benchmark boundary, qualitative prioritization, optional score rubrics, and
    slice appetite.
-4. Define element-to-rule routing for feature, spec, workbench, skill, runtime,
+5. Define element-to-rule routing for feature, spec, workbench, skill, runtime,
    docs, Python, TypeScript, and JavaScript surfaces.
-5. Implement roadmap/spec lookup before non-trivial planning in the relevant
+6. Implement roadmap/spec lookup before non-trivial planning in the relevant
    CLI/runtime/orchestrator path.
-6. Implement recurring-problem detection by searching lessons, rules, active
+7. Implement strict validation for obvious meta-planning tasks and lifecycle
+   state misuse in plan/task artifacts.
+8. Implement recurring-problem detection by searching lessons, rules, active
    workbench artifacts, and knowledge outputs before bug-fix planning.
-7. Implement similar-system discovery for new function work using exact search
+9. Implement similar-system discovery for new function work using exact search
    first, semantic/indexed retrieval where available, and explicit code/spec
    citations in plan or explorer-check evidence.
-8. Add future-refactor debt capture to workbench/report/spec outputs, plus
+10. Add future-refactor debt capture to workbench/report/spec outputs, plus
    optional narrow code comments only where the future refactor must stay
    visible to maintainers.
-9. Implement orchestrator rule loading so all applicable `.agents/rules/` are
+11. Implement orchestrator rule loading so all applicable `.agents/rules/` are
    read before routing and summarized into delegated-agent task instructions.
-10. Update affected project-local skills and docs, then record a pending item to
+12. Update affected project-local skills and docs, then record a pending item to
    propagate the skill change back to universal-skills through the branch/PR
    flow.
-11. Add validation tests for missing preflight evidence, repeated-problem
-   escalation, similar-system evidence, and rule-context propagation.
-12. Update operator docs and templates only after behavior and validation pass.
+13. Add validation tests for missing preflight evidence, meta-planning task
+   rejection, lifecycle state handling, repeated-problem escalation,
+   similar-system evidence, and rule-context propagation.
+14. Update operator docs and templates only after behavior and validation pass.
 
 ## 9) Constraints and Assumptions
 
@@ -293,6 +338,8 @@ Assumptions:
   are sufficient for the first implementation.
 - Similar-system detection can start with exact and path-aware search before
   adding heavier semantic retrieval.
+- Direct-execution validation can start with explicit anti-pattern detection
+  for task-like lines instead of broad semantic inference.
 - Decision-intake can start as documented workflow and skill behavior before any
   command-native helper exists. A scoring tool is not required for fast paths.
 - The orchestrator can pass rule obligations as concise task context without
@@ -312,6 +359,13 @@ Success looks like:
 
 - A plan for non-trivial work records the governing feature/spec found, or
   records the governance gap and blocks implementation until resolved.
+- A plan or task artifact for governed execution does not contain tasks whose
+  deliverable is creating, writing, preparing, or researching the plan.
+- Task boards and checkbox tasks use the canonical lifecycle states, including
+  `[!] problem`, `[>] moved`, `[%] implemented_untested`, and
+  `[&] tested_needs_spec_validation`.
+- A task marked `[x]` has closure evidence and, when applicable, test plus
+  spec/user-experience validation proof.
 - A plan for ambiguous or product-shaped work records user, outcome, non-goals,
   critical assumptions, rival hypothesis, reversibility, benchmark boundary,
   and first slice appetite before benchmark-driven planning.
@@ -344,6 +398,9 @@ Review questions:
 - Did the agent separate opportunity from solution before bringing effort into
   the decision?
 - Did benchmark inform the plan without replacing problem framing?
+- Do task items execute the requested work rather than make another plan?
+- Do intermediate task states honestly show missing test or spec/user-experience
+  validation work?
 - Does similar-system evidence prevent accidental duplication without forcing
   a risky refactor?
 - Can a reviewer see which rules the orchestrator enforced for each agent?
@@ -360,6 +417,12 @@ Review questions:
 - Risk: rule context becomes too large for delegated agents -> Mitigation:
   summarize obligations and link rule files instead of copying full text when
   not needed.
+- Risk: anti-meta-plan validation blocks legitimate governance artifact work ->
+  Mitigation: target task-like anti-patterns narrowly and allow explicit
+  user-requested artifact maintenance.
+- Risk: the richer state model becomes cosmetic -> Mitigation: make strict
+  validation fail closure when `[%]`, `[&]`, `[!]`, or `[>]` are unresolved or
+  lack required notes.
 - Risk: scoring creates false precision or slows fast decisions -> Mitigation:
   make scoring optional, ask before using it when the user wants speed, and
   require rubrics/evidence notes when formal scores are used.
@@ -372,6 +435,10 @@ Review questions:
 Evidence expected from delivery:
 
 - Unit or integration tests for plan/spec preflight outcomes.
+- Tests proving plan/task artifacts with obvious meta-planning tasks fail
+  strict validation.
+- Tests proving canonical task states parse, update, summarize, and block
+  closure correctly.
 - Tests or fixtures for recurring-problem lookup against lessons and rules.
 - Tests proving similar-system evidence is recorded without modifying the
   existing similar system.
@@ -391,6 +458,8 @@ Open questions:
   plus links to the full rule files?
 - Q-04 Should decision-intake become a runtime command, a workbench template, or
   remain a skill/workflow rule until repeated usage proves the right shape?
+- Q-05 How far should historical workbench sessions be migrated from legacy
+  state names after the canonical state model is proven?
 
 ## 13) Acceptance Checklist
 

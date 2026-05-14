@@ -37,11 +37,14 @@ from lib.agents_config import (
     load_agents_config,
     parse_offset,
 )
+from lib.execution_commands import evidence_record_closure_error
 from lib.markdown_docs import split_markdown_frontmatter as split_frontmatter
 from lib.postmortem_governance import postmortem_governance_review_issues
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
+AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
+CANONICAL_WB_DIR = AGENTS_DIR / "wb"
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 TELEMETRY_SCRIPT = Path(__file__).resolve().parent / "agents-telemetry.py"
 WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
@@ -66,9 +69,15 @@ TASK_ACTIONS = {
     "mark-done": ("x", "done"),
     "mark-in-progress": ("/", "in_progress"),
     "mark-pending": (" ", "pending"),
-    "mark-ready": ("%", "ready_for_test"),
-    "mark-blocked": ("!", "blocked"),
-    "mark-skipped": (">", "skipped"),
+    "mark-implemented": ("%", "implemented_untested"),
+    "mark-tested": ("&", "tested_needs_spec_validation"),
+    "mark-problem": ("!", "problem"),
+    "mark-moved": (">", "moved"),
+}
+LEGACY_TASK_ACTION_ALIASES = {
+    "mark-ready": "mark-implemented",
+    "mark-blocked": "mark-problem",
+    "mark-skipped": "mark-moved",
 }
 TIMESTAMP_FIELDS = ("created_at", "updated_at")
 TASK_ID_RE = re.compile(r"^T-\d{2,3}$")
@@ -81,6 +90,13 @@ def now_iso_gmt3() -> str:
 
 def now_timeline_label() -> str:
     return datetime.now(WB_TZ).strftime(f"%Y-%m-%d %H:%M{WB_OFFSET[:3]}")
+
+
+def canonical_wb_label() -> str:
+    try:
+        return str(CANONICAL_WB_DIR.relative_to(ROOT_DIR))
+    except ValueError:
+        return str(CANONICAL_WB_DIR)
 
 
 def parse_iso_timestamp(value: str) -> datetime:
@@ -124,6 +140,20 @@ def _resolve_session_path(session: str, *, source: str) -> Path:
     if not p.is_absolute():
         p = (ROOT_DIR / p).resolve() if "/" in session else (WB_DIR / session).resolve()
     if p.exists() and p.is_dir():
+        try:
+            p.resolve().relative_to(CANONICAL_WB_DIR.resolve())
+        except ValueError:
+            raise FileNotFoundError(f"Session must be under {canonical_wb_label()} ({source}): {session}")
+        protected = {
+            item.strip()
+            for item in os.getenv("AGENTS_PROTECTED_SESSION_IDS", "").split(",")
+            if item.strip()
+        }
+        if p.name in protected:
+            raise FileNotFoundError(
+                f"Session is protected/read-only for this run ({source}): {p.name}. "
+                "Create or target a different .agents/wb session."
+            )
         return p
     raise FileNotFoundError(f"Session folder not found ({source}): {session}")
 
@@ -145,7 +175,7 @@ def resolve_session(session: str | None) -> Path:
     active = get_active_session_id()
     if not active:
         raise FileNotFoundError("No active session found in .agents/wb/.active_session")
-    return (WB_DIR / active).resolve()
+    return _resolve_session_path(active, source=".active_session")
 
 
 def require_explicit_session(args: argparse.Namespace, command: str) -> None:
@@ -437,7 +467,7 @@ def update_task_markers(
     lines = body.splitlines()
     found = False
 
-    checklist_re = re.compile(r'^(\s*-\s\[[ /%!>x]\]\s+)(T-\d{2,3})(\s+.+)$')
+    checklist_re = re.compile(r'^(\s*-\s\[[ /%!>&x]\]\s+)(T-\d{2,3})(\s+.+)$')
 
     for i, line in enumerate(lines):
         # Legacy format: - [x] T-01 description
@@ -537,6 +567,9 @@ def validate_evidence_reference(session_dir: Path, evidence_id: str, task_id: st
             raise ValueError(
                 f"Evidence '{evidence_id}' belongs to task '{record.get('task_id')}', not '{task_id}'"
             )
+        closure_error = evidence_record_closure_error(record)
+        if closure_error:
+            raise ValueError(f"Evidence '{evidence_id}' is not valid closure evidence: {closure_error}")
         return
 
     raise ValueError(
@@ -664,28 +697,26 @@ def cmd_task(args: argparse.Namespace):
     task_file = latest_doc_file(session_dir, "task")
 
     action = None
-    for key in TASK_ACTIONS:
+    all_actions = tuple(TASK_ACTIONS.keys()) + tuple(LEGACY_TASK_ACTION_ALIASES.keys())
+    for key in all_actions:
         if getattr(args, key.replace("-", "_")):
             action = key
             break
     if not action:
         raise ValueError("No task action provided")
 
+    canonical_action = LEGACY_TASK_ACTION_ALIASES.get(action, action)
+
     if action == "mark-done":
-        if not args.evidence_id and not args.allow_unsafe_done:
+        if not args.evidence_id:
             raise ValueError(
                 "mark-done requires --evidence-id. Register evidence first via "
-                "'wb-update evidence <TASK_ID> ...' or use --allow-unsafe-done (not recommended)."
+                "'wb-update evidence <TASK_ID> ...'."
             )
         if args.evidence_id:
             validate_evidence_reference(session_dir, args.evidence_id, args.task_id)
-        if args.allow_unsafe_done and not args.evidence_id:
-            print(
-                "⚠️  mark-done executed without evidence id (unsafe bypass enabled).",
-                file=sys.stderr,
-            )
 
-    marker, state = TASK_ACTIONS[action]
+    marker, state = TASK_ACTIONS[canonical_action]
     update_task_markers(task_file, args.task_id, marker, state, evidence_id=args.evidence_id)
     print(f"✓ {args.task_id} updated to {state} in {display_path(task_file)}")
 
@@ -735,20 +766,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_task.add_argument("--session", help="session id/path (required)")
     p_task.add_argument(
         "--evidence-id",
-        help="evidence ID from 'wb-update evidence' (required for --mark-done unless bypassed)",
-    )
-    p_task.add_argument(
-        "--allow-unsafe-done",
-        action="store_true",
-        help="allow --mark-done without evidence-id (prints warning and is audit-risky)",
+        help="evidence ID from 'wb-update evidence' (required for --mark-done)",
     )
     action_group = p_task.add_mutually_exclusive_group(required=True)
     action_group.add_argument("--mark-done", action="store_true")
     action_group.add_argument("--mark-in-progress", action="store_true")
     action_group.add_argument("--mark-pending", action="store_true")
-    action_group.add_argument("--mark-ready", action="store_true")
-    action_group.add_argument("--mark-blocked", action="store_true")
-    action_group.add_argument("--mark-skipped", action="store_true")
+    action_group.add_argument("--mark-implemented", action="store_true")
+    action_group.add_argument("--mark-tested", action="store_true")
+    action_group.add_argument("--mark-problem", action="store_true")
+    action_group.add_argument("--mark-moved", action="store_true")
+    action_group.add_argument("--mark-ready", action="store_true", help="legacy alias for --mark-implemented")
+    action_group.add_argument("--mark-blocked", action="store_true", help="legacy alias for --mark-problem")
+    action_group.add_argument("--mark-skipped", action="store_true", help="legacy alias for --mark-moved")
     p_task.set_defaults(func=cmd_task)
 
     p_evidence = sub.add_parser("evidence", help="register evidence for a task in session ledger")
