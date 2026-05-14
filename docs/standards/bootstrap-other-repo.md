@@ -3,7 +3,7 @@ doc_type: standard
 id: 000000_000000_bootstrap-other-repo_standard_01
 status: active
 created_at: '2026-03-23T00:00:00Z'
-updated_at: '2026-04-16T23:01:19-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Bootstrap Other Repo
@@ -125,6 +125,10 @@ silently replace additional project content.
 - Bootstrap does not copy scaffold-local skill history; it only prepares the baseline needed for the target repo to own its selection and upgrade path.
 - Bootstrap should reinforce project-local skills, not turn global Codex skills into a second project contract.
 - `skills-sync pull` refreshes only a configured external git-backed source; use `skills-sync sync` / `skills-sync update` to actually refresh `.agents/skills/` in the target repo.
+- Bootstrap should keep `uv` as the Python package/runtime manager, but materialize
+  the executable under `.agents/tools/uv/bin/uv` with `./.agents/agents hydrate-uv`
+  before hydrating project-local managed Python under `.agents/tools/uv/python/`
+  and the `.agents/scripts/.venv` and `.agents/runtime/.venv` virtualenvs.
 
 ## Verification
 
@@ -133,6 +137,7 @@ After install, validate the target repo with:
 ```bash
 just --list
 just --justfile Justfile agents_scaffold::doctor
+just --justfile Justfile agents_scaffold::setup-uv
 just --justfile Justfile agents_scaffold::lint
 just --justfile Justfile agents_scaffold::test-scripts
 just --justfile Justfile agents_scaffold::all

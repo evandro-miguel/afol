@@ -13,12 +13,12 @@ PLACEHOLDER_RE = re.compile(
 )
 SECTION_RE_TEMPLATE = r"^##\s+{heading}\s*$\n(?P<body>.*?)(?=^##\s+|\Z)"
 TASK_TABLE_RE = re.compile(r"^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|$", re.MULTILINE)
-TASK_CHECKLIST_RE = re.compile(r"^\s*-\s*\[[ /%!>x]\]\s+(T-\d{2,3})\s+(.+)$", re.MULTILINE)
+TASK_CHECKLIST_RE = re.compile(r"^\s*-\s*\[[ /%!>&x]\]\s+(T-\d{2,3})\s+(.+)$", re.MULTILINE)
 
 GENERIC_NOISE_LINES = {
     "---",
     "|------|-------|-------|-------|",
-    "**state values:** `pending` | `in_progress` | `ready_for_test` | `testing` | `done` | `blocked`",
+    "**state values:** `pending` | `in_progress` | `problem` | `moved` | `implemented_untested` | `tested_needs_spec_validation` | `done`",
 }
 
 

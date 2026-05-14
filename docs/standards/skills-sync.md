@@ -3,7 +3,7 @@ doc_type: standard
 id: skills-sync-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-18T21:39:30-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Skills Sync Standard
@@ -88,6 +88,9 @@ just skills-init
 just skills-pull
 ```
 
+`skills-pull` is the explicit network refresh command.
+`skills-sync` and `skills-update` are local-only by default and will not call `git fetch/checkout/pull` unless `--pull` is passed.
+
 If only the repo-local bootstrap seed exists, `just skills-pull` is a no-op. It never creates a git checkout under `.agents/cache/`.
 
 3. Discover what is available:
@@ -123,8 +126,20 @@ just skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
 just skills-sync SKILLS=agentic-folder-sys
 just skills-update SKILLS=agentic-folder-sys
 ```
+Without `--pull`, these commands use the current local source only.
+Use `--pull` when you want to refresh the external source before syncing.
 
-8. Propose one locally edited skill back to universal-skills only through a branch:
+8. Record source provenance in manifest:
+
+`skills-sync` and `skills-pull` record source metadata in `.agents/skills-sync.manifest.json` under `source`.
+Observed fields are:
+- `path`: seed path (relative when inside the repo, absolute otherwise)
+- `source_type`: `git` or `local`
+- `ref`: branch/ref intended for sync
+- `branch`: resolved git branch when available
+- `commit`: resolved git commit when available
+
+9. Propose one locally edited skill back to universal-skills only through a branch:
 
 ```bash
 just skills-push SKILL=agentic-folder-sys BRANCH=skills-sync/agentic-folder-sys COMMIT=1 PUSH=1 PR=1
@@ -132,7 +147,7 @@ just skills-push SKILL=agentic-folder-sys BRANCH=skills-sync/agentic-folder-sys 
 
 This command must never push to `main` directly. It requires an external universal-skills checkout and pushes only a proposal branch; use `PR=1` when the change should be opened as a GitHub pull request.
 
-9. Verify sync and structure:
+10. Verify sync and structure:
 
 ```bash
 just skills-check SKILLS=agentic-folder-sys

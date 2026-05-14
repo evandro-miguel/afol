@@ -49,7 +49,20 @@ VALID_STATUSES = [
     "blocking",
     "accepted",
 ]
-VALID_STATES = ["pending", "in_progress", "ready_for_test", "testing", "done", "blocked", "skipped"]
+VALID_STATES = [
+    "pending",
+    "in_progress",
+    "implemented_untested",
+    "tested_needs_spec_validation",
+    "problem",
+    "moved",
+    "done",
+    # Legacy compatibility aliases
+    "ready_for_test",
+    "testing",
+    "blocked",
+    "skipped",
+]
 VALID_DOC_TYPES = [
     "plan",
     "task",

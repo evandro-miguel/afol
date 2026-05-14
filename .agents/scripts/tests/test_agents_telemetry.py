@@ -46,6 +46,25 @@ class AgentsTelemetryTests(unittest.TestCase):
             self.assertEqual(saved[0]["context"], {"source": "test"})
             self.assertNotIn("context", saved[0]["metadata"])
 
+    def test_record_event_falls_back_when_randomness_is_blocked(self):
+        script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
+        agents_telemetry = load_module("agents_telemetry_test_randomness_fallback", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            events_file = root / "events.jsonl"
+
+            agents_telemetry.TELEMETRY_EVENTS_FILE = events_file
+            agents_telemetry.ACTIVE_SESSION_FILE = root / ".active_session"
+
+            with patch.object(agents_telemetry.uuid, "uuid4", side_effect=NotImplementedError("blocked")):
+                first = agents_telemetry.record_event("tool_exec", session_id="test-session")
+                second = agents_telemetry.record_event("tool_exec", session_id="test-session")
+
+            self.assertRegex(first["event_id"], r"^[0-9a-f]{64}$")
+            self.assertRegex(second["event_id"], r"^[0-9a-f]{64}$")
+            self.assertNotEqual(first["event_id"], second["event_id"])
+
     def test_main_record_parses_context_flag_into_context_field(self):
         script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
         agents_telemetry = load_module("agents_telemetry_test_main", script_path)

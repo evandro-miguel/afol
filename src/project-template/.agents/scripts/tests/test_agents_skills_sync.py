@@ -611,7 +611,58 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             output = buffer.getvalue()
             self.assertIn("updated git skills source", output)
 
-    def test_cmd_sync_updates_project_from_external_source_and_mirrors_local_source(self):
+    def test_cmd_pull_records_external_source_metadata(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._make_source_skill(root, "writing-skills", description="Local seed")
+            self._make_profile(root, "core", ["writing-skills"])
+            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+
+            self._make_source_skill(
+                Path(td),
+                "writing-skills",
+                description="External version",
+                source_dir="external-universal-skills",
+            )
+            self._make_profile(
+                Path(td),
+                "core",
+                ["writing-skills"],
+                source_dir="external-universal-skills",
+            )
+            (external_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+
+            manifest = {
+                "version": 2,
+                "repo": "https://github.com/example/skill-universal.git",
+                "ref": "release/main",
+                "mode": "copy",
+                "installs": [{"app": "all", "profile": "core"}],
+            }
+            module.save_manifest(manifest)
+
+            args = type("Args", (), {})()
+            with (
+                mock.patch.object(module, "run") as patched_run,
+                mock.patch.object(module, "_git_head_ref", return_value="release/main"),
+                mock.patch.object(module, "_git_head_commit", return_value="abc123"),
+            ):
+                module.cmd_pull(args)
+
+            self.assertEqual(patched_run.call_count, 3)
+            loaded = module.load_manifest()
+            source = loaded.get("source", {})
+            self.assertEqual(source.get("path"), str(external_root))
+            self.assertEqual(source.get("ref"), "release/main")
+            self.assertEqual(source.get("branch"), "release/main")
+            self.assertEqual(source.get("commit"), "abc123")
+
+    def test_cmd_sync_updates_project_from_external_source_without_refreshing(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td) / "repo"
             root.mkdir()
@@ -651,13 +702,55 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             with mock.patch.object(module, "run") as patched_run:
                 module.cmd_sync(args)
 
-            self.assertEqual(patched_run.call_count, 3)
+            self.assertEqual(patched_run.call_count, 0)
             project_doc = (root / ".agents/skills/writing-skills/SKILL.md").read_text(encoding="utf-8")
             source_doc = (root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md").read_text(
                 encoding="utf-8"
             )
             self.assertIn("External version", project_doc)
-            self.assertIn("External version", source_doc)
+            self.assertIn("Local seed", source_doc)
+
+    def test_cmd_sync_with_pull_refreshes_external_source(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._make_source_skill(root, "writing-skills", description="Local seed")
+            self._make_profile(root, "core", ["writing-skills"])
+            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+
+            self._make_source_skill(
+                Path(td),
+                "writing-skills",
+                description="External version",
+                source_dir="external-universal-skills",
+            )
+            self._make_profile(
+                Path(td),
+                "core",
+                ["writing-skills"],
+                source_dir="external-universal-skills",
+            )
+            (external_root / "index.json").write_text("{}\n", encoding="utf-8")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"skills": None, "runtime": None, "profile": None, "pull": True})()
+            with mock.patch.object(module, "run") as patched_run:
+                module.cmd_sync(args)
+
+            self.assertEqual(patched_run.call_count, 3)
 
     def test_mirror_skills_to_local_source_copies_index_and_profiles(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:

@@ -1,7 +1,7 @@
-uv_cache_dir := env("UV_CACHE_DIR", ".agents/cache/uv")
-python_bin := `if [ -x .agents/scripts/.venv/bin/python3 ]; then echo .agents/scripts/.venv/bin/python3; else echo python3; fi`
+python_bin := `if [ -x .agents/scripts/.venv/bin/python3 ]; then echo .agents/scripts/.venv/bin/python3; elif [ -x .agents/scripts/.venv/bin/python ]; then echo .agents/scripts/.venv/bin/python; else echo .agents/scripts/.venv/bin/python3; fi`
 set export := true
 
+PYTHONHASHSEED := env("PYTHONHASHSEED", "0")
 TARGET_PATH := env("TARGET_PATH", "")
 OUTPUT_DIR := env("OUTPUT_DIR", "")
 RUNNER := env("RUNNER", "")
@@ -55,7 +55,6 @@ RESULT := env("RESULT", "")
 ARTIFACT := env("ARTIFACT", "")
 ACTION := env("ACTION", "")
 EVIDENCE_ID := env("EVIDENCE_ID", "")
-ALLOW_UNSAFE_DONE := env("ALLOW_UNSAFE_DONE", "")
 FILE := env("FILE", "")
 STATUS := env("STATUS", "")
 MSG := env("MSG", "")
@@ -79,16 +78,19 @@ ALL_WB := env("ALL_WB", "")
 help:
   @just --list
 
+setup-uv:
+  @echo "→ Installing project-local uv..."
+  @./.agents/agents hydrate-uv
+  @echo "✓ Project-local uv ready"
+
 setup:
-  @echo "→ Setting up UV virtualenv..."
-  @mkdir -p "{{uv_cache_dir}}"
-  @cd .agents/scripts && UV_CACHE_DIR="{{uv_cache_dir}}" uv sync
+  @echo "→ Hydrating project-local UV environments..."
+  @./.agents/agents hydrate
   @echo "✓ Setup complete"
 
 setup-runtime:
-  @echo "→ Setting up central runtime environment..."
-  @mkdir -p "{{uv_cache_dir}}"
-  @cd .agents/runtime && UV_CACHE_DIR="{{uv_cache_dir}}" uv sync --locked
+  @echo "→ Hydrating central runtime environment..."
+  @./.agents/agents hydrate
   @echo "✓ Runtime setup complete"
 
 doctor:
@@ -99,8 +101,8 @@ clean:
   @echo "→ Cleaning temporary files..."
   @rm -rf .agents/scripts/.venv
   @rm -rf .agents/scripts/uv.lock
-  @find .agents -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-  @find .agents -type f -name "*.pyc" -delete 2>/dev/null || true
+  @find .agents -type d -name "__pycache__" -exec rm -rf {} + || true
+  @find .agents -type f -name "*.pyc" -delete || true
   @echo "✓ Clean complete"
 
 structure:
@@ -146,7 +148,8 @@ verify-session:
   @./.agents/agents verify-tasks ".agents/wb/${SESSION_ID}"
 
 verify-active:
-  @active_session="$(cat .agents/wb/.active_session 2>/dev/null || true)"; \
+  @active_session=""; \
+  if [ -f .agents/wb/.active_session ]; then active_session="$(cat .agents/wb/.active_session)"; fi; \
   if [ -z "${active_session}" ]; then \
     echo "Usage: just verify-active (requires .agents/wb/.active_session)"; \
     exit 1; \
@@ -155,7 +158,8 @@ verify-active:
   ./.agents/agents verify-tasks ".agents/wb/${active_session}"
 
 verify-active-if-present:
-  @active_session="$(cat .agents/wb/.active_session 2>/dev/null || true)"; \
+  @active_session=""; \
+  if [ -f .agents/wb/.active_session ]; then active_session="$(cat .agents/wb/.active_session)"; fi; \
   if [ -z "${active_session}" ]; then \
     echo "→ No active session set; skipping active-session verification"; \
   else \
@@ -164,7 +168,8 @@ verify-active-if-present:
   fi
 
 verify-strict:
-  @active_session="$(cat .agents/wb/.active_session 2>/dev/null || true)"; \
+  @active_session=""; \
+  if [ -f .agents/wb/.active_session ]; then active_session="$(cat .agents/wb/.active_session)"; fi; \
   if [ -z "${active_session}" ]; then \
     echo "Usage: just verify-strict (requires .agents/wb/.active_session)"; \
     exit 1; \
@@ -173,7 +178,8 @@ verify-strict:
   ./.agents/agents verify-tasks ".agents/wb/${active_session}" --strict
 
 verify-strict-if-present:
-  @active_session="$(cat .agents/wb/.active_session 2>/dev/null || true)"; \
+  @active_session=""; \
+  if [ -f .agents/wb/.active_session ]; then active_session="$(cat .agents/wb/.active_session)"; fi; \
   if [ -z "${active_session}" ]; then \
     echo "→ No active session set; skipping strict active-session verification"; \
   else \
@@ -205,47 +211,48 @@ benchmark-runtime-flow:
 
 test-scripts:
   @echo "→ Running script unit tests..."
-  @mkdir -p "{{uv_cache_dir}}"
-  @UV_CACHE_DIR="{{uv_cache_dir}}" uv run --project .agents/scripts pytest .agents/scripts/tests -m "not integration and not e2e"
+  @if [ -x .agents/scripts/.venv/bin/python ]; then py=.agents/scripts/.venv/bin/python; elif [ -x .agents/scripts/.venv/bin/python3 ]; then py=.agents/scripts/.venv/bin/python3; else echo "Missing .agents/scripts/.venv. Run './.agents/agents hydrate' first."; exit 1; fi; \
+  PYTHONHASHSEED="${PYTHONHASHSEED:-0}" "$py" -m pytest -s .agents/scripts/tests -m "not integration and not e2e"
   @echo "✓ Script unit tests passed"
 
 test-scripts-integration:
   @echo "→ Running script integration tests..."
-  @mkdir -p "{{uv_cache_dir}}"
-  @UV_CACHE_DIR="{{uv_cache_dir}}" uv run --project .agents/scripts pytest .agents/scripts/tests/integration
+  @if [ -x .agents/scripts/.venv/bin/python ]; then py=.agents/scripts/.venv/bin/python; elif [ -x .agents/scripts/.venv/bin/python3 ]; then py=.agents/scripts/.venv/bin/python3; else echo "Missing .agents/scripts/.venv. Run './.agents/agents hydrate' first."; exit 1; fi; \
+  PYTHONHASHSEED="${PYTHONHASHSEED:-0}" "$py" -m pytest -s .agents/scripts/tests/integration
   @echo "✓ Script integration tests passed"
 
 test-scripts-all:
   @echo "→ Running full script test suite with 80% coverage gate..."
-  @mkdir -p "{{uv_cache_dir}}"
-  @UV_CACHE_DIR="{{uv_cache_dir}}" uv run --project .agents/scripts pytest .agents/scripts/tests -m "not e2e" --cov=.agents/scripts --cov-config=.agents/scripts/pyproject.toml --cov-report=term-missing --cov-fail-under=80
+  @if [ -x .agents/scripts/.venv/bin/python ]; then py=.agents/scripts/.venv/bin/python; elif [ -x .agents/scripts/.venv/bin/python3 ]; then py=.agents/scripts/.venv/bin/python3; else echo "Missing .agents/scripts/.venv. Run './.agents/agents hydrate' first."; exit 1; fi; \
+  PYTHONHASHSEED="${PYTHONHASHSEED:-0}" "$py" -m pytest -s .agents/scripts/tests -m "not e2e" --cov=.agents/scripts --cov-config=.agents/scripts/pyproject.toml --cov-report=term-missing --cov-fail-under=80
   @echo "✓ Full script test suite and coverage gate passed"
 
 lint-scripts:
   @echo "→ Linting Python scripts..."
-  @mkdir -p "{{uv_cache_dir}}"
-  @cd .agents/scripts && UV_CACHE_DIR="{{uv_cache_dir}}" uv run ruff check .
+  @if [ -x .agents/scripts/.venv/bin/ruff ]; then ruff=.agents/scripts/.venv/bin/ruff; else echo "Missing .agents/scripts/.venv/bin/ruff. Run './.agents/agents hydrate' first."; exit 1; fi; \
+  PYTHONHASHSEED="${PYTHONHASHSEED:-0}" "$ruff" check .agents/scripts
   @echo "✓ Python scripts linted"
 
 lint-runtime:
   @echo "→ Linting central runtime package..."
-  @mkdir -p "{{uv_cache_dir}}"
-  @UV_CACHE_DIR="{{uv_cache_dir}}" uv run --project .agents/runtime --locked ruff check .agents/runtime
+  @if [ -x .agents/runtime/.venv/bin/ruff ]; then ruff=.agents/runtime/.venv/bin/ruff; else echo "Missing .agents/runtime/.venv/bin/ruff. Run './.agents/agents hydrate' first."; exit 1; fi; \
+  PYTHONHASHSEED="${PYTHONHASHSEED:-0}" "$ruff" check .agents/runtime
   @echo "✓ Central runtime linted"
 
 test-runtime:
   @echo "→ Running central runtime tests..."
-  @mkdir -p "{{uv_cache_dir}}"
-  @uv run --project .agents/runtime --locked pytest .agents/runtime/tests
+  @if [ -x .agents/runtime/.venv/bin/python ]; then py=.agents/runtime/.venv/bin/python; elif [ -x .agents/runtime/.venv/bin/python3 ]; then py=.agents/runtime/.venv/bin/python3; else echo "Missing .agents/runtime/.venv. Run './.agents/agents hydrate' first."; exit 1; fi; \
+  PYTHONHASHSEED="${PYTHONHASHSEED:-0}" "$py" -m pytest -s .agents/runtime/tests
   @echo "✓ Central runtime tests passed"
 
 runtime-mcp-smoke:
   @echo "→ Running central runtime and MCP smoke checks..."
-  @./.agents/agents runtime manifest >/dev/null
-  @./.agents/agents runtime command-registry >/dev/null
-  @./.agents/agents mcp validate >/dev/null
-  @./.agents/agents session list --json >/dev/null
-  @./.agents/agents-mcp inspect --depth 1 --max-entries 50 >/dev/null
+  @mkdir -p .agents/tmp
+  @./.agents/agents runtime manifest >.agents/tmp/runtime-manifest-smoke.log
+  @./.agents/agents runtime command-registry >.agents/tmp/runtime-command-registry-smoke.log
+  @./.agents/agents mcp validate >.agents/tmp/runtime-mcp-validate-smoke.log
+  @./.agents/agents session list --json >.agents/tmp/session-list-smoke.log
+  @./.agents/agents-mcp inspect --depth 1 --max-entries 50 >.agents/tmp/agents-mcp-inspect-smoke.log
   @echo "✓ Central runtime and MCP smoke checks passed"
 
 agents-all: doctor structure index knowledge-index sync lint lint-scripts lint-runtime skills-check tools-check telemetry-validate test-scripts-all test-runtime runtime-mcp-smoke
@@ -514,29 +521,29 @@ wb-evidence:
   "${cmd[@]}"
 
 wb-task:
-  @if [ -z "${SESSION_ID:-}" ] || [ -z "${TASK_ID:-}" ]; then echo "Usage: just wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|ready|blocked|skipped [EVIDENCE_ID=E-...] [ALLOW_UNSAFE_DONE=1]"; exit 1; fi
+  @if [ -z "${SESSION_ID:-}" ] || [ -z "${TASK_ID:-}" ]; then echo "Usage: just wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done|in_progress|pending|implemented|tested|problem|moved [EVIDENCE_ID=E-...]"; exit 1; fi
   @if [ "${ACTION:-}" = "done" ]; then \
     if [ -n "${EVIDENCE_ID:-}" ]; then \
       ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-done --evidence-id "${EVIDENCE_ID}"; \
-    elif [ "${ALLOW_UNSAFE_DONE:-}" = "1" ]; then \
-      ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-done --allow-unsafe-done; \
     else \
-      echo "ACTION=done requires EVIDENCE_ID. Use just wb-evidence first or set ALLOW_UNSAFE_DONE=1"; \
+      echo "ACTION=done requires EVIDENCE_ID from a passing closure evidence record. Use just wb-evidence first."; \
       exit 1; \
     fi; \
   elif [ "${ACTION:-}" = "in_progress" ]; then \
     ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-in-progress; \
   elif [ "${ACTION:-}" = "pending" ]; then \
     ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-pending; \
-  elif [ "${ACTION:-}" = "ready" ]; then \
-    ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-ready; \
-  elif [ "${ACTION:-}" = "blocked" ]; then \
-    ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-blocked; \
-  elif [ "${ACTION:-}" = "skipped" ]; then \
-    ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-skipped; \
+  elif [ "${ACTION:-}" = "implemented" ]; then \
+    ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-implemented; \
+  elif [ "${ACTION:-}" = "tested" ]; then \
+    ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-tested; \
+  elif [ "${ACTION:-}" = "problem" ]; then \
+    ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-problem; \
+  elif [ "${ACTION:-}" = "moved" ]; then \
+    ./.agents/agents wb-update task "${TASK_ID}" --session "${SESSION_ID}" --mark-moved; \
   else \
     echo "Invalid ACTION=${ACTION:-}"; \
-    echo "Use one of: done, in_progress, pending, ready, blocked, skipped"; \
+    echo "Use one of: done, in_progress, pending, implemented, tested, problem, moved"; \
     exit 1; \
   fi
 
@@ -573,7 +580,8 @@ telemetry-export:
 
 telemetry-validate:
   @echo "→ Validating telemetry data..."
-  @{{python_bin}} .agents/scripts/agents-telemetry.py validate
+  @if [ -x .agents/scripts/.venv/bin/python ]; then py=.agents/scripts/.venv/bin/python; elif [ -x .agents/scripts/.venv/bin/python3 ]; then py=.agents/scripts/.venv/bin/python3; else echo "Missing .agents/scripts/.venv. Run './.agents/agents hydrate' first."; exit 1; fi; \
+  PYTHONHASHSEED="${PYTHONHASHSEED:-0}" "$py" .agents/scripts/agents-telemetry.py validate
 
 telemetry-heat:
   @echo "→ Generating heat map..."

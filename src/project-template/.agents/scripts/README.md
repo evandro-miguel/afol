@@ -8,10 +8,11 @@ Scripts are stored in `.agents/scripts/` and executed via:
 
 - **Justfile** (canonical): `just doctor`, `just new THEME=x`
 - **Wrapper**: `.agents/agents doctor`
-- **UV direct**: `uv run --with pyyaml .agents/scripts/agents-doctor.py`
+- **UV direct**: `.agents/tools/uv/bin/uv run --with pyyaml .agents/scripts/agents-doctor.py`
 
 The wrapper is hermetic by default: once `.agents/scripts/.venv` exists, it runs scripts through the local interpreter directly.
-`uv` is only required to provision or refresh the local environment.
+`uv` is only required to provision or refresh the local environment, and the
+supported binary is project-local at `.agents/tools/uv/bin/uv`.
 
 ## Central Configuration
 
@@ -68,10 +69,12 @@ Quick reference: `docs/standards/scripts-quickstart.md`
 
 ```bash
 # One-time setup
-cd .agents/scripts && uv sync
+./.agents/agents hydrate-uv
+./.agents/agents hydrate
 ```
 
-The scaffold uses a repo-local UV cache during setup and validation: `.agents/cache/uv/`.
+The scaffold uses repo-local UV surfaces during setup and validation:
+`.agents/tools/uv/bin/uv`, `.agents/tools/uv/python/`, and `.agents/cache/uv/`.
 
 Bootstrap exports are sanitized by design: the target repo gets generic roadmap/spec baselines and empty knowledge indexes, not this scaffold's local `wb/`, lessons history, telemetry reports, or live roadmap/spec backlog.
 Bootstrap also copies `docs/templates/plan.md` so downstream repos inherit the reusable ExecPlan starter.

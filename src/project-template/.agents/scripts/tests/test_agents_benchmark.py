@@ -36,6 +36,14 @@ def test_catalog_contains_live_scenarios():
     assert benchmark.BENCHMARK_PACK_ID == "runtime-flow-live-agent-v4"
 
 
+def test_fixture_roadmap_matches_agents_new_feature_heading_contract():
+    benchmark = load_module()
+
+    roadmap = benchmark._fixture_roadmap_text()
+
+    assert f"### {benchmark.FIXTURE_FEATURE_ID} " in roadmap
+
+
 def test_parse_observed_tool_data_counts_errors_and_retries():
     benchmark = load_module()
     stdout = "\n".join(

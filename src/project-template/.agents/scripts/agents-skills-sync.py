@@ -287,6 +287,9 @@ def _normalize_v2_manifest(data: Dict[str, Any]) -> Dict[str, Any]:
         "mode": _normalized_mode(data),
         "installs": _normalize_v2_installs(data),
     }
+    source_data = data.get("source")
+    if isinstance(source_data, dict):
+        manifest["source"] = dict(source_data)
 
     if not manifest["repo"]:
         manifest["repo"] = str(cfg("upstream_repo_url")).strip()
@@ -317,6 +320,65 @@ def _normalize_manifest(data: Any) -> Dict[str, Any]:
     if version not in (MANIFEST_VERSION,):
         raise RuntimeError(f"Unsupported skills manifest version: {version}")
     return _normalize_v2_manifest(data)
+
+
+def _manifest_source_path(source_repo: Path) -> str:
+    resolved = source_repo.resolve()
+    try:
+        return str(resolved.relative_to(ROOT_DIR.resolve()))
+    except ValueError:
+        return str(resolved)
+
+
+def _git_head_ref(repo: Path) -> str | None:
+    result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo, text=True)
+    if result.returncode != 0:
+        return None
+    value = result.stdout.strip()
+    if not value or value == "HEAD":
+        return None
+    return value
+
+
+def _git_head_commit(repo: Path) -> str | None:
+    result = run_command(["git", "rev-parse", "HEAD"], cwd=repo, text=True)
+    if result.returncode != 0:
+        return None
+    value = result.stdout.strip()
+    return value or None
+
+
+def _source_metadata(source_repo: Path, *, ref: str | None = None) -> Dict[str, str]:
+    source_ref = (ref or cfg("upstream_branch")).strip()
+    metadata: Dict[str, str] = {
+        "path": _manifest_source_path(source_repo),
+        "source_type": "git" if (source_repo / ".git").exists() else "local",
+    }
+    if source_ref:
+        metadata["ref"] = source_ref
+    if (source_repo / ".git").exists():
+        branch = _git_head_ref(source_repo)
+        commit = _git_head_commit(source_repo)
+        if branch:
+            metadata["branch"] = branch
+        if commit:
+            metadata["commit"] = commit
+    return metadata
+
+
+def _update_source_metadata(
+    manifest: Dict[str, Any],
+    source_repo: Path,
+    *,
+    ref: str | None = None,
+):
+    source_entry = manifest.get("source")
+    if source_entry is not None and not isinstance(source_entry, dict):
+        source_entry = {}
+    if not isinstance(source_entry, dict):
+        source_entry = {}
+    source_entry.update(_source_metadata(source_repo, ref=ref))
+    manifest["source"] = source_entry
 
 
 def _normalize_manifest_header(manifest: Dict[str, Any]):
@@ -570,6 +632,7 @@ def refresh_git_sync_repo(manifest: Dict[str, Any]) -> Path | None:
     run(["git", "fetch", "origin"], cwd=repo)
     run(["git", "checkout", ref], cwd=repo)
     run(["git", "pull", "--ff-only", "origin", ref], cwd=repo)
+    _update_source_metadata(manifest, repo, ref=ref)
     return repo
 
 
@@ -834,9 +897,17 @@ def cmd_pull(args: argparse.Namespace):
     manifest = load_manifest()
     repo = refresh_git_sync_repo(manifest)
     if repo is None:
+        repo = source_repo_path()
+        _update_source_metadata(
+            manifest,
+            repo,
+            ref=str(manifest.get("ref", cfg("upstream_branch")).strip() or cfg("upstream_branch")),
+        )
+        save_manifest(manifest)
         print(f"OK: source refresh skipped for repo-local skills source at {source_repo_path()}")
         return
 
+    save_manifest(manifest)
     ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
     print(f"OK: updated git skills source at {repo} (ref={ref})")
     if repo != source_repo_path():
@@ -1221,6 +1292,7 @@ def cmd_status(args: argparse.Namespace):
     print(f"- version: {manifest.get('version', MANIFEST_VERSION)}")
     print(f"- repo: {manifest.get('repo', cfg('upstream_repo_url'))}")
     print(f"- ref: {manifest.get('ref', cfg('upstream_branch'))}")
+    print(f"- source_metadata: {manifest.get('source', {})}")
     print(f"- mode: {manifest.get('mode', cfg('mode'))}")
     print(f"- source_dir: {preferred_source_repo_path()}")
     print(f"- external_source_dir: {external_source_repo_path() or 'none'}")
@@ -1251,10 +1323,15 @@ def cmd_sync(args: argparse.Namespace):
     if not skills:
         raise RuntimeError("No selected skills. Provide --skills or update manifest.")
 
-    refreshed_repo = refresh_git_sync_repo(manifest)
+    refreshed_repo = refresh_git_sync_repo(manifest) if getattr(args, "pull", False) else None
     source_repo = refreshed_repo or source_repo_path()
     if refreshed_repo is not None:
         mirror_skills_to_local_source(refreshed_repo, skills, manifest)
+    _update_source_metadata(
+        manifest,
+        source_repo,
+        ref=str(manifest.get("ref", cfg("upstream_branch")).strip() or None),
+    )
 
     problems = validate_project_structure()
     if problems:
@@ -1447,6 +1524,12 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--runtime", dest="runtime", help="Target runtime/app")
             sp.add_argument("--app", dest="runtime", help="Alias for --runtime")
             sp.add_argument("--profile", help="Profile name used for selected installs")
+        if name in {"sync", "update"}:
+            sp.add_argument(
+                "--pull",
+                action="store_true",
+                help="Refresh the external source before syncing",
+            )
         if name == "list":
             sp.add_argument("--installed", action="store_true", help="Show only currently installed project skills")
             sp.add_argument("--selected", action="store_true", help="Show only skills resolved from the manifest for this runtime/profile")

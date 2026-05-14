@@ -189,3 +189,94 @@ class BootstrapTests(unittest.TestCase):
                 "Failed to prepare repo-local universal-skills checkout",
             ):
                 module.prepare_sibling_universal_skills_checkout(target, dry_run=False)
+
+    def test_bootstrap_manifest_can_roundtrip(self):
+        """Managed file manifest should persist and reload with stable payload."""
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td) / "target"
+            target.mkdir()
+            module = self._load_with_root(target)
+
+            template = module.TEMPLATE_ROOT
+            template.mkdir(parents=True, exist_ok=True)
+            (template / "AGENTS.md").write_text("managed bootstrap fixture", encoding="utf-8")
+            (template / ".agents").mkdir(parents=True, exist_ok=True)
+            (template / ".agents/agents").write_text("bootstrap wrapper fixture\n", encoding="utf-8")
+
+            with mock.patch.object(
+                module,
+                "MANDATORY_FILES_TO_COPY",
+                [Path("AGENTS.md")],
+            ), mock.patch.object(
+                module,
+                "MANDATORY_DIRS_TO_COPY",
+                [Path(".agents")],
+            ), mock.patch.object(module, "OPTIONAL_FILES_TO_COPY", []):
+                manifest = module.bootstrap_manifest(target)
+                self.assertIn("AGENTS.md", manifest.managed_files)
+                self.assertIn(".agents/agents", manifest.managed_files)
+                module.write_bootstrap_manifest(target, manifest)
+
+                loaded = module._load_bootstrap_manifest(target)
+                self.assertEqual(loaded.version, manifest.version)
+                self.assertEqual(loaded.managed_files, manifest.managed_files)
+                self.assertEqual(
+                    loaded.managed_files["AGENTS.md"],
+                    module.file_hash(template / "AGENTS.md"),
+                )
+
+    def test_bootstrap_reconcile_plan_reports_expected_actions(self):
+        """Reconcile planning should classify create/update and preservation actions."""
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            target = Path(td) / "target"
+            target.mkdir()
+            module = self._load_with_root(target)
+
+            template = module.TEMPLATE_ROOT
+            template.mkdir(parents=True, exist_ok=True)
+            source_agents = template / "AGENTS.md"
+            source_runtime = template / ".agents/agents"
+            source_agents.parent.mkdir(parents=True, exist_ok=True)
+            source_agents.write_text("source AGENTS\n", encoding="utf-8")
+            source_runtime.parent.mkdir(parents=True, exist_ok=True)
+            source_runtime.write_text("source agents wrapper\n", encoding="utf-8")
+
+            (target / "AGENTS.md").write_text("source AGENTS\n", encoding="utf-8")
+            (target / ".agents").mkdir(parents=True, exist_ok=True)
+            (target / ".agents/agents").write_text("user edited wrapper\n", encoding="utf-8")
+            (target / ".agents/local-note.md").write_text("user file\n", encoding="utf-8")
+            (target / "local-only.txt").write_text("outside scoped file\n", encoding="utf-8")
+            (target / ".agents/deprecated.txt").write_text("stale managed file\n", encoding="utf-8")
+
+            prior_manifest = module.BootstrapManifest(
+                version=module.BOOTSTRAP_MANIFEST_VERSION,
+                generated_at="2026-01-01T00:00:00Z",
+                managed_files={
+                    "AGENTS.md": module.file_hash(source_agents),
+                    ".agents/agents": module.file_hash(source_runtime),
+                    ".agents/deprecated.txt": "stale",
+                },
+            )
+
+            with mock.patch.object(
+                module,
+                "MANDATORY_FILES_TO_COPY",
+                [Path("AGENTS.md"), Path(".agents/agents")],
+            ), mock.patch.object(
+                module,
+                "MANDATORY_DIRS_TO_COPY",
+                [],
+            ), mock.patch.object(module, "OPTIONAL_FILES_TO_COPY", []):
+                plan = module.bootstrap_reconcile_plan(target, manifest=prior_manifest)
+
+            actions = {entry.action for entry in plan}
+            paths_by_action = {action: sorted(str(item.path) for item in plan if item.action == action) for action in actions}
+
+            self.assertIn(module.BootstrapAction.SKIP_IDENTICAL, actions)
+            self.assertIn(module.BootstrapAction.CONFLICT_USER_EDITED, actions)
+            self.assertIn(module.BootstrapAction.PRESERVE_UNMANAGED, actions)
+            self.assertIn(module.BootstrapAction.DELETE_STALE_MANAGED, actions)
+
+            self.assertTrue(any(".agents/agents" in path for path in paths_by_action[module.BootstrapAction.CONFLICT_USER_EDITED]))
+            self.assertTrue(any(".agents/local-note.md" in path for path in paths_by_action[module.BootstrapAction.PRESERVE_UNMANAGED]))
+            self.assertTrue(any(".agents/deprecated.txt" in path for path in paths_by_action[module.BootstrapAction.DELETE_STALE_MANAGED]))

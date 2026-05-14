@@ -36,6 +36,8 @@ import json
 import os
 import sys
 import uuid
+import hashlib
+import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -71,10 +73,23 @@ ACTIVE_SESSION_FILE = Path(
 # Ensure data directory exists
 TELEMETRY_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+_EVENT_ID_COUNTER = 0
+
 
 def get_iso_timestamp() -> str:
     """Get current timestamp in ISO 8601 format with timezone."""
     return now_iso_with_offset("Z")
+
+
+def get_event_id() -> str:
+    """Return a unique event id without requiring sandbox randomness."""
+    global _EVENT_ID_COUNTER
+    try:
+        return str(uuid.uuid4())
+    except (NotImplementedError, OSError, PermissionError):
+        _EVENT_ID_COUNTER += 1
+        seed = f"{os.getpid()}:{time.monotonic_ns()}:{_EVENT_ID_COUNTER}"
+        return hashlib.sha256(seed.encode("utf-8")).hexdigest()
 
 
 def load_schema() -> Dict[str, Any]:
@@ -135,7 +150,7 @@ def record_event(
         "timestamp": get_iso_timestamp(),
         "event_type": event_type,
         "session_id": session_id,
-        "event_id": str(uuid.uuid4()),
+        "event_id": get_event_id(),
         "metadata": metadata or {},
         "context": context or {}
     }

@@ -94,12 +94,14 @@ just doctor
 # Use --child-spec <id> to link an existing child spec.
 # Use --spec-lite only when you need to create a local lightweight spec artifact.
 
-# Research-only workstream
+# Research-only workstream, when research itself is the requested deliverable
 .agents/agents new auth-investigation --feature-id F-02 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --intent research
 
 # The same theme would also infer `research` safely if --intent is omitted
 
-# Governed planning workstream (plan/task first; optional brainstorm or explorer-check)
+# Governed planning workstream. The plan tracks direct execution work; optional
+# brainstorm/research/explorer-check artifacts are sidecars only when requested
+# or needed as a small blocking proof.
 .agents/agents new planning-track --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --intent planning
 
 # Optional: add a pack for another major track inside an existing session
@@ -413,7 +415,8 @@ updated_at: "2026-02-23T00:00:00-03:00"
 ### Setup & Validation
 
 ```bash
-just setup          # Setup UV virtualenv
+just setup-uv       # Install/copy project-local uv
+just setup          # Setup project-local uv, managed Python, and virtualenvs
 just setup-runtime  # Setup central runtime environment
 just doctor         # Validate .agents structure
 just clean          # Clean caches
@@ -466,7 +469,7 @@ just patterns-rate      # Rate pattern
 # Main tools
 .agents/agents doctor           # Validate structure
 .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id>  # Create minimal delivery workstream (task by default)
-.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --intent planning  # Create governed planning workstream (plan/task first; optional brainstorm or explorer-check)
+.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --intent planning  # Create governed planning workstream for direct execution; optional sidecars only when requested/blocking
 .agents/agents verify-tasks     # Verify tasks
 .agents/agents status           # Show session status + workflow artifact readiness
 .agents/agents benchmark list   # List controlled live-agent runtime-flow benchmark scenarios

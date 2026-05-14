@@ -2,15 +2,15 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-04-26T18:08:42+00:00"
-updated_at: "2026-04-26T18:08:42+00:00"
+created_at: "2026-05-09T20:07:53+00:00"
+updated_at: "2026-05-09T20:07:53+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 72
+- Total indexed docs: 74
 
 ## Brainstorm
 
@@ -84,6 +84,8 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260424_1359_benchmark-results-and-hypothesis-improvements_report_01` | `.agents/wb/260424_1359_benchmark-results-and-hypothesis-improvements/260424_1359_benchmark-results-and-hypothesis-improvements_report_01.md` | - Roadmap feature: F-19
 - `260424_1435_benchmark-indicator-improvement-round_report_01` | `.agents/wb/260424_1435_benchmark-indicator-improvement-round/260424_1435_benchmark-indicator-improvement-round_report_01.md` | - Final live autonomous benchmark passed after stabilizing the fixture runtime.
 - `260426_1418_parallel-session-local-management_report_01` | `.agents/wb/260426_1418_parallel-session-local-management/260426_1418_parallel-session-local-management_report_01.md` | - Roadmap feature: F-20
+- `260504_1304_sandboxed-local-runtime-bootstrap_report_01` | `.agents/wb/260504_1304_sandboxed-local-runtime-bootstrap/260504_1304_sandboxed-local-runtime-bootstrap_report_01.md` | Implemented the operational slice requested for sandbox compatibility and
+- `260509_1453_plan-task-execution-integrity_report_01` | `.agents/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_report_01.md` | - Roadmap feature: F-18
 
 ## Research
 

@@ -4,7 +4,7 @@ id: scripts-usage
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-24T12:29:13-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Scripts Usage
@@ -22,6 +22,7 @@ This document contains detailed script documentation.
 just help
 
 # Setup (first time)
+just setup-uv
 just setup
 
 # Validate structure
@@ -50,8 +51,8 @@ just lint-scripts      # Lint Python code
 
 # Workbench updates
 just wb-touch          # Update timestamps
-just wb-evidence SESSION_ID=<id> TASK_ID=T-01 CMD="just verify-strict" RESULT="passed"
-just wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with evidence
+just wb-evidence SESSION_ID=<id> TASK_ID=T-01 CMD="just verify-strict" RESULT="passed" ARTIFACT=.agents/wb/<id>/<id>_report_01.md
+just wb-task SESSION_ID=<id> TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with ledger evidence
 ```
 
 ### Using Wrapper
@@ -79,29 +80,31 @@ currently delegates to the existing `.agents/scripts/` command bodies for
 compatibility. Use `.agents/agents runtime command-registry` to inspect the
 registered public aliases.
 
-`uv` stays on the setup path and runtime launch path, and UV cache writes are
+`uv` stays on the setup path and runtime launch path, but it is materialized as
+a project-local tool under `.agents/tools/uv/bin/uv`. UV cache writes are
 redirected to `.agents/cache/uv/`.
 
 ## Setup (One Time)
 
 ### Prerequisites
 
-Install [uv](https://docs.astral.sh/uv/):
+Prepare project-local `uv`:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+./.agents/agents hydrate-uv
 ```
 
-### Initialize Virtualenv
+### Initialize Local Runtime
 
 ```bash
-cd .agents/scripts
-uv sync
+./.agents/agents hydrate
 ```
 
 This creates:
 
-- `.venv/` - Isolated Python virtualenv
+- `.agents/tools/uv/python/` - Project-local managed CPython install
+- `.agents/scripts/.venv/` - Script virtualenv
+- `.agents/runtime/.venv/` - Runtime virtualenv
 - `uv.lock` - Locked dependencies
 
 ## Usage
@@ -141,8 +144,8 @@ This creates:
 
 ```bash
 # For setup/bootstrap or direct script execution outside the wrapper
-uv run --with pyyaml .agents/scripts/agents-doctor.py
-uv run --with pyyaml .agents/scripts/agents-new.py auth-refactor --spec
+.agents/tools/uv/bin/uv run --with pyyaml .agents/scripts/agents-doctor.py
+.agents/tools/uv/bin/uv run --with pyyaml .agents/scripts/agents-new.py auth-refactor --spec
 ```
 
 ### With Python (Not Recommended)

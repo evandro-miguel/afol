@@ -483,9 +483,33 @@ def _fixture_spec_text(spec_id: str, title: str, doc_type: str) -> str:
 def _fixture_roadmap_text() -> str:
     return (
         "# General Roadmap\n\n"
-        f"## {FIXTURE_FEATURE_ID} Controlled Runtime Flow Benchmarks\n\n"
+        f"### {FIXTURE_FEATURE_ID} Controlled Runtime Flow Benchmarks\n\n"
         f"- Parent spec: `docs/arc/SPECS/{FIXTURE_PARENT_SPEC_FILE.name}`\n"
         "- Purpose: fixture roadmap entry for live benchmark execution.\n"
+    )
+
+
+def _fixture_agents_text() -> str:
+    return (
+        "# AGENTS.md\n\n"
+        "## Governed Execution Trigger\n\n"
+        "When the request requires implementation, validation, or delivery and references governed work, "
+        "workbench state, evidence, or task completion, the `.agents/wb/` workflow is part of the work.\n\n"
+        "Use the scaffold wrapper as the source of truth:\n\n"
+        "1. `./.agents/agents new <theme> --feature-id <F-id> --parent-spec <spec-id> --child-spec <spec-id>` creates the governed session.\n"
+        "2. `./.agents/agents implement start --session <session-id> --task-id T-01` begins the executable task before product edits.\n"
+        "3. Edit the product and run the acceptance check named by the request.\n"
+        "4. `./.agents/agents implement complete --session <session-id> --task-id T-01 --command \"<verification command>\" --result passed --artifact <path-or-report>` records evidence and marks the task done.\n\n"
+        "Do not reuse fixture sessions for new delivery work. Do not create tasks already marked `[x]`. "
+        "Do not manually edit `.agents/wb` task state or `.evidence.jsonl`.\n\n"
+        "## Task State Markers\n\n"
+        "- `[ ]` pending\n"
+        "- `[/]` in_progress\n"
+        "- `[!]` problem\n"
+        "- `[>]` moved\n"
+        "- `[%]` implemented_untested\n"
+        "- `[&]` tested_needs_spec_validation\n"
+        "- `[x]` done only after task-scoped closure evidence exists\n"
     )
 
 
@@ -497,7 +521,13 @@ def _hypothetical_problem_text() -> str:
         "## Acceptance\n\n"
         "- `python scripts/check_runtime_policy.py` must pass.\n"
         "- Keep the change minimal.\n"
-        "- Use the repository's normal governed operational workflow for planning, execution tracking, evidence, and final verification.\n\n"
+        "- Use the repository's normal governed operational workflow for planning, execution tracking, evidence, and final verification.\n"
+        "- Treat `scripts/check_runtime_policy.py` as an immutable acceptance gate, not product code for this request.\n"
+        "- The existing fixture session is context only and does not satisfy this delivery request.\n\n"
+        "## Operational Order\n\n"
+        "- For governed work, create or target the `.agents/wb/` session before editing product files.\n"
+        "- Move the relevant task into progress before the product edit.\n"
+        "- After validation passes, record evidence and close the task with the returned evidence id.\n\n"
         "## Workflow Discovery Pointers\n\n"
         "- The raw tool catalog stores entries in the top-level `tools` array.\n"
         "- The relevant tool contracts are `new`, `wb-update`, and `implement` if you choose the guided execution path.\n"
@@ -524,11 +554,64 @@ def _runtime_policy_text() -> str:
 def _runtime_policy_check_text() -> str:
     return (
         "#!/usr/bin/env python3\n"
-        '"""Validate the tiny benchmark runtime policy fixture."""\n\n'
+        '"""Validate the tiny benchmark runtime policy fixture.\n\n'
+        "This is an immutable acceptance gate for the benchmark request. It is\n"
+        "not product code for this task.\n"
+        '"""\n\n'
         "from __future__ import annotations\n\n"
         "import json\n"
+        "import re\n"
         "from pathlib import Path\n\n"
-        'POLICY_PATH = Path("app/runtime_policy.json")\n\n\n'
+        'POLICY_PATH = Path("app/runtime_policy.json")\n'
+        "SCRIPT_REPO_ROOT = Path(__file__).resolve().parents[1]\n"
+        f'FIXTURE_SESSION_ID = "{FIXTURE_WORKSTREAM_ID}"\n'
+        'WB_DIR = Path(".agents/wb")\n'
+        'TASK_TABLE_RE = re.compile(r"^\\|\\s*(T-\\d{2,3})\\s*\\|\\s*([^|]+?)\\s*\\|")\n'
+        'TASK_CHECK_RE = re.compile(r"^-\\s*\\[([ /%!>&x])\\]\\s+(T-\\d{2,3})\\b")\n'
+        "MARKER_TO_STATE = {\n"
+        '    " ": "pending",\n'
+        '    "/": "in_progress",\n'
+        '    "%": "implemented_untested",\n'
+        '    "&": "tested_needs_spec_validation",\n'
+        '    "!": "problem",\n'
+        '    ">": "moved",\n'
+        '    "x": "done",\n'
+        "}\n"
+        'STARTED_STATES = {"in_progress", "implemented_untested", "tested_needs_spec_validation", "done"}\n\n\n'
+        "def _task_state(task_file: Path, task_id: str = \"T-01\") -> str | None:\n"
+        "    for raw_line in task_file.read_text(encoding=\"utf-8\").splitlines():\n"
+        "        line = raw_line.strip()\n"
+        "        table = TASK_TABLE_RE.match(line)\n"
+        "        if table and table.group(1) == task_id:\n"
+        "            return table.group(2).strip().lower()\n"
+        "        check = TASK_CHECK_RE.match(line)\n"
+        "        if check and check.group(2) == task_id:\n"
+        "            return MARKER_TO_STATE.get(check.group(1))\n"
+        "    return None\n\n\n"
+        "def _governed_session_started() -> bool:\n"
+        "    if not WB_DIR.exists():\n"
+        "        return False\n"
+        "    for session_dir in WB_DIR.iterdir():\n"
+        "        if not session_dir.is_dir() or session_dir.name == FIXTURE_SESSION_ID:\n"
+        "            continue\n"
+        "        has_plan = any(session_dir.glob(\"*_plan_*.md\"))\n"
+        "        for task_file in session_dir.glob(\"*_task_*.md\"):\n"
+        "            state = _task_state(task_file)\n"
+        "            if has_plan and state in STARTED_STATES:\n"
+        "                return True\n"
+        "    return False\n\n\n"
+        "def _governance_failures() -> list[str]:\n"
+        "    if Path.cwd().resolve() != SCRIPT_REPO_ROOT:\n"
+        "        return [\n"
+        "            \"runtime policy check must run from the repository root, not a copied or nested working tree\",\n"
+        "            f\"expected cwd {SCRIPT_REPO_ROOT}, got {Path.cwd().resolve()}\",\n"
+        "        ]\n"
+        "    if _governed_session_started():\n"
+        "        return []\n"
+        "    return [\n"
+        "        \"governed workbench state is not started for this delivery request\",\n"
+        "        \"expected a non-fixture .agents/wb session with a plan and T-01 beyond pending before product validation\",\n"
+        "    ]\n\n\n"
         "def main() -> int:\n"
         "    data = json.loads(POLICY_PATH.read_text(encoding=\"utf-8\"))\n"
         "    expected = {\n"
@@ -541,6 +624,7 @@ def _runtime_policy_check_text() -> str:
         "        for key, value in expected.items()\n"
         "        if data.get(key) != value\n"
         "    ]\n"
+        "    failures.extend(_governance_failures())\n"
         "    if failures:\n"
         "        print(\"runtime policy check failed\")\n"
         "        for failure in failures:\n"
@@ -575,18 +659,17 @@ def _prepare_fixture_repo(temp_root: Path) -> Path:
         ".agents/agents",
         ".agents/tools.json",
         ".agents/agents.config",
-        "AGENTS.md",
         "README.md",
-        "docs/arc/GENERAL-ROADMAP.md",
         "docs/agentic/agents-benchmark.md",
     ):
         src = ROOT_DIR / rel_path
         if src.exists():
             _copy_file(src, temp_root / rel_path)
 
+    _write_text(temp_root / "AGENTS.md", _fixture_agents_text())
+
     roadmap_dst = temp_root / "docs" / "arc" / "GENERAL-ROADMAP.md"
-    if not roadmap_dst.exists():
-        _write_text(roadmap_dst, _fixture_roadmap_text())
+    _write_text(roadmap_dst, _fixture_roadmap_text())
 
     _copy_or_write_text(
         FIXTURE_PARENT_SPEC_FILE,
@@ -614,7 +697,11 @@ def _prepare_fixture_repo(temp_root: Path) -> Path:
     _write_text(session_dir / f"{FIXTURE_WORKSTREAM_ID}_report_01.md", _fixture_report_text())
     _write_text(temp_root / "docs" / "benchmark_problem.md", _hypothetical_problem_text())
     _write_text(temp_root / "app" / "runtime_policy.json", _runtime_policy_text())
-    _write_text(temp_root / "scripts" / "check_runtime_policy.py", _runtime_policy_check_text())
+    runtime_check = temp_root / "scripts" / "check_runtime_policy.py"
+    _write_text(runtime_check, _runtime_policy_check_text())
+    runtime_check.chmod(0o444)
+
+    subprocess.run(["git", "init", "-q"], cwd=temp_root, check=False)
 
     return temp_root
 
@@ -931,6 +1018,15 @@ def _validate_session_create(output: dict[str, Any], repo_root: Path) -> list[st
 def _validate_runtime_policy_file(repo_root: Path) -> list[str]:
     failures: list[str] = []
     policy_file = repo_root / "app" / "runtime_policy.json"
+    check_file = repo_root / "scripts" / "check_runtime_policy.py"
+    try:
+        check_text = check_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        failures.append(f"runtime policy check script could not be read: {exc}")
+        check_text = ""
+    if check_text != _runtime_policy_check_text():
+        failures.append("runtime policy check script was modified")
+
     try:
         policy = json.loads(policy_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -1119,7 +1215,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 "- Return JSON only that matches the provided schema.\n\n"
                 "Task:\n"
                 f"1. Run `./.agents/agents implement start --session {FIXTURE_WORKSTREAM_ID} --task-id T-01`.\n"
-                f"2. Run `./.agents/agents implement complete --session {FIXTURE_WORKSTREAM_ID} --task-id T-01 --command \"{LIVE_COMPLETE_COMMAND}\" --result passed`.\n"
+                f"2. Run `./.agents/agents implement complete --session {FIXTURE_WORKSTREAM_ID} --task-id T-01 --command \"{LIVE_COMPLETE_COMMAND}\" --result passed --artifact .agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md`.\n"
                 f"3. Inspect `.agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md` and `.agents/wb/{FIXTURE_WORKSTREAM_ID}/.evidence.jsonl`.\n"
                 "4. Return whether completion and evidence recording both succeeded."
             ),
@@ -1140,7 +1236,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             ),
             required_command_substrings=(
                 f"wb-update evidence T-02 --session {FIXTURE_WORKSTREAM_ID}",
-                f"wb-update task T-02 --session {FIXTURE_WORKSTREAM_ID} --mark-done",
+                f"wb-update task T-02 --session {FIXTURE_WORKSTREAM_ID} --mark-done --evidence-id",
                 f"wb-update timeline --session {FIXTURE_WORKSTREAM_ID}",
             ),
             response_schema=_wb_update_task_schema(),
@@ -1154,7 +1250,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 "- Run only the three wb-update commands, then inspect the task, log, and evidence files.\n"
                 "- Return JSON only that matches the provided schema.\n\n"
                 "Task:\n"
-                f"1. Run `./.agents/agents wb-update evidence T-02 --session {FIXTURE_WORKSTREAM_ID} --command \"benchmark wb-update evidence\" --result passed` and capture the returned evidence id.\n"
+                f"1. Run `./.agents/agents wb-update evidence T-02 --session {FIXTURE_WORKSTREAM_ID} --command \"benchmark wb-update evidence\" --result passed --artifact .agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_log_01.md` and capture the returned evidence id.\n"
                 f"2. Run `./.agents/agents wb-update task T-02 --session {FIXTURE_WORKSTREAM_ID} --mark-done --evidence-id <captured-id>`.\n"
                 f"3. Run `./.agents/agents wb-update timeline --session {FIXTURE_WORKSTREAM_ID} --message \"T-02 completed via wb-update benchmark\"`.\n"
                 "4. Inspect the fixture task/log/evidence files and return whether the task was marked done and the timeline entry was written."
@@ -1220,7 +1316,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 f"`./.agents/agents new benchmark-created-session --feature-id {FIXTURE_FEATURE_ID} --parent-spec {FIXTURE_PARENT_SPEC_ID} --child-spec {FIXTURE_CHILD_SPEC_ID}` "
                 "and capture the created session id.\n"
                 "2. Run `./.agents/agents wb-update task T-01 --session <created-session-id> --mark-in-progress`.\n"
-                "3. Run `./.agents/agents wb-update evidence T-01 --session <created-session-id> --command \"benchmark created session scripted progress\" --result passed` and capture the evidence id.\n"
+                "3. Run `./.agents/agents wb-update evidence T-01 --session <created-session-id> --command \"benchmark created session scripted progress\" --result passed --artifact .agents/wb/<created-session-id>/<created-session-id>_task_01.md` and capture the evidence id.\n"
                 "4. Run `./.agents/agents wb-update task T-01 --session <created-session-id> --mark-done --evidence-id <captured-id>`.\n"
                 "5. Inspect the created session task file and `.evidence.jsonl` ledger.\n"
                 "6. Return the created session id, captured evidence id, whether each scripted command was used, whether T-01 is done, and `manual_markdown_edit: false`."
@@ -1260,6 +1356,10 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             forbidden_command_substrings=(
                 "cp -a .",
                 "rsync",
+                "mkdir -p sandbox",
+                "cd sandbox",
+                "cp .agents/agents sandbox",
+                "cp -R .agents",
                 "AGENTS_SCRIPT_PYTHON",
                 "PYTHONPATH=",
                 "uv run --with",
@@ -1276,6 +1376,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 "Rules:\n"
                 "- Use tools and inspect the repository as needed. Do not answer from memory.\n"
                 "- Do not manually edit workbench task state or evidence ledgers.\n"
+                "- When closing a task, record task-scoped closure evidence with the real verification command, a passed result, and an artifact path or note before marking it done.\n"
                 "- You are not being given the exact scaffold commands; discover the normal repository workflow from local context.\n"
                 "- Keep the product change minimal.\n"
                 "- Keep this bounded: do not run broad lint suites, repository-wide tests, package installs, bootstrap, sync, or full session closure.\n"
@@ -1484,7 +1585,16 @@ def _handle_command_execution_event(
         )
         return 0, retry_count
     if event_type in {"item.completed", "item.complete"} and item.get("exit_code") not in (None, 0):
+        call_entry = call_index.get(item_id)
+        if call_entry is not None:
+            call_entry["exit_code"] = item.get("exit_code")
+            call_entry["aggregated_output_excerpt"] = _excerpt(str(item.get("aggregated_output", "")), 1000)
         return _handle_failed_call_output(item_id, call_index, prior_failures), 0
+    if event_type in {"item.completed", "item.complete"}:
+        call_entry = call_index.get(item_id)
+        if call_entry is not None:
+            call_entry["exit_code"] = item.get("exit_code")
+            call_entry["aggregated_output_excerpt"] = _excerpt(str(item.get("aggregated_output", "")), 1000)
     return 0, 0
 
 
@@ -1568,9 +1678,72 @@ def _forbidden_commands_absent(tool_calls: list[dict[str, Any]], forbidden: tupl
     return failures
 
 
+def _live_scenario_command(
+    scenario: LiveBenchmarkScenario,
+    profile: BenchmarkProfile,
+    fixture_root: Path,
+    schema_path: Path,
+    output_path: Path,
+) -> list[str]:
+    command = [
+        "codex",
+        "exec",
+        "--json",
+        "--ephemeral",
+        "--skip-git-repo-check",
+        "--color",
+        "never",
+        "-m",
+        profile.model,
+        "-c",
+        f'model_reasoning_effort="{profile.reasoning_effort}"',
+        "-c",
+        "features.apps=false",
+        "-c",
+        "apps._default.enabled=false",
+        "-c",
+        "apps._default.default_tools_enabled=false",
+        "--full-auto",
+        "-C",
+        str(fixture_root),
+        "--add-dir",
+        str(fixture_root / ".agents"),
+        "--output-schema",
+        str(schema_path),
+        "-o",
+        str(output_path),
+        scenario.prompt,
+    ]
+    sandbox_insert_at = command.index("--full-auto")
+    if scenario.id == "live-autonomous-agentic-folder-delivery":
+        command.remove("--full-auto")
+        command.insert(sandbox_insert_at, "--dangerously-bypass-approvals-and-sandbox")
+    else:
+        command[sandbox_insert_at:sandbox_insert_at] = ["-s", "workspace-write"]
+        command.insert(4, "--ignore-user-config")
+    return command
+
+
+def _live_scenario_env(scenario: LiveBenchmarkScenario) -> dict[str, str]:
+    env = _benchmark_env()
+    if scenario.id == "live-autonomous-agentic-folder-delivery":
+        env["AGENTS_PROTECTED_SESSION_IDS"] = FIXTURE_WORKSTREAM_ID
+    return env
+
+
+def _timeout_streams(exc: subprocess.TimeoutExpired) -> tuple[str, str]:
+    stdout = exc.stdout or ""
+    stderr = exc.stderr or ""
+    if isinstance(stdout, bytes):
+        stdout = stdout.decode("utf-8", errors="replace")
+    if isinstance(stderr, bytes):
+        stderr = stderr.decode("utf-8", errors="replace")
+    return stdout, stderr
+
+
 def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfile) -> dict[str, Any]:
     prompt_bytes = _json_size(scenario.prompt)
-    temp_parent = AGENTS_DIR / "tmp" / "benchmarks-live"
+    temp_parent = Path(os.environ.get("AGENTS_BENCHMARK_TEMP_PARENT", "/tmp/agents-benchmark-live"))
     temp_parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="agents-benchmark-live-", dir=temp_parent) as temp_dir:
@@ -1581,40 +1754,11 @@ def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfil
         schema_path = tmp_dir / f"{scenario.id}-schema.json"
         output_path = tmp_dir / f"{scenario.id}-output.json"
         schema_path.write_text(json.dumps(scenario.response_schema, indent=2), encoding="utf-8")
-
-        command = [
-            "codex",
-            "exec",
-            "--json",
-            "--ephemeral",
-            "--ignore-user-config",
-            "--skip-git-repo-check",
-            "--color",
-            "never",
-            "-m",
-            profile.model,
-            "-c",
-            f'model_reasoning_effort="{profile.reasoning_effort}"',
-            "-c",
-            "features.apps=false",
-            "-c",
-            "apps._default.enabled=false",
-            "-c",
-            "apps._default.default_tools_enabled=false",
-            "-s",
-            "workspace-write",
-            "--full-auto",
-            "-C",
-            str(fixture_root),
-            "--output-schema",
-            str(schema_path),
-            "-o",
-            str(output_path),
-            scenario.prompt,
-        ]
+        command = _live_scenario_command(scenario, profile, fixture_root, schema_path, output_path)
 
         started_at = time.perf_counter()
         timed_out = False
+
         try:
             completed = subprocess.run(
                 command,
@@ -1622,7 +1766,7 @@ def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfil
                 capture_output=True,
                 text=True,
                 timeout=scenario.timeout_seconds,
-                env=_benchmark_env(),
+                env=_live_scenario_env(scenario),
             )
             returncode = completed.returncode
             stdout = completed.stdout or ""
@@ -1630,12 +1774,7 @@ def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfil
         except subprocess.TimeoutExpired as exc:
             timed_out = True
             returncode = 124
-            stdout = exc.stdout or ""
-            stderr = exc.stderr or ""
-            if isinstance(stdout, bytes):
-                stdout = stdout.decode("utf-8", errors="replace")
-            if isinstance(stderr, bytes):
-                stderr = stderr.decode("utf-8", errors="replace")
+            stdout, stderr = _timeout_streams(exc)
         duration_ms = round((time.perf_counter() - started_at) * 1000)
         tool_calls, error_count, retry_count = _parse_observed_tool_data(stdout)
 
