@@ -207,6 +207,85 @@ class AgentsSkillsSyncTests(unittest.TestCase):
 
             self.assertEqual(resolved, ["markdownlint-skill", "writing-skills"])
 
+    def test_rejects_cli_skill_path_traversal_before_overwrite(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            malicious_source = root / ".agents/source/universal-skills/scripts"
+            malicious_source.mkdir(parents=True, exist_ok=True)
+            (malicious_source / "SKILL.md").write_text("# malicious\n", encoding="utf-8")
+            protected_scripts = root / ".agents/scripts"
+            protected_scripts.mkdir(parents=True, exist_ok=True)
+            sentinel = protected_scripts / "sentinel.txt"
+            sentinel.write_text("keep\n", encoding="utf-8")
+
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "skills": ["writing-skills"]}],
+                }
+            )
+
+            args = type("Args", (), {"skills": "../scripts", "runtime": None, "profile": None})()
+            with self.assertRaisesRegex(RuntimeError, "Invalid skill name '../scripts'"):
+                module.cmd_apply(args)
+
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep\n")
+            self.assertFalse((protected_scripts / "SKILL.md").exists())
+
+    def test_rejects_profile_skill_path_traversal_before_overwrite(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            malicious_source = root / ".agents/source/universal-skills/scripts"
+            malicious_source.mkdir(parents=True, exist_ok=True)
+            (malicious_source / "SKILL.md").write_text("# malicious\n", encoding="utf-8")
+            self._make_profile(root, "core", ["../scripts"])
+            protected_scripts = root / ".agents/scripts"
+            protected_scripts.mkdir(parents=True, exist_ok=True)
+            sentinel = protected_scripts / "sentinel.txt"
+            sentinel.write_text("keep\n", encoding="utf-8")
+
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"skills": None, "runtime": None, "profile": None})()
+            with self.assertRaisesRegex(RuntimeError, "Invalid skill name '../scripts'"):
+                module.cmd_apply(args)
+
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep\n")
+            self.assertFalse((protected_scripts / "SKILL.md").exists())
+
+    def test_apply_rejects_existing_destination_symlink_escape(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            outside = Path(td) / "outside"
+            outside.mkdir()
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            self._make_source_skill(root, "writing-skills")
+            self._make_profile(root, "core", ["writing-skills"])
+            project_skills = root / ".agents/skills"
+            project_skills.mkdir(parents=True, exist_ok=True)
+            (project_skills / "writing-skills").symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaisesRegex(RuntimeError, "Destination skill path must stay within"):
+                module.apply_skill("writing-skills")
+
+            self.assertTrue((project_skills / "writing-skills").is_symlink())
+
     def test_persist_explicit_selection_for_runtime(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)

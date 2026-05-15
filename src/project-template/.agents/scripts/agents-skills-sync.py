@@ -111,6 +111,45 @@ def dedupe(items: Iterable[str]) -> List[str]:
     return result
 
 
+def _normalize_safe_component(value: Any, label: str) -> str:
+    if not isinstance(value, str):
+        raise RuntimeError(f"Invalid {label}: expected a non-empty string")
+
+    text = value.strip()
+    if not text:
+        raise RuntimeError(f"Invalid {label}: expected a non-empty string")
+    if "\0" in text:
+        raise RuntimeError(f"Invalid {label} '{text}': NUL bytes are not allowed")
+    if Path(text).is_absolute():
+        raise RuntimeError(f"Invalid {label} '{text}': absolute paths are not allowed")
+    if "/" in text or "\\" in text or text in {".", ".."}:
+        raise RuntimeError(f"Invalid {label} '{text}': path separators are not allowed")
+    return text
+
+
+def normalize_skill_name(value: Any) -> str:
+    return _normalize_safe_component(value, "skill name")
+
+
+def normalize_profile_name(value: Any) -> str:
+    return _normalize_safe_component(value, "profile name")
+
+
+def _path_within(base: Path, candidate: Path) -> bool:
+    try:
+        candidate.resolve(strict=False).relative_to(base.resolve(strict=False))
+    except ValueError:
+        return False
+    return True
+
+
+def _assert_path_within(base: Path, candidate: Path, label: str):
+    if not _path_within(base, candidate):
+        raise RuntimeError(
+            f"{label} must stay within {base.resolve(strict=False)}: {candidate.resolve(strict=False)}"
+        )
+
+
 def _normalize_string_list(value: Any, fallback: List[str] | None = None) -> List[str]:
     if value is None:
         return list(fallback or [])
@@ -127,28 +166,36 @@ def _normalize_string_list(value: Any, fallback: List[str] | None = None) -> Lis
     return result
 
 
+def _normalize_skill_list(value: Any, fallback: List[str] | None = None) -> List[str]:
+    return dedupe([normalize_skill_name(item) for item in _normalize_string_list(value, fallback)])
+
+
+def _normalize_profile_list(value: Any, fallback: List[str] | None = None) -> List[str]:
+    return dedupe([normalize_profile_name(item) for item in _normalize_string_list(value, fallback)])
+
+
 def _normalize_install(entry: Any) -> Dict[str, Any] | None:
     if not isinstance(entry, dict):
         return None
 
     app = normalize_runtime(str(entry.get("app", SPECIAL_APP_ALL)))
-    skills = _normalize_string_list(entry.get("skills"), [])
+    skills = _normalize_skill_list(entry.get("skills"), [])
     profile = entry.get("profile")
-    profile_name = profile.strip() if isinstance(profile, str) else ""
+    profile_name = normalize_profile_name(profile) if isinstance(profile, str) and profile.strip() else ""
     if not skills and not profile_name:
         return None
 
     normalized: Dict[str, Any] = {"app": app}
     if skills:
-        normalized["skills"] = dedupe(skills)
+        normalized["skills"] = skills
     if profile_name:
         normalized["profile"] = profile_name
     return normalized
 
 
 def _default_manifest() -> Dict[str, Any]:
-    default_skills = dedupe(_normalize_string_list(cfg("default_skills")))
-    default_profile = str(cfg("default_profile")).strip()
+    default_skills = _normalize_skill_list(cfg("default_skills"))
+    default_profile = normalize_profile_name(str(cfg("default_profile"))) if str(cfg("default_profile")).strip() else ""
 
     installs = []
     if default_profile:
@@ -167,11 +214,12 @@ def _default_manifest() -> Dict[str, Any]:
 
 
 def _profile_skills_from_source(profile: str, manifest: Dict[str, Any]) -> List[str]:
+    profile = normalize_profile_name(profile)
     profiles = manifest.get("profiles")
     if isinstance(profiles, dict):
         profile_data = profiles.get(profile)
         if profile_data is not None:
-            return dedupe(_normalize_string_list(profile_data))
+            return _normalize_skill_list(profile_data)
 
     profile_path = upstream_profiles_root() / f"{profile}.json"
     if not profile_path.exists():
@@ -185,7 +233,7 @@ def _profile_skills_from_source(profile: str, manifest: Dict[str, Any]) -> List[
     if not isinstance(raw_profile, dict):
         return []
 
-    return dedupe(_normalize_string_list(raw_profile.get("skills")))
+    return _normalize_skill_list(raw_profile.get("skills"))
 
 
 def _resolve_install_skills(
@@ -200,12 +248,10 @@ def _resolve_install_skills(
         profile = profile_override
 
     if isinstance(skills, list) and skills:
-        return dedupe(_normalize_string_list(skills))
+        return _normalize_skill_list(skills)
 
     if isinstance(profile, str):
-        profile_name = profile.strip()
-        if not profile_name:
-            return []
+        profile_name = normalize_profile_name(profile)
         resolved = _profile_skills_from_source(profile_name, manifest)
         if resolved:
             return resolved
@@ -223,7 +269,7 @@ def _legacy_install_entries(raw_installs: Any) -> List[Any]:
 
 
 def _normalize_legacy_installs(data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    legacy_skills = dedupe(_normalize_string_list(data.get("selected_skills")))
+    legacy_skills = _normalize_skill_list(data.get("selected_skills"))
     legacy_installs: List[Dict[str, Any]] = []
 
     for entry in _legacy_install_entries(data.get("installs", [])):
@@ -301,7 +347,7 @@ def _normalize_v2_manifest(data: Dict[str, Any]) -> Dict[str, Any]:
     profiles = data.get("profiles")
     if isinstance(profiles, dict):
         manifest["profiles"] = {
-            str(name): dedupe(_normalize_string_list(skills))
+            normalize_profile_name(str(name)): _normalize_skill_list(skills)
             for name, skills in profiles.items()
         }
 
@@ -470,14 +516,19 @@ def _is_valid_source_repo(path: Path) -> bool:
             return False
         if not isinstance(raw_profile, dict):
             return False
-        referenced = dedupe(_normalize_string_list(raw_profile.get("skills")))
+        try:
+            referenced = _normalize_skill_list(raw_profile.get("skills"))
+        except RuntimeError:
+            return False
         if any(name not in available for name in referenced):
             return False
 
     return True
 
 
-def _remove_path(path: Path):
+def _remove_path(path: Path, root: Path | None = None):
+    if root is not None:
+        _assert_path_within(root, path, "Removal path")
     if path.is_symlink() or path.is_file():
         path.unlink()
         return
@@ -485,19 +536,27 @@ def _remove_path(path: Path):
         shutil.rmtree(path)
 
 
-def _copy_tree(src: Path, dst: Path):
+def _copy_tree(src: Path, dst: Path, *, src_root: Path | None = None, dst_root: Path | None = None):
+    if src_root is not None:
+        _assert_path_within(src_root, src, "Source path")
+    if dst_root is not None:
+        _assert_path_within(dst_root, dst, "Destination path")
     if dst.exists() or dst.is_symlink():
-        _remove_path(dst)
+        _remove_path(dst, root=dst_root)
     shutil.copytree(src, dst)
 
 
 def _copy_skill_dir(src_root: Path, dst_root: Path, name: str):
+    name = normalize_skill_name(name)
+    source_skills_root = skills_root_for_repo(src_root)
     src = skills_root_for_repo(src_root) / name
+    _assert_path_within(source_skills_root, src, "Source skill path")
+    _assert_path_within(dst_root, dst_root / name, "Destination skill path")
     if not (src / "SKILL.md").exists():
         raise RuntimeError(f"Source skill missing SKILL.md: {src}")
 
     dst_root.mkdir(parents=True, exist_ok=True)
-    _copy_tree(src, dst_root / name)
+    _copy_tree(src, dst_root / name, src_root=source_skills_root, dst_root=dst_root)
 
 
 def _ensure_source_repo_layout(repo: Path):
@@ -518,6 +577,7 @@ def _repo_skill_names(repo: Path) -> List[str]:
 
 
 def _read_profile_skills(repo: Path, profile_name: str) -> List[str]:
+    profile_name = normalize_profile_name(profile_name)
     profile_path = profiles_root_for_repo(repo) / f"{profile_name}.json"
     if not profile_path.exists():
         return []
@@ -527,7 +587,7 @@ def _read_profile_skills(repo: Path, profile_name: str) -> List[str]:
         return []
     if not isinstance(raw_profile, dict):
         return []
-    return dedupe(_normalize_string_list(raw_profile.get("skills")))
+    return _normalize_skill_list(raw_profile.get("skills"))
 
 
 def _configured_profile_names(manifest: Dict[str, Any] | None = None) -> List[str]:
@@ -540,12 +600,12 @@ def _configured_profile_names(manifest: Dict[str, Any] | None = None) -> List[st
                 continue
             profile = entry.get("profile")
             if isinstance(profile, str) and profile.strip():
-                profile_names.append(profile.strip())
+                profile_names.append(normalize_profile_name(profile))
 
     if profile_names:
         return dedupe(profile_names)
 
-    default_profile = str(cfg("default_profile")).strip()
+    default_profile = normalize_profile_name(str(cfg("default_profile"))) if str(cfg("default_profile")).strip() else ""
     return [default_profile] if default_profile else []
 
 
@@ -650,18 +710,21 @@ def mirror_skills_to_local_source(source_repo: Path, skills: Sequence[str], mani
 
 
 def stage_skill_for_proposal(name: str, target_repo: Path) -> bool:
+    name = normalize_skill_name(name)
     src = project_skills_root() / name
+    _assert_path_within(project_skills_root(), src, "Project skill path")
     if not (src / "SKILL.md").exists():
         raise RuntimeError(f"Project skill missing SKILL.md: {src}")
 
     _ensure_source_repo_layout(target_repo)
     skills_root = skills_root_for_repo(target_repo)
     dst = skills_root / name
+    _assert_path_within(skills_root, dst, "Proposal skill path")
     if (dst / "SKILL.md").exists() and skill_digest(src) == skill_digest(dst):
         return False
 
     skills_root.mkdir(parents=True, exist_ok=True)
-    _copy_tree(src, dst)
+    _copy_tree(src, dst, src_root=project_skills_root(), dst_root=skills_root)
     return True
 
 
@@ -773,8 +836,11 @@ def available_skills(source_repo: Path | None = None) -> List[str]:
 
 
 def _skill_doc_path(name: str, source_repo: Path | None = None) -> Path:
+    name = normalize_skill_name(name)
     root = skills_root_for_repo(source_repo or source_repo_path())
-    return root / name / "SKILL.md"
+    path = root / name / "SKILL.md"
+    _assert_path_within(root, path.parent, "Source skill path")
+    return path
 
 
 def _skill_search_blob(name: str, source_repo: Path | None = None) -> str:
@@ -835,7 +901,8 @@ def resolve_skills_for_request(
     runtime: str,
     profile: str | None,
 ) -> List[str]:
-    explicit = dedupe(_normalize_string_list(cli_skills))
+    explicit = _normalize_skill_list(cli_skills)
+    profile = normalize_profile_name(profile) if isinstance(profile, str) and profile.strip() else None
     if explicit:
         return explicit
 
@@ -922,9 +989,11 @@ def _compare(skills: Iterable[str], mode: str) -> Tuple[List[str], List[str], Li
     missing_project: List[str] = []
     drift: List[str] = []
 
-    for name in sorted(set(skills)):
+    for name in sorted(set(_normalize_skill_list(list(skills)))):
         src = src_root / name
         dst = dst_root / name
+        _assert_path_within(src_root, src, "Source skill path")
+        _assert_path_within(dst_root, dst, "Destination skill path")
         if not (src / "SKILL.md").exists():
             missing_source.append(name)
             continue
@@ -1015,9 +1084,14 @@ def cmd_search(args: argparse.Namespace):
 
 
 def apply_skill(name: str, source_repo: Path | None = None):
+    name = normalize_skill_name(name)
     source_root = source_repo or source_repo_path()
-    src = skills_root_for_repo(source_root) / name
-    dst = project_skills_root() / name
+    src_root = skills_root_for_repo(source_root)
+    dst_root = project_skills_root()
+    src = src_root / name
+    dst = dst_root / name
+    _assert_path_within(src_root, src, "Source skill path")
+    _assert_path_within(dst_root, dst, "Destination skill path")
 
     if not (src / "SKILL.md").exists():
         raise RuntimeError(f"Source skill missing SKILL.md: {src}")
@@ -1026,10 +1100,7 @@ def apply_skill(name: str, source_repo: Path | None = None):
     dst.parent.mkdir(parents=True, exist_ok=True)
 
     if dst.exists() or dst.is_symlink():
-        if dst.is_symlink() or dst.is_file():
-            dst.unlink()
-        else:
-            shutil.rmtree(dst)
+        _remove_path(dst, root=dst_root)
 
     if mode == "link":
         dst.symlink_to(src, target_is_directory=True)
@@ -1040,7 +1111,8 @@ def apply_skill(name: str, source_repo: Path | None = None):
 
 
 def apply_skills_from_repo(skills: Sequence[str], source_repo: Path | None = None):
-    for name in skills:
+    normalized_skills = _normalize_skill_list(list(skills))
+    for name in normalized_skills:
         apply_skill(name, source_repo=source_repo)
         print(f"APPLIED: {name}")
 
@@ -1057,9 +1129,9 @@ def _persist_explicit_skill_selection(
         installs = []
         manifest["installs"] = installs
 
-    explicit = {"app": runtime, "skills": dedupe(skills)}
+    explicit = {"app": runtime, "skills": _normalize_skill_list(skills)}
     if profile:
-        explicit["profile"] = str(profile)
+        explicit["profile"] = normalize_profile_name(profile)
 
     for install in installs:
         if isinstance(install, dict) and normalize_runtime(str(install.get("app", SPECIAL_APP_ALL))) == runtime:
@@ -1087,7 +1159,7 @@ def _persist_ensured_skill(
     except RuntimeError:
         existing = []
 
-    merged = dedupe([*existing, skill])
+    merged = _normalize_skill_list([*existing, skill])
     _persist_explicit_skill_selection(
         manifest,
         runtime=runtime,
@@ -1150,9 +1222,7 @@ def cmd_ensure(args: argparse.Namespace):
     else:
         ensure_repo_cloned(manifest)
 
-    skill = args.skill.strip()
-    if not skill:
-        raise RuntimeError("Skill name is required")
+    skill = normalize_skill_name(args.skill)
 
     source_repo = refreshed_repo or source_repo_path()
     if refreshed_repo is not None:
@@ -1204,10 +1274,10 @@ def _print_project_structure_problems(problems: List[str]) -> None:
 def _explicit_manifest_skills(manifest: Dict[str, Any], runtime: str) -> set[str]:
     selected_installs = _resolve_targets(manifest, runtime)
     return {
-        skill
+        normalize_skill_name(skill)
         for install in selected_installs
         if isinstance(install, dict)
-        for skill in _normalize_string_list(install.get("skills"), [])
+        for skill in _normalize_skill_list(install.get("skills"), [])
     }
 
 
@@ -1360,7 +1430,7 @@ def _push_skill_names(args: argparse.Namespace) -> List[str]:
     single = getattr(args, "skill", None)
     if isinstance(single, str) and single.strip():
         candidates.append(single.strip())
-    explicit = dedupe(_normalize_string_list(candidates))
+    explicit = _normalize_skill_list(candidates)
     if not explicit:
         raise RuntimeError("Provide a skill name or --skills for the upstream proposal")
     return explicit

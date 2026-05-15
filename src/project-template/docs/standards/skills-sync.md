@@ -22,6 +22,12 @@ Standardize how project repositories consume relevant skills from a repo-local o
 - When a repo-local source is only a bootstrap seed, Git-backed refresh and upstream proposal work must use an external universal-skills checkout configured with `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`
 - Treat the current manifest as the scaffold-side adapter over the richer universal-skills repo/ref/profile contract
 - Prefer project-local skills under `.agents/skills/`; keep global Codex skills minimal and avoid using them as the primary project skill surface
+- Treat skill and profile identifiers as single path components, not paths.
+  Reject empty values, absolute paths, path separators, NUL bytes, `.`, and
+  `..` before resolving source or destination paths.
+- Before copy/link/delete operations, verify the resolved source remains under
+  the configured universal-skills `skills/` root and the resolved destination
+  remains under `.agents/skills/`.
 
 ## Configuration
 
@@ -56,6 +62,13 @@ just skills-pull
 ```
 
 If only the repo-local bootstrap seed exists, `just skills-pull` is a no-op. It never creates a git checkout under `.agents/cache/`.
+
+`skills-pull` is the explicit network refresh command.
+`skills-sync` and `skills-update` are local-only by default and will not call `git fetch/checkout/pull` unless `--pull` is passed.
+
+If a selected skill name comes from CLI input, a local manifest, or an
+upstream profile, validation must complete for the full selection before any
+destination is removed or copied.
 
 3. Discover what is available:
 
