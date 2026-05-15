@@ -2,15 +2,15 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-05-09T20:07:53+00:00"
-updated_at: "2026-05-09T20:07:53+00:00"
+created_at: "2026-05-15T01:08:58+00:00"
+updated_at: "2026-05-15T01:08:58+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 74
+- Total indexed docs: 77
 
 ## Brainstorm
 
@@ -86,6 +86,9 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260426_1418_parallel-session-local-management_report_01` | `.agents/wb/260426_1418_parallel-session-local-management/260426_1418_parallel-session-local-management_report_01.md` | - Roadmap feature: F-20
 - `260504_1304_sandboxed-local-runtime-bootstrap_report_01` | `.agents/wb/260504_1304_sandboxed-local-runtime-bootstrap/260504_1304_sandboxed-local-runtime-bootstrap_report_01.md` | Implemented the operational slice requested for sandbox compatibility and
 - `260509_1453_plan-task-execution-integrity_report_01` | `.agents/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_report_01.md` | - Roadmap feature: F-18
+- `260509_1750_done-state-hardening_report_01` | `.agents/wb/260509_1750_done-state-hardening/260509_1750_done-state-hardening_report_01.md` | - Roadmap feature: F-18
+- `260514_1732_prompt-token-policy-optimization_report_01` | `.agents/wb/260514_1732_prompt-token-policy-optimization/260514_1732_prompt-token-policy-optimization_report_01.md` | - Roadmap feature: F-07
+- `260514_1938_token-efficiency-execution_report_01` | `.agents/wb/260514_1938_token-efficiency-execution/260514_1938_token-efficiency-execution_report_01.md` | - Delivered the F-07 token-efficiency slice through delegated agents while the
 
 ## Research
 
