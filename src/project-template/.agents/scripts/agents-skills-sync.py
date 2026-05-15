@@ -10,7 +10,9 @@ import json
 import os
 import re
 import shutil
+import stat
 import sys
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
@@ -383,7 +385,8 @@ def _git_head_ref(repo: Path) -> str | None:
     result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo, text=True)
     if result.returncode != 0:
         return None
-    value = result.stdout.strip()
+    stdout = result.stdout if isinstance(result.stdout, str) else ""
+    value = stdout.strip()
     if not value or value == "HEAD":
         return None
     return value
@@ -393,7 +396,8 @@ def _git_head_commit(repo: Path) -> str | None:
     result = run_command(["git", "rev-parse", "HEAD"], cwd=repo, text=True)
     if result.returncode != 0:
         return None
-    value = result.stdout.strip()
+    stdout = result.stdout if isinstance(result.stdout, str) else ""
+    value = stdout.strip()
     return value or None
 
 
@@ -469,6 +473,10 @@ def _require_channel_policy(channel_data: Dict[str, Any], channel: str):
         raise RuntimeError(f"Release channel '{channel}' missing policy")
     if policy.get("allowFloatingRef") is not False:
         raise RuntimeError(f"Release channel '{channel}' must disable floating refs")
+    if policy.get("requireSignedTag") is not True:
+        raise RuntimeError(f"Release channel '{channel}' must require signed tags")
+    if policy.get("requireSourceChecksum") is not True:
+        raise RuntimeError(f"Release channel '{channel}' must require source checksum")
     if policy.get("requireReleaseManifest") is not True or policy.get("requireSkillBom") is not True:
         raise RuntimeError(f"Release channel '{channel}' must require release manifest and skill BOM")
 
@@ -654,6 +662,25 @@ def _copy_tree(src: Path, dst: Path, *, src_root: Path | None = None, dst_root: 
     shutil.copytree(src, dst)
 
 
+def _validate_skill_payload(src: Path):
+    if src.is_symlink():
+        raise RuntimeError(f"Invalid skill payload: symlink is not allowed: {src}")
+
+    for current_root, dir_names, file_names in os.walk(src, followlinks=False):
+        root_path = Path(current_root)
+        for dir_name in dir_names:
+            dir_path = root_path / dir_name
+            if dir_path.is_symlink():
+                raise RuntimeError(f"Invalid skill payload: symlink is not allowed: {dir_path}")
+        for file_name in file_names:
+            file_path = root_path / file_name
+            if file_path.is_symlink():
+                raise RuntimeError(f"Invalid skill payload: symlink is not allowed: {file_path}")
+            st = file_path.stat(follow_symlinks=False)
+            if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+                raise RuntimeError(f"Invalid skill payload: hardlink is not allowed: {file_path}")
+
+
 def _copy_skill_dir(src_root: Path, dst_root: Path, name: str):
     name = normalize_skill_name(name)
     source_skills_root = skills_root_for_repo(src_root)
@@ -662,6 +689,7 @@ def _copy_skill_dir(src_root: Path, dst_root: Path, name: str):
     _assert_path_within(dst_root, dst_root / name, "Destination skill path")
     if not (src / "SKILL.md").exists():
         raise RuntimeError(f"Source skill missing SKILL.md: {src}")
+    _validate_skill_payload(src)
 
     dst_root.mkdir(parents=True, exist_ok=True)
     _copy_tree(src, dst_root / name, src_root=source_skills_root, dst_root=dst_root)
@@ -788,6 +816,90 @@ def ensure_git_sync_repo(manifest: Dict[str, Any] | None = None) -> Path | None:
     return existing_git_sync_repo_path()
 
 
+def _channel_worktree_root() -> Path:
+    root = ROOT_DIR / ".agents" / "tmp" / "skills-sync-worktrees"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _create_disposable_channel_worktree(repo: Path, ref: str) -> Path:
+    safe_ref = re.sub(r"[^a-zA-Z0-9._-]+", "-", ref.strip()) or "release"
+    worktree_path = _channel_worktree_root() / f"{safe_ref}-{uuid.uuid4().hex[:8]}"
+    run(["git", "worktree", "add", "--detach", str(worktree_path), ref], cwd=repo)
+    if not worktree_path.exists():
+        shutil.copytree(repo, worktree_path, ignore=shutil.ignore_patterns(".git"))
+    return worktree_path
+
+
+def _verify_signed_tag(repo: Path, ref: str):
+    run(["git", "tag", "-v", ref], cwd=repo)
+
+
+def _refresh_channel_ref(
+    repo: Path,
+    manifest: Dict[str, Any],
+    *,
+    channel: str,
+    release_tag: str | None = None,
+) -> Tuple[Path, str, Dict[str, str]]:
+    channel_name = _normalize_channel_name(channel)
+    run(["git", "fetch", "origin"], cwd=repo)
+    channel_data = _read_release_channel(repo, channel_name)
+    ref = _normalize_release_tag(release_tag or str(channel_data.get("releaseTag", "")))
+    if channel_data.get("releaseTag") != ref:
+        raise RuntimeError(f"Release channel '{channel_name}' does not point to {ref}")
+    _verify_signed_tag(repo, ref)
+    staged_repo = _create_disposable_channel_worktree(repo, ref)
+    verification = _verify_release_channel_artifacts(staged_repo, channel_data)
+    current_commit = _git_head_commit(staged_repo)
+    if current_commit and current_commit.lower() != verification["commit"]:
+        raise RuntimeError(
+            f"Release channel '{channel_name}' commit mismatch: "
+            f"expected {verification['commit']}, got {current_commit.lower()}"
+        )
+    manifest["channel"] = channel_name
+    manifest["ref"] = ref
+    return staged_repo, ref, verification
+
+
+def _refresh_standard_ref(
+    repo: Path,
+    manifest: Dict[str, Any],
+    *,
+    ref: str,
+    release_tag: str | None = None,
+    allow_floating_ref: bool = False,
+) -> str:
+    if _is_floating_ref(ref) and not allow_floating_ref and release_tag:
+        raise RuntimeError(f"Refusing floating skills source ref '{ref}' without --allow-floating-ref")
+    if release_tag:
+        ref = _normalize_release_tag(release_tag)
+        manifest["ref"] = ref
+    run(["git", "fetch", "origin"], cwd=repo)
+    run(["git", "checkout", ref], cwd=repo)
+    if _is_floating_ref(ref):
+        run(["git", "pull", "--ff-only", "origin", ref], cwd=repo)
+    return ref
+
+
+def _restore_source_repo_ref(repo: Path, original_ref: str | None, original_commit: str | None):
+    if not original_ref and not original_commit:
+        return
+    if original_ref:
+        try:
+            run(["git", "checkout", original_ref], cwd=repo)
+            return
+        except RuntimeError:
+            pass
+    if original_commit:
+        try:
+            run(["git", "checkout", original_commit], cwd=repo)
+            return
+        except RuntimeError:
+            pass
+    raise RuntimeError("Failed to restore external skills source ref after refresh failure")
+
+
 def refresh_git_sync_repo(
     manifest: Dict[str, Any],
     *,
@@ -809,32 +921,28 @@ def refresh_git_sync_repo(
 
     verification: Dict[str, str] | None = None
     if channel:
-        channel_name = _normalize_channel_name(channel)
-        run(["git", "fetch", "origin"], cwd=repo)
-        channel_data = _read_release_channel(repo, channel_name)
-        ref = _normalize_release_tag(release_tag or str(channel_data.get("releaseTag", "")))
-        if channel_data.get("releaseTag") != ref:
-            raise RuntimeError(f"Release channel '{channel_name}' does not point to {ref}")
-        run(["git", "checkout", ref], cwd=repo)
-        verification = _verify_release_channel_artifacts(repo, channel_data)
-        current_commit = _git_head_commit(repo)
-        if current_commit and current_commit.lower() != verification["commit"]:
-            raise RuntimeError(
-                f"Release channel '{channel_name}' commit mismatch: "
-                f"expected {verification['commit']}, got {current_commit.lower()}"
-            )
-        manifest["channel"] = channel_name
-        manifest["ref"] = ref
-    else:
-        if _is_floating_ref(ref) and not allow_floating_ref and release_tag:
-            raise RuntimeError(f"Refusing floating skills source ref '{ref}' without --allow-floating-ref")
-        if release_tag:
-            ref = _normalize_release_tag(release_tag)
-            manifest["ref"] = ref
-        run(["git", "fetch", "origin"], cwd=repo)
-        run(["git", "checkout", ref], cwd=repo)
-        if _is_floating_ref(ref):
-            run(["git", "pull", "--ff-only", "origin", ref], cwd=repo)
+        staged_repo, ref, verification = _refresh_channel_ref(
+            repo,
+            manifest,
+            channel=channel,
+            release_tag=release_tag,
+        )
+        _update_source_metadata(manifest, staged_repo, ref=ref, verification=verification)
+        return staged_repo
+
+    original_ref = _git_head_ref(repo)
+    original_commit = _git_head_commit(repo)
+    try:
+        ref = _refresh_standard_ref(
+            repo,
+            manifest,
+            ref=ref,
+            release_tag=release_tag,
+            allow_floating_ref=allow_floating_ref,
+        )
+    except Exception:
+        _restore_source_repo_ref(repo, original_ref, original_commit)
+        raise
     _update_source_metadata(manifest, repo, ref=ref, verification=verification)
     return repo
 
@@ -858,6 +966,7 @@ def stage_skill_for_proposal(name: str, target_repo: Path) -> bool:
     _assert_path_within(project_skills_root(), src, "Project skill path")
     if not (src / "SKILL.md").exists():
         raise RuntimeError(f"Project skill missing SKILL.md: {src}")
+    _validate_skill_payload(src)
 
     _ensure_source_repo_layout(target_repo)
     skills_root = skills_root_for_repo(target_repo)
@@ -1243,6 +1352,7 @@ def apply_skill(name: str, source_repo: Path | None = None):
 
     if not (src / "SKILL.md").exists():
         raise RuntimeError(f"Source skill missing SKILL.md: {src}")
+    _validate_skill_payload(src)
 
     mode = cfg("mode")
     dst.parent.mkdir(parents=True, exist_ok=True)

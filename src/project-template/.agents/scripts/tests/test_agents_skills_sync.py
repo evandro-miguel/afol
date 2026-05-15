@@ -2,6 +2,7 @@ import importlib.util
 import hashlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -327,6 +328,33 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 module.apply_skill("writing-skills")
 
             self.assertTrue((project_skills / "writing-skills").is_symlink())
+
+    def test_apply_rejects_symlink_inside_source_skill_payload(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            skill_dir = self._make_source_skill(root, "writing-skills")
+            (skill_dir / "references").mkdir(parents=True, exist_ok=True)
+            (skill_dir / "references" / "note.md").write_text("content\n", encoding="utf-8")
+            (skill_dir / "README.md").symlink_to(skill_dir / "references" / "note.md")
+
+            with self.assertRaisesRegex(RuntimeError, "symlink is not allowed"):
+                module.apply_skill("writing-skills")
+
+    def test_apply_rejects_hardlink_inside_source_skill_payload(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            skill_dir = self._make_source_skill(root, "writing-skills")
+            source_file = skill_dir / "details.md"
+            source_file.write_text("payload\n", encoding="utf-8")
+            hardlink_file = skill_dir / "details-copy.md"
+            os.link(source_file, hardlink_file)
+
+            with self.assertRaisesRegex(RuntimeError, "hardlink is not allowed"):
+                module.apply_skill("writing-skills")
 
     def test_persist_explicit_selection_for_runtime(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -783,7 +811,7 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertEqual(source.get("branch"), "release/main")
             self.assertEqual(source.get("commit"), "abc123")
 
-    def test_cmd_pull_with_channel_checks_out_verified_release(self):
+    def test_cmd_pull_with_channel_uses_disposable_worktree_without_checkouting_external_repo(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td) / "repo"
             root.mkdir()
@@ -829,12 +857,20 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             ):
                 module.cmd_pull(args)
 
-            self.assertEqual(
-                patched_run.call_args_list,
-                [
-                    mock.call(["git", "fetch", "origin"], cwd=external_root),
-                    mock.call(["git", "checkout", "v1.2.3"], cwd=external_root),
-                ],
+            self.assertEqual(patched_run.call_count, 3)
+            self.assertEqual(patched_run.call_args_list[0], mock.call(["git", "fetch", "origin"], cwd=external_root))
+            self.assertEqual(patched_run.call_args_list[1], mock.call(["git", "tag", "-v", "v1.2.3"], cwd=external_root))
+            worktree_call = patched_run.call_args_list[2]
+            worktree_cmd = worktree_call.args[0]
+            self.assertEqual(worktree_call.kwargs.get("cwd"), external_root)
+            self.assertEqual(worktree_cmd[:4], ["git", "worktree", "add", "--detach"])
+            self.assertEqual(worktree_cmd[-1], "v1.2.3")
+            self.assertTrue(str(worktree_cmd[4]).startswith(str(root / ".agents/tmp/skills-sync-worktrees")))
+            self.assertFalse(
+                any(
+                    call.kwargs.get("cwd") == external_root and call.args[0][:2] == ["git", "checkout"]
+                    for call in patched_run.call_args_list
+                )
             )
             loaded = module.load_manifest()
             self.assertEqual(loaded["ref"], "v1.2.3")
@@ -843,6 +879,36 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertEqual(verification.get("channel"), "stable")
             self.assertEqual(verification.get("releaseTag"), "v1.2.3")
             self.assertEqual(verification.get("commit"), commit)
+            self.assertIn(".agents/tmp/skills-sync-worktrees", loaded.get("source", {}).get("path", ""))
+
+    def test_cmd_pull_with_channel_rejects_invalid_channel_name(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root)
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "Stable!", "release_tag": None, "allow_floating_ref": False})()
+            with mock.patch.object(module, "run") as patched_run:
+                with self.assertRaisesRegex(RuntimeError, "Invalid release channel"):
+                    module.cmd_pull(args)
+            self.assertEqual(patched_run.call_count, 0)
 
     def test_cmd_pull_with_channel_rejects_release_tag_mismatch(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -903,6 +969,244 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             with mock.patch.object(module, "run"):
                 with self.assertRaisesRegex(RuntimeError, "skill BOM hash mismatch"):
                     module.cmd_pull(args)
+
+    def test_cmd_pull_with_channel_rejects_manifest_hash_mismatch(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root)
+            (external_root / "releases/manifests/v1.2.3.json").write_text(
+                '{"release":"v1.2.3","artifacts":["tampered"]}\n',
+                encoding="utf-8",
+            )
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            with mock.patch.object(module, "run"):
+                with self.assertRaisesRegex(RuntimeError, "manifest hash mismatch"):
+                    module.cmd_pull(args)
+
+    def test_cmd_pull_with_channel_rejects_source_checksum_mismatch(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root)
+            (external_root / "releases/checksums/v1.2.3.sha256").write_text(
+                f"{'c' * 64}  source.tar.gz\n",
+                encoding="utf-8",
+            )
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            with mock.patch.object(module, "run"):
+                with self.assertRaisesRegex(RuntimeError, "source checksum mismatch"):
+                    module.cmd_pull(args)
+
+    def test_cmd_pull_with_channel_rejects_commit_mismatch(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root, commit="a" * 40)
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            with (
+                mock.patch.object(module, "run"),
+                mock.patch.object(module, "_git_head_commit", side_effect=["b" * 40, "b" * 40]),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "commit mismatch"):
+                    module.cmd_pull(args)
+
+    def test_cmd_pull_with_channel_rejects_missing_require_signed_tag(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root)
+            channel_path = external_root / "releases/channels/stable.json"
+            data = json.loads(channel_path.read_text(encoding="utf-8"))
+            data["policy"]["requireSignedTag"] = False
+            channel_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            with mock.patch.object(module, "run"):
+                with self.assertRaisesRegex(RuntimeError, "must require signed tags"):
+                    module.cmd_pull(args)
+
+    def test_cmd_pull_with_channel_rejects_unverifiable_signed_tag(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root)
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            def fail_tag_verify(cmd, cwd=None):
+                if cmd[:3] == ["git", "tag", "-v"]:
+                    raise RuntimeError("bad signature")
+
+            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            with mock.patch.object(module, "run", side_effect=fail_tag_verify) as patched_run:
+                with self.assertRaisesRegex(RuntimeError, "bad signature"):
+                    module.cmd_pull(args)
+
+            self.assertFalse(
+                any(call.args[0][:4] == ["git", "worktree", "add", "--detach"] for call in patched_run.call_args_list)
+            )
+
+    def test_cmd_pull_with_channel_rejects_missing_require_source_checksum(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root)
+            channel_path = external_root / "releases/channels/stable.json"
+            data = json.loads(channel_path.read_text(encoding="utf-8"))
+            data["policy"]["requireSourceChecksum"] = False
+            channel_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            with mock.patch.object(module, "run"):
+                with self.assertRaisesRegex(RuntimeError, "must require source checksum"):
+                    module.cmd_pull(args)
+
+    def test_cmd_pull_with_channel_failure_does_not_checkout_external_repo_for_restore(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root, commit="a" * 40)
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            with (
+                mock.patch.object(module, "run") as patched_run,
+                mock.patch.object(module, "_git_head_commit", return_value="b" * 40),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "commit mismatch"):
+                    module.cmd_pull(args)
+
+            self.assertEqual(patched_run.call_count, 3)
+            self.assertEqual(patched_run.call_args_list[0], mock.call(["git", "fetch", "origin"], cwd=external_root))
+            self.assertEqual(patched_run.call_args_list[1], mock.call(["git", "tag", "-v", "v1.2.3"], cwd=external_root))
+            self.assertEqual(patched_run.call_args_list[2].kwargs.get("cwd"), external_root)
+            self.assertEqual(patched_run.call_args_list[2].args[0][:4], ["git", "worktree", "add", "--detach"])
+            self.assertFalse(
+                any(
+                    call.kwargs.get("cwd") == external_root and call.args[0][:2] == ["git", "checkout"]
+                    for call in patched_run.call_args_list
+                )
+            )
 
     def test_cmd_sync_updates_project_from_external_source_without_refreshing(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
