@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from lib.agents_config import get_active_session_file_path, get_cfg_path, load_agents_config
+from lib.cli_output import to_json_text
 from lib.execution_commands import (
     ExecutionError,
     TERMINAL_ARTIFACT_STATUSES,
@@ -60,6 +60,10 @@ def _print_items(label: str, items: list[str]) -> None:
     print(f"{label}:")
     for item in items:
         print(f" - {item}")
+
+
+def _emit_json(payload: Dict[str, Any], pretty: bool) -> None:
+    print(to_json_text(payload, pretty=pretty, sort_keys=True))
 
 
 def _run_strict_verify(session_dir: Path) -> subprocess.CompletedProcess[str]:
@@ -133,7 +137,7 @@ def cmd_close(args: argparse.Namespace) -> int:
     }
 
     if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        _emit_json(payload, getattr(args, "pretty", False))
         return 0
 
     print(f"✓ session closed: {target.name}")
@@ -204,10 +208,8 @@ def _build_session_overview(session_dir: Path, active_session: str) -> Dict[str,
 
 
 def _print_session_list(payload: Dict[str, Any]) -> None:
-    print("Project Session List (.agents/wb)")
-    print(f"active_session: {payload['active_session'] or 'unset'}")
+    print(f"sessions: {payload['count']} active={payload['active_session'] or 'unset'} scope={payload['scope']}")
     if not payload["sessions"]:
-        print("sessions: none")
         return
 
     for entry in payload["sessions"]:
@@ -234,7 +236,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     }
 
     if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        _emit_json(payload, getattr(args, "pretty", False))
         return 0
 
     _print_session_list(payload)
@@ -250,10 +252,10 @@ def _classify_for_sweep(entry: Dict[str, Any]) -> str:
 
 
 def _print_session_sweep(payload: Dict[str, Any]) -> None:
-    print("Project Session Sweep (read-only)")
-    print(f"scope: {payload['scope']}")
-    print(f"active_session: {payload['active_session'] or 'unset'}")
-    print(f"scanned_sessions: {payload['count']}")
+    print(
+        "sweep: "
+        f"scanned={payload['count']} active={payload['active_session'] or 'unset'} scope={payload['scope']}"
+    )
     _print_items("stale", payload["stale"])
     _print_items("open", payload["open"])
     _print_items("close_candidates", payload["close_candidates"])
@@ -294,7 +296,7 @@ def cmd_sweep(args: argparse.Namespace) -> int:
     }
 
     if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        _emit_json(payload, getattr(args, "pretty", False))
         return 0
 
     _print_session_sweep(payload)
@@ -302,11 +304,11 @@ def cmd_sweep(args: argparse.Namespace) -> int:
 
 
 def _print_catchup(payload: Dict[str, object]) -> None:
-    print("Agents Session Catchup")
-    print(f"session: {payload['session']}")
-    print(f"roadmap_feature: {payload['roadmap_feature']}")
-    print(f"catchup_required: {payload['catchup_required']}")
-    print(f"context_ready: {payload['context_ready']}")
+    print(
+        "catchup: "
+        f"session={payload['session']} roadmap_feature={payload['roadmap_feature']} "
+        f"catchup_required={payload['catchup_required']} context_ready={payload['context_ready']}"
+    )
     _print_items("missing_context", list(payload.get("missing_context", [])))
     _print_task_summary(payload["tasks"])
     _print_git_summary(payload["git"])
@@ -320,7 +322,7 @@ def cmd_catchup(args: argparse.Namespace) -> int:
     payload = build_session_catchup(target, paths_limit=args.paths_limit)
 
     if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        _emit_json(payload, getattr(args, "pretty", False))
         return 0
 
     _print_catchup(payload)
@@ -340,7 +342,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--next-session",
         help="Optional session id/path to become the new active-session pointer after successful closure",
     )
-    p_close.add_argument("--json", action="store_true", help="Emit JSON payload")
+    p_close.add_argument("--json", action="store_true", help="Emit JSON payload (compact by default)")
+    p_close.add_argument("--pretty", action="store_true", help="Pretty-print JSON output (requires --json)")
     p_close.set_defaults(func=cmd_close)
 
     p_catchup = sub.add_parser(
@@ -348,7 +351,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Summarize working-tree drift, session artifact freshness, and the next safe resume step",
     )
     p_catchup.add_argument("--session", help="Session id/path (default: active session)")
-    p_catchup.add_argument("--json", action="store_true", help="Emit JSON payload")
+    p_catchup.add_argument("--json", action="store_true", help="Emit JSON payload (compact by default)")
+    p_catchup.add_argument("--pretty", action="store_true", help="Pretty-print JSON output (requires --json)")
     p_catchup.add_argument("--paths-limit", type=int, default=10, help="Limit listed git paths in output")
     p_catchup.set_defaults(func=cmd_catchup)
 
@@ -356,14 +360,16 @@ def build_parser() -> argparse.ArgumentParser:
         "list",
         help="List project-local workbench sessions under .agents/wb with lightweight lifecycle signals",
     )
-    p_list.add_argument("--json", action="store_true", help="Emit JSON payload")
+    p_list.add_argument("--json", action="store_true", help="Emit JSON payload (compact by default)")
+    p_list.add_argument("--pretty", action="store_true", help="Pretty-print JSON output (requires --json)")
     p_list.set_defaults(func=cmd_list)
 
     p_sweep = sub.add_parser(
         "sweep",
         help="Read-only sweep of project-local workbench sessions (stale/open/close-candidate)",
     )
-    p_sweep.add_argument("--json", action="store_true", help="Emit JSON payload")
+    p_sweep.add_argument("--json", action="store_true", help="Emit JSON payload (compact by default)")
+    p_sweep.add_argument("--pretty", action="store_true", help="Pretty-print JSON output (requires --json)")
     p_sweep.set_defaults(func=cmd_sweep)
 
     return parser
@@ -371,6 +377,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    if getattr(args, "pretty", False) and not getattr(args, "json", False):
+        print("--pretty requires --json")
+        return 2
     try:
         return args.func(args)
     except Exception as exc:

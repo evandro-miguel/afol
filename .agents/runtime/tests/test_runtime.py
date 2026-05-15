@@ -6,6 +6,22 @@ from agentic_scaffold.config import find_repo_root
 from agentic_scaffold.runtime import AgenticRuntime
 
 
+def _tree_paths(tree: list[dict] | list[object]) -> set[str]:
+    paths: set[str] = set()
+
+    def visit(nodes: list[object]) -> None:
+        for node in nodes:
+            path = getattr(node, "path", None)
+            if isinstance(path, str):
+                paths.add(path)
+            children = getattr(node, "children", None)
+            if isinstance(children, list) and children:
+                visit(children)
+
+    visit(list(tree))
+    return paths
+
+
 def test_runtime_config_uses_shared_surface_contract(scaffold_repo):
     runtime = AgenticRuntime.from_repo_root(scaffold_repo)
 
@@ -149,3 +165,86 @@ def test_adoption_plan_classifies_overlay_actions(scaffold_repo):
     assert "benchmark" in kinds
     assert "rollback-record" in kinds
     assert plan.summary
+
+
+def test_workspace_inspect_generated_and_hidden_filters(scaffold_repo):
+    (scaffold_repo / ".git").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (scaffold_repo / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".venv" / "bin" / "python").write_text("#!/usr/bin/env python\n", encoding="utf-8")
+    (scaffold_repo / ".pytest_cache").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".pytest_cache" / "state").write_text("ok\n", encoding="utf-8")
+    (scaffold_repo / ".ruff_cache").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".ruff_cache" / "state").write_text("ok\n", encoding="utf-8")
+    (scaffold_repo / "__pycache__").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / "__pycache__" / "runtime.pyc").write_text("bytecode\n", encoding="utf-8")
+    (scaffold_repo / "node_modules" / "pkg").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / "node_modules" / "pkg" / "index.js").write_text("export const x = 1;\n", encoding="utf-8")
+    (scaffold_repo / ".agents" / "cache").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".agents" / "cache" / "snapshot.json").write_text("{}", encoding="utf-8")
+    (scaffold_repo / ".agents" / "tmp").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".agents" / "tmp" / "work.txt").write_text("temp\n", encoding="utf-8")
+    (scaffold_repo / ".agents" / ".tmp").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".agents" / ".tmp" / "work.txt").write_text("temp\n", encoding="utf-8")
+    (scaffold_repo / ".agents" / ".cache").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".agents" / ".cache" / "index.json").write_text("{}", encoding="utf-8")
+    (scaffold_repo / ".agents" / "scripts" / "agents_scripts.egg-info").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".agents" / "scripts" / "agents_scripts.egg-info" / "PKG-INFO").write_text(
+        "name: agents-scripts\n", encoding="utf-8"
+    )
+    (scaffold_repo / ".agents" / "tools" / "uv").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".agents" / "tools" / "uv" / "state.txt").write_text("ok\n", encoding="utf-8")
+    (scaffold_repo / ".agents" / "data" / "telemetry").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".agents" / "data" / "telemetry" / "events.jsonl").write_text("{}", encoding="utf-8")
+    (scaffold_repo / ".agents" / "wb" / "260101_test").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".agents" / "wb" / "260101_test" / "task.md").write_text("# task\n", encoding="utf-8")
+    (scaffold_repo / ".hidden-keep").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".hidden-keep" / "note.md").write_text("# keep\n", encoding="utf-8")
+    (scaffold_repo / "docs" / "keep.md").write_text("# keep\n", encoding="utf-8")
+
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    noisy_prefixes = (
+        ".git",
+        ".venv",
+        ".pytest_cache",
+        ".ruff_cache",
+        "__pycache__",
+        "node_modules",
+        ".agents/cache",
+        ".agents/tmp",
+        ".agents/.tmp",
+        ".agents/.cache",
+        ".agents/scripts/agents_scripts.egg-info",
+        ".agents/tools/uv",
+        ".agents/wb",
+        ".agents/data/telemetry/events.jsonl",
+    )
+
+    def includes_noisy(paths: set[str]) -> bool:
+        return any(path == prefix or path.startswith(f"{prefix}/") for path in paths for prefix in noisy_prefixes)
+
+    default_summary = runtime.workspace.inspect(depth=6, max_entries=2000)
+    default_paths = _tree_paths(default_summary.tree)
+    assert "docs/keep.md" in default_paths
+    assert ".hidden-keep/note.md" not in default_paths
+    assert includes_noisy(default_paths) is False
+
+    with_hidden = runtime.workspace.inspect(depth=6, include_hidden=True, max_entries=2000)
+    hidden_paths = _tree_paths(with_hidden.tree)
+    assert ".hidden-keep/note.md" in hidden_paths
+    assert includes_noisy(hidden_paths) is False
+
+    with_generated = runtime.workspace.inspect(depth=6, include_generated=True, max_entries=2000)
+    generated_paths = _tree_paths(with_generated.tree)
+    assert any(path == "node_modules" or path.startswith("node_modules/") for path in generated_paths)
+    assert any(path == ".agents/tmp" or path.startswith(".agents/tmp/") for path in generated_paths)
+    assert any(
+        path == ".agents/scripts/agents_scripts.egg-info"
+        or path.startswith(".agents/scripts/agents_scripts.egg-info/")
+        for path in generated_paths
+    )
+    assert any(path == ".agents/tools/uv" or path.startswith(".agents/tools/uv/") for path in generated_paths)
+    assert any(path == ".agents/wb" or path.startswith(".agents/wb/") for path in generated_paths)
+    assert ".agents/data/telemetry/events.jsonl" in generated_paths
+    assert ".git/HEAD" in generated_paths
+    assert ".hidden-keep/note.md" not in generated_paths

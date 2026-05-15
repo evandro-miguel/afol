@@ -80,7 +80,9 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
     assert validation_resource is not None
     assert validation_resource.name == "Validation snapshot"
 
-    validation = json.loads(validation_resource.fn())
+    validation_text = validation_resource.fn()
+    assert "\n  " not in validation_text
+    validation = json.loads(validation_text)
     assert validation["ok"] is True
     assert validation["created_dirs"] == []
     assert validation["issues"] == []

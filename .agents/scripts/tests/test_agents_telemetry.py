@@ -176,6 +176,37 @@ class AgentsTelemetryTests(unittest.TestCase):
             self.assertEqual(agents_telemetry.get_iso_timestamp(), "2026-01-01T00:00:00Z")
             mocked.assert_called_once_with("Z")
 
+    def test_query_events_json_is_compact_by_default(self):
+        script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
+        agents_telemetry = load_module("agents_telemetry_query_compact", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            events_file = root / "events.jsonl"
+            events_file.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-05-14T00:00:00Z",
+                        "event_type": "tool_exec",
+                        "session_id": "s1",
+                        "event_id": "e1",
+                        "metadata": {},
+                        "context": {},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            agents_telemetry.TELEMETRY_EVENTS_FILE = events_file
+
+            out = StringIO()
+            with patch("sys.stdout", out):
+                agents_telemetry.query_events(output_format="json")
+
+            payload = out.getvalue().strip()
+            self.assertTrue(payload.startswith("["))
+            self.assertNotIn("\n", payload)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -53,6 +53,15 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(args.command, "sweep")
         self.assertFalse(args.json)
 
+    def test_main_rejects_pretty_without_json(self):
+        args = argparse.Namespace(command="list", json=False, pretty=True, func=lambda _args: 0)
+        with mock.patch.object(self.session, "build_parser") as mocked_parser, \
+             mock.patch("builtins.print") as mock_print:
+            mocked_parser.return_value.parse_args.return_value = args
+            result = self.session.main()
+        self.assertEqual(result, 2)
+        self.assertIn("--pretty requires --json", mock_print.call_args_list[0][0][0])
+
 
 class SessionHelperTests(unittest.TestCase):
     @classmethod
@@ -143,7 +152,7 @@ class SessionCloseTests(unittest.TestCase):
         cls.session = load_module("agents_session_close_tests", SCRIPT_PATH)
 
     def _close_args(self, **overrides):
-        defaults = {"session": None, "next_session": None, "json": False}
+        defaults = {"session": None, "next_session": None, "json": False, "pretty": False}
         defaults.update(overrides)
         return argparse.Namespace(**defaults)
 
@@ -243,7 +252,7 @@ class SessionInventoryTests(unittest.TestCase):
         cls.session = load_module("agents_session_inventory_tests", SCRIPT_PATH)
 
     def _args(self, **overrides):
-        defaults = {"json": False}
+        defaults = {"json": False, "pretty": False}
         defaults.update(overrides)
         return argparse.Namespace(**defaults)
 
@@ -328,7 +337,7 @@ class SessionCatchupTests(unittest.TestCase):
         cls.session = load_module("agents_session_catchup_tests", SCRIPT_PATH)
 
     def _catchup_args(self, **overrides):
-        defaults = {"session": None, "json": False, "paths_limit": 10}
+        defaults = {"session": None, "json": False, "pretty": False, "paths_limit": 10}
         defaults.update(overrides)
         return argparse.Namespace(**defaults)
 

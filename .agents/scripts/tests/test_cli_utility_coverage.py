@@ -472,7 +472,7 @@ def test_telemetry_storage_reports_heat_and_cli(tmp_path, monkeypatch, capsys):
     telemetry.print_heat_elements(heat["all"])
     telemetry.print_heat_elements([], output_format="text")
     telemetry.print_heat_elements(heat["all"], output_format="json")
-    assert "TELEMETRY REPORT" in capsys.readouterr().out
+    assert "report:" in capsys.readouterr().out
 
     for argv in (
         ["agents-telemetry.py", "query", "--format", "json"],
@@ -917,7 +917,7 @@ def test_doctor_run_checks_success_and_error_branches(tmp_path, monkeypatch, cap
     bad.write_text("---\n: bad\n---\n# Bad\n", encoding="utf-8")
     doctor.validate_frontmatter(bad)
     doctor.print_report()
-    assert "VALIDATION REPORT" in capsys.readouterr().out
+    assert "doctor:" in capsys.readouterr().out
 
     monkeypatch.setattr(sys, "argv", ["agents-doctor.py"])
     with pytest.raises(SystemExit):
@@ -1275,7 +1275,7 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
         lambda timestamp, install_mode: {Path("docs/arc/GENERAL-ROADMAP.md"): f"roadmap {timestamp} {install_mode}\n"},
     )
     monkeypatch.setattr(bootstrap, "prepare_sibling_universal_skills_checkout", lambda target, dry_run: None)
-    monkeypatch.setattr(bootstrap, "run_post_checks", lambda target: None)
+    monkeypatch.setattr(bootstrap, "run_post_checks", lambda *args, **kwargs: None)
 
     stack = bootstrap.detect_stack(target)
     assert "Node.js (package.json)" in stack["signals"]
@@ -1317,4 +1317,4 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     assert bootstrap.main() == 0
     monkeypatch.setattr(sys, "argv", ["agents-bootstrap.py", str(source), "--dry-run"])
     assert bootstrap.main() == 1
-    assert "AGENTS BOOTSTRAP" in capsys.readouterr().out
+    assert "bootstrap:" in capsys.readouterr().out

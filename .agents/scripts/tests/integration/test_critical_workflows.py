@@ -212,7 +212,7 @@ def test_doctor_workflow(isolated_repo: Path):
     result = run_command(isolated_repo, ["doctor"])
 
     assert result.returncode == 0, result.stderr
-    assert "VALIDATION REPORT" in result.stdout
+    assert "doctor: folders=" in result.stdout
 
 
 def test_lint_workflow(isolated_repo: Path):
@@ -239,7 +239,8 @@ def test_repo_map_dry_run_workflow(isolated_repo: Path):
     result = run_command(isolated_repo, ["repo-map", ".", "--dry-run"])
 
     assert result.returncode == 0, result.stderr
-    assert "Analysis shadow repo: <dry-run skipped>" in result.stdout
+    assert "analysis_shadow_repo: <dry-run skipped>" in result.stdout
+    assert "resolved_command:" in result.stdout
     assert str(isolated_repo / "docs" / "map") in result.stdout
 
 

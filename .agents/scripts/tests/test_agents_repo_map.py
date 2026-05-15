@@ -86,7 +86,7 @@ class AgentsRepoMapTests(unittest.TestCase):
 
             output = buf.getvalue()
             self.assertEqual(code, 0)
-            self.assertIn("Analysis shadow repo: <dry-run skipped>", output)
+            self.assertIn("analysis_shadow_repo: <dry-run skipped>", output)
             self.assertIn("WARN: repo-map runner preview path does not exist", output)
             self.assertIn(str(temp_root / "missing-runner.sh"), output)
 

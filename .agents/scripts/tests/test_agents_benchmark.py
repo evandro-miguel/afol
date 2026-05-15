@@ -302,3 +302,45 @@ def test_validate_scenario_ids_rejects_unknown_ids():
         assert "Unknown benchmark scenario" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_print_show_compact_json_by_default(capsys):
+    benchmark = load_module()
+    scenario_id = next(iter(benchmark.SCENARIOS))
+    benchmark._print_show(scenario_id, pretty=False)
+    output = capsys.readouterr().out.strip()
+    assert output.startswith("{")
+    assert "\n" not in output
+
+
+def test_main_run_emits_compact_json(monkeypatch, capsys):
+    benchmark = load_module()
+
+    def fake_run_suite(_ids, _profile, _output, executor=None):
+        _ = executor
+        return {
+            "pack_id": benchmark.BENCHMARK_PACK_ID,
+            "generated_at": "2026-05-14T00:00:00Z",
+            "benchmark_profile": benchmark.DEFAULT_PROFILE.to_dict(),
+            "scenario_count": 0,
+            "pass": True,
+            "duration_ms": 0,
+            "tool_call_count": 0,
+            "tool_success_count": 0,
+            "error_count": 0,
+            "retry_count": 0,
+            "checks_total": 0,
+            "checks_passed": 0,
+            "context_bytes_total": 0,
+            "prompt_bytes_total": 0,
+            "accuracy": 1.0,
+            "tool_success_rate": 0.0,
+            "scenarios": [],
+        }
+
+    monkeypatch.setattr(benchmark, "run_suite", fake_run_suite)
+    code = benchmark.main(["run"])
+    output = capsys.readouterr().out.strip()
+    assert code == 0
+    assert output.startswith("{")
+    assert "\n" not in output

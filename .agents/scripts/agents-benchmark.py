@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from lib.cli_output import to_json_text
+
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 AGENTS_DIR = ROOT_DIR / ".agents"
@@ -1913,7 +1915,7 @@ def _print_list() -> None:
         print(f"- {scenario.id}: {scenario.description}")
 
 
-def _print_show(scenario_id: str) -> None:
+def _print_show(scenario_id: str, pretty: bool = False) -> None:
     scenario = SCENARIOS.get(scenario_id)
     if scenario is None:
         raise ValueError(f"Unknown benchmark scenario: {scenario_id}")
@@ -1931,7 +1933,7 @@ def _print_show(scenario_id: str) -> None:
         "timeout_seconds": scenario.timeout_seconds,
         "benchmark_profile": DEFAULT_PROFILE.to_dict(),
     }
-    print(json.dumps(payload, indent=2))
+    print(to_json_text(payload, pretty=pretty, sort_keys=False))
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -1942,11 +1944,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     show_parser = subparsers.add_parser("show", help="Show one benchmark scenario")
     show_parser.add_argument("scenario_id")
+    show_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
 
     run_parser = subparsers.add_parser("run", help="Run one or more benchmark scenarios")
     run_parser.add_argument("scenario_ids", nargs="*", help="Optional benchmark scenario ids")
     run_parser.add_argument("--save", action="store_true", help="Save results under .agents/data/benchmarks/results/")
     run_parser.add_argument("--output", type=Path, help="Write the JSON payload to an explicit path")
+    run_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
     return parser
 
 
@@ -1960,7 +1964,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "show":
-            _print_show(args.scenario_id)
+            _print_show(args.scenario_id, args.pretty)
             return 0
 
         if args.command == "run":
@@ -1969,20 +1973,21 @@ def main(argv: list[str] | None = None) -> int:
             if saved_path is not None:
                 payload = dict(payload)
                 payload["saved_to"] = _relative_from_root(saved_path)
-            print(json.dumps(payload, indent=2))
+            print(to_json_text(payload, pretty=args.pretty, sort_keys=False))
             return 0 if payload["pass"] else 1
     except ValueError as exc:
         print(f"❌ {exc}")
         return 2
     except subprocess.TimeoutExpired as exc:
         print(
-            json.dumps(
+            to_json_text(
                 {
                     "pack_id": BENCHMARK_PACK_ID,
                     "pass": False,
                     "error": f"benchmark timed out after {exc.timeout}s",
                 },
-                indent=2,
+                pretty=False,
+                sort_keys=False,
             )
         )
         return 1

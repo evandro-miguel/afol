@@ -305,11 +305,10 @@ def _validate_semantic_signals(output_root: Path) -> None:
 
 
 def _print_summary(repo_root: Path, output_root: Path, runner: Path, image: str, generated: list[Path]) -> None:
-    print("Agents Repo Map")
-    print(f"repo: {repo_root}")
-    print(f"output: {output_root}")
-    print(f"runner: {runner}")
-    print(f"image: {image}")
+    print(
+        "repo_map: "
+        f"repo={repo_root} output={output_root} runner={runner} image={image} generated={len(generated)}"
+    )
     print("generated_artifacts:")
     for path in generated:
         print(f" - {path}")
@@ -383,16 +382,14 @@ def main() -> int:
         print(f"❌ {exc}")
         return 1
 
-    print(f"Source repo: {repo_root}")
-    print(f"Final output root: {output_root}")
-
     if args.dry_run:
         runner = _resolve_runner_preview(args.runner)
         cmd = [str(runner), str(repo_root), str(output_root), str(args.image)]
-        print("Analysis shadow repo: <dry-run skipped>")
+        print(f"repo_map_dry_run: repo={repo_root} output={output_root}")
+        print("analysis_shadow_repo: <dry-run skipped>")
         if not runner.exists():
             print(f"WARN: repo-map runner preview path does not exist: {runner}")
-        print("Resolved repo-map command:")
+        print("resolved_command:")
         print(" ".join(cmd))
         return 0
 
@@ -405,8 +402,8 @@ def main() -> int:
     staging_root, shadow_repo = _prepare_shadow_repo(repo_root)
     shadow_output = staging_root / "map-output"
     cmd = [str(runner), str(shadow_repo), str(shadow_output), str(args.image)]
-    print(f"Analysis shadow repo: {shadow_repo}")
-    print("Resolved repo-map command:")
+    print(f"analysis_shadow_repo: {shadow_repo}")
+    print("resolved_command:")
     print(" ".join(cmd))
 
     try:

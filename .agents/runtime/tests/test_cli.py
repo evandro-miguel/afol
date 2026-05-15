@@ -16,6 +16,15 @@ def test_cli_manifest(scaffold_repo):
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["skill_count"] == 1
+    assert "\n  " not in result.stdout
+
+
+def test_cli_manifest_pretty_mode(scaffold_repo):
+    result = runner.invoke(app, ["manifest", "--pretty", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["skill_count"] == 1
+    assert "\n  " in result.stdout
 
 
 

@@ -139,6 +139,8 @@ PARTIAL_STARTER_PARENT_SPECS = [
 BOOTSTRAP_MANIFEST_PATH = Path(".agents/bootstrap-manifest.json")
 BOOTSTRAP_MANIFEST_VERSION = 1
 POST_CHECK_TIMEOUT_SECONDS = 600
+_VERBOSE_OUTPUT = True
+_ACTION_COUNTS: Dict[str, int] = {}
 
 
 class BootstrapAction(str, Enum):
@@ -491,6 +493,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip post-bootstrap doctor/tools-check verification",
     )
+    parser.add_argument("--verbose", action="store_true", help="Show per-file action output")
     return parser.parse_args()
 
 
@@ -529,7 +532,17 @@ def detect_stack(target: Path) -> Dict[str, List[str]]:
 
 
 def print_action(action: str, path: Path):
-    print(f"- {action}: {path}")
+    _ACTION_COUNTS[action] = _ACTION_COUNTS.get(action, 0) + 1
+    if _VERBOSE_OUTPUT:
+        print(f"- {action}: {path}")
+
+
+def print_action_summary() -> None:
+    if not _ACTION_COUNTS:
+        print("actions: none")
+        return
+    summary = ", ".join(f"{name}={count}" for name, count in sorted(_ACTION_COUNTS.items()))
+    print(f"actions: {summary}")
 
 
 def safe_copy_file(src: Path, dst: Path, force: bool, dry_run: bool):
@@ -1525,21 +1538,22 @@ def validate_target(target: Path, dry_run: bool, install_mode: str):
 def main() -> int:
     args = parse_args()
     target = Path(args.target).resolve()
+    global _VERBOSE_OUTPUT
+    _VERBOSE_OUTPUT = args.verbose
+    _ACTION_COUNTS.clear()
 
-    print("=" * 70)
-    print("AGENTS BOOTSTRAP")
-    print("=" * 70)
-    print(f"Source: {TEMPLATE_ROOT}")
-    print(f"Target: {target}")
     install_mode = INSTALL_MODE_PARTIAL if args.partial else INSTALL_MODE_FULL
-    print(f"Mode:   {'dry-run' if args.dry_run else 'apply'} ({install_mode})")
-    print()
+    print(
+        "bootstrap: "
+        f"source={TEMPLATE_ROOT} target={target} mode={'dry-run' if args.dry_run else 'apply'} "
+        f"install_mode={install_mode}"
+    )
 
     try:
         validate_target(target, args.dry_run, install_mode)
 
         stack = detect_stack(target)
-        print("Detected stack:")
+        print("detected_stack:")
         for signal in stack["signals"]:
             print(f"  - {signal}")
 
@@ -1561,7 +1575,8 @@ def main() -> int:
         if not args.dry_run and not args.skip_checks:
             run_post_checks(target, install_mode)
 
-        print("\n✅ Bootstrap completed")
+        print("✅ Bootstrap completed")
+        print_action_summary()
         if args.dry_run:
             print("Dry-run only: no files were written")
         else:
@@ -1569,7 +1584,8 @@ def main() -> int:
         return 0
 
     except Exception as exc:
-        print(f"\n❌ Bootstrap failed: {exc}")
+        print_action_summary()
+        print(f"❌ Bootstrap failed: {exc}")
         return 1
 
 
