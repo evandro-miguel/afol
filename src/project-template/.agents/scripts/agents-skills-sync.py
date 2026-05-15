@@ -336,6 +336,9 @@ def _normalize_v2_manifest(data: Dict[str, Any]) -> Dict[str, Any]:
     source_data = data.get("source")
     if isinstance(source_data, dict):
         manifest["source"] = dict(source_data)
+    channel_data = data.get("channel")
+    if isinstance(channel_data, str) and channel_data.strip():
+        manifest["channel"] = _normalize_channel_name(channel_data)
 
     if not manifest["repo"]:
         manifest["repo"] = str(cfg("upstream_repo_url")).strip()
@@ -412,11 +415,114 @@ def _source_metadata(source_repo: Path, *, ref: str | None = None) -> Dict[str, 
     return metadata
 
 
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _normalize_release_tag(value: Any) -> str:
+    if not isinstance(value, str):
+        raise RuntimeError("Invalid release tag: expected a string")
+    text = value.strip()
+    match = re.fullmatch(r"v?(\d+\.\d+\.\d+)", text)
+    if not match:
+        raise RuntimeError(f"Invalid release tag: {value}")
+    return f"v{match.group(1)}"
+
+
+def _normalize_channel_name(value: Any) -> str:
+    if not isinstance(value, str):
+        raise RuntimeError("Invalid release channel: expected a string")
+    text = value.strip()
+    if not re.fullmatch(r"[a-z][a-z0-9-]*", text):
+        raise RuntimeError(f"Invalid release channel: {value}")
+    return text
+
+
+def _is_floating_ref(ref: str) -> bool:
+    text = ref.strip()
+    if re.fullmatch(r"[a-f0-9]{40}", text, flags=re.IGNORECASE):
+        return False
+    if re.fullmatch(r"v\d+\.\d+\.\d+", text):
+        return False
+    return True
+
+
+def _read_release_channel(repo: Path, channel: str) -> Dict[str, Any]:
+    channel = _normalize_channel_name(channel)
+    channel_path = repo / "releases" / "channels" / f"{channel}.json"
+    if not channel_path.exists():
+        raise RuntimeError(f"Release channel not found: {channel_path}")
+    try:
+        data = json.loads(channel_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Could not parse release channel {channel_path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Release channel must be a JSON object: {channel_path}")
+    if data.get("channel") != channel:
+        raise RuntimeError(f"Release channel mismatch in {channel_path}")
+    return data
+
+
+def _require_channel_policy(channel_data: Dict[str, Any], channel: str):
+    policy = channel_data.get("policy")
+    if not isinstance(policy, dict):
+        raise RuntimeError(f"Release channel '{channel}' missing policy")
+    if policy.get("allowFloatingRef") is not False:
+        raise RuntimeError(f"Release channel '{channel}' must disable floating refs")
+    if policy.get("requireReleaseManifest") is not True or policy.get("requireSkillBom") is not True:
+        raise RuntimeError(f"Release channel '{channel}' must require release manifest and skill BOM")
+
+
+def _verify_release_channel_artifacts(repo: Path, channel_data: Dict[str, Any]) -> Dict[str, str]:
+    channel = _normalize_channel_name(str(channel_data.get("channel", "")))
+    _require_channel_policy(channel_data, channel)
+    release_tag = _normalize_release_tag(str(channel_data.get("releaseTag", "")))
+    commit = str(channel_data.get("commit", "")).strip().lower()
+    source_sha = str(channel_data.get("sourceSha256", "")).strip().lower()
+    manifest_sha = str(channel_data.get("releaseManifestSha256", "")).strip().lower()
+    bom_sha = str(channel_data.get("skillBomSha256", "")).strip().lower()
+
+    for label, value in {
+        "commit": commit,
+        "sourceSha256": source_sha,
+        "releaseManifestSha256": manifest_sha,
+        "skillBomSha256": bom_sha,
+    }.items():
+        pattern = r"^[a-f0-9]{40}$" if label == "commit" else r"^[a-f0-9]{64}$"
+        if not re.fullmatch(pattern, value, flags=re.IGNORECASE):
+            raise RuntimeError(f"Release channel '{channel}' has invalid {label}")
+
+    manifest_file = repo / "releases" / "manifests" / f"{release_tag}.json"
+    bom_file = repo / "releases" / "boms" / f"{release_tag}.skill-bom.json"
+    checksum_file = repo / "releases" / "checksums" / f"{release_tag}.sha256"
+    for required in [manifest_file, bom_file, checksum_file]:
+        if not required.exists():
+            raise RuntimeError(f"Release artifact not found: {required}")
+    if _sha256_file(manifest_file) != manifest_sha:
+        raise RuntimeError(f"Release channel '{channel}' manifest hash mismatch")
+    if _sha256_file(bom_file) != bom_sha:
+        raise RuntimeError(f"Release channel '{channel}' skill BOM hash mismatch")
+    checksum_value = checksum_file.read_text(encoding="utf-8").strip().split()[0].lower()
+    if checksum_value != source_sha:
+        raise RuntimeError(f"Release channel '{channel}' source checksum mismatch")
+
+    return {
+        "channel": channel,
+        "releaseTag": release_tag,
+        "commit": commit,
+        "sourceSha256": source_sha,
+        "releaseManifestSha256": manifest_sha,
+        "skillBomSha256": bom_sha,
+        "verifiedAt": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+
+
 def _update_source_metadata(
     manifest: Dict[str, Any],
     source_repo: Path,
     *,
     ref: str | None = None,
+    verification: Dict[str, str] | None = None,
 ):
     source_entry = manifest.get("source")
     if source_entry is not None and not isinstance(source_entry, dict):
@@ -424,6 +530,8 @@ def _update_source_metadata(
     if not isinstance(source_entry, dict):
         source_entry = {}
     source_entry.update(_source_metadata(source_repo, ref=ref))
+    if verification:
+        source_entry["verification"] = verification
     manifest["source"] = source_entry
 
 
@@ -680,19 +788,54 @@ def ensure_git_sync_repo(manifest: Dict[str, Any] | None = None) -> Path | None:
     return existing_git_sync_repo_path()
 
 
-def refresh_git_sync_repo(manifest: Dict[str, Any]) -> Path | None:
+def refresh_git_sync_repo(
+    manifest: Dict[str, Any],
+    *,
+    channel: str | None = None,
+    release_tag: str | None = None,
+    allow_floating_ref: bool = False,
+) -> Path | None:
     repo = ensure_git_sync_repo(manifest)
     if repo is None:
+        if channel or release_tag:
+            raise RuntimeError("Verified skills updates require a configured external git source")
         return None
 
     ref = str(manifest.get("ref") or cfg("upstream_branch")).strip()
     if not (repo / ".git").exists():
+        if channel or release_tag:
+            raise RuntimeError(f"Verified skills updates require a git repository: {repo}")
         return None
 
-    run(["git", "fetch", "origin"], cwd=repo)
-    run(["git", "checkout", ref], cwd=repo)
-    run(["git", "pull", "--ff-only", "origin", ref], cwd=repo)
-    _update_source_metadata(manifest, repo, ref=ref)
+    verification: Dict[str, str] | None = None
+    if channel:
+        channel_name = _normalize_channel_name(channel)
+        run(["git", "fetch", "origin"], cwd=repo)
+        channel_data = _read_release_channel(repo, channel_name)
+        ref = _normalize_release_tag(release_tag or str(channel_data.get("releaseTag", "")))
+        if channel_data.get("releaseTag") != ref:
+            raise RuntimeError(f"Release channel '{channel_name}' does not point to {ref}")
+        run(["git", "checkout", ref], cwd=repo)
+        verification = _verify_release_channel_artifacts(repo, channel_data)
+        current_commit = _git_head_commit(repo)
+        if current_commit and current_commit.lower() != verification["commit"]:
+            raise RuntimeError(
+                f"Release channel '{channel_name}' commit mismatch: "
+                f"expected {verification['commit']}, got {current_commit.lower()}"
+            )
+        manifest["channel"] = channel_name
+        manifest["ref"] = ref
+    else:
+        if _is_floating_ref(ref) and not allow_floating_ref and release_tag:
+            raise RuntimeError(f"Refusing floating skills source ref '{ref}' without --allow-floating-ref")
+        if release_tag:
+            ref = _normalize_release_tag(release_tag)
+            manifest["ref"] = ref
+        run(["git", "fetch", "origin"], cwd=repo)
+        run(["git", "checkout", ref], cwd=repo)
+        if _is_floating_ref(ref):
+            run(["git", "pull", "--ff-only", "origin", ref], cwd=repo)
+    _update_source_metadata(manifest, repo, ref=ref, verification=verification)
     return repo
 
 
@@ -962,7 +1105,12 @@ def cmd_pull(args: argparse.Namespace):
         return
 
     manifest = load_manifest()
-    repo = refresh_git_sync_repo(manifest)
+    repo = refresh_git_sync_repo(
+        manifest,
+        channel=getattr(args, "channel", None),
+        release_tag=getattr(args, "release_tag", None),
+        allow_floating_ref=bool(getattr(args, "allow_floating_ref", False)),
+    )
     if repo is None:
         repo = source_repo_path()
         _update_source_metadata(
@@ -1217,8 +1365,13 @@ def cmd_ensure(args: argparse.Namespace):
 
     manifest = load_manifest()
     refreshed_repo: Path | None = None
-    if getattr(args, "pull", False):
-        refreshed_repo = refresh_git_sync_repo(manifest)
+    if getattr(args, "pull", False) or getattr(args, "channel", None) or getattr(args, "release_tag", None):
+        refreshed_repo = refresh_git_sync_repo(
+            manifest,
+            channel=getattr(args, "channel", None),
+            release_tag=getattr(args, "release_tag", None),
+            allow_floating_ref=bool(getattr(args, "allow_floating_ref", False)),
+        )
     else:
         ensure_repo_cloned(manifest)
 
@@ -1393,7 +1546,16 @@ def cmd_sync(args: argparse.Namespace):
     if not skills:
         raise RuntimeError("No selected skills. Provide --skills or update manifest.")
 
-    refreshed_repo = refresh_git_sync_repo(manifest) if getattr(args, "pull", False) else None
+    refreshed_repo = (
+        refresh_git_sync_repo(
+            manifest,
+            channel=getattr(args, "channel", None),
+            release_tag=getattr(args, "release_tag", None),
+            allow_floating_ref=bool(getattr(args, "allow_floating_ref", False)),
+        )
+        if getattr(args, "pull", False) or getattr(args, "channel", None) or getattr(args, "release_tag", None)
+        else None
+    )
     source_repo = refreshed_repo or source_repo_path()
     if refreshed_repo is not None:
         mirror_skills_to_local_source(refreshed_repo, skills, manifest)
@@ -1594,6 +1756,14 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--runtime", dest="runtime", help="Target runtime/app")
             sp.add_argument("--app", dest="runtime", help="Alias for --runtime")
             sp.add_argument("--profile", help="Profile name used for selected installs")
+        if name in {"pull", "sync", "update", "ensure"}:
+            sp.add_argument("--channel", help="Verified release channel to use, for example stable")
+            sp.add_argument("--release-tag", help="Verified release tag to use, for example v1.2.3")
+            sp.add_argument(
+                "--allow-floating-ref",
+                action="store_true",
+                help="Allow a mutable branch ref for development-only refreshes",
+            )
         if name in {"sync", "update"}:
             sp.add_argument(
                 "--pull",

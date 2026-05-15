@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import io
 import json
 import sys
@@ -91,6 +92,47 @@ class AgentsSkillsSyncTests(unittest.TestCase):
         (source_root / "profiles").mkdir(parents=True, exist_ok=True)
         (source_root / "index.json").write_text(index, encoding="utf-8")
         return source_root
+
+    def _write_release_channel(
+        self,
+        source_root: Path,
+        *,
+        channel: str = "stable",
+        release_tag: str = "v1.2.3",
+        commit: str = "a" * 40,
+        source_sha256: str = "b" * 64,
+        bom_body: str | None = None,
+    ) -> dict:
+        manifest_body = json.dumps({"release": release_tag, "artifacts": []}, sort_keys=True) + "\n"
+        bom_body = bom_body or json.dumps({"release": release_tag, "skills": []}, sort_keys=True) + "\n"
+        releases = source_root / "releases"
+        manifest_path = releases / "manifests" / f"{release_tag}.json"
+        bom_path = releases / "boms" / f"{release_tag}.skill-bom.json"
+        checksum_path = releases / "checksums" / f"{release_tag}.sha256"
+        channel_path = releases / "channels" / f"{channel}.json"
+        for parent in [manifest_path.parent, bom_path.parent, checksum_path.parent, channel_path.parent]:
+            parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(manifest_body, encoding="utf-8")
+        bom_path.write_text(bom_body, encoding="utf-8")
+        checksum_path.write_text(f"{source_sha256}  source.tar.gz\n", encoding="utf-8")
+        channel_data = {
+            "channel": channel,
+            "releaseTag": release_tag,
+            "commit": commit,
+            "sourceSha256": source_sha256,
+            "releaseManifestSha256": hashlib.sha256(manifest_body.encode("utf-8")).hexdigest(),
+            "skillBomSha256": hashlib.sha256(bom_body.encode("utf-8")).hexdigest(),
+            "generatedAt": "2026-05-15T00:00:00Z",
+            "policy": {
+                "allowFloatingRef": False,
+                "requireSignedTag": True,
+                "requireReleaseManifest": True,
+                "requireSkillBom": True,
+                "requireSourceChecksum": True,
+            },
+        }
+        channel_path.write_text(json.dumps(channel_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return channel_data
 
     def test_legacy_manifest_migrates_to_version2(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -740,6 +782,127 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertEqual(source.get("ref"), "release/main")
             self.assertEqual(source.get("branch"), "release/main")
             self.assertEqual(source.get("commit"), "abc123")
+
+    def test_cmd_pull_with_channel_checks_out_verified_release(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._make_source_skill(root, "writing-skills", description="Local seed")
+            self._make_profile(root, "core", ["writing-skills"])
+            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+
+            self._make_source_skill(
+                Path(td),
+                "writing-skills",
+                description="External version",
+                source_dir="external-universal-skills",
+            )
+            self._make_profile(
+                Path(td),
+                "core",
+                ["writing-skills"],
+                source_dir="external-universal-skills",
+            )
+            (external_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            commit = "a" * 40
+            self._write_release_channel(external_root, commit=commit)
+
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            with (
+                mock.patch.object(module, "run") as patched_run,
+                mock.patch.object(module, "_git_head_ref", return_value="HEAD"),
+                mock.patch.object(module, "_git_head_commit", return_value=commit),
+            ):
+                module.cmd_pull(args)
+
+            self.assertEqual(
+                patched_run.call_args_list,
+                [
+                    mock.call(["git", "fetch", "origin"], cwd=external_root),
+                    mock.call(["git", "checkout", "v1.2.3"], cwd=external_root),
+                ],
+            )
+            loaded = module.load_manifest()
+            self.assertEqual(loaded["ref"], "v1.2.3")
+            self.assertEqual(loaded["channel"], "stable")
+            verification = loaded.get("source", {}).get("verification", {})
+            self.assertEqual(verification.get("channel"), "stable")
+            self.assertEqual(verification.get("releaseTag"), "v1.2.3")
+            self.assertEqual(verification.get("commit"), commit)
+
+    def test_cmd_pull_with_channel_rejects_release_tag_mismatch(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root)
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "stable", "release_tag": "v9.9.9", "allow_floating_ref": False})()
+            with mock.patch.object(module, "run"):
+                with self.assertRaisesRegex(RuntimeError, "does not point to v9.9.9"):
+                    module.cmd_pull(args)
+
+    def test_cmd_pull_with_channel_rejects_bad_bom_hash(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            external_root = Path(td) / "external-universal-skills"
+            module = self._load_with_root(root)
+            module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
+            self._seed_source_repo(root)
+            self._seed_source_repo(Path(td), source_dir="external-universal-skills")
+            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
+            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            (external_root / ".git").mkdir(parents=True, exist_ok=True)
+            self._write_release_channel(external_root)
+            (external_root / "releases/boms/v1.2.3.skill-bom.json").write_text(
+                '{"release":"v1.2.3","skills":["tampered"]}\n',
+                encoding="utf-8",
+            )
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            with mock.patch.object(module, "run"):
+                with self.assertRaisesRegex(RuntimeError, "skill BOM hash mismatch"):
+                    module.cmd_pull(args)
 
     def test_cmd_sync_updates_project_from_external_source_without_refreshing(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
