@@ -70,12 +70,23 @@ def test_cli_command_registry_manifest(scaffold_repo):
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     commands = {item["name"]: item for item in payload["commands"]}
-    assert {"status", "knowledge", "session", "doctor", "benchmark", "skills-sync", "verify-tasks"} <= set(commands)
+    assert {
+        "status",
+        "knowledge",
+        "session",
+        "doctor",
+        "benchmark",
+        "scaffold-update",
+        "skills-sync",
+        "verify-tasks",
+    } <= set(commands)
     assert commands["status"]["script_name"] == "agents-status.py"
+    assert commands["scaffold-update"]["script_name"] == "agents-scaffold-update.py"
     assert commands["verify"]["alias_of"] == "verify-tasks"
 
     help_commands = {item["name"]: item for item in payload["help_commands"]}
     assert "lint-docs" in help_commands
+    assert "scaffold-update" in help_commands
     assert "lint" not in help_commands
     assert help_commands["lint-docs"]["aliases"] == ["lint"]
     assert help_commands["structure-map"]["aliases"] == ["map"]

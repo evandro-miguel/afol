@@ -552,6 +552,7 @@ declare -A COMMAND_MAP=(
     ["knowledge"]="agents-knowledge"
     ["memory"]="agents-memory"
     ["bootstrap"]="agents-bootstrap"
+    ["scaffold-update"]="agents-scaffold-update"
     ["skills-sync"]="agents-skills-sync"
     ["fix-symlinks"]="agents-fix-symlinks"
 )
@@ -625,6 +626,7 @@ show_help() {
         echo "  knowledge           Search and pull reusable workbench knowledge"
         echo "  memory              Emit governed external-memory MCP contracts"
         echo "  bootstrap           Install the scaffold into another repository"
+        echo "  scaffold-update     Update scaffold-owned .agents files from an allowlisted payload"
         echo "  skills-sync         Sync project skills from universal-skills"
         echo "  fix-symlinks        Repair symlinks with copy fallback"
         echo "  hydrate-uv          Install/copy uv into .agents/tools/uv/"
@@ -664,6 +666,7 @@ show_help() {
     echo "  .agents/agents runtime manifest"
     echo "  .agents/agents mcp validate"
     echo "  .agents/agents bootstrap /path/to/target-repo --dry-run"
+    echo "  .agents/agents scaffold-update --channel stable --source /path/to/source-repo --plan-only"
     echo "  .agents/agents skills-sync status"
     echo "  .agents/agents fix-symlinks --dry-run"
 }
