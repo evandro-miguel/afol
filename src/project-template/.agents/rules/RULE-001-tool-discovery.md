@@ -4,167 +4,62 @@ theme: tool-discovery-usage
 version: 1.0
 created: 2026-02-23
 applies_to: All agents (QWEN, CLAUDE, GEMINI)
-updated_at: '2026-04-13T19:37:09-03:00'
+updated_at: '2026-05-14T20:05:00-03:00'
 ---
 
 # Tool Discovery & Usage
 
-**Purpose:** Ensure agents discover and use .agents tools correctly.
-
----
+**Purpose:** Discover tools first. Use smallest correct tool.
 
 ## Mandatory First Step
-
-**BEFORE any work, ALWAYS run:**
 
 ```bash
 ./.agents/agents tools list
 ```
-
----
 
 ## Tool Discovery Commands
 
 | Command | Purpose |
-|---------|---------|
-| `.agents/agents tools list` | List all available tools |
-| `.agents/agents tools list --type validation` | Filter by type |
-| `.agents/agents tools search <keyword>` | Search by keyword |
-| `.agents/agents tools info <tool-id>` | Get detailed info |
-| `.agents/agents tools help` | Show help |
-
----
-
-## Tool Categories
-
-| Type | Tools | When to Use |
-|------|-------|-------------|
-| `validation` | `doctor`, `lint-docs` | Before commits |
-| `creation` | `new` | Starting new work |
-| `documentation` | `index`, `structure-map` | After creating specs |
-| `verification` | `verify-tasks` | Before marking complete |
-| `automation` | `wb-update` | Repetitive tasks |
-| `synchronization` | `sync` | After AGENTS.md changes |
-| `discovery` | `tools` | When unsure |
-
----
+| --- | --- |
+| `./.agents/agents tools list` | List available tools |
+| `./.agents/agents tools list --type validation` | Show validation tools |
+| `./.agents/agents tools search <keyword>` | Find tool by keyword |
+| `./.agents/agents tools info <tool-id>` | Show tool details |
+| `./.agents/agents tools help` | Command help |
 
 ## Tool Usage Pattern
 
 ```text
-1. Discover → .agents/agents tools list
-2. Learn    → .agents/agents tools info <tool-id>
-3. Read     → docs/agentic/<tool>.md
-4. Execute  → .agents/agents <command> [args]
-5. Verify   → Check output and exit code
+1) Discover: tools list
+2) Scope: tools info <tool-id>
+3) Read: docs/agentic/<tool>.md
+4) Execute: ./.agents/agents <command>
+5) Verify: exit code + output
 ```
 
----
-
-## Common Tools Quick Reference
-
-### doctor (validation)
+## Common Commands
 
 ```bash
 ./.agents/agents doctor
-just doctor
-```
-
-**When:** Before starting work, after structural changes
-
-### new (creation)
-
-```bash
-./.agents/agents new <theme> --spec
-just new THEME=<theme>
-```
-
-**When:** Starting new feature/bugfix
-
-### verify-tasks (verification)
-
-```bash
+./.agents/agents new <theme> --feature-id F-01 --parent-spec <parent-spec-id>
 ./.agents/agents verify-tasks .agents/wb/<session>/
-just verify
-```
-
-**When:** Before marking workstream complete
-
-### wb-update (automation)
-
-```bash
 ./.agents/agents wb-update touch
-./.agents/agents wb-update task T-01 --mark-done
-./.agents/agents wb-update timeline --message "done"
-```
-
-**When:** Updating workbench metadata
-
-### lint-docs (validation)
-
-```bash
 ./.agents/agents lint-docs .agents/wb/
-just lint
 ```
-
-**When:** Before commits, after editing docs
-
----
 
 ## Justfile Quick Reference
 
 ```bash
-just help              # Show all commands
-just doctor            # Validate structure
-just new THEME=x       # Create workstream
-just verify            # Verify tasks complete
-just lint              # Lint markdown docs
-just all               # Full validation
-just st                # structure (alias)
-just dr                # doctor (alias)
+just help
+just doctor
+just new THEME=<theme>
+just lint
+just verify
+just all
 ```
 
----
+## Rule
 
-## Best Practices
-
-**DO:**
-
-- ✅ Run `tools list` before starting work
-- ✅ Use `tools info <tool>` to learn about tools
-- ✅ Read `docs/agentic/<tool>.md` for details
-- ✅ Run `just doctor` + `just lint` + `just verify` before commits
-
-**DON'T:**
-
-- ❌ Skip tool discovery
-- ❌ Use tools without reading docs
-- ❌ Commit without validation
-- ❌ Use `doc` as alias (use `dr` for doctor)
-
----
-
-## Troubleshooting
-
-```bash
-# Tool not found
-python -m json.tool .agents/tools.json
-
-# List available tools
-./.agents/agents tools list
-
-# Check wrapper
-./.agents/agents help
-```
-
----
-
-## References
-
-- `.agents/agents tools list` - Tool discovery command
-- `.agents/agents tools info <tool-id>` - Tool details
-- `.agents/tools.json` - Tool catalog
-
----
-
-*Version: 1.0 | Lines: ~150 | Max: 250*
+- No blind tool use.
+- No large discovery when focused commands can answer.
+- Validate before closing work.
