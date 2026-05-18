@@ -2,8 +2,9 @@
 
 All active workstreams live here in session folders.
 
-The `.active_session` file points to the live session folder and should be
-treated as the source of truth when the table and folders drift.
+The `.active_session` file is a project-local convenience pointer for one
+operator. Parallel agents should target sessions explicitly with `--session` or
+`AGENTS_SESSION_ID`; do not treat `.active_session` as shared synchronization.
 
 ## Naming convention
 
@@ -35,6 +36,9 @@ Optional pack folders for multiple major tracks:
 | Session | Theme | Status |
 |---------|-------|--------|
 | `260413_1851_just-command-runner-migration` | `just-command-runner-migration` | active |
+
+Use `./.agents/agents session list` and `./.agents/agents session sweep` to
+review local session state before resuming or closing work.
 
 ## Archive
 

@@ -22,6 +22,7 @@ class RuntimeCommand:
 
 _PRIMARY_COMMAND_SPECS = (
     ("doctor", "agents-doctor.py", "Validate .agents structure and integrity.", ()),
+    ("benchmark", "agents-benchmark.py", "Run controlled runtime-flow benchmark scenarios.", ()),
     ("new", "agents-new.py", "Create new governed workstreams.", ()),
     ("index", "agents-index.py", "Update specs and decision indexes.", ()),
     ("lint-docs", "agents-lint-docs.py", "Validate markdown docs consistency.", ("lint",)),
@@ -41,6 +42,7 @@ _PRIMARY_COMMAND_SPECS = (
     ("knowledge", "agents-knowledge.py", "Search and pull reusable workbench knowledge.", ()),
     ("memory", "agents-memory.py", "Emit governed external-memory MCP contracts.", ()),
     ("bootstrap", "agents-bootstrap.py", "Install the scaffold into another repository.", ()),
+    ("scaffold-update", "agents-scaffold-update.py", "Update scaffold-owned .agents files from a verified allowlisted payload.", ()),
     ("skills-sync", "agents-skills-sync.py", "Sync project skills from universal-skills.", ()),
     ("fix-symlinks", "agents-fix-symlinks.py", "Repair symlinks with copy fallback.", ()),
 )

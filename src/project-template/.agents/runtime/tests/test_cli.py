@@ -26,6 +26,27 @@ def test_cli_validate(scaffold_repo):
     assert payload["ok"] is True
 
 
+def test_cli_adoption_plan(scaffold_repo):
+    result = runner.invoke(app, ["adoption-plan", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["repo_root"] == str(scaffold_repo)
+    assert payload["inspection"]["has_runtime_wrapper"] is False
+    kinds = [item["kind"] for item in payload["actions"]]
+    assert "add-wrapper" in kinds
+    assert "reconcile-skills" in kinds
+    assert "benchmark" in kinds
+
+
+def test_cli_inspect_target(scaffold_repo):
+    result = runner.invoke(app, ["inspect-target", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["repo_root"] == str(scaffold_repo)
+    assert payload["has_justfile"] is False
+    assert payload["has_mcp_wrapper"] is False
+
+
 def _write_argv_script(scaffold_repo, script_name: str, label: str) -> None:
     script = scaffold_repo / ".agents" / "scripts" / script_name
     script.write_text(
@@ -40,12 +61,23 @@ def test_cli_command_registry_manifest(scaffold_repo):
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     commands = {item["name"]: item for item in payload["commands"]}
-    assert {"status", "knowledge", "session", "doctor", "skills-sync", "verify-tasks"} <= set(commands)
+    assert {
+        "status",
+        "knowledge",
+        "session",
+        "doctor",
+        "benchmark",
+        "scaffold-update",
+        "skills-sync",
+        "verify-tasks",
+    } <= set(commands)
     assert commands["status"]["script_name"] == "agents-status.py"
+    assert commands["scaffold-update"]["script_name"] == "agents-scaffold-update.py"
     assert commands["verify"]["alias_of"] == "verify-tasks"
 
     help_commands = {item["name"]: item for item in payload["help_commands"]}
     assert "lint-docs" in help_commands
+    assert "scaffold-update" in help_commands
     assert "lint" not in help_commands
     assert help_commands["lint-docs"]["aliases"] == ["lint"]
     assert help_commands["structure-map"]["aliases"] == ["map"]
@@ -78,6 +110,13 @@ def test_cli_run_registered_command(scaffold_repo):
     result = runner.invoke(app, ["run", "doctor", "--fix", "--repo-root", str(scaffold_repo)])
     assert result.exit_code == 0
     assert result.stdout == "doctor:--fix\n"
+
+
+def test_cli_run_registered_benchmark_command(scaffold_repo):
+    _write_argv_script(scaffold_repo, "agents-benchmark.py", "benchmark")
+    result = runner.invoke(app, ["run", "benchmark", "list", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    assert result.stdout == "benchmark:list\n"
 
 
 def test_cli_run_forwards_help_to_registered_command(scaffold_repo):

@@ -83,6 +83,9 @@ IGNORED_DIRS = {
     "wb",
     "z-arq",
 }
+IGNORED_PATH_SUFFIXES = {
+    ".agents/tools/uv",
+}
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 MAP_DIR = get_cfg_path(ROOT_DIR, CONFIG, "map_dir")
@@ -127,10 +130,17 @@ class SectionStats:
 
 
 class StructureMapper:
-    def __init__(self, project_path: Path, output_path: Path, cache_enabled: bool = True):
+    def __init__(
+        self,
+        project_path: Path,
+        output_path: Path,
+        cache_enabled: bool = True,
+        verbose: bool = False,
+    ):
         self.project_path = project_path.resolve()
         self.output_path = output_path.resolve()
         self.cache_enabled = cache_enabled
+        self.verbose = verbose
         self.cache: Dict[str, Any] = {}
         self.stats: Dict[str, int] = {
             "total_files": 0,
@@ -144,9 +154,11 @@ class StructureMapper:
         if cache_file.exists() and self.cache_enabled:
             try:
                 self.cache = json.loads(cache_file.read_text())
-                print(f"✓ Loaded cache: {len(self.cache.get('files', {}))} entries")
+                if self.verbose:
+                    print(f"✓ Loaded cache: {len(self.cache.get('files', {}))} entries")
             except Exception as e:
-                print(f"⚠️  Cache load failed: {e}")
+                if self.verbose:
+                    print(f"⚠️  Cache load failed: {e}")
                 self.cache = {}
 
     def save_cache(self):
@@ -155,8 +167,11 @@ class StructureMapper:
             return
 
         cache_file = self.output_path / CACHE_FILE
-        cache_file.write_text(json.dumps(self.cache, indent=2))
-        print(f"✓ Saved cache: {len(self.cache.get('files', {}))} entries")
+        tmp_file = cache_file.with_name(f".{cache_file.name}.tmp")
+        tmp_file.write_text(json.dumps(self.cache, indent=2))
+        os.replace(tmp_file, cache_file)
+        if self.verbose:
+            print(f"✓ Saved cache: {len(self.cache.get('files', {}))} entries")
 
     def compute_file_hash(self, file_path: Path) -> str:
         """Compute hash of file content for change detection."""
@@ -261,19 +276,20 @@ class StructureMapper:
 
     def scan_files(self) -> Dict[str, SectionStats]:
         """Scan all files in project."""
-        print(f"Scanning: {self.project_path}")
-        print()
+        print(f"scanning: {self.project_path}")
 
         sections: Dict[str, List[FileInfo]] = {name: [] for name in DEFAULT_SECTIONS}
         next_cache: Dict[str, Any] = {}
 
         # Walk through project directory
         for root, dirs, files in os.walk(self.project_path):
+            rel_root = Path(root).relative_to(self.project_path)
             # Keep selected hidden dirs like .agents, while ignoring common heavy/cache dirs.
             dirs[:] = [
                 d for d in dirs
                 if (not d.startswith(".") or d in ALLOWED_HIDDEN_DIRS)
                 and d not in IGNORED_DIRS
+                and (rel_root / d).as_posix() not in IGNORED_PATH_SUFFIXES
             ]
 
             for file in files:
@@ -440,11 +456,6 @@ This documentation uses **incremental updates**:
 
     def run(self):
         """Run the structure mapping process."""
-        print("=" * 60)
-        print("AGENTS STRUCTURE MAP - Project Documentation")
-        print("=" * 60)
-        print()
-
         # Load cache
         self.load_cache()
 
@@ -462,31 +473,28 @@ This documentation uses **incremental updates**:
         readme_content = self.generate_readme(sections)
         readme_path = self.output_path / "README.md"
         readme_path.write_text(readme_content)
-        print(f"✓ Created: {readme_path.relative_to(self.project_path)}")
+        if self.verbose:
+            print(f"✓ Created: {readme_path.relative_to(self.project_path)}")
 
         # Generate section files
         for name, stats in sections.items():
             section_content = self.generate_section_md(stats)
             section_path = self.output_path / f"{name}.md"
             section_path.write_text(section_content)
-            print(f"✓ Created: {section_path.relative_to(self.project_path)}")
+            if self.verbose:
+                print(f"✓ Created: {section_path.relative_to(self.project_path)}")
 
         # Save cache
         self.save_cache()
 
         # Print summary
-        print()
-        print("=" * 60)
-        print("SUMMARY")
-        print("=" * 60)
-        print(f"Total files documented: {self.stats['total_files']}")
-        print(f"Total lines: {self.stats['total_lines']:,}")
-        print()
-        print("Sections:")
-        for name, count in sorted(self.stats['sections'].items(), key=lambda x: x[1], reverse=True):
-            print(f"  {name}: {count} files")
-        print()
-        print("=" * 60)
+        print(
+            "structure_map: "
+            f"files={self.stats['total_files']} lines={self.stats['total_lines']} "
+            f"sections={len(self.stats['sections'])} output={self.output_path}"
+        )
+        for name, count in sorted(self.stats["sections"].items(), key=lambda x: x[1], reverse=True):
+            print(f" - {name}: {count}")
 
 
 def main():
@@ -506,6 +514,7 @@ def main():
         idx = sys.argv.index("--output")
         if idx + 1 < len(sys.argv):
             output_path = Path(sys.argv[idx + 1])
+    verbose = "--verbose" in sys.argv
 
     # Default output path
     if not output_path:
@@ -515,7 +524,7 @@ def main():
             output_path = project_path / "docs" / "map" / "structure"
 
     # Run mapper
-    mapper = StructureMapper(project_path, output_path)
+    mapper = StructureMapper(project_path, output_path, verbose=verbose)
     mapper.run()
 
 

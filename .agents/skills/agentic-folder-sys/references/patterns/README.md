@@ -23,9 +23,8 @@ skills under `.agents/skills/` to reflect the current upstream git source.
 Rule:
 
 - `skills-sync pull` refreshes only an external git-backed source when one is
-  configured.
-- `skills-sync sync` / `skills-sync update` refresh the actual project skill
-  copies under `.agents/skills/`.
+  configured. `skills-sync sync` / `skills-sync update` refresh the actual
+  project skill copies under `.agents/skills/`.
 
 ## 2. Ensure One Operational Skill
 
@@ -60,6 +59,6 @@ When the change is non-trivial, use the scaffold's workbench flow:
 
 State rules:
 
-- use the task state board as the source of truth
-- move to `ready_for_test` only after implementation is in place
-- mark `done` only after evidence exists
+- use the task marker board as the source of truth with canonical markers:
+  `[ ]`, `[/]`, `[!]`, `[>]`, `[%]`, `[&]`, `[x]` move from `[%]` to `[&]` only
+  after test evidence exists mark `[x]` only after closure evidence exists

@@ -109,10 +109,12 @@ class AgentsStatusSummaryTests(unittest.TestCase):
             payload = agents_status.summarize_session(session_dir)
             by_doc_type = {item["doc_type"]: item for item in payload["workflow_artifacts"]}
 
+            self.assertEqual(by_doc_type["brainstorm"]["state"], "blocked")
             self.assertEqual(by_doc_type["plan"]["state"], "ready")
             self.assertEqual(by_doc_type["task"]["state"], "ready")
             self.assertEqual(by_doc_type["report"]["state"], "done")
-            self.assertEqual(payload["workflow_next"], "brainstorm ready")
+            self.assertEqual(payload["ready_state"], "blocked")
+            self.assertIn("brainstorm blocked", payload["workflow_next"])
 
 
 if __name__ == "__main__":

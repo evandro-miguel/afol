@@ -5,7 +5,7 @@ type: tool-doc
 status: active
 owner: system
 created_at: '2026-02-23T00:00:00-03:00'
-updated_at: '2026-04-13T19:36:46-03:00'
+updated_at: '2026-04-16T23:01:19-03:00'
 links:
   tools_json: ./tools-json.md
   wrapper: ./agents-wrapper.md
@@ -39,11 +39,29 @@ Installs `.agents` system in another repository:
 6. **Runs system setup** - Sync docs, optional skills sync, and symlink repair
 7. **Validates** - Runs doctor and tools checks
 
+When the target repository already exists, bootstrap must behave as an overlay:
+
+- `create` for missing scaffold-managed files
+- `skip` for existing project-owned files
+- `patch-managed` for scaffold-owned files that can be safely updated
+- `adapt-config` for legacy layout or path translation
+- `add-wrapper` for missing compatibility adapters such as `.agents/agents-mcp`
+- `reconcile-skills` for manifest/source drift that needs explicit
+  classification
+- `conflict` when overwrite would touch project-owned content
+- `benchmark` for timing and verification evidence
+
+The overlay contract exists so an existing repo can adopt the scaffold without
+losing its own docs, workbench, or local runtime choices.
+
 Sanitization rule:
 
 - Bootstrap must not leak this scaffold's local workbench sessions, knowledge index content, lesson-entry history, telemetry reports, or the scaffold's live roadmap/spec backlog into the target repository.
 - The target repo should start with generic placeholders and empty indexes where project-specific history would otherwise be misleading.
 - Skills configuration is treated as a compatibility baseline that downstream repos can evolve into a pinned source/ref/profile contract.
+- Existing repo adoption should prefer MCP/runtime planning and validation,
+  then use shell wrappers only as a fallback surface when the runtime path is
+  unavailable.
 
 Primary runtime baseline:
 
@@ -168,6 +186,9 @@ Usage notes:
 - The skills baseline is generic by design and should be upgraded by the target repo owner rather than treated as scaffold-local history.
 - Keep global Codex skills lean; the target repo should rely primarily on `.agents/skills/` plus the repo-local `.agents/source/universal-skills` source checkout when available.
 - `skills-sync pull` is only meaningful when that source checkout is backed by git; repo-local seeded sources are treated as already available.
+- Existing repo adoption should never replace project-owned docs or runtime
+  adapters by default. If a target file needs replacement, the update should
+  surface a conflict and require explicit operator intent.
 
 See the installation playbook: [bootstrap-other-repo.md](../standards/bootstrap-other-repo.md)
 

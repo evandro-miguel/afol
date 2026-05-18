@@ -39,8 +39,7 @@ Cause:
 
 Fix:
 
-- create the repo first
-- use full bootstrap for a new repo
+- create the repo first use full bootstrap for a new repo
 
 ## 3. Pull Did Not Update Installed Skills
 

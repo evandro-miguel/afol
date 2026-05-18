@@ -12,8 +12,7 @@ Do not edit workbench timestamps manually.
 
 Always update metadata via scripts:
 
-- `make wb-touch`
-- `./.agents/agents wb-update touch`
+- `make wb-touch` `./.agents/agents wb-update touch`
 
 ## 2. `--partial` Still Requires an Existing Repo
 
@@ -50,7 +49,7 @@ Use `agentic-folder-sys` for both scaffold lifecycle operations and governed
 
 ## 8. Verify Before Closing
 
-Do not mark tasks done just because files changed.
+Do not mark tasks `[x]` just because files changed.
 
 ## 9. Use the Scaffold Repo-Map Wrapper
 
@@ -60,7 +59,7 @@ root. Use `./.agents/agents repo-map .` or `make repo-map` so the map stays in
 
 ## 10. Safety Rules
 
-- Never expose secrets in code, logs, docs, or commits.
-- Avoid destructive operations unless explicitly authorized. Do not delete logic, only refactor.
-- Archive before delete under `.agents/z-arq/YYYYMMDD_<description>/`.
-- Do not add dependencies without clear justification.
+- Never expose secrets in code, logs, docs, or commits. Avoid destructive
+  operations unless explicitly authorized. Do not delete logic, only refactor.
+  Archive before delete under `.agents/z-arq/YYYYMMDD_<description>/`. Do not
+  add dependencies without clear justification.

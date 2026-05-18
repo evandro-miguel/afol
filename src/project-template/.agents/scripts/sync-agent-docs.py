@@ -30,8 +30,8 @@ AGENT_FILES = [
 ]
 
 # Header that should be preserved in target files
-HEADER_TEMPLATE = """# Agent-specific instructions for {agent_name}
-# Auto-synced from AGENTS.md - run `.agents/scripts/sync-agent-docs.py` to update
+HEADER_TEMPLATE = """<!-- Agent-specific instructions for {agent_name}. -->
+<!-- Auto-synced from AGENTS.md. Run sync-agent-docs.py to update. -->
 
 """
 
@@ -42,7 +42,6 @@ FOOTER_WARNING = """
 > **⚠️ IMPORTANT:** THIS FILE IS A REPLICA OF THE `AGENTS.md`.
 >
 > - **DO NOT READ** the `AGENTS.md` AGAIN if you read this one.
-> - The official skills and files of the repo are always on `.agents/skills`.
 > - This file is auto-synced. Run `.agents/scripts/sync-agent-docs.py` to update.
 """
 

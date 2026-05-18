@@ -13,6 +13,7 @@ import unittest
 import tempfile
 import shutil
 import sys
+import json
 from pathlib import Path
 from datetime import datetime, timedelta
 import importlib.util
@@ -268,6 +269,25 @@ status: active
 class TestStrictVerification(unittest.TestCase):
     """Test strict mode verification end-to-end."""
 
+    @staticmethod
+    def _valid_postmortem_body() -> str:
+        return (
+            "# Postmortem\n\n"
+            "## What Was Achieved\n\n"
+            "- Captured the final governance review for the session.\n\n"
+            "## Root Causes\n\n"
+            "- The session needed an explicit promotion review to avoid losing repeat learnings.\n\n"
+            "## Follow-ups for Next Rounds\n\n"
+            "- Keep the governance review section mandatory whenever a postmortem is created.\n\n"
+            "## Governance Promotion Review\n\n"
+            "- Lesson entry needed: no\n"
+            "- Rule update needed: yes\n"
+            "- ADR or decision record needed: no\n"
+            "- Skill or doc update needed: yes\n"
+            "- Evidence reviewed: test_task_01, test_report_01, ./.agents/agents verify-tasks --strict\n"
+            "- Follow-up recorded: yes\n"
+        )
+
     def setUp(self):
         """Create temporary session folder."""
         self.temp_dir = tempfile.mkdtemp()
@@ -331,6 +351,8 @@ class TestStrictVerification(unittest.TestCase):
         child_spec: str = "",
         plan_status: str = "active",
         plan_body: str | None = None,
+        write_evidence: bool = True,
+        evidence_entries: list[dict] | None = None,
     ) -> None:
         governance = self._governance_fields(feature_id=feature_id, child_spec=child_spec)
         default_plan_body = (
@@ -463,6 +485,37 @@ class TestStrictVerification(unittest.TestCase):
         (self.session_dir / "test_log_01.md").write_text(log_content)
         (self.session_dir / "test_brainstorm_01.md").write_text(brainstorm_content)
         (self.session_dir / "test_explorer_check_01.md").write_text(explorer_content)
+        if write_evidence:
+            entries = evidence_entries or [
+                {
+                    "id": "E-1",
+                    "task_id": "T-01",
+                    "command": "python3 -m unittest",
+                    "result": "passed",
+                    "artifacts": ["test_report_01.md"],
+                    "note": "",
+                }
+            ]
+            (self.session_dir / ".evidence.jsonl").write_text(
+                "".join(json.dumps(entry) + "\n" for entry in entries),
+                encoding="utf-8",
+            )
+
+    def _write_valid_evidence(self, *, task_id: str = "T-01", evidence_id: str = "E-1") -> None:
+        (self.session_dir / ".evidence.jsonl").write_text(
+            json.dumps(
+                {
+                    "id": evidence_id,
+                    "task_id": task_id,
+                    "command": "python3 test.py",
+                    "result": "passed",
+                    "artifacts": ["test_report_01.md"],
+                    "note": "",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
     def test_strict_mode_passes_with_evidence(self):
         """Strict mode passes when tasks have evidence."""
@@ -496,7 +549,8 @@ class TestStrictVerification(unittest.TestCase):
                 "| Task | State | Owner | Notes |\n"
                 "|------|-------|-------|-------|\n"
                 "| T-01 | done | worker | Implement feature |\n"
-            )
+            ),
+            write_evidence=False,
         )
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
@@ -529,7 +583,147 @@ class TestStrictVerification(unittest.TestCase):
         self.assertGreater(len(results['contradictions']), 0)
         self.assertEqual(len(results['governance_issues']), 0)
 
-    def test_strict_mode_fails_when_final_plan_lacks_exploration_gates(self):
+    def test_strict_mode_fails_done_task_with_failed_evidence_ledger(self):
+        """Strict mode rejects done tasks that cite blocking failed evidence."""
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            )
+        )
+        (self.session_dir / ".evidence.jsonl").write_text(
+            json.dumps(
+                {
+                    "id": "E-1",
+                    "task_id": "T-01",
+                    "command": "just lint",
+                    "result": "failed: No justfile found",
+                    "note": "",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertEqual(results["evidence_issues"][0]["type"], "failed_evidence")
+
+    def test_strict_mode_allows_explicit_non_blocking_failed_evidence(self):
+        """Strict mode allows failed evidence only when marked non-blocking."""
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Audit completed with accepted finding |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            )
+        )
+        (self.session_dir / ".evidence.jsonl").write_text(
+            json.dumps(
+                {
+                    "id": "E-1",
+                    "task_id": "T-01",
+                    "command": "optional-smoke",
+                    "result": "failed: optional environment unavailable",
+                    "note": "non-blocking accepted failure for audit-only scope",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["evidence_issues"]), 0)
+
+    def test_strict_mode_allows_failed_evidence_superseded_by_later_pass(self):
+        """Strict mode allows a failed command after a later passing rerun of the same command."""
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Fixed after rerun |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            )
+        )
+        entries = [
+            {
+                "id": "E-1",
+                "task_id": "T-01",
+                "command": "skills-sync check",
+                "result": "failed: source-drift detected",
+                "note": "",
+            },
+            {
+                "id": "E-2",
+                "task_id": "T-01",
+                "command": "skills-sync check",
+                "result": "pass: skills structure and sync are valid",
+                "artifacts": [".agents/skills/agentic-folder-sys/SKILL.md"],
+                "note": "",
+            },
+        ]
+        (self.session_dir / ".evidence.jsonl").write_text(
+            "".join(json.dumps(entry) + "\n" for entry in entries),
+            encoding="utf-8",
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["evidence_issues"]), 0)
+
+    def test_strict_mode_allows_failed_evidence_resolved_by_later_evidence_id_reference(self):
+        """Strict mode allows a later successful proof to explicitly resolve an earlier failed evidence id."""
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Fixed after alternate validation |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            )
+        )
+        entries = [
+            {
+                "id": "E-failed",
+                "task_id": "T-01",
+                "command": "old benchmark command",
+                "result": "failed: prior workflow skipped evidence",
+                "note": "",
+            },
+            {
+                "id": "E-pass",
+                "task_id": "T-01",
+                "command": "new benchmark command",
+                "result": "passed",
+                "artifacts": [".agents/tmp/new-benchmark.json"],
+                "note": "resolves prior failed evidence E-failed after benchmark harness repair",
+            },
+        ]
+        (self.session_dir / ".evidence.jsonl").write_text(
+            "".join(json.dumps(entry) + "\n" for entry in entries),
+            encoding="utf-8",
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["evidence_issues"]), 0)
+
+    def test_strict_mode_does_not_require_absent_exploration_gates(self):
         governance = self._governance_fields()
         (self.session_dir / "test_plan_01.md").write_text(
             "---\n"
@@ -579,10 +773,11 @@ class TestStrictVerification(unittest.TestCase):
             "---\n\n"
             "# Log\n"
         )
+        self._write_valid_evidence()
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results["planning_gate_issues"]), 0)
+        self.assertEqual(len(results["planning_gate_issues"]), 0)
 
     def test_strict_mode_fails_when_final_plan_lacks_execplan_sections(self):
         self._write_standard_docs(
@@ -665,7 +860,7 @@ class TestStrictVerification(unittest.TestCase):
         self.assertFalse(all_completed)
         self.assertGreater(len(results["execplan_issues"]), 0)
 
-    def test_strict_mode_fails_when_final_report_lacks_postmortem(self):
+    def test_strict_mode_allows_final_report_without_postmortem_when_absent(self):
         self._write_standard_docs(
             task_body=(
                 "# Tasks\n\n"
@@ -683,8 +878,70 @@ class TestStrictVerification(unittest.TestCase):
         report_file.write_text(report_text)
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["postmortem_issues"]), 0)
+
+    def test_strict_mode_fails_when_final_postmortem_lacks_governance_review(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            ),
+            report_body="Implementation completed and verified.\n",
+        )
+        report_file = self.session_dir / "test_report_01.md"
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
+        (self.session_dir / "test_postmortem_01.md").write_text(
+            "---\n"
+            "doc_type: postmortem\n"
+            "id: test_postmortem_01\n"
+            "status: final\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            "child_spec: \"\"\n"
+            "---\n\n"
+            "# Postmortem\n"
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
         self.assertGreater(len(results["postmortem_issues"]), 0)
+
+    def test_strict_mode_allows_final_postmortem_with_governance_review(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npytest\n```\n\n"
+                "Result: passed.\n"
+            ),
+            report_body="Implementation completed and verified.\n",
+        )
+        report_file = self.session_dir / "test_report_01.md"
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
+        (self.session_dir / "test_postmortem_01.md").write_text(
+            "---\n"
+            "doc_type: postmortem\n"
+            "id: test_postmortem_01\n"
+            "status: final\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            "child_spec: \"\"\n"
+            "---\n\n"
+            + self._valid_postmortem_body()
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["postmortem_issues"]), 0)
 
     def test_strict_mode_fails_when_active_artifact_is_placeholder_only(self):
         self._write_standard_docs(
@@ -758,7 +1015,7 @@ class TestStrictVerification(unittest.TestCase):
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results["closure_issues"]), 0)
+        self.assertGreater(len(results["artifact_utility_issues"]), 0)
 
     def test_non_strict_mode_ignores_evidence(self):
         """Non-strict mode passes without evidence checks."""
@@ -858,6 +1115,7 @@ links:
         (self.session_dir / "z_test_task_01.md").write_text(task_content)
         (self.session_dir / "z_test_report_01.md").write_text(report_content)
         (self.session_dir / "z_test_log_01.md").write_text(log_content)
+        self._write_valid_evidence()
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
@@ -932,6 +1190,7 @@ status: final
         (self.session_dir / "a_test_task_01.md").write_text(task_content)
         (self.session_dir / "a_test_log_01.md").write_text(log_content)
         (self.session_dir / "a_test_policy_01.md").write_text(final_standard)
+        self._write_valid_evidence()
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
@@ -962,6 +1221,67 @@ status: final
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
         self.assertGreater(len(results.get("governance_issues", [])), 0)
+
+    def test_strict_mode_rejects_plan_meta_planning_primary_steps(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature |\n\n"
+                "```bash\npython3 test.py\n```\n"
+                "Result: passed\n"
+            ),
+        )
+        plan_path = self.session_dir / "test_plan_01.md"
+        plan_path.write_text(
+            plan_path.read_text().replace(
+                "1. Edit the template.\n2. Run verification.\n",
+                "1. Create the real plan for implementation.\n2. Run verification.\n",
+                1,
+            )
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results.get("meta_task_issues", [])), 0)
+
+    def test_strict_mode_rejects_task_meta_planning_rows(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Pesquisar para montar o plano real |\n\n"
+                "```bash\npython3 test.py\n```\n"
+                "Result: passed\n"
+            ),
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertGreater(len(results.get("meta_task_issues", [])), 0)
+
+    def test_state_board_parses_compound_owner_values(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | orchestrator/tester | Implement feature with evidence |\n\n"
+                "```bash\npython3 test.py\n```\n"
+                "Result: passed\n"
+            ),
+        )
+
+        task_file = self.session_dir / "test_task_01.md"
+        tasks = verify_tasks.extract_tasks(task_file.read_text(), task_file)
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0][0], "T-01")
+        self.assertEqual(tasks[0][2], "done")
 
 
 if __name__ == '__main__':

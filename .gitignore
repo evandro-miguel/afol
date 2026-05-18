@@ -1,10 +1,13 @@
 # Agents scripts virtualenv (isolated per project)
 .agents/scripts/.venv/
+.agents/runtime/.venv/
+.agents/scripts/*.egg-info/
 
 # UV lock files (optional: commit for reproducible builds)
 .agents/scripts/uv.lock
 uv.lock
 !.agents/runtime/uv.lock
+!src/project-template/.agents/runtime/uv.lock
 
 # Python cache
 .agents/scripts/__pycache__/
@@ -18,9 +21,12 @@ uv.lock
 
 # Runtime telemetry events (operational data)
 .agents/data/telemetry/events.jsonl
+.agents/data/benchmarks/results/*
 
 # Runtime/cache snapshots
 .agents/.cache/
+.agents/tools/uv/
+src/project-template/.agents/tmp/
 .agents/journal/
 
 # Universal-skills must not be a repo-local git cache or nested checkout.
@@ -52,3 +58,4 @@ docs/telemetry/reports/implementation_report.md
 
 # Makefile in a-docs (keep root Makefile)
 # .agents/a-docs/standards/Makefile
+.gitnexus

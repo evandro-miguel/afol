@@ -37,6 +37,13 @@ links:
 
 - <missed item>
 
+## Optional Artifacts Inventory
+
+- Brainstorm: `<brainstorm_doc_id_or_empty>` -> `<draft|final|not created>`
+- Research: `<research_doc_id_or_empty>` -> `<draft|final|not created>`
+- Explorer check: `<explorer_check_doc_id_or_empty>` -> `<draft|final|not created>`
+- Any other optional artifact: `<artifact_id_or_empty>` -> `<draft|final|not created>`
+
 ## Problems Encountered
 
 - <problem>
@@ -53,10 +60,20 @@ links:
 
 - <follow-up>
 
+## Governance Promotion Review
+
+- Lesson entry needed: <yes/no>
+- Rule update needed: <yes/no>
+- ADR or decision record needed: <yes/no>
+- Skill or doc update needed: <yes/no>
+- Evidence reviewed: <artifact ids, commands, or paths>
+- Follow-up recorded: <yes/no>
+
 ## Final Assessment
 
 - Session outcome: <successful/partial/blocked>
 - Should a new feature or child spec be created from this postmortem: <yes/no>
+- Optional artifacts present were finalized before closure: <yes/no>
 
 ---
 

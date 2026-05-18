@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-import subprocess
 import sys
 from dataclasses import dataclass
 
 from agentic_scaffold.config import RuntimeConfig
+from agentic_scaffold.process_utils import (
+    DEFAULT_COMMAND_TIMEOUT_SECONDS,
+    ProcessError,
+    run_command,
+)
 
 
 @dataclass(frozen=True)
@@ -18,6 +22,7 @@ class RuntimeCommand:
 
 _PRIMARY_COMMAND_SPECS = (
     ("doctor", "agents-doctor.py", "Validate .agents structure and integrity.", ()),
+    ("benchmark", "agents-benchmark.py", "Run controlled runtime-flow benchmark scenarios.", ()),
     ("new", "agents-new.py", "Create new governed workstreams.", ()),
     ("index", "agents-index.py", "Update specs and decision indexes.", ()),
     ("lint-docs", "agents-lint-docs.py", "Validate markdown docs consistency.", ("lint",)),
@@ -37,6 +42,7 @@ _PRIMARY_COMMAND_SPECS = (
     ("knowledge", "agents-knowledge.py", "Search and pull reusable workbench knowledge.", ()),
     ("memory", "agents-memory.py", "Emit governed external-memory MCP contracts.", ()),
     ("bootstrap", "agents-bootstrap.py", "Install the scaffold into another repository.", ()),
+    ("scaffold-update", "agents-scaffold-update.py", "Update scaffold-owned .agents files from a verified allowlisted payload.", ()),
     ("skills-sync", "agents-skills-sync.py", "Sync project skills from universal-skills.", ()),
     ("fix-symlinks", "agents-fix-symlinks.py", "Repair symlinks with copy fallback.", ()),
 )
@@ -101,13 +107,17 @@ class RuntimeRegistry:
         script = self.config.repo_root / ".agents" / "scripts" / command.script_name
         if not script.exists():
             raise FileNotFoundError(f"Registered command script not found: {script}")
-        proc = subprocess.run(
-            [sys.executable, str(script), *args],
-            cwd=self.config.repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            proc = run_command(
+                [sys.executable, str(script), *args],
+                cwd=self.config.repo_root,
+                capture_output=True,
+                check=False,
+                timeout=DEFAULT_COMMAND_TIMEOUT_SECONDS,
+            )
+        except ProcessError as exc:
+            print(f"Runtime command timed out: {exc}", file=sys.stderr)
+            return 124
         if proc.stdout:
             sys.stdout.write(proc.stdout)
         if proc.stderr:

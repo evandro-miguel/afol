@@ -159,7 +159,7 @@ def cmd_context(args: argparse.Namespace) -> int:
         payload: Dict[str, Any] = {
             "project": project,
             "url": args.url,
-            "depth": str(args.depth),
+            "depth": args.depth,
             "max_related": args.max_related,
             "output_format": "text",
         }
@@ -191,15 +191,15 @@ def cmd_context(args: argparse.Namespace) -> int:
         print(f"3. Call `{cfg['context_tool']}` on server `{cfg['server']}` with:")
         print("```json")
         print(
-            json_arg_block(
-                {
-                    "project": project,
-                    "url": "memory://<selected-permalink>",
-                    "depth": str(args.depth),
-                    "max_related": args.max_related,
-                    "output_format": "text",
-                }
-            )
+                json_arg_block(
+                    {
+                        "project": project,
+                        "url": "memory://<selected-permalink>",
+                        "depth": args.depth,
+                        "max_related": args.max_related,
+                        "output_format": "text",
+                    }
+                )
         )
         print("```")
     print()

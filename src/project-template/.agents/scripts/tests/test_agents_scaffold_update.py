@@ -1,0 +1,349 @@
+import importlib.util
+import io
+import json
+import os
+import sys
+import tempfile
+import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
+from unittest import mock
+
+
+def load_module(module_name: str, file_path: Path):
+    script_dir = file_path.parent
+    lib_dir = script_dir / "lib"
+    for candidate in (script_dir, lib_dir):
+        if str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load module from {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+SCRIPT_PATH = Path(".agents/scripts/agents-scaffold-update.py").resolve()
+
+
+class AgentsScaffoldUpdateTests(unittest.TestCase):
+    @staticmethod
+    def _load_with_root(root: Path):
+        module = load_module(f"agents_scaffold_update_test_{uuid4_hex()}", SCRIPT_PATH)
+        module.ROOT_DIR = root
+        module.TARGET_AGENTS_DIR = root / ".agents"
+        module.STAGING_ROOT = module.TARGET_AGENTS_DIR / "tmp" / "scaffold-update" / "staging"
+        module.BACKUP_ROOT = module.TARGET_AGENTS_DIR / "tmp" / "scaffold-update" / "backups"
+        return module
+
+    @staticmethod
+    def _write(path: Path, content: str):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    def _write_channel_metadata(
+        self,
+        module,
+        source: Path,
+        *,
+        match_payload: bool,
+        source_agents: Path | None = None,
+        bad_manifest_hash: bool = False,
+    ):
+        channel_file = source / "releases/channels/stable.json"
+        channel_file.parent.mkdir(parents=True, exist_ok=True)
+
+        source_agents = source_agents or source / ".agents"
+        payload_sha = "0" * 64
+        if match_payload:
+            rel_paths = module._collect_payload_files(source_agents)
+            payload_sha = module._payload_sha256(source_agents, rel_paths)
+
+        release_tag = "v1.2.3"
+        manifest_body = json.dumps({"release": release_tag}, sort_keys=True) + "\n"
+        bom_body = json.dumps({"release": release_tag, "skills": []}, sort_keys=True) + "\n"
+        manifest_path = self._write_bytes(source / f"releases/manifests/{release_tag}.json", manifest_body)
+        manifest_hash = "f" * 64 if bad_manifest_hash else module._sha256_file(manifest_path)
+        bom_hash = module._sha256_file(
+            self._write_bytes(source / f"releases/boms/{release_tag}.skill-bom.json", bom_body)
+        )
+        self._write(source / f"releases/checksums/{release_tag}.sha256", f"{payload_sha}  source.tar.gz\n")
+
+        payload = {
+            "channel": "stable",
+            "releaseTag": release_tag,
+            "commit": "a" * 40,
+            "sourceSha256": payload_sha,
+            "scaffoldPayloadSha256": payload_sha,
+            "releaseManifestSha256": manifest_hash,
+            "skillBomSha256": bom_hash,
+            "policy": {
+                "allowFloatingRef": False,
+                "requireSignedTag": True,
+                "requireSourceChecksum": True,
+                "requireReleaseManifest": True,
+                "requireSkillBom": True,
+            },
+        }
+        channel_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    def _write_bytes(self, path: Path, content: str) -> Path:
+        self._write(path, content)
+        return path
+
+    def test_plan_only_outputs_summary_and_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".agents").mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "old\n")
+            self._write(source / ".agents/agents", "new\n")
+            self._write(source / ".agents/scripts/tool.py", "print('ok')\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=True)
+
+            stream = io.StringIO()
+            with redirect_stdout(stream):
+                rc = module.main(["--source", str(source), "--channel", "stable", "--plan-only"])
+
+            self.assertEqual(rc, 0)
+            output = stream.getvalue()
+            self.assertIn("SCAFFOLD UPDATE PLAN", output)
+            self.assertIn("update: 1", output)
+            self.assertIn("create: 1", output)
+            self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
+            self.assertFalse((root / ".agents/tmp/scaffold-update/staging").exists())
+
+    def test_diff_only_shows_unified_diff_and_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".agents").mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "line-a\n")
+            self._write(source / ".agents/agents", "line-b\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=True)
+
+            stream = io.StringIO()
+            with redirect_stdout(stream):
+                rc = module.main(["--source", str(source), "--channel", "stable", "--diff-only"])
+
+            self.assertEqual(rc, 0)
+            output = stream.getvalue()
+            self.assertIn("--- a/.agents/agents", output)
+            self.assertIn("+++ b/.agents/agents", output)
+            self.assertIn("+line-b", output)
+            self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
+            self.assertFalse((root / ".agents/tmp/scaffold-update/staging").exists())
+
+    def test_apply_happy_path_creates_backup_updates_content_and_cleans_staging(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".agents").mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "old\n")
+            self._write(source / ".agents/agents", "new\n")
+            self._write(source / ".agents/scripts/tool.py", "print('ok')\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=True)
+
+            rc = module.main(["--source", str(source), "--channel", "stable", "--apply"])
+
+            self.assertEqual(rc, 0)
+            self.assertEqual((root / ".agents/agents").read_text(encoding="utf-8"), "new\n")
+            self.assertTrue((root / ".agents/scripts/tool.py").exists())
+
+            backup_dirs = list((root / ".agents/tmp/scaffold-update/backups").glob("*"))
+            self.assertTrue(backup_dirs)
+            self.assertTrue((backup_dirs[0] / "agents").exists())
+
+            staging_root = root / ".agents/tmp/scaffold-update/staging"
+            if staging_root.exists():
+                self.assertEqual(list(staging_root.iterdir()), [])
+
+    def test_source_repo_prefers_project_template_agents_payload(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".agents").mkdir(parents=True)
+            template_agents = source / "src/project-template/.agents"
+            template_agents.mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "old\n")
+            self._write(source / ".agents/agents", "wrong-root-payload\n")
+            self._write(template_agents / "agents", "template-payload\n")
+            self._write(template_agents / "tmp/pytest-scripts.log", "ignored runtime noise\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=True, source_agents=template_agents)
+
+            rc = module.main(["--source", str(source), "--channel", "stable", "--apply"])
+
+            self.assertEqual(rc, 0)
+            self.assertEqual((root / ".agents/agents").read_text(encoding="utf-8"), "template-payload\n")
+            self.assertFalse((root / ".agents/tmp/pytest-scripts.log").exists())
+
+    def test_rejects_bad_release_artifact_hash_without_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".agents").mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "old\n")
+            self._write(source / ".agents/agents", "new\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=True, bad_manifest_hash=True)
+
+            with self.assertRaisesRegex(RuntimeError, "Release manifest hash mismatch"):
+                module.main(["--source", str(source), "--channel", "stable", "--apply"])
+
+            self.assertEqual((root / ".agents/agents").read_text(encoding="utf-8"), "old\n")
+            self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
+
+    def test_git_checkout_verifies_commit_and_signed_tag(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".git").mkdir(parents=True)
+            module = self._load_with_root(root)
+            metadata = module.ChannelMetadata(
+                channel="stable",
+                release_tag="v1.2.3",
+                commit="a" * 40,
+                source_sha256="b" * 64,
+                scaffold_payload_sha256="b" * 64,
+                release_manifest_sha256="c" * 64,
+                skill_bom_sha256="d" * 64,
+                metadata_file=source / "releases/channels/stable.json",
+            )
+
+            with mock.patch.object(
+                module.subprocess,
+                "run",
+                side_effect=[
+                    mock.Mock(returncode=0, stdout="a" * 40 + "\n", stderr=""),
+                    mock.Mock(returncode=0, stdout="", stderr="good signature\n"),
+                ],
+            ) as run_mock:
+                module._verify_git_commit_when_available(source, metadata)
+
+            self.assertEqual(run_mock.call_args_list[0].args[0], ["git", "rev-parse", "HEAD"])
+            self.assertEqual(run_mock.call_args_list[1].args[0], ["git", "tag", "-v", "v1.2.3"])
+
+    def test_rejects_payload_outside_allowlist_without_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".agents").mkdir(parents=True)
+
+            self._write(source / ".agents/wb/unsafe.txt", "x\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=False)
+
+            with self.assertRaisesRegex(RuntimeError, "outside scaffold allowlist"):
+                module.main(["--source", str(source), "--channel", "stable", "--plan-only"])
+
+            self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
+            self.assertFalse((root / ".agents/tmp/scaffold-update/staging").exists())
+
+    def test_rolls_back_when_validation_command_fails_and_cleans_staging(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".agents").mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "old\n")
+            self._write(source / ".agents/agents", "new\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=True)
+
+            rc = module.main(
+                [
+                    "--source",
+                    str(source),
+                    "--channel",
+                    "stable",
+                    "--apply",
+                    "--validate-command",
+                    "python3 -c \"import sys; sys.exit(7)\"",
+                ]
+            )
+
+            self.assertEqual(rc, 1)
+            self.assertEqual((root / ".agents/agents").read_text(encoding="utf-8"), "old\n")
+            staging_root = root / ".agents/tmp/scaffold-update/staging"
+            if staging_root.exists():
+                self.assertEqual(list(staging_root.iterdir()), [])
+
+    def test_rejects_symlink_payload_without_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            source_agents = source / ".agents"
+            source_agents.mkdir(parents=True)
+
+            real_file = source_agents / "scripts/real.py"
+            self._write(real_file, "print('ok')\n")
+            (source_agents / "scripts/link.py").symlink_to(real_file)
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=False)
+
+            with self.assertRaisesRegex(RuntimeError, "symlink is not allowed"):
+                module.main(["--source", str(source), "--channel", "stable", "--plan-only"])
+
+            self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
+            self.assertFalse((root / ".agents/tmp/scaffold-update/staging").exists())
+
+    def test_rejects_hardlink_payload_without_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            source_agents = source / ".agents"
+            source_agents.mkdir(parents=True)
+
+            original = source_agents / "scripts/original.py"
+            alias = source_agents / "scripts/alias.py"
+            self._write(original, "print('ok')\n")
+            os.link(original, alias)
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=False)
+
+            with self.assertRaisesRegex(RuntimeError, "hardlink is not allowed"):
+                module.main(["--source", str(source), "--channel", "stable", "--plan-only"])
+
+            self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
+            self.assertFalse((root / ".agents/tmp/scaffold-update/staging").exists())
+
+
+def uuid4_hex() -> str:
+    import uuid
+
+    return uuid.uuid4().hex
+
+
+if __name__ == "__main__":
+    unittest.main()

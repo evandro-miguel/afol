@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -16,9 +17,40 @@ SESSION_ID = "260402_0000_integration"
 pytestmark = pytest.mark.integration
 
 
+def _copytree_ignore_runtime_state(src: str, names: list[str]) -> set[str]:
+    """Exclude generated runtime/state folders from isolated repo copies."""
+    rel_src = Path(src).resolve().relative_to(ROOT_DIR)
+    ignored = {
+        name
+        for name in names
+        if name
+        in {
+            ".git",
+            ".coverage",
+            ".pytest_cache",
+            ".worktrees",
+            "__pycache__",
+            "build",
+            "dist",
+            "node_modules",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".venv",
+        }
+    }
+
+    if rel_src == Path(".agents"):
+        ignored.update({"cache", "wb", "z-arq", "tmp"})
+    elif rel_src == Path("docs"):
+        ignored.add("map")
+
+    return ignored
+
+
 def isolated_env(repo_root: Path) -> dict[str, str]:
     env = os.environ.copy()
     env["AGENTS_ACTIVE_SESSION_FILE"] = str(repo_root / ".agents" / "wb" / ".active_session")
+    env["AGENTS_SCRIPT_PYTHON"] = str(ROOT_DIR / ".agents" / "scripts" / ".venv" / "bin" / "python3")
     env["AGENTS_UV_CACHE_DIR"] = str(repo_root / ".agents" / "cache" / "uv")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PATH"] = f"{ROOT_DIR / '.agents' / 'scripts' / '.venv' / 'bin'}:{env.get('PATH', '')}"
@@ -41,22 +73,12 @@ def build_isolated_repo(tmp_root: Path) -> Path:
     shutil.copytree(
         ROOT_DIR,
         repo_root,
-        ignore=shutil.ignore_patterns(
-            ".git",
-            ".coverage",
-            ".pytest_cache",
-            "__pycache__",
-            ".mypy_cache",
-            ".ruff_cache",
-            ".venv",
-            ".agents/cache",
-            ".agents/wb",
-            ".agents/z-arq",
-            ".agents/tmp",
-            "docs/map",
-            "docs/map/structure",
-        ),
+        ignore=_copytree_ignore_runtime_state,
     )
+
+    (repo_root / "docs" / "map" / "structure").mkdir(parents=True, exist_ok=True)
+    (repo_root / ".agents" / "z-arq").mkdir(parents=True, exist_ok=True)
+    (repo_root / ".agents" / "tmp").mkdir(parents=True, exist_ok=True)
 
     session_dir = repo_root / ".agents" / "wb" / SESSION_ID
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -124,6 +146,17 @@ def build_isolated_repo(tmp_root: Path) -> Path:
     return repo_root
 
 
+def first_available_feature_and_spec(repo_root: Path) -> tuple[str, str]:
+    roadmap = (repo_root / "docs" / "arc" / "GENERAL-ROADMAP.md").read_text(encoding="utf-8")
+    specs_dir = repo_root / "docs" / "arc" / "SPECS"
+    for spec_file in sorted(specs_dir.glob("*_spec_*.md")):
+        content = spec_file.read_text(encoding="utf-8")
+        match = re.search(r"^roadmap_feature:\s*['\"]?(F-[0-9]+)['\"]?", content, re.MULTILINE)
+        if match and match.group(1) in roadmap:
+            return match.group(1), spec_file.stem
+    raise AssertionError("Expected at least one spec linked to a roadmap feature")
+
+
 @pytest.fixture
 def isolated_repo() -> Path:
     with tempfile.TemporaryDirectory() as td:
@@ -138,17 +171,18 @@ def test_new_quick_workflow(isolated_repo: Path):
     assert "✓ Added task:" in result.stdout
 
 
-def test_new_planning_workflow_creates_brainstorm_and_explorer_check(isolated_repo: Path):
-    """`--intent planning` should materialize the governed planning artifact bundle."""
+def test_new_planning_workflow_creates_minimum_plan_and_task(isolated_repo: Path):
+    """`--intent planning` should materialize the minimum mandatory artifact set."""
+    feature_id, parent_spec = first_available_feature_and_spec(isolated_repo)
     result = run_command(
         isolated_repo,
         [
             "new",
             "integration-planning-track",
             "--feature-id",
-            "F-10",
+            feature_id,
             "--parent-spec",
-            "260323_1704_universal-skills-runtime-integration_spec_01",
+            parent_spec,
             "--intent",
             "planning",
         ],
@@ -161,9 +195,8 @@ def test_new_planning_workflow_creates_brainstorm_and_explorer_check(isolated_re
     session_dir = session_dirs[-1]
     session_id = session_dir.name
 
-    assert (session_dir / f"{session_id}_brainstorm_01.md").exists()
-    assert (session_dir / f"{session_id}_explorer-check_01.md").exists()
     assert (session_dir / f"{session_id}_plan_01.md").exists()
+    assert (session_dir / f"{session_id}_task_01.md").exists()
 
 
 def test_wb_update_task_workflow(isolated_repo: Path):
@@ -199,6 +232,15 @@ def test_tools_workflow(isolated_repo: Path):
     validate_result = run_command(isolated_repo, ["tools", "validate"])
     assert validate_result.returncode == 0, validate_result.stderr
     assert "✅ Catalog is valid" in validate_result.stdout
+
+
+def test_repo_map_dry_run_workflow(isolated_repo: Path):
+    """`.agents/agents repo-map . --dry-run` should preview without shadow-copying."""
+    result = run_command(isolated_repo, ["repo-map", ".", "--dry-run"])
+
+    assert result.returncode == 0, result.stderr
+    assert "Analysis shadow repo: <dry-run skipped>" in result.stdout
+    assert str(isolated_repo / "docs" / "map") in result.stdout
 
 
 def test_session_catchup_temp_repo_scenarios():

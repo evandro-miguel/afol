@@ -14,6 +14,9 @@ Usage:
     python agents-doctor.py [--fix]
 """
 
+import argparse
+import contextlib
+import io
 import re
 import sys
 from pathlib import Path
@@ -87,8 +90,9 @@ class Issue:
 
 
 class AgentsDoctor:
-    def __init__(self, fix: bool = False):
+    def __init__(self, fix: bool = False, verbose: bool = False):
         self.fix = fix
+        self.verbose = verbose
         self.issues: List[Issue] = []
         self.stats = {
             "folders_checked": 0,
@@ -99,19 +103,21 @@ class AgentsDoctor:
 
     def run(self) -> bool:
         """Run all checks and return True if all pass."""
-        print("=" * 60)
-        print("AGENTS DOCTOR - Structure Validation")
-        print("=" * 60)
-        print()
+        def _run_checks() -> None:
+            self.check_required_folders()
+            self.check_templates()
+            self.check_workbench_sessions()
+            self.check_active_session_pointer()
+            self.check_arc_docs()
+            self.check_current_state_map_dir()
+            self.check_roadmap_governance()
+            self.check_primary_runtime_compatibility()
 
-        self.check_required_folders()
-        self.check_templates()
-        self.check_workbench_sessions()
-        self.check_active_session_pointer()
-        self.check_arc_docs()
-        self.check_current_state_map_dir()
-        self.check_roadmap_governance()
-        self.check_primary_runtime_compatibility()
+        if self.verbose:
+            _run_checks()
+        else:
+            with contextlib.redirect_stdout(io.StringIO()):
+                _run_checks()
 
         self.print_report()
 
@@ -555,15 +561,11 @@ class AgentsDoctor:
 
     def print_report(self):
         """Print validation report."""
-        print("=" * 60)
-        print("VALIDATION REPORT")
-        print("=" * 60)
-        print()
-        print(f"Folders checked: {self.stats['folders_checked']}")
-        print(f"Templates checked: {self.stats['templates_checked']}")
-        print(f"Docs checked: {self.stats['docs_checked']}")
-        print(f"Frontmatter checked: {self.stats['frontmatter_checked']}")
-        print()
+        print(
+            "doctor: "
+            f"folders={self.stats['folders_checked']} templates={self.stats['templates_checked']} "
+            f"docs={self.stats['docs_checked']} frontmatter={self.stats['frontmatter_checked']}"
+        )
 
         if not self.issues:
             print("✅ No issues found!")
@@ -577,32 +579,26 @@ class AgentsDoctor:
                 print(f"❌ ERRORS ({len(errors)}):")
                 for issue in errors:
                     print(f"   {issue}")
-                print()
-
             if warnings:
                 print(f"⚠️  WARNINGS ({len(warnings)}):")
                 for issue in warnings:
                     print(f"   {issue}")
-                print()
-
             if infos:
                 print(f"ℹ️  INFO ({len(infos)}):")
                 for issue in infos:
                     print(f"   {issue}")
-                print()
-
-        print("=" * 60)
 
         if not HAS_YAML:
-            print()
             print("⚠️  Note: PyYAML not installed. Install for full validation:")
             print("   pip install pyyaml")
-            print()
 
 
 def main():
-    fix = "--fix" in sys.argv
-    doctor = AgentsDoctor(fix=fix)
+    parser = argparse.ArgumentParser(description="Validate .agents folder structure and integrity")
+    parser.add_argument("--fix", action="store_true", help="Auto-fix checkbox formatting issues")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed per-check progress output")
+    args = parser.parse_args()
+    doctor = AgentsDoctor(fix=args.fix, verbose=args.verbose)
     success = doctor.run()
     sys.exit(0 if success else 1)
 

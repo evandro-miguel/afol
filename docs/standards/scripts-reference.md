@@ -4,7 +4,7 @@ id: scripts-reference
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-13T19:37:02-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Agents System - Quick Reference
@@ -16,6 +16,7 @@ updated_at: '2026-04-13T19:37:02-03:00'
 ```bash
 just help          # Show all commands
 just doctor        # Validate .agents structure
+just benchmark-runtime-flow # Run controlled live-agent runtime-flow benchmarks
 just new THEME=x   # Create workstream
 just structure     # Generate project structure docs
 just agents-all    # Full scaffold validation workflow
@@ -27,16 +28,18 @@ just all           # Alias for just agents-all
 | Command | Description | Options |
 |---------|-------------|---------|
 | `just help` | Show help message | - |
-| `just setup` | Initialize UV virtualenv | - |
+| `just setup-uv` | Install/copy project-local `uv` | - |
+| `just setup` | Initialize project-local UV virtualenvs | - |
 | `just doctor` | Validate structure | - |
 | `just clean` | Remove temp files | - |
 | `just structure` | Generate structure docs | - |
 | `just index` | Update SPECS/ADRS indexes | - |
 | `just sync` | Sync AGENTS.md files | - |
 | `just tools-check` | Validate tools catalog + CLI smoke tests | - |
+| `just benchmark-runtime-flow` | Run the controlled live-agent runtime-flow benchmark family | `SCENARIOS=id1,id2`, `MODEL=gpt-5.4-mini`, `REASONING=medium`, `SAVE=1`, `OUTPUT=<path>` |
 | `just new` | Create workstream | `THEME=<name>` `SPEC=1\|lite` |
 | `just bootstrap` | Bootstrap .agents system in another repository | `TARGET=/path/to/repo` |
-| `just verify` | Check task completion across all sessions | - |
+| `just verify` | Check task completion and evidence across all sessions | - |
 | `just verify-session` | Check task completion for one session | `SESSION_ID=<session-id>` |
 | `just verify-active` | Check task completion for active session only | - |
 | `just lint` | Lint markdown docs | - |
@@ -63,13 +66,17 @@ just all           # Alias for just agents-all
 | `just wb-touch` | Update `updated_at` in one session docs | `SESSION_ID=<session-id>` `[FILE=<path>]` |
 | `just wb-normalize-time` | Normalize WB timestamps to configured offset | - |
 | `just wb-files-changed` | Refresh report `Files Changed` from git | `SESSION_ID=<session-id>` or `REPORT=<report-file>` |
-| `just wb-task` | Mark task by ID in one session | `SESSION_ID=<session-id>` `TASK_ID=T-01 ACTION=done\|in_progress\|pending\|ready\|blocked\|skipped` |
+| `just wb-task` | Mark task by ID in one session and sync the board row; `ACTION=done` requires a valid evidence id from `just wb-evidence`; canonical states are `pending`, `in_progress`, `problem`, `moved`, `implemented_untested`, `tested_needs_spec_validation`, and `done` | `SESSION_ID=<session-id>` `TASK_ID=T-01 ACTION=done\|in_progress\|pending\|implemented\|tested\|problem\|moved` `[EVIDENCE_ID=E-...]` |
 | `just wb-status` | Set frontmatter status in one session docs | `SESSION_ID=<session-id>` `STATUS=<value>` `FILE=plan\|task\|spec-lite\|report\|log\|all` (`spec-lite` is the current compatibility key for child specs) |
 | `just wb-timeline` | Append timeline entry in one session log | `SESSION_ID=<session-id>` `MSG=\"text\"` |
 | `just wb-link` | Set `links.<key>` in one session doc frontmatter | `SESSION_ID=<session-id>` `FILE=<doc>` `KEY=<k>` `VALUE=<v>` |
 | `just agents-all` | Full scaffold validation (`doctor`, `structure`, `index`, `knowledge-index`, `sync`, markdown/script/runtime lint, skills/tools/telemetry checks, script coverage gate, runtime tests, and MCP smoke) | - |
 | `just all` | Alias for `just agents-all` | - |
 | `just refresh` | Clean + setup + structure | - |
+
+The `just wb-task` wrapper row above remains a compatibility surface. Use the
+canonical board states from `docs/standards/checkbox-protocol.md` as the source
+of truth; do not treat `skipped` as the semantic contract for `- [>]`.
 
 ### Aliases
 
@@ -138,6 +145,9 @@ Just wrapper entrypoint:
 ```bash
 .agents/agents help
 .agents/agents doctor
+.agents/agents benchmark list
+.agents/agents benchmark run live-implement-next-governance-preflight --save
+.agents/agents benchmark run live-wb-update-task-evidence-timeline --save
 .agents/agents new auth-refactor --spec
 .agents/agents structure-map . --output docs/map/structure/
 .agents/agents repo-map .
@@ -156,8 +166,8 @@ services.
 Direct UV usage:
 
 ```bash
-uv run --with pyyaml .agents/scripts/agents-doctor.py
-uv run --with pyyaml .agents/scripts/agents-new.py my-feature --spec
+.agents/tools/uv/bin/uv run --with pyyaml .agents/scripts/agents-doctor.py
+.agents/tools/uv/bin/uv run --with pyyaml .agents/scripts/agents-new.py my-feature --spec
 ```
 
 ## Project Config

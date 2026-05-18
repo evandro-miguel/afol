@@ -1,157 +1,124 @@
 # AGENTS.md
 
-## Project Goal
+## Project Overview
 
-- Goal: <describe the product, system, or repository purpose>.
-- Primary users: <describe who this project serves>.
-- Success criteria: <describe the observable outcome that means the work is correct>.
-- Current constraints: <describe important technical, security, operational, or delivery constraints>.
+`{project_name}` uses a local `.agents` workflow for LLM-assisted delivery.
+Replace this section after bootstrap with real product purpose and constraints.
 
-Keep this section project-specific. Update it before significant work starts.
+## Governed Execution
 
-## Agent Operating Contract
+- Use `.agents/wb/` when work includes implementation, validation, or delivery.
+- Before product edits: create/target a session and move task to `in_progress`.
+- Canonical path:
+  1. `./.agents/agents new {theme} --feature-id {F-id} --parent-spec {spec-id}`
+  2. `./.agents/agents implement start --session {session-id} --task-id T-01`
+  3. Edit and run named verification.
+  4. Close with `./.agents/agents implement complete ... --result passed`.
+- Planning-only or read-only questions stay in chat unless durable artifacts
+  are required.
 
-- Contribute to a correct, minimal, tested, well-evidenced, and context-efficient delivery.
-- Prefer truth over fluency, evidence over guesswork, reuse over reinvention, minimal delta over broad changes, focused context over broad context, and executable validation over model opinion.
-- Do not fabricate facts, code behavior, file contents, test results, tool outputs, source quality, or repository state.
-- Do not silently assume unclear requirements when the ambiguity materially affects correctness, architecture, scope, contracts, security, or data.
-- Do not create speculative features, expand scope silently, or perform unrelated repo-wide cleanup.
-- Do not mark work as done without evidence.
+## Stack
 
-## Context Discipline
+- Languages: `{project_languages}`
+- Runtime/CLI: `{runtime_cli_notes}`
+- Package/tool manager: `{package_tooling}`
+- Data/config formats: `{data_config_formats}`
 
-- Start narrow.
-- Read, search, and inspect only what is needed for the current task.
-- Prefer symbol search, grep, index search, file tree checks, and targeted reads before broad reads.
-- Before opening more files or sources, summarize what is already known in 3 to 7 lines.
-- Stop gathering context when additional context is unlikely to change the decision.
-- Pass compressed handoffs, not raw dumps.
-- Prefer structured summaries over long prose.
+## Repository Map
 
-## Evidence Rules
+- `.agents/scripts/`: CLI helpers.
+- `.agents/runtime/`: runtime package/adapters.
+- `.agents/wb/`: governed sessions.
+- `.agents/rules/`: local operational contracts only.
+- `.agents/skills/`: project-local skills only when needed.
+- `.agents/source/universal-skills/`: local seed, not nested git.
+- `docs/`: project docs.
+- `docs/map/`: current-state evidence only.
 
-Prefer deterministic evidence over model judgment whenever possible.
+## Working Rules
 
-Evidence priority:
+- Read relevant local files before edits.
+- Keep changes surgical.
+- Prefer reuse/simplify/delete over new code.
+- Do not add speculative features.
+- Do not revert user/other-agent work without request.
+- Reproduce bugs when practical and verify meaningful changes.
+- Add one lesson in `docs/lessons/entries/` after user correction that
+  prevents recurrence.
+- Use English for repo artifacts unless user asks otherwise.
 
-1. Reproducible tests or deterministic repro
-2. Lint, typecheck, build, schema checks, static checks
-3. Focused runtime validation
-4. Visual or observable confirmation
-5. Model critique
+## Context And Tokens
 
-Use model critique to find problems and improvement opportunities. Do not use it as final proof when executable checks are available.
+- Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus.
+- Prefer `.agents/agents knowledge pull "<topic>"` before broad historical
+  reads.
+- Use RTK only for noisy shell output:
+  `rtk git status`, `rtk find`, `rtk summary`, bounded `rtk grep`.
+- Keep raw output when exact lines or failure evidence matters.
+- Stop context collection when it will not change decisions.
 
-## Testing and Quality
+## Tool Routing
 
-- Strong default target: at least 80% of touched logic should be covered by meaningful tests or equivalent high-confidence validation when practical and measurable.
-- Coverage is not a substitute for meaningful assertions.
-- Always look for existing tests before writing new ones.
-- Prefer focused tests close to the changed behavior.
-- If tests cannot be added or run, explain exactly why and provide the strongest substitute validation available.
-- Leave the touched scope cleaner, more coherent, and easier to verify than before.
+- Use MCPs for indexed/structured operations.
+- Exact search: `rg`, `fd`, `jq`.
+- Syntax search: `sg`/`ast-grep`.
+- Repo history/context: `git`/`gh`; indexed graph/callers: GitNexus CLI.
+- Browser/UI: `npx playwright` or `bunx playwright`; lightweight checks:
+  `lightpanda`.
+- Runtime/tasks: `uv`/`python3`, `bun`/`node`/`npm`, `just`/`make`.
+- Docs/ops: `markdownlint`/`lint-md`/`fix-md`/`validate-md`, `markitdown`,
+  `yt-dlp`, `docker compose`, `tmux`.
 
-## Project Structure
+## Planning And Evidence
 
-```text
-<project-root>/
-|-- AGENTS.md                 # Agent operating contract for this project
-|-- Justfile                  # Wrapper that delegates to docs/standards/Justfile
-|-- docs/
-|   |-- arc/                  # Goal-state governance: roadmap, specs, decisions
-|   |   |-- GENERAL-ROADMAP.md
-|   |   |-- SPECS/
-|   |   `-- DECISIONS/
-|   |-- map/                  # Current-state maps and analysis evidence
-|   |   `-- structure/
-|   |-- standards/            # Human-readable standards and command references
-|   |-- templates/            # Reusable document starters only
-|   |-- lessons/              # Lessons learned and prevention rules
-|   |-- knowledge/            # Repo-local knowledge index and notes
-|   |-- patterns/             # Proven patterns and anti-patterns
-|   |-- telemetry/            # Telemetry docs and dashboards
-|   `-- agentic/              # Tool and runtime documentation
-|-- .agents/
-|   |-- agents                # CLI wrapper
-|   |-- agents.config         # Central scaffold config
-|   |-- tools.json            # Tool catalog
-|   |-- rules/                # Mandatory agent rules
-|   |-- scripts/              # Automation scripts and shared helpers
-|   |-- runtime/              # Runtime package and MCP surfaces
-|   |-- skills/               # Project-local skills
-|   |-- source/               # Repo-local universal-skills source seed
-|   |-- wb/                   # Active workbench sessions
-|   |-- tmp/                  # Disposable workspace
-|   |-- data/                 # Schemas and runtime data
-|   `-- z-arq/                # Archived work and notes
-`-- .claude/                  # Claude adapter
-```
-
-## Documentation Boundaries
-
-- `docs/arc/` is prescriptive goal-state governance.
-- `docs/map/` is descriptive current-state evidence.
-- `docs/templates/` is the only location for reusable document starters.
-- `.agents/` is for agent-system surfaces: rules, workbench state, skills, telemetry, adapters, runtime automation, and disposable state.
-- Do not put runtime state, caches, generated operational artifacts, or workbench sessions under `docs/`.
-- Do not put roadmap entries, specs, ADRs, or product intent under `docs/map/`.
-
-## Mandatory Rules
-
-Read `.agents/rules/README.md` first when rule coverage is unclear.
-
-- `.agents/rules/RULE-001-tool-discovery.md`: use before relying on unfamiliar tools or wrappers.
-- `.agents/rules/RULE-002-workstream-creation.md`: use before creating or updating workbench sessions.
-- `.agents/rules/RULE-003-documentation-standards.md`: use before adding or editing managed Markdown docs.
-- `.agents/rules/RULE-004-validation-linting.md`: use before marking work complete.
-- `.agents/rules/RULE-005-folder-structure.md`: use when adding, moving, or validating project folders.
-
-Agents must follow the applicable rule file, not only this summary.
-
-## Workbench
-
-- Use `.agents/wb/` for active sessions.
-- Keep one session folder per workstream.
-- Require frontmatter on workbench Markdown files.
-- Track plan, task, log, report, and postmortem artifacts where applicable.
-- Use `./.agents/agents wb-update ...` for managed timestamps, task state, links, file lists, and evidence when available.
-
-## Reuse and Minimality
-
-- First search for an existing pattern, helper, module, test, or documentation that can be reused.
-- Prefer deletion, simplification, consolidation, or reuse before adding new code.
-- Prefer the smallest correct change that satisfies the requirement.
-- If a task is too broad, reduce it to the smallest executable slice and state the remaining slices clearly.
-
-## Cleanliness
-
-- Clean what you touch.
-- Remove orphaned imports, dead branches, duplicated snippets introduced by the current work, stale comments caused by the change, and local inconsistencies in the touched scope.
-- Do not perform unrelated cleanup unless it blocks correctness, validation, or safe delivery.
-
-## Escalation
-
-- After 2 failed attempts on the same issue, change strategy.
-- After 3 materially different strategies without meaningful progress, escalate.
-- Escalate early if the blocker is caused by missing access, contradictory requirements, broken tooling, external dependency failure, or systemic ambiguity.
-- Escalation must state: current objective, observed evidence, strategies attempted, suspected root cause, and minimum next action needed.
-
-## Communication
-
-- Be concise.
-- Lead with the answer, finding, or verdict.
-- Separate facts, inferences, risks, and unknowns.
-- Prefer compact structured output.
-- Avoid long narrative unless it adds decision value.
+- Use roadmap-first delivery for non-trivial features.
+- Run the smallest decision-intake lane for ambiguous/product-shaped work.
+- Plans must describe direct execution, not pre-plan research.
+- Keep workbench artifact count minimal: default is `plan + task`.
+- Start tasks as `pending`/`in_progress`; mark `[x]` only with valid
+  evidence id.
+- Finalize optional artifacts before closure.
 
 ## Verification
 
-- Verify behavior before marking work done.
-- Keep lint and test commands explicit in repo docs.
-- Run the narrowest meaningful checks first, then broader checks when the change affects shared behavior.
-- If checks cannot run, explain why and provide the strongest substitute evidence available.
+- Never close work without proof.
+- Gate selection:
+  - docs/prompt/process -> `just lint`
+  - `.agents/scripts` -> `just lint-scripts` + focused tests or
+    `just test-scripts-all`
+  - `.agents/runtime` -> `just lint-runtime` + focused tests or
+    `just test-runtime`
+  - scaffold/release -> `just agents-all`
+- Run focused checks first; broaden only when risk requires.
+- If runtime guidance changes, report docs/mirror sync status.
 
-## Language
+## Docs And Boundaries
 
-- Write repository artifacts in English by default.
-- Use another language only when explicitly requested.
+- `docs/` is project documentation, not runtime state.
+- Keep runtime state/caches/generated ops artifacts outside `docs/`.
+- `docs/map/` is descriptive evidence only.
+- `docs/arc/` is goal-state governance.
+- Use `.agents/tmp/` only for disposable files.
+- Do not manually edit managed `updated_at`; use `just wb-touch` or
+  `./.agents/agents wb-update touch`.
+- Keep project-local rules/docs minimal: only required operational contracts.
+- Do not duplicate long rationale from canonical docs/skills; link to
+  canonical source.
+
+## Runtime And Skill Sync
+
+- `AGENTS.md` is canonical runtime instructions.
+- `CLAUDE.md` is the committed mirror; keep it compatible and synced.
+- Keep committed adapters thin and traceable.
+- Prefer project-local skills only for project-specific behavior.
+- `skills-sync sync` / `skills-sync update` refresh `.agents/skills/`.
+- `skills-sync pull` refreshes configured external source only.
+- `skills-sync push` is branch/PR flow; never direct to universal `main`.
+- When local skill behavior changes, record pending propagation to
+  universal-skills.
+
+## Optional Memory
+
+- Repo-local workbench docs and `knowledge` are canonical.
+- External memory is auxiliary retrieval only.
+- `.agents/agents memory search|context|recent|show` emits MCP contracts only.

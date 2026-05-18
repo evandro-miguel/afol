@@ -2,202 +2,157 @@
 
 ## Project Overview
 
-This repository is a base scaffold for an `AGENTS`-based workflow system used to coordinate LLM-assisted development. It is designed for interactive agent runtimes that operate through CLI products such as Codex CLI, OpenCode, Gemini CLI, Claude Code, and similar terminal-first agents. It provides standardized tooling for creating workstreams, tracking tasks, validating docs, and collecting telemetry across projects.
+This repo is the canonical `.agents` scaffold for terminal-first LLM-assisted
+development. It provides workbench sessions, task/evidence tracking, runtime
+adapters, docs standards, telemetry, and bootstrap assets for downstream repos.
 
-## Current Stack
+## Governed Execution
 
-- **Main language:** Python 3.11+
-- **Runtime and tooling:** Python scripts (`.agents/scripts/*`), Bash wrappers, Make, shell-based automation, runtime adapter docs for interactive agent CLIs
-- **Package manager:** `uv` (for Python environment/dependency management)
-- **Docs/data formats:** Markdown, YAML, JSON, TOML
+- If work requires implementation, validation, or delivery and references
+  governed work, evidence, task state, or closure, `.agents/wb/` is part of the
+  work.
+- Before product edits: create or target a session, then move the executable
+  task to `in_progress`.
+- Canonical path:
+  1. `./.agents/agents new {theme} --feature-id {F-id} --parent-spec {spec-id}`
+  2. `./.agents/agents implement start --session {session-id} --task-id T-01`
+  3. Edit and run the named verification.
+  4. Close with `./.agents/agents implement complete ... --result passed`.
+- Planning-only, read-only checks, and broad context questions stay in the
+  conversation unless a durable governed artifact is explicitly needed.
 
-## Runtime Positioning
+## Stack
 
-- This scaffold is for interactive agent execution environments, not for embedding a general-purpose agent SDK into an application runtime.
-- The primary execution model is: an operator opens a repository in an interactive CLI agent, and the scaffold provides the governance, docs, tools, telemetry, and runtime adapters that the agent uses while working.
-- Runtime folders should stay thin and focused on adapter/configuration concerns. Only `.claude/` is committed as a local runtime adapter; Codex uses `AGENTS.md` directly and OpenCode, Qwen, and Gemini use global runtime configuration.
-- Do not redesign the scaffold around long-lived backend agent services unless the roadmap explicitly introduces that use case.
+- Language: Python 3.11+
+- Tooling: `.agents/scripts/*`, `.agents/runtime`, Bash wrappers, Just, Make,
+  `uv`, Markdown, YAML, JSON, and TOML.
+- Runtime model: interactive CLI agents. Do not redesign this scaffold around
+  long-lived backend agent services unless the roadmap introduces that use case.
 
-## Repo Structure
+## Repository Map
 
-- `docs/`: project-owned documentation, repository mapping, and other non-agent project docs
-- `.agents/scripts/`: implementation of CLI commands (telemetry, patterns, linting, workbench updates)
-- `.agents/wb/`: workbench sessions (plan/task/log/report/research/spec/...) and active session state
-- `.agents/rules/`: operational guardrail files
-- `.agents/data/`: telemetry data and JSON schemas
-- `.agents/skills/`: project skills and workflows
-- `.agents/cache/`: cached remote skill/tool metadata
-- `.agents/agents.config`: configuration for wrappers, sync, and runtime defaults
-- `README.md`: onboarding and command reference for the scaffold
+- `.agents/scripts/`: CLI command implementations and helpers.
+- `.agents/runtime/`: runtime package and adapter support.
+- `.agents/wb/`: governed workstreams and local active-session state.
+- `.agents/rules/`: operational guardrails.
+- `.agents/skills/`: project-local skills and workflows.
+- `.agents/source/universal-skills/`: repo-local seed, not a nested git checkout.
+- `docs/`: project-owned docs, roadmap/specs, standards, templates, lessons,
+  telemetry, and maps.
+- `docs/map/`: current-state descriptive evidence only.
+- `src/project-template/`: downstream project baseline.
 
-## Important Files
+## Working Rules
 
-- `docs/map/` (current-state repository maps and analysis evidence)
-- `.agents/agents` (CLI entrypoint)
-- `.agents/scripts/agents-*.py` (command implementations)
-- `docs/templates/` (doc/workbench templates)
-- `.agents/wb/` and `.agents/z-arq/` (active and archived workstreams)
-- `Justfile` (canonical command runner; imports `docs/standards/Justfile`)
-- `Justfile` (temporary compatibility bridge to `docs/standards/Justfile`)
-- `.agents/agents.config` (source/target config for sync and runtime)
+- Read relevant local files before editing. Ground claims in live tool output.
+- Keep changes surgical. Touch only files required by the request.
+- Prefer reuse, simplification, deletion, and consolidation before new code.
+- Do not add speculative features, config switches, or one-off abstractions.
+- Do not revert user or other-agent work unless explicitly asked.
+- Reproduce bugs before fixing when practical; verify each meaningful change.
+- After user corrections, capture one lesson under `docs/lessons/entries/` when
+  it prevents recurrence.
+- Write repository artifacts in English unless the user explicitly asks
+  otherwise.
 
-## General Rules
+## Context And Tokens
 
-### Self-Improvement Loop
+- Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
+  CLI, and existing `docs/map/` before broad scans.
+- Prefer `.agents/agents knowledge pull "<topic>"` before opening historical
+  docs when prior work may answer the question.
+- Use RTK selectively for noisy shell output: `rtk git status`, `rtk find`,
+  `rtk summary`, and bounded `rtk grep` with directory scope plus `--glob`.
+- Keep raw `rg`, raw reads, and native command logs when exact source lines,
+  edit context, or failure evidence matter.
+- Do not wrap MCP output, tiny status commands, or single-file colon-heavy grep
+  with RTK. If RTK forces extra follow-up calls, stop using it for that path.
+- Stop gathering context when more context is unlikely to change the decision.
+  Pass compact handoffs, not raw dumps.
 
-- After any user correction, create one lesson file in `docs/lessons/entries/`
-- Add a prevention rule to avoid repeating the same mistake
-- Add guardrails when feasible (tests, assertions, lint rules, CI checks)
-- Review relevant lessons before starting significant work
+## Tool Routing
 
-### Verification Before Done
+- Use MCPs for structured/indexed operations: Project RAG, repo-analysis
+  sweeps, official docs, memory/notes, and tool-native state.
+- Exact search: `rg` for identifiers/text, `fd` for paths, `jq` for JSON.
+- Semantic or syntax search: `grepai` for fuzzy/public-code search;
+  `sg`/`ast-grep` for syntax-aware matching or codemod planning.
+- Repo context: `git`/`gh` for history and PRs; GitNexus CLI for indexed graph
+  or caller workflows; `repomix`, `yek`, and `gitingest` only when a compact
+  repo export materially helps.
+- Browser/UI checks: `npx playwright` or `bunx playwright` for E2E,
+  screenshots, and automation; `lightpanda` for lightweight page checks.
+- Runtime/tasks: `uv`/`python3` for Python; `bun`/`node`/`npm` for JS;
+  `just`/`make` for project command entrypoints.
+- Docs/ops: `markdownlint`/`lint-md`/`fix-md`/`validate-md` for Markdown,
+  `markitdown` for document conversion, `yt-dlp` for media, `docker compose`
+  for containers, and `tmux` for long-running terminals.
 
-- Never mark work complete without proof
-- Compare intended behavior vs actual behavior
-- Run verification commands and capture evidence
-- Mandatory gate: `just lint` must pass before any task/session can be marked as complete
-- Ask: `Would this pass a strict senior/staff review?`
-- Deterministic verification: evidence over assumptions
+## Planning And Evidence
 
-### Documentation Currency (Mandatory)
+- Roadmap-first delivery is mandatory for meaningful feature work:
+  roadmap feature -> parent spec -> optional child spec -> workbench.
+- For ambiguous, product-shaped, benchmark-heavy, or prioritization-heavy work,
+  run the smallest useful `docs/standards/decision-intake.md` lane before
+  planning, delegation, benchmarking, or implementation.
+- Plans describe direct execution of the requested work. Do not add pre-plan,
+  generic research, broad discovery, or "make the real plan" tasks.
+- Do needed discovery before authoring a plan and fold findings into facts,
+  risks, sequencing, and validation.
+- Workbench artifact economy is mandatory. Create only artifacts with a concrete
+  operational reason; the normal governed minimum is `plan + task`.
+- New tasks start pending or in_progress. Mark `[x]` only through task-scoped
+  closure evidence and a valid evidence id.
+- Optional artifacts must be finalized before session closure.
 
-- Every non-trivial change must have corresponding management documentation in the active workbench session.
-- Major code/docs changes must include at least:
-  - one updated plan/task/log entry
-  - one report artifact with validation evidence
-  - one knowledge/learned entry if a correction, bug, or process gap was found
-- Any tool/command change must have its canonical command reference updated in:
-  - `README.md`
-  - `docs/standards/`
-  - runtime mirrors when behavior/usage changed
-- Do not finish a workstream without explicitly checking the documentation freshness requirement in the final report.
+## Verification
 
-### Roadmap-First Delivery (Mandatory)
+- Never mark work complete without proof.
+- Gate selection: docs/prompt/process -> `just lint`; `.agents/scripts` ->
+  `just lint-scripts` plus focused tests or `just test-scripts-all`;
+  `.agents/runtime` -> `just lint-runtime` plus focused tests or
+  `just test-runtime`; cross-cutting scaffold/release -> `just agents-all`.
+- Prefer focused checks first, then broader checks when risk justifies them.
+- Runtime/tool-routing/prompt/rule-loading changes should run the controlled
+  runtime-flow benchmark family when regression risk is material.
+- Use `gpt-5.4-mini` with medium reasoning as the default benchmark baseline
+  unless a benchmark spec says otherwise.
+- Final reports must state changes, verification, remaining risk/skipped gates,
+  documentation-drift status, and mirror sync status when runtime guidance
+  changed.
 
-- Every meaningful feature must exist in `docs/arc/GENERAL-ROADMAP.md`
-- Every roadmap feature must link to one governing parent spec in `docs/arc/SPECS/`
-- Use child specs when they improve clarity, coordination, or reviewability for a feature
-- Workstreams must carry `roadmap_feature` and `parent_spec` context
-- Specs define philosophy, expected behavior, user journey, boundaries, and acceptance
-- Local workstreams may choose `spec` or `spec-child`; keep `spec-lite` as a legacy alias during migration. The parent spec remains mandatory.
-- Workstreams define delivery and verification; they do not replace strategic feature definition
+## Docs And Boundaries
 
-### Planning Intelligence (Mandatory For Major Work)
+- `docs/` is project-owned documentation, not runtime state.
+- Keep runtime state, caches, mirrors, generated operational artifacts, and
+  workbench evidence outside `docs/`.
+- `docs/map/` describes current state; it must not contain roadmap items,
+  feature specs, ADRs, briefs, desired architecture, or product philosophy.
+- `docs/arc/` is goal-state governance: roadmap, specs, decisions,
+  architecture, project brief, tech stack, and engineering guidelines.
+- Use `.agents/tmp/` only for disposable temporary files.
+- Never edit managed `updated_at` manually; use `just wb-touch` or
+  `./.agents/agents wb-update touch`.
 
-- For major work, the workbench plan file is an ExecPlan and must follow `PLANS.md`
-- The canonical ExecPlan path is `.agents/wb/<session_id>/<session_id>_plan_01.md`
-- ExecPlans must stay self-contained and living: keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current while work proceeds
-- Major plans must link to a brainstorm artifact before the plan can be considered complete
-- Major plans must link to an explorer-check artifact proving the current repo was inspected
-- Search prior findings through `.agents/agents knowledge` before broad repo rereads when relevant
-- Prefer `.agents/agents knowledge pull "<topic>"` before opening full historical docs so the first pass stays compact
-- If external memory integration is enabled, use `.agents/agents memory search|context "<topic>"` after repo-local `knowledge` lookup when cross-project context is still needed
-- Treat external memory as auxiliary retrieval only; never replace `.agents/wb/` or repo-local `knowledge` as canonical project state
-- Final session closure requires a finalized postmortem
+## Runtime And Skill Sync
 
-### Demand Elegance (Balanced)
+- `AGENTS.md` is the canonical runtime instruction source.
+- `CLAUDE.md` is the only committed root mirror generated from `AGENTS.md`.
+- OpenCode, Codex, Qwen, and Gemini use `AGENTS.md` directly or global runtime
+  config; committed adapters stay thin, secret-free, and traceable.
+- Prefer project-local skills under `.agents/skills/`.
+- Keep global Codex skills lean. Do not rely on a large machine-global skill
+  set as primary project behavior.
+- `skills-sync sync` / `skills-sync update` refresh `.agents/skills/`.
+  `skills-sync pull` refreshes only a configured external source. `skills-sync
+  push` is a branch/PR proposal flow and must never push directly to universal
+  `main`.
+- Agent behavior changes update the project-local skill first, then leave a
+  pending item to propagate the improvement to universal-skills.
 
-- For non-trivial changes, evaluate if there is a cleaner design
-- If the solution is hacky, refactor to a maintainable one
-- Avoid over-engineering simple tasks / Simplicity first: minimal necessary change
-- Keep diffs small, clear, and reviewable
+## Optional Memory
 
-### Autonomous Bug Fixing
-
-- Reproduce or explain why reproduction is blocked
-- Identify root cause first, not only symptoms
-- Implement fix + guardrail when feasible
-- Verify and report symptom, cause, fix, and proof
-- Minimal blast radius: touch only what is required
-
-### Safety Rules
-
-- Never expose secrets in code, logs, docs, or commits
-- Avoid destructive operations unless explicitly authorized
-- Do not add dependencies without clear justification
-- Archive before delete under `.agents/z-arq/YYYYMMDD_<description>/`
-
-### Docs Boundary Rule
-
-- `docs/` is the project-owned documentation surface
-- Do not use `docs/` for runtime state, caches, mirrors, or generated operational artifacts
-- Operational state must live outside `docs/` (for example: `.agents/cache/`, `.agents/wb/`, `.agents/tmp/`)
-
-### Project vs Agent Boundary
-
-- Reserve `.agents/` for agent-system surfaces such as workbench state, rules,
-  skills, telemetry, and runtime automation.
-- Keep project-owned documentation under `docs/` at the repository root when
-  the documentation is about the repository rather than the agent system.
-- **`docs/map/` is the current-state, descriptive, non-governance surface.**
-  It holds repository maps, codemaps, dependency graphs, API/ABI snapshots,
-  and analysis evidence generated from tooling. It describes what the repo
-  looks like right now, not what it should become.
-- Treat legacy `docs/arc/structure/` outputs as archived compatibility
-  material, not as a second durable current-state map surface.
-- **`docs/map/` must never contain:** roadmap entries, feature specs, ADRs,
-  project briefs, architecture intent, or any document that defines desired
-  behavior or product philosophy. Those belong under `docs/arc/`.
-- **`docs/arc/` is the goal-state, prescriptive, governance surface.**
-  It holds roadmap, specs, decisions, architecture, project brief, tech stack,
-  and engineering guidelines. It defines what the repo should become.
-- Use `docs/arc/`, `docs/standards/`, `docs/templates/`, `docs/telemetry/`,
-  `docs/patterns/`, `docs/knowledge/`, and `docs/lessons/` for project-facing
-  canon that should live with the repository instead of the agent runtime.
-- Workbench sessions, runtime rules, and agent memory remain under `.agents/`.
-- Workstreams may reference `docs/map/` as evidence of current state, but must
-  never promote map artifacts to governance sources. When map evidence conflicts
-  with roadmap/spec intent, the roadmap/spec wins.
-
-### Temporary Workspace Rule
-
-- Use `.agents/tmp/` for temporary files that do not fit the durable structure yet
-- Treat `.agents/tmp/` as non-canonical and disposable
-- Do not store final docs, decisions, roadmap items, or session evidence in `.agents/tmp/`
-
-### Language Policy
-
-- Write all repository artifacts in English by default
-- Use Portuguese only when explicitly requested by the user
-- Keep identifiers, docs, reports, and operational notes consistent with this rule
-
-### Metadata Update Policy (Mandatory)
-
-- Never edit `updated_at` manually in managed docs
-- Always update `updated_at` via automation commands/scripts
-- Preferred commands:
-  - `just wb-touch`
-  - `./.agents/agents wb-update touch`
-  - `./.agents/agents wb-update touch --file <path>`
-
-### Agent Sync
-
-- `AGENTS.md` is the canonical runtime instruction source
-- `CLAUDE.md` is the only committed root mirror generated from `AGENTS.md`
-- Keep generic operating guidance in sync here and add repository-specific detail in this file
-
-### Primary Runtime Compatibility
-
-- Treat OpenCode, Codex, Qwen, Gemini CLI, and Claude Code style interactive runtimes as the primary supported environments for this scaffold
-- Keep `AGENTS.md` and `.agents/*` as the canonical governance layer across all runtimes
-- Keep committed runtime adapters thin, secret-free, and traceable back to canonical governance
-- Never commit runtime credentials, auth state, or user-local machine configuration
-- Prefer changes that improve terminal-first interactive execution over changes that only benefit embedded SDK/server scenarios
-
-### Project-Local Skills Preferred
-
-- Prefer project-local skills under `.agents/skills/` as the main skill surface for Codex, OpenCode, Qwen, Claude Code, and Gemini CLI in this repo.
-- Keep global Codex skills lean; do not rely on a large machine-global skill set as the primary source of project behavior.
-- Prefer a repo-local universal-skills source seed at `.agents/source/universal-skills`; it must not be a nested git checkout.
-- Do not create or use `.agents/cache/universal-skills`; Git-backed universal-skills work must happen in an external checkout configured via `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`.
-- Bootstrap and `skills-sync` should prepare the project-local skill surface so each repository carries only the subset it actually needs.
-- Treat `skills-sync sync` / `skills-sync update` as the simple path that refreshes `.agents/skills/` from the configured universal-skills source.
-- Treat `skills-sync pull` as a refresh step only for an external git checkout; `skills-sync push` is only a branch/PR proposal flow and must never push directly to universal `main`.
-
-### Optional External Memory
-
-- The scaffold may expose an optional `memory` adapter for external memory providers such as `basic_memory`.
-- Use `.agents/agents memory status` to inspect the configured provider/project/runtime contract.
-- Use `.agents/agents memory search|context|recent|show` to emit exact MCP contracts for interactive runtimes when cross-project context is needed.
-- The `memory` command family is contract-only in the scaffold. It governs how agents should call memory MCP tools through the host runtime; it does not execute MCP tool calls from shell.
-- Keep repo-local workbench docs and `knowledge` canonical. External memory is for auxiliary retrieval and curated reuse, not for live task/plan/report authority.
+- Repo-local workbench docs and `knowledge` are canonical.
+- External memory is auxiliary retrieval only.
+- `.agents/agents memory search|context|recent|show` emits MCP contracts for
+  host runtimes; it does not execute MCP calls from shell.

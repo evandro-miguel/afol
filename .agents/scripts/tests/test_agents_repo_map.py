@@ -86,7 +86,29 @@ class AgentsRepoMapTests(unittest.TestCase):
 
             output = buf.getvalue()
             self.assertEqual(code, 0)
-            self.assertIn("Analysis shadow repo: <dry-run skipped>", output)
+            self.assertIn("analysis_shadow_repo: <dry-run skipped>", output)
+            self.assertIn("WARN: repo-map runner preview path does not exist", output)
+            self.assertIn(str(temp_root / "missing-runner.sh"), output)
+
+    def test_run_requires_runner_when_not_dry_run(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            temp_root = Path(td)
+            repo_dir = temp_root / "repo"
+            repo_dir.mkdir()
+
+            buf = io.StringIO()
+            argv = ["agents-repo-map.py", str(repo_dir)]
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": ""}, clear=False),
+                mock.patch.object(self.repo_map, "_runner_candidates", return_value=iter([temp_root / "missing-runner.sh"])),
+                contextlib.redirect_stdout(buf),
+            ):
+                code = self.repo_map.main()
+
+            output = buf.getvalue()
+            self.assertEqual(code, 1)
+            self.assertIn("Repository map runner not found", output)
             self.assertIn(str(temp_root / "missing-runner.sh"), output)
 
     def test_run_succeeds_when_runner_writes_required_readme(self):

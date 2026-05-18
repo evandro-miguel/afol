@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -27,7 +28,11 @@ def _copytree_ignore_runtime_state(src: str, names: list[str]) -> set[str]:
             ".git",
             ".coverage",
             ".pytest_cache",
+            ".worktrees",
             "__pycache__",
+            "build",
+            "dist",
+            "node_modules",
             ".mypy_cache",
             ".ruff_cache",
             ".venv",
@@ -45,6 +50,7 @@ def _copytree_ignore_runtime_state(src: str, names: list[str]) -> set[str]:
 def isolated_env(repo_root: Path) -> dict[str, str]:
     env = os.environ.copy()
     env["AGENTS_ACTIVE_SESSION_FILE"] = str(repo_root / ".agents" / "wb" / ".active_session")
+    env["AGENTS_SCRIPT_PYTHON"] = str(ROOT_DIR / ".agents" / "scripts" / ".venv" / "bin" / "python3")
     env["AGENTS_UV_CACHE_DIR"] = str(repo_root / ".agents" / "cache" / "uv")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PATH"] = f"{ROOT_DIR / '.agents' / 'scripts' / '.venv' / 'bin'}:{env.get('PATH', '')}"
@@ -140,6 +146,17 @@ def build_isolated_repo(tmp_root: Path) -> Path:
     return repo_root
 
 
+def first_available_feature_and_spec(repo_root: Path) -> tuple[str, str]:
+    roadmap = (repo_root / "docs" / "arc" / "GENERAL-ROADMAP.md").read_text(encoding="utf-8")
+    specs_dir = repo_root / "docs" / "arc" / "SPECS"
+    for spec_file in sorted(specs_dir.glob("*_spec_*.md")):
+        content = spec_file.read_text(encoding="utf-8")
+        match = re.search(r"^roadmap_feature:\s*['\"]?(F-[0-9]+)['\"]?", content, re.MULTILINE)
+        if match and match.group(1) in roadmap:
+            return match.group(1), spec_file.stem
+    raise AssertionError("Expected at least one spec linked to a roadmap feature")
+
+
 @pytest.fixture
 def isolated_repo() -> Path:
     with tempfile.TemporaryDirectory() as td:
@@ -154,17 +171,18 @@ def test_new_quick_workflow(isolated_repo: Path):
     assert "✓ Added task:" in result.stdout
 
 
-def test_new_planning_workflow_creates_brainstorm_and_explorer_check(isolated_repo: Path):
-    """`--intent planning` should materialize the governed planning artifact bundle."""
+def test_new_planning_workflow_creates_minimum_plan_and_task(isolated_repo: Path):
+    """`--intent planning` should materialize the minimum mandatory artifact set."""
+    feature_id, parent_spec = first_available_feature_and_spec(isolated_repo)
     result = run_command(
         isolated_repo,
         [
             "new",
             "integration-planning-track",
             "--feature-id",
-            "F-10",
+            feature_id,
             "--parent-spec",
-            "260323_1704_universal-skills-runtime-integration_spec_01",
+            parent_spec,
             "--intent",
             "planning",
         ],
@@ -177,9 +195,8 @@ def test_new_planning_workflow_creates_brainstorm_and_explorer_check(isolated_re
     session_dir = session_dirs[-1]
     session_id = session_dir.name
 
-    assert (session_dir / f"{session_id}_brainstorm_01.md").exists()
-    assert (session_dir / f"{session_id}_explorer-check_01.md").exists()
     assert (session_dir / f"{session_id}_plan_01.md").exists()
+    assert (session_dir / f"{session_id}_task_01.md").exists()
 
 
 def test_wb_update_task_workflow(isolated_repo: Path):
@@ -195,7 +212,7 @@ def test_doctor_workflow(isolated_repo: Path):
     result = run_command(isolated_repo, ["doctor"])
 
     assert result.returncode == 0, result.stderr
-    assert "VALIDATION REPORT" in result.stdout
+    assert "doctor: folders=" in result.stdout
 
 
 def test_lint_workflow(isolated_repo: Path):
@@ -222,7 +239,8 @@ def test_repo_map_dry_run_workflow(isolated_repo: Path):
     result = run_command(isolated_repo, ["repo-map", ".", "--dry-run"])
 
     assert result.returncode == 0, result.stderr
-    assert "Analysis shadow repo: <dry-run skipped>" in result.stdout
+    assert "analysis_shadow_repo: <dry-run skipped>" in result.stdout
+    assert "resolved_command:" in result.stdout
     assert str(isolated_repo / "docs" / "map") in result.stdout
 
 
@@ -239,6 +257,7 @@ def test_session_catchup_temp_repo_scenarios():
             ".agents/scripts/agents-session.py",
             ".agents/scripts/lib/agents_config.py",
             ".agents/scripts/lib/artifact_utility.py",
+            ".agents/scripts/lib/cli_output.py",
             ".agents/scripts/lib/execution_commands.py",
             ".agents/scripts/lib/markdown_docs.py",
             ".agents/scripts/lib/workflow_manifest.py",

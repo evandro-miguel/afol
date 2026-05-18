@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 from typing import Dict, List
 
 from lib.agents_config import load_agents_config, now_iso_with_offset
+from lib.cli_output import to_json_text
 from lib.execution_commands import (
     ExecutionError,
     context_readiness,
@@ -43,28 +43,49 @@ DOCS_TO_DISPLAY = [
 
 
 def print_status(data: Dict[str, object]) -> None:
-    print("Agents Status")
     print(f"session: {data['session']}")
-    print(f"context_ready: {data['context_ready']}")
-    if data["missing_context"]:
-        print("missing_context:")
-        for item in data["missing_context"]:
-            print(f" - {item}")
-    print(f"roadmap_feature: {data['roadmap_feature']}")
+    print(f"ready_state: {data['ready_state']} context_ready={data['context_ready']} roadmap_feature={data['roadmap_feature']}")
+
+    _print_missing_context(data["missing_context"])
 
     tasks = data["tasks"]
     print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
     if tasks['next']:
         print(f"next_task: {tasks['next']}")
-    if data["workflow_next"]:
+    if data["ready_state"] != "complete" and data["workflow_next"]:
         print(f"next_artifact: {data['workflow_next']}")
-    if data['blocked_tasks']:
-        print("blocked_tasks:")
-        for line in data['blocked_tasks']:
+    _print_blocked_tasks(data["blocked_tasks"])
+
+    _print_workflow_artifacts(data["workflow_artifacts"])
+    _print_artifacts(data["artifacts"])
+
+
+def _print_missing_context(missing_context) -> None:
+    if missing_context:
+        print(f"missing_context ({len(missing_context)}):")
+        for item in missing_context:
+            print(f" - {item}")
+
+
+def _print_blocked_tasks(blocked_tasks) -> None:
+    if blocked_tasks:
+        print(f"blocked_tasks ({len(blocked_tasks)}):")
+        for line in blocked_tasks:
             print(f" - {line}")
-    if data["workflow_artifacts"]:
-        print("workflow_artifacts:")
-        for item in data["workflow_artifacts"]:
+
+
+def _print_workflow_artifacts(workflow_artifacts) -> None:
+    if workflow_artifacts:
+        artifacts = list(workflow_artifacts)
+        blocked_count = sum(1 for item in artifacts if item["state"] == "blocked")
+        invalid_count = sum(1 for item in artifacts if item["state"] == "invalid")
+        print(
+            "workflow_artifacts: "
+            f"total={len(artifacts)} blocked={blocked_count} invalid={invalid_count}"
+        )
+        for item in artifacts:
+            if item["state"] == "done":
+                continue
             status = item["status"] or "n/a"
             blockers = f" blockers={'; '.join(item['blockers'])}" if item["blockers"] else ""
             utility = item.get("utility", {})
@@ -73,17 +94,17 @@ def print_status(data: Dict[str, object]) -> None:
                 utility_notes = f" reasons={'; '.join(utility['reasons'])}"
             print(f" - {item['doc_type']}: {item['state']} (status={status}){blockers}{utility_notes}")
 
-    print(f"plan: {data['artifacts'].get('plan', '')}")
-    print(f"task: {data['artifacts'].get('task', '')}")
-    print(f"spec: {data['artifacts'].get('spec', '')}")
-    print(f"report: {data['artifacts'].get('report', '')}")
-    print(f"log: {data['artifacts'].get('log', '')}")
-    print(f"architecture: {data['artifacts'].get('architecture', '')}")
-    print(f"product: {data['artifacts'].get('product', '')}")
-    print(f"guidelines: {data['artifacts'].get('guidelines', '')}")
-    print(f"tech_stack: {data['artifacts'].get('tech-stack', '')}")
-    print(f"current_state_map: {data['artifacts'].get('current-state-map', '')}")
-    print(f"ready_state: {data['ready_state']}")
+
+def _print_artifacts(artifacts) -> None:
+    present_artifacts = [name for name, path in artifacts.items() if path]
+    print(
+        "artifacts: "
+        f"present={len(present_artifacts)} missing={len(artifacts) - len(present_artifacts)}"
+    )
+    for alias in ("task", "plan", "report", "log", "spec"):
+        path = artifacts.get(alias, "")
+        if path:
+            print(f" - {alias}: {path}")
 
 
 def summarize_session(session_path: Path, check_context: bool = False) -> Dict[str, object]:
@@ -96,11 +117,21 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
     task = resolve_artifact(session_path, "task")
 
     total, done, remaining, blocked_rows, rows = parse_state_summary(task)
-    ready_state = "idle"
-    if task and total and done == total:
-        ready_state = "complete"
-    elif total:
-        ready_state = "ready"
+    manifest_states = workflow_artifact_states(session_path)
+    optional_open_blockers = [
+        item
+        for item in manifest_states
+        if item.get("doc_type") in {"brainstorm", "research", "explorer-check", "postmortem"}
+        and item.get("exists")
+        and str(item.get("status") or "").strip().lower() != "final"
+    ]
+
+    ready_state = "blocked" if optional_open_blockers else "idle"
+    if ready_state != "blocked":
+        if task and total and done == total:
+            ready_state = "complete"
+        elif total:
+            ready_state = "ready"
 
     roadmap_feature = ""
     if task and task.exists():
@@ -110,8 +141,9 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
     context_ready, missing_context = context_readiness(session_path)
     if not check_context:
         missing_context = []
-    manifest_states = workflow_artifact_states(session_path)
     next_artifact = next_workflow_artifact(manifest_states)
+
+    workflow_next = None if ready_state == "complete" else _format_next_artifact(next_artifact)
 
     return {
         "session": session_path.name,
@@ -129,7 +161,7 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
         "context_ready": context_ready,
         "missing_context": missing_context,
         "workflow_artifacts": manifest_states,
-        "workflow_next": _format_next_artifact(next_artifact),
+        "workflow_next": workflow_next,
     }
 
 
@@ -155,7 +187,8 @@ def _format_next_artifact(item):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Show workstream status from canonical .agents artifacts")
     parser.add_argument("--session", help="Session id/path (default: active session)")
-    parser.add_argument("--json", action="store_true", help="Emit JSON payload")
+    parser.add_argument("--json", action="store_true", help="Emit JSON payload (compact by default)")
+    parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output (requires --json)")
     parser.add_argument("--artifact", action="append", help="Resolve a logical artifact name")
     parser.add_argument("--check-context", action="store_true", help="Include missing context details")
     return parser.parse_args()
@@ -179,8 +212,12 @@ def main() -> int:
         return 0
 
     payload = summarize_session(session, check_context=args.check_context)
+    if args.pretty and not args.json:
+        print("--pretty requires --json")
+        return 2
+
     if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        print(to_json_text(payload, pretty=args.pretty, sort_keys=True))
     else:
         print_status(payload)
 

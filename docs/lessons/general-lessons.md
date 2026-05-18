@@ -2,7 +2,7 @@
 doc_type: lessons
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-02-23T17:54:59-03:00'
+updated_at: '2026-05-09T18:05:26-03:00'
 ---
 
 # General Lessons
@@ -132,6 +132,16 @@ Lessons should be reviewed periodically:
 
 **Guardrail:** Keep a `Language Policy` section in root `AGENTS.md` and apply it to docs, logs, and management artifacts.
 
+### 2026-05-09 - Done state must be ledger-gated
+
+**Context:** User identified repeated cross-project behavior where agents created or updated tasks as `done` before execution was actually validated.
+
+**Lesson:** A task state is not complete just because the task file contains completion text. Completion must be tied to task-scoped ledger evidence.
+
+**Prevention rule:** Never create a new task as `done`; only move to `done` through `wb-update task --mark-done --evidence-id E-...` after valid `.evidence.jsonl` closure evidence exists.
+
+**Guardrail:** Completion commands and strict verification must reject generic evidence labels, missing evidence IDs, unresolved failed evidence, and document-only evidence.
+
 ---
 
 ## Prevention rules
@@ -151,6 +161,7 @@ Lessons should be reviewed periodically:
 13. **Template-first AGENTS** - Keep root AGENTS generic with placeholders and reusable operational rules
 14. **Discovery-first tool docs** - Keep AGENTS tool guidance short and rely on dynamic tools catalog commands
 15. **English by default** - Use English across repo artifacts unless user explicitly requests another language
+16. **Ledger-gated done state** - Never seed tasks as `done`; require `.evidence.jsonl` closure evidence and `--evidence-id` before `done`
 
 ## Guardrails
 
@@ -168,6 +179,7 @@ Lessons should be reviewed periodically:
 - Root `AGENTS.md` preserves placeholder sections and generic management-tool workflow guidance
 - Root `AGENTS.md` keeps tools guidance concise and delegates details to `.agents/agents tools` discovery commands
 - Root `AGENTS.md` includes explicit `Language Policy` enforcing English as default
+- Task `done` state is ledger-gated and cannot rely on document-only evidence
 
 ---
 

@@ -3,6 +3,13 @@
 # Agents CLI Wrapper
 # Run .agents scripts with UV isolation
 #
+# Governed delivery lifecycle:
+#   1. Use this wrapper to create/target a .agents/wb session before product edits.
+#   2. Move the execution task to in_progress before product edits.
+#   3. Run the product verification named by the request.
+#   4. Complete the task through this wrapper so evidence and done state are recorded together.
+# Do not edit named validation scripts to make checks pass unless the request is to change that validator.
+#
 # Usage:
 #   .agents/agents <script> [args...]
 #   .agents/agents doctor [args...]
@@ -18,24 +25,346 @@ else
     SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
 fi
 ORIGINAL_PWD="$(pwd)"
+TOOLS_DIR="${SCRIPT_DIR}/tools"
+PROJECT_UV_BIN="${AGENTS_UV_BIN:-${TOOLS_DIR}/uv/bin/uv}"
+PROJECT_UV_PYTHON_DIR="${AGENTS_UV_PYTHON_DIR:-${TOOLS_DIR}/uv/python}"
+PROJECT_UV_PYTHON_VERSION="${AGENTS_UV_PYTHON_VERSION:-3.11}"
+PROJECT_UV_PYTHON_BIN=""
 
-resolve_python_bin() {
-    if [ -x "${SCRIPTS_DIR}/.venv/bin/python3" ]; then
-        echo "${SCRIPTS_DIR}/.venv/bin/python3"
-    elif [ -x "${SCRIPTS_DIR}/.venv/bin/python" ]; then
-        echo "${SCRIPTS_DIR}/.venv/bin/python"
-    elif command -v python3 >/dev/null 2>&1; then
-        command -v python3
-    elif command -v python >/dev/null 2>&1; then
-        command -v python
+find_system_uv_bin() {
+    command -v uv || true
+}
+
+resolve_uv_bin() {
+    if [ -n "${AGENTS_UV_BIN:-}" ] && [ -x "${AGENTS_UV_BIN}" ]; then
+        echo "${AGENTS_UV_BIN}"
+    elif [ -x "${PROJECT_UV_BIN}" ]; then
+        echo "${PROJECT_UV_BIN}"
+    elif [ "${AGENTS_ALLOW_SYSTEM_UV:-}" = "1" ]; then
+        find_system_uv_bin
     else
         echo ""
     fi
 }
 
+hydrate_project_uv() {
+    if [ -x "${PROJECT_UV_BIN}" ]; then
+        echo "✓ Project-local uv already available: ${PROJECT_UV_BIN}"
+        return 0
+    fi
+
+    mkdir -p "$(dirname "${PROJECT_UV_BIN}")"
+
+    local system_uv_bin
+    system_uv_bin="$(find_system_uv_bin)"
+    if [ -n "${system_uv_bin}" ] && [ -x "${system_uv_bin}" ]; then
+        cp "${system_uv_bin}" "${PROJECT_UV_BIN}"
+        chmod 0755 "${PROJECT_UV_BIN}"
+        echo "✓ Project-local uv installed: ${PROJECT_UV_BIN}"
+        return 0
+    fi
+
+    local curl_bin
+    curl_bin="$(command -v curl || true)"
+    if [ -n "${curl_bin}" ]; then
+        local installer_tmp
+        installer_tmp="$(mktemp "${TMPDIR:-/tmp}/agents-uv-install.XXXXXX")" || return 1
+        echo "→ Installing project-local uv..."
+        if "${curl_bin}" -LsSf https://astral.sh/uv/install.sh -o "${installer_tmp}"; then
+            UV_INSTALL_DIR="$(dirname "${PROJECT_UV_BIN}")" \
+                INSTALLER_NO_MODIFY_PATH=1 \
+                sh "${installer_tmp}"
+        fi
+        rm -f "${installer_tmp}"
+        if [ -x "${PROJECT_UV_BIN}" ]; then
+            echo "✓ Project-local uv installed: ${PROJECT_UV_BIN}"
+            return 0
+        fi
+    fi
+
+    echo "❌ Project-local uv is not available at ${PROJECT_UV_BIN}"
+    echo "   Run ./.agents/agents hydrate-uv from a network-enabled shell or set AGENTS_UV_BIN to a project-local uv binary."
+    return 1
+}
+
+resolve_project_uv_python_bin() {
+    if [ -n "${AGENTS_UV_PYTHON_BIN:-}" ] && [ -x "${AGENTS_UV_PYTHON_BIN}" ]; then
+        echo "${AGENTS_UV_PYTHON_BIN}"
+        return 0
+    fi
+
+    if [ ! -d "${PROJECT_UV_PYTHON_DIR}" ]; then
+        echo ""
+        return 0
+    fi
+
+    local python_bin
+    python_bin="$(
+        find "${PROJECT_UV_PYTHON_DIR}" \
+            -path "*/bin/python${PROJECT_UV_PYTHON_VERSION}" \
+            -type f \
+            -perm /111 \
+            | sort \
+            | head -n 1
+    )"
+    if [ -n "${python_bin}" ]; then
+        echo "${python_bin}"
+        return 0
+    fi
+
+    python_bin="$(
+        find "${PROJECT_UV_PYTHON_DIR}" \
+            -path "*/bin/python3" \
+            -type f \
+            -perm /111 \
+            | sort \
+            | head -n 1
+    )"
+    if [ -n "${python_bin}" ]; then
+        echo "${python_bin}"
+        return 0
+    fi
+
+    python_bin="$(
+        find "${PROJECT_UV_PYTHON_DIR}" \
+            -path "*/bin/python" \
+            -type f \
+            -perm /111 \
+            | sort \
+            | head -n 1
+    )"
+    echo "${python_bin}"
+}
+
+hydrate_project_python() {
+    PROJECT_UV_PYTHON_BIN="$(resolve_project_uv_python_bin)"
+    if [ -n "${PROJECT_UV_PYTHON_BIN}" ]; then
+        echo "✓ Project-local Python already available: ${PROJECT_UV_PYTHON_BIN}"
+        return 0
+    fi
+
+    mkdir -p "${PROJECT_UV_PYTHON_DIR}"
+    echo "→ Installing project-local Python ${PROJECT_UV_PYTHON_VERSION}..."
+    UV_CACHE_DIR="${UV_CACHE_DIR}" \
+        UV_PYTHON_INSTALL_DIR="${PROJECT_UV_PYTHON_DIR}" \
+        "${UV_BIN}" python install \
+        --install-dir "${PROJECT_UV_PYTHON_DIR}" \
+        "${PROJECT_UV_PYTHON_VERSION}"
+
+    PROJECT_UV_PYTHON_BIN="$(resolve_project_uv_python_bin)"
+    if [ -n "${PROJECT_UV_PYTHON_BIN}" ]; then
+        echo "✓ Project-local Python installed: ${PROJECT_UV_PYTHON_BIN}"
+        return 0
+    fi
+
+    echo "❌ Project-local Python was not found under ${PROJECT_UV_PYTHON_DIR}"
+    return 1
+}
+
+resolve_real_path() {
+    local target="$1"
+    local python_bin
+    python_bin="$(command -v python3 || command -v python || true)"
+    if [ -n "${python_bin}" ]; then
+        "${python_bin}" -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "${target}" && return 0
+    fi
+    echo "${target}"
+}
+
+ensure_venv_uses_project_python() {
+    local venv_dir="$1"
+    local existing_python=""
+
+    if [ -x "${venv_dir}/bin/python3" ]; then
+        existing_python="${venv_dir}/bin/python3"
+    elif [ -x "${venv_dir}/bin/python" ]; then
+        existing_python="${venv_dir}/bin/python"
+    else
+        return 0
+    fi
+
+    local resolved_python
+    resolved_python="$(resolve_real_path "${existing_python}")"
+
+    case "${resolved_python}" in
+        "${PROJECT_UV_PYTHON_DIR}"/*)
+            return 0
+            ;;
+    esac
+
+    echo "→ Removing non-project virtualenv: ${venv_dir}"
+    echo "  Existing interpreter resolves to: ${resolved_python}"
+    rm -rf "${venv_dir}"
+}
+
+run_uv_sync() {
+    local target_dir="$1"
+    shift
+
+    local log_dir="${SCRIPT_DIR}/tmp"
+    mkdir -p "${log_dir}"
+    local log_file="${log_dir}/uv-sync-$(basename "${target_dir}").log"
+
+    set +e
+    (
+        cd "${target_dir}" || exit 1
+        UV_CACHE_DIR="${UV_CACHE_DIR}" \
+            UV_PYTHON_INSTALL_DIR="${PROJECT_UV_PYTHON_DIR}" \
+            "${UV_BIN}" sync --python "${PROJECT_UV_PYTHON_BIN}" "$@"
+    ) >"${log_file}" 2>&1
+    local status="${?}"
+    set -e
+
+    if [ "${status}" -ne 0 ]; then
+        cat "${log_file}" >&2
+        if grep -q "failed to create UnixStream\\|Tokio executor failed\\|socketpair" "${log_file}"; then
+            echo "" >&2
+            echo "❌ uv could not start in this sandbox because Unix socket creation is blocked." >&2
+            echo "   The project-local uv binary is still: ${UV_BIN}" >&2
+            echo "   Run hydrate from a sandbox/profile that allows UnixStream/socketpair, then normal commands will use the local .venv directly." >&2
+        fi
+        if grep -qi "failed to query Python interpreter\\|Permission denied (os error 13)\\|failed to get random numbers\\|urandom" "${log_file}"; then
+            echo "" >&2
+            echo "❌ uv could not inspect the project-local Python in this sandbox." >&2
+            echo "   The managed Python target is: ${PROJECT_UV_PYTHON_BIN}" >&2
+            echo "   This usually means the sandbox is blocking device/random access needed by Python startup or uv interpreter probing." >&2
+            echo "   Re-run hydrate in a sandbox/profile that allows those runtime primitives; normal wrapper commands will then use the local .venv." >&2
+        fi
+        return "${status}"
+    fi
+
+    rm -f "${log_file}"
+    return 0
+}
+
+resolve_python_bin() {
+    if [ -n "${AGENTS_SCRIPT_PYTHON:-}" ] && [ -x "${AGENTS_SCRIPT_PYTHON}" ]; then
+        echo "${AGENTS_SCRIPT_PYTHON}"
+    elif [ -x "${SCRIPTS_DIR}/.venv/bin/python3" ]; then
+        echo "${SCRIPTS_DIR}/.venv/bin/python3"
+    elif [ -x "${SCRIPTS_DIR}/.venv/bin/python" ]; then
+        echo "${SCRIPTS_DIR}/.venv/bin/python"
+    elif [ "${AGENTS_ALLOW_SYSTEM_PYTHON:-}" = "1" ]; then
+        local python3_bin
+        python3_bin="$(command -v python3 || true)"
+        local python_bin
+        python_bin="$(command -v python || true)"
+        if [ -n "${python3_bin}" ]; then
+            echo "${python3_bin}"
+        elif [ -n "${python_bin}" ]; then
+            echo "${python_bin}"
+        else
+            echo ""
+        fi
+    else
+        echo ""
+    fi
+}
+
+hydrate_runtime_and_scripts() {
+    if [ -z "${UV_BIN}" ]; then
+        hydrate_project_uv || return 1
+        UV_BIN="$(resolve_uv_bin)"
+    fi
+
+    if [ -z "${UV_BIN}" ]; then
+        echo "❌ Project-local uv is not available."
+        echo "   Run ./.agents/agents hydrate-uv first."
+        return 1
+    fi
+
+    hydrate_project_python || return 1
+    PROJECT_UV_PYTHON_BIN="$(resolve_project_uv_python_bin)"
+    if [ -z "${PROJECT_UV_PYTHON_BIN}" ]; then
+        echo "❌ Project-local Python is not available."
+        echo "   Run ./.agents/agents hydrate from a sandbox/profile that can install managed Python into ${PROJECT_UV_PYTHON_DIR}."
+        return 1
+    fi
+
+    local project_cache_dir="${UV_CACHE_DIR}"
+    mkdir -p "${project_cache_dir}"
+    if [ "${?}" -ne 0 ]; then
+        echo "❌ Unable to prepare UV cache directory: ${project_cache_dir}"
+        return 1
+    fi
+
+    echo "→ Hydrating script environment..."
+    ensure_venv_uses_project_python "${SCRIPTS_DIR}/.venv"
+    UV_CACHE_DIR="${project_cache_dir}" run_uv_sync "${SCRIPTS_DIR}"
+    echo "✓ Script environment hydrated"
+
+    if [ ! -d "${SCRIPT_DIR}/runtime" ]; then
+        echo "⚠️  Runtime package not found, skipping runtime hydration: ${SCRIPT_DIR}/runtime"
+        return 0
+    fi
+
+    echo "→ Hydrating runtime environment..."
+    ensure_venv_uses_project_python "${SCRIPT_DIR}/runtime/.venv"
+    if [ -f "${SCRIPT_DIR}/runtime/uv.lock" ]; then
+        UV_CACHE_DIR="${project_cache_dir}" run_uv_sync "${SCRIPT_DIR}/runtime" --locked
+    else
+        UV_CACHE_DIR="${project_cache_dir}" run_uv_sync "${SCRIPT_DIR}/runtime"
+    fi
+    echo "✓ Runtime environment hydrated"
+    echo "✓ Hydration complete"
+    return 0
+}
+
+require_script_python() {
+    if [ -n "${AGENTS_SCRIPT_PYTHON:-}" ]; then
+        return 0
+    fi
+
+    if [ -d "${SCRIPTS_DIR}/.venv" ]; then
+        return 0
+    fi
+
+    echo "⚠️  Project-local script virtualenv is not present at ${SCRIPTS_DIR}/.venv"
+    echo "   Run ./.agents/agents hydrate to provision .agents/scripts and .agents/runtime dependencies."
+    if [ "${AGENTS_ALLOW_SYSTEM_PYTHON:-}" = "1" ]; then
+        echo "   AGENTS_ALLOW_SYSTEM_PYTHON=1 is set; falling back to system Python."
+        return 0
+    fi
+
+    echo "   This is required in sandboxed/local runtime mode."
+    echo "   Set AGENTS_ALLOW_SYSTEM_PYTHON=1 to opt in to explicit system Python fallback."
+    return 1
+}
+
 PYTHON_BIN="$(resolve_python_bin)"
-UV_BIN="$(command -v uv 2>/dev/null || true)"
-export UV_CACHE_DIR="${AGENTS_UV_CACHE_DIR:-${SCRIPT_DIR}/cache/uv}"
+UV_BIN="$(resolve_uv_bin)"
+
+if [ -n "${AGENTS_SCRIPT_PYTHON:-}" ] && [ ! -x "${AGENTS_SCRIPT_PYTHON}" ]; then
+    echo "❌ AGENTS_SCRIPT_PYTHON is not executable: ${AGENTS_SCRIPT_PYTHON}"
+    exit 1
+fi
+
+resolve_uv_cache_dir() {
+    if [ -n "${AGENTS_UV_CACHE_DIR:-}" ]; then
+        echo "${AGENTS_UV_CACHE_DIR}"
+        return 0
+    fi
+
+    if [ -n "${UV_CACHE_DIR:-}" ]; then
+        echo "${UV_CACHE_DIR}"
+        return 0
+    fi
+
+    local local_cache="${SCRIPT_DIR}/cache/uv"
+    if mkdir -p "${local_cache}" && [ -w "${local_cache}" ]; then
+        echo "${local_cache}"
+        return 0
+    fi
+
+    local project_name
+    project_name="$(basename "$(cd "${SCRIPT_DIR}/.." && pwd)")"
+    local fallback_cache="${TMPDIR:-/tmp}/agents-uv-cache/${project_name}"
+    mkdir -p "${fallback_cache}"
+    echo "${fallback_cache}"
+}
+
+export UV_CACHE_DIR="$(resolve_uv_cache_dir)"
+export PYTHONHASHSEED="${PYTHONHASHSEED:-0}"
 
 TELEMETRY_SCRIPT="${SCRIPTS_DIR}/agents-telemetry.py"
 ACTIVE_SESSION_FILE="${AGENTS_ACTIVE_SESSION_FILE:-${SCRIPT_DIR}/wb/.active_session}"
@@ -56,10 +385,11 @@ record_tool_telemetry() {
     fi
 
     if [ -n "${session_id}" ] && [ -f "${TELEMETRY_SCRIPT}" ]; then
+        mkdir -p "${SCRIPT_DIR}/tmp"
         "${PYTHON_BIN}" "${TELEMETRY_SCRIPT}" record tool_exec \
             --session-id="${session_id}" \
             --metadata="{\"tool_name\":\"${tool_name}\",\"outcome\":\"${outcome}\",\"exit_code\":${exit_code}}" \
-            >/dev/null 2>&1 || true
+            >>"${SCRIPT_DIR}/tmp/telemetry-record.log" 2>&1 || true
     fi
 }
 
@@ -81,24 +411,61 @@ run_and_record() {
     return "${exit_code}"
 }
 
+resolve_runtime_bin() {
+    local runtime_entrypoint="$1"
+    local runtime_bin="${SCRIPT_DIR}/runtime/.venv/bin/${runtime_entrypoint}"
+
+    if [ -x "${runtime_bin}" ]; then
+        echo "${runtime_bin}"
+        return 0
+    fi
+
+    echo ""
+}
+
 run_runtime_and_record() {
     local tool_name="$1"
     local runtime_entrypoint="$2"
     shift 2
-
-    if [ -z "${UV_BIN}" ]; then
-        echo "uv not found. Install with:"
-        echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
-        return 1
-    fi
 
     if [ ! -d "${SCRIPT_DIR}/runtime" ]; then
         echo "Runtime package not found: ${SCRIPT_DIR}/runtime"
         return 1
     fi
 
-    mkdir -p "${UV_CACHE_DIR}"
     cd "${ORIGINAL_PWD}"
+
+    local runtime_bin
+    runtime_bin="$(resolve_runtime_bin "${runtime_entrypoint}")"
+    if [ -n "${runtime_bin}" ]; then
+        set +e
+        "${runtime_bin}" "$@"
+        local exit_code=$?
+        set -e
+
+        if [ "${exit_code}" -eq 0 ]; then
+            record_tool_telemetry "${tool_name}" "success" "${exit_code}"
+        else
+            record_tool_telemetry "${tool_name}" "failure" "${exit_code}"
+        fi
+
+        return "${exit_code}"
+    fi
+
+    if [ "${AGENTS_RUNTIME_ALLOW_UV_RUN:-}" != "1" ]; then
+        echo "Runtime entrypoint not found: ${SCRIPT_DIR}/runtime/.venv/bin/${runtime_entrypoint}"
+        echo "   Run ./.agents/agents hydrate to provision the project-local runtime."
+        echo "   Set AGENTS_RUNTIME_ALLOW_UV_RUN=1 to opt in to uv run fallback."
+        return 1
+    fi
+
+    if [ -z "${UV_BIN}" ]; then
+        echo "Project-local uv not found: ${PROJECT_UV_BIN}"
+        echo "   Run ./.agents/agents hydrate-uv first."
+        return 1
+    fi
+
+    mkdir -p "${UV_CACHE_DIR}"
 
     set +e
     "${UV_BIN}" run --project "${SCRIPT_DIR}/runtime" --locked "${runtime_entrypoint}" "$@"
@@ -116,6 +483,16 @@ run_runtime_and_record() {
 
 if [ "$#" -gt 0 ]; then
     case "$1" in
+        hydrate-uv)
+            shift
+            hydrate_project_uv
+            exit "$?"
+            ;;
+        hydrate)
+            shift
+            hydrate_runtime_and_scripts
+            exit "$?"
+            ;;
         runtime)
             shift
             if [ "$#" -eq 0 ]; then
@@ -132,46 +509,37 @@ if [ "$#" -gt 0 ]; then
             run_runtime_and_record "mcp" "agentic-mcp" "$@"
             exit "$?"
             ;;
-        help|-h|--help)
-            ;;
-        *)
+        adoption-plan|inspect-target)
             COMMAND_NAME="$1"
             shift
-            run_runtime_and_record "${COMMAND_NAME}" "agentic" "run" "${COMMAND_NAME}" "$@"
+            run_runtime_and_record "${COMMAND_NAME}" "agentic" "${COMMAND_NAME}" "$@"
             exit "$?"
+            ;;
+        help|-h|--help)
             ;;
     esac
 fi
 
-# Check if .venv exists
-if [ ! -d "${SCRIPTS_DIR}/.venv" ]; then
-    if [ -z "${UV_BIN}" ]; then
-        echo "❌ uv not found. Install with:"
-        echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
-        exit 1
-    fi
-    echo "⚠️  Virtualenv not found. Setting up..."
-    mkdir -p "${UV_CACHE_DIR}"
-    cd "${SCRIPTS_DIR}"
-    "${UV_BIN}" sync
-    PYTHON_BIN="$(resolve_python_bin)"
-    if [ -z "${PYTHON_BIN}" ]; then
-        echo "❌ Python interpreter not found after virtualenv setup"
-        exit 1
-    fi
-    echo "✓ Setup complete"
-    echo
+# Ensure local scripts runtime is provisioned
+if ! require_script_python; then
+    exit 1
 fi
+PYTHON_BIN="$(resolve_python_bin)"
 
 if [ -z "${PYTHON_BIN}" ]; then
-    echo "❌ Python interpreter not found. Run 'just setup' to provision .agents/scripts/.venv."
+    echo "❌ Python interpreter not found. Install Python 3.11+ and rerun './.agents/agents hydrate'."
     exit 1
+fi
+
+if [ "${AGENTS_ALLOW_SYSTEM_PYTHON:-}" = "1" ] && [ -z "${AGENTS_SCRIPT_PYTHON:-}" ] && [ ! -d "${SCRIPTS_DIR}/.venv" ]; then
+    echo "⚠️  AGENTS_ALLOW_SYSTEM_PYTHON=1 is enabled; using non-project Python runtime."
 fi
 
 # Command map: command -> script_name (without .py)
 # Aliases are handled in the case statement below
 declare -A COMMAND_MAP=(
     ["doctor"]="agents-doctor"
+    ["benchmark"]="agents-benchmark"
     ["new"]="agents-new"
     ["index"]="agents-index"
     ["lint-docs"]="agents-lint-docs"
@@ -196,6 +564,7 @@ declare -A COMMAND_MAP=(
     ["knowledge"]="agents-knowledge"
     ["memory"]="agents-memory"
     ["bootstrap"]="agents-bootstrap"
+    ["scaffold-update"]="agents-scaffold-update"
     ["skills-sync"]="agents-skills-sync"
     ["fix-symlinks"]="agents-fix-symlinks"
 )
@@ -206,7 +575,8 @@ render_registry_help_commands() {
     fi
 
     local payload=""
-    if ! payload="$("${UV_BIN}" run --project "${SCRIPT_DIR}/runtime" --locked agentic command-registry 2>/dev/null)"; then
+    mkdir -p "${SCRIPT_DIR}/tmp"
+    if ! payload="$("${UV_BIN}" run --project "${SCRIPT_DIR}/runtime" --locked agentic command-registry 2>"${SCRIPT_DIR}/tmp/command-registry-help.log")"; then
         return 1
     fi
 
@@ -248,6 +618,7 @@ show_help() {
     echo "Commands:"
     if ! render_registry_help_commands; then
         echo "  doctor              Validate .agents structure and integrity"
+        echo "  benchmark           Run controlled runtime-flow benchmark scenarios"
         echo "  new                 Create new governed workstreams"
         echo "  index               Update specs and decision indexes"
         echo "  lint-docs           Validate markdown docs consistency"
@@ -267,8 +638,11 @@ show_help() {
         echo "  knowledge           Search and pull reusable workbench knowledge"
         echo "  memory              Emit governed external-memory MCP contracts"
         echo "  bootstrap           Install the scaffold into another repository"
+        echo "  scaffold-update     Update scaffold-owned .agents files from an allowlisted payload"
         echo "  skills-sync         Sync project skills from universal-skills"
         echo "  fix-symlinks        Repair symlinks with copy fallback"
+        echo "  hydrate-uv          Install/copy uv into .agents/tools/uv/"
+        echo "  hydrate             Provision local .agents/scripts and .agents/runtime environments"
     fi
     echo "  runtime             Run the central .agents/runtime CLI"
     echo "  mcp                 Run the FastMCP-backed runtime CLI"
@@ -276,7 +650,12 @@ show_help() {
     echo
     echo "Examples:"
     echo "  .agents/agents doctor"
+    echo "  .agents/agents benchmark list"
+    echo "  .agents/agents benchmark run --save"
+    echo "  # Governed delivery: session -> start -> edit/verify -> complete-with-evidence"
     echo "  .agents/agents new auth-refactor --feature-id F-01 --parent-spec my-parent-spec --spec"
+    echo "  .agents/agents implement start --session 260223_1200_auth-refactor --task-id T-01"
+    echo "  .agents/agents implement complete --session 260223_1200_auth-refactor --task-id T-01 --command \"just verify\" --result passed --artifact .agents/wb/260223_1200_auth-refactor/report.md"
     echo "  .agents/agents structure-map . --output docs/map/structure/"
     echo "  .agents/agents repo-map ."
     echo "  .agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/"
@@ -299,6 +678,7 @@ show_help() {
     echo "  .agents/agents runtime manifest"
     echo "  .agents/agents mcp validate"
     echo "  .agents/agents bootstrap /path/to/target-repo --dry-run"
+    echo "  .agents/agents scaffold-update --channel stable --source /path/to/source-repo --plan-only"
     echo "  .agents/agents skills-sync status"
     echo "  .agents/agents fix-symlinks --dry-run"
 }

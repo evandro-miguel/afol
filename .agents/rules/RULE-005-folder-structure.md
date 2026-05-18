@@ -3,8 +3,8 @@ id: RULE-005
 theme: folder-structure
 version: 1.0
 created: 2026-02-23
-applies_to: All agents (QWEN, CLAUDE, GEMINI)
-updated_at: '2026-04-13T19:36:42-03:00'
+applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
+updated_at: '2026-04-18T22:35:01-03:00'
 ---
 
 # Folder Structure
@@ -57,11 +57,11 @@ src/
 | `docs/arc/DECISIONS/` | Architecture decisions |
 | `docs/map/` | Current-state repository mapping |
 | `src/project-template/` | Exportable scaffold baseline source |
-| `wb/` | Workstreams |
-| `rules/` | Agent rules |
-| `scripts/` | Tool scripts |
-| `skills/` | Agent skills |
-| `z-arq/` | Architecture notes |
+| `.agents/wb/` | Workstreams |
+| `.agents/rules/` | Agent rules |
+| `.agents/scripts/` | Tool scripts |
+| `.agents/skills/` | Agent skills |
+| `.agents/z-arq/` | Archived work and notes |
 
 **Validate:**
 
@@ -101,9 +101,7 @@ doctor:
 sync:
   source_file: AGENTS.md
   target_files:
-    - QWEN.md
     - CLAUDE.md
-    - GEMINI.md
 ```
 
 **Location:** `.agents/agents.config`
@@ -141,7 +139,7 @@ python -m json.tool .agents/tools.json
 ### .active_session
 
 ```text
-.agents/wb/260223_1800_auth-refactor/
+260223_1800_auth-refactor
 ```
 
 **Purpose:** Points to current workstream
@@ -199,6 +197,10 @@ python -m json.tool .agents/tools.json
 - ✅ Keep configuration in `.agents/agents.config`
 - ✅ Store tool docs in `docs/agentic/`
 - ✅ Store human docs in `docs/standards/`
+- ✅ During cleanup/update work, identify obsolete or duplicated rules, docs,
+  workflow elements, generated artifacts, caches, and adapters
+- ✅ Ask the user whether to remove or adapt obsolete folder elements unless
+  removal/adaptation was already explicitly authorized
 - ✅ Validate structure with `just doctor`
 
 **DON'T:**
@@ -207,6 +209,8 @@ python -m json.tool .agents/tools.json
 - ❌ Edit `agents.config` without validating YAML
 - ❌ Edit `tools.json` without validating JSON
 - ❌ Delete required folders
+- ❌ Leave obsolete rules, docs, or duplicated surfaces in place without naming
+  the cleanup/adaptation decision
 
 ---
 
@@ -235,7 +239,7 @@ cat .agents/wb/.active_session
 
 - `docs/agentic/agents-config.md` - Config loader docs
 - `docs/agentic/tools-json.md` - tools.json docs
-- RULE-001 - Tool Discovery & Usage
+- RULE-006 - Applicable Rule Resolution
 
 ---
 

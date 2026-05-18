@@ -26,27 +26,28 @@ risk_level: medium
 
 ## Intent
 
-- Require structured brainstorming and explicit repo exploration before a major plan can be treated as complete.
+- Keep `plan` + `task` as the mandatory core while allowing brainstorm and explorer-check artifacts only when they add real value.
 
 ## Expected Behavior
 
-- Major plans must link to a brainstorm artifact.
-- Major plans must link to an explorer-check artifact documenting current-project review.
-- Verification must flag missing mandatory exploration artifacts for governed work.
+- Major plans may link to brainstorm and explorer-check artifacts when they exist.
+- Plan completion does not require force-creating brainstorm or explorer-check artifacts.
+- Verification must flag unfinished optional exploration artifacts only when they are present.
+- Closure must fail if any present optional exploration artifact is still open.
 
 ## User Journey
 
-1. Create a governed session.
-2. Fill brainstorm and explorer-check.
-3. Complete the plan with links to those artifacts.
-4. Verify the session; missing gates are flagged.
+1. Create a governed session with the `plan` / `task` core.
+2. Add brainstorm and explorer-check only when the work actually benefits from them.
+3. Complete the plan with links to any optional exploration artifacts that were created.
+4. Verify the session; present optional artifacts must be final before closure.
 
 ## Acceptance
 
-- [x] Brainstorm template captures options, assumptions, and preferred direction.
-- [x] Explorer-check template captures inspected paths, commands, findings, and plan-readiness.
-- [x] New workstreams create both artifacts by default.
-- [x] Strict verification catches missing exploration gates.
+- [x] Brainstorm template captures options, assumptions, and preferred direction when created.
+- [x] Explorer-check template captures inspected paths, commands, findings, and plan-readiness when created.
+- [x] New workstreams create `plan` / `task` by default without forcing optional exploration artifacts.
+- [x] Strict verification catches unfinished optional exploration artifacts when they exist.
 
 ---
 

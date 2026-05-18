@@ -216,12 +216,14 @@ def test_structure_mapper_scans_cache_generates_and_cli(tmp_path, monkeypatch):
     (project / "tests").mkdir()
     (project / "data").mkdir()
     (project / "node_modules").mkdir()
+    (project / ".agents" / "tools" / "uv").mkdir(parents=True)
     (project / "components" / "HomePage.tsx").write_text("export function HomePage() {}\n", encoding="utf-8")
     (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
     (project / "types" / "UserTypes.ts").write_text("type User = {}\n", encoding="utf-8")
     (project / "tests" / "test_app.py").write_text("def test_app():\n    assert True\n", encoding="utf-8")
     (project / "data" / "config.json").write_text("{}\n", encoding="utf-8")
     (project / "node_modules" / "skip.py").write_text("skip\n", encoding="utf-8")
+    (project / ".agents" / "tools" / "uv" / "skip.py").write_text("skip\n", encoding="utf-8")
 
     mapper = struct.StructureMapper(project, output)
     assert mapper.classify_file("tests/test_app.py", ".py") == "tests"
@@ -233,6 +235,7 @@ def test_structure_mapper_scans_cache_generates_and_cli(tmp_path, monkeypatch):
     assert mapper.compute_file_hash(project / "services" / "UserService.py")
     sections = mapper.scan_files()
     assert set(sections) >= {"frontend", "backend", "types", "tests", "data"}
+    assert ".agents/tools/uv/skip.py" not in mapper.cache["files"]
     mapper.run()
     assert (output / "README.md").exists()
     assert (output / struct.CACHE_FILE).exists()
@@ -347,7 +350,7 @@ def test_tools_smoke_runner_success_and_failure(monkeypatch, capsys):
             return SimpleNamespace(returncode=1, stdout="Unknown type", stderr="")
         return SimpleNamespace(
             returncode=0,
-            stdout="AGENTS TOOLS - Available Tools wb-update doctor lint-docs TOOL: Agents Doctor CHECKS SUBCOMMANDS normalize-time Catalog Validation Catalog is valid AGENTS TOOLS - Help validate",
+            stdout="AGENTS TOOLS - Available Tools wb-update doctor lint-docs TOOL: Agents Doctor CHECKS TOOL: Agents Runtime Flow Benchmark benchmark run SUBCOMMANDS normalize-time Catalog Validation Catalog is valid AGENTS TOOLS - Help validate",
             stderr="",
         )
 
@@ -693,6 +696,7 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
 
     monkeypatch.setattr(wb_update, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(wb_update, "WB_DIR", wb_dir)
+    monkeypatch.setattr(wb_update, "CANONICAL_WB_DIR", wb_dir)
     monkeypatch.setattr(wb_update, "ACTIVE_SESSION_FILE", active)
     monkeypatch.setattr(wb_update, "TELEMETRY_SCRIPT", tmp_path / "telemetry.py")
 
@@ -708,6 +712,10 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
     assert wb_update.get_active_session_id() == wb_case_dir.name
     assert wb_update.resolve_session(None) == wb_case_dir.resolve()
     assert wb_update.resolve_session(str(wb_case_dir)) == wb_case_dir
+    outside_session = tmp_path / "app" / "workbench" / "260101_0100_wrong-root"
+    outside_session.mkdir(parents=True)
+    with pytest.raises(FileNotFoundError):
+        wb_update.resolve_session(str(outside_session))
     with pytest.raises(FileNotFoundError):
         wb_update.resolve_session("missing")
     with pytest.raises(ValueError):
@@ -754,16 +762,22 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
     wb_update.cmd_evidence(
         SimpleNamespace(session=str(wb_case_dir), task_id="T-02", command="pytest", result="passed", artifact=[], note=None)
     )
+    evidence_t2 = wb_update.append_evidence_record(
+        wb_case_dir, "T-02", "pytest", "passed", artifacts=["pytest.log"], note=None
+    )
     wb_update.cmd_task(
         SimpleNamespace(
             **{
                 "session": str(wb_case_dir),
                 "task_id": "T-02",
-                "evidence_id": None,
-                "allow_unsafe_done": True,
+                "evidence_id": evidence_t2["id"],
                 "mark_done": True,
                 "mark_in_progress": False,
                 "mark_pending": False,
+                "mark_implemented": False,
+                "mark_tested": False,
+                "mark_problem": False,
+                "mark_moved": False,
                 "mark_ready": False,
                 "mark_blocked": False,
                 "mark_skipped": False,
@@ -772,13 +786,14 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
     )
     wb_update.cmd_status(SimpleNamespace(session=str(wb_case_dir), file="report", value="final"))
     assert wb_update._report_status(wb_case_dir) == "final"
-    wb_update.ensure_postmortem_ready_for_report_final(wb_case_dir)
+    wb_update.ensure_optional_artifacts_ready_for_report_final(wb_case_dir)
 
     no_post = wb_dir / "260101_0200_no-postmortem"
     no_post.mkdir()
     write_wb_doc(no_post, "report", "# Report\n", status="active")
+    write_wb_doc(no_post, "brainstorm", "# Brainstorm\n", status="active")
     with pytest.raises(ValueError):
-        wb_update.ensure_postmortem_ready_for_report_final(no_post)
+        wb_update.ensure_optional_artifacts_ready_for_report_final(no_post)
 
     monkeypatch.setattr(sys, "argv", ["agents-wb-update.py", "timeline", "--session", str(wb_case_dir), "--message", "from main"])
     wb_update.main()
@@ -998,11 +1013,16 @@ def test_verify_tasks_report_and_main_branches(tmp_path, monkeypatch, capsys):
             "strict_mode": strict_mode,
             "total_tasks": 2,
             "completed": 1,
+            "done": 1,
             "skipped": 1,
+            "moved": 1,
             "pending": 1,
             "in_progress": 1,
             "ready_for_test": 1,
+            "implemented_untested": 1,
+            "tested_needs_spec_validation": 0,
             "blocked": 1,
+            "problem": 1,
             "task_files": [
                 {
                     "file": task_file,
@@ -1066,7 +1086,12 @@ def test_verify_tasks_report_and_main_branches(tmp_path, monkeypatch, capsys):
             "pending": 0,
             "in_progress": 0,
             "ready_for_test": 0,
+            "implemented_untested": 0,
+            "tested_needs_spec_validation": 0,
             "blocked": 0,
+            "problem": 0,
+            "skipped": 0,
+            "moved": 0,
             "open_tasks": [],
             "issues": [],
         }
@@ -1113,6 +1138,7 @@ def test_agents_new_creates_workstream_quick_mode_and_error_branches(tmp_path, m
 
     monkeypatch.setattr(agents_new, "ROOT_DIR", root)
     monkeypatch.setattr(agents_new, "WB_DIR", wb)
+    monkeypatch.setattr(agents_new, "CANONICAL_WB_DIR", wb)
     monkeypatch.setattr(agents_new, "ACTIVE_SESSION_FILE", active)
     monkeypatch.setattr(agents_new, "ROADMAP_FILE", roadmap)
     monkeypatch.setattr(agents_new, "SPECS_DIR", specs)
@@ -1152,8 +1178,6 @@ def test_agents_new_creates_workstream_quick_mode_and_error_branches(tmp_path, m
             "F-01",
             "--parent-spec",
             "260101_0100_parent_spec_01",
-            "--child-spec",
-            "260101_0100_child_spec_01",
             "--spec-child",
             "--spec-test",
             "--with",
@@ -1255,7 +1279,7 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
 
     stack = bootstrap.detect_stack(target)
     assert "Node.js (package.json)" in stack["signals"]
-    assert "python -m pytest" in stack["commands"]
+    assert "./.agents/tools/uv/bin/uv run --project . pytest" in stack["commands"]
     assert bootstrap.current_timestamp().endswith("Z")
     assert "ts=2026" in bootstrap.render_template(Path("docs/templates/template.md"), "2026-01-01T00:00:00Z")
     assert bootstrap.roadmap_specs_for_mode(bootstrap.INSTALL_MODE_PARTIAL)[0]["feature_id"] == "F-01"

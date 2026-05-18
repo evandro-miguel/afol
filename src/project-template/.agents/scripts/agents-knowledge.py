@@ -5,18 +5,12 @@ from __future__ import annotations
 
 import argparse
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List
 
-try:
-    import yaml
-except ImportError as exc:
-    print(f"❌ Missing dependency: {exc}")
-    sys.exit(1)
-
 from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
+from lib.markdown_docs import split_markdown_frontmatter as split_frontmatter
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
@@ -42,18 +36,6 @@ class MatchSnippet:
     def __init__(self, line_no: int, text: str):
         self.line_no = line_no
         self.text = text
-
-
-def split_frontmatter(content: str) -> tuple[dict, str] | None:
-    if not content.startswith("---\n"):
-        return None
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        return None
-    loaded = yaml.safe_load(parts[1].strip()) or {}
-    if not isinstance(loaded, dict):
-        return None
-    return loaded, parts[2].lstrip("\n")
 
 
 def iter_knowledge_docs() -> Iterable[KnowledgeDoc]:

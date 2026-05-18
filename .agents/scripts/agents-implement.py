@@ -11,12 +11,15 @@ from lib.execution_commands import (
     append_timeline_entry,
     assert_task_sequence,
     find_session,
+    load_feature_operation_governance,
     find_task_by_id,
     next_task,
+    normalize_task_state,
     parse_task_rows,
     parse_state_summary,
     append_evidence,
     update_task_state,
+    validate_closure_evidence,
 )
 from lib.agents_config import load_agents_config
 
@@ -43,8 +46,27 @@ def _ensure_prerequisites(rows, target: str) -> None:
         raise ExecutionError(f"Task {target} is blocked by prior tasks: {'; '.join(blocking)}")
 
 
+def _emit_feature_operation_governance(session_dir: Path) -> None:
+    bundle = load_feature_operation_governance(session_dir)
+    if not bundle:
+        return
+
+    print("Governance preflight:")
+    print(f"  feature: {bundle['feature_id']}")
+    print(f"  parent_spec: {bundle['parent_spec']} -> {bundle['parent_spec_path']}")
+    if bundle.get("child_spec"):
+        print(f"  child_spec: {bundle['child_spec']} -> {bundle['child_spec_path']}")
+    print(f"  plan: {bundle['plan_path']}")
+    print(f"  task: {bundle['task_path']}")
+    print("  rules loaded:")
+    for rule in bundle["rules"]:
+        print(f"    - {rule['id']} -> {rule['path']}")
+    print()
+
+
 def cmd_next(args: argparse.Namespace) -> int:
     session_dir = find_session(args.session)
+    _emit_feature_operation_governance(session_dir)
     task_file, rows, done, remaining = _get_session_tasks(session_dir)
     _ensure_task_board(task_file, rows)
     nxt = next_task(rows)
@@ -61,6 +83,7 @@ def cmd_next(args: argparse.Namespace) -> int:
 
 def cmd_start(args: argparse.Namespace) -> int:
     session_dir = find_session(args.session)
+    _emit_feature_operation_governance(session_dir)
     task_file, rows, _, _ = _get_session_tasks(session_dir)
     _ensure_task_board(task_file, rows)
 
@@ -75,12 +98,13 @@ def cmd_start(args: argparse.Namespace) -> int:
     row = find_task_by_id(rows, target)
     if not row:
         raise ExecutionError(f"Task {target} not found")
-    if row.state == "done":
+    row_state = normalize_task_state(row.state)
+    if row_state == "done":
         raise ExecutionError(f"Task {target} is already done")
-    if row.state == "in_progress":
+    if row_state == "in_progress":
         print(f"Task {target} already in progress")
         return 0
-    if row.state != "pending":
+    if row_state != "pending":
         raise ExecutionError(f"Task {target} cannot be started from state {row.state}")
 
     _ensure_prerequisites(rows, target)
@@ -95,6 +119,7 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 def cmd_complete(args: argparse.Namespace) -> int:
     session_dir = find_session(args.session)
+    _emit_feature_operation_governance(session_dir)
     task_file, rows, _, _ = _get_session_tasks(session_dir)
     _ensure_task_board(task_file, rows)
 
@@ -109,37 +134,46 @@ def cmd_complete(args: argparse.Namespace) -> int:
     row = find_task_by_id(rows, target)
     if not row:
         raise ExecutionError(f"Task {target} not found")
-    if row.state == "done":
+    row_state = normalize_task_state(row.state)
+    if row_state == "done":
         raise ExecutionError(f"Task {target} is already done")
-    if row.state not in {"in_progress", "ready_for_test"}:
+    if row_state not in {"in_progress", "implemented_untested", "tested_needs_spec_validation"}:
         raise ExecutionError(
-            f"Task {target} cannot be completed from state {row.state}; start it first or move it to ready_for_test"
+            f"Task {target} cannot be completed from state {row.state}; start it first or move it to a validated intermediate state"
         )
 
     _ensure_prerequisites(rows, target)
 
-    command = args.command or "implement complete"
-    result = args.result or "passed"
+    if getattr(args, "no_evidence", False):
+        raise ExecutionError("--no-evidence is no longer supported for task completion")
 
-    if args.no_evidence:
-        if not args.force:
-            raise ExecutionError("--no-evidence requires --force for completion")
-    else:
-        append_evidence(session_dir, target, command=command, result=result, artifacts=args.artifact, note=args.note)
+    command = (args.command or "").strip()
+    result = (args.result or "").strip()
+    artifacts = args.artifact or []
+    validate_closure_evidence(command=command, result=result, artifacts=artifacts, note=args.note)
+    evidence_id = append_evidence(session_dir, target, command=command, result=result, artifacts=artifacts, note=args.note)
 
-    update_task_state(task_file, target, "done")
+    update_task_state(task_file, target, "done", evidence_id=evidence_id)
 
     log_files = sorted(session_dir.glob("*_log_*.md"))
     if log_files:
-        evidence_txt = " without evidence" if args.no_evidence else " with evidence"
-        append_timeline_entry(log_files[-1], f"implement complete: {target}{evidence_txt}")
+        append_timeline_entry(log_files[-1], f"implement complete: {target} with evidence {evidence_id}")
 
     print(f"✓ completed {target} in {session_dir.name}")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Guided execution command")
+    p = argparse.ArgumentParser(
+        description="Guided execution command",
+        epilog=(
+            "Governed delivery lifecycle: create or target a session with "
+            "`./.agents/agents new ...`, run `implement start` before product "
+            "edits, verify the product change, then run `implement complete` "
+            "with the verification command/result/artifact so evidence and done "
+            "state are written together."
+        ),
+    )
     sub = p.add_subparsers(dest="command", required=True)
 
     p_next = sub.add_parser("next", help="Show next governed task")
@@ -154,12 +188,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_complete = sub.add_parser("complete", help="Mark task done with evidence")
     p_complete.add_argument("--session")
     p_complete.add_argument("--task-id", help="Task id (e.g., T-01). Defaults to next actionable")
-    p_complete.add_argument("--command", help="Command used for implementation", default="implement complete")
-    p_complete.add_argument("--result", help="Execution result", default="passed")
+    p_complete.add_argument("--command", help="Command or gate used for closure evidence", required=True)
+    p_complete.add_argument("--result", help="Execution result for closure evidence", required=True)
     p_complete.add_argument("--artifact", action="append", help="Evidence artifact")
     p_complete.add_argument("--note", help="Evidence note")
-    p_complete.add_argument("--no-evidence", action="store_true", help="Complete without evidence")
-    p_complete.add_argument("--force", action="store_true", help="Allow unsafe operations")
     p_complete.set_defaults(func=cmd_complete)
 
     return p

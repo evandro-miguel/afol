@@ -28,6 +28,7 @@ def write_task_file(session_dir: Path, body: str) -> Path:
         "id: scenario-task\n"
         "updated_at: '2026-03-06T21:28:26-03:00'\n"
         "roadmap_feature: F-08\n"
+        "parent_spec: scenario-parent-spec\n"
         "links:\n"
         "  plan: scenario-plan\n"
         "---\n\n"
@@ -46,6 +47,7 @@ def write_plan_file(session_dir: Path) -> Path:
         "doc_type: plan\n"
         "id: scenario-plan\n"
         "roadmap_feature: F-08\n"
+        "parent_spec: scenario-parent-spec\n"
         "workstream_intent: delivery\n"
         "---\n\n"
         "# Plan\n\n"
@@ -200,14 +202,14 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             states = {row.task_id: row.state for row in rows}
             self.assertEqual(states["T-01"], "pending")
             self.assertEqual(states["T-02"], "in_progress")
-            self.assertEqual(states["T-03"], "ready_for_test")
+            self.assertEqual(states["T-03"], "implemented_untested")
             self.assertEqual(states["T-04"], "done")
-            self.assertEqual(states["T-05"], "blocked")
-            self.assertEqual(states["T-06"], "skipped")
+            self.assertEqual(states["T-05"], "problem")
+            self.assertEqual(states["T-06"], "moved")
 
     def test_next_task_prefers_first_actionable_when_no_in_progress(self):
         rows = [
-            self.execution_commands.TaskRow("T-01", "ready_for_test", "qa", "ready", 0, "table"),
+            self.execution_commands.TaskRow("T-01", "implemented_untested", "qa", "ready", 0, "table"),
             self.execution_commands.TaskRow("T-02", "pending", "worker", "pending", 1, "table"),
         ]
         nxt = self.execution_commands.next_task(rows)
@@ -217,11 +219,11 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
     def test_assert_task_sequence_reports_prior_non_done(self):
         rows = [
             self.execution_commands.TaskRow("T-01", "done", "worker", "ok", 0, "table"),
-            self.execution_commands.TaskRow("T-02", "blocked", "worker", "blocked", 1, "table"),
+            self.execution_commands.TaskRow("T-02", "problem", "worker", "blocked", 1, "table"),
             self.execution_commands.TaskRow("T-03", "pending", "worker", "later", 2, "table"),
         ]
         blocking = self.execution_commands.assert_task_sequence(rows, "T-03")
-        self.assertEqual(blocking, ["T-02 is blocked"])
+        self.assertEqual(blocking, ["T-02 is problem"])
 
     def test_update_task_state_table_row(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -256,7 +258,7 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             session_dir.mkdir(parents=True, exist_ok=True)
             task_file = write_task_file(session_dir, "- [ ] T-01 item")
             with self.assertRaises(self.execution_commands.ExecutionError):
-                self.execution_commands.update_task_state(task_file, "T-01", "testing")
+                self.execution_commands.update_task_state(task_file, "T-01", "not_a_state")
 
     def test_update_task_states_from_updates_suffix_only(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -301,6 +303,19 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             self.assertFalse(ready)
             self.assertIn("task", missing)
 
+    def test_find_session_rejects_paths_outside_canonical_workbench(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            wb_dir = root / ".agents" / "wb"
+            outside = root / "app" / "workbench" / "260307_0106_wrong-root"
+            outside.mkdir(parents=True, exist_ok=True)
+            with (
+                mock.patch.object(self.execution_commands, "WB_DIR", wb_dir),
+                mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", wb_dir),
+            ):
+                with self.assertRaises(self.execution_commands.ExecutionError):
+                    self.execution_commands.find_session(str(outside))
+
     def test_resolve_artifact_tech_stack_alias_variants(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)
@@ -330,6 +345,27 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
 
             resolved = self.execution_commands.resolve_artifact(session_dir, "spec-child")
             self.assertIsNone(resolved)
+
+    def test_artifact_snapshot_normalizes_null_child_spec_to_empty_string(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260307_0108c_null-child-spec"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            plan_file = session_dir / f"{session_dir.name}_plan_01.md"
+            plan_file.write_text(
+                "---\n"
+                "doc_type: plan\n"
+                "id: scenario-plan\n"
+                "roadmap_feature: F-08\n"
+                "parent_spec: parent-spec\n"
+                "child_spec:\n"
+                "workstream_intent: delivery\n"
+                "---\n\n"
+                "# Plan\n",
+                encoding="utf-8",
+            )
+
+            snapshot = self.execution_commands.artifact_snapshot(plan_file)
+            self.assertEqual(snapshot["child_spec"], "")
 
     def test_workflow_artifact_states_include_only_present_optional_variant(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -366,17 +402,20 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             states = self.execution_commands.workflow_artifact_states(session_dir)
             by_doc_type = {item["doc_type"]: item for item in states}
 
-            self.assertEqual(by_doc_type["brainstorm"]["state"], "ready")
-            self.assertEqual(by_doc_type["explorer-check"]["state"], "ready")
-            self.assertEqual(by_doc_type["plan"]["state"], "blocked")
-            self.assertIn("explorer-check: draft", by_doc_type["plan"]["blockers"])
+            self.assertEqual(by_doc_type["brainstorm"]["state"], "blocked")
+            self.assertIn("closure gate: optional 'brainstorm'", by_doc_type["brainstorm"]["blockers"][0])
+            self.assertEqual(by_doc_type["explorer-check"]["state"], "blocked")
+            self.assertIn("closure gate: optional 'explorer-check'", by_doc_type["explorer-check"]["blockers"][0])
+            self.assertEqual(by_doc_type["plan"]["state"], "ready")
             self.assertEqual(by_doc_type["task"]["state"], "blocked")
             self.assertIn("plan: draft", by_doc_type["task"]["blockers"])
             self.assertEqual(by_doc_type["report"]["state"], "done")
+            self.assertEqual(by_doc_type["postmortem"]["state"], "blocked")
+            self.assertIn("closure gate: optional 'postmortem'", by_doc_type["postmortem"]["blockers"][0])
 
             next_artifact = self.execution_commands.next_workflow_artifact(states)
             self.assertIsNotNone(next_artifact)
-            self.assertEqual(next_artifact["doc_type"], "plan")
+            self.assertEqual(next_artifact["doc_type"], "brainstorm")
 
 
 class ImplementAndReviewScenarioTests(unittest.TestCase):
@@ -388,10 +427,16 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
         cls.agents_review = load_module("agents_review_scenario_test", scripts_dir / "agents-review.py")
         cls.execution_commands = importlib.import_module("lib.execution_commands")
 
+    def _allow_temp_workbench(self, session_dir: Path) -> None:
+        self.execution_commands.WB_DIR = session_dir.parent
+        self.execution_commands.CANONICAL_WB_DIR = session_dir.parent.resolve()
+
     def test_implement_start_defaults_to_next_task(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260307_0200_start-default"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(session_dir)
+            write_plan_file(session_dir)
             write_task_file(
                 session_dir,
                 "| Task | State | Owner | Notes |\n"
@@ -400,7 +445,8 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
             )
             write_log_file(session_dir)
             args = argparse.Namespace(session=str(session_dir), task_id=None)
-            code = self.agents_implement.cmd_start(args)
+            with mock.patch.object(self.agents_implement, "load_feature_operation_governance", return_value=None):
+                code = self.agents_implement.cmd_start(args)
             self.assertEqual(code, 0)
             content = (session_dir / f"{session_dir.name}_task_01.md").read_text(encoding="utf-8")
             self.assertIn("| T-01 | in_progress |", content)
@@ -409,6 +455,7 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260307_0201_start-blocked"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(session_dir)
             write_task_file(
                 session_dir,
                 "| Task | State | Owner | Notes |\n"
@@ -423,6 +470,8 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             session_dir = Path(td) / "260307_0202_complete-evidence"
             session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(session_dir)
+            write_plan_file(session_dir)
             write_task_file(
                 session_dir,
                 "| Task | State | Owner | Notes |\n"
@@ -440,7 +489,8 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
                 no_evidence=False,
                 force=False,
             )
-            code = self.agents_implement.cmd_complete(args)
+            with mock.patch.object(self.agents_implement, "load_feature_operation_governance", return_value=None):
+                code = self.agents_implement.cmd_complete(args)
             self.assertEqual(code, 0)
             task_content = (session_dir / f"{session_dir.name}_task_01.md").read_text(encoding="utf-8")
             self.assertIn("| T-01 | done |", task_content)
@@ -510,6 +560,11 @@ class SessionCloseScenarioTests(unittest.TestCase):
         scripts_dir = Path(".agents/scripts").resolve()
         sys.path.insert(0, str(scripts_dir))
         cls.agents_session = load_module("agents_session_scenario_test", scripts_dir / "agents-session.py")
+        cls.execution_commands = importlib.import_module("lib.execution_commands")
+
+    def _allow_temp_workbench(self, session_dir: Path) -> None:
+        self.execution_commands.WB_DIR = session_dir.parent
+        self.execution_commands.CANONICAL_WB_DIR = session_dir.parent.resolve()
 
     def test_resolve_next_session_rejects_same_target(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -522,6 +577,7 @@ class SessionCloseScenarioTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td) / "260307_0301_close-json"
             target.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(target)
             args = argparse.Namespace(session=str(target), next_session=None, json=True)
             verify = mock.Mock(returncode=0, stdout="ok\n", stderr="")
             missing_active = Path(td) / ".active_missing"
@@ -539,6 +595,7 @@ class SessionCloseScenarioTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td) / "260307_0302_close-fail"
             target.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(target)
             active_file = Path(td) / ".active_session"
             active_file.write_text("260307_0302_close-fail\n", encoding="utf-8")
             args = argparse.Namespace(session=str(target), next_session=None, json=False)
@@ -560,6 +617,7 @@ class SessionCloseScenarioTests(unittest.TestCase):
             next_target = Path(td) / "260307_0304_close-next"
             target.mkdir(parents=True, exist_ok=True)
             next_target.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(target)
             active_file = Path(td) / ".active_session"
             args = argparse.Namespace(**{"session": str(target), "next_session": str(next_target), "json": False})
             verify = mock.Mock(returncode=0, stdout="ok\n", stderr="")

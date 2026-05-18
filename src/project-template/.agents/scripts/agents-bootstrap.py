@@ -5,18 +5,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
+import os
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Callable, Dict, List, Sequence, Set, Tuple
+from enum import Enum
+from typing import Callable, Dict, Iterable, List, NamedTuple, Sequence, Set, Tuple
 
 from lib.agents_config import now_iso_with_offset
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-TEMPLATE_ROOT = ROOT_DIR
+TEMPLATE_ROOT = ROOT_DIR / "src" / "project-template"
 LOCAL_UNIVERSAL_SKILLS_DIR = Path(".agents/source/universal-skills")
 
 MANDATORY_FILES_TO_COPY = [
@@ -24,6 +27,7 @@ MANDATORY_FILES_TO_COPY = [
     Path("CLAUDE.md"),
     Path("Justfile"),
     Path(".agents/agents"),
+    Path(".agents/agents-mcp"),
     Path(".agents/agents.config"),
     Path(".agents/tools.json"),
     Path(".agents/skills-sync.manifest.json"),
@@ -132,6 +136,272 @@ PARTIAL_STARTER_PARENT_SPECS = [
     },
 ]
 
+BOOTSTRAP_MANIFEST_PATH = Path(".agents/bootstrap-manifest.json")
+BOOTSTRAP_MANIFEST_VERSION = 1
+POST_CHECK_TIMEOUT_SECONDS = 600
+_VERBOSE_OUTPUT = True
+_ACTION_COUNTS: Dict[str, int] = {}
+
+
+class BootstrapAction(str, Enum):
+    CREATE = "create"
+    SKIP_IDENTICAL = "skip-identical"
+    UPDATE_MANAGED = "update-managed"
+    CONFLICT_USER_EDITED = "conflict-user-edited"
+    PRESERVE_UNMANAGED = "preserve-unmanaged"
+    DELETE_STALE_MANAGED = "delete-stale-managed"
+
+
+class ManagedFileEntry(NamedTuple):
+    path: str
+    hash: str
+
+
+class BootstrapManifest(NamedTuple):
+    version: int
+    generated_at: str
+    managed_files: Dict[str, str]
+
+
+class BootstrapPlanItem(NamedTuple):
+    action: BootstrapAction
+    path: Path
+    source: Path | None
+    reason: str
+
+
+BOOTSTRAP_RECONCILE_SCOPE: Sequence[Path] = (
+    Path("AGENTS.md"),
+    Path("CLAUDE.md"),
+    Path("Justfile"),
+    Path(".agents"),
+)
+
+
+def bootstrap_lock_file(target: Path) -> Path:
+    return target / BOOTSTRAP_MANIFEST_PATH
+
+
+def bootstrap_manifest_payload_from_data(data: object) -> Dict[str, object]:
+    if not isinstance(data, dict):
+        return {}
+    return data
+
+
+def file_hash(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(8192), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _managed_entry_key(path: Path) -> str:
+    return path.as_posix()
+
+
+def _collect_dir_file_records(
+    source_dir: Path,
+    rel: Path,
+) -> Dict[Path, Path]:
+    entries: Dict[Path, Path] = {}
+    ignore = _ignore_for_dir(rel)
+    for dirpath, dirnames, filenames in os.walk(source_dir):
+        root_path = Path(dirpath)
+        ignored_names = ignore(str(dirpath), sorted(list(dirnames) + list(filenames)))
+
+        dirnames[:] = [name for name in dirnames if name not in ignored_names]
+        for filename in sorted(filenames):
+            if filename in ignored_names:
+                continue
+            source_file = root_path / filename
+            if source_file.is_file():
+                rel_file = source_file.resolve().relative_to(TEMPLATE_ROOT)
+                entries[rel_file] = source_file
+    return entries
+
+
+def _managed_files_from_template() -> Dict[Path, Path]:
+    managed: Dict[Path, Path] = {}
+    for rel in MANDATORY_FILES_TO_COPY:
+        source_file = _template_source(rel)
+        if source_file.is_file():
+            managed[rel] = source_file
+    for rel in OPTIONAL_FILES_TO_COPY:
+        source_file = _template_source(rel)
+        if source_file.is_file():
+            managed[rel] = source_file
+    for rel in MANDATORY_DIRS_TO_COPY:
+        source_dir = _template_source(rel)
+        if not source_dir.is_dir():
+            continue
+        managed.update(_collect_dir_file_records(source_dir, rel))
+    return managed
+
+
+def _load_bootstrap_manifest(target: Path) -> BootstrapManifest:
+    manifest_path = bootstrap_lock_file(target)
+    if not manifest_path.exists():
+        return BootstrapManifest(version=BOOTSTRAP_MANIFEST_VERSION, generated_at=current_timestamp(), managed_files={})
+
+    try:
+        payload = bootstrap_manifest_payload_from_data(json.loads(manifest_path.read_text(encoding="utf-8")))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Could not parse bootstrap manifest {manifest_path}: {exc}") from exc
+
+    managed_files = payload.get("managed_files")
+    if not isinstance(managed_files, dict):
+        managed_files = {}
+    cleaned: Dict[str, str] = {
+        k: v
+        for k, v in managed_files.items()
+        if isinstance(k, str) and isinstance(v, str)
+    }
+    return BootstrapManifest(
+        version=int(payload.get("version", BOOTSTRAP_MANIFEST_VERSION)),
+        generated_at=str(payload.get("generated_at", current_timestamp())),
+        managed_files=cleaned,
+    )
+
+
+def bootstrap_manifest(target: Path) -> BootstrapManifest:
+    managed = _managed_files_from_template()
+    return BootstrapManifest(
+        version=BOOTSTRAP_MANIFEST_VERSION,
+        generated_at=current_timestamp(),
+        managed_files={
+            _managed_entry_key(rel): file_hash(path) for rel, path in sorted(managed.items(), key=lambda item: _managed_entry_key(item[0]))
+        },
+    )
+
+
+def write_bootstrap_manifest(target: Path, manifest: BootstrapManifest):
+    manifest_path = bootstrap_lock_file(target)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "version": manifest.version,
+                "generated_at": manifest.generated_at,
+                "managed_files": manifest.managed_files,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def finalize_bootstrap_manifest(target: Path, dry_run: bool):
+    manifest_path = bootstrap_lock_file(target)
+    print_action("write bootstrap manifest", manifest_path)
+    if dry_run:
+        return
+    write_bootstrap_manifest(target, bootstrap_manifest(target))
+
+
+def _iter_preserve_scope_files(target: Path) -> Iterable[Path]:
+    seen: Set[str] = set()
+    for rel in BOOTSTRAP_RECONCILE_SCOPE:
+        scope_root = target / rel
+        if not scope_root.exists():
+            continue
+        if scope_root.is_file():
+            yield scope_root
+            continue
+
+        for root, dirs, filenames in os.walk(scope_root):
+            ignored = _common_ignored_names(sorted(list(dirs) + list(filenames)))
+            dirs[:] = [name for name in dirs if name not in ignored]
+            for filename in sorted(filenames):
+                if filename in ignored:
+                    continue
+                absolute = Path(root) / filename
+                rel_path = absolute.relative_to(target).as_posix()
+                if rel_path in seen:
+                    continue
+                seen.add(rel_path)
+                yield absolute
+
+
+def _classify_reconcile_item(
+    rel: Path,
+    source_path: Path,
+    target_path: Path,
+    prev_hash: str | None,
+) -> BootstrapPlanItem:
+    source_hash = file_hash(source_path)
+    if not target_path.exists():
+        return BootstrapPlanItem(BootstrapAction.CREATE, target_path, source_path, "missing in target")
+
+    target_hash = file_hash(target_path)
+    if target_hash == source_hash:
+        return BootstrapPlanItem(
+            BootstrapAction.SKIP_IDENTICAL,
+            target_path,
+            source_path,
+            "source and target identical",
+        )
+    if prev_hash is None:
+        return BootstrapPlanItem(
+            BootstrapAction.UPDATE_MANAGED,
+            target_path,
+            source_path,
+            "managed change (no prior manifest hash)",
+        )
+    if prev_hash == source_hash:
+        return BootstrapPlanItem(
+            BootstrapAction.CONFLICT_USER_EDITED,
+            target_path,
+            source_path,
+            "target diverged from locked managed state",
+        )
+    if target_hash == prev_hash:
+        return BootstrapPlanItem(
+            BootstrapAction.UPDATE_MANAGED,
+            target_path,
+            source_path,
+            "source changed since prior manifest",
+        )
+
+    return BootstrapPlanItem(
+        BootstrapAction.CONFLICT_USER_EDITED,
+        target_path,
+        source_path,
+        "target and source diverged from manifest",
+    )
+
+
+def bootstrap_reconcile_plan(target: Path, manifest: BootstrapManifest | None = None) -> List[BootstrapPlanItem]:
+    planned_source = _managed_files_from_template()
+    managed_paths = {_managed_entry_key(path) for path in planned_source}
+    manifest = manifest or _load_bootstrap_manifest(target)
+    actions: List[BootstrapPlanItem] = []
+
+    for rel, source_path in sorted(planned_source.items(), key=lambda item: _managed_entry_key(item[0])):
+        target_path = target / rel
+        prev_hash = manifest.managed_files.get(_managed_entry_key(rel))
+        actions.append(_classify_reconcile_item(rel, source_path, target_path, prev_hash))
+
+    for rel_str, _prev in manifest.managed_files.items():
+        if rel_str in managed_paths:
+            continue
+        stale_path = target / rel_str
+        if stale_path.exists():
+            actions.append(BootstrapPlanItem(BootstrapAction.DELETE_STALE_MANAGED, stale_path, None, "managed file removed from manifest"))
+
+    for absolute_path in _iter_preserve_scope_files(target):
+        rel_str = absolute_path.relative_to(target).as_posix()
+        if rel_str in managed_paths:
+            continue
+        if rel_str in manifest.managed_files:
+            continue
+        if rel_str == _managed_entry_key(BOOTSTRAP_MANIFEST_PATH):
+            continue
+        if absolute_path.is_file():
+            actions.append(BootstrapPlanItem(BootstrapAction.PRESERVE_UNMANAGED, absolute_path, None, "local file outside managed manifest"))
+
+    return actions
 
 def _template_source(rel: Path) -> Path:
     return TEMPLATE_ROOT / rel
@@ -165,6 +435,49 @@ def copy_optional_files(target: Path, force: bool, dry_run: bool):
         safe_copy_file(src, dst, force, dry_run)
 
 
+def _wrapper_needs_runtime_refresh(path: Path, markers: Sequence[str]) -> bool:
+    if not path.exists():
+        return False
+    content = path.read_text(encoding="utf-8")
+    return any(marker not in content for marker in markers)
+
+
+def ensure_partial_runtime_surfaces(target: Path, dry_run: bool):
+    managed_surfaces: Sequence[Tuple[Path, Sequence[str], str]] = [
+        (
+            Path(".agents/agents"),
+            (
+                "run_runtime_and_record",
+                'run --project "${SCRIPT_DIR}/runtime" --locked',
+                "mcp|agents-mcp)",
+                "command-registry",
+            ),
+            "patch managed wrapper",
+        ),
+        (
+            Path(".agents/agents-mcp"),
+            (
+                'run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp',
+            ),
+            "refresh managed mcp wrapper",
+        ),
+    ]
+
+    for rel, markers, action in managed_surfaces:
+        src = _template_source(rel)
+        dst = target / rel
+        if not dst.exists():
+            safe_copy_file(src, dst, force=False, dry_run=dry_run)
+            continue
+        if not _wrapper_needs_runtime_refresh(dst, markers):
+            continue
+        print_action(action, dst)
+        if dry_run:
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Bootstrap .agents system into target repo")
     parser.add_argument("target", help="Target repository path")
@@ -180,6 +493,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip post-bootstrap doctor/tools-check verification",
     )
+    parser.add_argument("--verbose", action="store_true", help="Show per-file action output")
     return parser.parse_args()
 
 
@@ -203,7 +517,7 @@ def detect_stack(target: Path) -> Dict[str, List[str]]:
         stack["signals"].append("Bun")
     if (target / "pyproject.toml").exists():
         stack["signals"].append("Python (pyproject.toml)")
-        stack["commands"].append("python -m pytest")
+        stack["commands"].append("./.agents/tools/uv/bin/uv run --project . pytest")
     if (target / "go.mod").exists():
         stack["signals"].append("Go")
         stack["commands"].append("go test ./...")
@@ -218,7 +532,17 @@ def detect_stack(target: Path) -> Dict[str, List[str]]:
 
 
 def print_action(action: str, path: Path):
-    print(f"- {action}: {path}")
+    _ACTION_COUNTS[action] = _ACTION_COUNTS.get(action, 0) + 1
+    if _VERBOSE_OUTPUT:
+        print(f"- {action}: {path}")
+
+
+def print_action_summary() -> None:
+    if not _ACTION_COUNTS:
+        print("actions: none")
+        return
+    summary = ", ".join(f"{name}={count}" for name, count in sorted(_ACTION_COUNTS.items()))
+    print(f"actions: {summary}")
 
 
 def safe_copy_file(src: Path, dst: Path, force: bool, dry_run: bool):
@@ -1115,11 +1439,17 @@ def post_checks_use_just(target: Path) -> bool:
     return shutil.which("just") is not None and (target / "Justfile").exists()
 
 
-def build_post_check_commands(target: Path) -> List[Tuple[str, List[str], bool]]:
+def build_post_check_commands(target: Path, install_mode: str = INSTALL_MODE_FULL) -> List[Tuple[str, List[str], bool]]:
     recipe_prefix = _just_recipe_prefix(target)
     if not post_checks_use_just(target):
         raise RuntimeError("just is required for post-bootstrap checks")
+    repo_validation_required = install_mode != INSTALL_MODE_PARTIAL
     commands: List[Tuple[str, List[str], bool]] = [
+        (
+            "hydrate",
+            ["./.agents/agents", "hydrate"],
+            True,
+        ),
         (
             "sync-agent-docs",
             ["./.agents/agents", "sync", "--force"],
@@ -1141,23 +1471,59 @@ def build_post_check_commands(target: Path) -> List[Tuple[str, List[str], bool]]
             ("fmt-check", _just_post_check_command("--fmt", "--check"), True),
             ("list", _just_post_check_command("--list"), True),
             ("doctor", _just_post_check_command(f"{recipe_prefix}doctor"), True),
-            ("lint", _just_post_check_command(f"{recipe_prefix}lint"), True),
-            ("test-scripts", _just_post_check_command(f"{recipe_prefix}test-scripts"), True),
-            ("all", _just_post_check_command(f"{recipe_prefix}all"), True),
+            ("lint", _just_post_check_command(f"{recipe_prefix}lint"), repo_validation_required),
+            ("test-scripts", _just_post_check_command(f"{recipe_prefix}test-scripts"), repo_validation_required),
+            ("all", _just_post_check_command(f"{recipe_prefix}all"), repo_validation_required),
         ]
     )
     return commands
 
-def run_post_checks(target: Path):
-    commands = build_post_check_commands(target)
+
+def _format_post_check_output(stdout: object, stderr: object) -> str:
+    parts: List[str] = []
+    if stdout:
+        parts.append(f"stdout:\n{stdout.decode() if isinstance(stdout, bytes) else stdout}")
+    if stderr:
+        parts.append(f"stderr:\n{stderr.decode() if isinstance(stderr, bytes) else stderr}")
+    return "\n".join(parts).strip()
+
+
+def run_post_checks(target: Path, install_mode: str = INSTALL_MODE_FULL):
+    commands = build_post_check_commands(target, install_mode)
 
     for name, cmd, required in commands:
         print(f"\n→ Running post-bootstrap check: {name}")
-        result = subprocess.run(cmd, cwd=target)
-        if result.returncode != 0:
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=target,
+                capture_output=True,
+                text=True,
+                timeout=POST_CHECK_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            details = _format_post_check_output(exc.stdout, exc.stderr)
+            message = f"Post-bootstrap check timed out after {POST_CHECK_TIMEOUT_SECONDS}s: {name}"
+            if details:
+                message = f"{message}\n{details}"
             if required:
-                raise RuntimeError(f"Post-bootstrap check failed: {name}")
-            print(f"⚠️  Optional post-bootstrap check failed: {name}")
+                raise RuntimeError(message) from exc
+            print(message)
+            continue
+        except OSError as exc:
+            message = f"Post-bootstrap check could not start: {name}: {exc}"
+            if required:
+                raise RuntimeError(message) from exc
+            print(message)
+            continue
+        if result.returncode != 0:
+            details = _format_post_check_output(result.stdout, result.stderr)
+            message = f"Post-bootstrap check failed: {name} (exit {result.returncode})"
+            if details:
+                message = f"{message}\n{details}"
+            if required:
+                raise RuntimeError(message)
+            print(message)
 
 
 def validate_target(target: Path, dry_run: bool, install_mode: str):
@@ -1177,21 +1543,22 @@ def validate_target(target: Path, dry_run: bool, install_mode: str):
 def main() -> int:
     args = parse_args()
     target = Path(args.target).resolve()
+    global _VERBOSE_OUTPUT
+    _VERBOSE_OUTPUT = args.verbose
+    _ACTION_COUNTS.clear()
 
-    print("=" * 70)
-    print("AGENTS BOOTSTRAP")
-    print("=" * 70)
-    print(f"Source: {TEMPLATE_ROOT}")
-    print(f"Target: {target}")
     install_mode = INSTALL_MODE_PARTIAL if args.partial else INSTALL_MODE_FULL
-    print(f"Mode:   {'dry-run' if args.dry_run else 'apply'} ({install_mode})")
-    print()
+    print(
+        "bootstrap: "
+        f"source={TEMPLATE_ROOT} target={target} mode={'dry-run' if args.dry_run else 'apply'} "
+        f"install_mode={install_mode}"
+    )
 
     try:
         validate_target(target, args.dry_run, install_mode)
 
         stack = detect_stack(target)
-        print("Detected stack:")
+        print("detected_stack:")
         for signal in stack["signals"]:
             print(f"  - {signal}")
 
@@ -1201,16 +1568,20 @@ def main() -> int:
         copy_required_files(target, args.force, args.dry_run)
         copy_required_dirs(target, args.force, args.dry_run)
         copy_optional_files(target, args.force, args.dry_run)
+        if install_mode == INSTALL_MODE_PARTIAL:
+            ensure_partial_runtime_surfaces(target, args.dry_run)
 
         ensure_dirs(target, args.dry_run)
         write_generated_baseline(target, args.force, args.dry_run, install_mode)
         ensure_justfile(target, args.dry_run)
         write_adaptation_doc(target, stack, args.dry_run, install_mode)
+        finalize_bootstrap_manifest(target, args.dry_run)
 
         if not args.dry_run and not args.skip_checks:
-            run_post_checks(target)
+            run_post_checks(target, install_mode)
 
-        print("\n✅ Bootstrap completed")
+        print("✅ Bootstrap completed")
+        print_action_summary()
         if args.dry_run:
             print("Dry-run only: no files were written")
         else:
@@ -1218,7 +1589,8 @@ def main() -> int:
         return 0
 
     except Exception as exc:
-        print(f"\n❌ Bootstrap failed: {exc}")
+        print_action_summary()
+        print(f"❌ Bootstrap failed: {exc}")
         return 1
 
 
