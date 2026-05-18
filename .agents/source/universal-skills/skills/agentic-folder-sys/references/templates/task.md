@@ -52,7 +52,7 @@ New tasks must start `[ ]` or `[/]`; do not seed new work as `[x]`.
 ## Test Gate
 
 - Move to `[%]` only after the implementation checkpoint.
-- Move to `[&]` only when runtime validation passed but spec/UX validation is still pending.
-- Record real command/gate, result, artifact path or note, and evidence id before marking `[x]`.
-- If validation does not apply, record `N/A` explicitly in the evidence ledger before marking `[x]`.
+- Move to `[&]` only after runtime validation passes.
+- Record command, result, artifact, and evidence id before `[x]`.
+- If validation does not apply, write `N/A` in the evidence ledger before `[x]`.
 ```

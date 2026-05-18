@@ -1352,6 +1352,23 @@ def write_local_seed_index(index_path: Path, skills: Sequence[str], profiles: Se
     index_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+def selected_skill_names_for_local_seed() -> List[str]:
+    manifest = load_local_skills_manifest()
+    names: List[str] = []
+    installs = manifest.get("installs")
+    if isinstance(installs, list):
+        for entry in installs:
+            if not isinstance(entry, dict):
+                continue
+            skills = entry.get("skills")
+            if not isinstance(skills, list):
+                continue
+            for name in skills:
+                if isinstance(name, str) and name.strip() and name.strip() not in names:
+                    names.append(name.strip())
+    return names or local_project_skill_names()
+
+
 def copy_repo_local_universal_skills_checkout(source: Path, checkout: Path):
     shutil.copytree(
         source,
@@ -1360,13 +1377,126 @@ def copy_repo_local_universal_skills_checkout(source: Path, checkout: Path):
     )
 
 
+def _optional_external_source_path(raw: str) -> Path:
+    candidate = Path(raw).expanduser()
+    if not candidate.is_absolute():
+        candidate = ROOT_DIR / candidate
+    return candidate.resolve(strict=False)
+
+
+def external_universal_skills_source_candidates() -> List[Path]:
+    candidates: List[Path] = []
+    env_source = os.environ.get("AGENTS_UNIVERSAL_SKILLS_SOURCE", "").strip()
+    if env_source:
+        candidates.append(_optional_external_source_path(env_source))
+
+    # Common local development layout: the scaffold source and universal-skills
+    # live as sibling repositories under the same workspace directory.
+    candidates.extend(
+        [
+            ROOT_DIR.parent / "universal-skills",
+            ROOT_DIR.parent / "skill-universal",
+        ]
+    )
+
+    unique: List[Path] = []
+    seen: Set[Path] = set()
+    for candidate in candidates:
+        resolved = candidate.resolve(strict=False)
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        unique.append(resolved)
+    return unique
+
+
+def refresh_git_universal_skills_source(source: Path) -> bool:
+    if not (source / ".git").exists():
+        return True
+
+    branch_result = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=source,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    branch = branch_result.stdout.strip() if branch_result.returncode == 0 else ""
+    if branch and branch != "HEAD":
+        cmd = ["git", "pull", "--ff-only", "origin", branch]
+    else:
+        cmd = ["git", "fetch", "origin"]
+
+    result = subprocess.run(cmd, cwd=source, capture_output=True, text=True, check=False)
+    return result.returncode == 0
+
+
+def refreshed_external_universal_skills_source() -> Path | None:
+    for candidate in external_universal_skills_source_candidates():
+        if not is_valid_universal_skills_checkout(candidate):
+            continue
+        if refresh_git_universal_skills_source(candidate):
+            return candidate
+        print_action("skip external universal-skills refresh failure", candidate)
+    return None
+
+
+def seed_repo_local_universal_skills_from_source(source: Path, checkout: Path) -> bool:
+    skill_names = selected_skill_names_for_local_seed()
+    if not skill_names:
+        return False
+
+    local_source = ROOT_DIR / LOCAL_UNIVERSAL_SKILLS_DIR
+    source_skills_root = source / "skills"
+    fallback_skills_roots = [
+        local_source / "skills",
+        local_project_skills_root(),
+    ]
+
+    skills_root = checkout / "skills"
+    profiles_root = checkout / "profiles"
+    skills_root.mkdir(parents=True, exist_ok=True)
+    profiles_root.mkdir(parents=True, exist_ok=True)
+
+    selected_sources: List[Tuple[str, Path]] = []
+    for name in skill_names:
+        source_skill = source_skills_root / name
+        if source_skill.exists():
+            selected_sources.append((name, source_skill))
+            continue
+        for fallback_root in fallback_skills_roots:
+            fallback_skill = fallback_root / name
+            if fallback_skill.exists():
+                selected_sources.append((name, fallback_skill))
+                break
+
+    if len(selected_sources) != len(skill_names):
+        return False
+
+    copied: List[str] = []
+    for name, source_skill in selected_sources:
+        shutil.copytree(source_skill, skills_root / name)
+        copied.append(name)
+
+    profile_names = profile_names_for_local_seed()
+    for profile_name in profile_names:
+        write_local_seed_profile(profiles_root / f"{profile_name}.json", copied)
+
+    write_local_seed_index(checkout / "index.json", copied, profile_names)
+    return True
+
+
 def seed_repo_local_universal_skills_checkout(checkout: Path) -> bool:
+    external_source = refreshed_external_universal_skills_source()
+    if external_source and seed_repo_local_universal_skills_from_source(external_source, checkout):
+        return True
+
     local_source = ROOT_DIR / LOCAL_UNIVERSAL_SKILLS_DIR
     if is_valid_universal_skills_checkout(local_source):
         copy_repo_local_universal_skills_checkout(local_source, checkout)
         return True
 
-    skill_names = local_project_skill_names()
+    skill_names = selected_skill_names_for_local_seed()
     if not skill_names:
         return False
 

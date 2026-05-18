@@ -57,7 +57,42 @@ Important notes:
   repo already owns `make all`, use `make agents-all` for the scaffold aggregate
   validation. Use `--force` only when the overwrite is intentional.
 
-## 3. Upgrade the Framework in an Adopted Repo
+## 3. Verified Scaffold Update
+
+Use `scaffold-update` when the repo already has the scaffold and you need to
+refresh scaffold-owned `.agents` files from a source checkout that already has
+stable channel metadata, release artifacts, and a verifiable signed tag.
+
+Preview first:
+
+```bash
+./.agents/agents scaffold-update --channel stable \
+  --source /path/to/scaffold-source --plan-only
+./.agents/agents scaffold-update --channel stable \
+  --source /path/to/scaffold-source --diff-only
+```
+
+Apply only after the preview is expected:
+
+```bash
+./.agents/agents scaffold-update --channel stable \
+  --source /path/to/scaffold-source \
+  --apply \
+  --validate-command "make agents-all"
+```
+
+Rules:
+
+- do not use a floating branch as a stable source unless release metadata and
+  signed-tag verification pass; do not apply from a source without
+  `releases/channels/stable.json`; inspect the plan/diff before `--apply`; rely
+  on the command backup under `.agents/tmp/scaffold-update/backups/<timestamp>/`
+  for rollback evidence.
+
+If the source checkout does not yet have stable channel metadata, use the
+partial bootstrap flow below instead of pretending the update is verified.
+
+## 4. Legacy Partial Bootstrap Upgrade
 
 ```bash
 ./.agents/agents bootstrap /path/to/adopted-project --partial
@@ -66,9 +101,9 @@ make -C /path/to/adopted-project agents-all
 ```
 
 Use this flow when the repo already contains the scaffold and you want to
-refresh the local framework surface safely.
+refresh the local framework surface without the stable channel updater.
 
-## 4. Minimal Validation
+## 5. Minimal Validation
 
 After bootstrap or upgrade, validate with:
 

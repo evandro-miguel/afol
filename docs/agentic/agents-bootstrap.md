@@ -185,7 +185,12 @@ Usage notes:
 - Optional upstream skills sync warnings are non-blocking and do not mean the bootstrap failed.
 - The skills baseline is generic by design and should be upgraded by the target repo owner rather than treated as scaffold-local history.
 - Keep global Codex skills lean; the target repo should rely primarily on `.agents/skills/` plus the repo-local `.agents/source/universal-skills` source checkout when available.
-- `skills-sync pull` is only meaningful when that source checkout is backed by git; repo-local seeded sources are treated as already available.
+- During bootstrap, the installer first tries to refresh an external
+  `universal-skills` checkout from `AGENTS_UNIVERSAL_SKILLS_SOURCE` or from a
+  sibling `universal-skills` / `skill-universal` repo, then writes a plain
+  repo-local seed under `.agents/source/universal-skills`.
+- `skills-sync pull` is only meaningful when an external source checkout is
+  backed by git; repo-local seeded sources are treated as already available.
 - Existing repo adoption should never replace project-owned docs or runtime
   adapters by default. If a target file needs replacement, the update should
   surface a conflict and require explicit operator intent.

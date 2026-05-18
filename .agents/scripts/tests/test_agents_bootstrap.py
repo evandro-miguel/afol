@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -184,11 +185,69 @@ class BootstrapTests(unittest.TestCase):
             target.mkdir()
             module = self._load_with_root(target)
 
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "Failed to prepare repo-local universal-skills checkout",
-            ):
+            with mock.patch.dict(os.environ, {}, clear=True):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "Failed to prepare repo-local universal-skills checkout",
+                ):
+                    module.prepare_sibling_universal_skills_checkout(target, dry_run=False)
+
+    def test_prepare_sibling_universal_skills_checkout_prefers_refreshed_external_source(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "scaffold"
+            target = Path(td) / "project"
+            external = Path(td) / "universal-skills"
+            target.mkdir(parents=True)
+            module = self._load_with_root(root)
+
+            manifest = root / ".agents" / "skills-sync.manifest.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                '{"installs":[{"app":"all","skills":["agentic-folder-sys","agentic-scaffold-mcp"]}]}',
+                encoding="utf-8",
+            )
+
+            external_skill = external / "skills" / "agentic-folder-sys"
+            external_skill.mkdir(parents=True)
+            (external_skill / "SKILL.md").write_text("external folder sys\n", encoding="utf-8")
+            (external / "profiles").mkdir()
+            (external / "profiles" / "core.json").write_text(
+                '{"name":"core","skills":["agentic-folder-sys"]}',
+                encoding="utf-8",
+            )
+            (external / "index.json").write_text('{"skills":[]}', encoding="utf-8")
+            (external / ".git").mkdir()
+
+            local_mcp = root / ".agents" / "source" / "universal-skills" / "skills" / "agentic-scaffold-mcp"
+            local_mcp.mkdir(parents=True)
+            (local_mcp / "SKILL.md").write_text("local scaffold mcp\n", encoding="utf-8")
+
+            def fake_run(cmd, **kwargs):
+                result = mock.Mock()
+                result.returncode = 0
+                result.stdout = "main\n" if cmd[:3] == ["git", "rev-parse", "--abbrev-ref"] else ""
+                result.stderr = ""
+                return result
+
+            with mock.patch.object(module.subprocess, "run", side_effect=fake_run) as patched_run:
                 module.prepare_sibling_universal_skills_checkout(target, dry_run=False)
+
+            checkout = target / ".agents" / "source" / "universal-skills"
+            self.assertEqual(
+                (checkout / "skills" / "agentic-folder-sys" / "SKILL.md").read_text(encoding="utf-8"),
+                "external folder sys\n",
+            )
+            self.assertEqual(
+                (checkout / "skills" / "agentic-scaffold-mcp" / "SKILL.md").read_text(encoding="utf-8"),
+                "local scaffold mcp\n",
+            )
+            self.assertEqual(
+                [entry[0][0] for entry in patched_run.call_args_list],
+                [
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                    ["git", "pull", "--ff-only", "origin", "main"],
+                ],
+            )
 
     def test_bootstrap_manifest_can_roundtrip(self):
         """Managed file manifest should persist and reload with stable payload."""
