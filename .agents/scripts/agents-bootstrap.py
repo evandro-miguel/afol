@@ -1244,11 +1244,15 @@ def load_local_skills_manifest() -> Dict[str, object]:
     return data if isinstance(data, dict) else {}
 
 
+def is_skill_directory(path: Path) -> bool:
+    return path.is_dir() and (path / "SKILL.md").is_file()
+
+
 def _checkout_skill_names(skills_dir: Path) -> Set[str]:
     return {
         item.name
         for item in skills_dir.iterdir()
-        if item.is_dir() and (item / "SKILL.md").exists()
+        if is_skill_directory(item)
     }
 
 
@@ -1305,7 +1309,7 @@ def local_project_skill_names() -> List[str]:
     return sorted(
         item.name
         for item in skills_root.iterdir()
-        if item.is_dir() and (item / "SKILL.md").exists()
+        if is_skill_directory(item)
     )
 
 
@@ -1467,12 +1471,12 @@ def seed_repo_local_universal_skills_from_source(source: Path, checkout: Path) -
     selected_sources: List[Tuple[str, Path]] = []
     for name in skill_names:
         source_skill = source_skills_root / name
-        if source_skill.exists():
+        if is_skill_directory(source_skill):
             selected_sources.append((name, source_skill))
             continue
         for fallback_root in fallback_skills_roots:
             fallback_skill = fallback_root / name
-            if fallback_skill.exists():
+            if is_skill_directory(fallback_skill):
                 selected_sources.append((name, fallback_skill))
                 break
 
@@ -1522,14 +1526,21 @@ def seed_repo_local_universal_skills_checkout(checkout: Path) -> bool:
     if not skill_names:
         return False
 
+    source_skills_root = local_project_skills_root()
+    selected_sources: List[Tuple[str, Path]] = []
+    for name in skill_names:
+        source_skill = source_skills_root / name
+        if not is_skill_directory(source_skill):
+            return False
+        selected_sources.append((name, source_skill))
+
     skills_root = checkout / "skills"
     profiles_root = checkout / "profiles"
     skills_root.mkdir(parents=True, exist_ok=True)
     profiles_root.mkdir(parents=True, exist_ok=True)
 
-    source_skills_root = local_project_skills_root()
-    for name in skill_names:
-        shutil.copytree(source_skills_root / name, skills_root / name)
+    for name, source_skill in selected_sources:
+        shutil.copytree(source_skill, skills_root / name)
 
     profile_names = profile_names_for_local_seed()
     for profile_name in profile_names:

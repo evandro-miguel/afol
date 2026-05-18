@@ -249,6 +249,34 @@ class BootstrapTests(unittest.TestCase):
                 ],
             )
 
+    def test_seed_external_invalid_skill_directory_uses_local_fallback(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "scaffold"
+            external = Path(td) / "universal-skills"
+            checkout = Path(td) / "project" / ".agents" / "source" / "universal-skills"
+            module = self._load_with_root(root)
+
+            manifest = root / ".agents" / "skills-sync.manifest.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                '{"installs":[{"app":"all","skills":["agentic-folder-sys"]}]}',
+                encoding="utf-8",
+            )
+            malformed_external_skill = external / "skills" / "agentic-folder-sys"
+            malformed_external_skill.mkdir(parents=True)
+            (malformed_external_skill / "README.md").write_text("missing skill doc\n", encoding="utf-8")
+
+            local_skill = root / ".agents" / "source" / "universal-skills" / "skills" / "agentic-folder-sys"
+            local_skill.mkdir(parents=True)
+            (local_skill / "SKILL.md").write_text("local valid fallback\n", encoding="utf-8")
+
+            self.assertTrue(module.seed_repo_local_universal_skills_from_source(external, checkout))
+            self.assertEqual(
+                (checkout / "skills" / "agentic-folder-sys" / "SKILL.md").read_text(encoding="utf-8"),
+                "local valid fallback\n",
+            )
+            self.assertTrue(module.is_valid_universal_skills_checkout(checkout))
+
     def test_seed_external_partial_checkout_is_cleaned_before_local_fallback(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td) / "scaffold"
