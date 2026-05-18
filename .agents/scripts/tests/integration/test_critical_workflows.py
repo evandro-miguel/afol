@@ -257,6 +257,7 @@ def test_session_catchup_temp_repo_scenarios():
             ".agents/scripts/agents-session.py",
             ".agents/scripts/lib/agents_config.py",
             ".agents/scripts/lib/artifact_utility.py",
+            ".agents/scripts/lib/cli_output.py",
             ".agents/scripts/lib/execution_commands.py",
             ".agents/scripts/lib/markdown_docs.py",
             ".agents/scripts/lib/workflow_manifest.py",
