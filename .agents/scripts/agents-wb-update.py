@@ -473,7 +473,7 @@ def update_task_markers(
         # Legacy format: - [x] T-01 description
         m = checklist_re.match(line)
         if m and m.group(2) == task_id:
-            prefix = re.sub(r"\[[ /%!>x]\]", f"[{marker}]", m.group(1), count=1)
+            prefix = re.sub(r"\[[ /%!>&x]\]", f"[{marker}]", m.group(1), count=1)
             description = EVIDENCE_TAG_RE.sub("", m.group(3)).rstrip()
             if marker == "x" and evidence_id:
                 description = f"{description} (evidence: {evidence_id})"

@@ -122,6 +122,31 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             # State Board format should be updated
             self.assertIn("| T-01 | done | worker |", content)
 
+    def test_update_task_marker_replaces_tested_checklist_marker(self):
+        """Checklist done updates should replace the tested-needs-validation marker."""
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_tested_marker_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            task_file = Path(td) / "task.md"
+            task_file.write_text(
+                "---\n"
+                "doc_type: task\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Tasks\n\n"
+                "## Task List\n"
+                "- [&] T-01 Validate runtime behavior\n",
+                encoding="utf-8",
+            )
+
+            wb_update.update_task_markers(task_file, "T-01", "x", "done", evidence_id="E-1")
+            content = task_file.read_text(encoding="utf-8")
+
+            self.assertIn("- [x] T-01 Validate runtime behavior (evidence: E-1)", content)
+            self.assertNotIn("- [&] T-01", content)
+
     def test_latest_doc_file_spec_child_alias_reads_historical_spec_lite(self):
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
         sys.path.insert(0, str(script_path.parent))

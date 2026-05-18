@@ -1446,6 +1446,11 @@ def build_post_check_commands(target: Path, install_mode: str = INSTALL_MODE_FUL
     repo_validation_required = install_mode != INSTALL_MODE_PARTIAL
     commands: List[Tuple[str, List[str], bool]] = [
         (
+            "hydrate",
+            ["./.agents/agents", "hydrate"],
+            True,
+        ),
+        (
             "sync-agent-docs",
             ["./.agents/agents", "sync", "--force"],
             True,

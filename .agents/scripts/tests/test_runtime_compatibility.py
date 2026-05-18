@@ -97,6 +97,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                     agents_bootstrap.run_post_checks(target)
 
             self.assertIn(["./.agents/agents", "skills-sync", "sync"], calls)
+            self.assertIn(["./.agents/agents", "hydrate"], calls)
             self.assertIn(["just", "--justfile", "Justfile", "--fmt", "--check"], calls)
             self.assertIn(["just", "--justfile", "Justfile", "--list"], calls)
             self.assertIn(["just", "--justfile", "Justfile", "all"], calls)
@@ -118,6 +119,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertEqual(
             names,
             [
+                "hydrate",
                 "sync-agent-docs",
                 "skills-sync",
                 "fix-symlinks",

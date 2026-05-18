@@ -158,7 +158,9 @@ class StructureMapper:
             return
 
         cache_file = self.output_path / CACHE_FILE
-        cache_file.write_text(json.dumps(self.cache, indent=2))
+        tmp_file = cache_file.with_name(f".{cache_file.name}.tmp")
+        tmp_file.write_text(json.dumps(self.cache, indent=2))
+        os.replace(tmp_file, cache_file)
         print(f"✓ Saved cache: {len(self.cache.get('files', {}))} entries")
 
     def compute_file_hash(self, file_path: Path) -> str:

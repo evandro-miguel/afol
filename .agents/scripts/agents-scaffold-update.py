@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import stat
 import subprocess
@@ -280,7 +281,7 @@ def _validate_result(touched: List[FileChange], staged_agents: Path, validate_co
     if not validate_command:
         return
 
-    proc = subprocess.run(validate_command, cwd=ROOT_DIR, shell=True, check=False)
+    proc = subprocess.run(shlex.split(validate_command), cwd=ROOT_DIR, check=False)
     if proc.returncode != 0:
         raise RuntimeError(f"Validation command failed with exit code {proc.returncode}: {validate_command}")
 
@@ -312,7 +313,9 @@ def _payload_sha256(source_agents_dir: Path, rel_paths: Iterable[Path]) -> str:
         file_path = source_agents_dir / rel_path
         digest.update(rel_path.as_posix().encode("utf-8"))
         digest.update(b"\0")
-        digest.update(file_path.read_bytes())
+        with file_path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
         digest.update(b"\n")
     return digest.hexdigest()
 

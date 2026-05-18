@@ -67,11 +67,15 @@ hydrate_project_uv() {
     local curl_bin
     curl_bin="$(command -v curl || true)"
     if [ -n "${curl_bin}" ]; then
+        local installer_tmp
+        installer_tmp="$(mktemp "${TMPDIR:-/tmp}/agents-uv-install.XXXXXX")" || return 1
         echo "→ Installing project-local uv..."
-        "${curl_bin}" -LsSf https://astral.sh/uv/install.sh | \
+        if "${curl_bin}" -LsSf https://astral.sh/uv/install.sh -o "${installer_tmp}"; then
             UV_INSTALL_DIR="$(dirname "${PROJECT_UV_BIN}")" \
-            INSTALLER_NO_MODIFY_PATH=1 \
-            sh
+                INSTALLER_NO_MODIFY_PATH=1 \
+                sh "${installer_tmp}"
+        fi
+        rm -f "${installer_tmp}"
         if [ -x "${PROJECT_UV_BIN}" ]; then
             echo "✓ Project-local uv installed: ${PROJECT_UV_BIN}"
             return 0
@@ -157,6 +161,16 @@ hydrate_project_python() {
     return 1
 }
 
+resolve_real_path() {
+    local target="$1"
+    local python_bin
+    python_bin="$(command -v python3 || command -v python || true)"
+    if [ -n "${python_bin}" ]; then
+        "${python_bin}" -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "${target}" && return 0
+    fi
+    echo "${target}"
+}
+
 ensure_venv_uses_project_python() {
     local venv_dir="$1"
     local existing_python=""
@@ -170,9 +184,7 @@ ensure_venv_uses_project_python() {
     fi
 
     local resolved_python
-    if ! resolved_python="$(readlink -f "${existing_python}")"; then
-        resolved_python="${existing_python}"
-    fi
+    resolved_python="$(resolve_real_path "${existing_python}")"
 
     case "${resolved_python}" in
         "${PROJECT_UV_PYTHON_DIR}"/*)
@@ -195,7 +207,7 @@ run_uv_sync() {
 
     set +e
     (
-        cd "${target_dir}"
+        cd "${target_dir}" || exit 1
         UV_CACHE_DIR="${UV_CACHE_DIR}" \
             UV_PYTHON_INSTALL_DIR="${PROJECT_UV_PYTHON_DIR}" \
             "${UV_BIN}" sync --python "${PROJECT_UV_PYTHON_BIN}" "$@"
