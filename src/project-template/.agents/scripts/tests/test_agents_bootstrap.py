@@ -249,6 +249,53 @@ class BootstrapTests(unittest.TestCase):
                 ],
             )
 
+    def test_seed_external_partial_checkout_is_cleaned_before_local_fallback(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "scaffold"
+            checkout = Path(td) / "project" / ".agents" / "source" / "universal-skills"
+            module = self._load_with_root(root)
+
+            manifest = root / ".agents" / "skills-sync.manifest.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                '{"installs":[{"app":"all","skills":["agentic-folder-sys"]}]}',
+                encoding="utf-8",
+            )
+            local_source = root / ".agents" / "source" / "universal-skills"
+            local_skill = local_source / "skills" / "agentic-folder-sys"
+            local_skill.mkdir(parents=True)
+            (local_skill / "SKILL.md").write_text("local fallback\n", encoding="utf-8")
+            (local_source / "profiles").mkdir()
+            (local_source / "profiles" / "core.json").write_text(
+                '{"name":"core","skills":["agentic-folder-sys"]}',
+                encoding="utf-8",
+            )
+            (local_source / "index.json").write_text('{"skills":[]}', encoding="utf-8")
+
+            def partial_seed(_source, partial_checkout):
+                (partial_checkout / "skills").mkdir(parents=True)
+                (partial_checkout / "partial.txt").write_text("partial\n", encoding="utf-8")
+                return False
+
+            with mock.patch.object(module, "refreshed_external_universal_skills_source", return_value=Path(td) / "external"):
+                with mock.patch.object(module, "seed_repo_local_universal_skills_from_source", side_effect=partial_seed):
+                    self.assertTrue(module.seed_repo_local_universal_skills_checkout(checkout))
+
+            self.assertFalse((checkout / "partial.txt").exists())
+            self.assertEqual(
+                (checkout / "skills" / "agentic-folder-sys" / "SKILL.md").read_text(encoding="utf-8"),
+                "local fallback\n",
+            )
+
+    def test_refresh_git_universal_skills_source_handles_missing_git_binary(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            source = Path(td) / "universal-skills"
+            (source / ".git").mkdir(parents=True)
+            module = self._load_with_root(Path(td) / "scaffold")
+
+            with mock.patch.object(module.subprocess, "run", side_effect=OSError("git missing")):
+                self.assertFalse(module.refresh_git_universal_skills_source(source))
+
     def test_bootstrap_manifest_can_roundtrip(self):
         """Managed file manifest should persist and reload with stable payload."""
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:

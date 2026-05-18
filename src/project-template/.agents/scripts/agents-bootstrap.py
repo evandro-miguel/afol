@@ -1355,6 +1355,7 @@ def write_local_seed_index(index_path: Path, skills: Sequence[str], profiles: Se
 def selected_skill_names_for_local_seed() -> List[str]:
     manifest = load_local_skills_manifest()
     names: List[str] = []
+    seen: Set[str] = set()
     installs = manifest.get("installs")
     if isinstance(installs, list):
         for entry in installs:
@@ -1364,8 +1365,12 @@ def selected_skill_names_for_local_seed() -> List[str]:
             if not isinstance(skills, list):
                 continue
             for name in skills:
-                if isinstance(name, str) and name.strip() and name.strip() not in names:
-                    names.append(name.strip())
+                if not isinstance(name, str):
+                    continue
+                normalized = name.strip()
+                if normalized and normalized not in seen:
+                    names.append(normalized)
+                    seen.add(normalized)
     return names or local_project_skill_names()
 
 
@@ -1414,20 +1419,26 @@ def refresh_git_universal_skills_source(source: Path) -> bool:
     if not (source / ".git").exists():
         return True
 
-    branch_result = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-        cwd=source,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        branch_result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=source,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return False
     branch = branch_result.stdout.strip() if branch_result.returncode == 0 else ""
     if branch and branch != "HEAD":
         cmd = ["git", "pull", "--ff-only", "origin", branch]
     else:
         cmd = ["git", "fetch", "origin"]
 
-    result = subprocess.run(cmd, cwd=source, capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(cmd, cwd=source, capture_output=True, text=True, check=False)
+    except OSError:
+        return False
     return result.returncode == 0
 
 
@@ -1453,11 +1464,6 @@ def seed_repo_local_universal_skills_from_source(source: Path, checkout: Path) -
         local_project_skills_root(),
     ]
 
-    skills_root = checkout / "skills"
-    profiles_root = checkout / "profiles"
-    skills_root.mkdir(parents=True, exist_ok=True)
-    profiles_root.mkdir(parents=True, exist_ok=True)
-
     selected_sources: List[Tuple[str, Path]] = []
     for name in skill_names:
         source_skill = source_skills_root / name
@@ -1473,6 +1479,11 @@ def seed_repo_local_universal_skills_from_source(source: Path, checkout: Path) -
     if len(selected_sources) != len(skill_names):
         return False
 
+    skills_root = checkout / "skills"
+    profiles_root = checkout / "profiles"
+    skills_root.mkdir(parents=True, exist_ok=True)
+    profiles_root.mkdir(parents=True, exist_ok=True)
+
     copied: List[str] = []
     for name, source_skill in selected_sources:
         shutil.copytree(source_skill, skills_root / name)
@@ -1486,13 +1497,24 @@ def seed_repo_local_universal_skills_from_source(source: Path, checkout: Path) -
     return True
 
 
+def remove_partial_universal_skills_checkout(checkout: Path):
+    if checkout.exists():
+        shutil.rmtree(checkout)
+
+
 def seed_repo_local_universal_skills_checkout(checkout: Path) -> bool:
     external_source = refreshed_external_universal_skills_source()
-    if external_source and seed_repo_local_universal_skills_from_source(external_source, checkout):
-        return True
+    if external_source:
+        try:
+            if seed_repo_local_universal_skills_from_source(external_source, checkout):
+                return True
+        except OSError:
+            print_action("skip external universal-skills seed failure", checkout)
+        remove_partial_universal_skills_checkout(checkout)
 
     local_source = ROOT_DIR / LOCAL_UNIVERSAL_SKILLS_DIR
     if is_valid_universal_skills_checkout(local_source):
+        remove_partial_universal_skills_checkout(checkout)
         copy_repo_local_universal_skills_checkout(local_source, checkout)
         return True
 
