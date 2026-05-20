@@ -60,6 +60,11 @@ class BootstrapTests(unittest.TestCase):
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn("Justfile", mandatory)
 
+    def test_mandatory_files_include_rtk_policy(self):
+        """The RTK policy must be copied when AGENTS.md references it."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn("RTK.md", mandatory)
+
     def test_mandatory_files_exclude_opencode_json(self):
         """opencode.json should not be in the minimal root bootstrap surface."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}

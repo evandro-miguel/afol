@@ -25,6 +25,7 @@ LOCAL_UNIVERSAL_SKILLS_DIR = Path(".agents/source/universal-skills")
 MANDATORY_FILES_TO_COPY = [
     Path("AGENTS.md"),
     Path("CLAUDE.md"),
+    Path("RTK.md"),
     Path("Justfile"),
     Path(".agents/agents"),
     Path(".agents/agents-mcp"),
@@ -173,6 +174,7 @@ class BootstrapPlanItem(NamedTuple):
 BOOTSTRAP_RECONCILE_SCOPE: Sequence[Path] = (
     Path("AGENTS.md"),
     Path("CLAUDE.md"),
+    Path("RTK.md"),
     Path("Justfile"),
     Path(".agents"),
 )

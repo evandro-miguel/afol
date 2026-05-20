@@ -82,6 +82,7 @@ Compatibility mirrors kept for broader reuse:
 |------|---------|
 | `AGENTS.md` | Canonical instruction template |
 | `CLAUDE.md` | Mandatory agent instruction replica |
+| `RTK.md` | Selective shell-output compression policy |
 | `.agents/agents` | CLI wrapper |
 | `.agents/agents.config` | Configuration |
 | `.agents/tools.json` | Tool catalog |
@@ -102,6 +103,7 @@ Compatibility mirrors kept for broader reuse:
 |----------|--------|
 | `<target>/AGENTS.md` | Copied |
 | `<target>/CLAUDE.md` | Copied |
+| `<target>/RTK.md` | Copied |
 | `<target>/.agents/` | Complete structure |
 | `<target>/.agents/tmp/` | Temporary non-canonical workspace |
 | `<target>/.claude/` | Runtime folder ensured |
@@ -207,6 +209,7 @@ Edit `agents-bootstrap.py`:
 MANDATORY_FILES_TO_COPY = [
     "AGENTS.md",
     "CLAUDE.md",
+    "RTK.md",
     ".agents/agents",
     ".agents/agents.config",
     ".agents/tools.json",

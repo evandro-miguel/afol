@@ -49,11 +49,15 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 ## Context And Tokens
 
-- Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus.
+- Use Caveman-style updates by default: concise, no filler, no repeated setup.
+  Keep full precise prose when compression could hide risk, order, or evidence.
+- Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
+  CLI, and existing `docs/map/` before broad scans.
 - Prefer `.agents/agents knowledge pull "<topic>"` before broad historical
   reads.
 - Use RTK only for noisy shell output:
   `rtk git status`, `rtk find`, `rtk summary`, bounded `rtk grep`.
+  Use `RTK.md` when present for detailed command policy.
 - Keep raw output when exact lines or failure evidence matters.
 - Stop context collection when it will not change decisions.
 
