@@ -24,7 +24,11 @@ Rule:
 
 - `skills-sync pull` refreshes only an external git-backed source when one is
   configured. `skills-sync sync` / `skills-sync update` refresh the actual
-  project skill copies under `.agents/skills/`.
+  project skill copies under `.agents/skills/`. Treat skill and profile names
+  from CLI, manifest, and upstream profiles as identifiers, not paths. A safe
+  implementation rejects absolute paths, path separators, NUL bytes, `.`, and
+  `..`, then verifies resolved source and destination paths stay under their
+  configured roots before delete/copy/link.
 
 ## 2. Ensure One Operational Skill
 
@@ -35,7 +39,22 @@ Rule:
 Use this when the repo needs the scaffold-operating skill available locally
 without doing a broader skill refresh.
 
-## 3. Propose a Local Skill Change Back to Universal-Skills
+## 3. Verified Scaffold Refresh
+
+```bash
+./.agents/agents scaffold-update --channel stable \
+  --source /path/to/scaffold-source --plan-only
+./.agents/agents scaffold-update --channel stable \
+  --source /path/to/scaffold-source --diff-only
+```
+
+Use this only for scaffold-owned `.agents` files, not project-owned docs or app
+code. The source must provide stable channel metadata and release artifacts; the
+command verifies the signed tag when the source is a git checkout, validates the
+allowlisted payload checksum, stages changes, backs up touched files, and rolls
+back if validation fails. Add `--apply` only after the plan/diff is expected.
+
+## 4. Propose a Local Skill Change Back to Universal-Skills
 
 ```bash
 ./.agents/agents skills-sync push agentic-folder-sys \
@@ -47,7 +66,7 @@ Use this only with an external universal-skills checkout configured. The command
 creates a proposal branch and can open a PR; it must never push directly to
 universal `main`.
 
-## 4. Governed Workbench Execution
+## 5. Governed Workbench Execution
 
 When the change is non-trivial, use the scaffold's workbench flow:
 
@@ -59,6 +78,6 @@ When the change is non-trivial, use the scaffold's workbench flow:
 
 State rules:
 
-- use the task marker board as the source of truth with canonical markers:
-  `[ ]`, `[/]`, `[!]`, `[>]`, `[%]`, `[&]`, `[x]` move from `[%]` to `[&]` only
+- use the task marker board as the source of truth with canonical markers: `[
+  ]`, `[/]`, `[!]`, `[>]`, `[%]`, `[&]`, `[x]` move from `[%]` to `[&]` only
   after test evidence exists mark `[x]` only after closure evidence exists

@@ -82,6 +82,7 @@ Compatibility mirrors kept for broader reuse:
 |------|---------|
 | `AGENTS.md` | Canonical instruction template |
 | `CLAUDE.md` | Mandatory agent instruction replica |
+| `RTK.md` | Selective shell-output compression policy |
 | `.agents/agents` | CLI wrapper |
 | `.agents/agents.config` | Configuration |
 | `.agents/tools.json` | Tool catalog |
@@ -102,6 +103,7 @@ Compatibility mirrors kept for broader reuse:
 |----------|--------|
 | `<target>/AGENTS.md` | Copied |
 | `<target>/CLAUDE.md` | Copied |
+| `<target>/RTK.md` | Copied |
 | `<target>/.agents/` | Complete structure |
 | `<target>/.agents/tmp/` | Temporary non-canonical workspace |
 | `<target>/.claude/` | Runtime folder ensured |
@@ -185,7 +187,12 @@ Usage notes:
 - Optional upstream skills sync warnings are non-blocking and do not mean the bootstrap failed.
 - The skills baseline is generic by design and should be upgraded by the target repo owner rather than treated as scaffold-local history.
 - Keep global Codex skills lean; the target repo should rely primarily on `.agents/skills/` plus the repo-local `.agents/source/universal-skills` source checkout when available.
-- `skills-sync pull` is only meaningful when that source checkout is backed by git; repo-local seeded sources are treated as already available.
+- During bootstrap, the installer first tries to refresh an external
+  `universal-skills` checkout from `AGENTS_UNIVERSAL_SKILLS_SOURCE` or from a
+  sibling `universal-skills` / `skill-universal` repo, then writes a plain
+  repo-local seed under `.agents/source/universal-skills`.
+- `skills-sync pull` is only meaningful when an external source checkout is
+  backed by git; repo-local seeded sources are treated as already available.
 - Existing repo adoption should never replace project-owned docs or runtime
   adapters by default. If a target file needs replacement, the update should
   surface a conflict and require explicit operator intent.
@@ -202,6 +209,7 @@ Edit `agents-bootstrap.py`:
 MANDATORY_FILES_TO_COPY = [
     "AGENTS.md",
     "CLAUDE.md",
+    "RTK.md",
     ".agents/agents",
     ".agents/agents.config",
     ".agents/tools.json",

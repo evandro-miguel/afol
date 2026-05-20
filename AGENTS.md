@@ -57,12 +57,15 @@ adapters, docs standards, telemetry, and bootstrap assets for downstream repos.
 
 ## Context And Tokens
 
+- Use Caveman-style updates by default: concise, no filler, no repeated setup.
+  Keep full precise prose when compression could hide risk, order, or evidence.
 - Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
   CLI, and existing `docs/map/` before broad scans.
 - Prefer `.agents/agents knowledge pull "<topic>"` before opening historical
   docs when prior work may answer the question.
 - Use RTK selectively for noisy shell output: `rtk git status`, `rtk find`,
   `rtk summary`, and bounded `rtk grep` with directory scope plus `--glob`.
+  Use `RTK.md` when present for detailed command policy.
 - Keep raw `rg`, raw reads, and native command logs when exact source lines,
   edit context, or failure evidence matter.
 - Do not wrap MCP output, tiny status commands, or single-file colon-heavy grep
