@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import json
-import re
 import subprocess
+import json
+import os
+import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -16,19 +17,62 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("PyYAML is required") from exc
 
-from .agents_config import (
-    get_active_session_file_path,
-    get_cfg_path,
-    load_agents_config,
-    now_iso_with_offset,
-)
-from .artifact_utility import analyze_artifact_utility
-from .workflow_manifest import load_artifact_manifest, load_artifact_policy
+try:
+    from .agents_config import (
+        get_active_session_file_path,
+        get_cfg_path,
+        load_agents_config,
+        now_iso_with_offset,
+    )
+    from .artifact_utility import analyze_artifact_utility
+    from .markdown_docs import split_markdown_frontmatter
+    from .workflow_manifest import load_artifact_manifest, load_artifact_policy
+except ImportError:
+    from lib.agents_config import (
+        get_active_session_file_path,
+        get_cfg_path,
+        load_agents_config,
+        now_iso_with_offset,
+    )
+    from lib.artifact_utility import analyze_artifact_utility
+    from lib.markdown_docs import split_markdown_frontmatter
+    from lib.workflow_manifest import load_artifact_manifest, load_artifact_policy
+
+try:
+    from .process_utils import run_command
+except ImportError:
+    try:
+        from lib.process_utils import run_command
+    except ImportError:
+        pass
+
+
+if "run_command" not in globals():
+
+    def run_command(
+        cmd,
+        *,
+        cwd: Path | None = None,
+        timeout: int = 120,
+        **kwargs,
+    ):
+        run_kwargs = dict(kwargs)
+        try:
+            return subprocess.run(list(cmd), cwd=cwd, timeout=timeout, **run_kwargs)
+        except TypeError as exc:
+            if "unexpected keyword argument 'timeout'" not in str(exc):
+                raise
+            return subprocess.run(list(cmd), cwd=cwd, **kwargs)
+
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
+AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
+CANONICAL_WB_DIR = AGENTS_DIR / "wb"
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
+SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
+RULES_DIR = AGENTS_DIR / "rules"
 WORKFLOW_DOC = ROOT_DIR / "docs/standards/workflow.md"
 ARCHIVE_KNOWLEDGE = ROOT_DIR / "docs/knowledge"
 PRODUCT_BRIEF = ROOT_DIR / "docs/arc/PROJECT-BRIEF.md"
@@ -110,22 +154,61 @@ ALIAS_ARTIFACTS = set(DOC_PATTERNS.keys()) | {
 }
 
 TASK_TABLE_RE = re.compile(r"^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]*)\s*\|\s*([^|]*)\s*\|")
-TASK_CHECKLIST_RE = re.compile(r"^\s*-\s*\[[ /%!>x]\]\s+(T-\d{2,3})\s+(.+)$")
+TASK_CHECKLIST_RE = re.compile(r"^\s*-\s*\[([ /%!>&x])\]\s+(T-\d{2,3})\s+(.+)$")
 TASK_ID_RE = re.compile(r"^T-\d{2,3}$")
-TASK_ROW_RE = re.compile(r"^(\s*-\s*\[)([ /%!>x])(?:\]\s+)(T-\d{2,3})(\s+.+)$")
+TASK_ROW_RE = re.compile(r"^(\s*-\s*\[)([ /%!>&x])(?:\]\s+)(T-\d{2,3})(\s+.+)$")
+EVIDENCE_TAG_RE = re.compile(r"\s+\(evidence:\s*([^)]+)\)\s*$", re.IGNORECASE)
+FAILED_EVIDENCE_RE = re.compile(
+    r"\b(?:fail|failed|failure|error|fatal|blocked|source-drift|no justfile found|exit code [1-9])\b",
+    re.IGNORECASE,
+)
+SUCCESS_EVIDENCE_RE = re.compile(
+    r"\b(?:pass|passed|success|successful|ok|green|valid|validated|verified|resolved|completed|final)\b",
+    re.IGNORECASE,
+)
+ACCEPTED_FAILURE_RE = re.compile(
+    r"\b(?:expected failure|accepted failure|non-blocking|accepted non-blocking|n/a|not applicable|resolves prior failed evidence)\b",
+    re.IGNORECASE,
+)
+GENERIC_CLOSURE_COMMAND_RE = re.compile(
+    r"^(?:implement complete|complete|done|mark done|mark-done|finalize|close task)$",
+    re.IGNORECASE,
+)
 
 TASK_MARKER_TO_STATE = {
     " ": "pending",
     "/": "in_progress",
-    "%": "ready_for_test",
+    "%": "implemented_untested",
+    "&": "tested_needs_spec_validation",
+    "!": "problem",
+    ">": "moved",
     "x": "done",
-    "!": "blocked",
-    ">": "skipped",
 }
 
-STATE_TO_MARKER = {v: k for k, v in TASK_MARKER_TO_STATE.items()}
-FORWARD_STATES = {"pending", "ready_for_test", "in_progress", "blocked", "skipped", "done"}
-BLOCKING_STATES = {"blocked", "in_progress"}
+LEGACY_STATE_ALIASES = {
+    "blocked": "problem",
+    "skipped": "moved",
+    "ready_for_test": "implemented_untested",
+    "testing": "tested_needs_spec_validation",
+    "completed": "done",
+}
+
+STATE_TO_MARKER = {
+    "pending": " ",
+    "in_progress": "/",
+    "implemented_untested": "%",
+    "tested_needs_spec_validation": "&",
+    "problem": "!",
+    "moved": ">",
+    "done": "x",
+}
+FORWARD_STATES = set(STATE_TO_MARKER.keys())
+BLOCKING_STATES = {"problem", "in_progress"}
+FEATURE_OPERATION_RULE_FILES = (
+    ("RULE-002", "RULE-002-workstream-creation.md"),
+    ("RULE-004", "RULE-004-validation-linting.md"),
+    ("RULE-006", "RULE-006-applicable-rule-resolution.md"),
+)
 
 
 @dataclass(frozen=True)
@@ -138,22 +221,22 @@ class TaskRow:
     line_type: str
 
 
+def canonical_wb_label() -> str:
+    try:
+        return str(CANONICAL_WB_DIR.relative_to(ROOT_DIR))
+    except ValueError:
+        return str(CANONICAL_WB_DIR)
+
+
 class ExecutionError(RuntimeError):
     pass
 
 
 def split_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
-    if not text.startswith("---\n"):
+    parsed = split_markdown_frontmatter(text)
+    if parsed is None:
         return {}, text
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return {}, text
-    raw = parts[1].strip()
-    body = parts[2].lstrip("\n")
-    parsed = yaml.safe_load(raw) or {}
-    if isinstance(parsed, dict):
-        return parsed, body
-    return {}, body
+    return parsed
 
 
 def parse_iso_timestamp(value: str) -> Optional[datetime]:
@@ -186,23 +269,59 @@ def latest_file(session_dir: Path, alias: str) -> Optional[Path]:
     return files[-1]
 
 
+def _resolve_session_path(session: str, *, source: str) -> Path:
+    candidate = Path(session)
+    if not candidate.is_absolute():
+        candidate = (
+            (ROOT_DIR / session).resolve() if "/" in session else (WB_DIR / session).resolve()
+        )
+    if candidate.exists() and candidate.is_dir():
+        try:
+            candidate.resolve().relative_to(CANONICAL_WB_DIR.resolve())
+        except ValueError:
+            raise ExecutionError(
+                f"Session must be under {canonical_wb_label()} ({source}): {session}"
+            )
+        protected = {
+            item.strip()
+            for item in os.getenv("AGENTS_PROTECTED_SESSION_IDS", "").split(",")
+            if item.strip()
+        }
+        if candidate.name in protected:
+            raise ExecutionError(
+                f"Session is protected/read-only for this run ({source}): {candidate.name}. "
+                "Create or target a different .agents/wb session."
+            )
+        return candidate
+    raise ExecutionError(f"Session not found ({source}): {session}")
+
+
+def _strict_session_resolution_enabled() -> bool:
+    return os.getenv("AGENTS_SESSION_STRICT", "").strip() == "1"
+
+
 def find_session(session: Optional[str]) -> Path:
     if session:
-        candidate = Path(session)
-        if not candidate.is_absolute():
-            candidate = (ROOT_DIR / session).resolve() if "/" in session else (WB_DIR / session).resolve()
-        if not candidate.exists() or not candidate.is_dir():
-            raise ExecutionError(f"Session not found: {session}")
-        return candidate
+        return _resolve_session_path(session, source="--session")
+
+    env_session = os.getenv("AGENTS_SESSION_ID", "").strip()
+    if env_session:
+        return _resolve_session_path(env_session, source="AGENTS_SESSION_ID")
+
+    if _strict_session_resolution_enabled():
+        raise ExecutionError(
+            "Session resolution strict mode is enabled (AGENTS_SESSION_STRICT=1). "
+            "Pass --session <id/path> or set AGENTS_SESSION_ID."
+        )
 
     active = get_active_session_file_path(ROOT_DIR, CONFIG)
     if active.exists():
         active_id = active.read_text().strip()
         if active_id:
-            candidate = (WB_DIR / active_id).resolve()
-            if candidate.exists() and candidate.is_dir():
-                return candidate
-    raise ExecutionError("No active session found. Run .agents/agents new and set an active session.")
+            return _resolve_session_path(active_id, source=".active_session")
+    raise ExecutionError(
+        "No active session found. Run .agents/agents new and set an active session."
+    )
 
 
 def resolve_artifact(session_dir: Path, artifact: str) -> Optional[Path]:
@@ -237,6 +356,93 @@ def relative_to_root(path: Path) -> str:
         return str(path)
 
 
+def normalize_task_state(state: str) -> str:
+    candidate = str(state or "").strip().lower()
+    return LEGACY_STATE_ALIASES.get(candidate, candidate)
+
+
+def evidence_entry_has_blocking_failure(entry: Dict[str, Any]) -> bool:
+    result = str(entry.get("result", ""))
+    note = str(entry.get("note", ""))
+    combined = f"{result}\n{note}"
+    if not FAILED_EVIDENCE_RE.search(combined):
+        return False
+    return not ACCEPTED_FAILURE_RE.search(combined)
+
+
+def is_successful_evidence_entry(entry: Dict[str, Any]) -> bool:
+    result = str(entry.get("result", ""))
+    note = str(entry.get("note", ""))
+    combined = f"{result}\n{note}"
+    return bool(SUCCESS_EVIDENCE_RE.search(combined)) and not evidence_entry_has_blocking_failure(
+        entry
+    )
+
+
+def closure_evidence_error(
+    *,
+    command: str,
+    result: str,
+    artifacts: Iterable[str] | None = None,
+    note: str | None = None,
+) -> str | None:
+    command_text = str(command or "").strip()
+    result_text = str(result or "").strip()
+    artifact_list = [str(a).strip() for a in artifacts or [] if str(a).strip()]
+    note_text = str(note or "").strip()
+
+    if not command_text:
+        return "closure evidence requires the command or gate that was actually run"
+    if GENERIC_CLOSURE_COMMAND_RE.match(command_text):
+        return "closure evidence command is generic; record the real command or gate"
+    if not result_text:
+        return "closure evidence requires an explicit result"
+
+    entry = {
+        "command": command_text,
+        "result": result_text,
+        "artifacts": artifact_list,
+        "note": note_text,
+    }
+    if evidence_entry_has_blocking_failure(entry):
+        return "closure evidence records a blocking failure"
+    if not is_successful_evidence_entry(entry) and not ACCEPTED_FAILURE_RE.search(
+        f"{result_text}\n{note_text}"
+    ):
+        return "closure evidence result must show a passed/validated gate or explicit N/A"
+    if not artifact_list and not note_text:
+        return "closure evidence requires an artifact path or explanatory note"
+    return None
+
+
+def validate_closure_evidence(
+    *,
+    command: str,
+    result: str,
+    artifacts: Iterable[str] | None = None,
+    note: str | None = None,
+) -> None:
+    error = closure_evidence_error(command=command, result=result, artifacts=artifacts, note=note)
+    if error:
+        raise ExecutionError(error)
+
+
+def evidence_record_closure_error(record: Dict[str, Any]) -> str | None:
+    artifacts = record.get("artifacts")
+    return closure_evidence_error(
+        command=str(record.get("command", "")),
+        result=str(record.get("result", "")),
+        artifacts=artifacts if isinstance(artifacts, list) else [],
+        note=str(record.get("note", "")),
+    )
+
+
+def _frontmatter_str(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def artifact_snapshot(path: Optional[Path]) -> Dict[str, Any]:
     if path is None or not path.exists():
         return {
@@ -246,7 +452,12 @@ def artifact_snapshot(path: Optional[Path]) -> Dict[str, Any]:
             "status": "",
             "updated_at": "",
             "mtime": None,
-            "utility": {"useful": False, "placeholder_count": 0, "substantive_line_count": 0, "reasons": ["missing"]},
+            "utility": {
+                "useful": False,
+                "placeholder_count": 0,
+                "substantive_line_count": 0,
+                "reasons": ["missing"],
+            },
         }
 
     fm, body = split_frontmatter(path.read_text(encoding="utf-8"))
@@ -255,13 +466,15 @@ def artifact_snapshot(path: Optional[Path]) -> Dict[str, Any]:
     return {
         "exists": True,
         "path": relative_to_root(path),
-        "id": str(fm.get("id", "")).strip(),
-        "status": str(fm.get("status", "")).strip(),
-        "updated_at": str(fm.get("updated_at", "")).strip(),
+        "id": _frontmatter_str(fm.get("id", "")),
+        "status": _frontmatter_str(fm.get("status", "")),
+        "updated_at": _frontmatter_str(fm.get("updated_at", "")),
         "mtime": path.stat().st_mtime,
         "links": fm.get("links", {}) if isinstance(fm.get("links", {}), dict) else {},
-        "roadmap_feature": str(fm.get("roadmap_feature", "")).strip(),
-        "workstream_intent": str(fm.get("workstream_intent", "")).strip(),
+        "roadmap_feature": _frontmatter_str(fm.get("roadmap_feature", "")),
+        "parent_spec": _frontmatter_str(fm.get("parent_spec", "")),
+        "child_spec": _frontmatter_str(fm.get("child_spec", "")),
+        "workstream_intent": _frontmatter_str(fm.get("workstream_intent", "")),
         "doc_type": doc_type,
         "utility": utility,
     }
@@ -282,7 +495,11 @@ def _dependency_ready(snapshot: Dict[str, Any]) -> bool:
 def _artifact_done(snapshot: Dict[str, Any]) -> bool:
     status = str(snapshot.get("status") or "").strip()
     utility = snapshot.get("utility", {})
-    return bool(snapshot.get("exists")) and bool(utility.get("useful")) and status in TERMINAL_ARTIFACT_STATUSES
+    return (
+        bool(snapshot.get("exists"))
+        and bool(utility.get("useful"))
+        and status in TERMINAL_ARTIFACT_STATUSES
+    )
 
 
 def infer_session_intent(session_dir: Path) -> str:
@@ -320,11 +537,7 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
     intent = infer_session_intent(session_dir)
     profile = ARTIFACT_POLICY.get(intent, {})
     default_doc_types = set(profile.get("create", []))
-    optional_doc_types = {
-        entry["doc_type"]
-        for entry in ARTIFACT_MANIFEST
-        if entry.get("flag")
-    }
+    optional_doc_types = {entry["doc_type"] for entry in ARTIFACT_MANIFEST if entry.get("flag")}
     present_doc_types = {
         entry["doc_type"]
         for entry in ARTIFACT_MANIFEST
@@ -340,12 +553,22 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
         entry
         for entry in ARTIFACT_MANIFEST
         if entry["doc_type"] in selected_doc_types
-        and (entry["doc_type"] not in optional_doc_types or entry["doc_type"] in present_optional_doc_types)
+        and (
+            entry["doc_type"] not in optional_doc_types
+            or entry["doc_type"] in present_optional_doc_types
+        )
     ]
     snapshots = {
         entry["doc_type"]: artifact_snapshot(latest_file(session_dir, entry["doc_type"]))
         for entry in manifest_entries
     }
+    task_file = resolve_artifact(session_dir, "task")
+    total_tasks, done_tasks, _, _, _ = parse_state_summary(task_file)
+    report_snapshot = snapshots.get("report", {})
+    report_is_final = str(report_snapshot.get("status") or "").strip().lower() == "final"
+    all_tasks_done = total_tasks > 0 and done_tasks == total_tasks
+    is_closure_mode = report_is_final or all_tasks_done
+    closure_optional_doc_types = {"brainstorm", "research", "explorer-check", "postmortem"}
     states: List[Dict[str, Any]] = []
 
     for entry in manifest_entries:
@@ -363,11 +586,23 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
                 if dependency_snapshot.get("exists") and not utility.get("useful"):
                     blockers.append(f"{dependency}: invalid")
                 else:
-                    blockers.append(f"{dependency}: {dependency_snapshot.get('status') or 'unknown'}")
+                    blockers.append(
+                        f"{dependency}: {dependency_snapshot.get('status') or 'unknown'}"
+                    )
 
         state = "ready"
         if not snapshot.get("exists"):
             state = "missing"
+        elif (
+            is_closure_mode
+            and doc_type in closure_optional_doc_types
+            and str(snapshot.get("status") or "").strip().lower() != "final"
+        ):
+            blockers.append(
+                f"closure gate: optional '{doc_type}' is present with status="
+                f"'{str(snapshot.get('status') or '').strip() or 'missing'}'; set status=final"
+            )
+            state = "blocked"
         elif _artifact_done(snapshot):
             state = "done"
         elif not snapshot.get("utility", {}).get("useful"):
@@ -406,7 +641,7 @@ def next_workflow_artifact(states: Iterable[Dict[str, Any]]) -> Optional[Dict[st
 
 
 def git_status_entries(root_dir: Path = ROOT_DIR) -> Tuple[bool, List[Dict[str, Any]]]:
-    proc = subprocess.run(
+    proc = run_command(
         ["git", "-C", str(root_dir), "status", "--porcelain"],
         capture_output=True,
         text=True,
@@ -438,7 +673,16 @@ def git_status_entries(root_dir: Path = ROOT_DIR) -> Tuple[bool, List[Dict[str, 
 
 
 def _session_artifacts(session_dir: Path) -> Dict[str, Dict[str, Any]]:
-    artifact_names = ["plan", "task", "research", "log", "report", "brainstorm", "explorer-check"]
+    artifact_names = [
+        "plan",
+        "task",
+        "research",
+        "log",
+        "report",
+        "brainstorm",
+        "explorer-check",
+        "postmortem",
+    ]
     return {name: artifact_snapshot(resolve_artifact(session_dir, name)) for name in artifact_names}
 
 
@@ -450,11 +694,108 @@ def _session_roadmap_feature(artifacts: Dict[str, Dict[str, Any]]) -> str:
     return ""
 
 
-def _split_session_git_changes(session_dir: Path) -> Tuple[bool, List[Dict[str, Any]], List[Dict[str, Any]]]:
+def _session_governance_value(artifacts: Dict[str, Dict[str, Any]], field: str) -> str:
+    for alias in ("task", "plan", "research", "report", "postmortem"):
+        value = artifacts[alias].get(field, "")
+        if value:
+            return str(value)
+    return ""
+
+
+def _resolve_spec_by_id(spec_id: str) -> Optional[Path]:
+    if not spec_id:
+        return None
+    for spec_file in sorted(SPECS_DIR.rglob("*.md")):
+        if spec_file.name in {"INDEX.md", "README.md"}:
+            continue
+        fm, _ = split_frontmatter(spec_file.read_text(encoding="utf-8"))
+        if str(fm.get("id", "")).strip() == spec_id:
+            return spec_file
+    return None
+
+
+def _is_governed_workbench_session(session_dir: Path) -> bool:
+    try:
+        session_dir.resolve().relative_to(WB_DIR.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, Any]]:
+    """Load the rule/spec bundle that must be visible before feature operations."""
+    if not _is_governed_workbench_session(session_dir):
+        return None
+
+    artifacts = _session_artifacts(session_dir)
+    missing_artifacts = [alias for alias in ("plan", "task") if not artifacts[alias]["exists"]]
+    if missing_artifacts:
+        raise ExecutionError(
+            "Governed feature operations require plan and task artifacts; missing: "
+            + ", ".join(sorted(missing_artifacts))
+        )
+
+    feature_id = _session_roadmap_feature(artifacts)
+    if not feature_id:
+        raise ExecutionError(
+            "Governed feature operations require roadmap_feature in the session plan or task."
+        )
+
+    parent_spec = _session_governance_value(artifacts, "parent_spec")
+    if not parent_spec:
+        raise ExecutionError(
+            "Governed feature operations require parent_spec in the session plan or task."
+        )
+
+    parent_spec_path = _resolve_spec_by_id(parent_spec)
+    if parent_spec_path is None:
+        raise ExecutionError(f"Parent spec not found for governed feature operation: {parent_spec}")
+
+    child_spec = _session_governance_value(artifacts, "child_spec")
+    child_spec_path = None
+    if child_spec:
+        child_spec_path = _resolve_spec_by_id(child_spec)
+        if child_spec_path is None:
+            raise ExecutionError(
+                f"Child spec not found for governed feature operation: {child_spec}"
+            )
+
+    rules: List[Dict[str, str]] = []
+    missing_rules: List[str] = []
+    for rule_id, filename in FEATURE_OPERATION_RULE_FILES:
+        rule_path = (RULES_DIR / filename).resolve()
+        if not rule_path.exists():
+            missing_rules.append(filename)
+            continue
+        rules.append({"id": rule_id, "path": relative_to_root(rule_path)})
+
+    if missing_rules:
+        raise ExecutionError(
+            "Governed feature operations require rule files before execution: "
+            + ", ".join(sorted(missing_rules))
+        )
+
+    return {
+        "session": session_dir.name,
+        "feature_id": feature_id,
+        "parent_spec": parent_spec,
+        "parent_spec_path": relative_to_root(parent_spec_path),
+        "child_spec": child_spec,
+        "child_spec_path": None if child_spec_path is None else relative_to_root(child_spec_path),
+        "plan_path": artifacts["plan"]["path"],
+        "task_path": artifacts["task"]["path"],
+        "rules": rules,
+    }
+
+
+def _split_session_git_changes(
+    session_dir: Path,
+) -> Tuple[bool, List[Dict[str, Any]], List[Dict[str, Any]]]:
     git_available, git_changes = git_status_entries(ROOT_DIR)
     session_prefix = relative_to_root(session_dir).rstrip("/")
     session_changes = [
-        entry for entry in git_changes
+        entry
+        for entry in git_changes
         if entry["path"] == session_prefix or entry["path"].startswith(f"{session_prefix}/")
     ]
     repo_changes = [entry for entry in git_changes if entry not in session_changes]
@@ -470,17 +811,19 @@ def _collect_catchup_state(
     stale_artifacts: List[str] = []
 
     plan_links = artifacts["plan"].get("links", {}) if artifacts["plan"]["exists"] else {}
-    expects_research = (
-        bool(plan_links.get("research"))
-        or artifacts["brainstorm"]["exists"]
-        or artifacts["explorer-check"]["exists"]
-    )
+    expects_research = bool(plan_links.get("research"))
     if expects_research and not artifacts["research"]["exists"]:
-        warnings.append("Plan context exists but no research artifact is present for durable findings capture.")
+        warnings.append(
+            "Plan context exists but no research artifact is present for durable findings capture."
+        )
 
-    latest_repo_mtime = max((entry["mtime"] for entry in repo_changes if entry["mtime"] is not None), default=None)
+    latest_repo_mtime = max(
+        (entry["mtime"] for entry in repo_changes if entry["mtime"] is not None), default=None
+    )
     if repo_changes and not artifacts["log"]["exists"]:
-        warnings.append("Repo has working-tree changes outside the session, but no log artifact exists.")
+        warnings.append(
+            "Repo has working-tree changes outside the session, but no log artifact exists."
+        )
 
     if repo_changes and latest_repo_mtime is not None:
         for alias in ("log", "research", "report"):
@@ -491,16 +834,30 @@ def _collect_catchup_state(
                 stale_artifacts.append(alias)
 
     if repo_changes and not session_changes:
-        warnings.append("Repo has changes outside the session, but the session artifacts are unchanged in git.")
+        warnings.append(
+            "Repo has changes outside the session, but the session artifacts are unchanged in git."
+        )
 
     if "log" in stale_artifacts:
-        warnings.append("Repo changes are newer than the session log; capture progress before continuing.")
+        warnings.append(
+            "Repo changes are newer than the session log; capture progress before continuing."
+        )
     if len(repo_changes) >= 5 and not artifacts["research"]["exists"]:
-        warnings.append("Many repo changes are present without a research artifact; findings may be living only in transient context.")
+        warnings.append(
+            "Many repo changes are present without a research artifact; findings may be living only in transient context."
+        )
     elif len(repo_changes) >= 5 and "research" in stale_artifacts:
-        warnings.append("Repo changes are newer than the research artifact; refresh findings before making new planning decisions.")
-    if artifacts["report"]["exists"] and artifacts["report"].get("status", "").lower() == "final" and repo_changes:
-        warnings.append("Report is marked final while the working tree still has unrecorded repo changes.")
+        warnings.append(
+            "Repo changes are newer than the research artifact; refresh findings before making new planning decisions."
+        )
+    if (
+        artifacts["report"]["exists"]
+        and artifacts["report"].get("status", "").lower() == "final"
+        and repo_changes
+    ):
+        warnings.append(
+            "Report is marked final while the working tree still has unrecorded repo changes."
+        )
 
     return warnings, stale_artifacts
 
@@ -517,7 +874,9 @@ def _catchup_next_step(
         return "Restore missing governed artifacts before resuming implementation."
     if "log" in stale_artifacts:
         return "Repo changes are newer than the session log; capture progress before continuing."
-    if len(repo_changes) >= 5 and (not artifacts["research"]["exists"] or "research" in stale_artifacts):
+    if len(repo_changes) >= 5 and (
+        not artifacts["research"]["exists"] or "research" in stale_artifacts
+    ):
         return "Refresh the research artifact so findings are durable before making new decisions."
     if warnings:
         return warnings[0]
@@ -541,7 +900,9 @@ def build_session_catchup(session_dir: Path, paths_limit: int = 10) -> Dict[str,
     git_available, session_changes, repo_changes = _split_session_git_changes(session_dir)
     warnings, stale_artifacts = _collect_catchup_state(artifacts, repo_changes, session_changes)
     catchup_required = bool(missing_context or repo_changes or warnings)
-    next_step = _catchup_next_step(missing_context, stale_artifacts, warnings, repo_changes, artifacts, nxt)
+    next_step = _catchup_next_step(
+        missing_context, stale_artifacts, warnings, repo_changes, artifacts, nxt
+    )
 
     return {
         "session": session_dir.name,
@@ -553,7 +914,9 @@ def build_session_catchup(session_dir: Path, paths_limit: int = 10) -> Dict[str,
             "total": total,
             "done": done,
             "remaining": remaining,
-            "next": None if nxt is None else {
+            "next": None
+            if nxt is None
+            else {
                 "task_id": nxt.task_id,
                 "state": nxt.state,
                 "owner": nxt.owner,
@@ -589,48 +952,61 @@ def parse_task_rows(task_file: Path) -> List[TaskRow]:
         table = TASK_TABLE_RE.match(line.strip())
         if table:
             task_id, state, owner, notes = table.groups()
-            rows.append(TaskRow(task_id=task_id.strip(), state=state.strip().lower(), owner=owner.strip(), notes=notes.strip(), line=idx, line_type="table"))
+            rows.append(
+                TaskRow(
+                    task_id=task_id.strip(),
+                    state=normalize_task_state(state),
+                    owner=owner.strip(),
+                    notes=notes.strip(),
+                    line=idx,
+                    line_type="table",
+                )
+            )
             continue
 
         checklist = TASK_CHECKLIST_RE.match(line)
         if checklist:
-            marker = None
-            if "[x]" in line:
-                marker = "x"
-            elif "[/]" in line:
-                marker = "/"
-            elif "[ ]" in line:
-                marker = " "
-            elif "[%]" in line:
-                marker = "%"
-            elif "[!]" in line:
-                marker = "!"
-            elif ">" in line[:5]:
-                marker = ">"
+            marker, task_id, text = checklist.groups()
             state = TASK_MARKER_TO_STATE.get(marker or " ", "pending")
-            task_id, text = checklist.groups()
-            rows.append(TaskRow(task_id=task_id.strip(), state=state, owner="", notes=text.strip(), line=idx, line_type="checklist"))
+            rows.append(
+                TaskRow(
+                    task_id=task_id.strip(),
+                    state=state,
+                    owner="",
+                    notes=text.strip(),
+                    line=idx,
+                    line_type="checklist",
+                )
+            )
 
     return rows
 
 
-def parse_state_summary(task_file: Optional[Path]) -> Tuple[int, int, int, List[str], List[TaskRow]]:
+def parse_state_summary(
+    task_file: Optional[Path],
+) -> Tuple[int, int, int, List[str], List[TaskRow]]:
     if not task_file:
         return 0, 0, 0, [], []
     rows = parse_task_rows(task_file)
     total = len(rows)
-    done = sum(1 for row in rows if row.state == "done")
-    blocked = [f"{row.task_id}:{row.state}:{row.owner}:{row.notes}" for row in rows if row.state == "blocked"]
+    done = sum(1 for row in rows if normalize_task_state(row.state) == "done")
+    blocked = [
+        f"{row.task_id}:{normalize_task_state(row.state)}:{row.owner}:{row.notes}"
+        for row in rows
+        if normalize_task_state(row.state) == "problem"
+    ]
     remaining = total - done
     return total, done, remaining, blocked, rows
 
 
 def next_task(rows: List[TaskRow]) -> Optional[TaskRow]:
     for row in rows:
-        if row.state == "in_progress":
+        state = normalize_task_state(row.state)
+        if state == "in_progress":
             return row
     for row in rows:
-        if row.state in {"pending", "ready_for_test"}:
+        state = normalize_task_state(row.state)
+        if state in {"pending", "implemented_untested", "tested_needs_spec_validation"}:
             return row
     return None
 
@@ -655,8 +1031,18 @@ def assert_task_sequence(task_rows: List[TaskRow], target_id: str) -> List[str]:
 
     return blocking
 
-def update_task_state(task_file: Path, task_id: str, new_state: str) -> bool:
-    target = new_state.strip().lower()
+
+def _append_evidence_tag(text: str, evidence_id: str | None) -> str:
+    cleaned = EVIDENCE_TAG_RE.sub("", text).rstrip()
+    if evidence_id:
+        return f"{cleaned} (evidence: {evidence_id})"
+    return cleaned
+
+
+def update_task_state(
+    task_file: Path, task_id: str, new_state: str, evidence_id: str | None = None
+) -> bool:
+    target = normalize_task_state(new_state)
     if target not in FORWARD_STATES:
         raise ExecutionError(f"Invalid task state: {new_state}")
     if not TASK_ID_RE.match(task_id):
@@ -673,7 +1059,11 @@ def update_task_state(task_file: Path, task_id: str, new_state: str) -> bool:
             row_id, _, owner, notes = table.groups()
             if row_id.strip() == task_id:
                 owner = owner.strip()
-                notes = notes.strip()
+                notes = (
+                    _append_evidence_tag(notes.strip(), evidence_id)
+                    if target == "done"
+                    else notes.strip()
+                )
                 lines[i] = f"| {row_id} | {target} | {owner} | {notes} |"
                 changed = True
                 continue
@@ -683,7 +1073,8 @@ def update_task_state(task_file: Path, task_id: str, new_state: str) -> bool:
         if m:
             prefix, marker, row_id, text = m.groups()
             if row_id.strip() == task_id:
-                lines[i] = f"{prefix}{STATE_TO_MARKER[target]}] {row_id}{text}"
+                updated_text = _append_evidence_tag(text, evidence_id) if target == "done" else text
+                lines[i] = f"{prefix}{STATE_TO_MARKER[target]}] {row_id}{updated_text}"
                 changed = True
 
     if not changed:
@@ -739,10 +1130,19 @@ def append_timeline_entry(log_file: Path, message: str) -> bool:
 def evidence_file(session_dir: Path) -> Path:
     return session_dir / ".evidence.jsonl"
 
+
 def new_evidence_id() -> str:
     return datetime.now().strftime("E-%Y%m%d%H%M%S%f")
 
-def append_evidence(session_dir: Path, task_id: str, command: str, result: str, artifacts: Iterable[str] | None = None, note: str | None = None) -> str:
+
+def append_evidence(
+    session_dir: Path,
+    task_id: str,
+    command: str,
+    result: str,
+    artifacts: Iterable[str] | None = None,
+    note: str | None = None,
+) -> str:
     if not TASK_ID_RE.match(task_id):
         raise ExecutionError(f"Invalid task id: {task_id}")
     eid = new_evidence_id()

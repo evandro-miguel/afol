@@ -4,7 +4,7 @@ id: test-strategy
 theme: tests
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-02T15:21:56-03:00'
+updated_at: '2026-05-04T16:08:31-03:00'
 ---
 
 # .agents/scripts Test Strategy
@@ -88,9 +88,9 @@ just all
 Equivalent direct pytest commands:
 
 ```bash
-uv run --project .agents/scripts pytest .agents/scripts/tests -m "not integration and not e2e"
-uv run --project .agents/scripts pytest .agents/scripts/tests/integration
-uv run --project .agents/scripts pytest .agents/scripts/tests -m "not e2e" --cov=.agents/scripts --cov-config=.agents/scripts/pyproject.toml --cov-report=term-missing --cov-fail-under=80
+.agents/scripts/.venv/bin/python -m pytest .agents/scripts/tests -m "not integration and not e2e"
+.agents/scripts/.venv/bin/python -m pytest .agents/scripts/tests/integration
+.agents/scripts/.venv/bin/python -m pytest .agents/scripts/tests -m "not e2e" --cov=.agents/scripts --cov-config=.agents/scripts/pyproject.toml --cov-report=term-missing --cov-fail-under=80
 ```
 
 ## Isolation Rules

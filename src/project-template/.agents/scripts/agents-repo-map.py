@@ -18,8 +18,13 @@ ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 MAP_CFG = CONFIG.get("repo_map", {})
 PATHS_CFG = CONFIG.get("paths", {})
 DEFAULT_OUTPUT_DIR = str(PATHS_CFG.get("map_dir", "docs/map")).strip() or "docs/map"
-DEFAULT_IMAGE = str(MAP_CFG.get("docker_image", "docker-analisys-tools:latest")).strip() or "docker-analisys-tools:latest"
-DEFAULT_REQUIRED_DOCS = [str(item) for item in MAP_CFG.get("required_root_docs", ["README.md"]) if str(item).strip()]
+DEFAULT_IMAGE = (
+    str(MAP_CFG.get("docker_image", "docker-analisys-tools:latest")).strip()
+    or "docker-analisys-tools:latest"
+)
+DEFAULT_REQUIRED_DOCS = [
+    str(item) for item in MAP_CFG.get("required_root_docs", ["README.md"]) if str(item).strip()
+]
 DEFAULT_RUNNER_HINT = Path.home() / "apps" / "docker-analisys-tools" / "scripts" / "run-repo-map.sh"
 SCAFFOLD_CONTRACT_HEADING = "## Scaffold Contract"
 SCAFFOLD_CONTRACT_BLOCK = "\n".join(
@@ -54,12 +59,23 @@ DEGENERATE_MARKERS = {
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate or refresh the repository codemap under docs/map")
-    parser.add_argument("repo", nargs="?", default=".", help="Repository root to analyze (default: current directory)")
+    parser = argparse.ArgumentParser(
+        description="Generate or refresh the repository codemap under docs/map"
+    )
+    parser.add_argument(
+        "repo",
+        nargs="?",
+        default=".",
+        help="Repository root to analyze (default: current directory)",
+    )
     parser.add_argument("--output", help="Map output directory (default: <repo>/docs/map)")
     parser.add_argument("--runner", help="Path to run-repo-map.sh")
-    parser.add_argument("--image", default=DEFAULT_IMAGE, help=f"Docker image tag (default: {DEFAULT_IMAGE})")
-    parser.add_argument("--dry-run", action="store_true", help="Print the resolved command without executing it")
+    parser.add_argument(
+        "--image", default=DEFAULT_IMAGE, help=f"Docker image tag (default: {DEFAULT_IMAGE})"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print the resolved command without executing it"
+    )
     return parser.parse_args()
 
 
@@ -113,6 +129,21 @@ def _resolve_runner(cli_runner: str | None) -> Path:
     )
 
 
+def _resolve_runner_preview(cli_runner: str | None) -> Path:
+    """Return the runner path to show in dry-run mode without requiring it to exist."""
+    fallback: Path | None = None
+    for candidate in _runner_candidates(cli_runner):
+        resolved = candidate.resolve() if candidate.exists() else candidate.expanduser()
+        if fallback is None:
+            fallback = resolved
+        if resolved.exists() and resolved.is_file():
+            return resolved
+
+    if fallback is None:
+        return DEFAULT_RUNNER_HINT
+    return fallback
+
+
 def _runner_requires_standard_host_tools(runner: Path) -> bool:
     try:
         return runner.resolve() == DEFAULT_RUNNER_HINT.resolve()
@@ -142,7 +173,9 @@ def _validate_generated_docs(output_root: Path, required_docs: list[str]) -> lis
     missing = [doc for doc in required_docs if not (output_root / doc).exists()]
     if missing:
         missing_block = ", ".join(missing)
-        raise RuntimeError(f"Repo map run completed but required map docs are missing: {missing_block}")
+        raise RuntimeError(
+            f"Repo map run completed but required map docs are missing: {missing_block}"
+        )
     return generated
 
 
@@ -218,7 +251,9 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
         "- Dominant feature clusters: `.agents/scripts, docs, .agents/skills`.",
         "- Public boundaries currently concentrate in `.agents/agents`, `Justfile`, and the runtime instruction entrypoints.",
     ]
-    _replace_section(output_root / "ARCHITECTURE.md", "## What This System Appears To Do", architecture_intro)
+    _replace_section(
+        output_root / "ARCHITECTURE.md", "## What This System Appears To Do", architecture_intro
+    )
 
     domain_bullets = [
         "",
@@ -227,9 +262,13 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
         "- `.agents/skills`: Repo-local skill payloads selected for interactive runtimes.",
         "- Runtime instruction entrypoints (`AGENTS.md` and the Claude mirror): Thin contract surfaces for interactive runtimes.",
     ]
-    _replace_section(output_root / "ARCHITECTURE.md", "## Why The Main Domains Exist", domain_bullets)
+    _replace_section(
+        output_root / "ARCHITECTURE.md", "## Why The Main Domains Exist", domain_bullets
+    )
 
-    cli_entrypoints = [item for item in [repo_root / ".agents" / "agents", repo_root / "Justfile"] if item.exists()]
+    cli_entrypoints = [
+        item for item in [repo_root / ".agents" / "agents", repo_root / "Justfile"] if item.exists()
+    ]
     runtime_docs = [
         path
         for path in [
@@ -248,7 +287,9 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
     ]
     _replace_section(output_root / "API_MAP.md", "## Public Boundary Counts", api_counts)
 
-    api_boundaries = [""] + [f"- `{path.relative_to(repo_root)}`" for path in [*cli_entrypoints, *runtime_docs]]
+    api_boundaries = [""] + [
+        f"- `{path.relative_to(repo_root)}`" for path in [*cli_entrypoints, *runtime_docs]
+    ]
     _replace_section(output_root / "API_MAP.md", "## Public Boundary Files", api_boundaries)
 
     supporting_surfaces = [
@@ -258,7 +299,11 @@ def _augment_scaffold_map(repo_root: Path, output_root: Path) -> None:
         "- `.agents/skills-sync.manifest.json`: Pinned project-local skills selection and source contract.",
         "- `.claude/`: Secret-free Claude adapter notes and rule links committed with the scaffold.",
     ]
-    _replace_section(output_root / "API_MAP.md", "## Supporting Integration And Contract Surfaces", supporting_surfaces)
+    _replace_section(
+        output_root / "API_MAP.md",
+        "## Supporting Integration And Contract Surfaces",
+        supporting_surfaces,
+    )
 
     _replace_first_line_with_prefix(
         output_root / "LLM_QUICKSTART.md",
@@ -286,10 +331,14 @@ def _validate_semantic_signals(output_root: Path) -> None:
         problems.append("README.md does not mention .agents/scripts in Major Runtime Surfaces")
 
     if problems:
-        raise RuntimeError("Repo map run completed but semantic validation failed:\n- " + "\n- ".join(problems))
+        raise RuntimeError(
+            "Repo map run completed but semantic validation failed:\n- " + "\n- ".join(problems)
+        )
 
 
-def _print_summary(repo_root: Path, output_root: Path, runner: Path, image: str, generated: list[Path]) -> None:
+def _print_summary(
+    repo_root: Path, output_root: Path, runner: Path, image: str, generated: list[Path]
+) -> None:
     print("Agents Repo Map")
     print(f"repo: {repo_root}")
     print(f"output: {output_root}")
@@ -364,7 +413,6 @@ def main() -> int:
     try:
         repo_root = _resolve_repo(args.repo)
         output_root = _resolve_output(repo_root, args.output)
-        runner = _resolve_runner(args.runner)
     except Exception as exc:
         print(f"❌ {exc}")
         return 1
@@ -373,11 +421,20 @@ def main() -> int:
     print(f"Final output root: {output_root}")
 
     if args.dry_run:
+        runner = _resolve_runner_preview(args.runner)
         cmd = [str(runner), str(repo_root), str(output_root), str(args.image)]
         print("Analysis shadow repo: <dry-run skipped>")
+        if not runner.exists():
+            print(f"WARN: repo-map runner preview path does not exist: {runner}")
         print("Resolved repo-map command:")
         print(" ".join(cmd))
         return 0
+
+    try:
+        runner = _resolve_runner(args.runner)
+    except Exception as exc:
+        print(f"❌ {exc}")
+        return 1
 
     staging_root, shadow_repo = _prepare_shadow_repo(repo_root)
     shadow_output = staging_root / "map-output"

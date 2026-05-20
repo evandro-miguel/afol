@@ -302,9 +302,7 @@ def manager_with_backups(backup_dir: Path) -> Any:
             """Cria backups fictícios."""
             versions = ["v1.1.0", "v1.0.0"]
             for i, version in enumerate(versions):
-                backup_path = (
-                    self.backup_dir / f"backup_2026022{i + 0}_{100000 + i * 10000}"
-                )
+                backup_path = self.backup_dir / f"backup_2026022{i + 0}_{100000 + i * 10000}"
                 backup_path.mkdir(parents=True, exist_ok=True)
 
                 metadata = {
@@ -371,9 +369,7 @@ def create_git_history(repo_path: Path, commits: list[str]):
         file = repo_path / f"file_{i}.txt"
         file.write_text(f"Content {i}\n")
 
-        subprocess.run(
-            ["git", "add", "."], cwd=repo_path, capture_output=True, check=False
-        )
+        subprocess.run(["git", "add", "."], cwd=repo_path, capture_output=True, check=False)
         subprocess.run(
             ["git", "commit", "-m", msg],
             cwd=repo_path,

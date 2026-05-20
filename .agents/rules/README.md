@@ -1,3 +1,12 @@
+---
+doc_type: rule
+id: readme
+theme: rules
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # Rules
 
 **Mandatory rules folder for all agents.**
@@ -11,11 +20,12 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 ```text
 .agents/rules/
 ├── README.md
-├── RULE-001-tool-discovery.md
 ├── RULE-002-workstream-creation.md
 ├── RULE-003-documentation-standards.md
 ├── RULE-004-validation-linting.md
-└── RULE-005-folder-structure.md
+├── RULE-005-folder-structure.md
+├── RULE-006-applicable-rule-resolution.md
+└── RULE-007-postmortem-governance-review.md
 ```
 
 ---
@@ -24,13 +34,14 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 
 | ID | Rule | Lines | Purpose |
 |----|------|-------|---------|
-| **RULE-001** | [tool-discovery](./RULE-001-tool-discovery.md) | ~150 | Tool discovery & usage patterns |
-| **RULE-002** | [workstream-creation](./RULE-002-workstream-creation.md) | ~140 | Creating workstreams & tasks |
+| **RULE-002** | [workstream-creation](./RULE-002-workstream-creation.md) | ~160 | Creating workstreams, decision intake & tasks |
 | **RULE-003** | [documentation-standards](./RULE-003-documentation-standards.md) | ~150 | Frontmatter & markdown standards |
 | **RULE-004** | [validation-linting](./RULE-004-validation-linting.md) | ~160 | Pre-commit validation |
 | **RULE-005** | [folder-structure](./RULE-005-folder-structure.md) | ~160 | Required folder structure |
+| **RULE-006** | [applicable-rule-resolution](./RULE-006-applicable-rule-resolution.md) | ~150 | Required rule/skill/spec routing by touched element |
+| **RULE-007** | [postmortem-governance-review](./RULE-007-postmortem-governance-review.md) | ~100 | Final postmortem promotion review before closure |
 
-**Total:** ~760 lines across 5 focused rules (max 250 each)
+**Total:** ~880 lines across 6 focused rules (max 250 each)
 
 ---
 
@@ -39,8 +50,8 @@ All agent-specific rules stored here. Symlinked from agent config folders.
 ### Before Starting Work
 
 ```bash
-# RULE-001: Discover tools
-./.agents/agents tools list
+# RULE-006: Identify element type and applicable rules before edits
+# Use docs/standards/decision-intake.md before benchmark/planning for ambiguous or product-shaped work
 ```
 
 ### Creating New Work
@@ -68,6 +79,13 @@ just doctor && just lint && just verify
 
 ```bash
 # RULE-005: All agent files in .agents/
+```
+
+### Postmortem Closure
+
+```bash
+# RULE-007: Final postmortem must complete Governance Promotion Review
+./.agents/agents wb-update status --session <session-id> --file postmortem --value final
 ```
 
 ---
@@ -143,10 +161,11 @@ Content here.
 | Location | Content |
 |----------|---------|
 | `docs/agentic/` | Tool documentation |
+| `docs/agentic/agents-tools.md` | Optional tool discovery reference |
 | `docs/standards/` | Human standards |
 | `.agents/tools.json` | Tool catalog |
 | `.agents/agents.config` | Central config |
 
 ---
 
-*Last updated: 2026-02-23 | Rules: 5 | Total lines: ~760*
+*Last updated: 2026-04-23 | Rules: 6 | Total lines: ~840*

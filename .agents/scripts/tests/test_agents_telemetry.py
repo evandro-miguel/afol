@@ -41,10 +41,33 @@ class AgentsTelemetryTests(unittest.TestCase):
             self.assertEqual(event["context"], {"source": "test"})
             self.assertNotIn("context", event["metadata"])
 
-            saved = [json.loads(line) for line in events_file.read_text().splitlines() if line.strip()]
+            saved = [
+                json.loads(line) for line in events_file.read_text().splitlines() if line.strip()
+            ]
             self.assertEqual(len(saved), 1)
             self.assertEqual(saved[0]["context"], {"source": "test"})
             self.assertNotIn("context", saved[0]["metadata"])
+
+    def test_record_event_falls_back_when_randomness_is_blocked(self):
+        script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
+        agents_telemetry = load_module("agents_telemetry_test_randomness_fallback", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            events_file = root / "events.jsonl"
+
+            agents_telemetry.TELEMETRY_EVENTS_FILE = events_file
+            agents_telemetry.ACTIVE_SESSION_FILE = root / ".active_session"
+
+            with patch.object(
+                agents_telemetry.uuid, "uuid4", side_effect=NotImplementedError("blocked")
+            ):
+                first = agents_telemetry.record_event("tool_exec", session_id="test-session")
+                second = agents_telemetry.record_event("tool_exec", session_id="test-session")
+
+            self.assertRegex(first["event_id"], r"^[0-9a-f]{64}$")
+            self.assertRegex(second["event_id"], r"^[0-9a-f]{64}$")
+            self.assertNotEqual(first["event_id"], second["event_id"])
 
     def test_main_record_parses_context_flag_into_context_field(self):
         script_path = Path(__file__).resolve().parent.parent / "agents-telemetry.py"
@@ -69,7 +92,9 @@ class AgentsTelemetryTests(unittest.TestCase):
             with patch.object(sys, "argv", argv), patch("sys.stdout", new=StringIO()):
                 agents_telemetry.main()
 
-            saved = [json.loads(line) for line in events_file.read_text().splitlines() if line.strip()]
+            saved = [
+                json.loads(line) for line in events_file.read_text().splitlines() if line.strip()
+            ]
             self.assertEqual(len(saved), 1)
             self.assertEqual(saved[0]["context"], {"via": "flag"})
             self.assertNotIn("context", saved[0]["metadata"])
@@ -96,7 +121,9 @@ class AgentsTelemetryTests(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0)
-            saved = [json.loads(line) for line in events_file.read_text().splitlines() if line.strip()]
+            saved = [
+                json.loads(line) for line in events_file.read_text().splitlines() if line.strip()
+            ]
             self.assertGreaterEqual(len(saved), 1)
             last_event = saved[-1]
             self.assertEqual(last_event["event_type"], "tool_exec")
@@ -134,11 +161,15 @@ class AgentsTelemetryTests(unittest.TestCase):
                 "record",
                 "tool_exec",
                 "--session-id=test-session",
-                '--metadata=[]',
+                "--metadata=[]",
                 '--context=["a"]',
             ]
             stderr = StringIO()
-            with patch.object(sys, "argv", argv), patch("sys.stderr", stderr), patch("sys.stdout", new=StringIO()):
+            with (
+                patch.object(sys, "argv", argv),
+                patch("sys.stderr", stderr),
+                patch("sys.stdout", new=StringIO()),
+            ):
                 with self.assertRaises(SystemExit):
                     agents_telemetry.main()
 
@@ -156,6 +187,37 @@ class AgentsTelemetryTests(unittest.TestCase):
         ) as mocked:
             self.assertEqual(agents_telemetry.get_iso_timestamp(), "2026-01-01T00:00:00Z")
             mocked.assert_called_once_with("Z")
+
+    def test_query_events_json_is_compact_by_default(self):
+        script_path = Path(".agents/scripts/agents-telemetry.py").resolve()
+        agents_telemetry = load_module("agents_telemetry_query_compact", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            events_file = root / "events.jsonl"
+            events_file.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-05-14T00:00:00Z",
+                        "event_type": "tool_exec",
+                        "session_id": "s1",
+                        "event_id": "e1",
+                        "metadata": {},
+                        "context": {},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            agents_telemetry.TELEMETRY_EVENTS_FILE = events_file
+
+            out = StringIO()
+            with patch("sys.stdout", out):
+                agents_telemetry.query_events(output_format="json")
+
+            payload = out.getvalue().strip()
+            self.assertTrue(payload.startswith("["))
+            self.assertNotIn("\n", payload)
 
 
 if __name__ == "__main__":

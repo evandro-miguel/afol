@@ -24,14 +24,11 @@ from lib.agents_config import load_agents_config, resolve_repo_path
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 SYNC_CFG = CONFIG.get("sync", {})
 AGENTS_FILE = resolve_repo_path(ROOT_DIR, SYNC_CFG.get("source_file", "AGENTS.md"))
-AGENT_FILES = [
-    resolve_repo_path(ROOT_DIR, p)
-    for p in SYNC_CFG.get("target_files", ["CLAUDE.md"])
-]
+AGENT_FILES = [resolve_repo_path(ROOT_DIR, p) for p in SYNC_CFG.get("target_files", ["CLAUDE.md"])]
 
 # Header that should be preserved in target files
-HEADER_TEMPLATE = """# Agent-specific instructions for {agent_name}
-# Auto-synced from AGENTS.md - run `.agents/scripts/sync-agent-docs.py` to update
+HEADER_TEMPLATE = """<!-- Agent-specific instructions for {agent_name}. -->
+<!-- Auto-synced from AGENTS.md. Run sync-agent-docs.py to update. -->
 
 """
 
@@ -42,7 +39,6 @@ FOOTER_WARNING = """
 > **⚠️ IMPORTANT:** THIS FILE IS A REPLICA OF THE `AGENTS.md`.
 >
 > - **DO NOT READ** the `AGENTS.md` AGAIN if you read this one.
-> - The official skills and files of the repo are always on `.agents/skills`.
 > - This file is auto-synced. Run `.agents/scripts/sync-agent-docs.py` to update.
 """
 
@@ -65,8 +61,8 @@ def get_expected_content(agent_file: Path) -> str:
     content = header + agents_content
 
     # Ensure there's a newline before footer
-    if not content.endswith('\n'):
-        content += '\n'
+    if not content.endswith("\n"):
+        content += "\n"
     content += FOOTER_WARNING
 
     return content
@@ -104,9 +100,9 @@ def check_file_status(agent_file: Path) -> dict:
 
 def show_diff(agent_file: Path, expected: str, actual: str) -> None:
     """Show differences between expected and actual content."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"File: {agent_file}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     expected_lines = expected.splitlines()
     actual_lines = actual.splitlines()
@@ -125,7 +121,7 @@ def show_diff(agent_file: Path, expected: str, actual: str) -> None:
     if len(actual_lines) > 10:
         print(f"     ... ({len(actual_lines) - 10} more lines)")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
 
 
 def _print_modified_files_warning(modified_files: list[dict]) -> None:
@@ -186,7 +182,7 @@ def _resolve_modified_files(force: bool, statuses: list[dict]) -> tuple[bool, in
         print("Keeping local modifications. Files not synced.")
         return force, 2
     if response in {"O", "F"}:
-        force = (response == "F")
+        force = response == "F"
         if not force:
             print("Proceeding with overwrite...")
         return force, 0

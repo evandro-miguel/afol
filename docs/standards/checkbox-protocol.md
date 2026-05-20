@@ -13,14 +13,15 @@ This document defines the standard checklist markers used across all agent docum
 
 ### State Markers
 
-| Marker | Meaning | When to Use |
-|--------|---------|-------------|
-| `- [ ]` | Pending | Task not started |
-| `- [/]` | In Progress | Currently working on |
-| `- [%]` | Implemented, Not Tested | Ready for testing |
-| `- [!]` | Blocked/Error | Cannot proceed (requires blocks file) |
-| `- [>]` | Skipped | Skipped by user request (requires log entry) |
-| `- [x]` | Done | Tested and verified |
+| Marker | Canonical State | Meaning | Required Notes |
+|--------|-----------------|---------|-----------------|
+| `- [ ]` | `pending` | Task not started | None |
+| `- [/]` | `in_progress` | Work is actively underway | Current execution evidence |
+| `- [!]` | `problem` | A real blocker or issue exists | Problem note or blocks file |
+| `- [>]` | `moved` | Task is deferred to a later plan/session | Destination and reason |
+| `- [%]` | `implemented_untested` | Implementation is in place but validation has not run yet | Validation evidence pending |
+| `- [&]` | `tested_needs_spec_validation` | Runtime validation passed, but spec/UX/acceptance validation is still pending | Spec validation evidence pending |
+| `- [x]` | `done` | Fully finished | Validation evidence, or explicit `N/A` when validation does not apply |
 
 ### Marker Authorization Rules
 
@@ -28,18 +29,24 @@ This document defines the standard checklist markers used across all agent docum
 |--------|-------------|--------------|
 | `- [ ]` | Anyone | No |
 | `- [/]` | Agent | No |
-| `- [%]` | Agent | No |
-| `- [!]` | Agent | Yes (blocks file) |
-| `- [>]` | **User only** | **Yes (mandatory)** |
-| `- [x]` | Agent | No |
-
-**Agents MUST NOT set `- [>]` without explicit user authorization.**
+| `- [!]` | Agent | Yes (blocks file or problem note) |
+| `- [>]` | Agent or user | Yes (mandatory destination + reason) |
+| `- [%]` | Agent | Yes when validation is still pending |
+| `- [&]` | Agent | Yes when spec validation is still pending |
+| `- [x]` | Agent | Yes when evidence or explicit `N/A` is recorded |
 
 #### Fallback for Unsupported Tools
 
-If a tool cannot parse `- [/]` or `- [%]`, it must fall back to:
+If a tool cannot parse the canonical markers, it must fall back to the
+matching `state:` value in the State Board and preserve any required notes:
 
-- `- [ ]` with a `state: in_progress` or `ready_for_test` in the State Board.
+- `pending`
+- `in_progress`
+- `problem`
+- `moved`
+- `implemented_untested`
+- `tested_needs_spec_validation`
+- `done`
 
 ### Blocked Tasks Protocol
 
@@ -52,13 +59,13 @@ When marking a task with `- [!]`:
 
 See: `docs/templates/blocks.md`
 
-### Skipped Tasks Protocol
+### Moved Tasks Protocol
 
 When a task is marked with `- [>]`:
 
-1. User must explicitly authorize the skip
-2. Create a log entry documenting the skip reason
-3. Record timestamp and authorization
+1. Record the destination plan/session in the Notes column
+2. Record the reason for the deferment in the Notes column
+3. Create a log entry if the move changes the active execution path
 
 ---
 

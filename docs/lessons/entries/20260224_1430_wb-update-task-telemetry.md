@@ -45,14 +45,15 @@ All task state changes were done via direct `edit` tool on markdown files, bypas
 ### Mandatory wb-update Commands
 
 ```bash
-# Mark task as done (with telemetry)
-.agents/agents wb-update task T-03 --mark-done
+# Mark task as done (with telemetry and evidence)
+.agents/agents wb-update evidence T-03 --command "make test-scripts" --result passed --artifact .agents/wb/<session>/<session>_report_01.md
+.agents/agents wb-update task T-03 --mark-done --evidence-id E-...
 
 # Mark task as in_progress (with telemetry)
 .agents/agents wb-update task T-04 --mark-in-progress
 
-# Mark task as blocked (with reason)
-.agents/agents wb-update task T-05 --mark-blocked
+# Mark task as problem (with reason in task notes/report)
+.agents/agents wb-update task T-05 --mark-problem
 
 # Add timeline entry for significant milestone
 .agents/agents wb-update timeline --message "Phase 3: All hotspots refactored"
@@ -61,9 +62,9 @@ All task state changes were done via direct `edit` tool on markdown files, bypas
 ### Telemetry Event Flow
 
 ```text
-User runs: wb-update task T-03 --mark-done
+User records evidence, then runs: wb-update task T-03 --mark-done --evidence-id E-...
     ↓
-Script updates: task_03.md checkbox - [ ] → - [x]
+Script updates: task_03.md checkbox - [ ] → - [x] and keeps the evidence id attached
     ↓
 Script updates: State Board table State column
     ↓

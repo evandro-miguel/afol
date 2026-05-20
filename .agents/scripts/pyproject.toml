@@ -25,11 +25,14 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
     "-v",
+    "-s",
     "--strict-markers",
     "--tb=short",
     "-p",
     "no:cacheprovider",
+    "--basetemp=.agents/tmp/pytest-scripts-basetemp",
 ]
+log_file = ".agents/tmp/pytest-scripts.log"
 markers = [
     "unit: Unit tests",
     "integration: Integration tests",

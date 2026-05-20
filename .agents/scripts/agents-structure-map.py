@@ -30,13 +30,32 @@ from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
 # Configuration
 DEFAULT_SECTIONS = {
     "frontend": {
-        "patterns": ["components", "hooks", "pages", "views", "ui", "screens", "layouts", "features"],
+        "patterns": [
+            "components",
+            "hooks",
+            "pages",
+            "views",
+            "ui",
+            "screens",
+            "layouts",
+            "features",
+        ],
         "extensions": [".tsx", ".jsx", ".vue", ".svelte"],
         "title": "Frontend",
         "description": "React components, hooks, and UI elements",
     },
     "backend": {
-        "patterns": ["services", "api", "controllers", "routes", "handlers", "utils", "lib", "core", "domain"],
+        "patterns": [
+            "services",
+            "api",
+            "controllers",
+            "routes",
+            "handlers",
+            "utils",
+            "lib",
+            "core",
+            "domain",
+        ],
         "extensions": [".ts", ".js", ".py", ".go", ".rs", ".java"],
         "title": "Backend",
         "description": "Services, utilities, and business logic",
@@ -83,6 +102,9 @@ IGNORED_DIRS = {
     "wb",
     "z-arq",
 }
+IGNORED_PATH_SUFFIXES = {
+    ".agents/tools/uv",
+}
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 MAP_DIR = get_cfg_path(ROOT_DIR, CONFIG, "map_dir")
@@ -106,7 +128,7 @@ class FileInfo:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'FileInfo':
+    def from_dict(cls, data: dict) -> "FileInfo":
         return cls(**data)
 
 
@@ -120,17 +142,21 @@ class SectionStats:
     total_size_kb: float
 
     def to_dict(self) -> dict:
-        return {
-            **asdict(self),
-            'files': [f.to_dict() for f in self.files]
-        }
+        return {**asdict(self), "files": [f.to_dict() for f in self.files]}
 
 
 class StructureMapper:
-    def __init__(self, project_path: Path, output_path: Path, cache_enabled: bool = True):
+    def __init__(
+        self,
+        project_path: Path,
+        output_path: Path,
+        cache_enabled: bool = True,
+        verbose: bool = False,
+    ):
         self.project_path = project_path.resolve()
         self.output_path = output_path.resolve()
         self.cache_enabled = cache_enabled
+        self.verbose = verbose
         self.cache: Dict[str, Any] = {}
         self.stats: Dict[str, int] = {
             "total_files": 0,
@@ -144,9 +170,11 @@ class StructureMapper:
         if cache_file.exists() and self.cache_enabled:
             try:
                 self.cache = json.loads(cache_file.read_text())
-                print(f"✓ Loaded cache: {len(self.cache.get('files', {}))} entries")
+                if self.verbose:
+                    print(f"✓ Loaded cache: {len(self.cache.get('files', {}))} entries")
             except Exception as e:
-                print(f"⚠️  Cache load failed: {e}")
+                if self.verbose:
+                    print(f"⚠️  Cache load failed: {e}")
                 self.cache = {}
 
     def save_cache(self):
@@ -155,13 +183,16 @@ class StructureMapper:
             return
 
         cache_file = self.output_path / CACHE_FILE
-        cache_file.write_text(json.dumps(self.cache, indent=2))
-        print(f"✓ Saved cache: {len(self.cache.get('files', {}))} entries")
+        tmp_file = cache_file.with_name(f".{cache_file.name}.tmp")
+        tmp_file.write_text(json.dumps(self.cache, indent=2))
+        os.replace(tmp_file, cache_file)
+        if self.verbose:
+            print(f"✓ Saved cache: {len(self.cache.get('files', {}))} entries")
 
     def compute_file_hash(self, file_path: Path) -> str:
         """Compute hash of file content for change detection."""
         try:
-            content = file_path.read_text(errors='ignore')
+            content = file_path.read_text(errors="ignore")
             return hashlib.md5(content.encode()).hexdigest()
         except Exception:
             return ""
@@ -169,7 +200,7 @@ class StructureMapper:
     def count_lines(self, file_path: Path) -> int:
         """Count non-empty lines in file."""
         try:
-            content = file_path.read_text(errors='ignore')
+            content = file_path.read_text(errors="ignore")
             return len([line for line in content.splitlines() if line.strip()])
         except Exception:
             return 0
@@ -210,7 +241,10 @@ class StructureMapper:
 
         # Check frontend
         for pattern in DEFAULT_SECTIONS["frontend"]["patterns"]:
-            if pattern in rel_path_lower and extension in DEFAULT_SECTIONS["frontend"]["extensions"]:
+            if (
+                pattern in rel_path_lower
+                and extension in DEFAULT_SECTIONS["frontend"]["extensions"]
+            ):
                 return "frontend"
 
         # Check backend
@@ -234,46 +268,48 @@ class StructureMapper:
         name = Path(file_info.relative_path).stem
 
         # Heuristic descriptions based on naming patterns
-        if name.endswith('View'):
+        if name.endswith("View"):
             return "View component; view component (stateful)"
-        elif name.endswith('Page'):
+        elif name.endswith("Page"):
             return "Page component; view component (stateful)"
-        elif name.endswith('Controller'):
+        elif name.endswith("Controller"):
             return "Controller; handles business logic (stateful)"
-        elif name.endswith('Service'):
+        elif name.endswith("Service"):
             return "Service; external API integration"
-        elif name.endswith('Hook') or name.startswith('use'):
+        elif name.endswith("Hook") or name.startswith("use"):
             return "Custom hook; reusable logic"
-        elif name.endswith('Model'):
+        elif name.endswith("Model"):
             return "Data model; schema definition"
-        elif name.endswith('Schema'):
+        elif name.endswith("Schema"):
             return "Schema; validation rules"
-        elif name.endswith('Config') or name.endswith('Constants'):
+        elif name.endswith("Config") or name.endswith("Constants"):
             return "Configuration; constants and settings"
-        elif 'test' in name.lower() or name.endswith('.test'):
+        elif "test" in name.lower() or name.endswith(".test"):
             return "Test file; unit tests"
-        elif name.endswith('Utils') or name.endswith('Helpers'):
+        elif name.endswith("Utils") or name.endswith("Helpers"):
             return "Utilities; helper functions"
-        elif name.endswith('Types') or name.endswith('Interfaces'):
+        elif name.endswith("Types") or name.endswith("Interfaces"):
             return "Type definitions; interfaces and types"
         else:
             return "Module; functionality"
 
     def scan_files(self) -> Dict[str, SectionStats]:
         """Scan all files in project."""
-        print(f"Scanning: {self.project_path}")
-        print()
+        print(f"scanning: {self.project_path}")
 
         sections: Dict[str, List[FileInfo]] = {name: [] for name in DEFAULT_SECTIONS}
         next_cache: Dict[str, Any] = {}
 
         # Walk through project directory
         for root, dirs, files in os.walk(self.project_path):
+            rel_root = Path(root).relative_to(self.project_path)
             # Keep selected hidden dirs like .agents, while ignoring common heavy/cache dirs.
             dirs[:] = [
-                d for d in dirs
+                d
+                for d in dirs
                 if (not d.startswith(".") or d in ALLOWED_HIDDEN_DIRS)
                 and d not in IGNORED_DIRS
+                and (rel_root / d).as_posix() not in IGNORED_PATH_SUFFIXES
             ]
 
             for file in files:
@@ -291,27 +327,29 @@ class StructureMapper:
 
                 # Check cache for existing description
                 cache_key = rel_path
-                cached = self.cache.get('files', {}).get(cache_key)
+                cached = self.cache.get("files", {}).get(cache_key)
 
-                if cached and cached.get('hash') == file_hash:
+                if cached and cached.get("hash") == file_hash:
                     # Use cached description
-                    description = cached.get('description', '')
+                    description = cached.get("description", "")
                 else:
                     # Generate new description
-                    description = self.generate_description(FileInfo(
-                        path=str(file_path),
-                        relative_path=rel_path,
-                        lines=lines,
-                        size_kb=size_kb,
-                        extension=extension,
-                        section=section
-                    ))
+                    description = self.generate_description(
+                        FileInfo(
+                            path=str(file_path),
+                            relative_path=rel_path,
+                            lines=lines,
+                            size_kb=size_kb,
+                            extension=extension,
+                            section=section,
+                        )
+                    )
 
                     # Update cache
                 next_cache[cache_key] = {
-                    'hash': file_hash,
-                    'description': description,
-                    'section': section,
+                    "hash": file_hash,
+                    "description": description,
+                    "section": section,
                 }
 
                 file_info = FileInfo(
@@ -322,7 +360,7 @@ class StructureMapper:
                     extension=extension,
                     section=section,
                     description=description,
-                    hash=file_hash
+                    hash=file_hash,
                 )
 
                 sections[section].append(file_info)
@@ -330,7 +368,7 @@ class StructureMapper:
                 self.stats["total_lines"] += lines
                 self.stats["sections"][section] = self.stats["sections"].get(section, 0) + 1
 
-        self.cache['files'] = next_cache
+        self.cache["files"] = next_cache
 
         # Build section stats
         result = {}
@@ -345,7 +383,7 @@ class StructureMapper:
                 description=config["description"],
                 files=sorted(files, key=lambda f: f.lines, reverse=True),
                 total_lines=sum(f.lines for f in files),
-                total_size_kb=sum(f.size_kb for f in files)
+                total_size_kb=sum(f.size_kb for f in files),
             )
 
         return result
@@ -363,8 +401,8 @@ class StructureMapper:
 
 | Metric | Value |
 |--------|-------|
-| **Total Files** | {self.stats['total_files']} |
-| **Total Lines** | {self.stats['total_lines']:,} |
+| **Total Files** | {self.stats["total_files"]} |
+| **Total Lines** | {self.stats["total_lines"]:,} |
 
 ## 📂 Documentation Sections
 
@@ -373,7 +411,9 @@ class StructureMapper:
 """
 
         for name, stats in sections.items():
-            content += f"| [{stats.title}](./{name}.md) | {stats.description} | {len(stats.files)} |\n"
+            content += (
+                f"| [{stats.title}](./{name}.md) | {stats.description} | {len(stats.files)} |\n"
+            )
 
         content += f"""
 ## 🔄 Change Detection
@@ -390,7 +430,9 @@ This documentation uses **incremental updates**:
 """
 
         # Add top-level directories
-        top_dirs = sorted([d for d in self.project_path.iterdir() if d.is_dir() and not d.name.startswith('.')])[:10]
+        top_dirs = sorted(
+            [d for d in self.project_path.iterdir() if d.is_dir() and not d.name.startswith(".")]
+        )[:10]
         for d in top_dirs:
             content += f"├── 📁 {d.name}/\n"
 
@@ -428,7 +470,7 @@ This documentation uses **incremental updates**:
 """
 
         for file_info in stats.files:
-            display_path = file_info.relative_path.replace('\\', '/')
+            display_path = file_info.relative_path.replace("\\", "/")
             content += f"| `{display_path}` | {file_info.lines:,} | {file_info.size_kb:.1f} KB | {file_info.description} |\n"
 
         content += """
@@ -440,11 +482,6 @@ This documentation uses **incremental updates**:
 
     def run(self):
         """Run the structure mapping process."""
-        print("=" * 60)
-        print("AGENTS STRUCTURE MAP - Project Documentation")
-        print("=" * 60)
-        print()
-
         # Load cache
         self.load_cache()
 
@@ -462,31 +499,28 @@ This documentation uses **incremental updates**:
         readme_content = self.generate_readme(sections)
         readme_path = self.output_path / "README.md"
         readme_path.write_text(readme_content)
-        print(f"✓ Created: {readme_path.relative_to(self.project_path)}")
+        if self.verbose:
+            print(f"✓ Created: {readme_path.relative_to(self.project_path)}")
 
         # Generate section files
         for name, stats in sections.items():
             section_content = self.generate_section_md(stats)
             section_path = self.output_path / f"{name}.md"
             section_path.write_text(section_content)
-            print(f"✓ Created: {section_path.relative_to(self.project_path)}")
+            if self.verbose:
+                print(f"✓ Created: {section_path.relative_to(self.project_path)}")
 
         # Save cache
         self.save_cache()
 
         # Print summary
-        print()
-        print("=" * 60)
-        print("SUMMARY")
-        print("=" * 60)
-        print(f"Total files documented: {self.stats['total_files']}")
-        print(f"Total lines: {self.stats['total_lines']:,}")
-        print()
-        print("Sections:")
-        for name, count in sorted(self.stats['sections'].items(), key=lambda x: x[1], reverse=True):
-            print(f"  {name}: {count} files")
-        print()
-        print("=" * 60)
+        print(
+            "structure_map: "
+            f"files={self.stats['total_files']} lines={self.stats['total_lines']} "
+            f"sections={len(self.stats['sections'])} output={self.output_path}"
+        )
+        for name, count in sorted(self.stats["sections"].items(), key=lambda x: x[1], reverse=True):
+            print(f" - {name}: {count}")
 
 
 def main():
@@ -506,6 +540,7 @@ def main():
         idx = sys.argv.index("--output")
         if idx + 1 < len(sys.argv):
             output_path = Path(sys.argv[idx + 1])
+    verbose = "--verbose" in sys.argv
 
     # Default output path
     if not output_path:
@@ -515,7 +550,7 @@ def main():
             output_path = project_path / "docs" / "map" / "structure"
 
     # Run mapper
-    mapper = StructureMapper(project_path, output_path)
+    mapper = StructureMapper(project_path, output_path, verbose=verbose)
     mapper.run()
 
 

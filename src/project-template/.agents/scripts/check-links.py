@@ -25,6 +25,7 @@ from dataclasses import dataclass
 @dataclass
 class LinkIssue:
     """Represents a broken link issue."""
+
     file: str
     line: int
     link: str
@@ -34,6 +35,7 @@ class LinkIssue:
 @dataclass
 class LinkResult:
     """Result of link checking."""
+
     total_links: int
     valid_links: int
     broken_links: int
@@ -48,22 +50,22 @@ def extract_links(content: str, filepath: str) -> List[Tuple[int, str]]:
     Skips links inside inline code (`) and code blocks (```).
     """
     links = []
-    lines = content.split('\n')
+    lines = content.split("\n")
 
     # Markdown link pattern: [text](url) - but not in code
-    md_pattern = re.compile(r'(?<!`)\[.*?\]\((.*?)\)(?!`)')
+    md_pattern = re.compile(r"(?<!`)\[.*?\]\((.*?)\)(?!`)")
 
     # HTML link pattern: <a href="url">
     html_pattern = re.compile(r'<a\s+href=["\']([^"\']+)["\']')
 
     # Image link pattern: ![alt](url) - but not in code
-    img_pattern = re.compile(r'(?<!`)!\[.*?\]\((.*?)\)(?!`)')
+    img_pattern = re.compile(r"(?<!`)!\[.*?\]\((.*?)\)(?!`)")
 
     in_code_block = False
 
     for line_num, line in enumerate(lines, 1):
         # Skip code blocks
-        if line.strip().startswith('```'):
+        if line.strip().startswith("```"):
             in_code_block = not in_code_block
             continue
 
@@ -71,7 +73,7 @@ def extract_links(content: str, filepath: str) -> List[Tuple[int, str]]:
             continue
 
         # Skip lines that are mostly code (more than 50% backticks)
-        if line.count('`') > len(line) * 0.3:
+        if line.count("`") > len(line) * 0.3:
             continue
 
         # Find markdown links
@@ -100,20 +102,20 @@ def resolve_link(link: str, current_file: str) -> Optional[str]:
     Returns resolved path for internal links.
     """
     # Skip external links
-    if link.startswith(('http://', 'https://', 'mailto:', 'ftp://', '#')):
+    if link.startswith(("http://", "https://", "mailto:", "ftp://", "#")):
         return None
 
     # Skip anchor-only links
-    if link.startswith('#'):
+    if link.startswith("#"):
         return None
 
     # Get directory of current file
     current_dir = os.path.dirname(current_file)
 
     # Resolve relative path
-    if link.startswith('./'):
+    if link.startswith("./"):
         link_path = os.path.join(current_dir, link[2:])
-    elif link.startswith('../'):
+    elif link.startswith("../"):
         link_path = os.path.join(current_dir, link)
     else:
         link_path = os.path.join(current_dir, link)
@@ -138,23 +140,23 @@ def check_link(link_path: str) -> Tuple[bool, str]:
         return True, "File exists"
 
     # Check if directory exists (for folder links)
-    if link_path.endswith('/') and os.path.isdir(link_path):
+    if link_path.endswith("/") and os.path.isdir(link_path):
         return True, "Directory exists"
     elif os.path.isdir(link_path):
         return True, "Directory exists"
 
     # Check with .md extension
-    if not link_path.endswith('.md'):
-        md_path = link_path + '.md'
+    if not link_path.endswith(".md"):
+        md_path = link_path + ".md"
         if os.path.isfile(md_path):
             return True, "File exists (with .md)"
 
     # Check for index.md in directory
     if os.path.isdir(link_path):
-        index_path = os.path.join(link_path, 'index.md')
+        index_path = os.path.join(link_path, "index.md")
         if os.path.isfile(index_path):
             return True, "index.md exists"
-        readme_path = os.path.join(link_path, 'README.md')
+        readme_path = os.path.join(link_path, "README.md")
         if os.path.isfile(readme_path):
             return True, "README.md exists"
 
@@ -162,16 +164,18 @@ def check_link(link_path: str) -> Tuple[bool, str]:
 
 
 def _collect_markdown_files(path: str) -> List[str]:
-    if os.path.isfile(path) and path.endswith('.md'):
+    if os.path.isfile(path) and path.endswith(".md"):
         return [path]
     if not os.path.isdir(path):
         return []
 
     markdown_files: List[str] = []
     for root, dirs, files in os.walk(path):
-        dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__']]
+        dirs[:] = [
+            d for d in dirs if not d.startswith(".") and d not in ["node_modules", "__pycache__"]
+        ]
         for file_name in files:
-            if file_name.endswith('.md'):
+            if file_name.endswith(".md"):
                 markdown_files.append(os.path.join(root, file_name))
     return markdown_files
 
@@ -231,17 +235,12 @@ def check_path(path: str, verbose: bool = False) -> LinkResult:
 
     markdown_files = _collect_markdown_files(path)
     if not markdown_files:
-        return LinkResult(
-            total_links=0,
-            valid_links=0,
-            broken_links=0,
-            issues=[]
-        )
+        return LinkResult(total_links=0, valid_links=0, broken_links=0, issues=[])
 
     # Check each file
     for filepath in markdown_files:
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
         except Exception as e:
             _append_unreadable_issue(issues, filepath, e)
@@ -255,10 +254,7 @@ def check_path(path: str, verbose: bool = False) -> LinkResult:
                 valid_links += 1
 
     return LinkResult(
-        total_links=total_links,
-        valid_links=valid_links,
-        broken_links=len(issues),
-        issues=issues
+        total_links=total_links, valid_links=valid_links, broken_links=len(issues), issues=issues
     )
 
 
@@ -326,38 +322,23 @@ Examples:
   %(prog)s --verbose                # Show all links checked
   %(prog)s --fix                    # Generate fix report
   %(prog)s --output report.txt      # Save report to file
-        """
+        """,
     )
 
     parser.add_argument(
-        'directories',
-        nargs='*',
-        default=['docs/'],
-        help='Directories or files to check (default: docs/)'
+        "directories",
+        nargs="*",
+        default=["docs/"],
+        help="Directories or files to check (default: docs/)",
     )
 
-    parser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        help='Show all links checked'
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show all links checked")
 
-    parser.add_argument(
-        '-q', '--quiet',
-        action='store_true',
-        help='Only show broken links'
-    )
+    parser.add_argument("-q", "--quiet", action="store_true", help="Only show broken links")
 
-    parser.add_argument(
-        '--fix',
-        action='store_true',
-        help='Generate fix script'
-    )
+    parser.add_argument("--fix", action="store_true", help="Generate fix script")
 
-    parser.add_argument(
-        '-o', '--output',
-        help='Save report to file'
-    )
+    parser.add_argument("-o", "--output", help="Save report to file")
 
     args = parser.parse_args()
 
@@ -393,14 +374,14 @@ Examples:
     # Generate fix script
     if args.fix and all_issues:
         fix_script = generate_fix_script(all_issues)
-        fix_file = 'fix_links.sh'
-        with open(fix_file, 'w') as f:
+        fix_file = "fix_links.sh"
+        with open(fix_file, "w") as f:
             f.write(fix_script)
         print(f"\nFix script generated: {fix_file}")
 
     # Save report
     if args.output:
-        with open(args.output, 'w') as f:
+        with open(args.output, "w") as f:
             f.write(f"Total links: {total_links}\n")
             f.write(f"Valid links: {total_valid}\n")
             f.write(f"Broken links: {len(all_issues)}\n\n")
@@ -412,5 +393,5 @@ Examples:
     sys.exit(1 if all_issues else 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

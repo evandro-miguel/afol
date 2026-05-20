@@ -141,10 +141,14 @@ class ExecutionCommandFlowTests(unittest.TestCase):
         scripts_dir = Path(".agents/scripts").resolve()
         sys.path.insert(0, str(scripts_dir))
         cls.execution_commands = importlib.import_module("lib.execution_commands")
-        cls.agents_implement = load_module("agents_implement_flow_test", scripts_dir / "agents-implement.py")
+        cls.agents_implement = load_module(
+            "agents_implement_flow_test", scripts_dir / "agents-implement.py"
+        )
         cls.agents_review = load_module("agents_review_flow_test", scripts_dir / "agents-review.py")
         cls.agents_revert = load_module("agents_revert_flow_test", scripts_dir / "agents-revert.py")
-        cls.agents_session = load_module("agents_session_flow_test", scripts_dir / "agents-session.py")
+        cls.agents_session = load_module(
+            "agents_session_flow_test", scripts_dir / "agents-session.py"
+        )
 
     def test_next_task_prioritizes_in_progress(self):
         rows = [
@@ -164,12 +168,16 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             write_session_task(session_dir, "| T-01 | pending | worker | first |")
             context = write_global_context(temp_root)
 
-            with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
+            with mock.patch.dict(
+                self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False
+            ):
                 product = self.execution_commands.resolve_artifact(session_dir, "product")
                 guidelines = self.execution_commands.resolve_artifact(session_dir, "guidelines")
                 tech_stack = self.execution_commands.resolve_artifact(session_dir, "tech-stack")
                 architecture = self.execution_commands.resolve_artifact(session_dir, "architecture")
-                current_state_map = self.execution_commands.resolve_artifact(session_dir, "current-state-map")
+                current_state_map = self.execution_commands.resolve_artifact(
+                    session_dir, "current-state-map"
+                )
                 active_task = self.execution_commands.resolve_artifact(session_dir, "active_task")
 
             self.assertIsNotNone(product)
@@ -191,8 +199,7 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             session_dir.mkdir(parents=True, exist_ok=True)
             write_session_task(
                 session_dir,
-                "| T-01 | pending | worker | first |\n"
-                "| T-02 | pending | worker | second |",
+                "| T-01 | pending | worker | first |\n| T-02 | pending | worker | second |",
             )
 
             args = argparse.Namespace(session=str(session_dir), task_id="T-02")
@@ -235,12 +242,12 @@ class ExecutionCommandFlowTests(unittest.TestCase):
 
     def test_revert_task_requires_confirm_before_mutation(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            session_dir = Path(td) / "260307_0003_revert-task"
+            temp_root = Path(td)
+            session_dir = temp_root / ".agents" / "wb" / "260307_0003_revert-task"
             session_dir.mkdir(parents=True, exist_ok=True)
             task_file = write_session_task(
                 session_dir,
-                "| T-01 | done | worker | first |\n"
-                "| T-02 | done | worker | second |",
+                "| T-01 | done | worker | first |\n| T-02 | done | worker | second |",
             )
             write_session_log(session_dir)
 
@@ -251,8 +258,11 @@ class ExecutionCommandFlowTests(unittest.TestCase):
                 confirm=False,
             )
             buf = io.StringIO()
-            with contextlib.redirect_stdout(buf):
-                code = self.agents_revert.cmd_task(args)
+            with mock.patch.object(
+                self.execution_commands, "CANONICAL_WB_DIR", temp_root / ".agents" / "wb"
+            ):
+                with contextlib.redirect_stdout(buf):
+                    code = self.agents_revert.cmd_task(args)
 
             output = buf.getvalue()
             content = task_file.read_text(encoding="utf-8")
@@ -263,19 +273,22 @@ class ExecutionCommandFlowTests(unittest.TestCase):
 
     def test_revert_session_confirm_resets_tasks_and_report(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            session_dir = Path(td) / "260307_0004_revert-session"
+            temp_root = Path(td)
+            session_dir = temp_root / ".agents" / "wb" / "260307_0004_revert-session"
             session_dir.mkdir(parents=True, exist_ok=True)
             task_file = write_session_task(
                 session_dir,
-                "| T-01 | done | worker | first |\n"
-                "| T-02 | in_progress | worker | second |",
+                "| T-01 | done | worker | first |\n| T-02 | in_progress | worker | second |",
             )
             report_file = session_dir / f"{session_dir.name}_report_01.md"
             write_session_report(session_dir, status="final")
             write_session_log(session_dir)
 
             args = argparse.Namespace(session=str(session_dir), confirm=True)
-            code = self.agents_revert.cmd_session(args)
+            with mock.patch.object(
+                self.execution_commands, "CANONICAL_WB_DIR", temp_root / ".agents" / "wb"
+            ):
+                code = self.agents_revert.cmd_session(args)
 
             self.assertEqual(code, 0)
             task_content = task_file.read_text(encoding="utf-8")
@@ -302,11 +315,12 @@ class ExecutionCommandFlowTests(unittest.TestCase):
     def test_session_close_repoints_active_session_when_requested(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)
-            session_dir = temp_root / "260307_0006_close-target"
-            after_dir = temp_root / "260307_0007_close-next"
+            wb_dir = temp_root / ".agents" / "wb"
+            session_dir = wb_dir / "260307_0006_close-target"
+            after_dir = wb_dir / "260307_0007_close-next"
             session_dir.mkdir(parents=True, exist_ok=True)
             after_dir.mkdir(parents=True, exist_ok=True)
-            active_file = temp_root / ".active_session"
+            active_file = wb_dir / ".active_session"
             active_file.write_text(f"{session_dir.name}\n", encoding="utf-8")
 
             args = argparse.Namespace(
@@ -317,9 +331,12 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             verify = mock.Mock(returncode=0, stdout="strict ok\n", stderr="")
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", active_file):
-                with mock.patch.object(self.agents_session, "_run_strict_verify", return_value=verify):
-                    with contextlib.redirect_stdout(buf):
-                        code = self.agents_session.cmd_close(args)
+                with mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", wb_dir):
+                    with mock.patch.object(
+                        self.agents_session, "_run_strict_verify", return_value=verify
+                    ):
+                        with contextlib.redirect_stdout(buf):
+                            code = self.agents_session.cmd_close(args)
 
             output = buf.getvalue()
             self.assertEqual(code, 0)
@@ -327,12 +344,13 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             self.assertIn("✓ session closed", output)
             self.assertIn("->", output)
 
-    def test_session_close_keeps_active_pointer_by_default(self):
+    def test_session_close_clears_active_pointer_by_default(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)
-            session_dir = temp_root / "260307_0008_close-retain"
+            wb_dir = temp_root / ".agents" / "wb"
+            session_dir = wb_dir / "260307_0008_close-retain"
             session_dir.mkdir(parents=True, exist_ok=True)
-            active_file = temp_root / ".active_session"
+            active_file = wb_dir / ".active_session"
             active_file.write_text(f"{session_dir.name}\n", encoding="utf-8")
 
             args = argparse.Namespace(
@@ -343,21 +361,25 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             verify = mock.Mock(returncode=0, stdout="strict ok\n", stderr="")
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", active_file):
-                with mock.patch.object(self.agents_session, "_run_strict_verify", return_value=verify):
-                    with contextlib.redirect_stdout(buf):
-                        code = self.agents_session.cmd_close(args)
+                with mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", wb_dir):
+                    with mock.patch.object(
+                        self.agents_session, "_run_strict_verify", return_value=verify
+                    ):
+                        with contextlib.redirect_stdout(buf):
+                            code = self.agents_session.cmd_close(args)
 
             output = buf.getvalue()
             self.assertEqual(code, 0)
-            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), session_dir.name)
-            self.assertIn("remains the default pointer", output)
+            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), "")
+            self.assertIn("cannot remain the default pointer", output)
 
     def test_session_close_aborts_when_strict_verify_fails(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)
-            session_dir = temp_root / "260307_0009_close-fail"
+            wb_dir = temp_root / ".agents" / "wb"
+            session_dir = wb_dir / "260307_0009_close-fail"
             session_dir.mkdir(parents=True, exist_ok=True)
-            active_file = temp_root / ".active_session"
+            active_file = wb_dir / ".active_session"
             active_file.write_text(f"{session_dir.name}\n", encoding="utf-8")
 
             args = argparse.Namespace(
@@ -368,9 +390,12 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             verify = mock.Mock(returncode=1, stdout="strict failed\n", stderr="")
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", active_file):
-                with mock.patch.object(self.agents_session, "_run_strict_verify", return_value=verify):
-                    with contextlib.redirect_stdout(buf):
-                        code = self.agents_session.cmd_close(args)
+                with mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", wb_dir):
+                    with mock.patch.object(
+                        self.agents_session, "_run_strict_verify", return_value=verify
+                    ):
+                        with contextlib.redirect_stdout(buf):
+                            code = self.agents_session.cmd_close(args)
 
             output = buf.getvalue()
             self.assertEqual(code, 1)
@@ -380,7 +405,8 @@ class ExecutionCommandFlowTests(unittest.TestCase):
     def test_session_catchup_reports_repo_drift_and_next_step(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)
-            session_dir = temp_root / "260307_0010_catchup"
+            wb_dir = temp_root / ".agents" / "wb"
+            session_dir = wb_dir / "260307_0010_catchup"
             session_dir.mkdir(parents=True, exist_ok=True)
             write_session_plan(session_dir)
             write_session_task(session_dir, "| T-01 | pending | worker | first |")
@@ -398,12 +424,21 @@ class ExecutionCommandFlowTests(unittest.TestCase):
 
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ROOT_DIR", temp_root):
-                with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", temp_root / ".active_session"):
+                with mock.patch.object(
+                    self.agents_session, "ACTIVE_SESSION_FILE", wb_dir / ".active_session"
+                ):
                     with mock.patch.object(self.execution_commands, "ROOT_DIR", temp_root):
-                        with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
-                            with mock.patch.object(self.execution_commands.subprocess, "run", return_value=git_status):
-                                with contextlib.redirect_stdout(buf):
-                                    code = self.agents_session.cmd_catchup(args)
+                        with mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", wb_dir):
+                            with mock.patch.dict(
+                                self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False
+                            ):
+                                with mock.patch.object(
+                                    self.execution_commands.subprocess,
+                                    "run",
+                                    return_value=git_status,
+                                ):
+                                    with contextlib.redirect_stdout(buf):
+                                        code = self.agents_session.cmd_catchup(args)
 
             payload = json.loads(buf.getvalue())
             self.assertEqual(code, 0)
@@ -415,7 +450,8 @@ class ExecutionCommandFlowTests(unittest.TestCase):
     def test_session_catchup_warns_when_research_missing_for_governed_plan(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             temp_root = Path(td)
-            session_dir = temp_root / "260307_0011_catchup-research"
+            wb_dir = temp_root / ".agents" / "wb"
+            session_dir = wb_dir / "260307_0011_catchup-research"
             session_dir.mkdir(parents=True, exist_ok=True)
             (session_dir / f"{session_dir.name}_plan_01.md").write_text(
                 "---\n"
@@ -439,15 +475,22 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ROOT_DIR", temp_root):
                 with mock.patch.object(self.execution_commands, "ROOT_DIR", temp_root):
-                    with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
-                        with mock.patch.object(self.execution_commands.subprocess, "run", return_value=git_status):
-                            with contextlib.redirect_stdout(buf):
-                                code = self.agents_session.cmd_catchup(args)
+                    with mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", wb_dir):
+                        with mock.patch.dict(
+                            self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False
+                        ):
+                            with mock.patch.object(
+                                self.execution_commands.subprocess, "run", return_value=git_status
+                            ):
+                                with contextlib.redirect_stdout(buf):
+                                    code = self.agents_session.cmd_catchup(args)
 
             payload = json.loads(buf.getvalue())
             self.assertEqual(code, 0)
             self.assertTrue(payload["catchup_required"])
-            self.assertTrue(any("research artifact" in warning.lower() for warning in payload["warnings"]))
+            self.assertTrue(
+                any("research artifact" in warning.lower() for warning in payload["warnings"])
+            )
 
     def test_review_reports_catchup_warning_when_git_drift_exists(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -469,9 +512,17 @@ class ExecutionCommandFlowTests(unittest.TestCase):
             git_status = mock.Mock(returncode=0, stdout=" M src/app.py\n", stderr="")
             buf = io.StringIO()
             with mock.patch.object(self.execution_commands, "ROOT_DIR", temp_root):
-                with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
-                    with mock.patch.object(self.execution_commands.subprocess, "run", return_value=git_status):
-                        with mock.patch.object(self.agents_review, "run_verify_tasks", return_value=(0, "verify ok\n", "")):
+                with mock.patch.dict(
+                    self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False
+                ):
+                    with mock.patch.object(
+                        self.execution_commands.subprocess, "run", return_value=git_status
+                    ):
+                        with mock.patch.object(
+                            self.agents_review,
+                            "run_verify_tasks",
+                            return_value=(0, "verify ok\n", ""),
+                        ):
                             with contextlib.redirect_stdout(buf):
                                 code = self.agents_review.cmd_scope(session_dir, "all")
 

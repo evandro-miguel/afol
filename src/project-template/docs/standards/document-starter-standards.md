@@ -3,18 +3,18 @@ doc_type: standard
 id: 000000_000000_document-starter-standards_standard_01
 status: active
 created_at: 2026-02-23 00:00:00+00:00
-updated_at: '2026-04-13T13:37:56-03:00'
+updated_at: '2026-05-14T20:05:00-03:00'
 title: Document Starter Standards
 ---
 
 ## Document Starter Standards
 
-This document defines minimum quality criteria for reusable document starters in the agent system.
-Reusable starters must live under `docs/templates/`.
+Reusable starters live in `docs/templates/`.
+Keep them short and executable.
 
 ### Frontmatter Requirements
 
-All reusable document starters MUST include:
+All reusable starters must include:
 
 ```yaml
 ---
@@ -28,47 +28,53 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 #### Required Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `doc_type` | string | Document type identifier |
-| `id` | string | Unique identifier with timestamp |
-| `status` | string | Current status |
-| `created_at` | string | ISO 8601 UTC timestamp |
-| `updated_at` | string | ISO 8601 UTC timestamp |
+| Field | Type |
+| --- | --- |
+| `doc_type` | string |
+| `id` | string |
+| `status` | string |
+| `created_at` | string |
+| `updated_at` | string |
 
 #### Recommended Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `title` | string | Short descriptive title |
-| `theme` | string | Theme or feature name |
-| `owners` | array | List of owners |
-| `links` | array | Related document links |
-| `workstream_intent` | string | Governing session intent when the doc is materialized |
-| `artifact_purpose` | string | Why this artifact deserves to exist in the session |
+| Field | Type |
+| --- | --- |
+| `title` | string |
+| `theme` | string |
+| `owners` | array |
+| `links` | array |
+| `workstream_intent` | string |
+| `artifact_purpose` | string |
 
 ### Content Structure Requirements
 
 #### Required Sections
 
-1. **Frontmatter** - YAML block at the top
-2. **Title** - Clear heading (H1 or H2)
-3. **Body** - Structured content with logical sections
-4. **Footer** - Template reference comment
+1. Frontmatter
+2. Title
+3. Body
+4. Footer template reference (when used)
 
 #### Content Guidelines
 
-- Use consistent heading hierarchy (H1 → H2 → H3)
-- Include placeholder markers `<placeholder>` for customizable content
-- Provide examples where helpful
-- Keep sections focused and modular
+- Keep headings consistent.
+- Keep placeholders explicit (`<placeholder>`).
+- Keep one useful example when needed.
+- Keep only operational instructions.
+
+### Minimalism Rule
+
+- Local starter text is contract, not essay.
+- Keep commands, paths, IDs, placeholders, gates.
+- Move deep rationale to canonical docs/skills.
 
 ### Naming Conventions
 
 #### File Names
 
-- Use lowercase with hyphens: `starter-name.md`
-- Place reusable starter files under `docs/templates/`
+- lowercase + hyphens: `starter-name.md`
+- location: `docs/templates/`
 
 #### ID Format
 
@@ -80,53 +86,12 @@ Example: `260223_1430_auth-refactor_task_01`
 
 ### Checklist for New Starters
 
-Before creating a new reusable starter, verify:
-
-- [ ] Frontmatter follows canonical schema
-- [ ] All required fields are present
-- [ ] Placeholders are clearly marked
-- [ ] Examples are provided
-- [ ] Starter is placed under `docs/templates/`
-- [ ] ID uses correct format
-- [ ] Footer references correct `docs/templates/` path when a footer is used
-
-### Starter Categories
-
-#### Workbench Starters
-
-Location: `docs/templates/`
-
-- plan.md
-- task.md
-- log.md
-- report.md
-- brainstorm.md
-- explorer-check.md
-- research.md
-- postmortem.md
-- blocks.md
-- retrospective.md
-
-#### Architecture Starters
-
-Location: `docs/templates/`
-
-- spec.md
-- spec-child.md
-- spec-test.md
-- spec-lite.md (legacy alias)
-- adr.md
-- architecture.md
-- roadmap.md
-
-#### Standard Documents
-
-Location: `docs/standards/`
-
-- workflow.md
-- verification.md
-- frontmatter.md
-- document-starter-standards.md
+- [ ] Frontmatter follows schema
+- [ ] Required fields present
+- [ ] Placeholders clear
+- [ ] Content is minimal and executable
+- [ ] File is under `docs/templates/`
+- [ ] ID format is correct
 
 ---
 

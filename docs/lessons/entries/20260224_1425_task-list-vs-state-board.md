@@ -68,10 +68,11 @@ The **State Board** Notes column only said:
 ```text
 1. Read ## Task List for specific work items
 2. Execute the work
-3. Update Task List: - [ ] → - [x]
-4. Update State Board: pending → in_progress → done
-5. Run: .agents/agents wb-update task T-XX --mark-done
-6. Add timeline entry: .agents/agents wb-update timeline --message "..."
+3. Record closure evidence: `.agents/agents wb-update evidence T-XX --command "..." --result passed --artifact <path>`
+4. Update Task List: - [ ] → - [x] with the returned evidence id
+5. Update State Board: pending → in_progress → done
+6. Run: `.agents/agents wb-update task T-XX --mark-done --evidence-id E-...`
+7. Add timeline entry: `.agents/agents wb-update timeline --message "..."`
 ```
 
 ### Template Compliance

@@ -41,7 +41,10 @@ class AgentsRepoMapTests(unittest.TestCase):
 
             buf = io.StringIO()
             argv = ["agents-repo-map.py", str(repo_dir), "--dry-run"]
-            with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False):
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False),
+            ):
                 with contextlib.redirect_stdout(buf):
                     code = self.repo_map.main()
 
@@ -62,11 +65,66 @@ class AgentsRepoMapTests(unittest.TestCase):
             with (
                 mock.patch.object(sys, "argv", argv),
                 mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False),
-                mock.patch.object(self.repo_map, "_prepare_shadow_repo", side_effect=AssertionError("should not copy")),
+                mock.patch.object(
+                    self.repo_map,
+                    "_prepare_shadow_repo",
+                    side_effect=AssertionError("should not copy"),
+                ),
             ):
                 code = self.repo_map.main()
 
             self.assertEqual(code, 0)
+
+    def test_dry_run_does_not_require_runner(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            temp_root = Path(td)
+            repo_dir = temp_root / "repo"
+            repo_dir.mkdir()
+
+            buf = io.StringIO()
+            argv = ["agents-repo-map.py", str(repo_dir), "--dry-run"]
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": ""}, clear=False),
+                mock.patch.object(
+                    self.repo_map,
+                    "_runner_candidates",
+                    return_value=iter([temp_root / "missing-runner.sh"]),
+                ),
+                contextlib.redirect_stdout(buf),
+            ):
+                code = self.repo_map.main()
+
+            output = buf.getvalue()
+            self.assertEqual(code, 0)
+            self.assertIn("Analysis shadow repo: <dry-run skipped>", output)
+            self.assertIn("WARN: repo-map runner preview path does not exist", output)
+            self.assertIn(str(temp_root / "missing-runner.sh"), output)
+
+    def test_run_requires_runner_when_not_dry_run(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            temp_root = Path(td)
+            repo_dir = temp_root / "repo"
+            repo_dir.mkdir()
+
+            buf = io.StringIO()
+            argv = ["agents-repo-map.py", str(repo_dir)]
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": ""}, clear=False),
+                mock.patch.object(
+                    self.repo_map,
+                    "_runner_candidates",
+                    return_value=iter([temp_root / "missing-runner.sh"]),
+                ),
+                contextlib.redirect_stdout(buf),
+            ):
+                code = self.repo_map.main()
+
+            output = buf.getvalue()
+            self.assertEqual(code, 1)
+            self.assertIn("Repository map runner not found", output)
+            self.assertIn(str(temp_root / "missing-runner.sh"), output)
 
     def test_run_succeeds_when_runner_writes_required_readme(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -77,15 +135,15 @@ class AgentsRepoMapTests(unittest.TestCase):
                 temp_root / "run-repo-map.sh",
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                "mkdir -p \"$2\"\n"
+                'mkdir -p "$2"\n'
                 "cat > \"$2/README.md\" <<'EOF'\n"
                 "---\n"
-                "title: \"Map\"\n"
-                "description: \"x\"\n"
-                "doc_kind: \"map\"\n"
-                "version: \"v2026-03-23_1\"\n"
-                "created_at: \"2026-03-23T00:00:00Z\"\n"
-                "updated_at: \"2026-03-23T00:00:00Z\"\n"
+                'title: "Map"\n'
+                'description: "x"\n'
+                'doc_kind: "map"\n'
+                'version: "v2026-03-23_1"\n'
+                'created_at: "2026-03-23T00:00:00Z"\n'
+                'updated_at: "2026-03-23T00:00:00Z"\n'
                 "---\n"
                 "\n"
                 "# Map\n"
@@ -98,7 +156,10 @@ class AgentsRepoMapTests(unittest.TestCase):
 
             buf = io.StringIO()
             argv = ["agents-repo-map.py", str(repo_dir)]
-            with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False):
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False),
+            ):
                 with contextlib.redirect_stdout(buf):
                     code = self.repo_map.main()
 
@@ -122,16 +183,16 @@ class AgentsRepoMapTests(unittest.TestCase):
                 temp_root / "run-repo-map.sh",
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                "mkdir -p \"$2\"\n"
-                "rm -f \"$2/OLD.md\"\n"
+                'mkdir -p "$2"\n'
+                'rm -f "$2/OLD.md"\n'
                 "cat > \"$2/README.md\" <<'EOF'\n"
                 "---\n"
-                "title: \"Map\"\n"
-                "description: \"x\"\n"
-                "doc_kind: \"map\"\n"
-                "version: \"v2026-03-23_1\"\n"
-                "created_at: \"2026-03-23T00:00:00Z\"\n"
-                "updated_at: \"2026-03-23T00:00:00Z\"\n"
+                'title: "Map"\n'
+                'description: "x"\n'
+                'doc_kind: "map"\n'
+                'version: "v2026-03-23_1"\n'
+                'created_at: "2026-03-23T00:00:00Z"\n'
+                'updated_at: "2026-03-23T00:00:00Z"\n'
                 "---\n"
                 "\n"
                 "# Map\n"
@@ -143,7 +204,10 @@ class AgentsRepoMapTests(unittest.TestCase):
             )
 
             argv = ["agents-repo-map.py", str(repo_dir)]
-            with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False):
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False),
+            ):
                 code = self.repo_map.main()
 
             self.assertEqual(code, 0)
@@ -155,11 +219,16 @@ class AgentsRepoMapTests(unittest.TestCase):
             temp_root = Path(td)
             repo_dir = temp_root / "repo"
             repo_dir.mkdir()
-            runner = make_runner(temp_root / "run-repo-map.sh", "#!/usr/bin/env bash\nmkdir -p \"$2\"\n")
+            runner = make_runner(
+                temp_root / "run-repo-map.sh", '#!/usr/bin/env bash\nmkdir -p "$2"\n'
+            )
 
             buf = io.StringIO()
             argv = ["agents-repo-map.py", str(repo_dir)]
-            with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False):
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False),
+            ):
                 with contextlib.redirect_stdout(buf):
                     code = self.repo_map.main()
 
@@ -210,15 +279,15 @@ class AgentsRepoMapTests(unittest.TestCase):
                 temp_root / "run-repo-map.sh",
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
-                "mkdir -p \"$2\"\n"
+                'mkdir -p "$2"\n'
                 "cat > \"$2/README.md\" <<'EOF'\n"
                 "---\n"
-                "title: \"Map\"\n"
-                "description: \"x\"\n"
-                "doc_kind: \"map\"\n"
-                "version: \"v2026-03-23_1\"\n"
-                "created_at: \"2026-03-23T00:00:00Z\"\n"
-                "updated_at: \"2026-03-23T00:00:00Z\"\n"
+                'title: "Map"\n'
+                'description: "x"\n'
+                'doc_kind: "map"\n'
+                'version: "v2026-03-23_1"\n'
+                'created_at: "2026-03-23T00:00:00Z"\n'
+                'updated_at: "2026-03-23T00:00:00Z"\n'
                 "---\n"
                 "\n"
                 "# Map\n"
@@ -236,7 +305,10 @@ class AgentsRepoMapTests(unittest.TestCase):
 
             buf = io.StringIO()
             argv = ["agents-repo-map.py", str(repo_dir)]
-            with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False):
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.dict(os.environ, {"AGENTS_REPO_MAP_RUNNER": str(runner)}, clear=False),
+            ):
                 with contextlib.redirect_stdout(buf):
                     code = self.repo_map.main()
 

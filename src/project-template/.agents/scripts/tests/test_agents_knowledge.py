@@ -43,7 +43,9 @@ class AgentsKnowledgeTests(unittest.TestCase):
             try:
                 buffer = io.StringIO()
                 with redirect_stdout(buffer):
-                    result = knowledge.cmd_search(type("Args", (), {"query": "OpenCode", "limit": 5})())
+                    result = knowledge.cmd_search(
+                        type("Args", (), {"query": "OpenCode", "limit": 5})()
+                    )
             finally:
                 knowledge.WB_DIR = original_wb
 
@@ -87,7 +89,9 @@ class AgentsKnowledgeTests(unittest.TestCase):
 
             self.assertEqual(result, 0)
             self.assertTrue((knowledge_dir / "INDEX.md").exists())
-            self.assertIn("260306_0000_sample_postmortem_01", (knowledge_dir / "INDEX.md").read_text())
+            self.assertIn(
+                "260306_0000_sample_postmortem_01", (knowledge_dir / "INDEX.md").read_text()
+            )
 
     def test_pull_returns_compact_reuse_digest(self):
         script_path = Path(".agents/scripts/agents-knowledge.py").resolve()

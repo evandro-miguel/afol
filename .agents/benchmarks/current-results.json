@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "updated_at": "2026-04-24T18:34:45.458883Z",
+  "pack_id": "runtime-flow-live-agent-v4",
+  "generated_at": "2026-04-24T18:34:45.458416Z",
+  "saved_result_path": ".agents/data/benchmarks/results/20260424_153445_runtime-flow-live-agent-v4.json",
+  "benchmark_profile": {
+    "runtime": "codex",
+    "model": "gpt-5.4-mini",
+    "reasoning_effort": "medium"
+  },
+  "summary": {
+    "pass": true,
+    "scenario_count": 1,
+    "duration_ms": 63372,
+    "tool_call_count": 21,
+    "tool_success_count": 20,
+    "tool_success_rate": 0.9524,
+    "checks_total": 30,
+    "checks_passed": 30,
+    "accuracy": 1.0,
+    "error_count": 1,
+    "retry_count": 0,
+    "context_bytes_total": 93205,
+    "prompt_bytes_total": 2210
+  },
+  "comparison_to_previous": {
+    "status": "comparable",
+    "reason": "same_pack_and_scenarios",
+    "baseline_saved_result_path": ".agents/data/benchmarks/results/20260424_152950_runtime-flow-live-agent-v4.json",
+    "baseline_generated_at": "2026-04-24T18:29:50.479986Z",
+    "scenario_ids": [
+      "live-autonomous-agentic-folder-delivery"
+    ],
+    "baseline_scenario_ids": [
+      "live-autonomous-agentic-folder-delivery"
+    ],
+    "delta": {
+      "duration_ms": -177555,
+      "tool_call_count": -11,
+      "tool_success_rate": 0.0774,
+      "error_count": -3,
+      "accuracy": 0.2,
+      "context_bytes_total": 0,
+      "prompt_bytes_total": 0
+    },
+    "delta_pct": {
+      "duration_ms": -73.7,
+      "tool_call_count": -34.38,
+      "tool_success_rate": 8.85,
+      "error_count": -75.0,
+      "accuracy": 25.0,
+      "context_bytes_total": 0.0,
+      "prompt_bytes_total": 0.0
+    },
+    "trend": {
+      "duration_ms": "improved",
+      "tool_call_count": "improved",
+      "tool_success_rate": "improved",
+      "error_count": "improved",
+      "accuracy": "improved",
+      "context_bytes_total": "unchanged",
+      "prompt_bytes_total": "unchanged"
+    }
+  },
+  "efficiency": {
+    "duration_ms_per_scenario": 63372.0,
+    "checks_per_second": 0.4734,
+    "tool_calls_per_second": 0.3314,
+    "bytes_per_second": 1505.6334,
+    "bytes_per_tool_call": 4543.57
+  },
+  "scenarios": [
+    {
+      "id": "live-autonomous-agentic-folder-delivery",
+      "pass": true,
+      "duration_ms": 62559,
+      "tool_call_count": 21,
+      "checks_total": 30,
+      "checks_passed": 30,
+      "error_count": 1,
+      "retry_count": 0
+    }
+  ]
+}

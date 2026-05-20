@@ -23,7 +23,7 @@ class AgentsToolsCatalogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             bad_tools = Path(td) / "tools.json"
             bad_tools.write_text(
-                '{\n'
+                "{\n"
                 '  "version": "1",\n'
                 '  "updated_at": "2026-02-24T00:00:00Z",\n'
                 '  "description": "x",\n'
@@ -31,7 +31,7 @@ class AgentsToolsCatalogTests(unittest.TestCase):
                 '  "tool_categories": {},\n'
                 '  "justfile_targets": {},\n'
                 '  "tools": [{"id": "duplicate"}]\n'
-                '}\n'
+                "}\n"
             )
 
             original = tools_mod.TOOLS_JSON
@@ -41,6 +41,21 @@ class AgentsToolsCatalogTests(unittest.TestCase):
                     tools_mod.load_tools()
             finally:
                 tools_mod.TOOLS_JSON = original
+
+    def test_load_tools_rejects_non_object_catalog(self):
+        script_path = Path(".agents/scripts/agents-tools.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        tools_mod = load_module("agents_tools_catalog_type_test", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            bad_tools = Path(td) / "tools.json"
+            bad_tools.write_text("[1,2,3]\n", encoding="utf-8")
+
+            original = tools_mod.TOOLS_JSON
+            tools_mod.TOOLS_JSON = bad_tools
+            with self.assertRaisesRegex(ValueError, "Tools catalog must be a JSON object"):
+                tools_mod.load_tools()
+            tools_mod.TOOLS_JSON = original
 
     def test_tools_catalog_includes_memory_tool(self):
         script_path = Path(".agents/scripts/agents-tools.py").resolve()

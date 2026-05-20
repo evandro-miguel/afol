@@ -4,7 +4,7 @@ id: scripts-usage
 theme: standards
 status: active
 created_at: '2026-02-23T23:37:47-03:00'
-updated_at: '2026-04-13T19:37:02-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Scripts Usage
@@ -22,6 +22,7 @@ This document contains detailed script documentation.
 just help
 
 # Setup (first time)
+just setup-uv
 just setup
 
 # Validate structure
@@ -50,8 +51,8 @@ just lint-scripts      # Lint Python code
 
 # Workbench updates
 just wb-touch          # Update timestamps
-just wb-evidence SESSION_ID=<id> TASK_ID=T-01 CMD="just verify-strict" RESULT="passed"
-just wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with evidence
+just wb-evidence SESSION_ID=<id> TASK_ID=T-01 CMD="just verify-strict" RESULT="passed" ARTIFACT=.agents/wb/<id>/<id>_report_01.md
+just wb-task SESSION_ID=<id> TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with ledger evidence
 ```
 
 ### Using Wrapper
@@ -63,6 +64,8 @@ just wb-task TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...  # Mark task done with e
 .agents/agents wb-update touch
 .agents/agents wb-update evidence T-01 --session <id> --command "just verify-strict" --result "passed"
 .agents/agents tools list
+.agents/agents benchmark list
+.agents/agents benchmark run live-implement-next-governance-preflight --save
 .agents/agents telemetry heat --period weekly
 .agents/agents status
 .agents/agents implement next
@@ -77,29 +80,31 @@ currently delegates to the existing `.agents/scripts/` command bodies for
 compatibility. Use `.agents/agents runtime command-registry` to inspect the
 registered public aliases.
 
-`uv` stays on the setup path and runtime launch path, and UV cache writes are
+`uv` stays on the setup path and runtime launch path, but it is materialized as
+a project-local tool under `.agents/tools/uv/bin/uv`. UV cache writes are
 redirected to `.agents/cache/uv/`.
 
 ## Setup (One Time)
 
 ### Prerequisites
 
-Install [uv](https://docs.astral.sh/uv/):
+Prepare project-local `uv`:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+./.agents/agents hydrate-uv
 ```
 
-### Initialize Virtualenv
+### Initialize Local Runtime
 
 ```bash
-cd .agents/scripts
-uv sync
+./.agents/agents hydrate
 ```
 
 This creates:
 
-- `.venv/` - Isolated Python virtualenv
+- `.agents/tools/uv/python/` - Project-local managed CPython install
+- `.agents/scripts/.venv/` - Script virtualenv
+- `.agents/runtime/.venv/` - Runtime virtualenv
 - `uv.lock` - Locked dependencies
 
 ## Usage
@@ -139,8 +144,8 @@ This creates:
 
 ```bash
 # For setup/bootstrap or direct script execution outside the wrapper
-uv run --with pyyaml .agents/scripts/agents-doctor.py
-uv run --with pyyaml .agents/scripts/agents-new.py auth-refactor --spec
+.agents/tools/uv/bin/uv run --with pyyaml .agents/scripts/agents-doctor.py
+.agents/tools/uv/bin/uv run --with pyyaml .agents/scripts/agents-new.py auth-refactor --spec
 ```
 
 ### With Python (Not Recommended)
@@ -250,6 +255,43 @@ python .agents/scripts/agents-memory.py context "persistent planning memory" --r
 python .agents/scripts/agents-memory.py recent --timeframe 7d
 python .agents/scripts/agents-memory.py show projects/260311-basic-memory-implementation/current-state
 ```
+
+---
+
+### agents-benchmark.py
+
+Runs the controlled live-agent runtime-flow benchmark family for risky scaffold execution
+changes.
+
+**Default benchmark profile:**
+
+- `runtime=codex`
+- `model=gpt-5.4-mini`
+- `reasoning_effort=medium`
+
+**Core metrics:**
+
+- overall and per-scenario `pass` / `fail`
+- duration in milliseconds
+- retries and error counts
+- tool success count and success rate
+- `context_bytes` from declared fixture artifacts
+- observed tool calls and required command matching
+- `checks_total`, `checks_passed`, and `accuracy`
+
+**Usage:**
+
+```bash
+python .agents/scripts/agents-benchmark.py list
+python .agents/scripts/agents-benchmark.py show live-implement-next-governance-preflight
+python .agents/scripts/agents-benchmark.py run
+python .agents/scripts/agents-benchmark.py run live-implement-start-complete-evidence --save
+python .agents/scripts/agents-benchmark.py run live-wb-update-task-evidence-timeline --save
+python .agents/scripts/agents-benchmark.py run live-tools-benchmark-discovery --output .agents/data/benchmarks/results/manual.json
+```
+
+This runner uses isolated temporary fixture repos so benchmark scenarios do not
+mutate the live workbench session of the current repository.
 
 ---
 
@@ -404,6 +446,8 @@ Executes guided task transitions.
 - `next`: show the next active task
 - `start`: move a task to `in_progress`
 - `complete`: mark a task done and write a lightweight evidence record
+- For governed sessions under `.agents/wb/`, the command now loads and prints
+  the active feature/spec/rule bundle before task transitions proceed.
 
 **Usage:**
 
@@ -442,17 +486,43 @@ python .agents/scripts/agents-revert.py session --confirm
 
 Summarizes catchup/resume state and closes a session only after strict verification succeeds.
 
+Session context:
+
+- `.agents/wb/.active_session` is a project-local convenience pointer for one
+  operator, not a safe synchronization primitive for parallel agents.
+- `AGENTS_SESSION_ID=<session-id>` is the explicit session target for shells
+  or wrappers that honor the session-context contract.
+- `AGENTS_SESSION_STRICT=1` requests strict session handling during sweep,
+  catchup, and close flows.
+
 **Behavior:**
 
+- `list` reports project-local sessions under `.agents/wb/`
+- `sweep` performs a read-only project-local stale/open/close-candidate scan
 - `catchup` reports working-tree drift, stale or missing artifacts, and the next safe resume step
 - Runs `verify-tasks.py --strict` for the target session
 - Refuses closure if strict verification fails
-- Optionally repoints `.agents/wb/.active_session` with `--next-session`
-- Leaves the active pointer unchanged by default
+- Optionally repoints the convenience pointer with `--next-session`
+- Clears the convenience pointer when the closed session was active and no
+  `--next-session` was supplied
+
+Project-local workflow:
+
+1. List local sessions with `list`.
+2. Sweep stale or overlapping sessions with `sweep`.
+3. Catch up the target session with `catchup --session <session-id>` before
+   resuming work.
+4. Close with `close --session <session-id>` only after strict verification
+   passes.
+5. Use `--next-session <next-session-id>` only for an intentional handoff.
 
 **Usage:**
 
 ```bash
+python .agents/scripts/agents-session.py list
+python .agents/scripts/agents-session.py list --json
+python .agents/scripts/agents-session.py sweep
+python .agents/scripts/agents-session.py sweep --json
 python .agents/scripts/agents-session.py catchup
 python .agents/scripts/agents-session.py catchup --session .agents/wb/260306_2128_context-driven-execution-commands
 python .agents/scripts/agents-session.py catchup --json

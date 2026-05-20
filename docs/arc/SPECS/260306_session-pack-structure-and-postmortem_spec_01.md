@@ -28,27 +28,30 @@ risk_level: medium
 
 ## Intent
 
-- Support multiple major plan tracks inside one session while making final session closure require a post-mortem.
+- Support multiple major plan tracks inside one session while keeping postmortem optional and requiring any present optional artifact to be final before closure.
 
 ## Expected Behavior
 
 - Sessions may contain pack folders for separate major plan tracks.
 - Tooling works recursively across session roots and pack folders.
-- Final report closure is blocked until a post-mortem exists.
+- Brainstorm, research, explorer-check, and postmortem artifacts are optional.
+- Final session closure is blocked if any present optional artifact is not final.
+- A postmortem, when present, records which optional artifacts existed and whether they were final.
 
 ## User Journey
 
 1. A session is created.
 2. If the session splits into multiple major efforts, each effort gets its own pack folder.
 3. Execution proceeds with recursive tooling support.
-4. Before marking the report final, a post-mortem is completed.
+4. Optional brainstorm, research, explorer-check, and postmortem artifacts are created only when they add real value.
+5. Before closing the session, any present optional artifact is final, and the postmortem, when present, records the state of those optional artifacts.
 
 ## Acceptance
 
 - [x] `agents-new` supports optional pack creation.
 - [x] Workbench tools operate recursively inside sessions.
-- [x] A post-mortem template exists and can be materialized when real closure analysis starts.
-- [x] `wb-update status --file report --value final` fails without a post-mortem.
+- [x] A post-mortem template exists for sessions that need closure analysis.
+- [x] Finalization checks only block closure when a present optional artifact is not final.
 
 ---
 

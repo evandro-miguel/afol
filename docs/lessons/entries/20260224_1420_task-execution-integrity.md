@@ -49,7 +49,8 @@ Before marking any task `done`:
 - [ ] All ## Task List items executed (not just State Board updated)
 - [ ] Verification commands run and output captured
 - [ ] Before/after metrics documented in task file
-- [ ] `.agents/agents wb-update task T-XX --mark-done` executed
+- [ ] `.agents/agents wb-update evidence T-XX ...` recorded a passing closure evidence id
+- [ ] `.agents/agents wb-update task T-XX --mark-done --evidence-id E-...` executed
 - [ ] Related log entry added with timestamp
 - [ ] Report updated with evidence
 ```
@@ -84,6 +85,7 @@ Before marking any task `done`:
 make doctor && make lint && make test-scripts
 
 # Record task completion with telemetry:
-.agents/agents wb-update task T-03 --mark-done
+.agents/agents wb-update evidence T-03 --command "make test-scripts" --result passed --artifact .agents/wb/<session>/<session>_report_01.md
+.agents/agents wb-update task T-03 --mark-done --evidence-id E-...
 .agents/agents wb-update timeline --message "T-03 completed: refactored X, Y, Z"
 ```

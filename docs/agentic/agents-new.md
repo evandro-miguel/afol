@@ -112,6 +112,9 @@ typically added later with `--with postmortem` once real closure work exists.
 # With spec-lite (legacy compatibility alias for spec-child)
 ./.agents/agents new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --spec-lite
 
+# Link an existing child spec without creating another spec artifact
+./.agents/agents new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --child-spec existing-child-spec
+
 # Plan only
 ./.agents/agents new quick-task --feature-id F-04 --parent-spec my-parent-spec --plan-only
 
@@ -134,12 +137,14 @@ typically added later with `--with postmortem` once real closure work exists.
 ### Governance Rules
 
 - Standard workstreams require `--feature-id` and `--parent-spec`.
-- `--child-spec` is optional and must differ from `--parent-spec`.
+- `--child-spec` links an existing child spec and must differ from `--parent-spec`.
+- `--spec-child`/`--spec-lite` creates a new local child-spec artifact. Do not combine either flag with `--child-spec`.
 - `--quick` bypasses standard governance checks and appends work to the active session.
 - `--intent` chooses the default artifact set for the workstream.
 - When `--intent` is omitted, obvious themes such as `auth-investigation` or `api-postmortem` are mapped to a safer non-delivery intent automatically.
 - `--with <doc-type>` adds only the specific extra artifacts that are justified.
 - `--into-session` may reuse the root session without `--pack` when you are materializing missing artifacts later.
+- `--into-session` must target an existing session under `.agents/wb/`; do not use `/tmp` or a copied workbench path.
 
 ### Multi-Session Support
 
@@ -147,17 +152,23 @@ typically added later with `--with postmortem` once real closure work exists.
 
 - ⚠️ System shows a warning (non-blocking)
 - ✅ New session is created normally
-- 📌 `.active_session` pointer updates to the new session
-- 🎯 Use `--session <id>` to target specific sessions in `wb-update` commands
+- 📌 `.active_session` pointer updates to the new session for the local
+  operator fast path
+- 🎯 Use `--session <id>` or `AGENTS_SESSION_ID=<id>` to target specific
+  sessions in parallel-agent contexts
 
 ```bash
 # Example: Working with multiple sessions
 ./.agents/agents new feature-a          # Creates session A (active)
 ./.agents/agents new feature-b          # Creates session B (now active, warns about A)
 
-# Target specific session for operations
-./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done
+# Target specific session for operations.
+# Done requires a prior passing closure evidence record and its evidence id.
+./.agents/agents wb-update evidence T-01 --session 260224_1200_feature-a --command "just lint" --result passed --artifact .agents/wb/260224_1200_feature-a/260224_1200_feature-a_report_01.md
+./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done --evidence-id E-...
 ./.agents/agents wb-update touch --session 260224_1200_feature-b
+# Or set AGENTS_SESSION_ID in the process environment before running status
+./.agents/agents status
 ```
 
 ## ExecPlan Convention

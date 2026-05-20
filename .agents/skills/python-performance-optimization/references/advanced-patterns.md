@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: advanced-patterns
+theme: references
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # Python Performance Optimization — Advanced Reference
 
 Advanced optimization techniques including NumPy vectorization, caching, memory management, parallelization, async I/O, database optimization, and benchmarking tools.

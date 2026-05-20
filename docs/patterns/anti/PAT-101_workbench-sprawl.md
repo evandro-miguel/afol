@@ -109,7 +109,9 @@ Use **PAT-002: Single Active Session**:
 
 ## Prevention
 
-- Check `.agents/wb/.active_session` before creating new
+- Check `.agents/wb/.active_session` before creating new local work
+- Run `.agents/agents session list` and `.agents/agents session sweep` before
+  opening another parallel session
 - Run `.agents/agents verify-tasks` on current session
 - Ask: "Can this be a quick task in current session?"
 - Weekly review: archive or complete old sessions

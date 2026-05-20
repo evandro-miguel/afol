@@ -68,14 +68,18 @@ class ChangeService:
             reason=reason,
         )
 
-    def apply_unified_diff(self, relative_path: str, diff_text: str, reason: str) -> FileWriteResult:
+    def apply_unified_diff(
+        self, relative_path: str, diff_text: str, reason: str
+    ) -> FileWriteResult:
         target = self._resolve_target(relative_path)
         if not target.exists():
             raise FileNotFoundError(relative_path)
         change_id = self.journal.next_change_id()
         backup_path = self.journal.backup_file(change_id, self.config.repo_root, target)
 
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".diff", delete=False) as handle:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", suffix=".diff", delete=False
+        ) as handle:
             handle.write(diff_text)
             temp_patch_path = Path(handle.name)
         try:
@@ -103,7 +107,9 @@ class ChangeService:
                     backup_relative=backup_path,
                     target_relative=target.relative_to(self.config.repo_root).as_posix(),
                 )
-            raise RuntimeError((completed.stderr or completed.stdout or "failed to apply patch").strip())
+            raise RuntimeError(
+                (completed.stderr or completed.stdout or "failed to apply patch").strip()
+            )
 
         record = ChangeRecord(
             change_id=change_id,

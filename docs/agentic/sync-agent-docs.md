@@ -15,7 +15,8 @@ links:
 
 ## Why It Exists
 
-**Problem:** Multiple runtimes and agents (OPENCODE, QWEN, CLAUDE, GEMINI) have separate instruction files. Keeping them synchronized manually is:
+**Problem:** Multiple runtimes and agents have separate instruction files.
+Keeping them synchronized manually is:
 
 - Error-prone
 - Laborious
@@ -37,15 +38,15 @@ Synchronizes agent files:
 
 ### Files Read
 
-| File | Purpose |
-|------|---------|
-| `AGENTS.md` | Central template |
+| File        | Purpose             |
+|-------------|---------------------|
+| `AGENTS.md` | Central template    |
 | `CLAUDE.md` | CLAUDE instructions |
 
 ### Files Written
 
-| File | Purpose |
-|------|---------|
+| File        | Purpose               |
+|-------------|-----------------------|
 | `CLAUDE.md` | Updated from template |
 
 ## How to Configure
@@ -62,8 +63,8 @@ sync:
 ### Header Template
 
 ```python
-HEADER_TEMPLATE = """# Agent-specific instructions for {agent_name}
-# Auto-synced from AGENTS.md - run `.agents/scripts/sync-agent-docs.py` to update
+HEADER_TEMPLATE = """<!-- Agent-specific instructions for {agent_name}. -->
+<!-- Auto-synced from AGENTS.md. Run sync-agent-docs.py to update. -->
 
 """
 ```

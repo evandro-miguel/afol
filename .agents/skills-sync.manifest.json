@@ -1,7 +1,8 @@
 {
   "version": 2,
   "repo": "https://github.com/evandro-miguel/skill-universal.git",
-  "ref": "main",
+  "ref": "v0.3.1",
+  "channel": "stable",
   "source_dir": ".agents/source/universal-skills",
   "mode": "copy",
   "installs": [

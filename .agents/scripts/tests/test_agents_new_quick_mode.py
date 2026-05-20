@@ -2,6 +2,8 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from unittest import mock
 from pathlib import Path
 
@@ -16,6 +18,23 @@ def load_module(module_name: str, file_path: Path):
 
 
 class AgentsNewQuickModeTests(unittest.TestCase):
+    def test_parse_args_prints_usage_for_help_without_governance_error(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_help_test", script_path)
+
+        output = StringIO()
+        with (
+            mock.patch.object(sys, "argv", ["agents-new.py", "--help"]),
+            redirect_stdout(output),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            agents_new._parse_args()
+
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn("Usage: ./.agents/agents new <theme>", output.getvalue())
+        self.assertIn("Governed delivery lifecycle:", output.getvalue())
+
     def test_main_does_not_create_session_folder_twice(self):
         script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
@@ -37,12 +56,20 @@ class AgentsNewQuickModeTests(unittest.TestCase):
 
         with (
             mock.patch.object(agents_new, "_parse_args", return_value=args),
-            mock.patch.object(agents_new, "get_active_session", return_value="260224_1030_scripts-lean-efficiency"),
+            mock.patch.object(
+                agents_new, "get_active_session", return_value="260224_1030_scripts-lean-efficiency"
+            ),
             mock.patch.object(agents_new, "_handle_quick_mode", return_value=False),
             mock.patch.object(agents_new, "_validate_governance_requirements"),
             mock.patch.object(agents_new, "_check_active_session_policy"),
-            mock.patch.object(agents_new, "get_session_id", return_value="260224_1300_execution-integrity-hardening"),
-            mock.patch.object(agents_new, "get_timestamp", return_value="2026-02-24T13:00:00-03:00"),
+            mock.patch.object(
+                agents_new,
+                "get_session_id",
+                return_value="260224_1300_execution-integrity-hardening",
+            ),
+            mock.patch.object(
+                agents_new, "get_timestamp", return_value="2026-02-24T13:00:00-03:00"
+            ),
             mock.patch.object(agents_new, "_create_workstream") as create_workstream_mock,
             mock.patch.object(agents_new, "create_session_folder") as create_session_folder_mock,
         ):
@@ -88,13 +115,60 @@ class AgentsNewQuickModeTests(unittest.TestCase):
                 mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True),
                 mock.patch.object(agents_new, "ROADMAP_FILE", roadmap_file),
                 mock.patch.object(agents_new, "_roadmap_has_feature", return_value=True),
-                mock.patch.object(agents_new, "_normalize_spec_reference", side_effect=["parent-spec", "child-spec"]),
+                mock.patch.object(
+                    agents_new,
+                    "_normalize_spec_reference",
+                    side_effect=["parent-spec", "child-spec"],
+                ),
             ):
                 agents_new._validate_governance_requirements(args)
 
         self.assertEqual(args["feature_id"], "F-07")
         self.assertEqual(args["parent_spec"], "parent-spec")
         self.assertEqual(args["child_spec"], "child-spec")
+
+    def test_validate_governance_requirements_rejects_child_spec_link_with_spec_artifact(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_child_spec_conflict_test", script_path)
+
+        args = {
+            "quick_mode": False,
+            "feature_id": "F-07",
+            "parent_spec": "parent-raw",
+            "child_spec": "child-raw",
+            "use_spec_child": True,
+            "use_spec_lite": False,
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            roadmap_file = Path(td) / "GENERAL-ROADMAP.md"
+            roadmap_file.write_text("### F-07 Governance Fixture\n")
+            with (
+                mock.patch.object(agents_new, "GOVERNANCE_REQUIRED", True),
+                mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True),
+                mock.patch.object(agents_new, "ROADMAP_FILE", roadmap_file),
+                mock.patch.object(agents_new, "_roadmap_has_feature", return_value=True),
+                mock.patch.object(
+                    agents_new, "_normalize_spec_reference", side_effect=["parent-spec"]
+                ),
+            ):
+                with self.assertRaises(SystemExit):
+                    agents_new._validate_governance_requirements(args)
+
+    def test_next_available_session_id_adds_suffix_on_collision(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_session_collision_test", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            wb_dir = Path(td) / ".agents" / "wb"
+            (wb_dir / "260509_2100_runtime-policy").mkdir(parents=True)
+            (wb_dir / "260509_2100_runtime-policy_02").mkdir()
+            with mock.patch.object(agents_new, "WB_DIR", wb_dir):
+                actual = agents_new.next_available_session_id("260509_2100_runtime-policy")
+
+        self.assertEqual(actual, "260509_2100_runtime-policy_03")
 
     def test_validate_governance_requirements_skips_standard_checks_in_quick_mode(self):
         script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
@@ -110,6 +184,41 @@ class AgentsNewQuickModeTests(unittest.TestCase):
 
         with mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True):
             agents_new._validate_governance_requirements(args)
+
+    def test_resolve_existing_session_rejects_paths_outside_workbench(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_into_session_scope_test", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            wb_dir = root / ".agents" / "wb"
+            allowed = wb_dir / "260101_0100_allowed"
+            outside = root / "tmp-session"
+            allowed.mkdir(parents=True)
+            outside.mkdir()
+
+            agents_new.ROOT_DIR = root
+            agents_new.WB_DIR = wb_dir
+            agents_new.CANONICAL_WB_DIR = wb_dir
+
+            self.assertEqual(agents_new.resolve_existing_session(str(allowed)), allowed)
+            with self.assertRaises(ValueError):
+                agents_new.resolve_existing_session(str(outside))
+
+    def test_create_session_folder_rejects_configured_workbench_outside_canonical_root(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_create_scope_test", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            agents_new.ROOT_DIR = root
+            agents_new.WB_DIR = root / "app" / "workbench"
+            agents_new.CANONICAL_WB_DIR = root / ".agents" / "wb"
+
+            with self.assertRaises(ValueError):
+                agents_new.create_session_folder("260101_0100_wrong-root")
 
     def test_get_timestamp_uses_configured_offset(self):
         script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
@@ -169,6 +278,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
 
             agents_new.ROOT_DIR = root
             agents_new.WB_DIR = wb_dir
+            agents_new.CANONICAL_WB_DIR = wb_dir
 
             task_id, task_path, log_path = agents_new.add_quick_task_to_active_session(
                 active_session=session_id,
@@ -240,7 +350,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["doc_type"] for entry in planning_default],
-            ["brainstorm", "explorer-check", "plan"],
+            ["plan", "task"],
         )
 
         planning_plan_only = agents_new._iter_workstream_artifacts(
@@ -276,7 +386,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["doc_type"] for entry in delivery_with_spec],
-            ["task", "spec"],
+            ["plan", "task", "spec"],
         )
 
         research_only = agents_new._iter_workstream_artifacts(
@@ -321,7 +431,14 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_spec_alias_parse_test", script_path)
 
-        argv = ["agents-new.py", "workflow-hardening", "--spec-lite", "--spec-test", "--with", "spec_lite"]
+        argv = [
+            "agents-new.py",
+            "workflow-hardening",
+            "--spec-lite",
+            "--spec-test",
+            "--with",
+            "spec_lite",
+        ]
         with mock.patch.object(sys, "argv", argv):
             parsed = agents_new._parse_args()
 
