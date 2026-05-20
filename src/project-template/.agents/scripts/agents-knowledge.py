@@ -5,18 +5,12 @@ from __future__ import annotations
 
 import argparse
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List
 
-try:
-    import yaml
-except ImportError as exc:
-    print(f"❌ Missing dependency: {exc}")
-    sys.exit(1)
-
 from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
+from lib.markdown_docs import split_markdown_frontmatter as split_frontmatter
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
@@ -28,7 +22,16 @@ DOC_TYPES = {"research", "brainstorm", "explorer-check", "postmortem", "report"}
 
 
 class KnowledgeDoc:
-    def __init__(self, path: Path, doc_type: str, doc_id: str, theme: str, status: str, title: str, summary: str):
+    def __init__(
+        self,
+        path: Path,
+        doc_type: str,
+        doc_id: str,
+        theme: str,
+        status: str,
+        title: str,
+        summary: str,
+    ):
         self.path = path
         self.doc_type = doc_type
         self.doc_id = doc_id
@@ -42,18 +45,6 @@ class MatchSnippet:
     def __init__(self, line_no: int, text: str):
         self.line_no = line_no
         self.text = text
-
-
-def split_frontmatter(content: str) -> tuple[dict, str] | None:
-    if not content.startswith("---\n"):
-        return None
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        return None
-    loaded = yaml.safe_load(parts[1].strip()) or {}
-    if not isinstance(loaded, dict):
-        return None
-    return loaded, parts[2].lstrip("\n")
 
 
 def iter_knowledge_docs() -> Iterable[KnowledgeDoc]:
@@ -140,7 +131,9 @@ def cmd_search(args: argparse.Namespace) -> int:
     query = args.query.lower()
     docs: List[tuple[int, KnowledgeDoc]] = []
     for doc in iter_knowledge_docs():
-        haystack = " ".join([doc.doc_id, doc.doc_type, doc.theme, doc.title, doc.summary, relative(doc.path)]).lower()
+        haystack = " ".join(
+            [doc.doc_id, doc.doc_type, doc.theme, doc.title, doc.summary, relative(doc.path)]
+        ).lower()
         score = haystack.count(query)
         if score > 0:
             docs.append((score, doc))
@@ -162,7 +155,9 @@ def cmd_pull(args: argparse.Namespace) -> int:
     query = args.query.lower()
     docs: List[tuple[int, KnowledgeDoc, List[MatchSnippet]]] = []
     for doc in iter_knowledge_docs():
-        haystack = " ".join([doc.doc_id, doc.doc_type, doc.theme, doc.title, doc.summary, relative(doc.path)]).lower()
+        haystack = " ".join(
+            [doc.doc_id, doc.doc_type, doc.theme, doc.title, doc.summary, relative(doc.path)]
+        ).lower()
         score = haystack.count(query)
         snippets = extract_matching_snippets(doc.path, args.query, limit=args.snippets)
         score += len(snippets) * 2
@@ -184,7 +179,9 @@ def cmd_pull(args: argparse.Namespace) -> int:
         if snippets:
             for snippet in snippets:
                 print(f"  snippet L{snippet.line_no}: {snippet.text}")
-        print(f"  reuse: open with '.agents/agents knowledge show {doc.doc_id}' if deeper context is needed")
+        print(
+            f"  reuse: open with '.agents/agents knowledge show {doc.doc_id}' if deeper context is needed"
+        )
     return 0
 
 
@@ -225,7 +222,7 @@ def cmd_index(args: argparse.Namespace) -> int:
 
     lines = [
         "---",
-        'doc_type: index',
+        "doc_type: index",
         'id: "knowledge_index"',
         "status: active",
         f'created_at: "{timestamp}"',

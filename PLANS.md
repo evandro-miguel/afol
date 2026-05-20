@@ -22,12 +22,21 @@ Do not use an ExecPlan as a replacement for roadmap or parent spec governance. I
 - parent spec defines feature philosophy and acceptance
 - workbench ExecPlan defines the concrete execution path for a session
 
+An ExecPlan is not a container for pre-planning, generic discovery, broad
+research, or "create the real plan" tasks. Do needed discovery before writing or
+revising the plan, then fold findings into facts, assumptions, risks, scope,
+sequencing, and validation. Create a research, brainstorm, or explorer-check
+artifact only when it is the requested deliverable or the smallest blocking
+proof before safe execution.
+
 ## Non-negotiable requirements
 
 - Every ExecPlan must be self-contained enough for a novice contributor to continue the work from the plan and the repository alone.
 - Every ExecPlan is a living document. Update it as progress happens, discoveries appear, or design decisions change.
 - Every ExecPlan must explain user-visible or operator-visible outcomes, not just code edits.
 - Every ExecPlan must name the relevant files, modules, commands, and expected observations explicitly.
+- Every ExecPlan must keep phases tied to concrete implementation, change,
+  decision, artifact, or validation outcomes for the requested work.
 - Every finalized ExecPlan must maintain the sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective`.
 
 ## Required structure in this scaffold
@@ -65,7 +74,7 @@ The canonical template is `docs/templates/plan.md`. It must include, at minimum:
 Before a session is considered complete:
 
 - the ExecPlan must reflect the actual path taken
-- the final report and postmortem must agree with the plan outcome
+- the final report and any optional artifact that exists must agree with the plan outcome
 - strict verification must pass for the session
 
 This file is the canonical ExecPlan contract for this repository.

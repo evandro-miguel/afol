@@ -3,7 +3,7 @@ doc_type: standard
 id: skills-sync-standard
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-13T19:37:03-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Skills Sync Standard
@@ -22,6 +22,45 @@ Standardize how project repositories consume relevant skills from a repo-local o
 - When a repo-local source is only a bootstrap seed, Git-backed refresh and upstream proposal work must use an external universal-skills checkout configured with `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`
 - Treat the current manifest as the scaffold-side adapter over the richer universal-skills repo/ref/profile contract
 - Prefer project-local skills under `.agents/skills/`; keep global Codex skills minimal and avoid using them as the primary project skill surface
+- Treat skill and profile identifiers as single path components, not paths.
+  Reject empty values, absolute paths, path separators, NUL bytes, `.`, and
+  `..` before resolving source or destination paths.
+- Before copy/link/delete operations, verify the resolved source remains under
+  the configured universal-skills `skills/` root and the resolved destination
+  remains under `.agents/skills/`.
+
+## Classification Model
+
+Skills sync must distinguish these cases:
+
+- `source-drift` - the selected universal-skills source/ref/profile changed
+- `stale-manifest-entry` - the local manifest still requests a skill that is no
+  longer required for the selected source/profile
+- `local-extra` - the repo intentionally keeps a project-specific skill outside
+  the universal source contract
+- `install-update` - the requested skill is part of the active selection and
+  should be refreshed in `.agents/skills/`
+- `proposal-update` - the skill should be proposed back to the external
+  universal-skills checkout through the branch/PR flow
+
+The default check should report stale entries and local extras separately from
+real source drift. That keeps existing repos from treating intentional local
+customization as a universal-source failure.
+
+## Feature-Driven Skill Propagation
+
+Every feature addition or meaningful feature behavior change must keep the
+agent-facing skill surface current:
+
+- Update affected project-local skills under `.agents/skills/` as part of the
+  feature work.
+- Update README, standards, specs, command references, and runtime mirrors when
+  their guidance changes.
+- Record a visible pending item in the roadmap, spec, workbench task, plan, or
+  report to propose the same skill change back to the external universal-skills
+  checkout.
+- Use only the branch/PR proposal flow for upstream propagation. Do not push
+  directly to universal `main`.
 
 ## Configuration
 
@@ -54,6 +93,13 @@ just skills-init
 ```bash
 just skills-pull
 ```
+
+`skills-pull` is the explicit network refresh command.
+`skills-sync` and `skills-update` are local-only by default and will not call `git fetch/checkout/pull` unless `--pull` is passed.
+
+If a selected skill name comes from CLI input, a local manifest, or an
+upstream profile, validation must complete for the full selection before any
+destination is removed or copied.
 
 If only the repo-local bootstrap seed exists, `just skills-pull` is a no-op. It never creates a git checkout under `.agents/cache/`.
 
@@ -90,8 +136,20 @@ just skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
 just skills-sync SKILLS=agentic-folder-sys
 just skills-update SKILLS=agentic-folder-sys
 ```
+Without `--pull`, these commands use the current local source only.
+Use `--pull` when you want to refresh the external source before syncing.
 
-8. Propose one locally edited skill back to universal-skills only through a branch:
+8. Record source provenance in manifest:
+
+`skills-sync` and `skills-pull` record source metadata in `.agents/skills-sync.manifest.json` under `source`.
+Observed fields are:
+- `path`: seed path (relative when inside the repo, absolute otherwise)
+- `source_type`: `git` or `local`
+- `ref`: branch/ref intended for sync
+- `branch`: resolved git branch when available
+- `commit`: resolved git commit when available
+
+9. Propose one locally edited skill back to universal-skills only through a branch:
 
 ```bash
 just skills-push SKILL=agentic-folder-sys BRANCH=skills-sync/agentic-folder-sys COMMIT=1 PUSH=1 PR=1
@@ -99,7 +157,7 @@ just skills-push SKILL=agentic-folder-sys BRANCH=skills-sync/agentic-folder-sys 
 
 This command must never push to `main` directly. It requires an external universal-skills checkout and pushes only a proposal branch; use `PR=1` when the change should be opened as a GitHub pull request.
 
-9. Verify sync and structure:
+10. Verify sync and structure:
 
 ```bash
 just skills-check SKILLS=agentic-folder-sys

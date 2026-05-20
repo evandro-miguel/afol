@@ -46,5 +46,5 @@ And explicitly confirm in report:
 
 For `wb-update task --mark-done`:
 
-- Evidence ID is required by default
-- Unsafe bypass (`--allow-unsafe-done`) must be exceptional and auditable
+- Evidence ID from task-scoped closure evidence is required.
+- Unsafe bypass is not supported.

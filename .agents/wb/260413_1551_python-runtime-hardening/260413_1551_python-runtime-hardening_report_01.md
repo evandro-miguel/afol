@@ -2,11 +2,11 @@
 doc_type: report
 id: 260413_1551_python-runtime-hardening_report_01
 theme: python-runtime-hardening
-status: done
+status: final
 owners:
 - orchestrator
 created_at: 2026-04-13 18:27:01-03:00
-updated_at: '2026-04-13T18:28:54-03:00'
+updated_at: '2026-04-21T20:52:19-03:00'
 roadmap_feature: F-16
 parent_spec: 260413_1250_project-template-source-separation_spec_01
 links:

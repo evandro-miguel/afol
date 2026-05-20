@@ -425,10 +425,7 @@ def _print_validate_errors(errors: List[str], warnings: List[str]) -> None:
 
 
 def _validate_tool_entries(
-    tools: List[Dict[str, Any]],
-    ids: List[str],
-    type_set: Set[str],
-    errors: List[str]
+    tools: List[Dict[str, Any]], ids: List[str], type_set: Set[str], errors: List[str]
 ) -> None:
     """Validate individual tool entries."""
     for idx, tool in enumerate(tools):
@@ -453,10 +450,7 @@ def _validate_tool_entries(
 
 
 def _validate_categories(
-    categories: Any,
-    type_set: Set[str],
-    id_set: Set[str],
-    errors: List[str]
+    categories: Any, type_set: Set[str], id_set: Set[str], errors: List[str]
 ) -> None:
     """Validate tool_categories structure and references."""
     if not isinstance(categories, dict):
@@ -487,10 +481,7 @@ def _validate_categories(
 
 
 def _validate_execution_modes(
-    execution_modes: Any,
-    ids: List[str],
-    errors: List[str],
-    warnings: List[str]
+    execution_modes: Any, ids: List[str], errors: List[str], warnings: List[str]
 ) -> None:
     """Validate execution_modes structure."""
     if execution_modes and not isinstance(execution_modes, dict):

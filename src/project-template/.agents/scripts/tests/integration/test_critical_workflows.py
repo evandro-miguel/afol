@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -16,9 +17,42 @@ SESSION_ID = "260402_0000_integration"
 pytestmark = pytest.mark.integration
 
 
+def _copytree_ignore_runtime_state(src: str, names: list[str]) -> set[str]:
+    """Exclude generated runtime/state folders from isolated repo copies."""
+    rel_src = Path(src).resolve().relative_to(ROOT_DIR)
+    ignored = {
+        name
+        for name in names
+        if name
+        in {
+            ".git",
+            ".coverage",
+            ".pytest_cache",
+            ".worktrees",
+            "__pycache__",
+            "build",
+            "dist",
+            "node_modules",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".venv",
+        }
+    }
+
+    if rel_src == Path(".agents"):
+        ignored.update({"cache", "wb", "z-arq", "tmp"})
+    elif rel_src == Path("docs"):
+        ignored.add("map")
+
+    return ignored
+
+
 def isolated_env(repo_root: Path) -> dict[str, str]:
     env = os.environ.copy()
     env["AGENTS_ACTIVE_SESSION_FILE"] = str(repo_root / ".agents" / "wb" / ".active_session")
+    env["AGENTS_SCRIPT_PYTHON"] = str(
+        ROOT_DIR / ".agents" / "scripts" / ".venv" / "bin" / "python3"
+    )
     env["AGENTS_UV_CACHE_DIR"] = str(repo_root / ".agents" / "cache" / "uv")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PATH"] = f"{ROOT_DIR / '.agents' / 'scripts' / '.venv' / 'bin'}:{env.get('PATH', '')}"
@@ -41,26 +75,18 @@ def build_isolated_repo(tmp_root: Path) -> Path:
     shutil.copytree(
         ROOT_DIR,
         repo_root,
-        ignore=shutil.ignore_patterns(
-            ".git",
-            ".coverage",
-            ".pytest_cache",
-            "__pycache__",
-            ".mypy_cache",
-            ".ruff_cache",
-            ".venv",
-            ".agents/cache",
-            ".agents/wb",
-            ".agents/z-arq",
-            ".agents/tmp",
-            "docs/map",
-            "docs/map/structure",
-        ),
+        ignore=_copytree_ignore_runtime_state,
     )
+
+    (repo_root / "docs" / "map" / "structure").mkdir(parents=True, exist_ok=True)
+    (repo_root / ".agents" / "z-arq").mkdir(parents=True, exist_ok=True)
+    (repo_root / ".agents" / "tmp").mkdir(parents=True, exist_ok=True)
 
     session_dir = repo_root / ".agents" / "wb" / SESSION_ID
     session_dir.mkdir(parents=True, exist_ok=True)
-    (repo_root / ".agents" / "wb" / ".active_session").write_text(f"{SESSION_ID}\n", encoding="utf-8")
+    (repo_root / ".agents" / "wb" / ".active_session").write_text(
+        f"{SESSION_ID}\n", encoding="utf-8"
+    )
     (session_dir / f"{SESSION_ID}_plan_01.md").write_text(
         "---\n"
         "doc_type: plan\n"
@@ -124,6 +150,17 @@ def build_isolated_repo(tmp_root: Path) -> Path:
     return repo_root
 
 
+def first_available_feature_and_spec(repo_root: Path) -> tuple[str, str]:
+    roadmap = (repo_root / "docs" / "arc" / "GENERAL-ROADMAP.md").read_text(encoding="utf-8")
+    specs_dir = repo_root / "docs" / "arc" / "SPECS"
+    for spec_file in sorted(specs_dir.glob("*_spec_*.md")):
+        content = spec_file.read_text(encoding="utf-8")
+        match = re.search(r"^roadmap_feature:\s*['\"]?(F-[0-9]+)['\"]?", content, re.MULTILINE)
+        if match and match.group(1) in roadmap:
+            return match.group(1), spec_file.stem
+    raise AssertionError("Expected at least one spec linked to a roadmap feature")
+
+
 @pytest.fixture
 def isolated_repo() -> Path:
     with tempfile.TemporaryDirectory() as td:
@@ -138,17 +175,18 @@ def test_new_quick_workflow(isolated_repo: Path):
     assert "✓ Added task:" in result.stdout
 
 
-def test_new_planning_workflow_creates_brainstorm_and_explorer_check(isolated_repo: Path):
-    """`--intent planning` should materialize the governed planning artifact bundle."""
+def test_new_planning_workflow_creates_minimum_plan_and_task(isolated_repo: Path):
+    """`--intent planning` should materialize the minimum mandatory artifact set."""
+    feature_id, parent_spec = first_available_feature_and_spec(isolated_repo)
     result = run_command(
         isolated_repo,
         [
             "new",
             "integration-planning-track",
             "--feature-id",
-            "F-10",
+            feature_id,
             "--parent-spec",
-            "260323_1704_universal-skills-runtime-integration_spec_01",
+            parent_spec,
             "--intent",
             "planning",
         ],
@@ -161,9 +199,8 @@ def test_new_planning_workflow_creates_brainstorm_and_explorer_check(isolated_re
     session_dir = session_dirs[-1]
     session_id = session_dir.name
 
-    assert (session_dir / f"{session_id}_brainstorm_01.md").exists()
-    assert (session_dir / f"{session_id}_explorer-check_01.md").exists()
     assert (session_dir / f"{session_id}_plan_01.md").exists()
+    assert (session_dir / f"{session_id}_task_01.md").exists()
 
 
 def test_wb_update_task_workflow(isolated_repo: Path):
@@ -201,13 +238,24 @@ def test_tools_workflow(isolated_repo: Path):
     assert "✅ Catalog is valid" in validate_result.stdout
 
 
+def test_repo_map_dry_run_workflow(isolated_repo: Path):
+    """`.agents/agents repo-map . --dry-run` should preview without shadow-copying."""
+    result = run_command(isolated_repo, ["repo-map", ".", "--dry-run"])
+
+    assert result.returncode == 0, result.stderr
+    assert "Analysis shadow repo: <dry-run skipped>" in result.stdout
+    assert str(isolated_repo / "docs" / "map") in result.stdout
+
+
 def test_session_catchup_temp_repo_scenarios():
     """`agents-session.py catchup` should behave coherently across isolated repo scenarios."""
     with tempfile.TemporaryDirectory() as td:
         temp_root = Path(td) / "repo"
         temp_root.mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "codex@example.com"], cwd=temp_root, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "codex@example.com"], cwd=temp_root, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Codex"], cwd=temp_root, check=True)
 
         for rel in [
@@ -243,16 +291,18 @@ def test_session_catchup_temp_repo_scenarios():
             "  specs_dir: docs/arc/SPECS\n"
             "  decisions_dir: docs/arc/DECISIONS\n"
             "time:\n"
-            "  default_offset: \"+00:00\"\n"
-            "  wb_offset: \"-03:00\"\n"
+            '  default_offset: "+00:00"\n'
+            '  wb_offset: "-03:00"\n'
             "workflow:\n"
-            "  feature_id_pattern: \"^F-[0-9]{2,3}$\"\n",
+            '  feature_id_pattern: "^F-[0-9]{2,3}$"\n',
             encoding="utf-8",
         )
         (temp_root / "docs/standards/workflow.md").write_text("# workflow\n", encoding="utf-8")
         (temp_root / "docs/knowledge/INDEX.md").write_text("# knowledge\n", encoding="utf-8")
         (temp_root / "docs/arc/PROJECT-BRIEF.md").write_text("# brief\n", encoding="utf-8")
-        (temp_root / "docs/arc/ENGINEERING-GUIDELINES.md").write_text("# guidelines\n", encoding="utf-8")
+        (temp_root / "docs/arc/ENGINEERING-GUIDELINES.md").write_text(
+            "# guidelines\n", encoding="utf-8"
+        )
         (temp_root / "docs/arc/TECH-STACK.md").write_text("# stack\n", encoding="utf-8")
         (temp_root / "docs/arc/GENERAL-ROADMAP.md").write_text("# roadmap\n", encoding="utf-8")
 
@@ -333,10 +383,14 @@ def test_session_catchup_temp_repo_scenarios():
             with_report=False,
             with_research=False,
         )
-        missing_research = write_session("260307_2302_missing-research", with_research=False, research_link=True)
+        missing_research = write_session(
+            "260307_2302_missing-research", with_research=False, research_link=True
+        )
 
         subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "baseline"], cwd=temp_root, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "baseline"], cwd=temp_root, check=True, capture_output=True
+        )
         script = temp_root / ".agents/scripts/agents-session.py"
         env = os.environ.copy()
         env["PYTHONPATH"] = str(temp_root / ".agents/scripts")
@@ -344,7 +398,14 @@ def test_session_catchup_temp_repo_scenarios():
 
         def run_catchup(session: Path):
             proc = subprocess.run(
-                [str(ROOT_DIR / ".agents/scripts/.venv/bin/python"), str(script), "catchup", "--session", str(session), "--json"],
+                [
+                    str(ROOT_DIR / ".agents/scripts/.venv/bin/python"),
+                    str(script),
+                    "catchup",
+                    "--session",
+                    str(session),
+                    "--json",
+                ],
                 cwd=temp_root,
                 env=env,
                 capture_output=True,
@@ -364,10 +425,16 @@ def test_session_catchup_temp_repo_scenarios():
 
         missing_research_payload = run_catchup(missing_research)
         assert missing_research_payload["catchup_required"] is True
-        assert any("research artifact" in warning.lower() for warning in missing_research_payload["warnings"])
+        assert any(
+            "research artifact" in warning.lower()
+            for warning in missing_research_payload["warnings"]
+        )
 
         (temp_root / "outside-change.txt").write_text("drift\n", encoding="utf-8")
         drift_payload = run_catchup(clean)
         assert drift_payload["catchup_required"] is True
         assert drift_payload["git"]["repo_changed"] >= 1
-        assert any("repo has changes outside the session" in warning.lower() for warning in drift_payload["warnings"])
+        assert any(
+            "repo has changes outside the session" in warning.lower()
+            for warning in drift_payload["warnings"]
+        )

@@ -36,12 +36,15 @@ import json
 import os
 import sys
 import uuid
+import hashlib
+import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import argparse
 
 from lib.agents_config import now_iso_with_offset
+from lib.cli_output import to_json_text
 
 
 # Configuration
@@ -64,17 +67,28 @@ TELEMETRY_EVENTS_FILE = Path(
     )
 )
 ACTIVE_SESSION_FILE = Path(__file__).parent.parent / "wb" / ".active_session"
-ACTIVE_SESSION_FILE = Path(
-    os.environ.get("AGENTS_ACTIVE_SESSION_FILE", str(ACTIVE_SESSION_FILE))
-)
+ACTIVE_SESSION_FILE = Path(os.environ.get("AGENTS_ACTIVE_SESSION_FILE", str(ACTIVE_SESSION_FILE)))
 
 # Ensure data directory exists
 TELEMETRY_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+_EVENT_ID_COUNTER = 0
 
 
 def get_iso_timestamp() -> str:
     """Get current timestamp in ISO 8601 format with timezone."""
     return now_iso_with_offset("Z")
+
+
+def get_event_id() -> str:
+    """Return a unique event id without requiring sandbox randomness."""
+    global _EVENT_ID_COUNTER
+    try:
+        return str(uuid.uuid4())
+    except (NotImplementedError, OSError, PermissionError):
+        _EVENT_ID_COUNTER += 1
+        seed = f"{os.getpid()}:{time.monotonic_ns()}:{_EVENT_ID_COUNTER}"
+        return hashlib.sha256(seed.encode("utf-8")).hexdigest()
 
 
 def load_schema() -> Dict[str, Any]:
@@ -97,10 +111,18 @@ def validate_event(event: Dict[str, Any]) -> bool:
             return False
 
     valid_event_types = [
-        "session_start", "session_end", "tool_exec",
-        "task_complete", "task_status_change", "blocker",
-        "error", "pattern_applied", "file_changed",
-        "element_access", "element_view", "element_apply"
+        "session_start",
+        "session_end",
+        "tool_exec",
+        "task_complete",
+        "task_status_change",
+        "blocker",
+        "error",
+        "pattern_applied",
+        "file_changed",
+        "element_access",
+        "element_view",
+        "element_apply",
     ]
     if event["event_type"] not in valid_event_types:
         print(f"Error: Invalid event_type: {event['event_type']}", file=sys.stderr)
@@ -121,7 +143,7 @@ def record_event(
     event_type: str,
     session_id: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
-    context: Optional[Dict[str, Any]] = None
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Record a telemetry event to the events file."""
 
@@ -135,9 +157,9 @@ def record_event(
         "timestamp": get_iso_timestamp(),
         "event_type": event_type,
         "session_id": session_id,
-        "event_id": str(uuid.uuid4()),
+        "event_id": get_event_id(),
         "metadata": metadata or {},
-        "context": context or {}
+        "context": context or {},
     }
 
     if not validate_event(event):
@@ -155,7 +177,7 @@ def load_events(
     since: Optional[str] = None,
     until: Optional[str] = None,
     event_type: Optional[str] = None,
-    session_id: Optional[str] = None
+    session_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Load telemetry events with optional filters."""
     if not TELEMETRY_EVENTS_FILE.exists():
@@ -196,19 +218,16 @@ def query_events(
     until: Optional[str] = None,
     event_type: Optional[str] = None,
     session_id: Optional[str] = None,
-    output_format: str = "text"
+    output_format: str = "text",
+    pretty_json: bool = False,
 ) -> None:
     """Query and display telemetry events."""
     events = load_events(
-        limit=limit,
-        since=since,
-        until=until,
-        event_type=event_type,
-        session_id=session_id
+        limit=limit, since=since, until=until, event_type=event_type, session_id=session_id
     )
 
     if output_format == "json":
-        print(json.dumps(events, indent=2))
+        print(to_json_text(events, pretty=pretty_json, sort_keys=False))
     elif output_format == "csv":
         if events:
             # CSV header
@@ -219,7 +238,7 @@ def query_events(
                     event.get("timestamp", ""),
                     event.get("event_type", ""),
                     event.get("session_id", ""),
-                    event.get("event_id", "")
+                    event.get("event_id", ""),
                 ]
                 print(",".join(row))
     else:
@@ -228,7 +247,7 @@ def query_events(
             print("No events found.")
             return
 
-        print(f"Found {len(events)} events:\n")
+        print(f"events: {len(events)}")
         for event in events:
             ts = event.get("timestamp", "unknown")[:19]
             etype = event.get("event_type", "unknown")
@@ -242,10 +261,7 @@ def query_events(
                     print(f"    {key}: {value}")
 
 
-def export_events(
-    output_path: Optional[str] = None,
-    output_format: str = "json"
-) -> None:
+def export_events(output_path: Optional[str] = None, output_format: str = "json") -> None:
     """Export all telemetry events to a file."""
     events = load_events(limit=10000)  # Large limit for export
 
@@ -267,7 +283,7 @@ def export_events(
                         event.get("timestamp", ""),
                         event.get("event_type", ""),
                         event.get("session_id", ""),
-                        event.get("event_id", "")
+                        event.get("event_id", ""),
                     ]
                     f.write(",".join(row) + "\n")
 
@@ -277,6 +293,7 @@ def export_events(
 def _calculate_date_range(period: str) -> Optional[str]:
     """Calculate date range for telemetry query."""
     from datetime import timedelta
+
     now = datetime.now(timezone.utc)
     if period == "weekly":
         return (now - timedelta(days=7)).isoformat().replace("+00:00", "Z")
@@ -362,7 +379,7 @@ def generate_report(period: str = "weekly") -> Dict[str, Any]:
             "total_events": total_events,
             "total_sessions": len(sessions),
             "avg_session_duration_seconds": avg_duration,
-            "success_rate": outcomes["success"] / max(1, sum(outcomes.values()))
+            "success_rate": outcomes["success"] / max(1, sum(outcomes.values())),
         },
         "event_breakdown": event_counts,
         "tool_usage": tool_usage,
@@ -370,9 +387,8 @@ def generate_report(period: str = "weekly") -> Dict[str, Any]:
         "blockers_count": len(blockers),
         "errors_count": len(errors),
         "top_blockers": [
-            e.get("metadata", {}).get("blocker_reason", "unknown")
-            for e in blockers[:5]
-        ]
+            e.get("metadata", {}).get("blocker_reason", "unknown") for e in blockers[:5]
+        ],
     }
 
     return report
@@ -380,50 +396,32 @@ def generate_report(period: str = "weekly") -> Dict[str, Any]:
 
 def print_report(report: Dict[str, Any]) -> None:
     """Print formatted telemetry report."""
-    print("\n" + "=" * 60)
-    print("TELEMETRY REPORT")
-    print("=" * 60)
-    print(f"Period: {report['period']}")
-    print(f"Generated: {report['generated_at']}")
-    print()
-
-    print("SUMMARY")
-    print("-" * 40)
     summary = report["summary"]
-    print(f"  Total Events: {summary['total_events']}")
-    print(f"  Total Sessions: {summary['total_sessions']}")
-    print(f"  Avg Session Duration: {summary['avg_session_duration_seconds']:.1f}s")
-    print(f"  Success Rate: {summary['success_rate']:.1%}")
-    print()
+    print(
+        "report: "
+        f"period={report['period']} generated_at={report['generated_at']} "
+        f"events={summary['total_events']} sessions={summary['total_sessions']} "
+        f"success_rate={summary['success_rate']:.1%}"
+    )
+    print(f"avg_session_duration_seconds: {summary['avg_session_duration_seconds']:.1f}")
 
-    print("EVENT BREAKDOWN")
-    print("-" * 40)
+    print("event_breakdown:")
     for etype, count in sorted(report["event_breakdown"].items(), key=lambda x: -x[1]):
         print(f"  {etype:25s} {count:5d}")
-    print()
 
-    print("TOOL USAGE")
-    print("-" * 40)
+    print("tool_usage_top:")
     for tool, count in sorted(report["tool_usage"].items(), key=lambda x: -x[1])[:10]:
         print(f"  {tool:25s} {count:5d}")
-    print()
 
-    print("OUTCOMES")
-    print("-" * 40)
+    print("outcomes:")
     for outcome, count in report["outcomes"].items():
         print(f"  {outcome:15s} {count:5d}")
-    print()
 
-    print("ISSUES")
-    print("-" * 40)
-    print(f"  Blockers: {report['blockers_count']}")
-    print(f"  Errors: {report['errors_count']}")
+    print(f"issues: blockers={report['blockers_count']} errors={report['errors_count']}")
     if report["top_blockers"]:
-        print("  Top Blockers:")
+        print("top_blockers:")
         for blocker in report["top_blockers"]:
-            print(f"    - {blocker}")
-    print()
-    print("=" * 60)
+            print(f"  - {blocker}")
 
 
 def validate_telemetry() -> bool:
@@ -463,7 +461,7 @@ def _get_period_delta(period: str) -> timedelta:
         return timedelta(weeks=1)
     elif period == "monthly":
         return timedelta(days=30)
-    return timedelta(days=365*10)  # ~10 years for "all"
+    return timedelta(days=365 * 10)  # ~10 years for "all"
 
 
 def _collect_element_stats(events: List[Dict], period_start: datetime) -> Dict[str, Dict]:
@@ -498,7 +496,9 @@ def _parse_timestamp(value: str) -> Optional[datetime]:
         return None
 
 
-def _extract_element_identity(event_type: Optional[str], metadata: Dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+def _extract_element_identity(
+    event_type: Optional[str], metadata: Dict[str, Any]
+) -> tuple[Optional[str], Optional[str]]:
     if event_type == "tool_exec":
         return metadata.get("tool_name"), "tool"
     if event_type == "pattern_applied":
@@ -558,14 +558,11 @@ def _calculate_element_heat_score(stats: Dict, max_access: int) -> Dict:
         "last_access_days_ago": stats["last_access_days_ago"],
         "success_count": stats["success_count"],
         "fail_count": stats["fail_count"],
-        "trend": "stable"
+        "trend": "stable",
     }
 
 
-def calculate_heat_scores(
-    period: str = "weekly",
-    compare_previous: bool = False
-) -> Dict[str, Any]:
+def calculate_heat_scores(period: str = "weekly", compare_previous: bool = False) -> Dict[str, Any]:
     """
     Calculate heat scores for elements within a specific time period.
 
@@ -590,7 +587,9 @@ def calculate_heat_scores(
     max_access = max(s["access_count"] for s in element_stats.values())
 
     # Calculate scores
-    scored_elements = [_calculate_element_heat_score(stats, max_access) for stats in element_stats.values()]
+    scored_elements = [
+        _calculate_element_heat_score(stats, max_access) for stats in element_stats.values()
+    ]
     scored_elements.sort(key=lambda x: -x["heat_score"])
 
     # Categorize by type
@@ -608,9 +607,13 @@ def calculate_heat_scores(
             "hot_count": len([e for e in scored_elements if e["heat_level"] == "hot"]),
             "warm_count": len([e for e in scored_elements if e["heat_level"] == "warm"]),
             "cold_count": len([e for e in scored_elements if e["heat_level"] == "cold"]),
-            "avg_heat_score": round(sum(e["heat_score"] for e in scored_elements) / len(scored_elements), 1) if scored_elements else 0,
-            "total_accesses": sum(e["access_count"] for e in scored_elements)
-        }
+            "avg_heat_score": round(
+                sum(e["heat_score"] for e in scored_elements) / len(scored_elements), 1
+            )
+            if scored_elements
+            else 0,
+            "total_accesses": sum(e["access_count"] for e in scored_elements),
+        },
     }
 
     return result
@@ -620,7 +623,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Agents Telemetry - Collect and query telemetry data",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
@@ -632,25 +635,54 @@ def _build_parser() -> argparse.ArgumentParser:
     record_parser.add_argument("--metadata", help="Metadata as JSON string")
     record_parser.add_argument("--context", help="Context as JSON string")
     record_parser.add_argument("--outcome", help="Event outcome")
+    record_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
 
     # Heat commands
     heat_parser = subparsers.add_parser("heat", help="Show heat map of all elements")
-    heat_parser.add_argument("--type", choices=["all", "tools", "patterns", "templates", "documents"], default="all")
+    heat_parser.add_argument(
+        "--type", choices=["all", "tools", "patterns", "templates", "documents"], default="all"
+    )
     heat_parser.add_argument("--format", choices=["text", "json"], default="text")
-    heat_parser.add_argument("--min-score", type=float, default=0, help="Minimum heat score to show")
-    heat_parser.add_argument("--period", choices=["daily", "weekly", "monthly", "all"], default="weekly", help="Time period for heat calculation")
+    heat_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
+    heat_parser.add_argument(
+        "--min-score", type=float, default=0, help="Minimum heat score to show"
+    )
+    heat_parser.add_argument(
+        "--period",
+        choices=["daily", "weekly", "monthly", "all"],
+        default="weekly",
+        help="Time period for heat calculation",
+    )
 
     hot_parser = subparsers.add_parser("hot", help="Show hottest (most accessed) elements")
     hot_parser.add_argument("--limit", type=int, default=10, help="Number of hot elements to show")
-    hot_parser.add_argument("--type", choices=["all", "tools", "patterns", "templates", "documents"], default="all")
+    hot_parser.add_argument(
+        "--type", choices=["all", "tools", "patterns", "templates", "documents"], default="all"
+    )
     hot_parser.add_argument("--format", choices=["text", "json"], default="text")
-    hot_parser.add_argument("--period", choices=["daily", "weekly", "monthly", "all"], default="weekly", help="Time period for heat calculation")
+    hot_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
+    hot_parser.add_argument(
+        "--period",
+        choices=["daily", "weekly", "monthly", "all"],
+        default="weekly",
+        help="Time period for heat calculation",
+    )
 
     cold_parser = subparsers.add_parser("cold", help="Show coldest (least accessed) elements")
-    cold_parser.add_argument("--limit", type=int, default=10, help="Number of cold elements to show")
-    cold_parser.add_argument("--type", choices=["all", "tools", "patterns", "templates", "documents"], default="all")
+    cold_parser.add_argument(
+        "--limit", type=int, default=10, help="Number of cold elements to show"
+    )
+    cold_parser.add_argument(
+        "--type", choices=["all", "tools", "patterns", "templates", "documents"], default="all"
+    )
     cold_parser.add_argument("--format", choices=["text", "json"], default="text")
-    cold_parser.add_argument("--period", choices=["daily", "weekly", "monthly", "all"], default="weekly", help="Time period for heat calculation")
+    cold_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
+    cold_parser.add_argument(
+        "--period",
+        choices=["daily", "weekly", "monthly", "all"],
+        default="weekly",
+        help="Time period for heat calculation",
+    )
 
     # Query command
     query_parser = subparsers.add_parser("query", help="Query telemetry events")
@@ -660,17 +692,25 @@ def _build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--until", help="Filter until date (ISO 8601)")
     query_parser.add_argument("--event-type", help="Filter by event type")
     query_parser.add_argument("--session-id", help="Filter by session ID")
-    query_parser.add_argument("--format", dest="output_format", choices=["text", "json", "csv"], default="text")
+    query_parser.add_argument(
+        "--format", dest="output_format", choices=["text", "json", "csv"], default="text"
+    )
+    query_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
 
     # Export command
     export_parser = subparsers.add_parser("export", help="Export telemetry data")
-    export_parser.add_argument("--format", dest="output_format", choices=["json", "csv"], default="json")
+    export_parser.add_argument(
+        "--format", dest="output_format", choices=["json", "csv"], default="json"
+    )
     export_parser.add_argument("--output", help="Output file path")
 
     # Report command
     report_parser = subparsers.add_parser("report", help="Generate telemetry report")
     report_parser.add_argument("--period", choices=["weekly", "monthly", "all"], default="weekly")
-    report_parser.add_argument("--format", dest="output_format", choices=["text", "json"], default="text")
+    report_parser.add_argument(
+        "--format", dest="output_format", choices=["text", "json"], default="text"
+    )
+    report_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
 
     # Validate command
     subparsers.add_parser("validate", help="Validate telemetry data")
@@ -727,7 +767,7 @@ def _handle_record(args: argparse.Namespace) -> None:
         context=context,
     )
     print(f"Recorded event: {event['event_id']}")
-    print(json.dumps(event, indent=2))
+    print(to_json_text(event, pretty=args.pretty, sort_keys=False))
 
 
 def _handle_query(args: argparse.Namespace) -> None:
@@ -739,6 +779,7 @@ def _handle_query(args: argparse.Namespace) -> None:
         event_type=args.event_type,
         session_id=args.session_id,
         output_format=args.output_format,
+        pretty_json=args.pretty,
     )
 
 
@@ -749,7 +790,7 @@ def _handle_export(args: argparse.Namespace) -> None:
 def _handle_report(args: argparse.Namespace) -> None:
     report = generate_report(period=args.period)
     if args.output_format == "json":
-        print(json.dumps(report, indent=2))
+        print(to_json_text(report, pretty=args.pretty, sort_keys=False))
     else:
         print_report(report)
 
@@ -770,17 +811,19 @@ def _handle_heat(args: argparse.Namespace) -> None:
         element_type=args.type,
         min_score=args.min_score,
         output_format=args.format,
+        pretty_json=args.pretty,
     )
 
 
 def _handle_hot(args: argparse.Namespace) -> None:
     heat_data = calculate_heat_scores(period=args.period)
     elements = _heat_elements(heat_data, args.type)
-    hot_elements = [e for e in elements if e["heat_level"] == "hot"][:args.limit]
+    hot_elements = [e for e in elements if e["heat_level"] == "hot"][: args.limit]
     print_heat_elements(
         hot_elements,
         title=f"🔥 HOT Elements (Last {args.period})",
         output_format=args.format,
+        pretty_json=args.pretty,
     )
 
 
@@ -790,18 +833,25 @@ def _handle_cold(args: argparse.Namespace) -> None:
     cold_elements = sorted(
         [e for e in elements if e["heat_level"] == "cold"],
         key=lambda x: x["heat_score"],
-    )[:args.limit]
+    )[: args.limit]
     print_heat_elements(
         cold_elements,
         title=f"🧊 COLD Elements (Last {args.period})",
         output_format=args.format,
+        pretty_json=args.pretty,
     )
 
 
-def print_heat_map(heat_data: Dict[str, Any], element_type: str = "all", min_score: float = 0, output_format: str = "text") -> None:
+def print_heat_map(
+    heat_data: Dict[str, Any],
+    element_type: str = "all",
+    min_score: float = 0,
+    output_format: str = "text",
+    pretty_json: bool = False,
+) -> None:
     """Print heat map of elements."""
     if output_format == "json":
-        print(json.dumps(heat_data, indent=2))
+        print(to_json_text(heat_data, pretty=pretty_json, sort_keys=False))
         return
 
     summary = heat_data.get("summary", {})
@@ -809,18 +859,13 @@ def print_heat_map(heat_data: Dict[str, Any], element_type: str = "all", min_sco
     period_start = heat_data.get("period_start", "unknown")[:10]
     period_end = heat_data.get("period_end", "unknown")[:10]
 
-    print("\n" + "=" * 70)
-    print(f"🔥 HEAT MAP - Element Usage & Engagement ({period})")
-    print("=" * 70)
-    print(f"Period: {period_start} → {period_end}")
-    print()
-    print(f"Total Elements: {summary.get('total_elements', 0)}")
-    print(f"Total Accesses: {summary.get('total_accesses', 0)}")
-    print(f"🔴 Hot (score >= 70): {summary.get('hot_count', 0)}")
-    print(f"🟡 Warm (score 40-69): {summary.get('warm_count', 0)}")
-    print(f"🔵 Cold (score < 40): {summary.get('cold_count', 0)}")
-    print(f"Avg Heat Score: {summary.get('avg_heat_score', 0)}")
-    print()
+    print(
+        "heat_map: "
+        f"period={period} range={period_start}->{period_end} "
+        f"elements={summary.get('total_elements', 0)} accesses={summary.get('total_accesses', 0)} "
+        f"hot={summary.get('hot_count', 0)} warm={summary.get('warm_count', 0)} cold={summary.get('cold_count', 0)} "
+        f"avg_score={summary.get('avg_heat_score', 0)}"
+    )
 
     # Print by category
     categories = ["tools", "patterns", "templates", "documents"]
@@ -832,50 +877,65 @@ def print_heat_map(heat_data: Dict[str, Any], element_type: str = "all", min_sco
         if not elements:
             continue
 
-        print(f"\n{category.upper()}")
-        print("-" * 70)
-        print(f"{'Element':25s} {'Score':>8s} {'Level':>8s} {'Access':>8s} {'Last':>8s} {'Success':>10s}")
-        print("-" * 70)
+        print(category.upper())
+        print(
+            f"{'Element':25s} {'Score':>8s} {'Level':>8s} {'Access':>8s} {'Last':>8s} {'Success':>10s}"
+        )
 
         for elem in elements:
             if elem["heat_score"] < min_score:
                 continue
 
-            icon = "🔴" if elem["heat_level"] == "hot" else "🟡" if elem["heat_level"] == "warm" else "🔵"
-            last_access = f"{elem['last_access_days_ago']}d ago" if elem['last_access_days_ago'] < 30 else f"{elem['last_access_days_ago']}d"
-            success_rate = f"{elem['success_count']}/{elem['access_count']} ({elem['success_score']:.0f}%)"
+            icon = (
+                "🔴"
+                if elem["heat_level"] == "hot"
+                else "🟡"
+                if elem["heat_level"] == "warm"
+                else "🔵"
+            )
+            last_access = (
+                f"{elem['last_access_days_ago']}d ago"
+                if elem["last_access_days_ago"] < 30
+                else f"{elem['last_access_days_ago']}d"
+            )
+            success_rate = (
+                f"{elem['success_count']}/{elem['access_count']} ({elem['success_score']:.0f}%)"
+            )
 
-            print(f"{icon} {elem['element_id']:23s} {elem['heat_score']:>8.1f} {elem['heat_level']:>8s} {elem['access_count']:>8d} {last_access:>8s} {success_rate:>10s}")
+            print(
+                f"{icon} {elem['element_id']:23s} {elem['heat_score']:>8.1f} {elem['heat_level']:>8s} {elem['access_count']:>8d} {last_access:>8s} {success_rate:>10s}"
+            )
 
-    print()
-    print("=" * 70)
 
-
-def print_heat_elements(elements: List[Dict[str, Any]], title: str = "Elements", output_format: str = "text") -> None:
+def print_heat_elements(
+    elements: List[Dict[str, Any]],
+    title: str = "Elements",
+    output_format: str = "text",
+    pretty_json: bool = False,
+) -> None:
     """Print list of heat-scored elements."""
     if output_format == "json":
-        print(json.dumps(elements, indent=2))
+        print(to_json_text(elements, pretty=pretty_json, sort_keys=False))
         return
 
     if not elements:
         print("No elements found matching criteria.")
         return
 
-    print("\n" + "=" * 70)
-    print(title)
-    print("=" * 70)
-    print()
-    print(f"{'Element':25s} {'Type':>12s} {'Score':>8s} {'Level':>8s} {'Access':>8s} {'Success':>10s}")
-    print("-" * 70)
+    print(f"{title} count={len(elements)}")
+    print(
+        f"{'Element':25s} {'Type':>12s} {'Score':>8s} {'Level':>8s} {'Access':>8s} {'Success':>10s}"
+    )
 
     for elem in elements:
-        icon = "🔴" if elem["heat_level"] == "hot" else "🟡" if elem["heat_level"] == "warm" else "🔵"
+        icon = (
+            "🔴" if elem["heat_level"] == "hot" else "🟡" if elem["heat_level"] == "warm" else "🔵"
+        )
         success_rate = f"{elem['success_count']}/{elem['access_count']}"
 
-        print(f"{icon} {elem['element_id']:23s} {elem['element_type']:>12s} {elem['heat_score']:>8.1f} {elem['heat_level']:>8s} {elem['access_count']:>8d} {success_rate:>10s}")
-
-    print()
-    print("=" * 70)
+        print(
+            f"{icon} {elem['element_id']:23s} {elem['element_type']:>12s} {elem['heat_score']:>8.1f} {elem['heat_level']:>8s} {elem['access_count']:>8d} {success_rate:>10s}"
+        )
 
 
 if __name__ == "__main__":

@@ -34,7 +34,9 @@ class AgentsConfigActiveSessionOverrideTests(unittest.TestCase):
             root = Path(td)
             config = {"paths": {"active_session_file": ".agents/wb/.active_session"}}
 
-            with mock.patch.dict(os.environ, {"AGENTS_ACTIVE_SESSION_FILE": "custom/.active_session"}):
+            with mock.patch.dict(
+                os.environ, {"AGENTS_ACTIVE_SESSION_FILE": "custom/.active_session"}
+            ):
                 resolved = agents_config.get_active_session_file_path(root, config)
 
             self.assertEqual(resolved, (root / "custom/.active_session").resolve())

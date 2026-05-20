@@ -54,13 +54,13 @@ def print_status(data: Dict[str, object]) -> None:
 
     tasks = data["tasks"]
     print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
-    if tasks['next']:
+    if tasks["next"]:
         print(f"next_task: {tasks['next']}")
     if data["workflow_next"]:
         print(f"next_artifact: {data['workflow_next']}")
-    if data['blocked_tasks']:
+    if data["blocked_tasks"]:
         print("blocked_tasks:")
-        for line in data['blocked_tasks']:
+        for line in data["blocked_tasks"]:
             print(f" - {line}")
     if data["workflow_artifacts"]:
         print("workflow_artifacts:")
@@ -71,7 +71,9 @@ def print_status(data: Dict[str, object]) -> None:
             utility_notes = ""
             if item["state"] == "invalid" and utility.get("reasons"):
                 utility_notes = f" reasons={'; '.join(utility['reasons'])}"
-            print(f" - {item['doc_type']}: {item['state']} (status={status}){blockers}{utility_notes}")
+            print(
+                f" - {item['doc_type']}: {item['state']} (status={status}){blockers}{utility_notes}"
+            )
 
     print(f"plan: {data['artifacts'].get('plan', '')}")
     print(f"task: {data['artifacts'].get('task', '')}")
@@ -96,11 +98,21 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
     task = resolve_artifact(session_path, "task")
 
     total, done, remaining, blocked_rows, rows = parse_state_summary(task)
-    ready_state = "idle"
-    if task and total and done == total:
-        ready_state = "complete"
-    elif total:
-        ready_state = "ready"
+    manifest_states = workflow_artifact_states(session_path)
+    optional_open_blockers = [
+        item
+        for item in manifest_states
+        if item.get("doc_type") in {"brainstorm", "research", "explorer-check", "postmortem"}
+        and item.get("exists")
+        and str(item.get("status") or "").strip().lower() != "final"
+    ]
+
+    ready_state = "blocked" if optional_open_blockers else "idle"
+    if ready_state != "blocked":
+        if task and total and done == total:
+            ready_state = "complete"
+        elif total:
+            ready_state = "ready"
 
     roadmap_feature = ""
     if task and task.exists():
@@ -110,7 +122,6 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
     context_ready, missing_context = context_readiness(session_path)
     if not check_context:
         missing_context = []
-    manifest_states = workflow_artifact_states(session_path)
     next_artifact = next_workflow_artifact(manifest_states)
 
     return {
@@ -153,11 +164,15 @@ def _format_next_artifact(item):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Show workstream status from canonical .agents artifacts")
+    parser = argparse.ArgumentParser(
+        description="Show workstream status from canonical .agents artifacts"
+    )
     parser.add_argument("--session", help="Session id/path (default: active session)")
     parser.add_argument("--json", action="store_true", help="Emit JSON payload")
     parser.add_argument("--artifact", action="append", help="Resolve a logical artifact name")
-    parser.add_argument("--check-context", action="store_true", help="Include missing context details")
+    parser.add_argument(
+        "--check-context", action="store_true", help="Include missing context details"
+    )
     return parser.parse_args()
 
 

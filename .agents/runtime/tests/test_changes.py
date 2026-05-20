@@ -1,9 +1,28 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from agentic_scaffold.runtime import AgenticRuntime
 from agentic_scaffold.services.changes import UnsafePathError
+from agentic_scaffold.services.journal import JournalStore
+
+
+def test_journal_change_id_falls_back_when_randomness_is_blocked(scaffold_repo: Path, monkeypatch):
+    import agentic_scaffold.services.journal as journal_module
+
+    def blocked_uuid4():
+        raise NotImplementedError("randomness blocked")
+
+    monkeypatch.setattr(journal_module, "uuid4", blocked_uuid4)
+
+    journal = JournalStore(scaffold_repo / ".agents" / "runtime-journal")
+    first = journal.next_change_id()
+    second = journal.next_change_id()
+
+    assert first.startswith("chg_")
+    assert second.startswith("chg_")
+    assert first != second
 
 
 def test_write_and_undo(scaffold_repo: Path):
@@ -21,7 +40,6 @@ def test_write_and_undo(scaffold_repo: Path):
     undo = runtime.undo_last_change()
     assert undo.ok is True
     assert not target.exists()
-
 
 
 def test_archive_and_undo(scaffold_repo: Path):
@@ -86,6 +104,76 @@ def test_write_rejects_paths_outside_repo(scaffold_repo: Path):
 
     assert not (scaffold_repo.parent / "repo-evil" / "pwn.md").exists()
 
+
+def test_undo_rejects_tampered_write_target_outside_repo(scaffold_repo: Path):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    target = scaffold_repo / "docs" / "agentic" / "new-note.md"
+
+    runtime.changes.write_text_file(
+        "docs/agentic/new-note.md", "# New note\n", reason="create note"
+    )
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    document["payload"]["target_path"] = "../outside/pwn.md"
+    change_file.write_text(json.dumps(document), encoding="utf-8")
+
+    try:
+        runtime.undo_last_change()
+    except ValueError as exc:
+        assert "outside the repository" in str(exc)
+    else:
+        raise AssertionError("undo accepted a tampered path outside the repository")
+
+    assert target.exists()
+    assert not (scaffold_repo.parent / "outside" / "pwn.md").exists()
+
+
+def test_undo_rejects_tampered_backup_path_outside_journal(scaffold_repo: Path):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    target = scaffold_repo / "docs" / "agentic" / "existing-note.md"
+    target.write_text("old\n", encoding="utf-8")
+
+    runtime.changes.write_text_file("docs/agentic/existing-note.md", "new\n", reason="update note")
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    document["payload"]["backup_path"] = "../outside-backup"
+    change_file.write_text(json.dumps(document), encoding="utf-8")
+
+    try:
+        runtime.undo_last_change()
+    except ValueError as exc:
+        assert "outside the runtime journal backups" in str(exc)
+    else:
+        raise AssertionError("undo accepted a tampered backup path outside the journal")
+
+    assert target.read_text(encoding="utf-8") == "new\n"
+
+
+def test_undo_rejects_tampered_archive_destination_outside_repo(scaffold_repo: Path):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    stale = scaffold_repo / "docs" / "map" / "old.md"
+    stale.write_text("old\n", encoding="utf-8")
+
+    runtime.changes.archive_paths(["docs/map/old.md"], slug="stale-docs", reason="cleanup")
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    document["payload"]["moves"][0]["original_path"] = "../outside/restored.md"
+    change_file.write_text(json.dumps(document), encoding="utf-8")
+
+    try:
+        runtime.undo_last_change()
+    except ValueError as exc:
+        assert "outside the repository" in str(exc)
+    else:
+        raise AssertionError("undo accepted a tampered archive destination outside the repository")
+
+    assert not (scaffold_repo.parent / "outside" / "restored.md").exists()
 
 
 def test_apply_unified_diff_and_undo(scaffold_repo: Path):

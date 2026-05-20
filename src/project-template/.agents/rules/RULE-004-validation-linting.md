@@ -4,202 +4,52 @@ theme: validation-linting
 version: 1.0
 created: 2026-02-23
 applies_to: All agents (QWEN, CLAUDE, GEMINI)
-updated_at: '2026-04-13T19:37:11-03:00'
+updated_at: '2026-05-14T20:05:00-03:00'
 ---
 
 # Validation & Linting
 
-**Purpose:** Ensure code and documentation quality before commits.
-
----
+**Purpose:** No closure without proof.
 
 ## Pre-Commit Validation (MANDATORY)
 
-**BEFORE EVERY COMMIT:**
-
 ```bash
-# 1. Validate structure
 just doctor
-
-# 2. Lint documentation
 just lint
-
-# 3. Verify tasks complete
 just verify
 ```
 
-**OR full validation:**
+Full pass:
 
 ```bash
 just all
-# Equivalent to: doctor + structure + index + verify
 ```
-
----
 
 ## Validation Commands
 
-### doctor (Structure Validation)
-
 ```bash
 ./.agents/agents doctor
-just doctor
-```
-
-**Checks:**
-
-- ✓ Required folders exist
-- ✓ Templates are present
-- ✓ Frontmatter YAML is valid
-- ✓ IDs follow convention (YYMMDD_HHMM_theme_type_N)
-- ✓ Timestamps in ISO 8601 with timezone
-- ✓ Cross-links between documents are valid
-
-**Exit codes:**
-
-- `0` = All valid
-- `1` = Errors found
-
----
-
-### lint-docs (Markdown Linting)
-
-```bash
-# Lint specific folder
 ./.agents/agents lint-docs .agents/wb/
-
-# Lint all docs
-./.agents/agents lint-docs .agents/
-
-# Auto-fix issues
 ./.agents/agents lint-docs .agents/wb --fix
-
-# Via Justfile
-just lint
-```
-
-**Checks:**
-
-- ✓ Checkbox markers format (`- [X]`, `- [/]`, `- [ ]`)
-- ✓ Status fields in frontmatter
-- ✓ State values are valid
-- ✓ Required frontmatter fields exist
-- ✓ Cross-references are valid
-- ✓ Task IDs follow T-NN pattern
-
----
-
-### verify-tasks (Task Completion)
-
-```bash
-# Verify specific session
-./.agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/
-
-# Verify current directory
-./.agents/agents verify-tasks .
-
-# Via Justfile
-just verify
-```
-
-**Exit codes:**
-
-- `0` = All tasks complete
-- `1` = Pending tasks found
-
----
-
-## Fixing Issues
-
-### Auto-fix (when possible)
-
-```bash
-./.agents/agents lint-docs .agents/wb --fix
-```
-
-### Manual fixes
-
-| Issue | Fix |
-|-------|-----|
-| Invalid frontmatter | Add/correct YAML frontmatter |
-| Wrong timestamp format | Use ISO 8601 with timezone |
-| Invalid task marker | Use `- [x]`, `- [/]`, `- [ ]` |
-| Missing task ID | Add T-NN format ID |
-| Invalid status | Use valid status value |
-
-### Normalize timestamps
-
-```bash
+./.agents/agents verify-tasks .agents/wb/<session>/
 ./.agents/agents wb-update normalize-time --all-wb
 ```
 
----
+## Exit Codes
+
+- `doctor`: `0` pass, `1` errors
+- `verify-tasks`: `0` complete, `1` pending/invalid
 
 ## Validation Checklist
 
-Before marking task complete:
+- [ ] `just doctor` passes
+- [ ] `just lint` passes
+- [ ] `just verify` passes
+- [ ] Frontmatter valid
+- [ ] Task markers valid
+- [ ] Timestamps include timezone
 
-- [ ] `just doctor` passes (all ✓)
-- [ ] `just lint` passes (no issues)
-- [ ] `just verify` passes (all tasks [x])
-- [ ] Frontmatter is valid
-- [ ] Task markers are correct
-- [ ] Timestamps have timezone
+## Rule
 
----
-
-## Health Metrics
-
-| Metric | Command | Healthy |
-|--------|---------|---------|
-| Structure valid | `just doctor` | All ✓ |
-| Docs linted | `just lint` | No issues |
-| Tasks complete | `just verify` | All [x] |
-| Config valid | `python -m json.tool .agents/tools.json` | Valid JSON |
-
----
-
-## Best Practices
-
-**DO:**
-
-- ✅ Run `just doctor` before starting work
-- ✅ Run `just lint` after editing docs
-- ✅ Run `just verify` before marking complete
-- ✅ Fix issues immediately
-- ✅ Use `--fix` when available
-
-**DON'T:**
-
-- ❌ Commit without validation
-- ❌ Ignore validation errors
-- ❌ Skip `just verify` for workstreams
-- ❌ Leave tasks in `[ ]` when done
-
----
-
-## Troubleshooting
-
-```bash
-# Get detailed error
-./.agents/agents doctor
-
-# Fix lint issues
-./.agents/agents lint-docs .agents/wb --fix
-
-# Validate tools.json
-python -m json.tool .agents/tools.json
-```
-
----
-
-## References
-
-- `.agents/agents doctor` - Structure validation
-- `.agents/agents lint-docs` - Markdown validation
-- `.agents/agents verify-tasks` - Task verification
-- RULE-003 - Documentation Standards
-
----
-
-*Version: 1.0 | Lines: ~160 | Max: 250*
+- Do not commit with failed required gates.
+- Do not mark task done without evidence-backed validation.

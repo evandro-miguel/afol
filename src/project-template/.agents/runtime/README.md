@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: readme
+theme: runtime
+status: active
+created_at: '2026-05-05T11:50:54+00:00'
+updated_at: '2026-05-05T11:50:54+00:00'
+---
+
 # Agentic Runtime
 
 Central runtime and FastMCP adapter for this project's agentic workflow.

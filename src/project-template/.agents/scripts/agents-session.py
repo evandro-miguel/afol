@@ -4,17 +4,40 @@
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
+import json
 import sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
-from lib.agents_config import get_active_session_file_path, load_agents_config
-from lib.execution_commands import ExecutionError, build_session_catchup, find_session
+from lib.agents_config import get_active_session_file_path, get_cfg_path, load_agents_config
+from lib.execution_commands import (
+    ExecutionError,
+    TERMINAL_ARTIFACT_STATUSES,
+    artifact_snapshot,
+    build_session_catchup,
+    find_session,
+    parse_state_summary,
+    resolve_artifact,
+)
+
+try:
+    from lib.process_utils import run_command
+except ImportError:
+
+    def run_command(
+        cmd,
+        *,
+        cwd: Path | None = None,
+        timeout: int = 120,
+        **kwargs,
+    ):
+        return subprocess.run(list(cmd), cwd=cwd, timeout=timeout, **kwargs)
+
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
+WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 VERIFY_TASKS_SCRIPT = Path(__file__).resolve().parent / "verify-tasks.py"
 
 
@@ -28,6 +51,10 @@ def _write_active_session(session_id: str) -> None:
     ACTIVE_SESSION_FILE.write_text(f"{session_id}\n", encoding="utf-8")
 
 
+def _clear_active_session() -> None:
+    ACTIVE_SESSION_FILE.write_text("", encoding="utf-8")
+
+
 def _print_items(label: str, items: list[str]) -> None:
     if not items:
         return
@@ -37,7 +64,7 @@ def _print_items(label: str, items: list[str]) -> None:
 
 
 def _run_strict_verify(session_dir: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return run_command(
         [sys.executable, str(VERIFY_TASKS_SCRIPT), "--strict", str(session_dir)],
         capture_output=True,
         text=True,
@@ -92,7 +119,9 @@ def cmd_close(args: argparse.Namespace) -> int:
         pointer_action = "repointed"
         active_after = next_session.name
     elif active_before == target.name:
-        pointer_action = "retained"
+        _clear_active_session()
+        pointer_action = "cleared"
+        active_after = ""
 
     payload = {
         "session": target.name,
@@ -112,10 +141,168 @@ def cmd_close(args: argparse.Namespace) -> int:
     print("strict_verify: passed")
     if pointer_action == "repointed":
         print(f"active_session: {active_before or 'unset'} -> {active_after}")
-    elif pointer_action == "retained":
-        print(f"active_session: {active_after} (closed session remains the default pointer)")
+    elif pointer_action == "cleared":
+        print("active_session: unset (closed session cannot remain the default pointer)")
     else:
         print(f"active_session: unchanged ({active_after or 'unset'})")
+    return 0
+
+
+def _iter_project_sessions() -> list[Path]:
+    if not WB_DIR.exists():
+        return []
+    return sorted(
+        [entry for entry in WB_DIR.iterdir() if entry.is_dir() and not entry.name.startswith(".")],
+        key=lambda entry: entry.name,
+    )
+
+
+def _artifact_status(session_dir: Path, alias: str) -> Optional[str]:
+    snapshot = artifact_snapshot(resolve_artifact(session_dir, alias))
+    value = str(snapshot.get("status") or "").strip()
+    return value or None
+
+
+def _build_session_overview(session_dir: Path, active_session: str) -> Dict[str, Any]:
+    task_file = resolve_artifact(session_dir, "task")
+    total, done, remaining, blocked_rows, _ = parse_state_summary(task_file)
+    blocked_count = len(blocked_rows)
+    report_status = _artifact_status(session_dir, "report")
+    postmortem_status = _artifact_status(session_dir, "postmortem")
+
+    normalized_report = (report_status or "").strip().lower()
+    normalized_postmortem = (postmortem_status or "").strip().lower()
+    report_terminal = normalized_report in TERMINAL_ARTIFACT_STATUSES
+    postmortem_terminal = normalized_postmortem in TERMINAL_ARTIFACT_STATUSES
+
+    catchup_signal = (task_file is None) or remaining > 0 or blocked_count > 0
+    stale_reasons: list[str] = []
+    if report_terminal and remaining > 0:
+        stale_reasons.append("report is terminal but tasks remain")
+    if postmortem_terminal and not report_terminal:
+        stale_reasons.append("postmortem is terminal without a terminal report")
+
+    return {
+        "active": active_session == session_dir.name,
+        "session": session_dir.name,
+        "tasks": {
+            "total": total,
+            "done": done,
+            "remaining": remaining,
+            "blocked": blocked_count,
+        },
+        "report_status": report_status,
+        "postmortem_status": postmortem_status,
+        "catchup_signal": catchup_signal,
+        "stale_signal": bool(stale_reasons),
+        "stale_reasons": stale_reasons,
+        "close_candidate": bool(
+            report_terminal and total > 0 and remaining == 0 and not stale_reasons
+        ),
+    }
+
+
+def _print_session_list(payload: Dict[str, Any]) -> None:
+    print("Project Session List (.agents/wb)")
+    print(f"active_session: {payload['active_session'] or 'unset'}")
+    if not payload["sessions"]:
+        print("sessions: none")
+        return
+
+    for entry in payload["sessions"]:
+        marker = "*" if entry["active"] else "-"
+        tasks = entry["tasks"]
+        report_status = entry["report_status"] or "none"
+        postmortem_status = entry["postmortem_status"] or "none"
+        print(
+            f"{marker} {entry['session']} "
+            f"tasks={tasks['done']}/{tasks['total']} remaining={tasks['remaining']} blocked={tasks['blocked']} "
+            f"report={report_status} postmortem={postmortem_status} "
+            f"catchup={'yes' if entry['catchup_signal'] else 'no'} stale={'yes' if entry['stale_signal'] else 'no'}"
+        )
+
+
+def cmd_list(args: argparse.Namespace) -> int:
+    active_session = _read_active_session()
+    sessions = [
+        _build_session_overview(session_dir, active_session)
+        for session_dir in _iter_project_sessions()
+    ]
+    payload = {
+        "scope": str(WB_DIR.resolve()),
+        "active_session": active_session or None,
+        "count": len(sessions),
+        "sessions": sessions,
+    }
+
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+
+    _print_session_list(payload)
+    return 0
+
+
+def _classify_for_sweep(entry: Dict[str, Any]) -> str:
+    if entry["stale_signal"]:
+        return "stale"
+    if entry["close_candidate"]:
+        return "close_candidate"
+    return "open"
+
+
+def _print_session_sweep(payload: Dict[str, Any]) -> None:
+    print("Project Session Sweep (read-only)")
+    print(f"scope: {payload['scope']}")
+    print(f"active_session: {payload['active_session'] or 'unset'}")
+    print(f"scanned_sessions: {payload['count']}")
+    _print_items("stale", payload["stale"])
+    _print_items("open", payload["open"])
+    _print_items("close_candidates", payload["close_candidates"])
+
+
+def cmd_sweep(args: argparse.Namespace) -> int:
+    _ = args
+    active_session = _read_active_session()
+    sessions = [
+        _build_session_overview(session_dir, active_session)
+        for session_dir in _iter_project_sessions()
+    ]
+
+    stale: list[str] = []
+    open_sessions: list[str] = []
+    close_candidates: list[str] = []
+    for entry in sessions:
+        item = entry["session"]
+        if entry["active"]:
+            item = f"{item} [active]"
+        if entry["stale_reasons"]:
+            item = f"{item} ({'; '.join(entry['stale_reasons'])})"
+
+        bucket = _classify_for_sweep(entry)
+        if bucket == "stale":
+            stale.append(item)
+        elif bucket == "close_candidate":
+            close_candidates.append(item)
+        else:
+            open_sessions.append(item)
+
+    payload = {
+        "scope": str(WB_DIR.resolve()),
+        "active_session": active_session or None,
+        "count": len(sessions),
+        "read_only": True,
+        "stale": stale,
+        "open": open_sessions,
+        "close_candidates": close_candidates,
+        "sessions": sessions,
+    }
+
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+
+    _print_session_sweep(payload)
     return 0
 
 
@@ -167,8 +354,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_catchup.add_argument("--session", help="Session id/path (default: active session)")
     p_catchup.add_argument("--json", action="store_true", help="Emit JSON payload")
-    p_catchup.add_argument("--paths-limit", type=int, default=10, help="Limit listed git paths in output")
+    p_catchup.add_argument(
+        "--paths-limit", type=int, default=10, help="Limit listed git paths in output"
+    )
     p_catchup.set_defaults(func=cmd_catchup)
+
+    p_list = sub.add_parser(
+        "list",
+        help="List project-local workbench sessions under .agents/wb with lightweight lifecycle signals",
+    )
+    p_list.add_argument("--json", action="store_true", help="Emit JSON payload")
+    p_list.set_defaults(func=cmd_list)
+
+    p_sweep = sub.add_parser(
+        "sweep",
+        help="Read-only sweep of project-local workbench sessions (stale/open/close-candidate)",
+    )
+    p_sweep.add_argument("--json", action="store_true", help="Emit JSON payload")
+    p_sweep.set_defaults(func=cmd_sweep)
 
     return parser
 

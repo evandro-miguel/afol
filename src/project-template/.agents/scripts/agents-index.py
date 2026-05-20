@@ -21,6 +21,7 @@ from typing import List
 
 try:
     import yaml
+
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
@@ -106,7 +107,11 @@ def scan_docs(directory: Path, pattern: str) -> List[DocEntry]:
     entries = []
 
     for file_path in directory.glob(pattern):
-        if file_path.name.startswith("TEMPLATE_") or file_path.name == "INDEX.md" or file_path.name == "README.md":
+        if (
+            file_path.name.startswith("TEMPLATE_")
+            or file_path.name == "INDEX.md"
+            or file_path.name == "README.md"
+        ):
             continue
 
         # Determine doc type from filename
@@ -152,9 +157,9 @@ updated_at: "{timestamp}"
 | Metric | Count |
 |--------|-------|
 | Total | {len(entries)} |
-| Draft | {len([e for e in entries if e.status == 'draft'])} |
-| Active | {len([e for e in entries if e.status == 'active'])} |
-| Final | {len([e for e in entries if e.status == 'final'])} |
+| Draft | {len([e for e in entries if e.status == "draft"])} |
+| Active | {len([e for e in entries if e.status == "active"])} |
+| Final | {len([e for e in entries if e.status == "final"])} |
 
 ## Index
 

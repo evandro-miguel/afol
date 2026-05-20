@@ -42,10 +42,17 @@ def get_memory_config() -> Dict[str, Any]:
         "authority": str(raw.get("authority", "auxiliary")).strip() or "auxiliary",
         "project": str(raw.get("project", "main")).strip() or "main",
         "workspace": str(raw.get("workspace", "")).strip(),
-        "server": str(raw.get("runtime_server", defaults.get("server", provider))).strip() or provider,
-        "search_tool": str(raw.get("search_tool", defaults.get("search_tool", "search_notes"))).strip(),
-        "context_tool": str(raw.get("context_tool", defaults.get("context_tool", "build_context"))).strip(),
-        "recent_tool": str(raw.get("recent_tool", defaults.get("recent_tool", "recent_activity"))).strip(),
+        "server": str(raw.get("runtime_server", defaults.get("server", provider))).strip()
+        or provider,
+        "search_tool": str(
+            raw.get("search_tool", defaults.get("search_tool", "search_notes"))
+        ).strip(),
+        "context_tool": str(
+            raw.get("context_tool", defaults.get("context_tool", "build_context"))
+        ).strip(),
+        "recent_tool": str(
+            raw.get("recent_tool", defaults.get("recent_tool", "recent_activity"))
+        ).strip(),
         "show_tool": str(raw.get("show_tool", defaults.get("show_tool", "read_note"))).strip(),
     }
 
@@ -65,11 +72,17 @@ def json_arg_block(data: Dict[str, Any]) -> str:
 def print_boundary_notes(cfg: Dict[str, Any]) -> None:
     print("Boundary")
     print("- `.agents/wb/` and repo-local `knowledge` remain canonical.")
-    print("- External memory is auxiliary retrieval and curated reuse, not live plan/task/report state.")
+    print(
+        "- External memory is auxiliary retrieval and curated reuse, not live plan/task/report state."
+    )
     if cfg["mode"] != "contract":
-        print(f"- Runtime mode is configured as `{cfg['mode']}`, but this command family currently emits contracts only.")
+        print(
+            f"- Runtime mode is configured as `{cfg['mode']}`, but this command family currently emits contracts only."
+        )
     else:
-        print("- This command family emits MCP contracts only; it does not execute MCP tool calls from shell.")
+        print(
+            "- This command family emits MCP contracts only; it does not execute MCP tool calls from shell."
+        )
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -92,7 +105,9 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"- authority: {cfg['authority']}")
     print(f"- mode: {cfg['mode']}")
     print("- supported commands: status, search, context, recent, show")
-    print("- recommended order: `knowledge pull` -> `memory search/context` -> targeted repo reread")
+    print(
+        "- recommended order: `knowledge pull` -> `memory search/context` -> targeted repo reread"
+    )
     print()
     print_boundary_notes(cfg)
     return 0
@@ -159,7 +174,7 @@ def cmd_context(args: argparse.Namespace) -> int:
         payload: Dict[str, Any] = {
             "project": project,
             "url": args.url,
-            "depth": str(args.depth),
+            "depth": args.depth,
             "max_related": args.max_related,
             "output_format": "text",
         }
@@ -195,7 +210,7 @@ def cmd_context(args: argparse.Namespace) -> int:
                 {
                     "project": project,
                     "url": "memory://<selected-permalink>",
-                    "depth": str(args.depth),
+                    "depth": args.depth,
                     "max_related": args.max_related,
                     "output_format": "text",
                 }
@@ -297,7 +312,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_context.add_argument("--url", help="explicit memory:// URL or permalink to expand directly")
     p_context.add_argument("--depth", type=int, default=1)
     p_context.add_argument("--max-related", type=int, default=3)
-    p_context.add_argument("--limit", type=int, default=5, help="search page size when URL is not provided")
+    p_context.add_argument(
+        "--limit", type=int, default=5, help="search page size when URL is not provided"
+    )
     p_context.set_defaults(func=cmd_context)
 
     p_recent = sub.add_parser("recent", help="emit MCP contract for recent memory activity")

@@ -11,8 +11,8 @@ Primary supported runtimes: OpenCode, Codex, Qwen, Gemini CLI, and Claude Code s
 `.agents` is a standardized system for managing LLM-assisted development workflows, focused on:
 
 - **Consistent documentation** - Standardized templates for plans, tasks, reports
-- **Planning rigor** - Brainstorm and explorer-check gates for major plans
-- **Knowledge reuse** - Low-token search over prior research, reports, and postmortems
+- **Planning rigor** - Plan/task first, with optional brainstorm or explorer-check when useful
+- **Knowledge reuse** - Low-token search over prior research, reports, and finalized postmortems when they exist
 - **Automated telemetry** - Tracks tool, pattern, and document usage without manual intervention
 - **Heat scoring** - Identifies hot/cold elements by period (daily, weekly, monthly)
 - **Pattern catalog** - Catalog of patterns and anti-patterns with automatic suggestions
@@ -48,7 +48,7 @@ docs/
 │           └── event.json   # Event schema
 │
 ├── wb/                      # Active workstreams
-│   ├── .active_session      # Current session
+│   ├── .active_session      # Project-local convenience pointer for one operator
 │   └── YYMMDD_HHMM_theme/   # Session folders
 │
 ├── tmp/                     # Temporary non-canonical artifacts
@@ -72,6 +72,9 @@ just doctor
 
 # List available tools
 .agents/agents tools list
+
+# Inspect the controlled live-agent runtime-flow benchmark family
+.agents/agents benchmark list
 ```
 
 ### 2. Create Workstream
@@ -81,16 +84,24 @@ just doctor
 
 # 2. Define or update the governing parent spec in docs/arc/SPECS/
 
-# 3. Create the workstream with mandatory governance linkage
-.agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --spec-lite
-# `--spec-lite` is the current CLI compatibility flag while `spec-child` is the canonical future doc name.
+# 3. For ambiguous/product-shaped work, run the smallest useful
+#    docs/standards/decision-intake.md lane before benchmark, planning,
+#    delegation, or implementation. Use formal scoring only when it helps or
+#    the user asks.
 
-# Research-only workstream
+# 4. Create the workstream with mandatory governance linkage
+.agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --child-spec 260306_auth_refactor_spec-child_01
+# Use --child-spec <id> to link an existing child spec.
+# Use --spec-lite only when you need to create a local lightweight spec artifact.
+
+# Research-only workstream, when research itself is the requested deliverable
 .agents/agents new auth-investigation --feature-id F-02 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --intent research
 
 # The same theme would also infer `research` safely if --intent is omitted
 
-# Governed planning workstream (seeds brainstorm + explorer-check + plan by default)
+# Governed planning workstream. The plan tracks direct execution work; optional
+# brainstorm/research/explorer-check artifacts are sidecars only when requested
+# or needed as a small blocking proof.
 .agents/agents new planning-track --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --intent planning
 
 # Optional: add a pack for another major track inside an existing session
@@ -125,6 +136,9 @@ just doctor
 - OpenCode, Qwen, Gemini, and Codex do not need committed root mirrors in this scaffold; they use `AGENTS.md` directly or global runtime configuration.
 - `.claude/` should only contain project-safe adapter notes and links.
 - Project-owned documentation belongs under `docs/`; `.agents/` is reserved for agent-system surfaces such as workbench, skills, telemetry, and runtime automation.
+- `.agents/wb/.active_session` is a project-local convenience pointer for a
+  single operator; parallel agents should not use it as a shared
+  synchronization primitive.
 - The scaffold should be optimized for interactive CLI agent execution paths first; embedded SDK/server use cases are secondary and should not drive the default structure.
 - Bootstrap exports a generic, history-free baseline for downstream repos and supports a partial install mode that preserves existing project-owned files.
 - The exported baseline keeps current-state repository mapping in `docs/map/` and avoids publishing repo-map artifacts inside `.agents/`.
@@ -162,6 +176,9 @@ just doctor
 - `skills-sync push` is a branch/PR proposal flow. It requires an external universal-skills checkout and refuses direct pushes to `main`.
 - Keep `agentic-folder-sys` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, git-backed skills flow, and governed workbench sessions.
 - The scaffold should not depend on global Codex skills for universal-skills content.
+- Feature additions and meaningful behavior changes must update affected
+  project-local skills and docs, then leave a pending item to propose the skill
+  change back to universal-skills through the branch/PR flow.
 - Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and project-agnostic.
 
 ### Optional External Memory
@@ -210,11 +227,12 @@ just telemetry-heat PERIOD=daily
 # Catch up the active session before resuming after a gap
 .agents/agents session catchup --session <session-id>
 
-# Finalize postmortem before closing the session report
+# Finalize postmortem, if one exists, before closing the session report
+# The final postmortem now requires a completed Governance Promotion Review.
 .agents/agents wb-update status --session <session-id> --file postmortem --value final
 .agents/agents wb-update status --session <session-id> --file report --value final
 
-# Close the verified session and optionally move the active pointer
+# Close the verified session and optionally move the convenience pointer
 .agents/agents session close --session <session-id>
 .agents/agents session close --session <session-id> --next-session <next-session-id>
 
@@ -224,6 +242,21 @@ just wb-files-changed
 # View session telemetry
 just telemetry-report PERIOD=weekly
 ```
+
+### Project-Local Session Workflow
+
+1. List local sessions with `./.agents/agents session list`.
+2. Sweep stale or overlapping sessions with `./.agents/agents session sweep`.
+3. Use `AGENTS_SESSION_ID=<session-id>` when a shell or wrapper honors the
+   session-context contract and needs an explicit target.
+4. Set `AGENTS_SESSION_STRICT=1` when you want strict session handling for
+   sweep, catchup, or close flows.
+5. Catch up a target session before resuming with
+   `./.agents/agents session catchup --session <session-id>`.
+6. Close only after strict verification passes with
+   `./.agents/agents session close --session <session-id>`.
+7. Use `--next-session <next-session-id>` only for an intentional handoff to a
+   different session.
 
 ### Documentation Currency (Required)
 
@@ -339,10 +372,10 @@ just patterns-apply PATTERN_ID=PAT-001
 - `spec.md` / `spec-child.md` - Local workstream refinements chosen as needed
 - `spec-lite.md` - Legacy compatibility alias for `spec-child`
 - `spec-test.md` - Journey-first testing strategy artifact before test implementation
-- `brainstorm.md` - Ideation when real option analysis happened
-- `explorer-check.md` - Current-project exploration proof when repo inspection is needed
+- `brainstorm.md` - Optional ideation artifact when real option analysis happened
+- `explorer-check.md` - Optional current-project exploration proof when repo inspection is needed
 - `research.md` - Research when durable findings are needed
-- `postmortem.md` - Final session closure artifact when a real outcome exists
+- `postmortem.md` - Optional final session closure artifact that records optional artifact state and whether the session should promote a lesson, rule, ADR/decision, or skill/doc follow-up
 
 ### ExecPlans
 
@@ -382,7 +415,8 @@ updated_at: "2026-02-23T00:00:00-03:00"
 ### Setup & Validation
 
 ```bash
-just setup          # Setup UV virtualenv
+just setup-uv       # Install/copy project-local uv
+just setup          # Setup project-local uv, managed Python, and virtualenvs
 just setup-runtime  # Setup central runtime environment
 just doctor         # Validate .agents structure
 just clean          # Clean caches
@@ -390,6 +424,7 @@ just lint-scripts   # Lint Python operational scripts
 just test-scripts-all # Run script unit + integration tests with 80% coverage gate
 just lint-runtime   # Lint central runtime package
 just test-runtime   # Run central runtime tests
+just benchmark-runtime-flow # Run controlled live-agent runtime-flow benchmarks selectively after risky execution changes
 just runtime-mcp-smoke # Smoke runtime and MCP CLIs
 just agents-all     # Full scaffold validation, including docs, scripts, runtime, tools, telemetry, and MCP smoke
 just all            # Alias for just agents-all
@@ -434,9 +469,12 @@ just patterns-rate      # Rate pattern
 # Main tools
 .agents/agents doctor           # Validate structure
 .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id>  # Create minimal delivery workstream (task by default)
-.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --intent planning  # Create governed planning bundle (brainstorm + explorer-check + plan)
+.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --intent planning  # Create governed planning workstream for direct execution; optional sidecars only when requested/blocking
 .agents/agents verify-tasks     # Verify tasks
 .agents/agents status           # Show session status + workflow artifact readiness
+.agents/agents benchmark list   # List controlled live-agent runtime-flow benchmark scenarios
+.agents/agents benchmark run live-implement-next-governance-preflight --save  # Run one live benchmark and persist JSON output
+.agents/agents benchmark run live-wb-update-task-evidence-timeline --save  # Measure script-based task/evidence/timeline flow
 .agents/agents wb-update touch  # Update session
 .agents/agents bootstrap /path/to/target-repo --dry-run  # Preview generic export to another repo
 .agents/agents bootstrap /path/to/existing-project --partial  # Partial install for a live repo
@@ -528,7 +566,7 @@ just telemetry-cold PERIOD=monthly TYPE=tools
 
 ## 🤝 Contributing
 
-1. Create only the workstream artifacts you need: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --spec-lite` (`--spec-lite` remains the current compatibility flag for `spec-child`)
+1. Create only the workstream artifacts you need: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --child-spec <child-spec-id>` when linking an existing child spec; use `--spec-lite` only when creating a local lightweight spec artifact.
 2. Follow templates from `docs/templates/`
 3. Apply relevant patterns
 4. Validate: `just all`

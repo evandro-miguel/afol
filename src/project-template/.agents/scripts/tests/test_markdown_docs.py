@@ -11,11 +11,7 @@ def write_doc(path: Path, content: str) -> Path:
 def test_parse_markdown_doc_returns_frontmatter_body_and_raw_content(tmp_path):
     doc = write_doc(
         tmp_path / "valid.md",
-        "---\n"
-        "doc_type: task\n"
-        "id: test_task_01\n"
-        "---\n\n"
-        "# Body\n",
+        "---\ndoc_type: task\nid: test_task_01\n---\n\n# Body\n",
     )
 
     parsed = parse_markdown_doc(doc)

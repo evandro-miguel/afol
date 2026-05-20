@@ -2,7 +2,7 @@
 doc_type: task
 id: 260413_1551_python-runtime-hardening_task_01
 theme: python-runtime-hardening
-status: done
+status: final
 owners:
 - worker
 - tester
@@ -10,7 +10,7 @@ workstream_intent: delivery
 artifact_purpose: Track implementation tasks for RAG-backed Python script quality
   remediation.
 created_at: 2026-04-13 18:09:48-03:00
-updated_at: '2026-04-13T18:28:38-03:00'
+updated_at: '2026-04-21T20:58:24-03:00'
 roadmap_feature: F-16
 parent_spec: 260413_1250_project-template-source-separation_spec_01
 child_spec: null
@@ -56,27 +56,27 @@ Before starting work, consult relevant resources:
 
 ### Prevention Rules
 
-- [ ] Check `docs/lessons/general-lessons.md`
-- [ ] Check lesson entries in `docs/lessons/entries/`
+- [x] Check `docs/lessons/general-lessons.md`
+- [x] Check lesson entries in `docs/lessons/entries/`
 
 ### Useful Resources
 
 - Rules useful for this task:
-- [ ] `.agents/rules/RULE-001-tool-discovery.md`
-- [ ] `.agents/rules/RULE-003-documentation-standards.md`
-- [ ] `.agents/rules/RULE-004-validation-linting.md`
+- [x] `.agents/rules/RULE-001-tool-discovery.md`
+- [x] `.agents/rules/RULE-003-documentation-standards.md`
+- [x] `.agents/rules/RULE-004-validation-linting.md`
 - Docs useful for this task:
   - [x] `.agents/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_plan_02.md`
 - Skills useful for this task:
-- [ ] `evandro-rag-system`
-- [ ] `python-type-safety`
-- [ ] `python-testing-patterns`
-- [ ] `python-design-patterns`
+- [x] `evandro-rag-system`
+- [x] `python-type-safety`
+- [x] `python-testing-patterns`
+- [x] `python-design-patterns`
 - [x] `python-performance-optimization`
-  - [ ] `python-resource-management`
-  - [ ] `python-code-style`
+- [x] `python-resource-management`
+- [x] `python-code-style`
 - Integrations useful for this task:
-  - [ ] Project RAG project ID `md7608d8126cjr7mxyb7w6f9jd84szzy`
+  - [x] Project RAG project ID `md7608d8126cjr7mxyb7w6f9jd84szzy`
 
 ## Implementation Checkpoint
 

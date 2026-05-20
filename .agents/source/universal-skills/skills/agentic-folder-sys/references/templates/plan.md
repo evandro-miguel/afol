@@ -23,6 +23,15 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 - <clear outcome>
 
+## Execution Contract
+
+- Every step must be an action an agent can execute now.
+- If discovery is still needed, do it before the plan or reduce it to the
+  smallest blocking proof.
+- Do not use the plan to restate feature philosophy; keep that in roadmap/spec.
+- Do not add a phase whose only purpose is to create another plan, gather
+  broad context, or run generic research.
+
 ## Scope
 
 - In scope: <items>
@@ -39,13 +48,18 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 2. <phase 2>
 3. <phase 3>
 
+- Each phase must be directly executable and outcome-focused.
+- If a discovery step is unavoidable, make it the smallest blocking proof and
+  state the decision or artifact it must produce.
+
 ## Critical Dependencies
 
 - Tools: <critical tools only>
 - MCPs: <critical MCPs only>
 - Skills: <critical skills only>
-- Executor instruction: Research whether additional critical
-  dependencies are needed before execution.
+- Executor instruction: if a critical dependency is discovered during
+  execution, record the concrete finding and update risks or validation; do not
+  add a generic research phase to this plan.
 
 ## Large Plan Handling
 

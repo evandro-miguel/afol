@@ -1,13 +1,32 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import shutil
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 from agentic_scaffold.models import ChangeRecord, UndoResult
+
+_FALLBACK_COUNTER = 0
+
+
+class UnsafeJournalPathError(ValueError):
+    pass
+
+
+def _change_id_suffix() -> str:
+    global _FALLBACK_COUNTER
+    try:
+        return uuid4().hex[:8]
+    except (NotImplementedError, OSError, PermissionError):
+        _FALLBACK_COUNTER += 1
+        seed = f"{os.getpid()}:{time.monotonic_ns()}:{_FALLBACK_COUNTER}"
+        return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:8]
 
 
 @dataclass(frozen=True)
@@ -31,7 +50,7 @@ class JournalStore:
 
     def next_change_id(self) -> str:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        return f"chg_{stamp}_{uuid4().hex[:8]}"
+        return f"chg_{stamp}_{_change_id_suffix()}"
 
     def record(self, record: ChangeRecord, payload: dict) -> None:
         target = self.paths.entries_dir / f"{record.change_id}.json"
@@ -39,7 +58,9 @@ class JournalStore:
             "record": record.model_dump(mode="json"),
             "payload": payload,
         }
-        target.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        target.write_text(
+            json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
 
     def list_change_files(self) -> list[Path]:
         return sorted(self.paths.entries_dir.glob("chg_*.json"))
@@ -50,6 +71,32 @@ class JournalStore:
 
     def load(self, change_file: Path) -> dict:
         return json.loads(change_file.read_text(encoding="utf-8"))
+
+    def _resolve_repo_path(self, repo_root: Path, relative_path: str) -> Path:
+        if not str(relative_path).strip():
+            raise UnsafeJournalPathError("journal path is empty")
+        root = repo_root.resolve()
+        target = (root / relative_path).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError as exc:
+            raise UnsafeJournalPathError("journal path is outside the repository") from exc
+        if target == root:
+            raise UnsafeJournalPathError("journal path cannot target the repository root")
+        return target
+
+    def _resolve_backup_path(self, backup_relative: str) -> Path:
+        if not str(backup_relative).strip():
+            raise UnsafeJournalPathError("backup path is empty")
+        backups_root = self.paths.backups_dir.resolve()
+        backup_path = (self.paths.root / backup_relative).resolve()
+        try:
+            backup_path.relative_to(backups_root)
+        except ValueError as exc:
+            raise UnsafeJournalPathError(
+                "backup path is outside the runtime journal backups"
+            ) from exc
+        return backup_path
 
     def backup_file(self, change_id: str, repo_root: Path, target: Path) -> str:
         relative = target.relative_to(repo_root).as_posix()
@@ -63,22 +110,22 @@ class JournalStore:
         return ""
 
     def restore_backup(self, repo_root: Path, backup_relative: str, target_relative: str) -> Path:
-        backup_path = self.paths.root / backup_relative
-        target_path = repo_root / target_relative
+        backup_path = self._resolve_backup_path(backup_relative)
+        target_path = self._resolve_repo_path(repo_root, target_relative)
         target_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(backup_path, target_path)
         return target_path
 
     def delete_if_exists(self, repo_root: Path, relative_path: str) -> None:
-        target = repo_root / relative_path
+        target = self._resolve_repo_path(repo_root, relative_path)
         if target.is_dir():
             shutil.rmtree(target, ignore_errors=True)
         elif target.exists():
             target.unlink(missing_ok=True)
 
     def move_path(self, repo_root: Path, source_relative: str, dest_relative: str) -> Path:
-        source = repo_root / source_relative
-        destination = repo_root / dest_relative
+        source = self._resolve_repo_path(repo_root, source_relative)
+        destination = self._resolve_repo_path(repo_root, dest_relative)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(source), str(destination))
         return destination
@@ -110,7 +157,7 @@ class JournalStore:
                 original_relative = item["original_path"]
                 self.move_path(repo_root, archived_relative, original_relative)
                 restored.append(original_relative)
-            archive_dir = repo_root / archive_root
+            archive_dir = self._resolve_repo_path(repo_root, archive_root)
             if archive_dir.exists() and not any(archive_dir.iterdir()):
                 archive_dir.rmdir()
         else:
@@ -121,4 +168,6 @@ class JournalStore:
         if backup_dir.exists():
             shutil.rmtree(backup_dir, ignore_errors=True)
 
-        return UndoResult(ok=True, message=f"Undo applied for {record.change_id}.", restored_paths=restored)
+        return UndoResult(
+            ok=True, message=f"Undo applied for {record.change_id}.", restored_paths=restored
+        )

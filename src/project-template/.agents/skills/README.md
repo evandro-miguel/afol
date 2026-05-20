@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: readme
+theme: skills
+status: active
+created_at: '2026-05-05T11:50:54+00:00'
+updated_at: '2026-05-05T11:50:54+00:00'
+---
+
 # Skills System
 
 Skills define capabilities and behaviors for AI agents operating in this repository.

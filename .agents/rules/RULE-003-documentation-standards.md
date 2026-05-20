@@ -3,8 +3,8 @@ id: RULE-003
 theme: documentation-standards
 version: 1.0
 created: 2026-02-23
-applies_to: All agents (QWEN, CLAUDE, GEMINI)
-updated_at: '2026-04-13T19:36:40-03:00'
+applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
+updated_at: '2026-04-18T22:35:01-03:00'
 ---
 
 # Documentation Standards
@@ -15,7 +15,14 @@ updated_at: '2026-04-13T19:36:40-03:00'
 
 ## Frontmatter (MANDATORY)
 
-**EVERY `.md` file MUST have YAML frontmatter:**
+Project-authored managed Markdown files must have YAML frontmatter.
+
+This applies to docs, rules, workbench artifacts, lessons, specs, reports, and
+templates maintained by this scaffold.
+
+This does not apply to vendored packages, dependency caches, third-party
+licenses, generated build artifacts, or intentionally external Markdown copied
+under cache/archive folders.
 
 ```yaml
 ---
@@ -38,11 +45,11 @@ links:
 
 | Type | Required Fields |
 |------|-----------------|
-| `plan` | id, theme, type, status, owner, created_at, updated_at |
-| `task` | id, theme, type, status, owner, created_at, updated_at |
-| `log` | id, theme, type, status, owner, created_at, updated_at |
-| `spec` | id, theme, type, status, owner, created_at, updated_at |
-| `report` | id, theme, type, status, owner, created_at, updated_at, links.files_changed |
+| `plan` | doc_type, id, theme, status, owners, created_at, updated_at |
+| `task` | doc_type, id, theme, status, owners, created_at, updated_at |
+| `log` | doc_type, id, theme, status, owners, created_at, updated_at |
+| `spec` | doc_type, id, theme, status, owners, created_at, updated_at |
+| `report` | doc_type, id, theme, status, owners, created_at, updated_at, links.files_changed |
 
 ---
 
@@ -138,7 +145,7 @@ links:
 
 **DO:**
 
-- ✅ Always include frontmatter
+- ✅ Include frontmatter in project-authored managed Markdown
 - ✅ Use valid status values
 - ✅ Include timezone in timestamps
 - ✅ Update `updated_at` when editing
@@ -146,7 +153,8 @@ links:
 
 **DON'T:**
 
-- ❌ Skip frontmatter
+- ❌ Skip frontmatter on managed project docs
+- ❌ Treat vendored cache/license Markdown as project documentation
 - ❌ Use invalid status values
 - ❌ Use timestamps without timezone
 - ❌ Mix marker formats (`- [X]` vs `- [x]`)

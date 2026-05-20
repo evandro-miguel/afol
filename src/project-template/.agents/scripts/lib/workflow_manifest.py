@@ -25,6 +25,8 @@ class ArtifactIntentProfile(TypedDict, total=False):
     create: list[str]
     allow: list[str]
     required_context: list[str]
+    require_present_optional_artifacts_final_before_closure: bool
+    optional_artifacts_final_before_closure: list[str]
 
 
 DEFAULT_ARTIFACT_MANIFEST: tuple[ArtifactManifestEntry, ...] = (
@@ -44,14 +46,12 @@ DEFAULT_ARTIFACT_MANIFEST: tuple[ArtifactManifestEntry, ...] = (
         "doc_type": "explorer-check",
         "template": "explorer-check.md",
         "phase": "planning",
-        "depends_on": ["brainstorm"],
         "purpose": "Prove the current repo was inspected and the plan is grounded in real code.",
     },
     {
         "doc_type": "plan",
         "template": "plan.md",
         "phase": "planning",
-        "depends_on": ["brainstorm", "research", "explorer-check"],
         "purpose": "Define the concrete execution path for work that will actually be performed.",
     },
     {
@@ -108,7 +108,7 @@ DEFAULT_ARTIFACT_MANIFEST: tuple[ArtifactManifestEntry, ...] = (
         "template": "report.md",
         "phase": "delivery",
         "id_placeholder": "<report_doc_id_or_empty>",
-        "depends_on": ["task", "log"],
+        "depends_on": ["task"],
         "purpose": "Summarize delivered changes and verification after real work lands.",
     },
     {
@@ -125,7 +125,7 @@ DEFAULT_ARTIFACT_POLICY: Dict[str, Any] = {
     "default_intent": "delivery",
     "intents": {
         "delivery": {
-            "create": ["task"],
+            "create": ["plan", "task"],
             "allow": [
                 "brainstorm",
                 "research",
@@ -140,10 +140,18 @@ DEFAULT_ARTIFACT_POLICY: Dict[str, Any] = {
                 "report",
                 "postmortem",
             ],
-            "required_context": ["roadmap", "task", "workflow", "product", "guidelines", "tech-stack"],
+            "required_context": [
+                "roadmap",
+                "plan",
+                "task",
+                "workflow",
+                "product",
+                "guidelines",
+                "tech-stack",
+            ],
         },
         "planning": {
-            "create": ["brainstorm", "explorer-check", "plan"],
+            "create": ["plan", "task"],
             "allow": [
                 "brainstorm",
                 "research",
@@ -154,32 +162,83 @@ DEFAULT_ARTIFACT_POLICY: Dict[str, Any] = {
                 "spec-test",
                 "spec-lite",
             ],
-            "required_context": ["roadmap", "plan", "workflow", "product", "guidelines", "tech-stack"],
+            "required_context": [
+                "roadmap",
+                "plan",
+                "task",
+                "workflow",
+                "product",
+                "guidelines",
+                "tech-stack",
+            ],
         },
         "research": {
             "create": ["research"],
             "allow": ["brainstorm", "research", "explorer-check", "log", "report"],
-            "required_context": ["roadmap", "research", "workflow", "product", "guidelines", "tech-stack"],
+            "required_context": [
+                "roadmap",
+                "research",
+                "workflow",
+                "product",
+                "guidelines",
+                "tech-stack",
+            ],
         },
         "brainstorming": {
             "create": ["brainstorm"],
             "allow": ["brainstorm", "research", "explorer-check", "plan"],
-            "required_context": ["roadmap", "brainstorm", "workflow", "product", "guidelines", "tech-stack"],
+            "required_context": [
+                "roadmap",
+                "brainstorm",
+                "workflow",
+                "product",
+                "guidelines",
+                "tech-stack",
+            ],
         },
         "exploration": {
             "create": ["explorer-check"],
             "allow": ["explorer-check", "research", "plan"],
-            "required_context": ["roadmap", "explorer-check", "workflow", "product", "guidelines", "tech-stack"],
+            "required_context": [
+                "roadmap",
+                "explorer-check",
+                "workflow",
+                "product",
+                "guidelines",
+                "tech-stack",
+            ],
         },
         "specification": {
             "create": ["spec-child"],
-            "allow": ["research", "explorer-check", "plan", "spec", "spec-child", "spec-test", "spec-lite"],
+            "allow": [
+                "research",
+                "explorer-check",
+                "plan",
+                "spec",
+                "spec-child",
+                "spec-test",
+                "spec-lite",
+            ],
             "required_context": ["roadmap", "workflow", "product", "guidelines", "tech-stack"],
         },
         "closure": {
             "create": ["report"],
             "allow": ["log", "report", "postmortem"],
-            "required_context": ["roadmap", "report", "workflow", "product", "guidelines", "tech-stack"],
+            "required_context": [
+                "roadmap",
+                "report",
+                "workflow",
+                "product",
+                "guidelines",
+                "tech-stack",
+            ],
+            "require_present_optional_artifacts_final_before_closure": True,
+            "optional_artifacts_final_before_closure": [
+                "brainstorm",
+                "research",
+                "explorer-check",
+                "postmortem",
+            ],
         },
     },
 }
@@ -262,7 +321,9 @@ def default_doc_id_placeholder(doc_type: str) -> str:
 
 def manifest_id_placeholders(manifest: tuple[ArtifactManifestEntry, ...]) -> dict[str, str]:
     return {
-        entry["doc_type"]: entry.get("id_placeholder", default_doc_id_placeholder(entry["doc_type"]))
+        entry["doc_type"]: entry.get(
+            "id_placeholder", default_doc_id_placeholder(entry["doc_type"])
+        )
         for entry in manifest
     }
 
@@ -277,11 +338,29 @@ def coerce_intent_profile(raw: Any, valid_doc_types: set[str]) -> ArtifactIntent
     if not isinstance(raw, dict):
         return None
 
-    create = [item for item in _normalize_string_list(raw.get("create", [])) if item in valid_doc_types]
-    allow = [item for item in _normalize_string_list(raw.get("allow", [])) if item in valid_doc_types]
+    create = [
+        item for item in _normalize_string_list(raw.get("create", [])) if item in valid_doc_types
+    ]
+    allow = [
+        item for item in _normalize_string_list(raw.get("allow", [])) if item in valid_doc_types
+    ]
     required_context = _normalize_string_list(raw.get("required_context", []))
+    require_optional_final_before_closure = bool(
+        raw.get("require_present_optional_artifacts_final_before_closure", False)
+    )
+    optional_artifacts_final_before_closure = [
+        item
+        for item in _normalize_string_list(raw.get("optional_artifacts_final_before_closure", []))
+        if item in valid_doc_types
+    ]
 
-    if not create and not allow and not required_context:
+    if (
+        not create
+        and not allow
+        and not required_context
+        and not require_optional_final_before_closure
+        and not optional_artifacts_final_before_closure
+    ):
         return None
 
     profile: ArtifactIntentProfile = {}
@@ -291,6 +370,10 @@ def coerce_intent_profile(raw: Any, valid_doc_types: set[str]) -> ArtifactIntent
         profile["allow"] = allow
     if required_context:
         profile["required_context"] = required_context
+    if require_optional_final_before_closure:
+        profile["require_present_optional_artifacts_final_before_closure"] = True
+    if optional_artifacts_final_before_closure:
+        profile["optional_artifacts_final_before_closure"] = optional_artifacts_final_before_closure
     return profile
 
 
@@ -302,9 +385,9 @@ def load_artifact_policy(
     catalog = manifest or DEFAULT_ARTIFACT_MANIFEST
     valid_doc_types = {entry["doc_type"] for entry in catalog}
     raw_policy = workflow_cfg.get("artifact_policy", {})
-    default_intent = str(raw_policy.get("default_intent", DEFAULT_ARTIFACT_POLICY["default_intent"])).strip() or str(
-        DEFAULT_ARTIFACT_POLICY["default_intent"]
-    )
+    default_intent = str(
+        raw_policy.get("default_intent", DEFAULT_ARTIFACT_POLICY["default_intent"])
+    ).strip() or str(DEFAULT_ARTIFACT_POLICY["default_intent"])
     raw_intents = raw_policy.get("intents", {})
 
     profiles: Dict[str, ArtifactIntentProfile] = {}

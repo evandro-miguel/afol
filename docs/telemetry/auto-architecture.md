@@ -3,7 +3,7 @@ doc_type: architecture
 id: telemetry-auto-architecture
 status: active
 created_at: '2026-02-23T21:45:00Z'
-updated_at: '2026-04-13T19:37:07-03:00'
+updated_at: '2026-05-04T16:08:31-03:00'
 ---
 
 # Telemetry Automation Architecture
@@ -24,7 +24,7 @@ Telemetry system for .agents is **fully automated** - no manual recording requir
 ┌─────────────────────────────────────────────────────────────┐
 │                  .agents/agents (wrapper)                    │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │ 1. Execute tool via uv run                           │   │
+│  │ 1. Execute tool via local venv entrypoint             │   │
 │  │ 2. record_tool_telemetry() → tool_exec event         │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────┬───────────────────────────────────────┘
@@ -85,7 +85,7 @@ User Command
     ▼
 .agents/agents (bash wrapper)
     │
-    ├─► Execute tool (uv run)
+    ├─► Execute tool (local venv entrypoint)
     │
     └─► record_tool_telemetry()
             │
@@ -132,9 +132,10 @@ docs/                           # ← Project-owned documentation
 - All capture is automatic via wrapper
 - Manual recording only for edge cases (blockers, custom events)
 
-### 2. Silent Failures
+### 2. Non-Blocking Failures
 
-- Telemetry errors are swallowed (`2>/dev/null || true`)
+- Telemetry errors are logged to project-local `.agents/tmp/` files when the
+  caller needs to keep primary command output clean.
 - System must not interfere with primary tool function
 - Telemetry is observability, not core functionality
 
@@ -197,8 +198,7 @@ Auto-populated from reports:
 
    ```bash
    my-tool)
-       uv run scripts/agents-my-tool.py "$@"
-       record_tool_telemetry "my-tool" "success"
+       run_and_record "my-tool" "agents-my-tool.py" "$@"
        ;;
    ```
 

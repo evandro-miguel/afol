@@ -2,4 +2,4 @@ set unstable := true
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 set working-directory := "."
 
-mod agents_scaffold 'docs/standards/Justfile'
+import 'docs/standards/Justfile'

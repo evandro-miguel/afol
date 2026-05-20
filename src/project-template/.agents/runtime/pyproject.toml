@@ -1,7 +1,7 @@
 [project]
 name = "agentic-runtime"
 version = "0.1.0"
-description = "Central runtime and FastMCP adapter for this project's agentic workflow"
+description = "Central runtime and FastMCP adapter for project-local agent operations"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -36,7 +36,8 @@ packages = ["src/agentic_scaffold"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 asyncio_mode = "auto"
-addopts = ["-q"]
+addopts = ["-q", "-s", "--basetemp=.agents/tmp/pytest-runtime-basetemp"]
+log_file = ".agents/tmp/pytest-runtime.log"
 
 [tool.ruff]
 line-length = 100

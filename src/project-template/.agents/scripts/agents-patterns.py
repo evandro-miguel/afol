@@ -28,14 +28,15 @@ Options:
 """
 
 import json
-import sys
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import argparse
 
 from lib.agents_config import get_active_session_file_path, get_cfg_path, load_agents_config
+from lib.markdown_docs import split_markdown_frontmatter
 
 
 # Configuration
@@ -45,12 +46,7 @@ TELEMETRY_SCRIPT = Path(__file__).parent / "agents-telemetry.py"
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 
 # Pattern subdirectories by type
-PATTERN_SUBDIRS = {
-    "success": "success",
-    "anti": "anti",
-    "tool": "tools",
-    "template": "templates"
-}
+PATTERN_SUBDIRS = {"success": "success", "anti": "anti", "tool": "tools", "template": "templates"}
 
 
 def get_iso_timestamp() -> str:
@@ -68,29 +64,10 @@ def get_active_session() -> Optional[str]:
 
 def parse_frontmatter(content: str) -> Dict[str, Any]:
     """Parse YAML frontmatter from markdown content."""
-    import re
-
-    # Simple YAML frontmatter parser (avoids external dependency)
-    match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
-    if not match:
+    parsed = split_markdown_frontmatter(content)
+    if parsed is None:
         return {}
-
-    frontmatter = {}
-    for line in match.group(1).split('\n'):
-        if ':' in line:
-            key, value = line.split(':', 1)
-            key = key.strip()
-            value = value.strip().strip('"\'')
-
-            # Handle lists
-            if value == '':
-                continue
-            # Handle arrays in single line
-            if value.startswith('[') and value.endswith(']'):
-                value = [v.strip().strip('"\'') for v in value[1:-1].split(',')]
-
-            frontmatter[key] = value
-
+    frontmatter, _ = parsed
     return frontmatter
 
 
@@ -106,12 +83,13 @@ def load_pattern(file_path: Path) -> Optional[Dict[str, Any]]:
     if not frontmatter:
         return None
 
-    # Extract body
-    body_start = content.find('---', content.find('---') + 3) + 3
-    body = content[body_start:].strip()
+    parsed = split_markdown_frontmatter(content)
+    if parsed is None:
+        return None
+    frontmatter, body = parsed
 
-    frontmatter['file_path'] = str(file_path)
-    frontmatter['body'] = body
+    frontmatter["file_path"] = str(file_path)
+    frontmatter["body"] = body
 
     return frontmatter
 
@@ -137,15 +115,13 @@ def scan_patterns() -> List[Dict[str, Any]]:
 
 
 def suggest_patterns(
-    theme: Optional[str] = None,
-    tags: Optional[List[str]] = None,
-    limit: int = 5
+    theme: Optional[str] = None, tags: Optional[List[str]] = None, limit: int = 5
 ) -> List[Dict[str, Any]]:
     """Suggest relevant patterns based on theme or tags."""
     patterns = scan_patterns()
 
     # Only show active patterns
-    patterns = [p for p in patterns if p.get('status') == 'active']
+    patterns = [p for p in patterns if p.get("status") == "active"]
 
     scored_patterns = []
 
@@ -155,11 +131,11 @@ def suggest_patterns(
         # Score by theme match
         if theme:
             theme_lower = theme.lower()
-            pattern_id = pattern.get('id', '').lower()
-            pattern_tags = pattern.get('tags', [])
+            pattern_id = pattern.get("id", "").lower()
+            pattern_tags = pattern.get("tags", [])
 
             # Check if theme keywords appear in pattern
-            if any(keyword in pattern_id for keyword in theme_lower.split('-')):
+            if any(keyword in pattern_id for keyword in theme_lower.split("-")):
                 score += 10
 
             # Check tag matches
@@ -169,16 +145,16 @@ def suggest_patterns(
 
         # Score by tags
         if tags:
-            pattern_tags = [t.lower() for t in pattern.get('tags', [])]
+            pattern_tags = [t.lower() for t in pattern.get("tags", [])]
             for tag in tags:
                 if tag.lower() in pattern_tags:
                     score += 3
 
         # Boost high effectiveness
-        effectiveness = pattern.get('effectiveness', 'medium')
-        if effectiveness == 'high':
+        effectiveness = pattern.get("effectiveness", "medium")
+        if effectiveness == "high":
             score += 2
-        elif effectiveness == 'medium':
+        elif effectiveness == "medium":
             score += 1
 
         if score > 0:
@@ -191,17 +167,16 @@ def suggest_patterns(
 
 
 def list_patterns(
-    pattern_type: Optional[str] = None,
-    status: Optional[str] = None
+    pattern_type: Optional[str] = None, status: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """List patterns with optional filters."""
     patterns = scan_patterns()
 
     if pattern_type:
-        patterns = [p for p in patterns if p.get('type') == pattern_type]
+        patterns = [p for p in patterns if p.get("type") == pattern_type]
 
     if status:
-        patterns = [p for p in patterns if p.get('status') == status]
+        patterns = [p for p in patterns if p.get("status") == status]
 
     return patterns
 
@@ -211,16 +186,13 @@ def show_pattern(pattern_id: str) -> Optional[Dict[str, Any]]:
     patterns = scan_patterns()
 
     for pattern in patterns:
-        if pattern.get('id') == pattern_id:
+        if pattern.get("id") == pattern_id:
             return pattern
 
     return None
 
 
-def apply_pattern(
-    pattern_id: str,
-    session_id: Optional[str] = None
-) -> bool:
+def apply_pattern(pattern_id: str, session_id: Optional[str] = None) -> bool:
     """Record pattern application in telemetry."""
     if not session_id:
         session_id = get_active_session()
@@ -236,28 +208,40 @@ def apply_pattern(
         return False
 
     # Record pattern_applied event
-    metadata = {
-        "pattern_id": pattern_id,
-        "pattern_type": pattern.get('type'),
-        "outcome": "applied"
-    }
+    metadata = {"pattern_id": pattern_id, "pattern_type": pattern.get("type"), "outcome": "applied"}
 
     try:
         subprocess.run(
-            [sys.executable, str(TELEMETRY_SCRIPT), "record", "pattern_applied",
-             "--session-id", session_id,
-             "--metadata", json.dumps(metadata)],
+            [
+                sys.executable,
+                str(TELEMETRY_SCRIPT),
+                "record",
+                "pattern_applied",
+                "--session-id",
+                session_id,
+                "--metadata",
+                json.dumps(metadata),
+            ],
             capture_output=True,
-            timeout=5
+            timeout=5,
         )
 
         # Also record element_access for heat tracking
         subprocess.run(
-            [sys.executable, str(TELEMETRY_SCRIPT), "record", "element_access",
-             "--session-id", session_id,
-             "--metadata", json.dumps({"element_id": pattern_id, "element_type": "pattern", "outcome": "success"})],
+            [
+                sys.executable,
+                str(TELEMETRY_SCRIPT),
+                "record",
+                "element_access",
+                "--session-id",
+                session_id,
+                "--metadata",
+                json.dumps(
+                    {"element_id": pattern_id, "element_type": "pattern", "outcome": "success"}
+                ),
+            ],
             capture_output=True,
-            timeout=5
+            timeout=5,
         )
     except Exception:
         pass  # Silent fail - telemetry is non-blocking
@@ -272,28 +256,29 @@ def rate_pattern(pattern_id: str, effectiveness: str) -> bool:
         print(f"Error: Pattern {pattern_id} not found", file=sys.stderr)
         return False
 
-    if effectiveness not in ['high', 'medium', 'low']:
+    if effectiveness not in ["high", "medium", "low"]:
         print(f"Error: Invalid effectiveness: {effectiveness}", file=sys.stderr)
         return False
 
     # Read pattern file
-    file_path = Path(pattern['file_path'])
+    file_path = Path(pattern["file_path"])
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     # Update effectiveness in frontmatter
     import re
+
     new_content = re.sub(
         r'effectiveness:\s*["\']?(high|medium|low)["\']?',
         f'effectiveness: "{effectiveness}"',
-        content
+        content,
     )
 
     # Update updated_at
     new_content = re.sub(
         r'updated_at:\s*["\']?[\d\-T:Z+]+["\']?',
         f'updated_at: "{get_iso_timestamp()}"',
-        new_content
+        new_content,
     )
 
     # Write back
@@ -314,15 +299,15 @@ def print_pattern_table(patterns: List[Dict[str, Any]]) -> None:
     print("-" * 90)
 
     for pattern in patterns:
-        pid = pattern.get('id', 'unknown')[:10]
-        ptype = pattern.get('type', 'unknown')[:10]
+        pid = pattern.get("id", "unknown")[:10]
+        ptype = pattern.get("type", "unknown")[:10]
 
         # Extract name from file path or pattern title
-        file_path = pattern.get('file_path', '')
-        name = Path(file_path).stem.replace('_', ' ').title()[:30]
+        file_path = pattern.get("file_path", "")
+        name = Path(file_path).stem.replace("_", " ").title()[:30]
 
-        effectiveness = pattern.get('effectiveness', 'unknown')[:15]
-        tags = ', '.join(pattern.get('tags', []))[:20]
+        effectiveness = pattern.get("effectiveness", "unknown")[:15]
+        tags = ", ".join(pattern.get("tags", []))[:20]
 
         print(f"{pid:10s} {ptype:10s} {name:30s} {effectiveness:15s} {tags}")
 
@@ -343,10 +328,10 @@ def print_pattern_detail(pattern: Dict[str, Any]) -> None:
     print("-" * 40)
 
     # Extract context from body
-    body = pattern.get('body', '')
-    if '## Context' in body:
-        context_start = body.find('## Context') + len('## Context')
-        context_end = body.find('##', context_start)
+    body = pattern.get("body", "")
+    if "## Context" in body:
+        context_start = body.find("## Context") + len("## Context")
+        context_end = body.find("##", context_start)
         if context_end == -1:
             context_end = len(body)
         print(body[context_start:context_end].strip())
@@ -354,9 +339,9 @@ def print_pattern_detail(pattern: Dict[str, Any]) -> None:
     print()
     print("PATTERN")
     print("-" * 40)
-    if '## Pattern' in body:
-        pattern_start = body.find('## Pattern') + len('## Pattern')
-        pattern_end = body.find('##', pattern_start)
+    if "## Pattern" in body:
+        pattern_start = body.find("## Pattern") + len("## Pattern")
+        pattern_end = body.find("##", pattern_start)
         if pattern_end == -1:
             pattern_end = len(body)
         print(body[pattern_start:pattern_end].strip())
@@ -369,7 +354,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Agents Patterns - Suggest and manage patterns",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
@@ -402,12 +387,8 @@ def main():
     args = parser.parse_args()
 
     if args.command == "suggest":
-        tags = args.tags.split(',') if args.tags else []
-        patterns = suggest_patterns(
-            theme=args.theme,
-            tags=tags,
-            limit=args.limit
-        )
+        tags = args.tags.split(",") if args.tags else []
+        patterns = suggest_patterns(theme=args.theme, tags=tags, limit=args.limit)
 
         if not patterns:
             print("No matching patterns found.")
@@ -421,10 +402,7 @@ def main():
                 print("Use 'agents-patterns.py apply <ID>' to apply to current session")
 
     elif args.command == "list":
-        patterns = list_patterns(
-            pattern_type=args.type,
-            status=args.status
-        )
+        patterns = list_patterns(pattern_type=args.type, status=args.status)
         print_pattern_table(patterns)
 
     elif args.command == "show":

@@ -3,7 +3,7 @@ doc_type: standard
 id: 260411_agentic-runtime_standard_01
 status: active
 created_at: '2026-04-11T22:20:58-03:00'
-updated_at: '2026-04-13T19:36:49-03:00'
+updated_at: '2026-05-04T16:08:30-03:00'
 ---
 
 # Agentic Runtime
@@ -17,6 +17,10 @@ The wrapper keeps the existing `.agents/agents <legacy-command>` surface intact 
 ```bash
 .agents/agents runtime manifest
 .agents/agents runtime validate
+.agents/runtime/.venv/bin/agentic adoption-plan
+.agents/runtime/.venv/bin/agentic inspect-target
+.agents/agents adoption-plan
+.agents/agents inspect-target
 .agents/agents runtime search "roadmap"
 .agents/agents runtime inspect --depth 2
 .agents/agents mcp serve
@@ -44,7 +48,9 @@ just runtime-mcp-smoke
 ```
 
 `just all` includes the runtime lint, runtime test, and runtime MCP smoke gates.
-Runtime setup, validation, CI, and runtime launchers use the checked-in `uv.lock` through `uv --locked`.
+Runtime setup uses the project-local `.agents/tools/uv/bin/uv` with the checked-in
+`uv.lock`. Normal validation, CI, and runtime launchers execute from
+`.agents/runtime/.venv/` directly so sandboxed runs do not need global `uv`.
 
 ## Safety Model
 
@@ -61,6 +67,15 @@ New agent-native behavior should enter through `.agents/runtime/` first.
 Existing `.agents/scripts/` commands remain callable through `.agents/agents`
 as compatibility delegates until the runtime has equivalent native behavior and
 the workbench records validation evidence for the replacement.
+
+Adoption planning now lives in the runtime layer through:
+
+- `adoption-plan`
+- `inspect-target`
+
+Those commands are routed directly through `.agents/agents` as runtime-native
+surfaces, while registry-backed compatibility commands continue to use the
+script fallback.
 
 The source-kit priority wrappers were migrated first:
 

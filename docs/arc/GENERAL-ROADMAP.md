@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-13T19:36:57-03:00'
+updated_at: '2026-05-09T14:59:47-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -135,7 +135,11 @@ updated_at: '2026-04-13T19:36:57-03:00'
 ### F-07 Execution Intelligence and Knowledge System
 
 - Status: done
-- Why: The scaffold still depends too much on agent memory and manual discipline. Planning can finish without structured exploration, sessions cannot reuse prior research efficiently, and final closure does not require a proper post-mortem. That increases token waste, weakens traceability, and makes multi-agent work less reliable.
+- Why: The scaffold needs reusable knowledge and disciplined closure without
+  turning pre-plan exploration into mandatory plan content. Plans should express
+  the execution path for the actual work, while optional exploration artifacts
+  remain sidecars only when they materially reduce risk or are the requested
+  deliverable.
 - Governing spec: `docs/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md`
 - Child spec policy:
   - Required: yes
@@ -144,16 +148,17 @@ updated_at: '2026-04-13T19:36:57-03:00'
     - `260306_knowledge-reuse-and-token-efficiency_spec_01`
     - `260306_session-pack-structure-and-postmortem_spec_01`
 - Exit criteria:
-  - Plans cannot be considered complete without structured pre-plan exploration artifacts.
+  - Plans stay complete with the minimum `plan + task` core when the execution path is clear.
+  - Brainstorm, research, and explorer-check artifacts are optional sidecars, not mandatory pre-plan gates.
   - Agents can quickly find prior research, brainstorms, explorer checks, and post-mortems with low-token discovery paths.
   - Sessions can group multiple major plan tracks in dedicated pack folders without losing verification coverage.
-  - Final session closure requires a completed post-mortem.
+  - Final session closure finalizes every optional artifact that actually exists.
 - Delivery tasks:
   - [x] Define the parent feature philosophy and child spec boundaries.
-  - [x] Make brainstorm and explorer-check artifacts part of the governed planning flow.
+  - [x] Keep brainstorm and explorer-check artifacts available as optional sidecars when they materially help.
   - [x] Add reusable knowledge indexing/search for prior research artifacts.
   - [x] Add optional session pack folders for multiple major plans inside one session.
-  - [x] Require post-mortem completion before final session closure.
+  - [x] Require finalization of optional artifacts that exist before session closure.
 
 ### F-08 Context-Driven Execution Commands
 
@@ -394,6 +399,121 @@ updated_at: '2026-04-13T19:36:57-03:00'
         mirrors after command parity is proven.
   - [x] Verify with `just all`, focused bootstrap/template tests, and the 80%
         scripts coverage gate.
+
+### F-18 Agent Governance Preflight and Recurrence Guardrails
+
+- Status: planned
+- Why: Agents still rely on manual discipline to check whether a requested plan
+  already has a governing spec, whether a user-reported problem has happened
+  before, whether similar implementation already exists, and whether delegated
+  agents actually received and followed all applicable `.agents/rules/`.
+  Recurring plan/task drift also allows agents to create work about making a
+  plan instead of executable tasks for the requested work.
+- Governing spec: `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md`
+- Child spec policy:
+  - Required: yes
+  - Child specs should isolate plan/spec preflight, recurring-problem
+    escalation, similar-system detection, and orchestrator rule enforcement.
+- Exit criteria:
+  - Ambiguous or product-shaped work runs a compact decision intake before
+    benchmark, planning, or implementation.
+  - Decision intake records user, behavior evidence, observable outcome,
+    constraints, non-goals, reversibility, assumptions, and first-slice
+    appetite.
+  - Every non-trivial plan begins by checking whether a governing roadmap
+    feature and parent spec already exist.
+  - User-reported repeated problems trigger prior-lesson lookup, heavier
+    verification, and a new or updated general/specific rule when prevention is
+    feasible.
+  - New function work includes similar-system discovery; when a similar system
+    exists, the agent points to it in code and spec evidence, avoids modifying
+    it by default, and records future refactor debt for both the old and new
+    code paths.
+  - The orchestrator loads all applicable `.agents/rules/` before routing work
+    and passes enforceable rule context to every agent it coordinates.
+  - Workbench plans and tasks describe direct execution of the requested work,
+    not tasks to create, draft, or research a later plan.
+  - Task lifecycle markers distinguish problem, moved, implemented-untested,
+    tested-but-needing-spec-validation, and fully done states.
+- Delivery tasks:
+  - [ ] Define the preflight contract and acceptance checks in the parent spec.
+  - [ ] Add decision-intake, challenge, qualitative prioritization, optional
+        scoring, benchmark-order, and fixed-appetite slice guidance.
+  - [ ] Add implementation support for roadmap/spec lookup before planning.
+  - [ ] Add recurring-problem lookup and heavy verification escalation.
+  - [ ] Add similar-system discovery and future-refactor debt capture.
+  - [ ] Add applicable-rule resolution by touched element type, including
+        feature/spec/workbench/skill/runtime/code surfaces.
+  - [ ] Add orchestrator rule-loading and delegated-agent enforcement.
+  - [ ] Add direct-execution plan/task integrity validation that rejects obvious
+        meta-planning tasks.
+  - [ ] Add the canonical task state model:
+        `[ ]`, `[/]`, `[!]`, `[>]`, `[%]`, `[&]`, `[x]`.
+  - [ ] Update affected project-local skills/docs and leave a pending
+        universal-skills propagation item for the new agent behavior.
+  - [ ] Verify with focused tests, strict workbench validation, and `just lint`.
+
+### F-19 Controlled Runtime Flow Benchmarks
+
+- Status: planned
+- Why: The scaffold has smoke checks and strict workbench validation, but it
+  still lacks a standard benchmark family for controlled agent-tool execution
+  flows. When runtime adapters, prompt/rule loading, tool routing, or command
+  orchestration changes, maintainers need a repeatable way to measure whether
+  real execution flows regressed without turning that benchmark into a universal
+  gate for every change.
+- Governing spec: `docs/arc/SPECS/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md`
+- Exit criteria:
+  - The scaffold defines a standard benchmark contract for controlled
+    agent-tool execution flows with fixed scope and expected tools.
+  - The default benchmark tier is documented as `gpt-5.4-mini` with `medium`
+    reasoning unless a benchmark spec explicitly overrides it.
+  - Benchmark results capture pass/fail, timing, tool success/failure, and any
+    available context or prompt-size signal.
+  - AGENTS/rules/skills/docs explain that runtime-flow benchmarks are targeted
+    regression measurement for risky execution changes, not a universal gate
+    for every task.
+- Delivery tasks:
+  - [ ] Define the benchmark contract, scenario shape, and when-to-run policy.
+  - [ ] Define the initial controlled scenario pack for high-value execution
+        flows.
+  - [x] Plan the runtime/CLI surface for running and recording the benchmarks.
+  - [x] Add a live-agent benchmark slice that measures real `codex exec` tool
+        usage in controlled fixture tasks.
+  - [ ] Update governance docs and skills so agents know when benchmark runs are
+        advisable.
+  - [ ] Verify the planning/governance slice with strict workbench validation
+        and `just lint`.
+
+### F-20 Parallel Session Isolation
+
+- Status: planned
+- Why: The scaffold supports multiple workbench sessions, but the operational
+  model still relies on one repository-global `.agents/wb/.active_session`
+  pointer. Remote agents and parallel PRs can contaminate that pointer, as Jules
+  did when several branches tried to fix CI by changing the active session
+  instead of targeting their own session context.
+- Governing spec: `docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md`
+- Exit criteria:
+  - Commands that mutate workbench state can target an explicit or context-local
+    session without relying on the global active pointer.
+  - CI and PR review can detect suspicious `.agents/wb/.active_session` changes
+    without blocking intentional session-management work.
+  - Operators can list, bind, switch, catch up, and close parallel sessions
+    without losing track of branch/worktree context.
+  - Remote-agent review docs explain how to reject active-session contamination
+    while preserving useful code or test ideas.
+- Delivery tasks:
+  - [ ] Inventory all active-session reads and writes across scripts, Just
+        recipes, and runtime docs.
+  - [ ] Define and implement the session resolution order: explicit
+        `--session`, environment override, context-local binding, global
+        pointer fallback.
+  - [ ] Add branch/worktree-aware session context for parallel local and remote
+        work.
+  - [ ] Add CI/review checks for suspicious `.active_session` mutations.
+  - [ ] Update session command UX and docs for Jules-style parallel PR review.
+  - [ ] Verify with focused tests, `just lint`, and strict validation.
 
 ## 5) Prioritization
 

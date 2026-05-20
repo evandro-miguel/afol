@@ -12,9 +12,8 @@ except ImportError:  # pragma: no cover - exercised by callers that gate on None
     yaml = None
 
 
-def parse_markdown_doc(doc_file: Path) -> tuple[dict[str, Any], str, str] | None:
-    """Return parsed frontmatter, body, and raw content for a markdown doc."""
-    content = doc_file.read_text(encoding="utf-8")
+def split_markdown_frontmatter(content: str) -> tuple[dict[str, Any], str] | None:
+    """Return frontmatter and body for markdown text when present."""
     if not content.startswith("---\n") or yaml is None:
         return None
 
@@ -30,4 +29,14 @@ def parse_markdown_doc(doc_file: Path) -> tuple[dict[str, Any], str, str] | None
     if not isinstance(frontmatter, dict):
         return None
 
-    return frontmatter, parts[2].lstrip("\n"), content
+    return frontmatter, parts[2].lstrip("\n")
+
+
+def parse_markdown_doc(doc_file: Path) -> tuple[dict[str, Any], str, str] | None:
+    """Return parsed frontmatter, body, and raw content for a markdown doc."""
+    content = doc_file.read_text(encoding="utf-8")
+    parsed = split_markdown_frontmatter(content)
+    if parsed is None:
+        return None
+    frontmatter, body = parsed
+    return frontmatter, body, content

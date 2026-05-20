@@ -23,19 +23,21 @@ from pathlib import Path
 def find_files(paths: list[str]) -> list[Path]:
     """Find all markdown files in given paths."""
     excluded_files = {
-        'checkbox-protocol.md',  # Contains intentional examples
-        'task.md',  # Template with example state board
+        "checkbox-protocol.md",  # Contains intentional examples
+        "task.md",  # Template with example state board
     }
-    excluded_patterns = ['**/templates/**', '**/rules/**']
+    excluded_patterns = ["**/templates/**", "**/rules/**"]
     files = []
     for path in paths:
         p = Path(path)
-        if p.is_file() and p.suffix == '.md':
+        if p.is_file() and p.suffix == ".md":
             if p.name not in excluded_files and not any(pat in str(p) for pat in excluded_patterns):
                 files.append(p)
         elif p.is_dir():
-            for f in p.rglob('*.md'):
-                if f.name not in excluded_files and not any(pat in str(f) for pat in excluded_patterns):
+            for f in p.rglob("*.md"):
+                if f.name not in excluded_files and not any(
+                    pat in str(f) for pat in excluded_patterns
+                ):
                     files.append(f)
     return files
 
@@ -49,14 +51,14 @@ def fix_checkbox_separators(content: str) -> tuple[str, int]:
     """
     # Pattern to match checkbox without following space
     # Matches: - [x]text (no space after ])
-    pattern = r'^(\s*-\s*\[[ xX/!>%]\])(\S)'
+    pattern = r"^(\s*-\s*\[[ xX/!>%]\])(\S)"
 
     count = 0
 
     def replacer(match):
         nonlocal count
         count += 1
-        return match.group(1) + ' ' + match.group(2)
+        return match.group(1) + " " + match.group(2)
 
     fixed_content = re.sub(pattern, replacer, content, flags=re.MULTILINE)
     return fixed_content, count
@@ -64,46 +66,40 @@ def fix_checkbox_separators(content: str) -> tuple[str, int]:
 
 def process_file(file_path: Path, dry_run: bool = False) -> dict:
     """Process a single file and return stats."""
-    result = {
-        'file': str(file_path),
-        'fixed': 0,
-        'error': None
-    }
+    result = {"file": str(file_path), "fixed": 0, "error": None}
 
     try:
-        content = file_path.read_text(encoding='utf-8')
+        content = file_path.read_text(encoding="utf-8")
         fixed_content, count = fix_checkbox_separators(content)
 
         if count > 0:
-            result['fixed'] = count
+            result["fixed"] = count
             if not dry_run:
-                file_path.write_text(fixed_content, encoding='utf-8')
+                file_path.write_text(fixed_content, encoding="utf-8")
     except Exception as e:
-        result['error'] = str(e)
+        result["error"] = str(e)
 
     return result
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Fix missing separators after checkbox markers in markdown files'
+        description="Fix missing separators after checkbox markers in markdown files"
     )
     parser.add_argument(
-        'paths',
-        nargs='*',
-        default=['.'],
-        help='Files or directories to process (default: current directory)'
+        "paths",
+        nargs="*",
+        default=["."],
+        help="Files or directories to process (default: current directory)",
     )
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Show what would be fixed without modifying files'
+        "--dry-run", action="store_true", help="Show what would be fixed without modifying files"
     )
     parser.add_argument(
-        '--exclude',
-        nargs='*',
-        default=['.venv', 'node_modules', '.git', 'cache'],
-        help='Directories to exclude'
+        "--exclude",
+        nargs="*",
+        default=[".venv", "node_modules", ".git", "cache"],
+        help="Directories to exclude",
     )
 
     args = parser.parse_args()
@@ -111,10 +107,7 @@ def main():
     # Filter paths
     all_files = find_files(args.paths)
     excluded = set(args.exclude)
-    files = [
-        f for f in all_files
-        if not any(excl in str(f) for excl in excluded)
-    ]
+    files = [f for f in all_files if not any(excl in str(f) for excl in excluded)]
 
     if not files:
         print("No markdown files found to process.")
@@ -130,15 +123,15 @@ def main():
     for file_path in files:
         result = process_file(file_path, dry_run=args.dry_run)
 
-        if result['error']:
+        if result["error"]:
             print(f"  ✗ {result['file']}: {result['error']}")
-        elif result['fixed'] > 0:
-            total_fixed += result['fixed']
+        elif result["fixed"] > 0:
+            total_fixed += result["fixed"]
             fixed_files += 1
             action = "Would fix" if args.dry_run else "Fixed"
             print(f"  ✓ {result['file']}: {action} {result['fixed']} checkbox(es)")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Files processed: {len(files)}")
     print(f"Files with fixes: {fixed_files}")
     print(f"Total checkboxes fixed: {total_fixed}")
@@ -149,5 +142,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: backend
+theme: structure-uv
+status: active
+created_at: '2026-05-05T11:50:54+00:00'
+updated_at: '2026-05-05T11:50:54+00:00'
+---
+
 # 🎨 Backend Structure
 
 **Generated:** 2026-02-23T18:03:35Z
