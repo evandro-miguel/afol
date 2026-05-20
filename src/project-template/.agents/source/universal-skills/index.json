@@ -1,0 +1,16 @@
+{
+  "generated_by": "agents-skills-sync local source",
+  "profiles": [
+    "core"
+  ],
+  "skills": [
+    {
+      "name": "agentic-scaffold-mcp",
+      "path": "skills/agentic-scaffold-mcp"
+    },
+    {
+      "name": "agentic-folder-sys",
+      "path": "skills/agentic-folder-sys"
+    }
+  ]
+}

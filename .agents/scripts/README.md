@@ -81,7 +81,7 @@ Bootstrap also copies `docs/templates/plan.md` so downstream repos inherit the r
 For full bootstrap, the target directory is created automatically when missing.
 For existing projects, use `--partial` so bootstrap fills only the missing scaffold surface and leaves project-owned files intact.
 The preferred source seed is `.agents/source/universal-skills/` inside the repo. It must not be a nested git checkout.
-Bootstrap seeds `.agents/source/universal-skills/` from committed `.agents/skills/` content, so the default downstream install path is self-contained.
+Bootstrap first tries to refresh an external `universal-skills` checkout from `AGENTS_UNIVERSAL_SKILLS_SOURCE` or a sibling `universal-skills` / `skill-universal` repo, then writes a plain repo-local seed. If no external source is available, it falls back to committed project assets so the default downstream install path is self-contained.
 `skills-sync pull` refreshes an external git checkout only when `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir` is configured.
 `skills-sync list` / `skills-sync search` prefer that external catalog when configured.
 `skills-sync sync` / `skills-sync update` are the one-step paths that actually refresh `.agents/skills/`.
