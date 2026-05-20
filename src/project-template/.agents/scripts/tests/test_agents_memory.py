@@ -57,7 +57,13 @@ class AgentsMemoryTests(unittest.TestCase):
             args = type(
                 "Args",
                 (),
-                {"query": "agent memory", "project": None, "runtime": "codex", "search_type": "hybrid", "limit": 5},
+                {
+                    "query": "agent memory",
+                    "project": None,
+                    "runtime": "codex",
+                    "search_type": "hybrid",
+                    "limit": 5,
+                },
             )()
             with redirect_stdout(buffer):
                 result = memory.cmd_search(args)

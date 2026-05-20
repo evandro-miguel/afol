@@ -43,7 +43,9 @@ def test_generate_manifest(scaffold_repo):
     assert manifest.runtime_docs["AGENTS.md"] is True
     assert manifest.tool_catalog_count == 1
     assert manifest.major_surfaces == list(runtime.config.manifest_major_surfaces)
-    assert manifest.search_roots == [path.relative_to(scaffold_repo).as_posix() for path in runtime.config.search_roots]
+    assert manifest.search_roots == [
+        path.relative_to(scaffold_repo).as_posix() for path in runtime.config.search_roots
+    ]
 
 
 def test_search_docs_finds_roadmap(scaffold_repo):
@@ -51,7 +53,10 @@ def test_search_docs_finds_roadmap(scaffold_repo):
     response = runtime.search.search("roadmap", limit=5)
 
     assert response.hits
-    assert any("knowledge/INDEX.md" in hit.path or "GENERAL-ROADMAP.md" in hit.path for hit in response.hits)
+    assert any(
+        "knowledge/INDEX.md" in hit.path or "GENERAL-ROADMAP.md" in hit.path
+        for hit in response.hits
+    )
 
 
 def test_search_docs_ignores_malformed_frontmatter(scaffold_repo):

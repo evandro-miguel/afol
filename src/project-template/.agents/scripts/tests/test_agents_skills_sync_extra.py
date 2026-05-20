@@ -117,8 +117,9 @@ class SkillsSyncUtilTests(unittest.TestCase):
 
     def test_cfg_path(self):
         """cfg_path returns Path for configured key."""
-        with mock.patch.object(self.ss, "skills_sync_config",
-                               return_value={"project_dir": ".agents/skills"}):
+        with mock.patch.object(
+            self.ss, "skills_sync_config", return_value={"project_dir": ".agents/skills"}
+        ):
             result = self.ss.cfg_path("project_dir")
         self.assertIsInstance(result, Path)
 
@@ -245,9 +246,11 @@ class SkillsSyncPathTests(unittest.TestCase):
                     "upstream_skills_dir": "custom-skills",
                 }
             }
-            with mock.patch.object(self.ss, "ROOT_DIR", root), \
-                 mock.patch.object(self.ss, "CONFIG", config), \
-                 mock.patch.object(self.ss, "active_source_repo_path", return_value=None):
+            with (
+                mock.patch.object(self.ss, "ROOT_DIR", root),
+                mock.patch.object(self.ss, "CONFIG", config),
+                mock.patch.object(self.ss, "active_source_repo_path", return_value=None),
+            ):
                 self.assertEqual(self.ss.project_skills_root(), root / ".agents/project-skills")
                 self.assertEqual(
                     self.ss.upstream_skills_root(),
@@ -389,34 +392,42 @@ class SkillsSyncCmdTests(unittest.TestCase):
             source_dir = Path(td) / "universal-skills"
             source_dir.mkdir()
             (source_dir / "skills").mkdir()
-            with mock.patch.object(self.ss, "cfg_path", return_value=source_dir.parent), \
-                 mock.patch.object(self.ss, "ensure_enabled", return_value=True), \
-                 mock.patch.object(self.ss, "load_manifest", return_value=self.ss._default_manifest()), \
-                 mock.patch.object(self.ss, "save_manifest"), \
-                 mock.patch.object(self.ss, "ensure_repo_cloned"), \
-                 mock.patch.object(self.ss, "project_skills_root", return_value=Path(td) / "proj"), \
-                 mock.patch("builtins.print"):
+            with (
+                mock.patch.object(self.ss, "cfg_path", return_value=source_dir.parent),
+                mock.patch.object(self.ss, "ensure_enabled", return_value=True),
+                mock.patch.object(
+                    self.ss, "load_manifest", return_value=self.ss._default_manifest()
+                ),
+                mock.patch.object(self.ss, "save_manifest"),
+                mock.patch.object(self.ss, "ensure_repo_cloned"),
+                mock.patch.object(self.ss, "project_skills_root", return_value=Path(td) / "proj"),
+                mock.patch("builtins.print"),
+            ):
                 args = argparse.Namespace()
                 self.ss.cmd_init(args)
 
     def test_cmd_status(self):
-        with mock.patch.object(self.ss, "ensure_enabled", return_value=True), \
-             mock.patch.object(self.ss, "load_manifest", return_value=self.ss._default_manifest()), \
-             mock.patch.object(self.ss, "installed_skills", return_value=["a"]), \
-             mock.patch.object(self.ss, "available_skills", return_value=["a", "b"]), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.ss, "ensure_enabled", return_value=True),
+            mock.patch.object(self.ss, "load_manifest", return_value=self.ss._default_manifest()),
+            mock.patch.object(self.ss, "installed_skills", return_value=["a"]),
+            mock.patch.object(self.ss, "available_skills", return_value=["a", "b"]),
+            mock.patch("builtins.print"),
+        ):
             args = argparse.Namespace()
             self.ss.cmd_status(args)
 
     def test_cmd_check_valid(self):
-        with mock.patch.object(self.ss, "ensure_enabled", return_value=True), \
-             mock.patch.object(self.ss, "load_manifest", return_value=self.ss._default_manifest()), \
-             mock.patch.object(self.ss, "validate_project_structure", return_value=[]), \
-             mock.patch.object(self.ss, "installed_skills", return_value=["a"]), \
-             mock.patch.object(self.ss, "resolve_skills_for_request", return_value=["a"]), \
-             mock.patch.object(self.ss, "_compare", return_value=([], [], [])), \
-             mock.patch.object(self.ss, "upstream_skills_root", return_value=Path("/tmp")), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.ss, "ensure_enabled", return_value=True),
+            mock.patch.object(self.ss, "load_manifest", return_value=self.ss._default_manifest()),
+            mock.patch.object(self.ss, "validate_project_structure", return_value=[]),
+            mock.patch.object(self.ss, "installed_skills", return_value=["a"]),
+            mock.patch.object(self.ss, "resolve_skills_for_request", return_value=["a"]),
+            mock.patch.object(self.ss, "_compare", return_value=([], [], [])),
+            mock.patch.object(self.ss, "upstream_skills_root", return_value=Path("/tmp")),
+            mock.patch("builtins.print"),
+        ):
             args = argparse.Namespace(skills=None, runtime=None)
             self.ss.cmd_check(args)
 
@@ -428,16 +439,26 @@ class SkillsSyncCmdTests(unittest.TestCase):
                 return "copy"
             return self.ss.DEFAULTS[key]
 
-        with mock.patch.object(self.ss, "ensure_enabled", return_value=True), \
-             mock.patch.object(self.ss, "load_manifest", return_value=self.ss._default_manifest()), \
-             mock.patch.object(self.ss, "_resolve_targets", return_value=[{"app": "all", "skills": ["legacy-skill"]}]), \
-             mock.patch.object(self.ss, "validate_project_structure", return_value=[]), \
-             mock.patch.object(self.ss, "resolve_skills_for_request", return_value=["agentic-folder-sys"]), \
-             mock.patch.object(self.ss, "_compare", return_value=(["legacy-skill"], [], [])), \
-             mock.patch.object(self.ss, "installed_skills", return_value=["agentic-folder-sys", "project-only"]), \
-             mock.patch.object(self.ss, "upstream_skills_root", return_value=Path("/tmp")), \
-             mock.patch.object(self.ss, "cfg", side_effect=cfg_side_effect), \
-             mock.patch("builtins.print") as print_mock:
+        with (
+            mock.patch.object(self.ss, "ensure_enabled", return_value=True),
+            mock.patch.object(self.ss, "load_manifest", return_value=self.ss._default_manifest()),
+            mock.patch.object(
+                self.ss,
+                "_resolve_targets",
+                return_value=[{"app": "all", "skills": ["legacy-skill"]}],
+            ),
+            mock.patch.object(self.ss, "validate_project_structure", return_value=[]),
+            mock.patch.object(
+                self.ss, "resolve_skills_for_request", return_value=["agentic-folder-sys"]
+            ),
+            mock.patch.object(self.ss, "_compare", return_value=(["legacy-skill"], [], [])),
+            mock.patch.object(
+                self.ss, "installed_skills", return_value=["agentic-folder-sys", "project-only"]
+            ),
+            mock.patch.object(self.ss, "upstream_skills_root", return_value=Path("/tmp")),
+            mock.patch.object(self.ss, "cfg", side_effect=cfg_side_effect),
+            mock.patch("builtins.print") as print_mock,
+        ):
             args = argparse.Namespace(skills=None, runtime=None)
             self.ss.cmd_check(args)
 
@@ -454,16 +475,26 @@ class SkillsSyncCmdTests(unittest.TestCase):
                 return "copy"
             return self.ss.DEFAULTS[key]
 
-        with mock.patch.object(self.ss, "ensure_enabled", return_value=True), \
-             mock.patch.object(self.ss, "load_manifest", return_value=self.ss._default_manifest()), \
-             mock.patch.object(self.ss, "_resolve_targets", return_value=[{"app": "all", "profile": "core"}]), \
-             mock.patch.object(self.ss, "validate_project_structure", return_value=[]), \
-             mock.patch.object(self.ss, "resolve_skills_for_request", return_value=["agentic-folder-sys"]), \
-             mock.patch.object(self.ss, "_compare", return_value=([], ["agentic-folder-sys"], ["agentic-folder-sys"])), \
-             mock.patch.object(self.ss, "installed_skills", return_value=["agentic-folder-sys"]), \
-             mock.patch.object(self.ss, "upstream_skills_root", return_value=Path("/tmp")), \
-             mock.patch.object(self.ss, "cfg", side_effect=cfg_side_effect), \
-             mock.patch("builtins.print") as print_mock:
+        with (
+            mock.patch.object(self.ss, "ensure_enabled", return_value=True),
+            mock.patch.object(self.ss, "load_manifest", return_value=self.ss._default_manifest()),
+            mock.patch.object(
+                self.ss, "_resolve_targets", return_value=[{"app": "all", "profile": "core"}]
+            ),
+            mock.patch.object(self.ss, "validate_project_structure", return_value=[]),
+            mock.patch.object(
+                self.ss, "resolve_skills_for_request", return_value=["agentic-folder-sys"]
+            ),
+            mock.patch.object(
+                self.ss,
+                "_compare",
+                return_value=([], ["agentic-folder-sys"], ["agentic-folder-sys"]),
+            ),
+            mock.patch.object(self.ss, "installed_skills", return_value=["agentic-folder-sys"]),
+            mock.patch.object(self.ss, "upstream_skills_root", return_value=Path("/tmp")),
+            mock.patch.object(self.ss, "cfg", side_effect=cfg_side_effect),
+            mock.patch("builtins.print") as print_mock,
+        ):
             args = argparse.Namespace(skills=None, runtime=None)
             with self.assertRaises(RuntimeError):
                 self.ss.cmd_check(args)

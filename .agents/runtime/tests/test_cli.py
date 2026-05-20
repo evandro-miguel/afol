@@ -10,7 +10,6 @@ from agentic_scaffold.cli import app
 runner = CliRunner()
 
 
-
 def test_cli_manifest(scaffold_repo):
     result = runner.invoke(app, ["manifest", "--repo-root", str(scaffold_repo)])
     assert result.exit_code == 0
@@ -25,7 +24,6 @@ def test_cli_manifest_pretty_mode(scaffold_repo):
     payload = json.loads(result.stdout)
     assert payload["skill_count"] == 1
     assert "\n  " in result.stdout
-
 
 
 def test_cli_validate(scaffold_repo):
@@ -59,8 +57,7 @@ def test_cli_inspect_target(scaffold_repo):
 def _write_argv_script(scaffold_repo, script_name: str, label: str) -> None:
     script = scaffold_repo / ".agents" / "scripts" / script_name
     script.write_text(
-        "import sys\n"
-        f"print('{label}:' + ' '.join(sys.argv[1:]))\n",
+        f"import sys\nprint('{label}:' + ' '.join(sys.argv[1:]))\n",
         encoding="utf-8",
     )
 

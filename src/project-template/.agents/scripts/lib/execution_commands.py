@@ -64,6 +64,7 @@ if "run_command" not in globals():
                 raise
             return subprocess.run(list(cmd), cwd=cwd, **kwargs)
 
+
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
@@ -271,12 +272,16 @@ def latest_file(session_dir: Path, alias: str) -> Optional[Path]:
 def _resolve_session_path(session: str, *, source: str) -> Path:
     candidate = Path(session)
     if not candidate.is_absolute():
-        candidate = (ROOT_DIR / session).resolve() if "/" in session else (WB_DIR / session).resolve()
+        candidate = (
+            (ROOT_DIR / session).resolve() if "/" in session else (WB_DIR / session).resolve()
+        )
     if candidate.exists() and candidate.is_dir():
         try:
             candidate.resolve().relative_to(CANONICAL_WB_DIR.resolve())
         except ValueError:
-            raise ExecutionError(f"Session must be under {canonical_wb_label()} ({source}): {session}")
+            raise ExecutionError(
+                f"Session must be under {canonical_wb_label()} ({source}): {session}"
+            )
         protected = {
             item.strip()
             for item in os.getenv("AGENTS_PROTECTED_SESSION_IDS", "").split(",")
@@ -314,7 +319,9 @@ def find_session(session: Optional[str]) -> Path:
         active_id = active.read_text().strip()
         if active_id:
             return _resolve_session_path(active_id, source=".active_session")
-    raise ExecutionError("No active session found. Run .agents/agents new and set an active session.")
+    raise ExecutionError(
+        "No active session found. Run .agents/agents new and set an active session."
+    )
 
 
 def resolve_artifact(session_dir: Path, artifact: str) -> Optional[Path]:
@@ -367,7 +374,9 @@ def is_successful_evidence_entry(entry: Dict[str, Any]) -> bool:
     result = str(entry.get("result", ""))
     note = str(entry.get("note", ""))
     combined = f"{result}\n{note}"
-    return bool(SUCCESS_EVIDENCE_RE.search(combined)) and not evidence_entry_has_blocking_failure(entry)
+    return bool(SUCCESS_EVIDENCE_RE.search(combined)) and not evidence_entry_has_blocking_failure(
+        entry
+    )
 
 
 def closure_evidence_error(
@@ -389,10 +398,17 @@ def closure_evidence_error(
     if not result_text:
         return "closure evidence requires an explicit result"
 
-    entry = {"command": command_text, "result": result_text, "artifacts": artifact_list, "note": note_text}
+    entry = {
+        "command": command_text,
+        "result": result_text,
+        "artifacts": artifact_list,
+        "note": note_text,
+    }
     if evidence_entry_has_blocking_failure(entry):
         return "closure evidence records a blocking failure"
-    if not is_successful_evidence_entry(entry) and not ACCEPTED_FAILURE_RE.search(f"{result_text}\n{note_text}"):
+    if not is_successful_evidence_entry(entry) and not ACCEPTED_FAILURE_RE.search(
+        f"{result_text}\n{note_text}"
+    ):
         return "closure evidence result must show a passed/validated gate or explicit N/A"
     if not artifact_list and not note_text:
         return "closure evidence requires an artifact path or explanatory note"
@@ -436,7 +452,12 @@ def artifact_snapshot(path: Optional[Path]) -> Dict[str, Any]:
             "status": "",
             "updated_at": "",
             "mtime": None,
-            "utility": {"useful": False, "placeholder_count": 0, "substantive_line_count": 0, "reasons": ["missing"]},
+            "utility": {
+                "useful": False,
+                "placeholder_count": 0,
+                "substantive_line_count": 0,
+                "reasons": ["missing"],
+            },
         }
 
     fm, body = split_frontmatter(path.read_text(encoding="utf-8"))
@@ -474,7 +495,11 @@ def _dependency_ready(snapshot: Dict[str, Any]) -> bool:
 def _artifact_done(snapshot: Dict[str, Any]) -> bool:
     status = str(snapshot.get("status") or "").strip()
     utility = snapshot.get("utility", {})
-    return bool(snapshot.get("exists")) and bool(utility.get("useful")) and status in TERMINAL_ARTIFACT_STATUSES
+    return (
+        bool(snapshot.get("exists"))
+        and bool(utility.get("useful"))
+        and status in TERMINAL_ARTIFACT_STATUSES
+    )
 
 
 def infer_session_intent(session_dir: Path) -> str:
@@ -512,11 +537,7 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
     intent = infer_session_intent(session_dir)
     profile = ARTIFACT_POLICY.get(intent, {})
     default_doc_types = set(profile.get("create", []))
-    optional_doc_types = {
-        entry["doc_type"]
-        for entry in ARTIFACT_MANIFEST
-        if entry.get("flag")
-    }
+    optional_doc_types = {entry["doc_type"] for entry in ARTIFACT_MANIFEST if entry.get("flag")}
     present_doc_types = {
         entry["doc_type"]
         for entry in ARTIFACT_MANIFEST
@@ -532,7 +553,10 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
         entry
         for entry in ARTIFACT_MANIFEST
         if entry["doc_type"] in selected_doc_types
-        and (entry["doc_type"] not in optional_doc_types or entry["doc_type"] in present_optional_doc_types)
+        and (
+            entry["doc_type"] not in optional_doc_types
+            or entry["doc_type"] in present_optional_doc_types
+        )
     ]
     snapshots = {
         entry["doc_type"]: artifact_snapshot(latest_file(session_dir, entry["doc_type"]))
@@ -562,7 +586,9 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
                 if dependency_snapshot.get("exists") and not utility.get("useful"):
                     blockers.append(f"{dependency}: invalid")
                 else:
-                    blockers.append(f"{dependency}: {dependency_snapshot.get('status') or 'unknown'}")
+                    blockers.append(
+                        f"{dependency}: {dependency_snapshot.get('status') or 'unknown'}"
+                    )
 
         state = "ready"
         if not snapshot.get("exists"):
@@ -647,7 +673,16 @@ def git_status_entries(root_dir: Path = ROOT_DIR) -> Tuple[bool, List[Dict[str, 
 
 
 def _session_artifacts(session_dir: Path) -> Dict[str, Dict[str, Any]]:
-    artifact_names = ["plan", "task", "research", "log", "report", "brainstorm", "explorer-check", "postmortem"]
+    artifact_names = [
+        "plan",
+        "task",
+        "research",
+        "log",
+        "report",
+        "brainstorm",
+        "explorer-check",
+        "postmortem",
+    ]
     return {name: artifact_snapshot(resolve_artifact(session_dir, name)) for name in artifact_names}
 
 
@@ -721,7 +756,9 @@ def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, A
     if child_spec:
         child_spec_path = _resolve_spec_by_id(child_spec)
         if child_spec_path is None:
-            raise ExecutionError(f"Child spec not found for governed feature operation: {child_spec}")
+            raise ExecutionError(
+                f"Child spec not found for governed feature operation: {child_spec}"
+            )
 
     rules: List[Dict[str, str]] = []
     missing_rules: List[str] = []
@@ -751,11 +788,14 @@ def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, A
     }
 
 
-def _split_session_git_changes(session_dir: Path) -> Tuple[bool, List[Dict[str, Any]], List[Dict[str, Any]]]:
+def _split_session_git_changes(
+    session_dir: Path,
+) -> Tuple[bool, List[Dict[str, Any]], List[Dict[str, Any]]]:
     git_available, git_changes = git_status_entries(ROOT_DIR)
     session_prefix = relative_to_root(session_dir).rstrip("/")
     session_changes = [
-        entry for entry in git_changes
+        entry
+        for entry in git_changes
         if entry["path"] == session_prefix or entry["path"].startswith(f"{session_prefix}/")
     ]
     repo_changes = [entry for entry in git_changes if entry not in session_changes]
@@ -773,11 +813,17 @@ def _collect_catchup_state(
     plan_links = artifacts["plan"].get("links", {}) if artifacts["plan"]["exists"] else {}
     expects_research = bool(plan_links.get("research"))
     if expects_research and not artifacts["research"]["exists"]:
-        warnings.append("Plan context exists but no research artifact is present for durable findings capture.")
+        warnings.append(
+            "Plan context exists but no research artifact is present for durable findings capture."
+        )
 
-    latest_repo_mtime = max((entry["mtime"] for entry in repo_changes if entry["mtime"] is not None), default=None)
+    latest_repo_mtime = max(
+        (entry["mtime"] for entry in repo_changes if entry["mtime"] is not None), default=None
+    )
     if repo_changes and not artifacts["log"]["exists"]:
-        warnings.append("Repo has working-tree changes outside the session, but no log artifact exists.")
+        warnings.append(
+            "Repo has working-tree changes outside the session, but no log artifact exists."
+        )
 
     if repo_changes and latest_repo_mtime is not None:
         for alias in ("log", "research", "report"):
@@ -788,16 +834,30 @@ def _collect_catchup_state(
                 stale_artifacts.append(alias)
 
     if repo_changes and not session_changes:
-        warnings.append("Repo has changes outside the session, but the session artifacts are unchanged in git.")
+        warnings.append(
+            "Repo has changes outside the session, but the session artifacts are unchanged in git."
+        )
 
     if "log" in stale_artifacts:
-        warnings.append("Repo changes are newer than the session log; capture progress before continuing.")
+        warnings.append(
+            "Repo changes are newer than the session log; capture progress before continuing."
+        )
     if len(repo_changes) >= 5 and not artifacts["research"]["exists"]:
-        warnings.append("Many repo changes are present without a research artifact; findings may be living only in transient context.")
+        warnings.append(
+            "Many repo changes are present without a research artifact; findings may be living only in transient context."
+        )
     elif len(repo_changes) >= 5 and "research" in stale_artifacts:
-        warnings.append("Repo changes are newer than the research artifact; refresh findings before making new planning decisions.")
-    if artifacts["report"]["exists"] and artifacts["report"].get("status", "").lower() == "final" and repo_changes:
-        warnings.append("Report is marked final while the working tree still has unrecorded repo changes.")
+        warnings.append(
+            "Repo changes are newer than the research artifact; refresh findings before making new planning decisions."
+        )
+    if (
+        artifacts["report"]["exists"]
+        and artifacts["report"].get("status", "").lower() == "final"
+        and repo_changes
+    ):
+        warnings.append(
+            "Report is marked final while the working tree still has unrecorded repo changes."
+        )
 
     return warnings, stale_artifacts
 
@@ -814,7 +874,9 @@ def _catchup_next_step(
         return "Restore missing governed artifacts before resuming implementation."
     if "log" in stale_artifacts:
         return "Repo changes are newer than the session log; capture progress before continuing."
-    if len(repo_changes) >= 5 and (not artifacts["research"]["exists"] or "research" in stale_artifacts):
+    if len(repo_changes) >= 5 and (
+        not artifacts["research"]["exists"] or "research" in stale_artifacts
+    ):
         return "Refresh the research artifact so findings are durable before making new decisions."
     if warnings:
         return warnings[0]
@@ -838,7 +900,9 @@ def build_session_catchup(session_dir: Path, paths_limit: int = 10) -> Dict[str,
     git_available, session_changes, repo_changes = _split_session_git_changes(session_dir)
     warnings, stale_artifacts = _collect_catchup_state(artifacts, repo_changes, session_changes)
     catchup_required = bool(missing_context or repo_changes or warnings)
-    next_step = _catchup_next_step(missing_context, stale_artifacts, warnings, repo_changes, artifacts, nxt)
+    next_step = _catchup_next_step(
+        missing_context, stale_artifacts, warnings, repo_changes, artifacts, nxt
+    )
 
     return {
         "session": session_dir.name,
@@ -850,7 +914,9 @@ def build_session_catchup(session_dir: Path, paths_limit: int = 10) -> Dict[str,
             "total": total,
             "done": done,
             "remaining": remaining,
-            "next": None if nxt is None else {
+            "next": None
+            if nxt is None
+            else {
                 "task_id": nxt.task_id,
                 "state": nxt.state,
                 "owner": nxt.owner,
@@ -902,12 +968,23 @@ def parse_task_rows(task_file: Path) -> List[TaskRow]:
         if checklist:
             marker, task_id, text = checklist.groups()
             state = TASK_MARKER_TO_STATE.get(marker or " ", "pending")
-            rows.append(TaskRow(task_id=task_id.strip(), state=state, owner="", notes=text.strip(), line=idx, line_type="checklist"))
+            rows.append(
+                TaskRow(
+                    task_id=task_id.strip(),
+                    state=state,
+                    owner="",
+                    notes=text.strip(),
+                    line=idx,
+                    line_type="checklist",
+                )
+            )
 
     return rows
 
 
-def parse_state_summary(task_file: Optional[Path]) -> Tuple[int, int, int, List[str], List[TaskRow]]:
+def parse_state_summary(
+    task_file: Optional[Path],
+) -> Tuple[int, int, int, List[str], List[TaskRow]]:
     if not task_file:
         return 0, 0, 0, [], []
     rows = parse_task_rows(task_file)
@@ -954,6 +1031,7 @@ def assert_task_sequence(task_rows: List[TaskRow], target_id: str) -> List[str]:
 
     return blocking
 
+
 def _append_evidence_tag(text: str, evidence_id: str | None) -> str:
     cleaned = EVIDENCE_TAG_RE.sub("", text).rstrip()
     if evidence_id:
@@ -961,7 +1039,9 @@ def _append_evidence_tag(text: str, evidence_id: str | None) -> str:
     return cleaned
 
 
-def update_task_state(task_file: Path, task_id: str, new_state: str, evidence_id: str | None = None) -> bool:
+def update_task_state(
+    task_file: Path, task_id: str, new_state: str, evidence_id: str | None = None
+) -> bool:
     target = normalize_task_state(new_state)
     if target not in FORWARD_STATES:
         raise ExecutionError(f"Invalid task state: {new_state}")
@@ -979,7 +1059,11 @@ def update_task_state(task_file: Path, task_id: str, new_state: str, evidence_id
             row_id, _, owner, notes = table.groups()
             if row_id.strip() == task_id:
                 owner = owner.strip()
-                notes = _append_evidence_tag(notes.strip(), evidence_id) if target == "done" else notes.strip()
+                notes = (
+                    _append_evidence_tag(notes.strip(), evidence_id)
+                    if target == "done"
+                    else notes.strip()
+                )
                 lines[i] = f"| {row_id} | {target} | {owner} | {notes} |"
                 changed = True
                 continue
@@ -1046,10 +1130,19 @@ def append_timeline_entry(log_file: Path, message: str) -> bool:
 def evidence_file(session_dir: Path) -> Path:
     return session_dir / ".evidence.jsonl"
 
+
 def new_evidence_id() -> str:
     return datetime.now().strftime("E-%Y%m%d%H%M%S%f")
 
-def append_evidence(session_dir: Path, task_id: str, command: str, result: str, artifacts: Iterable[str] | None = None, note: str | None = None) -> str:
+
+def append_evidence(
+    session_dir: Path,
+    task_id: str,
+    command: str,
+    result: str,
+    artifacts: Iterable[str] | None = None,
+    note: str | None = None,
+) -> str:
     if not TASK_ID_RE.match(task_id):
         raise ExecutionError(f"Invalid task id: {task_id}")
     eid = new_evidence_id()

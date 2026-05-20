@@ -23,6 +23,7 @@ from lib.agents_config import get_active_session_file_path, get_cfg_path, load_a
 
 try:
     import yaml
+
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
@@ -69,10 +70,10 @@ VALID_DOC_TYPES = [
     "specs_readme",
 ]
 DOC_TYPES_PATTERN = "|".join(re.escape(t) for t in VALID_DOC_TYPES)
-ID_PATTERN = re.compile(rf'^\d{{6}}_\d{{4}}_[a-z0-9_-]+_({DOC_TYPES_PATTERN})_\d+$')
-TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$')
-TIGHT_CHECKBOX_PATTERN = re.compile(r'^(\s*)-\[([ xX/!>%])\](.*)$')
-MISSING_SEP_PATTERN = re.compile(r'(- \[[ xX/!>%]\])(?=\S)')
+ID_PATTERN = re.compile(rf"^\d{{6}}_\d{{4}}_[a-z0-9_-]+_({DOC_TYPES_PATTERN})_\d+$")
+TIMESTAMP_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$")
+TIGHT_CHECKBOX_PATTERN = re.compile(r"^(\s*)-\[([ xX/!>%])\](.*)$")
+MISSING_SEP_PATTERN = re.compile(r"(- \[[ xX/!>%]\])(?=\S)")
 
 
 class Issue:
@@ -127,17 +128,11 @@ class AgentsDoctor:
             folder_path = (ROOT_DIR / folder).resolve()
 
             if not folder_path.exists():
-                self.issues.append(Issue(
-                    "error",
-                    str(folder_path),
-                    "Required folder missing"
-                ))
+                self.issues.append(Issue("error", str(folder_path), "Required folder missing"))
             elif not folder_path.is_dir():
-                self.issues.append(Issue(
-                    "error",
-                    str(folder_path),
-                    "Path exists but is not a directory"
-                ))
+                self.issues.append(
+                    Issue("error", str(folder_path), "Path exists but is not a directory")
+                )
             else:
                 print(f"  ✓ {folder}")
 
@@ -152,20 +147,14 @@ class AgentsDoctor:
             template_path = TEMPLATES_DIR / template
 
             if not template_path.exists():
-                self.issues.append(Issue(
-                    "error",
-                    str(template_path),
-                    "Required template missing"
-                ))
+                self.issues.append(Issue("error", str(template_path), "Required template missing"))
             else:
                 # Validate template has frontmatter
                 content = template_path.read_text()
                 if not content.startswith("---"):
-                    self.issues.append(Issue(
-                        "warning",
-                        str(template_path),
-                        "Template missing YAML frontmatter"
-                    ))
+                    self.issues.append(
+                        Issue("warning", str(template_path), "Template missing YAML frontmatter")
+                    )
                 else:
                     print(f"  ✓ {template}")
 
@@ -177,17 +166,17 @@ class AgentsDoctor:
 
         self.stats["folders_checked"] += 1
         if not MAP_DIR.exists():
-            self.issues.append(Issue(
-                "error",
-                str(MAP_DIR),
-                "Configured current-state map directory missing"
-            ))
+            self.issues.append(
+                Issue("error", str(MAP_DIR), "Configured current-state map directory missing")
+            )
         elif not MAP_DIR.is_dir():
-            self.issues.append(Issue(
-                "error",
-                str(MAP_DIR),
-                "Configured current-state map path exists but is not a directory"
-            ))
+            self.issues.append(
+                Issue(
+                    "error",
+                    str(MAP_DIR),
+                    "Configured current-state map path exists but is not a directory",
+                )
+            )
         else:
             print(f"  ✓ {MAP_DIR.relative_to(ROOT_DIR)}")
 
@@ -208,12 +197,14 @@ class AgentsDoctor:
             self.stats["docs_checked"] += 1
 
             # Check session naming convention
-            if not re.match(r'^\d{6}_\d{4}_[a-z0-9_-]+$', session.name):
-                self.issues.append(Issue(
-                    "warning",
-                    str(session),
-                    "Session folder name doesn't follow YYMMDD_HHMM_theme pattern"
-                ))
+            if not re.match(r"^\d{6}_\d{4}_[a-z0-9_-]+$", session.name):
+                self.issues.append(
+                    Issue(
+                        "warning",
+                        str(session),
+                        "Session folder name doesn't follow YYMMDD_HHMM_theme pattern",
+                    )
+                )
             else:
                 print(f"  ✓ {session.name}")
 
@@ -227,18 +218,17 @@ class AgentsDoctor:
     def check_active_session_pointer(self):
         """Validate active session pointer consistency."""
         print("Checking active session pointer...")
-        has_sessions = any(
-            entry.is_dir() and not entry.name.startswith(".")
-            for entry in WB_DIR.iterdir()
-        ) if WB_DIR.exists() else False
+        has_sessions = (
+            any(entry.is_dir() and not entry.name.startswith(".") for entry in WB_DIR.iterdir())
+            if WB_DIR.exists()
+            else False
+        )
 
         if not ACTIVE_SESSION_FILE.exists():
             if has_sessions:
-                self.issues.append(Issue(
-                    "warning",
-                    str(ACTIVE_SESSION_FILE),
-                    "Active session file missing"
-                ))
+                self.issues.append(
+                    Issue("warning", str(ACTIVE_SESSION_FILE), "Active session file missing")
+                )
             else:
                 print("  ✓ no active session set")
             print()
@@ -246,28 +236,30 @@ class AgentsDoctor:
 
         raw = ACTIVE_SESSION_FILE.read_text().strip()
         if not raw:
-            self.issues.append(Issue(
-                "warning",
-                str(ACTIVE_SESSION_FILE),
-                "Active session file is empty"
-            ))
+            self.issues.append(
+                Issue("warning", str(ACTIVE_SESSION_FILE), "Active session file is empty")
+            )
             print()
             return
 
-        if not re.match(r'^\d{6}_\d{4}_[a-z0-9_-]+$', raw):
-            self.issues.append(Issue(
-                "warning",
-                str(ACTIVE_SESSION_FILE),
-                f"Active session id format looks invalid: {raw}"
-            ))
+        if not re.match(r"^\d{6}_\d{4}_[a-z0-9_-]+$", raw):
+            self.issues.append(
+                Issue(
+                    "warning",
+                    str(ACTIVE_SESSION_FILE),
+                    f"Active session id format looks invalid: {raw}",
+                )
+            )
 
         session_dir = WB_DIR / raw
         if not session_dir.exists() or not session_dir.is_dir():
-            self.issues.append(Issue(
-                "error",
-                str(ACTIVE_SESSION_FILE),
-                f"Active session points to missing folder: {session_dir}"
-            ))
+            self.issues.append(
+                Issue(
+                    "error",
+                    str(ACTIVE_SESSION_FILE),
+                    f"Active session points to missing folder: {session_dir}",
+                )
+            )
         else:
             print(f"  ✓ active -> {raw}")
 
@@ -288,11 +280,9 @@ class AgentsDoctor:
                 self.validate_frontmatter(file_path)
                 print(f"  ✓ {arc_file}")
             else:
-                self.issues.append(Issue(
-                    "warning",
-                    str(file_path),
-                    "Recommended architecture file missing"
-                ))
+                self.issues.append(
+                    Issue("warning", str(file_path), "Recommended architecture file missing")
+                )
 
         # Check SPECS index
         specs_index = arc_dir / "SPECS" / "INDEX.md"
@@ -313,58 +303,68 @@ class AgentsDoctor:
         print("Checking roadmap governance...")
 
         if not ROADMAP_FILE.exists():
-            self.issues.append(Issue(
-                "error",
-                str(ROADMAP_FILE),
-                "Main roadmap file missing"
-            ))
+            self.issues.append(Issue("error", str(ROADMAP_FILE), "Main roadmap file missing"))
             print()
             return
 
         content = ROADMAP_FILE.read_text()
         feature_matches = list(re.finditer(r"^###\s+(F-\d{2,3})\b", content, re.MULTILINE))
         if not feature_matches:
-            self.issues.append(Issue(
-                "warning",
-                str(ROADMAP_FILE),
-                "No roadmap feature sections found (expected headings like '### F-01 ...')"
-            ))
+            self.issues.append(
+                Issue(
+                    "warning",
+                    str(ROADMAP_FILE),
+                    "No roadmap feature sections found (expected headings like '### F-01 ...')",
+                )
+            )
             print()
             return
 
         for idx, match in enumerate(feature_matches):
             feature_id = match.group(1)
             section_start = match.start()
-            section_end = feature_matches[idx + 1].start() if idx + 1 < len(feature_matches) else len(content)
+            section_end = (
+                feature_matches[idx + 1].start() if idx + 1 < len(feature_matches) else len(content)
+            )
             section = content[section_start:section_end]
 
-            governing_spec_match = re.search(r"^- Governing spec:\s+`?([^`\n]+)`?\s*$", section, re.MULTILINE)
+            governing_spec_match = re.search(
+                r"^- Governing spec:\s+`?([^`\n]+)`?\s*$", section, re.MULTILINE
+            )
             if not governing_spec_match:
-                self.issues.append(Issue(
-                    "warning",
-                    str(ROADMAP_FILE),
-                    f"Roadmap feature {feature_id} is missing a 'Governing spec' line"
-                ))
+                self.issues.append(
+                    Issue(
+                        "warning",
+                        str(ROADMAP_FILE),
+                        f"Roadmap feature {feature_id} is missing a 'Governing spec' line",
+                    )
+                )
                 continue
 
             raw_ref = governing_spec_match.group(1).strip()
-            spec_path = (ROOT_DIR / raw_ref).resolve() if not Path(raw_ref).is_absolute() else Path(raw_ref)
+            spec_path = (
+                (ROOT_DIR / raw_ref).resolve() if not Path(raw_ref).is_absolute() else Path(raw_ref)
+            )
             if not spec_path.exists():
-                self.issues.append(Issue(
-                    "error",
-                    str(ROADMAP_FILE),
-                    f"Roadmap feature {feature_id} references missing governing spec: {raw_ref}"
-                ))
+                self.issues.append(
+                    Issue(
+                        "error",
+                        str(ROADMAP_FILE),
+                        f"Roadmap feature {feature_id} references missing governing spec: {raw_ref}",
+                    )
+                )
                 continue
 
             try:
                 spec_path.relative_to(SPECS_DIR.resolve())
             except ValueError:
-                self.issues.append(Issue(
-                    "warning",
-                    str(ROADMAP_FILE),
-                    f"Roadmap feature {feature_id} governing spec is outside {SPECS_DIR.relative_to(ROOT_DIR)}"
-                ))
+                self.issues.append(
+                    Issue(
+                        "warning",
+                        str(ROADMAP_FILE),
+                        f"Roadmap feature {feature_id} governing spec is outside {SPECS_DIR.relative_to(ROOT_DIR)}",
+                    )
+                )
 
         print(f"  ✓ {len(feature_matches)} roadmap feature(s) found")
         print()
@@ -379,11 +379,11 @@ class AgentsDoctor:
         }
         for runtime_name, path in runtime_docs.items():
             if not path.exists():
-                self.issues.append(Issue(
-                    "error",
-                    str(path),
-                    f"Primary runtime entrypoint missing for {runtime_name}"
-                ))
+                self.issues.append(
+                    Issue(
+                        "error", str(path), f"Primary runtime entrypoint missing for {runtime_name}"
+                    )
+                )
             else:
                 print(f"  ✓ {runtime_name} entrypoint -> {path.name}")
 
@@ -392,36 +392,36 @@ class AgentsDoctor:
         }
         for runtime_name, path in runtime_dirs.items():
             if not path.exists() or not path.is_dir():
-                self.issues.append(Issue(
-                    "error",
-                    str(path),
-                    f"Primary runtime folder missing for {runtime_name}"
-                ))
+                self.issues.append(
+                    Issue("error", str(path), f"Primary runtime folder missing for {runtime_name}")
+                )
                 continue
 
             print(f"  ✓ {runtime_name} folder -> {path.relative_to(ROOT_DIR)}")
 
             readme_path = path / "README.md"
             if not readme_path.exists():
-                self.issues.append(Issue(
-                    "warning",
-                    str(readme_path),
-                    f"Runtime README missing for {runtime_name}"
-                ))
+                self.issues.append(
+                    Issue("warning", str(readme_path), f"Runtime README missing for {runtime_name}")
+                )
 
             skills_path = path / "skills"
             if not skills_path.exists():
-                self.issues.append(Issue(
-                    "warning",
-                    str(skills_path),
-                    f"Runtime skills link missing for {runtime_name}"
-                ))
+                self.issues.append(
+                    Issue(
+                        "warning",
+                        str(skills_path),
+                        f"Runtime skills link missing for {runtime_name}",
+                    )
+                )
             elif not skills_path.is_symlink():
-                self.issues.append(Issue(
-                    "warning",
-                    str(skills_path),
-                    f"Runtime skills path for {runtime_name} is not a symlink to .agents/skills"
-                ))
+                self.issues.append(
+                    Issue(
+                        "warning",
+                        str(skills_path),
+                        f"Runtime skills path for {runtime_name} is not a symlink to .agents/skills",
+                    )
+                )
 
         print()
 
@@ -429,11 +429,7 @@ class AgentsDoctor:
         """Validate frontmatter field values."""
         # Check required fields
         if not fm.get("doc_type") and not fm.get("type"):
-            self.issues.append(Issue(
-                "warning",
-                str(file_path),
-                "Missing doc_type/type field"
-            ))
+            self.issues.append(Issue("warning", str(file_path), "Missing doc_type/type field"))
 
         # Check timestamp format
         self._check_frontmatter_timestamps(file_path, fm)
@@ -447,22 +443,28 @@ class AgentsDoctor:
             if ts_field in fm:
                 ts_value = fm[ts_field]
                 if isinstance(ts_value, str) and not TIMESTAMP_PATTERN.match(ts_value):
-                    self.issues.append(Issue(
-                        "warning",
-                        str(file_path),
-                        f"Invalid timestamp format for {ts_field}: {ts_value} (expected ISO 8601: ...Z or ...-03:00)"
-                    ))
+                    self.issues.append(
+                        Issue(
+                            "warning",
+                            str(file_path),
+                            f"Invalid timestamp format for {ts_field}: {ts_value} (expected ISO 8601: ...Z or ...-03:00)",
+                        )
+                    )
 
     def _check_frontmatter_id(self, file_path: Path, fm: Dict):
         """Check ID field format in frontmatter."""
         if "id" in fm:
             id_value = fm["id"]
-            if isinstance(id_value, str) and not ID_PATTERN.match(id_value) and not id_value.endswith("_root") and not id_value.endswith("_readme") and not id_value.endswith("_index"):
-                self.issues.append(Issue(
-                    "info",
-                    str(file_path),
-                    f"ID may not follow convention: {id_value}"
-                ))
+            if (
+                isinstance(id_value, str)
+                and not ID_PATTERN.match(id_value)
+                and not id_value.endswith("_root")
+                and not id_value.endswith("_readme")
+                and not id_value.endswith("_index")
+            ):
+                self.issues.append(
+                    Issue("info", str(file_path), f"ID may not follow convention: {id_value}")
+                )
 
     def validate_frontmatter(self, file_path: Path):
         """Validate YAML frontmatter in a file."""
@@ -470,21 +472,13 @@ class AgentsDoctor:
         content = file_path.read_text()
 
         if not content.startswith("---"):
-            self.issues.append(Issue(
-                "warning",
-                str(file_path),
-                "Missing YAML frontmatter"
-            ))
+            self.issues.append(Issue("warning", str(file_path), "Missing YAML frontmatter"))
             return
 
         # Extract frontmatter
         parts = content.split("---", 2)
         if len(parts) < 3:
-            self.issues.append(Issue(
-                "warning",
-                str(file_path),
-                "Invalid frontmatter structure"
-            ))
+            self.issues.append(Issue("warning", str(file_path), "Invalid frontmatter structure"))
             return
 
         frontmatter_text = parts[1].strip()
@@ -492,22 +486,16 @@ class AgentsDoctor:
         if not HAS_YAML:
             # Basic validation without yaml library
             if "created_at:" not in frontmatter_text and "created:" not in frontmatter_text:
-                self.issues.append(Issue(
-                    "warning",
-                    str(file_path),
-                    "Missing created_at/created field"
-                ))
+                self.issues.append(
+                    Issue("warning", str(file_path), "Missing created_at/created field")
+                )
             return
 
         try:
             fm = yaml.safe_load(frontmatter_text)
             self._validate_frontmatter_fields(file_path, fm)
         except yaml.YAMLError as e:
-            self.issues.append(Issue(
-                "error",
-                str(file_path),
-                f"Invalid YAML frontmatter: {e}"
-            ))
+            self.issues.append(Issue("error", str(file_path), f"Invalid YAML frontmatter: {e}"))
 
     def validate_checkboxes(self, file_path: Path):
         """Validate checkbox markers in file."""
@@ -537,21 +525,21 @@ class AgentsDoctor:
                     lines[idx] = line
                     changed = True
 
-            if re.search(r'-\[[^\s]\]', original) and not re.search(r'- \[[ xX/!>%]\]', original):
-                self.issues.append(Issue(
-                    "info",
-                    str(file_path),
-                    f"Line {idx + 1}: Checkbox may have non-standard marker"
-                ))
+            if re.search(r"-\[[^\s]\]", original) and not re.search(r"- \[[ xX/!>%]\]", original):
+                self.issues.append(
+                    Issue(
+                        "info",
+                        str(file_path),
+                        f"Line {idx + 1}: Checkbox may have non-standard marker",
+                    )
+                )
 
         if changed:
             normalized = "\n".join(lines) + ("\n" if had_trailing_newline else "")
             file_path.write_text(normalized)
-            self.issues.append(Issue(
-                "info",
-                str(file_path),
-                "Auto-fixed checkbox formatting issues (--fix)"
-            ))
+            self.issues.append(
+                Issue("info", str(file_path), "Auto-fixed checkbox formatting issues (--fix)")
+            )
 
     def print_report(self):
         """Print validation report."""

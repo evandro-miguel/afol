@@ -31,29 +31,47 @@ class ReviewInspectTests(unittest.TestCase):
         if plan_fm:
             (session_dir / "260401_plan_01.md").write_text(f"---\n{plan_fm}\n---\n# Plan\n")
         if task_fm:
-            (session_dir / "260401_task_01.md").write_text(f"---\n{task_fm}\n---\n# Task\n| Task | State | Owner | Slice | Acceptance |\n|------|-------|-------|-------|------------|\n| T-01 | done | dev | S-01 | Accept |")
+            (session_dir / "260401_task_01.md").write_text(
+                f"---\n{task_fm}\n---\n# Task\n| Task | State | Owner | Slice | Acceptance |\n|------|-------|-------|-------|------------|\n| T-01 | done | dev | S-01 | Accept |"
+            )
         if spec_body:
-            (session_dir / "260401_spec-child_01.md").write_text(f"---\nstatus: final\n---\n{spec_body}")
+            (session_dir / "260401_spec-child_01.md").write_text(
+                f"---\nstatus: final\n---\n{spec_body}"
+            )
         if report_body:
-            (session_dir / "260401_report_01.md").write_text(f"---\nstatus: final\n---\n{report_body}")
+            (session_dir / "260401_report_01.md").write_text(
+                f"---\nstatus: final\n---\n{report_body}"
+            )
         return session_dir
 
     def test_inspect_artifacts_no_task(self):
         """Missing task artifact reports error."""
         session_dir = self._make_session()
-        with mock.patch.object(self.review, "infer_session_intent", return_value="delivery"), \
-             mock.patch.object(self.review, "build_session_catchup",
-                               return_value={"warnings": [], "stale_artifacts": []}):
+        with (
+            mock.patch.object(self.review, "infer_session_intent", return_value="delivery"),
+            mock.patch.object(
+                self.review,
+                "build_session_catchup",
+                return_value={"warnings": [], "stale_artifacts": []},
+            ),
+        ):
             findings = self.review.inspect_artifacts(session_dir)
         errors = [f for f in findings if f["severity"] == "error"]
         self.assertTrue(any("task" in f["scope"] for f in errors))
 
     def test_inspect_artifacts_no_plan(self):
         """Missing plan artifact reports info."""
-        session_dir = self._make_session(task_fm="id: t1\nroadmap_feature: F-01\nlinks:\n  plan: p1")
-        with mock.patch.object(self.review, "infer_session_intent", return_value="delivery"), \
-             mock.patch.object(self.review, "build_session_catchup",
-                               return_value={"warnings": [], "stale_artifacts": []}):
+        session_dir = self._make_session(
+            task_fm="id: t1\nroadmap_feature: F-01\nlinks:\n  plan: p1"
+        )
+        with (
+            mock.patch.object(self.review, "infer_session_intent", return_value="delivery"),
+            mock.patch.object(
+                self.review,
+                "build_session_catchup",
+                return_value={"warnings": [], "stale_artifacts": []},
+            ),
+        ):
             findings = self.review.inspect_artifacts(session_dir)
         self.assertTrue(any("plan" in f["scope"] for f in findings))
 
@@ -66,9 +84,14 @@ class ReviewInspectTests(unittest.TestCase):
         (session_dir / "260401_task_01.md").write_text(
             "---\nid: t1\nroadmap_feature: F-01\nlinks:\n  plan: p1\n---\n# Task\n"
         )
-        with mock.patch.object(self.review, "infer_session_intent", return_value="delivery"), \
-             mock.patch.object(self.review, "build_session_catchup",
-                               return_value={"warnings": [], "stale_artifacts": []}):
+        with (
+            mock.patch.object(self.review, "infer_session_intent", return_value="delivery"),
+            mock.patch.object(
+                self.review,
+                "build_session_catchup",
+                return_value={"warnings": [], "stale_artifacts": []},
+            ),
+        ):
             findings = self.review.inspect_artifacts(session_dir)
         self.assertTrue(any("frontmatter" in f["message"].lower() for f in findings))
 
@@ -77,13 +100,20 @@ class ReviewInspectTests(unittest.TestCase):
         td = tempfile.mkdtemp()
         session_dir = Path(td) / "session"
         session_dir.mkdir()
-        (session_dir / "260401_plan_01.md").write_text("---\nid: p1\nroadmap_feature: F-01\n---\n# Plan\n")
+        (session_dir / "260401_plan_01.md").write_text(
+            "---\nid: p1\nroadmap_feature: F-01\n---\n# Plan\n"
+        )
         (session_dir / "260401_task_01.md").write_text(
             "---\nid: t1\nroadmap_feature: F-02\nlinks:\n  plan: p1\n---\n# Task\n"
         )
-        with mock.patch.object(self.review, "infer_session_intent", return_value="delivery"), \
-             mock.patch.object(self.review, "build_session_catchup",
-                               return_value={"warnings": [], "stale_artifacts": []}):
+        with (
+            mock.patch.object(self.review, "infer_session_intent", return_value="delivery"),
+            mock.patch.object(
+                self.review,
+                "build_session_catchup",
+                return_value={"warnings": [], "stale_artifacts": []},
+            ),
+        ):
             findings = self.review.inspect_artifacts(session_dir)
         self.assertTrue(any("roadmap_feature" in f["message"] for f in findings))
 
@@ -92,13 +122,20 @@ class ReviewInspectTests(unittest.TestCase):
         td = tempfile.mkdtemp()
         session_dir = Path(td) / "session"
         session_dir.mkdir()
-        (session_dir / "260401_plan_01.md").write_text("---\nid: p1\nroadmap_feature: F-01\n---\n# Plan\n")
+        (session_dir / "260401_plan_01.md").write_text(
+            "---\nid: p1\nroadmap_feature: F-01\n---\n# Plan\n"
+        )
         (session_dir / "260401_task_01.md").write_text(
             "---\nid: t1\nroadmap_feature: F-01\nlinks:\n  plan: wrong-id\n---\n# Task\n"
         )
-        with mock.patch.object(self.review, "infer_session_intent", return_value="delivery"), \
-             mock.patch.object(self.review, "build_session_catchup",
-                               return_value={"warnings": [], "stale_artifacts": []}):
+        with (
+            mock.patch.object(self.review, "infer_session_intent", return_value="delivery"),
+            mock.patch.object(
+                self.review,
+                "build_session_catchup",
+                return_value={"warnings": [], "stale_artifacts": []},
+            ),
+        ):
             findings = self.review.inspect_artifacts(session_dir)
         self.assertTrue(any("link" in f["message"].lower() for f in findings))
 
@@ -108,9 +145,14 @@ class ReviewInspectTests(unittest.TestCase):
             plan_fm="id: p1\nroadmap_feature: F-01",
             task_fm="id: t1\nroadmap_feature: F-01\nlinks:\n  plan: p1",
         )
-        with mock.patch.object(self.review, "infer_session_intent", return_value="delivery"), \
-             mock.patch.object(self.review, "build_session_catchup",
-                               return_value={"warnings": [], "stale_artifacts": []}):
+        with (
+            mock.patch.object(self.review, "infer_session_intent", return_value="delivery"),
+            mock.patch.object(
+                self.review,
+                "build_session_catchup",
+                return_value={"warnings": [], "stale_artifacts": []},
+            ),
+        ):
             findings = self.review.inspect_artifacts(session_dir)
         self.assertTrue(any("spec" in f["scope"] for f in findings))
 
@@ -120,18 +162,28 @@ class ReviewInspectTests(unittest.TestCase):
             plan_fm="id: p1\nroadmap_feature: F-01",
             task_fm="id: t1\nroadmap_feature: F-01\nlinks:\n  plan: p1",
         )
-        with mock.patch.object(self.review, "infer_session_intent", return_value="delivery"), \
-             mock.patch.object(self.review, "build_session_catchup",
-                               return_value={"warnings": [], "stale_artifacts": []}):
+        with (
+            mock.patch.object(self.review, "infer_session_intent", return_value="delivery"),
+            mock.patch.object(
+                self.review,
+                "build_session_catchup",
+                return_value={"warnings": [], "stale_artifacts": []},
+            ),
+        ):
             findings = self.review.inspect_artifacts(session_dir)
         self.assertTrue(any("report" in f["scope"] for f in findings))
 
     def test_inspect_artifacts_planning_intent_no_plan(self):
         """Planning intent without plan reports error."""
         session_dir = self._make_session()
-        with mock.patch.object(self.review, "infer_session_intent", return_value="planning"), \
-             mock.patch.object(self.review, "build_session_catchup",
-                               return_value={"warnings": [], "stale_artifacts": []}):
+        with (
+            mock.patch.object(self.review, "infer_session_intent", return_value="planning"),
+            mock.patch.object(
+                self.review,
+                "build_session_catchup",
+                return_value={"warnings": [], "stale_artifacts": []},
+            ),
+        ):
             findings = self.review.inspect_artifacts(session_dir)
         self.assertTrue(any("plan" in f["scope"] and f["severity"] == "error" for f in findings))
 
@@ -141,9 +193,14 @@ class ReviewInspectTests(unittest.TestCase):
             plan_fm="id: p1\nroadmap_feature: F-01",
             task_fm="id: t1\nroadmap_feature: F-01\nlinks:\n  plan: p1",
         )
-        with mock.patch.object(self.review, "infer_session_intent", return_value="delivery"), \
-             mock.patch.object(self.review, "build_session_catchup",
-                               return_value={"warnings": ["drift detected"], "stale_artifacts": ["plan"]}):
+        with (
+            mock.patch.object(self.review, "infer_session_intent", return_value="delivery"),
+            mock.patch.object(
+                self.review,
+                "build_session_catchup",
+                return_value={"warnings": ["drift detected"], "stale_artifacts": ["plan"]},
+            ),
+        ):
             findings = self.review.inspect_artifacts(session_dir)
         self.assertTrue(any("drift" in f["message"] for f in findings))
 
@@ -159,10 +216,11 @@ class ReviewScopeTests(unittest.TestCase):
         session_dir = Path(td) / "session"
         session_dir.mkdir()
         (session_dir / "260401_task_01.md").write_text("---\nstatus: active\n---\n# Task\n")
-        with mock.patch.object(self.review, "inspect_artifacts", return_value=[]), \
-             mock.patch.object(self.review, "run_verify_tasks",
-                               return_value=(1, "fail output", "")), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.review, "inspect_artifacts", return_value=[]),
+            mock.patch.object(self.review, "run_verify_tasks", return_value=(1, "fail output", "")),
+            mock.patch("builtins.print"),
+        ):
             result = self.review.cmd_scope(session_dir, "all")
         self.assertEqual(result, 1)
 
@@ -175,10 +233,11 @@ class ReviewScopeTests(unittest.TestCase):
             {"scope": "task", "severity": "warning", "message": "task issue"},
             {"scope": "plan", "severity": "info", "message": "plan note"},
         ]
-        with mock.patch.object(self.review, "inspect_artifacts", return_value=findings), \
-             mock.patch.object(self.review, "run_verify_tasks",
-                               return_value=(0, "ok", "")), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.review, "inspect_artifacts", return_value=findings),
+            mock.patch.object(self.review, "run_verify_tasks", return_value=(0, "ok", "")),
+            mock.patch("builtins.print"),
+        ):
             result = self.review.cmd_scope(session_dir, "task")
         self.assertEqual(result, 0)
 
@@ -187,10 +246,11 @@ class ReviewScopeTests(unittest.TestCase):
         td = tempfile.mkdtemp()
         session_dir = Path(td) / "session"
         session_dir.mkdir()
-        with mock.patch.object(self.review, "inspect_artifacts", return_value=[]), \
-             mock.patch.object(self.review, "run_verify_tasks",
-                               return_value=(0, "ok", "")), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.review, "inspect_artifacts", return_value=[]),
+            mock.patch.object(self.review, "run_verify_tasks", return_value=(0, "ok", "")),
+            mock.patch("builtins.print"),
+        ):
             result = self.review.cmd_scope(session_dir, "all")
         self.assertEqual(result, 0)
 
@@ -206,8 +266,10 @@ class ReviewMainTests(unittest.TestCase):
             mock_parser.return_value.parse_args.return_value = argparse.Namespace(
                 session=None, scope="all"
             )
-            with mock.patch.object(self.review, "find_session", side_effect=Exception("boom")), \
-                 mock.patch("builtins.print"):
+            with (
+                mock.patch.object(self.review, "find_session", side_effect=Exception("boom")),
+                mock.patch("builtins.print"),
+            ):
                 result = self.review.main()
         self.assertEqual(result, 1)
 
@@ -217,7 +279,9 @@ class ReviewMainTests(unittest.TestCase):
             mock_parser.return_value.parse_args.return_value = argparse.Namespace(
                 session=None, scope="all"
             )
-            with mock.patch.object(self.review, "find_session", return_value=Path("/tmp/s")), \
-                 mock.patch.object(self.review, "cmd_scope", return_value=0):
+            with (
+                mock.patch.object(self.review, "find_session", return_value=Path("/tmp/s")),
+                mock.patch.object(self.review, "cmd_scope", return_value=0),
+            ):
                 result = self.review.main()
         self.assertEqual(result, 0)

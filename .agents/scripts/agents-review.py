@@ -57,7 +57,12 @@ def _inspect_plan_and_task(
         return
 
     if plan_file is None:
-        _append_issue(findings, "plan", "info", "No plan artifact found; session is using minimal delivery mode")
+        _append_issue(
+            findings,
+            "plan",
+            "info",
+            "No plan artifact found; session is using minimal delivery mode",
+        )
         return
 
     plan_fm, _ = split_frontmatter(plan_file.read_text(encoding="utf-8"))
@@ -65,7 +70,10 @@ def _inspect_plan_and_task(
         _append_issue(findings, "plan", "error", "Plan file missing frontmatter")
 
     task_fm, _ = split_frontmatter(task_file.read_text(encoding="utf-8"))
-    if str(task_fm.get("roadmap_feature", "")).strip() != str(plan_fm.get("roadmap_feature", "")).strip():
+    if (
+        str(task_fm.get("roadmap_feature", "")).strip()
+        != str(plan_fm.get("roadmap_feature", "")).strip()
+    ):
         _append_issue(findings, "task", "error", "task.roadmap_feature does not match plan")
 
     links = task_fm.get("links", {})
@@ -79,7 +87,12 @@ def _inspect_optional_artifacts(
     report_file: Path | None,
 ) -> None:
     if spec_file is None:
-        _append_issue(findings, "spec", "info", "No spec artifact found; implementation guidance may be incomplete")
+        _append_issue(
+            findings,
+            "spec",
+            "info",
+            "No spec artifact found; implementation guidance may be incomplete",
+        )
     if report_file is None:
         _append_issue(findings, "report", "warning", "No report artifact found")
 
@@ -95,13 +108,20 @@ def _inspect_task_rows(findings: List[Dict[str, str]], task_file: Path | None) -
 
     blocked = [r for r in rows if r.state == "blocked"]
     if blocked:
-        _append_issue(findings, "task", "warning", f"Blocked tasks present: {', '.join(r.task_id for r in blocked)}")
+        _append_issue(
+            findings,
+            "task",
+            "warning",
+            f"Blocked tasks present: {', '.join(r.task_id for r in blocked)}",
+        )
 
 
 def _inspect_catchup(findings: List[Dict[str, str]], session_dir: Path) -> None:
     catchup = build_session_catchup(session_dir, paths_limit=5)
     if catchup["warnings"]:
-        _append_issue(findings, "verify", "warning", f"Session catchup advised: {catchup['warnings'][0]}")
+        _append_issue(
+            findings, "verify", "warning", f"Session catchup advised: {catchup['warnings'][0]}"
+        )
     if catchup["stale_artifacts"]:
         _append_issue(
             findings,
@@ -172,9 +192,13 @@ def cmd_scope(session_dir: Path, scope: str) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Review a session against plan/spec/task/workflow constraints")
+    p = argparse.ArgumentParser(
+        description="Review a session against plan/spec/task/workflow constraints"
+    )
     p.add_argument("--session", help="Session id/path (default: active session)")
-    p.add_argument("--scope", choices=["all", "plan", "task", "spec", "report", "verify"], default="all")
+    p.add_argument(
+        "--scope", choices=["all", "plan", "task", "spec", "report", "verify"], default="all"
+    )
     return p
 
 

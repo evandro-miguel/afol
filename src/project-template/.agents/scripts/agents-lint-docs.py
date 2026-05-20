@@ -26,6 +26,7 @@ from lib.agents_config import get_cfg_path, load_agents_config
 
 try:
     import yaml
+
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
@@ -104,7 +105,7 @@ VALID_DOC_TYPES = [
 
 # Checkbox markers
 VALID_MARKERS = [" ", "/", "%", "!", ">", "x"]
-MARKER_PATTERN = re.compile(r'- \[(.)\]')
+MARKER_PATTERN = re.compile(r"- \[(.)\]")
 INLINE_CODE_PATTERN = re.compile(r"`[^`]*`")
 FENCE_PATTERN = re.compile(r"^\s*```")
 TABLE_SEPARATOR_PATTERN = re.compile(r"^\|(?:\s*:?-{3,}:?\s*\|)+\s*$")
@@ -188,50 +189,54 @@ class DocLinter:
         try:
             fm = yaml.safe_load(frontmatter_text)
             if fm is None:
-                self.issues.append(LintIssue(
-                    "warning", file_path, 0,
-                    "Empty YAML frontmatter"
-                ))
+                self.issues.append(LintIssue("warning", file_path, 0, "Empty YAML frontmatter"))
                 return
             if not isinstance(fm, dict):
-                self.issues.append(LintIssue(
-                    "error", file_path, 0,
-                    "Frontmatter must be a YAML mapping/object"
-                ))
+                self.issues.append(
+                    LintIssue("error", file_path, 0, "Frontmatter must be a YAML mapping/object")
+                )
                 return
 
             self._check_frontmatter_fields(file_path, fm)
         except yaml.YAMLError as e:
-            self.issues.append(LintIssue(
-                "error", file_path, 0,
-                f"Invalid YAML: {e}"
-            ))
+            self.issues.append(LintIssue("error", file_path, 0, f"Invalid YAML: {e}"))
 
     def _check_frontmatter_fields(self, file_path: Path, fm: Dict):
         """Check frontmatter field values."""
         # Check doc_type
         doc_type = fm.get("doc_type", fm.get("type", ""))
-        if doc_type and not self._is_placeholder_value(doc_type) and doc_type not in VALID_DOC_TYPES:
-            self.issues.append(LintIssue(
-                "warning", file_path, 0,
-                f"Unknown doc_type: '{doc_type}'. Valid: {', '.join(VALID_DOC_TYPES)}"
-            ))
+        if (
+            doc_type
+            and not self._is_placeholder_value(doc_type)
+            and doc_type not in VALID_DOC_TYPES
+        ):
+            self.issues.append(
+                LintIssue(
+                    "warning",
+                    file_path,
+                    0,
+                    f"Unknown doc_type: '{doc_type}'. Valid: {', '.join(VALID_DOC_TYPES)}",
+                )
+            )
 
         # Check status
         status = fm.get("status", "")
         if status and not self._is_placeholder_value(status) and status not in VALID_STATUSES:
-            self.issues.append(LintIssue(
-                "warning", file_path, 0,
-                f"Unknown status: '{status}'. Valid: {', '.join(VALID_STATUSES)}"
-            ))
+            self.issues.append(
+                LintIssue(
+                    "warning",
+                    file_path,
+                    0,
+                    f"Unknown status: '{status}'. Valid: {', '.join(VALID_STATUSES)}",
+                )
+            )
 
         # Check required fields based on doc_type
         if doc_type in ["plan", "task", "report"]:
             if not fm.get("theme"):
-                self.issues.append(LintIssue(
-                    "warning", file_path, 0,
-                    "Missing required field: 'theme'"
-                ))
+                self.issues.append(
+                    LintIssue("warning", file_path, 0, "Missing required field: 'theme'")
+                )
 
         # Check timestamp format
         self._check_timestamps(file_path, fm)
@@ -243,10 +248,14 @@ class DocLinter:
                 ts_value = fm[ts_field]
                 if isinstance(ts_value, str):
                     if not self._is_valid_timestamp(ts_value):
-                        self.issues.append(LintIssue(
-                            "warning", file_path, 0,
-                            f"Invalid timestamp format for {ts_field}: '{ts_value}' (expected ISO 8601: ...Z or ...-03:00)"
-                        ))
+                        self.issues.append(
+                            LintIssue(
+                                "warning",
+                                file_path,
+                                0,
+                                f"Invalid timestamp format for {ts_field}: '{ts_value}' (expected ISO 8601: ...Z or ...-03:00)",
+                            )
+                        )
 
     def check_frontmatter(self, file_path: Path, content: str):
         """Check YAML frontmatter."""
@@ -255,17 +264,11 @@ class DocLinter:
         if frontmatter_text is None and not invalid_structure:
             if file_path.name.lower() == "readme.md":
                 return
-            self.issues.append(LintIssue(
-                "warning", file_path, 0,
-                "Missing YAML frontmatter"
-            ))
+            self.issues.append(LintIssue("warning", file_path, 0, "Missing YAML frontmatter"))
             return
 
         if invalid_structure:
-            self.issues.append(LintIssue(
-                "error", file_path, 0,
-                "Invalid frontmatter structure"
-            ))
+            self.issues.append(LintIssue("error", file_path, 0, "Invalid frontmatter structure"))
             return
 
         self._validate_frontmatter_yaml(file_path, frontmatter_text)
@@ -288,19 +291,27 @@ class DocLinter:
             for match in MARKER_PATTERN.finditer(search_line):
                 marker = match.group(1)
                 if marker not in VALID_MARKERS:
-                    self.issues.append(LintIssue(
-                        "info", file_path, i,
-                        f"Non-standard checkbox marker: '[{marker}]'. Valid: {', '.join(f'[{m}]' for m in VALID_MARKERS)}"
-                    ))
+                    self.issues.append(
+                        LintIssue(
+                            "info",
+                            file_path,
+                            i,
+                            f"Non-standard checkbox marker: '[{marker}]'. Valid: {', '.join(f'[{m}]' for m in VALID_MARKERS)}",
+                        )
+                    )
 
                 # Check for missing space after checkbox
                 end_idx = match.end()
                 has_separator = end_idx >= len(search_line) or search_line[end_idx] in {" ", "|"}
                 if not has_separator:
-                    self.issues.append(LintIssue(
-                        "warning", file_path, i,
-                        f"Missing separator after checkbox marker: '- [{marker}]'"
-                    ))
+                    self.issues.append(
+                        LintIssue(
+                            "warning",
+                            file_path,
+                            i,
+                            f"Missing separator after checkbox marker: '- [{marker}]'",
+                        )
+                    )
 
     def check_state_board(self, file_path: Path, lines: List[str]):
         """Check state board table."""
@@ -328,11 +339,19 @@ class DocLinter:
                         # Skip table header row
                         if row_task == "task" or state.lower() == "state":
                             continue
-                        if state and not self._is_placeholder_value(state) and state not in VALID_STATES:
-                            self.issues.append(LintIssue(
-                                "warning", file_path, i,
-                                f"Unknown state: '{state}'. Valid: {', '.join(VALID_STATES)}"
-                            ))
+                        if (
+                            state
+                            and not self._is_placeholder_value(state)
+                            and state not in VALID_STATES
+                        ):
+                            self.issues.append(
+                                LintIssue(
+                                    "warning",
+                                    file_path,
+                                    i,
+                                    f"Unknown state: '{state}'. Valid: {', '.join(VALID_STATES)}",
+                                )
+                            )
                 elif line.strip() and not line.strip().startswith("|"):
                     in_state_board = False
 
@@ -353,16 +372,21 @@ class DocLinter:
 
             # Check if status matches content indicators
             if status == "final" and "- [ ]" in content:
-                self.issues.append(LintIssue(
-                    "warning", file_path, 0,
-                    "Status is 'final' but file contains unchecked items"
-                ))
+                self.issues.append(
+                    LintIssue(
+                        "warning",
+                        file_path,
+                        0,
+                        "Status is 'final' but file contains unchecked items",
+                    )
+                )
 
             if status == "draft" and "- [x]" in content:
-                self.issues.append(LintIssue(
-                    "info", file_path, 0,
-                    "Status is 'draft' but file contains completed items"
-                ))
+                self.issues.append(
+                    LintIssue(
+                        "info", file_path, 0, "Status is 'draft' but file contains completed items"
+                    )
+                )
 
         except yaml.YAMLError:
             pass
@@ -374,23 +398,31 @@ class DocLinter:
         # Check for plan/task links
         if "plan:" in body or "task:" in body:
             # Extract referenced IDs
-            id_pattern = re.compile(r'["\']?(\d{6}_\d{4}_[a-z0-9_-]+_(?:plan|task|report|spec|adr)_\d+)["\']?')
+            id_pattern = re.compile(
+                r'["\']?(\d{6}_\d{4}_[a-z0-9_-]+_(?:plan|task|report|spec|adr)_\d+)["\']?'
+            )
             references = id_pattern.findall(body)
 
             # Note: We can't validate if the referenced file exists without more context
             # This is just a lint check for format
             for ref in references:
-                if not re.match(r'^\d{6}_\d{4}_[a-z0-9_-]+_(?:plan|task|report|spec|adr)_\d+$', ref):
-                    self.issues.append(LintIssue(
-                        "info", file_path, 0,
-                        f"Cross-reference may have invalid format: '{ref}'"
-                    ))
+                if not re.match(
+                    r"^\d{6}_\d{4}_[a-z0-9_-]+_(?:plan|task|report|spec|adr)_\d+$", ref
+                ):
+                    self.issues.append(
+                        LintIssue(
+                            "info",
+                            file_path,
+                            0,
+                            f"Cross-reference may have invalid format: '{ref}'",
+                        )
+                    )
 
     def _is_valid_timestamp(self, ts: str) -> bool:
         """Check if timestamp is valid ISO 8601 with Z or timezone offset."""
         if ts == "YYYY-MM-DDTHH:MM:SSZ":
             return True
-        pattern = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$')
+        pattern = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$")
         return bool(pattern.match(ts))
 
     def _is_placeholder_value(self, value: object) -> bool:

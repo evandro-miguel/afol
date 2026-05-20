@@ -89,7 +89,9 @@ JUSTFILE_MODULE_APPEND = """# .agents scaffold module (collision-safe namespaced
 mod agents_scaffold 'docs/standards/Justfile'
 """
 JUSTFILE_IMPORT_RE = re.compile(r'^\s*import\s+["\']docs/standards/Justfile["\']\s*$')
-JUSTFILE_MODULE_RE = re.compile(r'^\s*mod\s+agents_scaffold\s+["\']docs/standards/Justfile["\']\s*$')
+JUSTFILE_MODULE_RE = re.compile(
+    r'^\s*mod\s+agents_scaffold\s+["\']docs/standards/Justfile["\']\s*$'
+)
 
 COMMON_COPY_IGNORES = {
     ".venv",
@@ -244,10 +246,14 @@ def _managed_files_from_template() -> Dict[Path, Path]:
 def _load_bootstrap_manifest(target: Path) -> BootstrapManifest:
     manifest_path = bootstrap_lock_file(target)
     if not manifest_path.exists():
-        return BootstrapManifest(version=BOOTSTRAP_MANIFEST_VERSION, generated_at=current_timestamp(), managed_files={})
+        return BootstrapManifest(
+            version=BOOTSTRAP_MANIFEST_VERSION, generated_at=current_timestamp(), managed_files={}
+        )
 
     try:
-        payload = bootstrap_manifest_payload_from_data(json.loads(manifest_path.read_text(encoding="utf-8")))
+        payload = bootstrap_manifest_payload_from_data(
+            json.loads(manifest_path.read_text(encoding="utf-8"))
+        )
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Could not parse bootstrap manifest {manifest_path}: {exc}") from exc
 
@@ -255,9 +261,7 @@ def _load_bootstrap_manifest(target: Path) -> BootstrapManifest:
     if not isinstance(managed_files, dict):
         managed_files = {}
     cleaned: Dict[str, str] = {
-        k: v
-        for k, v in managed_files.items()
-        if isinstance(k, str) and isinstance(v, str)
+        k: v for k, v in managed_files.items() if isinstance(k, str) and isinstance(v, str)
     }
     return BootstrapManifest(
         version=int(payload.get("version", BOOTSTRAP_MANIFEST_VERSION)),
@@ -272,7 +276,8 @@ def bootstrap_manifest(target: Path) -> BootstrapManifest:
         version=BOOTSTRAP_MANIFEST_VERSION,
         generated_at=current_timestamp(),
         managed_files={
-            _managed_entry_key(rel): file_hash(path) for rel, path in sorted(managed.items(), key=lambda item: _managed_entry_key(item[0]))
+            _managed_entry_key(rel): file_hash(path)
+            for rel, path in sorted(managed.items(), key=lambda item: _managed_entry_key(item[0]))
         },
     )
 
@@ -334,7 +339,9 @@ def _classify_reconcile_item(
 ) -> BootstrapPlanItem:
     source_hash = file_hash(source_path)
     if not target_path.exists():
-        return BootstrapPlanItem(BootstrapAction.CREATE, target_path, source_path, "missing in target")
+        return BootstrapPlanItem(
+            BootstrapAction.CREATE, target_path, source_path, "missing in target"
+        )
 
     target_hash = file_hash(target_path)
     if target_hash == source_hash:
@@ -374,13 +381,17 @@ def _classify_reconcile_item(
     )
 
 
-def bootstrap_reconcile_plan(target: Path, manifest: BootstrapManifest | None = None) -> List[BootstrapPlanItem]:
+def bootstrap_reconcile_plan(
+    target: Path, manifest: BootstrapManifest | None = None
+) -> List[BootstrapPlanItem]:
     planned_source = _managed_files_from_template()
     managed_paths = {_managed_entry_key(path) for path in planned_source}
     manifest = manifest or _load_bootstrap_manifest(target)
     actions: List[BootstrapPlanItem] = []
 
-    for rel, source_path in sorted(planned_source.items(), key=lambda item: _managed_entry_key(item[0])):
+    for rel, source_path in sorted(
+        planned_source.items(), key=lambda item: _managed_entry_key(item[0])
+    ):
         target_path = target / rel
         prev_hash = manifest.managed_files.get(_managed_entry_key(rel))
         actions.append(_classify_reconcile_item(rel, source_path, target_path, prev_hash))
@@ -390,7 +401,14 @@ def bootstrap_reconcile_plan(target: Path, manifest: BootstrapManifest | None = 
             continue
         stale_path = target / rel_str
         if stale_path.exists():
-            actions.append(BootstrapPlanItem(BootstrapAction.DELETE_STALE_MANAGED, stale_path, None, "managed file removed from manifest"))
+            actions.append(
+                BootstrapPlanItem(
+                    BootstrapAction.DELETE_STALE_MANAGED,
+                    stale_path,
+                    None,
+                    "managed file removed from manifest",
+                )
+            )
 
     for absolute_path in _iter_preserve_scope_files(target):
         rel_str = absolute_path.relative_to(target).as_posix()
@@ -401,9 +419,17 @@ def bootstrap_reconcile_plan(target: Path, manifest: BootstrapManifest | None = 
         if rel_str == _managed_entry_key(BOOTSTRAP_MANIFEST_PATH):
             continue
         if absolute_path.is_file():
-            actions.append(BootstrapPlanItem(BootstrapAction.PRESERVE_UNMANAGED, absolute_path, None, "local file outside managed manifest"))
+            actions.append(
+                BootstrapPlanItem(
+                    BootstrapAction.PRESERVE_UNMANAGED,
+                    absolute_path,
+                    None,
+                    "local file outside managed manifest",
+                )
+            )
 
     return actions
+
 
 def _template_source(rel: Path) -> Path:
     return TEMPLATE_ROOT / rel
@@ -458,9 +484,7 @@ def ensure_partial_runtime_surfaces(target: Path, dry_run: bool):
         ),
         (
             Path(".agents/agents-mcp"),
-            (
-                'run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp',
-            ),
+            ('run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp',),
             "refresh managed mcp wrapper",
         ),
     ]
@@ -672,16 +696,26 @@ def current_timestamp() -> str:
 
 
 def render_template(template_rel: Path, timestamp: str) -> str:
-    return _template_source(template_rel).read_text(encoding="utf-8").replace("YYYY-MM-DDTHH:MM:SSZ", timestamp)
+    return (
+        _template_source(template_rel)
+        .read_text(encoding="utf-8")
+        .replace("YYYY-MM-DDTHH:MM:SSZ", timestamp)
+    )
 
 
 def roadmap_specs_for_mode(install_mode: str) -> List[Dict[str, str]]:
-    return PARTIAL_STARTER_PARENT_SPECS if install_mode == INSTALL_MODE_PARTIAL else FULL_STARTER_PARENT_SPECS
+    return (
+        PARTIAL_STARTER_PARENT_SPECS
+        if install_mode == INSTALL_MODE_PARTIAL
+        else FULL_STARTER_PARENT_SPECS
+    )
 
 
 def build_full_roadmap(timestamp: str, starter_specs: Sequence[Dict[str, str]]) -> str:
     roadmap = render_template(Path("docs/templates/roadmap.md"), timestamp)
-    roadmap = roadmap.replace('id: "ROADMAP_general"', 'id: "000000_0000_general-roadmap_roadmap_01"', 1)
+    roadmap = roadmap.replace(
+        'id: "ROADMAP_general"', 'id: "000000_0000_general-roadmap_roadmap_01"', 1
+    )
     for spec in starter_specs:
         roadmap = roadmap.replace(
             "docs/arc/SPECS/<parent-spec-file>.md",
@@ -758,7 +792,9 @@ def build_partial_roadmap(timestamp: str, starter_specs: Sequence[Dict[str, str]
     )
 
 
-def build_roadmap(timestamp: str, install_mode: str, starter_specs: Sequence[Dict[str, str]]) -> str:
+def build_roadmap(
+    timestamp: str, install_mode: str, starter_specs: Sequence[Dict[str, str]]
+) -> str:
     if install_mode == INSTALL_MODE_PARTIAL:
         return build_partial_roadmap(timestamp, starter_specs)
     return build_full_roadmap(timestamp, starter_specs)
@@ -1048,12 +1084,12 @@ def build_parent_spec(timestamp: str, spec: Dict[str, str]) -> str:
             "risk_level: low",
             "---",
             "",
-            f'# SPEC: {spec["title"]}',
+            f"# SPEC: {spec['title']}",
             "",
             "## 1) Feature Intent",
             "- Outcome: <what changes for the user or system>",
             "- Why now: <why this feature matters now>",
-            f'- Roadmap feature: `{spec["feature_id"]}`',
+            f"- Roadmap feature: `{spec['feature_id']}`",
             "- Role of this spec: parent",
             "",
             "## 2) Problem",
@@ -1119,10 +1155,14 @@ def build_parent_spec(timestamp: str, spec: Dict[str, str]) -> str:
     )
 
 
-def generated_baseline_content(timestamp: str, install_mode: str = INSTALL_MODE_FULL) -> Dict[Path, str]:
+def generated_baseline_content(
+    timestamp: str, install_mode: str = INSTALL_MODE_FULL
+) -> Dict[Path, str]:
     starter_specs = roadmap_specs_for_mode(install_mode)
     baseline = {
-        Path("docs/arc/ARCHITECTURE.md"): render_template(Path("docs/templates/architecture.md"), timestamp),
+        Path("docs/arc/ARCHITECTURE.md"): render_template(
+            Path("docs/templates/architecture.md"), timestamp
+        ),
         Path("docs/arc/GENERAL-ROADMAP.md"): build_roadmap(timestamp, install_mode, starter_specs),
         Path("docs/arc/PROJECT-BRIEF.md"): build_project_brief(timestamp),
         Path("docs/arc/ENGINEERING-GUIDELINES.md"): build_engineering_guidelines(timestamp),
@@ -1156,9 +1196,15 @@ def write_generated_baseline(target: Path, force: bool, dry_run: bool, install_m
         safe_write_file(target / rel, content, force, dry_run)
 
 
-def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: bool, install_mode: str):
+def write_adaptation_doc(
+    target: Path, stack: Dict[str, List[str]], dry_run: bool, install_mode: str
+):
     out = target / "docs" / "standards" / "bootstrap-adaptation.md"
-    install_label = "partial install for an existing project" if install_mode == INSTALL_MODE_PARTIAL else "full bootstrap for a fresh repo"
+    install_label = (
+        "partial install for an existing project"
+        if install_mode == INSTALL_MODE_PARTIAL
+        else "full bootstrap for a fresh repo"
+    )
     body = [
         "---",
         "doc_type: standard",
@@ -1604,7 +1650,9 @@ def post_checks_use_just(target: Path) -> bool:
     return shutil.which("just") is not None and (target / "Justfile").exists()
 
 
-def build_post_check_commands(target: Path, install_mode: str = INSTALL_MODE_FULL) -> List[Tuple[str, List[str], bool]]:
+def build_post_check_commands(
+    target: Path, install_mode: str = INSTALL_MODE_FULL
+) -> List[Tuple[str, List[str], bool]]:
     recipe_prefix = _just_recipe_prefix(target)
     if not post_checks_use_just(target):
         raise RuntimeError("just is required for post-bootstrap checks")
@@ -1637,7 +1685,11 @@ def build_post_check_commands(target: Path, install_mode: str = INSTALL_MODE_FUL
             ("list", _just_post_check_command("--list"), True),
             ("doctor", _just_post_check_command(f"{recipe_prefix}doctor"), True),
             ("lint", _just_post_check_command(f"{recipe_prefix}lint"), repo_validation_required),
-            ("test-scripts", _just_post_check_command(f"{recipe_prefix}test-scripts"), repo_validation_required),
+            (
+                "test-scripts",
+                _just_post_check_command(f"{recipe_prefix}test-scripts"),
+                repo_validation_required,
+            ),
             ("all", _just_post_check_command(f"{recipe_prefix}all"), repo_validation_required),
         ]
     )
@@ -1696,7 +1748,9 @@ def validate_target(target: Path, dry_run: bool, install_mode: str):
         if dry_run or install_mode == INSTALL_MODE_FULL:
             target.mkdir(parents=True, exist_ok=True)
         elif install_mode == INSTALL_MODE_PARTIAL:
-            raise FileNotFoundError(f"Partial install requires an existing target directory: {target}")
+            raise FileNotFoundError(
+                f"Partial install requires an existing target directory: {target}"
+            )
         else:
             raise FileNotFoundError(f"Target directory not found: {target}")
     if not target.is_dir():

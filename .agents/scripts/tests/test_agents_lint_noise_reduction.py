@@ -19,6 +19,7 @@ def load_module(module_name: str, file_path: Path):
 def ensure_yaml_module():
     try:
         import yaml  # noqa: F401
+
         return
     except ImportError:
         pass
@@ -105,9 +106,7 @@ updated_at: 2026-02-24T00:00:00Z
             linter.check_frontmatter(file_path, content)
 
             unknown_doc_type_warnings = [
-                issue
-                for issue in linter.issues
-                if "Unknown doc_type" in issue.message
+                issue for issue in linter.issues if "Unknown doc_type" in issue.message
             ]
             self.assertEqual(unknown_doc_type_warnings, [])
 
@@ -121,7 +120,9 @@ updated_at: 2026-02-24T00:00:00Z
 
             with (
                 mock.patch.object(self.lint_docs, "AGENTS_DIR", agents_dir),
-                mock.patch.object(self.lint_docs, "EXCLUDED_PATH_PREFIXES", (".agents/tmp/", "tmp/")),
+                mock.patch.object(
+                    self.lint_docs, "EXCLUDED_PATH_PREFIXES", (".agents/tmp/", "tmp/")
+                ),
             ):
                 linter = self.lint_docs.DocLinter(fix=False)
                 self.assertTrue(linter.should_skip_file(tmp_file))

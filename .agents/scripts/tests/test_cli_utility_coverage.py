@@ -32,7 +32,9 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
     path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
 
 
-def make_pattern(base: Path, subdir: str, name: str, pattern_id: str, status: str = "active") -> Path:
+def make_pattern(
+    base: Path, subdir: str, name: str, pattern_id: str, status: str = "active"
+) -> Path:
     path = base / subdir / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -87,7 +89,9 @@ def tool_catalog() -> dict:
                 "updated_at": "2026-01-01",
                 "description": "Automate workbench maintenance",
                 "when_to_use": ["Automate session updates"],
-                "commands": [{"name": "touch", "description": "Touch docs", "usage": "wb-update touch"}],
+                "commands": [
+                    {"name": "touch", "description": "Touch docs", "usage": "wb-update touch"}
+                ],
             },
         ],
         "tool_categories": {
@@ -154,7 +158,9 @@ def test_agents_patterns_load_filter_apply_rate_and_cli(tmp_path, monkeypatch, c
     pattern_root = tmp_path / "patterns"
     pattern_file = make_pattern(pattern_root, "success", "test_pattern.md", "PAT-001")
     make_pattern(pattern_root, "anti", "deprecated_pattern.md", "PAT-002", status="deprecated")
-    (pattern_root / "success" / "TEMPLATE_skip.md").write_text("---\nid: skip\n---\n", encoding="utf-8")
+    (pattern_root / "success" / "TEMPLATE_skip.md").write_text(
+        "---\nid: skip\n---\n", encoding="utf-8"
+    )
     active = tmp_path / ".active_session"
     active.write_text("260101_0100_active\n", encoding="utf-8")
     calls: list[list[str]] = []
@@ -165,7 +171,9 @@ def test_agents_patterns_load_filter_apply_rate_and_cli(tmp_path, monkeypatch, c
     monkeypatch.setattr(
         patterns.subprocess,
         "run",
-        lambda cmd, **kwargs: calls.append(cmd) or SimpleNamespace(returncode=0, stdout="", stderr=""),
+        lambda cmd, **kwargs: (
+            calls.append(cmd) or SimpleNamespace(returncode=0, stdout="", stderr="")
+        ),
     )
     monkeypatch.setattr(patterns, "get_iso_timestamp", lambda: "2026-02-02T00:00:00Z")
 
@@ -217,10 +225,16 @@ def test_structure_mapper_scans_cache_generates_and_cli(tmp_path, monkeypatch):
     (project / "data").mkdir()
     (project / "node_modules").mkdir()
     (project / ".agents" / "tools" / "uv").mkdir(parents=True)
-    (project / "components" / "HomePage.tsx").write_text("export function HomePage() {}\n", encoding="utf-8")
-    (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
+    (project / "components" / "HomePage.tsx").write_text(
+        "export function HomePage() {}\n", encoding="utf-8"
+    )
+    (project / "services" / "UserService.py").write_text(
+        "def run():\n    return True\n", encoding="utf-8"
+    )
     (project / "types" / "UserTypes.ts").write_text("type User = {}\n", encoding="utf-8")
-    (project / "tests" / "test_app.py").write_text("def test_app():\n    assert True\n", encoding="utf-8")
+    (project / "tests" / "test_app.py").write_text(
+        "def test_app():\n    assert True\n", encoding="utf-8"
+    )
     (project / "data" / "config.json").write_text("{}\n", encoding="utf-8")
     (project / "node_modules" / "skip.py").write_text("skip\n", encoding="utf-8")
     (project / ".agents" / "tools" / "uv" / "skip.py").write_text("skip\n", encoding="utf-8")
@@ -253,7 +267,9 @@ def test_structure_mapper_scans_cache_generates_and_cli(tmp_path, monkeypatch):
     assert exc.value.code == 1
 
     cli_output = project / "docs" / "arc" / "structure-cli"
-    monkeypatch.setattr(sys, "argv", ["agents-structure-map.py", str(project), "--output", str(cli_output)])
+    monkeypatch.setattr(
+        sys, "argv", ["agents-structure-map.py", str(project), "--output", str(cli_output)]
+    )
     struct.main()
     assert (cli_output / "README.md").exists()
 
@@ -263,14 +279,18 @@ def test_structure_mapper_scan_uses_single_pass_metrics(tmp_path, monkeypatch):
     project = tmp_path / "project"
     output = project / "docs" / "map" / "structure"
     (project / "services").mkdir(parents=True)
-    (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
+    (project / "services" / "UserService.py").write_text(
+        "def run():\n    return True\n", encoding="utf-8"
+    )
 
     mapper = struct.StructureMapper(project, output)
 
     monkeypatch.setattr(
         mapper,
         "count_lines",
-        lambda _path: (_ for _ in ()).throw(AssertionError("legacy count_lines path should not run")),
+        lambda _path: (_ for _ in ()).throw(
+            AssertionError("legacy count_lines path should not run")
+        ),
     )
     monkeypatch.setattr(
         mapper,
@@ -336,12 +356,16 @@ def test_tools_smoke_runner_success_and_failure(monkeypatch, capsys):
     wrapper = Path("/tmp/fake-agents")
     original_exists = Path.exists
     monkeypatch.setattr(smoke, "WRAPPER", wrapper)
-    monkeypatch.setattr(Path, "exists", lambda self: False if self == wrapper else original_exists(self))
+    monkeypatch.setattr(
+        Path, "exists", lambda self: False if self == wrapper else original_exists(self)
+    )
 
     assert smoke.main() == 1
     assert "wrapper not found" in capsys.readouterr().out
 
-    monkeypatch.setattr(Path, "exists", lambda self: True if self == wrapper else original_exists(self))
+    monkeypatch.setattr(
+        Path, "exists", lambda self: True if self == wrapper else original_exists(self)
+    )
 
     def fake_run(cmd, cwd, capture_output, text):
         if "missing-tool" in cmd:
@@ -385,12 +409,16 @@ def test_telemetry_storage_reports_heat_and_cli(tmp_path, monkeypatch, capsys):
     assert telemetry.load_schema() == {}
     schema_file.write_text('{"type":"object"}', encoding="utf-8")
     assert telemetry.load_schema()["type"] == "object"
-    assert telemetry.validate_event({"timestamp": "x", "event_type": "tool_exec", "session_id": "s"})
+    assert telemetry.validate_event(
+        {"timestamp": "x", "event_type": "tool_exec", "session_id": "s"}
+    )
     assert not telemetry.validate_event({"event_type": "tool_exec", "session_id": "s"})
     assert not telemetry.validate_event({"timestamp": "x", "event_type": "bad", "session_id": "s"})
     assert telemetry.get_active_session() == "active-session"
 
-    event = telemetry.record_event("tool_exec", metadata={"tool_name": "doctor", "outcome": "success"})
+    event = telemetry.record_event(
+        "tool_exec", metadata={"tool_name": "doctor", "outcome": "success"}
+    )
     assert event["session_id"] == "active-session"
     loaded = telemetry.load_events(event_type="tool_exec", session_id="active-session")
     assert len(loaded) == 1
@@ -486,7 +514,19 @@ def test_telemetry_storage_reports_heat_and_cli(tmp_path, monkeypatch, capsys):
         monkeypatch.setattr(sys, "argv", argv)
         telemetry.main()
 
-    monkeypatch.setattr(sys, "argv", ["agents-telemetry.py", "record", "tool_exec", "--metadata", '{"tool_name":"lint"}', "--outcome", "success"])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agents-telemetry.py",
+            "record",
+            "tool_exec",
+            "--metadata",
+            '{"tool_name":"lint"}',
+            "--outcome",
+            "success",
+        ],
+    )
     telemetry.main()
     monkeypatch.setattr(sys, "argv", ["agents-telemetry.py", "validate"])
     with pytest.raises(SystemExit):
@@ -505,7 +545,7 @@ def test_check_links_extracts_resolves_reports_and_cli(tmp_path, monkeypatch, ca
         "[ok](target.md)\n"
         "[missing](missing.md)\n"
         "[external](https://example.com)\n"
-        "<a href=\"target.md\">html</a>\n"
+        '<a href="target.md">html</a>\n'
         "![img](image.png)\n"
         "```md\n[skip](missing.md)\n```\n",
         encoding="utf-8",
@@ -524,7 +564,9 @@ def test_check_links_extracts_resolves_reports_and_cli(tmp_path, monkeypatch, ca
 
     output = tmp_path / "report.txt"
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", ["check-links.py", str(current), "--fix", "--output", str(output)])
+    monkeypatch.setattr(
+        sys, "argv", ["check-links.py", str(current), "--fix", "--output", str(output)]
+    )
     with pytest.raises(SystemExit) as exc:
         links.main()
     assert exc.value.code == 1
@@ -584,7 +626,9 @@ def test_lint_fix_scripts_process_files_and_cli(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sys, "argv", ["fix-lint-checkboxes.py", "--dry-run", str(docs)])
     assert checkboxes.main() == 0
-    monkeypatch.setattr(sys, "argv", ["fix-lint-frontmatter.py", "--dry-run", str(docs / "missing.txt"), str(plain)])
+    monkeypatch.setattr(
+        sys, "argv", ["fix-lint-frontmatter.py", "--dry-run", str(docs / "missing.txt"), str(plain)]
+    )
     assert frontmatter.main() == 0
     monkeypatch.setattr(sys, "argv", ["fix-lint-doctypes.py", "--dry-run", "--base-dir", str(docs)])
     assert doctypes.main() == 0
@@ -637,12 +681,16 @@ def test_fix_symlinks_targets_modes_and_failures(tmp_path, monkeypatch, capsys):
     label, src, target, link_target = mappings[0]
     assert fix_symlinks.process_mapping(label, src, target, link_target, "copy", False, False) == 0
     assert target.exists()
-    assert fix_symlinks.process_mapping(label, src, target, link_target, "symlink", True, False) == 1
+    assert (
+        fix_symlinks.process_mapping(label, src, target, link_target, "symlink", True, False) == 1
+    )
     assert fix_symlinks.same_symlink(target, link_target) is False
 
     monkeypatch.setattr(fix_symlinks, "ROOT_DIR", root)
     monkeypatch.setattr(fix_symlinks, "AGENT_DIRS", [".claude"])
-    monkeypatch.setattr(sys, "argv", ["agents-fix-symlinks.py", "--mode", "copy", "--targets", "skills"])
+    monkeypatch.setattr(
+        sys, "argv", ["agents-fix-symlinks.py", "--mode", "copy", "--targets", "skills"]
+    )
     assert fix_symlinks.main() == 0
     monkeypatch.setattr(sys, "argv", ["agents-fix-symlinks.py", "--targets", "bad"])
     assert fix_symlinks.main() == 1
@@ -689,7 +737,9 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
         "|------|-------|-------|-------|\n"
         "| T-03 | pending | agent | Table task |\n",
     )
-    report = write_wb_doc(wb_case_dir, "report", "# Report\n\n## Files Changed\n\n- stale\n", status="active")
+    report = write_wb_doc(
+        wb_case_dir, "report", "# Report\n\n## Files Changed\n\n- stale\n", status="active"
+    )
     log = write_wb_doc(wb_case_dir, "log", "# Log\n\n## Timeline\n\n- old entry\n")
     write_wb_doc(wb_case_dir, "postmortem", "# Postmortem\n", status="final")
     spec_lite = write_wb_doc(wb_case_dir, "spec-lite", "# Spec Lite\n")
@@ -702,7 +752,11 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
 
     def fake_run(cmd, **kwargs):
         if cmd[0] == "git":
-            return SimpleNamespace(returncode=0, stdout=" M src/app.py\n?? .agents/wb/session/log.md\nR  old.py -> src/new.py\n", stderr="")
+            return SimpleNamespace(
+                returncode=0,
+                stdout=" M src/app.py\n?? .agents/wb/session/log.md\nR  old.py -> src/new.py\n",
+                stderr="",
+            )
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr(wb_update.subprocess, "run", fake_run)
@@ -719,7 +773,9 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
     with pytest.raises(FileNotFoundError):
         wb_update.resolve_session("missing")
     with pytest.raises(ValueError):
-        wb_update.require_explicit_session(SimpleNamespace(session=None, file=None, all_wb=False), "touch")
+        wb_update.require_explicit_session(
+            SimpleNamespace(session=None, file=None, all_wb=False), "touch"
+        )
     assert wb_update.latest_doc_file(wb_case_dir, "spec-child") == spec_lite
     assert wb_update.display_path(plan) == str(plan.relative_to(tmp_path))
     assert wb_update.parse_iso_timestamp("2026-01-01T00:00:00Z").tzinfo is not None
@@ -729,7 +785,11 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
     assert "2026-04-12T12:00:00-03:00" in plan.read_text(encoding="utf-8")
     assert wb_update.touch_targets([plan]) == 1
     assert wb_update.normalize_timestamps(plan) is True
-    assert wb_update.git_changed_files() == ["src/app.py", ".agents/wb/session/log.md", "src/new.py"]
+    assert wb_update.git_changed_files() == [
+        "src/app.py",
+        ".agents/wb/session/log.md",
+        "src/new.py",
+    ]
     assert wb_update.update_files_changed(report, include_wb=False) == 2
     assert "`src/app.py`" in report.read_text(encoding="utf-8")
     assert wb_update.set_status([report], "review") == 1
@@ -756,11 +816,22 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
     wb_update.cmd_touch(SimpleNamespace(session=str(wb_case_dir), file=None, all_wb=False))
     wb_update.cmd_touch(SimpleNamespace(session=None, file=str(plan), all_wb=False))
     wb_update.cmd_normalize_time(SimpleNamespace(session=str(wb_case_dir), file=None, all_wb=False))
-    wb_update.cmd_files_changed(SimpleNamespace(session=str(wb_case_dir), report=None, include_wb=True))
-    wb_update.cmd_link(SimpleNamespace(session=str(wb_case_dir), file="plan", key="task", value="task-id"))
+    wb_update.cmd_files_changed(
+        SimpleNamespace(session=str(wb_case_dir), report=None, include_wb=True)
+    )
+    wb_update.cmd_link(
+        SimpleNamespace(session=str(wb_case_dir), file="plan", key="task", value="task-id")
+    )
     wb_update.cmd_timeline(SimpleNamespace(session=str(wb_case_dir), message="timeline command"))
     wb_update.cmd_evidence(
-        SimpleNamespace(session=str(wb_case_dir), task_id="T-02", command="pytest", result="passed", artifact=[], note=None)
+        SimpleNamespace(
+            session=str(wb_case_dir),
+            task_id="T-02",
+            command="pytest",
+            result="passed",
+            artifact=[],
+            note=None,
+        )
     )
     evidence_t2 = wb_update.append_evidence_record(
         wb_case_dir, "T-02", "pytest", "passed", artifacts=["pytest.log"], note=None
@@ -795,9 +866,33 @@ def test_wb_update_commands_touch_status_evidence_and_task_flow(tmp_path, monkey
     with pytest.raises(ValueError):
         wb_update.ensure_optional_artifacts_ready_for_report_final(no_post)
 
-    monkeypatch.setattr(sys, "argv", ["agents-wb-update.py", "timeline", "--session", str(wb_case_dir), "--message", "from main"])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agents-wb-update.py",
+            "timeline",
+            "--session",
+            str(wb_case_dir),
+            "--message",
+            "from main",
+        ],
+    )
     wb_update.main()
-    monkeypatch.setattr(sys, "argv", ["agents-wb-update.py", "status", "--session", str(no_post), "--file", "report", "--value", "final"])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agents-wb-update.py",
+            "status",
+            "--session",
+            str(no_post),
+            "--file",
+            "report",
+            "--value",
+            "final",
+        ],
+    )
     with pytest.raises(SystemExit):
         wb_update.main()
     assert "timeline appended" in capsys.readouterr().out
@@ -895,9 +990,15 @@ def test_doctor_run_checks_success_and_error_branches(tmp_path, monkeypatch, cap
         encoding="utf-8",
     )
     for name in ("ARCHITECTURE.md", "README.md"):
-        (arc / name).write_text("---\ndoc_type: standard\nid: x_index\n---\n# Doc\n", encoding="utf-8")
-    (specs / "INDEX.md").write_text("---\ndoc_type: specs_index\nid: specs_index\n---\n# Index\n", encoding="utf-8")
-    (arc / "DECISIONS" / "INDEX.md").write_text("---\ndoc_type: adr_index\nid: adr_index\n---\n# Index\n", encoding="utf-8")
+        (arc / name).write_text(
+            "---\ndoc_type: standard\nid: x_index\n---\n# Doc\n", encoding="utf-8"
+        )
+    (specs / "INDEX.md").write_text(
+        "---\ndoc_type: specs_index\nid: specs_index\n---\n# Index\n", encoding="utf-8"
+    )
+    (arc / "DECISIONS" / "INDEX.md").write_text(
+        "---\ndoc_type: adr_index\nid: adr_index\n---\n# Index\n", encoding="utf-8"
+    )
 
     monkeypatch.setattr(doctor_mod, "ROOT_DIR", root)
     monkeypatch.setattr(doctor_mod, "TEMPLATES_DIR", templates)
@@ -1068,7 +1169,9 @@ def test_verify_tasks_report_and_main_branches(tmp_path, monkeypatch, capsys):
             "planning_gate_issues": [{"severity": "error", "description": "missing brainstorm"}],
             "execplan_issues": [{"severity": "error", "description": "missing section"}],
             "postmortem_issues": [{"severity": "error", "description": "missing postmortem"}],
-            "artifact_utility_issues": [{"severity": "error", "description": "placeholder artifact"}],
+            "artifact_utility_issues": [
+                {"severity": "error", "description": "placeholder artifact"}
+            ],
             "closure_issues": [{"severity": "error", "description": "missing closure"}],
             "final_doc_issues": [
                 {"document": task_file.name, "line": 3, "description": "open checklist"}
@@ -1099,7 +1202,9 @@ def test_verify_tasks_report_and_main_branches(tmp_path, monkeypatch, capsys):
     verify_tasks.print_report(True, success_payload)
     assert "All tasks completed" in capsys.readouterr().out
 
-    monkeypatch.setattr(verify_tasks, "verify_session", lambda path, strict=False: (True, success_payload))
+    monkeypatch.setattr(
+        verify_tasks, "verify_session", lambda path, strict=False: (True, success_payload)
+    )
     monkeypatch.setattr(sys, "argv", ["verify-tasks.py", str(verify_wb_dir), "--strict"])
     with pytest.raises(SystemExit) as exc:
         verify_tasks.main()
@@ -1152,7 +1257,9 @@ def test_agents_new_creates_workstream_quick_mode_and_error_branches(tmp_path, m
 
     def fake_run(cmd, **kwargs):
         calls.append(cmd)
-        if "agents-patterns.py" in " ".join(map(str, cmd)) or str(patterns) in " ".join(map(str, cmd)):
+        if "agents-patterns.py" in " ".join(map(str, cmd)) or str(patterns) in " ".join(
+            map(str, cmd)
+        ):
             return SimpleNamespace(returncode=0, stdout="PAT-001\n", stderr="")
         return SimpleNamespace(returncode=0, stdout="main\n", stderr="")
 
@@ -1163,9 +1270,14 @@ def test_agents_new_creates_workstream_quick_mode_and_error_branches(tmp_path, m
         agents_new.sanitize_theme("!!!")
     assert agents_new.get_config_placeholder("workflow.max_plan_lines_threshold") == "500"
     assert agents_new.get_config_placeholder("missing.value") is None
-    assert "value" in agents_new.fill_template("{workflow.max_plan_lines_threshold} <theme>", "id", "value", "ts")
+    assert "value" in agents_new.fill_template(
+        "{workflow.max_plan_lines_threshold} <theme>", "id", "value", "ts"
+    )
     assert agents_new._resolve_spec_reference("260101_0100_parent_spec_01") == parent_spec
-    assert agents_new._normalize_spec_reference(str(parent_spec), "Parent") == "260101_0100_parent_spec_01"
+    assert (
+        agents_new._normalize_spec_reference(str(parent_spec), "Parent")
+        == "260101_0100_parent_spec_01"
+    )
     assert agents_new._roadmap_has_feature("F-01") is True
 
     monkeypatch.setattr(
@@ -1226,9 +1338,25 @@ def test_agents_new_creates_workstream_quick_mode_and_error_branches(tmp_path, m
     for argv in (
         ["agents-new.py"],
         ["agents-new.py", "bad", "--feature-id", "F-99", "--parent-spec", "missing"],
-        ["agents-new.py", "bad", "--feature-id", "bad", "--parent-spec", "260101_0100_parent_spec_01"],
+        [
+            "agents-new.py",
+            "bad",
+            "--feature-id",
+            "bad",
+            "--parent-spec",
+            "260101_0100_parent_spec_01",
+        ],
         ["agents-new.py", "bad", "--feature-id", "F-01", "--parent-spec", "missing"],
-        ["agents-new.py", "bad", "--feature-id", "F-01", "--parent-spec", "260101_0100_parent_spec_01", "--with", "not-real"],
+        [
+            "agents-new.py",
+            "bad",
+            "--feature-id",
+            "F-01",
+            "--parent-spec",
+            "260101_0100_parent_spec_01",
+            "--with",
+            "not-real",
+        ],
     ):
         monkeypatch.setattr(sys, "argv", argv)
         with pytest.raises(SystemExit):
@@ -1242,14 +1370,18 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     source = tmp_path / "source"
     target = tmp_path / "target"
     (source / ".agents" / "skills" / "local-skill").mkdir(parents=True)
-    (source / ".agents" / "skills" / "local-skill" / "SKILL.md").write_text("# Skill\n", encoding="utf-8")
+    (source / ".agents" / "skills" / "local-skill" / "SKILL.md").write_text(
+        "# Skill\n", encoding="utf-8"
+    )
     (source / ".agents" / "skills-sync.manifest.json").write_text(
         '{"installs":[{"profile":"core"},{"profile":"dev"}]}\n',
         encoding="utf-8",
     )
     (source / "AGENTS.md").write_text("# Agents\n", encoding="utf-8")
     (source / "docs" / "templates").mkdir(parents=True)
-    (source / "docs" / "templates" / "template.md").write_text("ts=YYYY-MM-DDTHH:MM:SSZ\n", encoding="utf-8")
+    (source / "docs" / "templates" / "template.md").write_text(
+        "ts=YYYY-MM-DDTHH:MM:SSZ\n", encoding="utf-8"
+    )
     (source / "docs" / "templates" / "roadmap.md").write_text(
         'id: "ROADMAP_general"\n'
         "Feature F-01\n"
@@ -1260,7 +1392,9 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     )
     (source / "docs" / "standards").mkdir(parents=True)
     target.mkdir()
-    (target / "package.json").write_text('{"scripts":{"test":"vitest","dev":"vite"}}', encoding="utf-8")
+    (target / "package.json").write_text(
+        '{"scripts":{"test":"vitest","dev":"vite"}}', encoding="utf-8"
+    )
     (target / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
 
     monkeypatch.setattr(bootstrap, "ROOT_DIR", source)
@@ -1272,39 +1406,73 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     monkeypatch.setattr(
         bootstrap,
         "generated_baseline_content",
-        lambda timestamp, install_mode: {Path("docs/arc/GENERAL-ROADMAP.md"): f"roadmap {timestamp} {install_mode}\n"},
+        lambda timestamp, install_mode: {
+            Path("docs/arc/GENERAL-ROADMAP.md"): f"roadmap {timestamp} {install_mode}\n"
+        },
     )
-    monkeypatch.setattr(bootstrap, "prepare_sibling_universal_skills_checkout", lambda target, dry_run: None)
+    monkeypatch.setattr(
+        bootstrap, "prepare_sibling_universal_skills_checkout", lambda target, dry_run: None
+    )
     monkeypatch.setattr(bootstrap, "run_post_checks", lambda *args, **kwargs: None)
 
     stack = bootstrap.detect_stack(target)
     assert "Node.js (package.json)" in stack["signals"]
     assert "./.agents/tools/uv/bin/uv run --project . pytest" in stack["commands"]
     assert bootstrap.current_timestamp().endswith("Z")
-    assert "ts=2026" in bootstrap.render_template(Path("docs/templates/template.md"), "2026-01-01T00:00:00Z")
-    assert bootstrap.roadmap_specs_for_mode(bootstrap.INSTALL_MODE_PARTIAL)[0]["feature_id"] == "F-01"
-    assert "Existing Project Adoption" in bootstrap.build_partial_roadmap("2026-01-01T00:00:00Z", bootstrap.PARTIAL_STARTER_PARENT_SPECS)
-    assert "Feature F-01" in bootstrap.build_full_roadmap("2026-01-01T00:00:00Z", bootstrap.FULL_STARTER_PARENT_SPECS)
+    assert "ts=2026" in bootstrap.render_template(
+        Path("docs/templates/template.md"), "2026-01-01T00:00:00Z"
+    )
+    assert (
+        bootstrap.roadmap_specs_for_mode(bootstrap.INSTALL_MODE_PARTIAL)[0]["feature_id"] == "F-01"
+    )
+    assert "Existing Project Adoption" in bootstrap.build_partial_roadmap(
+        "2026-01-01T00:00:00Z", bootstrap.PARTIAL_STARTER_PARENT_SPECS
+    )
+    assert "Feature F-01" in bootstrap.build_full_roadmap(
+        "2026-01-01T00:00:00Z", bootstrap.FULL_STARTER_PARENT_SPECS
+    )
     assert "Project Brief" in bootstrap.build_project_brief("2026-01-01T00:00:00Z")
     assert "Tech Stack" in bootstrap.build_tech_stack("2026-01-01T00:00:00Z")
     assert "Current-State Map" in bootstrap.build_current_state_map_readme("2026-01-01T00:00:00Z")
-    assert "Engineering Guidelines" in bootstrap.build_engineering_guidelines("2026-01-01T00:00:00Z")
-    assert "SPECS INDEX" in bootstrap.build_specs_index("2026-01-01T00:00:00Z", bootstrap.FULL_STARTER_PARENT_SPECS)
+    assert "Engineering Guidelines" in bootstrap.build_engineering_guidelines(
+        "2026-01-01T00:00:00Z"
+    )
+    assert "SPECS INDEX" in bootstrap.build_specs_index(
+        "2026-01-01T00:00:00Z", bootstrap.FULL_STARTER_PARENT_SPECS
+    )
     assert "ADRS INDEX" in bootstrap.build_decisions_index("2026-01-01T00:00:00Z")
     assert "Knowledge Index" in bootstrap.build_knowledge_index("2026-01-01T00:00:00Z")
-    assert "SPEC:" in bootstrap.build_parent_spec("2026-01-01T00:00:00Z", bootstrap.FULL_STARTER_PARENT_SPECS[0])
+    assert "SPEC:" in bootstrap.build_parent_spec(
+        "2026-01-01T00:00:00Z", bootstrap.FULL_STARTER_PARENT_SPECS[0]
+    )
 
     dst_file = target / "copied.md"
     bootstrap.safe_copy_file(source / "AGENTS.md", dst_file, force=False, dry_run=False)
     bootstrap.safe_copy_file(source / "AGENTS.md", dst_file, force=False, dry_run=False)
     dst_dir = target / "templates-copy"
-    bootstrap.safe_copy_dir(source / "docs" / "templates", dst_dir, force=False, dry_run=False, ignore=bootstrap._ignore_default)
-    bootstrap.safe_copy_dir(source / "docs" / "templates", dst_dir, force=True, dry_run=True, ignore=bootstrap._ignore_default)
+    bootstrap.safe_copy_dir(
+        source / "docs" / "templates",
+        dst_dir,
+        force=False,
+        dry_run=False,
+        ignore=bootstrap._ignore_default,
+    )
+    bootstrap.safe_copy_dir(
+        source / "docs" / "templates",
+        dst_dir,
+        force=True,
+        dry_run=True,
+        ignore=bootstrap._ignore_default,
+    )
     bootstrap.ensure_dirs(target, dry_run=True)
     bootstrap.ensure_justfile(target, dry_run=True)
     bootstrap.safe_write_file(target / "generated.md", "generated\n", force=False, dry_run=False)
-    bootstrap.write_generated_baseline(target, force=False, dry_run=True, install_mode=bootstrap.INSTALL_MODE_FULL)
-    bootstrap.write_adaptation_doc(target, stack, dry_run=False, install_mode=bootstrap.INSTALL_MODE_PARTIAL)
+    bootstrap.write_generated_baseline(
+        target, force=False, dry_run=True, install_mode=bootstrap.INSTALL_MODE_FULL
+    )
+    bootstrap.write_adaptation_doc(
+        target, stack, dry_run=False, install_mode=bootstrap.INSTALL_MODE_PARTIAL
+    )
     assert (target / "docs" / "standards" / "bootstrap-adaptation.md").exists()
     assert bootstrap.load_local_skills_manifest()["installs"]
     assert bootstrap.local_project_skill_names() == ["local-skill"]
@@ -1313,7 +1481,9 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     assert bootstrap.seed_repo_local_universal_skills_checkout(checkout) is True
     assert bootstrap.is_valid_universal_skills_checkout(checkout) is True
 
-    monkeypatch.setattr(sys, "argv", ["agents-bootstrap.py", str(target), "--dry-run", "--skip-checks"])
+    monkeypatch.setattr(
+        sys, "argv", ["agents-bootstrap.py", str(target), "--dry-run", "--skip-checks"]
+    )
     assert bootstrap.main() == 0
     monkeypatch.setattr(sys, "argv", ["agents-bootstrap.py", str(source), "--dry-run"])
     assert bootstrap.main() == 1

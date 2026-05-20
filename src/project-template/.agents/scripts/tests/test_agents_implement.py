@@ -31,21 +31,27 @@ class ImplementNextTests(unittest.TestCase):
 
     def test_cmd_next_complete_session(self):
         """Session with all tasks done prints complete."""
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [], 2, 0)), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [], 2, 0)
+            ),
+            mock.patch("builtins.print"),
+        ):
             with self.assertRaises(self.impl.ExecutionError):
                 self.impl.cmd_next(_namespace())
 
     def test_cmd_next_with_pending(self):
         """Session with a pending task shows next."""
         row = mock.Mock(task_id="T-01", state="pending", owner="dev", notes="to do")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "next_task", return_value=row), \
-             mock.patch("builtins.print") as mock_print:
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "next_task", return_value=row),
+            mock.patch("builtins.print") as mock_print,
+        ):
             result = self.impl.cmd_next(_namespace())
         self.assertEqual(result, 0)
         output = "\n".join(str(c) for c in mock_print.call_args_list)
@@ -54,11 +60,14 @@ class ImplementNextTests(unittest.TestCase):
     def test_cmd_next_no_pending(self):
         """No next task — all done."""
         row = mock.Mock(task_id="T-01", state="done")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 1, 0)), \
-             mock.patch.object(self.impl, "next_task", return_value=None), \
-             mock.patch("builtins.print") as mock_print:
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 1, 0)
+            ),
+            mock.patch.object(self.impl, "next_task", return_value=None),
+            mock.patch("builtins.print") as mock_print,
+        ):
             result = self.impl.cmd_next(_namespace())
         self.assertEqual(result, 0)
         output = "\n".join(str(c) for c in mock_print.call_args_list)
@@ -73,38 +82,47 @@ class ImplementStartTests(unittest.TestCase):
     def test_cmd_start_explicit_task(self):
         """Start a specific task by ID."""
         row = mock.Mock(task_id="T-01", state="pending")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row), \
-             mock.patch.object(self.impl, "_ensure_prerequisites"), \
-             mock.patch.object(self.impl, "update_task_state"), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+            mock.patch.object(self.impl, "_ensure_prerequisites"),
+            mock.patch.object(self.impl, "update_task_state"),
+            mock.patch("builtins.print"),
+        ):
             result = self.impl.cmd_start(_namespace(task_id="T-01"))
         self.assertEqual(result, 0)
 
     def test_cmd_start_default_to_next(self):
         """Start defaults to next pending task."""
         row = mock.Mock(task_id="T-02", state="pending")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "next_task", return_value=row), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row), \
-             mock.patch.object(self.impl, "_ensure_prerequisites"), \
-             mock.patch.object(self.impl, "update_task_state"), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "next_task", return_value=row),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+            mock.patch.object(self.impl, "_ensure_prerequisites"),
+            mock.patch.object(self.impl, "update_task_state"),
+            mock.patch("builtins.print"),
+        ):
             result = self.impl.cmd_start(_namespace(task_id=None))
         self.assertEqual(result, 0)
 
     def test_cmd_start_already_in_progress(self):
         """Starting a task that is already in progress."""
         row = mock.Mock(task_id="T-01", state="in_progress")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row), \
-             mock.patch("builtins.print") as mock_print:
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+            mock.patch("builtins.print") as mock_print,
+        ):
             result = self.impl.cmd_start(_namespace(task_id="T-01"))
         self.assertEqual(result, 0)
         output = "\n".join(str(c) for c in mock_print.call_args_list)
@@ -113,40 +131,52 @@ class ImplementStartTests(unittest.TestCase):
     def test_cmd_start_already_done_raises(self):
         """Starting a done task raises error."""
         row = mock.Mock(task_id="T-01", state="done")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 1, 0)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 1, 0)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+        ):
             with self.assertRaises(self.impl.ExecutionError):
                 self.impl.cmd_start(_namespace(task_id="T-01"))
 
     def test_cmd_start_blocked_raises(self):
         """Starting a blocked task raises error."""
         row = mock.Mock(task_id="T-01", state="blocked")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+        ):
             with self.assertRaises(self.impl.ExecutionError):
                 self.impl.cmd_start(_namespace(task_id="T-01"))
 
     def test_cmd_start_task_not_found(self):
         """Starting a non-existent task raises error."""
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=None):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=None),
+        ):
             with self.assertRaises(self.impl.ExecutionError):
                 self.impl.cmd_start(_namespace(task_id="T-99"))
 
     def test_cmd_start_no_next_pending(self):
         """No pending task to auto-start."""
         row = mock.Mock(task_id="T-01", state="done")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 1, 0)), \
-             mock.patch.object(self.impl, "next_task", return_value=None), \
-             mock.patch("builtins.print") as mock_print:
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 1, 0)
+            ),
+            mock.patch.object(self.impl, "next_task", return_value=None),
+            mock.patch("builtins.print") as mock_print,
+        ):
             result = self.impl.cmd_start(_namespace(task_id=None))
         self.assertEqual(result, 0)
         output = "\n".join(str(c) for c in mock_print.call_args_list)
@@ -161,131 +191,221 @@ class ImplementCompleteTests(unittest.TestCase):
     def test_cmd_complete_happy_path(self):
         """Complete a task in progress with evidence."""
         row = mock.Mock(task_id="T-01", state="in_progress")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row), \
-             mock.patch.object(self.impl, "_ensure_prerequisites"), \
-             mock.patch.object(self.impl, "append_evidence"), \
-             mock.patch.object(self.impl, "update_task_state"), \
-            mock.patch("builtins.print"):
-            result = self.impl.cmd_complete(_namespace(
-                task_id="T-01", command="pytest", result="passed",
-                artifact=["pytest.log"], note=None, no_evidence=False, force=False
-            ))
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+            mock.patch.object(self.impl, "_ensure_prerequisites"),
+            mock.patch.object(self.impl, "append_evidence"),
+            mock.patch.object(self.impl, "update_task_state"),
+            mock.patch("builtins.print"),
+        ):
+            result = self.impl.cmd_complete(
+                _namespace(
+                    task_id="T-01",
+                    command="pytest",
+                    result="passed",
+                    artifact=["pytest.log"],
+                    note=None,
+                    no_evidence=False,
+                    force=False,
+                )
+            )
         self.assertEqual(result, 0)
 
     def test_cmd_complete_no_evidence_requires_force(self):
         """Complete without evidence requires force."""
         row = mock.Mock(task_id="T-01", state="in_progress")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+        ):
             with self.assertRaises(self.impl.ExecutionError):
-                self.impl.cmd_complete(_namespace(
-                    task_id="T-01", command=None, result=None,
-                    artifact=None, note=None, no_evidence=True, force=False
-                ))
+                self.impl.cmd_complete(
+                    _namespace(
+                        task_id="T-01",
+                        command=None,
+                        result=None,
+                        artifact=None,
+                        note=None,
+                        no_evidence=True,
+                        force=False,
+                    )
+                )
 
     def test_cmd_complete_no_evidence_with_force(self):
         """Complete without evidence is rejected even with force."""
         row = mock.Mock(task_id="T-01", state="in_progress")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+        ):
             with self.assertRaises(self.impl.ExecutionError):
-                self.impl.cmd_complete(_namespace(
-                    task_id="T-01", command=None, result=None,
-                    artifact=None, note=None, no_evidence=True, force=True
-                ))
+                self.impl.cmd_complete(
+                    _namespace(
+                        task_id="T-01",
+                        command=None,
+                        result=None,
+                        artifact=None,
+                        note=None,
+                        no_evidence=True,
+                        force=True,
+                    )
+                )
 
     def test_cmd_complete_already_done_raises(self):
         """Completing a done task raises error."""
         row = mock.Mock(task_id="T-01", state="done")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 1, 0)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 1, 0)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+        ):
             with self.assertRaises(self.impl.ExecutionError):
-                self.impl.cmd_complete(_namespace(
-                    task_id="T-01", command=None, result=None,
-                    artifact=None, note=None, no_evidence=False, force=False
-                ))
+                self.impl.cmd_complete(
+                    _namespace(
+                        task_id="T-01",
+                        command=None,
+                        result=None,
+                        artifact=None,
+                        note=None,
+                        no_evidence=False,
+                        force=False,
+                    )
+                )
 
     def test_cmd_complete_invalid_state_raises(self):
         """Completing from pending (not started) raises error."""
         row = mock.Mock(task_id="T-01", state="pending")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+        ):
             with self.assertRaises(self.impl.ExecutionError):
-                self.impl.cmd_complete(_namespace(
-                    task_id="T-01", command=None, result=None,
-                    artifact=None, note=None, no_evidence=False, force=False
-                ))
+                self.impl.cmd_complete(
+                    _namespace(
+                        task_id="T-01",
+                        command=None,
+                        result=None,
+                        artifact=None,
+                        note=None,
+                        no_evidence=False,
+                        force=False,
+                    )
+                )
 
     def test_cmd_complete_task_not_found(self):
         """Completing a non-existent task raises error."""
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=None):
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=None),
+        ):
             with self.assertRaises(self.impl.ExecutionError):
-                self.impl.cmd_complete(_namespace(
-                    task_id="T-99", command=None, result=None,
-                    artifact=None, note=None, no_evidence=False, force=False
-                ))
+                self.impl.cmd_complete(
+                    _namespace(
+                        task_id="T-99",
+                        command=None,
+                        result=None,
+                        artifact=None,
+                        note=None,
+                        no_evidence=False,
+                        force=False,
+                    )
+                )
 
     def test_cmd_complete_default_to_next(self):
         """Complete defaults to next task."""
         row = mock.Mock(task_id="T-01", state="in_progress")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "next_task", return_value=row), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row), \
-             mock.patch.object(self.impl, "_ensure_prerequisites"), \
-             mock.patch.object(self.impl, "append_evidence"), \
-             mock.patch.object(self.impl, "update_task_state"), \
-            mock.patch("builtins.print"):
-            result = self.impl.cmd_complete(_namespace(
-                task_id=None, command="pytest", result="passed",
-                artifact=["pytest.log"], note=None, no_evidence=False, force=False
-            ))
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "next_task", return_value=row),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+            mock.patch.object(self.impl, "_ensure_prerequisites"),
+            mock.patch.object(self.impl, "append_evidence"),
+            mock.patch.object(self.impl, "update_task_state"),
+            mock.patch("builtins.print"),
+        ):
+            result = self.impl.cmd_complete(
+                _namespace(
+                    task_id=None,
+                    command="pytest",
+                    result="passed",
+                    artifact=["pytest.log"],
+                    note=None,
+                    no_evidence=False,
+                    force=False,
+                )
+            )
         self.assertEqual(result, 0)
 
     def test_cmd_complete_no_actionable(self):
         """No actionable task to complete."""
         row = mock.Mock(task_id="T-01", state="done")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 1, 0)), \
-             mock.patch.object(self.impl, "next_task", return_value=None), \
-             mock.patch("builtins.print"):
-            result = self.impl.cmd_complete(_namespace(
-                task_id=None, command=None, result=None,
-                artifact=None, note=None, no_evidence=False, force=False
-            ))
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 1, 0)
+            ),
+            mock.patch.object(self.impl, "next_task", return_value=None),
+            mock.patch("builtins.print"),
+        ):
+            result = self.impl.cmd_complete(
+                _namespace(
+                    task_id=None,
+                    command=None,
+                    result=None,
+                    artifact=None,
+                    note=None,
+                    no_evidence=False,
+                    force=False,
+                )
+            )
         self.assertEqual(result, 0)
 
     def test_cmd_complete_ready_for_test(self):
         """Complete from ready_for_test state succeeds."""
         row = mock.Mock(task_id="T-01", state="ready_for_test")
-        with mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.impl, "_get_session_tasks",
-                               return_value=(Path("/tmp/t"), [row], 0, 1)), \
-             mock.patch.object(self.impl, "find_task_by_id", return_value=row), \
-             mock.patch.object(self.impl, "_ensure_prerequisites"), \
-             mock.patch.object(self.impl, "append_evidence"), \
-             mock.patch.object(self.impl, "update_task_state"), \
-            mock.patch("builtins.print"):
-            result = self.impl.cmd_complete(_namespace(
-                task_id="T-01", command="pytest", result="passed",
-                artifact=["pytest.log"], note=None, no_evidence=False, force=False
-            ))
+        with (
+            mock.patch.object(self.impl, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.impl, "_get_session_tasks", return_value=(Path("/tmp/t"), [row], 0, 1)
+            ),
+            mock.patch.object(self.impl, "find_task_by_id", return_value=row),
+            mock.patch.object(self.impl, "_ensure_prerequisites"),
+            mock.patch.object(self.impl, "append_evidence"),
+            mock.patch.object(self.impl, "update_task_state"),
+            mock.patch("builtins.print"),
+        ):
+            result = self.impl.cmd_complete(
+                _namespace(
+                    task_id="T-01",
+                    command="pytest",
+                    result="passed",
+                    artifact=["pytest.log"],
+                    note=None,
+                    no_evidence=False,
+                    force=False,
+                )
+            )
         self.assertEqual(result, 0)
 
 
@@ -331,8 +451,10 @@ class ImplementHelperTests(unittest.TestCase):
             ],
         }
 
-        with mock.patch.object(self.impl, "load_feature_operation_governance", return_value=bundle), \
-             mock.patch("builtins.print") as mock_print:
+        with (
+            mock.patch.object(self.impl, "load_feature_operation_governance", return_value=bundle),
+            mock.patch("builtins.print") as mock_print,
+        ):
             self.impl._emit_feature_operation_governance(Path("/tmp/s"))
 
         output = "\n".join(str(c.args[0]) for c in mock_print.call_args_list if c.args)
@@ -349,7 +471,9 @@ class ImplementMainTests(unittest.TestCase):
     def test_main_exception_returns_1(self):
         """main() catches exception and returns 1."""
         with mock.patch.object(self.impl, "build_parser") as mock_parser:
-            mock_parser.return_value.parse_args.return_value = mock.Mock(func=mock.Mock(side_effect=Exception("boom")))
+            mock_parser.return_value.parse_args.return_value = mock.Mock(
+                func=mock.Mock(side_effect=Exception("boom"))
+            )
             with mock.patch("builtins.print"):
                 result = self.impl.main()
         self.assertEqual(result, 1)

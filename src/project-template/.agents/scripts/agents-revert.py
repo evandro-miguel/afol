@@ -55,7 +55,7 @@ def cmd_task(args: argparse.Namespace) -> int:
     affected = [row.task_id]
     if args.to_state == "pending":
         ids = [r.task_id for r in rows]
-        affected = ids[ids.index(args.task_id):]
+        affected = ids[ids.index(args.task_id) :]
 
     if not _require_confirm(
         args,
@@ -120,16 +120,17 @@ def cmd_pack(args: argparse.Namespace) -> int:
     pack_dir = matching[0]
     changed = [str(p.relative_to(ROOT_DIR)) for p in pack_dir.rglob("*") if p.is_file()]
     if not args.confirm:
-        print(
-            f"Pack revert requires --confirm. Files in scope: "
-            f"{changed[:20]}"
-        )
+        print(f"Pack revert requires --confirm. Files in scope: {changed[:20]}")
         return 0
 
     if changed:
-        result = subprocess.run(["git", "restore", *changed], cwd=ROOT_DIR, check=False, capture_output=True, text=True)
+        result = subprocess.run(
+            ["git", "restore", *changed], cwd=ROOT_DIR, check=False, capture_output=True, text=True
+        )
         if result.returncode != 0:
-            raise ExecutionError(result.stderr.strip() or f"git restore failed for pack {args.pack}")
+            raise ExecutionError(
+                result.stderr.strip() or f"git restore failed for pack {args.pack}"
+            )
     print(f"✓ pack revert executed for {args.pack}")
     return 0
 
@@ -152,7 +153,7 @@ def cmd_phase(args: argparse.Namespace) -> int:
         raise ExecutionError("phase not resolvable from task board")
 
     ids = [r.task_id for r in rows]
-    affected = ids[ids.index(anchor):]
+    affected = ids[ids.index(anchor) :]
     if not _require_confirm(
         args,
         f"Phase revert summary: session={session_dir.name} phase={args.phase} affected={affected}",
@@ -175,14 +176,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_task = sub.add_parser("task", help="Revert by task id")
     p_task.add_argument("--session")
     p_task.add_argument("--task-id", required=True, help="Task id to revert")
-    p_task.add_argument("--to-state", choices=["pending", "in_progress", "blocked"], default="pending")
-    p_task.add_argument("--confirm", action="store_true", help="Apply the revert after showing explicit intent")
+    p_task.add_argument(
+        "--to-state", choices=["pending", "in_progress", "blocked"], default="pending"
+    )
+    p_task.add_argument(
+        "--confirm", action="store_true", help="Apply the revert after showing explicit intent"
+    )
     p_task.set_defaults(func=cmd_task)
 
     p_phase = sub.add_parser("phase", help="Revert from a phase marker")
     p_phase.add_argument("--session")
     p_phase.add_argument("--phase", required=True)
-    p_phase.add_argument("--confirm", action="store_true", help="Apply the revert after showing explicit intent")
+    p_phase.add_argument(
+        "--confirm", action="store_true", help="Apply the revert after showing explicit intent"
+    )
     p_phase.set_defaults(func=cmd_phase)
 
     p_pack = sub.add_parser("pack", help="Revert a pack workspace")
@@ -193,7 +200,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_session = sub.add_parser("session", help="Reset session execution state")
     p_session.add_argument("--session")
-    p_session.add_argument("--confirm", action="store_true", help="Apply the revert after showing explicit intent")
+    p_session.add_argument(
+        "--confirm", action="store_true", help="Apply the revert after showing explicit intent"
+    )
     p_session.set_defaults(func=cmd_session)
 
     return p

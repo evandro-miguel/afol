@@ -58,7 +58,9 @@ class JournalStore:
             "record": record.model_dump(mode="json"),
             "payload": payload,
         }
-        target.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        target.write_text(
+            json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
 
     def list_change_files(self) -> list[Path]:
         return sorted(self.paths.entries_dir.glob("chg_*.json"))
@@ -91,7 +93,9 @@ class JournalStore:
         try:
             backup_path.relative_to(backups_root)
         except ValueError as exc:
-            raise UnsafeJournalPathError("backup path is outside the runtime journal backups") from exc
+            raise UnsafeJournalPathError(
+                "backup path is outside the runtime journal backups"
+            ) from exc
         return backup_path
 
     def backup_file(self, change_id: str, repo_root: Path, target: Path) -> str:
@@ -164,4 +168,6 @@ class JournalStore:
         if backup_dir.exists():
             shutil.rmtree(backup_dir, ignore_errors=True)
 
-        return UndoResult(ok=True, message=f"Undo applied for {record.change_id}.", restored_paths=restored)
+        return UndoResult(
+            ok=True, message=f"Undo applied for {record.change_id}.", restored_paths=restored
+        )

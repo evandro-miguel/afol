@@ -13,4 +13,3 @@ def to_json_text(payload: Any, *, pretty: bool = False, sort_keys: bool = True) 
     else:
         kwargs["separators"] = (",", ":")
     return json.dumps(payload, **kwargs)
-

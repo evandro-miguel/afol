@@ -22,11 +22,7 @@ class AgentsDoctorFixTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             doc_file = Path(td) / "sample.md"
-            doc_file.write_text(
-                "# Sample\n\n"
-                "-[X]Needs space\n"
-                "- [x]ok\n"
-            )
+            doc_file.write_text("# Sample\n\n-[X]Needs space\n- [x]ok\n")
 
             doctor = agents_doctor.AgentsDoctor(fix=True)
             doctor.validate_checkboxes(doc_file)
@@ -35,7 +31,10 @@ class AgentsDoctorFixTests(unittest.TestCase):
             self.assertIn("- [x] Needs space", content)
             self.assertIn("- [x] ok", content)
             self.assertTrue(
-                any("Auto-fixed checkbox formatting issues (--fix)" in i.message for i in doctor.issues)
+                any(
+                    "Auto-fixed checkbox formatting issues (--fix)" in i.message
+                    for i in doctor.issues
+                )
             )
 
     def test_missing_active_session_is_ok_when_no_sessions_exist(self):
@@ -59,7 +58,9 @@ class AgentsDoctorFixTests(unittest.TestCase):
                 agents_doctor.ACTIVE_SESSION_FILE = original_active
                 agents_doctor.WB_DIR = original_wb
 
-            self.assertFalse(any("Active session file missing" in issue.message for issue in doctor.issues))
+            self.assertFalse(
+                any("Active session file missing" in issue.message for issue in doctor.issues)
+            )
 
     def test_check_required_folders_reports_missing_folder(self):
         script_path = Path(".agents/scripts/agents-doctor.py").resolve()
@@ -81,7 +82,12 @@ class AgentsDoctorFixTests(unittest.TestCase):
                 agents_doctor.ROOT_DIR = original_root
                 agents_doctor.REQUIRED_FOLDERS = original_required_folders
 
-            self.assertTrue(any(issue.severity == "error" and issue.message == "Required folder missing" for issue in doctor.issues))
+            self.assertTrue(
+                any(
+                    issue.severity == "error" and issue.message == "Required folder missing"
+                    for issue in doctor.issues
+                )
+            )
             self.assertTrue(any(issue.path.endswith("docs/missing") for issue in doctor.issues))
 
     def test_check_templates_reports_missing_template(self):
@@ -108,8 +114,15 @@ class AgentsDoctorFixTests(unittest.TestCase):
                 agents_doctor.TEMPLATES_DIR = original_templates_dir
                 agents_doctor.REQUIRED_TEMPLATES = original_required_templates
 
-            self.assertTrue(any(issue.severity == "error" and issue.message == "Required template missing" for issue in doctor.issues))
-            self.assertTrue(any(issue.path.endswith("missing-template.md") for issue in doctor.issues))
+            self.assertTrue(
+                any(
+                    issue.severity == "error" and issue.message == "Required template missing"
+                    for issue in doctor.issues
+                )
+            )
+            self.assertTrue(
+                any(issue.path.endswith("missing-template.md") for issue in doctor.issues)
+            )
 
     def test_check_templates_warns_when_template_lacks_frontmatter(self):
         script_path = Path(".agents/scripts/agents-doctor.py").resolve()
@@ -137,7 +150,13 @@ class AgentsDoctorFixTests(unittest.TestCase):
                 agents_doctor.TEMPLATES_DIR = original_templates_dir
                 agents_doctor.REQUIRED_TEMPLATES = original_required_templates
 
-            self.assertTrue(any(issue.severity == "warning" and issue.message == "Template missing YAML frontmatter" for issue in doctor.issues))
+            self.assertTrue(
+                any(
+                    issue.severity == "warning"
+                    and issue.message == "Template missing YAML frontmatter"
+                    for issue in doctor.issues
+                )
+            )
 
     def test_check_active_session_pointer_reports_missing_folder(self):
         script_path = Path(".agents/scripts/agents-doctor.py").resolve()
@@ -162,7 +181,12 @@ class AgentsDoctorFixTests(unittest.TestCase):
                 agents_doctor.WB_DIR = original_wb
                 agents_doctor.ACTIVE_SESSION_FILE = original_active
 
-            self.assertTrue(any("Active session points to missing folder:" in issue.message for issue in doctor.issues))
+            self.assertTrue(
+                any(
+                    "Active session points to missing folder:" in issue.message
+                    for issue in doctor.issues
+                )
+            )
 
 
 if __name__ == "__main__":

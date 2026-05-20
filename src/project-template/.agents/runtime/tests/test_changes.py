@@ -24,7 +24,6 @@ def test_write_and_undo(scaffold_repo: Path):
     assert not target.exists()
 
 
-
 def test_archive_and_undo(scaffold_repo: Path):
     runtime = AgenticRuntime.from_repo_root(scaffold_repo)
     stale = scaffold_repo / "docs" / "map" / "old.md"
@@ -92,7 +91,9 @@ def test_undo_rejects_tampered_write_target_outside_repo(scaffold_repo: Path):
     runtime = AgenticRuntime.from_repo_root(scaffold_repo)
     target = scaffold_repo / "docs" / "agentic" / "new-note.md"
 
-    runtime.changes.write_text_file("docs/agentic/new-note.md", "# New note\n", reason="create note")
+    runtime.changes.write_text_file(
+        "docs/agentic/new-note.md", "# New note\n", reason="create note"
+    )
     change_file = runtime.journal.latest_change_file()
     assert change_file is not None
 
@@ -155,7 +156,6 @@ def test_undo_rejects_tampered_archive_destination_outside_repo(scaffold_repo: P
         raise AssertionError("undo accepted a tampered archive destination outside the repository")
 
     assert not (scaffold_repo.parent / "outside" / "restored.md").exists()
-
 
 
 def test_apply_unified_diff_and_undo(scaffold_repo: Path):

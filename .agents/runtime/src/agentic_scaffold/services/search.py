@@ -108,7 +108,9 @@ class KnowledgeSearchService:
         hits.sort(key=lambda item: (-item.score, item.path))
         return SearchResponse(
             query=normalized,
-            searched_roots=[root.relative_to(self.repo_root).as_posix() for root in self.search_roots],
+            searched_roots=[
+                root.relative_to(self.repo_root).as_posix() for root in self.search_roots
+            ],
             total_candidates=total_candidates,
             hits=hits[:limit],
         )

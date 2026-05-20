@@ -50,7 +50,9 @@ def _copytree_ignore_runtime_state(src: str, names: list[str]) -> set[str]:
 def isolated_env(repo_root: Path) -> dict[str, str]:
     env = os.environ.copy()
     env["AGENTS_ACTIVE_SESSION_FILE"] = str(repo_root / ".agents" / "wb" / ".active_session")
-    env["AGENTS_SCRIPT_PYTHON"] = str(ROOT_DIR / ".agents" / "scripts" / ".venv" / "bin" / "python3")
+    env["AGENTS_SCRIPT_PYTHON"] = str(
+        ROOT_DIR / ".agents" / "scripts" / ".venv" / "bin" / "python3"
+    )
     env["AGENTS_UV_CACHE_DIR"] = str(repo_root / ".agents" / "cache" / "uv")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PATH"] = f"{ROOT_DIR / '.agents' / 'scripts' / '.venv' / 'bin'}:{env.get('PATH', '')}"
@@ -82,7 +84,9 @@ def build_isolated_repo(tmp_root: Path) -> Path:
 
     session_dir = repo_root / ".agents" / "wb" / SESSION_ID
     session_dir.mkdir(parents=True, exist_ok=True)
-    (repo_root / ".agents" / "wb" / ".active_session").write_text(f"{SESSION_ID}\n", encoding="utf-8")
+    (repo_root / ".agents" / "wb" / ".active_session").write_text(
+        f"{SESSION_ID}\n", encoding="utf-8"
+    )
     (session_dir / f"{SESSION_ID}_plan_01.md").write_text(
         "---\n"
         "doc_type: plan\n"
@@ -249,7 +253,9 @@ def test_session_catchup_temp_repo_scenarios():
         temp_root = Path(td) / "repo"
         temp_root.mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "codex@example.com"], cwd=temp_root, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "codex@example.com"], cwd=temp_root, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Codex"], cwd=temp_root, check=True)
 
         for rel in [
@@ -285,16 +291,18 @@ def test_session_catchup_temp_repo_scenarios():
             "  specs_dir: docs/arc/SPECS\n"
             "  decisions_dir: docs/arc/DECISIONS\n"
             "time:\n"
-            "  default_offset: \"+00:00\"\n"
-            "  wb_offset: \"-03:00\"\n"
+            '  default_offset: "+00:00"\n'
+            '  wb_offset: "-03:00"\n'
             "workflow:\n"
-            "  feature_id_pattern: \"^F-[0-9]{2,3}$\"\n",
+            '  feature_id_pattern: "^F-[0-9]{2,3}$"\n',
             encoding="utf-8",
         )
         (temp_root / "docs/standards/workflow.md").write_text("# workflow\n", encoding="utf-8")
         (temp_root / "docs/knowledge/INDEX.md").write_text("# knowledge\n", encoding="utf-8")
         (temp_root / "docs/arc/PROJECT-BRIEF.md").write_text("# brief\n", encoding="utf-8")
-        (temp_root / "docs/arc/ENGINEERING-GUIDELINES.md").write_text("# guidelines\n", encoding="utf-8")
+        (temp_root / "docs/arc/ENGINEERING-GUIDELINES.md").write_text(
+            "# guidelines\n", encoding="utf-8"
+        )
         (temp_root / "docs/arc/TECH-STACK.md").write_text("# stack\n", encoding="utf-8")
         (temp_root / "docs/arc/GENERAL-ROADMAP.md").write_text("# roadmap\n", encoding="utf-8")
 
@@ -375,10 +383,14 @@ def test_session_catchup_temp_repo_scenarios():
             with_report=False,
             with_research=False,
         )
-        missing_research = write_session("260307_2302_missing-research", with_research=False, research_link=True)
+        missing_research = write_session(
+            "260307_2302_missing-research", with_research=False, research_link=True
+        )
 
         subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "baseline"], cwd=temp_root, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "baseline"], cwd=temp_root, check=True, capture_output=True
+        )
         script = temp_root / ".agents/scripts/agents-session.py"
         env = os.environ.copy()
         env["PYTHONPATH"] = str(temp_root / ".agents/scripts")
@@ -386,7 +398,14 @@ def test_session_catchup_temp_repo_scenarios():
 
         def run_catchup(session: Path):
             proc = subprocess.run(
-                [str(ROOT_DIR / ".agents/scripts/.venv/bin/python"), str(script), "catchup", "--session", str(session), "--json"],
+                [
+                    str(ROOT_DIR / ".agents/scripts/.venv/bin/python"),
+                    str(script),
+                    "catchup",
+                    "--session",
+                    str(session),
+                    "--json",
+                ],
                 cwd=temp_root,
                 env=env,
                 capture_output=True,
@@ -406,10 +425,16 @@ def test_session_catchup_temp_repo_scenarios():
 
         missing_research_payload = run_catchup(missing_research)
         assert missing_research_payload["catchup_required"] is True
-        assert any("research artifact" in warning.lower() for warning in missing_research_payload["warnings"])
+        assert any(
+            "research artifact" in warning.lower()
+            for warning in missing_research_payload["warnings"]
+        )
 
         (temp_root / "outside-change.txt").write_text("drift\n", encoding="utf-8")
         drift_payload = run_catchup(clean)
         assert drift_payload["catchup_required"] is True
         assert drift_payload["git"]["repo_changed"] >= 1
-        assert any("repo has changes outside the session" in warning.lower() for warning in drift_payload["warnings"])
+        assert any(
+            "repo has changes outside the session" in warning.lower()
+            for warning in drift_payload["warnings"]
+        )

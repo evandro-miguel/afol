@@ -49,7 +49,10 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         mandatory_files = {str(path) for path in agents_bootstrap.MANDATORY_FILES_TO_COPY}
         mandatory_dirs = {str(path) for path in agents_bootstrap.MANDATORY_DIRS_TO_COPY}
         ensure_dirs = {str(path) for path in agents_bootstrap.ENSURE_DIRS}
-        generated_files = {str(path) for path in agents_bootstrap.generated_baseline_content("2026-03-23T00:00:00Z")}
+        generated_files = {
+            str(path)
+            for path in agents_bootstrap.generated_baseline_content("2026-03-23T00:00:00Z")
+        }
 
         self.assertIn("AGENTS.md", mandatory_files)
         self.assertIn("CLAUDE.md", mandatory_files)
@@ -110,7 +113,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
-            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
+            (target / "Justfile").write_text(
+                "mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8"
+            )
 
             with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
                 commands = agents_bootstrap.build_post_check_commands(target)
@@ -144,7 +149,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
-            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
+            (target / "Justfile").write_text(
+                "mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8"
+            )
             calls = []
             cwds = []
 
@@ -171,13 +178,19 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             target = Path(td)
-            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
+            (target / "Justfile").write_text(
+                "mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8"
+            )
             calls = []
 
             def fake_run(cmd, cwd=None, **kwargs):
                 calls.append(cmd)
                 result = mock.Mock()
-                result.returncode = 1 if cmd[:4] == ["just", "--justfile", "Justfile", "agents_scaffold::lint"] else 0
+                result.returncode = (
+                    1
+                    if cmd[:4] == ["just", "--justfile", "Justfile", "agents_scaffold::lint"]
+                    else 0
+                )
                 return result
 
             with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
@@ -196,7 +209,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             target = Path(td)
 
             with mock.patch.object(agents_bootstrap.shutil, "which", return_value=None):
-                with self.assertRaisesRegex(RuntimeError, "just is required for post-bootstrap checks"):
+                with self.assertRaisesRegex(
+                    RuntimeError, "just is required for post-bootstrap checks"
+                ):
                     agents_bootstrap.build_post_check_commands(target)
 
     def test_removed_root_runtime_mirrors_are_absent(self):
@@ -212,7 +227,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         doctor.check_primary_runtime_compatibility()
 
         runtime_issues = [
-            issue for issue in doctor.issues
+            issue
+            for issue in doctor.issues
             if any(token in issue.path for token in ("AGENTS.md", "CLAUDE.md", ".claude"))
         ]
         self.assertEqual(runtime_issues, [])
@@ -250,8 +266,12 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 shutil.copy2(Path(sys.executable), python_link)
                 python_link.chmod(python_link.stat().st_mode | stat.S_IXUSR)
 
-            (scripts_dir / "agents-doctor.py").write_text("print('wrapper-local-venv-ok')\n", encoding="utf-8")
-            (scripts_dir / "agents-telemetry.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
+            (scripts_dir / "agents-doctor.py").write_text(
+                "print('wrapper-local-venv-ok')\n", encoding="utf-8"
+            )
+            (scripts_dir / "agents-telemetry.py").write_text(
+                "raise SystemExit(0)\n", encoding="utf-8"
+            )
 
             env = os.environ.copy()
             env["PATH"] = "/usr/bin:/bin"
@@ -310,7 +330,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             wrapper_dst.write_text(wrapper_src.read_text(encoding="utf-8"), encoding="utf-8")
             wrapper_dst.chmod(wrapper_dst.stat().st_mode | stat.S_IXUSR)
 
-            (scripts_dir / "agents-doctor.py").write_text("print('system-python-ok')\n", encoding="utf-8")
+            (scripts_dir / "agents-doctor.py").write_text(
+                "print('system-python-ok')\n", encoding="utf-8"
+            )
 
             env = os.environ.copy()
             env["PATH"] = "/usr/bin:/bin"
@@ -383,9 +405,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             fake_uv_dir.mkdir(parents=True, exist_ok=True)
             fake_uv = fake_uv_dir / "uv"
             fake_uv.write_text(
-                "#!/usr/bin/env bash\n"
-                'echo \"$UV_CACHE_DIR|$*\" >> \"{log}\"\n'
-                "exit 0\n".format(log=uv_log),
+                '#!/usr/bin/env bash\necho "$UV_CACHE_DIR|$*" >> "{log}"\nexit 0\n'.format(
+                    log=uv_log
+                ),
                 encoding="utf-8",
             )
             fake_uv.chmod(fake_uv.stat().st_mode | stat.S_IXUSR)
@@ -419,7 +441,11 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertIn("Hydrating script environment", result.stdout)
             self.assertIn("Hydrating runtime environment", result.stdout)
-            calls = [line.strip() for line in uv_log.read_text(encoding="utf-8").splitlines() if line.strip()]
+            calls = [
+                line.strip()
+                for line in uv_log.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
             self.assertEqual(len(calls), 2)
             self.assertIn(f"|sync --python {project_python}", calls[0])
             self.assertIn(f"|sync --python {project_python} --locked", calls[1])
@@ -496,8 +522,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
             runtime_bin = runtime_bin_dir / "agentic"
             runtime_bin.write_text(
-                "#!/usr/bin/env bash\n"
-                "echo \"RUNTIME_BIN:$*\"\n",
+                '#!/usr/bin/env bash\necho "RUNTIME_BIN:$*"\n',
                 encoding="utf-8",
             )
             runtime_bin.chmod(runtime_bin.stat().st_mode | stat.S_IXUSR)
@@ -549,9 +574,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             fake_uv_dir.mkdir(parents=True, exist_ok=True)
             fake_uv = fake_uv_dir / "uv"
             fake_uv.write_text(
-                "#!/usr/bin/env python3\n"
-                "import sys\n"
-                "print('FAKE_UV:' + ' '.join(sys.argv[1:]))\n",
+                "#!/usr/bin/env python3\nimport sys\nprint('FAKE_UV:' + ' '.join(sys.argv[1:]))\n",
                 encoding="utf-8",
             )
             fake_uv.chmod(fake_uv.stat().st_mode | stat.S_IXUSR)
@@ -577,9 +600,12 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         agents_wrapper = Path(".agents/agents").read_text(encoding="utf-8")
         mcp_wrapper = Path(".agents/agents-mcp").read_text(encoding="utf-8")
 
-        self.assertIn('runtime/.venv/bin/${runtime_entrypoint}', agents_wrapper)
+        self.assertIn("runtime/.venv/bin/${runtime_entrypoint}", agents_wrapper)
         self.assertIn('PROJECT_UV_BIN="${AGENTS_UV_BIN:-${TOOLS_DIR}/uv/bin/uv}"', agents_wrapper)
-        self.assertIn('PROJECT_UV_PYTHON_DIR="${AGENTS_UV_PYTHON_DIR:-${TOOLS_DIR}/uv/python}"', agents_wrapper)
+        self.assertIn(
+            'PROJECT_UV_PYTHON_DIR="${AGENTS_UV_PYTHON_DIR:-${TOOLS_DIR}/uv/python}"',
+            agents_wrapper,
+        )
         self.assertIn("find_system_uv_bin()", agents_wrapper)
         self.assertIn("hydrate_project_python()", agents_wrapper)
         self.assertIn('sync --python "${PROJECT_UV_PYTHON_BIN}"', agents_wrapper)
@@ -593,11 +619,13 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("AGENTS_RUNTIME_ALLOW_UV_RUN", agents_wrapper)
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked', agents_wrapper)
         self.assertIn('RUNTIME_BIN="${SCRIPT_DIR}/runtime/.venv/bin/agentic-mcp"', mcp_wrapper)
-        self.assertIn('PROJECT_UV_BIN="${AGENTS_UV_BIN:-${SCRIPT_DIR}/tools/uv/bin/uv}"', mcp_wrapper)
+        self.assertIn(
+            'PROJECT_UV_BIN="${AGENTS_UV_BIN:-${SCRIPT_DIR}/tools/uv/bin/uv}"', mcp_wrapper
+        )
         self.assertIn('export PYTHONHASHSEED="${PYTHONHASHSEED:-0}"', mcp_wrapper)
         self.assertIn("AGENTS_RUNTIME_ALLOW_UV_RUN", mcp_wrapper)
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp', mcp_wrapper)
-        self.assertIn('adoption-plan|inspect-target', agents_wrapper)
+        self.assertIn("adoption-plan|inspect-target", agents_wrapper)
 
     def test_partial_bootstrap_refreshes_legacy_runtime_wrappers(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -610,8 +638,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             legacy_agents_dir = target / ".agents"
             legacy_agents_dir.mkdir(parents=True, exist_ok=True)
             (legacy_agents_dir / "agents").write_text(
-                "#!/usr/bin/env bash\n"
-                "echo legacy\n",
+                "#!/usr/bin/env bash\necho legacy\n",
                 encoding="utf-8",
             )
 
@@ -656,11 +683,12 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertFalse(
                 (target / "docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md").exists()
             )
+            self.assertFalse((target / "docs/telemetry/reports/implementation_report.md").exists())
             self.assertFalse(
-                (target / "docs/telemetry/reports/implementation_report.md").exists()
-            )
-            self.assertFalse(
-                (target / "docs/lessons/entries/20260224_2036_bootstrap-must-provision-full-agent-runtime.md").exists()
+                (
+                    target
+                    / "docs/lessons/entries/20260224_2036_bootstrap-must-provision-full-agent-runtime.md"
+                ).exists()
             )
             self.assertTrue(
                 (target / "docs/arc/SPECS/000000_0000_feature-f01-parent_spec_01.md").exists()
@@ -669,7 +697,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertNotIn("F-01 Roadmap-First Governance", roadmap)
             self.assertIn("<describe the product or system>", project_brief)
             self.assertIn("Goal-state canon", project_brief)
-            self.assertNotIn("base scaffold for an AGENTS-governed development workflow", project_brief)
+            self.assertNotIn(
+                "base scaffold for an AGENTS-governed development workflow", project_brief
+            )
             self.assertIn("| Total | 2 |", specs_index)
             self.assertIn("- Total indexed docs: 0", knowledge_index)
             self.assertIn("current-state, descriptive", map_readme)
@@ -708,7 +738,14 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             "scaffold repository",
         ]
 
-        generated_names = {".agent", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules"}
+        generated_names = {
+            ".agent",
+            ".venv",
+            "__pycache__",
+            ".pytest_cache",
+            ".ruff_cache",
+            "node_modules",
+        }
         ignored_runtime_artifacts = {
             ".agents/runtime/.venv",
             ".agents/runtime/uv.lock",
@@ -719,13 +756,23 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             for path in template_root.rglob("*")
             if (
                 path.relative_to(template_root).as_posix() not in ignored_runtime_artifacts
-                and not any(part in generated_names for part in path.relative_to(template_root).parts)
+                and not any(
+                    part in generated_names for part in path.relative_to(template_root).parts
+                )
                 and not path.relative_to(template_root).as_posix().startswith(".agents/tmp/")
                 and not path.relative_to(template_root).as_posix().startswith(".agents/cache/")
-                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.venv/")
-                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.pytest_cache/")
-                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.ruff_cache/")
-                and not path.relative_to(template_root).as_posix().startswith(".agents/scripts/.venv/")
+                and not path.relative_to(template_root)
+                .as_posix()
+                .startswith(".agents/runtime/.venv/")
+                and not path.relative_to(template_root)
+                .as_posix()
+                .startswith(".agents/runtime/.pytest_cache/")
+                and not path.relative_to(template_root)
+                .as_posix()
+                .startswith(".agents/runtime/.ruff_cache/")
+                and not path.relative_to(template_root)
+                .as_posix()
+                .startswith(".agents/scripts/.venv/")
                 and not (
                     path.name == "__pycache__"
                     and path.relative_to(template_root).as_posix().startswith(".agents/scripts/")
@@ -746,12 +793,19 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 path.is_file()
                 and path.suffix in text_suffixes
                 and not path.relative_to(template_root).as_posix().startswith(".agents/tmp/")
-                and not path.relative_to(template_root).as_posix().startswith(".agents/runtime/.venv/")
-                and not path.relative_to(template_root).as_posix().startswith(".agents/scripts/.venv/")
+                and not path.relative_to(template_root)
+                .as_posix()
+                .startswith(".agents/runtime/.venv/")
+                and not path.relative_to(template_root)
+                .as_posix()
+                .startswith(".agents/scripts/.venv/")
             )
         ]
         for path in sorted(set(generic_files + text_files)):
-            if path.relative_to(template_root).as_posix() == ".agents/scripts/tests/test_runtime_compatibility.py":
+            if (
+                path.relative_to(template_root).as_posix()
+                == ".agents/scripts/tests/test_runtime_compatibility.py"
+            ):
                 continue
             content = path.read_text(encoding="utf-8")
             for token in forbidden_tokens:
@@ -771,7 +825,16 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             (template_root / "Justfile").read_text(encoding="utf-8"),
         )
         self.assertFalse((template_root / "PLANS.md").exists())
-        for path in ["OPENCODE.md", "QWEN.md", "GEMINI.md", "opencode.json", ".opencode", ".qwen", ".gemini", ".codex"]:
+        for path in [
+            "OPENCODE.md",
+            "QWEN.md",
+            "GEMINI.md",
+            "opencode.json",
+            ".opencode",
+            ".qwen",
+            ".gemini",
+            ".codex",
+        ]:
             self.assertFalse((template_root / path).exists())
 
         template_files_outside_templates = [
@@ -845,7 +908,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 install_mode=agents_bootstrap.INSTALL_MODE_PARTIAL,
             )
 
-            adaptation_doc = (target / "docs/standards/bootstrap-adaptation.md").read_text(encoding="utf-8")
+            adaptation_doc = (target / "docs/standards/bootstrap-adaptation.md").read_text(
+                encoding="utf-8"
+            )
 
             self.assertIn("## Skills Baseline", adaptation_doc)
             self.assertIn("## Current State vs Goal State", adaptation_doc)
@@ -870,18 +935,29 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertTrue(agents_bootstrap.is_valid_universal_skills_checkout(checkout))
             self.assertTrue((checkout / "skills" / "agentic-folder-sys" / "SKILL.md").exists())
             self.assertTrue((checkout / "skills" / "agentic-scaffold-mcp" / "SKILL.md").exists())
-            self.assertFalse((checkout / "skills" / "agentic-system-workflow" / "SKILL.md").exists())
+            self.assertFalse(
+                (checkout / "skills" / "agentic-system-workflow" / "SKILL.md").exists()
+            )
             self.assertFalse((checkout / "skills" / "workbench-agent-teams" / "SKILL.md").exists())
             self.assertFalse((checkout / "skills" / "writing-skills" / "SKILL.md").exists())
             self.assertEqual(
-                json.loads((checkout / "profiles" / "core.json").read_text(encoding="utf-8"))["skills"],
+                json.loads((checkout / "profiles" / "core.json").read_text(encoding="utf-8"))[
+                    "skills"
+                ],
                 json.loads(
-                    (Path(".agents/source/universal-skills/profiles/core.json")).read_text(encoding="utf-8")
+                    (Path(".agents/source/universal-skills/profiles/core.json")).read_text(
+                        encoding="utf-8"
+                    )
                 )["skills"],
             )
             self.assertIn(
                 "agentic-folder-sys",
-                [entry["name"] for entry in json.loads((checkout / "index.json").read_text(encoding="utf-8"))["skills"]],
+                [
+                    entry["name"]
+                    for entry in json.loads((checkout / "index.json").read_text(encoding="utf-8"))[
+                        "skills"
+                    ]
+                ],
             )
             checkout.resolve().relative_to(target.resolve())
             patched_run.assert_not_called()

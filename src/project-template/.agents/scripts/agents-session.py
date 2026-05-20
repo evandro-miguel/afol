@@ -34,6 +34,7 @@ except ImportError:
     ):
         return subprocess.run(list(cmd), cwd=cwd, timeout=timeout, **kwargs)
 
+
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
@@ -151,11 +152,7 @@ def _iter_project_sessions() -> list[Path]:
     if not WB_DIR.exists():
         return []
     return sorted(
-        [
-            entry
-            for entry in WB_DIR.iterdir()
-            if entry.is_dir() and not entry.name.startswith(".")
-        ],
+        [entry for entry in WB_DIR.iterdir() if entry.is_dir() and not entry.name.startswith(".")],
         key=lambda entry: entry.name,
     )
 
@@ -199,7 +196,9 @@ def _build_session_overview(session_dir: Path, active_session: str) -> Dict[str,
         "catchup_signal": catchup_signal,
         "stale_signal": bool(stale_reasons),
         "stale_reasons": stale_reasons,
-        "close_candidate": bool(report_terminal and total > 0 and remaining == 0 and not stale_reasons),
+        "close_candidate": bool(
+            report_terminal and total > 0 and remaining == 0 and not stale_reasons
+        ),
     }
 
 
@@ -225,7 +224,10 @@ def _print_session_list(payload: Dict[str, Any]) -> None:
 
 def cmd_list(args: argparse.Namespace) -> int:
     active_session = _read_active_session()
-    sessions = [_build_session_overview(session_dir, active_session) for session_dir in _iter_project_sessions()]
+    sessions = [
+        _build_session_overview(session_dir, active_session)
+        for session_dir in _iter_project_sessions()
+    ]
     payload = {
         "scope": str(WB_DIR.resolve()),
         "active_session": active_session or None,
@@ -262,7 +264,10 @@ def _print_session_sweep(payload: Dict[str, Any]) -> None:
 def cmd_sweep(args: argparse.Namespace) -> int:
     _ = args
     active_session = _read_active_session()
-    sessions = [_build_session_overview(session_dir, active_session) for session_dir in _iter_project_sessions()]
+    sessions = [
+        _build_session_overview(session_dir, active_session)
+        for session_dir in _iter_project_sessions()
+    ]
 
     stale: list[str] = []
     open_sessions: list[str] = []
@@ -349,7 +354,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_catchup.add_argument("--session", help="Session id/path (default: active session)")
     p_catchup.add_argument("--json", action="store_true", help="Emit JSON payload")
-    p_catchup.add_argument("--paths-limit", type=int, default=10, help="Limit listed git paths in output")
+    p_catchup.add_argument(
+        "--paths-limit", type=int, default=10, help="Limit listed git paths in output"
+    )
     p_catchup.set_defaults(func=cmd_catchup)
 
     p_list = sub.add_parser(

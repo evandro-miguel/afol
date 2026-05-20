@@ -135,6 +135,7 @@ def test_run_command_double_fallback_text_kwarg_error_with_cwd(monkeypatch, tmp_
 
 def test_run_command_unexpected_typeerror_reraises(monkeypatch):
     """Non-timeout/non-text TypeError should reraise."""
+
     def _fake_run(cmd, **kwargs):
         raise TypeError("unexpected keyword argument 'capture_output'")
 

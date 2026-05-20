@@ -86,7 +86,9 @@ class BootstrapTests(unittest.TestCase):
     def test_template_root_points_to_src_project_template(self):
         """Bootstrap should read the export source from src/project-template."""
         self._skip_without_source_template()
-        self.assertEqual(self.bootstrap.TEMPLATE_ROOT, self.bootstrap.ROOT_DIR / "src" / "project-template")
+        self.assertEqual(
+            self.bootstrap.TEMPLATE_ROOT, self.bootstrap.ROOT_DIR / "src" / "project-template"
+        )
 
     def test_ensure_justfile_creates_wrapper_when_missing(self):
         """ensure_justfile must create the wrapper when Justfile is missing."""
@@ -103,7 +105,9 @@ class BootstrapTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             target = Path(tmpdir)
             justfile = target / "Justfile"
-            justfile.write_text("set shell := [\"bash\", \"-c\"]\nmod agents_scaffold 'docs/standards/Justfile'\n")
+            justfile.write_text(
+                'set shell := ["bash", "-c"]\nmod agents_scaffold \'docs/standards/Justfile\'\n'
+            )
             with mock.patch.object(self.bootstrap, "print_action") as mock_print:
                 self.bootstrap.ensure_justfile(target, dry_run=False)
             actions = [call[0][0] for call in mock_print.call_args_list]
@@ -127,9 +131,7 @@ class BootstrapTests(unittest.TestCase):
             target = Path(tmpdir)
             justfile = target / "Justfile"
             justfile.write_text(
-                "# import 'docs/standards/Justfile'\n"
-                "default:\n"
-                "  @echo custom\n",
+                "# import 'docs/standards/Justfile'\ndefault:\n  @echo custom\n",
                 encoding="utf-8",
             )
             self.bootstrap.ensure_justfile(target, dry_run=False)
@@ -149,7 +151,9 @@ class BootstrapTests(unittest.TestCase):
 
     def test_current_timestamp_uses_agents_config_clock(self):
         """Bootstrap timestamp helper should use the shared timezone helper."""
-        with mock.patch.object(self.bootstrap, "now_iso_with_offset", return_value="2026-01-01T00:00:00Z") as patched:
+        with mock.patch.object(
+            self.bootstrap, "now_iso_with_offset", return_value="2026-01-01T00:00:00Z"
+        ) as patched:
             self.assertEqual(self.bootstrap.current_timestamp(), "2026-01-01T00:00:00Z")
             patched.assert_called_once_with("Z")
 
@@ -340,17 +344,23 @@ class BootstrapTests(unittest.TestCase):
             template.mkdir(parents=True, exist_ok=True)
             (template / "AGENTS.md").write_text("managed bootstrap fixture", encoding="utf-8")
             (template / ".agents").mkdir(parents=True, exist_ok=True)
-            (template / ".agents/agents").write_text("bootstrap wrapper fixture\n", encoding="utf-8")
+            (template / ".agents/agents").write_text(
+                "bootstrap wrapper fixture\n", encoding="utf-8"
+            )
 
-            with mock.patch.object(
-                module,
-                "MANDATORY_FILES_TO_COPY",
-                [Path("AGENTS.md")],
-            ), mock.patch.object(
-                module,
-                "MANDATORY_DIRS_TO_COPY",
-                [Path(".agents")],
-            ), mock.patch.object(module, "OPTIONAL_FILES_TO_COPY", []):
+            with (
+                mock.patch.object(
+                    module,
+                    "MANDATORY_FILES_TO_COPY",
+                    [Path("AGENTS.md")],
+                ),
+                mock.patch.object(
+                    module,
+                    "MANDATORY_DIRS_TO_COPY",
+                    [Path(".agents")],
+                ),
+                mock.patch.object(module, "OPTIONAL_FILES_TO_COPY", []),
+            ):
                 manifest = module.bootstrap_manifest(target)
                 self.assertIn("AGENTS.md", manifest.managed_files)
                 self.assertIn(".agents/agents", manifest.managed_files)
@@ -397,25 +407,47 @@ class BootstrapTests(unittest.TestCase):
                 },
             )
 
-            with mock.patch.object(
-                module,
-                "MANDATORY_FILES_TO_COPY",
-                [Path("AGENTS.md"), Path(".agents/agents")],
-            ), mock.patch.object(
-                module,
-                "MANDATORY_DIRS_TO_COPY",
-                [],
-            ), mock.patch.object(module, "OPTIONAL_FILES_TO_COPY", []):
+            with (
+                mock.patch.object(
+                    module,
+                    "MANDATORY_FILES_TO_COPY",
+                    [Path("AGENTS.md"), Path(".agents/agents")],
+                ),
+                mock.patch.object(
+                    module,
+                    "MANDATORY_DIRS_TO_COPY",
+                    [],
+                ),
+                mock.patch.object(module, "OPTIONAL_FILES_TO_COPY", []),
+            ):
                 plan = module.bootstrap_reconcile_plan(target, manifest=prior_manifest)
 
             actions = {entry.action for entry in plan}
-            paths_by_action = {action: sorted(str(item.path) for item in plan if item.action == action) for action in actions}
+            paths_by_action = {
+                action: sorted(str(item.path) for item in plan if item.action == action)
+                for action in actions
+            }
 
             self.assertIn(module.BootstrapAction.SKIP_IDENTICAL, actions)
             self.assertIn(module.BootstrapAction.CONFLICT_USER_EDITED, actions)
             self.assertIn(module.BootstrapAction.PRESERVE_UNMANAGED, actions)
             self.assertIn(module.BootstrapAction.DELETE_STALE_MANAGED, actions)
 
-            self.assertTrue(any(".agents/agents" in path for path in paths_by_action[module.BootstrapAction.CONFLICT_USER_EDITED]))
-            self.assertTrue(any(".agents/local-note.md" in path for path in paths_by_action[module.BootstrapAction.PRESERVE_UNMANAGED]))
-            self.assertTrue(any(".agents/deprecated.txt" in path for path in paths_by_action[module.BootstrapAction.DELETE_STALE_MANAGED]))
+            self.assertTrue(
+                any(
+                    ".agents/agents" in path
+                    for path in paths_by_action[module.BootstrapAction.CONFLICT_USER_EDITED]
+                )
+            )
+            self.assertTrue(
+                any(
+                    ".agents/local-note.md" in path
+                    for path in paths_by_action[module.BootstrapAction.PRESERVE_UNMANAGED]
+                )
+            )
+            self.assertTrue(
+                any(
+                    ".agents/deprecated.txt" in path
+                    for path in paths_by_action[module.BootstrapAction.DELETE_STALE_MANAGED]
+                )
+            )

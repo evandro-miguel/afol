@@ -47,27 +47,35 @@ except ImportError:
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
 SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
-FEATURE_ID_PATTERN = re.compile(CONFIG.get("workflow", {}).get("feature_id_pattern", r"^F-\d{2,3}$"))
+FEATURE_ID_PATTERN = re.compile(
+    CONFIG.get("workflow", {}).get("feature_id_pattern", r"^F-\d{2,3}$")
+)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
-REQUIRE_BRAINSTORM_BEFORE_PLAN_FINAL = bool(WORKFLOW_CFG.get("require_brainstorm_before_plan_final", True))
-REQUIRE_EXPLORER_CHECK_BEFORE_PLAN_FINAL = bool(WORKFLOW_CFG.get("require_explorer_check_before_plan_final", True))
+REQUIRE_BRAINSTORM_BEFORE_PLAN_FINAL = bool(
+    WORKFLOW_CFG.get("require_brainstorm_before_plan_final", True)
+)
+REQUIRE_EXPLORER_CHECK_BEFORE_PLAN_FINAL = bool(
+    WORKFLOW_CFG.get("require_explorer_check_before_plan_final", True)
+)
 REQUIRE_EXECPLAN_SECTIONS_BEFORE_PLAN_FINAL = bool(
     WORKFLOW_CFG.get("require_execplan_sections_before_plan_final", True)
 )
 REQUIRE_EXECPLAN_PROGRESS_BEFORE_PLAN_FINAL = bool(
     WORKFLOW_CFG.get("require_execplan_progress_before_plan_final", True)
 )
-REQUIRE_POSTMORTEM_BEFORE_REPORT_FINAL = bool(WORKFLOW_CFG.get("require_postmortem_before_report_final", True))
+REQUIRE_POSTMORTEM_BEFORE_REPORT_FINAL = bool(
+    WORKFLOW_CFG.get("require_postmortem_before_report_final", True)
+)
 
 # Task status markers
 MARKERS = {
-    'pending': r'- \[ \]',
-    'in_progress': r'- \[/\]',
-    'implemented_untested': r'- \[%\]',
-    'tested_needs_spec_validation': r'- \[&\]',
-    'problem': r'- \[!\]',
-    'moved': r'- \[>\]',
-    'done': r'- \[x\]',
+    "pending": r"- \[ \]",
+    "in_progress": r"- \[/\]",
+    "implemented_untested": r"- \[%\]",
+    "tested_needs_spec_validation": r"- \[&\]",
+    "problem": r"- \[!\]",
+    "moved": r"- \[>\]",
+    "done": r"- \[x\]",
 }
 
 MARKER_TO_STATUS = {
@@ -94,54 +102,70 @@ def normalize_task_state(value: str) -> str:
     return LEGACY_STATE_ALIASES.get(candidate, candidate)
 
 
-TASK_LINE_RE = re.compile(r'^\s*-\s\[( |/|%|&|!|>|x)\]\s+(T-\d{2,3})\s+(.+?)\s*$')
+TASK_LINE_RE = re.compile(r"^\s*-\s\[( |/|%|&|!|>|x)\]\s+(T-\d{2,3})\s+(.+?)\s*$")
 
 # State Board table pattern: | T-01 | done | worker/tester | notes |
-STATE_BOARD_TASK_RE = re.compile(r'^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|')
+STATE_BOARD_TASK_RE = re.compile(r"^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|")
 
 STATE_BOARD_MAP = {
-    'pending': 'pending',
-    'in_progress': 'in_progress',
-    'implemented_untested': 'implemented_untested',
-    'tested_needs_spec_validation': 'tested_needs_spec_validation',
-    'problem': 'problem',
-    'moved': 'moved',
-    'done': 'done',
+    "pending": "pending",
+    "in_progress": "in_progress",
+    "implemented_untested": "implemented_untested",
+    "tested_needs_spec_validation": "tested_needs_spec_validation",
+    "problem": "problem",
+    "moved": "moved",
+    "done": "done",
     # Legacy aliases
-    'ready_for_test': 'implemented_untested',
-    'testing': 'tested_needs_spec_validation',
-    'blocked': 'problem',
-    'skipped': 'moved',
-    'completed': 'done',
+    "ready_for_test": "implemented_untested",
+    "testing": "tested_needs_spec_validation",
+    "blocked": "problem",
+    "skipped": "moved",
+    "completed": "done",
 }
 
 # Evidence patterns for strict mode
 EVIDENCE_PATTERNS = {
-    'command': re.compile(r'```(?:bash|shell|console|python|text)?\s*.*?```', re.DOTALL | re.IGNORECASE),
-    'result': re.compile(r'\b(?:result|output|response|status)\s*[:\-=]\s*\S+', re.IGNORECASE),
-    'artifact': re.compile(r'\b(?:artifact|file|evidence|proof)\s*[:\-=]\s*\S+\.(?:md|json|txt|log|py)', re.IGNORECASE),
-    'verification': re.compile(r'\b(?:verified|validated|confirmed|tested|passed|success|successful)\b', re.IGNORECASE),
+    "command": re.compile(
+        r"```(?:bash|shell|console|python|text)?\s*.*?```", re.DOTALL | re.IGNORECASE
+    ),
+    "result": re.compile(r"\b(?:result|output|response|status)\s*[:\-=]\s*\S+", re.IGNORECASE),
+    "artifact": re.compile(
+        r"\b(?:artifact|file|evidence|proof)\s*[:\-=]\s*\S+\.(?:md|json|txt|log|py)", re.IGNORECASE
+    ),
+    "verification": re.compile(
+        r"\b(?:verified|validated|confirmed|tested|passed|success|successful)\b", re.IGNORECASE
+    ),
 }
 
 # Contradiction phrases for report analysis
 CONTRADICTION_PHRASES = {
-    'all_completed': re.compile(r'\ball\b.*?\b(?:tasks?|items?|work)\b.*?\b(?:completed|done|finished)', re.IGNORECASE),
-    'pending_execution': re.compile(r'\b(?:pending|not yet|awaiting|waiting for|to do)\b', re.IGNORECASE),
-    'blocked': re.compile(r'\b(?:blocked|stuck|unable to|cannot|fail|failed|failure|error)\b', re.IGNORECASE),
-    'in_progress': re.compile(r'\b(?:in progress|working on|implementing|currently)\b', re.IGNORECASE),
+    "all_completed": re.compile(
+        r"\ball\b.*?\b(?:tasks?|items?|work)\b.*?\b(?:completed|done|finished)", re.IGNORECASE
+    ),
+    "pending_execution": re.compile(
+        r"\b(?:pending|not yet|awaiting|waiting for|to do)\b", re.IGNORECASE
+    ),
+    "blocked": re.compile(
+        r"\b(?:blocked|stuck|unable to|cannot|fail|failed|failure|error)\b", re.IGNORECASE
+    ),
+    "in_progress": re.compile(
+        r"\b(?:in progress|working on|implementing|currently)\b", re.IGNORECASE
+    ),
 }
 
 FAILED_EVIDENCE_RE = re.compile(
     r"\b(?:fail|failed|failure|error|fatal|blocked|source-drift|no justfile found|exit code [1-9])\b",
     re.IGNORECASE,
 )
-SUCCESS_EVIDENCE_RE = re.compile(r"\b(?:pass|passed|success|successful|ok|green|valid|resolved)\b", re.IGNORECASE)
+SUCCESS_EVIDENCE_RE = re.compile(
+    r"\b(?:pass|passed|success|successful|ok|green|valid|resolved)\b", re.IGNORECASE
+)
 ACCEPTED_FAILURE_RE = re.compile(
     r"\b(?:expected failure|accepted failure|non-blocking|accepted non-blocking|n/a)\b",
     re.IGNORECASE,
 )
 
-FINAL_OPEN_MARKER_RE = re.compile(r'^\s*-\s\[( |/|%|&|!|>)\]\s+')
+FINAL_OPEN_MARKER_RE = re.compile(r"^\s*-\s\[( |/|%|&|!|>)\]\s+")
 FUTURE_TOLERANCE = timedelta(minutes=2)
 EXECPLAN_REQUIRED_HEADINGS = [
     "Purpose / Big Picture",
@@ -157,7 +181,7 @@ EXECPLAN_REQUIRED_HEADINGS = [
     "Artifacts and Notes",
     "Interfaces and Dependencies",
 ]
-PROGRESS_MARKER_RE = re.compile(r'^\s*-\s\[( |/|%|&|!|>|x)\]\s+', re.MULTILINE)
+PROGRESS_MARKER_RE = re.compile(r"^\s*-\s\[( |/|%|&|!|>|x)\]\s+", re.MULTILINE)
 
 META_TASK_PATTERNS = [
     re.compile(
@@ -174,7 +198,7 @@ META_TASK_PATTERNS = [
     ),
 ]
 PLAN_STEP_RE = re.compile(r"^\s*(?:\d+\.\s+|-\s+)(.+?)\s*$")
-TASK_BOARD_ROW_RE = re.compile(r'^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+)\|\s*([^|]*)\|\s*([^|]*)\|')
+TASK_BOARD_ROW_RE = re.compile(r"^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+)\|\s*([^|]*)\|\s*([^|]*)\|")
 
 
 def parse_iso_timestamp(value: str) -> datetime:
@@ -198,22 +222,24 @@ def extract_evidence(content: str, file_path: Path) -> Dict[str, Any]:
     - evidence_details: list of found evidence types
     """
     evidence = {
-        'has_command': bool(EVIDENCE_PATTERNS['command'].search(content)),
-        'has_result': bool(EVIDENCE_PATTERNS['result'].search(content)),
-        'has_artifact': bool(EVIDENCE_PATTERNS['artifact'].search(content)),
-        'has_verification': bool(EVIDENCE_PATTERNS['verification'].search(content)),
-        'evidence_count': 0,
-        'evidence_details': [],
+        "has_command": bool(EVIDENCE_PATTERNS["command"].search(content)),
+        "has_result": bool(EVIDENCE_PATTERNS["result"].search(content)),
+        "has_artifact": bool(EVIDENCE_PATTERNS["artifact"].search(content)),
+        "has_verification": bool(EVIDENCE_PATTERNS["verification"].search(content)),
+        "evidence_count": 0,
+        "evidence_details": [],
     }
 
     for pattern_name, pattern in EVIDENCE_PATTERNS.items():
         matches = pattern.findall(content)
         if matches:
-            evidence['evidence_count'] += len(matches)
-            evidence['evidence_details'].append({
-                'type': pattern_name,
-                'count': len(matches),
-            })
+            evidence["evidence_count"] += len(matches)
+            evidence["evidence_details"].append(
+                {
+                    "type": pattern_name,
+                    "count": len(matches),
+                }
+            )
 
     return evidence
 
@@ -236,28 +262,34 @@ def detect_report_contradictions(content: str) -> List[Dict[str, Any]]:
             findings[name] = len(matches)
 
     # Check for contradictory combinations
-    if 'all_completed' in findings:
-        if 'pending_execution' in findings:
-            contradictions.append({
-                'type': 'completion_conflict',
-                'severity': 'error',
-                'description': 'Report claims "all completed" but also mentions pending work',
-                'conflicting_phrases': ['all_completed', 'pending_execution'],
-            })
-        if 'blocked' in findings:
-            contradictions.append({
-                'type': 'completion_conflict',
-                'severity': 'error',
-                'description': 'Report claims "all completed" but also mentions blocked items',
-                'conflicting_phrases': ['all_completed', 'blocked'],
-            })
-        if 'in_progress' in findings:
-            contradictions.append({
-                'type': 'completion_conflict',
-                'severity': 'warning',
-                'description': 'Report claims "all completed" but also mentions work in progress',
-                'conflicting_phrases': ['all_completed', 'in_progress'],
-            })
+    if "all_completed" in findings:
+        if "pending_execution" in findings:
+            contradictions.append(
+                {
+                    "type": "completion_conflict",
+                    "severity": "error",
+                    "description": 'Report claims "all completed" but also mentions pending work',
+                    "conflicting_phrases": ["all_completed", "pending_execution"],
+                }
+            )
+        if "blocked" in findings:
+            contradictions.append(
+                {
+                    "type": "completion_conflict",
+                    "severity": "error",
+                    "description": 'Report claims "all completed" but also mentions blocked items',
+                    "conflicting_phrases": ["all_completed", "blocked"],
+                }
+            )
+        if "in_progress" in findings:
+            contradictions.append(
+                {
+                    "type": "completion_conflict",
+                    "severity": "warning",
+                    "description": 'Report claims "all completed" but also mentions work in progress',
+                    "conflicting_phrases": ["all_completed", "in_progress"],
+                }
+            )
 
     return contradictions
 
@@ -277,17 +309,23 @@ def check_temporal_consistency(session_dir: Path) -> List[Dict[str, Any]]:
     now_local = datetime.now()
 
     if yaml is None:
-        return [{'type': 'config', 'severity': 'warning', 'description': 'PyYAML not available, skipping temporal checks'}]
+        return [
+            {
+                "type": "config",
+                "severity": "warning",
+                "description": "PyYAML not available, skipping temporal checks",
+            }
+        ]
 
-    for doc_file in session_dir.glob('*.md'):
+    for doc_file in session_dir.glob("*.md"):
         parsed = parse_markdown_doc(doc_file)
         if parsed is None:
             continue
 
         fm, _, content = parsed
         doc_name = doc_file.name
-        created_at = fm.get('created_at')
-        updated_at = fm.get('updated_at')
+        created_at = fm.get("created_at")
+        updated_at = fm.get("updated_at")
         timeline_entries = _extract_timeline_entries(content)
 
         _record_frontmatter_temporal_issues(
@@ -304,12 +342,12 @@ def check_temporal_consistency(session_dir: Path) -> List[Dict[str, Any]]:
 
 def _extract_timeline_entries(content: str) -> List[str]:
     """Return the timeline timestamps found in a workbench doc."""
-    timeline_match = re.search(r'## Timeline\s*\n(.*?)(?=\n## |\Z)', content, re.DOTALL)
+    timeline_match = re.search(r"## Timeline\s*\n(.*?)(?=\n## |\Z)", content, re.DOTALL)
     if not timeline_match:
         return []
 
     timeline_content = timeline_match.group(1)
-    return re.findall(r'-\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})', timeline_content)
+    return re.findall(r"-\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})", timeline_content)
 
 
 def _record_temporal_issue(
@@ -317,12 +355,14 @@ def _record_temporal_issue(
     doc_name: str,
     description: str,
 ) -> None:
-    issues.append({
-        'type': 'temporal_inconsistency',
-        'severity': 'error',
-        'document': doc_name,
-        'description': description,
-    })
+    issues.append(
+        {
+            "type": "temporal_inconsistency",
+            "severity": "error",
+            "document": doc_name,
+            "description": description,
+        }
+    )
 
 
 def _record_frontmatter_temporal_issues(
@@ -345,15 +385,15 @@ def _record_frontmatter_temporal_issues(
         _record_temporal_issue(
             issues,
             doc_name,
-            f'updated_at ({updated_at}) is before created_at ({created_at})',
+            f"updated_at ({updated_at}) is before created_at ({created_at})",
         )
 
     # Compare in wall-clock form to avoid brittle timezone assumptions.
     if created_dt.replace(tzinfo=None) > now_local + FUTURE_TOLERANCE:
-        _record_temporal_issue(issues, doc_name, f'created_at ({created_at}) is in the future')
+        _record_temporal_issue(issues, doc_name, f"created_at ({created_at}) is in the future")
 
     if updated_dt.replace(tzinfo=None) > now_local + FUTURE_TOLERANCE:
-        _record_temporal_issue(issues, doc_name, f'updated_at ({updated_at}) is in the future')
+        _record_temporal_issue(issues, doc_name, f"updated_at ({updated_at}) is in the future")
 
 
 def _record_timeline_temporal_issues(
@@ -374,7 +414,7 @@ def _record_timeline_temporal_issues(
     for timeline_entry in timeline_entries:
         try:
             # Parse timeline entry format: "YYYY-MM-DD HH:MM"
-            entry_dt = datetime.strptime(timeline_entry, '%Y-%m-%d %H:%M')
+            entry_dt = datetime.strptime(timeline_entry, "%Y-%m-%d %H:%M")
         except ValueError:
             continue
 
@@ -383,7 +423,7 @@ def _record_timeline_temporal_issues(
             _record_temporal_issue(
                 issues,
                 doc_name,
-                f'Timeline entry ({timeline_entry}) is later than updated_at ({updated_at})',
+                f"Timeline entry ({timeline_entry}) is later than updated_at ({updated_at})",
             )
 
 
@@ -433,9 +473,7 @@ def check_plan_task_coherence(session_dir: Path) -> List[Dict[str, Any]]:
         return issues
 
     task_docs = {
-        str(d["fm"].get("id", "")).strip(): d
-        for d in docs
-        if d["name"].find("_task_") != -1
+        str(d["fm"].get("id", "")).strip(): d for d in docs if d["name"].find("_task_") != -1
     }
     for plan_doc in sorted(plans, key=lambda d: d["name"]):
         plan_id = plan_doc["fm"].get("id")
@@ -509,22 +547,30 @@ def _fm_text(value: Any) -> str:
 
 
 def _append_governance_issue(issues: List[Dict[str, Any]], description: str) -> None:
-    issues.append({
-        "type": "governance",
-        "severity": "error",
-        "description": description,
-    })
+    issues.append(
+        {
+            "type": "governance",
+            "severity": "error",
+            "description": description,
+        }
+    )
 
 
-def _validate_governance_feature(plan_id: Any, feature_id: str, issues: List[Dict[str, Any]]) -> None:
+def _validate_governance_feature(
+    plan_id: Any, feature_id: str, issues: List[Dict[str, Any]]
+) -> None:
     if not feature_id:
         _append_governance_issue(issues, f"Plan {plan_id} is missing roadmap_feature")
         return
     if not FEATURE_ID_PATTERN.match(feature_id):
-        _append_governance_issue(issues, f"Plan {plan_id} has invalid roadmap_feature '{feature_id}'")
+        _append_governance_issue(
+            issues, f"Plan {plan_id} has invalid roadmap_feature '{feature_id}'"
+        )
         return
     if not _roadmap_has_feature(feature_id):
-        _append_governance_issue(issues, f"Plan {plan_id} references missing roadmap feature '{feature_id}'")
+        _append_governance_issue(
+            issues, f"Plan {plan_id} references missing roadmap feature '{feature_id}'"
+        )
 
 
 def _validate_governance_spec_reference(
@@ -578,7 +624,9 @@ def _validate_governance_link(
         )
 
 
-def _validate_plan_governance(plan_doc: Dict[str, Any], docs_by_id: Dict[str, Dict[str, Any]], issues: List[Dict[str, Any]]) -> None:
+def _validate_plan_governance(
+    plan_doc: Dict[str, Any], docs_by_id: Dict[str, Dict[str, Any]], issues: List[Dict[str, Any]]
+) -> None:
     plan_fm = plan_doc["fm"]
     plan_id = plan_fm.get("id")
     feature_id = _fm_text(plan_fm.get("roadmap_feature", ""))
@@ -650,20 +698,24 @@ def check_planning_intelligence_gates(session_dir: Path) -> List[Dict[str, Any]]
         if REQUIRE_BRAINSTORM_BEFORE_PLAN_FINAL:
             brainstorm_id = _fm_text(links.get("brainstorm", ""))
             if not brainstorm_id or brainstorm_id not in docs_by_id:
-                issues.append({
-                    "type": "planning_gate",
-                    "severity": "error",
-                    "description": f"Plan {plan_id} is final but has no linked brainstorm artifact",
-                })
+                issues.append(
+                    {
+                        "type": "planning_gate",
+                        "severity": "error",
+                        "description": f"Plan {plan_id} is final but has no linked brainstorm artifact",
+                    }
+                )
 
         if REQUIRE_EXPLORER_CHECK_BEFORE_PLAN_FINAL:
             explorer_id = _fm_text(links.get("explorer_check", ""))
             if not explorer_id or explorer_id not in docs_by_id:
-                issues.append({
-                    "type": "planning_gate",
-                    "severity": "error",
-                    "description": f"Plan {plan_id} is final but has no linked explorer-check artifact",
-                })
+                issues.append(
+                    {
+                        "type": "planning_gate",
+                        "severity": "error",
+                        "description": f"Plan {plan_id} is final but has no linked explorer-check artifact",
+                    }
+                )
 
     return issues
 
@@ -742,34 +794,42 @@ def check_postmortem_closure(session_dir: Path) -> List[Dict[str, Any]]:
     docs = load_frontmatter_docs(session_dir)
     reports = [d for d in docs if "_report_" in d["name"]]
     postmortems = [d for d in docs if "_postmortem_" in d["name"]]
-    final_reports = [d for d in reports if str(d["fm"].get("status", "")).strip().lower() == "final"]
+    final_reports = [
+        d for d in reports if str(d["fm"].get("status", "")).strip().lower() == "final"
+    ]
     if final_reports and REQUIRE_POSTMORTEM_BEFORE_REPORT_FINAL:
         if not postmortems:
-            issues.append({
-                "type": "postmortem_gate",
-                "severity": "error",
-                "description": "Final report exists but no postmortem document was found",
-            })
+            issues.append(
+                {
+                    "type": "postmortem_gate",
+                    "severity": "error",
+                    "description": "Final report exists but no postmortem document was found",
+                }
+            )
             return issues
 
         if not any(str(d["fm"].get("status", "")).strip().lower() == "final" for d in postmortems):
-            issues.append({
-                "type": "postmortem_gate",
-                "severity": "error",
-                "description": "Final report exists but no postmortem has status=final",
-            })
+            issues.append(
+                {
+                    "type": "postmortem_gate",
+                    "severity": "error",
+                    "description": "Final report exists but no postmortem has status=final",
+                }
+            )
 
     for doc in postmortems:
         if str(doc["fm"].get("status", "")).strip().lower() != "final":
             continue
         review_issues = postmortem_governance_review_issues(doc["body"])
         for issue in review_issues:
-            issues.append({
-                "type": "postmortem_governance_review",
-                "severity": "error",
-                "document": doc["name"],
-                "description": f"Final postmortem is incomplete: {issue}",
-            })
+            issues.append(
+                {
+                    "type": "postmortem_governance_review",
+                    "severity": "error",
+                    "document": doc["name"],
+                    "description": f"Final postmortem is incomplete: {issue}",
+                }
+            )
 
     return issues
 
@@ -872,7 +932,9 @@ def check_meta_task_integrity(session_dir: Path) -> List[Dict[str, Any]]:
     return issues
 
 
-def check_delivery_closure_readiness(session_dir: Path, completed_tasks: int) -> List[Dict[str, Any]]:
+def check_delivery_closure_readiness(
+    session_dir: Path, completed_tasks: int
+) -> List[Dict[str, Any]]:
     """Validate closure blockers only for optional artifacts that are present."""
     issues: List[Dict[str, Any]] = []
     if yaml is None:
@@ -955,12 +1017,14 @@ def has_sufficient_evidence(evidence: Dict[str, Any]) -> bool:
     - Artifact reference
     - Verification statement
     """
-    criteria_met = sum([
-        evidence['has_command'],
-        evidence['has_result'],
-        evidence['has_artifact'],
-        evidence['has_verification'],
-    ])
+    criteria_met = sum(
+        [
+            evidence["has_command"],
+            evidence["has_result"],
+            evidence["has_artifact"],
+            evidence["has_verification"],
+        ]
+    )
     return criteria_met >= 2
 
 
@@ -1015,10 +1079,7 @@ def _unresolved_failed_evidence_entries(entries: List[Dict[str, Any]]) -> List[D
 
 
 def _evidence_text(entry: Dict[str, Any]) -> str:
-    return " ".join(
-        str(entry.get(key, ""))
-        for key in ("id", "command", "result", "note")
-    )
+    return " ".join(str(entry.get(key, "")) for key in ("id", "command", "result", "note"))
 
 
 def _valid_closure_evidence_entries(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1065,7 +1126,7 @@ def extract_tasks(content: str, file_path: Path) -> List[Tuple[str, str, str, in
                 state = match.group(2).lower()
                 # Extract description from notes column (use state as placeholder for description)
                 task_text = f"{state} (State Board)"
-                marker_type = STATE_BOARD_MAP.get(state, 'pending')
+                marker_type = STATE_BOARD_MAP.get(state, "pending")
                 if task_text:
                     tasks.append((task_id, task_text, marker_type, line_num))
                 continue
@@ -1156,13 +1217,21 @@ def _record_task_verification(
             ledger_entries = (evidence_ledger or {}).get(task_info["id"], [])
             failed_entries = _unresolved_failed_evidence_entries(ledger_entries)
             if failed_entries:
-                _record_failed_evidence(results, task_info["id"], task_info["file"], task_info["line"], failed_entries[0])
+                _record_failed_evidence(
+                    results,
+                    task_info["id"],
+                    task_info["file"],
+                    task_info["line"],
+                    failed_entries[0],
+                )
                 file_result["all_completed"] = False
                 return False
             valid_entries = _valid_closure_evidence_entries(ledger_entries)
             if not valid_entries:
                 evidence = extract_evidence(content, task_info["file"])
-                _record_missing_evidence(results, task_info["id"], task_info["file"], task_info["line"], evidence)
+                _record_missing_evidence(
+                    results, task_info["id"], task_info["file"], task_info["line"], evidence
+                )
                 file_result["all_completed"] = False
                 return False
         return True
@@ -1212,7 +1281,10 @@ def _run_strict_session_checks(session_path: Path, results: Dict[str, Any]) -> b
         ("postmortem_issues", lambda: check_postmortem_closure(session_path)),
         ("final_doc_issues", lambda: check_final_docs_for_open_checklists(session_path)),
         ("artifact_utility_issues", lambda: check_artifact_utility(session_path)),
-        ("closure_issues", lambda: check_delivery_closure_readiness(session_path, results["completed"])),
+        (
+            "closure_issues",
+            lambda: check_delivery_closure_readiness(session_path, results["completed"]),
+        ),
     )
 
     all_clear = True
@@ -1236,48 +1308,48 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
     - Checks temporal consistency
     """
     results = {
-        'session': session_path,
-        'task_files': [],
-        'open_tasks': [],
-        'total_tasks': 0,
-        'completed': 0,
-        'done': 0,
-        'pending': 0,
-        'in_progress': 0,
-        'implemented_untested': 0,
-        'tested_needs_spec_validation': 0,
-        'problem': 0,
-        'moved': 0,
+        "session": session_path,
+        "task_files": [],
+        "open_tasks": [],
+        "total_tasks": 0,
+        "completed": 0,
+        "done": 0,
+        "pending": 0,
+        "in_progress": 0,
+        "implemented_untested": 0,
+        "tested_needs_spec_validation": 0,
+        "problem": 0,
+        "moved": 0,
         # Legacy compatibility counters
-        'ready_for_test': 0,
-        'blocked': 0,
-        'skipped': 0,
-        'issues': [],
-        'strict_mode': strict,
-        'evidence_issues': [],
-        'contradictions': [],
-        'temporal_issues': [],
-        'coherence_issues': [],
-        'governance_issues': [],
-        'meta_task_issues': [],
-        'planning_gate_issues': [],
-        'execplan_issues': [],
-        'postmortem_issues': [],
-        'final_doc_issues': [],
-        'artifact_utility_issues': [],
-        'closure_issues': [],
+        "ready_for_test": 0,
+        "blocked": 0,
+        "skipped": 0,
+        "issues": [],
+        "strict_mode": strict,
+        "evidence_issues": [],
+        "contradictions": [],
+        "temporal_issues": [],
+        "coherence_issues": [],
+        "governance_issues": [],
+        "meta_task_issues": [],
+        "planning_gate_issues": [],
+        "execplan_issues": [],
+        "postmortem_issues": [],
+        "final_doc_issues": [],
+        "artifact_utility_issues": [],
+        "closure_issues": [],
     }
 
     if not session_path.exists():
-        results['issues'].append(f"Session folder not found: {session_path}")
+        results["issues"].append(f"Session folder not found: {session_path}")
         return False, results
 
     # Find all task files (recursive, so .agents/wb/ can be used directly)
-    task_files = list(session_path.rglob('*task*.md'))
+    task_files = list(session_path.rglob("*task*.md"))
 
     if not task_files:
         if not strict:
-            results['issues'].append("No task files found in session")
+            results["issues"].append("No task files found in session")
             return True, results  # No tasks = vacuously true in non-strict mode
 
     all_completed = True
@@ -1285,9 +1357,9 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
 
     for task_file in sorted(task_files):
         file_result = {
-            'file': task_file,
-            'tasks': [],
-            'all_completed': True,
+            "file": task_file,
+            "tasks": [],
+            "all_completed": True,
         }
 
         content = task_file.read_text()
@@ -1295,14 +1367,14 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
 
         for task_id, task_text, marker_type, line_num in tasks:
             task_info = {
-                'id': task_id,
-                'description': task_text,
-                'status': marker_type,
-                'line': line_num,
-                'file': task_file,
+                "id": task_id,
+                "description": task_text,
+                "status": marker_type,
+                "line": line_num,
+                "file": task_file,
             }
-            file_result['tasks'].append(task_info)
-            results['total_tasks'] += 1
+            file_result["tasks"].append(task_info)
+            results["total_tasks"] += 1
 
             task_completed = _record_task_verification(
                 results,
@@ -1315,7 +1387,7 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
             )
             all_completed = all_completed and task_completed
 
-        results['task_files'].append(file_result)
+        results["task_files"].append(file_result)
 
     if strict:
         all_completed = all_completed and _run_strict_session_checks(session_path, results)
@@ -1326,8 +1398,8 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
 def _print_evidence_issue(issue: Dict[str, Any]) -> None:
     print(f"  ⚠️  {issue['task_id']} | {issue['file'].split('/')[-1]}:{issue['line']}")
     print(f"      {issue['description']}")
-    if issue.get('evidence_details'):
-        details = ', '.join([f"{e['type']}:{e['count']}" for e in issue['evidence_details']])
+    if issue.get("evidence_details"):
+        details = ", ".join([f"{e['type']}:{e['count']}" for e in issue["evidence_details"]])
         print(f"      Evidence found: {details}")
     if issue.get("command") or issue.get("result"):
         print(f"      Command: {issue.get('command', '')}")
@@ -1345,8 +1417,7 @@ def _print_standard_issue(issue: Dict[str, Any]) -> None:
 
 def _print_final_doc_issue(issue: Dict[str, Any]) -> None:
     print(
-        f"  ⚠️  {issue.get('document', 'unknown')}:{issue.get('line', '?')} "
-        f"{issue['description']}"
+        f"  ⚠️  {issue.get('document', 'unknown')}:{issue.get('line', '?')} {issue['description']}"
     )
 
 
@@ -1367,8 +1438,18 @@ def _print_issue_section(
 def _print_strict_mode_sections(results: Dict[str, Any]) -> None:
     print("Strict Mode Checks:")
     print("-" * 60)
-    _print_issue_section("Evidence Issues", results["evidence_issues"], "Evidence checks passed", _print_evidence_issue)
-    _print_issue_section("Contradictions", results["contradictions"], "No contradictions detected", _print_contradiction_issue)
+    _print_issue_section(
+        "Evidence Issues",
+        results["evidence_issues"],
+        "Evidence checks passed",
+        _print_evidence_issue,
+    )
+    _print_issue_section(
+        "Contradictions",
+        results["contradictions"],
+        "No contradictions detected",
+        _print_contradiction_issue,
+    )
     _print_issue_section(
         "Temporal Issues",
         results["temporal_issues"],
@@ -1444,13 +1525,13 @@ def _print_task_details(results: Dict[str, Any]) -> None:
             continue
 
         status_icon = {
-            'done': '✓',
-            'moved': '➤',
-            'pending': '⏳',
-            'in_progress': '🔄',
-            'implemented_untested': '🧪',
-            'tested_needs_spec_validation': '🔬',
-            'problem': '⚠️',
+            "done": "✓",
+            "moved": "➤",
+            "pending": "⏳",
+            "in_progress": "🔄",
+            "implemented_untested": "🧪",
+            "tested_needs_spec_validation": "🔬",
+            "problem": "⚠️",
         }
 
         for task in file_result["tasks"]:
@@ -1463,7 +1544,9 @@ def _print_task_details(results: Dict[str, Any]) -> None:
         print("-" * 60)
         for task in results["open_tasks"]:
             rel = task["file"].relative_to(results["session"])
-            print(f"  {task['id']} | {rel}:{task['line']} | {task['status']} | {task['description']}")
+            print(
+                f"  {task['id']} | {rel}:{task['line']} | {task['status']} | {task['description']}"
+            )
 
 
 def _print_failure_summary(results: Dict[str, Any]) -> None:
@@ -1524,28 +1607,28 @@ def print_report(all_completed: bool, results: Dict) -> None:
     print("Task Verification Report")
     print("=" * 60)
     print(f"Session: {results['session']}")
-    if results.get('strict_mode'):
+    if results.get("strict_mode"):
         print("Mode: STRICT")
     print()
 
     print("Summary:")
     print(f"  Total tasks:     {results['total_tasks']}")
     print(f"  Completed:       {results['completed']} ✓")
-    if results['moved'] > 0:
+    if results["moved"] > 0:
         print(f"  Moved:           {results['moved']} ➤")
-    if results['pending'] > 0:
+    if results["pending"] > 0:
         print(f"  Pending:         {results['pending']} ⏳")
-    if results['in_progress'] > 0:
+    if results["in_progress"] > 0:
         print(f"  In Progress:     {results['in_progress']} 🔄")
-    if results['implemented_untested'] > 0:
+    if results["implemented_untested"] > 0:
         print(f"  Implemented:     {results['implemented_untested']} 🧪")
-    if results['tested_needs_spec_validation'] > 0:
+    if results["tested_needs_spec_validation"] > 0:
         print(f"  Tested/Spec:     {results['tested_needs_spec_validation']} 🔬")
-    if results['problem'] > 0:
+    if results["problem"] > 0:
         print(f"  Problem:         {results['problem']} ⚠️")
     print()
 
-    if results.get('strict_mode'):
+    if results.get("strict_mode"):
         _print_strict_mode_sections(results)
 
     _print_task_details(results)
@@ -1558,9 +1641,9 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Verify all tasks in a session are completed.',
+        description="Verify all tasks in a session are completed.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
+        epilog="""
 Examples:
   python verify-tasks.py .agents/wb/260223_1200_auth-refactor/
   python verify-tasks.py --strict .agents/wb/260223_1200-auth-refactor/
@@ -1571,18 +1654,16 @@ Strict Mode:
   - Tasks marked done must have evidence references
   - Report contradictions are detected
   - Timeline/frontmatter temporal inconsistencies are flagged
-'''
+""",
     )
     parser.add_argument(
-        'session_path',
-        nargs='?',
+        "session_path",
+        nargs="?",
         default=None,
-        help='Session folder path (default: current directory)'
+        help="Session folder path (default: current directory)",
     )
     parser.add_argument(
-        '--strict',
-        action='store_true',
-        help='Enable strict verification mode with evidence checks'
+        "--strict", action="store_true", help="Enable strict verification mode with evidence checks"
     )
 
     args = parser.parse_args()

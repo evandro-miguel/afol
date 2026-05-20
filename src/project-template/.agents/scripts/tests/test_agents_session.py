@@ -118,21 +118,29 @@ class SessionHelperTests(unittest.TestCase):
 
     def test_print_task_summary_with_next(self):
         with mock.patch("builtins.print") as mock_print:
-            self.session._print_task_summary({
-                "done": 1, "total": 2, "remaining": 1,
-                "next": {"task_id": "T-02", "state": "pending", "notes": "waiting"},
-                "blocked": [],
-            })
+            self.session._print_task_summary(
+                {
+                    "done": 1,
+                    "total": 2,
+                    "remaining": 1,
+                    "next": {"task_id": "T-02", "state": "pending", "notes": "waiting"},
+                    "blocked": [],
+                }
+            )
         output = "\n".join(str(c) for c in mock_print.call_args_list)
         self.assertIn("1/2", output)
 
     def test_print_git_summary(self):
         with mock.patch("builtins.print") as mock_print:
-            self.session._print_git_summary({
-                "changed": 5, "repo_changed": 3, "session_changed": 2,
-                "repo_paths": ["a.py", "b.py"],
-                "session_paths": ["task.md"],
-            })
+            self.session._print_git_summary(
+                {
+                    "changed": 5,
+                    "repo_changed": 3,
+                    "session_changed": 2,
+                    "repo_paths": ["a.py", "b.py"],
+                    "session_paths": ["task.md"],
+                }
+            )
         output = "\n".join(str(c) for c in mock_print.call_args_list)
         self.assertIn("total=5", output)
 
@@ -149,44 +157,63 @@ class SessionCloseTests(unittest.TestCase):
 
     def test_cmd_close_success(self):
         target = Path("/tmp/session-close-ok")
-        with mock.patch.object(self.session, "find_session", return_value=target), \
-             mock.patch.object(self.session, "_run_strict_verify",
-                               return_value=mock.Mock(returncode=0, stdout="", stderr="")), \
-             mock.patch.object(self.session, "_read_active_session", return_value="other"), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.session, "find_session", return_value=target),
+            mock.patch.object(
+                self.session,
+                "_run_strict_verify",
+                return_value=mock.Mock(returncode=0, stdout="", stderr=""),
+            ),
+            mock.patch.object(self.session, "_read_active_session", return_value="other"),
+            mock.patch("builtins.print"),
+        ):
             result = self.session.cmd_close(self._close_args())
         self.assertEqual(result, 0)
 
     def test_cmd_close_verify_fails(self):
         target = Path("/tmp/session-close-fail")
-        with mock.patch.object(self.session, "find_session", return_value=target), \
-             mock.patch.object(self.session, "_run_strict_verify",
-                               return_value=mock.Mock(returncode=1, stdout="fail", stderr="")), \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.session, "find_session", return_value=target),
+            mock.patch.object(
+                self.session,
+                "_run_strict_verify",
+                return_value=mock.Mock(returncode=1, stdout="fail", stderr=""),
+            ),
+            mock.patch("builtins.print"),
+        ):
             result = self.session.cmd_close(self._close_args())
         self.assertEqual(result, 1)
 
     def test_cmd_close_repoint(self):
         target = Path("/tmp/session-a")
         next_target = Path("/tmp/session-b")
-        with mock.patch.object(self.session, "find_session",
-                               side_effect=[target, next_target]), \
-             mock.patch.object(self.session, "_run_strict_verify",
-                               return_value=mock.Mock(returncode=0, stdout="", stderr="")), \
-             mock.patch.object(self.session, "_read_active_session", return_value="session-a"), \
-             mock.patch.object(self.session, "_write_active_session") as mock_write, \
-             mock.patch("builtins.print"):
+        with (
+            mock.patch.object(self.session, "find_session", side_effect=[target, next_target]),
+            mock.patch.object(
+                self.session,
+                "_run_strict_verify",
+                return_value=mock.Mock(returncode=0, stdout="", stderr=""),
+            ),
+            mock.patch.object(self.session, "_read_active_session", return_value="session-a"),
+            mock.patch.object(self.session, "_write_active_session") as mock_write,
+            mock.patch("builtins.print"),
+        ):
             result = self.session.cmd_close(self._close_args(next_session="session-b"))
         self.assertEqual(result, 0)
         mock_write.assert_called_once_with("session-b")
 
     def test_cmd_close_json_output(self):
         target = Path("/tmp/session-json")
-        with mock.patch.object(self.session, "find_session", return_value=target), \
-             mock.patch.object(self.session, "_run_strict_verify",
-                               return_value=mock.Mock(returncode=0, stdout="", stderr="")), \
-             mock.patch.object(self.session, "_read_active_session", return_value=""), \
-             mock.patch("builtins.print") as mock_print:
+        with (
+            mock.patch.object(self.session, "find_session", return_value=target),
+            mock.patch.object(
+                self.session,
+                "_run_strict_verify",
+                return_value=mock.Mock(returncode=0, stdout="", stderr=""),
+            ),
+            mock.patch.object(self.session, "_read_active_session", return_value=""),
+            mock.patch("builtins.print") as mock_print,
+        ):
             result = self.session.cmd_close(self._close_args(json=True))
         self.assertEqual(result, 0)
         call_args = mock_print.call_args_list[0]
@@ -195,12 +222,17 @@ class SessionCloseTests(unittest.TestCase):
 
     def test_cmd_close_clears_active_pointer(self):
         target = Path("/tmp/session-ret")
-        with mock.patch.object(self.session, "find_session", return_value=target), \
-             mock.patch.object(self.session, "_run_strict_verify",
-                               return_value=mock.Mock(returncode=0, stdout="", stderr="")), \
-             mock.patch.object(self.session, "_read_active_session", return_value="session-ret"), \
-             mock.patch.object(self.session, "_clear_active_session") as mock_clear, \
-             mock.patch("builtins.print") as mock_print:
+        with (
+            mock.patch.object(self.session, "find_session", return_value=target),
+            mock.patch.object(
+                self.session,
+                "_run_strict_verify",
+                return_value=mock.Mock(returncode=0, stdout="", stderr=""),
+            ),
+            mock.patch.object(self.session, "_read_active_session", return_value="session-ret"),
+            mock.patch.object(self.session, "_clear_active_session") as mock_clear,
+            mock.patch("builtins.print") as mock_print,
+        ):
             result = self.session.cmd_close(self._close_args())
         self.assertEqual(result, 0)
         mock_clear.assert_called_once_with()
@@ -218,9 +250,7 @@ def write_session_task(session_dir: Path, rows: list[str]) -> None:
         "# Tasks\n\n"
         "## State Board\n\n"
         "| Task | State | Owner | Notes |\n"
-        "|------|-------|-------|-------|\n"
-        + "\n".join(rows)
-        + "\n",
+        "|------|-------|-------|-------|\n" + "\n".join(rows) + "\n",
         encoding="utf-8",
     )
 
@@ -228,11 +258,7 @@ def write_session_task(session_dir: Path, rows: list[str]) -> None:
 def write_session_doc(session_dir: Path, doc_type: str, status: str) -> None:
     doc_file = session_dir / f"{session_dir.name}_{doc_type}_01.md"
     doc_file.write_text(
-        "---\n"
-        f"doc_type: {doc_type}\n"
-        f"status: {status}\n"
-        "---\n\n"
-        f"# {doc_type}\n",
+        f"---\ndoc_type: {doc_type}\nstatus: {status}\n---\n\n# {doc_type}\n",
         encoding="utf-8",
     )
 
@@ -267,9 +293,11 @@ class SessionInventoryTests(unittest.TestCase):
 
             active_file.write_text(f"{open_dir.name}\n", encoding="utf-8")
 
-            with mock.patch.object(self.session, "WB_DIR", wb_dir), \
-                 mock.patch.object(self.session, "ACTIVE_SESSION_FILE", active_file), \
-                 mock.patch("builtins.print") as mock_print:
+            with (
+                mock.patch.object(self.session, "WB_DIR", wb_dir),
+                mock.patch.object(self.session, "ACTIVE_SESSION_FILE", active_file),
+                mock.patch("builtins.print") as mock_print,
+            ):
                 result = self.session.cmd_list(self._args(json=True))
 
             self.assertEqual(result, 0)
@@ -307,9 +335,11 @@ class SessionInventoryTests(unittest.TestCase):
 
             active_file.write_text(f"{open_dir.name}\n", encoding="utf-8")
 
-            with mock.patch.object(self.session, "WB_DIR", wb_dir), \
-                 mock.patch.object(self.session, "ACTIVE_SESSION_FILE", active_file), \
-                 mock.patch("builtins.print") as mock_print:
+            with (
+                mock.patch.object(self.session, "WB_DIR", wb_dir),
+                mock.patch.object(self.session, "ACTIVE_SESSION_FILE", active_file),
+                mock.patch("builtins.print") as mock_print,
+            ):
                 result = self.session.cmd_sweep(self._args(json=True))
 
             self.assertEqual(result, 0)
@@ -318,7 +348,9 @@ class SessionInventoryTests(unittest.TestCase):
             self.assertEqual(payload["active_session"], open_dir.name)
             self.assertTrue(any(stale_dir.name in item for item in payload["stale"]))
             self.assertTrue(any(open_dir.name in item for item in payload["open"]))
-            self.assertTrue(any(close_candidate.name in item for item in payload["close_candidates"]))
+            self.assertTrue(
+                any(close_candidate.name in item for item in payload["close_candidates"])
+            )
             self.assertEqual(active_file.read_text(encoding="utf-8").strip(), open_dir.name)
 
 
@@ -336,15 +368,21 @@ class SessionCatchupTests(unittest.TestCase):
         target = Path("/tmp/session-catchup")
         payload = {
             "roadmap_feature": "F-01",
-            "catchup_required": True, "context_ready": True,
-            "missing_context": [], "tasks": {"done": 0, "total": 1, "remaining": 1, "next": None, "blocked": []},
+            "catchup_required": True,
+            "context_ready": True,
+            "missing_context": [],
+            "tasks": {"done": 0, "total": 1, "remaining": 1, "next": None, "blocked": []},
             "git": {"changed": 0, "repo_changed": 0, "session_changed": 0},
-            "stale_artifacts": [], "warnings": [], "next_step": "proceed",
+            "stale_artifacts": [],
+            "warnings": [],
+            "next_step": "proceed",
         }
         payload[SESSION_KEY] = "test"
-        with mock.patch.object(self.session, "find_session", return_value=target), \
-             mock.patch.object(self.session, "build_session_catchup", return_value=payload), \
-             mock.patch("builtins.print") as mock_print:
+        with (
+            mock.patch.object(self.session, "find_session", return_value=target),
+            mock.patch.object(self.session, "build_session_catchup", return_value=payload),
+            mock.patch("builtins.print") as mock_print,
+        ):
             result = self.session.cmd_catchup(self._catchup_args())
         self.assertEqual(result, 0)
         output = "\n".join(str(c) for c in mock_print.call_args_list)
@@ -354,15 +392,21 @@ class SessionCatchupTests(unittest.TestCase):
         target = Path("/tmp/session-catchup-json")
         payload = {
             "roadmap_feature": "F-01",
-            "catchup_required": False, "context_ready": True,
-            "missing_context": [], "tasks": {"done": 1, "total": 1, "remaining": 0, "next": None, "blocked": []},
+            "catchup_required": False,
+            "context_ready": True,
+            "missing_context": [],
+            "tasks": {"done": 1, "total": 1, "remaining": 0, "next": None, "blocked": []},
             "git": {"changed": 0, "repo_changed": 0, "session_changed": 0},
-            "stale_artifacts": [], "warnings": [], "next_step": "done",
+            "stale_artifacts": [],
+            "warnings": [],
+            "next_step": "done",
         }
         payload[SESSION_KEY] = "test"
-        with mock.patch.object(self.session, "find_session", return_value=target), \
-             mock.patch.object(self.session, "build_session_catchup", return_value=payload), \
-             mock.patch("builtins.print") as mock_print:
+        with (
+            mock.patch.object(self.session, "find_session", return_value=target),
+            mock.patch.object(self.session, "build_session_catchup", return_value=payload),
+            mock.patch("builtins.print") as mock_print,
+        ):
             result = self.session.cmd_catchup(self._catchup_args(json=True))
         self.assertEqual(result, 0)
         call_args = mock_print.call_args_list[0]
@@ -372,10 +416,20 @@ class SessionCatchupTests(unittest.TestCase):
     def test_print_catchup(self):
         payload = {
             "roadmap_feature": "F-01",
-            "catchup_required": True, "context_ready": False,
-            "missing_context": ["product"], "tasks": {"done": 0, "total": 1, "remaining": 1, "next": None, "blocked": []},
-            "git": {"changed": 2, "repo_changed": 1, "session_changed": 1, "repo_paths": [], "session_paths": []},
-            "stale_artifacts": ["plan"], "warnings": ["drift"], "next_step": "review",
+            "catchup_required": True,
+            "context_ready": False,
+            "missing_context": ["product"],
+            "tasks": {"done": 0, "total": 1, "remaining": 1, "next": None, "blocked": []},
+            "git": {
+                "changed": 2,
+                "repo_changed": 1,
+                "session_changed": 1,
+                "repo_paths": [],
+                "session_paths": [],
+            },
+            "stale_artifacts": ["plan"],
+            "warnings": ["drift"],
+            "next_step": "review",
         }
         payload[SESSION_KEY] = "test"
         with mock.patch("builtins.print") as mock_print:

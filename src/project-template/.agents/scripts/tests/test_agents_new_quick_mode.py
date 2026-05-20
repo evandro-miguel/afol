@@ -56,12 +56,20 @@ class AgentsNewQuickModeTests(unittest.TestCase):
 
         with (
             mock.patch.object(agents_new, "_parse_args", return_value=args),
-            mock.patch.object(agents_new, "get_active_session", return_value="260224_1030_scripts-lean-efficiency"),
+            mock.patch.object(
+                agents_new, "get_active_session", return_value="260224_1030_scripts-lean-efficiency"
+            ),
             mock.patch.object(agents_new, "_handle_quick_mode", return_value=False),
             mock.patch.object(agents_new, "_validate_governance_requirements"),
             mock.patch.object(agents_new, "_check_active_session_policy"),
-            mock.patch.object(agents_new, "get_session_id", return_value="260224_1300_execution-integrity-hardening"),
-            mock.patch.object(agents_new, "get_timestamp", return_value="2026-02-24T13:00:00-03:00"),
+            mock.patch.object(
+                agents_new,
+                "get_session_id",
+                return_value="260224_1300_execution-integrity-hardening",
+            ),
+            mock.patch.object(
+                agents_new, "get_timestamp", return_value="2026-02-24T13:00:00-03:00"
+            ),
             mock.patch.object(agents_new, "_create_workstream") as create_workstream_mock,
             mock.patch.object(agents_new, "create_session_folder") as create_session_folder_mock,
         ):
@@ -107,7 +115,11 @@ class AgentsNewQuickModeTests(unittest.TestCase):
                 mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True),
                 mock.patch.object(agents_new, "ROADMAP_FILE", roadmap_file),
                 mock.patch.object(agents_new, "_roadmap_has_feature", return_value=True),
-                mock.patch.object(agents_new, "_normalize_spec_reference", side_effect=["parent-spec", "child-spec"]),
+                mock.patch.object(
+                    agents_new,
+                    "_normalize_spec_reference",
+                    side_effect=["parent-spec", "child-spec"],
+                ),
             ):
                 agents_new._validate_governance_requirements(args)
 
@@ -137,7 +149,9 @@ class AgentsNewQuickModeTests(unittest.TestCase):
                 mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True),
                 mock.patch.object(agents_new, "ROADMAP_FILE", roadmap_file),
                 mock.patch.object(agents_new, "_roadmap_has_feature", return_value=True),
-                mock.patch.object(agents_new, "_normalize_spec_reference", side_effect=["parent-spec"]),
+                mock.patch.object(
+                    agents_new, "_normalize_spec_reference", side_effect=["parent-spec"]
+                ),
             ):
                 with self.assertRaises(SystemExit):
                     agents_new._validate_governance_requirements(args)
@@ -417,7 +431,14 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_spec_alias_parse_test", script_path)
 
-        argv = ["agents-new.py", "workflow-hardening", "--spec-lite", "--spec-test", "--with", "spec_lite"]
+        argv = [
+            "agents-new.py",
+            "workflow-hardening",
+            "--spec-lite",
+            "--spec-test",
+            "--with",
+            "spec_lite",
+        ]
         with mock.patch.object(sys, "argv", argv):
             parsed = agents_new._parse_args()
 

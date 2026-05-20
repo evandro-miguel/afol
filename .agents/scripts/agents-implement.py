@@ -27,7 +27,11 @@ _ROOT_DIR, _CONFIG = load_agents_config(Path(__file__).resolve().parent)
 
 
 def _get_session_tasks(session_dir: Path):
-    task = sorted(session_dir.glob("*_task_*.md"))[-1] if list(session_dir.glob("*_task_*.md")) else None
+    task = (
+        sorted(session_dir.glob("*_task_*.md"))[-1]
+        if list(session_dir.glob("*_task_*.md"))
+        else None
+    )
     if not task:
         raise ExecutionError("No task file found for active session")
     rows = parse_task_rows(task)
@@ -151,13 +155,17 @@ def cmd_complete(args: argparse.Namespace) -> int:
     result = (args.result or "").strip()
     artifacts = args.artifact or []
     validate_closure_evidence(command=command, result=result, artifacts=artifacts, note=args.note)
-    evidence_id = append_evidence(session_dir, target, command=command, result=result, artifacts=artifacts, note=args.note)
+    evidence_id = append_evidence(
+        session_dir, target, command=command, result=result, artifacts=artifacts, note=args.note
+    )
 
     update_task_state(task_file, target, "done", evidence_id=evidence_id)
 
     log_files = sorted(session_dir.glob("*_log_*.md"))
     if log_files:
-        append_timeline_entry(log_files[-1], f"implement complete: {target} with evidence {evidence_id}")
+        append_timeline_entry(
+            log_files[-1], f"implement complete: {target} with evidence {evidence_id}"
+        )
 
     print(f"✓ completed {target} in {session_dir.name}")
     return 0
@@ -188,7 +196,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_complete = sub.add_parser("complete", help="Mark task done with evidence")
     p_complete.add_argument("--session")
     p_complete.add_argument("--task-id", help="Task id (e.g., T-01). Defaults to next actionable")
-    p_complete.add_argument("--command", help="Command or gate used for closure evidence", required=True)
+    p_complete.add_argument(
+        "--command", help="Command or gate used for closure evidence", required=True
+    )
     p_complete.add_argument("--result", help="Execution result for closure evidence", required=True)
     p_complete.add_argument("--artifact", action="append", help="Evidence artifact")
     p_complete.add_argument("--note", help="Evidence note")

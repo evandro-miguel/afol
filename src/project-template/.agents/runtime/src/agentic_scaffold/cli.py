@@ -25,7 +25,9 @@ def inspect(
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Inspect the workspace tree."""
-    result = _runtime(repo_root).workspace.inspect(depth=depth, include_hidden=include_hidden, max_entries=max_entries)
+    result = _runtime(repo_root).workspace.inspect(
+        depth=depth, include_hidden=include_hidden, max_entries=max_entries
+    )
     console.print_json(data=result.model_dump(mode="json"))
 
 
@@ -52,7 +54,9 @@ def validate(
 
 
 @app.command()
-def manifest(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True)) -> None:
+def manifest(
+    repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
+) -> None:
     """Generate the compact repository manifest."""
     result = _runtime(repo_root).generate_manifest()
     console.print_json(data=result.model_dump(mode="json"))
@@ -84,7 +88,9 @@ def archive(
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Archive repository paths safely."""
-    result = _runtime(repo_root).changes.archive_paths(relative_paths=paths, slug=slug, reason=reason)
+    result = _runtime(repo_root).changes.archive_paths(
+        relative_paths=paths, slug=slug, reason=reason
+    )
     console.print_json(data=result.model_dump(mode="json"))
 
 
@@ -97,7 +103,9 @@ def write(
 ) -> None:
     """Write text content from a file into a repository path."""
     content = content_file.read_text(encoding="utf-8")
-    result = _runtime(repo_root).changes.write_text_file(relative_path=path, content=content, reason=reason)
+    result = _runtime(repo_root).changes.write_text_file(
+        relative_path=path, content=content, reason=reason
+    )
     console.print_json(data=result.model_dump(mode="json"))
 
 
@@ -110,12 +118,16 @@ def patch_command(
 ) -> None:
     """Apply a unified diff from a file."""
     diff_text = diff_file.read_text(encoding="utf-8")
-    result = _runtime(repo_root).changes.apply_unified_diff(relative_path=path, diff_text=diff_text, reason=reason)
+    result = _runtime(repo_root).changes.apply_unified_diff(
+        relative_path=path, diff_text=diff_text, reason=reason
+    )
     console.print_json(data=result.model_dump(mode="json"))
 
 
 @app.command()
-def undo(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True)) -> None:
+def undo(
+    repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
+) -> None:
     """Undo the latest change created by this MCP runtime."""
     result = _runtime(repo_root).undo_last_change()
     console.print_json(data=result.model_dump(mode="json"))
@@ -123,13 +135,17 @@ def undo(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=
 
 
 @app.command()
-def serve(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True)) -> None:
+def serve(
+    repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
+) -> None:
     """Run the FastMCP server using stdio transport."""
     build_mcp(repo_root).run()
 
 
 @app.command()
-def inspect_config(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True)) -> None:
+def inspect_config(
+    repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
+) -> None:
     runtime = _runtime(repo_root)
     payload = {
         "repo_root": str(runtime.config.repo_root),
@@ -146,7 +162,11 @@ def _run_registered(command_name: str, args: list[str], repo_root: Optional[Path
     raise typer.Exit(code=exit_code)
 
 
-REGISTRY_COMMAND_CONTEXT = {"allow_extra_args": True, "ignore_unknown_options": True, "help_option_names": []}
+REGISTRY_COMMAND_CONTEXT = {
+    "allow_extra_args": True,
+    "ignore_unknown_options": True,
+    "help_option_names": [],
+}
 
 
 @app.command(context_settings=REGISTRY_COMMAND_CONTEXT)
@@ -187,13 +207,14 @@ def session(
 
 
 @app.command("command-registry")
-def command_registry(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True)) -> None:
+def command_registry(
+    repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
+) -> None:
     """Show runtime registry commands."""
     runtime = _runtime(repo_root)
     payload = runtime.command_registry_resource()
     payload["help_commands"] = runtime.registry.help_manifest()
     console.print_json(data=payload)
-
 
 
 def main() -> None:

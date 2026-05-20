@@ -60,9 +60,7 @@ def write_doc(session_dir: Path, doc_type: str, status: str) -> None:
             "| T-01 | pending | worker | Implement intent-based artifact selection |\n"
         ),
         "log": (
-            "# Log\n\n"
-            "## Timeline\n"
-            "- 2026-04-04 09:01 - Started implementing artifact policy - ok\n"
+            "# Log\n\n## Timeline\n- 2026-04-04 09:01 - Started implementing artifact policy - ok\n"
         ),
         "report": (
             "# Report\n\n"
