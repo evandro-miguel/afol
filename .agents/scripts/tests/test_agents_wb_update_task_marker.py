@@ -57,7 +57,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
         wb_update.CANONICAL_WB_DIR = session_dir.parent.resolve()
 
     def test_require_explicit_session_for_write_commands(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_require_session_test", script_path)
 
@@ -98,7 +98,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
     def test_update_task_marker_does_not_break_checkbox_format(self):
         """Test that updating task markers preserves State Board format."""
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_test", script_path)
 
@@ -124,7 +124,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
     def test_update_task_marker_replaces_tested_checklist_marker(self):
         """Checklist done updates should replace the tested-needs-validation marker."""
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_tested_marker_test", script_path)
 
@@ -148,7 +148,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             self.assertNotIn("- [&] T-01", content)
 
     def test_latest_doc_file_spec_child_alias_reads_historical_spec_lite(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_spec_alias_test", script_path)
 
@@ -170,7 +170,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
     def test_mark_done_rejects_missing_evidence(self):
         """Test that mark-done requires a valid evidence reference."""
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_mark_done_gate_test", script_path)
 
@@ -201,7 +201,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
     def test_evidence_ledger_validates_mark_done_reference(self):
         """Test that evidence ledger validates mark-done reference."""
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_evidence_test", script_path)
 
@@ -258,7 +258,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 wb_update.cmd_task(args_mismatch)
 
     def test_mark_tested_sets_canonical_state(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_mark_tested_state_test", script_path)
 
@@ -290,7 +290,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
 
     def test_status_final_on_report_records_session_end(self):
         """Setting the report to final should emit a session_end telemetry event."""
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_session_end_test", script_path)
 
@@ -326,7 +326,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             record_mock.assert_called_once_with(session_dir, "wb-update status")
 
     def test_status_final_on_report_passes_without_optional_artifacts(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_report_final_no_optional_test", script_path)
 
@@ -352,7 +352,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             record_mock.assert_called_once_with(session_dir, "wb-update status")
 
     def test_status_final_on_report_blocks_with_active_optional_artifact(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_report_final_block_test", script_path)
 
@@ -384,7 +384,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             self.assertIn("status: active", report_file.read_text())
 
     def test_status_final_on_postmortem_blocks_without_governance_review(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_postmortem_final_block_test", script_path)
 
@@ -409,7 +409,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             self.assertIn("status: active", postmortem_file.read_text())
 
     def test_status_final_on_postmortem_passes_with_governance_review(self):
-        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-wb-update.py"
         sys.path.insert(0, str(script_path.parent))
         wb_update = load_module("agents_wb_update_postmortem_final_ok_test", script_path)
 

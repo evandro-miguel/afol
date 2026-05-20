@@ -57,7 +57,7 @@ def ensure_yaml_module():
 class AgentsLintNoiseReductionTests(unittest.TestCase):
     def setUp(self):
         ensure_yaml_module()
-        script_path = Path(".agents/scripts/agents-lint-docs.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-lint-docs.py"
         sys.path.insert(0, str(script_path.parent))
         self.lint_docs = load_module("agents_lint_docs_noise_test", script_path)
 

@@ -16,7 +16,7 @@ def load_module(module_name: str, file_path: Path):
 
 class AgentsToolsCatalogTests(unittest.TestCase):
     def test_load_tools_rejects_duplicate_keys(self):
-        script_path = Path(".agents/scripts/agents-tools.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-tools.py"
         sys.path.insert(0, str(script_path.parent))
         tools_mod = load_module("agents_tools_catalog_test", script_path)
 
@@ -43,7 +43,7 @@ class AgentsToolsCatalogTests(unittest.TestCase):
                 tools_mod.TOOLS_JSON = original
 
     def test_load_tools_rejects_non_object_catalog(self):
-        script_path = Path(".agents/scripts/agents-tools.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-tools.py"
         sys.path.insert(0, str(script_path.parent))
         tools_mod = load_module("agents_tools_catalog_type_test", script_path)
 
@@ -58,7 +58,7 @@ class AgentsToolsCatalogTests(unittest.TestCase):
             tools_mod.TOOLS_JSON = original
 
     def test_tools_catalog_includes_memory_tool(self):
-        script_path = Path(".agents/scripts/agents-tools.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-tools.py"
         sys.path.insert(0, str(script_path.parent))
         tools_mod = load_module("agents_tools_memory_catalog_test", script_path)
 

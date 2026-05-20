@@ -26,7 +26,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.skipTest("source project template is only present in the source repo")
 
     def test_sync_targets_only_include_claude_mirror(self):
-        script_path = Path(".agents/scripts/sync-agent-docs.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "sync-agent-docs.py"
         sys.path.insert(0, str(script_path.parent))
         sync_agent_docs = load_module("sync_agent_docs_runtime_test", script_path)
 
@@ -41,7 +41,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertEqual(fix_symlinks.AGENT_DIRS, [".claude"])
 
     def test_bootstrap_mandatory_files_use_minimal_root_runtime_docs(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_runtime_test", script_path)
         self._skip_without_source_template(agents_bootstrap)
@@ -75,7 +75,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertNotIn("docs/arc/SPECS", mandatory_dirs)
 
     def test_bootstrap_post_checks_prefer_just_when_available(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_optional_sync_test", script_path)
 
@@ -107,7 +107,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertEqual(cwds, [target] * len(cwds))
 
     def test_build_post_check_commands_cover_full_validation_contract(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_command_contract_test", script_path)
 
@@ -143,7 +143,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         )
 
     def test_bootstrap_post_checks_use_namespaced_recipe_when_justfile_is_module(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_namespaced_just_test", script_path)
 
@@ -172,7 +172,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertEqual(cwds, [target] * len(cwds))
 
     def test_partial_bootstrap_post_checks_downgrade_repo_validation_failures(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_partial_post_checks_test", script_path)
 
@@ -201,7 +201,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
 
     def test_bootstrap_post_checks_require_just(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_make_required_test", script_path)
 
@@ -245,7 +245,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn('"agentic-folder-sys"', config_text)
 
     def test_wrapper_keeps_legacy_commands_on_local_script_runtime(self):
-        wrapper_src = Path(".agents/agents").resolve()
+        wrapper_src = Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "agents"
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
@@ -288,7 +288,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("wrapper-local-venv-ok", result.stdout)
 
     def test_wrapper_rejects_missing_script_venv_without_hydrate(self):
-        wrapper_src = Path(".agents/agents").resolve()
+        wrapper_src = Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "agents"
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
@@ -317,7 +317,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("Run ./.agents/agents hydrate", combined)
 
     def test_wrapper_allows_system_python_with_opt_in(self):
-        wrapper_src = Path(".agents/agents").resolve()
+        wrapper_src = Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "agents"
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
@@ -350,7 +350,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("system-python-ok", result.stdout)
 
     def test_wrapper_keeps_agents_script_python_override(self):
-        wrapper_src = Path(".agents/agents").resolve()
+        wrapper_src = Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "agents"
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
@@ -384,7 +384,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("script-python-override-ok", result.stdout)
 
     def test_wrapper_hydrate_runs_sync_for_scripts_and_runtime(self):
-        wrapper_src = Path(".agents/agents").resolve()
+        wrapper_src = Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "agents"
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
@@ -453,7 +453,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertTrue((agents_dir / "tools" / "uv" / "bin" / "uv").is_file())
 
     def test_wrapper_rejects_missing_runtime_venv_without_hydrate(self):
-        wrapper_src = Path(".agents/agents").resolve()
+        wrapper_src = Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "agents"
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
@@ -492,7 +492,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("AGENTS_RUNTIME_ALLOW_UV_RUN", result.stdout)
 
     def test_wrapper_routes_runtime_adoption_commands_directly(self):
-        wrapper_src = Path(".agents/agents").resolve()
+        wrapper_src = Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "agents"
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
@@ -543,7 +543,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertNotIn("agentic run adoption-plan", result.stdout)
 
     def test_wrapper_runtime_uv_fallback_requires_explicit_opt_in(self):
-        wrapper_src = Path(".agents/agents").resolve()
+        wrapper_src = Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "agents"
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
@@ -628,7 +628,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("adoption-plan|inspect-target", agents_wrapper)
 
     def test_partial_bootstrap_refreshes_legacy_runtime_wrappers(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_runtime_surface_refresh_test", script_path)
         self._skip_without_source_template(agents_bootstrap)
@@ -652,7 +652,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn('agentic-mcp "$@"', mcp_wrapper)
 
     def test_bootstrap_exports_generic_baseline_without_scaffold_history(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_generic_export_test", script_path)
         self._skip_without_source_template(agents_bootstrap)
@@ -709,7 +709,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
 
     def test_project_template_stays_generic_and_history_free(self):
-        template_root = Path("src/project-template")
+        template_root = Path(__file__).resolve().parent.parent.parent.parent / "src" / "project-template"
         if not template_root.exists():
             self.skipTest("source project template is only present in the source repo")
         generic_files = [
@@ -851,7 +851,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertEqual([path.name for path in structure_files], ["README.md"])
 
     def test_partial_bootstrap_generates_existing_project_adoption_baseline(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_partial_export_test", script_path)
         self._skip_without_source_template(agents_bootstrap)
@@ -872,7 +872,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         )
 
     def test_bootstrap_partial_baseline_mentions_skills_adoption_contract(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_skills_baseline_test", script_path)
         self._skip_without_source_template(agents_bootstrap)
@@ -890,7 +890,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("partial installs preserve existing project files", engineering_guidelines)
 
     def test_bootstrap_adaptation_doc_mentions_partial_install_and_repo_skill_baseline(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_adaptation_doc_test", script_path)
 
@@ -920,7 +920,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("just --fmt --check", adaptation_doc)
 
     def test_bootstrap_seeds_repo_local_universal_skills_checkout_without_network(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_sibling_checkout_test", script_path)
 
@@ -945,7 +945,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                     "skills"
                 ],
                 json.loads(
-                    (Path(".agents/source/universal-skills/profiles/core.json")).read_text(
+                    (Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "source" / "universal-skills" / "profiles" / "core.json").read_text(
                         encoding="utf-8"
                     )
                 )["skills"],
@@ -963,7 +963,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             patched_run.assert_not_called()
 
     def test_bootstrap_skips_repo_local_checkout_for_universal_skills_repo(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_no_apps_checkout_test", script_path)
 
@@ -977,7 +977,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             patched_run.assert_not_called()
 
     def test_full_bootstrap_creates_missing_target_directory(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_create_target_test", script_path)
 
@@ -994,7 +994,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertTrue(target.is_dir())
 
     def test_existing_project_justfile_appends_scaffold_module(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-bootstrap.py"
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_justfile_test", script_path)
 

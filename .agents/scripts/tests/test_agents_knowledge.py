@@ -18,7 +18,7 @@ def load_module(module_name: str, file_path: Path):
 
 class AgentsKnowledgeTests(unittest.TestCase):
     def test_search_finds_research_documents(self):
-        script_path = Path(".agents/scripts/agents-knowledge.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-knowledge.py"
         sys.path.insert(0, str(script_path.parent))
         knowledge = load_module("agents_knowledge_search_test", script_path)
 
@@ -53,7 +53,7 @@ class AgentsKnowledgeTests(unittest.TestCase):
             self.assertIn("260306_0000_sample_research_01", buffer.getvalue())
 
     def test_index_generates_knowledge_index(self):
-        script_path = Path(".agents/scripts/agents-knowledge.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-knowledge.py"
         sys.path.insert(0, str(script_path.parent))
         knowledge = load_module("agents_knowledge_index_test", script_path)
 
@@ -94,7 +94,7 @@ class AgentsKnowledgeTests(unittest.TestCase):
             )
 
     def test_pull_returns_compact_reuse_digest(self):
-        script_path = Path(".agents/scripts/agents-knowledge.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-knowledge.py"
         sys.path.insert(0, str(script_path.parent))
         knowledge = load_module("agents_knowledge_pull_test", script_path)
 

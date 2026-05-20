@@ -36,7 +36,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         self.assertIn("Governed delivery lifecycle:", output.getvalue())
 
     def test_main_does_not_create_session_folder_twice(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_main_flow_test", script_path)
 
@@ -84,7 +84,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         create_session_folder_mock.assert_not_called()
 
     def test_telemetry_pattern_helpers_are_non_blocking(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_helpers_test", script_path)
 
@@ -96,7 +96,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         agents_new.suggest_patterns_for_theme("theme")
 
     def test_validate_governance_requirements_normalizes_parent_and_child_specs(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_governance_test", script_path)
 
@@ -171,7 +171,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         self.assertEqual(actual, "260509_2100_runtime-policy_03")
 
     def test_validate_governance_requirements_skips_standard_checks_in_quick_mode(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_governance_quick_test", script_path)
 
@@ -221,7 +221,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
                 agents_new.create_session_folder("260101_0100_wrong-root")
 
     def test_get_timestamp_uses_configured_offset(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_timestamp_test", script_path)
 
@@ -234,7 +234,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             mocked.assert_called_once_with(agents_new.WB_OFFSET)
 
     def test_get_session_id_uses_compact_session_timestamp_helper(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_session_id_test", script_path)
 
@@ -250,7 +250,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             mocked.assert_called_once_with(agents_new.WB_OFFSET)
 
     def test_add_quick_task_updates_task_and_materializes_log_when_needed(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_test", script_path)
 
@@ -301,7 +301,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             )
 
     def test_template_replacements_include_exploration_and_postmortem_docs(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_template_replacements_test", script_path)
 
@@ -335,7 +335,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         self.assertEqual(replacements["<workstream_intent>"], "research")
 
     def test_iter_workstream_artifacts_uses_intent_policy(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_manifest_test", script_path)
 
@@ -415,7 +415,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
 
     def test_parse_args_infers_research_intent_from_theme_when_not_explicit(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_intent_inference_test", script_path)
 
@@ -427,7 +427,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         self.assertEqual(parsed["intent"], "research")
 
     def test_parse_args_keeps_spec_lite_legacy_and_accepts_spec_test(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_spec_alias_parse_test", script_path)
 
@@ -449,7 +449,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         self.assertIn("spec-lite", parsed["with_artifacts"])
 
     def test_ordered_selected_doc_types_rejects_disallowed_artifacts_for_intent(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_policy_validation_test", script_path)
 
@@ -467,7 +467,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             )
 
     def test_ordered_selected_doc_types_keeps_spec_lite_legacy_artifact(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_spec_alias_selection_test", script_path)
 
@@ -486,7 +486,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         self.assertNotIn("spec-child", selected)
 
     def test_ordered_selected_doc_types_selects_spec_child_and_spec_test(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_spec_child_selection_test", script_path)
 
@@ -506,7 +506,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         self.assertNotIn("spec-lite", selected)
 
     def test_coerce_artifact_manifest_fallbacks_to_default(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_manifest_fallback_test", script_path)
 
@@ -530,7 +530,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
 
     def test_coerce_artifact_manifest_uses_only_valid_entries(self):
-        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))
         agents_new = load_module("agents_new_manifest_valid_entries_test", script_path)
 

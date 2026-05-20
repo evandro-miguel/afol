@@ -17,7 +17,7 @@ def load_module(module_name: str, file_path: Path):
 class AgentsLintStateBoardTests(unittest.TestCase):
     def test_invalid_state_in_table_is_detected(self):
         """Test that invalid state in State Board table is detected."""
-        script_path = Path(".agents/scripts/agents-lint-docs.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-lint-docs.py"
         sys.path.insert(0, str(script_path.parent))
         lint_docs = load_module("agents_lint_docs_state_test", script_path)
 
@@ -41,7 +41,7 @@ class AgentsLintStateBoardTests(unittest.TestCase):
 
     def test_valid_state_in_table_is_accepted(self):
         """Test that valid states in State Board table are accepted."""
-        script_path = Path(".agents/scripts/agents-lint-docs.py").resolve()
+        script_path = Path(__file__).resolve().parent.parent / "agents-lint-docs.py"
         sys.path.insert(0, str(script_path.parent))
         lint_docs = load_module("agents_lint_docs_state_test", script_path)
 
