@@ -1,10 +1,10 @@
 ---
-doc_type: standard
+doc_type: structure
 id: backend
 theme: structure
 status: active
-created_at: '2026-05-05T11:44:41+00:00'
-updated_at: '2026-05-05T11:44:41+00:00'
+created_at: '2026-05-10T16:27:41+00:00'
+updated_at: '2026-05-10T16:27:41+00:00'
 ---
 
 # 🎨 Backend Structure

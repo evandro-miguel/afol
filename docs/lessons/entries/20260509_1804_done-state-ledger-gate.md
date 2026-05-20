@@ -46,4 +46,3 @@ in reports; they are not closure gates.
 
 If validation is not applicable, record that as explicit evidence with `result:
 N/A` or an equivalent note before moving the task to `done`.
-

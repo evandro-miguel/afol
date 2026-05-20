@@ -1,5 +1,5 @@
 ---
-doc_type: lesson
+doc_type: lesson_entry
 id: 20260404_0951_artifacts-must-have-real-utility
 status: active
 created_at: '2026-04-04T09:51:00-03:00'
