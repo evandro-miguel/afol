@@ -183,7 +183,11 @@ def _plan_changes(source_agents_dir: Path, rel_paths: Iterable[Path]) -> List[Fi
         else:
             action = "update"
 
-        plan.append(FileChange(rel_path=rel_path, source_file=source_file, target_file=target_file, action=action))
+        plan.append(
+            FileChange(
+                rel_path=rel_path, source_file=source_file, target_file=target_file, action=action
+            )
+        )
     return plan
 
 
@@ -276,14 +280,18 @@ def _validate_result(touched: List[FileChange], staged_agents: Path, validate_co
         target_file = item.target_file
         _validate_target_entry(target_file)
         if target_file.read_bytes() != (staged_agents / item.rel_path).read_bytes():
-            raise RuntimeError(f"Validation failed: content mismatch after promotion: {target_file}")
+            raise RuntimeError(
+                f"Validation failed: content mismatch after promotion: {target_file}"
+            )
 
     if not validate_command:
         return
 
     proc = subprocess.run(shlex.split(validate_command), cwd=ROOT_DIR, check=False)
     if proc.returncode != 0:
-        raise RuntimeError(f"Validation command failed with exit code {proc.returncode}: {validate_command}")
+        raise RuntimeError(
+            f"Validation command failed with exit code {proc.returncode}: {validate_command}"
+        )
 
 
 def _rollback(touched: List[FileChange], backup_dir: Path):
@@ -373,7 +381,9 @@ def _verify_git_commit_when_available(source_repo_root: Path, metadata: ChannelM
         check=False,
     )
     if proc.returncode != 0:
-        raise RuntimeError(f"Could not verify source git commit for {source_repo_root}: {proc.stderr.strip()}")
+        raise RuntimeError(
+            f"Could not verify source git commit for {source_repo_root}: {proc.stderr.strip()}"
+        )
     actual = proc.stdout.strip().lower()
     if actual != metadata.commit:
         raise RuntimeError(f"Source git commit mismatch: expected {metadata.commit}, got {actual}")
@@ -418,8 +428,7 @@ def _load_channel_metadata(source_repo_root: Path, channel: str) -> ChannelMetad
     channel_file = source_repo_root / "releases" / "channels" / f"{channel}.json"
     if not channel_file.exists():
         raise RuntimeError(
-            "Verified channel metadata is required for scaffold-update. "
-            f"Expected: {channel_file}"
+            f"Verified channel metadata is required for scaffold-update. Expected: {channel_file}"
         )
 
     try:
@@ -437,7 +446,9 @@ def _load_channel_metadata(source_repo_root: Path, channel: str) -> ChannelMetad
     release_tag = str(payload.get("releaseTag", "")).strip()
     _require_match(release_tag, r"v?\d+\.\d+\.\d+", "releaseTag", channel_file)
 
-    commit = _require_match(str(payload.get("commit", "")).strip(), r"[a-f0-9]{40}", "commit", channel_file)
+    commit = _require_match(
+        str(payload.get("commit", "")).strip(), r"[a-f0-9]{40}", "commit", channel_file
+    )
     source_sha256 = _require_match(
         str(payload.get("sourceSha256", "")).strip(),
         r"[a-f0-9]{64}",
@@ -519,7 +530,9 @@ def _resolve_source_roots(source: Path) -> tuple[Path, Path]:
     template_agents_dir = source_path / "src" / "project-template" / ".agents"
     if template_agents_dir.is_dir():
         if template_agents_dir.is_symlink():
-            raise RuntimeError(f"Invalid source path: symlink is not allowed: {template_agents_dir}")
+            raise RuntimeError(
+                f"Invalid source path: symlink is not allowed: {template_agents_dir}"
+            )
         return source_path, template_agents_dir
 
     if (source_path / ".agents").is_dir():
@@ -544,10 +557,14 @@ def _resolve_source_roots(source: Path) -> tuple[Path, Path]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Secure scaffold update for .agents")
     parser.add_argument("--channel", default="stable", help="Release channel to apply (stable)")
-    parser.add_argument("--source", required=True, help="Source repo root or direct .agents directory")
+    parser.add_argument(
+        "--source", required=True, help="Source repo root or direct .agents directory"
+    )
     parser.add_argument("--plan-only", action="store_true", help="Show update plan and exit")
     parser.add_argument("--diff-only", action="store_true", help="Show diff and exit")
-    parser.add_argument("--apply", action="store_true", help="Apply changes (default is preview-only)")
+    parser.add_argument(
+        "--apply", action="store_true", help="Apply changes (default is preview-only)"
+    )
     parser.add_argument(
         "--validate-command",
         help="Optional command to run after promotion; non-zero exit triggers rollback",
@@ -611,7 +628,9 @@ def main(argv: list[str] | None = None) -> int:
     touched: list[FileChange] = []
     try:
         touched = _promote(staged_agents, changes)
-        _validate_result(touched, staged_agents, None if args.skip_validate else args.validate_command)
+        _validate_result(
+            touched, staged_agents, None if args.skip_validate else args.validate_command
+        )
     except Exception as exc:
         rollback_error: Exception | None = None
         try:

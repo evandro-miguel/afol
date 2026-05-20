@@ -209,7 +209,9 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
 
     def test_next_task_prefers_first_actionable_when_no_in_progress(self):
         rows = [
-            self.execution_commands.TaskRow("T-01", "implemented_untested", "qa", "ready", 0, "table"),
+            self.execution_commands.TaskRow(
+                "T-01", "implemented_untested", "qa", "ready", 0, "table"
+            ),
             self.execution_commands.TaskRow("T-02", "pending", "worker", "pending", 1, "table"),
         ]
         nxt = self.execution_commands.next_task(rows)
@@ -291,7 +293,9 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
                 result="passed",
             )
             evidence_path = session_dir / ".evidence.jsonl"
-            evidence_path.write_text(evidence_path.read_text(encoding="utf-8") + "{invalid\n", encoding="utf-8")
+            evidence_path.write_text(
+                evidence_path.read_text(encoding="utf-8") + "{invalid\n", encoding="utf-8"
+            )
             count = self.execution_commands.evidence_count(session_dir, "T-01")
             self.assertEqual(count, 1)
 
@@ -322,7 +326,9 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             session_dir = temp_root / "260307_0107_alias"
             session_dir.mkdir(parents=True, exist_ok=True)
             context = write_global_context(temp_root)
-            with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
+            with mock.patch.dict(
+                self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False
+            ):
                 a = self.execution_commands.resolve_artifact(session_dir, "tech-stack")
                 b = self.execution_commands.resolve_artifact(session_dir, "tech_stack")
             self.assertIsNotNone(a)
@@ -403,15 +409,22 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             by_doc_type = {item["doc_type"]: item for item in states}
 
             self.assertEqual(by_doc_type["brainstorm"]["state"], "blocked")
-            self.assertIn("closure gate: optional 'brainstorm'", by_doc_type["brainstorm"]["blockers"][0])
+            self.assertIn(
+                "closure gate: optional 'brainstorm'", by_doc_type["brainstorm"]["blockers"][0]
+            )
             self.assertEqual(by_doc_type["explorer-check"]["state"], "blocked")
-            self.assertIn("closure gate: optional 'explorer-check'", by_doc_type["explorer-check"]["blockers"][0])
+            self.assertIn(
+                "closure gate: optional 'explorer-check'",
+                by_doc_type["explorer-check"]["blockers"][0],
+            )
             self.assertEqual(by_doc_type["plan"]["state"], "ready")
             self.assertEqual(by_doc_type["task"]["state"], "blocked")
             self.assertIn("plan: draft", by_doc_type["task"]["blockers"])
             self.assertEqual(by_doc_type["report"]["state"], "done")
             self.assertEqual(by_doc_type["postmortem"]["state"], "blocked")
-            self.assertIn("closure gate: optional 'postmortem'", by_doc_type["postmortem"]["blockers"][0])
+            self.assertIn(
+                "closure gate: optional 'postmortem'", by_doc_type["postmortem"]["blockers"][0]
+            )
 
             next_artifact = self.execution_commands.next_workflow_artifact(states)
             self.assertIsNotNone(next_artifact)
@@ -423,8 +436,12 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
     def setUpClass(cls):
         scripts_dir = Path(".agents/scripts").resolve()
         sys.path.insert(0, str(scripts_dir))
-        cls.agents_implement = load_module("agents_implement_scenario_test", scripts_dir / "agents-implement.py")
-        cls.agents_review = load_module("agents_review_scenario_test", scripts_dir / "agents-review.py")
+        cls.agents_implement = load_module(
+            "agents_implement_scenario_test", scripts_dir / "agents-implement.py"
+        )
+        cls.agents_review = load_module(
+            "agents_review_scenario_test", scripts_dir / "agents-review.py"
+        )
         cls.execution_commands = importlib.import_module("lib.execution_commands")
 
     def _allow_temp_workbench(self, session_dir: Path) -> None:
@@ -445,7 +462,9 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
             )
             write_log_file(session_dir)
             args = argparse.Namespace(session=str(session_dir), task_id=None)
-            with mock.patch.object(self.agents_implement, "load_feature_operation_governance", return_value=None):
+            with mock.patch.object(
+                self.agents_implement, "load_feature_operation_governance", return_value=None
+            ):
                 code = self.agents_implement.cmd_start(args)
             self.assertEqual(code, 0)
             content = (session_dir / f"{session_dir.name}_task_01.md").read_text(encoding="utf-8")
@@ -489,13 +508,21 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
                 no_evidence=False,
                 force=False,
             )
-            with mock.patch.object(self.agents_implement, "load_feature_operation_governance", return_value=None):
+            with mock.patch.object(
+                self.agents_implement, "load_feature_operation_governance", return_value=None
+            ):
                 code = self.agents_implement.cmd_complete(args)
             self.assertEqual(code, 0)
-            task_content = (session_dir / f"{session_dir.name}_task_01.md").read_text(encoding="utf-8")
+            task_content = (session_dir / f"{session_dir.name}_task_01.md").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("| T-01 | done |", task_content)
             evidence_path = session_dir / ".evidence.jsonl"
-            data = [json.loads(line) for line in evidence_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            data = [
+                json.loads(line)
+                for line in evidence_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
             self.assertEqual(len(data), 1)
             self.assertEqual(data[0]["task_id"], "T-01")
             self.assertEqual(data[0]["command"], "just test-scripts")
@@ -512,7 +539,9 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
                 "| T-01 | done | worker | first |",
             )
             write_report_file(session_dir, status="final")
-            with mock.patch.object(self.agents_review, "run_verify_tasks", return_value=(0, "ok\n", "")):
+            with mock.patch.object(
+                self.agents_review, "run_verify_tasks", return_value=(0, "ok\n", "")
+            ):
                 buf = io.StringIO()
                 with contextlib.redirect_stdout(buf):
                     code = self.agents_review.cmd_scope(session_dir, "verify")
@@ -531,7 +560,9 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
                     {"scope": "task", "severity": "error", "message": "task error"},
                 ],
             ):
-                with mock.patch.object(self.agents_review, "run_verify_tasks", return_value=(0, "", "")):
+                with mock.patch.object(
+                    self.agents_review, "run_verify_tasks", return_value=(0, "", "")
+                ):
                     buf = io.StringIO()
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_review.cmd_scope(session_dir, "task")
@@ -545,7 +576,9 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
             session_dir = Path(td) / "260307_0205_review-verify-fail"
             session_dir.mkdir(parents=True, exist_ok=True)
             with mock.patch.object(self.agents_review, "inspect_artifacts", return_value=[]):
-                with mock.patch.object(self.agents_review, "run_verify_tasks", return_value=(1, "bad\n", "err\n")):
+                with mock.patch.object(
+                    self.agents_review, "run_verify_tasks", return_value=(1, "bad\n", "err\n")
+                ):
                     buf = io.StringIO()
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_review.cmd_scope(session_dir, "verify")
@@ -559,7 +592,9 @@ class SessionCloseScenarioTests(unittest.TestCase):
     def setUpClass(cls):
         scripts_dir = Path(".agents/scripts").resolve()
         sys.path.insert(0, str(scripts_dir))
-        cls.agents_session = load_module("agents_session_scenario_test", scripts_dir / "agents-session.py")
+        cls.agents_session = load_module(
+            "agents_session_scenario_test", scripts_dir / "agents-session.py"
+        )
         cls.execution_commands = importlib.import_module("lib.execution_commands")
 
     def _allow_temp_workbench(self, session_dir: Path) -> None:
@@ -583,7 +618,9 @@ class SessionCloseScenarioTests(unittest.TestCase):
             missing_active = Path(td) / ".active_missing"
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", missing_active):
-                with mock.patch.object(self.agents_session, "_run_strict_verify", return_value=verify):
+                with mock.patch.object(
+                    self.agents_session, "_run_strict_verify", return_value=verify
+                ):
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_session.cmd_close(args)
             self.assertEqual(code, 0)
@@ -602,14 +639,18 @@ class SessionCloseScenarioTests(unittest.TestCase):
             verify = mock.Mock(returncode=1, stdout="stdout fail\n", stderr="stderr fail\n")
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", active_file):
-                with mock.patch.object(self.agents_session, "_run_strict_verify", return_value=verify):
+                with mock.patch.object(
+                    self.agents_session, "_run_strict_verify", return_value=verify
+                ):
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_session.cmd_close(args)
             output = buf.getvalue()
             self.assertEqual(code, 1)
             self.assertIn("stdout fail", output)
             self.assertIn("stderr fail", output)
-            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), "260307_0302_close-fail")
+            self.assertEqual(
+                active_file.read_text(encoding="utf-8").strip(), "260307_0302_close-fail"
+            )
 
     def test_close_repoint_from_unset_active(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -619,11 +660,15 @@ class SessionCloseScenarioTests(unittest.TestCase):
             next_target.mkdir(parents=True, exist_ok=True)
             self._allow_temp_workbench(target)
             active_file = Path(td) / ".active_session"
-            args = argparse.Namespace(**{"session": str(target), "next_session": str(next_target), "json": False})
+            args = argparse.Namespace(
+                **{"session": str(target), "next_session": str(next_target), "json": False}
+            )
             verify = mock.Mock(returncode=0, stdout="ok\n", stderr="")
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", active_file):
-                with mock.patch.object(self.agents_session, "_run_strict_verify", return_value=verify):
+                with mock.patch.object(
+                    self.agents_session, "_run_strict_verify", return_value=verify
+                ):
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_session.cmd_close(args)
             self.assertEqual(code, 0)

@@ -10,7 +10,9 @@ class WorkspaceInspector:
     def __init__(self, repo_root: Path) -> None:
         self.repo_root = repo_root
 
-    def inspect(self, depth: int = 3, include_hidden: bool = False, max_entries: int = 500) -> WorkspaceSummary:
+    def inspect(
+        self, depth: int = 3, include_hidden: bool = False, max_entries: int = 500
+    ) -> WorkspaceSummary:
         counters = {"files": 0, "dirs": 0, "seen": 0, "truncated": False}
 
         def build_tree(path: Path, remaining: int) -> list[TreeNode]:
@@ -20,12 +22,18 @@ class WorkspaceInspector:
 
             nodes: list[TreeNode] = []
             try:
-                entries = sorted(path.iterdir(), key=lambda entry: (entry.is_file(), entry.name.lower()))
+                entries = sorted(
+                    path.iterdir(), key=lambda entry: (entry.is_file(), entry.name.lower())
+                )
             except PermissionError:
                 return []
 
             for entry in entries:
-                if not include_hidden and entry.name.startswith('.') and entry.name not in {'.agents', '.github'}:
+                if (
+                    not include_hidden
+                    and entry.name.startswith(".")
+                    and entry.name not in {".agents", ".github"}
+                ):
                     continue
                 if counters["seen"] >= max_entries:
                     counters["truncated"] = True

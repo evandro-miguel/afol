@@ -143,7 +143,9 @@ def _resolve_session_path(session: str, *, source: str) -> Path:
         try:
             p.resolve().relative_to(CANONICAL_WB_DIR.resolve())
         except ValueError:
-            raise FileNotFoundError(f"Session must be under {canonical_wb_label()} ({source}): {session}")
+            raise FileNotFoundError(
+                f"Session must be under {canonical_wb_label()} ({source}): {session}"
+            )
         protected = {
             item.strip()
             for item in os.getenv("AGENTS_PROTECTED_SESSION_IDS", "").split(",")
@@ -311,7 +313,9 @@ def ensure_postmortems_ready_for_final(session_dir: Path) -> None:
             issues.append(f"{doc_path.name}: {'; '.join(doc_issues)}")
 
     if issues:
-        raise ValueError("Cannot finalize postmortem without governance review: " + " | ".join(issues))
+        raise ValueError(
+            "Cannot finalize postmortem without governance review: " + " | ".join(issues)
+        )
 
 
 def touch_file(path: Path, timestamp: str) -> bool:
@@ -467,7 +471,7 @@ def update_task_markers(
     lines = body.splitlines()
     found = False
 
-    checklist_re = re.compile(r'^(\s*-\s\[[ /%!>&x]\]\s+)(T-\d{2,3})(\s+.+)$')
+    checklist_re = re.compile(r"^(\s*-\s\[[ /%!>&x]\]\s+)(T-\d{2,3})(\s+.+)$")
 
     for i, line in enumerate(lines):
         # Legacy format: - [x] T-01 description
@@ -492,7 +496,9 @@ def update_task_markers(
                     # Update state (column 2, index 1)
                     cells[1] = state
                     # Reconstruct the row with proper formatting
-                    lines[i] = f"| {cells[0]} | {cells[1]} | {cells[2] if len(cells) > 2 else ''} | {cells[3] if len(cells) > 3 else ''} |"
+                    lines[i] = (
+                        f"| {cells[0]} | {cells[1]} | {cells[2] if len(cells) > 2 else ''} | {cells[3] if len(cells) > 3 else ''} |"
+                    )
                     found = True
 
     if not found:
@@ -569,7 +575,9 @@ def validate_evidence_reference(session_dir: Path, evidence_id: str, task_id: st
             )
         closure_error = evidence_record_closure_error(record)
         if closure_error:
-            raise ValueError(f"Evidence '{evidence_id}' is not valid closure evidence: {closure_error}")
+            raise ValueError(
+                f"Evidence '{evidence_id}' is not valid closure evidence: {closure_error}"
+            )
         return
 
     raise ValueError(
@@ -733,10 +741,7 @@ def cmd_evidence(args: argparse.Namespace):
         note=args.note,
     )
     ledger = display_path(_session_ledger_file(session_dir))
-    print(
-        f"✓ evidence recorded: {record['id']} for {record['task_id']} "
-        f"in {ledger}"
-    )
+    print(f"✓ evidence recorded: {record['id']} for {record['task_id']} in {ledger}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -746,19 +751,29 @@ def build_parser() -> argparse.ArgumentParser:
     p_touch = sub.add_parser("touch", help="update updated_at in frontmatter")
     p_touch.add_argument("--session", help="session id/path (required for session-scoped writes)")
     p_touch.add_argument("--file", help="single file to touch")
-    p_touch.add_argument("--all-wb", action="store_true", help="touch all markdown files under .agents/wb")
+    p_touch.add_argument(
+        "--all-wb", action="store_true", help="touch all markdown files under .agents/wb"
+    )
     p_touch.set_defaults(func=cmd_touch)
 
-    p_norm = sub.add_parser("normalize-time", help="normalize created_at/updated_at to configured WB offset")
+    p_norm = sub.add_parser(
+        "normalize-time", help="normalize created_at/updated_at to configured WB offset"
+    )
     p_norm.add_argument("--session", help="session id/path (required for session-scoped writes)")
     p_norm.add_argument("--file", help="single file to normalize")
-    p_norm.add_argument("--all-wb", action="store_true", help="normalize all markdown files under .agents/wb")
+    p_norm.add_argument(
+        "--all-wb", action="store_true", help="normalize all markdown files under .agents/wb"
+    )
     p_norm.set_defaults(func=cmd_normalize_time)
 
-    p_changed = sub.add_parser("files-changed", help="refresh report 'Files Changed' from git status")
+    p_changed = sub.add_parser(
+        "files-changed", help="refresh report 'Files Changed' from git status"
+    )
     p_changed.add_argument("--session", help="session id/path (required for session-scoped writes)")
     p_changed.add_argument("--report", help="explicit report file")
-    p_changed.add_argument("--include-wb", action="store_true", help="include .agents/wb paths in output")
+    p_changed.add_argument(
+        "--include-wb", action="store_true", help="include .agents/wb paths in output"
+    )
     p_changed.set_defaults(func=cmd_files_changed)
 
     p_task = sub.add_parser("task", help="update task marker/state by task id")
@@ -776,17 +791,27 @@ def build_parser() -> argparse.ArgumentParser:
     action_group.add_argument("--mark-tested", action="store_true")
     action_group.add_argument("--mark-problem", action="store_true")
     action_group.add_argument("--mark-moved", action="store_true")
-    action_group.add_argument("--mark-ready", action="store_true", help="legacy alias for --mark-implemented")
-    action_group.add_argument("--mark-blocked", action="store_true", help="legacy alias for --mark-problem")
-    action_group.add_argument("--mark-skipped", action="store_true", help="legacy alias for --mark-moved")
+    action_group.add_argument(
+        "--mark-ready", action="store_true", help="legacy alias for --mark-implemented"
+    )
+    action_group.add_argument(
+        "--mark-blocked", action="store_true", help="legacy alias for --mark-problem"
+    )
+    action_group.add_argument(
+        "--mark-skipped", action="store_true", help="legacy alias for --mark-moved"
+    )
     p_task.set_defaults(func=cmd_task)
 
     p_evidence = sub.add_parser("evidence", help="register evidence for a task in session ledger")
     p_evidence.add_argument("task_id", help="Task ID (e.g., T-01 or T-001)")
     p_evidence.add_argument("--session", help="session id/path (required)")
-    p_evidence.add_argument("--command", required=True, help="command or action that produced evidence")
+    p_evidence.add_argument(
+        "--command", required=True, help="command or action that produced evidence"
+    )
     p_evidence.add_argument("--result", required=True, help="execution result summary")
-    p_evidence.add_argument("--artifact", action="append", default=[], help="artifact path/reference (repeatable)")
+    p_evidence.add_argument(
+        "--artifact", action="append", default=[], help="artifact path/reference (repeatable)"
+    )
     p_evidence.add_argument("--note", help="optional note")
     p_evidence.set_defaults(func=cmd_evidence)
 

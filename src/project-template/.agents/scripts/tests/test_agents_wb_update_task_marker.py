@@ -107,7 +107,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             task_file.write_text(
                 "---\n"
                 "doc_type: task\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Tasks\n\n"
                 "## State Board\n"
@@ -133,7 +133,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             task_file.write_text(
                 "---\n"
                 "doc_type: task\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Tasks\n\n"
                 "## Task List\n"
@@ -159,7 +159,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             spec_lite.write_text(
                 "---\n"
                 "doc_type: spec-lite\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Spec Lite\n",
                 encoding="utf-8",
@@ -182,7 +182,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             task_file.write_text(
                 "---\n"
                 "doc_type: task\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Tasks\n\n"
                 "## State Board\n"
@@ -213,7 +213,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             task_file.write_text(
                 "---\n"
                 "doc_type: task\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Tasks\n\n"
                 "## State Board\n"
@@ -232,7 +232,9 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             )
             ledger_file = session_dir / ".evidence.jsonl"
             self.assertTrue(ledger_file.exists())
-            loaded = [json.loads(line) for line in ledger_file.read_text().splitlines() if line.strip()]
+            loaded = [
+                json.loads(line) for line in ledger_file.read_text().splitlines() if line.strip()
+            ]
             self.assertEqual(len(loaded), 1)
             self.assertEqual(loaded[0]["id"], record["id"])
 
@@ -268,7 +270,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             task_file.write_text(
                 "---\n"
                 "doc_type: task\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Tasks\n\n"
                 "## State Board\n"
@@ -302,7 +304,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "---\n"
                 "doc_type: report\n"
                 "status: active\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Report\n"
             )
@@ -310,7 +312,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "---\n"
                 "doc_type: postmortem\n"
                 "status: final\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Postmortem\n"
             )
@@ -337,7 +339,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "---\n"
                 "doc_type: report\n"
                 "status: active\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Report\n"
             )
@@ -363,7 +365,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "---\n"
                 "doc_type: report\n"
                 "status: active\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Report\n"
             )
@@ -371,7 +373,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "---\n"
                 "doc_type: brainstorm\n"
                 "status: active\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Brainstorm\n"
             )
@@ -395,7 +397,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "---\n"
                 "doc_type: postmortem\n"
                 "status: active\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
                 "---\n\n"
                 "# Postmortem\n"
             )
@@ -420,9 +422,8 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "---\n"
                 "doc_type: postmortem\n"
                 "status: active\n"
-                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
-                "---\n\n"
-                + self._valid_postmortem_body()
+                'updated_at: "2026-02-23T00:00:00-03:00"\n'
+                "---\n\n" + self._valid_postmortem_body()
             )
 
             args = argparse.Namespace(session=str(session_dir), file="postmortem", value="final")

@@ -26,7 +26,9 @@ def load_module(module_name: str, relative_path: str):
 
 
 def test_execution_commands_find_session_resolution_order_and_strict(tmp_path, monkeypatch):
-    execution_commands = load_module("execution_commands_session_contract_test", "lib/execution_commands.py")
+    execution_commands = load_module(
+        "execution_commands_session_contract_test", "lib/execution_commands.py"
+    )
 
     wb_dir = tmp_path / ".agents" / "wb"
     wb_dir.mkdir(parents=True, exist_ok=True)
@@ -56,7 +58,9 @@ def test_execution_commands_find_session_resolution_order_and_strict(tmp_path, m
     assert execution_commands.find_session(None) == active_dir.resolve()
 
     monkeypatch.setenv("AGENTS_SESSION_STRICT", "1")
-    with pytest.raises(execution_commands.ExecutionError, match="Pass --session <id/path> or set AGENTS_SESSION_ID"):
+    with pytest.raises(
+        execution_commands.ExecutionError, match="Pass --session <id/path> or set AGENTS_SESSION_ID"
+    ):
         execution_commands.find_session(None)
 
 
@@ -87,7 +91,9 @@ def test_wb_update_resolve_session_order_and_strict(tmp_path, monkeypatch):
     assert wb_update.resolve_session(None) == active_dir.resolve()
 
     monkeypatch.setenv("AGENTS_SESSION_STRICT", "1")
-    with pytest.raises(FileNotFoundError, match="Pass --session <id/path> or set AGENTS_SESSION_ID"):
+    with pytest.raises(
+        FileNotFoundError, match="Pass --session <id/path> or set AGENTS_SESSION_ID"
+    ):
         wb_update.resolve_session(None)
 
 

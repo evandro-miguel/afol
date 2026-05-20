@@ -137,7 +137,9 @@ class PrintStatusTests(unittest.TestCase):
         self.assertIn("dep-X", output)
 
     def test_print_status_with_next_task(self):
-        data = self._sample_data(tasks={"done": 0, "total": 1, "remaining": 1, "next": "T-01 pending"})
+        data = self._sample_data(
+            tasks={"done": 0, "total": 1, "remaining": 1, "next": "T-01 pending"}
+        )
         with mock.patch("builtins.print") as mock_print:
             self.status.print_status(data)
         output = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
@@ -209,11 +211,13 @@ class SummarizeSessionTests(unittest.TestCase):
     def test_summarize_session_returns_expected_keys(self):
         session_dir = mock.MagicMock()
         session_dir.name = "260401_test_session"
-        with mock.patch.object(self.status, "resolve_artifact", return_value=None), \
-             mock.patch.object(self.status, "parse_state_summary", return_value=(0, 0, 0, [], [])), \
-             mock.patch.object(self.status, "workflow_artifact_states", return_value=[]), \
-             mock.patch.object(self.status, "context_readiness", return_value=(True, [])), \
-             mock.patch.object(self.status, "next_workflow_artifact", return_value=None):
+        with (
+            mock.patch.object(self.status, "resolve_artifact", return_value=None),
+            mock.patch.object(self.status, "parse_state_summary", return_value=(0, 0, 0, [], [])),
+            mock.patch.object(self.status, "workflow_artifact_states", return_value=[]),
+            mock.patch.object(self.status, "context_readiness", return_value=(True, [])),
+            mock.patch.object(self.status, "next_workflow_artifact", return_value=None),
+        ):
             result = self.status.summarize_session(session_dir)
         self.assertIn("session", result)
         self.assertIn("tasks", result)
@@ -224,12 +228,16 @@ class SummarizeSessionTests(unittest.TestCase):
         session_dir = mock.MagicMock()
         task_file = mock.MagicMock()
         task_file.exists.return_value = True
-        with mock.patch.object(self.status, "resolve_artifact", return_value=task_file), \
-             mock.patch.object(self.status, "parse_state_summary", return_value=(2, 2, 0, [], [])), \
-             mock.patch.object(self.status, "workflow_artifact_states", return_value=[]), \
-             mock.patch.object(self.status, "context_readiness", return_value=(True, [])), \
-             mock.patch.object(self.status, "next_workflow_artifact", return_value=None), \
-             mock.patch.object(self.status, "split_frontmatter", return_value=({"roadmap_feature": "F-05"}, "")):
+        with (
+            mock.patch.object(self.status, "resolve_artifact", return_value=task_file),
+            mock.patch.object(self.status, "parse_state_summary", return_value=(2, 2, 0, [], [])),
+            mock.patch.object(self.status, "workflow_artifact_states", return_value=[]),
+            mock.patch.object(self.status, "context_readiness", return_value=(True, [])),
+            mock.patch.object(self.status, "next_workflow_artifact", return_value=None),
+            mock.patch.object(
+                self.status, "split_frontmatter", return_value=({"roadmap_feature": "F-05"}, "")
+            ),
+        ):
             result = self.status.summarize_session(session_dir)
         self.assertEqual(result["ready_state"], "complete")
         self.assertEqual(result["roadmap_feature"], "F-05")
@@ -242,27 +250,39 @@ class MainPathTests(unittest.TestCase):
 
     def test_main_json_output(self):
         mock_args = mock.Mock(session=None, json=True, artifact=None, check_context=False)
-        with mock.patch.object(self.status, "parse_args", return_value=mock_args), \
-             mock.patch.object(self.status, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.status, "summarize_session", return_value={"session": "s"}):
+        with (
+            mock.patch.object(self.status, "parse_args", return_value=mock_args),
+            mock.patch.object(self.status, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(self.status, "summarize_session", return_value={"session": "s"}),
+        ):
             with mock.patch("builtins.print") as mock_print:
                 result = self.status.main()
         self.assertEqual(result, 0)
         self.assertTrue(any("session" in str(c) for c in mock_print.call_args_list))
 
     def test_main_artifact_resolution(self):
-        mock_args = mock.Mock(session=None, json=False, artifact=["task", "plan"], check_context=False)
-        with mock.patch.object(self.status, "parse_args", return_value=mock_args), \
-             mock.patch.object(self.status, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.status, "resolve_artifact", side_effect=[Path("task.md"), Path("plan.md")]):
+        mock_args = mock.Mock(
+            session=None, json=False, artifact=["task", "plan"], check_context=False
+        )
+        with (
+            mock.patch.object(self.status, "parse_args", return_value=mock_args),
+            mock.patch.object(self.status, "find_session", return_value=Path("/tmp/s")),
+            mock.patch.object(
+                self.status, "resolve_artifact", side_effect=[Path("task.md"), Path("plan.md")]
+            ),
+        ):
             with mock.patch("builtins.print"):
                 result = self.status.main()
         self.assertEqual(result, 0)
 
     def test_main_error_path(self):
         mock_args = mock.Mock(session=None, json=False, artifact=None, check_context=False)
-        with mock.patch.object(self.status, "parse_args", return_value=mock_args), \
-             mock.patch.object(self.status, "find_session", side_effect=self.status.ExecutionError("not found")):
+        with (
+            mock.patch.object(self.status, "parse_args", return_value=mock_args),
+            mock.patch.object(
+                self.status, "find_session", side_effect=self.status.ExecutionError("not found")
+            ),
+        ):
             with mock.patch("builtins.print"):
                 result = self.status.main()
         self.assertEqual(result, 1)

@@ -65,9 +65,7 @@ def list_mappings(root: Path, selected: set[str]) -> List[Tuple[str, Path, Path,
         claude_rules_parent = root / ".claude" / "rules"
         if claude_rules_parent.exists():
             target = claude_rules_parent / "default"
-            mappings.append(
-                (".claude/rules/default", src_rules, target, "../../.agents/rules")
-            )
+            mappings.append((".claude/rules/default", src_rules, target, "../../.agents/rules"))
 
     return mappings
 
@@ -136,7 +134,9 @@ def _enforce_copy_mode(src: Path, target: Path, dry_run: bool, force: bool) -> i
     return 0
 
 
-def _auto_from_symlink(src: Path, target: Path, link_target: str, dry_run: bool, force: bool) -> int:
+def _auto_from_symlink(
+    src: Path, target: Path, link_target: str, dry_run: bool, force: bool
+) -> int:
     if not force:
         print("- skip: symlink mismatch (use --force to fix)")
         return 1

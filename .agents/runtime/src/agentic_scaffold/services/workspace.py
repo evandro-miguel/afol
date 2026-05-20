@@ -47,7 +47,9 @@ class WorkspaceInspector:
 
             nodes: list[TreeNode] = []
             try:
-                entries = sorted(path.iterdir(), key=lambda entry: (entry.is_file(), entry.name.lower()))
+                entries = sorted(
+                    path.iterdir(), key=lambda entry: (entry.is_file(), entry.name.lower())
+                )
             except PermissionError:
                 return []
 
@@ -100,9 +102,15 @@ class WorkspaceInspector:
             return False
         if any(part in GENERATED_ROOT_NAMES for part in parts):
             return True
-        if any(WorkspaceInspector._contains_subsequence(parts, prefix) for prefix in GENERATED_PATH_PREFIXES):
+        if any(
+            WorkspaceInspector._contains_subsequence(parts, prefix)
+            for prefix in GENERATED_PATH_PREFIXES
+        ):
             return True
-        if any(WorkspaceInspector._contains_subsequence(parts, file_path) for file_path in GENERATED_FILE_PATHS):
+        if any(
+            WorkspaceInspector._contains_subsequence(parts, file_path)
+            for file_path in GENERATED_FILE_PATHS
+        ):
             return True
         return False
 
@@ -111,4 +119,6 @@ class WorkspaceInspector:
         seq_len = len(sequence)
         if seq_len == 0 or len(parts) < seq_len:
             return False
-        return any(parts[index : index + seq_len] == sequence for index in range(len(parts) - seq_len + 1))
+        return any(
+            parts[index : index + seq_len] == sequence for index in range(len(parts) - seq_len + 1)
+        )

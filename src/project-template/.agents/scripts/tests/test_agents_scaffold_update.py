@@ -65,12 +65,16 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
         release_tag = "v1.2.3"
         manifest_body = json.dumps({"release": release_tag}, sort_keys=True) + "\n"
         bom_body = json.dumps({"release": release_tag, "skills": []}, sort_keys=True) + "\n"
-        manifest_path = self._write_bytes(source / f"releases/manifests/{release_tag}.json", manifest_body)
+        manifest_path = self._write_bytes(
+            source / f"releases/manifests/{release_tag}.json", manifest_body
+        )
         manifest_hash = "f" * 64 if bad_manifest_hash else module._sha256_file(manifest_path)
         bom_hash = module._sha256_file(
             self._write_bytes(source / f"releases/boms/{release_tag}.skill-bom.json", bom_body)
         )
-        self._write(source / f"releases/checksums/{release_tag}.sha256", f"{payload_sha}  source.tar.gz\n")
+        self._write(
+            source / f"releases/checksums/{release_tag}.sha256", f"{payload_sha}  source.tar.gz\n"
+        )
 
         payload = {
             "channel": "stable",
@@ -188,12 +192,16 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
             self._write(template_agents / "tmp/pytest-scripts.log", "ignored runtime noise\n")
 
             module = self._load_with_root(root)
-            self._write_channel_metadata(module, source, match_payload=True, source_agents=template_agents)
+            self._write_channel_metadata(
+                module, source, match_payload=True, source_agents=template_agents
+            )
 
             rc = module.main(["--source", str(source), "--channel", "stable", "--apply"])
 
             self.assertEqual(rc, 0)
-            self.assertEqual((root / ".agents/agents").read_text(encoding="utf-8"), "template-payload\n")
+            self.assertEqual(
+                (root / ".agents/agents").read_text(encoding="utf-8"), "template-payload\n"
+            )
             self.assertFalse((root / ".agents/tmp/pytest-scripts.log").exists())
 
     def test_rejects_bad_release_artifact_hash_without_writes(self):
@@ -285,7 +293,7 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
                     "stable",
                     "--apply",
                     "--validate-command",
-                    "python3 -c \"import sys; sys.exit(7)\"",
+                    'python3 -c "import sys; sys.exit(7)"',
                 ]
             )
 

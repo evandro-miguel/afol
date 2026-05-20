@@ -178,7 +178,9 @@ class SymlinkProcessMappingTests(unittest.TestCase):
             target = Path(td) / "target"
             target.mkdir()
             with mock.patch("builtins.print"):
-                result = self.fsl.process_mapping("test", src, target, "src", "symlink", False, False)
+                result = self.fsl.process_mapping(
+                    "test", src, target, "src", "symlink", False, False
+                )
             self.assertEqual(result, 1)
 
     def test_process_mapping_symlink_mode_force(self):
@@ -189,7 +191,9 @@ class SymlinkProcessMappingTests(unittest.TestCase):
             target = Path(td) / "target"
             target.mkdir()
             with mock.patch("builtins.print"):
-                result = self.fsl.process_mapping("test", src, target, "src", "symlink", False, True)
+                result = self.fsl.process_mapping(
+                    "test", src, target, "src", "symlink", False, True
+                )
             self.assertEqual(result, 0)
             self.assertTrue(target.is_symlink())
 
@@ -201,7 +205,9 @@ class SymlinkProcessMappingTests(unittest.TestCase):
             target = Path(td) / "link"
             target.symlink_to("src", target_is_directory=True)
             with mock.patch("builtins.print"):
-                result = self.fsl.process_mapping("test", src, target, "other", "copy", False, False)
+                result = self.fsl.process_mapping(
+                    "test", src, target, "other", "copy", False, False
+                )
             self.assertEqual(result, 1)
 
     def test_process_mapping_copy_mode_force(self):
@@ -278,7 +284,9 @@ class SymlinkMainTests(unittest.TestCase):
     def test_main_invalid_targets(self):
         """main returns 1 for invalid targets."""
         with mock.patch.object(self.fsl, "parse_args") as mock_args:
-            mock_args.return_value = mock.Mock(targets="invalid", mode="auto", dry_run=False, force=False)
+            mock_args.return_value = mock.Mock(
+                targets="invalid", mode="auto", dry_run=False, force=False
+            )
             with mock.patch("builtins.print"):
                 result = self.fsl.main()
         self.assertEqual(result, 1)
@@ -286,9 +294,13 @@ class SymlinkMainTests(unittest.TestCase):
     def test_main_no_mappings(self):
         """main returns 0 when no applicable targets found."""
         with tempfile.TemporaryDirectory() as td:
-            with mock.patch.object(self.fsl, "ROOT_DIR", Path(td)), \
-                 mock.patch.object(self.fsl, "parse_args") as mock_args:
-                mock_args.return_value = mock.Mock(targets="skills,rules", mode="auto", dry_run=False, force=False)
+            with (
+                mock.patch.object(self.fsl, "ROOT_DIR", Path(td)),
+                mock.patch.object(self.fsl, "parse_args") as mock_args,
+            ):
+                mock_args.return_value = mock.Mock(
+                    targets="skills,rules", mode="auto", dry_run=False, force=False
+                )
                 with mock.patch("builtins.print"):
                     result = self.fsl.main()
         self.assertEqual(result, 0)

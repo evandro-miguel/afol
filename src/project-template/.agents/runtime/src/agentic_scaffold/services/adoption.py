@@ -26,14 +26,18 @@ class AdoptionPlanner:
         adaptation_doc = root / "docs" / "standards" / "bootstrap-adaptation.md"
 
         justfile_text = justfile.read_text(encoding="utf-8") if justfile.exists() else ""
-        wrapper_text = runtime_wrapper.read_text(encoding="utf-8") if runtime_wrapper.exists() else ""
+        wrapper_text = (
+            runtime_wrapper.read_text(encoding="utf-8") if runtime_wrapper.exists() else ""
+        )
 
         return AdoptionInspection(
             repo_root=str(root),
             has_justfile=justfile.exists(),
             justfile_uses_direct_import="import 'docs/standards/Justfile'" in justfile_text,
             has_runtime_wrapper=runtime_wrapper.exists(),
-            runtime_wrapper_exposes_runtime=all(marker in wrapper_text for marker in _WRAPPER_ROUTE_MARKERS)
+            runtime_wrapper_exposes_runtime=all(
+                marker in wrapper_text for marker in _WRAPPER_ROUTE_MARKERS
+            )
             if runtime_wrapper.exists()
             else False,
             has_mcp_wrapper=mcp_wrapper.exists(),
@@ -202,7 +206,9 @@ class AdoptionPlanner:
                     path=".agents/agents.config",
                     reason="target repo still uses a legacy .agents-relative layout",
                     managed=True,
-                    notes=["translate legacy layout entries without clobbering target-owned config"],
+                    notes=[
+                        "translate legacy layout entries without clobbering target-owned config"
+                    ],
                 )
             )
         else:
@@ -279,7 +285,9 @@ class AdoptionPlanner:
                 path=".agents/skills-sync.manifest.json",
                 reason="skill manifest needs explicit classification against the selected universal source/profile",
                 managed=True,
-                notes=["distinguish source drift, stale manifest entries, and intentional local extras"],
+                notes=[
+                    "distinguish source drift, stale manifest entries, and intentional local extras"
+                ],
             )
         )
 
@@ -313,7 +321,7 @@ class AdoptionPlanner:
             "templates_dir: .agents/a-docs/templates",
             "arc_dir: .agents/arc",
             "map_dir: .agents/arc/map",
-            "skills_sync:\n  source_dir: \"../universal-skills\"",
+            'skills_sync:\n  source_dir: "../universal-skills"',
             "skills_sync:\n  source_dir: ../universal-skills",
         )
         return any(marker in text for marker in legacy_markers)
@@ -321,6 +329,10 @@ class AdoptionPlanner:
     def _summarize_plan(self, actions: list[AdoptionAction], inspection: AdoptionInspection) -> str:
         if any(action.kind == "conflict" for action in actions):
             return "Update plan contains conflicts that require operator review before overwrite."
-        if inspection.has_runtime_wrapper and inspection.has_mcp_wrapper and inspection.justfile_uses_direct_import:
+        if (
+            inspection.has_runtime_wrapper
+            and inspection.has_mcp_wrapper
+            and inspection.justfile_uses_direct_import
+        ):
             return "Target repo is mostly aligned; only overlays, reconciliation, and benchmark capture remain."
         return "Target repo needs an overlay update with explicit compatibility adapters and runtime validation."

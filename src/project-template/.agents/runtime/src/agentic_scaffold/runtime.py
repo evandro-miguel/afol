@@ -32,7 +32,11 @@ class AgenticRuntime:
 
     def generate_manifest(self) -> RepoManifest:
         repo_root = self.config.repo_root
-        docs_md = sum(1 for _ in (repo_root / "docs").rglob("*.md")) if (repo_root / "docs").exists() else 0
+        docs_md = (
+            sum(1 for _ in (repo_root / "docs").rglob("*.md"))
+            if (repo_root / "docs").exists()
+            else 0
+        )
         script_files = (
             sum(1 for _ in (repo_root / ".agents" / "scripts").glob("*.py"))
             if (repo_root / ".agents" / "scripts").exists()
@@ -47,7 +51,11 @@ class AgenticRuntime:
         skills = []
         if skills_dir.exists():
             for skill_dir in sorted(path for path in skills_dir.iterdir() if path.is_dir()):
-                skills.append(SkillSummary(name=skill_dir.name, path=skill_dir.relative_to(repo_root).as_posix()))
+                skills.append(
+                    SkillSummary(
+                        name=skill_dir.name, path=skill_dir.relative_to(repo_root).as_posix()
+                    )
+                )
         tool_catalog_count = 0
         tool_catalog_tools = []
         tools_path = repo_root / ".agents" / "tools.json"
@@ -84,7 +92,7 @@ class AgenticRuntime:
                 "wrapper_commands": [
                     ".agents/agents new <theme> --feature-id <F-id> --parent-spec <spec-id>",
                     ".agents/agents implement start --session <session-id> --task-id T-01",
-                    ".agents/agents implement complete --session <session-id> --task-id T-01 --command \"<verification command>\" --result passed --artifact <path-or-report>",
+                    '.agents/agents implement complete --session <session-id> --task-id T-01 --command "<verification command>" --result passed --artifact <path-or-report>',
                 ],
                 "forbidden_shortcuts": [
                     "product_edit_before_session_and_in_progress_task",
@@ -95,7 +103,9 @@ class AgenticRuntime:
                 ],
             },
             major_surfaces=list(self.config.manifest_major_surfaces),
-            search_roots=[root.relative_to(repo_root).as_posix() for root in self.config.search_roots],
+            search_roots=[
+                root.relative_to(repo_root).as_posix() for root in self.config.search_roots
+            ],
             write_blocklist=list(self.config.write_blocklist),
         )
 

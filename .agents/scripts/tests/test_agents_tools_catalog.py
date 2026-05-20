@@ -23,7 +23,7 @@ class AgentsToolsCatalogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             bad_tools = Path(td) / "tools.json"
             bad_tools.write_text(
-                '{\n'
+                "{\n"
                 '  "version": "1",\n'
                 '  "updated_at": "2026-02-24T00:00:00Z",\n'
                 '  "description": "x",\n'
@@ -31,7 +31,7 @@ class AgentsToolsCatalogTests(unittest.TestCase):
                 '  "tool_categories": {},\n'
                 '  "justfile_targets": {},\n'
                 '  "tools": [{"id": "duplicate"}]\n'
-                '}\n'
+                "}\n"
             )
 
             original = tools_mod.TOOLS_JSON

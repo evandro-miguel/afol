@@ -41,7 +41,9 @@ class AgentsTelemetryTests(unittest.TestCase):
             self.assertEqual(event["context"], {"source": "test"})
             self.assertNotIn("context", event["metadata"])
 
-            saved = [json.loads(line) for line in events_file.read_text().splitlines() if line.strip()]
+            saved = [
+                json.loads(line) for line in events_file.read_text().splitlines() if line.strip()
+            ]
             self.assertEqual(len(saved), 1)
             self.assertEqual(saved[0]["context"], {"source": "test"})
             self.assertNotIn("context", saved[0]["metadata"])
@@ -57,7 +59,9 @@ class AgentsTelemetryTests(unittest.TestCase):
             agents_telemetry.TELEMETRY_EVENTS_FILE = events_file
             agents_telemetry.ACTIVE_SESSION_FILE = root / ".active_session"
 
-            with patch.object(agents_telemetry.uuid, "uuid4", side_effect=NotImplementedError("blocked")):
+            with patch.object(
+                agents_telemetry.uuid, "uuid4", side_effect=NotImplementedError("blocked")
+            ):
                 first = agents_telemetry.record_event("tool_exec", session_id="test-session")
                 second = agents_telemetry.record_event("tool_exec", session_id="test-session")
 
@@ -88,7 +92,9 @@ class AgentsTelemetryTests(unittest.TestCase):
             with patch.object(sys, "argv", argv), patch("sys.stdout", new=StringIO()):
                 agents_telemetry.main()
 
-            saved = [json.loads(line) for line in events_file.read_text().splitlines() if line.strip()]
+            saved = [
+                json.loads(line) for line in events_file.read_text().splitlines() if line.strip()
+            ]
             self.assertEqual(len(saved), 1)
             self.assertEqual(saved[0]["context"], {"via": "flag"})
             self.assertNotIn("context", saved[0]["metadata"])
@@ -115,7 +121,9 @@ class AgentsTelemetryTests(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0)
-            saved = [json.loads(line) for line in events_file.read_text().splitlines() if line.strip()]
+            saved = [
+                json.loads(line) for line in events_file.read_text().splitlines() if line.strip()
+            ]
             self.assertGreaterEqual(len(saved), 1)
             last_event = saved[-1]
             self.assertEqual(last_event["event_type"], "tool_exec")
@@ -153,11 +161,15 @@ class AgentsTelemetryTests(unittest.TestCase):
                 "record",
                 "tool_exec",
                 "--session-id=test-session",
-                '--metadata=[]',
+                "--metadata=[]",
                 '--context=["a"]',
             ]
             stderr = StringIO()
-            with patch.object(sys, "argv", argv), patch("sys.stderr", stderr), patch("sys.stdout", new=StringIO()):
+            with (
+                patch.object(sys, "argv", argv),
+                patch("sys.stderr", stderr),
+                patch("sys.stdout", new=StringIO()),
+            ):
                 with self.assertRaises(SystemExit):
                     agents_telemetry.main()
 

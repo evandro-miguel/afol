@@ -31,9 +31,13 @@ def run_command(
     run_kwargs_no_timeout = dict(run_kwargs)
 
     try:
-        return subprocess.run(list(cmd), cwd=cwd, **full_kwargs) if cwd is not None else subprocess.run(
-            list(cmd),
-            **full_kwargs,
+        return (
+            subprocess.run(list(cmd), cwd=cwd, **full_kwargs)
+            if cwd is not None
+            else subprocess.run(
+                list(cmd),
+                **full_kwargs,
+            )
         )
     except subprocess.TimeoutExpired as exc:
         raise ProcessError(f"Command timed out after {timeout}s: {' '.join(cmd)}") from exc
@@ -52,4 +56,6 @@ def run_command(
                 raise
             if "unexpected keyword argument 'text'" not in str(secondary):
                 raise
-            return subprocess.run(list(cmd), cwd=cwd) if cwd is not None else subprocess.run(list(cmd))
+            return (
+                subprocess.run(list(cmd), cwd=cwd) if cwd is not None else subprocess.run(list(cmd))
+            )

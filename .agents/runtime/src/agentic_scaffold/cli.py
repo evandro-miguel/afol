@@ -27,7 +27,9 @@ def inspect(
     include_hidden: bool = False,
     include_generated: bool = False,
     max_entries: int = typer.Option(500, min=50, max=5000),
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Inspect the workspace tree."""
@@ -44,7 +46,9 @@ def inspect(
 def search(
     query: str,
     limit: int = typer.Option(8, min=1, max=50),
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Search scaffold docs and workbench artifacts."""
@@ -55,7 +59,9 @@ def search(
 @app.command()
 def validate(
     auto_fix: bool = False,
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Validate the scaffold structure."""
@@ -66,7 +72,9 @@ def validate(
 
 @app.command()
 def manifest(
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Generate the compact repository manifest."""
@@ -76,7 +84,9 @@ def manifest(
 
 @app.command("inspect-target")
 def inspect_target(
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Inspect the target repo for adoption readiness signals."""
@@ -86,7 +96,9 @@ def inspect_target(
 
 @app.command("adoption-plan")
 def adoption_plan(
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Generate a non-destructive scaffold update plan for an existing repo."""
@@ -99,11 +111,15 @@ def archive(
     paths: list[str] = typer.Argument(..., help="Relative repository paths to archive."),
     slug: str = typer.Option(..., help="Archive slug, ex: stale-docs"),
     reason: str = typer.Option("archive for safe organization"),
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Archive repository paths safely."""
-    result = _runtime(repo_root).changes.archive_paths(relative_paths=paths, slug=slug, reason=reason)
+    result = _runtime(repo_root).changes.archive_paths(
+        relative_paths=paths, slug=slug, reason=reason
+    )
     _emit_json(result.model_dump(mode="json"), pretty=pretty)
 
 
@@ -112,12 +128,16 @@ def write(
     path: str,
     content_file: Path = typer.Option(..., exists=True, file_okay=True, dir_okay=False),
     reason: str = typer.Option(...),
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Write text content from a file into a repository path."""
     content = content_file.read_text(encoding="utf-8")
-    result = _runtime(repo_root).changes.write_text_file(relative_path=path, content=content, reason=reason)
+    result = _runtime(repo_root).changes.write_text_file(
+        relative_path=path, content=content, reason=reason
+    )
     _emit_json(result.model_dump(mode="json"), pretty=pretty)
 
 
@@ -126,18 +146,24 @@ def patch_command(
     path: str,
     diff_file: Path = typer.Option(..., exists=True, file_okay=True, dir_okay=False),
     reason: str = typer.Option(...),
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Apply a unified diff from a file."""
     diff_text = diff_file.read_text(encoding="utf-8")
-    result = _runtime(repo_root).changes.apply_unified_diff(relative_path=path, diff_text=diff_text, reason=reason)
+    result = _runtime(repo_root).changes.apply_unified_diff(
+        relative_path=path, diff_text=diff_text, reason=reason
+    )
     _emit_json(result.model_dump(mode="json"), pretty=pretty)
 
 
 @app.command()
 def undo(
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Undo the latest change created by this MCP runtime."""
@@ -147,7 +173,9 @@ def undo(
 
 
 @app.command()
-def serve(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True)) -> None:
+def serve(
+    repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
+) -> None:
     """Run the FastMCP server using stdio transport."""
     from agentic_scaffold.server import build_mcp
 
@@ -156,7 +184,9 @@ def serve(repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay
 
 @app.command()
 def inspect_config(
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     runtime = _runtime(repo_root)
@@ -175,7 +205,11 @@ def _run_registered(command_name: str, args: list[str], repo_root: Optional[Path
     raise typer.Exit(code=exit_code)
 
 
-REGISTRY_COMMAND_CONTEXT = {"allow_extra_args": True, "ignore_unknown_options": True, "help_option_names": []}
+REGISTRY_COMMAND_CONTEXT = {
+    "allow_extra_args": True,
+    "ignore_unknown_options": True,
+    "help_option_names": [],
+}
 
 
 @app.command(context_settings=REGISTRY_COMMAND_CONTEXT)
@@ -217,7 +251,9 @@ def session(
 
 @app.command("command-registry")
 def command_registry(
-    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    pretty: bool = typer.Option(
+        False, "--pretty", help="Emit human-readable JSON with indentation."
+    ),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Show runtime registry commands."""
@@ -225,7 +261,6 @@ def command_registry(
     payload = runtime.command_registry_resource()
     payload["help_commands"] = runtime.registry.help_manifest()
     _emit_json(payload, pretty=pretty)
-
 
 
 def main() -> None:

@@ -105,13 +105,20 @@ class AgentsSkillsSyncTests(unittest.TestCase):
         bom_body: str | None = None,
     ) -> dict:
         manifest_body = json.dumps({"release": release_tag, "artifacts": []}, sort_keys=True) + "\n"
-        bom_body = bom_body or json.dumps({"release": release_tag, "skills": []}, sort_keys=True) + "\n"
+        bom_body = (
+            bom_body or json.dumps({"release": release_tag, "skills": []}, sort_keys=True) + "\n"
+        )
         releases = source_root / "releases"
         manifest_path = releases / "manifests" / f"{release_tag}.json"
         bom_path = releases / "boms" / f"{release_tag}.skill-bom.json"
         checksum_path = releases / "checksums" / f"{release_tag}.sha256"
         channel_path = releases / "channels" / f"{channel}.json"
-        for parent in [manifest_path.parent, bom_path.parent, checksum_path.parent, channel_path.parent]:
+        for parent in [
+            manifest_path.parent,
+            bom_path.parent,
+            checksum_path.parent,
+            channel_path.parent,
+        ]:
             parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(manifest_body, encoding="utf-8")
         bom_path.write_text(bom_body, encoding="utf-8")
@@ -132,7 +139,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 "requireSourceChecksum": True,
             },
         }
-        channel_path.write_text(json.dumps(channel_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        channel_path.write_text(
+            json.dumps(channel_data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         return channel_data
 
     def test_legacy_manifest_migrates_to_version2(self):
@@ -160,7 +169,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertEqual(loaded["ref"], "release/v1")
             self.assertEqual(loaded["source_dir"], ".agents/source/universal-skills")
             installs = loaded["installs"]
-            self.assertEqual(installs, [{"app": "all", "skills": ["markdownlint-skill", "writing-skills"]}])
+            self.assertEqual(
+                installs, [{"app": "all", "skills": ["markdownlint-skill", "writing-skills"]}]
+            )
 
     def test_default_source_dir_is_repo_local(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -169,7 +180,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG = {}
 
             self.assertEqual(module.cfg("source_dir"), ".agents/source/universal-skills")
-            self.assertEqual(module.preferred_source_repo_path(), root / ".agents/source/universal-skills")
+            self.assertEqual(
+                module.preferred_source_repo_path(), root / ".agents/source/universal-skills"
+            )
 
     def test_default_manifest_combines_profile_and_default_skills(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -371,7 +384,10 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 skills=["writing-skills", "markdownlint-skill"],
             )
 
-            self.assertIn({"app": "codex", "skills": ["writing-skills", "markdownlint-skill"]}, manifest["installs"])
+            self.assertIn(
+                {"app": "codex", "skills": ["writing-skills", "markdownlint-skill"]},
+                manifest["installs"],
+            )
             self.assertIn({"app": "all", "profile": "core"}, manifest["installs"])
 
     def test_check_warns_when_optional_pool_is_missing(self):
@@ -425,7 +441,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
 
             buffer = io.StringIO()
             with redirect_stdout(buffer):
-                module.cmd_check(type("Args", (), {"skills": None, "runtime": None, "profile": None})())
+                module.cmd_check(
+                    type("Args", (), {"skills": None, "runtime": None, "profile": None})()
+                )
 
             output = buffer.getvalue()
             self.assertIn("WARN: stale-manifest-entry: stale-skill", output)
@@ -452,7 +470,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             )
 
             with redirect_stdout(buffer):
-                module.cmd_check(type("Args", (), {"skills": None, "runtime": None, "profile": None})())
+                module.cmd_check(
+                    type("Args", (), {"skills": None, "runtime": None, "profile": None})()
+                )
 
             output = buffer.getvalue()
             self.assertIn("ERROR: source-drift (selected set): missing-profile-skill", output)
@@ -506,9 +526,13 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module = self._load_with_root(root)
             self._make_source_skill(root, "writing-skills", description="Local source")
             self._make_profile(root, "core", ["writing-skills"])
-            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+            (root / ".agents/source/universal-skills/index.json").write_text(
+                "{}\n", encoding="utf-8"
+            )
 
-            self.assertEqual(module.active_source_repo_path(), root / ".agents/source/universal-skills")
+            self.assertEqual(
+                module.active_source_repo_path(), root / ".agents/source/universal-skills"
+            )
 
     def test_active_source_uses_external_source_when_repo_local_seed_is_partial(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -519,7 +543,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
 
             self._make_source_skill(root, "writing-skills", description="Partial local source")
-            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+            (root / ".agents/source/universal-skills/index.json").write_text(
+                "{}\n", encoding="utf-8"
+            )
 
             self._make_source_skill(
                 Path(td),
@@ -551,7 +577,14 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             args = type(
                 "Args",
                 (),
-                {"query": "markdown", "limit": 20, "selected": False, "runtime": None, "skills": None, "profile": None},
+                {
+                    "query": "markdown",
+                    "limit": 20,
+                    "selected": False,
+                    "runtime": None,
+                    "skills": None,
+                    "profile": None,
+                },
             )()
             with redirect_stdout(buffer):
                 module.cmd_search(args)
@@ -596,7 +629,14 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             args = type(
                 "Args",
                 (),
-                {"query": "markdown", "limit": 20, "selected": False, "runtime": None, "skills": None, "profile": None},
+                {
+                    "query": "markdown",
+                    "limit": 20,
+                    "selected": False,
+                    "runtime": None,
+                    "skills": None,
+                    "profile": None,
+                },
             )()
             with redirect_stdout(buffer):
                 module.cmd_search(args)
@@ -714,7 +754,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._make_source_skill(root, "writing-skills", description="Local seed")
             self._make_profile(root, "core", ["writing-skills"])
-            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+            (root / ".agents/source/universal-skills/index.json").write_text(
+                "{}\n", encoding="utf-8"
+            )
 
             self._make_source_skill(
                 Path(td),
@@ -728,7 +770,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 ["writing-skills"],
                 source_dir="external-universal-skills",
             )
-            (external_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
+            (external_root / "index.json").write_text(
+                '{"generated_by":"git-source"}\n', encoding="utf-8"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
 
             module.save_manifest(
@@ -769,7 +813,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._make_source_skill(root, "writing-skills", description="Local seed")
             self._make_profile(root, "core", ["writing-skills"])
-            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+            (root / ".agents/source/universal-skills/index.json").write_text(
+                "{}\n", encoding="utf-8"
+            )
 
             self._make_source_skill(
                 Path(td),
@@ -783,7 +829,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 ["writing-skills"],
                 source_dir="external-universal-skills",
             )
-            (external_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
+            (external_root / "index.json").write_text(
+                '{"generated_by":"git-source"}\n', encoding="utf-8"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
 
             manifest = {
@@ -820,7 +868,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._make_source_skill(root, "writing-skills", description="Local seed")
             self._make_profile(root, "core", ["writing-skills"])
-            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+            (root / ".agents/source/universal-skills/index.json").write_text(
+                "{}\n", encoding="utf-8"
+            )
 
             self._make_source_skill(
                 Path(td),
@@ -834,7 +884,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 ["writing-skills"],
                 source_dir="external-universal-skills",
             )
-            (external_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
+            (external_root / "index.json").write_text(
+                '{"generated_by":"git-source"}\n', encoding="utf-8"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             commit = "a" * 40
             self._write_release_channel(external_root, commit=commit)
@@ -849,7 +901,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False}
+            )()
             with (
                 mock.patch.object(module, "run") as patched_run,
                 mock.patch.object(module, "_git_head_ref", return_value="HEAD"),
@@ -858,17 +912,26 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 module.cmd_pull(args)
 
             self.assertEqual(patched_run.call_count, 3)
-            self.assertEqual(patched_run.call_args_list[0], mock.call(["git", "fetch", "origin"], cwd=external_root))
-            self.assertEqual(patched_run.call_args_list[1], mock.call(["git", "tag", "-v", "v1.2.3"], cwd=external_root))
+            self.assertEqual(
+                patched_run.call_args_list[0],
+                mock.call(["git", "fetch", "origin"], cwd=external_root),
+            )
+            self.assertEqual(
+                patched_run.call_args_list[1],
+                mock.call(["git", "tag", "-v", "v1.2.3"], cwd=external_root),
+            )
             worktree_call = patched_run.call_args_list[2]
             worktree_cmd = worktree_call.args[0]
             self.assertEqual(worktree_call.kwargs.get("cwd"), external_root)
             self.assertEqual(worktree_cmd[:4], ["git", "worktree", "add", "--detach"])
             self.assertEqual(worktree_cmd[-1], "v1.2.3")
-            self.assertTrue(str(worktree_cmd[4]).startswith(str(root / ".agents/tmp/skills-sync-worktrees")))
+            self.assertTrue(
+                str(worktree_cmd[4]).startswith(str(root / ".agents/tmp/skills-sync-worktrees"))
+            )
             self.assertFalse(
                 any(
-                    call.kwargs.get("cwd") == external_root and call.args[0][:2] == ["git", "checkout"]
+                    call.kwargs.get("cwd") == external_root
+                    and call.args[0][:2] == ["git", "checkout"]
                     for call in patched_run.call_args_list
                 )
             )
@@ -879,7 +942,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             self.assertEqual(verification.get("channel"), "stable")
             self.assertEqual(verification.get("releaseTag"), "v1.2.3")
             self.assertEqual(verification.get("commit"), commit)
-            self.assertIn(".agents/tmp/skills-sync-worktrees", loaded.get("source", {}).get("path", ""))
+            self.assertIn(
+                ".agents/tmp/skills-sync-worktrees", loaded.get("source", {}).get("path", "")
+            )
 
     def test_cmd_pull_with_channel_rejects_invalid_channel_name(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -890,8 +955,12 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root)
             module.save_manifest(
@@ -904,7 +973,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "Stable!", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "Stable!", "release_tag": None, "allow_floating_ref": False}
+            )()
             with mock.patch.object(module, "run") as patched_run:
                 with self.assertRaisesRegex(RuntimeError, "Invalid release channel"):
                     module.cmd_pull(args)
@@ -919,8 +990,12 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root)
             module.save_manifest(
@@ -933,7 +1008,11 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "stable", "release_tag": "v9.9.9", "allow_floating_ref": False})()
+            args = type(
+                "Args",
+                (),
+                {"channel": "stable", "release_tag": "v9.9.9", "allow_floating_ref": False},
+            )()
             with mock.patch.object(module, "run"):
                 with self.assertRaisesRegex(RuntimeError, "does not point to v9.9.9"):
                     module.cmd_pull(args)
@@ -947,8 +1026,12 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root)
             (external_root / "releases/boms/v1.2.3.skill-bom.json").write_text(
@@ -965,7 +1048,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False}
+            )()
             with mock.patch.object(module, "run"):
                 with self.assertRaisesRegex(RuntimeError, "skill BOM hash mismatch"):
                     module.cmd_pull(args)
@@ -979,8 +1064,12 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root)
             (external_root / "releases/manifests/v1.2.3.json").write_text(
@@ -997,7 +1086,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False}
+            )()
             with mock.patch.object(module, "run"):
                 with self.assertRaisesRegex(RuntimeError, "manifest hash mismatch"):
                     module.cmd_pull(args)
@@ -1011,8 +1102,12 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root)
             (external_root / "releases/checksums/v1.2.3.sha256").write_text(
@@ -1029,7 +1124,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False}
+            )()
             with mock.patch.object(module, "run"):
                 with self.assertRaisesRegex(RuntimeError, "source checksum mismatch"):
                     module.cmd_pull(args)
@@ -1043,8 +1140,12 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root, commit="a" * 40)
             module.save_manifest(
@@ -1057,7 +1158,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False}
+            )()
             with (
                 mock.patch.object(module, "run"),
                 mock.patch.object(module, "_git_head_commit", side_effect=["b" * 40, "b" * 40]),
@@ -1074,14 +1177,20 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root)
             channel_path = external_root / "releases/channels/stable.json"
             data = json.loads(channel_path.read_text(encoding="utf-8"))
             data["policy"]["requireSignedTag"] = False
-            channel_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            channel_path.write_text(
+                json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
             module.save_manifest(
                 {
                     "version": 2,
@@ -1092,7 +1201,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False}
+            )()
             with mock.patch.object(module, "run"):
                 with self.assertRaisesRegex(RuntimeError, "must require signed tags"):
                     module.cmd_pull(args)
@@ -1106,8 +1217,12 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root)
             module.save_manifest(
@@ -1124,13 +1239,18 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 if cmd[:3] == ["git", "tag", "-v"]:
                     raise RuntimeError("bad signature")
 
-            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False}
+            )()
             with mock.patch.object(module, "run", side_effect=fail_tag_verify) as patched_run:
                 with self.assertRaisesRegex(RuntimeError, "bad signature"):
                     module.cmd_pull(args)
 
             self.assertFalse(
-                any(call.args[0][:4] == ["git", "worktree", "add", "--detach"] for call in patched_run.call_args_list)
+                any(
+                    call.args[0][:4] == ["git", "worktree", "add", "--detach"]
+                    for call in patched_run.call_args_list
+                )
             )
 
     def test_cmd_pull_with_channel_rejects_missing_require_source_checksum(self):
@@ -1142,14 +1262,20 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root)
             channel_path = external_root / "releases/channels/stable.json"
             data = json.loads(channel_path.read_text(encoding="utf-8"))
             data["policy"]["requireSourceChecksum"] = False
-            channel_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            channel_path.write_text(
+                json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
             module.save_manifest(
                 {
                     "version": 2,
@@ -1160,7 +1286,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False}
+            )()
             with mock.patch.object(module, "run"):
                 with self.assertRaisesRegex(RuntimeError, "must require source checksum"):
                     module.cmd_pull(args)
@@ -1174,8 +1302,12 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._seed_source_repo(root)
             self._seed_source_repo(Path(td), source_dir="external-universal-skills")
-            self._make_source_skill(Path(td), "writing-skills", source_dir="external-universal-skills")
-            self._make_profile(Path(td), "core", ["writing-skills"], source_dir="external-universal-skills")
+            self._make_source_skill(
+                Path(td), "writing-skills", source_dir="external-universal-skills"
+            )
+            self._make_profile(
+                Path(td), "core", ["writing-skills"], source_dir="external-universal-skills"
+            )
             (external_root / ".git").mkdir(parents=True, exist_ok=True)
             self._write_release_channel(external_root, commit="a" * 40)
             module.save_manifest(
@@ -1188,7 +1320,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False})()
+            args = type(
+                "Args", (), {"channel": "stable", "release_tag": None, "allow_floating_ref": False}
+            )()
             with (
                 mock.patch.object(module, "run") as patched_run,
                 mock.patch.object(module, "_git_head_commit", return_value="b" * 40),
@@ -1197,13 +1331,22 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                     module.cmd_pull(args)
 
             self.assertEqual(patched_run.call_count, 3)
-            self.assertEqual(patched_run.call_args_list[0], mock.call(["git", "fetch", "origin"], cwd=external_root))
-            self.assertEqual(patched_run.call_args_list[1], mock.call(["git", "tag", "-v", "v1.2.3"], cwd=external_root))
+            self.assertEqual(
+                patched_run.call_args_list[0],
+                mock.call(["git", "fetch", "origin"], cwd=external_root),
+            )
+            self.assertEqual(
+                patched_run.call_args_list[1],
+                mock.call(["git", "tag", "-v", "v1.2.3"], cwd=external_root),
+            )
             self.assertEqual(patched_run.call_args_list[2].kwargs.get("cwd"), external_root)
-            self.assertEqual(patched_run.call_args_list[2].args[0][:4], ["git", "worktree", "add", "--detach"])
+            self.assertEqual(
+                patched_run.call_args_list[2].args[0][:4], ["git", "worktree", "add", "--detach"]
+            )
             self.assertFalse(
                 any(
-                    call.kwargs.get("cwd") == external_root and call.args[0][:2] == ["git", "checkout"]
+                    call.kwargs.get("cwd") == external_root
+                    and call.args[0][:2] == ["git", "checkout"]
                     for call in patched_run.call_args_list
                 )
             )
@@ -1217,7 +1360,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._make_source_skill(root, "writing-skills", description="Local seed")
             self._make_profile(root, "core", ["writing-skills"])
-            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+            (root / ".agents/source/universal-skills/index.json").write_text(
+                "{}\n", encoding="utf-8"
+            )
 
             self._make_source_skill(
                 Path(td),
@@ -1249,10 +1394,12 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 module.cmd_sync(args)
 
             self.assertEqual(patched_run.call_count, 0)
-            project_doc = (root / ".agents/skills/writing-skills/SKILL.md").read_text(encoding="utf-8")
-            source_doc = (root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md").read_text(
+            project_doc = (root / ".agents/skills/writing-skills/SKILL.md").read_text(
                 encoding="utf-8"
             )
+            source_doc = (
+                root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md"
+            ).read_text(encoding="utf-8")
             self.assertIn("External version", project_doc)
             self.assertIn("Local seed", source_doc)
 
@@ -1265,7 +1412,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             module.CONFIG["skills_sync"]["external_source_dir"] = str(external_root)
             self._make_source_skill(root, "writing-skills", description="Local seed")
             self._make_profile(root, "core", ["writing-skills"])
-            (root / ".agents/source/universal-skills/index.json").write_text("{}\n", encoding="utf-8")
+            (root / ".agents/source/universal-skills/index.json").write_text(
+                "{}\n", encoding="utf-8"
+            )
 
             self._make_source_skill(
                 Path(td),
@@ -1292,7 +1441,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 }
             )
 
-            args = type("Args", (), {"skills": None, "runtime": None, "profile": None, "pull": True})()
+            args = type(
+                "Args", (), {"skills": None, "runtime": None, "profile": None, "pull": True}
+            )()
             with mock.patch.object(module, "run") as patched_run:
                 module.cmd_sync(args)
 
@@ -1317,7 +1468,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 ["writing-skills"],
                 source_dir="external-universal-skills",
             )
-            (external_root / "index.json").write_text('{"generated_by":"git-source"}\n', encoding="utf-8")
+            (external_root / "index.json").write_text(
+                '{"generated_by":"git-source"}\n', encoding="utf-8"
+            )
 
             module.mirror_skills_to_local_source(external_root, ["writing-skills"])
 
@@ -1325,15 +1478,21 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 (root / ".agents/source/universal-skills/index.json").read_text(encoding="utf-8")
             )
             mirrored_profile = json.loads(
-                (root / ".agents/source/universal-skills/profiles/core.json").read_text(encoding="utf-8")
+                (root / ".agents/source/universal-skills/profiles/core.json").read_text(
+                    encoding="utf-8"
+                )
             )
             self.assertEqual(mirrored_index["generated_by"], "agents-skills-sync local source")
             self.assertEqual(mirrored_index["profiles"], ["core"])
-            self.assertEqual([entry["name"] for entry in mirrored_index["skills"]], ["writing-skills"])
+            self.assertEqual(
+                [entry["name"] for entry in mirrored_index["skills"]], ["writing-skills"]
+            )
             self.assertEqual(mirrored_profile, {"name": "core", "skills": ["writing-skills"]})
             self.assertIn(
                 "External version",
-                (root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md").read_text(encoding="utf-8"),
+                (root / ".agents/source/universal-skills/skills/writing-skills/SKILL.md").read_text(
+                    encoding="utf-8"
+                ),
             )
 
     def test_cmd_push_requires_external_git_source(self):
@@ -1445,7 +1604,13 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 [
                     mock.call(["git", "fetch", "origin"], cwd=external_root),
                     mock.call(
-                        ["git", "checkout", "-b", "skills-sync/propose-writing-skills", "origin/main"],
+                        [
+                            "git",
+                            "checkout",
+                            "-b",
+                            "skills-sync/propose-writing-skills",
+                            "origin/main",
+                        ],
                         cwd=external_root,
                     ),
                     mock.call(["git", "add", "--", "skills/writing-skills"], cwd=external_root),
@@ -1540,7 +1705,9 @@ class AgentsSkillsSyncTests(unittest.TestCase):
             ):
                 module._checkout_proposal_branch(root, "skills-sync/writing-skills", "main")
 
-            patched_run.assert_called_once_with(["git", "checkout", "skills-sync/writing-skills"], cwd=root)
+            patched_run.assert_called_once_with(
+                ["git", "checkout", "skills-sync/writing-skills"], cwd=root
+            )
 
     def test_append_codex_trailer_is_idempotent(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:

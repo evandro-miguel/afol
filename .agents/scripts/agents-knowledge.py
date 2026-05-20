@@ -22,7 +22,16 @@ DOC_TYPES = {"research", "brainstorm", "explorer-check", "postmortem", "report"}
 
 
 class KnowledgeDoc:
-    def __init__(self, path: Path, doc_type: str, doc_id: str, theme: str, status: str, title: str, summary: str):
+    def __init__(
+        self,
+        path: Path,
+        doc_type: str,
+        doc_id: str,
+        theme: str,
+        status: str,
+        title: str,
+        summary: str,
+    ):
         self.path = path
         self.doc_type = doc_type
         self.doc_id = doc_id
@@ -122,7 +131,9 @@ def cmd_search(args: argparse.Namespace) -> int:
     query = args.query.lower()
     docs: List[tuple[int, KnowledgeDoc]] = []
     for doc in iter_knowledge_docs():
-        haystack = " ".join([doc.doc_id, doc.doc_type, doc.theme, doc.title, doc.summary, relative(doc.path)]).lower()
+        haystack = " ".join(
+            [doc.doc_id, doc.doc_type, doc.theme, doc.title, doc.summary, relative(doc.path)]
+        ).lower()
         score = haystack.count(query)
         if score > 0:
             docs.append((score, doc))
@@ -144,7 +155,9 @@ def cmd_pull(args: argparse.Namespace) -> int:
     query = args.query.lower()
     docs: List[tuple[int, KnowledgeDoc, List[MatchSnippet]]] = []
     for doc in iter_knowledge_docs():
-        haystack = " ".join([doc.doc_id, doc.doc_type, doc.theme, doc.title, doc.summary, relative(doc.path)]).lower()
+        haystack = " ".join(
+            [doc.doc_id, doc.doc_type, doc.theme, doc.title, doc.summary, relative(doc.path)]
+        ).lower()
         score = haystack.count(query)
         snippets = extract_matching_snippets(doc.path, args.query, limit=args.snippets)
         score += len(snippets) * 2
@@ -166,7 +179,9 @@ def cmd_pull(args: argparse.Namespace) -> int:
         if snippets:
             for snippet in snippets:
                 print(f"  snippet L{snippet.line_no}: {snippet.text}")
-        print(f"  reuse: open with '.agents/agents knowledge show {doc.doc_id}' if deeper context is needed")
+        print(
+            f"  reuse: open with '.agents/agents knowledge show {doc.doc_id}' if deeper context is needed"
+        )
     return 0
 
 
@@ -207,7 +222,7 @@ def cmd_index(args: argparse.Namespace) -> int:
 
     lines = [
         "---",
-        'doc_type: index',
+        "doc_type: index",
         'id: "knowledge_index"',
         "status: active",
         f'created_at: "{timestamp}"',

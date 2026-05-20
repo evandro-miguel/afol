@@ -44,13 +44,15 @@ DOCS_TO_DISPLAY = [
 
 def print_status(data: Dict[str, object]) -> None:
     print(f"session: {data['session']}")
-    print(f"ready_state: {data['ready_state']} context_ready={data['context_ready']} roadmap_feature={data['roadmap_feature']}")
+    print(
+        f"ready_state: {data['ready_state']} context_ready={data['context_ready']} roadmap_feature={data['roadmap_feature']}"
+    )
 
     _print_missing_context(data["missing_context"])
 
     tasks = data["tasks"]
     print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
-    if tasks['next']:
+    if tasks["next"]:
         print(f"next_task: {tasks['next']}")
     if data["ready_state"] != "complete" and data["workflow_next"]:
         print(f"next_artifact: {data['workflow_next']}")
@@ -92,7 +94,9 @@ def _print_workflow_artifacts(workflow_artifacts) -> None:
             utility_notes = ""
             if item["state"] == "invalid" and utility.get("reasons"):
                 utility_notes = f" reasons={'; '.join(utility['reasons'])}"
-            print(f" - {item['doc_type']}: {item['state']} (status={status}){blockers}{utility_notes}")
+            print(
+                f" - {item['doc_type']}: {item['state']} (status={status}){blockers}{utility_notes}"
+            )
 
 
 def _print_artifacts(artifacts) -> None:
@@ -185,12 +189,20 @@ def _format_next_artifact(item):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Show workstream status from canonical .agents artifacts")
+    parser = argparse.ArgumentParser(
+        description="Show workstream status from canonical .agents artifacts"
+    )
     parser.add_argument("--session", help="Session id/path (default: active session)")
-    parser.add_argument("--json", action="store_true", help="Emit JSON payload (compact by default)")
-    parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output (requires --json)")
+    parser.add_argument(
+        "--json", action="store_true", help="Emit JSON payload (compact by default)"
+    )
+    parser.add_argument(
+        "--pretty", action="store_true", help="Pretty-print JSON output (requires --json)"
+    )
     parser.add_argument("--artifact", action="append", help="Resolve a logical artifact name")
-    parser.add_argument("--check-context", action="store_true", help="Include missing context details")
+    parser.add_argument(
+        "--check-context", action="store_true", help="Include missing context details"
+    )
     return parser.parse_args()
 
 

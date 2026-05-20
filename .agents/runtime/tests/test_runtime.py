@@ -59,7 +59,9 @@ def test_generate_manifest(scaffold_repo):
     assert manifest.runtime_docs["AGENTS.md"] is True
     assert manifest.tool_catalog_count == 1
     assert manifest.major_surfaces == list(runtime.config.manifest_major_surfaces)
-    assert manifest.search_roots == [path.relative_to(scaffold_repo).as_posix() for path in runtime.config.search_roots]
+    assert manifest.search_roots == [
+        path.relative_to(scaffold_repo).as_posix() for path in runtime.config.search_roots
+    ]
 
 
 def test_search_docs_finds_roadmap(scaffold_repo):
@@ -67,7 +69,10 @@ def test_search_docs_finds_roadmap(scaffold_repo):
     response = runtime.search.search("roadmap", limit=5)
 
     assert response.hits
-    assert any("knowledge/INDEX.md" in hit.path or "GENERAL-ROADMAP.md" in hit.path for hit in response.hits)
+    assert any(
+        "knowledge/INDEX.md" in hit.path or "GENERAL-ROADMAP.md" in hit.path
+        for hit in response.hits
+    )
 
 
 def test_search_docs_ignores_malformed_frontmatter(scaffold_repo):
@@ -173,7 +178,9 @@ def test_workspace_inspect_generated_and_hidden_filters(scaffold_repo):
     (scaffold_repo / ".git").mkdir(parents=True, exist_ok=True)
     (scaffold_repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
     (scaffold_repo / ".venv" / "bin").mkdir(parents=True, exist_ok=True)
-    (scaffold_repo / ".venv" / "bin" / "python").write_text("#!/usr/bin/env python\n", encoding="utf-8")
+    (scaffold_repo / ".venv" / "bin" / "python").write_text(
+        "#!/usr/bin/env python\n", encoding="utf-8"
+    )
     (scaffold_repo / ".pytest_cache").mkdir(parents=True, exist_ok=True)
     (scaffold_repo / ".pytest_cache" / "state").write_text("ok\n", encoding="utf-8")
     (scaffold_repo / ".ruff_cache").mkdir(parents=True, exist_ok=True)
@@ -181,7 +188,9 @@ def test_workspace_inspect_generated_and_hidden_filters(scaffold_repo):
     (scaffold_repo / "__pycache__").mkdir(parents=True, exist_ok=True)
     (scaffold_repo / "__pycache__" / "runtime.pyc").write_text("bytecode\n", encoding="utf-8")
     (scaffold_repo / "node_modules" / "pkg").mkdir(parents=True, exist_ok=True)
-    (scaffold_repo / "node_modules" / "pkg" / "index.js").write_text("export const x = 1;\n", encoding="utf-8")
+    (scaffold_repo / "node_modules" / "pkg" / "index.js").write_text(
+        "export const x = 1;\n", encoding="utf-8"
+    )
     (scaffold_repo / ".agents" / "cache").mkdir(parents=True, exist_ok=True)
     (scaffold_repo / ".agents" / "cache" / "snapshot.json").write_text("{}", encoding="utf-8")
     (scaffold_repo / ".agents" / "tmp").mkdir(parents=True, exist_ok=True)
@@ -190,16 +199,22 @@ def test_workspace_inspect_generated_and_hidden_filters(scaffold_repo):
     (scaffold_repo / ".agents" / ".tmp" / "work.txt").write_text("temp\n", encoding="utf-8")
     (scaffold_repo / ".agents" / ".cache").mkdir(parents=True, exist_ok=True)
     (scaffold_repo / ".agents" / ".cache" / "index.json").write_text("{}", encoding="utf-8")
-    (scaffold_repo / ".agents" / "scripts" / "agents_scripts.egg-info").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / ".agents" / "scripts" / "agents_scripts.egg-info").mkdir(
+        parents=True, exist_ok=True
+    )
     (scaffold_repo / ".agents" / "scripts" / "agents_scripts.egg-info" / "PKG-INFO").write_text(
         "name: agents-scripts\n", encoding="utf-8"
     )
     (scaffold_repo / ".agents" / "tools" / "uv").mkdir(parents=True, exist_ok=True)
     (scaffold_repo / ".agents" / "tools" / "uv" / "state.txt").write_text("ok\n", encoding="utf-8")
     (scaffold_repo / ".agents" / "data" / "telemetry").mkdir(parents=True, exist_ok=True)
-    (scaffold_repo / ".agents" / "data" / "telemetry" / "events.jsonl").write_text("{}", encoding="utf-8")
+    (scaffold_repo / ".agents" / "data" / "telemetry" / "events.jsonl").write_text(
+        "{}", encoding="utf-8"
+    )
     (scaffold_repo / ".agents" / "wb" / "260101_test").mkdir(parents=True, exist_ok=True)
-    (scaffold_repo / ".agents" / "wb" / "260101_test" / "task.md").write_text("# task\n", encoding="utf-8")
+    (scaffold_repo / ".agents" / "wb" / "260101_test" / "task.md").write_text(
+        "# task\n", encoding="utf-8"
+    )
     (scaffold_repo / ".hidden-keep").mkdir(parents=True, exist_ok=True)
     (scaffold_repo / ".hidden-keep" / "note.md").write_text("# keep\n", encoding="utf-8")
     (scaffold_repo / "docs" / "keep.md").write_text("# keep\n", encoding="utf-8")
@@ -223,7 +238,11 @@ def test_workspace_inspect_generated_and_hidden_filters(scaffold_repo):
     )
 
     def includes_noisy(paths: set[str]) -> bool:
-        return any(path == prefix or path.startswith(f"{prefix}/") for path in paths for prefix in noisy_prefixes)
+        return any(
+            path == prefix or path.startswith(f"{prefix}/")
+            for path in paths
+            for prefix in noisy_prefixes
+        )
 
     default_summary = runtime.workspace.inspect(depth=6, max_entries=2000)
     default_paths = _tree_paths(default_summary.tree)
@@ -238,14 +257,19 @@ def test_workspace_inspect_generated_and_hidden_filters(scaffold_repo):
 
     with_generated = runtime.workspace.inspect(depth=6, include_generated=True, max_entries=2000)
     generated_paths = _tree_paths(with_generated.tree)
-    assert any(path == "node_modules" or path.startswith("node_modules/") for path in generated_paths)
+    assert any(
+        path == "node_modules" or path.startswith("node_modules/") for path in generated_paths
+    )
     assert any(path == ".agents/tmp" or path.startswith(".agents/tmp/") for path in generated_paths)
     assert any(
         path == ".agents/scripts/agents_scripts.egg-info"
         or path.startswith(".agents/scripts/agents_scripts.egg-info/")
         for path in generated_paths
     )
-    assert any(path == ".agents/tools/uv" or path.startswith(".agents/tools/uv/") for path in generated_paths)
+    assert any(
+        path == ".agents/tools/uv" or path.startswith(".agents/tools/uv/")
+        for path in generated_paths
+    )
     assert any(path == ".agents/wb" or path.startswith(".agents/wb/") for path in generated_paths)
     assert ".agents/data/telemetry/events.jsonl" in generated_paths
     assert ".git/HEAD" in generated_paths

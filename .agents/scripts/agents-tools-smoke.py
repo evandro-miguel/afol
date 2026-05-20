@@ -44,7 +44,11 @@ def main() -> int:
         ([str(WRAPPER), "tools", "list"], 0, ["AGENTS TOOLS - Available Tools", "wb-update"]),
         ([str(WRAPPER), "tools", "list", "--type", "validation"], 0, ["doctor", "lint-docs"]),
         ([str(WRAPPER), "tools", "info", "doctor"], 0, ["TOOL: Agents Doctor", "CHECKS"]),
-        ([str(WRAPPER), "tools", "info", "benchmark"], 0, ["TOOL: Agents Runtime Flow Benchmark", "benchmark run"]),
+        (
+            [str(WRAPPER), "tools", "info", "benchmark"],
+            0,
+            ["TOOL: Agents Runtime Flow Benchmark", "benchmark run"],
+        ),
         ([str(WRAPPER), "tools", "info", "wb-update"], 0, ["SUBCOMMANDS", "normalize-time"]),
         ([str(WRAPPER), "tools", "search", "automate"], 0, ["wb-update"]),
         ([str(WRAPPER), "tools", "validate"], 0, ["Catalog Validation", "Catalog is valid"]),
