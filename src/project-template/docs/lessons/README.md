@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: readme
+theme: lessons
+status: active
+created_at: '2026-05-05T11:50:54+00:00'
+updated_at: '2026-05-05T11:50:54+00:00'
+---
+
 # Lessons
 
 This folder stores reusable lessons learned after the project accumulates real

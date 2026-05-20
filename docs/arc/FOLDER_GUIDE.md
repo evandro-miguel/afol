@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: folder-guide
+theme: arc
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # Architecture
 
 This folder contains all architecture documentation for the project.

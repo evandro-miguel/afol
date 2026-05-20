@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: readme
+theme: wb
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # Workbench
 
 All active workstreams live here in session folders.

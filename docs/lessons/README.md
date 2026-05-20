@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: readme
+theme: lessons
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # Lessons
 
 This folder contains lessons learned and prevention rules.

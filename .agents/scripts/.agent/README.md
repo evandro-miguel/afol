@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: readme
+theme: .agent
+status: active
+created_at: '2026-05-05T11:50:54+00:00'
+updated_at: '2026-05-05T11:50:54+00:00'
+---
+
 # .agent (Scripts Internal)
 
 This folder stores internal script documentation artifacts used by helper tooling.

@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: readme
+theme: structure
+status: active
+created_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-05-05T11:44:41+00:00'
+---
+
 # 📁 Project Structure - Complete Index
 
 **Generated:** 2026-05-15T01:08:58+00:00
