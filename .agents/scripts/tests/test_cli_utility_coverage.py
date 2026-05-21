@@ -1184,6 +1184,8 @@ def test_agents_new_creates_workstream_quick_mode_and_error_branches(tmp_path, m
             "log",
             "--with=report",
             "--force-new",
+            "--task",
+            "Implement coverage feature workflow and verify generated artifacts",
         ],
     )
     agents_new.main()

@@ -18,9 +18,34 @@ depends_on:
 links:
   plan: <plan_doc_id>
   roadmap: <roadmap_path>
+output_artifacts:
+  primary:
+    task: YYMMDD_HHMM_<theme>_task_01
+    plan: <plan_doc_id>
+  sidecars:
+    brainstorm: <brainstorm_doc_id_or_empty>
+    research: <research_doc_id_or_empty>
+    explorer_check: <explorer_check_doc_id_or_empty>
+    postmortem: <postmortem_doc_id_or_empty>
+  sidecar_justification:
+    brainstorm: <required|not_required>
+    research: <required|not_required>
+    explorer_check: <required|not_required>
+    postmortem: <required|not_required>
 ---
 
 # Tasks: <theme>
+
+## Output Artifacts (file-first)
+
+- Primary artifact: `task`
+- Sidecars:
+  - brainstorm: `<brainstorm_doc_id_or_empty>`
+  - research: `<research_doc_id_or_empty>`
+  - explorer_check: `<explorer_check_doc_id_or_empty>`
+  - postmortem: `<postmortem_doc_id_or_empty>`
+- Sidecar justification:
+  - Provide one value per optional artifact, or `not_required`.
 
 Each task must be executable by an agent now. Do not create task items whose
 only purpose is to make the plan, research the plan, or gather broad context.

@@ -460,7 +460,12 @@ class TestStrictVerification(unittest.TestCase):
             "1. Keep the current workflow.\n"
             "2. Enforce stronger verification.\n\n"
             "## Preferred Direction\n"
-            "- Selected: stronger verification with evidence.\n"
+            "- Selected: stronger verification with evidence.\n\n"
+            "## Sidecar Justification\n\n"
+            "- Blocking question: Which verification lane should own strict evidence checks?\n"
+            "- Decision produced: Keep strict verification as the closure gate.\n"
+            "- Execution task affected: T-01\n"
+            "- Stop condition: The task has passing evidence.\n"
         )
         explorer_content = (
             "---\n"
@@ -476,7 +481,12 @@ class TestStrictVerification(unittest.TestCase):
             "## Findings\n"
             "- The repo already validates evidence and coherence.\n\n"
             "## Impact on the Plan\n"
-            "- Keep strict verification central.\n"
+            "- Keep strict verification central.\n\n"
+            "## Sidecar Justification\n\n"
+            "- Blocking question: Which files control strict task verification?\n"
+            "- Decision produced: verify-tasks.py remains the central strict verifier.\n"
+            "- Execution task affected: T-01\n"
+            "- Stop condition: Relevant verification files were inspected.\n"
         )
 
         (self.session_dir / "test_plan_01.md").write_text(plan_content)
@@ -1245,7 +1255,8 @@ status: final
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results.get("meta_task_issues", [])), 0)
+        self.assertEqual(len(results.get("meta_task_issues", [])), 1)
+        self.assertIn("contains meta-planning as primary task", results["meta_task_issues"][0]["description"])
 
     def test_strict_mode_rejects_task_meta_planning_rows(self):
         self._write_standard_docs(
@@ -1262,7 +1273,119 @@ status: final
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results.get("meta_task_issues", [])), 0)
+        self.assertEqual(len(results.get("meta_task_issues", [])), 1)
+        self.assertIn("contains meta-planning as primary task", results["meta_task_issues"][0]["description"])
+
+    def test_meta_task_integrity_allows_direct_executable_tasks(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Run pytest and verify results |\n\n"
+                "```bash\npython3 test.py\n```\n"
+                "Result: passed\n"
+            ),
+            plan_body=(
+                "# Plan\n\n"
+                "## Purpose / Big Picture\n"
+                "Drive the implementation forward.\n\n"
+                "## Progress\n"
+                "- [x] 2026-03-23 18:00Z - Baseline planning completed.\n\n"
+                "## Surprises & Discoveries\n"
+                "- Observation: execution completed.\n\n"
+                "## Decision Log\n"
+                "- Decision: keep the workbench plan canonical.\n"
+                "  Rationale: execution is explicit.\n"
+                "  Date/Author: 2026-03-23 / test\n\n"
+                "## Outcomes & Retrospective\n"
+                "- Outcome: baseline prepared.\n"
+                "- Remaining: implementation.\n"
+                "- Lesson: use direct execution.\n\n"
+                "## Context and Orientation\n"
+                "Current repo state and key files.\n\n"
+                "## Plan of Work\n"
+                "Describe the sequence of changes.\n\n"
+                "## Concrete Steps\n"
+                "1. Run tests.\n"
+                "2. Review outputs and merge.\n\n"
+                "## Validation and Acceptance\n"
+                "- Run pytest and expect success.\n\n"
+                "## Idempotence and Recovery\n"
+                "Safe to rerun validation.\n\n"
+                "## Artifacts and Notes\n"
+                "- None.\n\n"
+                "## Interfaces and Dependencies\n"
+                "- verify-tasks.py\n"
+            ),
+        )
+
+        issues = verify_tasks.check_meta_task_integrity(verify_tasks.load_frontmatter_docs(self.session_dir))
+        self.assertEqual(len(issues), 0)
+
+    def test_strict_mode_rejects_sidecar_without_justification(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npython3 test.py\n```\n"
+                "Result: passed\n"
+            ),
+        )
+        (self.session_dir / "test_research_01.md").write_text(
+            "---\n"
+            "doc_type: research\n"
+            "id: test_research_01\n"
+            "status: active\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            'child_spec: ""\n'
+            "---\n\n"
+            "# Research\n\n"
+            "Focused investigation that affects implementation.\n"
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertEqual(len(results.get("sidecar_justification_issues", [])), 1)
+        self.assertIn("missing Sidecar Justification", results["sidecar_justification_issues"][0]["description"])
+
+    def test_strict_mode_allows_sidecar_with_execution_justification(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npython3 test.py\n```\n"
+                "Result: passed\n"
+            ),
+        )
+        (self.session_dir / "test_research_01.md").write_text(
+            "---\n"
+            "doc_type: research\n"
+            "id: test_research_01\n"
+            "status: active\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            'child_spec: ""\n'
+            "---\n\n"
+            "# Research\n\n"
+            "Focused investigation that affects implementation.\n\n"
+            "## Sidecar Justification\n\n"
+            "- Blocking question: Which validation hook owns the regression check?\n"
+            "- Decision produced: verify-tasks strict owns persisted sidecar validation.\n"
+            "- Execution task affected: T-01\n"
+            "- Stop condition: The strict check has a focused passing test.\n"
+        )
+
+        _, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertEqual(len(results.get("sidecar_justification_issues", [])), 0)
 
     def test_state_board_parses_compound_owner_values(self):
         self._write_standard_docs(

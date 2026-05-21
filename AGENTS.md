@@ -73,6 +73,14 @@ adapters, docs standards, telemetry, and bootstrap assets for downstream repos.
 - Stop gathering context when more context is unlikely to change the decision.
   Pass compact handoffs, not raw dumps.
 
+## File-First / Chat-Light Output
+
+- For implementation-completion and governed slice reporting, use compact handoff
+  fields: `STATUS`, `TASK`, `FILES_WRITTEN`, `VALIDATION_OR_CHECKS`,
+  `SUMMARY`, `BLOCKERS`, and `NEXT`.
+- Use `docs/standards/file-first-chat-light.md` for required artifact fields,
+  sidecar justification, and compact handoff formatting.
+
 ## Tool Routing
 
 - Use MCPs for structured/indexed operations: Project RAG, repo-analysis

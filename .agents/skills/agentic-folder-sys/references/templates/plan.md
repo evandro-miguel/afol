@@ -6,6 +6,14 @@ metadata:
 
 # Plan Template
 
+## Output Artifacts (file-first)
+
+- Primary artifact: `plan`
+- Sidecars:
+  - brainstorm, research, explorer-check, postmortem
+- Sidecar justification:
+  - required|not_required per optional artifact
+
 ```markdown
 ---
 doc_type: plan

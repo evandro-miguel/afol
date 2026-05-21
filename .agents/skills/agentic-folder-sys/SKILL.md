@@ -278,6 +278,15 @@ Resources exposed by the runtime include `repo://manifest`, `repo://validation`,
 
 ## Workbench Artifacts
 
+- For this skill, workbench artifacts must follow `docs/standards/file-first-chat-light.md`.
+- Mandatory output fields in plan/task/report templates:
+  `output_artifacts` and `sidecar_justification`.
+- Set sidecar justification to `not_required` for intentionally skipped optional
+  artifacts.
+- Return completion handoffs in compact format with:
+  `STATUS`, `TASK`, `FILES_WRITTEN`, `VALIDATION_OR_CHECKS`, `SUMMARY`,
+  `BLOCKERS`, and `NEXT`.
+
 Minimum artifact set:
 
 - `plan`

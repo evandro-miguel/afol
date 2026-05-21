@@ -38,6 +38,7 @@ from lib.execution_commands import (
 )
 from lib.markdown_docs import parse_markdown_doc
 from lib.postmortem_governance import postmortem_governance_review_issues
+from lib.task_integrity import check_meta_task_integrity, check_sidecar_justification_integrity
 
 try:
     import yaml
@@ -158,23 +159,6 @@ EXECPLAN_REQUIRED_HEADINGS = [
     "Interfaces and Dependencies",
 ]
 PROGRESS_MARKER_RE = re.compile(r'^\s*-\s\[( |/|%|&|!|>|x)\]\s+', re.MULTILINE)
-
-META_TASK_PATTERNS = [
-    re.compile(
-        r"\b(?:create|write|make|prepare|draft|build|criar|escrever|fazer|preparar|montar)\b[^.\n]{0,120}\b(?:plan|plano|execplan)\b",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"\b(?:research|investigate|study|analyze|pesquisar|investigar|estudar|analisar)\b[^.\n]{0,120}\b(?:to|for|para)\b[^.\n]{0,80}\b(?:create|write|make|prepare|build|criar|escrever|fazer|preparar|montar)\b[^.\n]{0,80}\b(?:plan|plano|execplan)\b",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"\b(?:delegate|assign|delegar|atribuir)\b[^.\n]{0,160}\b(?:plan|plano|execplan)\b",
-        re.IGNORECASE,
-    ),
-]
-PLAN_STEP_RE = re.compile(r"^\s*(?:\d+\.\s+|-\s+)(.+?)\s*$")
-TASK_BOARD_ROW_RE = re.compile(r'^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+)\|\s*([^|]*)\|\s*([^|]*)\|')
 
 
 def parse_iso_timestamp(value: str) -> datetime:
@@ -804,74 +788,6 @@ def check_artifact_utility(session_dir: Path) -> List[Dict[str, Any]]:
     return issues
 
 
-def _section_lines(body: str, heading: str) -> List[str]:
-    section_body = _section_body(body, heading)
-    return [line.strip() for line in section_body.splitlines() if line.strip()]
-
-
-def _collect_primary_task_lines(doc: Dict[str, Any]) -> List[Tuple[int, str]]:
-    doc_type = str(doc["fm"].get("doc_type", "")).strip()
-    body = doc["body"]
-    lines = body.splitlines()
-    collected: List[Tuple[int, str]] = []
-
-    if doc_type == "plan":
-        plan_lines = _section_lines(body, "Plan of Work") + _section_lines(body, "Concrete Steps")
-        for line in plan_lines:
-            match = PLAN_STEP_RE.match(line)
-            if match:
-                collected.append((0, match.group(1).strip()))
-        return collected
-
-    if doc_type != "task":
-        return collected
-
-    for line_num, line in enumerate(lines, 1):
-        checklist = TASK_LINE_RE.match(line)
-        if checklist:
-            collected.append((line_num, checklist.group(3).strip()))
-            continue
-
-        row = TASK_BOARD_ROW_RE.match(line)
-        if row:
-            collected.append((line_num, row.group(4).strip()))
-
-    return collected
-
-
-def check_meta_task_integrity(session_dir: Path) -> List[Dict[str, Any]]:
-    """Reject plan/task artifacts that use primary tasks for meta-planning."""
-    issues: List[Dict[str, Any]] = []
-    if yaml is None:
-        return issues
-
-    for doc in load_frontmatter_docs(session_dir):
-        doc_type = str(doc["fm"].get("doc_type", "")).strip()
-        if doc_type not in {"plan", "task"}:
-            continue
-
-        for line_num, text in _collect_primary_task_lines(doc):
-            normalized = " ".join(text.split())
-            if not normalized:
-                continue
-            for pattern in META_TASK_PATTERNS:
-                if pattern.search(normalized):
-                    issues.append(
-                        {
-                            "type": "meta_task_integrity",
-                            "severity": "error",
-                            "document": doc["name"],
-                            "line": line_num,
-                            "description": (
-                                f"{doc_type} contains meta-planning as primary task: '{normalized}'"
-                            ),
-                        }
-                    )
-                    break
-
-    return issues
-
-
 def check_delivery_closure_readiness(session_dir: Path, completed_tasks: int) -> List[Dict[str, Any]]:
     """Validate closure blockers only for optional artifacts that are present."""
     issues: List[Dict[str, Any]] = []
@@ -1207,6 +1123,7 @@ def _run_strict_session_checks(session_path: Path, results: Dict[str, Any]) -> b
         ("coherence_issues", lambda: check_plan_task_coherence(session_path)),
         ("governance_issues", lambda: check_governance_coherence(session_path)),
         ("meta_task_issues", lambda: check_meta_task_integrity(session_path)),
+        ("sidecar_justification_issues", lambda: check_sidecar_justification_integrity(session_path)),
         ("planning_gate_issues", lambda: check_planning_intelligence_gates(session_path)),
         ("execplan_issues", lambda: check_execplan_requirements(session_path)),
         ("postmortem_issues", lambda: check_postmortem_closure(session_path)),
@@ -1260,6 +1177,7 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
         'coherence_issues': [],
         'governance_issues': [],
         'meta_task_issues': [],
+        'sidecar_justification_issues': [],
         'planning_gate_issues': [],
         'execplan_issues': [],
         'postmortem_issues': [],
@@ -1394,6 +1312,12 @@ def _print_strict_mode_sections(results: Dict[str, Any]) -> None:
         _print_standard_issue,
     )
     _print_issue_section(
+        "Sidecar Justification Issues",
+        results.get("sidecar_justification_issues", []),
+        "Sidecar justification checks passed",
+        _print_standard_issue,
+    )
+    _print_issue_section(
         "Planning Gate Issues",
         results.get("planning_gate_issues", []),
         "Planning gate checks passed",
@@ -1475,6 +1399,7 @@ def _print_failure_summary(results: Dict[str, Any]) -> None:
         ("coherence_issues", "plan/task coherence issue(s) found"),
         ("governance_issues", "roadmap/spec governance issue(s) found"),
         ("meta_task_issues", "meta-planning task issue(s) found"),
+        ("sidecar_justification_issues", "sidecar justification issue(s) found"),
         ("planning_gate_issues", "planning gate issue(s) found"),
         ("execplan_issues", "ExecPlan issue(s) found"),
         ("postmortem_issues", "postmortem issue(s) found"),

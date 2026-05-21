@@ -25,7 +25,8 @@ Minimum check:
 1. What element am I touching?
 2. Which project rule applies?
 3. Which spec, standard, template, or skill applies?
-4. Which validation proves I followed it?
+4. Which output artifact fields and sidecar-justification rules apply?
+5. Which validation proves I followed it?
 ```
 
 If no project-specific rule exists for the element, the agent must state the
@@ -70,6 +71,16 @@ When creating a new function, command, workflow, or artifact type:
   includes that refactor.
 - Record future refactor debt for both the existing and new code paths when
   duplication or convergence is likely.
+
+## File-First Contract Check
+
+When work touches workbench artifacts, ensure:
+
+- Output artifacts include required fields for primary and optional sidecar artifacts.
+- `sidecar_justification` exists for each optional artifact, including `not_required`
+  when skipped.
+- Final handoff to the user uses the compact format from
+  `file-first-chat-light` when completion is being reported.
 
 ---
 

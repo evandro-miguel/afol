@@ -6,6 +6,14 @@ metadata:
 
 # Task Template
 
+## Output Artifacts (file-first)
+
+- Primary artifact: `task`
+- Sidecars:
+  - brainstorm, research, explorer-check, postmortem
+- Sidecar justification:
+  - required|not_required per optional artifact
+
 ```markdown
 ---
 doc_type: task

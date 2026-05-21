@@ -19,6 +19,20 @@ links:
   plan: <plan_doc_id>
   task: <task_doc_id>
   postmortem: <postmortem_doc_id_or_empty>
+output_artifacts:
+  primary:
+    report: YYMMDD_HHMM_<theme>_report_01
+    task: <task_doc_id>
+  sidecars:
+    brainstorm: <brainstorm_doc_id_or_empty>
+    research: <research_doc_id_or_empty>
+    explorer_check: <explorer_check_doc_id_or_empty>
+    postmortem: <postmortem_doc_id_or_empty>
+  sidecar_justification:
+    brainstorm: <required|not_required>
+    research: <required|not_required>
+    explorer_check: <required|not_required>
+    postmortem: <required|not_required>
 ---
 
 # Report: <theme>
@@ -62,6 +76,17 @@ links:
 ## Risks / Follow-ups
 
 - <open item>
+
+## Output Artifacts (file-first)
+
+- Primary artifact: `report`
+- Sidecars:
+  - brainstorm: `<brainstorm_doc_id_or_empty>`
+  - research: `<research_doc_id_or_empty>`
+  - explorer_check: `<explorer_check_doc_id_or_empty>`
+  - postmortem: `<postmortem_doc_id_or_empty>`
+- Sidecar justification:
+  - Provide one value per optional artifact, or `not_required`.
 
 ## Postmortem Link
 

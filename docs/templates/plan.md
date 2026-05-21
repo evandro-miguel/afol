@@ -21,9 +21,34 @@ links:
   postmortem: <postmortem_doc_id_or_empty>
 repo: <repo_name>
 branch: <branch_or_worktree>
+output_artifacts:
+  primary:
+    plan: YYMMDD_HHMM_<theme>_plan_01
+    task: <task_doc_id>
+  sidecars:
+    brainstorm: <brainstorm_doc_id_or_empty>
+    research: <research_doc_id_or_empty>
+    explorer_check: <explorer_check_doc_id_or_empty>
+    postmortem: <postmortem_doc_id_or_empty>
+  sidecar_justification:
+    brainstorm: <required|not_required>
+    research: <required|not_required>
+    explorer_check: <required|not_required>
+    postmortem: <required|not_required>
 ---
 
 # Plan: <theme>
+
+## Output Artifacts (file-first)
+
+- Primary artifact: `plan`
+- Sidecars:
+  - brainstorm: `<brainstorm_doc_id_or_empty>`
+  - research: `<research_doc_id_or_empty>`
+  - explorer_check: `<explorer_check_doc_id_or_empty>`
+  - postmortem: `<postmortem_doc_id_or_empty>`
+- Sidecar justification:
+  - Provide one value per optional artifact, or `not_required`.
 
 This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current as work proceeds. Follow `PLANS.md` from the repository root when writing or revising this file.
 

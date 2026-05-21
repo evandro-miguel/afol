@@ -16,6 +16,14 @@ links:
   roadmap: <roadmap_path>
   brainstorm: <brainstorm_doc_id>
   plan: <plan_doc_id>
+output_artifacts:
+  primary:
+    explorer_check: YYMMDD_HHMM_<theme>_explorer-check_01
+  links:
+    roadmap: <roadmap_path>
+    plan: <plan_doc_id>
+    brainstorm: <brainstorm_doc_id>
+  sidecar_justification: <required|not_required>
 ---
 
 # Explorer Check: <theme>
@@ -60,6 +68,19 @@ links:
 - Plan grounded in current repo state: <yes/no>
 - Additional exploration still required:
   - <item or none>
+
+## Output Artifact Contract
+
+- If this sidecar exists, record `sidecar_justification` as `required`.
+- If not required, set `sidecar_justification` to `not_required` and keep the
+  field explicit.
+
+## Sidecar Justification
+
+- Blocking question: <question this sidecar must answer>
+- Decision produced: <decision or N/A until answered>
+- Execution task affected: <T-XX>
+- Stop condition: <what makes this sidecar complete>
 
 ---
 
