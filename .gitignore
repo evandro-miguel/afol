@@ -59,3 +59,4 @@ docs/telemetry/reports/implementation_report.md
 # Makefile in a-docs (keep root Makefile)
 # .agents/a-docs/standards/Makefile
 .gitnexus
+.agents/tmp/

@@ -1297,11 +1297,7 @@ def is_skill_directory(path: Path) -> bool:
 
 
 def _checkout_skill_names(skills_dir: Path) -> Set[str]:
-    return {
-        item.name
-        for item in skills_dir.iterdir()
-        if is_skill_directory(item)
-    }
+    return {item.name for item in skills_dir.iterdir() if is_skill_directory(item)}
 
 
 def _profile_skill_names(profile_file: Path) -> List[str] | None:
@@ -1354,11 +1350,7 @@ def local_project_skill_names() -> List[str]:
     skills_root = local_project_skills_root()
     if not skills_root.exists():
         return []
-    return sorted(
-        item.name
-        for item in skills_root.iterdir()
-        if is_skill_directory(item)
-    )
+    return sorted(item.name for item in skills_root.iterdir() if is_skill_directory(item))
 
 
 def _profile_names_from_installs(installs: object) -> Set[str]:

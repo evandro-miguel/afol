@@ -227,7 +227,9 @@ class BootstrapTests(unittest.TestCase):
             (external / "index.json").write_text('{"skills":[]}', encoding="utf-8")
             (external / ".git").mkdir()
 
-            local_mcp = root / ".agents" / "source" / "universal-skills" / "skills" / "agentic-scaffold-mcp"
+            local_mcp = (
+                root / ".agents" / "source" / "universal-skills" / "skills" / "agentic-scaffold-mcp"
+            )
             local_mcp.mkdir(parents=True)
             (local_mcp / "SKILL.md").write_text("local scaffold mcp\n", encoding="utf-8")
 
@@ -243,11 +245,15 @@ class BootstrapTests(unittest.TestCase):
 
             checkout = target / ".agents" / "source" / "universal-skills"
             self.assertEqual(
-                (checkout / "skills" / "agentic-folder-sys" / "SKILL.md").read_text(encoding="utf-8"),
+                (checkout / "skills" / "agentic-folder-sys" / "SKILL.md").read_text(
+                    encoding="utf-8"
+                ),
                 "external folder sys\n",
             )
             self.assertEqual(
-                (checkout / "skills" / "agentic-scaffold-mcp" / "SKILL.md").read_text(encoding="utf-8"),
+                (checkout / "skills" / "agentic-scaffold-mcp" / "SKILL.md").read_text(
+                    encoding="utf-8"
+                ),
                 "local scaffold mcp\n",
             )
             self.assertEqual(
@@ -273,15 +279,21 @@ class BootstrapTests(unittest.TestCase):
             )
             malformed_external_skill = external / "skills" / "agentic-folder-sys"
             malformed_external_skill.mkdir(parents=True)
-            (malformed_external_skill / "README.md").write_text("missing skill doc\n", encoding="utf-8")
+            (malformed_external_skill / "README.md").write_text(
+                "missing skill doc\n", encoding="utf-8"
+            )
 
-            local_skill = root / ".agents" / "source" / "universal-skills" / "skills" / "agentic-folder-sys"
+            local_skill = (
+                root / ".agents" / "source" / "universal-skills" / "skills" / "agentic-folder-sys"
+            )
             local_skill.mkdir(parents=True)
             (local_skill / "SKILL.md").write_text("local valid fallback\n", encoding="utf-8")
 
             self.assertTrue(module.seed_repo_local_universal_skills_from_source(external, checkout))
             self.assertEqual(
-                (checkout / "skills" / "agentic-folder-sys" / "SKILL.md").read_text(encoding="utf-8"),
+                (checkout / "skills" / "agentic-folder-sys" / "SKILL.md").read_text(
+                    encoding="utf-8"
+                ),
                 "local valid fallback\n",
             )
             self.assertTrue(module.is_valid_universal_skills_checkout(checkout))
@@ -314,13 +326,21 @@ class BootstrapTests(unittest.TestCase):
                 (partial_checkout / "partial.txt").write_text("partial\n", encoding="utf-8")
                 return False
 
-            with mock.patch.object(module, "refreshed_external_universal_skills_source", return_value=Path(td) / "external"):
-                with mock.patch.object(module, "seed_repo_local_universal_skills_from_source", side_effect=partial_seed):
+            with mock.patch.object(
+                module,
+                "refreshed_external_universal_skills_source",
+                return_value=Path(td) / "external",
+            ):
+                with mock.patch.object(
+                    module, "seed_repo_local_universal_skills_from_source", side_effect=partial_seed
+                ):
                     self.assertTrue(module.seed_repo_local_universal_skills_checkout(checkout))
 
             self.assertFalse((checkout / "partial.txt").exists())
             self.assertEqual(
-                (checkout / "skills" / "agentic-folder-sys" / "SKILL.md").read_text(encoding="utf-8"),
+                (checkout / "skills" / "agentic-folder-sys" / "SKILL.md").read_text(
+                    encoding="utf-8"
+                ),
                 "local fallback\n",
             )
 
