@@ -137,7 +137,7 @@ Before reporting completion:
 
 **DON'T:**
 
-- ❌ Treat "feature", "spec", "TypeScript", or "skill" work as a
+- ❌ Treat "feature", "spec", "TypeScript", "Python", or "skill" work as a
   generic edit.
 - ❌ Delegate work without passing the applicable rule context.
 - ❌ Close work without evidence that the relevant rules were followed.
