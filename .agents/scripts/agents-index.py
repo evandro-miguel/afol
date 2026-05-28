@@ -98,14 +98,15 @@ class DocEntry:
         return f"| {self.id} | {self.theme} | {self.status} | {self.owner} | {links_str} |"
 
 
-def scan_docs(directory: Path, pattern: str) -> List[DocEntry]:
+def scan_docs(directory: Path, pattern: str, recursive: bool = False) -> List[DocEntry]:
     """Scan directory for doc files."""
     if not directory.exists():
         return []
 
     entries = []
+    files = directory.rglob(pattern) if recursive else directory.glob(pattern)
 
-    for file_path in directory.glob(pattern):
+    for file_path in files:
         if file_path.name.startswith("TEMPLATE_") or file_path.name == "INDEX.md" or file_path.name == "README.md":
             continue
 
@@ -149,6 +150,8 @@ updated_at: "{timestamp}"
 
 ## Summary
 
+<!-- markdownlint-disable MD013 MD060 -->
+
 | Metric | Count |
 |--------|-------|
 | Total | {len(entries)} |
@@ -169,6 +172,8 @@ updated_at: "{timestamp}"
         content += "| - | - | - | - | - |\n"
 
     content += f"""
+<!-- markdownlint-enable MD013 MD060 -->
+
 ---
 *Index: `{path_label}`*
 """
@@ -186,7 +191,7 @@ def main():
 
     # Scan SPECS
     print("Scanning SPECS...")
-    spec_entries = scan_docs(SPECS_DIR, "*.md")
+    spec_entries = scan_docs(SPECS_DIR, "*.md", recursive=True)
     print(f"  Found {len(spec_entries)} spec file(s)")
 
     # Scan DECISIONS

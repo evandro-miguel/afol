@@ -1,550 +1,252 @@
 ---
 doc_type: roadmap
-id: 260223_0000_arc_roadmap_01
+id: 260521_0000_total_reformulation_roadmap_01
 status: active
 owners:
 - orchestrator
-created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-05-09T14:59:47-03:00'
+created_at: '2026-05-21T00:00:00+08:00'
+updated_at: '2026-05-21T00:00:00+08:00'
 ---
 
 # GENERAL ROADMAP
 
 ## 1) North Star
 
-- Turn this scaffold into a roadmap-first delivery system for all downstream projects.
-- Make product intent explicit before execution: every relevant feature must exist in the roadmap, have a governing spec, and define what success means before code starts.
-- Treat roadmap and specs as the canonical product philosophy layer, while workstreams remain the execution layer.
+Build a universal, low-token, Bun/TypeScript-first governance and execution
+system for AI agents.
 
-## 2) Mandatory Operating Model
+The system should let agents work across projects using the same local protocol,
+the same short commands, the same governance structure, the same update model,
+and the same execution rules.
 
-- No feature implementation starts without a roadmap entry.
-- No roadmap feature is executable without a linked parent spec.
-- Large features should be decomposed into child specs when that improves clarity, coordination, or reviewability.
-- Roadmap items track feature status and completion tasks.
-- Specs describe intent, expected behavior, user journey, constraints, risks, and acceptance; they do not contain implementation code.
-- Workstream plans, tasks, logs, and reports must link back to the roadmap feature and its governing spec.
+## 2) Product Model
 
-## 3) Current Phase
+The project has two layers:
 
-- Phase: Roadmap-First Governance Foundation
-- Goal: Replace the current optional roadmap/spec flow with a mandatory feature-definition system that every bootstrapped project must follow.
-- Definition of done:
-  - The scaffold ships with a mandatory roadmap structure centered on features.
-  - The scaffold ships with a mandatory spec model centered on feature intent and user journey.
-  - Large features have a documented child-spec decomposition rule.
-  - Project tooling refuses to treat implementation as valid when roadmap/spec prerequisites are missing.
+~~~text
+Universal CLI
+- owns logic
+- implemented in Bun/TypeScript
+- versioned and updateable
 
-## 4) Feature Portfolio
+Project template
+- owns local state
+- keeps rules, skills, workbench, specs, evidence, logs, config
+- installed into each downstream project
+~~~
 
-### F-01 Roadmap-First Governance
+The current reformulation should move from a copied script-heavy scaffold to a
+universal CLI plus minimal local project state.
 
-- Status: done
-- Why: The scaffold currently supports roadmap/spec usage, but does not make them the required source of truth for product direction.
-- Governing spec: `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md`
-- Exit criteria:
-  - Every repository created from this scaffold contains a usable roadmap at bootstrap time.
-  - The roadmap represents the complete feature backlog, not an optional summary.
-  - Feature progress can be read directly from roadmap state.
-- Delivery tasks:
-  - [x] Define the governance philosophy for roadmap-first delivery.
-  - [x] Rewrite the roadmap template around features, status, and linked specs.
-  - [x] Update project rules so roadmap maintenance is mandatory.
+## 3) Strategic Priorities
 
-### F-02 Feature Specification System
+1. Low-token command execution.
+2. Minimal local template.
+3. Bun/TypeScript as the system core.
+4. Smart routing of rules and skills.
+5. File-first, chat-light handoffs.
+6. Safe file operations with mutation tracking.
+7. Updateable downstream project installations.
+8. Strong validation and closure gates.
+9. Future public distribution.
 
-- Status: done
-- Why: Features need a durable product definition that explains intent, user expectations, and boundaries before execution details appear in workstreams.
-- Governing spec: `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md`
-- Exit criteria:
-  - Every roadmap feature references a parent spec.
-  - Parent specs define expected behavior, user journey, scope, constraints, and acceptance.
-  - Spec documentation becomes the required pre-implementation artifact for meaningful work.
-- Delivery tasks:
-  - [x] Define the parent-spec philosophy for feature work.
-  - [x] Rewrite spec templates to favor behavior, experience, and intent over implementation detail.
-  - [x] Keep `spec-lite` available as a discretionary workstream-level option when a lighter local refinement is the better fit.
+## 4) Current-State Reconciliation
 
-### F-03 Child Spec Decomposition
+This repository already has useful Python, Bash, uv, Just, workbench, MCP, safe
+mutation, and validation behavior. That behavior is compatibility contract, not
+disposable history.
 
-- Status: done
-- Why: Large features need sub-specifications so teams can execute in bounded objectives without losing the parent feature narrative.
-- Governing spec: `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md`
-- Exit criteria:
-  - Large features can declare child specs before implementation starts.
-  - Child specs inherit the parent feature goal while narrowing one objective.
-  - Teams can trace execution from roadmap feature -> parent spec -> child spec -> workstream.
-- Delivery tasks:
-  - [x] Define the parent/child spec relationship.
-  - [x] Add naming and linking rules for child specs.
-  - [x] Define the threshold that requires decomposition.
+The Bun/TypeScript reformulation must be staged:
 
-### F-04 Workflow Enforcement
+1. Add ./a as the new project-local front door.
+2. Delegate from ./a to existing .agents/agents commands where parity does not
+   exist yet.
+3. Implement one typed Bun/TypeScript command family at a time.
+4. Keep Python/Bash paths until parity tests prove the replacement.
+5. Shrink src/project-template only after bootstrap/export validation proves
+   downstream installs still work.
 
-- Status: done
-- Why: Governance only works if the scaffold enforces it in work creation, verification, and bootstrap flows.
-- Governing spec: `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md`
-- Required child specs before execution:
-  - Workflow gate enforcement
-  - Bootstrap baseline enforcement
-  - Verification guardrails
-- Exit criteria:
-  - New workstreams cannot bypass roadmap/spec linkage for non-trivial work.
-  - Doctor/verify checks detect missing roadmap/spec prerequisites.
-  - Bootstrap creates all mandatory strategic documents.
-- Delivery tasks:
-  - [x] Update `agents-new` and workbench rules for roadmap/spec references.
-  - [x] Add doctor/verify checks for roadmap and spec presence.
-  - [x] Ensure bootstrap initializes the new governance baseline.
+## 5) Feature Portfolio
 
-### F-05 Reliability and System Parity
-
-- Status: done
-- Why: The scaffold still has tooling gaps in telemetry, verification scope, test execution, and CI. Those should be fixed under the new governance model rather than as unrelated patches.
-- Governing spec: `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md`
-- Required child specs before execution:
-  - Telemetry parity
-  - Test and CI hardening
-  - Validation semantics
-- Exit criteria:
-  - Telemetry reflects real command outcomes.
-  - Validation commands match documented guarantees.
-  - Test automation is trustworthy for adopters of the scaffold.
-- Delivery tasks:
-  - [x] Fix telemetry parity gaps (`tool_exec`, `session_end`, failure capture).
-  - [x] Make `just all` a truthful full-validation command.
-  - [x] Align the test strategy, actual test runner, and CI baseline.
-
-### F-06 Primary Runtime Compatibility
-
-- Status: done
-- Why: This scaffold is intended to serve OpenCode, Codex, and Qwen first, but only Codex/Qwen-style mirrors are modeled directly today. Runtime-specific instructions, config entrypoints, approval modes, and agent/subagent conventions are not yet standardized across the primary target runtimes.
-- Governing spec: `docs/arc/SPECS/260306_primary-agent-runtime-compatibility_spec_01.md`
-- Exit criteria:
-  - OpenCode is treated as a first-class runtime in bootstrap, docs, and project structure.
-  - The scaffold documents a shared compatibility contract for OpenCode, Codex, and Qwen.
-  - Runtime-specific committed files stay secret-free and derive from the same canonical governance source.
-  - Project owners can understand which runtime-specific files are committed, generated, or local-only.
-- Delivery tasks:
-  - [x] Research official runtime capabilities for OpenCode, Codex, and Qwen.
-  - [x] Define the committed compatibility contract for the three primary runtimes.
-  - [x] Add first-class OpenCode support to sync/bootstrap/runtime docs.
-  - [x] Document runtime-specific config boundaries, especially what must never be committed.
-  - [x] Add runtime health checks and tool-catalog parity for the primary runtime contract.
-
-### F-07 Execution Intelligence and Knowledge System
-
-- Status: done
-- Why: The scaffold needs reusable knowledge and disciplined closure without
-  turning pre-plan exploration into mandatory plan content. Plans should express
-  the execution path for the actual work, while optional exploration artifacts
-  remain sidecars only when they materially reduce risk or are the requested
-  deliverable.
-- Governing spec: `docs/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md`
-- Child spec policy:
-  - Required: yes
-  - Child specs:
-    - `260306_planning-rigor-and-explorer-gates_spec_01`
-    - `260306_knowledge-reuse-and-token-efficiency_spec_01`
-    - `260306_session-pack-structure-and-postmortem_spec_01`
-- Exit criteria:
-  - Plans stay complete with the minimum `plan + task` core when the execution path is clear.
-  - Brainstorm, research, and explorer-check artifacts are optional sidecars, not mandatory pre-plan gates.
-  - Agents can quickly find prior research, brainstorms, explorer checks, and post-mortems with low-token discovery paths.
-  - Sessions can group multiple major plan tracks in dedicated pack folders without losing verification coverage.
-  - Final session closure finalizes every optional artifact that actually exists.
-- Delivery tasks:
-  - [x] Define the parent feature philosophy and child spec boundaries.
-  - [x] Keep brainstorm and explorer-check artifacts available as optional sidecars when they materially help.
-  - [x] Add reusable knowledge indexing/search for prior research artifacts.
-  - [x] Add optional session pack folders for multiple major plans inside one session.
-  - [x] Require finalization of optional artifacts that exist before session closure.
-
-### F-08 Context-Driven Execution Commands
-
-- Status: done
-- Why: The scaffold now has strong governance, reusable knowledge, and runtime compatibility, but it still exposes too much of that power through low-level repo commands. Operators do not yet get a unified, context-driven execution layer for setup/resume, next-step status, guided implementation, review, and logical revert. That slows adoption and makes runtime UX less consistent than it should be.
-- Governing spec: `docs/arc/SPECS/260306_context-driven-execution-commands_spec_01.md`
-- Child spec policy:
-  - Required: yes
-  - Child specs:
-    - `260306_artifact-resolution-layer_spec_01`
-    - `260306_project-context-canon-and-setup_spec_01`
-    - `260306_guided-status-and-implementation_spec_01`
-    - `260306_review-and-logical-revert_spec_01`
-    - `260306_runtime-command-parity_spec_01`
-- Exit criteria:
-  - Canonical project context artifacts exist for product, guidelines, tech stack, workflow, and artifact indexing without creating a second governance tree.
-  - Scripts can resolve logical artifacts such as active plan, workflow, roadmap, and parent spec without hardcoded command-specific path rules.
-  - Operators can ask for the next governed action, execute the next task, review against specs and guidelines, and revert logical work units rather than raw files only.
-  - The command model is portable across OpenCode, Codex, Qwen, and Gemini-facing adapters while keeping `AGENTS.md` and `.agents/*` canonical.
-- Delivery tasks:
-  - [x] Define the parent feature philosophy, user journey, and non-goals for context-driven execution commands.
-  - [x] Design the artifact resolution layer and canonical project-context document set.
-  - [x] Plan the `status`, `implement`, `review`, and `revert` command families in phased delivery order.
-  - [x] Define runtime adapter rules so command semantics stay aligned across primary runtimes.
-  - [x] Prove the feature can reuse existing workbench, telemetry, and knowledge systems instead of duplicating Conductor's track structure.
-
-### F-09 Persistent Planning Memory and Session Catchup
-
-- Status: done
-- Why: The scaffold now has governed workbench artifacts, but it still relies on operators to manually keep plan, findings, and progress synchronized while exploring. Resume ergonomics are also weaker than they should be: there is no first-class catchup command that reconciles workbench state with git drift, and there is no lightweight cadence guard to force durable note capture after exploration bursts.
-- Governing spec: `docs/arc/SPECS/260307_persistent-planning-memory_spec_01.md`
-- Exit criteria:
-  - Operators get a native catchup/resume flow that compares workbench artifacts with current repo changes before execution continues.
-  - The system documents and enforces a canonical mapping between lightweight working-memory concepts and the richer workbench artifacts.
-  - Major sessions can prove that exploration findings were persisted to durable artifacts before planning or implementation decisions continue.
-  - Untrusted external content is explicitly routed to research/findings artifacts rather than plan files that may be re-read frequently by runtimes.
-- Delivery tasks:
-  - [x] Define the product model for native persistent working memory without duplicating governance trees in project root.
-  - [x] Add a session catchup command or equivalent workflow that highlights unsynced plan/task/log/report state against `git status` and recent diffs.
-  - [x] Define freshness and cadence rules for updating research/log artifacts during exploration-heavy work.
-  - [x] Add status/review/verify signals for stale or missing working-memory artifacts in major sessions.
-  - [x] Update operator docs so the three-file mental model maps cleanly onto workbench `plan`/`research`/`log` artifacts.
-
-### F-10 Universal Skills Runtime Integration
-
-- Status: done
-- Why: The scaffold already ships a basic `skills-sync`, but the upstream universal-skills system is more mature about lockfiles, profiles, host-specific installs, and reproducible project adoption. The scaffold should absorb that model so interactive runtimes such as Codex, OpenCode, Gemini CLI, and Claude Code can bootstrap the right skill surface deterministically.
-- Governing spec: `docs/arc/SPECS/260323_1704_universal-skills-runtime-integration_spec_01.md`
-- Exit criteria:
-  - Project skill selection can be pinned to a source repo/ref contract instead of only a mutable branch/skill list.
-  - The scaffold can describe and install skill sets by profile or explicit skill list for the supported interactive runtimes.
-  - Bootstrap can prepare downstream repos with a reproducible skills lock/config baseline.
-  - Skills validation can distinguish source contract issues, install drift, and runtime-target compatibility problems.
-- Delivery tasks:
-  - [x] Define the product contract for lockfile/profile-based universal-skills integration in this scaffold.
-  - [x] Upgrade `skills-sync` to support pinned source metadata, profiles, and on-demand skill install semantics.
-  - [x] Integrate the new skills model into bootstrap for fresh and partial installs.
-  - [x] Add validation and test coverage for the supported runtime targets and lockfile semantics.
-  - [x] Update operator docs so project maintainers understand local vs upstream skill ownership and upgrade flow.
-
-### F-11 Current-State Maps and Goal-State Governance
-
-- Status: done
-- Why: The scaffold already distinguishes roadmap/spec/workbench governance from execution, but it still lacks an explicit contract for separating descriptive current-state project maps from goal-state product and architecture intent. As downstream repos adopt heavier codemap and analysis surfaces under `docs/map/`, the scaffold needs to prevent those artifacts from being mistaken for roadmap/spec governance sources.
-- Governing spec: `docs/arc/SPECS/260323_1741_current-state-maps-and-goal-state-governance_spec_01.md`
-- Exit criteria:
-  - `docs/map/` is explicitly defined as the current-state, descriptive, non-governance surface for repository maps, codemaps, and analysis evidence.
-  - Desired-state docs remain outside `docs/map/` and stay canonical for architecture intent, roadmap, project brief, tech stack, ADRs, and feature specs.
-  - Workstreams and operator docs explain when to consume `docs/map/` as evidence and when to use roadmap/specs as the governing source of truth.
-  - Bootstrap and project documentation can explain the split without introducing a second planning or verification system.
-- Delivery tasks:
-  - [x] Define the document taxonomy for current-state vs goal-state artifacts.
-  - [x] Define `docs/map/` boundaries, ownership, and refresh semantics.
-  - [x] Define how roadmap/spec/workbench flows may reference maps without promoting them to governance sources.
-  - [x] Plan the documentation, bootstrap, and command changes needed to adopt the split safely.
-
-### F-12 ExecPlan-Native Planning System
-
-- Status: done
-- Why: The scaffold already requires plans for major work, but the current `plan.md` is still too static and governance-oriented compared with the stronger ExecPlan pattern described for Codex. Plans should be living, self-contained, novice-guiding documents that remain executable from the plan file alone while still fitting this repo's roadmap/spec/workbench model.
-- Governing spec: `docs/arc/SPECS/260323_1815_execplan-native-planning-system_spec_01.md`
-- Exit criteria:
-  - The scaffold has a canonical `PLANS.md` contract adapted to workbench-based planning.
-  - `AGENTS.md` and operator docs explain when to use ExecPlans and where they live in this repo.
-  - The plan template is upgraded with required living-document sections such as progress, discoveries, decisions, and outcomes.
-  - Strict verification can detect final plans that lack required ExecPlan sections or a maintained progress checklist.
-- Delivery tasks:
-  - [x] Define the adapted ExecPlan contract for this scaffold and how it maps into roadmap/spec/workbench artifacts.
-  - [x] Update `AGENTS.md`, README, workflow docs, and the plan template to reflect the ExecPlan model.
-  - [x] Add strict verification for required ExecPlan sections and living-plan progress tracking.
-  - [x] Add tests proving the new plan requirements are enforced and the template remains usable.
-
-### F-13 Agentic Runtime Restructure
-
-- Status: done
-- Why: The scaffold has outgrown a collection of standalone Python scripts, manually mirrored tool metadata, and documentation-only discovery. Operators need one coherent agentic runtime with a shared service layer, stable CLI compatibility, MCP-native tool access, reversible mutation primitives, and generated/validated documentation surfaces.
-- Governing spec: `docs/arc/SPECS/260411_agentic-runtime-restructure_spec_01.md`
-- Exit criteria:
-  - The operational implementation lives in a single UV-managed runtime package under `.agents/runtime/`.
-  - `.agents/agents <command>` remains the stable public CLI while delegating to the new runtime.
-  - MCP tools/resources/prompts are exposed from the same runtime service layer as the CLI.
-  - Tool catalog, docs, skills, current-state maps, Make targets, and CI all describe and validate the new runtime.
-  - Legacy standalone scripts are either compatibility shims or archived after parity is proven.
-- Delivery tasks:
-  - [x] Define the parent feature philosophy and migration boundaries for the total runtime restructure.
-  - [x] Build the shared runtime package and compatibility CLI adapter.
-  - [x] Integrate MCP-native tools, resources, prompts, journaling, and undo support.
-  - [x] Migrate or wrap every existing `.agents/agents` command through the shared registry.
-    - [x] Start with `status`, `knowledge pull`, and `session catchup`, matching the source-kit phase-2 recommendation.
-    - [x] Add parity tests before redirecting each legacy alias through the runtime registry.
-    - [x] Promote the proven wrapper pattern to all public command aliases, including `implement`, `review`, `revert`, and `skills-sync`.
-  - [x] Update docs, skills, current-state maps, Make targets, and CI gates.
-  - [x] Archive superseded standalone script surfaces only after command parity and strict verification pass.
-    - [x] No standalone script was archived in this batch because public commands remain compatibility delegates; archive only per script after a future native port fully supersedes it.
-
-### F-14 Spec Child And Spec Test Strategy Artifacts
-
-- Status: done
-- Why: `spec-lite` no longer communicates the intended rigor of local feature
-  decomposition, and test work needs a written strategy artifact before agents
-  start creating or running tests. The scaffold should make child feature
-  refinement explicit through `spec-child` and require `spec-test` to record
-  what a test must prove before implementation.
-- Governing spec: `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md`
-- Exit criteria:
-  - `spec-child` is the canonical future name for child/local feature
-    specification artifacts that refine a parent spec.
-  - `spec-test` is defined as a mutable test strategy artifact, not test code,
-    that captures user journeys, click paths, performance expectations, target
-    tooling, construction notes, expected results, and evidence criteria before
-    testing starts.
-  - Feature-level planning has a durable folder convention for one or more
-    `spec-test` artifacts per feature, while workbench sessions can link to the
-    relevant strategy.
-  - Historical `spec-lite` artifacts remain readable during migration, with a
-    planned compatibility alias instead of an immediate breaking rename.
-- Delivery tasks:
-  - [x] Define the naming, frontmatter, link, and folder convention for
-    `spec-child` and `spec-test`.
-  - [x] Update future templates and governance docs to replace `spec-lite`
-    with `spec-child` as the canonical child-spec artifact.
-  - [x] Add a `spec-test` template that records the expected journey,
-    clicks/actions, performance expectations, target technology, test
-    construction strategy, expected output, and evidence format.
-  - [x] Plan validation so test-focused workstreams link to a `spec-test`
-    before test implementation begins.
-  - [x] Keep `spec-lite` as a backwards-compatible historical alias until
-    migration and documentation parity are proven.
-
-### F-15 Repo-Wide Simplification and Runtime Parity Cleanup
-
-- Status: complete
-- Why: The scaffold now has a central runtime, an 80% scripts coverage gate, and
-  clear current-state vs goal-state documentation rules, but the repo still has
-  stale current-state maps, a legacy generated structure surface that belongs in
-  `docs/map/structure/`, compatibility command metadata that can drift, and
-  several Python command modules that still need complexity reduction under
-  proven parity.
-- Governing spec: `docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md`
-- Child spec policy:
-  - Required: yes
-  - Child specs should isolate map boundary cleanup, runtime registry parity,
-    and Python command simplification when each slice begins execution.
-- Exit criteria:
-  - `docs/map/` is the only durable current-state repository map surface.
-  - `docs/map/structure/` is the canonical current-state structure index and
-    `docs/arc/structure/` is no longer maintained as a competing current-state
-    surface.
-  - `.agents/agents` and `.agents/agents-mcp` remain stable thin launchers while
-    command metadata and compatibility behavior are validated from a single
-    runtime registry path where practical.
-  - Complexity reductions land in small batches with focused parity tests and no
-    reduction below the 80% scripts coverage gate.
-  - Legacy script paths are archived only after replacement behavior has
-    executable parity evidence.
-- Delivery tasks:
-  - [x] Create the F-15 governed parent spec and workbench execution session.
-  - [x] Sync root runtime mirrors from `AGENTS.md` after the F-15 governance
-    update.
-  - [x] Reconcile current-state documentation so `docs/map/` owns map evidence.
-  - [x] Consolidate runtime command metadata and wrapper parity without changing
-    public command semantics.
-  - [x] Reduce Python command complexity in bounded, tested slices.
-  - [x] Refresh docs, indexes, and maps after code behavior is proven.
-  - [x] Close with strict workbench verification, `just lint`, and the relevant
-    Python/runtime gates.
-
-### F-16 Project Template Source Separation
-
-- Status: complete
-- Why: The scaffold needs one visible, sanitized source tree for the default
-  project folder installed into downstream repos, separate from this repository's
-  development workbench, tests, maps, caches, and historical governance.
-- Governing spec: `docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md`
-- Exit criteria:
-  - `src/project-template/` is the canonical downstream project baseline.
-  - Bootstrap copies from the template source instead of directly from the live
-    development repo root.
-  - Export tests prove local history, caches, telemetry events, and generated
-    repo-specific artifacts are not shipped to downstream projects.
-  - The final script refactor pass removes duplicate responsibilities and keeps
-    every public script purpose-defined.
-- Delivery tasks:
-  - [ ] Create the sanitized project-template source tree.
-  - [ ] Rewire bootstrap and tests around the template source.
-  - [ ] Update only the minimal operator docs for the new boundary.
-  - [ ] Run the final `refactor-workflows` script simplification pass.
-  - [ ] Verify with lint, focused tests, and a dry-run bootstrap.
-
-### F-17 Just Command Runner Migration
+### F-00 Total Reformulation Strategy
 
 - Status: planned
-- Why: The scaffold currently exposes operator workflows through Make targets,
-  but `just` is already available locally and better matches the repo's
-  command-runner use case. The migration must preserve bootstrap, CI, template,
-  documentation, and 80% script coverage behavior while removing Make as a
-  required command surface.
-- Governing spec: `docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md`
-- Child spec policy:
-  - Required: yes
-  - Child specs should isolate command parity, bootstrap/template wiring, and
-    documentation/catalog cleanup when each slice begins execution.
-- Exit criteria:
-  - `just` is the canonical command runner for scaffold operations.
-  - Every former Make target has a tested `just` equivalent or an explicitly
-    documented replacement.
-  - Bootstrap and `src/project-template/` generate and validate the Just-based
-    command surface without relying on Make.
-  - CI and operator docs use `just all` as the full-validation command.
-  - Script tests keep the 80% coverage gate and the migrated commands run with
-    behavior equivalent to the previous Make targets.
-- Delivery tasks:
-  - [x] Create a governed workbench session and execution plan for the Just
-        migration.
-  - [x] Add Justfile command parity for the existing scaffold targets.
-  - [x] Update bootstrap, template, tests, and CI to prefer Just.
-  - [x] Clean Make references from canonical docs, catalog metadata, and runtime
-        mirrors after command parity is proven.
-  - [x] Verify with `just all`, focused bootstrap/template tests, and the 80%
-        scripts coverage gate.
+- Governing spec:
+  docs/arc/SPECS/260521_0000_total-reformulation-strategy_spec_01.md
+- Why: The project needs one coherent strategy before architecture, command
+  design, and migration work begin.
+- Exit criteria: manifesto exists; roadmap exists; feature specs exist;
+  product/factory boundary is explicit; Bun/TS migration direction is explicit.
 
-### F-18 Agent Governance Preflight and Recurrence Guardrails
+### F-01 Universal Agent CLI
 
 - Status: planned
-- Why: Agents still rely on manual discipline to check whether a requested plan
-  already has a governing spec, whether a user-reported problem has happened
-  before, whether similar implementation already exists, and whether delegated
-  agents actually received and followed all applicable `.agents/rules/`.
-  Recurring plan/task drift also allows agents to create work about making a
-  plan instead of executable tasks for the requested work.
-- Governing spec: `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md`
-- Child spec policy:
-  - Required: yes
-  - Child specs should isolate plan/spec preflight, recurring-problem
-    escalation, similar-system detection, and orchestrator rule enforcement.
-- Exit criteria:
-  - Ambiguous or product-shaped work runs a compact decision intake before
-    benchmark, planning, or implementation.
-  - Decision intake records user, behavior evidence, observable outcome,
-    constraints, non-goals, reversibility, assumptions, and first-slice
-    appetite.
-  - Every non-trivial plan begins by checking whether a governing roadmap
-    feature and parent spec already exist.
-  - User-reported repeated problems trigger prior-lesson lookup, heavier
-    verification, and a new or updated general/specific rule when prevention is
-    feasible.
-  - New function work includes similar-system discovery; when a similar system
-    exists, the agent points to it in code and spec evidence, avoids modifying
-    it by default, and records future refactor debt for both the old and new
-    code paths.
-  - The orchestrator loads all applicable `.agents/rules/` before routing work
-    and passes enforceable rule context to every agent it coordinates.
-  - Workbench plans and tasks describe direct execution of the requested work,
-    not tasks to create, draft, or research a later plan.
-  - Task lifecycle markers distinguish problem, moved, implemented-untested,
-    tested-but-needing-spec-validation, and fully done states.
-- Delivery tasks:
-  - [ ] Define the preflight contract and acceptance checks in the parent spec.
-  - [ ] Add decision-intake, challenge, qualitative prioritization, optional
-        scoring, benchmark-order, and fixed-appetite slice guidance.
-  - [ ] Add implementation support for roadmap/spec lookup before planning.
-  - [ ] Add recurring-problem lookup and heavy verification escalation.
-  - [ ] Add similar-system discovery and future-refactor debt capture.
-  - [ ] Add applicable-rule resolution by touched element type, including
-        feature/spec/workbench/skill/runtime/code surfaces.
-  - [ ] Add orchestrator rule-loading and delegated-agent enforcement.
-  - [ ] Add direct-execution plan/task integrity validation that rejects obvious
-        meta-planning tasks.
-  - [ ] Add the canonical task state model:
-        `[ ]`, `[/]`, `[!]`, `[>]`, `[%]`, `[&]`, `[x]`.
-  - [ ] Update affected project-local skills/docs and leave a pending
-        universal-skills propagation item for the new agent behavior.
-  - [ ] Verify with focused tests, strict workbench validation, and `just lint`.
+- Governing spec: docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md
+- Why: Logic should live in one updateable CLI instead of being copied into
+  every project.
+- Exit criteria: Bun/TypeScript CLI architecture is defined; CLI runs from ./a;
+- CLI reads local project state; CLI supports version lock and update checks;
+  compatibility delegation preserves current behavior until parity.
 
-### F-19 Controlled Runtime Flow Benchmarks
+### F-02 Minimal Project Template
 
 - Status: planned
-- Why: The scaffold has smoke checks and strict workbench validation, but it
-  still lacks a standard benchmark family for controlled agent-tool execution
-  flows. When runtime adapters, prompt/rule loading, tool routing, or command
-  orchestration changes, maintainers need a repeatable way to measure whether
-  real execution flows regressed without turning that benchmark into a universal
-  gate for every change.
-- Governing spec: `docs/arc/SPECS/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md`
-- Exit criteria:
-  - The scaffold defines a standard benchmark contract for controlled
-    agent-tool execution flows with fixed scope and expected tools.
-  - The default benchmark tier is documented as `gpt-5.4-mini` with `medium`
-    reasoning unless a benchmark spec explicitly overrides it.
-  - Benchmark results capture pass/fail, timing, tool success/failure, and any
-    available context or prompt-size signal.
-  - AGENTS/rules/skills/docs explain that runtime-flow benchmarks are targeted
-    regression measurement for risky execution changes, not a universal gate
-    for every task.
-- Delivery tasks:
-  - [ ] Define the benchmark contract, scenario shape, and when-to-run policy.
-  - [ ] Define the initial controlled scenario pack for high-value execution
-        flows.
-  - [x] Plan the runtime/CLI surface for running and recording the benchmarks.
-  - [x] Add a live-agent benchmark slice that measures real `codex exec` tool
-        usage in controlled fixture tasks.
-  - [ ] Update governance docs and skills so agents know when benchmark runs are
-        advisable.
-  - [ ] Verify the planning/governance slice with strict workbench validation
-        and `just lint`.
+- Governing spec: docs/arc/SPECS/260521_0020_minimal-project-template_spec_01.md
+- Why: Downstream projects need only the local state and minimal docs required
+  for agents to operate.
+- Exit criteria: src/project-template becomes minimal; template contains
+  config, lock, manifest, rules, skills, workbench, and required docs; factory
+  noise is excluded; bootstrap/export validates cleanliness.
 
-### F-20 Parallel Session Isolation
+### F-03 Agent Command Design System
 
 - Status: planned
-- Why: The scaffold supports multiple workbench sessions, but the operational
-  model still relies on one repository-global `.agents/wb/.active_session`
-  pointer. Remote agents and parallel PRs can contaminate that pointer, as Jules
-  did when several branches tried to fix CI by changing the active session
-  instead of targeting their own session context.
-- Governing spec: `docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md`
-- Exit criteria:
-  - Commands that mutate workbench state can target an explicit or context-local
-    session without relying on the global active pointer.
-  - CI and PR review can detect suspicious `.agents/wb/.active_session` changes
-    without blocking intentional session-management work.
-  - Operators can list, bind, switch, catch up, and close parallel sessions
-    without losing track of branch/worktree context.
-  - Remote-agent review docs explain how to reject active-session contamination
-    while preserving useful code or test ideas.
-- Delivery tasks:
-  - [ ] Inventory all active-session reads and writes across scripts, Just
-        recipes, and runtime docs.
-  - [ ] Define and implement the session resolution order: explicit
-        `--session`, environment override, context-local binding, global
-        pointer fallback.
-  - [ ] Add branch/worktree-aware session context for parallel local and remote
-        work.
-  - [ ] Add CI/review checks for suspicious `.active_session` mutations.
-  - [ ] Update session command UX and docs for Jules-style parallel PR review.
-  - [ ] Verify with focused tests, `just lint`, and strict validation.
+- Governing spec:
+  docs/arc/SPECS/260521_0030_agent-command-design-system_spec_01.md
+- Why: Agents should use short, predictable commands to reduce repeated token
+  cost.
+- Exit criteria: short grammar exists; long aliases exist; high-frequency
+  operations use 1-3 letter commands; compact output is default; JSON output is
+  available.
 
-## 5) Prioritization
+### F-04 Governance Workbench System
 
-Score inputs:
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260521_0040_governance-workbench-system_spec_01.md
+- Why: Plans, tasks, evidence, logs, specs, and reports need a durable local
+  execution model.
+- Exit criteria: typed workbench model; command-managed
+  plans/tasks/logs/evidence/reports/sidecars; evidence required for completion;
+  closure validation catches drift.
 
-- Governance leverage across all downstream repos
-- Reduction of ambiguous or undocumented work
-- Ability to enforce behavior automatically
-- Risk reduction for future scaffold adopters
+### F-05 Smart Rules and Skills Routing
 
-Tie-breaker:
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260521_0050_smart-rules-and-skills-routing_spec_01.md
+- Why: Agents should receive only relevant rules and skills for the current
+  work.
+- Exit criteria: rule router; skill router; surface detection; compact
+  delegation context; project-local updateable rules and skills.
 
-- Prefer work that turns a currently optional behavior into an enforceable rule.
+### F-06 File-First Low-Token Execution
 
-## 6) Risks
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260521_0060_file-first-low-token-execution_spec_01.md
+- Why: Agents should save detailed work into files and return compact handoffs
+  instead of flooding context.
+- Exit criteria: research save flow; log append flow; compact handoff format;
+  summary plus paths; routine updates avoid manual file editing.
 
-- Governance becomes too heavy for small tasks -> preserve a clearly defined quick path, but require roadmap/spec linkage for non-trivial work.
-- Specs drift into implementation detail -> define product-philosophy boundaries explicitly and keep code out of specs.
-- Teams create roadmap items without maintaining them -> add validation gates and review cadence.
-- Enforcement arrives before templates are usable -> ship template/documentation changes before hard gates.
-- Runtime-specific files diverge from canonical governance -> keep one source of truth and derive mirrors/adapters from it where possible.
+### F-07 Local State Index and Event Log
 
-## 7) Operating Cadence
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260521_0070_local-state-index-and-event-log_spec_01.md
+- Why: Agents should query compact state instead of repeatedly scanning raw
+  files.
+- Exit criteria: local indexes for workbench, rules, skills, specs, and files;
+  event log records command and file activity; compact queries; optional watcher
+  plan.
 
-- Weekly review:
-  - Roadmap status changes
-  - New features added or removed
-  - Parent specs created or updated
-  - Child specs required for upcoming work
-  - Reliability gaps still blocking trust in the scaffold
+### F-08 Safe File Mutation and Undo
 
----
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260521_0080_safe-file-mutation-and-undo_spec_01.md
+- Why: Agents need safe tools to move, patch, write, archive, and undo files.
+- Exit criteria: mutation journal; session/task context; dry-run; undo where
+  feasible; protected dangerous paths.
 
-*Roadmap: `docs/arc/GENERAL-ROADMAP.md`*
+### F-09 Template Update and Versioning
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260521_0090_template-update-and-versioning_spec_01.md
+- Why: Downstream projects must receive updates when the core system improves.
+- Exit criteria: project lock; managed manifest; update check; update preview;
+  conflict detection; preserved local edits.
+
+### F-10 Runtime Adapters and MCP
+
+- Status: planned
+- Governing spec: docs/arc/SPECS/260521_0100_runtime-adapters-and-mcp_spec_01.md
+- Why: The system should support Codex, OpenCode, Claude Code, Gemini CLI,
+- Qwen, and future runtimes.
+- Exit criteria: thin adapters; MCP exposes safe tools; CLI and MCP share core
+  logic; runtime-specific docs remain minimal.
+
+### F-11 Validation, CI, and Benchmarks
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260521_0110_validation-ci-and-benchmarks_spec_01.md
+- Why: The system needs trust gates before work is marked complete or releases
+  are published.
+- Exit criteria: type checks; unit tests; schema tests; command parity tests;
+  template export tests; workbench validation; MCP parity tests; benchmark
+  packs for accuracy, speed, safety, quality, and token cost on risky changes.
+
+### F-12 Public Distribution and Onboarding
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260521_0120_public-distribution-and-onboarding_spec_01.md
+- Why: The system should eventually be usable by other people.
+- Exit criteria: public install path; simple first-run onboarding; minimal
+  docs; examples; private assumptions removed.
+
+## 6) Recommended Delivery Phases
+
+1. Strategy and design: manifesto, roadmap, specs, architecture, command
+   system, product/factory boundary, compatibility constraints.
+1. CLI kernel: Bun/TypeScript skeleton, ./a, project detection, config/lock
+   reading, short router, compact output, compatibility delegation.
+1. Workbench core: session, task state, evidence, log append, plan status,
+   verify, close.
+1. Rules and skills: routers, surface detection, delegation context, update
+   model.
+1. File intelligence: indexes, state query, event log, optional watcher,
+   research/log save flows.
+1. Safe mutation: write/move/patch/archive, mutation journal, dry-run, undo.
+1. Update system: manifest, lock, check, preview, apply, conflicts.
+1. Public readiness: install path, minimal docs, examples, CI, release workflow.
+
+## 7) MVP
+
+The MVP should include ./a, Bun/TypeScript CLI, config and lock, short command
+grammar, status, new, task start/done, evidence add, log add, verify, close,
+rule resolve, skill list/update, template update check, and minimal validation.
+
+The MVP should not include full autonomous orchestration, complex UI, cloud
+sync, full watcher daemon, large docs, public package polish, or complete
+migration from every legacy script.
+
+## 8) Core Metrics
+
+Optimize for fewer file reads per agent task, fewer manual file writes, fewer
+repeated rule loads, fewer task-state mistakes, fewer closure-without-evidence
+cases, lower average command token cost, faster session resume, safer
+downstream updates, higher command parity, better routing accuracy, and
+measurable benchmark quality.
+
+## 9) Risks
+
+- Too many features before the CLI kernel works.
+- Docs becoming bigger than the operating system.
+- Commands becoming too short to understand.
+- Global CLI making projects non-reproducible.
+- Template becoming bloated.
+- Update flow overwriting local project edits.
+- Rules router delivering the wrong rules.
+- Agents trusting indexes after stale state.
+- Rewriting proven Python/uv behavior before Bun/TypeScript parity exists.
+
+## 10) Strategic Guardrail
+
+Every new feature must pass this test: does this reduce token cost, reduce agent
+friction, prevent a repeated error, or improve updateability?
+
+If not, it should not be added.

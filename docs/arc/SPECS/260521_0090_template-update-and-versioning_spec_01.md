@@ -1,0 +1,68 @@
+---
+doc_type: spec
+id: 260521_0090_template-update-and-versioning_spec_01
+theme: template-update-and-versioning
+status: draft
+owners:
+- orchestrator
+created_at: '2026-05-21T01:30:00+08:00'
+updated_at: '2026-05-21T01:30:00+08:00'
+roadmap_feature: F-09
+spec_role: parent
+parent_spec: 260521_0000_total-reformulation-strategy_spec_01
+links:
+  roadmap: docs/arc/GENERAL-ROADMAP.md
+  manifesto: docs/arc/PROJECT-MANIFESTO.md
+scope:
+  repo_areas:
+  - .agents/lock.json
+  - .agents/manifest.json cli/update src/project-template
+  packages:
+  - agentic-cli
+risk_level: high
+---
+
+# SPEC: template-update-and-versioning
+
+## 1) Feature Intent
+
+Allow downstream projects to update their local agent governance system when the
+universal system improves.
+
+## 2) Problem
+
+Templates become stale after they are copied, and copied implementation code
+fragments maintenance.
+
+## 3) Expected Behavior
+
+Each project has .agents/lock.json and .agents/manifest.json. The CLI supports
+update check, plan, and apply flows with conflict detection.
+
+## 4) Product Boundary
+
+The universal CLI owns reusable behavior. The project-local template owns local
+state, rules, skills, workbench artifacts, specs, evidence, logs, config, and
+update metadata. Current Python/uv/Bash behavior remains compatibility contract
+until Bun/TypeScript parity is proven by focused tests.
+
+## 5) Scope
+
+In scope: Lock file, manifest file, update check, update plan, conflict
+detection, apply update, post-update validation.
+
+Out of scope: Silent automatic updates by default, overwriting user edits
+without confirmation, cloud update service in MVP, arbitrary app-code migration.
+
+## 6) Acceptance
+
+Project can check and preview updates; user edits are preserved or flagged;
+managed files update safely; validation runs after update.
+
+## 7) Review Questions
+
+- Does this reduce agent friction or repeated token cost?
+- Does this preserve project-local ownership of state?
+- Does this avoid copying universal implementation logic into every downstream
+  project?
+- Is the validation path concrete enough to prove parity and safety?

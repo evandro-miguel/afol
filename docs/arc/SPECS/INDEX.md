@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-05-15T01:08:58+00:00"
-updated_at: "2026-05-15T01:08:58+00:00"
+created_at: "2026-05-21T23:15:06+00:00"
+updated_at: "2026-05-21T23:15:06+00:00"
 ---
 
 # SPECS INDEX
@@ -12,11 +12,13 @@ updated_at: "2026-05-15T01:08:58+00:00"
 
 ## Summary
 
+<!-- markdownlint-disable MD013 MD060 -->
+
 | Metric | Count |
 |--------|-------|
-| Total | 34 |
-| Draft | 1 |
-| Active | 32 |
+| Total | 53 |
+| Draft | 19 |
+| Active | 33 |
 | Final | 1 |
 
 ## Index
@@ -45,6 +47,7 @@ updated_at: "2026-05-15T01:08:58+00:00"
 | 260411_agentic-runtime-restructure_spec_01 | agentic-runtime-restructure | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260412_0000_specs-folder-guide_spec_01 |  | active |  |  |
 | 260412_1110_spec-child-and-spec-test-governance_spec_01 | spec-child-and-spec-test-governance | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260412_1130_spec-child-and-spec-test-governance_spec-test_01 | spec-child-and-spec-test-governance | active | tester | roadmap: docs/arc/GENERAL-ROADMAP.md, workbench_plan: 260412_1130_spec-child-and-spec-test-governance_plan_01 |
 | 260412_2004_repo-wide-simplification-runtime-parity_spec_01 | repo-wide-simplification-runtime-parity | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260413_1250_project-template-source-separation_spec_01 | project-template-source-separation | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260413_1250_project-template-source-separation_spec-child_01 | project-template-source-separation | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260413_1250_project-template-source-separation_plan_01, task: 260413_1250_project-template-source-separation_task_01, report: 260413_1250_project-template-source-separation_report_01 |
@@ -57,6 +60,26 @@ updated_at: "2026-05-15T01:08:58+00:00"
 | 260423_2120_runtime-flow-benchmark-scenarios_spec-child_01 | runtime-flow-benchmark-scenarios | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260426_1215_parallel-session-isolation_spec_01 | parallel-session-isolation | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260509_1453_plan-task-execution-integrity-state-model_spec-child_01 | plan-task-execution-integrity-state-model | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent_spec: docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md, plan: .agents/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_plan_01.md, task: .agents/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_task_01.md |
+| 260521_0000_total-reformulation-strategy_spec_01 | total-reformulation-strategy | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0010_universal-agent-cli_spec_01 | universal-agent-cli | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0020_minimal-project-template_spec_01 | minimal-project-template | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0030_agent-command-design-system_spec_01 | agent-command-design-system | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0040_governance-workbench-system_spec_01 | governance-workbench-system | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0050_smart-rules-and-skills-routing_spec_01 | smart-rules-and-skills-routing | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0060_file-first-low-token-execution_spec_01 | file-first-low-token-execution | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0070_local-state-index-and-event-log_spec_01 | local-state-index-and-event-log | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0080_safe-file-mutation-and-undo_spec_01 | safe-file-mutation-and-undo | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0090_template-update-and-versioning_spec_01 | template-update-and-versioning | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0130_universal-agent-cli-kernel-contract_spec-test_01 | universal-agent-cli-kernel-contract | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260521_0132_minimal-project-template-export_spec-test_01 | minimal-project-template-export | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260521_0135_agent-command-design-system_spec-test_01 | agent-command-design-system | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260521_0100_runtime-adapters-and-mcp_spec_01 | runtime-adapters-and-mcp | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0140_runtime-adapters-and-mcp-parity_spec-test_01 | runtime-adapters-and-mcp-parity | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260521_0145_validation-ci-benchmark-matrix_spec-test_01 | validation-ci-benchmark-matrix | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260521_0110_validation-ci-and-benchmarks_spec_01 | validation-ci-and-benchmarks | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0120_public-distribution-and-onboarding_spec_01 | public-distribution-and-onboarding | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+
+<!-- markdownlint-enable MD013 MD060 -->
 
 ---
 *Index: `docs/arc/SPECS/INDEX.md`*
