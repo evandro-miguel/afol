@@ -1141,6 +1141,53 @@ def _run_strict_session_checks(session_path: Path, results: Dict[str, Any]) -> b
     return all_clear
 
 
+def _verify_task_files(
+    session_path: Path,
+    task_files: List[Path],
+    results: Dict[str, Any],
+    strict: bool,
+) -> bool:
+    """Verify all tasks found in task markdown files and update counters/issues."""
+    all_completed = True
+    evidence_ledger = _load_evidence_ledger(session_path) if strict else {}
+
+    for task_file in sorted(task_files):
+        file_result = {
+            "file": task_file,
+            "tasks": [],
+            "all_completed": True,
+        }
+
+        content = task_file.read_text()
+        tasks = extract_tasks(content, task_file)
+
+        for task_id, task_text, marker_type, line_num in tasks:
+            task_info = {
+                "id": task_id,
+                "description": task_text,
+                "status": marker_type,
+                "line": line_num,
+                "file": task_file,
+            }
+            file_result["tasks"].append(task_info)
+            results["total_tasks"] += 1
+
+            task_completed = _record_task_verification(
+                results,
+                file_result,
+                task_info,
+                content,
+                strict,
+                marker_type,
+                evidence_ledger,
+            )
+            all_completed = all_completed and task_completed
+
+        results["task_files"].append(file_result)
+
+    return all_completed
+
+
 def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict]:
     """
     Verify all tasks in a session folder are completed.
@@ -1198,42 +1245,7 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
             results['issues'].append("No task files found in session")
             return True, results  # No tasks = vacuously true in non-strict mode
 
-    all_completed = True
-    evidence_ledger = _load_evidence_ledger(session_path) if strict else {}
-
-    for task_file in sorted(task_files):
-        file_result = {
-            'file': task_file,
-            'tasks': [],
-            'all_completed': True,
-        }
-
-        content = task_file.read_text()
-        tasks = extract_tasks(content, task_file)
-
-        for task_id, task_text, marker_type, line_num in tasks:
-            task_info = {
-                'id': task_id,
-                'description': task_text,
-                'status': marker_type,
-                'line': line_num,
-                'file': task_file,
-            }
-            file_result['tasks'].append(task_info)
-            results['total_tasks'] += 1
-
-            task_completed = _record_task_verification(
-                results,
-                file_result,
-                task_info,
-                content,
-                strict,
-                marker_type,
-                evidence_ledger,
-            )
-            all_completed = all_completed and task_completed
-
-        results['task_files'].append(file_result)
+    all_completed = _verify_task_files(session_path, task_files, results, strict)
 
     if strict:
         all_completed = all_completed and _run_strict_session_checks(session_path, results)

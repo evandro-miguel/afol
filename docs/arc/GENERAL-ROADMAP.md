@@ -221,6 +221,16 @@ The Bun/TypeScript reformulation must be staged:
   spec-lite remains a legacy compatibility alias; the F-14 folder convention
   `docs/arc/SPECS/F-14/spec-tests/` is explicit.
 
+### F-15 Repo-Wide Simplification Runtime Parity
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md
+- Why: bounded simplification slices should reduce runtime/script complexity and
+  map drift without changing the public CLI behavior.
+- Exit criteria: child-spec slices land with parity validation and strict
+  governed evidence, preserving interactive command contract.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command
