@@ -15,7 +15,7 @@ links:
   parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md
   plan: .agents/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_plan_01.md
   task: .agents/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_task_01.md
-  report: 
+  report:
 risk_level: low
 ---
 
