@@ -1023,6 +1023,30 @@ def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) 
     suggest_patterns_for_theme(theme)
 
 
+def _print_creation_context(args: Dict[str, object], session_id: str, timestamp: str, active_session: Optional[str]) -> None:
+    """Print creation context summary before file generation."""
+    print("=" * 60)
+    print(f"Creating new workstream: {args['theme']}")
+    print("=" * 60)
+    print()
+    print(f"Session ID: {session_id}")
+    print(f"Timestamp: {timestamp}")
+    print(f"Roadmap feature: {args['feature_id']}")
+    print(f"Parent spec: {args['parent_spec']}")
+    print(f"Intent: {args['intent']}")
+    if args.get("child_spec"):
+        print(f"Child spec: {args['child_spec']}")
+    if args.get("pack"):
+        print(f"Pack: {args['pack']}")
+    if args.get("into_session"):
+        print(f"Into existing session: {args['into_session']}")
+    if args.get("with_artifacts"):
+        print(f"Explicit artifacts: {', '.join(args['with_artifacts'])}")
+    if active_session and args["force_new"]:
+        print(f"Previous active session: {active_session}")
+    print()
+
+
 def main():
     """Main entry point."""
     args = _parse_args()
@@ -1070,26 +1094,7 @@ def main():
         session_id = next_available_session_id(get_session_id(args["theme"]))
     timestamp = get_timestamp()
 
-    print("=" * 60)
-    print(f"Creating new workstream: {args['theme']}")
-    print("=" * 60)
-    print()
-    print(f"Session ID: {session_id}")
-    print(f"Timestamp: {timestamp}")
-    print(f"Roadmap feature: {args['feature_id']}")
-    print(f"Parent spec: {args['parent_spec']}")
-    print(f"Intent: {args['intent']}")
-    if args.get("child_spec"):
-        print(f"Child spec: {args['child_spec']}")
-    if args.get("pack"):
-        print(f"Pack: {args['pack']}")
-    if args.get("into_session"):
-        print(f"Into existing session: {args['into_session']}")
-    if args.get("with_artifacts"):
-        print(f"Explicit artifacts: {', '.join(args['with_artifacts'])}")
-    if active_session and args["force_new"]:
-        print(f"Previous active session: {active_session}")
-    print()
+    _print_creation_context(args, session_id, timestamp, active_session)
 
     _create_workstream(session_id, args["theme"], timestamp, args)
 
