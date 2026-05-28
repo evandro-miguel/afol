@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { runValidationCommand } from "./validate/contract";
 
 const HELP_LINES = [
   "Usage: a [command] [options]",
@@ -15,6 +16,7 @@ const HELP_LINES = [
   "  task                   Work on session tasks",
   "  session                Work with session lifecycle",
   "  verify-tasks           Verify task completion",
+  "  v, validate            Validation contract and benchmark selector",
   "  runtime                Run runtime helpers",
   "  tools                  Use tools helpers",
   "",
@@ -34,6 +36,7 @@ const HELP_LINES = [
 const JSON_ALIASES = new Set(["-j", "--json"]);
 const STATUS_ALIASES = new Set(["s", "status"]);
 const HELP_ALIASES = new Set(["-h", "--help"]);
+const VALIDATE_ALIASES = new Set(["v", "validate"]);
 
 const exit = (code: number): never => {
   process.exit(code);
@@ -49,6 +52,10 @@ function isJsonAlias(value: string): boolean {
 
 function isHelpAlias(value: string): boolean {
   return HELP_ALIASES.has(value);
+}
+
+function isValidateAlias(value: string): boolean {
+  return VALIDATE_ALIASES.has(value);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -187,6 +194,9 @@ export function main(argv: string[]): number {
   }
 
   const command = normalized.length === 0 ? ["status"] : normalized;
+  if (command.length > 0 && isValidateAlias(command[0])) {
+    return runValidationCommand(projectRoot, command.slice(1));
+  }
   if (command[0] === "status" && command.includes("--json")) {
     // status is passed through directly with json when requested
   }

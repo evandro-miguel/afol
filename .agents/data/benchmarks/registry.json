@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "packs": [
+    {
+      "pack_id": "cli-kernel-local",
+      "min_scenarios": 6,
+      "selector_tags": ["cli", "kernel", "local"]
+    },
+    {
+      "pack_id": "workbench-parity",
+      "min_scenarios": 5,
+      "selector_tags": ["workbench", "parity"]
+    },
+    {
+      "pack_id": "mcp-parity",
+      "min_scenarios": 5,
+      "selector_tags": ["mcp", "runtime", "parity"]
+    },
+    {
+      "pack_id": "runtime-live-agent",
+      "min_scenarios": 3,
+      "selector_tags": ["runtime", "live", "risky"]
+    },
+    {
+      "pack_id": "token-economy",
+      "min_scenarios": 4,
+      "selector_tags": ["token", "cost", "compact-output"]
+    }
+  ]
+}
