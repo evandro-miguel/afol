@@ -69,7 +69,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Repo history/context: `git`/`gh`; indexed graph/callers: GitNexus CLI.
 - Browser/UI: `npx playwright` or `bunx playwright`; lightweight checks:
   `lightpanda`.
-- Runtime/tasks: `uv`/`python3`, `bun`/`node`/`npm`, `just`/`make`.
+- Runtime/tasks: `uv`/`python3`, `bun`/`node`/`npm`, `just`.
 - Docs/ops: `markdownlint`/`lint-md`/`fix-md`/`validate-md`, `markitdown`,
   `yt-dlp`, `docker compose`, `tmux`.
 

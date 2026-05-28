@@ -24,8 +24,8 @@ adapters, docs standards, telemetry, and bootstrap assets for downstream repos.
 ## Stack
 
 - Language: Python 3.11+
-- Tooling: `.agents/scripts/*`, `.agents/runtime`, Bash wrappers, Just, Make,
-  `uv`, Markdown, YAML, JSON, and TOML.
+- Tooling: `.agents/scripts/*`, `.agents/runtime`, Bash wrappers, Just, `uv`,
+  Markdown, YAML, JSON, and TOML.
 - Runtime model: interactive CLI agents. Do not redesign this scaffold around
   long-lived backend agent services unless the roadmap introduces that use case.
 
@@ -94,7 +94,7 @@ adapters, docs standards, telemetry, and bootstrap assets for downstream repos.
 - Browser/UI checks: `npx playwright` or `bunx playwright` for E2E,
   screenshots, and automation; `lightpanda` for lightweight page checks.
 - Runtime/tasks: `uv`/`python3` for Python; `bun`/`node`/`npm` for JS;
-  `just`/`make` for project command entrypoints.
+  `just` for project command entrypoints.
 - Docs/ops: `markdownlint`/`lint-md`/`fix-md`/`validate-md` for Markdown,
   `markitdown` for document conversion, `yt-dlp` for media, `docker compose`
   for containers, and `tmux` for long-running terminals.

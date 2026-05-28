@@ -11,7 +11,7 @@ updated_at: '2026-03-06T22:29:30-03:00'
 ## Primary Stack
 
 - Python 3.11+ for operational scripts
-- Bash and Make for wrapper automation
+- Bash and Just for wrapper automation
 - `uv` for environment and dependency management
 - Markdown, YAML, JSON, and TOML for durable project artifacts
 
@@ -25,4 +25,4 @@ updated_at: '2026-03-06T22:29:30-03:00'
 
 - `pytest` for script unit tests
 - `ruff` for Python linting
-- `make` targets for aggregate validation (`lint`, `lint-scripts`, `test-scripts`, `all`)
+- `just` targets for aggregate validation (`lint`, `lint-scripts`, `test-scripts`, `all`)
