@@ -29,11 +29,11 @@ updated_at: "2026-05-28T23:10:13Z"
 - Status: `satisfied` for runtime registry/MCP/catalog parity and `just all`; `partial` for legacy delegate removal because compatibility delegates remain preserved.
 - Residual risk: this is not native removal of the legacy scripts, only a conservative closure note on the current state.
 
-## F-17 Catalog Lifecycle Refresh
+## F-17 Catalog Lifecycle Closeout
 
 - Feature: `F-17 Just Command Runner Migration`
 - Accepted child slices:
   - `command-parity-gate-hardening` (`0d9f1cd`, `a13ce65`, `85ce32d`)
   - `bootstrap-template-justfile-wiring` (`6bf1453`, `059c927ee4e32accab85e9c38f594e3cb0f94cc3`)
-- Index state: `docs/arc/SPECS/INDEX.md` now marks both accepted child specs as `final`.
-- Status: `satisfied` for the docs/catalog lifecycle refresh; residual risk is limited to descriptive metadata, not runtime behavior.
+- Index state: `docs/arc/SPECS/INDEX.md` now marks the parent spec and both accepted child specs as `final`.
+- Status: `satisfied` for the docs/catalog lifecycle closeout; residual risk is limited to descriptive metadata, not runtime behavior.

@@ -60,8 +60,8 @@ This folder is the distilled current-state evidence surface for the repository.
 
 ## Lifecycle Snapshot
 
-- `docs/arc/SPECS/INDEX.md` now reflects the accepted F-17 child specs as `final`.
-- `docs/map/CHANGELOG.md` records the F-17 catalog refresh alongside the earlier F-13 closure note.
+- `docs/arc/SPECS/INDEX.md` now reflects the F-17 parent spec and accepted child specs as `final`.
+- `docs/map/CHANGELOG.md` records the F-17 closeout alongside the earlier F-13 closure note.
 
 ## Major Runtime Surfaces
 

@@ -233,11 +233,13 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-17 Just Command Runner Migration
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md
 - Why: keep `just` as the canonical command runner while preserving command
   parity and predictable validation behavior.
+- Closure note: the parent spec is final and the accepted child slices are
+  final.
 - Exit criteria: aggregate validation entrypoints and standards mirrors stay in
   command parity; governed slices close with strict evidence.
 
