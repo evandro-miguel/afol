@@ -19,6 +19,20 @@ Define how to install the `.agents` scaffold into another repository, including:
 - the preferred project-local skill model, where each repo carries its own `.agents/skills` subset instead of depending on many global Codex skills
 - the export source boundary, where the reusable baseline lives under `src/project-template/` in this repo instead of the live development root
 
+## Public onboarding requirements
+
+- Command path: `./.agents/agents` inside the scaffold.
+- Repo path requirement:
+  - provide a normal target directory path such as `/path/to/target-repo`, not a private host path.
+- Mode:
+  - `full`: target is empty or new.
+  - `partial`: target already has live content and you want scaffold adoption only.
+- Validation minimum:
+  - `./a status` (or `./a s`) confirms onboarding command visibility.
+  - `./a v` confirms wrapper/runtime toolchain version surface.
+  - `just --list`
+  - `just --justfile Justfile agents_scaffold::doctor`
+
 ## Modes
 
 ### Full Bootstrap

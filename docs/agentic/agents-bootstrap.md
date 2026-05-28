@@ -54,6 +54,23 @@ When the target repository already exists, bootstrap must behave as an overlay:
 The overlay contract exists so an existing repo can adopt the scaffold without
 losing its own docs, workbench, or local runtime choices.
 
+## Public onboarding and examples
+
+Public distribution entrypoint:
+
+- `full` install command:
+  - `./.agents/agents bootstrap /path/to/target-repo`
+- `partial` install command:
+  - `./.agents/agents bootstrap /path/to/existing-project --partial`
+
+Front-door checks available in all adopted repos:
+
+- `./a` delegates to this wrapper for status and workflow commands.
+- `./a s` (or `./a status`) reports status.
+- `./a v` reports version metadata when supported by the wrapper in that repo.
+- Validate the onboarding result with `just --list` and
+  `just --justfile Justfile agents_scaffold::doctor` (or root `just doctor` equivalent).
+
 Sanitization rule:
 
 - Bootstrap must not leak this scaffold's local workbench sessions, knowledge index content, lesson-entry history, telemetry reports, or the scaffold's live roadmap/spec backlog into the target repository.

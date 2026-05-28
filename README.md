@@ -111,7 +111,12 @@ just doctor
 .agents/agents new update-docs --quick
 ```
 
-### Bootstrap Another Repo
+### Public onboarding (full + partial bootstrap)
+
+Public onboarding has two entrypoints:
+
+- `full`: install this scaffold into a new or mostly empty repository.
+- `partial`: adopt the scaffold into an existing repository while preserving project-owned files by default.
 
 ```bash
 # Full bootstrap for a new or mostly empty repo
@@ -128,6 +133,15 @@ just doctor
 # The exportable project baseline is sourced from `src/project-template/`
 # inside this repo, not from the live development root.
 ```
+
+### Onboarding validation (minimum)
+
+- Validate installation from public examples:
+  - `./a s` (status alias)
+  - `./a status`
+  - `./a v` (version)
+  - `just --list`
+  - `just --justfile Justfile agents_scaffold::doctor`
 
 ### Runtime Entry Points
 

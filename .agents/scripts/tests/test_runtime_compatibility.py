@@ -72,6 +72,45 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("docs/arc/SPECS/INDEX.md", generated_files)
         self.assertNotIn("docs/arc/SPECS", mandatory_dirs)
 
+    def test_public_onboarding_docs_include_full_and_partial_paths(self):
+        docs = {
+            "README": Path("README.md").read_text(encoding="utf-8"),
+            "standards": Path("docs/standards/bootstrap-other-repo.md").read_text(encoding="utf-8"),
+            "agentic": Path("docs/agentic/agents-bootstrap.md").read_text(encoding="utf-8"),
+        }
+
+        self.assertIn("./.agents/agents bootstrap /path/to/target-repo", docs["README"])
+        self.assertIn("./.agents/agents bootstrap /path/to/existing-project --partial", docs["README"])
+        self.assertIn("./a s", docs["README"])
+        self.assertIn("./a v", docs["README"])
+        self.assertIn("just --justfile Justfile agents_scaffold::doctor", docs["README"])
+
+        for doc in docs.values():
+            self.assertIn("public onboarding", doc.lower())
+            self.assertIn("partial", doc.lower())
+            self.assertIn("full", doc.lower())
+            self.assertIn("bootstrap", doc.lower())
+
+        self.assertIn("## Onboarding validation (minimum)", docs["README"])
+        self.assertIn("## Public onboarding requirements", docs["standards"])
+        self.assertIn("## Public onboarding and examples", docs["agentic"])
+
+        self.assertIn("./a status", docs["standards"] + docs["agentic"])
+        self.assertIn("./a status", docs["README"])
+
+    def test_public_onboarding_docs_avoid_private_paths(self):
+        files = [
+            Path("README.md"),
+            Path("docs/standards/bootstrap-other-repo.md"),
+            Path("docs/agentic/agents-bootstrap.md"),
+        ]
+        forbidden = ["/home/ozy", "/Users/", "C:\\", "C:/", "~/.codex"]
+
+        for path in files:
+            content = path.read_text(encoding="utf-8")
+            for marker in forbidden:
+                self.assertNotIn(marker, content)
+
     def test_bootstrap_post_checks_prefer_just_when_available(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
