@@ -222,7 +222,7 @@ def test_undo_rejects_tampered_write_target_outside_repo(scaffold_repo: Path):
     try:
         runtime.undo_last_change()
     except ValueError as exc:
-        assert "target path mismatch" in str(exc)
+        assert "integrity verification failed" in str(exc)
     else:
         raise AssertionError("undo accepted a tampered path outside the repository")
 
@@ -246,7 +246,7 @@ def test_undo_rejects_tampered_write_target_mismatch_inside_repo(scaffold_repo: 
     document["payload"]["existed_before"] = False
     change_file.write_text(json.dumps(document), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="target path mismatch"):
+    with pytest.raises(ValueError, match="integrity verification failed"):
         runtime.undo_last_change()
 
     assert created_target.exists()
@@ -269,7 +269,7 @@ def test_undo_rejects_tampered_backup_path_outside_journal(scaffold_repo: Path):
     try:
         runtime.undo_last_change()
     except ValueError as exc:
-        assert "backup path does not match expected backup target" in str(exc)
+        assert "integrity verification failed" in str(exc)
     else:
         raise AssertionError("undo accepted a tampered backup path outside the journal")
 
@@ -292,7 +292,7 @@ def test_undo_rejects_tampered_archive_destination_outside_repo(scaffold_repo: P
     try:
         runtime.undo_last_change()
     except ValueError as exc:
-        assert "archive target path mismatch" in str(exc)
+        assert "integrity verification failed" in str(exc)
     else:
         raise AssertionError("undo accepted a tampered archive destination outside the repository")
 
@@ -316,7 +316,7 @@ def test_undo_rejects_tampered_move_destination_outside_repo(scaffold_repo: Path
     try:
         runtime.undo_last_change()
     except ValueError as exc:
-        assert "move paths mismatch" in str(exc)
+        assert "integrity verification failed" in str(exc)
     else:
         raise AssertionError("undo accepted tampered move destination outside repository")
 
@@ -345,7 +345,7 @@ def test_undo_rejects_tampered_move_patch_mismatch_before_filesystem_change(scaf
     document["payload"]["destination_path"] = "docs/map/forged-origin.md"
     change_file.write_text(json.dumps(document), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="action mismatch"):
+    with pytest.raises(ValueError, match="integrity verification failed"):
         runtime.undo_last_change()
 
     assert not source.exists()
@@ -373,7 +373,7 @@ def test_undo_rejects_tampered_move_paths_mismatch_inside_repo(scaffold_repo: Pa
     document["payload"]["destination_path"] = "docs/map/forged-origin.md"
     change_file.write_text(json.dumps(document), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="move paths mismatch"):
+    with pytest.raises(ValueError, match="integrity verification failed"):
         runtime.undo_last_change()
 
     assert not source.exists()
@@ -401,7 +401,7 @@ def test_undo_rejects_tampered_backup_swap_before_restore(scaffold_repo: Path):
     latest_document["payload"]["backup_path"] = other_document["payload"]["backup_path"]
     latest_change.write_text(json.dumps(latest_document), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="backup path does not match expected backup target"):
+    with pytest.raises(ValueError, match="integrity verification failed"):
         runtime.undo_last_change()
 
     assert note_a.read_text(encoding="utf-8") == "new-a\n"
@@ -423,7 +423,7 @@ def test_undo_rejects_tampered_archive_target_mismatch_inside_repo(scaffold_repo
     document["payload"]["moves"][0]["original_path"] = "docs/map/keep.md"
     change_file.write_text(json.dumps(document), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="archive target path mismatch"):
+    with pytest.raises(ValueError, match="integrity verification failed"):
         runtime.undo_last_change()
 
     assert not archived_target.exists()
@@ -456,14 +456,14 @@ def test_undo_rejects_tampered_write_target_to_protected_paths(
     document["payload"]["existed_before"] = False
     change_file.write_text(json.dumps(document), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="target path mismatch"):
+    with pytest.raises(ValueError, match="integrity verification failed"):
         runtime.undo_last_change()
 
     assert protected.read_text(encoding="utf-8") == original
     assert target.exists()
 
 
-def test_undo_rejects_legacy_move_entry_missing_mutation_action(scaffold_repo: Path):
+def test_undo_rejects_unsigned_entry_before_filesystem_change(scaffold_repo: Path):
     runtime = AgenticRuntime.from_repo_root(scaffold_repo)
     source = scaffold_repo / "docs" / "agentic" / "move-me.md"
     source.write_text("hello\n", encoding="utf-8")
@@ -473,14 +473,89 @@ def test_undo_rejects_legacy_move_entry_missing_mutation_action(scaffold_repo: P
     assert change_file is not None
 
     document = json.loads(change_file.read_text(encoding="utf-8"))
-    document["record"]["action"] = "patch"
-    document["payload"].pop("mutation_action", None)
+    document.pop("integrity", None)
     change_file.write_text(json.dumps(document), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="move entry missing mutation_action"):
+    with pytest.raises(ValueError, match="integrity metadata is missing"):
         runtime.undo_last_change()
 
     assert (scaffold_repo / "docs" / "map" / "moved.md").exists()
+
+
+def test_undo_rejects_tampered_write_record_targets_and_payload(scaffold_repo: Path):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    created_target = scaffold_repo / "docs" / "agentic" / "new-note.md"
+    forged_target = scaffold_repo / "docs" / "agentic" / "keep-me.md"
+    forged_target.write_text("keep\n", encoding="utf-8")
+
+    runtime.changes.write_text_file("docs/agentic/new-note.md", "# New note\n", reason="create note")
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    document["record"]["target_paths"] = ["docs/agentic/keep-me.md"]
+    document["payload"]["target_path"] = "docs/agentic/keep-me.md"
+    document["payload"]["backup_path"] = ""
+    document["payload"]["existed_before"] = False
+    change_file.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="integrity verification failed"):
+        runtime.undo_last_change()
+
+    assert created_target.exists()
+    assert forged_target.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_undo_rejects_tampered_move_record_targets_and_payload(scaffold_repo: Path):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    source = scaffold_repo / "docs" / "agentic" / "move-me.md"
+    destination = scaffold_repo / "docs" / "map" / "moved.md"
+    forged_source = scaffold_repo / "docs" / "agentic" / "forged-target.md"
+    forged_destination = scaffold_repo / "docs" / "map" / "forged-origin.md"
+    source.write_text("hello\n", encoding="utf-8")
+    forged_source.write_text("keep-source\n", encoding="utf-8")
+    forged_destination.write_text("keep-destination\n", encoding="utf-8")
+
+    runtime.changes.move_path("docs/agentic/move-me.md", "docs/map/moved.md", reason="move")
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    document["record"]["target_paths"] = ["docs/agentic/forged-target.md", "docs/map/forged-origin.md"]
+    document["payload"]["source_path"] = "docs/agentic/forged-target.md"
+    document["payload"]["destination_path"] = "docs/map/forged-origin.md"
+    change_file.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="integrity verification failed"):
+        runtime.undo_last_change()
+
+    assert not source.exists()
+    assert destination.exists()
+    assert forged_source.read_text(encoding="utf-8") == "keep-source\n"
+    assert forged_destination.read_text(encoding="utf-8") == "keep-destination\n"
+
+
+def test_undo_rejects_tampered_archive_record_targets_and_payload(scaffold_repo: Path):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    archived_target = scaffold_repo / "docs" / "map" / "old.md"
+    forged_target = scaffold_repo / "docs" / "map" / "keep.md"
+    archived_target.write_text("old\n", encoding="utf-8")
+    forged_target.write_text("keep\n", encoding="utf-8")
+
+    runtime.changes.archive_paths(["docs/map/old.md"], slug="stale-docs", reason="cleanup")
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    document["record"]["target_paths"] = ["docs/map/keep.md"]
+    document["payload"]["moves"][0]["original_path"] = "docs/map/keep.md"
+    change_file.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="integrity verification failed"):
+        runtime.undo_last_change()
+
+    assert not archived_target.exists()
+    assert forged_target.read_text(encoding="utf-8") == "keep\n"
 
 
 

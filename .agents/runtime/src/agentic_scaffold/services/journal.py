@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import shutil
@@ -43,12 +44,61 @@ class JournalPaths:
     def backups_dir(self) -> Path:
         return self.root / "backups"
 
+    @property
+    def integrity_key_file(self) -> Path:
+        return self.root / "integrity.key"
+
 
 class JournalStore:
     def __init__(self, root: Path) -> None:
         self.paths = JournalPaths(root=root)
         self.paths.entries_dir.mkdir(parents=True, exist_ok=True)
         self.paths.backups_dir.mkdir(parents=True, exist_ok=True)
+        self._integrity_key = self._load_or_create_integrity_key()
+
+    def _load_or_create_integrity_key(self) -> bytes:
+        key_path = self.paths.integrity_key_file
+        key_path.parent.mkdir(parents=True, exist_ok=True)
+        if not key_path.exists():
+            fd = os.open(str(key_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            try:
+                with os.fdopen(fd, "wb") as handle:
+                    handle.write(os.urandom(32))
+            except Exception:
+                key_path.unlink(missing_ok=True)
+                raise
+        try:
+            os.chmod(key_path, 0o600)
+        except PermissionError:
+            pass
+        key = key_path.read_bytes()
+        if len(key) < 32:
+            raise UnsafeJournalPathError("journal integrity key is malformed")
+        return key
+
+    def _integrity_material(self, record: dict, payload: dict) -> dict:
+        return {
+            "change_id": str(record.get("change_id", "")).strip(),
+            "timestamp": str(record.get("created_at", "")).strip(),
+            "record": record,
+            "payload": payload,
+        }
+
+    def _sign_integrity(self, record: dict, payload: dict) -> str:
+        material = self._integrity_material(record, payload)
+        encoded = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hmac.new(self._integrity_key, encoded, hashlib.sha256).hexdigest()
+
+    def _verify_integrity(self, record: dict, payload: dict, integrity: object) -> None:
+        if not isinstance(integrity, dict):
+            raise UnsafeJournalPathError("journal integrity metadata is missing")
+        algorithm = str(integrity.get("algorithm", "")).strip().lower()
+        signature = str(integrity.get("signature", "")).strip().lower()
+        if algorithm != "hmac-sha256" or not signature:
+            raise UnsafeJournalPathError("journal integrity metadata is malformed")
+        expected_signature = self._sign_integrity(record, payload)
+        if not hmac.compare_digest(signature, expected_signature):
+            raise UnsafeJournalPathError("journal integrity verification failed")
 
     def next_change_id(self) -> str:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -56,9 +106,14 @@ class JournalStore:
 
     def record(self, record: ChangeRecord, payload: dict) -> None:
         target = self.paths.entries_dir / f"{record.change_id}.json"
+        record_dump = record.model_dump(mode="json")
         document = {
-            "record": record.model_dump(mode="json"),
+            "record": record_dump,
             "payload": payload,
+            "integrity": {
+                "algorithm": "hmac-sha256",
+                "signature": self._sign_integrity(record_dump, payload),
+            },
         }
         target.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -173,6 +228,7 @@ class JournalStore:
             raise UnsafeJournalPathError("journal record is malformed")
         if not isinstance(payload, dict):
             raise UnsafeJournalPathError("journal payload is malformed")
+        self._verify_integrity(record, payload, data.get("integrity"))
         change_id = str(record.get("change_id", "")).strip()
         if not change_id:
             raise UnsafeJournalPathError("journal record is missing change id")
