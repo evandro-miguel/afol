@@ -4,7 +4,7 @@ description: "Entry point for the generated repository map, including reading or
 doc_kind: "codemap-index"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-28T09:48:25Z"
+updated_at: "2026-05-28T23:10:13Z"
 ---
 
 # Repository Map
@@ -57,6 +57,11 @@ This folder is the distilled current-state evidence surface for the repository.
 ## System Overview
 
 - No concise README system summary was extracted; rely on the domain and architecture docs below.
+
+## Lifecycle Snapshot
+
+- `docs/arc/SPECS/INDEX.md` now reflects the accepted F-17 child specs as `final`.
+- `docs/map/CHANGELOG.md` records the F-17 catalog refresh alongside the earlier F-13 closure note.
 
 ## Major Runtime Surfaces
 

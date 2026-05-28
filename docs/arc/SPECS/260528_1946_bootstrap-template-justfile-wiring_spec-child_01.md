@@ -2,13 +2,13 @@
 doc_type: spec-child
 id: 260528_1946_bootstrap-template-justfile-wiring_spec-child_01
 theme: bootstrap-template-justfile-wiring
-status: draft
+status: final
 owners:
 - orchestrator
 workstream_intent: delivery
 artifact_purpose: Capture the child scope that wires strict Justfile parity into the exported template baseline.
 created_at: '2026-05-28T22:46:34Z'
-updated_at: '2026-05-28T22:46:34Z'
+updated_at: '2026-05-28T20:10:13-03:00'
 roadmap_feature: F-17
 spec_role: child
 parent_spec: 260413_1849_just-command-runner-migration_spec_01
