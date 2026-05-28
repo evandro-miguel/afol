@@ -2,8 +2,8 @@
 doc_type: specs_index
 id: "specs_index"
 status: active
-created_at: "2026-05-21T23:15:06+00:00"
-updated_at: "2026-05-21T23:15:06+00:00"
+created_at: "2026-05-28T19:31:43+00:00"
+updated_at: "2026-05-28T19:31:43+00:00"
 ---
 
 # SPECS INDEX
@@ -18,8 +18,8 @@ updated_at: "2026-05-21T23:15:06+00:00"
 |--------|-------|
 | Total | 53 |
 | Draft | 19 |
-| Active | 33 |
-| Final | 1 |
+| Active | 32 |
+| Final | 2 |
 
 ## Index
 
@@ -52,7 +52,7 @@ updated_at: "2026-05-21T23:15:06+00:00"
 | 260413_1250_project-template-source-separation_spec_01 | project-template-source-separation | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260413_1250_project-template-source-separation_spec-child_01 | project-template-source-separation | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260413_1250_project-template-source-separation_plan_01, task: 260413_1250_project-template-source-separation_task_01, report: 260413_1250_project-template-source-separation_report_01 |
 | 260413_1849_just-command-runner-migration_spec_01 | just-command-runner-migration | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
-| 260415_2121_scripts-cleanup-optimization_spec-child_01 | scripts-cleanup-optimization | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md |
+| 260415_2121_scripts-cleanup-optimization_spec-child_01 | scripts-cleanup-optimization | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1606_scripts-cleanup-optimization/260528_1606_scripts-cleanup-optimization_plan_01.md, task: .agents/wb/260528_1606_scripts-cleanup-optimization/260528_1606_scripts-cleanup-optimization_task_01.md |
 | 260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01 | agent-governance-preflight-and-recurrence-guardrails | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260423_1605_controlled-runtime-flow-benchmarks_spec_01 | controlled-runtime-flow-benchmarks | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260423_1821_runtime-flow-benchmark-runner_spec-child_01 | runtime-flow-benchmark-runner | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
