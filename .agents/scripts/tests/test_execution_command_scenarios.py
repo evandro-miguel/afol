@@ -417,6 +417,62 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             self.assertIsNotNone(next_artifact)
             self.assertEqual(next_artifact["doc_type"], "brainstorm")
 
+    def test_rule_metadata_lookup_by_id_and_name(self):
+        by_id = self.execution_commands.get_rule_metadata("RULE-006")
+        self.assertIsNotNone(by_id)
+        self.assertEqual(by_id["id"], "RULE-006")
+
+        by_name = self.execution_commands.get_rule_metadata("applicable-rule-resolution")
+        self.assertIsNotNone(by_name)
+        self.assertEqual(by_name["id"], "RULE-006")
+
+    def test_resolve_applicable_rules_filters_by_surface_and_work_type(self):
+        resolved = self.execution_commands.resolve_applicable_rules(
+            surfaces=["feature", "validation", "workbench"],
+            work_type="delivery",
+        )
+        ids = [entry["id"] for entry in resolved]
+        self.assertIn("RULE-002", ids)
+        self.assertIn("RULE-004", ids)
+        self.assertIn("RULE-006", ids)
+        self.assertNotIn("RULE-007", ids)
+
+    def test_load_feature_operation_governance_includes_rule_skill_context_payload(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260307_0110_governance-payload"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_plan_file(session_dir)
+            write_task_file(
+                session_dir,
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-11 | in_progress | worker | route rules and skills with payload schema |",
+            )
+            specs_dir = Path(td) / "docs/arc/SPECS"
+            specs_dir.mkdir(parents=True, exist_ok=True)
+            (specs_dir / "scenario-parent.md").write_text(
+                "---\n"
+                "doc_type: spec\n"
+                "id: scenario-parent-spec\n"
+                "---\n\n"
+                "# Scenario Parent Spec\n",
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(self.execution_commands, "WB_DIR", session_dir.parent),
+                mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", session_dir.parent.resolve()),
+                mock.patch.object(self.execution_commands, "SPECS_DIR", specs_dir),
+            ):
+                bundle = self.execution_commands.load_feature_operation_governance(session_dir)
+
+            self.assertIsNotNone(bundle)
+            self.assertIn("rule_skill_context_payload", bundle)
+            payload = bundle["rule_skill_context_payload"]
+            self.assertEqual(payload["schema"]["version"], "1.0.0")
+            self.assertEqual(payload["governance"]["feature_id"], "F-08")
+            self.assertIn("rules", payload)
+            self.assertIn("skills", payload)
+
 
 class ImplementAndReviewScenarioTests(unittest.TestCase):
     @classmethod

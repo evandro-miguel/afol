@@ -203,11 +203,82 @@ STATE_TO_MARKER = {
 }
 FORWARD_STATES = set(STATE_TO_MARKER.keys())
 BLOCKING_STATES = {"problem", "in_progress"}
-FEATURE_OPERATION_RULE_FILES = (
-    ("RULE-002", "RULE-002-workstream-creation.md"),
-    ("RULE-004", "RULE-004-validation-linting.md"),
-    ("RULE-006", "RULE-006-applicable-rule-resolution.md"),
+RULE_METADATA_FILE = RULES_DIR / "index.json"
+FEATURE_OPERATION_SURFACES = ("feature", "workbench", "validation")
+RULE_SKILL_CONTEXT_SCHEMA_VERSION = "1.0.0"
+DEFAULT_RULE_METADATA: Tuple[Dict[str, Any], ...] = (
+    {
+        "id": "RULE-002",
+        "name": "workstream-creation",
+        "path": "RULE-002-workstream-creation.md",
+        "surfaces": ["feature", "workbench", "planning"],
+        "work_types": ["delivery", "implementation"],
+        "priority": 100,
+    },
+    {
+        "id": "RULE-003",
+        "name": "documentation-standards",
+        "path": "RULE-003-documentation-standards.md",
+        "surfaces": ["docs", "documentation"],
+        "work_types": ["delivery", "implementation", "docs"],
+        "priority": 60,
+    },
+    {
+        "id": "RULE-004",
+        "name": "validation-linting",
+        "path": "RULE-004-validation-linting.md",
+        "surfaces": ["validation", "testing", "feature"],
+        "work_types": ["delivery", "implementation", "validation"],
+        "priority": 100,
+    },
+    {
+        "id": "RULE-005",
+        "name": "folder-structure",
+        "path": "RULE-005-folder-structure.md",
+        "surfaces": ["structure", "scaffold"],
+        "work_types": ["delivery", "implementation", "refactor"],
+        "priority": 50,
+    },
+    {
+        "id": "RULE-006",
+        "name": "applicable-rule-resolution",
+        "path": "RULE-006-applicable-rule-resolution.md",
+        "surfaces": ["rules", "routing", "feature", "workbench"],
+        "work_types": ["delivery", "implementation", "routing"],
+        "priority": 100,
+    },
+    {
+        "id": "RULE-007",
+        "name": "postmortem-governance-review",
+        "path": "RULE-007-postmortem-governance-review.md",
+        "surfaces": ["postmortem", "closure", "workbench"],
+        "work_types": ["closure"],
+        "priority": 40,
+    },
 )
+MANDATORY_FEATURE_RULE_IDS = ("RULE-002", "RULE-004", "RULE-006")
+RULE_SKILL_CONTEXT_SCHEMA: Dict[str, Any] = {
+    "version": RULE_SKILL_CONTEXT_SCHEMA_VERSION,
+    "type": "object",
+    "required": ["governance", "routing", "rules", "skills"],
+    "properties": {
+        "governance": {
+            "type": "object",
+            "required": ["session", "feature_id", "parent_spec", "plan_path", "task_path"],
+        },
+        "routing": {
+            "type": "object",
+            "required": ["surfaces", "work_type"],
+        },
+        "rules": {
+            "type": "array",
+        },
+        "skills": {
+            "type": "object",
+            "required": ["selection", "items"],
+        },
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -687,6 +758,203 @@ def _is_governed_workbench_session(session_dir: Path) -> bool:
         return False
 
 
+def _normalize_text_list(value: Any) -> List[str]:
+    if isinstance(value, str):
+        return [value.strip().lower()] if value.strip() else []
+    if not isinstance(value, list):
+        return []
+    result: List[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        normalized = item.strip().lower()
+        if normalized:
+            result.append(normalized)
+    return sorted(set(result))
+
+
+def _normalize_rule_metadata_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(entry, dict):
+        raise ExecutionError("Rule metadata entry must be an object")
+    rule_id = str(entry.get("id", "")).strip().upper()
+    if not rule_id:
+        raise ExecutionError("Rule metadata entry requires id")
+    raw_path = str(entry.get("path", "")).strip()
+    if not raw_path:
+        raise ExecutionError(f"Rule metadata entry '{rule_id}' requires path")
+    rel_path = raw_path if raw_path.startswith(".agents/rules/") else f".agents/rules/{raw_path}"
+    rule_path = (ROOT_DIR / rel_path).resolve()
+    try:
+        rule_path.relative_to(RULES_DIR.resolve())
+    except ValueError as exc:
+        raise ExecutionError(f"Rule metadata path must stay under .agents/rules: {raw_path}") from exc
+    return {
+        "id": rule_id,
+        "name": str(entry.get("name", "")).strip() or rule_id.lower(),
+        "path": relative_to_root(rule_path),
+        "surfaces": _normalize_text_list(entry.get("surfaces")) or ["workbench"],
+        "work_types": _normalize_text_list(entry.get("work_types")) or ["delivery", "implementation"],
+        "priority": int(entry.get("priority", 50)),
+    }
+
+
+def _load_rule_catalog_entries() -> List[Dict[str, Any]]:
+    if RULE_METADATA_FILE.exists():
+        try:
+            raw_data = json.loads(RULE_METADATA_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ExecutionError(f"Could not parse rule metadata catalog: {RULE_METADATA_FILE}") from exc
+        raw_rules = raw_data.get("rules") if isinstance(raw_data, dict) else raw_data
+        if not isinstance(raw_rules, list):
+            raise ExecutionError("Rule metadata catalog must define a rules list")
+        return [_normalize_rule_metadata_entry(entry) for entry in raw_rules]
+    return [_normalize_rule_metadata_entry(entry) for entry in DEFAULT_RULE_METADATA]
+
+
+def list_rule_metadata() -> List[Dict[str, Any]]:
+    return sorted(_load_rule_catalog_entries(), key=lambda item: item["id"])
+
+
+def get_rule_metadata(identifier: str) -> Optional[Dict[str, Any]]:
+    needle = str(identifier or "").strip().lower()
+    if not needle:
+        return None
+    for entry in list_rule_metadata():
+        if entry["id"].lower() == needle or entry["name"].lower() == needle:
+            return entry
+    return None
+
+
+def _task_surface_tags(artifacts: Dict[str, Dict[str, Any]]) -> List[str]:
+    notes = ""
+    task_path = artifacts.get("task", {}).get("path")
+    if isinstance(task_path, str) and task_path.strip():
+        resolved_task = (ROOT_DIR / task_path).resolve()
+        if resolved_task.exists():
+            try:
+                notes = " ".join(row.notes for row in parse_task_rows(resolved_task)).lower()
+            except Exception:
+                notes = ""
+    surfaces = set(FEATURE_OPERATION_SURFACES)
+    if any(token in notes for token in ["skill", "skills-sync", "skills"]):
+        surfaces.add("skills")
+    if any(token in notes for token in ["rule", "rules", "routing"]):
+        surfaces.add("rules")
+    if any(token in notes for token in ["doc", "docs", "spec"]):
+        surfaces.add("documentation")
+    if any(token in notes for token in ["lint", "test", "validate", "verification"]):
+        surfaces.add("testing")
+    return sorted(surfaces)
+
+
+def resolve_applicable_rules(*, surfaces: Iterable[str], work_type: str) -> List[Dict[str, Any]]:
+    wanted_surfaces = {str(item).strip().lower() for item in surfaces if str(item).strip()}
+    normalized_work_type = str(work_type or "delivery").strip().lower() or "delivery"
+    selected: List[Tuple[int, Dict[str, Any]]] = []
+    for entry in list_rule_metadata():
+        entry_surfaces = set(entry["surfaces"])
+        entry_work_types = set(entry["work_types"])
+        surface_match = bool(entry_surfaces & wanted_surfaces)
+        work_type_match = normalized_work_type in entry_work_types or "all" in entry_work_types
+        if not surface_match or not work_type_match:
+            continue
+        score = entry["priority"] + len(entry_surfaces & wanted_surfaces)
+        selected.append((score, entry))
+    selected.sort(key=lambda item: (-item[0], item[1]["id"]))
+    return [item[1] for item in selected]
+
+
+def _available_local_skills() -> List[Dict[str, str]]:
+    skills_root = ROOT_DIR / ".agents" / "skills"
+    if not skills_root.exists():
+        return []
+    items: List[Dict[str, str]] = []
+    for entry in sorted(skills_root.iterdir(), key=lambda path: path.name):
+        if not entry.is_dir():
+            continue
+        skill_file = entry / "SKILL.md"
+        if not skill_file.exists():
+            continue
+        items.append({"name": entry.name, "path": relative_to_root(skill_file)})
+    return items
+
+
+def build_rule_skill_context_payload(
+    *,
+    session: str,
+    feature_id: str,
+    parent_spec: str,
+    child_spec: str,
+    plan_path: str,
+    task_path: str,
+    surfaces: List[str],
+    work_type: str,
+    rules: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    return {
+        "schema": RULE_SKILL_CONTEXT_SCHEMA,
+        "governance": {
+            "session": session,
+            "feature_id": feature_id,
+            "parent_spec": parent_spec,
+            "child_spec": child_spec,
+            "plan_path": plan_path,
+            "task_path": task_path,
+        },
+        "routing": {
+            "surfaces": surfaces,
+            "work_type": work_type,
+        },
+        "rules": [{"id": item["id"], "name": item["name"], "path": item["path"]} for item in rules],
+        "skills": {
+            "selection": "local-installed",
+            "items": _available_local_skills(),
+        },
+    }
+
+
+def _resolve_governance_rules(
+    *,
+    artifacts: Dict[str, Dict[str, Any]],
+    work_type: str,
+) -> Tuple[List[str], List[Dict[str, Any]]]:
+    surfaces = _task_surface_tags(artifacts)
+    resolved_rules = resolve_applicable_rules(surfaces=surfaces, work_type=work_type)
+    mandatory_missing: List[str] = []
+    selected_rules: List[Dict[str, Any]] = []
+    selected_ids = {entry["id"] for entry in resolved_rules}
+
+    for rule_id in MANDATORY_FEATURE_RULE_IDS:
+        if rule_id in selected_ids:
+            continue
+        metadata = get_rule_metadata(rule_id)
+        if metadata is None:
+            mandatory_missing.append(f"{rule_id} (metadata)")
+            continue
+        resolved_rules.append(metadata)
+
+    for entry in sorted(resolved_rules, key=lambda item: item["id"]):
+        rule_path = (ROOT_DIR / entry["path"]).resolve()
+        if not rule_path.exists():
+            mandatory_missing.append(f"{entry['id']} -> {entry['path']}")
+            continue
+        selected_rules.append(
+            {
+                "id": entry["id"],
+                "name": entry["name"],
+                "path": relative_to_root(rule_path),
+                "surfaces": list(entry.get("surfaces", [])),
+            }
+        )
+
+    if mandatory_missing:
+        raise ExecutionError(
+            "Governed feature operations require rule files before execution: "
+            + ", ".join(sorted(set(mandatory_missing)))
+        )
+    return surfaces, selected_rules
+
+
 def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, Any]]:
     """Load the rule/spec bundle that must be visible before feature operations."""
     if not _is_governed_workbench_session(session_dir):
@@ -723,20 +991,23 @@ def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, A
         if child_spec_path is None:
             raise ExecutionError(f"Child spec not found for governed feature operation: {child_spec}")
 
-    rules: List[Dict[str, str]] = []
-    missing_rules: List[str] = []
-    for rule_id, filename in FEATURE_OPERATION_RULE_FILES:
-        rule_path = (RULES_DIR / filename).resolve()
-        if not rule_path.exists():
-            missing_rules.append(filename)
-            continue
-        rules.append({"id": rule_id, "path": relative_to_root(rule_path)})
+    work_type = _session_governance_value(artifacts, "workstream_intent") or "delivery"
+    surfaces, selected_rules = _resolve_governance_rules(
+        artifacts=artifacts,
+        work_type=work_type,
+    )
 
-    if missing_rules:
-        raise ExecutionError(
-            "Governed feature operations require rule files before execution: "
-            + ", ".join(sorted(missing_rules))
-        )
+    payload = build_rule_skill_context_payload(
+        session=session_dir.name,
+        feature_id=feature_id,
+        parent_spec=parent_spec,
+        child_spec=child_spec,
+        plan_path=artifacts["plan"]["path"],
+        task_path=artifacts["task"]["path"],
+        surfaces=surfaces,
+        work_type=work_type,
+        rules=selected_rules,
+    )
 
     return {
         "session": session_dir.name,
@@ -747,7 +1018,10 @@ def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, A
         "child_spec_path": None if child_spec_path is None else relative_to_root(child_spec_path),
         "plan_path": artifacts["plan"]["path"],
         "task_path": artifacts["task"]["path"],
-        "rules": rules,
+        "rule_surfaces": surfaces,
+        "work_type": work_type,
+        "rules": selected_rules,
+        "rule_skill_context_payload": payload,
     }
 
 
