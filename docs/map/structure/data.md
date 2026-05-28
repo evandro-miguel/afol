@@ -1,6 +1,6 @@
 # 🎨 Data Structure
 
-**Generated:** 2026-05-28T19:41:46+00:00
+**Generated:** 2026-05-28T22:28:20+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -9,13 +9,12 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 46 files, 3,809 lines, 338.5 KB
+**Stats:** 45 files, 2,892 lines, 95.3 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/data/telemetry/events.jsonl` | 917 | 243.2 KB | Module; functionality |
 | `.agents/agents.config` | 364 | 9.0 KB | Module; functionality |
 | `src/project-template/.agents/agents.config` | 364 | 9.0 KB | Module; functionality |
 | `.agents/data/benchmarks/results/20260424_141508_runtime-flow-live-agent-v4.json` | 268 | 15.5 KB | Module; functionality |

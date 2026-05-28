@@ -86,6 +86,10 @@ IGNORED_DIRS = {
 IGNORED_PATH_SUFFIXES = {
     ".agents/tools/uv",
 }
+IGNORED_RELATIVE_PATHS = {
+    ".agents/data/telemetry/events.jsonl",
+    "src/project-template/.agents/data/telemetry/events.jsonl",
+}
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 MAP_DIR = get_cfg_path(ROOT_DIR, CONFIG, "map_dir")
@@ -311,7 +315,9 @@ class StructureMapper:
 
             for file in files:
                 file_path = Path(root) / file
-                rel_path = str(file_path.relative_to(self.project_path))
+                rel_path = str(file_path.relative_to(self.project_path)).replace("\\", "/")
+                if rel_path in IGNORED_RELATIVE_PATHS:
+                    continue
                 extension = file_path.suffix.lower()
 
                 # Classify file

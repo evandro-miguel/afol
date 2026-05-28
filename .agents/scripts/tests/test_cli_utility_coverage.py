@@ -364,6 +364,27 @@ def test_structure_mapper_prunes_output_subtree_from_scan_and_cache(tmp_path):
     assert not any(path.startswith("docs/arc/structure/") for path in mapper.cache["files"])
 
 
+def test_structure_mapper_ignores_volatile_telemetry_events(tmp_path):
+    struct = load_module("agents_structure_map_telemetry_events_test", "agents-structure-map.py")
+    project = tmp_path / "project"
+    output = project / "docs" / "map" / "structure"
+    (project / ".agents" / "data" / "telemetry").mkdir(parents=True)
+    (project / "services").mkdir(parents=True)
+    (project / ".agents" / "data" / "telemetry" / "events.jsonl").write_text(
+        "{\"event_type\":\"tool_exec\"}\n",
+        encoding="utf-8",
+    )
+    (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
+
+    mapper = struct.StructureMapper(project, output)
+    sections = mapper.scan_files()
+    collected_paths = {file.relative_path for stats in sections.values() for file in stats.files}
+
+    assert "services/UserService.py" in collected_paths
+    assert ".agents/data/telemetry/events.jsonl" not in collected_paths
+    assert ".agents/data/telemetry/events.jsonl" not in mapper.cache["files"]
+
+
 def test_structure_mapper_idempotent_when_scan_results_unchanged(tmp_path, monkeypatch):
     struct = load_module("agents_structure_map_idempotency_test", "agents-structure-map.py")
     project = tmp_path / "project"
