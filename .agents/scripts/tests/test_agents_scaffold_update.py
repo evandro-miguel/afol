@@ -44,6 +44,36 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
 
+    @staticmethod
+    def _parse_plan_json(output: str) -> dict[str, object]:
+        for line in output.splitlines():
+            if line.startswith("PLAN_JSON: "):
+                return json.loads(line.split("PLAN_JSON: ", 1)[1])
+        raise AssertionError("PLAN_JSON line not found in output")
+
+    def _write_target_baseline(self, module, root: Path, rel_paths: list[str]):
+        managed_hashes: dict[str, str] = {}
+        for rel in rel_paths:
+            target_file = root / ".agents" / rel
+            managed_hashes[rel] = module._sha256_file(target_file)
+
+        manifest_payload = {
+            "version": 1,
+            "kernel": "agentic-cli-ts",
+            "optional": True,
+            "commands": {"status": ["s", "status"]},
+            "managed_hashes": managed_hashes,
+        }
+        lock_payload = {
+            "schema_version": 1,
+            "revision": "e178aaf",
+            "project": "f09-target",
+            "locked": True,
+            "managed_hashes": managed_hashes,
+        }
+        self._write(root / ".agents/manifest.json", json.dumps(manifest_payload, indent=2) + "\n")
+        self._write(root / ".agents/lock.json", json.dumps(lock_payload, indent=2) + "\n")
+
     def _write_channel_metadata(
         self,
         module,
@@ -125,6 +155,7 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
 
             module = self._load_with_root(root)
             self._write_channel_metadata(module, source, match_payload=True)
+            self._write_target_baseline(module, root, ["agents"])
 
             stream = io.StringIO()
             with redirect_stdout(stream):
@@ -133,8 +164,8 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             output = stream.getvalue()
             self.assertIn("SCAFFOLD UPDATE PLAN", output)
-            self.assertIn("update: 1", output)
-            self.assertIn("create: 3", output)
+            self.assertIn("update: 3", output)
+            self.assertIn("create: 1", output)
             self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
             self.assertFalse((root / ".agents/tmp/scaffold-update/staging").exists())
 
@@ -150,6 +181,7 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
 
             module = self._load_with_root(root)
             self._write_channel_metadata(module, source, match_payload=True)
+            self._write_target_baseline(module, root, ["agents"])
 
             stream = io.StringIO()
             with redirect_stdout(stream):
@@ -203,6 +235,7 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
                 source_agents=source_agents,
                 manifest_payload=manifest,
             )
+            self._write_target_baseline(module, root, ["agents"])
 
             stream = io.StringIO()
             with redirect_stdout(stream):
@@ -235,13 +268,11 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
             self._write(source_agents / "scripts/project_owned.py", "managed-project-owned\n")
             self._write(source_agents / "scripts/generated.py", "managed-generated\n")
             self._write(source_agents / "scripts/ignored.py", "managed-ignored\n")
-            self._write(source_agents / "scripts/conflict.py", "managed-conflict\n")
 
             self._write(root / ".agents/agents", "managed-old\n")
             self._write(root / ".agents/scripts/project_owned.py", "user-project-owned\n")
             self._write(root / ".agents/scripts/generated.py", "user-generated\n")
             self._write(root / ".agents/scripts/ignored.py", "user-ignored\n")
-            self._write(root / ".agents/scripts/conflict.py", "user-conflict\n")
 
             module = self._load_with_root(root)
             manifest = {
@@ -253,7 +284,6 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
                     "project-owned": ["scripts/project_owned.py"],
                     "generated": ["scripts/generated.py"],
                     "ignored": ["scripts/ignored.py"],
-                    "conflict": ["scripts/conflict.py"],
                 },
             }
             self._write_channel_metadata(
@@ -263,6 +293,7 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
                 source_agents=source_agents,
                 manifest_payload=manifest,
             )
+            self._write_target_baseline(module, root, ["agents"])
 
             rc = module.main(["--source", str(source), "--channel", "stable", "--apply"])
 
@@ -271,7 +302,6 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
             self.assertEqual((root / ".agents/scripts/project_owned.py").read_text(encoding="utf-8"), "user-project-owned\n")
             self.assertEqual((root / ".agents/scripts/generated.py").read_text(encoding="utf-8"), "user-generated\n")
             self.assertEqual((root / ".agents/scripts/ignored.py").read_text(encoding="utf-8"), "user-ignored\n")
-            self.assertEqual((root / ".agents/scripts/conflict.py").read_text(encoding="utf-8"), "user-conflict\n")
 
             backup_dirs = list((root / ".agents/tmp/scaffold-update/backups").glob("*"))
             self.assertTrue(backup_dirs)
@@ -294,6 +324,7 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
 
             module = self._load_with_root(root)
             self._write_channel_metadata(module, source, match_payload=True)
+            self._write_target_baseline(module, root, ["agents"])
 
             rc = module.main(["--source", str(source), "--channel", "stable", "--apply"])
 
@@ -325,6 +356,7 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
 
             module = self._load_with_root(root)
             self._write_channel_metadata(module, source, match_payload=True, source_agents=template_agents)
+            self._write_target_baseline(module, root, ["agents"])
 
             rc = module.main(["--source", str(source), "--channel", "stable", "--apply"])
 
@@ -412,6 +444,7 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
 
             module = self._load_with_root(root)
             self._write_channel_metadata(module, source, match_payload=True)
+            self._write_target_baseline(module, root, ["agents"])
 
             rc = module.main(
                 [
@@ -473,6 +506,115 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
 
             self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
             self.assertFalse((root / ".agents/tmp/scaffold-update/staging").exists())
+
+    def test_apply_blocks_managed_local_edit_when_target_diverges_from_baseline(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".agents").mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "managed-baseline\n")
+            self._write(source / ".agents/agents", "managed-new\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=True)
+            self._write_target_baseline(module, root, ["agents"])
+            self._write(root / ".agents/agents", "user-edited\n")
+
+            stream = io.StringIO()
+            with redirect_stdout(stream):
+                rc = module.main(["--source", str(source), "--channel", "stable", "--apply"])
+
+            self.assertEqual(rc, 1)
+            self.assertEqual((root / ".agents/agents").read_text(encoding="utf-8"), "user-edited\n")
+            self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
+            plan_json = self._parse_plan_json(stream.getvalue())
+            self.assertEqual(plan_json.get("status"), "conflict")
+            self.assertEqual(plan_json.get("counts", {}).get("local-edit"), 1)
+
+    def test_apply_blocks_managed_update_without_local_baseline_hash(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            (source / ".agents").mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "managed-old\n")
+            self._write(source / ".agents/agents", "managed-new\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=True)
+
+            stream = io.StringIO()
+            with redirect_stdout(stream):
+                rc = module.main(["--source", str(source), "--channel", "stable", "--apply"])
+
+            self.assertEqual(rc, 1)
+            self.assertEqual((root / ".agents/agents").read_text(encoding="utf-8"), "managed-old\n")
+            self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
+            plan_json = self._parse_plan_json(stream.getvalue())
+            self.assertEqual(plan_json.get("status"), "conflict")
+            self.assertEqual(plan_json.get("counts", {}).get("local-edit"), 1)
+
+    def test_apply_aborts_without_changes_when_plan_has_conflict(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            source_agents = source / ".agents"
+            source_agents.mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "managed-old\n")
+            self._write(root / ".agents/scripts/conflict.py", "user-conflict\n")
+            self._write(source_agents / "agents", "managed-new\n")
+            self._write(source_agents / "scripts/conflict.py", "managed-conflict\n")
+            self._write(source_agents / "scripts/new.py", "new-file\n")
+
+            module = self._load_with_root(root)
+            manifest = {
+                "version": 1,
+                "kernel": "agentic-cli-ts",
+                "optional": True,
+                "commands": {"status": ["s", "status"]},
+                "ownership": {
+                    "conflict": ["scripts/conflict.py"],
+                },
+            }
+            self._write_channel_metadata(
+                module,
+                source,
+                match_payload=True,
+                source_agents=source_agents,
+                manifest_payload=manifest,
+            )
+            self._write_target_baseline(module, root, ["agents"])
+
+            stream = io.StringIO()
+            with redirect_stdout(stream):
+                rc = module.main(["--source", str(source), "--channel", "stable", "--apply"])
+
+            self.assertEqual(rc, 1)
+            self.assertEqual((root / ".agents/agents").read_text(encoding="utf-8"), "managed-old\n")
+            self.assertFalse((root / ".agents/scripts/new.py").exists())
+            self.assertFalse((root / ".agents/tmp/scaffold-update/backups").exists())
+            plan_json = self._parse_plan_json(stream.getvalue())
+            self.assertEqual(plan_json.get("status"), "conflict")
+            self.assertEqual(plan_json.get("counts", {}).get("conflict"), 1)
+            self.assertEqual(plan_json.get("mode"), "apply")
+
+    def test_template_manifest_includes_default_ownership_and_hashes(self):
+        manifest_path = Path("src/project-template/.agents/manifest.json").resolve()
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        ownership = payload.get("ownership")
+        self.assertIsInstance(ownership, dict)
+        self.assertTrue(ownership.get("project-owned"))
+        self.assertTrue(ownership.get("generated"))
+        self.assertTrue(ownership.get("ignored"))
+        self.assertTrue(ownership.get("conflict"))
+        managed_hashes = payload.get("managed_hashes")
+        self.assertIsInstance(managed_hashes, dict)
+        self.assertRegex(str(managed_hashes.get("agents", "")), r"^[a-f0-9]{64}$")
 
 
 def uuid4_hex() -> str:

@@ -56,6 +56,7 @@ IGNORED_PAYLOAD_NAMES = {
     "settings.local.json",
 }
 OWNERSHIP_CATEGORIES = ("managed", "project-owned", "generated", "ignored", "conflict")
+BASELINE_HASH_KEYS = ("managed_hashes", "managedHashes", "managed_files", "managedFiles")
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,7 @@ class FileChange:
     target_file: Path
     action: str
     ownership: str
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -129,6 +131,26 @@ def _normalize_path_set(raw: object) -> set[Path]:
         if not normalized:
             continue
         entries.add(Path(normalized))
+    return entries
+
+
+def _normalize_hash_map(raw: object) -> dict[Path, str]:
+    if not isinstance(raw, dict):
+        return {}
+    entries: dict[Path, str] = {}
+    for raw_path, raw_hash in raw.items():
+        if not isinstance(raw_path, str) or not isinstance(raw_hash, str):
+            continue
+        normalized_path = raw_path.strip().strip("/").replace("\\", "/")
+        if not normalized_path:
+            continue
+        rel_path = Path(normalized_path)
+        if rel_path.is_absolute() or ".." in rel_path.parts:
+            continue
+        normalized_hash = raw_hash.strip().lower()
+        if not re.fullmatch(r"[a-f0-9]{64}", normalized_hash):
+            continue
+        entries[rel_path] = normalized_hash
     return entries
 
 
@@ -194,27 +216,86 @@ def _classify_ownership(rel_path: Path, catalog: OwnershipCatalog | None) -> str
     return catalog.category_for(rel_path)
 
 
-def _classify_action(rel_path: Path, ownership: str, source_file: Path, target_file: Path) -> str:
+def _extract_baseline_hashes(payload: dict[str, object]) -> dict[Path, str]:
+    baseline: dict[Path, str] = {}
+    for key in BASELINE_HASH_KEYS:
+        baseline.update(_normalize_hash_map(payload.get(key)))
+    return baseline
+
+
+def _load_local_baseline_hashes() -> dict[Path, str]:
+    baseline: dict[Path, str] = {}
+    for rel_path, label in (
+        (Path("lock.json"), "target .agents/lock.json"),
+        (Path("manifest.json"), "target .agents/manifest.json"),
+    ):
+        path = TARGET_AGENTS_DIR / rel_path
+        if not path.exists():
+            continue
+        try:
+            payload = _load_json_object(path, label=label)
+        except RuntimeError:
+            # Conservative fallback: missing/unreadable baseline means no safe overwrite.
+            continue
+        baseline.update(_extract_baseline_hashes(payload))
+    return baseline
+
+
+def _classify_managed_action(
+    rel_path: Path,
+    source_file: Path,
+    target_file: Path,
+    local_baseline_hashes: dict[Path, str],
+) -> tuple[str, str]:
+    if not target_file.exists():
+        return "create", "managed file missing in target"
+
+    source_hash = _sha256_file(source_file)
+    target_hash = _sha256_file(target_file)
+    if source_hash == target_hash:
+        return "unchanged", "source and target identical"
+    if rel_path in {Path("lock.json"), Path("manifest.json")}:
+        return "update", "managed metadata file update"
+
+    expected_hash = local_baseline_hashes.get(rel_path)
+    if expected_hash is None:
+        return "local-edit", "missing local baseline hash for managed file"
+    if target_hash != expected_hash:
+        return "local-edit", "target hash diverged from local managed baseline"
+    return "update", "managed file matches local baseline and can be updated"
+
+
+def _classify_conflict_action(source_file: Path, target_file: Path) -> tuple[str, str]:
+    if not target_file.exists():
+        return "create", "conflict-owned file missing in target"
+    if _sha256_file(source_file) == _sha256_file(target_file):
+        return "unchanged", "conflict-owned file unchanged"
+    return "conflict", "conflict-owned file diverged and requires manual resolution"
+
+
+def _classify_action(
+    rel_path: Path,
+    ownership: str,
+    source_file: Path,
+    target_file: Path,
+    local_baseline_hashes: dict[Path, str],
+) -> tuple[str, str]:
     if ownership == "managed":
-        if not target_file.exists():
-            return "create"
-        if source_file.read_bytes() == target_file.read_bytes():
-            return "unchanged"
-        return "update"
+        return _classify_managed_action(rel_path, source_file, target_file, local_baseline_hashes)
 
     if ownership == "project-owned":
-        return "preserve-project-owned"
+        return "preserve-project-owned", "manifest ownership=project-owned"
 
     if ownership == "generated":
-        return "skip-generated"
+        return "skip-generated", "manifest ownership=generated"
 
     if ownership == "ignored":
-        return "skip-ignored"
+        return "skip-ignored", "manifest ownership=ignored"
 
     if ownership == "conflict":
-        return "conflict"
+        return _classify_conflict_action(source_file, target_file)
 
-    return "preserve-project-owned"
+    return "preserve-project-owned", "unknown ownership category treated as project-owned"
 
 
 def _validate_rel_path(rel_path: Path):
@@ -291,6 +372,7 @@ def _plan_changes(
     source_agents_dir: Path,
     rel_paths: Iterable[Path],
     ownership_catalog: OwnershipCatalog,
+    local_baseline_hashes: dict[Path, str],
 ) -> List[FileChange]:
     plan: list[FileChange] = []
     for rel_path in rel_paths:
@@ -299,7 +381,13 @@ def _plan_changes(
         _assert_within(TARGET_AGENTS_DIR, target_file, "Target update path")
         _validate_target_entry(target_file)
         ownership = _classify_ownership(rel_path, ownership_catalog)
-        action = _classify_action(rel_path, ownership, source_file, target_file)
+        action, reason = _classify_action(
+            rel_path,
+            ownership,
+            source_file,
+            target_file,
+            local_baseline_hashes,
+        )
 
         plan.append(
             FileChange(
@@ -308,6 +396,7 @@ def _plan_changes(
                 target_file=target_file,
                 action=action,
                 ownership=ownership,
+                reason=reason,
             )
         )
     return plan
@@ -320,7 +409,9 @@ def _print_plan(plan: List[FileChange]):
     preserved_project = [item for item in plan if item.action == "preserve-project-owned"]
     preserved_generated = [item for item in plan if item.action == "skip-generated"]
     preserved_ignored = [item for item in plan if item.action == "skip-ignored"]
+    local_edits = [item for item in plan if item.action == "local-edit"]
     conflicts = [item for item in plan if item.action == "conflict"]
+    blocking = conflicts + local_edits
 
     print("SCAFFOLD UPDATE PLAN")
     print(f"- target: {TARGET_AGENTS_DIR}")
@@ -330,7 +421,8 @@ def _print_plan(plan: List[FileChange]):
     print(f"- preserved-project-owned: {len(preserved_project)}")
     print(f"- preserved-generated: {len(preserved_generated)}")
     print(f"- preserved-ignored: {len(preserved_ignored)}")
-    print(f"- conflict: {len(conflicts)}")
+    print(f"- conflict: {len(blocking)}")
+    print(f"- local-edit: {len(local_edits)}")
 
     for item in creates + updates:
         print(f"  - {item.action}: .agents/{item.rel_path.as_posix()}")
@@ -346,6 +438,37 @@ def _print_plan(plan: List[FileChange]):
 
     for item in conflicts:
         print(f"  - conflict: .agents/{item.rel_path.as_posix()}")
+    for item in local_edits:
+        print(f"  - local-edit: .agents/{item.rel_path.as_posix()} ({item.reason})")
+
+
+def _build_plan_summary(plan: List[FileChange], *, mode: str) -> dict[str, object]:
+    counts: dict[str, int] = {}
+    for item in plan:
+        counts[item.action] = counts.get(item.action, 0) + 1
+
+    blocking = [item for item in plan if item.action in {"conflict", "local-edit"}]
+    return {
+        "mode": mode,
+        "status": "conflict" if blocking else "ok",
+        "counts": counts,
+        "blocking_actions": ["conflict", "local-edit"],
+        "conflicts": [
+            {
+                "path": item.rel_path.as_posix(),
+                "action": item.action,
+                "ownership": item.ownership,
+                "reason": item.reason,
+            }
+            for item in blocking
+        ],
+    }
+
+
+def _emit_plan_summary(plan: List[FileChange], *, mode: str) -> dict[str, object]:
+    payload = _build_plan_summary(plan, mode=mode)
+    print(f"PLAN_JSON: {json.dumps(payload, sort_keys=True)}")
+    return payload
 
 
 def _as_text_lines(path: Path) -> list[str] | None:
@@ -632,6 +755,7 @@ def _write_manifest(
     source_root: Path,
     plan: List[FileChange],
     touched: List[FileChange],
+    plan_summary: dict[str, object],
     payload_sha256: str,
     source_lock: dict[str, object],
     source_manifest: Path,
@@ -650,12 +774,21 @@ def _write_manifest(
         "verifiedPayloadSha256": payload_sha256,
         "metadataFile": str(metadata.metadata_file),
         "source": str(source_root),
+        "status": plan_summary.get("status"),
+        "planSummary": plan_summary,
         "planned_files": [
-            {"path": item.rel_path.as_posix(), "action": item.action}
+            {
+                "path": item.rel_path.as_posix(),
+                "action": item.action,
+                "ownership": item.ownership,
+                "reason": item.reason,
+            }
             for item in plan
-            if item.action in {"create", "update"}
         ],
-        "touched_files": [item.rel_path.as_posix() for item in touched],
+        "touched_files": [
+            {"path": item.rel_path.as_posix(), "action": item.action}
+            for item in touched
+        ],
     }
     manifest_path = backup_dir / "update-manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -739,9 +872,12 @@ def main(argv: list[str] | None = None) -> int:
         label="source .agents/manifest.json",
         required=True,
     )
+    local_baseline_hashes = _load_local_baseline_hashes()
 
-    plan = _plan_changes(source_agents_dir, rel_paths, source_manifest)
+    plan = _plan_changes(source_agents_dir, rel_paths, source_manifest, local_baseline_hashes)
     _print_plan(plan)
+    mode = "apply" if args.apply else "diff" if args.diff_only else "plan" if args.plan_only else "preview"
+    plan_summary = _emit_plan_summary(plan, mode=mode)
 
     if args.diff_only:
         _print_diff(plan)
@@ -751,6 +887,11 @@ def main(argv: list[str] | None = None) -> int:
         if not args.plan_only:
             print("Preview mode only. Re-run with --apply to mutate files.")
         return 0
+
+    blocking = [item for item in plan if item.action in {"conflict", "local-edit"}]
+    if blocking:
+        print("ERROR: conflicts detected in update plan; apply aborted.")
+        return 1
 
     changes = [item for item in plan if item.action in {"create", "update"}]
     if not changes:
@@ -792,6 +933,7 @@ def main(argv: list[str] | None = None) -> int:
         source_repo_root,
         plan,
         touched,
+        plan_summary,
         payload_sha256,
         source_lock,
         source_agents_dir,
