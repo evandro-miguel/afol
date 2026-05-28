@@ -130,16 +130,17 @@ def test_validate_structure_ok(scaffold_repo):
 def test_command_registry_resource_includes_help_manifest(scaffold_repo):
     runtime = AgenticRuntime.from_repo_root(scaffold_repo)
     registry = runtime.command_registry_resource()
-    help_manifest = runtime.registry.help_manifest()
 
     assert registry["available"] is True
     commands = {item["name"]: item for item in registry["commands"]}
     assert commands["benchmark"]["script_name"] == "agents-benchmark.py"
+    assert commands["local-state"]["script_name"] == "agents-local-state.py"
     assert commands["scaffold-update"]["script_name"] == "agents-scaffold-update.py"
     assert commands["wb"]["alias_of"] == "wb-update"
 
-    help_commands = {item["name"]: item for item in help_manifest}
+    help_commands = {item["name"]: item for item in registry["help_commands"]}
     assert "benchmark" in help_commands
+    assert "local-state" in help_commands
     assert "scaffold-update" in help_commands
     assert help_commands["wb-update"]["aliases"] == ["wb"]
 

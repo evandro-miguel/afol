@@ -38,6 +38,7 @@ _PRIMARY_COMMAND_SPECS = (
     ("wb-update", "agents-wb-update.py", "Update workbench metadata and evidence.", ("wb",)),
     ("tools", "agents-tools.py", "Discover and validate tool catalog entries.", ()),
     ("telemetry", "agents-telemetry.py", "Query and record telemetry.", ()),
+    ("local-state", "agents-local-state.py", "Manage local state indexes and append-only event log.", ()),
     ("patterns", "agents-patterns.py", "Discover and apply reusable patterns.", ()),
     ("knowledge", "agents-knowledge.py", "Search and pull reusable workbench knowledge.", ()),
     ("memory", "agents-memory.py", "Emit governed external-memory MCP contracts.", ()),

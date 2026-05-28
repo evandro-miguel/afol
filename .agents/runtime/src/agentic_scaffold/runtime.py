@@ -256,7 +256,11 @@ class AgenticRuntime:
         )
 
     def command_registry_resource(self) -> dict[str, Any]:
-        return {"available": True, "commands": self.registry.manifest()}
+        return {
+            "available": True,
+            "commands": self.registry.manifest(),
+            "help_commands": self.registry.help_manifest(),
+        }
 
     def tool_catalog_resource(self) -> dict[str, Any]:
         path = self.config.repo_root / ".agents" / "tools.json"

@@ -135,6 +135,7 @@ def test_cli_command_registry_manifest(scaffold_repo):
         "status",
         "knowledge",
         "session",
+        "local-state",
         "doctor",
         "benchmark",
         "scaffold-update",

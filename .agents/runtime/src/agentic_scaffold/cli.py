@@ -242,7 +242,6 @@ def command_registry(
     """Show runtime registry commands."""
     runtime = _runtime(repo_root)
     payload = runtime.command_registry_resource()
-    payload["help_commands"] = runtime.registry.help_manifest()
     _emit_json(payload, pretty=pretty)
 
 

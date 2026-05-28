@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import re
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1425,3 +1427,29 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     monkeypatch.setattr(sys, "argv", ["agents-bootstrap.py", str(source), "--dry-run"])
     assert bootstrap.main() == 1
     assert "bootstrap:" in capsys.readouterr().out
+
+
+def test_wrapper_command_map_matches_runtime_registry_payload():
+    repo_root = Path(__file__).resolve().parents[3]
+    wrapper = repo_root / ".agents" / "agents"
+    payload = json.loads(
+        subprocess.run(
+            ["./.agents/agents", "runtime", "command-registry", "--repo-root", str(repo_root)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
+
+    wrapper_text = wrapper.read_text(encoding="utf-8")
+    block_match = re.search(r'declare -A COMMAND_MAP=\((.*?)\n\)', wrapper_text, re.S)
+    assert block_match is not None
+    wrapper_commands = {
+        match.group(1)
+        for match in re.finditer(r'\["([^"]+)"\]="[^"]+"', block_match.group(1))
+    }
+
+    registry_commands = {item["name"] for item in payload["commands"]}
+    assert wrapper_commands == registry_commands
+    assert any(item.get("name") == "local-state" for item in payload["help_commands"])

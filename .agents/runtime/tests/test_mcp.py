@@ -113,9 +113,11 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
     command_registry = json.loads(command_registry_resource.fn())
     assert command_registry["available"] is True
     commands = {item["name"]: item for item in command_registry["commands"]}
-    assert {"status", "knowledge", "session", "doctor", "skills-sync", "verify-tasks"} <= set(commands)
+    assert {"status", "knowledge", "session", "local-state", "doctor", "skills-sync", "verify-tasks"} <= set(commands)
     assert commands["status"]["script_name"] == "agents-status.py"
     assert commands["verify"]["alias_of"] == "verify-tasks"
+    help_commands = {item["name"]: item for item in command_registry["help_commands"]}
+    assert "local-state" in help_commands
 
     adoption_resource = await mcp.get_resource("repo://adoption-plan")
     assert adoption_resource is not None
