@@ -93,12 +93,16 @@ just --justfile Justfile agents_scaffold::doctor
 just --justfile Justfile agents_scaffold::lint
 just --justfile Justfile agents_scaffold::test-scripts
 just --justfile Justfile agents_scaffold::all
+just --justfile Justfile agents_scaffold::all-strict
 ```
 
 If the target repo uses a root `Justfile` that imports scaffold recipes directly
 instead of the default namespaced module wrapper, use the exposed root recipe
 names (`just doctor`, `just lint`, `just test-scripts`, `just agents-all`)
 instead.
+
+For governed closure checks in direct-import setups, use
+`just all-strict` (or `just validate-strict` alias).
 
 For isolated environments, also confirm the wrapper works without `uv` on `PATH`:
 

@@ -29,7 +29,7 @@ Provides:
 
 1. **Named targets** - `just doctor`, `just new`
 2. **Short aliases** - `st`, `ix`, `sy`, `vf`, `dr`
-3. **Composed workflows** - `just all`, `just refresh`
+3. **Composed workflows** - `just all`, `just all-strict`, `just refresh`
 4. **Variables** - `THEME=`, `TASK_ID=`, etc.
 5. **Runtime contract helpers** - command shortcuts for skills, optional external memory, and the central agentic runtime
 
@@ -76,6 +76,9 @@ just lint-runtime # Lint central runtime package
 just test-runtime # Run central runtime tests
 just runtime-mcp-smoke # Smoke runtime and MCP CLIs
 just all          # Full validation
+just all-strict   # Full validation + diff-check + strict session verify (if active)
+just validate-strict # Alias to all-strict
+just diff-check   # Patch whitespace check (`git diff --check`)
 ```
 
 Runtime setup uses the checked-in `.agents/runtime/uv.lock` through

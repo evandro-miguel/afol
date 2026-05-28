@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-05-28T22:19:22+00:00"
+updated_at: "2026-05-28T22:49:11+00:00"
 ---
 
 # SPECS INDEX
@@ -16,8 +16,8 @@ updated_at: "2026-05-28T22:19:22+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 57 |
-| Draft | 20 |
+| Total | 58 |
+| Draft | 21 |
 | Active | 32 |
 | Final | 5 |
 
@@ -82,6 +82,7 @@ updated_at: "2026-05-28T22:19:22+00:00"
 | 260528_1745_runtime-registry-parity_spec-child_01 | runtime-registry-parity | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_plan_01.md, task: .agents/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_task_01.md |
 | 260528_1759_python-command-simplification_spec-child_01 | python-command-simplification | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1759_python-command-simplification/260528_1759_python-command-simplification_plan_01.md, task: .agents/wb/260528_1759_python-command-simplification/260528_1759_python-command-simplification_task_01.md |
 | 260528_1913_command-parity-gate-hardening_spec-child_01 | command-parity-gate-hardening | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260528_1913_command-parity-gate-hardening_plan_01, task: 260528_1913_command-parity-gate-hardening_task_01 |
+| 260528_1946_bootstrap-template-justfile-wiring_spec-child_01 | bootstrap-template-justfile-wiring | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260528_1946_bootstrap-template-justfile-wiring_plan_01, task: 260528_1946_bootstrap-template-justfile-wiring_task_01 |
 
 <!-- markdownlint-enable MD013 MD060 -->
 
