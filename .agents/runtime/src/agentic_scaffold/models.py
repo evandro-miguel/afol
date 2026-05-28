@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -37,6 +37,24 @@ class SearchResponse(BaseModel):
     searched_roots: list[str]
     total_candidates: int
     hits: list[SearchHit]
+
+
+class ActionSpec(BaseModel):
+    action_id: str
+    cli_command: str
+    mcp_tool: str
+    description: str
+    side_effect: Literal["read", "write", "mixed", "none"] = "read"
+    required_guards: list[str] = Field(default_factory=list)
+
+
+class ActionResult(BaseModel):
+    status: Literal["ok", "error"]
+    message: str
+    payload: Any
+    touched_paths: list[str] = Field(default_factory=list)
+    mutation_id: str | None = None
+    next_step_hint: str | None = None
 
 
 class ValidationIssue(BaseModel):

@@ -23,7 +23,7 @@ def _emit_json(payload: object, pretty: bool = False) -> None:
 
 @app.command()
 def inspect(
-    depth: int = typer.Option(3, min=0, max=8),
+    depth: int = 3,
     include_hidden: bool = False,
     include_generated: bool = False,
     max_entries: int = typer.Option(500, min=50, max=5000),
@@ -31,13 +31,30 @@ def inspect(
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Inspect the workspace tree."""
-    result = _runtime(repo_root).workspace.inspect(
+    result = _runtime(repo_root).run_action(
+        "inspect",
         depth=depth,
         include_hidden=include_hidden,
         include_generated=include_generated,
         max_entries=max_entries,
     )
-    _emit_json(result.model_dump(mode="json"), pretty=pretty)
+    if result.status == "error":
+        _emit_json({"status": result.status, "message": result.message}, pretty=pretty)
+        raise typer.Exit(code=1)
+    _emit_json(result.payload, pretty=pretty)
+
+
+@app.command()
+def health(
+    pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
+    repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
+) -> None:
+    """Run minimal runtime health checks."""
+    result = _runtime(repo_root).run_action("health")
+    if result.status == "error":
+        _emit_json({"status": result.status, "message": result.message, "payload": result.payload}, pretty=pretty)
+        raise typer.Exit(code=1)
+    _emit_json(result.payload, pretty=pretty)
 
 
 @app.command()

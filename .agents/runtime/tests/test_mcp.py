@@ -37,6 +37,7 @@ async def test_mcp_lists_tools_resources_and_prompts(scaffold_repo):
             "search_docs",
             "validate_structure",
             "generate_manifest",
+            "runtime_health",
             "inspect_target_scaffold",
             "plan_scaffold_update",
             "archive_paths",
@@ -119,6 +120,22 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
     adoption_payload = json.loads(adoption_resource.fn())
     assert adoption_payload["repo_root"] == str(scaffold_repo)
     assert "benchmark" in {action["kind"] for action in adoption_payload["actions"]}
+
+
+async def test_mcp_runtime_health_smoke(scaffold_repo):
+    _Client, build_mcp = _require_mcp_runtime()
+    mcp = build_mcp(scaffold_repo)
+
+    health_tool = await mcp.get_tool("runtime_health")
+    assert health_tool is not None
+    health_payload = health_tool.fn()
+    assert isinstance(health_payload, dict)
+    assert health_payload["status"] == "healthy"
+    checks = health_payload["checks"]
+    assert checks["runtime_root"] == str(scaffold_repo)
+    assert checks["command_registry"]["required_available"] is True
+    assert checks["tool_catalog"]["available"] is True
+    assert "AGENTIC_REPO_ROOT" not in str(health_payload)
 
 
 async def test_mcp_inspect_workspace_rejects_invalid_depth(scaffold_repo):

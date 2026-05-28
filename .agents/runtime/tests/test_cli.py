@@ -6,6 +6,7 @@ import sys
 from typer.testing import CliRunner
 
 from agentic_scaffold.cli import app
+from agentic_scaffold.runtime import AgenticRuntime
 
 runner = CliRunner()
 
@@ -33,6 +34,38 @@ def test_cli_validate(scaffold_repo):
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["ok"] is True
+
+
+def test_cli_inspect_matches_core_action(scaffold_repo):
+    result = runner.invoke(
+        app,
+        ["inspect", "--depth", "2", "--max-entries", "60", "--repo-root", str(scaffold_repo)],
+    )
+    assert result.exit_code == 0
+
+    cli_payload = json.loads(result.stdout)
+    assert cli_payload["max_depth"] == 2
+
+    core_payload = AgenticRuntime.from_repo_root(scaffold_repo).run_action("inspect", depth=2, max_entries=60)
+    assert core_payload.status == "ok"
+    assert cli_payload["max_depth"] == core_payload.payload["max_depth"]
+
+
+def test_cli_inspect_invalid_depth_returns_action_error(scaffold_repo):
+    result = runner.invoke(app, ["inspect", "--depth", "99", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert payload["message"] == "depth must be between 0 and 10"
+
+
+def test_cli_health(scaffold_repo):
+    result = runner.invoke(app, ["health", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "healthy"
+    assert payload["checks"]["command_registry"]["required_available"] is True
+    assert "required" in payload["checks"]["command_registry"]
 
 
 def test_cli_adoption_plan(scaffold_repo):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
@@ -14,7 +15,6 @@ from agentic_scaffold.models import (
     SearchResponse,
     UndoResult,
     ValidationReport,
-    WorkspaceSummary,
 )
 from agentic_scaffold.runtime import AgenticRuntime
 
@@ -49,17 +49,26 @@ def _register_tools(mcp: FastMCP, runtime: AgenticRuntime) -> None:
         include_hidden: bool = False,
         include_generated: bool = False,
         max_entries: int = 500,
-    ) -> WorkspaceSummary:
-        if depth < 0 or depth > 10:
-            raise ValueError("depth must be between 0 and 10")
-        if max_entries < 1 or max_entries > 5000:
-            raise ValueError("max_entries must be between 1 and 5000")
-        return runtime.workspace.inspect(
+    ) -> dict[str, Any]:
+        result = runtime.run_action(
+            "inspect",
             depth=depth,
             include_hidden=include_hidden,
             include_generated=include_generated,
             max_entries=max_entries,
         )
+        if result.status != "ok":
+            raise ValueError(result.message)
+        return result.payload
+
+    @mcp.tool(description="Inspect the repository with minimal health and registration checks.")
+    def runtime_health() -> dict[str, Any]:
+        result = runtime.run_action("health")
+        if result.status != "ok":
+            raise ValueError(result.message)
+        if isinstance(result.payload, dict):
+            return result.payload
+        raise ValueError("runtime health returned malformed payload")
 
     @mcp.tool(description="Search markdown docs, workbench artifacts, map docs, and skills with fuzzy ranking.")
     def search_docs(query: str, limit: int = 8) -> SearchResponse:
