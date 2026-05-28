@@ -194,6 +194,18 @@ class ReviewScopeTests(unittest.TestCase):
             result = self.review.cmd_scope(session_dir, "all")
         self.assertEqual(result, 0)
 
+    def test_run_verify_tasks_uses_strict_flag(self):
+        """run_verify_tasks always calls verify-tasks with --strict."""
+        session_dir = Path("/tmp/session")
+        completed = mock.Mock(returncode=0, stdout="ok", stderr="")
+        with mock.patch.object(self.review.subprocess, "run", return_value=completed) as run_mock:
+            code, out, err = self.review.run_verify_tasks(session_dir)
+        cmd = run_mock.call_args.args[0]
+        self.assertIn("--strict", cmd)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "ok")
+        self.assertEqual(err, "")
+
 
 class ReviewMainTests(unittest.TestCase):
     @classmethod

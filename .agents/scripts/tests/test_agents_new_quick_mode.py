@@ -329,8 +329,10 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual(
             replacements["<report_doc_id_or_empty>"],
-            "260306_2002_execution-intelligence-system-api-cleanup_report_01",
+            "",
         )
+        self.assertEqual(replacements["<brainstorm_doc_id_or_empty>"], "")
+        self.assertEqual(replacements["<required|not_required>"], "not_required")
         self.assertEqual(replacements["<workstream_intent>"], "research")
 
     def test_iter_workstream_artifacts_uses_intent_policy(self):
@@ -385,7 +387,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["doc_type"] for entry in delivery_with_spec],
-            ["plan", "task", "spec"],
+            ["plan", "task", "spec", "log", "report"],
         )
 
         research_only = agents_new._iter_workstream_artifacts(

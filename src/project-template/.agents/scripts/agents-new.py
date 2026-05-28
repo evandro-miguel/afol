@@ -544,9 +544,16 @@ def _build_template_replacements(session_id: str, args: Dict[str, object]) -> Di
         "<roadmap_path>": f"docs/arc/{ROADMAP_FILE.name}",
         "<spec_role>": "workstream",
         "<workstream_intent>": str(args.get("intent") or DEFAULT_WORKSTREAM_INTENT),
+        "<required|not_required>": "not_required",
     }
+    selected_doc_types = set(_ordered_selected_doc_types(args))
     for doc_type, placeholder in WORKFLOW_ARTIFACT_DOC_PLACEHOLDERS.items():
-        replacements[placeholder] = _artifact_doc_id(doc_prefix, doc_type)
+        artifact_id = _artifact_doc_id(doc_prefix, doc_type)
+        replacements[placeholder] = artifact_id
+        # Compatibility alias used by current templates and historical docs.
+        replacements[f"<{doc_type.replace('-', '_')}_doc_id_or_empty>"] = (
+            artifact_id if doc_type in selected_doc_types else ""
+        )
     return replacements
 
 
@@ -584,6 +591,8 @@ def _ordered_selected_doc_types(args: Dict[str, object]) -> list[str]:
     selected.extend(_normalize_doc_type_alias(str(doc_type)) for doc_type in args.get("with_artifacts") or [])
 
     selected_set = {doc_type for doc_type in selected if doc_type in VALID_ARTIFACT_DOC_TYPES}
+    if intent == "delivery" and not args.get("plan_only"):
+        selected_set.update({"log", "report"})
     if args.get("use_spec"):
         selected_set.discard("spec-child")
         selected_set.discard("spec-lite")
