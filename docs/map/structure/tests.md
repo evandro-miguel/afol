@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-05-28T22:59:14+00:00
+**Generated:** 2026-05-28T23:31:42+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 165 files, 35,805 lines, 1718.8 KB
+**Stats:** 166 files, 35,863 lines, 1721.3 KB
 
 ### Files
 
@@ -147,10 +147,11 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_lint_state_board.py` | 58 | 2.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_lint_state_board.py` | 58 | 2.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260528_1913_command-parity-gate-hardening_spec-child_01.md` | 58 | 2.5 KB | Module; functionality |
+| `docs/arc/SPECS/260528_2022_runtime-mirror-cleanup_spec-child_01.md` | 58 | 2.5 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0000_total-reformulation-strategy_spec_01.md` | 55 | 2.1 KB | Module; functionality |
 | `src/project-template/.agents/scripts/tests/test_front_door_a.py` | 54 | 2.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260521_0040_governance-workbench-system_spec_01.md` | 53 | 2.0 KB | Module; functionality |
-| `docs/arc/SPECS/260528_1946_bootstrap-template-justfile-wiring_spec-child_01.md` | 53 | 2.3 KB | Module; functionality |
+| `docs/arc/SPECS/260528_1946_bootstrap-template-justfile-wiring_spec-child_01.md` | 53 | 2.4 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0120_public-distribution-and-onboarding_spec_01.md` | 52 | 2.1 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0090_template-update-and-versioning_spec_01.md` | 52 | 2.0 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0050_smart-rules-and-skills-routing_spec_01.md` | 52 | 2.0 KB | Module; functionality |
