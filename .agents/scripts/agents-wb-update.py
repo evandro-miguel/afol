@@ -515,7 +515,10 @@ def ensure_artifact(
         raise ValueError(f"Cannot ensure unsupported artifact type: {doc_type}")
     existing = doc_files(session_dir, doc_type)
     if existing:
-        return existing[-1]
+        target = existing[-1]
+        if doc_type in SIDECAR_DOC_TYPES:
+            validate_sidecar_justification(target)
+        return target
 
     if doc_type in SIDECAR_DOC_TYPES:
         missing = [
@@ -558,6 +561,8 @@ def ensure_artifact(
         write_frontmatter(target, fm, body)
     else:
         target.write_text(rendered)
+    if doc_type in SIDECAR_DOC_TYPES:
+        validate_sidecar_justification(target)
     return target
 
 

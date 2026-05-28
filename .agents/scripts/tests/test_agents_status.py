@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -51,9 +52,15 @@ class StatusTests(unittest.TestCase):
             args = self.status.parse_args()
             self.assertEqual(args.format, "text")
 
+    def test_parse_args_supports_details_alias(self):
+        """parse_args must support the explicit detailed text flag."""
+        with mock.patch.object(sys, "argv", ["agents-status.py", "--details"]):
+            args = self.status.parse_args()
+        self.assertTrue(args.legacy)
+
     def test_main_returns_int_exit_code(self):
         """main must return an integer exit code."""
-        mock_args = mock.Mock(session=None, json=False, pretty=False, artifact=[], check_context=False)
+        mock_args = mock.Mock(session=None, json=False, pretty=False, artifact=[], check_context=False, legacy=False)
         with mock.patch.object(self.status, "parse_args", return_value=mock_args), \
              mock.patch.object(self.status, "find_session", return_value=Path("/tmp/s")), \
              mock.patch.object(self.status, "summarize_session", return_value={"session": "s"}), \
@@ -101,22 +108,24 @@ class PrintStatusTests(unittest.TestCase):
         output = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
         self.assertIn("STATUS:", output)
         self.assertIn("TASK:", output)
-        self.assertIn("session:", output)
+        self.assertIn("FILES_WRITTEN:", output)
         self.assertIn("260401_1200_test", output)
-        self.assertIn("F-01", output)
-        self.assertIn("ready", output)
+        self.assertIn("session=260401_1200_test", output)
+        self.assertNotIn("session:", output)
+        self.assertNotIn("workflow_artifacts:", output)
+        self.assertNotIn("artifacts:", output)
 
     def test_print_status_with_missing_context(self):
         data = self._sample_data(missing_context=["roadmap", "product"])
         with mock.patch("builtins.print") as mock_print:
-            self.status.print_status(data)
+            self.status.print_status(data, legacy=True)
         output = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
         self.assertIn("roadmap", output)
 
     def test_print_status_with_blocked_tasks(self):
         data = self._sample_data(blocked_tasks=["T-03 blocked by X"])
         with mock.patch("builtins.print") as mock_print:
-            self.status.print_status(data)
+            self.status.print_status(data, legacy=True)
         output = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
         self.assertIn("blocked_tasks", output)
 
@@ -133,10 +142,29 @@ class PrintStatusTests(unittest.TestCase):
             ]
         )
         with mock.patch("builtins.print") as mock_print:
-            self.status.print_status(data)
+            self.status.print_status(data, legacy=True)
         output = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
         self.assertIn("brainstorm", output)
         self.assertIn("dep-X", output)
+
+    def test_print_status_legacy_includes_raw_dump(self):
+        data = self._sample_data(
+            workflow_artifacts=[
+                {
+                    "doc_type": "brainstorm",
+                    "state": "invalid",
+                    "status": "active",
+                    "blockers": ["dep-X"],
+                    "utility": {"reasons": ["not useful"]},
+                }
+            ]
+        )
+        with mock.patch("builtins.print") as mock_print:
+            self.status.print_status(data, legacy=True)
+        output = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
+        self.assertIn("session:", output)
+        self.assertIn("workflow_artifacts:", output)
+        self.assertIn("artifacts:", output)
 
     def test_print_status_with_next_task(self):
         data = self._sample_data(tasks={"done": 0, "total": 1, "remaining": 1, "next": "T-01 pending"})
@@ -288,7 +316,7 @@ class MainPathTests(unittest.TestCase):
         cls.status = load_module("agents_status_main_tests", SCRIPT_PATH)
 
     def test_main_json_output(self):
-        mock_args = mock.Mock(session=None, json=True, pretty=False, artifact=None, check_context=False)
+        mock_args = mock.Mock(session=None, json=True, pretty=False, artifact=None, check_context=False, legacy=False)
         with mock.patch.object(self.status, "parse_args", return_value=mock_args), \
              mock.patch.object(self.status, "find_session", return_value=Path("/tmp/s")), \
              mock.patch.object(
@@ -305,7 +333,7 @@ class MainPathTests(unittest.TestCase):
         self.assertNotIn("\n", rendered)
 
     def test_main_artifact_resolution(self):
-        mock_args = mock.Mock(session=None, json=False, pretty=False, artifact=["task", "plan"], check_context=False)
+        mock_args = mock.Mock(session=None, json=False, pretty=False, artifact=["task", "plan"], check_context=False, legacy=False)
         with mock.patch.object(self.status, "parse_args", return_value=mock_args), \
              mock.patch.object(self.status, "find_session", return_value=Path("/tmp/s")), \
              mock.patch.object(self.status, "resolve_artifact", side_effect=[Path("task.md"), Path("plan.md")]):
@@ -314,7 +342,7 @@ class MainPathTests(unittest.TestCase):
         self.assertEqual(result, 0)
 
     def test_main_error_path(self):
-        mock_args = mock.Mock(session=None, json=False, pretty=False, artifact=None, check_context=False)
+        mock_args = mock.Mock(session=None, json=False, pretty=False, artifact=None, check_context=False, legacy=False)
         with mock.patch.object(self.status, "parse_args", return_value=mock_args), \
              mock.patch.object(self.status, "find_session", side_effect=self.status.ExecutionError("not found")):
             with mock.patch("builtins.print"):

@@ -565,6 +565,39 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             )
             wb_update.validate_sidecar_justification(sidecar)
 
+    def test_cmd_ensure_existing_invalid_sidecar_raises(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_ensure_existing_invalid_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_ensure-invalid-sidecar"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
+            sidecar = session_dir / "260224_0000_ensure-invalid-sidecar_research_01.md"
+            sidecar.write_text(
+                "---\n"
+                "doc_type: research\n"
+                "status: active\n"
+                "sidecar_justification: required\n"
+                "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
+                "---\n\n"
+                "# Research\n",
+                encoding="utf-8",
+            )
+
+            args = argparse.Namespace(
+                session=str(session_dir),
+                file="research",
+                task_id="T-02",
+                blocking_question="Which validator must own prewrite checks?",
+                decision_produced="Reuse shared task_integrity helpers.",
+                stop_condition="Validator API selected and covered by tests.",
+                json=False,
+            )
+            with self.assertRaises(ValueError):
+                wb_update.cmd_ensure(args)
+
     def test_cmd_ensure_sidecar_json_compact_output(self):
         script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
         sys.path.insert(0, str(script_path.parent))

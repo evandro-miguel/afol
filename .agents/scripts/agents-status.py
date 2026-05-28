@@ -77,7 +77,7 @@ def _build_compact_handoff(
     }
 
 
-def print_status(data: Dict[str, object]) -> None:
+def print_status(data: Dict[str, object], legacy: bool = False) -> None:
     compact = data.get("compact_handoff", {})
     if not isinstance(compact, dict) or not compact:
         compact = _build_compact_handoff(
@@ -107,21 +107,24 @@ def print_status(data: Dict[str, object]) -> None:
         for line in compact.get("NEXT", []):
             print(f"- {line}")
 
-    print(f"session: {data['session']}")
-    print(f"ready_state: {data['ready_state']} context_ready={data['context_ready']} roadmap_feature={data['roadmap_feature']}")
+    if legacy:
+        print(f"session: {data['session']}")
+        print(
+            f"ready_state: {data['ready_state']} context_ready={data['context_ready']} roadmap_feature={data['roadmap_feature']}"
+        )
 
-    _print_missing_context(data["missing_context"])
+        _print_missing_context(data["missing_context"])
 
-    tasks = data["tasks"]
-    print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
-    if tasks['next']:
-        print(f"next_task: {tasks['next']}")
-    if data["ready_state"] != "complete" and data["workflow_next"]:
-        print(f"next_artifact: {data['workflow_next']}")
-    _print_blocked_tasks(data["blocked_tasks"])
+        tasks = data["tasks"]
+        print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
+        if tasks['next']:
+            print(f"next_task: {tasks['next']}")
+        if data["ready_state"] != "complete" and data["workflow_next"]:
+            print(f"next_artifact: {data['workflow_next']}")
+        _print_blocked_tasks(data["blocked_tasks"])
 
-    _print_workflow_artifacts(data["workflow_artifacts"])
-    _print_artifacts(data["artifacts"])
+        _print_workflow_artifacts(data["workflow_artifacts"])
+        _print_artifacts(data["artifacts"])
 
 
 def _print_missing_context(missing_context) -> None:
@@ -266,6 +269,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--session", help="Session id/path (default: active session)")
     parser.add_argument("--json", action="store_true", help="Emit JSON payload (compact by default)")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output (requires --json)")
+    parser.add_argument("--legacy", "--details", dest="legacy", action="store_true", help="Emit legacy detailed text output")
     parser.add_argument("--artifact", action="append", help="Resolve a logical artifact name")
     parser.add_argument("--check-context", action="store_true", help="Include missing context details")
     return parser.parse_args()
@@ -296,7 +300,7 @@ def main() -> int:
     if args.json:
         print(to_json_text(payload, pretty=args.pretty, sort_keys=True))
     else:
-        print_status(payload)
+        print_status(payload, legacy=args.legacy)
 
     return 0
 
