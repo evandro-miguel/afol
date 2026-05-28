@@ -198,6 +198,17 @@ The Bun/TypeScript reformulation must be staged:
 - Exit criteria: public install path; simple first-run onboarding; minimal
   docs; examples; private assumptions removed.
 
+### F-13 Agentic Runtime Restructure
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260411_agentic-runtime-restructure_spec_01.md
+- Why: Runtime command/help surfaces, MCP parity, and tool catalog alignment
+  must remain consistent while runtime code is restructured.
+- Exit criteria: runtime source-of-truth drives command/help parity; MCP smoke
+  and parity checks stay green; tool catalog/docs align with real gates and
+  command surface.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command
