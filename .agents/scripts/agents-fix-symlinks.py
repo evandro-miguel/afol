@@ -136,11 +136,12 @@ def _enforce_copy_mode(src: Path, target: Path, dry_run: bool, force: bool) -> i
     return 0
 
 
-def _auto_from_symlink(src: Path, target: Path, link_target: str, dry_run: bool, force: bool) -> int:
-    if not force:
-        print("- skip: symlink mismatch (use --force to fix)")
-        return 1
-    remove_target(target, dry_run)
+def _create_symlink_or_replicate(
+    src: Path,
+    target: Path,
+    link_target: str,
+    dry_run: bool,
+) -> int:
     try:
         create_symlink(link_target, target, dry_run)
         return 0
@@ -148,6 +149,14 @@ def _auto_from_symlink(src: Path, target: Path, link_target: str, dry_run: bool,
         print(f"- warn: symlink create failed ({exc}); fallback to replicate")
         replicate_dir(src, target, dry_run)
         return 0
+
+
+def _auto_from_symlink(src: Path, target: Path, link_target: str, dry_run: bool, force: bool) -> int:
+    if not force:
+        print("- skip: symlink mismatch (use --force to fix)")
+        return 1
+    remove_target(target, dry_run)
+    return _create_symlink_or_replicate(src, target, link_target, dry_run)
 
 
 def _auto_from_existing_target(src: Path, target: Path, dry_run: bool, force: bool) -> int:
@@ -161,13 +170,7 @@ def _auto_from_existing_target(src: Path, target: Path, dry_run: bool, force: bo
 
 
 def _auto_from_missing_target(src: Path, target: Path, link_target: str, dry_run: bool) -> int:
-    try:
-        create_symlink(link_target, target, dry_run)
-        return 0
-    except OSError as exc:
-        print(f"- warn: symlink create failed ({exc}); fallback to replicate")
-        replicate_dir(src, target, dry_run)
-        return 0
+    return _create_symlink_or_replicate(src, target, link_target, dry_run)
 
 
 def process_mapping(

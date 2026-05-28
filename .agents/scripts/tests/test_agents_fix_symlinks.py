@@ -153,6 +153,28 @@ class SymlinkHelperTests(unittest.TestCase):
                 self.fsl.create_symlink("src", target, dry_run=True)
             self.assertFalse(target.exists())
 
+    def test_create_symlink_or_replicate_symlink_success(self):
+        """_create_symlink_or_replicate returns success when symlink succeeds."""
+        src = Path("/tmp/src")
+        target = Path("/tmp/target")
+        with mock.patch.object(self.fsl, "create_symlink") as mock_symlink, \
+             mock.patch.object(self.fsl, "replicate_dir") as mock_replicate:
+            result = self.fsl._create_symlink_or_replicate(src, target, "src", dry_run=False)
+        self.assertEqual(result, 0)
+        mock_symlink.assert_called_once_with("src", target, False)
+        mock_replicate.assert_not_called()
+
+    def test_create_symlink_or_replicate_fallback_on_error(self):
+        """_create_symlink_or_replicate falls back to replicate on OSError."""
+        src = Path("/tmp/src")
+        target = Path("/tmp/target")
+        with mock.patch.object(self.fsl, "create_symlink", side_effect=OSError("no symlink")), \
+             mock.patch.object(self.fsl, "replicate_dir") as mock_replicate, \
+             mock.patch("builtins.print"):
+            result = self.fsl._create_symlink_or_replicate(src, target, "src", dry_run=False)
+        self.assertEqual(result, 0)
+        mock_replicate.assert_called_once_with(src, target, False)
+
 
 class SymlinkProcessMappingTests(unittest.TestCase):
     @classmethod
