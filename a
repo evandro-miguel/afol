@@ -2,7 +2,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${SCRIPT_DIR}/cli/main.ts" ]; then
+  KERNEL_SCRIPT="${SCRIPT_DIR}/cli/main.ts"
+elif [ -f "${SCRIPT_DIR}/../cli/main.ts" ]; then
+  KERNEL_SCRIPT="${SCRIPT_DIR}/../cli/main.ts"
+else
+  KERNEL_SCRIPT=""
+fi
 AGENTS_WRAPPER="${SCRIPT_DIR}/.agents/agents"
+
+if [ -n "${KERNEL_SCRIPT}" ] && command -v bun >/dev/null 2>&1; then
+  exec bun "${KERNEL_SCRIPT}" "$@"
+fi
 
 if [ ! -x "${AGENTS_WRAPPER}" ]; then
   echo "❌ Missing executable wrapper: ${AGENTS_WRAPPER}" >&2

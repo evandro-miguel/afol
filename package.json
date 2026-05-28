@@ -1,0 +1,10 @@
+{
+  "name": "agentic-start-folder-ts-kernel",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "typecheck": "bun build cli/main.ts --target=bun --outdir /tmp/agentic-kernel-typecheck",
+    "test": "bun test",
+    "kernel": "bun run cli/main.ts"
+  }
+}
