@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-05-21T00:00:00+08:00'
+updated_at: '2026-05-28T18:29:58Z'
 ---
 
 # GENERAL ROADMAP
@@ -208,6 +208,18 @@ The Bun/TypeScript reformulation must be staged:
 - Exit criteria: runtime source-of-truth drives command/help parity; MCP smoke
   and parity checks stay green; tool catalog/docs align with real gates and
   command surface.
+
+### F-14 Spec-Child And Spec-Test Governance
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md
+- Why: Child-spec naming, spec-test strategy docs, and legacy spec-lite
+  compatibility need a clear governance anchor before any executable follow-up.
+- Exit criteria: spec-child is documented as the canonical child/local spec
+  artifact; spec-test is documented as the pre-test strategy artifact;
+  spec-lite remains a legacy compatibility alias; the F-14 folder convention
+  `docs/arc/SPECS/F-14/spec-tests/` is explicit.
 
 ## 6) Recommended Delivery Phases
 

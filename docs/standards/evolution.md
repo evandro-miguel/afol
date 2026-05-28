@@ -3,7 +3,7 @@ doc_type: standard
 id: "000000_000000_evolution-standard_standard_01"
 status: active
 created_at: 2026-02-23T00:00:00Z
-updated_at: 2026-02-23T00:00:00Z
+updated_at: 2026-05-28T18:29:58Z
 title: "Standard Evolution Policy"
 ---
 
@@ -44,7 +44,7 @@ This document defines how the agent system standards evolve over time.
 | `updated` | `updated_at` | Accept with warning |
 | `topic` | `theme` | Accept with warning |
 | `spec_lite` | `spec-lite` | Accept with warning |
-| `spec-lite` | `spec-child` | Accept as compatibility alias during migration |
+| `spec-lite` | `spec-child` | Compatibility alias only; new content should use `spec-child` |
 
 #### Transition Period
 

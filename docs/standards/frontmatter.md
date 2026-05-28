@@ -3,7 +3,7 @@ doc_type: standard
 id: 000000_000000_frontmatter-standard_standard_01
 status: active
 created_at: 2026-02-23 00:00:00+00:00
-updated_at: '2026-04-04T10:08:11-03:00'
+updated_at: '2026-05-28T18:29:58Z'
 title: Frontmatter Standard
 ---
 
@@ -72,9 +72,9 @@ title: "<short title>"
 #### Architecture Types (arc)
 
 - `spec` - Full specification
-- `spec-child` - Child/local feature specification
-- `spec-test` - Journey-first test strategy specification
-- `spec-lite` - Legacy alias for `spec-child` during migration
+- `spec-child` - Canonical child/local feature specification
+- `spec-test` - Pre-test journey strategy specification
+- `spec-lite` - Legacy alias for `spec-child`; not preferred for new work
 - `adr` - Architecture decision record
 - `architecture` - Architecture documentation
 - `roadmap` - Roadmap planning

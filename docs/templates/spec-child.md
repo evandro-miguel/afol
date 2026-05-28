@@ -8,7 +8,7 @@ owners:
 workstream_intent: <workstream_intent>
 artifact_purpose: <artifact_purpose>
 created_at: YYYY-MM-DDTHH:MM:SSZ
-updated_at: YYYY-MM-DDTHH:MM:SSZ
+updated_at: 2026-05-28T18:29:58Z
 roadmap_feature: <feature_id>
 spec_role: child
 parent_spec: <parent_spec_id>
@@ -27,6 +27,11 @@ risk_level: low
 - Outcome: <what should become true>
 - Roadmap feature: `<feature_id>`
 - Parent spec: `<parent_spec_id>`
+
+## Canonical Position
+
+- `spec-child` is the canonical child/local feature specification artifact.
+- Use `spec-lite` only for historical compatibility during migration.
 
 ## Child Scope Rationale
 
