@@ -9,7 +9,7 @@ updated_at: "2026-05-28T09:48:25Z"
 
 # Repository Map
 
-This folder is the distilled architecture view of the repository.
+This folder is the distilled current-state evidence surface for the repository.
 
 ## Scaffold Contract
 
@@ -51,6 +51,7 @@ This folder is the distilled architecture view of the repository.
 
 - Root `.md` files: distilled explanations for agents and humans.
 - `domains/`: domain-focused breakdowns with responsibilities, key files, and risks.
+- `structure/`: lightweight physical-layout evidence for the current repository.
 - `extra/`: raw tool outputs, logs, and machine-readable evidence.
 
 ## System Overview

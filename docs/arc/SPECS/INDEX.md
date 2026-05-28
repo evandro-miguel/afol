@@ -16,10 +16,10 @@ updated_at: "2026-05-28T19:41:46+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 53 |
+| Total | 54 |
 | Draft | 19 |
 | Active | 32 |
-| Final | 2 |
+| Final | 3 |
 
 ## Index
 
@@ -78,6 +78,7 @@ updated_at: "2026-05-28T19:41:46+00:00"
 | 260521_0145_validation-ci-benchmark-matrix_spec-test_01 | validation-ci-benchmark-matrix | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260521_0110_validation-ci-and-benchmarks_spec_01 | validation-ci-and-benchmarks | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0120_public-distribution-and-onboarding_spec_01 | public-distribution-and-onboarding | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260528_1723_map-boundary-cleanup_spec-child_01 | map-boundary-cleanup | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent_spec: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_plan_01.md, task: .agents/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_task_01.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

@@ -12,8 +12,10 @@ updated_at: '2026-04-13T13:36:54-03:00'
 
 Define the strategy for auto-generating project structure documentation using `agents-structure-map.py`.
 
-This standard covers the lightweight physical layout view under `docs/map/structure/`.
-If a repository also adopts `docs/map/`, treat `structure/` as one current-state input surface among others, not as the goal-state canon.
+This standard covers the lightweight physical-layout current-state evidence
+under `docs/map/structure/`.
+If a repository also adopts `docs/map/`, treat `structure/` as one
+current-state evidence surface within that map, not as the goal-state canon.
 
 ## Overview
 
@@ -26,8 +28,10 @@ This standard establishes a **hybrid approach**:
 
 ## Relationship to `docs/map/`
 
-- `docs/map/structure/` documents the **physical structure** of the current repository.
-- `docs/map/` may hold a broader **current-state** surface, such as module maps, API maps, dependency views, and codemap-style artifacts.
+- `docs/map/structure/` documents the **physical structure** of the current
+  repository as current-state evidence.
+- `docs/map/` may hold a broader **current-state** surface, such as module
+  maps, API maps, dependency views, and codemap-style artifacts.
 - Use `.agents/agents repo-map` for the full codemap workflow described in [repo-map.md](repo-map.md).
 - Neither `structure/` nor `map/` replaces roadmap/spec governance.
 - Desired architecture, product intent, roadmap, and specs remain outside `docs/map/`.
