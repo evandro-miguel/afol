@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const REGISTRY_RELATIVE_PATH = ".agents/data/benchmarks/registry.json";
@@ -22,6 +22,7 @@ export type PackId = (typeof REQUIRED_PACKS)[number];
 export type ValidationScope = "default" | "wb" | "tpl" | "update";
 
 export interface Scenario {
+  schema_version: string;
   scenario_id: string;
   scenario_version: string;
   pack_id: PackId;
@@ -38,6 +39,8 @@ interface Baseline {
   baseline_id: string;
   pack_id: PackId;
   schema_version: string;
+  timing_p50_ms?: number;
+  timing_p95_ms?: number;
 }
 
 interface PackMetadata {
@@ -115,6 +118,16 @@ function asNumberRecord(value: unknown, key: string): Record<string, number> {
   return result;
 }
 
+function asOptionalNumber(value: unknown, key: string): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    throw new Error(`Invalid numeric field: ${key}`);
+  }
+  return value;
+}
+
 function loadJsonObject(path: string): Record<string, unknown> {
   if (!existsSync(path)) {
     throw new Error(`Missing required file: ${path}`);
@@ -136,6 +149,7 @@ function parsePackId(value: unknown, key: string): PackId {
 
 function parseScenario(data: Record<string, unknown>, sourcePath: string): Scenario {
   const scenario: Scenario = {
+    schema_version: asString(data.schema_version, `${sourcePath}.schema_version`),
     scenario_id: asString(data.scenario_id, `${sourcePath}.scenario_id`),
     scenario_version: asString(data.scenario_version, `${sourcePath}.scenario_version`),
     pack_id: parsePackId(data.pack_id, `${sourcePath}.pack_id`),
@@ -162,6 +176,8 @@ function parseBaseline(data: Record<string, unknown>, sourcePath: string): Basel
     baseline_id: asString(data.baseline_id, `${sourcePath}.baseline_id`),
     pack_id: parsePackId(data.pack_id, `${sourcePath}.pack_id`),
     schema_version: asString(data.schema_version, `${sourcePath}.schema_version`),
+    timing_p50_ms: asOptionalNumber(data.timing_p50_ms, `${sourcePath}.timing_p50_ms`),
+    timing_p95_ms: asOptionalNumber(data.timing_p95_ms, `${sourcePath}.timing_p95_ms`),
   };
 }
 
@@ -257,6 +273,11 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
       if (scenario.pack_id !== packId) {
         issues.push(`scenario-pack-mismatch:${packId}:${scenario.scenario_id}`);
       }
+      if (scenario.schema_version !== VALIDATION_SCHEMA_VERSION) {
+        issues.push(
+          `scenario-schema-version-mismatch:${packId}:${scenario.scenario_id}:${scenario.schema_version}`,
+        );
+      }
       if (scenario.result_schema !== BENCHMARK_RESULT_SCHEMA_VERSION) {
         issues.push(`scenario-schema-mismatch:${packId}:${scenario.scenario_id}`);
       }
@@ -264,8 +285,13 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
         issues.push(`scenario-contract-missing:${packId}:${scenario.scenario_id}`);
       }
     }
-    if (!snapshot.baselinesByPack[packId]) {
+    const baseline = snapshot.baselinesByPack[packId];
+    if (!baseline) {
       issues.push(`missing-baseline:${packId}`);
+      continue;
+    }
+    if (baseline.schema_version !== VALIDATION_SCHEMA_VERSION) {
+      issues.push(`baseline-schema-version-mismatch:${packId}:${baseline.schema_version}`);
     }
   }
   return issues;
@@ -337,15 +363,58 @@ function buildResult(
   projectRoot: string,
   scenario: Scenario,
   baselinePath: string,
-  baselineExists: boolean,
+  baseline: Baseline | undefined,
 ): BenchmarkResult {
   const metrics = scenario.deterministic_metrics;
+  const notes: string[] = [];
+  for (const [thresholdKey, thresholdValue] of Object.entries(scenario.thresholds)) {
+    const metricKey =
+      thresholdKey === "max_p95_ms" || thresholdKey === "min_p95_ms"
+        ? "timing_p95_ms"
+        : thresholdKey === "max_p50_ms" || thresholdKey === "min_p50_ms"
+          ? "timing_p50_ms"
+          : thresholdKey.startsWith("max_") || thresholdKey.startsWith("min_")
+            ? thresholdKey.slice(4)
+            : null;
+    if (!metricKey) {
+      notes.push(`unsupported-threshold:${thresholdKey}`);
+      continue;
+    }
+    const metricValue = metrics[metricKey];
+    if (typeof metricValue !== "number" || Number.isNaN(metricValue)) {
+      notes.push(`threshold-metric-missing:${thresholdKey}`);
+      continue;
+    }
+    if (thresholdKey.startsWith("max_") && metricValue > thresholdValue) {
+      notes.push(`threshold-exceeded:${thresholdKey}:${metricValue}>${thresholdValue}`);
+    } else if (thresholdKey.startsWith("min_") && metricValue < thresholdValue) {
+      notes.push(`threshold-below-min:${thresholdKey}:${metricValue}<${thresholdValue}`);
+    }
+  }
+  if (baseline) {
+    if (
+      typeof baseline.timing_p50_ms === "number"
+      && typeof metrics.timing_p50_ms === "number"
+      && metrics.timing_p50_ms > baseline.timing_p50_ms
+    ) {
+      notes.push(`baseline-regression:timing_p50_ms:${metrics.timing_p50_ms}>${baseline.timing_p50_ms}`);
+    }
+    if (
+      typeof baseline.timing_p95_ms === "number"
+      && typeof metrics.timing_p95_ms === "number"
+      && metrics.timing_p95_ms > baseline.timing_p95_ms
+    ) {
+      notes.push(`baseline-regression:timing_p95_ms:${metrics.timing_p95_ms}>${baseline.timing_p95_ms}`);
+    }
+  }
   const status: BenchmarkResult["status"] =
     scenario.implementation_status === "skipped"
       ? "skipped"
-      : baselineExists
-        ? "passed"
-        : "baseline-missing";
+      : !baseline
+        ? "baseline-missing"
+        : notes.length > 0
+          ? "failed"
+          : "passed";
   return {
     schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
     run_id: `det-${scenario.pack_id}-${scenario.scenario_id}-${scenario.scenario_version}`,
@@ -354,9 +423,9 @@ function buildResult(
     pack_id: scenario.pack_id,
     status,
     baseline_id: scenario.baseline_id,
-    baseline_reference: baselinePath,
+    baseline_reference: relative(projectRoot, baselinePath).replaceAll("\\", "/"),
     threshold_reference: scenario.thresholds,
-    pass: status === "passed" || status === "skipped",
+    pass: status === "passed",
     duration_ms: metrics.duration_ms ?? 0,
     timing_p50_ms: metrics.timing_p50_ms ?? metrics.duration_ms ?? 0,
     timing_p95_ms: metrics.timing_p95_ms ?? metrics.duration_ms ?? 0,
@@ -375,12 +444,12 @@ function buildResult(
         ? ["not-implemented-live-runner"]
         : status === "baseline-missing"
           ? ["baseline-missing"]
-          : [],
+          : notes,
   };
 }
 
 function outputJson(payload: Record<string, unknown>): number {
-  process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(payload)}\n`);
   return 0;
 }
 
@@ -467,21 +536,36 @@ function handleBenchmark(
   for (const packId of selectedPacks) {
     const scenarios = snapshot.scenariosByPack[packId] ?? [];
     const baselinePath = join(projectRoot, BASELINES_RELATIVE_PATH, packId, "baseline-v1.json");
-    const baselineExists = Boolean(snapshot.baselinesByPack[packId]);
+    const baseline = snapshot.baselinesByPack[packId];
     for (const scenario of scenarios) {
-      results.push(buildResult(projectRoot, scenario, baselinePath, baselineExists));
+      results.push(buildResult(projectRoot, scenario, baselinePath, baseline));
     }
   }
+  const passed = results.filter((entry) => entry.status === "passed").length;
+  const failed = results.filter((entry) => entry.status === "failed").length;
+  const skipped = results.filter((entry) => entry.status === "skipped").length;
+  const baselineMissing = results.filter((entry) => entry.status === "baseline-missing").length;
+  const contractIssues = validateRegistryContract(snapshot);
+  const pass = failed === 0 && baselineMissing === 0 && skipped === 0 && contractIssues.length === 0;
   return outputJson({
     schema_version: VALIDATION_SCHEMA_VERSION,
     command_family: "validation",
     mode: "benchmark",
     benchmark_result_schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
+    status: pass ? "passed" : "failed",
+    pass,
     selected_pack_ids: selectedPacks,
     selection_reasons: selection.reasons,
     result_count: results.length,
+    summary: {
+      total: results.length,
+      passed,
+      failed,
+      skipped,
+      baseline_missing: baselineMissing,
+    },
     results,
-    contract_issues: validateRegistryContract(snapshot),
+    contract_issues: contractIssues,
   });
 }
 
@@ -507,4 +591,3 @@ export function runValidationCommand(projectRoot: string, args: string[]): numbe
   }
   return handleSelect(snapshot, parsed.scope, parsed.changedPaths);
 }
-
