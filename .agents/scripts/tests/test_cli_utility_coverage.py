@@ -206,6 +206,42 @@ def test_agents_index_idempotent_when_entries_unchanged(tmp_path, monkeypatch):
     assert first_adrs == second_adrs
 
 
+def test_agents_index_handles_mixed_yaml_timestamp_types(tmp_path, monkeypatch):
+    agents_index = load_module("agents_index_mixed_timestamp_types_test", "agents-index.py")
+    specs = tmp_path / "docs" / "arc" / "SPECS"
+    specs.mkdir(parents=True)
+
+    (specs / "260101_0100_first_spec_01.md").write_text(
+        "---\n"
+        'id: "260101_0100_first_spec_01"\n'
+        "theme: One\n"
+        "status: active\n"
+        "owners: [agent]\n"
+        "created_at: 2026-01-01\n"
+        "---\n\n# Spec\n",
+        encoding="utf-8",
+    )
+    (specs / "260101_0200_second_spec_01.md").write_text(
+        "---\n"
+        'id: "260101_0200_second_spec_01"\n'
+        "theme: Two\n"
+        "status: active\n"
+        "owners: [agent]\n"
+        'created_at: "2026-01-02T00:00:00Z"\n'
+        "---\n\n# Spec\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(agents_index, "SPECS_DIR", specs)
+    entries = agents_index.scan_docs(specs, "*.md")
+
+    assert [entry.id for entry in entries] == [
+        "260101_0100_first_spec_01",
+        "260101_0200_second_spec_01",
+    ]
+    assert all(isinstance(entry.created_at, str) for entry in entries)
+
+
 def test_agents_patterns_load_filter_apply_rate_and_cli(tmp_path, monkeypatch, capsys):
     patterns = load_module("agents_patterns_coverage_test", "agents-patterns.py")
     pattern_root = tmp_path / "patterns"

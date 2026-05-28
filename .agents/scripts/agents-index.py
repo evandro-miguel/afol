@@ -71,7 +71,13 @@ class DocEntry:
                 self.status = fm.get("status", "")
                 owners = fm.get("owners", [])
                 self.owner = owners[0] if owners else ""
-                self.created_at = fm.get("created_at", fm.get("created", ""))
+                created_at = fm.get("created_at", fm.get("created", ""))
+                if created_at is None:
+                    self.created_at = ""
+                elif hasattr(created_at, "isoformat"):
+                    self.created_at = created_at.isoformat()
+                else:
+                    self.created_at = str(created_at).strip()
                 self.links = fm.get("links", {})
             except yaml.YAMLError:
                 pass
