@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from agentic_scaffold.runtime import AgenticRuntime
 from agentic_scaffold.services.changes import UnsafePathError
 from agentic_scaffold.services.journal import JournalStore
@@ -155,6 +157,11 @@ def test_move_and_undo(scaffold_repo: Path):
     assert result.path == "docs/map/moved.md"
     assert not source.exists()
     assert destination.exists()
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    assert document["record"]["action"] == "move"
+    assert document["payload"]["mutation_action"] == "move"
 
     undo = runtime.undo_last_change()
     assert undo.ok is True
@@ -292,6 +299,59 @@ def test_undo_rejects_tampered_move_destination_outside_repo(scaffold_repo: Path
 
     assert destination.exists()
     assert not (scaffold_repo.parent / "outside" / "moved.md").exists()
+
+
+@pytest.mark.parametrize(
+    ("protected_relative", "original"),
+    [
+        (".git/config", "[core]\nrepositoryformatversion = 0\n"),
+        (".agents/wb/.active_session", "260528_1145_f08-safe-file-mutation-undo\n"),
+    ],
+)
+def test_undo_rejects_tampered_write_target_to_protected_paths(
+    scaffold_repo: Path, protected_relative: str, original: str
+):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    protected = scaffold_repo / protected_relative
+    protected.parent.mkdir(parents=True, exist_ok=True)
+    protected.write_text(original, encoding="utf-8")
+
+    target = scaffold_repo / "docs" / "agentic" / "new-note.md"
+    runtime.changes.write_text_file("docs/agentic/new-note.md", "# New note\n", reason="create note")
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    document["payload"]["target_path"] = protected_relative
+    document["payload"]["backup_path"] = ""
+    document["payload"]["existed_before"] = False
+    change_file.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="journal path is blocked"):
+        runtime.undo_last_change()
+
+    assert protected.read_text(encoding="utf-8") == original
+    assert target.exists()
+
+
+def test_undo_rejects_legacy_move_entry_missing_mutation_action(scaffold_repo: Path):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    source = scaffold_repo / "docs" / "agentic" / "move-me.md"
+    source.write_text("hello\n", encoding="utf-8")
+
+    runtime.changes.move_path("docs/agentic/move-me.md", "docs/map/moved.md", reason="move")
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    document["record"]["action"] = "patch"
+    document["payload"].pop("mutation_action", None)
+    change_file.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="move entry missing mutation_action"):
+        runtime.undo_last_change()
+
+    assert (scaffold_repo / "docs" / "map" / "moved.md").exists()
 
 
 

@@ -10,9 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from agentic_scaffold.config import DEFAULT_BLOCKLIST
 from agentic_scaffold.models import ChangeRecord, UndoResult
 
 _FALLBACK_COUNTER = 0
+_UNDO_EXTRA_PROTECTED_PATHS: tuple[str, ...] = (".agents/wb/.active_session",)
 
 
 class UnsafeJournalPathError(ValueError):
@@ -70,17 +72,20 @@ class JournalStore:
     def load(self, change_file: Path) -> dict:
         return json.loads(change_file.read_text(encoding="utf-8"))
 
-    def _resolve_repo_path(self, repo_root: Path, relative_path: str) -> Path:
+    def _resolve_repo_path(self, repo_root: Path, relative_path: str, *, blocked_paths: tuple[str, ...] = ()) -> Path:
         if not str(relative_path).strip():
             raise UnsafeJournalPathError("journal path is empty")
         root = repo_root.resolve()
         target = (root / relative_path).resolve()
         try:
-            target.relative_to(root)
+            relative = target.relative_to(root).as_posix()
         except ValueError as exc:
             raise UnsafeJournalPathError("journal path is outside the repository") from exc
         if target == root:
             raise UnsafeJournalPathError("journal path cannot target the repository root")
+        for blocked in blocked_paths:
+            if relative == blocked or relative.startswith(f"{blocked}/"):
+                raise UnsafeJournalPathError(f"journal path is blocked: {relative}")
         return target
 
     def _resolve_backup_path(self, backup_relative: str) -> Path:
@@ -111,23 +116,27 @@ class JournalStore:
         backup_path = self.paths.backups_dir / change_id / safe_name
         return str(backup_path.relative_to(self.paths.root))
 
-    def restore_backup(self, repo_root: Path, backup_relative: str, target_relative: str) -> Path:
+    def restore_backup(
+        self, repo_root: Path, backup_relative: str, target_relative: str, *, blocked_paths: tuple[str, ...] = ()
+    ) -> Path:
         backup_path = self._resolve_backup_path(backup_relative)
-        target_path = self._resolve_repo_path(repo_root, target_relative)
+        target_path = self._resolve_repo_path(repo_root, target_relative, blocked_paths=blocked_paths)
         target_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(backup_path, target_path)
         return target_path
 
-    def delete_if_exists(self, repo_root: Path, relative_path: str) -> None:
-        target = self._resolve_repo_path(repo_root, relative_path)
+    def delete_if_exists(self, repo_root: Path, relative_path: str, *, blocked_paths: tuple[str, ...] = ()) -> None:
+        target = self._resolve_repo_path(repo_root, relative_path, blocked_paths=blocked_paths)
         if target.is_dir():
             shutil.rmtree(target, ignore_errors=True)
         elif target.exists():
             target.unlink(missing_ok=True)
 
-    def move_path(self, repo_root: Path, source_relative: str, dest_relative: str) -> Path:
-        source = self._resolve_repo_path(repo_root, source_relative)
-        destination = self._resolve_repo_path(repo_root, dest_relative)
+    def move_path(
+        self, repo_root: Path, source_relative: str, dest_relative: str, *, blocked_paths: tuple[str, ...] = ()
+    ) -> Path:
+        source = self._resolve_repo_path(repo_root, source_relative, blocked_paths=blocked_paths)
+        destination = self._resolve_repo_path(repo_root, dest_relative, blocked_paths=blocked_paths)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(source), str(destination))
         return destination
@@ -138,51 +147,110 @@ class JournalStore:
             return UndoResult(ok=False, message="No recorded change is available to undo.")
 
         data = self.load(change_file)
-        record = ChangeRecord.model_validate(data["record"])
-        payload = data["payload"]
-        if change_file.name != f"{record.change_id}.json":
+        if not isinstance(data, dict):
+            raise UnsafeJournalPathError("journal entry is malformed")
+        record = data.get("record")
+        payload = data.get("payload")
+        if not isinstance(record, dict):
+            raise UnsafeJournalPathError("journal record is malformed")
+        if not isinstance(payload, dict):
+            raise UnsafeJournalPathError("journal payload is malformed")
+        change_id = str(record.get("change_id", "")).strip()
+        if not change_id:
+            raise UnsafeJournalPathError("journal record is missing change id")
+        if change_file.name != f"{change_id}.json":
             raise UnsafeJournalPathError("journal entry filename does not match record change id")
         if bool(payload.get("dry_run", False)):
             raise UnsafeJournalPathError("journal entry marked as dry-run cannot be undone")
-        mutation_action = str(payload.get("mutation_action") or record.action).strip()
+        payload_action = str(payload.get("mutation_action", "")).strip()
+        record_action = str(record.get("action", "")).strip()
+        if payload_action and record_action and payload_action != record_action and (payload_action, record_action) != (
+            "move",
+            "patch",
+        ):
+            raise UnsafeJournalPathError("journal action mismatch between record and payload")
+        if not payload_action and record_action == "patch" and (
+            "source_path" in payload or "destination_path" in payload
+        ):
+            raise UnsafeJournalPathError("journal move entry missing mutation_action")
+        mutation_action = payload_action or record_action
+        if mutation_action not in {"write_text", "patch", "move", "archive"}:
+            raise UnsafeJournalPathError(f"unsupported journal mutation action: {mutation_action or 'unknown'}")
+        protected_paths = tuple(dict.fromkeys((*DEFAULT_BLOCKLIST, *_UNDO_EXTRA_PROTECTED_PATHS)))
         restored: list[str] = []
 
         if mutation_action in {"write_text", "patch"}:
-            target = payload["target_path"]
-            backup = payload.get("backup_path", "")
+            target = str(payload.get("target_path", "")).strip()
+            backup = str(payload.get("backup_path", "")).strip()
             existed_before = bool(payload.get("existed_before", False))
+            target_path = self._resolve_repo_path(repo_root, target, blocked_paths=protected_paths)
+            if existed_before and not backup:
+                raise UnsafeJournalPathError("journal entry missing backup for existing target")
             if backup:
-                restored_path = self.restore_backup(repo_root, backup, target)
+                self._resolve_backup_path(backup)
+            if backup:
+                restored_path = self.restore_backup(repo_root, backup, target, blocked_paths=protected_paths)
                 restored.append(restored_path.relative_to(repo_root).as_posix())
             elif not existed_before:
-                self.delete_if_exists(repo_root, target)
-                restored.append(str(target))
+                self.delete_if_exists(repo_root, target, blocked_paths=protected_paths)
+                restored.append(target_path.relative_to(repo_root.resolve()).as_posix())
         elif mutation_action == "move":
-            source_relative = payload["source_path"]
-            destination_relative = payload["destination_path"]
+            source_relative = str(payload.get("source_path", "")).strip()
+            destination_relative = str(payload.get("destination_path", "")).strip()
             destination_existed_before = bool(payload.get("destination_existed_before", False))
-            self.move_path(repo_root, destination_relative, source_relative)
+            self._resolve_repo_path(repo_root, source_relative, blocked_paths=protected_paths)
+            self._resolve_repo_path(repo_root, destination_relative, blocked_paths=protected_paths)
             restored.append(source_relative)
             destination_backup = str(payload.get("backup", {}).get("destination_path", "")).strip()
+            if destination_existed_before and not destination_backup:
+                raise UnsafeJournalPathError("journal entry missing destination backup for move undo")
+            if destination_backup:
+                self._resolve_backup_path(destination_backup)
+            self.move_path(
+                repo_root,
+                destination_relative,
+                source_relative,
+                blocked_paths=protected_paths,
+            )
             if destination_existed_before and destination_backup:
-                restored_destination = self.restore_backup(repo_root, destination_backup, destination_relative)
+                restored_destination = self.restore_backup(
+                    repo_root,
+                    destination_backup,
+                    destination_relative,
+                    blocked_paths=protected_paths,
+                )
                 restored.append(restored_destination.relative_to(repo_root).as_posix())
         elif mutation_action == "archive":
-            archive_root = payload["archive_root"]
-            for item in payload.get("moves", []):
-                archived_relative = item["archived_path"]
-                original_relative = item["original_path"]
-                self.move_path(repo_root, archived_relative, original_relative)
+            archive_root = str(payload.get("archive_root", "")).strip()
+            moves = payload.get("moves", [])
+            if not isinstance(moves, list):
+                raise UnsafeJournalPathError("journal archive moves payload is malformed")
+            archive_dir = self._resolve_repo_path(repo_root, archive_root, blocked_paths=protected_paths)
+            for item in moves:
+                if not isinstance(item, dict):
+                    raise UnsafeJournalPathError("journal archive move item is malformed")
+                archived_relative = str(item.get("archived_path", "")).strip()
+                original_relative = str(item.get("original_path", "")).strip()
+                self._resolve_repo_path(repo_root, archived_relative, blocked_paths=protected_paths)
+                self._resolve_repo_path(repo_root, original_relative, blocked_paths=protected_paths)
+            for item in moves:
+                archived_relative = str(item["archived_path"]).strip()
+                original_relative = str(item["original_path"]).strip()
+                self.move_path(
+                    repo_root,
+                    archived_relative,
+                    original_relative,
+                    blocked_paths=protected_paths,
+                )
                 restored.append(original_relative)
-            archive_dir = self._resolve_repo_path(repo_root, archive_root)
             if archive_dir.exists() and not any(archive_dir.iterdir()):
                 archive_dir.rmdir()
         else:
             return UndoResult(ok=False, message=f"Unsupported undo action: {mutation_action}")
 
         change_file.unlink(missing_ok=True)
-        backup_dir = self.paths.backups_dir / record.change_id
+        backup_dir = self.paths.backups_dir / change_id
         if backup_dir.exists():
             shutil.rmtree(backup_dir, ignore_errors=True)
 
-        return UndoResult(ok=True, message=f"Undo applied for {record.change_id}.", restored_paths=restored)
+        return UndoResult(ok=True, message=f"Undo applied for {change_id}.", restored_paths=restored)

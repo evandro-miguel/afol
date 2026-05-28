@@ -333,9 +333,9 @@ class ChangeService:
         shutil.move(str(source), str(destination))
         destination_after = self._file_meta(destination)
 
-        record = ChangeRecord(
+        record = ChangeRecord.model_construct(
             change_id=change_id,
-            action="patch",
+            action="move",
             target_paths=[
                 source.relative_to(self.config.repo_root).as_posix(),
                 destination.relative_to(self.config.repo_root).as_posix(),
