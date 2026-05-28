@@ -2,6 +2,7 @@ import importlib.util
 import io
 import json
 import os
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -615,6 +616,40 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
         managed_hashes = payload.get("managed_hashes")
         self.assertIsInstance(managed_hashes, dict)
         self.assertRegex(str(managed_hashes.get("agents", "")), r"^[a-f0-9]{64}$")
+
+    def test_template_managed_hashes_match_template_files_and_lock(self):
+        template_agents_dir = Path("src/project-template/.agents").resolve()
+        manifest_path = template_agents_dir / "manifest.json"
+        lock_path = template_agents_dir / "lock.json"
+
+        manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        lock_payload = json.loads(lock_path.read_text(encoding="utf-8"))
+
+        manifest_hashes = manifest_payload.get("managed_hashes")
+        lock_hashes = lock_payload.get("managed_hashes")
+        self.assertIsInstance(manifest_hashes, dict)
+        self.assertIsInstance(lock_hashes, dict)
+        self.assertEqual(manifest_hashes, lock_hashes)
+
+        for rel_path, declared_hash in manifest_hashes.items():
+            self.assertRegex(str(declared_hash), r"^[a-f0-9]{64}$")
+            target_path = template_agents_dir / rel_path
+            self.assertTrue(target_path.is_file(), f"Managed file missing: {rel_path}")
+            actual_hash = hashlib.sha256(target_path.read_bytes()).hexdigest()
+            self.assertEqual(
+                declared_hash,
+                actual_hash,
+                f"Managed hash mismatch for {rel_path}",
+            )
+
+        root_script = Path(".agents/scripts/agents-scaffold-update.py").resolve()
+        template_script = template_agents_dir / "scripts/agents-scaffold-update.py"
+        self.assertTrue(root_script.is_file())
+        self.assertTrue(template_script.is_file())
+        self.assertEqual(
+            hashlib.sha256(root_script.read_bytes()).hexdigest(),
+            hashlib.sha256(template_script.read_bytes()).hexdigest(),
+        )
 
 
 def uuid4_hex() -> str:

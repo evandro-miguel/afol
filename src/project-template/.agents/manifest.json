@@ -80,7 +80,7 @@
     "scripts/agents-repo-map.py": "057458b16f2690b6b2411466037598553ed66a28e5eceb3041606efe15586df1",
     "scripts/agents-revert.py": "2ee45164115f9c6947ab9c666a561e30e0df826154cdd92b8f4a6a4f0fb4fd2a",
     "scripts/agents-review.py": "5c5cf6cebf31cc6e63505730ab12b96652ba95911518873b3ae650d2bd682e69",
-    "scripts/agents-scaffold-update.py": "a471d401944a81bb7d36dd0ce48d9dd0c8523d9e93043348c36b2d58dbdbccd2",
+    "scripts/agents-scaffold-update.py": "7d8cff966f69f8fec9dcced52eaaf0730ed265b2427bcde14fdc3cc752565ecc",
     "scripts/agents-session.py": "cfbc6f5585e82801f96dd0c569809d71ed6c034e198d36068424b812cec35588",
     "scripts/agents-skills-sync.py": "4eb9bc71d1f60951459082060dcfae97350cfa0419a66a5508f0a457b61a8f69",
     "scripts/agents-status.py": "b1b714c16c485dea2dbf27572a1c6f824f81f036735883c1bdcb850bbc8f0cdb",
