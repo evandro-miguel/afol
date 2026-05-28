@@ -246,7 +246,7 @@ def test_undo_rejects_tampered_backup_path_outside_journal(scaffold_repo: Path):
     try:
         runtime.undo_last_change()
     except ValueError as exc:
-        assert "outside the runtime journal backups" in str(exc)
+        assert "backup path does not match expected backup target" in str(exc)
     else:
         raise AssertionError("undo accepted a tampered backup path outside the journal")
 
@@ -299,6 +299,62 @@ def test_undo_rejects_tampered_move_destination_outside_repo(scaffold_repo: Path
 
     assert destination.exists()
     assert not (scaffold_repo.parent / "outside" / "moved.md").exists()
+
+
+def test_undo_rejects_tampered_move_patch_mismatch_before_filesystem_change(scaffold_repo: Path):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    source = scaffold_repo / "docs" / "agentic" / "move-me.md"
+    destination = scaffold_repo / "docs" / "map" / "moved.md"
+    forged_source = scaffold_repo / "docs" / "agentic" / "forged-target.md"
+    forged_destination = scaffold_repo / "docs" / "map" / "forged-origin.md"
+    source.write_text("hello\n", encoding="utf-8")
+    forged_source.write_text("keep-source\n", encoding="utf-8")
+    forged_destination.write_text("keep-destination\n", encoding="utf-8")
+
+    runtime.changes.move_path("docs/agentic/move-me.md", "docs/map/moved.md", reason="move")
+    change_file = runtime.journal.latest_change_file()
+    assert change_file is not None
+
+    document = json.loads(change_file.read_text(encoding="utf-8"))
+    document["record"]["action"] = "patch"
+    document["payload"]["mutation_action"] = "move"
+    document["payload"]["source_path"] = "docs/agentic/forged-target.md"
+    document["payload"]["destination_path"] = "docs/map/forged-origin.md"
+    change_file.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="action mismatch"):
+        runtime.undo_last_change()
+
+    assert not source.exists()
+    assert destination.exists()
+    assert forged_source.read_text(encoding="utf-8") == "keep-source\n"
+    assert forged_destination.read_text(encoding="utf-8") == "keep-destination\n"
+
+
+def test_undo_rejects_tampered_backup_swap_before_restore(scaffold_repo: Path):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    note_a = scaffold_repo / "docs" / "agentic" / "note-a.md"
+    note_b = scaffold_repo / "docs" / "agentic" / "note-b.md"
+    note_a.write_text("old-a\n", encoding="utf-8")
+    note_b.write_text("old-b\n", encoding="utf-8")
+
+    runtime.changes.write_text_file("docs/agentic/note-a.md", "new-a\n", reason="update a")
+    runtime.changes.write_text_file("docs/agentic/note-b.md", "new-b\n", reason="update b")
+    change_files = runtime.journal.list_change_files()
+    assert len(change_files) == 2
+    latest_change = change_files[-1]
+    other_change = change_files[0]
+    latest_document = json.loads(latest_change.read_text(encoding="utf-8"))
+    other_document = json.loads(other_change.read_text(encoding="utf-8"))
+
+    latest_document["payload"]["backup_path"] = other_document["payload"]["backup_path"]
+    latest_change.write_text(json.dumps(latest_document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="backup path does not match expected backup target"):
+        runtime.undo_last_change()
+
+    assert note_a.read_text(encoding="utf-8") == "new-a\n"
+    assert note_b.read_text(encoding="utf-8") == "new-b\n"
 
 
 @pytest.mark.parametrize(

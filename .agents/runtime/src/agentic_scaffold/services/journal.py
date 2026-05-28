@@ -116,6 +116,12 @@ class JournalStore:
         backup_path = self.paths.backups_dir / change_id / safe_name
         return str(backup_path.relative_to(self.paths.root))
 
+    def expected_backup_path(
+        self, change_id: str, repo_root: Path, target_relative: str, *, blocked_paths: tuple[str, ...] = ()
+    ) -> str:
+        target_path = self._resolve_repo_path(repo_root, target_relative, blocked_paths=blocked_paths)
+        return self.planned_backup_path(change_id, repo_root.resolve(), target_path)
+
     def restore_backup(
         self, repo_root: Path, backup_relative: str, target_relative: str, *, blocked_paths: tuple[str, ...] = ()
     ) -> Path:
@@ -164,10 +170,7 @@ class JournalStore:
             raise UnsafeJournalPathError("journal entry marked as dry-run cannot be undone")
         payload_action = str(payload.get("mutation_action", "")).strip()
         record_action = str(record.get("action", "")).strip()
-        if payload_action and record_action and payload_action != record_action and (payload_action, record_action) != (
-            "move",
-            "patch",
-        ):
+        if payload_action and record_action and payload_action != record_action:
             raise UnsafeJournalPathError("journal action mismatch between record and payload")
         if not payload_action and record_action == "patch" and (
             "source_path" in payload or "destination_path" in payload
@@ -187,6 +190,14 @@ class JournalStore:
             if existed_before and not backup:
                 raise UnsafeJournalPathError("journal entry missing backup for existing target")
             if backup:
+                expected_backup = self.expected_backup_path(
+                    change_id,
+                    repo_root,
+                    target,
+                    blocked_paths=protected_paths,
+                )
+                if backup != expected_backup:
+                    raise UnsafeJournalPathError("journal backup path does not match expected backup target")
                 self._resolve_backup_path(backup)
             if backup:
                 restored_path = self.restore_backup(repo_root, backup, target, blocked_paths=protected_paths)
@@ -205,6 +216,14 @@ class JournalStore:
             if destination_existed_before and not destination_backup:
                 raise UnsafeJournalPathError("journal entry missing destination backup for move undo")
             if destination_backup:
+                expected_destination_backup = self.expected_backup_path(
+                    change_id,
+                    repo_root,
+                    destination_relative,
+                    blocked_paths=protected_paths,
+                )
+                if destination_backup != expected_destination_backup:
+                    raise UnsafeJournalPathError("journal destination backup path does not match expected backup target")
                 self._resolve_backup_path(destination_backup)
             self.move_path(
                 repo_root,
