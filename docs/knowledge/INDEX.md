@@ -2,15 +2,15 @@
 doc_type: index
 id: "knowledge_index"
 status: active
-created_at: "2026-05-28T18:14:37+00:00"
-updated_at: "2026-05-28T18:14:37+00:00"
+created_at: "2026-05-28T19:40:13+00:00"
+updated_at: "2026-05-28T19:40:13+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 8
+- Total indexed docs: 9
 
 ## Brainstorm
 
@@ -27,6 +27,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260528_0815_f04-workbench-core-smoke2_report_01` | `.agents/wb/260528_0815_f04-workbench-core-smoke2/260528_0815_f04-workbench-core-smoke2_report_01.md` | - Roadmap feature: F-04
 - `260528_0833_f04-workbench-core-review-fix_report_01` | `.agents/wb/260528_0833_f04-workbench-core-review-fix/260528_0833_f04-workbench-core-review-fix_report_01.md` | - Roadmap feature: F-04
 - `260528_0930_f05-review-fix_report_01` | `.agents/wb/260528_0930_f05-review-fix/260528_0930_f05-review-fix_report_01.md` | - Roadmap feature: F-05
+- `260528_1528_spec-child-and-spec-test-governance_report_01` | `.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_report_01.md` | - Roadmap feature: F-14
 
 ## Research
 

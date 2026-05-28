@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-05-28T18:14:37+00:00
+**Generated:** 2026-05-28T19:40:12+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,7 +9,7 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 114 files, 41,781 lines, 1740.3 KB
+**Stats:** 114 files, 41,806 lines, 1741.3 KB
 
 ### Files
 
@@ -22,7 +22,7 @@ Services, utilities, and business logic.
 | `.agents/scripts/agents-bootstrap.py` | 1,512 | 61.6 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-bootstrap.py` | 1,510 | 61.5 KB | Module; functionality |
 | `src/project-template/.agents/scripts/verify-tasks.py` | 1,347 | 53.8 KB | Module; functionality |
-| `.agents/scripts/verify-tasks.py` | 1,287 | 51.2 KB | Module; functionality |
+| `.agents/scripts/verify-tasks.py` | 1,296 | 51.6 KB | Module; functionality |
 | `.agents/scripts/lib/execution_commands.py` | 1,238 | 50.5 KB | Module; functionality |
 | `src/project-template/.agents/scripts/lib/execution_commands.py` | 1,211 | 49.7 KB | Module; functionality |
 | `.agents/scripts/agents-wb-update.py` | 991 | 41.0 KB | Module; functionality |
@@ -40,10 +40,10 @@ Services, utilities, and business logic.
 | `src/project-template/.agents/scripts/agents-tools.py` | 543 | 20.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-doctor.py` | 521 | 20.1 KB | Module; functionality |
 | `.agents/scripts/agents-doctor.py` | 520 | 20.3 KB | Module; functionality |
+| `.agents/scripts/agents-structure-map.py` | 453 | 17.7 KB | Module; functionality |
 | `.agents/runtime/src/agentic_scaffold/services/changes.py` | 449 | 19.4 KB | Module; functionality |
 | `.agents/scripts/agents-lint-docs.py` | 443 | 16.8 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-lint-docs.py` | 443 | 16.8 KB | Module; functionality |
-| `.agents/scripts/agents-structure-map.py` | 437 | 17.1 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-structure-map.py` | 434 | 17.0 KB | Module; functionality |
 | `.agents/scripts/lib/agents_config.py` | 422 | 16.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/lib/agents_config.py` | 422 | 16.2 KB | Module; functionality |

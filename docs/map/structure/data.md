@@ -1,6 +1,6 @@
 # 🎨 Data Structure
 
-**Generated:** 2026-05-28T18:14:37+00:00
+**Generated:** 2026-05-28T19:40:12+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -9,13 +9,13 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 47 files, 3,691 lines, 301.5 KB
+**Stats:** 46 files, 3,809 lines, 338.5 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/data/telemetry/events.jsonl` | 771 | 204.4 KB | Module; functionality |
+| `.agents/data/telemetry/events.jsonl` | 917 | 243.2 KB | Module; functionality |
 | `.agents/agents.config` | 364 | 9.0 KB | Module; functionality |
 | `src/project-template/.agents/agents.config` | 364 | 9.0 KB | Module; functionality |
 | `.agents/data/benchmarks/results/20260424_141508_runtime-flow-live-agent-v4.json` | 268 | 15.5 KB | Module; functionality |
@@ -52,7 +52,6 @@ Data files, constants, and configuration.
 | `.agents/data/benchmarks/scenarios/token-economy/token-noisy-output.json` | 31 | 0.8 KB | Module; functionality |
 | `.agents/data/benchmarks/registry.json` | 30 | 0.7 KB | Module; functionality |
 | `docs/map/extra/phase5/data-models.json` | 29 | 0.6 KB | Module; functionality |
-| `docs/map/structure/data.md` | 28 | 1.8 KB | Module; functionality |
 | `docs/map/extra/phase2/config-boundary-files.json` | 27 | 0.6 KB | Module; functionality |
 | `.agents/data/benchmarks/baselines/mcp-parity/baseline-v1.json` | 13 | 0.3 KB | Module; functionality |
 | `.agents/data/benchmarks/baselines/workbench-parity/baseline-v1.json` | 13 | 0.3 KB | Module; functionality |

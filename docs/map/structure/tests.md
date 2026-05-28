@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-05-28T18:14:37+00:00
+**Generated:** 2026-05-28T19:40:12+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 161 files, 35,392 lines, 1705.4 KB
+**Stats:** 160 files, 35,264 lines, 1692.8 KB
 
 ### Files
 
@@ -18,7 +18,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_skills_sync.py` | 1,596 | 76.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_skills_sync.py` | 1,596 | 76.7 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_verify_tasks_strict.py` | 1,278 | 50.1 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_cli_utility_coverage.py` | 1,190 | 58.7 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_cli_utility_coverage.py` | 1,205 | 59.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_cli_utility_coverage.py` | 1,188 | 58.6 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_verify_tasks_strict.py` | 1,161 | 44.5 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_runtime_compatibility.py` | 832 | 45.1 KB | Test file; unit tests |
@@ -82,7 +82,6 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md` | 149 | 6.9 KB | Test file; unit tests |
 | `docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md` | 149 | 7.0 KB | Module; functionality |
 | `cli/tests/kernel.test.ts` | 148 | 5.9 KB | Test file; unit tests |
-| `docs/map/structure/tests.md` | 145 | 14.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md` | 145 | 5.5 KB | Module; functionality |
 | `.agents/runtime/tests/conftest.py` | 144 | 4.4 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_telemetry.py` | 144 | 7.5 KB | Test file; unit tests |
@@ -131,7 +130,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_session_resolution_contract.py` | 76 | 4.2 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_session_resolution_contract.py` | 76 | 4.2 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_review-and-logical-revert_spec_01.md` | 76 | 2.8 KB | Module; functionality |
-| `docs/arc/SPECS/INDEX.md` | 76 | 10.0 KB | Module; functionality |
+| `docs/arc/SPECS/INDEX.md` | 76 | 10.2 KB | Module; functionality |
 | `docs/arc/SPECS/FOLDER_GUIDE.md` | 72 | 2.5 KB | Module; functionality |
 | `docs/arc/SPECS/F-10/spec-tests/260521_0140_runtime-adapters-and-mcp-parity_spec-test_01.md` | 72 | 2.6 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_runtime-command-parity_spec_01.md` | 71 | 2.6 KB | Module; functionality |
@@ -165,7 +164,7 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260306_knowledge-reuse-and-token-efficiency_spec_01.md` | 42 | 1.6 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_lint_frontmatter.py` | 35 | 1.3 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_lint_frontmatter.py` | 35 | 1.3 KB | Test file; unit tests |
-| `docs/arc/SPECS/260415_2121_scripts-cleanup-optimization_spec-child_01.md` | 33 | 1.3 KB | Module; functionality |
+| `docs/arc/SPECS/260415_2121_scripts-cleanup-optimization_spec-child_01.md` | 35 | 1.5 KB | Module; functionality |
 | `.agents/scripts/tests/test_markdown_docs.py` | 29 | 1.2 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_markdown_docs.py` | 29 | 1.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_config_parse_offset.py` | 17 | 0.8 KB | Test file; unit tests |
