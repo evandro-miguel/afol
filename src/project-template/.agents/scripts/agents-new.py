@@ -43,6 +43,58 @@ from lib.workflow_manifest import (
     load_artifact_policy,
     manifest_id_placeholders as _manifest_id_placeholders_impl,
 )
+
+try:
+    from lib.task_integrity import (
+        validate_task_board as _validate_task_board_impl,
+        validate_plan_concrete_steps as _validate_plan_concrete_steps_impl,
+        validate_task_text as _validate_task_text_impl,
+    )
+except Exception:
+    _validate_task_board_impl = None
+    _validate_plan_concrete_steps_impl = None
+    _validate_task_text_impl = None
+
+
+META_TASK_RE = re.compile(
+    r"\b(?:create|write|make|prepare|draft|build|delega|assign|plan|plano)\b",
+    re.IGNORECASE,
+)
+PLACEHOLDER_TASK_RE = re.compile(r"^\s*(?:<note>|<task description>|todo|tbd)\s*$", re.IGNORECASE)
+
+
+def _validate_task_text_fallback(task_text: str, source: str = "task") -> None:
+    """Fallback task validation when shared integrity module is unavailable."""
+    normalized = " ".join(str(task_text or "").split())
+    if not normalized:
+        raise ValueError(f"{source} requires executable task text.")
+    if PLACEHOLDER_TASK_RE.match(normalized):
+        raise ValueError(f"{source} contains placeholder task text: '{normalized}'")
+    if "plan" in normalized.lower() and META_TASK_RE.search(normalized):
+        raise ValueError(f"{source} contains meta-planning task text: '{normalized}'")
+
+
+def validate_task_text(task_text: str, source: str = "task") -> None:
+    """Validate task text for placeholder/meta-planning patterns."""
+    if _validate_task_text_impl is not None:
+        return _validate_task_text_impl(task_text, source=source)
+    return _validate_task_text_fallback(task_text, source=source)
+
+
+def validate_task_board(body: str, source: str = "task board") -> None:
+    """Validate task board text for executable task presence."""
+    if _validate_task_board_impl is not None:
+        return _validate_task_board_impl(body, source=source)
+    if not body or not str(body).strip():
+        raise ValueError(f"{source} requires at least one executable task.")
+
+
+def validate_plan_concrete_steps(body: str, source: str = "plan") -> None:
+    """Validate plan concrete steps for executable content."""
+    if _validate_plan_concrete_steps_impl is not None:
+        return _validate_plan_concrete_steps_impl(body, source=source)
+    if not body or not str(body).strip():
+        raise ValueError(f"{source} requires at least one concrete step.")
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -510,6 +562,28 @@ def _validate_governance_requirements(args: Dict[str, object]) -> None:
         args["child_spec"] = ""
 
 
+def _validate_nonquick_delivery_task_text(args: Dict[str, object]) -> None:
+    """Require an executable delivery task for non-quick delivery workstreams."""
+    if args.get("quick_mode"):
+        return
+
+    if str(args.get("intent") or "").strip() != "delivery":
+        return
+
+    task_text = str(args.get("task") or "").strip()
+    if not task_text:
+        print("❌ Delivery workstreams require --task text.")
+        print("Example:")
+        print("  ./.agents/agents new <theme> --intent delivery --task \"Implement X and verify Y\"")
+        sys.exit(1)
+
+    try:
+        validate_task_text(task_text, source="Delivery task")
+    except ValueError as exc:
+        print(f"❌ {exc}")
+        sys.exit(1)
+
+
 def _get_repo_name() -> str:
     """Return repository folder name."""
     return ROOT_DIR.name
@@ -534,6 +608,10 @@ def _get_branch_or_worktree() -> str:
 def _build_template_replacements(session_id: str, args: Dict[str, object]) -> Dict[str, str]:
     """Build placeholder replacements for workstream templates."""
     doc_prefix = _doc_prefix(session_id, args)
+    task_seed = str(args.get("task") or "").strip()
+    fallback_task = "Complete the selected workstream artifact and record verification evidence"
+    task_note = task_seed if task_seed else fallback_task
+    task_description = task_seed if task_seed else fallback_task
     replacements = {
         "<repo_name>": _get_repo_name(),
         "<branch_or_worktree>": _get_branch_or_worktree(),
@@ -541,6 +619,8 @@ def _build_template_replacements(session_id: str, args: Dict[str, object]) -> Di
         "<parent_spec_id>": str(args.get("parent_spec") or ""),
         "<parent_spec_id_or_empty>": str(args.get("parent_spec") or ""),
         "<child_spec_id_or_empty>": str(args.get("child_spec") or ""),
+        "<note>": task_note,
+        "<task description>": task_description,
         "<roadmap_path>": f"docs/arc/{ROADMAP_FILE.name}",
         "<spec_role>": "workstream",
         "<workstream_intent>": str(args.get("intent") or DEFAULT_WORKSTREAM_INTENT),
@@ -646,6 +726,12 @@ def _create_manifest_artifacts(
             timestamp,
             artifact_replacements,
         )
+        if entry["doc_type"] == "task":
+            try:
+                validate_task_board(content, source=f"{entry['doc_type']} artifact")
+            except ValueError as exc:
+                print(f"❌ {exc}")
+                sys.exit(1)
         create_file(target_dir, _artifact_filename(doc_prefix, entry["doc_type"]), content)
 
 
@@ -761,6 +847,7 @@ def _parse_args():
         "feature_id": _get_cli_flag_value("--feature-id"),
         "parent_spec": _get_cli_flag_value("--parent-spec"),
         "child_spec": _get_cli_flag_value("--child-spec"),
+        "task": _get_cli_flag_value("--task"),
         "pack": sanitize_theme(_get_cli_flag_value("--pack")) if _get_cli_flag_value("--pack") else "",
         "into_session": _get_cli_flag_value("--into-session"),
         "with_artifacts": [
@@ -779,6 +866,7 @@ def _print_usage():
         "Usage: ./.agents/agents new <theme> "
         "[--feature-id F-01 --parent-spec <spec-id> [--child-spec <spec-id>]] "
         "[--intent delivery|planning|research|brainstorming|exploration|specification|closure] "
+        "[--task \"<task text>\"] "
         "[--with <doc-type>] [--spec | --spec-child | --spec-lite] [--spec-test] [--pack <pack-slug>] "
         "[--into-session <session-id>] [--plan-only] [--force-new | --quick]"
     )
@@ -796,6 +884,7 @@ def _print_usage():
     print("  ./.agents/agents new new-child-spec --feature-id F-03 --parent-spec my-parent-spec --spec-child")
     print("  ./.agents/agents new hardening-tests --feature-id F-03 --parent-spec my-parent-spec --spec-test")
     print("  ./.agents/agents new investigate-auth --feature-id F-03 --parent-spec my-parent-spec --intent research")
+    print("  ./.agents/agents new delivery-task --feature-id F-02 --parent-spec parent-spec --intent delivery --task \"Fix input validation bug\"")
     print("  ./.agents/agents new api-follow-up --feature-id F-07 --parent-spec parent --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec")
     print("  ./.agents/agents new tiny-fix --quick")
     print("  ./.agents/agents new new-epic --feature-id F-04 --parent-spec parent --child-spec child --force-new")
@@ -944,6 +1033,7 @@ def main():
         return
 
     _validate_governance_requirements(args)
+    _validate_nonquick_delivery_task_text(args)
 
     if args["intent"] not in VALID_WORKSTREAM_INTENTS:
         print(f"❌ Invalid --intent: {args['intent']}")

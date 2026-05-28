@@ -441,6 +441,137 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         self.assertTrue(parsed["use_spec_test"])
         self.assertIn("spec-lite", parsed["with_artifacts"])
 
+    def test_template_parse_args_accepts_task_argument(self):
+        script_path = Path("src/project-template/.agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("template_agents_new_task_arg_parse_test", script_path)
+
+        argv = [
+            "agents-new.py",
+            "delivery-tasking",
+            "--task",
+            "Implement retry logic for checkout",
+            "--intent",
+            "delivery",
+        ]
+        with mock.patch.object(sys, "argv", argv):
+            parsed = agents_new._parse_args()
+
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["task"], "Implement retry logic for checkout")
+
+    def test_template_main_calls_delivery_task_validation(self):
+        script_path = Path("src/project-template/.agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("template_agents_new_main_flow_test", script_path)
+
+        args = {
+            "theme": "execution-integrity-hardening",
+            "use_spec": False,
+            "use_spec_lite": True,
+            "plan_only": False,
+            "force_new": True,
+            "quick_mode": False,
+            "intent": "delivery",
+            "feature_id": "F-01",
+            "parent_spec": "260306_roadmap-first-delivery-system_spec_01",
+            "child_spec": "",
+            "task": "Implement execution integrity hardening",
+            "with_artifacts": [],
+        }
+
+        with (
+            mock.patch.object(agents_new, "_parse_args", return_value=args),
+            mock.patch.object(agents_new, "get_active_session", return_value="260224_1030_scripts-lean-efficiency"),
+            mock.patch.object(agents_new, "_handle_quick_mode", return_value=False),
+            mock.patch.object(agents_new, "_validate_governance_requirements"),
+            mock.patch.object(agents_new, "_validate_nonquick_delivery_task_text") as validate_task_mock,
+            mock.patch.object(agents_new, "_check_active_session_policy"),
+            mock.patch.object(agents_new, "get_session_id", return_value="260224_1300_execution-integrity-hardening"),
+            mock.patch.object(agents_new, "get_timestamp", return_value="2026-02-24T13:00:00-03:00"),
+            mock.patch.object(agents_new, "_create_workstream") as create_workstream_mock,
+            mock.patch.object(agents_new, "create_session_folder") as create_session_folder_mock,
+        ):
+            agents_new.main()
+
+        validate_task_mock.assert_called_once_with(args)
+        create_workstream_mock.assert_called_once_with(
+            "260224_1300_execution-integrity-hardening",
+            "execution-integrity-hardening",
+            "2026-02-24T13:00:00-03:00",
+            args,
+        )
+        create_session_folder_mock.assert_not_called()
+
+    def test_template_nonquick_delivery_requires_task_text(self):
+        script_path = Path("src/project-template/.agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("template_agents_new_delivery_task_required_test", script_path)
+
+        args = {
+            "quick_mode": False,
+            "intent": "delivery",
+            "task": "",
+        }
+        with self.assertRaises(SystemExit):
+            agents_new._validate_nonquick_delivery_task_text(args)
+
+    def test_template_nonquick_delivery_rejects_placeholder_task_text(self):
+        script_path = Path("src/project-template/.agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("template_agents_new_delivery_task_placeholder_test", script_path)
+
+        args = {
+            "quick_mode": False,
+            "intent": "delivery",
+            "task": "<note>",
+        }
+        with self.assertRaises(SystemExit):
+            agents_new._validate_nonquick_delivery_task_text(args)
+
+    def test_template_nonquick_delivery_rejects_meta_planning_task_text(self):
+        script_path = Path("src/project-template/.agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("template_agents_new_delivery_task_meta_test", script_path)
+
+        args = {
+            "quick_mode": False,
+            "intent": "delivery",
+            "task": "Create the plan for implementation of retries.",
+        }
+        with self.assertRaises(SystemExit):
+            agents_new._validate_nonquick_delivery_task_text(args)
+
+    def test_template_task_template_renders_delivery_task_into_t01_row(self):
+        script_path = Path("src/project-template/.agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("template_agents_new_task_template_render_test", script_path)
+
+        replacements = agents_new._build_template_replacements(
+            "260623_1200_delivery-task",
+            {
+                "feature_id": "F-07",
+                "parent_spec": "parent-spec",
+                "child_spec": "",
+                "pack": "",
+                "intent": "delivery",
+                "task": "Implement retry logic for checkout",
+            },
+        )
+
+        content = agents_new.fill_template(
+            agents_new.load_template("task.md"),
+            "260623_1200_delivery-task",
+            "delivery-task",
+            "2026-06-23T12:00:00-03:00",
+            replacements,
+        )
+
+        self.assertIn(
+            "| T-01 | pending | worker | Implement retry logic for checkout |",
+            content,
+        )
+
     def test_ordered_selected_doc_types_rejects_disallowed_artifacts_for_intent(self):
         script_path = Path(".agents/scripts/agents-new.py").resolve()
         sys.path.insert(0, str(script_path.parent))
