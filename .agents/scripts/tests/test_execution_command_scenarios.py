@@ -483,6 +483,12 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             self.assertEqual(payload["governance"]["feature_id"], "F-08")
             self.assertIn("rules", payload)
             self.assertIn("skills", payload)
+            self.assertIn("route_metadata", bundle)
+            route_metadata = bundle["route_metadata"]
+            self.assertEqual(route_metadata["payload_key"], "rule_skill_context_payload")
+            self.assertEqual(route_metadata["payload_schema_version"], "1.0.0")
+            self.assertEqual(route_metadata["routing"]["work_type"], "delivery")
+            self.assertIn("RULE-002", route_metadata["routing"]["rule_ids"])
 
     def test_load_feature_operation_governance_warns_and_skips_optional_missing_rule(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:

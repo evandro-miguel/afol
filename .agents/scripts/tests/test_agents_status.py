@@ -99,6 +99,8 @@ class PrintStatusTests(unittest.TestCase):
         with mock.patch("builtins.print") as mock_print:
             self.status.print_status(data)
         output = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
+        self.assertIn("STATUS:", output)
+        self.assertIn("TASK:", output)
         self.assertIn("session:", output)
         self.assertIn("260401_1200_test", output)
         self.assertIn("F-01", output)
@@ -225,7 +227,9 @@ class SummarizeSessionTests(unittest.TestCase):
         self.assertIn("session", result)
         self.assertIn("tasks", result)
         self.assertIn("ready_state", result)
+        self.assertIn("compact_handoff", result)
         self.assertEqual(result["session"], "260401_test_session")
+        self.assertEqual(result["compact_handoff"]["STATUS"], "PARTIAL")
 
     def test_summarize_session_complete_state(self):
         session_dir = mock.MagicMock()
@@ -287,12 +291,17 @@ class MainPathTests(unittest.TestCase):
         mock_args = mock.Mock(session=None, json=True, pretty=False, artifact=None, check_context=False)
         with mock.patch.object(self.status, "parse_args", return_value=mock_args), \
              mock.patch.object(self.status, "find_session", return_value=Path("/tmp/s")), \
-             mock.patch.object(self.status, "summarize_session", return_value={"session": "s"}):
+             mock.patch.object(
+                 self.status,
+                 "summarize_session",
+                 return_value={"session": "s", "compact_handoff": {"STATUS": "DONE"}},
+             ):
             with mock.patch("builtins.print") as mock_print:
                 result = self.status.main()
         self.assertEqual(result, 0)
         rendered = mock_print.call_args_list[0][0][0]
         self.assertIn('"session":"s"', rendered)
+        self.assertIn('"compact_handoff":{"STATUS":"DONE"}', rendered)
         self.assertNotIn("\n", rendered)
 
     def test_main_artifact_resolution(self):

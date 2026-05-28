@@ -206,6 +206,7 @@ BLOCKING_STATES = {"problem", "in_progress"}
 RULE_METADATA_FILE = RULES_DIR / "index.json"
 FEATURE_OPERATION_SURFACES = ("feature", "workbench", "validation")
 RULE_SKILL_CONTEXT_SCHEMA_VERSION = "1.0.0"
+DELEGATION_ROUTE_METADATA_VERSION = "1.0.0"
 DEFAULT_RULE_METADATA: Tuple[Dict[str, Any], ...] = (
     {
         "id": "RULE-002",
@@ -918,6 +919,27 @@ def build_rule_skill_context_payload(
     }
 
 
+def build_delegation_route_metadata(
+    *,
+    session: str,
+    work_type: str,
+    surfaces: List[str],
+    rules: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    return {
+        "version": DELEGATION_ROUTE_METADATA_VERSION,
+        "transport": "governance_bundle",
+        "payload_key": "rule_skill_context_payload",
+        "payload_schema_version": RULE_SKILL_CONTEXT_SCHEMA_VERSION,
+        "session": session,
+        "routing": {
+            "work_type": work_type,
+            "surfaces": surfaces,
+            "rule_ids": [item["id"] for item in rules],
+        },
+    }
+
+
 def _resolve_governance_rules(
     *,
     artifacts: Dict[str, Dict[str, Any]],
@@ -1019,6 +1041,12 @@ def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, A
         work_type=work_type,
         rules=selected_rules,
     )
+    route_metadata = build_delegation_route_metadata(
+        session=session_dir.name,
+        work_type=work_type,
+        surfaces=surfaces,
+        rules=selected_rules,
+    )
 
     return {
         "session": session_dir.name,
@@ -1033,6 +1061,7 @@ def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, A
         "work_type": work_type,
         "rules": selected_rules,
         "rule_warnings": rule_warnings,
+        "route_metadata": route_metadata,
         "rule_skill_context_payload": payload,
     }
 

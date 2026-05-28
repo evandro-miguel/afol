@@ -479,6 +479,7 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
                 "---\n"
                 "doc_type: research\n"
                 "status: active\n"
+                "sidecar_justification: required\n"
                 "updated_at: \"2026-02-23T00:00:00-03:00\"\n"
                 "---\n\n"
                 + self._valid_sidecar_body()
@@ -525,6 +526,71 @@ class AgentsWbUpdateTaskMarkerTests(unittest.TestCase):
             self.assertIn("doc_type: research", content)
             self.assertIn("## Sidecar Justification", content)
             self.assertIn("- Execution task affected: T-02", content)
+            self.assertIn("sidecar_justification: required", content)
+
+    def test_validate_sidecar_justification_rejects_missing_frontmatter_value(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_sidecar_mode_missing_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            sidecar = Path(td) / "sample_research_01.md"
+            sidecar.write_text(
+                "---\n"
+                "doc_type: research\n"
+                "status: active\n"
+                "---\n\n"
+                + self._valid_sidecar_body(),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "missing sidecar_justification"):
+                wb_update.validate_sidecar_justification(sidecar)
+
+    def test_validate_sidecar_justification_allows_not_required_mode(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_sidecar_mode_not_required_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            sidecar = Path(td) / "sample_research_01.md"
+            sidecar.write_text(
+                "---\n"
+                "doc_type: research\n"
+                "status: active\n"
+                "sidecar_justification: not_required\n"
+                "---\n\n"
+                "# Research\n\n"
+                "- Optional record.\n",
+                encoding="utf-8",
+            )
+            wb_update.validate_sidecar_justification(sidecar)
+
+    def test_cmd_ensure_sidecar_json_compact_output(self):
+        script_path = Path(".agents/scripts/agents-wb-update.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        wb_update = load_module("agents_wb_update_ensure_json_output_test", script_path)
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260224_0000_ensure-json"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            self._allow_temp_workbench(wb_update, session_dir)
+            args = argparse.Namespace(
+                session=str(session_dir),
+                file="research",
+                task_id="T-02",
+                blocking_question="Which validator must own prewrite checks?",
+                decision_produced="Reuse shared task_integrity helpers.",
+                stop_condition="Validator API selected and covered by tests.",
+                json=True,
+            )
+            with mock.patch("builtins.print") as mock_print:
+                wb_update.cmd_ensure(args)
+            rendered = mock_print.call_args[0][0]
+            payload = json.loads(rendered)
+            self.assertEqual(payload["artifact"], "research")
+            self.assertEqual(payload["status"], "saved")
+            self.assertEqual(payload["sidecar_justification"], "required")
+            self.assertIn("_research_01.md", payload["path"])
 
 
 if __name__ == "__main__":

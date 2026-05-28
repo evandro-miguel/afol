@@ -39,6 +39,7 @@ from lib.agents_config import (
     parse_offset,
 )
 from lib.execution_commands import evidence_record_closure_error
+from lib.cli_output import to_json_text
 from lib.markdown_docs import split_markdown_frontmatter as split_frontmatter
 from lib.postmortem_governance import postmortem_governance_review_issues
 
@@ -92,6 +93,7 @@ SIDECAR_REQUIRED_LABELS = {
     "Execution task affected": re.compile(r"^\s*-\s*Execution task affected:\s*(T-\d{2,3})\s*$", re.IGNORECASE | re.MULTILINE),
     "Stop condition": re.compile(r"^\s*-\s*Stop condition:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE),
 }
+SIDECAR_JUSTIFICATION_ALLOWED = {"required", "not_required"}
 
 
 def now_iso_gmt3() -> str:
@@ -338,6 +340,13 @@ def _section_body(body: str, heading: str) -> str:
     return match.group("body") if match else ""
 
 
+def _sidecar_justification_value(frontmatter: dict) -> str:
+    raw = frontmatter.get("sidecar_justification")
+    if raw is None:
+        return ""
+    return str(raw).strip().lower()
+
+
 def validate_sidecar_justification(path: Path) -> None:
     parsed = split_frontmatter(path.read_text())
     if not parsed:
@@ -345,6 +354,16 @@ def validate_sidecar_justification(path: Path) -> None:
     fm, body = parsed
     doc_type = str(fm.get("doc_type", "")).strip()
     if doc_type not in SIDECAR_DOC_TYPES:
+        return
+
+    mode = _sidecar_justification_value(fm)
+    if not mode:
+        raise ValueError(f"{path.name} is missing sidecar_justification frontmatter value")
+    if mode not in SIDECAR_JUSTIFICATION_ALLOWED:
+        raise ValueError(
+            f"{path.name} has invalid sidecar_justification '{mode}'; expected required|not_required"
+        )
+    if mode == "not_required":
         return
 
     section = _section_body(body, "Sidecar Justification")
@@ -528,6 +547,7 @@ def ensure_artifact(
         fm["created_at"] = now_iso_gmt3()
         fm["updated_at"] = now_iso_gmt3()
         if doc_type in SIDECAR_DOC_TYPES:
+            fm["sidecar_justification"] = "required"
             body = _append_sidecar_justification(
                 body,
                 task_id=str(task_id),
@@ -973,6 +993,8 @@ def cmd_evidence(args: argparse.Namespace):
 def cmd_ensure(args: argparse.Namespace):
     require_explicit_session(args, "ensure")
     session_dir = resolve_session(args.session)
+    before_paths = doc_files(session_dir, args.file)
+    before_latest = before_paths[-1] if before_paths else None
     path = ensure_artifact(
         session_dir,
         args.file,
@@ -981,7 +1003,31 @@ def cmd_ensure(args: argparse.Namespace):
         decision_produced=args.decision_produced,
         stop_condition=args.stop_condition,
     )
-    print(f"✓ ensured {args.file}: {display_path(path)}")
+    created = before_latest is None or before_latest != path
+    payload = {
+        "status": "saved" if created else "exists",
+        "artifact": args.file,
+        "path": display_path(path),
+        "summary": (
+            f"{args.file} sidecar ready for governed handoff"
+            if args.file in SIDECAR_DOC_TYPES
+            else f"{args.file} artifact ready"
+        ),
+    }
+    if args.file in SIDECAR_DOC_TYPES:
+        parsed = split_frontmatter(path.read_text())
+        if parsed:
+            fm, _ = parsed
+            payload["sidecar_justification"] = _sidecar_justification_value(fm) or "missing"
+    if getattr(args, "json", False):
+        print(to_json_text(payload, pretty=False, sort_keys=True))
+        return
+    sidecar_label = payload.get("sidecar_justification")
+    extra = f" | sidecar={sidecar_label}" if sidecar_label else ""
+    print(
+        f"STATUS: {payload['status'].upper()} | ARTIFACT: {payload['artifact']} | "
+        f"PATH: {payload['path']} | SUMMARY: {payload['summary']}{extra}"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1042,6 +1088,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ensure.add_argument("--blocking-question", help="required for sidecar artifacts")
     p_ensure.add_argument("--decision-produced", help="required for sidecar artifacts")
     p_ensure.add_argument("--stop-condition", help="required for sidecar artifacts")
+    p_ensure.add_argument("--json", action="store_true", help="Emit compact JSON output")
     p_ensure.set_defaults(func=cmd_ensure)
 
     p_status = sub.add_parser("status", help="set frontmatter status in session docs")
