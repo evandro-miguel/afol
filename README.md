@@ -137,6 +137,7 @@ Public onboarding has two entrypoints:
 ### Onboarding validation (minimum)
 
 - Validate installation from public examples:
+  - `./a` (front-door entrypoint)
   - `./a s` (status alias)
   - `./a status`
   - `./a v` (version)

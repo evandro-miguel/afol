@@ -23,11 +23,13 @@ Define how to install the `.agents` scaffold into another repository, including:
 
 - Command path: `./.agents/agents` inside the scaffold.
 - Repo path requirement:
-  - provide a normal target directory path such as `/path/to/target-repo`, not a private host path.
+  - provide a normal target directory path such as `/path/to/target-repo`,
+    not a private host path.
 - Mode:
   - `full`: target is empty or new.
   - `partial`: target already has live content and you want scaffold adoption only.
 - Validation minimum:
+  - `./a` confirms the front-door wrapper is present.
   - `./a status` (or `./a s`) confirms onboarding command visibility.
   - `./a v` confirms wrapper/runtime toolchain version surface.
   - `just --list`
