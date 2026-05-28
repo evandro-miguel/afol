@@ -143,6 +143,37 @@ class AgentsNewQuickModeTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     agents_new._validate_governance_requirements(args)
 
+    def test_validate_governance_requirements_missing_flags_stdout_order(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_governance_missing_flags_test", script_path)
+
+        args = {
+            "quick_mode": False,
+            "feature_id": "",
+            "parent_spec": "",
+            "child_spec": "",
+        }
+
+        output = StringIO()
+        with (
+            mock.patch.object(agents_new, "GOVERNANCE_REQUIRED", True),
+            mock.patch.object(agents_new, "QUICK_MODE_BYPASSES_GOVERNANCE", True),
+            redirect_stdout(output),
+            self.assertRaises(SystemExit),
+        ):
+            agents_new._validate_governance_requirements(args)
+
+        self.assertEqual(
+            output.getvalue().splitlines(),
+            [
+                "❌ Roadmap-first governance is mandatory for standard workstreams.",
+                "Missing required flags: --feature-id, --parent-spec",
+                "Example:",
+                "  .agents/agents new <theme> --feature-id F-01 --parent-spec <parent-spec-id>",
+            ],
+        )
+
     def test_next_available_session_id_adds_suffix_on_collision(self):
         script_path = Path(".agents/scripts/agents-new.py").resolve()
         sys.path.insert(0, str(script_path.parent))

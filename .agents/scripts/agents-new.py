@@ -509,13 +509,8 @@ def _normalize_spec_reference(reference: str, role: str) -> str:
     return _doc_id_from_path(spec_path)
 
 
-def _validate_governance_requirements(args: Dict[str, object]) -> None:
-    """Enforce roadmap/spec linkage for standard workstreams."""
-    if args.get("quick_mode") and QUICK_MODE_BYPASSES_GOVERNANCE:
-        return
-    if not GOVERNANCE_REQUIRED:
-        return
-
+def _validate_governance_scope(args: Dict[str, object]) -> None:
+    """Validate required governance scope fields for standard workstreams."""
     missing_flags = []
     if not args.get("feature_id"):
         missing_flags.append("--feature-id")
@@ -546,6 +541,9 @@ def _validate_governance_requirements(args: Dict[str, object]) -> None:
     args["feature_id"] = feature_id
     args["parent_spec"] = _normalize_spec_reference(str(args["parent_spec"]), "Parent")
 
+
+def _validate_governance_child_spec(args: Dict[str, object]) -> None:
+    """Validate and normalize optional child-spec linkage semantics."""
     child_spec = str(args.get("child_spec") or "").strip()
     if child_spec:
         if args.get("use_spec_child") or args.get("use_spec_lite"):
@@ -558,8 +556,20 @@ def _validate_governance_requirements(args: Dict[str, object]) -> None:
             print("❌ --child-spec must differ from --parent-spec")
             sys.exit(1)
         args["child_spec"] = normalized_child
-    else:
-        args["child_spec"] = ""
+        return
+
+    args["child_spec"] = ""
+
+
+def _validate_governance_requirements(args: Dict[str, object]) -> None:
+    """Enforce roadmap/spec linkage for standard workstreams."""
+    if args.get("quick_mode") and QUICK_MODE_BYPASSES_GOVERNANCE:
+        return
+    if not GOVERNANCE_REQUIRED:
+        return
+
+    _validate_governance_scope(args)
+    _validate_governance_child_spec(args)
 
 
 def _validate_nonquick_delivery_task_text(args: Dict[str, object]) -> None:
