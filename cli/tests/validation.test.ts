@@ -139,8 +139,9 @@ describe("validation command family", () => {
     const proc = runKernel(["v", "bench", "--pack", "runtime-live-agent", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
-    expect(payload.status).toBe("failed");
+    expect(payload.status).toBe("skipped");
     expect(payload.pass).toBe(false);
+    expect(payload.notes).toEqual(["all-scenarios-skipped:not-implemented-live-runner"]);
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
     for (const result of results) {

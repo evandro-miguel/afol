@@ -547,16 +547,25 @@ function handleBenchmark(
   const baselineMissing = results.filter((entry) => entry.status === "baseline-missing").length;
   const contractIssues = validateRegistryContract(snapshot);
   const pass = failed === 0 && baselineMissing === 0 && skipped === 0 && contractIssues.length === 0;
+  const allSkipped =
+    results.length > 0
+    && skipped === results.length
+    && failed === 0
+    && baselineMissing === 0
+    && contractIssues.length === 0;
+  const status: "passed" | "failed" | "skipped" = pass ? "passed" : allSkipped ? "skipped" : "failed";
+  const notes = allSkipped ? ["all-scenarios-skipped:not-implemented-live-runner"] : [];
   return outputJson({
     schema_version: VALIDATION_SCHEMA_VERSION,
     command_family: "validation",
     mode: "benchmark",
     benchmark_result_schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
-    status: pass ? "passed" : "failed",
+    status,
     pass,
     selected_pack_ids: selectedPacks,
     selection_reasons: selection.reasons,
     result_count: results.length,
+    notes,
     summary: {
       total: results.length,
       passed,
