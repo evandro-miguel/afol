@@ -149,13 +149,23 @@ def record_event(event_type: str, source: str, payload: Dict[str, Any] | None = 
 
 def load_events(path: Path = EVENTS_FILE) -> Dict[str, Any]:
     if not path.exists():
-        return {"events": [], "total_lines": 0, "invalid_lines": 0, "invalid_samples": []}
+        return {
+            "events": [],
+            "total_lines": 0,
+            "invalid_lines": 0,
+            "invalid_samples": [],
+            "byte_size": 0,
+            "content_hash": "",
+        }
 
     events: List[Dict[str, Any]] = []
     invalid_lines = 0
     invalid_samples: List[Dict[str, Any]] = []
+    raw_bytes = path.read_bytes()
+    raw_text = raw_bytes.decode("utf-8", errors="replace")
+    lines = raw_text.splitlines()
 
-    for line_no, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_no, raw_line in enumerate(lines, start=1):
         line = raw_line.strip()
         if not line:
             continue
@@ -172,9 +182,11 @@ def load_events(path: Path = EVENTS_FILE) -> Dict[str, Any]:
 
     return {
         "events": events,
-        "total_lines": len(path.read_text(encoding="utf-8").splitlines()),
+        "total_lines": len(lines),
         "invalid_lines": invalid_lines,
         "invalid_samples": invalid_samples,
+        "byte_size": len(raw_bytes),
+        "content_hash": hashlib.sha256(raw_bytes).hexdigest(),
     }
 
 
@@ -392,6 +404,8 @@ def event_cursor() -> Dict[str, Any]:
     return {
         "path": rel(EVENTS_FILE),
         "line_count": loaded["total_lines"],
+        "byte_size": loaded["byte_size"],
+        "content_hash": loaded["content_hash"],
         "invalid_lines": loaded["invalid_lines"],
         "last_event_id": events[-1]["id"] if events else None,
     }
@@ -456,8 +470,19 @@ def compute_freshness(category: str) -> Dict[str, Any]:
         reasons.append("source_changed")
 
     existing_cursor = existing.get("event_cursor", {}) if isinstance(existing.get("event_cursor"), dict) else {}
-    if int(live_cursor.get("line_count", 0)) > int(existing_cursor.get("line_count", 0)):
+    live_line_count = int(live_cursor.get("line_count", 0))
+    existing_line_count = int(existing_cursor.get("line_count", 0))
+    if live_line_count > existing_line_count:
         reasons.append("new_events_not_indexed")
+    elif live_line_count < existing_line_count:
+        reasons.append("event_log_truncated")
+
+    if live_line_count == existing_line_count:
+        if any(
+            live_cursor.get(key) != existing_cursor.get(key)
+            for key in ("byte_size", "content_hash", "invalid_lines", "last_event_id")
+        ):
+            reasons.append("event_log_changed")
 
     return {
         "category": category,
@@ -468,6 +493,7 @@ def compute_freshness(category: str) -> Dict[str, Any]:
         "generated_at": existing.get("generated_at"),
         "live_source_count": live_sig["count"],
         "live_event_line_count": live_cursor["line_count"],
+        "live_event_byte_size": live_cursor["byte_size"],
     }
 
 

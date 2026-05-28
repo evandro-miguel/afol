@@ -28,6 +28,12 @@ uv.lock
 .agents/tools/uv/
 src/project-template/.agents/tmp/
 .agents/journal/
+.agents/scripts/.agents/
+src/project-template/.agents/scripts/.agents/
+.agents/data/events/
+.agents/data/index/
+src/project-template/.agents/data/events/
+src/project-template/.agents/data/index/
 
 # Universal-skills must not be a repo-local git cache or nested checkout.
 .agents/cache/universal-skills/

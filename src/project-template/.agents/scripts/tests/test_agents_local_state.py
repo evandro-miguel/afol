@@ -166,6 +166,44 @@ def test_rebuild_query_freshness_and_replay(tmp_path, monkeypatch):
     assert replay["events"][0]["type"] == "query"
 
 
+def test_event_log_truncation_rewrite_and_tamper_stale_index(tmp_path, monkeypatch):
+    local_state = load_module("agents_local_state_test_event_log_tamper", "agents-local-state.py")
+
+    monkeypatch.setattr(local_state, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(local_state, "AGENTS_DIR", tmp_path / ".agents")
+    monkeypatch.setattr(local_state, "WB_DIR", tmp_path / ".agents" / "wb")
+    monkeypatch.setattr(local_state, "RULES_DIR", tmp_path / ".agents" / "rules")
+    monkeypatch.setattr(local_state, "SKILLS_DIR", tmp_path / ".agents" / "skills")
+    monkeypatch.setattr(local_state, "SPECS_DIR", tmp_path / "docs" / "arc" / "SPECS")
+    monkeypatch.setattr(local_state, "DATA_DIR", tmp_path / ".agents" / "data")
+    monkeypatch.setattr(local_state, "EVENTS_DIR", tmp_path / ".agents" / "data" / "events")
+    monkeypatch.setattr(local_state, "EVENTS_FILE", tmp_path / ".agents" / "data" / "events" / "events.jsonl")
+    monkeypatch.setattr(local_state, "INDEX_DIR", tmp_path / ".agents" / "data" / "index")
+    monkeypatch.setattr(local_state, "INDEX_MANIFEST", tmp_path / ".agents" / "data" / "index" / "manifest.json")
+
+    _write_task_file(tmp_path / ".agents" / "wb" / "260528_1200_f07" / "260528_1200_f07_task_01.md")
+
+    local_state.record_event("seed", "test")
+    local_state.rebuild(["workbench"])
+
+    fresh = local_state.compute_freshness("workbench")
+    assert fresh["fresh"] is True
+
+    event_log = tmp_path / ".agents" / "data" / "events" / "events.jsonl"
+    event_log.write_text("", encoding="utf-8")
+    truncated = local_state.compute_freshness("workbench")
+    assert truncated["stale"] is True
+    assert "event_log_truncated" in truncated["reasons"]
+
+    event_log.write_text(
+        "{\"version\":1,\"timestamp\":\"2026-05-28T13:00:00Z\",\"type\":\"tamper\",\"source\":\"test\",\"payload\":{},\"metadata\":{},\"id\":\"abc\"}\n",
+        encoding="utf-8",
+    )
+    rewritten = local_state.compute_freshness("workbench")
+    assert rewritten["stale"] is True
+    assert "event_log_changed" in rewritten["reasons"]
+
+
 def test_cli_main_smoke(tmp_path, monkeypatch, capsys):
     local_state = load_module("agents_local_state_test_cli", "agents-local-state.py")
 

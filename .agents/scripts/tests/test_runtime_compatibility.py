@@ -77,7 +77,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_optional_sync_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td)
             (target / "Justfile").write_text("import 'docs/standards/Justfile'\n", encoding="utf-8")
             calls = []
@@ -109,7 +109,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_command_contract_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td)
             (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
 
@@ -143,7 +143,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_namespaced_just_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td)
             (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
             calls = []
@@ -170,7 +170,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_partial_post_checks_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td)
             (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
             calls = []
@@ -193,7 +193,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_make_required_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td)
 
             with mock.patch.object(agents_bootstrap.shutil, "which", return_value=None):
@@ -232,7 +232,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_wrapper_keeps_legacy_commands_on_local_script_runtime(self):
         wrapper_src = Path(".agents/agents").resolve()
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             agents_dir = root / ".agents"
             scripts_dir = agents_dir / "scripts"
@@ -271,7 +271,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_wrapper_rejects_missing_script_venv_without_hydrate(self):
         wrapper_src = Path(".agents/agents").resolve()
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             agents_dir = root / ".agents"
             scripts_dir = agents_dir / "scripts"
@@ -300,7 +300,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_wrapper_allows_system_python_with_opt_in(self):
         wrapper_src = Path(".agents/agents").resolve()
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             agents_dir = root / ".agents"
             scripts_dir = agents_dir / "scripts"
@@ -331,7 +331,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_wrapper_keeps_agents_script_python_override(self):
         wrapper_src = Path(".agents/agents").resolve()
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             agents_dir = root / ".agents"
             scripts_dir = agents_dir / "scripts"
@@ -365,7 +365,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_wrapper_hydrate_runs_sync_for_scripts_and_runtime(self):
         wrapper_src = Path(".agents/agents").resolve()
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             agents_dir = root / ".agents"
             scripts_dir = agents_dir / "scripts"
@@ -430,7 +430,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_wrapper_rejects_missing_runtime_venv_without_hydrate(self):
         wrapper_src = Path(".agents/agents").resolve()
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             agents_dir = root / ".agents"
             scripts_dir = agents_dir / "scripts"
@@ -469,7 +469,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_wrapper_routes_runtime_adoption_commands_directly(self):
         wrapper_src = Path(".agents/agents").resolve()
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             agents_dir = root / ".agents"
             scripts_dir = agents_dir / "scripts"
@@ -521,7 +521,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
     def test_wrapper_runtime_uv_fallback_requires_explicit_opt_in(self):
         wrapper_src = Path(".agents/agents").resolve()
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             agents_dir = root / ".agents"
             scripts_dir = agents_dir / "scripts"
@@ -606,7 +606,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         agents_bootstrap = load_module("agents_bootstrap_runtime_surface_refresh_test", script_path)
         self._skip_without_source_template(agents_bootstrap)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td)
             legacy_agents_dir = target / ".agents"
             legacy_agents_dir.mkdir(parents=True, exist_ok=True)
@@ -631,7 +631,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         agents_bootstrap = load_module("agents_bootstrap_generic_export_test", script_path)
         self._skip_without_source_template(agents_bootstrap)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td)
 
             agents_bootstrap.copy_required_files(target, force=False, dry_run=False)
@@ -832,7 +832,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_adaptation_doc_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td)
             stack = {
                 "signals": ["Python (pyproject.toml)"],
@@ -860,7 +860,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_sibling_checkout_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td) / "demo-repo"
             target.mkdir(parents=True, exist_ok=True)
             with mock.patch.object(agents_bootstrap.subprocess, "run") as patched_run:
@@ -892,7 +892,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_no_apps_checkout_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td) / "universal-skills"
             target.mkdir(parents=True, exist_ok=True)
 
@@ -906,7 +906,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_create_target_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td) / "new-project"
 
             agents_bootstrap.validate_target(
@@ -923,7 +923,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_justfile_test", script_path)
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory() as td:
             target = Path(td)
             justfile = target / "Justfile"
             justfile.write_text("default:\n  @echo existing\n", encoding="utf-8")
