@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-05-28T22:28:20+00:00
+**Generated:** 2026-05-28T22:59:14+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 164 files, 35,731 lines, 1715.2 KB
+**Stats:** 165 files, 35,805 lines, 1718.8 KB
 
 ### Files
 
@@ -21,7 +21,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_verify_tasks_strict.py` | 1,278 | 50.1 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_cli_utility_coverage.py` | 1,188 | 58.6 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_verify_tasks_strict.py` | 1,161 | 44.5 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_runtime_compatibility.py` | 832 | 45.1 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_runtime_compatibility.py` | 852 | 46.1 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_runtime_compatibility.py` | 798 | 43.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_scenarios.py` | 781 | 40.1 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_execution_command_scenarios.py` | 775 | 39.7 KB | Test file; unit tests |
@@ -126,7 +126,7 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260306_project-context-canon-and-setup_spec_01.md` | 85 | 3.6 KB | Module; functionality |
 | `docs/arc/SPECS/F-01/spec-tests/260521_0130_universal-agent-cli-kernel-contract_spec-test_01.md` | 84 | 2.8 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_guided-status-and-implementation_spec_01.md` | 82 | 3.1 KB | Module; functionality |
-| `docs/arc/SPECS/INDEX.md` | 80 | 11.8 KB | Module; functionality |
+| `docs/arc/SPECS/INDEX.md` | 81 | 12.0 KB | Module; functionality |
 | `docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md` | 77 | 3.1 KB | Module; functionality |
 | `.agents/scripts/tests/test_session_resolution_contract.py` | 76 | 4.2 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_session_resolution_contract.py` | 76 | 4.2 KB | Test file; unit tests |
@@ -150,6 +150,7 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260521_0000_total-reformulation-strategy_spec_01.md` | 55 | 2.1 KB | Module; functionality |
 | `src/project-template/.agents/scripts/tests/test_front_door_a.py` | 54 | 2.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260521_0040_governance-workbench-system_spec_01.md` | 53 | 2.0 KB | Module; functionality |
+| `docs/arc/SPECS/260528_1946_bootstrap-template-justfile-wiring_spec-child_01.md` | 53 | 2.3 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0120_public-distribution-and-onboarding_spec_01.md` | 52 | 2.1 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0090_template-update-and-versioning_spec_01.md` | 52 | 2.0 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0050_smart-rules-and-skills-routing_spec_01.md` | 52 | 2.0 KB | Module; functionality |

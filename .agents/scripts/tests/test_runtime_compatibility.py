@@ -180,6 +180,29 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             [cmd for _, cmd, _ in commands],
         )
 
+    def test_project_template_justfile_exports_strict_targets(self):
+        template_root = Path("src/project-template")
+        if not template_root.exists():
+            self.skipTest("source project template is only present in the source repo")
+
+        root_list = subprocess.run(
+            ["just", "--justfile", str(template_root / "Justfile"), "--list"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        standards_list = subprocess.run(
+            ["just", "--justfile", str(template_root / "docs/standards/Justfile"), "--list"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+
+        self.assertRegex(root_list, r"(?m)^\s*validate-strict\b")
+        self.assertRegex(standards_list, r"(?m)^\s*all-strict\b")
+        self.assertRegex(standards_list, r"(?m)^\s*diff-check\b")
+        self.assertRegex(standards_list, r"(?m)^\s*verify-strict-if-present\b")
+
     def test_bootstrap_post_checks_use_namespaced_recipe_when_justfile_is_module(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
