@@ -1,4 +1,5 @@
 ---
+doc_type: rule
 id: RULE-003
 theme: documentation-standards
 version: 1.0

@@ -1,4 +1,5 @@
 ---
+doc_type: rule
 id: RULE-001
 theme: tool-discovery-usage
 version: 1.0

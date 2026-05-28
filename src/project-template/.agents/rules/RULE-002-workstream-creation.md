@@ -1,4 +1,5 @@
 ---
+doc_type: rule
 id: RULE-002
 theme: workstream-creation
 version: 1.0
