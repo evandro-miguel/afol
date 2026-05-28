@@ -9,6 +9,8 @@ import typer
 from agentic_scaffold.runtime import AgenticRuntime
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+INSPECT_ACTION_SPEC = AgenticRuntime.require_action_spec("inspect")
+HEALTH_ACTION_SPEC = AgenticRuntime.require_action_spec("health")
 
 
 def _runtime(repo_root: Optional[Path]) -> AgenticRuntime:
@@ -21,18 +23,18 @@ def _emit_json(payload: object, pretty: bool = False) -> None:
     typer.echo(json.dumps(payload, ensure_ascii=False, indent=indent, separators=separators))
 
 
-@app.command()
+@app.command(name=INSPECT_ACTION_SPEC.cli_command)
 def inspect(
     depth: int = 3,
     include_hidden: bool = False,
     include_generated: bool = False,
-    max_entries: int = typer.Option(500, min=50, max=5000),
+    max_entries: int = typer.Option(500),
     pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Inspect the workspace tree."""
     result = _runtime(repo_root).run_action(
-        "inspect",
+        INSPECT_ACTION_SPEC.action_id,
         depth=depth,
         include_hidden=include_hidden,
         include_generated=include_generated,
@@ -44,13 +46,13 @@ def inspect(
     _emit_json(result.payload, pretty=pretty)
 
 
-@app.command()
+@app.command(name=HEALTH_ACTION_SPEC.cli_command)
 def health(
     pretty: bool = typer.Option(False, "--pretty", help="Emit human-readable JSON with indentation."),
     repo_root: Optional[Path] = typer.Option(None, exists=False, file_okay=False, dir_okay=True),
 ) -> None:
     """Run minimal runtime health checks."""
-    result = _runtime(repo_root).run_action("health")
+    result = _runtime(repo_root).run_action(HEALTH_ACTION_SPEC.action_id)
     if result.status == "error":
         _emit_json({"status": result.status, "message": result.message, "payload": result.payload}, pretty=pretty)
         raise typer.Exit(code=1)

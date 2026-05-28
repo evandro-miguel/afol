@@ -151,11 +151,13 @@ def test_runtime_action_spec_source_of_truth(scaffold_repo):
     assert specs["inspect"].mcp_tool == "inspect_workspace"
     assert specs["health"].cli_command == "health"
     assert specs["health"].mcp_tool == "runtime_health"
+    assert runtime.action_spec_for_cli_command("inspect") == specs["inspect"]
+    assert runtime.action_spec_for_mcp_tool("runtime_health") == specs["health"]
 
 
 def test_run_action_inspect_valid_and_invalid(scaffold_repo):
     runtime = AgenticRuntime.from_repo_root(scaffold_repo)
-    positive = runtime.run_action("inspect", depth=2, max_entries=30)
+    positive = runtime.run_action("inspect", depth=2, max_entries=10)
     assert positive.status == "ok"
     payload = positive.payload
     assert isinstance(payload, dict)
@@ -173,9 +175,12 @@ def test_runtime_health_action_returns_minimal_checks(scaffold_repo):
     assert health.status == "ok"
     assert isinstance(health.payload, dict)
     assert health.payload["status"] == "healthy"
-    assert health.payload["checks"]["runtime_root"] == str(scaffold_repo)
+    assert health.payload["checks"]["repo_root"]["exists"] is True
+    assert health.payload["checks"]["repo_root"]["label"] == scaffold_repo.name
     assert "command_registry" in health.payload["checks"]
     assert "required_available" in health.payload["checks"]["command_registry"]
+    assert health.payload["checks"]["search_roots"]["count"] >= 1
+    assert str(scaffold_repo) not in str(health.payload)
 
 
 def test_adoption_inspection_detects_missing_overlay_surfaces(scaffold_repo):

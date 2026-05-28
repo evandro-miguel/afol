@@ -11,6 +11,26 @@ from agentic_scaffold.runtime import AgenticRuntime
 runner = CliRunner()
 
 
+def _registered_cli_commands() -> set[str]:
+    names: set[str] = set()
+    for command in app.registered_commands:
+        if command.name:
+            names.add(command.name)
+            continue
+        callback = getattr(command, "callback", None)
+        callback_name = getattr(callback, "__name__", "")
+        if callback_name:
+            names.add(callback_name.replace("_", "-"))
+    return names
+
+
+def test_cli_action_commands_are_registered_from_shared_specs(scaffold_repo):
+    _ = scaffold_repo
+    command_names = _registered_cli_commands()
+    action_specs = AgenticRuntime.action_specs()
+    assert {spec.cli_command for spec in action_specs} <= command_names
+
+
 
 def test_cli_manifest(scaffold_repo):
     result = runner.invoke(app, ["manifest", "--repo-root", str(scaffold_repo)])
@@ -39,14 +59,14 @@ def test_cli_validate(scaffold_repo):
 def test_cli_inspect_matches_core_action(scaffold_repo):
     result = runner.invoke(
         app,
-        ["inspect", "--depth", "2", "--max-entries", "60", "--repo-root", str(scaffold_repo)],
+        ["inspect", "--depth", "2", "--max-entries", "10", "--repo-root", str(scaffold_repo)],
     )
     assert result.exit_code == 0
 
     cli_payload = json.loads(result.stdout)
     assert cli_payload["max_depth"] == 2
 
-    core_payload = AgenticRuntime.from_repo_root(scaffold_repo).run_action("inspect", depth=2, max_entries=60)
+    core_payload = AgenticRuntime.from_repo_root(scaffold_repo).run_action("inspect", depth=2, max_entries=10)
     assert core_payload.status == "ok"
     assert cli_payload["max_depth"] == core_payload.payload["max_depth"]
 
@@ -57,6 +77,14 @@ def test_cli_inspect_invalid_depth_returns_action_error(scaffold_repo):
     payload = json.loads(result.stdout)
     assert payload["status"] == "error"
     assert payload["message"] == "depth must be between 0 and 10"
+
+
+def test_cli_inspect_invalid_max_entries_returns_core_error(scaffold_repo):
+    result = runner.invoke(app, ["inspect", "--max-entries", "0", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "error"
+    assert payload["message"] == "max_entries must be between 1 and 5000"
 
 
 def test_cli_health(scaffold_repo):

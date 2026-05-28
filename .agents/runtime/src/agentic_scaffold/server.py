@@ -23,6 +23,8 @@ INSTRUCTIONS = (
     "controlled file writes/moves/patches with dry-run support, and reversible repository maintenance. Prefer search_docs and "
     "generate_manifest before broad reads. Use archive_paths instead of hard deletes."
 )
+INSPECT_ACTION_SPEC = AgenticRuntime.require_action_spec("inspect")
+HEALTH_ACTION_SPEC = AgenticRuntime.require_action_spec("health")
 
 
 def _build_runtime(repo_root: Path | None) -> AgenticRuntime:
@@ -43,15 +45,15 @@ def _json_resource(payload: object) -> str:
 
 
 def _register_tools(mcp: FastMCP, runtime: AgenticRuntime) -> None:
-    @mcp.tool(description="Inspect the repository tree with bounded depth and entry limits.")
-    def inspect_workspace(
+    @mcp.tool(name=INSPECT_ACTION_SPEC.mcp_tool, description=INSPECT_ACTION_SPEC.description)
+    def inspect_workspace_tool(
         depth: int = 3,
         include_hidden: bool = False,
         include_generated: bool = False,
         max_entries: int = 500,
     ) -> dict[str, Any]:
         result = runtime.run_action(
-            "inspect",
+            INSPECT_ACTION_SPEC.action_id,
             depth=depth,
             include_hidden=include_hidden,
             include_generated=include_generated,
@@ -61,13 +63,13 @@ def _register_tools(mcp: FastMCP, runtime: AgenticRuntime) -> None:
             raise ValueError(result.message)
         return result.payload
 
-    @mcp.tool(description="Inspect the repository with minimal health and registration checks.")
-    def runtime_health() -> dict[str, Any]:
-        result = runtime.run_action("health")
-        if result.status != "ok":
-            raise ValueError(result.message)
+    @mcp.tool(name=HEALTH_ACTION_SPEC.mcp_tool, description=HEALTH_ACTION_SPEC.description)
+    def runtime_health_tool() -> dict[str, Any]:
+        result = runtime.run_action(HEALTH_ACTION_SPEC.action_id)
         if isinstance(result.payload, dict):
             return result.payload
+        if result.status != "ok":
+            raise ValueError(result.message)
         raise ValueError("runtime health returned malformed payload")
 
     @mcp.tool(description="Search markdown docs, workbench artifacts, map docs, and skills with fuzzy ranking.")

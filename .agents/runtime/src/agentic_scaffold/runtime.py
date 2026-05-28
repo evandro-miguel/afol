@@ -14,16 +14,21 @@ from agentic_scaffold.services.search import KnowledgeSearchService
 from agentic_scaffold.services.validation import StructureValidator
 from agentic_scaffold.services.workspace import WorkspaceInspector
 
+INSPECT_ACTION_ID = "inspect"
+HEALTH_ACTION_ID = "health"
+INSPECT_MAX_ENTRIES_MIN = 1
+INSPECT_MAX_ENTRIES_MAX = 5000
+
 _ACTION_SPECS: tuple[ActionSpec, ...] = (
     ActionSpec(
-        action_id="inspect",
+        action_id=INSPECT_ACTION_ID,
         cli_command="inspect",
         mcp_tool="inspect_workspace",
         description="Inspect repository tree with bounded depth and visibility filters.",
         side_effect="read",
     ),
     ActionSpec(
-        action_id="health",
+        action_id=HEALTH_ACTION_ID,
         cli_command="health",
         mcp_tool="runtime_health",
         description="Run minimal runtime health and registration checks.",
@@ -31,6 +36,9 @@ _ACTION_SPECS: tuple[ActionSpec, ...] = (
         required_guards=["runtime_config", "tool_registration", "command_registry"],
     ),
 )
+_ACTION_SPECS_BY_ID: dict[str, ActionSpec] = {spec.action_id: spec for spec in _ACTION_SPECS}
+_ACTION_SPECS_BY_CLI_COMMAND: dict[str, ActionSpec] = {spec.cli_command: spec for spec in _ACTION_SPECS}
+_ACTION_SPECS_BY_MCP_TOOL: dict[str, ActionSpec] = {spec.mcp_tool: spec for spec in _ACTION_SPECS}
 
 
 class AgenticRuntime:
@@ -54,10 +62,22 @@ class AgenticRuntime:
 
     @classmethod
     def action_spec(cls, action_id: str) -> ActionSpec | None:
-        for spec in cls.action_specs():
-            if spec.action_id == action_id:
-                return spec
-        return None
+        return _ACTION_SPECS_BY_ID.get(action_id)
+
+    @classmethod
+    def action_spec_for_cli_command(cls, cli_command: str) -> ActionSpec | None:
+        return _ACTION_SPECS_BY_CLI_COMMAND.get(cli_command)
+
+    @classmethod
+    def action_spec_for_mcp_tool(cls, mcp_tool: str) -> ActionSpec | None:
+        return _ACTION_SPECS_BY_MCP_TOOL.get(mcp_tool)
+
+    @classmethod
+    def require_action_spec(cls, action_id: str) -> ActionSpec:
+        spec = cls.action_spec(action_id)
+        if spec is None:
+            raise RuntimeError(f"missing ActionSpec for action_id='{action_id}'")
+        return spec
 
     def run_action(
         self,
@@ -68,17 +88,17 @@ class AgenticRuntime:
         include_generated: bool = False,
         max_entries: int = 500,
     ) -> ActionResult:
-        if action_id == "inspect":
+        if action_id == INSPECT_ACTION_ID:
             if depth < 0 or depth > 10:
                 return ActionResult(
                     status="error",
                     message="depth must be between 0 and 10",
                     payload={"error": "depth out of range"},
                 )
-            if max_entries < 1 or max_entries > 5000:
+            if max_entries < INSPECT_MAX_ENTRIES_MIN or max_entries > INSPECT_MAX_ENTRIES_MAX:
                 return ActionResult(
                     status="error",
-                    message="max_entries must be between 1 and 5000",
+                    message=f"max_entries must be between {INSPECT_MAX_ENTRIES_MIN} and {INSPECT_MAX_ENTRIES_MAX}",
                     payload={"error": "max_entries out of range"},
                 )
             summary = self.workspace.inspect(
@@ -92,26 +112,48 @@ class AgenticRuntime:
                 message="inspect completed",
                 payload=summary.model_dump(mode="json"),
             )
-        if action_id == "health":
+        if action_id == HEALTH_ACTION_ID:
             required_commands = ("status", "knowledge", "verify-tasks")
             registry_names = {command["name"] for command in self.registry.manifest()}
             command_registry_ok = all(command in registry_names for command in required_commands)
             tool_catalog = self.tool_catalog_resource()
+            tool_catalog_available = bool(tool_catalog.get("available", False))
+            repo_root_exists = self.config.repo_root.exists()
+            search_root_labels = []
+            present_search_roots = 0
+            for root in self.config.search_roots:
+                label = root.name
+                if root == self.config.repo_root:
+                    label = "."
+                else:
+                    try:
+                        label = root.relative_to(self.config.repo_root).as_posix()
+                    except ValueError:
+                        label = root.name
+                if root.exists():
+                    present_search_roots += 1
+                search_root_labels.append(label)
             checks: dict[str, Any] = {
-                "runtime_root": str(self.config.repo_root),
+                "repo_root": {
+                    "exists": repo_root_exists,
+                    "label": self.config.repo_root.name,
+                },
                 "command_registry": {
                     "required_available": command_registry_ok,
                     "required": list(required_commands),
+                    "available_count": len(registry_names),
                 },
                 "tool_catalog": {
-                    "available": bool(tool_catalog.get("available", False)),
+                    "available": tool_catalog_available,
+                    "tool_count": int(tool_catalog.get("tool_count", 0)) if tool_catalog_available else 0,
                 },
                 "search_roots": {
                     "count": len(self.config.search_roots),
-                    "paths": [str(root) for root in self.config.search_roots],
+                    "present_count": present_search_roots,
+                    "labels": search_root_labels,
                 },
             }
-            if command_registry_ok and bool(tool_catalog.get("available", False)) and self.config.repo_root.exists():
+            if command_registry_ok and tool_catalog_available and repo_root_exists:
                 return ActionResult(
                     status="ok",
                     message="runtime health check passed",
@@ -126,11 +168,15 @@ class AgenticRuntime:
                 payload={
                     "status": "unhealthy",
                     "checks": checks,
-                    "missing": [
-                        {"type": "command_registry", "detail": "required command missing"}
-                        for missing in required_commands
-                        if missing not in registry_names
-                    ],
+                    "missing": (
+                        [
+                            {"type": "command_registry", "name": missing, "detail": "required command missing"}
+                            for missing in required_commands
+                            if missing not in registry_names
+                        ]
+                        + ([] if tool_catalog_available else [{"type": "tool_catalog", "name": "tools.json"}])
+                        + ([] if repo_root_exists else [{"type": "repo_root", "name": self.config.repo_root.name}])
+                    ),
                 },
                 next_step_hint="Fix runtime command registration or tool catalog availability.",
             )
