@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-05-28T19:40:12+00:00
+**Generated:** 2026-05-28T20:12:18+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 160 files, 35,264 lines, 1692.8 KB
+**Stats:** 160 files, 35,383 lines, 1698.2 KB
 
 ### Files
 
@@ -18,7 +18,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_skills_sync.py` | 1,596 | 76.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_skills_sync.py` | 1,596 | 76.7 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_verify_tasks_strict.py` | 1,278 | 50.1 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_cli_utility_coverage.py` | 1,205 | 59.7 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_cli_utility_coverage.py` | 1,276 | 62.8 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_cli_utility_coverage.py` | 1,188 | 58.6 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_verify_tasks_strict.py` | 1,161 | 44.5 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_runtime_compatibility.py` | 832 | 45.1 KB | Test file; unit tests |
@@ -76,6 +76,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_telemetry.py` | 171 | 8.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_primary-agent-runtime-compatibility_spec_01.md` | 171 | 8.4 KB | Module; functionality |
 | `docs/arc/SPECS/F-11/spec-tests/260521_0145_validation-ci-benchmark-matrix_spec-test_01.md` | 170 | 6.4 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_knowledge.py` | 163 | 7.5 KB | Test file; unit tests |
 | `docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md` | 161 | 7.2 KB | Module; functionality |
 | `.agents/runtime/tests/test_mcp.py` | 159 | 7.5 KB | Test file; unit tests |
 | `.agents/runtime/tests/test_cli.py` | 149 | 7.2 KB | Test file; unit tests |
@@ -101,7 +102,6 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260323_1750_current-state-map-contract_spec_01.md` | 119 | 5.8 KB | Module; functionality |
 | `.agents/scripts/tests/unit/test_refactored_functions.py` | 117 | 4.3 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/unit/test_refactored_functions.py` | 117 | 4.3 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_knowledge.py` | 115 | 5.3 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_knowledge.py` | 115 | 5.3 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_script_process_utils.py` | 114 | 5.2 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_script_process_utils.py` | 114 | 5.2 KB | Test file; unit tests |

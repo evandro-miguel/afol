@@ -149,6 +149,61 @@ def test_agents_index_scans_generates_and_runs_main(tmp_path, monkeypatch, capsy
     assert "DRY RUN" in capsys.readouterr().out
 
 
+def test_agents_index_idempotent_when_entries_unchanged(tmp_path, monkeypatch):
+    agents_index = load_module("agents_index_idempotency_test", "agents-index.py")
+    specs = tmp_path / "docs" / "arc" / "SPECS"
+    decisions = tmp_path / "docs" / "arc" / "DECISIONS"
+    specs.mkdir(parents=True)
+    decisions.mkdir(parents=True)
+    (specs / "260101_0100_test_spec_01.md").write_text(
+        "---\n"
+        'id: "260101_0100_test_spec_01"\n'
+        "theme: Testing\n"
+        "status: active\n"
+        "owners: [agent]\n"
+        'created_at: "2026-01-01T01:00:00Z"\n'
+        "---\n\n# Spec\n",
+        encoding="utf-8",
+    )
+    (decisions / "260101_0200_test_adr_01.md").write_text(
+        "---\n"
+        'id: "260101_0200_test_adr_01"\n'
+        "topic: Decision\n"
+        "status: final\n"
+        "owners: [architect]\n"
+        'created: "2026-01-01T02:00:00Z"\n'
+        "---\n\n# ADR\n",
+        encoding="utf-8",
+    )
+
+    class FakeDateTime:
+        tick = 0
+
+        @classmethod
+        def now(cls, _tz):
+            value = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc) + timedelta(seconds=cls.tick)
+            cls.tick += 1
+            return value
+
+    monkeypatch.setattr(agents_index, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(agents_index, "SPECS_DIR", specs)
+    monkeypatch.setattr(agents_index, "DECISIONS_DIR", decisions)
+    monkeypatch.setattr(agents_index, "datetime", FakeDateTime)
+
+    monkeypatch.setattr(sys, "argv", ["agents-index.py"])
+    agents_index.main()
+    first_specs = (specs / "INDEX.md").read_text(encoding="utf-8")
+    first_adrs = (decisions / "INDEX.md").read_text(encoding="utf-8")
+
+    monkeypatch.setattr(sys, "argv", ["agents-index.py"])
+    agents_index.main()
+    second_specs = (specs / "INDEX.md").read_text(encoding="utf-8")
+    second_adrs = (decisions / "INDEX.md").read_text(encoding="utf-8")
+
+    assert first_specs == second_specs
+    assert first_adrs == second_adrs
+
+
 def test_agents_patterns_load_filter_apply_rate_and_cli(tmp_path, monkeypatch, capsys):
     patterns = load_module("agents_patterns_coverage_test", "agents-patterns.py")
     pattern_root = tmp_path / "patterns"
@@ -305,6 +360,37 @@ def test_structure_mapper_prunes_output_subtree_from_scan_and_cache(tmp_path):
     assert "docs/arc/structure/data/generated.json" not in collected_paths
     assert "docs/arc/structure/data/generated.json" not in mapper.cache["files"]
     assert not any(path.startswith("docs/arc/structure/") for path in mapper.cache["files"])
+
+
+def test_structure_mapper_idempotent_when_scan_results_unchanged(tmp_path, monkeypatch):
+    struct = load_module("agents_structure_map_idempotency_test", "agents-structure-map.py")
+    project = tmp_path / "project"
+    output = project / "docs" / "map" / "structure"
+    (project / "services").mkdir(parents=True)
+    (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
+
+    class FakeDateTime:
+        tick = 0
+
+        @classmethod
+        def now(cls, _tz):
+            value = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc) + timedelta(seconds=cls.tick)
+            cls.tick += 1
+            return value
+
+    monkeypatch.setattr(struct, "datetime", FakeDateTime)
+    mapper = struct.StructureMapper(project, output)
+    mapper.run()
+    first_readme = (output / "README.md").read_text(encoding="utf-8")
+    first_backend = (output / "backend.md").read_text(encoding="utf-8")
+
+    mapper = struct.StructureMapper(project, output)
+    mapper.run()
+    second_readme = (output / "README.md").read_text(encoding="utf-8")
+    second_backend = (output / "backend.md").read_text(encoding="utf-8")
+
+    assert first_readme == second_readme
+    assert first_backend == second_backend
 
 
 def test_tools_catalog_display_validation_and_cli(monkeypatch, capsys):

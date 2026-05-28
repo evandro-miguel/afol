@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-05-28T19:40:12+00:00
+**Generated:** 2026-05-28T20:12:18+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,7 +9,7 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 114 files, 41,806 lines, 1741.3 KB
+**Stats:** 114 files, 41,906 lines, 1745.5 KB
 
 ### Files
 
@@ -40,7 +40,7 @@ Services, utilities, and business logic.
 | `src/project-template/.agents/scripts/agents-tools.py` | 543 | 20.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-doctor.py` | 521 | 20.1 KB | Module; functionality |
 | `.agents/scripts/agents-doctor.py` | 520 | 20.3 KB | Module; functionality |
-| `.agents/scripts/agents-structure-map.py` | 453 | 17.7 KB | Module; functionality |
+| `.agents/scripts/agents-structure-map.py` | 493 | 19.4 KB | Module; functionality |
 | `.agents/runtime/src/agentic_scaffold/services/changes.py` | 449 | 19.4 KB | Module; functionality |
 | `.agents/scripts/agents-lint-docs.py` | 443 | 16.8 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-lint-docs.py` | 443 | 16.8 KB | Module; functionality |
@@ -65,7 +65,8 @@ Services, utilities, and business logic.
 | `.agents/runtime/src/agentic_scaffold/runtime.py` | 270 | 12.5 KB | Module; functionality |
 | `.agents/scripts/agents-status.py` | 261 | 10.8 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-status.py` | 261 | 10.8 KB | Module; functionality |
-| `.agents/scripts/agents-knowledge.py` | 223 | 8.9 KB | Module; functionality |
+| `.agents/scripts/agents-knowledge.py` | 244 | 9.9 KB | Module; functionality |
+| `.agents/scripts/agents-index.py` | 226 | 8.5 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-knowledge.py` | 223 | 8.9 KB | Module; functionality |
 | `.agents/scripts/fix-lint-all.py` | 212 | 8.3 KB | Module; functionality |
 | `src/project-template/.agents/scripts/fix-lint-all.py` | 212 | 8.3 KB | Module; functionality |
@@ -74,7 +75,6 @@ Services, utilities, and business logic.
 | `src/project-template/.agents/scripts/sync-agent-docs.py` | 198 | 7.8 KB | Module; functionality |
 | `.agents/scripts/agents-fix-symlinks.py` | 196 | 7.1 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-fix-symlinks.py` | 196 | 7.1 KB | Module; functionality |
-| `.agents/scripts/agents-index.py` | 187 | 6.8 KB | Module; functionality |
 | `.agents/scripts/agents-implement.py` | 184 | 8.3 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-index.py` | 184 | 6.6 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-implement.py` | 184 | 8.3 KB | Module; functionality |
