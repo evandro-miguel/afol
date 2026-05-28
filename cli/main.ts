@@ -2,6 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { constants as osConstants } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 const HELP_LINES = [
@@ -97,10 +98,6 @@ function normalizeArguments(values: string[]): string[] {
     return [];
   }
 
-  if (values[0] && isHelpAlias(values[0])) {
-    return [];
-  }
-
   if (isStatusAlias(values[0])) {
     return normalizeStatusInvocation(values);
   }
@@ -115,6 +112,11 @@ function normalizeArguments(values: string[]): string[] {
   }
 
   return values;
+}
+
+function signalExitCode(signal: string): number {
+  const signalNumber = osConstants.signals[signal as keyof typeof osConstants.signals];
+  return typeof signalNumber === "number" ? 128 + signalNumber : 1;
 }
 
 function findProjectRoot(startPath: string): string | null {
@@ -151,7 +153,7 @@ function runLegacyAdapter(projectRoot: string, args: string[]): never {
 
   if (result.signal) {
     console.error(`Command terminated by signal: ${result.signal}`);
-    return exit(1);
+    return exit(signalExitCode(result.signal));
   }
 
   return exit(result.status ?? 0);
@@ -159,7 +161,7 @@ function runLegacyAdapter(projectRoot: string, args: string[]): never {
 
 export function main(argv: string[]): number {
   const args = argv.slice(2);
-  if (args.some(isHelpAlias)) {
+  if (args.length === 1 && isHelpAlias(args[0])) {
     console.log(HELP_LINES);
     return 0;
   }

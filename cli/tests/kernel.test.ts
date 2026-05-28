@@ -79,6 +79,23 @@ describe("kernel front-door", () => {
     }
   });
 
+  test("subcommand help delegates to the legacy adapter unchanged", () => {
+    const script = "#!/usr/bin/env bash\necho LEGACY:$*";
+    const root = mkProjectRoot("subcommand-help", script);
+    try {
+      for (const args of [
+        ["verify-tasks", "-h"],
+        ["verify-tasks", "--help"],
+      ]) {
+        const proc = runKernel(root, args);
+        expect(proc.status).toBe(0);
+        expect(proc.stdout as string).toBe(`LEGACY:${args.join(" ")}\n`);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("detects project root by walking up directories", () => {
     const root = mkProjectRoot("detection", "#!/usr/bin/env bash\necho ROOT:$(pwd)");
     const nested = join(root, "a", "b", "c");
@@ -130,6 +147,16 @@ describe("kernel front-door", () => {
     try {
       const proc = runKernel(root, ["status"]);
       expect(proc.status).toBe(11);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("preserves signal-based termination through adapter", () => {
+    const root = mkProjectRoot("signal", "#!/usr/bin/env bash\nkill -TERM $$\n");
+    try {
+      const proc = runKernel(root, ["status"]);
+      expect(proc.status).toBe(143);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
