@@ -94,6 +94,17 @@ mutation paths.
 - Tool registration smoke tests.
 - Runtime adapter health checks.
 
+### Coverage Gate Strategy
+
+- Program coverage minimum: **>= 80%** before implementation promotion.
+- Current live baseline that remains valid while TS/Bun stack is not yet implemented:
+  `.agents/scripts` with **83.24%** coverage.
+- TS/Bun/Bundler stack has a mandatory future coverage gate, scoped per
+  package and only activated after stack implementation starts.
+- Gate target is also 80%; each package must have explicit baseline
+  evidence and a recorded justification when temporarily below baseline in
+  transition.
+
 ## 4) Test Matrix By Tool And Scenario
 
 | Surface | Scenario | Metrics | Required threshold |
@@ -317,6 +328,10 @@ Default CI runs:
 - template export validation.
 - focused integration tests.
 - workbench validation where applicable.
+- Smoke benchmark runs are acceptable for early continuity checks, but global closure
+  requires full artifacts persisted for selected packs (`.agents/data/benchmarks/results/...`)
+  and evidence that all F-11 required pack scenarios were executed or explicitly
+  waived with artifact-backed reasoning.
 
 Selective CI maps paths to packs:
 

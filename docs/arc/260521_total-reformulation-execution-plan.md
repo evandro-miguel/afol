@@ -85,6 +85,21 @@ Validation:
 - Specs index refresh when wrapper/runtime allows.
 - Review against current-state anchors from agents.
 
+Coverage and benchmark lock (applies to the program):
+
+- Mínimo global de cobertura de programa: **>= 80%**. O gate de cobertura só
+  entra como bloqueador quando houver medições de pacote/stack válidas.
+- O gate atual vivo é o pacote legado de scripts Python (`.agents/scripts`) com
+  base de auditoria em **83.24%**. Esse valor permanece como linha de base até que
+  um novo stack seja ativado.
+- Para stacks não implementados ainda (Bun/TypeScript e toolchain associada),
+  cobertura é um gate futuro obrigatório por pacote/stack, com o mesmo limite de
+  80% e evidência própria de baseline antes da migração funcional.
+- Estratégia de benchmark de fechamento: cenário de smoke pode validar fluxo de
+  regressão local; fechamento global exige evidências persistidas por pack,
+  incluindo outputs JSON de resultado em diretório de artefatos, e aderência à
+  matriz do F-11 antes do `T-27`.
+
 ### Slice 2: `./a` Compatibility Front Door
 
 Files likely involved:
@@ -260,8 +275,12 @@ contract can protect parity.
   Verification: file, task, surface, unknown-route fixtures.
 - `T-12` F-05: implement skill metadata, list, get, and update behavior.
   Verification: local skills resolve without global dependency.
-- `T-13` F-05/F-06/F-10: implement delegation context packaging.
-  Verification: compact rule/skill context for subagent handoff.
+- `T-13a` F-05: define serialization payload schema for delegation payloads.
+  Verification: schema fixture tests for payload envelope and required keys.
+- `T-13b` F-06: implement delegation payload transport and route metadata rules.
+  Verification: payload/parity fixtures and route metadata integrity tests.
+- `T-13c` F-10: enforce workbench handoff contract for delegated context.
+  Verification: compact subagent handoff with rule/skill/context compatibility.
 
 ### Local State And Event Log
 
