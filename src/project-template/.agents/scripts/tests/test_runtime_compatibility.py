@@ -55,6 +55,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("CLAUDE.md", mandatory_files)
         self.assertIn("RTK.md", mandatory_files)
         self.assertIn("Justfile", mandatory_files)
+        self.assertIn("a", mandatory_files)
         self.assertNotIn("OPENCODE.md", mandatory_files)
         self.assertNotIn("QWEN.md", mandatory_files)
         self.assertNotIn("GEMINI.md", mandatory_files)

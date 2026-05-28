@@ -60,6 +60,11 @@ class BootstrapTests(unittest.TestCase):
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn("Justfile", mandatory)
 
+    def test_mandatory_files_include_front_door_wrapper(self):
+        """The root front door wrapper must be part of bootstrap mandatory files."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn("a", mandatory)
+
     def test_mandatory_files_exclude_opencode_json(self):
         """opencode.json should not be in the minimal root bootstrap surface."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}

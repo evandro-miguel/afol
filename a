@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENTS_WRAPPER="${SCRIPT_DIR}/.agents/agents"
+
+if [ ! -x "${AGENTS_WRAPPER}" ]; then
+  echo "❌ Missing executable wrapper: ${AGENTS_WRAPPER}" >&2
+  exit 127
+fi
+
+json_short=0
+if [ "${1:-}" = "-j" ]; then
+  json_short=1
+  shift
+fi
+
+if [ "${1:-}" = "s" ]; then
+  shift
+  set -- status "$@"
+fi
+
+if [ "${json_short}" -eq 1 ]; then
+  set -- "$@" --json
+fi
+
+exec "${AGENTS_WRAPPER}" "$@"
