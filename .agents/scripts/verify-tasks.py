@@ -941,6 +941,56 @@ def _valid_closure_evidence_entries(entries: List[Dict[str, Any]]) -> List[Dict[
     return [entry for entry in entries if evidence_record_closure_error(entry) is None]
 
 
+def _update_task_scan_state(
+    line: str,
+    *,
+    in_code_block: bool,
+    in_state_board: bool,
+) -> Tuple[bool, bool, bool]:
+    """Return updated parser state and whether current line should be skipped."""
+    stripped = line.strip()
+    if stripped.startswith("```"):
+        return (not in_code_block, in_state_board, True)
+    if in_code_block:
+        return (in_code_block, in_state_board, True)
+    if "## State Board" in line:
+        return (in_code_block, True, True)
+    if in_state_board and stripped.startswith("##"):
+        return (in_code_block, False, False)
+    return (in_code_block, in_state_board, False)
+
+
+def _parse_state_board_task_line(line: str, line_num: int) -> Tuple[str, str, str, int] | None:
+    """Parse a State Board row into a normalized task tuple."""
+    match = STATE_BOARD_TASK_RE.match(line)
+    if not match:
+        return None
+
+    task_id = match.group(1)
+    state = match.group(2).lower()
+    task_text = f"{state} (State Board)"
+    marker_type = STATE_BOARD_MAP.get(state, 'pending')
+
+    if not task_text:
+        return None
+    return (task_id, task_text, marker_type, line_num)
+
+
+def _parse_legacy_task_line(line: str, line_num: int) -> Tuple[str, str, str, int] | None:
+    """Parse a legacy checkbox task line into a normalized task tuple."""
+    match = TASK_LINE_RE.match(line)
+    if not match:
+        return None
+
+    marker_char = match.group(1)
+    task_id = match.group(2)
+    task_text = match.group(3).strip()
+    marker_type = MARKER_TO_STATUS[marker_char]
+    if not task_text:
+        return None
+    return (task_id, task_text, marker_type, line_num)
+
+
 def extract_tasks(content: str, file_path: Path) -> List[Tuple[str, str, str, int]]:
     """
     Extract all tasks from markdown content.
@@ -957,47 +1007,23 @@ def extract_tasks(content: str, file_path: Path) -> List[Tuple[str, str, str, in
     in_state_board = False
 
     for line_num, line in enumerate(lines, 1):
-        if line.strip().startswith("```"):
-            in_code_block = not in_code_block
+        in_code_block, in_state_board, skip_line = _update_task_scan_state(
+            line,
+            in_code_block=in_code_block,
+            in_state_board=in_state_board,
+        )
+        if skip_line:
             continue
 
-        if in_code_block:
-            continue
-
-        # Check if we're entering a State Board section
-        if "## State Board" in line:
-            in_state_board = True
-            continue
-
-        # Exit State Board when we hit another section
-        if in_state_board and line.strip().startswith("##"):
-            in_state_board = False
-
-        # Try to match State Board table row first
         if in_state_board:
-            match = STATE_BOARD_TASK_RE.match(line)
-            if match:
-                task_id = match.group(1)
-                state = match.group(2).lower()
-                # Extract description from notes column (use state as placeholder for description)
-                task_text = f"{state} (State Board)"
-                marker_type = STATE_BOARD_MAP.get(state, 'pending')
-                if task_text:
-                    tasks.append((task_id, task_text, marker_type, line_num))
+            parsed_state_board_task = _parse_state_board_task_line(line, line_num)
+            if parsed_state_board_task is not None:
+                tasks.append(parsed_state_board_task)
                 continue
 
-        # Try to match legacy checkbox format
-        match = TASK_LINE_RE.match(line)
-        if not match:
-            continue
-
-        marker_char = match.group(1)
-        task_id = match.group(2)
-        task_text = match.group(3).strip()
-        marker_type = MARKER_TO_STATUS[marker_char]
-
-        if task_text:
-            tasks.append((task_id, task_text, marker_type, line_num))
+        parsed_legacy_task = _parse_legacy_task_line(line, line_num)
+        if parsed_legacy_task is not None:
+            tasks.append(parsed_legacy_task)
 
     return tasks
 

@@ -82,7 +82,6 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "agents-new.py" = ["C901"]
-"verify-tasks.py" = ["C901"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 12
