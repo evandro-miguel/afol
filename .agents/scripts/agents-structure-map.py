@@ -280,16 +280,33 @@ class StructureMapper:
 
         sections: Dict[str, List[FileInfo]] = {name: [] for name in DEFAULT_SECTIONS}
         next_cache: Dict[str, Any] = {}
+        prune_output_subtree = False
+        if self.output_path != self.project_path:
+            try:
+                self.output_path.relative_to(self.project_path)
+                prune_output_subtree = True
+            except ValueError:
+                prune_output_subtree = False
 
         # Walk through project directory
         for root, dirs, files in os.walk(self.project_path):
-            rel_root = Path(root).relative_to(self.project_path)
+            root_path = Path(root).resolve()
+            if prune_output_subtree:
+                try:
+                    root_path.relative_to(self.output_path)
+                    dirs[:] = []
+                    continue
+                except ValueError:
+                    pass
+
+            rel_root = root_path.relative_to(self.project_path)
             # Keep selected hidden dirs like .agents, while ignoring common heavy/cache dirs.
             dirs[:] = [
                 d for d in dirs
                 if (not d.startswith(".") or d in ALLOWED_HIDDEN_DIRS)
                 and d not in IGNORED_DIRS
                 and (rel_root / d).as_posix() not in IGNORED_PATH_SUFFIXES
+                and (not prune_output_subtree or (root_path / d).resolve() != self.output_path)
             ]
 
             for file in files:

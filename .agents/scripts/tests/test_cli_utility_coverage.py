@@ -288,6 +288,25 @@ def test_structure_mapper_scan_uses_single_pass_metrics(tmp_path, monkeypatch):
     assert sections["backend"].files[0].lines == 2
 
 
+def test_structure_mapper_prunes_output_subtree_from_scan_and_cache(tmp_path):
+    struct = load_module("agents_structure_map_output_prune_test", "agents-structure-map.py")
+    project = tmp_path / "project"
+    output = project / "docs" / "arc" / "structure"
+    (project / "services").mkdir(parents=True)
+    (output / "data").mkdir(parents=True)
+    (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
+    (output / "data" / "generated.json").write_text("{\"generated\": true}\n", encoding="utf-8")
+
+    mapper = struct.StructureMapper(project, output)
+    sections = mapper.scan_files()
+    collected_paths = {file.relative_path for stats in sections.values() for file in stats.files}
+
+    assert "services/UserService.py" in collected_paths
+    assert "docs/arc/structure/data/generated.json" not in collected_paths
+    assert "docs/arc/structure/data/generated.json" not in mapper.cache["files"]
+    assert not any(path.startswith("docs/arc/structure/") for path in mapper.cache["files"])
+
+
 def test_tools_catalog_display_validation_and_cli(monkeypatch, capsys):
     tools = load_module("agents_tools_coverage_test", "agents-tools.py")
     catalog = tool_catalog()
