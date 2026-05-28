@@ -13,8 +13,8 @@ class FrontDoorATests(unittest.TestCase):
         path.write_text(content, encoding="utf-8")
         path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
-    def _run_with_fake_agents(self, args: list[str], fake_body: str):
-        source_wrapper = Path("a").resolve()
+    def _run_with_fake_agents(self, args: list[str], fake_body: str, source_wrapper: Path | None = None):
+        source_wrapper = Path("a").resolve() if source_wrapper is None else source_wrapper.resolve()
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
             wrapper = root / "a"
@@ -42,10 +42,19 @@ class FrontDoorATests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("ARGS:status", proc.stdout)
 
-    def test_json_shortcut_maps_to_status_json(self):
+    def test_json_shortcut_variants_map_to_status_json(self):
+        fake_body = "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n"
+        for args in (["-j"], ["--json"], ["-j", "s"], ["--json", "status"], ["s", "-j"], ["status", "--json"]):
+            with self.subTest(args=args):
+                proc = self._run_with_fake_agents(args, fake_body)
+                self.assertEqual(proc.returncode, 0)
+                self.assertIn("ARGS:status --json", proc.stdout)
+
+    def test_template_wrapper_json_shortcut_uses_template_source(self):
         proc = self._run_with_fake_agents(
-            ["-j", "s"],
+            ["--json", "status"],
             "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n",
+            source_wrapper=Path("src/project-template/a"),
         )
         self.assertEqual(proc.returncode, 0)
         self.assertIn("ARGS:status --json", proc.stdout)
