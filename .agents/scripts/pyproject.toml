@@ -84,7 +84,6 @@ ignore = ["E501"]
 "agents-new.py" = ["C901"]
 "agents-telemetry.py" = ["C901"]
 "check-links.py" = ["C901"]
-"sync-agent-docs.py" = ["C901"]
 "verify-tasks.py" = ["C901"]
 
 [tool.ruff.lint.mccabe]
