@@ -58,6 +58,9 @@ def _emit_feature_operation_governance(session_dir: Path) -> None:
         print(f"  child_spec: {bundle['child_spec']} -> {bundle['child_spec_path']}")
     print(f"  plan: {bundle['plan_path']}")
     print(f"  task: {bundle['task_path']}")
+    print(f"  routing: work_type={bundle.get('work_type', 'delivery')} surfaces={','.join(bundle.get('rule_surfaces', []))}")
+    for warning in bundle.get("rule_warnings", []):
+        print(f"  warning: {warning}")
     print("  rules loaded:")
     for rule in bundle["rules"]:
         print(f"    - {rule['id']} -> {rule['path']}")

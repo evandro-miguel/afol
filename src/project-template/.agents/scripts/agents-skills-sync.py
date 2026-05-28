@@ -195,6 +195,30 @@ def _normalize_install(entry: Any) -> Dict[str, Any] | None:
     return normalized
 
 
+def _normalize_skill_metadata_map(raw_skill_metadata: Any) -> Dict[str, Dict[str, str]]:
+    if not isinstance(raw_skill_metadata, dict):
+        return {}
+
+    skill_metadata: Dict[str, Dict[str, str]] = {}
+    for skill_name, raw_entry in raw_skill_metadata.items():
+        try:
+            normalized_name = normalize_skill_name(skill_name)
+        except RuntimeError:
+            continue
+        if not isinstance(raw_entry, dict):
+            continue
+        normalized_entry: Dict[str, str] = {}
+        for key, value in raw_entry.items():
+            if not isinstance(key, str) or not isinstance(value, str):
+                continue
+            text_value = value.strip()
+            if text_value:
+                normalized_entry[key] = text_value
+        if normalized_entry:
+            skill_metadata[normalized_name] = normalized_entry
+    return skill_metadata
+
+
 def _default_manifest() -> Dict[str, Any]:
     default_skills = _normalize_skill_list(cfg("default_skills"))
     default_profile = normalize_profile_name(str(cfg("default_profile"))) if str(cfg("default_profile")).strip() else ""
@@ -355,6 +379,10 @@ def _normalize_v2_manifest(data: Dict[str, Any]) -> Dict[str, Any]:
             normalize_profile_name(str(name)): _normalize_skill_list(skills)
             for name, skills in profiles.items()
         }
+
+    skill_metadata = _normalize_skill_metadata_map(data.get("skill_metadata"))
+    if skill_metadata:
+        manifest["skill_metadata"] = skill_metadata
 
     return manifest
 
@@ -1293,6 +1321,7 @@ def cmd_list(args: argparse.Namespace):
     if not ensure_enabled():
         return
 
+    manifest = load_manifest()
     source_repo = source_repo_path()
     if getattr(args, "selected", False):
         skills = _selected_skills_for_args(args)
@@ -1311,7 +1340,16 @@ def cmd_list(args: argparse.Namespace):
     print(f"- count: {len(skills)}")
     for name in skills:
         state = "installed" if name in installed else "available"
-        print(f"  - {name} [{state}]")
+        if getattr(args, "metadata", False):
+            details = _skill_metadata(name, source_repo=source_repo, manifest=manifest)
+            description = details.get("description", "")
+            status = details.get("manifest_metadata", {}).get("status", "")
+            suffix = f" status={status}" if status else ""
+            print(f"  - {name} [{state}]{suffix}")
+            if description:
+                print(f"    desc: {description}")
+        else:
+            print(f"  - {name} [{state}]")
 
 
 def cmd_search(args: argparse.Namespace):
@@ -1338,6 +1376,159 @@ def cmd_search(args: argparse.Namespace):
         print(f"  - {name} [{state}]")
     if not matches:
         print("  - none")
+
+
+def _frontmatter_key_values(text: str) -> Dict[str, str]:
+    if not text.startswith("---\n"):
+        return {}
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return {}
+    block = text[4:end]
+    values: Dict[str, str] = {}
+    for raw_line in block.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip()
+        if not key:
+            continue
+        values[key] = value.strip().strip("'\"")
+    return values
+
+
+def _manifest_skill_metadata(manifest: Dict[str, Any], skill: str) -> Dict[str, str]:
+    raw = manifest.get("skill_metadata")
+    if not isinstance(raw, dict):
+        return {}
+    entry = raw.get(skill)
+    if not isinstance(entry, dict):
+        return {}
+    result: Dict[str, str] = {}
+    for key, value in entry.items():
+        if isinstance(key, str) and isinstance(value, str):
+            result[key] = value
+    return result
+
+
+def _skill_metadata(name: str, *, source_repo: Path | None = None, manifest: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    normalized_name = normalize_skill_name(name)
+    doc_path = _skill_doc_path(normalized_name, source_repo=source_repo)
+    installed_path = project_skills_root() / normalized_name / "SKILL.md"
+    metadata: Dict[str, Any] = {
+        "name": normalized_name,
+        "source_path": str(doc_path),
+        "source_exists": doc_path.exists(),
+        "installed": installed_path.exists(),
+    }
+    if doc_path.exists():
+        text = doc_path.read_text(encoding="utf-8")
+        frontmatter = _frontmatter_key_values(text)
+        metadata["title"] = frontmatter.get("name", normalized_name)
+        metadata["description"] = frontmatter.get("description", "")
+        metadata["version"] = frontmatter.get("version", "")
+        metadata["updated_at"] = frontmatter.get("updated_at", "")
+    if manifest:
+        metadata["manifest_metadata"] = _manifest_skill_metadata(manifest, normalized_name)
+    return metadata
+
+
+def _skill_exists_in_catalog_or_project(name: str, *, source_repo: Path | None = None) -> bool:
+    normalized_name = normalize_skill_name(name)
+    source = source_repo or catalog_source_repo_path()
+    return normalized_name in installed_skills() or normalized_name in available_skills(source_repo=source)
+
+
+def cmd_get(args: argparse.Namespace):
+    if not ensure_enabled():
+        return
+
+    manifest = load_manifest()
+    source_repo = catalog_source_repo_path()
+    name = normalize_skill_name(args.skill)
+    details = _skill_metadata(name, source_repo=source_repo, manifest=manifest)
+    print("SKILL")
+    print(f"- name: {details['name']}")
+    print(f"- source_path: {details['source_path']}")
+    print(f"- source_exists: {details['source_exists']}")
+    print(f"- installed: {details['installed']}")
+    if details.get("description"):
+        print(f"- description: {details['description']}")
+    if details.get("version"):
+        print(f"- version: {details['version']}")
+    if details.get("updated_at"):
+        print(f"- updated_at: {details['updated_at']}")
+    manifest_meta = details.get("manifest_metadata", {})
+    if manifest_meta:
+        print(f"- manifest_metadata: {json.dumps(manifest_meta, ensure_ascii=False, sort_keys=True)}")
+
+
+def _update_manifest_skill_metadata(
+    manifest: Dict[str, Any],
+    *,
+    skill: str,
+    status: str | None,
+    note: str | None,
+    clear_note: bool,
+) -> Dict[str, str]:
+    metadata = manifest.get("skill_metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+        manifest["skill_metadata"] = metadata
+
+    skill_entry_raw = metadata.get(skill)
+    if not isinstance(skill_entry_raw, dict):
+        skill_entry_raw = {}
+        metadata[skill] = skill_entry_raw
+    skill_entry: Dict[str, str] = {
+        str(key): str(value)
+        for key, value in skill_entry_raw.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+
+    if status is not None:
+        cleaned_status = status.strip()
+        if cleaned_status:
+            skill_entry["status"] = cleaned_status
+        else:
+            skill_entry.pop("status", None)
+    if note is not None:
+        cleaned_note = note.strip()
+        if cleaned_note:
+            skill_entry["note"] = cleaned_note
+        else:
+            skill_entry.pop("note", None)
+    if clear_note:
+        skill_entry.pop("note", None)
+
+    skill_entry["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+    metadata[skill] = skill_entry
+    return skill_entry
+
+
+def cmd_update(args: argparse.Namespace):
+    if not ensure_enabled():
+        return
+
+    skill = normalize_skill_name(args.skill)
+    create = bool(getattr(args, "create", False))
+    if not create and not _skill_exists_in_catalog_or_project(skill):
+        raise RuntimeError(
+            f"Skill '{skill}' is not installed or present in the catalog; pass --create to add metadata for a new skill"
+        )
+    manifest = load_manifest()
+    entry = _update_manifest_skill_metadata(
+        manifest,
+        skill=skill,
+        status=getattr(args, "status", None),
+        note=getattr(args, "note", None),
+        clear_note=bool(getattr(args, "clear_note", False)),
+    )
+    _normalize_manifest_header(manifest)
+    save_manifest(manifest)
+    print(f"UPDATED: {skill}")
+    print(f"- metadata: {json.dumps(entry, ensure_ascii=False, sort_keys=True)}")
 
 
 def apply_skill(name: str, source_repo: Path | None = None):
@@ -1851,7 +2042,9 @@ def build_parser() -> argparse.ArgumentParser:
         ("pull", cmd_pull),
         ("status", cmd_status),
         ("list", cmd_list),
+        ("get", cmd_get),
         ("search", cmd_search),
+        ("update-metadata", cmd_update),
         ("plan", cmd_plan),
         ("apply", cmd_apply),
         ("ensure", cmd_ensure),
@@ -1883,6 +2076,19 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "list":
             sp.add_argument("--installed", action="store_true", help="Show only currently installed project skills")
             sp.add_argument("--selected", action="store_true", help="Show only skills resolved from the manifest for this runtime/profile")
+            sp.add_argument("--metadata", action="store_true", help="Include compact metadata summary for each skill")
+        if name == "get":
+            sp.add_argument("skill", help="Skill name to inspect metadata")
+        if name == "update-metadata":
+            sp.add_argument("skill", help="Skill name to update metadata for")
+            sp.add_argument(
+                "--create",
+                action="store_true",
+                help="Allow creating metadata for a skill that is not installed or present in the catalog",
+            )
+            sp.add_argument("--status", help="Status label to persist in manifest metadata")
+            sp.add_argument("--note", help="Short note to persist in manifest metadata")
+            sp.add_argument("--clear-note", action="store_true", help="Clear any persisted note from manifest metadata")
         if name == "search":
             sp.add_argument("query", help="Keyword to search in source skills")
             sp.add_argument("--limit", type=int, default=20, help="Maximum matches to print")

@@ -177,6 +177,17 @@ def write_global_context(root: Path) -> dict[str, Path]:
     }
 
 
+def write_rule_catalog(root: Path, entries: list[dict]) -> Path:
+    rules_dir = root / ".agents/rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    catalog = rules_dir / "index.json"
+    catalog.write_text(
+        json.dumps({"version": 1, "generated_by": "test", "rules": entries}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return catalog
+
+
 class ExecutionCommandsScenarioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -472,6 +483,151 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             self.assertEqual(payload["governance"]["feature_id"], "F-08")
             self.assertIn("rules", payload)
             self.assertIn("skills", payload)
+
+    def test_load_feature_operation_governance_warns_and_skips_optional_missing_rule(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            session_dir = root / ".agents/wb/260307_0111_optional-rule-skip"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_plan_file(session_dir)
+            write_task_file(
+                session_dir,
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-11 | in_progress | worker | docs validation feature workbench routing |",
+            )
+            specs_dir = root / "docs/arc/SPECS"
+            specs_dir.mkdir(parents=True, exist_ok=True)
+            (specs_dir / "scenario-parent.md").write_text(
+                "---\n"
+                "doc_type: spec\n"
+                "id: scenario-parent-spec\n"
+                "---\n\n"
+                "# Scenario Parent Spec\n",
+                encoding="utf-8",
+            )
+            rules_dir = root / ".agents/rules"
+            rules_dir.mkdir(parents=True, exist_ok=True)
+            (rules_dir / "RULE-002-workstream-creation.md").write_text("# rule 002\n", encoding="utf-8")
+            (rules_dir / "RULE-004-validation-linting.md").write_text("# rule 004\n", encoding="utf-8")
+            (rules_dir / "RULE-006-applicable-rule-resolution.md").write_text("# rule 006\n", encoding="utf-8")
+            write_rule_catalog(
+                root,
+                [
+                    {
+                        "id": "RULE-002",
+                        "name": "workstream-creation",
+                        "path": "RULE-002-workstream-creation.md",
+                        "surfaces": ["feature", "workbench", "planning"],
+                        "work_types": ["delivery", "implementation"],
+                        "priority": 100,
+                    },
+                    {
+                        "id": "RULE-003",
+                        "name": "documentation-standards",
+                        "path": "RULE-003-documentation-standards.md",
+                        "surfaces": ["docs", "documentation"],
+                        "work_types": ["delivery", "implementation", "docs"],
+                        "priority": 60,
+                    },
+                    {
+                        "id": "RULE-004",
+                        "name": "validation-linting",
+                        "path": "RULE-004-validation-linting.md",
+                        "surfaces": ["validation", "testing", "feature"],
+                        "work_types": ["delivery", "implementation", "validation"],
+                        "priority": 100,
+                    },
+                    {
+                        "id": "RULE-006",
+                        "name": "applicable-rule-resolution",
+                        "path": "RULE-006-applicable-rule-resolution.md",
+                        "surfaces": ["rules", "routing", "feature", "workbench"],
+                        "work_types": ["delivery", "implementation", "routing"],
+                        "priority": 100,
+                    },
+                ],
+            )
+            with (
+                mock.patch.object(self.execution_commands, "ROOT_DIR", root),
+                mock.patch.object(self.execution_commands, "WB_DIR", root / ".agents/wb"),
+                mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", root / ".agents/wb"),
+                mock.patch.object(self.execution_commands, "RULES_DIR", rules_dir),
+                mock.patch.object(self.execution_commands, "RULE_METADATA_FILE", rules_dir / "index.json"),
+                mock.patch.object(self.execution_commands, "SPECS_DIR", specs_dir),
+            ):
+                bundle = self.execution_commands.load_feature_operation_governance(session_dir)
+
+            self.assertIsNotNone(bundle)
+            self.assertIn("rule_warnings", bundle)
+            self.assertTrue(any("RULE-003" in warning for warning in bundle["rule_warnings"]))
+            self.assertNotIn("RULE-003", [rule["id"] for rule in bundle["rules"]])
+
+    def test_load_feature_operation_governance_fails_when_required_rule_missing(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            session_dir = root / ".agents/wb/260307_0112_required-rule-missing"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_plan_file(session_dir)
+            write_task_file(
+                session_dir,
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-11 | in_progress | worker | validation feature workbench |",
+            )
+            specs_dir = root / "docs/arc/SPECS"
+            specs_dir.mkdir(parents=True, exist_ok=True)
+            (specs_dir / "scenario-parent.md").write_text(
+                "---\n"
+                "doc_type: spec\n"
+                "id: scenario-parent-spec\n"
+                "---\n\n"
+                "# Scenario Parent Spec\n",
+                encoding="utf-8",
+            )
+            rules_dir = root / ".agents/rules"
+            rules_dir.mkdir(parents=True, exist_ok=True)
+            (rules_dir / "RULE-002-workstream-creation.md").write_text("# rule 002\n", encoding="utf-8")
+            (rules_dir / "RULE-006-applicable-rule-resolution.md").write_text("# rule 006\n", encoding="utf-8")
+            write_rule_catalog(
+                root,
+                [
+                    {
+                        "id": "RULE-002",
+                        "name": "workstream-creation",
+                        "path": "RULE-002-workstream-creation.md",
+                        "surfaces": ["feature", "workbench", "planning"],
+                        "work_types": ["delivery", "implementation"],
+                        "priority": 100,
+                    },
+                    {
+                        "id": "RULE-004",
+                        "name": "validation-linting",
+                        "path": "RULE-004-validation-linting.md",
+                        "surfaces": ["validation", "testing", "feature"],
+                        "work_types": ["delivery", "implementation", "validation"],
+                        "priority": 100,
+                    },
+                    {
+                        "id": "RULE-006",
+                        "name": "applicable-rule-resolution",
+                        "path": "RULE-006-applicable-rule-resolution.md",
+                        "surfaces": ["rules", "routing", "feature", "workbench"],
+                        "work_types": ["delivery", "implementation", "routing"],
+                        "priority": 100,
+                    },
+                ],
+            )
+            with (
+                mock.patch.object(self.execution_commands, "ROOT_DIR", root),
+                mock.patch.object(self.execution_commands, "WB_DIR", root / ".agents/wb"),
+                mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", root / ".agents/wb"),
+                mock.patch.object(self.execution_commands, "RULES_DIR", rules_dir),
+                mock.patch.object(self.execution_commands, "RULE_METADATA_FILE", rules_dir / "index.json"),
+                mock.patch.object(self.execution_commands, "SPECS_DIR", specs_dir),
+            ):
+                with self.assertRaisesRegex(self.execution_commands.ExecutionError, "RULE-004"):
+                    self.execution_commands.load_feature_operation_governance(session_dir)
 
 
 class ImplementAndReviewScenarioTests(unittest.TestCase):

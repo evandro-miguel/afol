@@ -1634,6 +1634,55 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 ],
             )
 
+    def test_cmd_update_metadata_requires_known_skill_without_create(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            module.save_manifest(module._default_manifest())
+
+            args = type(
+                "Args",
+                (),
+                {
+                    "skill": "ghost-skill",
+                    "status": "candidate",
+                    "note": "needs review",
+                    "clear_note": False,
+                    "create": False,
+                },
+            )()
+
+            with self.assertRaisesRegex(RuntimeError, "--create"):
+                module.cmd_update(args)
+
+            loaded = module.load_manifest()
+            self.assertNotIn("skill_metadata", loaded)
+
+    def test_cmd_update_metadata_create_allows_new_skill_entry(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            module.save_manifest(module._default_manifest())
+
+            args = type(
+                "Args",
+                (),
+                {
+                    "skill": "ghost-skill",
+                    "status": "candidate",
+                    "note": "needs review",
+                    "clear_note": False,
+                    "create": True,
+                },
+            )()
+
+            module.cmd_update(args)
+
+            loaded = module.load_manifest()
+            self.assertEqual(loaded["skill_metadata"]["ghost-skill"]["status"], "candidate")
+            self.assertEqual(loaded["skill_metadata"]["ghost-skill"]["note"], "needs review")
+            self.assertIn("updated_at", loaded["skill_metadata"]["ghost-skill"])
+
 
 if __name__ == "__main__":
     unittest.main()

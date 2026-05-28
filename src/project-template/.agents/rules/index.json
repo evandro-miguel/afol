@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "generated_by": "manual",
+  "rules": [
+    {
+      "id": "RULE-002",
+      "name": "workstream-creation",
+      "path": "RULE-002-workstream-creation.md",
+      "surfaces": ["feature", "workbench", "planning"],
+      "work_types": ["delivery", "implementation"],
+      "priority": 100
+    },
+    {
+      "id": "RULE-003",
+      "name": "documentation-standards",
+      "path": "RULE-003-documentation-standards.md",
+      "surfaces": ["docs", "documentation"],
+      "work_types": ["delivery", "implementation", "docs"],
+      "priority": 60
+    },
+    {
+      "id": "RULE-004",
+      "name": "validation-linting",
+      "path": "RULE-004-validation-linting.md",
+      "surfaces": ["validation", "testing", "feature"],
+      "work_types": ["delivery", "implementation", "validation"],
+      "priority": 100
+    },
+    {
+      "id": "RULE-005",
+      "name": "folder-structure",
+      "path": "RULE-005-folder-structure.md",
+      "surfaces": ["structure", "scaffold"],
+      "work_types": ["delivery", "implementation", "refactor"],
+      "priority": 50
+    },
+    {
+      "id": "RULE-006",
+      "name": "applicable-rule-resolution",
+      "path": "RULE-006-applicable-rule-resolution.md",
+      "surfaces": ["rules", "routing", "feature", "workbench"],
+      "work_types": ["delivery", "implementation", "routing"],
+      "priority": 100
+    },
+    {
+      "id": "RULE-007",
+      "name": "postmortem-governance-review",
+      "path": "RULE-007-postmortem-governance-review.md",
+      "surfaces": ["postmortem", "closure", "workbench"],
+      "work_types": ["closure"],
+      "priority": 40
+    }
+  ]
+}

@@ -795,6 +795,7 @@ def _normalize_rule_metadata_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
         "surfaces": _normalize_text_list(entry.get("surfaces")) or ["workbench"],
         "work_types": _normalize_text_list(entry.get("work_types")) or ["delivery", "implementation"],
         "priority": int(entry.get("priority", 50)),
+        "required": bool(entry.get("required", False)),
     }
 
 
@@ -823,6 +824,10 @@ def get_rule_metadata(identifier: str) -> Optional[Dict[str, Any]]:
         if entry["id"].lower() == needle or entry["name"].lower() == needle:
             return entry
     return None
+
+
+def _rule_is_required(entry: Dict[str, Any]) -> bool:
+    return bool(entry.get("required")) or entry["id"] in MANDATORY_FEATURE_RULE_IDS
 
 
 def _task_surface_tags(artifacts: Dict[str, Dict[str, Any]]) -> List[str]:
@@ -917,11 +922,12 @@ def _resolve_governance_rules(
     *,
     artifacts: Dict[str, Dict[str, Any]],
     work_type: str,
-) -> Tuple[List[str], List[Dict[str, Any]]]:
+) -> Tuple[List[str], List[Dict[str, Any]], List[str]]:
     surfaces = _task_surface_tags(artifacts)
     resolved_rules = resolve_applicable_rules(surfaces=surfaces, work_type=work_type)
     mandatory_missing: List[str] = []
     selected_rules: List[Dict[str, Any]] = []
+    warnings: List[str] = []
     selected_ids = {entry["id"] for entry in resolved_rules}
 
     for rule_id in MANDATORY_FEATURE_RULE_IDS:
@@ -936,7 +942,12 @@ def _resolve_governance_rules(
     for entry in sorted(resolved_rules, key=lambda item: item["id"]):
         rule_path = (ROOT_DIR / entry["path"]).resolve()
         if not rule_path.exists():
-            mandatory_missing.append(f"{entry['id']} -> {entry['path']}")
+            if _rule_is_required(entry):
+                mandatory_missing.append(f"{entry['id']} -> {entry['path']}")
+            else:
+                warnings.append(
+                    f"Skipping optional rule {entry['id']} because the file is missing: {entry['path']}"
+                )
             continue
         selected_rules.append(
             {
@@ -952,7 +963,7 @@ def _resolve_governance_rules(
             "Governed feature operations require rule files before execution: "
             + ", ".join(sorted(set(mandatory_missing)))
         )
-    return surfaces, selected_rules
+    return surfaces, selected_rules, warnings
 
 
 def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, Any]]:
@@ -992,7 +1003,7 @@ def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, A
             raise ExecutionError(f"Child spec not found for governed feature operation: {child_spec}")
 
     work_type = _session_governance_value(artifacts, "workstream_intent") or "delivery"
-    surfaces, selected_rules = _resolve_governance_rules(
+    surfaces, selected_rules, rule_warnings = _resolve_governance_rules(
         artifacts=artifacts,
         work_type=work_type,
     )
@@ -1021,6 +1032,7 @@ def load_feature_operation_governance(session_dir: Path) -> Optional[Dict[str, A
         "rule_surfaces": surfaces,
         "work_type": work_type,
         "rules": selected_rules,
+        "rule_warnings": rule_warnings,
         "rule_skill_context_payload": payload,
     }
 

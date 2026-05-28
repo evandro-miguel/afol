@@ -1190,6 +1190,12 @@ def _skill_metadata(name: str, *, source_repo: Path | None = None, manifest: Dic
     return metadata
 
 
+def _skill_exists_in_catalog_or_project(name: str, *, source_repo: Path | None = None) -> bool:
+    normalized_name = normalize_skill_name(name)
+    source = source_repo or catalog_source_repo_path()
+    return normalized_name in installed_skills() or normalized_name in available_skills(source_repo=source)
+
+
 def _matching_skills(query: str, *, skills: Iterable[str], source_repo: Path | None = None) -> List[str]:
     wanted = query.strip().lower()
     if not wanted:
@@ -1505,8 +1511,13 @@ def cmd_update(args: argparse.Namespace):
     if not ensure_enabled():
         return
 
-    manifest = load_manifest()
     skill = normalize_skill_name(args.skill)
+    create = bool(getattr(args, "create", False))
+    if not create and not _skill_exists_in_catalog_or_project(skill):
+        raise RuntimeError(
+            f"Skill '{skill}' is not installed or present in the catalog; pass --create to add metadata for a new skill"
+        )
+    manifest = load_manifest()
     entry = _update_manifest_skill_metadata(
         manifest,
         skill=skill,
@@ -2070,6 +2081,11 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("skill", help="Skill name to inspect metadata")
         if name == "update-metadata":
             sp.add_argument("skill", help="Skill name to update metadata for")
+            sp.add_argument(
+                "--create",
+                action="store_true",
+                help="Allow creating metadata for a skill that is not installed or present in the catalog",
+            )
             sp.add_argument("--status", help="Status label to persist in manifest metadata")
             sp.add_argument("--note", help="Short note to persist in manifest metadata")
             sp.add_argument("--clear-note", action="store_true", help="Clear any persisted note from manifest metadata")
