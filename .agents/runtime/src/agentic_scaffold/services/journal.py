@@ -105,6 +105,12 @@ class JournalStore:
             return str(backup_path.relative_to(self.paths.root))
         return ""
 
+    def planned_backup_path(self, change_id: str, repo_root: Path, target: Path) -> str:
+        relative = target.relative_to(repo_root).as_posix()
+        safe_name = relative.replace("/", "__")
+        backup_path = self.paths.backups_dir / change_id / safe_name
+        return str(backup_path.relative_to(self.paths.root))
+
     def restore_backup(self, repo_root: Path, backup_relative: str, target_relative: str) -> Path:
         backup_path = self._resolve_backup_path(backup_relative)
         target_path = self._resolve_repo_path(repo_root, target_relative)
@@ -134,9 +140,14 @@ class JournalStore:
         data = self.load(change_file)
         record = ChangeRecord.model_validate(data["record"])
         payload = data["payload"]
+        if change_file.name != f"{record.change_id}.json":
+            raise UnsafeJournalPathError("journal entry filename does not match record change id")
+        if bool(payload.get("dry_run", False)):
+            raise UnsafeJournalPathError("journal entry marked as dry-run cannot be undone")
+        mutation_action = str(payload.get("mutation_action") or record.action).strip()
         restored: list[str] = []
 
-        if record.action in {"write_text", "patch"}:
+        if mutation_action in {"write_text", "patch"}:
             target = payload["target_path"]
             backup = payload.get("backup_path", "")
             existed_before = bool(payload.get("existed_before", False))
@@ -146,7 +157,17 @@ class JournalStore:
             elif not existed_before:
                 self.delete_if_exists(repo_root, target)
                 restored.append(str(target))
-        elif record.action == "archive":
+        elif mutation_action == "move":
+            source_relative = payload["source_path"]
+            destination_relative = payload["destination_path"]
+            destination_existed_before = bool(payload.get("destination_existed_before", False))
+            self.move_path(repo_root, destination_relative, source_relative)
+            restored.append(source_relative)
+            destination_backup = str(payload.get("backup", {}).get("destination_path", "")).strip()
+            if destination_existed_before and destination_backup:
+                restored_destination = self.restore_backup(repo_root, destination_backup, destination_relative)
+                restored.append(restored_destination.relative_to(repo_root).as_posix())
+        elif mutation_action == "archive":
             archive_root = payload["archive_root"]
             for item in payload.get("moves", []):
                 archived_relative = item["archived_path"]
@@ -157,7 +178,7 @@ class JournalStore:
             if archive_dir.exists() and not any(archive_dir.iterdir()):
                 archive_dir.rmdir()
         else:
-            return UndoResult(ok=False, message=f"Unsupported undo action: {record.action}")
+            return UndoResult(ok=False, message=f"Unsupported undo action: {mutation_action}")
 
         change_file.unlink(missing_ok=True)
         backup_dir = self.paths.backups_dir / record.change_id

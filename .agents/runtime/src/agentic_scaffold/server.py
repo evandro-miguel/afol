@@ -10,8 +10,6 @@ from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from agentic_scaffold.models import (
     AdoptionInspection,
     AdoptionPlan,
-    ArchiveResult,
-    FileWriteResult,
     RepoManifest,
     SearchResponse,
     UndoResult,
@@ -22,7 +20,7 @@ from agentic_scaffold.runtime import AgenticRuntime
 
 INSTRUCTIONS = (
     "Use this MCP as the fast lane for scaffold inspection, validation, safe archiving, "
-    "controlled file writes, and reversible repository maintenance. Prefer search_docs and "
+    "controlled file writes/moves/patches with dry-run support, and reversible repository maintenance. Prefer search_docs and "
     "generate_manifest before broad reads. Use archive_paths instead of hard deletes."
 )
 
@@ -88,16 +86,27 @@ def _register_tools(mcp: FastMCP, runtime: AgenticRuntime) -> None:
         return runtime.adoption.plan()
 
     @mcp.tool(description="Archive one or more repository paths into .agents/z-arq/<timestamp>_<slug> with undo support.")
-    def archive_paths(paths: list[str], slug: str, reason: str = "archive for safe organization") -> ArchiveResult:
-        return runtime.changes.archive_paths(relative_paths=paths, slug=slug, reason=reason)
+    def archive_paths(
+        paths: list[str], slug: str, reason: str = "archive for safe organization", dry_run: bool = False
+    ) -> object:
+        return runtime.changes.archive_paths(relative_paths=paths, slug=slug, reason=reason, dry_run=dry_run)
 
     @mcp.tool(description="Write or replace a text file inside the repository with journaling and undo support.")
-    def write_text_file(path: str, content: str, reason: str) -> FileWriteResult:
-        return runtime.changes.write_text_file(relative_path=path, content=content, reason=reason)
+    def write_text_file(path: str, content: str, reason: str, dry_run: bool = False) -> object:
+        return runtime.changes.write_text_file(relative_path=path, content=content, reason=reason, dry_run=dry_run)
+
+    @mcp.tool(description="Move a repository path to another repository path with journaling and undo support.")
+    def move_path(source: str, destination: str, reason: str, dry_run: bool = False) -> object:
+        return runtime.changes.move_path(
+            source_relative_path=source,
+            dest_relative_path=destination,
+            reason=reason,
+            dry_run=dry_run,
+        )
 
     @mcp.tool(description="Apply a unified diff to one file with automatic backup and undo support.")
-    def apply_unified_diff(path: str, diff: str, reason: str) -> FileWriteResult:
-        return runtime.changes.apply_unified_diff(relative_path=path, diff_text=diff, reason=reason)
+    def apply_unified_diff(path: str, diff: str, reason: str, dry_run: bool = False) -> object:
+        return runtime.changes.apply_unified_diff(relative_path=path, diff_text=diff, reason=reason, dry_run=dry_run)
 
     @mcp.tool(description="Undo the latest archived, written, or patched change recorded by this MCP.")
     def undo_last_change() -> UndoResult:
