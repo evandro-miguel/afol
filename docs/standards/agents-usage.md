@@ -94,7 +94,12 @@ Wrapper contract:
 | `just quick` | Reuse active session for small task | `THEME=<name>` |
 | `just bootstrap` | Bootstrap .agents system in another repository | `TARGET=/path/to/repo` |
 | `just verify` | Check task completion | - |
+| `just verify-active` | Check task completion for active session | - |
+| `just verify-active-if-present` | Check active session only when `.agents/wb/.active_session` exists | - |
+| `just verify-strict` | Run strict verification on the active session | - |
+| `just verify-strict-if-present` | Run strict active-session verification only when `.agents/wb/.active_session` exists | - |
 | `just lint` | Validate markdown docs | - |
+| `just diff-check` | Run `git diff --check` for whitespace/conflict-marker hygiene | - |
 | `just skills-init` | Initialize universal skills sync | - |
 | `just skills-pull` | Refresh configured external git-backed skills source only | - |
 | `just skills-update` | Refresh `.agents/skills/` from the configured git source | `SKILLS=a,b,c`, `RUNTIME=codex`, `PROFILE=x` |
@@ -124,15 +129,18 @@ Wrapper contract:
 | `just test-scripts-all` | Run unit + integration tests with the 80% scripts coverage gate | - |
 | `just agents-all` | Run the full scaffold validation path, including docs, tools, telemetry, runtime tests, and MCP smoke | - |
 | `just all` | Alias for `just agents-all` | - |
+| `just all-strict` | Gate-hardened aggregate validation (`just agents-all`, `just diff-check`, and `just verify-strict-if-present`) | - |
+| `just validate-strict` | Root alias for `just all-strict` | - |
 
 ### Quick Workflows
 
 | Command | Description |
 |---------|-------------|
 | `just all` | Run full scaffold validation via `just agents-all` |
+| `just all-strict` | Run gate-hardened aggregate validation for governed closure |
 | `just refresh` | Clean + setup + structure |
 | `just docs` | Structure + index + sync |
-| `just check` | Doctor + lint + verify |
+| `just check` | Doctor + lint + verify-active-if-present |
 | `just init` | Setup + doctor |
 
 The `just wb-task` wrapper row above remains a compatibility surface. Use the
@@ -500,7 +508,10 @@ just verify
 # 2. Run full validation
 just all
 
-# 3. Sync agent docs
+# 3. Gate-hardening checks for governed closure
+just all-strict
+
+# 4. Sync agent docs
 just sync
 ```
 
@@ -547,7 +558,7 @@ This creates:
 | `just vf` | `just verify` |
 | `just dr` | `just doctor` |
 | `just docs` | `just structure index sync` |
-| `just check` | `just doctor lint verify` |
+| `just check` | `just doctor lint verify-active-if-present` |
 | `just init` | `just setup doctor` |
 
 ## Related Documents

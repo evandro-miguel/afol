@@ -231,6 +231,16 @@ The Bun/TypeScript reformulation must be staged:
 - Exit criteria: child-spec slices land with parity validation and strict
   governed evidence, preserving interactive command contract.
 
+### F-17 Just Command Runner Migration
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md
+- Why: keep `just` as the canonical command runner while preserving command
+  parity and predictable validation behavior.
+- Exit criteria: aggregate validation entrypoints and standards mirrors stay in
+  command parity; governed slices close with strict evidence.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command

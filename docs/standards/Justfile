@@ -191,6 +191,10 @@ lint:
   @echo "→ Linting markdown docs..."
   @./.agents/agents lint-docs .agents/ docs/ README.md AGENTS.md CLAUDE.md
 
+diff-check:
+  @echo "→ Checking patch whitespace..."
+  @git diff --check
+
 tools-check:
   @echo "→ Validating tools catalog..."
   @./.agents/agents tools validate
@@ -262,6 +266,8 @@ agents-all: doctor structure index knowledge-index sync lint lint-scripts lint-r
   @echo "╚═══════════════════════════════════════════════════════════╝"
 
 all: agents-all
+
+all-strict: agents-all diff-check verify-strict-if-present
 
 refresh: clean setup structure
   @echo ""
