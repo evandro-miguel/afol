@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "kernel": "agentic-cli-ts",
+  "optional": true,
+  "commands": {
+    "status": [
+      "s",
+      "status"
+    ]
+  }
+}

@@ -32,6 +32,8 @@ BACKUP_ROOT = TARGET_AGENTS_DIR / "tmp" / "scaffold-update" / "backups"
 ALLOWLIST_EXACT = {
     Path("agents"),
     Path("agents-mcp"),
+    Path("lock.json"),
+    Path("manifest.json"),
     Path("agents.config"),
     Path("skills-sync.manifest.json"),
     Path("tools.json"),
@@ -53,6 +55,42 @@ IGNORED_PAYLOAD_NAMES = {
     "events.jsonl",
     "settings.local.json",
 }
+OWNERSHIP_CATEGORIES = ("managed", "project-owned", "generated", "ignored", "conflict")
+
+
+@dataclass(frozen=True)
+class OwnershipEntry:
+    category: str
+    patterns: set[Path]
+
+
+@dataclass(frozen=True)
+class OwnershipCatalog:
+    entries: tuple[OwnershipEntry, ...]
+
+    @classmethod
+    def from_manifest(cls, payload: dict[str, object], *, source_label: str) -> "OwnershipCatalog":
+        raw = payload.get("ownership")
+        if raw is None:
+            return cls(entries=tuple())
+        if not isinstance(raw, dict):
+            raise RuntimeError(f"Invalid manifest ownership section in {source_label}: expected object")
+
+        entries: list[OwnershipEntry] = []
+        for category in OWNERSHIP_CATEGORIES:
+            patterns = _normalize_path_set(raw.get(category))
+            if patterns:
+                entries.append(OwnershipEntry(category=category, patterns=patterns))
+        return cls(entries=tuple(entries))
+
+    def category_for(self, rel_path: Path) -> str:
+        rel = rel_path.as_posix()
+        for entry in self.entries:
+            for pattern in entry.patterns:
+                normalized = pattern.as_posix()
+                if rel == normalized or rel.startswith(f"{normalized}/"):
+                    return entry.category
+        return "managed"
 
 
 @dataclass(frozen=True)
@@ -61,6 +99,7 @@ class FileChange:
     source_file: Path
     target_file: Path
     action: str
+    ownership: str
 
 
 @dataclass(frozen=True)
@@ -77,6 +116,55 @@ class ChannelMetadata:
 
 def _timestamp_slug() -> str:
     return dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _normalize_path_set(raw: object) -> set[Path]:
+    if not isinstance(raw, list):
+        return set()
+    entries: set[Path] = set()
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        normalized = item.strip().strip("/").replace("\\", "/")
+        if not normalized:
+            continue
+        entries.add(Path(normalized))
+    return entries
+
+
+def _load_json_object(path: Path, *, label: str) -> dict[str, object]:
+    if not path.exists():
+        raise RuntimeError(f"Missing {label}: {path}")
+    if path.is_dir():
+        raise RuntimeError(f"Invalid {label}: expected file, found directory {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Could not parse {label}: {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Invalid {label}: expected object in {path}")
+    return payload
+
+
+def _load_lock_file(path: Path, *, label: str) -> dict[str, object]:
+    payload = _load_json_object(path, label=label)
+    schema_version = payload.get("schema_version")
+    if not isinstance(schema_version, int):
+        raise RuntimeError(f"Invalid lock schema in {label}: schema_version must be int")
+    revision = payload.get("revision")
+    if not isinstance(revision, str) or not revision.strip():
+        raise RuntimeError(f"Invalid lock schema in {label}: revision must be non-empty string")
+    return payload
+
+
+def _load_manifest_file(path: Path, *, label: str, required: bool = False) -> OwnershipCatalog:
+    if not path.exists():
+        if required:
+            raise RuntimeError(f"Missing {label}: {path}")
+        return OwnershipCatalog(entries=())
+
+    payload = _load_json_object(path, label=label)
+    return OwnershipCatalog.from_manifest(payload, source_label=label)
 
 
 def _is_within(base: Path, candidate: Path) -> bool:
@@ -96,6 +184,37 @@ def _is_allowed(rel_path: Path) -> bool:
     if rel_path in ALLOWLIST_EXACT:
         return True
     return any(prefix == rel_path or prefix in rel_path.parents for prefix in ALLOWLIST_PREFIXES)
+
+
+def _classify_ownership(rel_path: Path, catalog: OwnershipCatalog | None) -> str:
+    if catalog is None:
+        return "managed"
+    if rel_path == Path("."):
+        return "managed"
+    return catalog.category_for(rel_path)
+
+
+def _classify_action(rel_path: Path, ownership: str, source_file: Path, target_file: Path) -> str:
+    if ownership == "managed":
+        if not target_file.exists():
+            return "create"
+        if source_file.read_bytes() == target_file.read_bytes():
+            return "unchanged"
+        return "update"
+
+    if ownership == "project-owned":
+        return "preserve-project-owned"
+
+    if ownership == "generated":
+        return "skip-generated"
+
+    if ownership == "ignored":
+        return "skip-ignored"
+
+    if ownership == "conflict":
+        return "conflict"
+
+    return "preserve-project-owned"
 
 
 def _validate_rel_path(rel_path: Path):
@@ -168,22 +287,29 @@ def _validate_target_entry(target_file: Path):
     _reject_symlink_or_hardlink(target_file, label="target payload")
 
 
-def _plan_changes(source_agents_dir: Path, rel_paths: Iterable[Path]) -> List[FileChange]:
+def _plan_changes(
+    source_agents_dir: Path,
+    rel_paths: Iterable[Path],
+    ownership_catalog: OwnershipCatalog,
+) -> List[FileChange]:
     plan: list[FileChange] = []
     for rel_path in rel_paths:
         source_file = source_agents_dir / rel_path
         target_file = TARGET_AGENTS_DIR / rel_path
         _assert_within(TARGET_AGENTS_DIR, target_file, "Target update path")
         _validate_target_entry(target_file)
+        ownership = _classify_ownership(rel_path, ownership_catalog)
+        action = _classify_action(rel_path, ownership, source_file, target_file)
 
-        if not target_file.exists():
-            action = "create"
-        elif source_file.read_bytes() == target_file.read_bytes():
-            action = "unchanged"
-        else:
-            action = "update"
-
-        plan.append(FileChange(rel_path=rel_path, source_file=source_file, target_file=target_file, action=action))
+        plan.append(
+            FileChange(
+                rel_path=rel_path,
+                source_file=source_file,
+                target_file=target_file,
+                action=action,
+                ownership=ownership,
+            )
+        )
     return plan
 
 
@@ -191,14 +317,35 @@ def _print_plan(plan: List[FileChange]):
     creates = [item for item in plan if item.action == "create"]
     updates = [item for item in plan if item.action == "update"]
     unchanged = [item for item in plan if item.action == "unchanged"]
+    preserved_project = [item for item in plan if item.action == "preserve-project-owned"]
+    preserved_generated = [item for item in plan if item.action == "skip-generated"]
+    preserved_ignored = [item for item in plan if item.action == "skip-ignored"]
+    conflicts = [item for item in plan if item.action == "conflict"]
 
     print("SCAFFOLD UPDATE PLAN")
     print(f"- target: {TARGET_AGENTS_DIR}")
     print(f"- create: {len(creates)}")
     print(f"- update: {len(updates)}")
     print(f"- unchanged: {len(unchanged)}")
+    print(f"- preserved-project-owned: {len(preserved_project)}")
+    print(f"- preserved-generated: {len(preserved_generated)}")
+    print(f"- preserved-ignored: {len(preserved_ignored)}")
+    print(f"- conflict: {len(conflicts)}")
+
     for item in creates + updates:
         print(f"  - {item.action}: .agents/{item.rel_path.as_posix()}")
+
+    for item in preserved_project:
+        print(f"  - preserve-project-owned: .agents/{item.rel_path.as_posix()}")
+
+    for item in preserved_generated:
+        print(f"  - preserve-generated: .agents/{item.rel_path.as_posix()}")
+
+    for item in preserved_ignored:
+        print(f"  - preserve-ignored: .agents/{item.rel_path.as_posix()}")
+
+    for item in conflicts:
+        print(f"  - conflict: .agents/{item.rel_path.as_posix()}")
 
 
 def _as_text_lines(path: Path) -> list[str] | None:
@@ -486,12 +633,16 @@ def _write_manifest(
     plan: List[FileChange],
     touched: List[FileChange],
     payload_sha256: str,
+    source_lock: dict[str, object],
+    source_manifest: Path,
 ):
     payload = {
         "timestamp": _timestamp_slug(),
         "channel": metadata.channel,
         "releaseTag": metadata.release_tag,
         "commit": metadata.commit,
+        "sourceLockRevision": source_lock.get("revision"),
+        "sourceManifest": str(source_manifest),
         "sourceSha256": metadata.source_sha256,
         "scaffoldPayloadSha256": metadata.scaffold_payload_sha256,
         "releaseManifestSha256": metadata.release_manifest_sha256,
@@ -582,7 +733,14 @@ def main(argv: list[str] | None = None) -> int:
             f"({metadata.metadata_file}): expected {metadata.scaffold_payload_sha256}, got {payload_sha256}"
         )
 
-    plan = _plan_changes(source_agents_dir, rel_paths)
+    source_lock = _load_lock_file(source_agents_dir / "lock.json", label="source .agents/lock.json")
+    source_manifest = _load_manifest_file(
+        source_agents_dir / "manifest.json",
+        label="source .agents/manifest.json",
+        required=True,
+    )
+
+    plan = _plan_changes(source_agents_dir, rel_paths, source_manifest)
     _print_plan(plan)
 
     if args.diff_only:
@@ -628,7 +786,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: promotion failed and rollback completed: {exc}", file=sys.stderr)
         return 1
 
-    _write_manifest(backup_dir, metadata, source_repo_root, plan, touched, payload_sha256)
+    _write_manifest(
+        backup_dir,
+        metadata,
+        source_repo_root,
+        plan,
+        touched,
+        payload_sha256,
+        source_lock,
+        source_agents_dir,
+    )
     shutil.rmtree(staging_run, ignore_errors=True)
 
     print("OK: scaffold update applied")
