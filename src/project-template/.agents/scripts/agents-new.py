@@ -591,8 +591,6 @@ def _ordered_selected_doc_types(args: Dict[str, object]) -> list[str]:
     selected.extend(_normalize_doc_type_alias(str(doc_type)) for doc_type in args.get("with_artifacts") or [])
 
     selected_set = {doc_type for doc_type in selected if doc_type in VALID_ARTIFACT_DOC_TYPES}
-    if intent == "delivery" and not args.get("plan_only"):
-        selected_set.update({"log", "report"})
     if args.get("use_spec"):
         selected_set.discard("spec-child")
         selected_set.discard("spec-lite")

@@ -51,6 +51,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             "feature_id": "F-01",
             "parent_spec": "260306_roadmap-first-delivery-system_spec_01",
             "child_spec": "",
+            "task": "Implement execution integrity hardening",
             "with_artifacts": [],
         }
 
@@ -363,6 +364,17 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual([entry["doc_type"] for entry in planning_only], ["plan"])
 
+        delivery_default = agents_new._iter_workstream_artifacts(
+            {
+                "intent": "delivery",
+                "plan_only": False,
+                "use_spec": False,
+                "use_spec_lite": False,
+                "with_artifacts": [],
+            }
+        )
+        self.assertEqual([entry["doc_type"] for entry in delivery_default], ["plan", "task"])
+
         delivery_with_spec = agents_new._iter_workstream_artifacts(
             {
                 "intent": "delivery",
@@ -374,7 +386,7 @@ class AgentsNewQuickModeTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["doc_type"] for entry in delivery_with_spec],
-            ["plan", "task", "spec", "log", "report"],
+            ["plan", "task", "spec"],
         )
 
         research_only = agents_new._iter_workstream_artifacts(

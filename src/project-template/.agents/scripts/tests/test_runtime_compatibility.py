@@ -681,7 +681,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
 
     def test_project_template_stays_generic_and_history_free(self):
-        template_root = Path("src/project-template")
+        template_root = Path(__file__).resolve().parents[3]
         if not template_root.exists():
             self.skipTest("source project template is only present in the source repo")
         generic_files = [
