@@ -48,7 +48,8 @@ Create or update the governing feature spec in `docs/arc/SPECS/`
 - Use child specs when decomposition improves clarity or coordination
 - Local workstreams may choose `spec` or `spec-child` after the parent spec exists.
 - Use `spec-child` for new child/local specs.
-- Keep `spec-lite` as a historical compatibility alias, not the default for new work.
+- Keep `spec-lite` as a historical compatibility alias, not the default for
+  new work.
 - Test-focused workstreams should link a `spec-test` strategy artifact before implementing or changing tests
 - Keep current-state evidence in `docs/map/` when needed, and keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder
 

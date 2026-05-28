@@ -8,7 +8,7 @@ owners:
 workstream_intent: delivery
 artifact_purpose: Summarize the docs-only governance slice and its verified outcome.
 created_at: 2026-05-28 18:29:58+00:00
-updated_at: '2026-05-28T15:42:40-03:00'
+updated_at: '2026-05-28T19:13:00-03:00'
 roadmap_feature: F-14
 parent_spec: 260412_1110_spec-child-and-spec-test-governance_spec_01
 child_spec: null
@@ -59,6 +59,9 @@ output_artifacts:
   [docs/standards/workflow.md](/home/ozy/apps/agentic_start_folder_dev_refactor_TS/docs/standards/workflow.md),
   and [docs/standards/evolution.md](/home/ozy/apps/agentic_start_folder_dev_refactor_TS/docs/standards/evolution.md)
   to the same terminology.
+- Reflowed [docs/standards/workflow.md](/home/ozy/apps/agentic_start_folder_dev_refactor_TS/docs/standards/workflow.md)
+  again to remove the final new MD013 at line 51; remaining line-length hits
+  in that file are legacy.
 - Created and advanced a dedicated WB session for F-14 instead of
   reusing the active F-08 session.
 
@@ -71,6 +74,7 @@ output_artifacts:
 - [docs/standards/frontmatter.md](/home/ozy/apps/agentic_start_folder_dev_refactor_TS/docs/standards/frontmatter.md)
 - [docs/standards/workflow.md](/home/ozy/apps/agentic_start_folder_dev_refactor_TS/docs/standards/workflow.md)
 - [docs/standards/evolution.md](/home/ozy/apps/agentic_start_folder_dev_refactor_TS/docs/standards/evolution.md)
+- [.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_report_01.md](/home/ozy/apps/agentic_start_folder_dev_refactor_TS/.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_report_01.md)
 - [.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_plan_01.md](/home/ozy/apps/agentic_start_folder_dev_refactor_TS/.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_plan_01.md)
 - [.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_task_01.md](/home/ozy/apps/agentic_start_folder_dev_refactor_TS/.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_task_01.md)
 
@@ -89,8 +93,9 @@ output_artifacts:
 - Lint: `just lint` -> pass -> Evidence: repo lint returned 7 existing INFO
   items in unrelated sessions
 - Additional checks:
-  - `markdownlint` on the touched docs still reports pre-existing debt in the
-    legacy templates and standards set.
+- `markdownlint` on the touched docs still reports pre-existing debt in the
+  legacy templates and standards set. The new `workflow.md#L51` MD013 is
+  cleared; remaining `workflow.md` line-length hits are pre-existing.
   - `docs/standards/evolution.md` is clean for MD013 in the final state, with
     remaining debt limited to legacy warnings such as MD060 where present.
   - `git diff --check` -> pass -> Evidence: no output
