@@ -278,24 +278,57 @@ describe("validation command family", () => {
     expect(summary.skipped).toBe(0);
   });
 
-  test("v bench reports skipped as explicit non-pass and separate summary bucket", () => {
+  test("v bench runtime-live-agent consumes saved live artifact and never reports skipped", () => {
     const proc = runKernel(["v", "bench", "--pack", "runtime-live-agent", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
-    expect(payload.status).toBe("skipped");
-    expect(payload.pass).toBe(false);
-    expect(payload.notes).toEqual(["all-scenarios-skipped:not-implemented-live-runner"]);
+    expect(payload.status).not.toBe("skipped");
+    expect(typeof payload.pass).toBe("boolean");
+    const notes = payload.notes as string[];
+    expect(
+      notes.some((entry) => entry.startsWith("runtime-live-agent-artifact:.agents/data/benchmarks/results/")),
+    ).toBe(true);
+    expect(notes).toContain("runtime-live-agent-refresh:./.agents/agents benchmark run --save");
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
     for (const result of results) {
-      expect(result.status).toBe("skipped");
-      expect(result.pass).toBe(false);
+      expect(result.status).not.toBe("skipped");
+      const resultNotes = result.notes as string[];
+      expect(
+        resultNotes.some((entry) => entry.startsWith("live-runner-artifact:.agents/data/benchmarks/results/")),
+      ).toBe(true);
     }
+    const summary = payload.summary as Record<string, unknown>;
+    expect(summary.total).toBe(3);
+    expect(summary.skipped).toBe(0);
+    expect(summary.baseline_missing).toBe(0);
+  });
+
+  test("v bench runtime-live-agent fails with actionable note when live artifact is missing", () => {
+    const fixtureRoot = createValidationFixtureRoot();
+    const proc = runKernel(["v", "bench", "--pack", "runtime-live-agent", "--json"], fixtureRoot);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.status).toBe("failed");
+    expect(payload.pass).toBe(false);
+    const notes = payload.notes as string[];
+    expect(notes).toContain(
+      "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:./.agents/agents benchmark run --save",
+    );
+    const results = payload.results as Array<Record<string, unknown>>;
+    expect(results.length).toBe(3);
+    expect(results.every((entry) => entry.status === "failed")).toBe(true);
+    expect(
+      results.every((entry) =>
+        (entry.notes as string[]).includes(
+          "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:./.agents/agents benchmark run --save",
+        )),
+    ).toBe(true);
     expect(payload.summary).toEqual({
       total: 3,
       passed: 0,
-      failed: 0,
-      skipped: 3,
+      failed: 3,
+      skipped: 0,
       baseline_missing: 0,
     });
   });

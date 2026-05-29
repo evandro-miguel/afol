@@ -13,7 +13,8 @@
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "runtime-live-agent-v1",
-  "implementation_status": "skipped",
+  "implementation_status": "implemented",
+  "live_runner_scenario_id": "live-tools-benchmark-discovery",
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,

@@ -44,6 +44,17 @@ a real mini-tier agent, real tool calls, and bounded fixture tasks.
 just benchmark-runtime-flow
 ```
 
+## Validation Bridge
+
+- `bun run cli/main.ts v bench --pack runtime-live-agent --json` consumes the
+  saved live benchmark artifact from:
+  - `.agents/benchmarks/runtime-flow-live-agent-v4-latest.json`
+  - the `saved_result_path` referenced by that snapshot
+- Refresh live evidence with:
+  - `./.agents/agents benchmark run --save`
+- If the saved live artifact is missing, the validation pack returns
+  `status=failed` with an actionable note that points to the refresh command.
+
 ## Contract
 
 - Runs `codex exec --json` in an isolated fixture repo

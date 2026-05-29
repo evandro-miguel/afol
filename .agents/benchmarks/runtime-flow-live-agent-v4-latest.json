@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updated_at": "2026-04-24T18:34:45.458883Z",
+  "updated_at": "2026-05-29T17:45:30.854162Z",
   "pack_id": "runtime-flow-live-agent-v4",
-  "generated_at": "2026-04-24T18:34:45.458416Z",
-  "saved_result_path": ".agents/data/benchmarks/results/20260424_153445_runtime-flow-live-agent-v4.json",
+  "generated_at": "2026-05-29T17:45:30.853620Z",
+  "saved_result_path": ".agents/data/benchmarks/results/20260529_144530_runtime-flow-live-agent-v4.json",
   "benchmark_profile": {
     "runtime": "codex",
     "model": "gpt-5.4-mini",
@@ -12,23 +12,23 @@
   "summary": {
     "pass": true,
     "scenario_count": 1,
-    "duration_ms": 63372,
-    "tool_call_count": 21,
-    "tool_success_count": 20,
-    "tool_success_rate": 0.9524,
-    "checks_total": 30,
-    "checks_passed": 30,
+    "duration_ms": 51640,
+    "tool_call_count": 20,
+    "tool_success_count": 19,
+    "tool_success_rate": 0.95,
+    "checks_total": 34,
+    "checks_passed": 34,
     "accuracy": 1.0,
     "error_count": 1,
     "retry_count": 0,
-    "context_bytes_total": 93205,
-    "prompt_bytes_total": 2210
+    "context_bytes_total": 94764,
+    "prompt_bytes_total": 2375
   },
   "comparison_to_previous": {
     "status": "comparable",
     "reason": "same_pack_and_scenarios",
-    "baseline_saved_result_path": ".agents/data/benchmarks/results/20260424_152950_runtime-flow-live-agent-v4.json",
-    "baseline_generated_at": "2026-04-24T18:29:50.479986Z",
+    "baseline_saved_result_path": ".agents/data/benchmarks/results/20260424_153445_runtime-flow-live-agent-v4.json",
+    "baseline_generated_at": "2026-04-24T18:34:45.458416Z",
     "scenario_ids": [
       "live-autonomous-agentic-folder-delivery"
     ],
@@ -36,48 +36,48 @@
       "live-autonomous-agentic-folder-delivery"
     ],
     "delta": {
-      "duration_ms": -177555,
-      "tool_call_count": -11,
-      "tool_success_rate": 0.0774,
-      "error_count": -3,
-      "accuracy": 0.2,
-      "context_bytes_total": 0,
-      "prompt_bytes_total": 0
+      "duration_ms": -11732,
+      "tool_call_count": -1,
+      "tool_success_rate": -0.0024,
+      "error_count": 0,
+      "accuracy": 0.0,
+      "context_bytes_total": 1559,
+      "prompt_bytes_total": 165
     },
     "delta_pct": {
-      "duration_ms": -73.7,
-      "tool_call_count": -34.38,
-      "tool_success_rate": 8.85,
-      "error_count": -75.0,
-      "accuracy": 25.0,
-      "context_bytes_total": 0.0,
-      "prompt_bytes_total": 0.0
+      "duration_ms": -18.51,
+      "tool_call_count": -4.76,
+      "tool_success_rate": -0.25,
+      "error_count": 0.0,
+      "accuracy": 0.0,
+      "context_bytes_total": 1.67,
+      "prompt_bytes_total": 7.47
     },
     "trend": {
       "duration_ms": "improved",
       "tool_call_count": "improved",
-      "tool_success_rate": "improved",
-      "error_count": "improved",
-      "accuracy": "improved",
-      "context_bytes_total": "unchanged",
-      "prompt_bytes_total": "unchanged"
+      "tool_success_rate": "regressed",
+      "error_count": "unchanged",
+      "accuracy": "unchanged",
+      "context_bytes_total": "regressed",
+      "prompt_bytes_total": "regressed"
     }
   },
   "efficiency": {
-    "duration_ms_per_scenario": 63372.0,
-    "checks_per_second": 0.4734,
-    "tool_calls_per_second": 0.3314,
-    "bytes_per_second": 1505.6334,
-    "bytes_per_tool_call": 4543.57
+    "duration_ms_per_scenario": 51640.0,
+    "checks_per_second": 0.6584,
+    "tool_calls_per_second": 0.3873,
+    "bytes_per_second": 1881.0806,
+    "bytes_per_tool_call": 4856.95
   },
   "scenarios": [
     {
       "id": "live-autonomous-agentic-folder-delivery",
       "pass": true,
-      "duration_ms": 62559,
-      "tool_call_count": 21,
-      "checks_total": 30,
-      "checks_passed": 30,
+      "duration_ms": 51600,
+      "tool_call_count": 20,
+      "checks_total": 34,
+      "checks_passed": 34,
       "error_count": 1,
       "retry_count": 0
     }

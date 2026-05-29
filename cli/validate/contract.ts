@@ -6,6 +6,9 @@ const REGISTRY_RELATIVE_PATH = ".agents/data/benchmarks/registry.json";
 const SCENARIOS_RELATIVE_PATH = ".agents/data/benchmarks/scenarios";
 const BASELINES_RELATIVE_PATH = ".agents/data/benchmarks/baselines";
 const RESULTS_RELATIVE_PATH = ".agents/data/benchmarks/results";
+const LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH = ".agents/benchmarks/runtime-flow-live-agent-v4-latest.json";
+const LIVE_BENCHMARK_EXPECTED_PACK_ID = "runtime-flow-live-agent-v4";
+const LIVE_BENCHMARK_REFRESH_COMMAND = "./.agents/agents benchmark run --save";
 
 export const VALIDATION_SCHEMA_VERSION = "1.0.0";
 export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
@@ -37,6 +40,7 @@ export interface Scenario {
   baseline_id: string;
   deterministic_metrics: Record<string, number>;
   implementation_status?: "implemented" | "skipped";
+  live_runner_scenario_id?: string;
 }
 
 interface Baseline {
@@ -97,6 +101,44 @@ interface BenchmarkResult {
   notes: string[];
 }
 
+interface LiveRunnerProfile {
+  runtime: string;
+  model: string;
+  reasoning_effort: string;
+}
+
+interface LiveRunnerScenarioResult {
+  id: string;
+  pass: boolean;
+  duration_ms: number;
+  tool_call_count: number;
+  tool_success_rate: number;
+  error_count: number;
+  retry_count: number;
+  context_bytes: number;
+  prompt_bytes: number;
+}
+
+interface LiveRunnerResultPayload {
+  pack_id: string;
+  generated_at: string;
+  pass: boolean;
+  duration_ms: number;
+  tool_call_count: number;
+  error_count: number;
+  retry_count: number;
+  context_bytes_total: number;
+  prompt_bytes_total: number;
+  benchmark_profile: LiveRunnerProfile;
+  scenarios: LiveRunnerScenarioResult[];
+}
+
+interface RuntimeLiveEvidence {
+  snapshotPathRelative: string;
+  savedResultPathRelative: string;
+  payload: LiveRunnerResultPayload;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -128,6 +170,23 @@ function asOptionalNumber(value: unknown, key: string): number | undefined {
   }
   if (typeof value !== "number" || Number.isNaN(value)) {
     throw new Error(`Invalid numeric field: ${key}`);
+  }
+  return value;
+}
+
+function asBoolean(value: unknown, key: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new Error(`Invalid boolean field: ${key}`);
+  }
+  return value;
+}
+
+function asOptionalString(value: unknown, key: string): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`Invalid optional string field: ${key}`);
   }
   return value;
 }
@@ -172,6 +231,10 @@ function parseScenario(data: Record<string, unknown>, sourcePath: string): Scena
       scenario.implementation_status = data.implementation_status;
     }
   }
+  scenario.live_runner_scenario_id = asOptionalString(
+    data.live_runner_scenario_id,
+    `${sourcePath}.live_runner_scenario_id`,
+  );
   return scenario;
 }
 
@@ -404,6 +467,233 @@ export function selectPacks(input: SelectorInput): SelectorOutput {
     };
   }
   return defaultPackSelection(input.changedPaths);
+}
+
+function parseLiveRunnerProfile(
+  data: unknown,
+  sourcePath: string,
+): LiveRunnerProfile {
+  if (!isObject(data)) {
+    throw new Error(`Invalid benchmark profile object: ${sourcePath}`);
+  }
+  return {
+    runtime: asString(data.runtime, `${sourcePath}.runtime`),
+    model: asString(data.model, `${sourcePath}.model`),
+    reasoning_effort: asString(data.reasoning_effort, `${sourcePath}.reasoning_effort`),
+  };
+}
+
+function parseLiveRunnerScenarioResult(
+  data: unknown,
+  sourcePath: string,
+): LiveRunnerScenarioResult {
+  if (!isObject(data)) {
+    throw new Error(`Invalid live scenario object: ${sourcePath}`);
+  }
+  return {
+    id: asString(data.id, `${sourcePath}.id`),
+    pass: asBoolean(data.pass, `${sourcePath}.pass`),
+    duration_ms: asOptionalNumber(data.duration_ms, `${sourcePath}.duration_ms`) ?? 0,
+    tool_call_count: asOptionalNumber(data.tool_call_count, `${sourcePath}.tool_call_count`) ?? 0,
+    tool_success_rate: asOptionalNumber(data.tool_success_rate, `${sourcePath}.tool_success_rate`) ?? 0,
+    error_count: asOptionalNumber(data.error_count, `${sourcePath}.error_count`) ?? 0,
+    retry_count: asOptionalNumber(data.retry_count, `${sourcePath}.retry_count`) ?? 0,
+    context_bytes: asOptionalNumber(data.context_bytes, `${sourcePath}.context_bytes`) ?? 0,
+    prompt_bytes: asOptionalNumber(data.prompt_bytes, `${sourcePath}.prompt_bytes`) ?? 0,
+  };
+}
+
+function parseLiveRunnerPayload(
+  data: Record<string, unknown>,
+  sourcePath: string,
+): LiveRunnerResultPayload {
+  const scenariosRaw = data.scenarios;
+  if (!Array.isArray(scenariosRaw)) {
+    throw new Error(`Invalid live runner scenarios array: ${sourcePath}.scenarios`);
+  }
+  const scenarios = scenariosRaw.map((entry, index) =>
+    parseLiveRunnerScenarioResult(entry, `${sourcePath}.scenarios[${index}]`));
+  if (scenarios.length === 0) {
+    throw new Error(`Live runner artifact has no scenarios: ${sourcePath}`);
+  }
+  return {
+    pack_id: asString(data.pack_id, `${sourcePath}.pack_id`),
+    generated_at: asString(data.generated_at, `${sourcePath}.generated_at`),
+    pass: asBoolean(data.pass, `${sourcePath}.pass`),
+    duration_ms: asOptionalNumber(data.duration_ms, `${sourcePath}.duration_ms`) ?? 0,
+    tool_call_count: asOptionalNumber(data.tool_call_count, `${sourcePath}.tool_call_count`) ?? 0,
+    error_count: asOptionalNumber(data.error_count, `${sourcePath}.error_count`) ?? 0,
+    retry_count: asOptionalNumber(data.retry_count, `${sourcePath}.retry_count`) ?? 0,
+    context_bytes_total: asOptionalNumber(data.context_bytes_total, `${sourcePath}.context_bytes_total`) ?? 0,
+    prompt_bytes_total: asOptionalNumber(data.prompt_bytes_total, `${sourcePath}.prompt_bytes_total`) ?? 0,
+    benchmark_profile: parseLiveRunnerProfile(data.benchmark_profile, `${sourcePath}.benchmark_profile`),
+    scenarios,
+  };
+}
+
+function resolveRelativePath(projectRoot: string, targetPath: string): string {
+  return relative(projectRoot, resolve(projectRoot, targetPath)).replaceAll("\\", "/");
+}
+
+function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
+  const snapshotPath = join(projectRoot, LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH);
+  if (!existsSync(snapshotPath)) {
+    throw new Error(
+      `runtime-live-artifact-missing:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+    );
+  }
+  const snapshot = loadJsonObject(snapshotPath);
+  const snapshotPackId = asString(snapshot.pack_id, `${snapshotPath}.pack_id`);
+  if (snapshotPackId !== LIVE_BENCHMARK_EXPECTED_PACK_ID) {
+    throw new Error(
+      `runtime-live-artifact-pack-mismatch:${snapshotPackId};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+    );
+  }
+  const snapshotProfile = parseLiveRunnerProfile(snapshot.benchmark_profile, `${snapshotPath}.benchmark_profile`);
+  if (snapshotProfile.model !== "gpt-5.4-mini" || snapshotProfile.reasoning_effort !== "medium") {
+    throw new Error(
+      `runtime-live-profile-mismatch:model=${snapshotProfile.model},reasoning=${snapshotProfile.reasoning_effort};expected:gpt-5.4-mini/medium;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+    );
+  }
+  const savedResultPathRaw = asString(snapshot.saved_result_path, `${snapshotPath}.saved_result_path`);
+  const savedResultPath = resolve(projectRoot, savedResultPathRaw);
+  if (!existsSync(savedResultPath)) {
+    throw new Error(
+      `runtime-live-artifact-result-missing:${savedResultPathRaw};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+    );
+  }
+  const savedResult = loadJsonObject(savedResultPath);
+  const payload = parseLiveRunnerPayload(savedResult, savedResultPath);
+  if (payload.pack_id !== LIVE_BENCHMARK_EXPECTED_PACK_ID) {
+    throw new Error(
+      `runtime-live-artifact-pack-mismatch:${payload.pack_id};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+    );
+  }
+  if (payload.benchmark_profile.model !== "gpt-5.4-mini" || payload.benchmark_profile.reasoning_effort !== "medium") {
+    throw new Error(
+      `runtime-live-profile-mismatch:model=${payload.benchmark_profile.model},reasoning=${payload.benchmark_profile.reasoning_effort};expected:gpt-5.4-mini/medium;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+    );
+  }
+  return {
+    snapshotPathRelative: resolveRelativePath(projectRoot, LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH),
+    savedResultPathRelative: resolveRelativePath(projectRoot, savedResultPathRaw),
+    payload,
+  };
+}
+
+function failedRuntimeLiveResult(
+  projectRoot: string,
+  scenario: Scenario,
+  baselinePath: string,
+  note: string,
+): BenchmarkResult {
+  return {
+    schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
+    run_id: `live-runtime-live-agent-${scenario.scenario_id}-${scenario.scenario_version}`,
+    scenario_id: scenario.scenario_id,
+    scenario_version: scenario.scenario_version,
+    pack_id: scenario.pack_id,
+    status: "failed",
+    baseline_id: scenario.baseline_id,
+    baseline_reference: relative(projectRoot, baselinePath).replaceAll("\\", "/"),
+    threshold_reference: scenario.thresholds,
+    pass: false,
+    duration_ms: 0,
+    timing_p50_ms: 0,
+    timing_p95_ms: 0,
+    error_count: 1,
+    retry_count: 0,
+    context_tokens: 0,
+    prompt_tokens: 0,
+    output_tokens: 0,
+    context_bytes: 0,
+    output_bytes: 0,
+    tool_call_count: 0,
+    tool_success_rate: 0,
+    git_commit: getGitCommit(projectRoot),
+    notes: [note],
+  };
+}
+
+function buildRuntimeLiveAgentResults(
+  projectRoot: string,
+  scenarios: Scenario[],
+  baselinePath: string,
+): { results: BenchmarkResult[]; notes: string[] } {
+  let evidence: RuntimeLiveEvidence;
+  try {
+    evidence = loadRuntimeLiveEvidence(projectRoot);
+  } catch (error) {
+    const note = (error as Error).message;
+    return {
+      results: scenarios.map((scenario) => failedRuntimeLiveResult(projectRoot, scenario, baselinePath, note)),
+      notes: [note],
+    };
+  }
+
+  const liveById = new Map<string, LiveRunnerScenarioResult>();
+  for (const liveScenario of evidence.payload.scenarios) {
+    liveById.set(liveScenario.id, liveScenario);
+  }
+  const fallbackScenario = evidence.payload.scenarios[0];
+
+  const results = scenarios.map((scenario, index) => {
+    const mappingId = scenario.live_runner_scenario_id;
+    const mappedScenario =
+      (mappingId ? liveById.get(mappingId) : undefined)
+      ?? liveById.get(scenario.scenario_id)
+      ?? evidence.payload.scenarios[index]
+      ?? fallbackScenario;
+    const mappedId = mappedScenario.id;
+    const status: BenchmarkResult["status"] = mappedScenario.pass ? "passed" : "failed";
+    const notes = [
+      `live-runner-artifact:${evidence.savedResultPathRelative}`,
+      `live-runner-snapshot:${evidence.snapshotPathRelative}`,
+      `live-runner-scenario:${mappedId}`,
+      `live-runner-generated-at:${evidence.payload.generated_at}`,
+      `live-runner-profile:${evidence.payload.benchmark_profile.model}/${evidence.payload.benchmark_profile.reasoning_effort}`,
+    ];
+    if (mappingId && mappingId !== mappedId) {
+      notes.push(`live-runner-mapping-fallback:${mappingId}->${mappedId}`);
+    }
+    if (!mappedScenario.pass) {
+      notes.push("live-runner-scenario-failed");
+    }
+    return {
+      schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
+      run_id: `live-runtime-live-agent-${scenario.scenario_id}-${scenario.scenario_version}`,
+      scenario_id: scenario.scenario_id,
+      scenario_version: scenario.scenario_version,
+      pack_id: scenario.pack_id,
+      status,
+      baseline_id: scenario.baseline_id,
+      baseline_reference: relative(projectRoot, baselinePath).replaceAll("\\", "/"),
+      threshold_reference: scenario.thresholds,
+      pass: status === "passed",
+      duration_ms: mappedScenario.duration_ms,
+      timing_p50_ms: mappedScenario.duration_ms,
+      timing_p95_ms: mappedScenario.duration_ms,
+      error_count: mappedScenario.error_count,
+      retry_count: mappedScenario.retry_count,
+      context_tokens: 0,
+      prompt_tokens: 0,
+      output_tokens: 0,
+      context_bytes: mappedScenario.context_bytes,
+      output_bytes: mappedScenario.prompt_bytes,
+      tool_call_count: mappedScenario.tool_call_count,
+      tool_success_rate: mappedScenario.tool_success_rate,
+      git_commit: getGitCommit(projectRoot),
+      notes,
+    };
+  });
+
+  return {
+    results,
+    notes: [
+      `runtime-live-agent-artifact:${evidence.savedResultPathRelative}`,
+      `runtime-live-agent-refresh:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+    ],
+  };
 }
 
 function buildResult(
@@ -642,10 +932,17 @@ function handleBenchmark(
   const selection = selectPacks({ scope, changedPaths });
   const selectedPacks = explicitPacks.length > 0 ? explicitPacks : selection.selected_pack_ids;
   const results: BenchmarkResult[] = [];
+  const benchmarkNotes: string[] = [];
   for (const packId of selectedPacks) {
     const scenarios = snapshot.scenariosByPack[packId] ?? [];
     const baselinePath = join(projectRoot, BASELINES_RELATIVE_PATH, packId, "baseline-v1.json");
     const baseline = snapshot.baselinesByPack[packId];
+    if (packId === "runtime-live-agent") {
+      const live = buildRuntimeLiveAgentResults(projectRoot, scenarios, baselinePath);
+      results.push(...live.results);
+      benchmarkNotes.push(...live.notes);
+      continue;
+    }
     for (const scenario of scenarios) {
       results.push(buildResult(projectRoot, scenario, baselinePath, baseline));
     }
@@ -663,7 +960,9 @@ function handleBenchmark(
     && baselineMissing === 0
     && contractIssues.length === 0;
   const status: "passed" | "failed" | "skipped" = pass ? "passed" : allSkipped ? "skipped" : "failed";
-  const notes = allSkipped ? ["all-scenarios-skipped:not-implemented-live-runner"] : [];
+  const notes = allSkipped
+    ? ["all-scenarios-skipped:not-implemented-live-runner", ...benchmarkNotes]
+    : benchmarkNotes;
   const payload: Record<string, unknown> = {
     schema_version: VALIDATION_SCHEMA_VERSION,
     command_family: "validation",
