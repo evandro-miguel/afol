@@ -37,6 +37,7 @@ const JSON_ALIASES = new Set(["-j", "--json"]);
 const STATUS_ALIASES = new Set(["s", "status"]);
 const HELP_ALIASES = new Set(["-h", "--help"]);
 const VALIDATE_ALIASES = new Set(["v", "validate"]);
+const PROJECT_CONFIG_CANDIDATES = ["config.json", "agents.config"] as const;
 
 const exit = (code: number): never => {
   process.exit(code);
@@ -126,12 +127,14 @@ function signalExitCode(signal: string): number {
   return typeof signalNumber === "number" ? 128 + signalNumber : 1;
 }
 
-function findProjectRoot(startPath: string): string | null {
+function findProjectRoot(startPath: string): { root: string; configPath: string } | null {
   let current = resolve(startPath);
   while (true) {
-    const configPath = join(current, ".agents", "config.json");
-    if (existsSync(configPath)) {
-      return current;
+    for (const configName of PROJECT_CONFIG_CANDIDATES) {
+      const configPath = join(current, ".agents", configName);
+      if (existsSync(configPath)) {
+        return { root: current, configPath };
+      }
     }
     const parent = dirname(current);
     if (parent === current) {
@@ -175,14 +178,15 @@ export function main(argv: string[]): number {
 
   const normalized = normalizeArguments(args);
 
-  const projectRoot = findProjectRoot(process.cwd());
-  if (!projectRoot) {
-    console.error("❌ Could not detect project root: .agents/config.json not found.");
+  const project = findProjectRoot(process.cwd());
+  if (!project) {
+    console.error("❌ Could not detect project root: .agents/config.json or .agents/agents.config not found.");
     return 3;
   }
+  const projectRoot = project.root;
 
   try {
-    loadJson(join(projectRoot, ".agents", "config.json"));
+    loadJson(project.configPath);
     loadJson(join(projectRoot, ".agents", "lock.json"));
     const manifestPath = join(projectRoot, ".agents", "manifest.json");
     if (existsSync(manifestPath)) {
