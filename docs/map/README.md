@@ -4,7 +4,7 @@ description: "Entry point for the generated repository map, including reading or
 doc_kind: "codemap-index"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T13:20:21-03:00"
+updated_at: "2026-05-29T14:10:48-03:00"
 ---
 
 # Repository Map
@@ -60,6 +60,15 @@ This folder is the distilled current-state evidence surface for the repository.
 
 ## Lifecycle Snapshot
 
+- F-01 through F-03 governance reconciliation is now in closeout: the roadmap
+  entries and parent specs are final, `docs/arc/SPECS/INDEX.md` is regenerated
+  via `just index`, and the accepted evidence IDs are
+  `E-20260528215311949499`, `E-20260528220141194181`,
+  `E-20260529135617802715`, and `E-20260529134101240986`. Strict verification
+  passed for
+  `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`,
+  `.agents/wb/260529_1350_f02-template-export-alignment/`, and
+  `.agents/wb/260529_1336_f03-kernel-grammar-alias-help/`.
 - F-16 project-template-source-separation is now in closeout: the roadmap entry
   is final, the parent spec is final, `docs/arc/SPECS/INDEX.md` has been
   regenerated, and the accepted implementation evidence is `b520f23` and

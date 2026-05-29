@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-05-29T16:22:06+00:00"
+updated_at: "2026-05-29T17:12:47+00:00"
 ---
 
 # SPECS INDEX
@@ -17,9 +17,9 @@ updated_at: "2026-05-29T16:22:06+00:00"
 | Metric | Count |
 |--------|-------|
 | Total | 59 |
-| Draft | 10 |
+| Draft | 7 |
 | Active | 28 |
-| Final | 21 |
+| Final | 24 |
 
 ## Index
 
@@ -61,9 +61,9 @@ updated_at: "2026-05-29T16:22:06+00:00"
 | 260426_1215_parallel-session-isolation_spec_01 | parallel-session-isolation | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260509_1453_plan-task-execution-integrity-state-model_spec-child_01 | plan-task-execution-integrity-state-model | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent_spec: docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md, plan: .agents/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_plan_01.md, task: .agents/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_task_01.md |
 | 260521_0000_total-reformulation-strategy_spec_01 | total-reformulation-strategy | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
-| 260521_0010_universal-agent-cli_spec_01 | universal-agent-cli | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
-| 260521_0020_minimal-project-template_spec_01 | minimal-project-template | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
-| 260521_0030_agent-command-design-system_spec_01 | agent-command-design-system | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0010_universal-agent-cli_spec_01 | universal-agent-cli | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0020_minimal-project-template_spec_01 | minimal-project-template | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0030_agent-command-design-system_spec_01 | agent-command-design-system | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0040_governance-workbench-system_spec_01 | governance-workbench-system | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0050_smart-rules-and-skills-routing_spec_01 | smart-rules-and-skills-routing | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0060_file-first-low-token-execution_spec_01 | file-first-low-token-execution | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |

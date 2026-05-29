@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260521_0010_universal-agent-cli_spec_01
 theme: universal-agent-cli
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T00:10:00+08:00'
-updated_at: '2026-05-21T00:10:00+08:00'
+updated_at: '2026-05-29T14:10:48-03:00'
 roadmap_feature: F-01
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -182,3 +182,13 @@ Implementation starts with failing tests for:
 - Can a project remain reproducible through local state and lock files?
 - Are frequent commands short enough for agents but still auditable?
 - Is every fallback temporary and covered by a parity stop condition?
+
+## 11) Closure
+
+- Accepted implementation evidence:
+  - `E-20260528215311949499`
+  - `E-20260528220141194181`
+- Closeout session: `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`
+- Strict verification:
+  `./.agents/agents verify-tasks --strict .agents/wb/260528_0722_slice2-cli-kernel-front-door/`
+  passed.

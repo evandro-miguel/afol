@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260521_0020_minimal-project-template_spec_01
 theme: minimal-project-template
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T00:20:00+08:00'
-updated_at: '2026-05-21T00:20:00+08:00'
+updated_at: '2026-05-29T14:10:48-03:00'
 roadmap_feature: F-02
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -155,3 +155,11 @@ Out of scope:
 - Downstream bootstrap can run `./a -h` and `./a s`.
 - Update preview can classify managed vs project-owned files.
 - Agents can start governed work without reading root factory docs.
+
+## 10) Closure
+
+- Accepted implementation evidence: `E-20260529135617802715`.
+- Closeout session: `.agents/wb/260529_1350_f02-template-export-alignment/`
+- Strict verification:
+  `./.agents/agents verify-tasks --strict .agents/wb/260529_1350_f02-template-export-alignment/`
+  passed.

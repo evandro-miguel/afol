@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260521_0030_agent-command-design-system_spec_01
 theme: agent-command-design-system
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T00:30:00+08:00'
-updated_at: '2026-05-21T00:30:00+08:00'
+updated_at: '2026-05-29T14:10:48-03:00'
 roadmap_feature: F-03
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -169,3 +169,11 @@ err missing-evidence task=T-01 hint="run ./a e a -t T-01 -c <cmd> -r pass"
 - Unknown commands fail with an actionable hint.
 - The alias table is snapshot-tested.
 - Agents can perform routine workbench updates without opening raw files.
+
+## 11) Closure
+
+- Accepted implementation evidence: `E-20260529134101240986`.
+- Closeout session: `.agents/wb/260529_1336_f03-kernel-grammar-alias-help/`
+- Strict verification:
+  `./.agents/agents verify-tasks --strict .agents/wb/260529_1336_f03-kernel-grammar-alias-help/`
+  passed.

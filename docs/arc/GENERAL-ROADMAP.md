@@ -80,27 +80,35 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-01 Universal Agent CLI
 
-- Status: planned
+- Status: final
 - Governing spec: docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md
 - Why: Logic should live in one updateable CLI instead of being copied into
   every project.
 - Exit criteria: Bun/TypeScript CLI architecture is defined; CLI runs from ./a;
 - CLI reads local project state; CLI supports version lock and update checks;
   compatibility delegation preserves current behavior until parity.
+- Closure note: accepted implementation evidence is `E-20260528215311949499`
+  and `E-20260528220141194181`; closeout session
+  `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`; strict verification
+  passed.
 
 ### F-02 Minimal Project Template
 
-- Status: planned
+- Status: final
 - Governing spec: docs/arc/SPECS/260521_0020_minimal-project-template_spec_01.md
 - Why: Downstream projects need only the local state and minimal docs required
   for agents to operate.
 - Exit criteria: src/project-template becomes minimal; template contains
   config, lock, manifest, rules, skills, workbench, and required docs; factory
   noise is excluded; bootstrap/export validates cleanliness.
+- Closure note: accepted implementation evidence is
+  `E-20260529135617802715`; closeout session
+  `.agents/wb/260529_1350_f02-template-export-alignment/`; strict verification
+  passed.
 
 ### F-03 Agent Command Design System
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0030_agent-command-design-system_spec_01.md
 - Why: Agents should use short, predictable commands to reduce repeated token
@@ -108,6 +116,10 @@ The Bun/TypeScript reformulation must be staged:
 - Exit criteria: short grammar exists; long aliases exist; high-frequency
   operations use 1-3 letter commands; compact output is default; JSON output is
   available.
+- Closure note: accepted implementation evidence is
+  `E-20260529134101240986`; closeout session
+  `.agents/wb/260529_1336_f03-kernel-grammar-alias-help/`; strict verification
+  passed.
 
 ### F-04 Governance Workbench System
 

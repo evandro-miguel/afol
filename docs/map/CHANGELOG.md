@@ -4,7 +4,7 @@ description: "Version-to-version summary of repository-map changes, focusing on 
 doc_kind: "changelog"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T13:20:21-03:00"
+updated_at: "2026-05-29T14:10:48-03:00"
 ---
 
 # Changelog
@@ -21,6 +21,24 @@ updated_at: "2026-05-29T13:20:21-03:00"
 - Domains detected: ``
 - Public boundary files detected: `2`
 - Top hotspots tracked: `0`
+
+## F-01 Through F-03 Governance Reconciliation
+
+- Feature: `F-01` through `F-03`
+- Scope: current-state docs reconciliation for the universal CLI, minimal
+  template, and command design slices.
+- Accepted implementation evidence:
+  - `E-20260528215311949499`
+  - `E-20260528220141194181`
+  - `E-20260529135617802715`
+  - `E-20260529134101240986`
+- Strict verification: the representative sessions
+  `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`,
+  `.agents/wb/260529_1350_f02-template-export-alignment/`, and
+  `.agents/wb/260529_1336_f03-kernel-grammar-alias-help/` all passed
+  `verify-tasks --strict`.
+- Status: satisfied for the docs/current-state layer; residual risk is limited
+  to future derived-index drift, not the current refresh.
 
 ## F-04 Through F-08 Governance Reconciliation
 

@@ -4,7 +4,7 @@ description: "Feature-oriented breakdown of the repository, explaining why each 
 doc_kind: "features"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T13:20:21-03:00"
+updated_at: "2026-05-29T14:10:48-03:00"
 ---
 
 # Features
@@ -17,6 +17,16 @@ This file groups the repository by feature or concern, not by raw directory list
 
 ## Feature Clusters
 
+- `F-01 through F-03 governance reconciliation`
+  - `docs/arc/GENERAL-ROADMAP.md`
+  - `docs/arc/SPECS/INDEX.md`
+  - `docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md`
+  - `docs/arc/SPECS/260521_0020_minimal-project-template_spec_01.md`
+  - `docs/arc/SPECS/260521_0030_agent-command-design-system_spec_01.md`
+  - `.agents/wb/260529_1410_f01-f03-governance-reconciliation/`
+  - `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`
+  - `.agents/wb/260529_1350_f02-template-export-alignment/`
+  - `.agents/wb/260529_1336_f03-kernel-grammar-alias-help/`
 - `F-04 through F-08 governance reconciliation`
   - `docs/arc/GENERAL-ROADMAP.md`
   - `docs/arc/SPECS/INDEX.md`
