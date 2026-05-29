@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-05-28T22:28:20+00:00
+**Generated:** 2026-05-29T18:50:08+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,46 +9,48 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 114 files, 41,949 lines, 1747.5 KB
+**Stats:** 114 files, 42,998 lines, 1789.8 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/scripts/agents-benchmark.py` | 1,780 | 86.0 KB | Module; functionality |
+| `.agents/scripts/agents-benchmark.py` | 1,784 | 86.1 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-benchmark.py` | 1,776 | 85.6 KB | Module; functionality |
 | `.agents/scripts/agents-skills-sync.py` | 1,733 | 74.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-skills-sync.py` | 1,733 | 74.2 KB | Module; functionality |
-| `.agents/scripts/agents-bootstrap.py` | 1,512 | 61.6 KB | Module; functionality |
-| `src/project-template/.agents/scripts/agents-bootstrap.py` | 1,510 | 61.5 KB | Module; functionality |
+| `.agents/scripts/agents-bootstrap.py` | 1,513 | 61.6 KB | Module; functionality |
+| `src/project-template/.agents/scripts/agents-bootstrap.py` | 1,513 | 61.6 KB | Module; functionality |
 | `src/project-template/.agents/scripts/verify-tasks.py` | 1,347 | 53.8 KB | Module; functionality |
 | `.agents/scripts/verify-tasks.py` | 1,318 | 52.4 KB | Module; functionality |
 | `.agents/scripts/lib/execution_commands.py` | 1,238 | 50.5 KB | Module; functionality |
 | `src/project-template/.agents/scripts/lib/execution_commands.py` | 1,211 | 49.7 KB | Module; functionality |
+| `cli/validate/contract.ts` | 1,003 | 35.8 KB | Module; functionality |
 | `.agents/scripts/agents-wb-update.py` | 991 | 41.0 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-wb-update.py` | 991 | 41.0 KB | Module; functionality |
 | `.agents/scripts/agents-new.py` | 966 | 42.7 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-new.py` | 950 | 41.8 KB | Module; functionality |
-| `.agents/scripts/agents-scaffold-update.py` | 797 | 34.2 KB | Module; functionality |
-| `src/project-template/.agents/scripts/agents-scaffold-update.py` | 797 | 34.2 KB | Module; functionality |
+| `.agents/scripts/agents-scaffold-update.py` | 774 | 33.0 KB | Module; functionality |
+| `src/project-template/.agents/scripts/agents-scaffold-update.py` | 774 | 33.0 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-telemetry.py` | 740 | 31.1 KB | Module; functionality |
 | `.agents/scripts/agents-telemetry.py` | 731 | 31.4 KB | Module; functionality |
 | `.agents/scripts/agents-local-state.py` | 567 | 23.0 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-local-state.py` | 567 | 23.0 KB | Module; functionality |
-| `cli/validate/contract.ts` | 562 | 19.5 KB | Module; functionality |
 | `.agents/scripts/agents-tools.py` | 544 | 20.4 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-tools.py` | 543 | 20.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-doctor.py` | 521 | 20.1 KB | Module; functionality |
 | `.agents/scripts/agents-doctor.py` | 520 | 20.3 KB | Module; functionality |
 | `.agents/scripts/agents-structure-map.py` | 499 | 19.7 KB | Module; functionality |
+| `.agents/scripts/lib/agents_config.py` | 454 | 18.0 KB | Module; functionality |
+| `src/project-template/.agents/scripts/lib/agents_config.py` | 450 | 17.7 KB | Module; functionality |
 | `.agents/runtime/src/agentic_scaffold/services/changes.py` | 449 | 19.4 KB | Module; functionality |
 | `.agents/scripts/agents-lint-docs.py` | 443 | 16.8 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-lint-docs.py` | 443 | 16.8 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-structure-map.py` | 434 | 17.0 KB | Module; functionality |
-| `.agents/scripts/lib/agents_config.py` | 422 | 16.2 KB | Module; functionality |
-| `src/project-template/.agents/scripts/lib/agents_config.py` | 422 | 16.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-repo-map.py` | 361 | 16.3 KB | Module; functionality |
 | `.agents/scripts/agents-repo-map.py` | 359 | 16.2 KB | Module; functionality |
+| `.agents/runtime/src/agentic_scaffold/services/search.py` | 355 | 14.2 KB | Module; functionality |
+| `cli/main.ts` | 345 | 11.6 KB | Module; functionality |
 | `.agents/scripts/agents-patterns.py` | 341 | 13.3 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-patterns.py` | 341 | 13.3 KB | Module; functionality |
 | `.agents/scripts/check-links.py` | 331 | 11.2 KB | Module; functionality |
@@ -63,10 +65,11 @@ Services, utilities, and business logic.
 | `.agents/scripts/agents-memory.py` | 288 | 11.7 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-memory.py` | 288 | 11.7 KB | Module; functionality |
 | `.agents/runtime/src/agentic_scaffold/runtime.py` | 274 | 12.6 KB | Module; functionality |
+| `.agents/runtime/src/agentic_scaffold/registry.py` | 272 | 13.5 KB | Module; functionality |
 | `.agents/scripts/agents-status.py` | 261 | 10.8 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-status.py` | 261 | 10.8 KB | Module; functionality |
 | `.agents/scripts/agents-knowledge.py` | 244 | 9.9 KB | Module; functionality |
-| `.agents/scripts/agents-index.py` | 226 | 8.5 KB | Module; functionality |
+| `.agents/scripts/agents-index.py` | 232 | 8.7 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-knowledge.py` | 223 | 8.9 KB | Module; functionality |
 | `.agents/scripts/fix-lint-all.py` | 212 | 8.3 KB | Module; functionality |
 | `src/project-template/.agents/scripts/fix-lint-all.py` | 212 | 8.3 KB | Module; functionality |
@@ -78,7 +81,6 @@ Services, utilities, and business logic.
 | `.agents/scripts/agents-implement.py` | 184 | 8.3 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-index.py` | 184 | 6.6 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-implement.py` | 184 | 8.3 KB | Module; functionality |
-| `cli/main.ts` | 179 | 5.6 KB | Module; functionality |
 | `.agents/scripts/lib/task_integrity.py` | 172 | 8.0 KB | Module; functionality |
 | `src/project-template/.agents/runtime/src/agentic_scaffold/services/changes.py` | 171 | 7.1 KB | Module; functionality |
 | `.agents/scripts/agents-revert.py` | 167 | 7.2 KB | Module; functionality |
@@ -101,9 +103,7 @@ Services, utilities, and business logic.
 | `src/project-template/.agents/runtime/src/agentic_scaffold/models.py` | 119 | 3.3 KB | Module; functionality |
 | `.agents/scripts/fix-lint-frontmatter.py` | 112 | 3.9 KB | Module; functionality |
 | `src/project-template/.agents/scripts/fix-lint-frontmatter.py` | 112 | 3.9 KB | Module; functionality |
-| `.agents/runtime/src/agentic_scaffold/registry.py` | 110 | 5.4 KB | Module; functionality |
 | `src/project-template/.agents/runtime/src/agentic_scaffold/registry.py` | 109 | 5.3 KB | Module; functionality |
-| `.agents/runtime/src/agentic_scaffold/services/search.py` | 103 | 3.6 KB | Module; functionality |
 | `.agents/runtime/src/agentic_scaffold/services/workspace.py` | 102 | 3.9 KB | Module; functionality |
 | `src/project-template/.agents/runtime/src/agentic_scaffold/services/search.py` | 101 | 3.6 KB | Module; functionality |
 | `.agents/skills/node/rules/assets/graceful-server.test.ts` | 68 | 2.6 KB | Test file; unit tests |

@@ -4,7 +4,7 @@ description: "Entry point for the generated repository map, including reading or
 doc_kind: "codemap-index"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T14:10:48-03:00"
+updated_at: "2026-05-29T15:54:13-03:00"
 ---
 
 # Repository Map
@@ -77,11 +77,10 @@ This folder is the distilled current-state evidence surface for the repository.
   benchmark matrix has 8 packs, the parent spec is final in
   `docs/arc/SPECS/INDEX.md`, and the accepted waves are the contract layer,
   selector/matrix pack-map, real typecheck gate, routing-accuracy,
-  update-safety, and mutation-safety. Selected-pack benchmark results are
-  persisted under `.agents/data/benchmarks/results/20260529_14263*_*.json`,
-  including explicit waiver evidence for `runtime-live-agent`
-  (`status=skipped`) in
-  `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`.
+  update-safety, and mutation-safety. The live `runtime-live-agent` refresh is
+  artifact-backed and passed, the global benchmark run now reports `36/36`
+  with `skipped=0`, and the scripts coverage validation stayed above threshold
+  at `84.11/84.12`.
 - F-15 repo-wide simplification runtime parity is now in closeout: the roadmap
   entry is final, the parent spec is final, and the accepted child slices are
   scripts cleanup, map boundary cleanup, runtime registry parity, and python

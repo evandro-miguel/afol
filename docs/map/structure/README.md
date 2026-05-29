@@ -1,14 +1,14 @@
 # 📁 Project Structure - Complete Index
 
-**Generated:** 2026-05-28T23:31:42+00:00
+**Generated:** 2026-05-29T18:50:08+00:00
 **Last Update:** First run
 
 ## 📊 Overview
 
 | Metric | Value |
 |--------|-------|
-| **Total Files** | 326 |
-| **Total Lines** | 80,985 |
+| **Total Files** | 357 |
+| **Total Lines** | 86,906 |
 
 ## 📂 Documentation Sections
 
@@ -17,7 +17,7 @@
 | [Backend](./backend.md) | Services, utilities, and business logic | 114 |
 | [Types](./types.md) | Type definitions and interfaces | 1 |
 | [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 166 |
-| [Data](./data.md) | Data files, constants, and configuration | 45 |
+| [Data](./data.md) | Data files, constants, and configuration | 76 |
 
 ## 🔄 Change Detection
 
@@ -30,6 +30,7 @@ This documentation uses **incremental updates**:
 
 ```
 agentic_start_folder_dev_refactor_TS/
+├── 📁 agents-config-yaml-bEvGiR/
 ├── 📁 cli/
 ├── 📁 docs/
 ├── 📁 src/

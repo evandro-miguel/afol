@@ -4,7 +4,7 @@ description: "Version-to-version summary of repository-map changes, focusing on 
 doc_kind: "changelog"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T14:10:48-03:00"
+updated_at: "2026-05-29T16:03:04-03:00"
 ---
 
 # Changelog
@@ -170,9 +170,11 @@ updated_at: "2026-05-29T14:10:48-03:00"
   - `.agents/data/benchmarks/results/20260529_142633_mcp-parity.json`
   - `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
   - `.agents/data/benchmarks/results/20260529_142633_token-economy.json`
-- Waiver evidence: `runtime-live-agent` remains explicit `status=skipped` with
-  note `all-scenarios-skipped:not-implemented-live-runner` in the persisted
-  result artifact above.
+- Live evidence: `runtime-live-agent` is now artifact-backed with
+  `status=passed` in the persisted result artifact above.
+- Global benchmark: `bun run cli/main.ts v bench --json` now reports `36/36`
+  with `skipped=0`, and scripts coverage validation stayed above threshold at
+  `84.11/84.12`.
 - Index state: `docs/arc/SPECS/INDEX.md` now marks
   `260521_0110_validation-ci-and-benchmarks_spec_01` as `final`.
 - Status: `satisfied` for the docs/current-state layer; residual risk is
