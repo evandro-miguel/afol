@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -42,6 +43,13 @@ class KnowledgePullHit:
     snippets: tuple[KnowledgeSnippet, ...]
 
 
+@dataclass(frozen=True)
+class KnowledgeIndexResult:
+    changed: bool
+    doc_count: int
+    path_label: str
+
+
 class KnowledgeSearchService:
     KNOWLEDGE_DOC_TYPES = {"research", "brainstorm", "explorer-check", "postmortem", "report"}
 
@@ -49,6 +57,7 @@ class KnowledgeSearchService:
         self.repo_root = repo_root
         self.search_roots = search_roots
         self.wb_dir = self.repo_root / ".agents" / "wb"
+        self.knowledge_index_file = self.repo_root / "docs" / "knowledge" / "INDEX.md"
 
     def _iter_markdown_files(self):
         for root in self.search_roots:
@@ -161,6 +170,56 @@ class KnowledgeSearchService:
         compact = re.sub(r"`([^`]+)`", r"\1", compact)
         return compact[:180]
 
+    def _repo_relative_path(self, path: Path) -> str:
+        try:
+            return path.relative_to(self.repo_root).as_posix()
+        except ValueError:
+            return str(path)
+
+    @staticmethod
+    def _parse_offset(offset: str) -> timezone:
+        value = offset.strip()
+        if value == "Z":
+            return timezone.utc
+        if len(value) != 6 or value[0] not in {"+", "-"} or value[3] != ":":
+            raise ValueError(f"Invalid timezone offset format: {offset}")
+        sign = value[0]
+        try:
+            hours = int(value[1:3])
+            minutes = int(value[4:6])
+        except ValueError as exc:
+            raise ValueError(f"Invalid timezone offset format: {offset}") from exc
+        if not (0 <= hours <= 23):
+            raise ValueError(f"Invalid timezone offset format: {offset}")
+        if not (0 <= minutes <= 59):
+            raise ValueError(f"Invalid timezone offset format: {offset}")
+        delta = timedelta(hours=hours, minutes=minutes)
+        if sign == "-":
+            delta = -delta
+        return timezone(delta)
+
+    def _load_default_offset(self) -> str:
+        config_path = self.repo_root / ".agents" / "agents.config"
+        if not config_path.exists():
+            return "+00:00"
+        try:
+            loaded = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            return "+00:00"
+        if not isinstance(loaded, dict):
+            return "+00:00"
+        time_cfg = loaded.get("time")
+        if not isinstance(time_cfg, dict):
+            return "+00:00"
+        raw_offset = str(time_cfg.get("default_offset", "+00:00")).strip()
+        if not raw_offset:
+            return "+00:00"
+        try:
+            self._parse_offset(raw_offset)
+        except ValueError:
+            return "+00:00"
+        return raw_offset
+
     @classmethod
     def _summarize_body(cls, body: str) -> str:
         for line in body.splitlines():
@@ -230,7 +289,7 @@ class KnowledgeSearchService:
                     doc.theme,
                     doc.title,
                     doc.summary,
-                    doc.path.relative_to(self.repo_root).as_posix(),
+                    self._repo_relative_path(doc.path),
                 ]
             ).lower()
             score = haystack.count(normalized_query)
@@ -263,7 +322,7 @@ class KnowledgeSearchService:
                     doc.theme,
                     doc.title,
                     doc.summary,
-                    doc.path.relative_to(self.repo_root).as_posix(),
+                    self._repo_relative_path(doc.path),
                 ]
             ).lower()
             score = haystack.count(normalized_query)
@@ -274,3 +333,63 @@ class KnowledgeSearchService:
             hits.append(KnowledgePullHit(score=score, doc=doc, snippets=tuple(matched_snippets)))
         hits.sort(key=lambda item: (-item.score, item.doc.doc_id))
         return hits[:limit]
+
+    def index_knowledge_docs(self) -> KnowledgeIndexResult:
+        docs = list(self._iter_knowledge_docs() or ())
+        self.knowledge_index_file.parent.mkdir(parents=True, exist_ok=True)
+
+        default_offset = self._load_default_offset()
+        now_ts = datetime.now(self._parse_offset(default_offset)).strftime(f"%Y-%m-%dT%H:%M:%S{default_offset}")
+        previous = self.knowledge_index_file.read_text(encoding="utf-8") if self.knowledge_index_file.exists() else ""
+
+        created_at = now_ts
+        updated_at = now_ts
+        parsed_previous = self._split_frontmatter(previous) if previous else None
+        if parsed_previous is not None:
+            frontmatter, _ = parsed_previous
+            existing_created = frontmatter.get("created_at")
+            existing_updated = frontmatter.get("updated_at")
+            if existing_created:
+                created_at = existing_created.strip()
+            if existing_updated:
+                updated_at = existing_updated.strip()
+
+        grouped: dict[str, list[KnowledgeDoc]] = {}
+        for doc in docs:
+            grouped.setdefault(doc.doc_type, []).append(doc)
+
+        lines = [
+            "---",
+            "doc_type: index",
+            'id: "knowledge_index"',
+            "status: active",
+            f'created_at: "{created_at}"',
+            f'updated_at: "{updated_at}"',
+            "---",
+            "",
+            "# Knowledge Index",
+            "",
+            "Low-token discovery index for reusable workbench knowledge artifacts.",
+            "",
+            f"- Total indexed docs: {len(docs)}",
+            "",
+        ]
+        for doc_type in sorted(grouped):
+            lines.extend([f"## {doc_type.title()}", ""])
+            for doc in grouped[doc_type]:
+                lines.append(
+                    f"- `{doc.doc_id}` | `{self._repo_relative_path(doc.path)}` | {doc.summary or doc.title}"
+                )
+            lines.append("")
+
+        stable_content = "\n".join(lines).rstrip() + "\n"
+        if stable_content == previous:
+            return KnowledgeIndexResult(changed=False, doc_count=len(docs), path_label=self._repo_relative_path(self.knowledge_index_file))
+
+        lines[5] = f'updated_at: "{now_ts}"'
+        next_content = "\n".join(lines).rstrip() + "\n"
+        if next_content == previous:
+            return KnowledgeIndexResult(changed=False, doc_count=len(docs), path_label=self._repo_relative_path(self.knowledge_index_file))
+
+        self.knowledge_index_file.write_text(next_content, encoding="utf-8")
+        return KnowledgeIndexResult(changed=True, doc_count=len(docs), path_label=self._repo_relative_path(self.knowledge_index_file))

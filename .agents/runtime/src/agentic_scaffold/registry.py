@@ -204,6 +204,22 @@ def _run_knowledge_show_in_process(config: RuntimeConfig, args: list[str]) -> in
     return 0
 
 
+def _run_knowledge_index_in_process(config: RuntimeConfig, args: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="knowledge index", description="generate knowledge index")
+    try:
+        parser.parse_args(args)
+    except SystemExit as exc:
+        return int(exc.code) if isinstance(exc.code, int) else 1
+
+    search_service = KnowledgeSearchService(config.repo_root, config.search_roots)
+    result = search_service.index_knowledge_docs()
+    if result.changed:
+        print(f"\u2713 knowledge index updated: {result.path_label} ({result.doc_count} docs)")
+        return 0
+    print(f"= knowledge index unchanged: {result.path_label} ({result.doc_count} docs)")
+    return 0
+
+
 def _emit_knowledge_search_hit(repo_root: Path, score: int, doc: KnowledgeDoc) -> None:
     print(f"[{score}] {doc.doc_type} | {doc.doc_id}")
     print(f"  path: {_repo_relative_path(repo_root, doc.path)}")
@@ -276,6 +292,8 @@ class RuntimeRegistry:
                 return _run_knowledge_search_in_process(self.config, subcommand_args)
             if subcommand == "show":
                 return _run_knowledge_show_in_process(self.config, subcommand_args)
+            if subcommand == "index":
+                return _run_knowledge_index_in_process(self.config, subcommand_args)
         if command_name == "status":
             return _run_status_in_process(self.config.repo_root, args)
         if command_name == "session" and args and args[0] == "catchup":

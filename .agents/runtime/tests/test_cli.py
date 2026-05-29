@@ -217,6 +217,41 @@ def _seed_knowledge_session(scaffold_repo) -> str:
     return session_id
 
 
+def _seed_knowledge_index_fixture(scaffold_repo) -> tuple[str, Path]:
+    session_id = _seed_knowledge_session(scaffold_repo)
+    session_dir = scaffold_repo / ".agents" / "wb" / session_id
+    (session_dir / f"{session_id}_postmortem_01.md").write_text(
+        "---\n"
+        "doc_type: postmortem\n"
+        f"id: {session_id}_postmortem_01\n"
+        "theme: runtime\n"
+        "status: final\n"
+        "---\n\n"
+        "# Postmortem: knowledge index parity\n\n"
+        "Runtime compatibility postmortem for knowledge index parity.\n",
+        encoding="utf-8",
+    )
+    index_path = scaffold_repo / "docs" / "knowledge" / "INDEX.md"
+    index_path.write_text(
+        "---\n"
+        "doc_type: index\n"
+        'id: "knowledge_index"\n'
+        "status: active\n"
+        'created_at: "2026-01-01T00:00:00+00:00"\n'
+        'updated_at: "2026-01-01T00:00:00+00:00"\n'
+        "---\n\n"
+        "# Knowledge Index\n\n"
+        "Low-token discovery index for reusable workbench knowledge artifacts.\n\n"
+        "- Total indexed docs: 2\n\n"
+        "## Postmortem\n\n"
+        f"- `{session_id}_postmortem_01` | `.agents/wb/{session_id}/{session_id}_postmortem_01.md` | Runtime compatibility postmortem for knowledge index parity.\n\n"
+        "## Research\n\n"
+        f"- `{session_id}_research_01` | `.agents/wb/{session_id}/{session_id}_research_01.md` | Runtime knowledge pull parity keeps output aligned with legacy script behavior.\n",
+        encoding="utf-8",
+    )
+    return session_id, index_path
+
+
 def _write_malformed_knowledge_markdown(scaffold_repo, session_id: str, name: str = "malformed.md") -> Path:
     path = scaffold_repo / ".agents" / "wb" / session_id / name
     path.write_bytes(
@@ -544,21 +579,61 @@ def test_cli_registered_knowledge_list_search_show_use_native_path(scaffold_repo
     assert f"id: {doc_id}" in show_result.stdout
 
 
-def test_cli_registered_knowledge_index_stays_delegated_subprocess(scaffold_repo, monkeypatch):
-    _stage_knowledge_script(scaffold_repo)
-    calls: list[list[str]] = []
+def test_cli_registered_knowledge_index_matches_script_and_final_bytes(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    _, index_path = _seed_knowledge_index_fixture(scaffold_repo)
 
-    def _capture_run_command(cmd, **_kwargs):
-        calls.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, stdout="delegated-index\n", stderr="")
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "index"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    legacy_bytes = index_path.read_bytes()
 
-    monkeypatch.setattr("agentic_scaffold.registry.run_command", _capture_run_command)
+    result = runner.invoke(app, ["knowledge", "index", "--repo-root", str(scaffold_repo)])
+    runtime_bytes = index_path.read_bytes()
+
+    assert result.exit_code == legacy.returncode == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+    assert runtime_bytes == legacy_bytes
+
+
+def test_cli_registered_knowledge_index_idempotent_preserves_timestamps(scaffold_repo):
+    _seed_knowledge_session(scaffold_repo)
+    index_path = scaffold_repo / "docs" / "knowledge" / "INDEX.md"
+
+    first = runner.invoke(app, ["knowledge", "index", "--repo-root", str(scaffold_repo)])
+    first_bytes = index_path.read_bytes()
+    first_stat = index_path.stat().st_mtime_ns
+
+    second = runner.invoke(app, ["knowledge", "index", "--repo-root", str(scaffold_repo)])
+    second_bytes = index_path.read_bytes()
+    second_stat = index_path.stat().st_mtime_ns
+
+    assert first.exit_code == 0
+    assert "knowledge index updated" in first.stdout
+    assert first.stderr == ""
+
+    assert second.exit_code == 0
+    assert second.stdout == "= knowledge index unchanged: docs/knowledge/INDEX.md (1 docs)\n"
+    assert second.stderr == ""
+    assert second_bytes == first_bytes
+    assert second_stat == first_stat
+
+
+def test_cli_registered_knowledge_index_uses_native_path(scaffold_repo, monkeypatch):
+    _seed_knowledge_session(scaffold_repo)
+
+    def _unexpected_run_command(*_args, **_kwargs):
+        raise AssertionError("knowledge index should not call run_command subprocess path")
+
+    monkeypatch.setattr("agentic_scaffold.registry.run_command", _unexpected_run_command)
     result = runner.invoke(app, ["knowledge", "index", "--repo-root", str(scaffold_repo)])
     assert result.exit_code == 0
-    assert result.stdout == "delegated-index\n"
-    assert len(calls) == 1
-    assert Path(calls[0][1]).name == "agents-knowledge.py"
-    assert calls[0][2:] == ["index"]
+    assert "knowledge index " in result.stdout
 
 
 def test_cli_registered_knowledge_pull_no_match_matches_script(scaffold_repo):

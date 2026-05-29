@@ -86,11 +86,10 @@ The source-kit priority wrappers were migrated first:
 After that wrapper path was proven with focused runtime tests, every public
 `.agents/agents <command>` alias was routed through the runtime command
 registry. `status` now executes in-process through the runtime while preserving
-the legacy output contract, and `knowledge list/search/show/pull` now dispatch
+the legacy output contract, and `knowledge list/search/show/pull/index` now dispatch
 through native runtime search/format logic with parity tests against
 `agents-knowledge.py`. Remaining registry entries stay delegated to existing
-scripts until their native ports land with parity evidence. `knowledge index`
-also remains delegated in this phase.
+scripts until their native ports land with parity evidence.
 
 ## Runtime Command Registry
 
@@ -108,6 +107,4 @@ preserving legacy script behavior:
 The registry owns public routing for the wrapper aliases listed by
 `.agents/agents runtime command-registry`. `status` is a native command family
 (`phase=native`). `knowledge` remains marked `phase=compatibility`, but
-`knowledge list/search/show/pull` execute through native runtime dispatch;
-`knowledge index` stays on the compatibility delegate until a dedicated write
-slice lands with parity evidence.
+`knowledge list/search/show/pull/index` execute through native runtime dispatch.
