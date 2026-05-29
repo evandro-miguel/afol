@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -204,6 +204,42 @@ describe("validation command family", () => {
     expect(results.length).toBe(5);
     expect(results.every((entry) => entry.pack_id === "mutation-safety")).toBe(true);
     expect(results.some((entry) => entry.status === "baseline-missing")).toBe(false);
+  });
+
+  test("v bench --save persists a benchmark result artifact under default results directory", () => {
+    const fixtureRoot = createValidationFixtureRoot();
+    const proc = runKernel(["v", "bench", "--pack", "cli-kernel-local", "--save", "--json"], fixtureRoot);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(typeof payload.saved_result_path).toBe("string");
+    const savedPath = payload.saved_result_path as string;
+    expect(savedPath.startsWith(".agents/data/benchmarks/results/")).toBe(true);
+    const absoluteSavedPath = join(fixtureRoot, savedPath);
+    expect(existsSync(absoluteSavedPath)).toBe(true);
+    const savedPayload = readJson(absoluteSavedPath);
+    expect(savedPayload.mode).toBe("benchmark");
+    const savedResults = savedPayload.results as Array<Record<string, unknown>>;
+    expect(savedResults.length).toBeGreaterThan(0);
+    const first = savedResults[0];
+    expect(typeof first.run_id).toBe("string");
+    expect(typeof first.pack_id).toBe("string");
+    expect(typeof first.baseline_id).toBe("string");
+    expect(typeof first.git_commit).toBe("string");
+  });
+
+  test("v bench --output writes to explicit path", () => {
+    const fixtureRoot = createValidationFixtureRoot();
+    const outputPath = join(fixtureRoot, ".agents", "tmp", "f11", "cli-kernel-local-result.json");
+    const proc = runKernel(
+      ["v", "bench", "--pack", "cli-kernel-local", "--output", outputPath, "--json"],
+      fixtureRoot,
+    );
+    expect(proc.status).toBe(0);
+    expect(existsSync(outputPath)).toBe(true);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.saved_result_path).toBe(".agents/tmp/f11/cli-kernel-local-result.json");
+    const savedPayload = readJson(outputPath);
+    expect(savedPayload.mode).toBe("benchmark");
   });
 
   test("v bench fails when metrics violate threshold and baseline", () => {

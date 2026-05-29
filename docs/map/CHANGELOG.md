@@ -113,6 +113,18 @@ updated_at: "2026-05-29T14:08:02Z"
   - `8dd5e20`
 - Matrix state: 8 packs with scenarios and baselines now define the current
   benchmark surface under `.agents/data/benchmarks/`.
+- Persisted selected-pack results:
+  - `.agents/data/benchmarks/results/20260529_142632_cli-kernel-local.json`
+  - `.agents/data/benchmarks/results/20260529_142632_workbench-parity.json`
+  - `.agents/data/benchmarks/results/20260529_142633_routing-accuracy.json`
+  - `.agents/data/benchmarks/results/20260529_142633_mutation-safety.json`
+  - `.agents/data/benchmarks/results/20260529_142633_update-safety.json`
+  - `.agents/data/benchmarks/results/20260529_142633_mcp-parity.json`
+  - `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
+  - `.agents/data/benchmarks/results/20260529_142633_token-economy.json`
+- Waiver evidence: `runtime-live-agent` remains explicit `status=skipped` with
+  note `all-scenarios-skipped:not-implemented-live-runner` in the persisted
+  result artifact above.
 - Index state: `docs/arc/SPECS/INDEX.md` now marks
   `260521_0110_validation-ci-and-benchmarks_spec_01` as `final`.
 - Status: `satisfied` for the docs/current-state layer; residual risk is

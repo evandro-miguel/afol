@@ -375,6 +375,20 @@ Selective CI maps paths to packs:
   - `7760358`
   - `681c6d0`
   - `8dd5e20`
+- Persisted selected-pack benchmark results:
+  - `.agents/data/benchmarks/results/20260529_142632_cli-kernel-local.json`
+  - `.agents/data/benchmarks/results/20260529_142632_workbench-parity.json`
+  - `.agents/data/benchmarks/results/20260529_142633_routing-accuracy.json`
+  - `.agents/data/benchmarks/results/20260529_142633_mutation-safety.json`
+  - `.agents/data/benchmarks/results/20260529_142633_update-safety.json`
+  - `.agents/data/benchmarks/results/20260529_142633_mcp-parity.json`
+  - `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
+  - `.agents/data/benchmarks/results/20260529_142633_token-economy.json`
+- Waiver (artifact-backed):
+  - `runtime-live-agent` is explicitly recorded as
+    `status=skipped` with note
+    `all-scenarios-skipped:not-implemented-live-runner`
+    in `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`.
 - Current benchmark matrix:
   - `cli-kernel-local`
   - `workbench-parity`

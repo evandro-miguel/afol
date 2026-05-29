@@ -64,7 +64,11 @@ This folder is the distilled current-state evidence surface for the repository.
   benchmark matrix has 8 packs, the parent spec is final in
   `docs/arc/SPECS/INDEX.md`, and the accepted waves are the contract layer,
   selector/matrix pack-map, real typecheck gate, routing-accuracy,
-  update-safety, and mutation-safety.
+  update-safety, and mutation-safety. Selected-pack benchmark results are
+  persisted under `.agents/data/benchmarks/results/20260529_14263*_*.json`,
+  including explicit waiver evidence for `runtime-live-agent`
+  (`status=skipped`) in
+  `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`.
 - F-13 tool catalog parity keeps the runtime registry, docs, and command
   surface aligned.
 - F-13 `status` command family now runs natively in runtime (`agentic status`)

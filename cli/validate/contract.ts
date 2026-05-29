@@ -1,10 +1,11 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const REGISTRY_RELATIVE_PATH = ".agents/data/benchmarks/registry.json";
 const SCENARIOS_RELATIVE_PATH = ".agents/data/benchmarks/scenarios";
 const BASELINES_RELATIVE_PATH = ".agents/data/benchmarks/baselines";
+const RESULTS_RELATIVE_PATH = ".agents/data/benchmarks/results";
 
 export const VALIDATION_SCHEMA_VERSION = "1.0.0";
 export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
@@ -499,16 +500,57 @@ function outputJson(payload: Record<string, unknown>): number {
   return 0;
 }
 
+function timestampSlug(now: Date = new Date()): string {
+  const pad = (value: number): string => String(value).padStart(2, "0");
+  return [
+    String(now.getUTCFullYear()),
+    pad(now.getUTCMonth() + 1),
+    pad(now.getUTCDate()),
+  ].join("")
+    + "_"
+    + [pad(now.getUTCHours()), pad(now.getUTCMinutes()), pad(now.getUTCSeconds())].join("");
+}
+
+function stableResultFileName(selectedPacks: PackId[]): string {
+  const packPart = selectedPacks.length === 1
+    ? selectedPacks[0]
+    : selectedPacks.length > 1
+      ? `${selectedPacks[0]}-multi`
+      : "benchmark";
+  return `${timestampSlug()}_${packPart}.json`;
+}
+
+function resolveOutputPath(projectRoot: string, outputPath: string): string {
+  return isAbsolute(outputPath) ? outputPath : resolve(projectRoot, outputPath);
+}
+
+function saveBenchmarkPayload(
+  projectRoot: string,
+  payload: Record<string, unknown>,
+  selectedPacks: PackId[],
+  outputPathArg?: string,
+): string {
+  const defaultPath = join(projectRoot, RESULTS_RELATIVE_PATH, stableResultFileName(selectedPacks));
+  const outputPath = outputPathArg ? resolveOutputPath(projectRoot, outputPathArg) : defaultPath;
+  mkdirSync(dirname(outputPath), { recursive: true });
+  writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  return relative(projectRoot, outputPath).replaceAll("\\", "/");
+}
+
 function parseArgs(args: string[]): {
   mode: "select" | "bench";
   scope: ValidationScope;
   changedPaths: string[];
   explicitPacks: PackId[];
+  save: boolean;
+  outputPath?: string;
 } {
   let mode: "select" | "bench" = "select";
   let scope: ValidationScope = "default";
   const changedPaths: string[] = [];
   const explicitPacks: PackId[] = [];
+  let save = false;
+  let outputPath: string | undefined;
 
   let index = 0;
   if (args[index] === "bench") {
@@ -542,6 +584,20 @@ function parseArgs(args: string[]): {
       index += 1;
       continue;
     }
+    if (token === "--save") {
+      save = true;
+      index += 1;
+      continue;
+    }
+    if (token === "--output") {
+      const value = args[index + 1];
+      if (!value) {
+        throw new Error("Missing value for --output");
+      }
+      outputPath = value;
+      index += 2;
+      continue;
+    }
     throw new Error(`Unknown validation argument: ${token}`);
   }
 
@@ -550,6 +606,8 @@ function parseArgs(args: string[]): {
     scope,
     changedPaths,
     explicitPacks,
+    save,
+    outputPath,
   };
 }
 
@@ -578,6 +636,8 @@ function handleBenchmark(
   scope: ValidationScope,
   changedPaths: string[],
   explicitPacks: PackId[],
+  persist: boolean,
+  outputPath?: string,
 ): number {
   const selection = selectPacks({ scope, changedPaths });
   const selectedPacks = explicitPacks.length > 0 ? explicitPacks : selection.selected_pack_ids;
@@ -604,7 +664,7 @@ function handleBenchmark(
     && contractIssues.length === 0;
   const status: "passed" | "failed" | "skipped" = pass ? "passed" : allSkipped ? "skipped" : "failed";
   const notes = allSkipped ? ["all-scenarios-skipped:not-implemented-live-runner"] : [];
-  return outputJson({
+  const payload: Record<string, unknown> = {
     schema_version: VALIDATION_SCHEMA_VERSION,
     command_family: "validation",
     mode: "benchmark",
@@ -624,7 +684,13 @@ function handleBenchmark(
     },
     results,
     contract_issues: contractIssues,
-  });
+  };
+  if (persist || outputPath) {
+    const savedResultPath = saveBenchmarkPayload(projectRoot, payload, selectedPacks, outputPath);
+    payload.saved_result_path = savedResultPath;
+    payload.saved_result_file = basename(savedResultPath);
+  }
+  return outputJson(payload);
 }
 
 export function runValidationCommand(projectRoot: string, args: string[]): number {
@@ -645,7 +711,15 @@ export function runValidationCommand(projectRoot: string, args: string[]): numbe
   }
 
   if (parsed.mode === "bench") {
-    return handleBenchmark(projectRoot, snapshot, parsed.scope, parsed.changedPaths, parsed.explicitPacks);
+    return handleBenchmark(
+      projectRoot,
+      snapshot,
+      parsed.scope,
+      parsed.changedPaths,
+      parsed.explicitPacks,
+      parsed.save,
+      parsed.outputPath,
+    );
   }
   return handleSelect(snapshot, parsed.scope, parsed.changedPaths);
 }
