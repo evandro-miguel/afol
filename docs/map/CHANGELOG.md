@@ -4,7 +4,7 @@ description: "Version-to-version summary of repository-map changes, focusing on 
 doc_kind: "changelog"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T14:42:15Z"
+updated_at: "2026-05-29T14:59:24Z"
 ---
 
 # Changelog
@@ -129,6 +129,17 @@ updated_at: "2026-05-29T14:42:15Z"
   `260521_0110_validation-ci-and-benchmarks_spec_01` as `final`.
 - Status: `satisfied` for the docs/current-state layer; residual risk is
   limited to future derived-index drift, not the current refresh.
+
+## F-15 Repo-Wide Simplification Runtime Parity Closeout
+
+- Feature: `F-15 Repo-Wide Simplification Runtime Parity`
+- Accepted child slices:
+  - `scripts-cleanup-optimization` (`.agents/wb/260528_1606_scripts-cleanup-optimization/`)
+  - `map-boundary-cleanup` (`.agents/wb/260528_1723_map-boundary-cleanup/`)
+  - `runtime-registry-parity` (`.agents/wb/260528_1745_runtime-registry-parity/`)
+  - `python-command-simplification` (`6851c27`)
+- Index state: `docs/arc/SPECS/INDEX.md` now marks the parent spec and accepted child specs as `final`.
+- Status: `satisfied` for the current-state docs/map layer; residual risk is limited to future follow-up planning, not the closed F-15 slices.
 
 ## F-14 Governance State Reconciliation
 

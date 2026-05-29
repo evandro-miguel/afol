@@ -4,7 +4,7 @@ description: "Entry point for the generated repository map, including reading or
 doc_kind: "codemap-index"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T14:42:15Z"
+updated_at: "2026-05-29T14:59:24Z"
 ---
 
 # Repository Map
@@ -69,6 +69,11 @@ This folder is the distilled current-state evidence surface for the repository.
   including explicit waiver evidence for `runtime-live-agent`
   (`status=skipped`) in
   `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`.
+- F-15 repo-wide simplification runtime parity is now in closeout: the roadmap
+  entry is final, the parent spec is final, and the accepted child slices are
+  scripts cleanup, map boundary cleanup, runtime registry parity, and python
+  command simplification. `docs/arc/SPECS/INDEX.md` now reflects the parent
+  spec and accepted child specs as `final`.
 - F-14 spec-child/spec-test governance is now in closeout: the roadmap entry
   is final, the parent spec is final, and the verified report lives under
   `.agents/wb/260528_1528_spec-child-and-spec-test-governance/`.
@@ -91,6 +96,8 @@ This folder is the distilled current-state evidence surface for the repository.
   with parity-preserving output/exit behavior against `agents-knowledge.py`.
 - `docs/arc/SPECS/INDEX.md` now reflects the F-17 parent spec and accepted child specs as `final`.
 - `docs/map/CHANGELOG.md` records the F-17 closeout alongside the earlier F-13 closure note.
+- `docs/arc/SPECS/INDEX.md` now reflects the F-15 parent spec and accepted child specs as `final`.
+- `docs/map/CHANGELOG.md` records the F-15 closeout alongside the earlier closure notes.
 - `docs/arc/SPECS/INDEX.md` now reflects the F-09 parent spec as `final`.
 - `docs/map/CHANGELOG.md` records the F-09 closeout alongside the earlier closure notes.
 - `docs/arc/SPECS/INDEX.md` now reflects the F-10, F-12, and F-14 parent specs as `final`.

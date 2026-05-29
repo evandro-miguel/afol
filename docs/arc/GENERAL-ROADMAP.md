@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-05-29T14:42:15Z'
+updated_at: '2026-05-29T14:59:24Z'
 ---
 
 # GENERAL ROADMAP
@@ -251,13 +251,16 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-15 Repo-Wide Simplification Runtime Parity
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md
-- Why: bounded simplification slices should reduce runtime/script complexity and
+- Why: bounded simplification slices reduced runtime/script complexity and
   map drift without changing the public CLI behavior.
-- Exit criteria: child-spec slices land with parity validation and strict
-  governed evidence, preserving interactive command contract.
+- Closure note: accepted child slices are final in `docs/arc/SPECS/INDEX.md`:
+  scripts cleanup, map boundary cleanup, runtime registry parity, and python
+  command simplification.
+- Exit criteria: satisfied; strict governed evidence exists for the accepted
+  slices and the current-state docs are reconciled.
 
 ### F-17 Just Command Runner Migration
 
