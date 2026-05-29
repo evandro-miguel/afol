@@ -493,9 +493,12 @@ function parseArgs(args: string[]): {
   if (args[index] === "bench") {
     mode = "bench";
     index += 1;
-  } else if (args[index] === "wb" || args[index] === "tpl" || args[index] === "update") {
-    scope = args[index];
-    index += 1;
+  } else {
+    const scopeArg = args[index];
+    if (scopeArg === "wb" || scopeArg === "tpl" || scopeArg === "update") {
+      scope = scopeArg;
+      index += 1;
+    }
   }
 
   while (index < args.length) {

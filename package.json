@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "typecheck": "bun build cli/main.ts --target=bun --outdir /tmp/agentic-kernel-typecheck",
+    "typecheck": "bunx tsc --noEmit -p tsconfig.json",
     "test": "bun test",
     "kernel": "bun run cli/main.ts"
   }
