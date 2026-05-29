@@ -85,6 +85,11 @@ describe("validation command family", () => {
     const skillsPayload = parseJsonOutput(skillsProc.stdout as string);
     expect(skillsPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
 
+    const mutationProc = runKernel(["v", "--changed-path", "cli/files/example.ts", "--json"]);
+    expect(mutationProc.status).toBe(0);
+    const mutationPayload = parseJsonOutput(mutationProc.stdout as string);
+    expect(mutationPayload.selected_pack_ids).toEqual(["mutation-safety"]);
+
     const updateProc = runKernel(["v", "--changed-path", "cli/update/example.ts", "--json"]);
     expect(updateProc.status).toBe(0);
     const updatePayload = parseJsonOutput(updateProc.stdout as string);
@@ -111,8 +116,8 @@ describe("validation command family", () => {
     expect(tokenPayload.selected_pack_ids).toEqual(["token-economy"]);
   });
 
-  test("v changed-path does not over-route generic cli paths to routing-accuracy", () => {
-    const proc = runKernel(["v", "--changed-path", "cli/files/example.ts", "--json"]);
+  test("v changed-path keeps generic cli fallback on cli-kernel-local", () => {
+    const proc = runKernel(["v", "--changed-path", "cli/main.ts", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
     expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
@@ -179,6 +184,25 @@ describe("validation command family", () => {
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(4);
     expect(results.every((entry) => entry.pack_id === "update-safety")).toBe(true);
+    expect(results.some((entry) => entry.status === "baseline-missing")).toBe(false);
+  });
+
+  test("v bench runs mutation-safety pack with complete baseline coverage", () => {
+    const proc = runKernel(["v", "bench", "--pack", "mutation-safety", "--json"]);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.mode).toBe("benchmark");
+    expect(payload.result_count).toBe(5);
+    expect(payload.summary).toEqual({
+      total: 5,
+      passed: 5,
+      failed: 0,
+      skipped: 0,
+      baseline_missing: 0,
+    });
+    const results = payload.results as Array<Record<string, unknown>>;
+    expect(results.length).toBe(5);
+    expect(results.every((entry) => entry.pack_id === "mutation-safety")).toBe(true);
     expect(results.some((entry) => entry.status === "baseline-missing")).toBe(false);
   });
 
@@ -305,7 +329,7 @@ describe("validation command family", () => {
     expect(updatePayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
   });
 
-  test("registry contract remains complete for the seven-pack matrix", () => {
+  test("registry contract remains complete for the eight-pack matrix", () => {
     const proc = runKernel(["v", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
@@ -313,6 +337,7 @@ describe("validation command family", () => {
     expect(registry.map((entry) => entry.pack_id)).toEqual([
       "cli-kernel-local",
       "routing-accuracy",
+      "mutation-safety",
       "update-safety",
       "workbench-parity",
       "mcp-parity",

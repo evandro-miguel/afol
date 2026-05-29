@@ -12,6 +12,7 @@ export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
 export const REQUIRED_PACKS = [
   "cli-kernel-local",
   "routing-accuracy",
+  "mutation-safety",
   "update-safety",
   "workbench-parity",
   "mcp-parity",
@@ -316,6 +317,7 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
       selected_pack_ids: [
         "cli-kernel-local",
         "routing-accuracy",
+        "mutation-safety",
         "update-safety",
         "workbench-parity",
         "mcp-parity",
@@ -348,6 +350,11 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
     if (hasPrefix(normalizedPath, ["cli/update/"])) {
       selected.add("update-safety");
       reasons.push(`update-change:${changedPath}`);
+      continue;
+    }
+    if (hasPrefix(normalizedPath, ["cli/files/"])) {
+      selected.add("mutation-safety");
+      reasons.push(`mutation-change:${changedPath}`);
       continue;
     }
     if (hasPrefix(normalizedPath, ["cli/"])) {
