@@ -37,3 +37,12 @@ updated_at: "2026-05-28T23:10:13Z"
   - `bootstrap-template-justfile-wiring` (`6bf1453`, `059c927ee4e32accab85e9c38f594e3cb0f94cc3`)
 - Index state: `docs/arc/SPECS/INDEX.md` now marks the parent spec and both accepted child specs as `final`.
 - Status: `satisfied` for the docs/catalog lifecycle closeout; residual risk is limited to descriptive metadata, not runtime behavior.
+
+## F-09 Template Update And Versioning Closeout
+
+- Feature: `F-09 Template Update and Versioning`
+- Accepted implementation evidence:
+  - `5a1811fe0a967fc8a89c2c78a2722d972e210700`
+  - `6fc611a095cca821c9276aad5b29ecc1fbd3ea96`
+- Index state: `docs/arc/SPECS/INDEX.md` now marks the parent spec as `final`.
+- Status: `satisfied` for the docs/catalog lifecycle closeout; residual risk is limited to descriptive metadata, not runtime behavior.

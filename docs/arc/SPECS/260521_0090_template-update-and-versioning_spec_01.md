@@ -2,17 +2,20 @@
 doc_type: spec
 id: 260521_0090_template-update-and-versioning_spec_01
 theme: template-update-and-versioning
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T01:30:00+08:00'
-updated_at: '2026-05-21T01:30:00+08:00'
+updated_at: '2026-05-28T21:37:14-03:00'
 roadmap_feature: F-09
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
   manifesto: docs/arc/PROJECT-MANIFESTO.md
+  plan: .agents/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_plan_01.md
+  task: .agents/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_task_01.md
+  report: .agents/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_report_01.md
 scope:
   repo_areas:
   - .agents/lock.json
@@ -66,3 +69,13 @@ managed files update safely; validation runs after update.
 - Does this avoid copying universal implementation logic into every downstream
   project?
 - Is the validation path concrete enough to prove parity and safety?
+
+## 8) Closure
+
+- Accepted implementation evidence:
+  - `5a1811fe0a967fc8a89c2c78a2722d972e210700` - scaffold update ignores
+    `.agents/source/**` seed content.
+  - `6fc611a095cca821c9276aad5b29ecc1fbd3ea96` - template bootstrap installs
+    lock and manifest.
+- Closeout session: `.agents/wb/260528_2137_f09-closeout/`
+- Status: final

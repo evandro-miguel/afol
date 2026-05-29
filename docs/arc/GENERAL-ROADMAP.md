@@ -162,12 +162,15 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-09 Template Update and Versioning
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0090_template-update-and-versioning_spec_01.md
 - Why: Downstream projects must receive updates when the core system improves.
 - Exit criteria: project lock; managed manifest; update check; update preview;
   conflict detection; preserved local edits.
+- Closure note: the parent spec is final and the accepted implementation
+  evidence is `5a1811fe0a967fc8a89c2c78a2722d972e210700` and
+  `6fc611a095cca821c9276aad5b29ecc1fbd3ea96`.
 
 ### F-10 Runtime Adapters and MCP
 
