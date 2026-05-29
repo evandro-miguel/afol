@@ -101,6 +101,7 @@ Compatibility mirrors kept for broader reuse:
 | `CLAUDE.md` | Mandatory agent instruction replica |
 | `RTK.md` | Selective shell-output compression policy |
 | `.agents/agents` | CLI wrapper |
+| `.agents/config.json` | Canonical project config seed |
 | `.agents/agents.config` | Configuration |
 | `.agents/tools.json` | Tool catalog |
 | `.agents/skills-sync.manifest.json` | Skills sync state |
@@ -228,6 +229,7 @@ MANDATORY_FILES_TO_COPY = [
     "CLAUDE.md",
     "RTK.md",
     ".agents/agents",
+    ".agents/config.json",
     ".agents/agents.config",
     ".agents/tools.json",
     ".agents/skills-sync.manifest.json",

@@ -30,6 +30,7 @@ MANDATORY_FILES_TO_COPY = [
     Path("a"),
     Path(".agents/agents"),
     Path(".agents/agents-mcp"),
+    Path(".agents/config.json"),
     Path(".agents/agents.config"),
     Path(".agents/lock.json"),
     Path(".agents/manifest.json"),

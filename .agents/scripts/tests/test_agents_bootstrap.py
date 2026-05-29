@@ -55,6 +55,11 @@ class BootstrapTests(unittest.TestCase):
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn(".agents/agents.config", mandatory)
 
+    def test_mandatory_files_include_canonical_config_json(self):
+        """The canonical JSON config must be in the mandatory files list."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn(".agents/config.json", mandatory)
+
     def test_mandatory_files_include_lock_file(self):
         """The lock file must be in the mandatory files list."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}

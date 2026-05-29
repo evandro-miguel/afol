@@ -24,7 +24,8 @@ Core surfaces:
 
 - `.agents/agents`: CLI wrapper.
 - `.agents/tools.json`: tool catalog.
-- `.agents/agents.config`: scaffold configuration.
+- `.agents/config.json`: canonical project config seed.
+- `.agents/agents.config`: legacy-compatible scaffold configuration.
 - `.agents/scripts/`: command implementations.
 - `.agents/runtime/`: runtime package and MCP adapter.
 - `.agents/rules/`: mandatory operating rules.
