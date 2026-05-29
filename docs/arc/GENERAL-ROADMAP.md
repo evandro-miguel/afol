@@ -264,13 +264,16 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-16 Export Contract Hardening
 
-- Status: active
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md
 - Why: enforce a strict export contract so bootstrap/export dry-run copies only
   sanctioned `src/project-template` content and keeps history/noise out.
-- Exit criteria: bootstrap export tests prove forbidden paths are excluded and
-  dry-run output remains source-of-truth aligned with `src/project-template`.
+- Closure note: accepted implementation evidence `b520f23` and `75cf349` is
+  complete; `docs/arc/SPECS/INDEX.md` now marks the parent spec as `final` and
+  the current-state map docs reflect the closeout.
+- Exit criteria: satisfied; the accepted export-contract and source-root helper
+  slices are complete and the docs/governance surfaces are reconciled.
 
 ### F-17 Just Command Runner Migration
 

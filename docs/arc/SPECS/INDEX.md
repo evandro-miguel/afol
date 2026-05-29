@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-05-29T15:00:16+00:00"
+updated_at: "2026-05-29T15:51:20+00:00"
 ---
 
 # SPECS INDEX
@@ -18,8 +18,8 @@ updated_at: "2026-05-29T15:00:16+00:00"
 |--------|-------|
 | Total | 59 |
 | Draft | 15 |
-| Active | 29 |
-| Final | 15 |
+| Active | 28 |
+| Final | 16 |
 
 ## Index
 
@@ -49,7 +49,7 @@ updated_at: "2026-05-29T15:00:16+00:00"
 | 260412_1110_spec-child-and-spec-test-governance_spec_01 | spec-child-and-spec-test-governance | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260412_1130_spec-child-and-spec-test-governance_spec-test_01 | spec-child-and-spec-test-governance | active | tester | roadmap: docs/arc/GENERAL-ROADMAP.md, workbench_plan: 260412_1130_spec-child-and-spec-test-governance_plan_01 |
 | 260412_2004_repo-wide-simplification-runtime-parity_spec_01 | repo-wide-simplification-runtime-parity | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
-| 260413_1250_project-template-source-separation_spec_01 | project-template-source-separation | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260413_1250_project-template-source-separation_spec_01 | project-template-source-separation | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: .agents/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_plan_01.md, task: .agents/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_task_01.md, report: .agents/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_report_01.md |
 | 260413_1250_project-template-source-separation_spec-child_01 | project-template-source-separation | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260413_1250_project-template-source-separation_plan_01, task: 260413_1250_project-template-source-separation_task_01, report: 260413_1250_project-template-source-separation_report_01 |
 | 260413_1849_just-command-runner-migration_spec_01 | just-command-runner-migration | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_plan_01.md, task: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_task_01.md, report: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_report_01.md |
 | 260415_2121_scripts-cleanup-optimization_spec-child_01 | scripts-cleanup-optimization | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1606_scripts-cleanup-optimization/260528_1606_scripts-cleanup-optimization_plan_01.md, task: .agents/wb/260528_1606_scripts-cleanup-optimization/260528_1606_scripts-cleanup-optimization_task_01.md |

@@ -22,6 +22,13 @@ updated_at: "2026-05-29T14:59:24Z"
 - Public boundary files detected: `2`
 - Top hotspots tracked: `0`
 
+## F-16 Project Template Source Separation Closeout
+
+- Feature: `F-16 Project Template Source Separation`
+- Accepted implementation evidence: `b520f23`, `75cf349`
+- Index state: `docs/arc/SPECS/INDEX.md` now marks the parent spec as `final`.
+- Status: `satisfied` for the docs/governance closeout; residual risk is limited to future docs drift, not the accepted implementation slices.
+
 ## F-13 Closure Note
 
 - Feature: `F-13 Agentic Runtime Restructure`

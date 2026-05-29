@@ -60,6 +60,10 @@ This folder is the distilled current-state evidence surface for the repository.
 
 ## Lifecycle Snapshot
 
+- F-16 project-template-source-separation is now in closeout: the roadmap entry
+  is final, the parent spec is final, `docs/arc/SPECS/INDEX.md` has been
+  regenerated, and the accepted implementation evidence is `b520f23` and
+  `75cf349`.
 - F-11 validation, CI, and benchmarks is now in closeout: the current-state
   benchmark matrix has 8 packs, the parent spec is final in
   `docs/arc/SPECS/INDEX.md`, and the accepted waves are the contract layer,
