@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260412_1110_spec-child-and-spec-test-governance_spec_01
 theme: spec-child-and-spec-test-governance
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-04-12T11:10:00-03:00'
-updated_at: '2026-04-12T13:58:05-03:00'
+updated_at: '2026-05-29T11:42:15-03:00'
 roadmap_feature: F-14
 spec_role: parent
 parent_spec: ''
@@ -172,3 +172,10 @@ Out of scope for this planning record:
     "lite" artifact?
   - Can one feature support multiple test strategies without scattering them
     across session notes?
+
+## 9) Closure
+
+- Accepted governance evidence: `E-20260528153442093351`.
+- Closeout session: `.agents/wb/260528_1528_spec-child-and-spec-test-governance/`.
+- Report: `.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_report_01.md`.
+- Status: final

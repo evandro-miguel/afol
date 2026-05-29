@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260521_0120_public-distribution-and-onboarding_spec_01
 theme: public-distribution-and-onboarding
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T02:00:00+08:00'
-updated_at: '2026-05-21T02:00:00+08:00'
+updated_at: '2026-05-29T11:42:15-03:00'
 roadmap_feature: F-12
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -66,3 +66,9 @@ project works; private assumptions are removed; docs stay short and practical.
 - Does this avoid copying universal implementation logic into every downstream
   project?
 - Is the validation path concrete enough to prove parity and safety?
+
+## 8) Closure
+
+- Accepted implementation evidence: `E-20260528144544308053`.
+- Closeout session: `.agents/wb/260528_1444_public-distribution-and-onboarding/`.
+- Status: final

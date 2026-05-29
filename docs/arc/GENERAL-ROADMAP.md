@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-05-28T18:29:58Z'
+updated_at: '2026-05-29T14:42:15Z'
 ---
 
 # GENERAL ROADMAP
@@ -174,12 +174,15 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-10 Runtime Adapters and MCP
 
-- Status: planned
+- Status: final
 - Governing spec: docs/arc/SPECS/260521_0100_runtime-adapters-and-mcp_spec_01.md
 - Why: The system should support Codex, OpenCode, Claude Code, Gemini CLI,
-- Qwen, and future runtimes.
+  Qwen, and future runtimes.
 - Exit criteria: thin adapters; MCP exposes safe tools; CLI and MCP share core
   logic; runtime-specific docs remain minimal.
+- Closure note: accepted implementation evidence is
+  `E-20260528134556147936`; closeout session
+  `.agents/wb/260528_1343_runtime-adapters-and-mcp/`.
 
 ### F-11 Validation, CI, and Benchmarks
 
@@ -206,12 +209,15 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-12 Public Distribution and Onboarding
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0120_public-distribution-and-onboarding_spec_01.md
 - Why: The system should eventually be usable by other people.
 - Exit criteria: public install path; simple first-run onboarding; minimal
   docs; examples; private assumptions removed.
+- Closure note: accepted implementation evidence is
+  `E-20260528144544308053`; closeout session
+  `.agents/wb/260528_1444_public-distribution-and-onboarding/`.
 
 ### F-13 Agentic Runtime Restructure
 
@@ -229,7 +235,7 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-14 Spec-Child And Spec-Test Governance
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md
 - Why: Child-spec naming, spec-test strategy docs, and legacy spec-lite
@@ -238,6 +244,10 @@ The Bun/TypeScript reformulation must be staged:
   artifact; spec-test is documented as the pre-test strategy artifact;
   spec-lite remains a legacy compatibility alias; the F-14 folder convention
   `docs/arc/SPECS/F-14/spec-tests/` is explicit.
+- Closure note: accepted governance evidence is
+  `E-20260528153442093351`; verified outcome summarized in
+  `.agents/wb/260528_1528_spec-child-and-spec-test-governance/`
+  and its final report.
 
 ### F-15 Repo-Wide Simplification Runtime Parity
 

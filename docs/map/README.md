@@ -4,7 +4,7 @@ description: "Entry point for the generated repository map, including reading or
 doc_kind: "codemap-index"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-28T23:10:13Z"
+updated_at: "2026-05-29T14:42:15Z"
 ---
 
 # Repository Map
@@ -69,6 +69,16 @@ This folder is the distilled current-state evidence surface for the repository.
   including explicit waiver evidence for `runtime-live-agent`
   (`status=skipped`) in
   `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`.
+- F-14 spec-child/spec-test governance is now in closeout: the roadmap entry
+  is final, the parent spec is final, and the verified report lives under
+  `.agents/wb/260528_1528_spec-child-and-spec-test-governance/`.
+- F-12 public distribution and onboarding is now in closeout: the roadmap
+  entry is final, the parent spec is final, and the docs-only onboarding slice
+  evidence lives under
+  `.agents/wb/260528_1444_public-distribution-and-onboarding/`.
+- F-10 runtime adapters and MCP is now in closeout: the roadmap entry is
+  final, the parent spec is final, and the adapter/MCP slice evidence lives
+  under `.agents/wb/260528_1343_runtime-adapters-and-mcp/`.
 - F-13 tool catalog parity keeps the runtime registry, docs, and command
   surface aligned.
 - F-13 `status` command family now runs natively in runtime (`agentic status`)
@@ -83,6 +93,8 @@ This folder is the distilled current-state evidence surface for the repository.
 - `docs/map/CHANGELOG.md` records the F-17 closeout alongside the earlier F-13 closure note.
 - `docs/arc/SPECS/INDEX.md` now reflects the F-09 parent spec as `final`.
 - `docs/map/CHANGELOG.md` records the F-09 closeout alongside the earlier closure notes.
+- `docs/arc/SPECS/INDEX.md` now reflects the F-10, F-12, and F-14 parent specs as `final`.
+- `docs/map/CHANGELOG.md` now records the F-10, F-12, and F-14 closeouts alongside the earlier closure notes.
 
 ## Major Runtime Surfaces
 

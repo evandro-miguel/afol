@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-05-29T14:10:02+00:00"
+updated_at: "2026-05-29T14:44:25+00:00"
 ---
 
 # SPECS INDEX
@@ -17,9 +17,9 @@ updated_at: "2026-05-29T14:10:02+00:00"
 | Metric | Count |
 |--------|-------|
 | Total | 59 |
-| Draft | 18 |
+| Draft | 15 |
 | Active | 30 |
-| Final | 11 |
+| Final | 14 |
 
 ## Index
 
@@ -46,7 +46,7 @@ updated_at: "2026-05-29T14:10:02+00:00"
 | 260323_1752_workflow-and-bootstrap-integration_spec_01 | workflow-and-bootstrap-integration | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260411_agentic-runtime-restructure_spec_01 | agentic-runtime-restructure | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_plan_01.md, task: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_task_01.md, report: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_report_01.md |
 | 260412_0000_specs-folder-guide_spec_01 |  | active |  |  |
-| 260412_1110_spec-child-and-spec-test-governance_spec_01 | spec-child-and-spec-test-governance | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260412_1110_spec-child-and-spec-test-governance_spec_01 | spec-child-and-spec-test-governance | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260412_1130_spec-child-and-spec-test-governance_spec-test_01 | spec-child-and-spec-test-governance | active | tester | roadmap: docs/arc/GENERAL-ROADMAP.md, workbench_plan: 260412_1130_spec-child-and-spec-test-governance_plan_01 |
 | 260412_2004_repo-wide-simplification-runtime-parity_spec_01 | repo-wide-simplification-runtime-parity | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260413_1250_project-template-source-separation_spec_01 | project-template-source-separation | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
@@ -73,11 +73,11 @@ updated_at: "2026-05-29T14:10:02+00:00"
 | 260521_0130_universal-agent-cli-kernel-contract_spec-test_01 | universal-agent-cli-kernel-contract | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260521_0132_minimal-project-template-export_spec-test_01 | minimal-project-template-export | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260521_0135_agent-command-design-system_spec-test_01 | agent-command-design-system | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
-| 260521_0100_runtime-adapters-and-mcp_spec_01 | runtime-adapters-and-mcp | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0100_runtime-adapters-and-mcp_spec_01 | runtime-adapters-and-mcp | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0140_runtime-adapters-and-mcp-parity_spec-test_01 | runtime-adapters-and-mcp-parity | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260521_0145_validation-ci-benchmark-matrix_spec-test_01 | validation-ci-benchmark-matrix | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260521_0110_validation-ci-and-benchmarks_spec_01 | validation-ci-and-benchmarks | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
-| 260521_0120_public-distribution-and-onboarding_spec_01 | public-distribution-and-onboarding | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0120_public-distribution-and-onboarding_spec_01 | public-distribution-and-onboarding | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260528_1723_map-boundary-cleanup_spec-child_01 | map-boundary-cleanup | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_plan_01.md, task: .agents/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_task_01.md |
 | 260528_1745_runtime-registry-parity_spec-child_01 | runtime-registry-parity | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_plan_01.md, task: .agents/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_task_01.md |
 | 260528_1759_python-command-simplification_spec-child_01 | python-command-simplification | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1759_python-command-simplification/260528_1759_python-command-simplification_plan_01.md, task: .agents/wb/260528_1759_python-command-simplification/260528_1759_python-command-simplification_task_01.md |

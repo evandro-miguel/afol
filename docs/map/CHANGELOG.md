@@ -4,7 +4,7 @@ description: "Version-to-version summary of repository-map changes, focusing on 
 doc_kind: "changelog"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T14:08:02Z"
+updated_at: "2026-05-29T14:42:15Z"
 ---
 
 # Changelog
@@ -129,3 +129,22 @@ updated_at: "2026-05-29T14:08:02Z"
   `260521_0110_validation-ci-and-benchmarks_spec_01` as `final`.
 - Status: `satisfied` for the docs/current-state layer; residual risk is
   limited to future derived-index drift, not the current refresh.
+
+## F-14 Governance State Reconciliation
+
+- Scope: current-state docs reconciliation for the F-14 governance slice.
+- Status: roadmap entry and parent spec are `final`; verified report is
+  `.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_report_01.md`.
+- Evidence: `E-20260528153442093351`.
+
+## F-12 Public Distribution And Onboarding Closeout
+
+- Scope: current-state docs reconciliation for the F-12 onboarding slice.
+- Status: roadmap entry and parent spec are `final`.
+- Evidence: `E-20260528144544308053`.
+
+## F-10 Runtime Adapters And MCP Closeout
+
+- Scope: current-state docs reconciliation for the F-10 runtime adapter slice.
+- Status: roadmap entry and parent spec are `final`.
+- Evidence: `E-20260528134556147936`.

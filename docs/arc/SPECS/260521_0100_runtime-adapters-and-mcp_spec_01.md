@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260521_0100_runtime-adapters-and-mcp_spec_01
 theme: runtime-adapters-and-mcp
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T01:40:00+08:00'
-updated_at: '2026-05-21T01:40:00+08:00'
+updated_at: '2026-05-29T11:42:15-03:00'
 roadmap_feature: F-10
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -173,3 +173,9 @@ Out of scope:
 - Agents can use MCP tools without reading full docs.
 - Runtime-specific instructions do not drift from canonical behavior.
 - CLI/MCP parity is covered by tests and selective benchmarks.
+
+## 11) Closure
+
+- Accepted implementation evidence: `E-20260528134556147936`.
+- Closeout session: `.agents/wb/260528_1343_runtime-adapters-and-mcp/`.
+- Status: final
