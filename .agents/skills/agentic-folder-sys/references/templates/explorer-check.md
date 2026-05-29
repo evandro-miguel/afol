@@ -6,14 +6,6 @@ metadata:
 
 # Explorer Check Template
 
-## Output Artifact Contract
-
-- Sidecars: optional for this workflow.
-- If produced, include explicit `sidecar_justification` as `required`.
-- If not produced, set `sidecar_justification` to `not_required`.
-- Produced sidecars must include a `Sidecar Justification` section with blocking
-  question, decision produced, execution task affected, and stop condition.
-
 `````markdown
 ---
 doc_type: explorer-check

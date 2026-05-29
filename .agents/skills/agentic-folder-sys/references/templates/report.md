@@ -6,14 +6,6 @@ metadata:
 
 # Report Template
 
-## Output Artifacts (file-first)
-
-- Primary artifact: `report`
-- Sidecars:
-  - brainstorm, research, explorer-check, postmortem
-- Sidecar justification:
-  - required|not_required per optional artifact
-
 ```markdown
 ---
 doc_type: report
