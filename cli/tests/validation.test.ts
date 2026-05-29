@@ -286,7 +286,31 @@ describe("validation command family", () => {
   });
 
   test("v bench runtime-live-agent fails on a partial live snapshot without fallback mapping", () => {
-    const proc = runKernel(["v", "bench", "--pack", "runtime-live-agent", "--json"]);
+    const fixtureRoot = createValidationFixtureRoot((root) => {
+      mkdirSync(join(root, ".agents", "benchmarks"), { recursive: true });
+      cpSync(
+        join(process.cwd(), ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json"),
+        join(root, ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json"),
+      );
+      const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
+      const savedResult = readJson(savedResultPath);
+      savedResult.scenarios = [
+        {
+          id: "live-implement-start-complete-evidence",
+          pass: true,
+          duration_ms: 120,
+          tool_call_count: 1,
+          tool_success_rate: 1,
+          error_count: 0,
+          retry_count: 0,
+          context_bytes: 1024,
+          prompt_bytes: 240,
+        },
+      ];
+      writeFileSync(savedResultPath, `${JSON.stringify(savedResult, null, 2)}\n`);
+    });
+
+    const proc = runKernel(["v", "bench", "--pack", "runtime-live-agent", "--json"], fixtureRoot);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
     expect(payload.status).toBe("failed");
@@ -299,9 +323,10 @@ describe("validation command family", () => {
     expect(notes.some((entry) => entry.startsWith("runtime-live-artifact-incomplete:"))).toBe(true);
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
-    expect(results.every((result) => result.status === "failed")).toBe(true);
+    expect(results.some((result) => result.status === "failed")).toBe(true);
+    expect(results.some((result) => result.status === "passed")).toBe(true);
     expect(
-      results.every((result) =>
+      results.some((result) =>
         (result.notes as string[]).some((entry) => entry.startsWith("runtime-live-direct-evidence-missing:"))),
     ).toBe(true);
     expect(
@@ -310,8 +335,8 @@ describe("validation command family", () => {
     ).toBe(false);
     const summary = payload.summary as Record<string, unknown>;
     expect(summary.total).toBe(3);
-    expect(summary.passed).toBe(0);
-    expect(summary.failed).toBe(3);
+    expect(summary.passed).toBe(1);
+    expect(summary.failed).toBe(2);
     expect(summary.skipped).toBe(0);
     expect(summary.baseline_missing).toBe(0);
   });

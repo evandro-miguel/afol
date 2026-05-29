@@ -372,6 +372,10 @@ def find_repo_root(start: Path | None = None) -> Path:
             return candidate
         # Backward compatibility: root-level agents.config plus .agents folder.
         if (candidate / "agents.config").exists() and (candidate / ".agents").exists():
+            # Guard against false-positive roots when runtime overlays expose a writable
+            # mirror under <repo>/.agents and discovery starts inside that mirror.
+            if candidate.name == ".agents" and (candidate.parent / ".agents" / "agents.config").exists():
+                continue
             return candidate
     return current
 

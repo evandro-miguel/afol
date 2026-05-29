@@ -943,7 +943,11 @@ def _validate_completion(output: dict[str, Any], repo_root: Path) -> list[str]:
     evidence_file = repo_root / ".agents" / "wb" / FIXTURE_WORKSTREAM_ID / ".evidence.jsonl"
     task_text = task_file.read_text(encoding="utf-8") if task_file.exists() else ""
     evidence_text = evidence_file.read_text(encoding="utf-8") if evidence_file.exists() else ""
-    if "| T-01 | done | worker | Run the controlled live benchmark fixture flow. |" not in task_text:
+    done_row_re = re.compile(
+        r"\|\s*T-01\s*\|\s*done\s*\|\s*worker\s*\|\s*Run the controlled live benchmark fixture flow\."
+        r"(?:\s*\(evidence:\s*E-[^)]+\))?\s*\|"
+    )
+    if not done_row_re.search(task_text):
         failures.append("fixture task not marked done")
     if LIVE_COMPLETE_COMMAND not in evidence_text or '"result": "passed"' not in evidence_text:
         failures.append("fixture evidence missing expected completion record")

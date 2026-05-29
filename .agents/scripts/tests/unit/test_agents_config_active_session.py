@@ -25,6 +25,23 @@ class AgentsConfigActiveSessionOverrideTests(unittest.TestCase):
         root = Path.cwd().resolve()
         self.assertEqual(agents_config.find_repo_root(root / ".agents" / "scripts"), root)
 
+    def test_find_repo_root_skips_overlay_agents_mirror_root(self):
+        script_path = Path(".agents/scripts/lib/agents_config.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_config = load_module("agents_config_overlay_root_discovery_test", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / ".agents" / "scripts").mkdir(parents=True, exist_ok=True)
+            (root / ".agents" / "agents.config").write_text("version: 1\n", encoding="utf-8")
+
+            overlay_root = root / ".agents"
+            (overlay_root / "agents.config").write_text("version: 1\n", encoding="utf-8")
+            (overlay_root / ".agents").mkdir(parents=True, exist_ok=True)
+
+            discovered = agents_config.find_repo_root(overlay_root / "scripts")
+            self.assertEqual(discovered, root)
+
     def test_active_session_file_uses_env_override(self):
         script_path = Path(".agents/scripts/lib/agents_config.py").resolve()
         sys.path.insert(0, str(script_path.parent))

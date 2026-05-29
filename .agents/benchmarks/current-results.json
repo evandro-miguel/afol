@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updated_at": "2026-05-29T17:45:30.854162Z",
+  "updated_at": "2026-05-29T18:24:59.805636Z",
   "pack_id": "runtime-flow-live-agent-v4",
-  "generated_at": "2026-05-29T17:45:30.853620Z",
-  "saved_result_path": ".agents/data/benchmarks/results/20260529_144530_runtime-flow-live-agent-v4.json",
+  "generated_at": "2026-05-29T18:24:59.805153Z",
+  "saved_result_path": ".agents/data/benchmarks/results/20260529_152459_runtime-flow-live-agent-v4.json",
   "benchmark_profile": {
     "runtime": "codex",
     "model": "gpt-5.4-mini",
@@ -11,74 +11,98 @@
   },
   "summary": {
     "pass": true,
-    "scenario_count": 1,
-    "duration_ms": 51640,
-    "tool_call_count": 20,
-    "tool_success_count": 19,
-    "tool_success_rate": 0.95,
-    "checks_total": 34,
-    "checks_passed": 34,
+    "scenario_count": 3,
+    "duration_ms": 26892,
+    "tool_call_count": 6,
+    "tool_success_count": 6,
+    "tool_success_rate": 1.0,
+    "checks_total": 28,
+    "checks_passed": 28,
     "accuracy": 1.0,
-    "error_count": 1,
+    "error_count": 0,
     "retry_count": 0,
-    "context_bytes_total": 94764,
-    "prompt_bytes_total": 2375
+    "context_bytes_total": 113380,
+    "prompt_bytes_total": 2103
   },
   "comparison_to_previous": {
     "status": "comparable",
     "reason": "same_pack_and_scenarios",
-    "baseline_saved_result_path": ".agents/data/benchmarks/results/20260424_153445_runtime-flow-live-agent-v4.json",
-    "baseline_generated_at": "2026-04-24T18:34:45.458416Z",
+    "baseline_saved_result_path": ".agents/data/benchmarks/results/20260529_152313_runtime-flow-live-agent-v4.json",
+    "baseline_generated_at": "2026-05-29T18:23:13.516858Z",
     "scenario_ids": [
-      "live-autonomous-agentic-folder-delivery"
+      "live-implement-next-governance-preflight",
+      "live-implement-start-complete-evidence",
+      "live-tools-benchmark-discovery"
     ],
     "baseline_scenario_ids": [
-      "live-autonomous-agentic-folder-delivery"
+      "live-implement-next-governance-preflight",
+      "live-implement-start-complete-evidence",
+      "live-tools-benchmark-discovery"
     ],
     "delta": {
-      "duration_ms": -11732,
-      "tool_call_count": -1,
-      "tool_success_rate": -0.0024,
+      "duration_ms": -6587,
+      "tool_call_count": -3,
+      "tool_success_rate": 0.0,
       "error_count": 0,
-      "accuracy": 0.0,
-      "context_bytes_total": 1559,
-      "prompt_bytes_total": 165
+      "accuracy": 0.0357,
+      "context_bytes_total": 0,
+      "prompt_bytes_total": 0
     },
     "delta_pct": {
-      "duration_ms": -18.51,
-      "tool_call_count": -4.76,
-      "tool_success_rate": -0.25,
+      "duration_ms": -19.68,
+      "tool_call_count": -33.33,
+      "tool_success_rate": 0.0,
       "error_count": 0.0,
-      "accuracy": 0.0,
-      "context_bytes_total": 1.67,
-      "prompt_bytes_total": 7.47
+      "accuracy": 3.7,
+      "context_bytes_total": 0.0,
+      "prompt_bytes_total": 0.0
     },
     "trend": {
       "duration_ms": "improved",
       "tool_call_count": "improved",
-      "tool_success_rate": "regressed",
+      "tool_success_rate": "unchanged",
       "error_count": "unchanged",
-      "accuracy": "unchanged",
-      "context_bytes_total": "regressed",
-      "prompt_bytes_total": "regressed"
+      "accuracy": "improved",
+      "context_bytes_total": "unchanged",
+      "prompt_bytes_total": "unchanged"
     }
   },
   "efficiency": {
-    "duration_ms_per_scenario": 51640.0,
-    "checks_per_second": 0.6584,
-    "tool_calls_per_second": 0.3873,
-    "bytes_per_second": 1881.0806,
-    "bytes_per_tool_call": 4856.95
+    "duration_ms_per_scenario": 8964.0,
+    "checks_per_second": 1.0412,
+    "tool_calls_per_second": 0.2231,
+    "bytes_per_second": 4294.3254,
+    "bytes_per_tool_call": 19247.17
   },
   "scenarios": [
     {
-      "id": "live-autonomous-agentic-folder-delivery",
+      "id": "live-tools-benchmark-discovery",
       "pass": true,
-      "duration_ms": 51600,
-      "tool_call_count": 20,
-      "checks_total": 34,
-      "checks_passed": 34,
-      "error_count": 1,
+      "duration_ms": 7524,
+      "tool_call_count": 1,
+      "checks_total": 8,
+      "checks_passed": 8,
+      "error_count": 0,
+      "retry_count": 0
+    },
+    {
+      "id": "live-implement-next-governance-preflight",
+      "pass": true,
+      "duration_ms": 7329,
+      "tool_call_count": 1,
+      "checks_total": 10,
+      "checks_passed": 10,
+      "error_count": 0,
+      "retry_count": 0
+    },
+    {
+      "id": "live-implement-start-complete-evidence",
+      "pass": true,
+      "duration_ms": 11931,
+      "tool_call_count": 4,
+      "checks_total": 10,
+      "checks_passed": 10,
+      "error_count": 0,
       "retry_count": 0
     }
   ]
