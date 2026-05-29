@@ -84,6 +84,31 @@ describe("validation command family", () => {
     expect(mcpProc.status).toBe(0);
     const mcpPayload = parseJsonOutput(mcpProc.stdout as string);
     expect(mcpPayload.selected_pack_ids).toEqual(["mcp-parity"]);
+
+    const tokenProc = runKernel([
+      "v",
+      "--changed-path",
+      "docs/standards/prompt-context-guidelines.md",
+      "--json",
+    ]);
+    expect(tokenProc.status).toBe(0);
+    const tokenPayload = parseJsonOutput(tokenProc.stdout as string);
+    expect(tokenPayload.selected_pack_ids).toEqual(["token-economy"]);
+  });
+
+  test("v changed-path does not route docs/spec-tests by runtime or mcp substrings", () => {
+    const proc = runKernel([
+      "v",
+      "--changed-path",
+      "docs/arc/SPECS/F-10/spec-tests/260521_0140_runtime-adapters-and-mcp-parity_spec-test_01.md",
+      "--json",
+    ]);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
+    const selected = payload.selected_pack_ids as string[];
+    expect(selected.includes("mcp-parity")).toBe(false);
+    expect(selected.includes("runtime-live-agent")).toBe(false);
   });
 
   test("v bench returns benchmark schema with scenario results", () => {
@@ -239,7 +264,7 @@ describe("validation command family", () => {
     expect(updatePayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
   });
 
-  test("registry contract remains complete for the four-pack matrix", () => {
+  test("registry contract remains complete for the five-pack matrix", () => {
     const proc = runKernel(["v", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
@@ -249,6 +274,7 @@ describe("validation command family", () => {
       "workbench-parity",
       "mcp-parity",
       "runtime-live-agent",
+      "token-economy",
     ]);
     expect(
       registry.every((entry) => (entry.scenario_count as number) >= (entry.min_scenarios as number)),

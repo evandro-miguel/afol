@@ -14,6 +14,7 @@ export const REQUIRED_PACKS = [
   "workbench-parity",
   "mcp-parity",
   "runtime-live-agent",
+  "token-economy",
 ] as const;
 
 export type PackId = (typeof REQUIRED_PACKS)[number];
@@ -297,6 +298,17 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 }
 
 function defaultPackSelection(changedPaths: string[]): SelectorOutput {
+  const normalizePath = (value: string): string => value.replace(/\\/g, "/").replace(/^\.\//, "");
+  const hasPrefix = (value: string, prefixes: readonly string[]): boolean =>
+    prefixes.some((prefix) => value.startsWith(prefix));
+  const isPromptContextDoc = (value: string): boolean => {
+    if (!value.startsWith("docs/")) {
+      return false;
+    }
+    const lower = value.toLowerCase();
+    return lower.includes("prompt") || lower.includes("context");
+  };
+
   if (changedPaths.length === 0) {
     return {
       selected_pack_ids: [
@@ -304,6 +316,7 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
         "workbench-parity",
         "mcp-parity",
         "runtime-live-agent",
+        "token-economy",
       ],
       reasons: ["default-no-paths"],
     };
@@ -311,25 +324,31 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
   const selected = new Set<PackId>();
   const reasons: string[] = [];
   for (const changedPath of changedPaths) {
-    if (changedPath.startsWith(".agents/runtime/") || changedPath.includes("runtime")) {
+    const normalizedPath = normalizePath(changedPath);
+    if (hasPrefix(normalizedPath, [".agents/runtime/"])) {
       selected.add("mcp-parity");
       selected.add("runtime-live-agent");
       reasons.push(`runtime-change:${changedPath}`);
       continue;
     }
-    if (changedPath.startsWith("cli/mcp/") || changedPath.includes("mcp")) {
+    if (hasPrefix(normalizedPath, ["cli/mcp/"])) {
       selected.add("mcp-parity");
       reasons.push(`mcp-change:${changedPath}`);
       continue;
     }
-    if (changedPath.startsWith("cli/")) {
+    if (hasPrefix(normalizedPath, ["cli/"])) {
       selected.add("cli-kernel-local");
       reasons.push(`cli-change:${changedPath}`);
       continue;
     }
-    if (changedPath.startsWith(".agents/wb/") || changedPath.includes("verify-tasks")) {
+    if (hasPrefix(normalizedPath, [".agents/wb/"])) {
       selected.add("workbench-parity");
       reasons.push(`workbench-change:${changedPath}`);
+      continue;
+    }
+    if (isPromptContextDoc(normalizedPath)) {
+      selected.add("token-economy");
+      reasons.push(`prompt-context-doc-change:${changedPath}`);
       continue;
     }
   }
