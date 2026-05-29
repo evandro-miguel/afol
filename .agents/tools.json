@@ -98,6 +98,11 @@
           "description": "Inspect a bounded workspace tree"
         },
         {
+          "name": "command-registry",
+          "usage": ".agents/agents runtime command-registry",
+          "description": "Show runtime registry commands and aliases"
+        },
+        {
           "name": "serve",
           "usage": ".agents/agents mcp serve",
           "description": "Run the FastMCP server using stdio transport"

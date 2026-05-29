@@ -69,6 +69,22 @@ class AgentsToolsCatalogTests(unittest.TestCase):
         self.assertEqual(memory_tool["tool"], "agents-memory.py")
         self.assertIn("memory status", memory_tool["commands"][0]["usage"])
 
+    def test_tools_catalog_runtime_includes_command_registry_entry(self):
+        script_path = Path(".agents/scripts/agents-tools.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        tools_mod = load_module("agents_tools_runtime_catalog_test", script_path)
+
+        tools = tools_mod.load_tools()
+        runtime_tool = next((tool for tool in tools["tools"] if tool["id"] == "agentic-runtime"), None)
+
+        self.assertIsNotNone(runtime_tool)
+        runtime_commands = {command["name"]: command for command in runtime_tool["commands"]}
+        self.assertIn("command-registry", runtime_commands)
+        self.assertEqual(
+            runtime_commands["command-registry"]["usage"],
+            ".agents/agents runtime command-registry",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
