@@ -57,7 +57,7 @@ class KnowledgeSearchService:
             yield from root.rglob("*.md")
 
     def _extract(self, path: Path) -> Candidate:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8", errors="ignore")
         frontmatter: dict[str, str] = {}
         body = text
         if text.startswith("---\n"):

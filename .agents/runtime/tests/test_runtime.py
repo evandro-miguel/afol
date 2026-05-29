@@ -83,6 +83,24 @@ def test_search_docs_ignores_malformed_frontmatter(scaffold_repo):
     assert any(hit.path == "docs/knowledge/BROKEN-FRONTMATTER.md" for hit in response.hits)
 
 
+def test_search_docs_ignores_malformed_utf8_bytes(scaffold_repo):
+    malformed_doc = scaffold_repo / "docs" / "knowledge" / "MALFORMED-UTF8.md"
+    malformed_doc.write_bytes(
+        b"---\n"
+        b"doc_type: report\n"
+        b"title: Malformed UTF8\n"
+        b"---\n"
+        b"# Malformed utf8 fixture\n\n"
+        b"generic malformed utf8 sentinel\n"
+        b"\xff\xfe\xfa\n"
+    )
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+
+    response = runtime.search.search("generic malformed utf8 sentinel", limit=5)
+
+    assert any(hit.path == "docs/knowledge/MALFORMED-UTF8.md" for hit in response.hits)
+
+
 def test_tool_catalog_resource_handles_corrupt_json(scaffold_repo):
     tool_catalog = scaffold_repo / ".agents" / "tools.json"
     tool_catalog.write_text("{bad-json", encoding="utf-8")
