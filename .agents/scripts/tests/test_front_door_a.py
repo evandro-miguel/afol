@@ -42,6 +42,8 @@ class FrontDoorATests(unittest.TestCase):
         fake_body: str,
         *,
         config_name: str = "config.json",
+        config_content: str | None = None,
+        extra_configs: dict[str, str] | None = None,
         source_wrapper: Path | None = None,
         nested_cwd: bool = False,
     ):
@@ -62,10 +64,15 @@ class FrontDoorATests(unittest.TestCase):
             agents_dir = root / ".agents"
             agents_dir.mkdir(parents=True, exist_ok=True)
             self._write_exec(agents_dir / "agents", fake_body)
-            (agents_dir / config_name).write_text(
-                json.dumps({"schema_version": 1, "project": {"name": "tmp"}}),
-                encoding="utf-8",
-            )
+            if config_content is None:
+                if config_name == "agents.config":
+                    config_content = "schema_version: 1\nproject:\n  name: tmp\n"
+                else:
+                    config_content = json.dumps({"schema_version": 1, "project": {"name": "tmp"}})
+            (agents_dir / config_name).write_text(config_content, encoding="utf-8")
+            if extra_configs:
+                for name, content in extra_configs.items():
+                    (agents_dir / name).write_text(content, encoding="utf-8")
             (agents_dir / "lock.json").write_text(
                 json.dumps({"schema_version": 1, "project": "tmp", "locked": True}),
                 encoding="utf-8",
@@ -130,6 +137,18 @@ class FrontDoorATests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("ARGS:status", proc.stdout)
         self.assertIn("PWD:", proc.stdout)
+
+    def test_kernel_prefers_config_json_when_both_configs_exist(self):
+        proc = self._run_kernel_with_fake_project(
+            ["s"],
+            "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n",
+            config_name="config.json",
+            config_content="{invalid-json",
+            extra_configs={"agents.config": "schema_version: 1\nproject:\n  name: yaml\n"},
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("Invalid JSON in", proc.stderr)
+        self.assertNotIn("ARGS:status", proc.stdout)
 
 
 if __name__ == "__main__":

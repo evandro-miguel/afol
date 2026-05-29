@@ -85,6 +85,35 @@ function loadJson(path: string): Record<string, unknown> {
   }
 }
 
+function loadYaml(path: string): Record<string, unknown> {
+  if (!existsSync(path)) {
+    throw new Error(`Missing required file: ${path}`);
+  }
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch (error) {
+    throw new Error(`Cannot read ${path}: ${(error as Error).message}`);
+  }
+  try {
+    const value = Bun.YAML.parse(raw);
+    if (!isObject(value)) {
+      throw new Error("Top-level YAML must be a mapping");
+    }
+    return value;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : `${error}`;
+    throw new Error(`Invalid YAML in ${path}: ${message}`);
+  }
+}
+
+function loadProjectConfig(path: string): Record<string, unknown> {
+  if (path.endsWith("agents.config")) {
+    return loadYaml(path);
+  }
+  return loadJson(path);
+}
+
 function removeJsonAliases(values: string[]): string[] {
   return values.filter((value) => !isJsonAlias(value));
 }
@@ -186,7 +215,7 @@ export function main(argv: string[]): number {
   const projectRoot = project.root;
 
   try {
-    loadJson(project.configPath);
+    loadProjectConfig(project.configPath);
     loadJson(join(projectRoot, ".agents", "lock.json"));
     const manifestPath = join(projectRoot, ".agents", "manifest.json");
     if (existsSync(manifestPath)) {
