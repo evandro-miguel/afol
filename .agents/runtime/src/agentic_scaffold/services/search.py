@@ -57,7 +57,7 @@ class KnowledgeSearchService:
             yield from root.rglob("*.md")
 
     def _extract(self, path: Path) -> Candidate:
-        text = path.read_text(encoding="utf-8", errors="ignore")
+        text = path.read_text(encoding="utf-8")
         frontmatter: dict[str, str] = {}
         body = text
         if text.startswith("---\n"):
@@ -174,7 +174,7 @@ class KnowledgeSearchService:
         if not self.wb_dir.exists():
             return
         for path in sorted(self.wb_dir.rglob("*.md")):
-            parsed = self._split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+            parsed = self._split_frontmatter(path.read_text(encoding="utf-8"))
             if parsed is None:
                 continue
             frontmatter, body = parsed
@@ -196,7 +196,7 @@ class KnowledgeSearchService:
             )
 
     def _extract_matching_snippets(self, path: Path, query: str, limit: int) -> list[KnowledgeSnippet]:
-        parsed = self._split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+        parsed = self._split_frontmatter(path.read_text(encoding="utf-8"))
         if parsed is None:
             return []
         _, body = parsed

@@ -217,6 +217,21 @@ def _seed_knowledge_session(scaffold_repo) -> str:
     return session_id
 
 
+def _write_malformed_knowledge_markdown(scaffold_repo, session_id: str, name: str = "malformed.md") -> Path:
+    path = scaffold_repo / ".agents" / "wb" / session_id / name
+    path.write_bytes(
+        b"---\n"
+        b"doc_type: research\n"
+        b"id: malformed_utf8\n"
+        b"theme: runtime\n"
+        b"status: active\n"
+        b"---\n\n"
+        b"# Malformed utf8 fixture\n\n"
+        b"Invalid byte: \xff\n"
+    )
+    return path
+
+
 def test_cli_command_registry_manifest(scaffold_repo):
     result = runner.invoke(app, ["command-registry", "--repo-root", str(scaffold_repo)])
     assert result.exit_code == 0
@@ -319,6 +334,27 @@ def test_cli_registered_knowledge_pull_matches_script(scaffold_repo):
     assert result.stderr == legacy.stderr
 
 
+def test_cli_registered_knowledge_pull_malformed_utf8_matches_legacy_failure(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    session_id = _seed_knowledge_session(scaffold_repo)
+    _write_malformed_knowledge_markdown(scaffold_repo, session_id)
+
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "pull", "runtime"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["knowledge", "pull", "runtime", "--repo-root", str(scaffold_repo)])
+
+    assert legacy.returncode == 1
+    assert "UnicodeDecodeError" in legacy.stderr
+    assert result.exit_code == legacy.returncode == 1
+    assert isinstance(result.exception, UnicodeDecodeError)
+    assert result.stdout == legacy.stdout == ""
+
+
 def test_cli_registered_knowledge_list_type_limit_matches_script(scaffold_repo):
     knowledge_script = _stage_knowledge_script(scaffold_repo)
     session_id = _seed_knowledge_session(scaffold_repo)
@@ -364,6 +400,27 @@ def test_cli_registered_knowledge_list_empty_matches_script(scaffold_repo):
     assert result.exit_code == legacy.returncode == 0
     assert result.stdout == legacy.stdout
     assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_knowledge_list_malformed_utf8_matches_legacy_failure(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    session_id = _seed_knowledge_session(scaffold_repo)
+    _write_malformed_knowledge_markdown(scaffold_repo, session_id)
+
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "list"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["knowledge", "list", "--repo-root", str(scaffold_repo)])
+
+    assert legacy.returncode == 1
+    assert "UnicodeDecodeError" in legacy.stderr
+    assert result.exit_code == legacy.returncode == 1
+    assert isinstance(result.exception, UnicodeDecodeError)
+    assert result.stdout == legacy.stdout == ""
 
 
 def test_cli_registered_knowledge_search_order_limit_matches_script(scaffold_repo):
