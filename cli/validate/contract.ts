@@ -12,6 +12,7 @@ export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
 export const REQUIRED_PACKS = [
   "cli-kernel-local",
   "routing-accuracy",
+  "update-safety",
   "workbench-parity",
   "mcp-parity",
   "runtime-live-agent",
@@ -315,6 +316,7 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
       selected_pack_ids: [
         "cli-kernel-local",
         "routing-accuracy",
+        "update-safety",
         "workbench-parity",
         "mcp-parity",
         "runtime-live-agent",
@@ -341,6 +343,11 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
     if (hasPrefix(normalizedPath, ["cli/rules/", "cli/skills/"])) {
       selected.add("routing-accuracy");
       reasons.push(`routing-change:${changedPath}`);
+      continue;
+    }
+    if (hasPrefix(normalizedPath, ["cli/update/"])) {
+      selected.add("update-safety");
+      reasons.push(`update-change:${changedPath}`);
       continue;
     }
     if (hasPrefix(normalizedPath, ["cli/"])) {

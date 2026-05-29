@@ -12,6 +12,11 @@
       "selector_tags": ["routing", "rules", "skills"]
     },
     {
+      "pack_id": "update-safety",
+      "min_scenarios": 4,
+      "selector_tags": ["update", "safety", "template"]
+    },
+    {
       "pack_id": "workbench-parity",
       "min_scenarios": 5,
       "selector_tags": ["workbench", "parity"]

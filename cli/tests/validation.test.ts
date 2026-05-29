@@ -85,6 +85,11 @@ describe("validation command family", () => {
     const skillsPayload = parseJsonOutput(skillsProc.stdout as string);
     expect(skillsPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
 
+    const updateProc = runKernel(["v", "--changed-path", "cli/update/example.ts", "--json"]);
+    expect(updateProc.status).toBe(0);
+    const updatePayload = parseJsonOutput(updateProc.stdout as string);
+    expect(updatePayload.selected_pack_ids).toEqual(["update-safety"]);
+
     const wbProc = runKernel(["v", "--changed-path", ".agents/wb/session/task.md", "--json"]);
     expect(wbProc.status).toBe(0);
     const wbPayload = parseJsonOutput(wbProc.stdout as string);
@@ -156,6 +161,25 @@ describe("validation command family", () => {
     expect((first.baseline_reference as string).startsWith("/")).toBe(false);
     expect(typeof first.threshold_reference).toBe("object");
     expect(first.pass).toBe(true);
+  });
+
+  test("v bench runs update-safety pack with complete baseline coverage", () => {
+    const proc = runKernel(["v", "bench", "--pack", "update-safety", "--json"]);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.mode).toBe("benchmark");
+    expect(payload.result_count).toBe(4);
+    expect(payload.summary).toEqual({
+      total: 4,
+      passed: 4,
+      failed: 0,
+      skipped: 0,
+      baseline_missing: 0,
+    });
+    const results = payload.results as Array<Record<string, unknown>>;
+    expect(results.length).toBe(4);
+    expect(results.every((entry) => entry.pack_id === "update-safety")).toBe(true);
+    expect(results.some((entry) => entry.status === "baseline-missing")).toBe(false);
   });
 
   test("v bench fails when metrics violate threshold and baseline", () => {
@@ -281,7 +305,7 @@ describe("validation command family", () => {
     expect(updatePayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
   });
 
-  test("registry contract remains complete for the six-pack matrix", () => {
+  test("registry contract remains complete for the seven-pack matrix", () => {
     const proc = runKernel(["v", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
@@ -289,6 +313,7 @@ describe("validation command family", () => {
     expect(registry.map((entry) => entry.pack_id)).toEqual([
       "cli-kernel-local",
       "routing-accuracy",
+      "update-safety",
       "workbench-parity",
       "mcp-parity",
       "runtime-live-agent",
