@@ -262,6 +262,16 @@ The Bun/TypeScript reformulation must be staged:
 - Exit criteria: satisfied; strict governed evidence exists for the accepted
   slices and the current-state docs are reconciled.
 
+### F-16 Export Contract Hardening
+
+- Status: active
+- Governing spec:
+  docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md
+- Why: enforce a strict export contract so bootstrap/export dry-run copies only
+  sanctioned `src/project-template` content and keeps history/noise out.
+- Exit criteria: bootstrap export tests prove forbidden paths are excluded and
+  dry-run output remains source-of-truth aligned with `src/project-template`.
+
 ### F-17 Just Command Runner Migration
 
 - Status: final

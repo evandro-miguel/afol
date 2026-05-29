@@ -680,6 +680,69 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertFalse((target / ".agents/arc/map").exists())
             self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
 
+    def test_bootstrap_export_contract_excludes_forbidden_history_and_local_artifacts(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_export_contract_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
+
+        managed_paths = {path.as_posix() for path in agents_bootstrap._managed_files_from_template()}
+        generated_paths = {
+            path.as_posix()
+            for path in agents_bootstrap.generated_baseline_content("2026-03-23T00:00:00Z")
+        }
+        export_paths = managed_paths | generated_paths
+
+        self.assertIn("AGENTS.md", export_paths)
+        self.assertIn(".agents/scripts/agents-bootstrap.py", export_paths)
+        self.assertIn("docs/arc/GENERAL-ROADMAP.md", export_paths)
+
+        forbidden_prefixes = [
+            ".git/",
+            ".agents/wb/",
+            "docs/arc/history/",
+            ".agents/source/",
+            ".agents/cache/",
+            ".agents/tmp/",
+            ".agents/runtime/.venv/",
+            ".agents/scripts/.venv/",
+            "node_modules/",
+            "__pycache__/",
+            ".pytest_cache/",
+            ".ruff_cache/",
+        ]
+        forbidden_names = {"events.jsonl", "settings.local.json", ".structure-cache.json"}
+
+        for rel in sorted(export_paths):
+            for prefix in forbidden_prefixes:
+                self.assertFalse(
+                    rel == prefix.rstrip("/") or rel.startswith(prefix),
+                    f"export contract leaked forbidden path {rel!r}",
+                )
+            self.assertNotIn(Path(rel).name, forbidden_names, f"export contract leaked local artifact {rel!r}")
+
+    def test_bootstrap_dry_run_uses_project_template_source_and_writes_nothing(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_dry_run_export_contract_test", script_path)
+        self._skip_without_source_template(agents_bootstrap)
+
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "target-repo"
+            result = subprocess.run(
+                [sys.executable, str(script_path), str(target), "--dry-run", "--skip-checks"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=f"{result.stdout}\n{result.stderr}")
+            self.assertIn(f"source={agents_bootstrap.TEMPLATE_ROOT}", result.stdout)
+            self.assertIn("mode=dry-run", result.stdout)
+            self.assertIn("Dry-run only: no files were written", result.stdout)
+            self.assertTrue(target.exists())
+            self.assertEqual(list(target.rglob("*")), [])
+
     def test_project_template_stays_generic_and_history_free(self):
         template_root = Path(__file__).resolve().parents[3]
         if not template_root.exists():
