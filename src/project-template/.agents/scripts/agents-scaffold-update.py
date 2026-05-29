@@ -54,6 +54,7 @@ IGNORED_PAYLOAD_NAMES = {
     ".structure-cache.json",
     "events.jsonl",
     "settings.local.json",
+    "source",
 }
 OWNERSHIP_CATEGORIES = ("managed", "project-owned", "generated", "ignored", "conflict")
 BASELINE_HASH_KEYS = ("managed_hashes", "managedHashes", "managed_files", "managedFiles")

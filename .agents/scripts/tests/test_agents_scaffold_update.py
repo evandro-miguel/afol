@@ -365,6 +365,31 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
             self.assertEqual((root / ".agents/agents").read_text(encoding="utf-8"), "template-payload\n")
             self.assertFalse((root / ".agents/tmp/pytest-scripts.log").exists())
 
+    def test_plan_only_ignores_source_seed_tree(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            source = Path(td) / "source"
+            (root / ".agents").mkdir(parents=True)
+            source_agents = source / ".agents"
+            source_agents.mkdir(parents=True)
+
+            self._write(root / ".agents/agents", "managed-old\n")
+            self._write(source_agents / "agents", "managed-new\n")
+            self._write(source_agents / "source/universal-skills/index.json", "{\"skills\":[]}\n")
+
+            module = self._load_with_root(root)
+            self._write_channel_metadata(module, source, match_payload=True)
+            self._write_target_baseline(module, root, ["agents"])
+
+            stream = io.StringIO()
+            with redirect_stdout(stream):
+                rc = module.main(["--source", str(source), "--channel", "stable", "--plan-only"])
+
+            self.assertEqual(rc, 0)
+            output = stream.getvalue()
+            self.assertIn("SCAFFOLD UPDATE PLAN", output)
+            self.assertNotIn("source/universal-skills", output)
+
     def test_rejects_bad_release_artifact_hash_without_writes(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "repo"
