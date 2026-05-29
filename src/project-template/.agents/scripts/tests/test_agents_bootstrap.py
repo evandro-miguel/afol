@@ -55,6 +55,16 @@ class BootstrapTests(unittest.TestCase):
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn(".agents/agents.config", mandatory)
 
+    def test_mandatory_files_include_lock_file(self):
+        """The lock file must be in the mandatory files list."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn(".agents/lock.json", mandatory)
+
+    def test_mandatory_files_include_manifest_file(self):
+        """The lock manifest must be in the mandatory files list."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn(".agents/manifest.json", mandatory)
+
     def test_mandatory_files_include_just_wrapper(self):
         """The Justfile wrapper must be in the mandatory files list."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
@@ -151,6 +161,29 @@ class BootstrapTests(unittest.TestCase):
             any("GENERAL-ROADMAP.md" in p for p in generated_paths),
             f"Roadmap not found in generated content: {generated_paths}",
         )
+
+    def test_copy_required_files_installs_lock_and_manifest(self):
+        """copy_required_files must install lock and manifest from template source."""
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td) / "scaffold"
+            target = Path(td) / "target"
+            target.mkdir(parents=True)
+            module = self._load_with_root(root)
+
+            source_agents_dir = module.TEMPLATE_ROOT / ".agents"
+            source_agents_dir.mkdir(parents=True, exist_ok=True)
+            (source_agents_dir / "lock.json").write_text('{"schema_version":1}\n', encoding="utf-8")
+            (source_agents_dir / "manifest.json").write_text('{"schema_version":1}\n', encoding="utf-8")
+
+            with mock.patch.object(
+                module,
+                "MANDATORY_FILES_TO_COPY",
+                [Path(".agents/lock.json"), Path(".agents/manifest.json")],
+            ):
+                module.copy_required_files(target, force=False, dry_run=False)
+
+            self.assertEqual((target / ".agents/lock.json").read_text(encoding="utf-8"), '{"schema_version":1}\n')
+            self.assertEqual((target / ".agents/manifest.json").read_text(encoding="utf-8"), '{"schema_version":1}\n')
 
     def test_current_timestamp_uses_agents_config_clock(self):
         """Bootstrap timestamp helper should use the shared timezone helper."""
