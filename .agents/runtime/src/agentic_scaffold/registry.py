@@ -84,6 +84,15 @@ def _load_script_module(script_path: Path) -> ModuleType:
 
 def _run_status_in_process(repo_root: Path, args: list[str]) -> int:
     script = repo_root / ".agents" / "scripts" / "agents-status.py"
+    return _run_script_main_in_process(script, args)
+
+
+def _run_session_catchup_in_process(repo_root: Path, args: list[str]) -> int:
+    script = repo_root / ".agents" / "scripts" / "agents-session.py"
+    return _run_script_main_in_process(script, args)
+
+
+def _run_script_main_in_process(script: Path, args: list[str]) -> int:
     if not script.exists():
         raise FileNotFoundError(f"Registered command script not found: {script}")
 
@@ -189,6 +198,8 @@ class RuntimeRegistry:
             return _run_knowledge_pull_in_process(self.config, args[1:])
         if command_name == "status":
             return _run_status_in_process(self.config.repo_root, args)
+        if command_name == "session" and args and args[0] == "catchup":
+            return _run_session_catchup_in_process(self.config.repo_root, args)
         command = COMMAND_REGISTRY[command_name]
         script = self.config.repo_root / ".agents" / "scripts" / command.script_name
         if not script.exists():

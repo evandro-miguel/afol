@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -12,6 +13,16 @@ from agentic_scaffold.cli import app
 from agentic_scaffold.runtime import AgenticRuntime
 
 runner = CliRunner()
+
+
+def _normalize_catchup_payload(payload: dict[str, object]) -> dict[str, object]:
+    payload.pop("generated_at", None)
+    artifacts = payload.get("artifacts")
+    if isinstance(artifacts, dict):
+        for artifact in artifacts.values():
+            if isinstance(artifact, dict):
+                artifact.pop("mtime", None)
+    return payload
 
 
 def _registered_cli_commands() -> set[str]:
@@ -144,6 +155,10 @@ def _stage_status_script(scaffold_repo) -> Path:
 
 def _stage_knowledge_script(scaffold_repo) -> Path:
     return _stage_runtime_script(scaffold_repo, "agents-knowledge.py")
+
+
+def _stage_session_script(scaffold_repo) -> Path:
+    return _stage_runtime_script(scaffold_repo, "agents-session.py")
 
 
 def _seed_status_session(scaffold_repo) -> str:
@@ -423,11 +438,45 @@ def test_cli_registered_knowledge_pull_uses_native_path(scaffold_repo, monkeypat
     assert "# Knowledge Pull: runtime" in result.stdout
 
 
-def test_cli_registered_session_matches_script(scaffold_repo):
-    _write_argv_script(scaffold_repo, "agents-session.py", "session")
-    result = runner.invoke(app, ["session", "catchup", "--json", "--repo-root", str(scaffold_repo)])
+def test_cli_registered_session_matches_script(scaffold_repo, monkeypatch):
+    session_script = _stage_session_script(scaffold_repo)
+    session_id = _seed_status_session(scaffold_repo)
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+
+    legacy = subprocess.run(
+        [sys.executable, str(session_script), "catchup", "--session", session_id, "--json"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+    )
+    result = runner.invoke(
+        app,
+        ["session", "catchup", "--session", session_id, "--json", "--repo-root", str(scaffold_repo)],
+    )
+    assert result.exit_code == legacy.returncode == 0
+    legacy_payload = _normalize_catchup_payload(json.loads(legacy.stdout))
+    runtime_payload = _normalize_catchup_payload(json.loads(result.stdout))
+    assert runtime_payload == legacy_payload
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_session_catchup_uses_in_process_path(scaffold_repo, monkeypatch):
+    _stage_session_script(scaffold_repo)
+    session_id = _seed_status_session(scaffold_repo)
+
+    def _unexpected_run_command(*_args, **_kwargs):
+        raise AssertionError("session catchup should not call run_command subprocess path")
+
+    monkeypatch.setattr("agentic_scaffold.registry.run_command", _unexpected_run_command)
+    result = runner.invoke(
+        app,
+        ["session", "catchup", "--session", session_id, "--json", "--repo-root", str(scaffold_repo)],
+    )
     assert result.exit_code == 0
-    assert result.stdout == "session:catchup --json\n"
+    payload = json.loads(result.stdout)
+    assert payload["session"] == session_id
 
 
 def test_cli_run_registered_command(scaffold_repo):
