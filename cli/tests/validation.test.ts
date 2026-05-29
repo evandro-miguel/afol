@@ -75,6 +75,16 @@ describe("validation command family", () => {
     const cliPayload = parseJsonOutput(cliProc.stdout as string);
     expect(cliPayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
 
+    const rulesProc = runKernel(["v", "--changed-path", "cli/rules/example.md", "--json"]);
+    expect(rulesProc.status).toBe(0);
+    const rulesPayload = parseJsonOutput(rulesProc.stdout as string);
+    expect(rulesPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
+
+    const skillsProc = runKernel(["v", "--changed-path", "cli/skills/example.md", "--json"]);
+    expect(skillsProc.status).toBe(0);
+    const skillsPayload = parseJsonOutput(skillsProc.stdout as string);
+    expect(skillsPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
+
     const wbProc = runKernel(["v", "--changed-path", ".agents/wb/session/task.md", "--json"]);
     expect(wbProc.status).toBe(0);
     const wbPayload = parseJsonOutput(wbProc.stdout as string);
@@ -94,6 +104,13 @@ describe("validation command family", () => {
     expect(tokenProc.status).toBe(0);
     const tokenPayload = parseJsonOutput(tokenProc.stdout as string);
     expect(tokenPayload.selected_pack_ids).toEqual(["token-economy"]);
+  });
+
+  test("v changed-path does not over-route generic cli paths to routing-accuracy", () => {
+    const proc = runKernel(["v", "--changed-path", "cli/files/example.ts", "--json"]);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
   });
 
   test("v changed-path does not route docs/spec-tests by runtime or mcp substrings", () => {
@@ -264,13 +281,14 @@ describe("validation command family", () => {
     expect(updatePayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
   });
 
-  test("registry contract remains complete for the five-pack matrix", () => {
+  test("registry contract remains complete for the six-pack matrix", () => {
     const proc = runKernel(["v", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
     const registry = payload.registry as Array<Record<string, unknown>>;
     expect(registry.map((entry) => entry.pack_id)).toEqual([
       "cli-kernel-local",
+      "routing-accuracy",
       "workbench-parity",
       "mcp-parity",
       "runtime-live-agent",

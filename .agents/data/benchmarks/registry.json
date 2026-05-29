@@ -7,6 +7,11 @@
       "selector_tags": ["cli", "kernel", "local"]
     },
     {
+      "pack_id": "routing-accuracy",
+      "min_scenarios": 4,
+      "selector_tags": ["routing", "rules", "skills"]
+    },
+    {
       "pack_id": "workbench-parity",
       "min_scenarios": 5,
       "selector_tags": ["workbench", "parity"]
