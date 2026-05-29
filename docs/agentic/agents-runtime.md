@@ -85,8 +85,9 @@ The source-kit priority wrappers were migrated first:
 
 After that wrapper path was proven with focused runtime tests, every public
 `.agents/agents <command>` alias was routed through the runtime command
-registry. The registry delegates to the existing scripts today; future native
-ports can replace individual delegate entries after parity evidence exists.
+registry. `status` now executes in-process through the runtime while preserving
+the legacy output contract; remaining registry entries still delegate to the
+existing scripts until their native ports land with parity evidence.
 
 ## Runtime Command Registry
 
@@ -102,6 +103,6 @@ preserving legacy script behavior:
 ```
 
 The registry owns public routing for the wrapper aliases listed by
-`.agents/agents runtime command-registry`. Each entry remains a compatibility
-delegate until the implementation is fully ported into runtime-native service
-code.
+`.agents/agents runtime command-registry`. `status` is the first native command
+family (`phase=native`), while the rest remain compatibility delegates until
+their implementations are fully ported with parity evidence.

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import sys
+from pathlib import Path
 
 from typer.testing import CliRunner
 
@@ -126,6 +129,52 @@ def _write_argv_script(scaffold_repo, script_name: str, label: str) -> None:
     )
 
 
+def _stage_status_script(scaffold_repo) -> Path:
+    source_scripts_dir = Path(__file__).resolve().parents[3] / ".agents" / "scripts"
+    target_scripts_dir = scaffold_repo / ".agents" / "scripts"
+    target_scripts_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_scripts_dir / "agents-status.py", target_scripts_dir / "agents-status.py")
+    shutil.copytree(source_scripts_dir / "lib", target_scripts_dir / "lib", dirs_exist_ok=True)
+    return target_scripts_dir / "agents-status.py"
+
+
+def _seed_status_session(scaffold_repo) -> str:
+    session_id = "260401_1200_status-parity"
+    session_dir = scaffold_repo / ".agents" / "wb" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_plan_01.md").write_text(
+        "---\n"
+        "doc_type: plan\n"
+        f"id: {session_id}_plan_01\n"
+        "status: active\n"
+        "roadmap_feature: F-13\n"
+        "updated_at: '2026-04-04T08:54:11-03:00'\n"
+        "---\n\n"
+        "# Plan\n\n"
+        "## Progress\n"
+        "- [x] seeded plan\n\n"
+        "## Concrete Steps\n"
+        "1. Seed status parity fixtures.\n",
+        encoding="utf-8",
+    )
+    (session_dir / f"{session_id}_task_01.md").write_text(
+        "---\n"
+        "doc_type: task\n"
+        f"id: {session_id}_task_01\n"
+        "status: active\n"
+        "roadmap_feature: F-13\n"
+        "updated_at: '2026-04-04T08:54:11-03:00'\n"
+        "---\n\n"
+        "# Tasks\n\n"
+        "## State Board\n\n"
+        "| Task | State | Owner | Notes |\n"
+        "|------|-------|-------|-------|\n"
+        "| T-01 | pending | worker | Validate status parity |\n",
+        encoding="utf-8",
+    )
+    return session_id
+
+
 def test_cli_command_registry_manifest(scaffold_repo):
     result = runner.invoke(app, ["command-registry", "--repo-root", str(scaffold_repo)])
     assert result.exit_code == 0
@@ -143,6 +192,7 @@ def test_cli_command_registry_manifest(scaffold_repo):
         "verify-tasks",
     } <= set(commands)
     assert commands["status"]["script_name"] == "agents-status.py"
+    assert commands["status"]["phase"] == "native"
     assert commands["scaffold-update"]["script_name"] == "agents-scaffold-update.py"
     assert commands["verify"]["alias_of"] == "verify-tasks"
 
@@ -155,11 +205,55 @@ def test_cli_command_registry_manifest(scaffold_repo):
 
 
 def test_cli_registered_status_matches_script(scaffold_repo):
-    _write_argv_script(scaffold_repo, "agents-status.py", "status")
-    result = runner.invoke(app, ["status", "--json", "--repo-root", str(scaffold_repo)])
+    status_script = _stage_status_script(scaffold_repo)
+    session_id = _seed_status_session(scaffold_repo)
+    legacy = subprocess.run(
+        [sys.executable, str(status_script), "--session", session_id, "--json"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["status", "--session", session_id, "--json", "--repo-root", str(scaffold_repo)])
+
+    assert legacy.returncode == 0
     assert result.exit_code == 0
-    assert result.stdout == "status:--json\n"
+    legacy_payload = json.loads(legacy.stdout)
+    runtime_payload = json.loads(result.stdout)
+    legacy_payload.pop("generated_at", None)
+    runtime_payload.pop("generated_at", None)
+    assert runtime_payload == legacy_payload
     assert sys.executable
+
+
+def test_cli_registered_status_matches_script_error_contract(scaffold_repo):
+    status_script = _stage_status_script(scaffold_repo)
+    session_id = _seed_status_session(scaffold_repo)
+    legacy = subprocess.run(
+        [sys.executable, str(status_script), "--session", session_id, "--pretty"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["status", "--session", session_id, "--pretty", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == legacy.returncode == 2
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_status_uses_in_process_path(scaffold_repo, monkeypatch):
+    _stage_status_script(scaffold_repo)
+    session_id = _seed_status_session(scaffold_repo)
+
+    def _unexpected_run_command(*_args, **_kwargs):
+        raise AssertionError("status should not call run_command subprocess path")
+
+    monkeypatch.setattr("agentic_scaffold.registry.run_command", _unexpected_run_command)
+    result = runner.invoke(app, ["status", "--session", session_id, "--json", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["session"] == session_id
 
 
 def test_cli_registered_knowledge_matches_script(scaffold_repo):

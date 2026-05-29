@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import importlib.util
 import sys
 from dataclasses import dataclass
+from pathlib import Path
+from types import ModuleType
 
 from agentic_scaffold.config import RuntimeConfig
 from agentic_scaffold.process_utils import (
@@ -52,7 +55,8 @@ _PRIMARY_COMMAND_SPECS = (
 def _build_command_registry() -> dict[str, RuntimeCommand]:
     registry: dict[str, RuntimeCommand] = {}
     for name, script_name, description, aliases in _PRIMARY_COMMAND_SPECS:
-        registry[name] = RuntimeCommand(name=name, script_name=script_name, description=description)
+        phase = "native" if name == "status" else "compatibility"
+        registry[name] = RuntimeCommand(name=name, script_name=script_name, description=description, phase=phase)
         for alias in aliases:
             registry[alias] = RuntimeCommand(
                 name=alias,
@@ -64,6 +68,46 @@ def _build_command_registry() -> dict[str, RuntimeCommand]:
 
 
 COMMAND_REGISTRY: dict[str, RuntimeCommand] = _build_command_registry()
+
+
+def _load_script_module(script_path: Path) -> ModuleType:
+    module_name = f"agentic_scaffold_{script_path.stem.replace('-', '_')}"
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load runtime command script: {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _run_status_in_process(repo_root: Path, args: list[str]) -> int:
+    script = repo_root / ".agents" / "scripts" / "agents-status.py"
+    if not script.exists():
+        raise FileNotFoundError(f"Registered command script not found: {script}")
+
+    scripts_dir = script.parent
+    scripts_dir_text = str(scripts_dir)
+    added_sys_path = False
+    if scripts_dir_text not in sys.path:
+        sys.path.insert(0, scripts_dir_text)
+        added_sys_path = True
+
+    previous_argv = sys.argv
+    try:
+        module = _load_script_module(script)
+        sys.argv = [script.name, *args]
+        try:
+            exit_code = module.main()
+        except SystemExit as exc:
+            return int(exc.code) if isinstance(exc.code, int) else 1
+        return int(exit_code) if isinstance(exit_code, int) else 0
+    finally:
+        sys.argv = previous_argv
+        if added_sys_path:
+            try:
+                sys.path.remove(scripts_dir_text)
+            except ValueError:
+                pass
 
 
 class RuntimeRegistry:
@@ -104,6 +148,8 @@ class RuntimeRegistry:
         if command_name not in COMMAND_REGISTRY:
             print(f"Unknown runtime registry command: {command_name}", file=sys.stderr)
             return 127
+        if command_name == "status":
+            return _run_status_in_process(self.config.repo_root, args)
         command = COMMAND_REGISTRY[command_name]
         script = self.config.repo_root / ".agents" / "scripts" / command.script_name
         if not script.exists():

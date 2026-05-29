@@ -115,6 +115,7 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
     commands = {item["name"]: item for item in command_registry["commands"]}
     assert {"status", "knowledge", "session", "local-state", "doctor", "skills-sync", "verify-tasks"} <= set(commands)
     assert commands["status"]["script_name"] == "agents-status.py"
+    assert commands["status"]["phase"] == "native"
     assert commands["verify"]["alias_of"] == "verify-tasks"
     help_commands = {item["name"]: item for item in command_registry["help_commands"]}
     assert "local-state" in help_commands

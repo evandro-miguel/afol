@@ -60,6 +60,8 @@ This folder is the distilled current-state evidence surface for the repository.
 
 ## Lifecycle Snapshot
 
+- F-13 `status` command family now runs natively in runtime (`agentic status`)
+  with parity-preserving output/exit behavior against `agents-status.py`.
 - `docs/arc/SPECS/INDEX.md` now reflects the F-17 parent spec and accepted child specs as `final`.
 - `docs/map/CHANGELOG.md` records the F-17 closeout alongside the earlier F-13 closure note.
 - `docs/arc/SPECS/INDEX.md` now reflects the F-09 parent spec as `final`.

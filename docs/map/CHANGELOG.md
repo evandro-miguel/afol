@@ -29,6 +29,13 @@ updated_at: "2026-05-28T23:10:13Z"
 - Status: `satisfied` for runtime registry/MCP/catalog parity and `just all`; `partial` for legacy delegate removal because compatibility delegates remain preserved.
 - Residual risk: this is not native removal of the legacy scripts, only a conservative closure note on the current state.
 
+## F-13 Status Native Port Slice
+
+- Scope: bounded port of the `status` command family only.
+- Runtime change: `agentic status` now executes in-process through runtime registry (`phase=native`) instead of spawning a delegated subprocess.
+- Parity evidence: focused runtime tests compare JSON/text/error behavior against `.agents/scripts/agents-status.py`.
+- Remaining scope: other command families still route through compatibility delegation.
+
 ## F-17 Catalog Lifecycle Closeout
 
 - Feature: `F-17 Just Command Runner Migration`
