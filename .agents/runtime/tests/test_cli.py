@@ -129,13 +129,21 @@ def _write_argv_script(scaffold_repo, script_name: str, label: str) -> None:
     )
 
 
-def _stage_status_script(scaffold_repo) -> Path:
+def _stage_runtime_script(scaffold_repo, script_name: str) -> Path:
     source_scripts_dir = Path(__file__).resolve().parents[3] / ".agents" / "scripts"
     target_scripts_dir = scaffold_repo / ".agents" / "scripts"
     target_scripts_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source_scripts_dir / "agents-status.py", target_scripts_dir / "agents-status.py")
+    shutil.copy2(source_scripts_dir / script_name, target_scripts_dir / script_name)
     shutil.copytree(source_scripts_dir / "lib", target_scripts_dir / "lib", dirs_exist_ok=True)
-    return target_scripts_dir / "agents-status.py"
+    return target_scripts_dir / script_name
+
+
+def _stage_status_script(scaffold_repo) -> Path:
+    return _stage_runtime_script(scaffold_repo, "agents-status.py")
+
+
+def _stage_knowledge_script(scaffold_repo) -> Path:
+    return _stage_runtime_script(scaffold_repo, "agents-knowledge.py")
 
 
 def _seed_status_session(scaffold_repo) -> str:
@@ -170,6 +178,25 @@ def _seed_status_session(scaffold_repo) -> str:
         "| Task | State | Owner | Notes |\n"
         "|------|-------|-------|-------|\n"
         "| T-01 | pending | worker | Validate status parity |\n",
+        encoding="utf-8",
+    )
+    return session_id
+
+
+def _seed_knowledge_session(scaffold_repo) -> str:
+    session_id = "260401_1300_knowledge-parity"
+    session_dir = scaffold_repo / ".agents" / "wb" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_research_01.md").write_text(
+        "---\n"
+        "doc_type: research\n"
+        f"id: {session_id}_research_01\n"
+        "theme: runtime\n"
+        "status: active\n"
+        "---\n\n"
+        "# Research: knowledge parity\n\n"
+        "Runtime knowledge pull parity keeps output aligned with legacy script behavior.\n"
+        "This line repeats runtime to generate snippet matches for runtime queries.\n",
         encoding="utf-8",
     )
     return session_id
@@ -256,11 +283,54 @@ def test_cli_registered_status_uses_in_process_path(scaffold_repo, monkeypatch):
     assert payload["session"] == session_id
 
 
-def test_cli_registered_knowledge_matches_script(scaffold_repo):
-    _write_argv_script(scaffold_repo, "agents-knowledge.py", "knowledge")
+def test_cli_registered_knowledge_pull_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    _seed_knowledge_session(scaffold_repo)
+
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "pull", "runtime", "--limit", "5", "--snippets", "2"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(
+        app,
+        ["knowledge", "pull", "runtime", "--limit", "5", "--snippets", "2", "--repo-root", str(scaffold_repo)],
+    )
+    assert legacy.returncode == 0
+    assert result.exit_code == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_knowledge_pull_no_match_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    _seed_knowledge_session(scaffold_repo)
+
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "pull", "nonexistent-topic"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["knowledge", "pull", "nonexistent-topic", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == legacy.returncode == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_knowledge_pull_uses_native_path(scaffold_repo, monkeypatch):
+    _seed_knowledge_session(scaffold_repo)
+
+    def _unexpected_run_command(*_args, **_kwargs):
+        raise AssertionError("knowledge pull should not call run_command subprocess path")
+
+    monkeypatch.setattr("agentic_scaffold.registry.run_command", _unexpected_run_command)
     result = runner.invoke(app, ["knowledge", "pull", "runtime", "--repo-root", str(scaffold_repo)])
     assert result.exit_code == 0
-    assert result.stdout == "knowledge:pull runtime\n"
+    assert "# Knowledge Pull: runtime" in result.stdout
 
 
 def test_cli_registered_session_matches_script(scaffold_repo):

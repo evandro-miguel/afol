@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import sys
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from agentic_scaffold.process_utils import (
     ProcessError,
     run_command,
 )
+from agentic_scaffold.services.search import KnowledgePullHit, KnowledgeSearchService
 
 
 @dataclass(frozen=True)
@@ -110,6 +112,41 @@ def _run_status_in_process(repo_root: Path, args: list[str]) -> int:
                 pass
 
 
+def _run_knowledge_pull_in_process(config: RuntimeConfig, args: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="knowledge pull", description="pull a compact digest for a topic")
+    parser.add_argument("query")
+    parser.add_argument("--limit", type=int, default=5)
+    parser.add_argument("--snippets", type=int, default=2)
+    try:
+        parsed_args = parser.parse_args(args)
+    except SystemExit as exc:
+        return int(exc.code) if isinstance(exc.code, int) else 1
+
+    search_service = KnowledgeSearchService(config.repo_root, config.search_roots)
+    hits = search_service.pull(query=parsed_args.query, limit=parsed_args.limit, snippets=parsed_args.snippets)
+    if not hits:
+        print(f"No reusable knowledge found for '{parsed_args.query}'.")
+        return 0
+
+    print(f"# Knowledge Pull: {parsed_args.query}")
+    print()
+    for hit in hits:
+        _emit_knowledge_pull_hit(config.repo_root, hit)
+    return 0
+
+
+def _emit_knowledge_pull_hit(repo_root: Path, hit: KnowledgePullHit) -> None:
+    doc = hit.doc
+    print(f"- {doc.doc_id} ({doc.doc_type}, score={hit.score})")
+    print(f"  path: {doc.path.relative_to(repo_root).as_posix()}")
+    if doc.summary:
+        print(f"  summary: {doc.summary}")
+    if hit.snippets:
+        for snippet in hit.snippets:
+            print(f"  snippet L{snippet.line_no}: {snippet.text}")
+    print(f"  reuse: open with '.agents/agents knowledge show {doc.doc_id}' if deeper context is needed")
+
+
 class RuntimeRegistry:
     def __init__(self, config: RuntimeConfig) -> None:
         self.config = config
@@ -148,6 +185,8 @@ class RuntimeRegistry:
         if command_name not in COMMAND_REGISTRY:
             print(f"Unknown runtime registry command: {command_name}", file=sys.stderr)
             return 127
+        if command_name == "knowledge" and args and args[0] == "pull":
+            return _run_knowledge_pull_in_process(self.config, args[1:])
         if command_name == "status":
             return _run_status_in_process(self.config.repo_root, args)
         command = COMMAND_REGISTRY[command_name]

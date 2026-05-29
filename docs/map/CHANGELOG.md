@@ -36,6 +36,13 @@ updated_at: "2026-05-28T23:10:13Z"
 - Parity evidence: focused runtime tests compare JSON/text/error behavior against `.agents/scripts/agents-status.py`.
 - Remaining scope: other command families still route through compatibility delegation.
 
+## F-13 Knowledge Pull Native Port Slice
+
+- Scope: bounded native dispatch for `knowledge pull` only; no broad `knowledge` family refactor.
+- Runtime change: `agentic knowledge pull` now executes in-process through runtime search/format logic instead of spawning delegated `agents-knowledge.py`.
+- Parity evidence: focused runtime tests compare output/exit behavior against `.agents/scripts/agents-knowledge.py`, including missing-topic behavior.
+- Remaining scope: non-`pull` knowledge subcommands and other command families still route through compatibility delegation.
+
 ## F-17 Catalog Lifecycle Closeout
 
 - Feature: `F-17 Just Command Runner Migration`

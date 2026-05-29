@@ -62,6 +62,8 @@ This folder is the distilled current-state evidence surface for the repository.
 
 - F-13 `status` command family now runs natively in runtime (`agentic status`)
   with parity-preserving output/exit behavior against `agents-status.py`.
+- F-13 `knowledge pull` now dispatches natively in runtime (`agentic knowledge pull`)
+  with parity-preserving output/exit behavior against `agents-knowledge.py`.
 - `docs/arc/SPECS/INDEX.md` now reflects the F-17 parent spec and accepted child specs as `final`.
 - `docs/map/CHANGELOG.md` records the F-17 closeout alongside the earlier F-13 closure note.
 - `docs/arc/SPECS/INDEX.md` now reflects the F-09 parent spec as `final`.
