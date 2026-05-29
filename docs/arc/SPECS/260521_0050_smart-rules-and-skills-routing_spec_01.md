@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260521_0050_smart-rules-and-skills-routing_spec_01
 theme: smart-rules-and-skills-routing
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T00:50:00+08:00'
-updated_at: '2026-05-21T00:50:00+08:00'
+updated_at: '2026-05-29T13:20:21-03:00'
 roadmap_feature: F-05
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -66,3 +66,9 @@ updateable.
 - Does this avoid copying universal implementation logic into every downstream
   project?
 - Is the validation path concrete enough to prove parity and safety?
+
+## 8) Closure
+
+- Accepted implementation evidence: `E-20260528100236370279`.
+- Closeout session: `.agents/wb/260528_0956_f05-review-parity-strict/`.
+- Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_0956_f05-review-parity-strict/` passed.

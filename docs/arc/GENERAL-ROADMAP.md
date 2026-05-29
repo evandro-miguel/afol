@@ -111,7 +111,7 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-04 Governance Workbench System
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0040_governance-workbench-system_spec_01.md
 - Why: Plans, tasks, evidence, logs, specs, and reports need a durable local
@@ -119,30 +119,36 @@ The Bun/TypeScript reformulation must be staged:
 - Exit criteria: typed workbench model; command-managed
   plans/tasks/logs/evidence/reports/sidecars; evidence required for completion;
   closure validation catches drift.
+- Closure note: accepted implementation evidence is `E-20260528084521802724`;
+  closeout session `.agents/wb/260528_0833_f04-workbench-core-review-fix/`.
 
 ### F-05 Smart Rules and Skills Routing
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0050_smart-rules-and-skills-routing_spec_01.md
 - Why: Agents should receive only relevant rules and skills for the current
   work.
 - Exit criteria: rule router; skill router; surface detection; compact
   delegation context; project-local updateable rules and skills.
+- Closure note: accepted implementation evidence is `E-20260528100236370279`;
+  closeout session `.agents/wb/260528_0956_f05-review-parity-strict/`.
 
 ### F-06 File-First Low-Token Execution
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0060_file-first-low-token-execution_spec_01.md
 - Why: Agents should save detailed work into files and return compact handoffs
   instead of flooding context.
 - Exit criteria: research save flow; log append flow; compact handoff format;
   summary plus paths; routine updates avoid manual file editing.
+- Closure note: accepted implementation evidence is `E-20260528103543755917`;
+  closeout session `.agents/wb/260528_1029_f06-review-fix/`.
 
 ### F-07 Local State Index and Event Log
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0070_local-state-index-and-event-log_spec_01.md
 - Why: Agents should query compact state instead of repeatedly scanning raw
@@ -150,15 +156,20 @@ The Bun/TypeScript reformulation must be staged:
 - Exit criteria: local indexes for workbench, rules, skills, specs, and files;
   event log records command and file activity; compact queries; optional watcher
   plan.
+- Closure note: accepted implementation evidence is `E-20260528112023377690`;
+  closeout session `.agents/wb/260528_1111_f07-local-state-review-fix/`.
 
 ### F-08 Safe File Mutation and Undo
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0080_safe-file-mutation-and-undo_spec_01.md
 - Why: Agents need safe tools to move, patch, write, archive, and undo files.
 - Exit criteria: mutation journal; session/task context; dry-run; undo where
   feasible; protected dangerous paths.
+- Closure note: accepted implementation evidence is `E-20260528122615973830`;
+  closeout session `.agents/wb/260528_1145_f08-safe-file-mutation-undo/`;
+  board cleanup was accepted in `cb2e024`.
 
 ### F-09 Template Update and Versioning
 

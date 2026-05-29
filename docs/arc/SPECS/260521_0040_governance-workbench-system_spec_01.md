@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260521_0040_governance-workbench-system_spec_01
 theme: governance-workbench-system
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T00:40:00+08:00'
-updated_at: '2026-05-21T00:40:00+08:00'
+updated_at: '2026-05-29T13:20:21-03:00'
 roadmap_feature: F-04
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -67,3 +67,9 @@ missing required state.
 - Does this avoid copying universal implementation logic into every downstream
   project?
 - Is the validation path concrete enough to prove parity and safety?
+
+## 8) Closure
+
+- Accepted implementation evidence: `E-20260528084521802724`.
+- Closeout session: `.agents/wb/260528_0833_f04-workbench-core-review-fix/`.
+- Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_0833_f04-workbench-core-review-fix/` passed.

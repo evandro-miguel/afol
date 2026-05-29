@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260521_0080_safe-file-mutation-and-undo_spec_01
 theme: safe-file-mutation-and-undo
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T01:20:00+08:00'
-updated_at: '2026-05-21T01:20:00+08:00'
+updated_at: '2026-05-29T13:20:21-03:00'
 roadmap_feature: F-08
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -65,3 +65,10 @@ protected paths are blocked; common moves do not require manual file handling.
 - Does this avoid copying universal implementation logic into every downstream
   project?
 - Is the validation path concrete enough to prove parity and safety?
+
+## 8) Closure
+
+- Accepted implementation evidence: `E-20260528122615973830`.
+- Closeout session: `.agents/wb/260528_1145_f08-safe-file-mutation-undo/`.
+- Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_1145_f08-safe-file-mutation-undo/` passed.
+- Board cleanup accepted in `cb2e024`.

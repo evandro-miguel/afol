@@ -4,7 +4,7 @@ description: "Version-to-version summary of repository-map changes, focusing on 
 doc_kind: "changelog"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T14:59:24Z"
+updated_at: "2026-05-29T13:20:21-03:00"
 ---
 
 # Changelog
@@ -21,6 +21,29 @@ updated_at: "2026-05-29T14:59:24Z"
 - Domains detected: ``
 - Public boundary files detected: `2`
 - Top hotspots tracked: `0`
+
+## F-04 Through F-08 Governance Reconciliation
+
+- Feature: `F-04` through `F-08`
+- Scope: current-state docs reconciliation for the governance workbench,
+  routing, file-first execution, local-state indexing, and safe mutation
+  slices.
+- Accepted implementation evidence:
+  - `E-20260528084521802724`
+  - `E-20260528100236370279`
+  - `E-20260528103543755917`
+  - `E-20260528112023377690`
+  - `E-20260528122615973830`
+- Strict verification: the representative sessions
+  `.agents/wb/260528_0833_f04-workbench-core-review-fix/`,
+  `.agents/wb/260528_0956_f05-review-parity-strict/`,
+  `.agents/wb/260528_1029_f06-review-fix/`,
+  `.agents/wb/260528_1111_f07-local-state-review-fix/`, and
+  `.agents/wb/260528_1145_f08-safe-file-mutation-undo/` all passed
+  `verify-tasks --strict`.
+- F-08 board cleanup accepted stale task removal in `cb2e024`.
+- Status: satisfied for the docs/current-state layer; residual risk is limited
+  to future derived-index drift, not the current refresh.
 
 ## F-16 Project Template Source Separation Closeout
 

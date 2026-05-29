@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-05-29T15:51:20+00:00"
+updated_at: "2026-05-29T16:22:06+00:00"
 ---
 
 # SPECS INDEX
@@ -17,9 +17,9 @@ updated_at: "2026-05-29T15:51:20+00:00"
 | Metric | Count |
 |--------|-------|
 | Total | 59 |
-| Draft | 15 |
+| Draft | 10 |
 | Active | 28 |
-| Final | 16 |
+| Final | 21 |
 
 ## Index
 
@@ -64,11 +64,11 @@ updated_at: "2026-05-29T15:51:20+00:00"
 | 260521_0010_universal-agent-cli_spec_01 | universal-agent-cli | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0020_minimal-project-template_spec_01 | minimal-project-template | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0030_agent-command-design-system_spec_01 | agent-command-design-system | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
-| 260521_0040_governance-workbench-system_spec_01 | governance-workbench-system | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
-| 260521_0050_smart-rules-and-skills-routing_spec_01 | smart-rules-and-skills-routing | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
-| 260521_0060_file-first-low-token-execution_spec_01 | file-first-low-token-execution | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
-| 260521_0070_local-state-index-and-event-log_spec_01 | local-state-index-and-event-log | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
-| 260521_0080_safe-file-mutation-and-undo_spec_01 | safe-file-mutation-and-undo | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0040_governance-workbench-system_spec_01 | governance-workbench-system | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0050_smart-rules-and-skills-routing_spec_01 | smart-rules-and-skills-routing | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0060_file-first-low-token-execution_spec_01 | file-first-low-token-execution | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0070_local-state-index-and-event-log_spec_01 | local-state-index-and-event-log | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0080_safe-file-mutation-and-undo_spec_01 | safe-file-mutation-and-undo | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0090_template-update-and-versioning_spec_01 | template-update-and-versioning | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md, plan: .agents/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_plan_01.md, task: .agents/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_task_01.md, report: .agents/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_report_01.md |
 | 260521_0130_universal-agent-cli-kernel-contract_spec-test_01 | universal-agent-cli-kernel-contract | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260521_0132_minimal-project-template-export_spec-test_01 | minimal-project-template-export | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |

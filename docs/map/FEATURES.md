@@ -4,7 +4,7 @@ description: "Feature-oriented breakdown of the repository, explaining why each 
 doc_kind: "features"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T14:59:24Z"
+updated_at: "2026-05-29T13:20:21-03:00"
 ---
 
 # Features
@@ -17,6 +17,20 @@ This file groups the repository by feature or concern, not by raw directory list
 
 ## Feature Clusters
 
+- `F-04 through F-08 governance reconciliation`
+  - `docs/arc/GENERAL-ROADMAP.md`
+  - `docs/arc/SPECS/INDEX.md`
+  - `docs/arc/SPECS/260521_0040_governance-workbench-system_spec_01.md`
+  - `docs/arc/SPECS/260521_0050_smart-rules-and-skills-routing_spec_01.md`
+  - `docs/arc/SPECS/260521_0060_file-first-low-token-execution_spec_01.md`
+  - `docs/arc/SPECS/260521_0070_local-state-index-and-event-log_spec_01.md`
+  - `docs/arc/SPECS/260521_0080_safe-file-mutation-and-undo_spec_01.md`
+  - `.agents/wb/260529_1319_f04-f08-governance-reconciliation/`
+  - `.agents/wb/260528_0833_f04-workbench-core-review-fix/`
+  - `.agents/wb/260528_0956_f05-review-parity-strict/`
+  - `.agents/wb/260528_1029_f06-review-fix/`
+  - `.agents/wb/260528_1111_f07-local-state-review-fix/`
+  - `.agents/wb/260528_1145_f08-safe-file-mutation-undo/`
 - `F-15 repo-wide simplification runtime parity`
   - `docs/arc/GENERAL-ROADMAP.md`
   - `docs/arc/SPECS/INDEX.md`

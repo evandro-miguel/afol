@@ -4,7 +4,7 @@ description: "Entry point for the generated repository map, including reading or
 doc_kind: "codemap-index"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T14:59:24Z"
+updated_at: "2026-05-29T13:20:21-03:00"
 ---
 
 # Repository Map
@@ -78,6 +78,12 @@ This folder is the distilled current-state evidence surface for the repository.
   scripts cleanup, map boundary cleanup, runtime registry parity, and python
   command simplification. `docs/arc/SPECS/INDEX.md` now reflects the parent
   spec and accepted child specs as `final`.
+- F-04 through F-08 governance reconciliation is now in closeout: the roadmap
+  entries and parent specs are final, `docs/arc/SPECS/INDEX.md` reflects the
+  final spec states after `just index`, and the accepted evidence IDs are
+  `E-20260528084521802724`, `E-20260528100236370279`,
+  `E-20260528103543755917`, `E-20260528112023377690`, and
+  `E-20260528122615973830`.
 - F-14 spec-child/spec-test governance is now in closeout: the roadmap entry
   is final, the parent spec is final, and the verified report lives under
   `.agents/wb/260528_1528_spec-child-and-spec-test-governance/`.
