@@ -321,6 +321,96 @@ def test_cli_registered_knowledge_pull_no_match_matches_script(scaffold_repo):
     assert result.stderr == legacy.stderr
 
 
+def test_cli_registered_knowledge_pull_multi_hit_order_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    session_id = _seed_knowledge_session(scaffold_repo)
+    session_dir = scaffold_repo / ".agents" / "wb" / session_id
+    (session_dir / f"{session_id}_research_02.md").write_text(
+        "---\n"
+        "doc_type: research\n"
+        f"id: {session_id}_research_02\n"
+        "theme: runtime\n"
+        "status: active\n"
+        "---\n\n"
+        "# Research: secondary runtime note\n\n"
+        "Runtime fallback coverage check.\n",
+        encoding="utf-8",
+    )
+
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "pull", "runtime", "--limit", "5", "--snippets", "2"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(
+        app,
+        ["knowledge", "pull", "runtime", "--limit", "5", "--snippets", "2", "--repo-root", str(scaffold_repo)],
+    )
+
+    assert legacy.returncode == 0
+    assert result.exit_code == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+    assert sum(1 for line in result.stdout.splitlines() if line.startswith("- ")) >= 2
+
+
+def test_cli_registered_knowledge_pull_snippet_limit_boundary_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    session_id = _seed_knowledge_session(scaffold_repo)
+    session_dir = scaffold_repo / ".agents" / "wb" / session_id
+    knowledge_doc = session_dir / f"{session_id}_research_01.md"
+    knowledge_doc.write_text(
+        knowledge_doc.read_text(encoding="utf-8")
+        + "Runtime boundary line to exercise snippet limit behavior.\n",
+        encoding="utf-8",
+    )
+
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "pull", "runtime", "--limit", "5", "--snippets", "1"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(
+        app,
+        ["knowledge", "pull", "runtime", "--limit", "5", "--snippets", "1", "--repo-root", str(scaffold_repo)],
+    )
+
+    assert legacy.returncode == 0
+    assert result.exit_code == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+    assert result.stdout.count("  snippet L") == 1
+
+
+def test_cli_registered_knowledge_pull_invalid_arg_stderr_contract_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    _seed_knowledge_session(scaffold_repo)
+
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "pull", "runtime", "--bad-flag"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(
+        app,
+        ["knowledge", "pull", "runtime", "--bad-flag", "--repo-root", str(scaffold_repo)],
+    )
+
+    assert result.exit_code == legacy.returncode == 2
+    assert result.stdout == legacy.stdout == ""
+    legacy_error = [line for line in legacy.stderr.splitlines() if "error:" in line][-1]
+    runtime_error = [line for line in result.stderr.splitlines() if "error:" in line][-1]
+    assert legacy_error.split("error:", maxsplit=1)[1].strip() == runtime_error.split("error:", maxsplit=1)[1].strip()
+    assert "usage:" in legacy.stderr
+    assert "usage:" in result.stderr
+
+
 def test_cli_registered_knowledge_pull_uses_native_path(scaffold_repo, monkeypatch):
     _seed_knowledge_session(scaffold_repo)
 
