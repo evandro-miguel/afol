@@ -14,7 +14,6 @@ export const REQUIRED_PACKS = [
   "workbench-parity",
   "mcp-parity",
   "runtime-live-agent",
-  "token-economy",
 ] as const;
 
 export type PackId = (typeof REQUIRED_PACKS)[number];
@@ -300,35 +299,42 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 function defaultPackSelection(changedPaths: string[]): SelectorOutput {
   if (changedPaths.length === 0) {
     return {
-      selected_pack_ids: ["cli-kernel-local", "workbench-parity", "mcp-parity", "token-economy"],
+      selected_pack_ids: [
+        "cli-kernel-local",
+        "workbench-parity",
+        "mcp-parity",
+        "runtime-live-agent",
+      ],
       reasons: ["default-no-paths"],
     };
   }
   const selected = new Set<PackId>();
   const reasons: string[] = [];
   for (const changedPath of changedPaths) {
+    if (changedPath.startsWith(".agents/runtime/") || changedPath.includes("runtime")) {
+      selected.add("mcp-parity");
+      selected.add("runtime-live-agent");
+      reasons.push(`runtime-change:${changedPath}`);
+      continue;
+    }
+    if (changedPath.startsWith("cli/mcp/") || changedPath.includes("mcp")) {
+      selected.add("mcp-parity");
+      reasons.push(`mcp-change:${changedPath}`);
+      continue;
+    }
     if (changedPath.startsWith("cli/")) {
       selected.add("cli-kernel-local");
-      selected.add("token-economy");
       reasons.push(`cli-change:${changedPath}`);
+      continue;
     }
     if (changedPath.startsWith(".agents/wb/") || changedPath.includes("verify-tasks")) {
       selected.add("workbench-parity");
       reasons.push(`workbench-change:${changedPath}`);
-    }
-    if (
-      changedPath.startsWith(".agents/runtime/")
-      || changedPath.includes("mcp")
-      || changedPath.includes("runtime")
-    ) {
-      selected.add("mcp-parity");
-      selected.add("runtime-live-agent");
-      reasons.push(`runtime-change:${changedPath}`);
+      continue;
     }
   }
   if (selected.size === 0) {
     selected.add("cli-kernel-local");
-    selected.add("token-economy");
     reasons.push("fallback-default");
   }
   return {
@@ -346,13 +352,13 @@ export function selectPacks(input: SelectorInput): SelectorOutput {
   }
   if (input.scope === "tpl") {
     return {
-      selected_pack_ids: ["cli-kernel-local", "token-economy"],
+      selected_pack_ids: ["cli-kernel-local"],
       reasons: ["scope-tpl"],
     };
   }
   if (input.scope === "update") {
     return {
-      selected_pack_ids: ["token-economy"],
+      selected_pack_ids: ["cli-kernel-local"],
       reasons: ["scope-update"],
     };
   }

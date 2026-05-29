@@ -69,6 +69,23 @@ describe("validation command family", () => {
     expect(selected.includes("runtime-live-agent")).toBe(true);
   });
 
+  test("v changed-path selector routes each supported benchmark pack", () => {
+    const cliProc = runKernel(["v", "--changed-path", "cli/main.ts", "--json"]);
+    expect(cliProc.status).toBe(0);
+    const cliPayload = parseJsonOutput(cliProc.stdout as string);
+    expect(cliPayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
+
+    const wbProc = runKernel(["v", "--changed-path", ".agents/wb/session/task.md", "--json"]);
+    expect(wbProc.status).toBe(0);
+    const wbPayload = parseJsonOutput(wbProc.stdout as string);
+    expect(wbPayload.selected_pack_ids).toEqual(["workbench-parity"]);
+
+    const mcpProc = runKernel(["v", "--changed-path", "cli/mcp/adapter.ts", "--json"]);
+    expect(mcpProc.status).toBe(0);
+    const mcpPayload = parseJsonOutput(mcpProc.stdout as string);
+    expect(mcpPayload.selected_pack_ids).toEqual(["mcp-parity"]);
+  });
+
   test("v bench returns benchmark schema with scenario results", () => {
     const proc = runKernel(["v", "bench", "--pack", "cli-kernel-local", "--json"]);
     expect(proc.status).toBe(0);
@@ -213,19 +230,30 @@ describe("validation command family", () => {
     expect(tplProc.status).toBe(0);
     const tplPayload = parseJsonOutput(tplProc.stdout as string);
     expect(tplPayload.scope).toBe("tpl");
-    expect(tplPayload.selected_pack_ids).toEqual(["cli-kernel-local", "token-economy"]);
+    expect(tplPayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
 
     const updateProc = runKernel(["v", "update", "--json"]);
     expect(updateProc.status).toBe(0);
     const updatePayload = parseJsonOutput(updateProc.stdout as string);
     expect(updatePayload.scope).toBe("update");
-    expect(updatePayload.selected_pack_ids).toEqual(["token-economy"]);
+    expect(updatePayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
   });
 
-  test("registry contract has no issues", () => {
+  test("registry contract remains complete for the four-pack matrix", () => {
     const proc = runKernel(["v", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
+    const registry = payload.registry as Array<Record<string, unknown>>;
+    expect(registry.map((entry) => entry.pack_id)).toEqual([
+      "cli-kernel-local",
+      "workbench-parity",
+      "mcp-parity",
+      "runtime-live-agent",
+    ]);
+    expect(
+      registry.every((entry) => (entry.scenario_count as number) >= (entry.min_scenarios as number)),
+    ).toBe(true);
+    expect(registry.every((entry) => entry.baseline_present === true)).toBe(true);
     expect(payload.contract_issues).toEqual([]);
   });
 });
