@@ -6,46 +6,111 @@ import { constants as osConstants } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { runValidationCommand } from "./validate/contract";
 
+type RouteKind = "status" | "validate" | "delegate";
+type AliasEntry = {
+  short?: string;
+  long: string;
+  route: RouteKind;
+};
+
+const KERNEL_ALIAS_CONTRACT = Object.freeze({
+  topLevel: Object.freeze<ReadonlyArray<AliasEntry>>([
+    { short: "s", long: "status", route: "status" },
+    { short: "v", long: "validate", route: "validate" },
+    { short: "n", long: "new", route: "delegate" },
+    { short: "t", long: "task", route: "delegate" },
+    { short: "l", long: "log", route: "delegate" },
+    { short: "e", long: "evidence", route: "delegate" },
+    { short: "r", long: "rule", route: "delegate" },
+    { short: "sk", long: "skill", route: "delegate" },
+    { short: "q", long: "query", route: "delegate" },
+    { short: "f", long: "file", route: "delegate" },
+    { short: "c", long: "close", route: "delegate" },
+    { short: "u", long: "undo", route: "delegate" },
+    { short: "up", long: "update", route: "delegate" },
+    { short: "b", long: "bootstrap", route: "delegate" },
+    { short: "ix", long: "index", route: "delegate" },
+    { short: "ev", long: "event", route: "delegate" },
+    { long: "session", route: "delegate" },
+    { long: "verify-tasks", route: "delegate" },
+    { long: "runtime", route: "delegate" },
+    { long: "tools", route: "delegate" },
+    { long: "implement", route: "delegate" },
+    { long: "wb-update", route: "delegate" },
+    { long: "knowledge", route: "delegate" },
+    { long: "memory", route: "delegate" },
+    { long: "skills-sync", route: "delegate" },
+    { long: "scaffold-update", route: "delegate" },
+    { long: "doctor", route: "delegate" },
+    { long: "mcp", route: "delegate" },
+    { long: "benchmark", route: "delegate" },
+    { long: "patterns", route: "delegate" },
+    { long: "review", route: "delegate" },
+    { long: "revert", route: "delegate" },
+    { long: "repo-map", route: "delegate" },
+    { long: "lint-docs", route: "delegate" },
+    { long: "local-state", route: "delegate" },
+    { long: "tools-smoke", route: "delegate" },
+    { long: "fix-symlinks", route: "delegate" },
+  ]),
+  flags: Object.freeze({
+    help: ["-h", "--help"] as const,
+    json: ["-j", "--json"] as const,
+  }),
+});
+
 const HELP_LINES = [
   "Usage: a [command] [options]",
   "",
   "Commands",
   "  s, status              Show status",
-  "  status -j/--json       Status as JSON",
-  "  new                    Create workstream/session",
+  "  v, validate            Validation contract and benchmark selector",
+  "  n, new                 Create workstream/session",
   "  task                   Work on session tasks",
   "  session                Work with session lifecycle",
   "  verify-tasks           Verify task completion",
-  "  v, validate            Validation contract and benchmark selector",
   "  runtime                Run runtime helpers",
   "  tools                  Use tools helpers",
   "",
   "Flags",
-  "  -j, --json             JSON output for status shorthand",
+  "  -j, --json             JSON output for status",
   "  -h, --help             Show this compact help",
   "",
   "Aliases",
-  "  status -> s",
+  "  s/status v/validate n/new t/task",
+  "  e/evidence r/rule q/query sk/skill",
+  "  c/close u/undo up/update b/bootstrap ix/index ev/event",
   "",
   "Examples",
   "  a s",
   "  a -j s",
-  "  a status --json",
+  "  a v --json",
 ].join("\n");
 
-const JSON_ALIASES = new Set(["-j", "--json"]);
-const STATUS_ALIASES = new Set(["s", "status"]);
-const HELP_ALIASES = new Set(["-h", "--help"]);
-const VALIDATE_ALIASES = new Set(["v", "validate"]);
+const JSON_ALIASES = new Set(KERNEL_ALIAS_CONTRACT.flags.json);
+const HELP_ALIASES = new Set(KERNEL_ALIAS_CONTRACT.flags.help);
 const PROJECT_CONFIG_CANDIDATES = ["config.json", "agents.config"] as const;
+const TOP_LEVEL_ALIAS_TO_CANONICAL = new Map<string, string>();
+const DELEGATED_COMMANDS = new Set<string>();
+const KNOWN_COMMANDS = new Set<string>();
+const KNOWN_CANONICAL_COMMANDS = new Set<string>();
+
+for (const alias of KERNEL_ALIAS_CONTRACT.topLevel) {
+  TOP_LEVEL_ALIAS_TO_CANONICAL.set(alias.long, alias.long);
+  KNOWN_COMMANDS.add(alias.long);
+  KNOWN_CANONICAL_COMMANDS.add(alias.long);
+  if (alias.short) {
+    TOP_LEVEL_ALIAS_TO_CANONICAL.set(alias.short, alias.long);
+    KNOWN_COMMANDS.add(alias.short);
+  }
+  if (alias.route === "delegate") {
+    DELEGATED_COMMANDS.add(alias.long);
+  }
+}
 
 const exit = (code: number): never => {
   process.exit(code);
 };
-
-function isStatusAlias(value: string): boolean {
-  return STATUS_ALIASES.has(value);
-}
 
 function isJsonAlias(value: string): boolean {
   return JSON_ALIASES.has(value);
@@ -55,8 +120,16 @@ function isHelpAlias(value: string): boolean {
   return HELP_ALIASES.has(value);
 }
 
+function canonicalizeTopLevelAlias(value: string): string {
+  return TOP_LEVEL_ALIAS_TO_CANONICAL.get(value) ?? value;
+}
+
+function isStatusAlias(value: string): boolean {
+  return canonicalizeTopLevelAlias(value) === "status";
+}
+
 function isValidateAlias(value: string): boolean {
-  return VALIDATE_ALIASES.has(value);
+  return canonicalizeTopLevelAlias(value) === "validate";
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -132,14 +205,20 @@ function normalizeStatusInvocation(values: string[]): string[] {
 
 function normalizeArguments(values: string[]): string[] {
   if (values.length === 0) {
-    return [];
+    return ["status"];
   }
 
-  if (isStatusAlias(values[0])) {
+  if (isHelpAlias(values[0]) && values.length === 1) {
+    return ["--help"];
+  }
+
+  const first = values[0];
+
+  if (isStatusAlias(first)) {
     return normalizeStatusInvocation(values);
   }
 
-  if (isJsonAlias(values[0])) {
+  if (isJsonAlias(first)) {
     if (values.length === 1) {
       return ["status", "--json"];
     }
@@ -148,7 +227,81 @@ function normalizeArguments(values: string[]): string[] {
     }
   }
 
-  return values;
+  return [canonicalizeTopLevelAlias(first), ...values.slice(1)];
+}
+
+function suggestionFor(command: string): string | null {
+  const normalizedInput = command.toLowerCase();
+  for (const candidate of KNOWN_CANONICAL_COMMANDS) {
+    const normalizedCandidate = candidate.toLowerCase();
+    if (normalizedCandidate.startsWith(normalizedInput) || normalizedInput.startsWith(normalizedCandidate)) {
+      return candidate;
+    }
+  }
+  for (const candidate of KNOWN_COMMANDS) {
+    const normalizedCandidate = candidate.toLowerCase();
+    if (normalizedCandidate.startsWith(normalizedInput) || normalizedInput.startsWith(normalizedCandidate)) {
+      return canonicalizeTopLevelAlias(candidate);
+    }
+  }
+  return null;
+}
+
+function formatUnknownCommandHint(command: string): string {
+  const suggestion = suggestionFor(command);
+  if (suggestion) {
+    return `err unknown-command command=${command} hint=\"run a -h\" did_you_mean=${suggestion}`;
+  }
+  return `err unknown-command command=${command} hint=\"run a -h\"`;
+}
+
+type CommandResolution =
+  | { kind: "help" }
+  | { kind: "validate"; args: string[] }
+  | { kind: "delegate"; args: string[] }
+  | { kind: "unknown"; message: string; exitCode: number };
+
+function resolveCommand(args: string[]): CommandResolution {
+  if (args.length === 1 && isHelpAlias(args[0])) {
+    return { kind: "help" };
+  }
+
+  const normalized = normalizeArguments(args);
+  const [topLevel, ...rest] = normalized;
+
+  if (!topLevel) {
+    return { kind: "delegate", args: ["status"] };
+  }
+
+  if (topLevel === "--help") {
+    return { kind: "help" };
+  }
+
+  if (isValidateAlias(topLevel)) {
+    return { kind: "validate", args: rest };
+  }
+
+  if (isStatusAlias(topLevel)) {
+    return { kind: "delegate", args: normalizeStatusInvocation(normalized) };
+  }
+
+  if (DELEGATED_COMMANDS.has(topLevel)) {
+    return { kind: "delegate", args: normalized };
+  }
+
+  if (topLevel.startsWith("-")) {
+    return {
+      kind: "unknown",
+      message: `err unknown-flag flag=${topLevel} hint=\"run a -h\"`,
+      exitCode: 2,
+    };
+  }
+
+  return {
+    kind: "unknown",
+    message: formatUnknownCommandHint(topLevel),
+    exitCode: 2,
+  };
 }
 
 function signalExitCode(signal: string): number {
@@ -200,12 +353,11 @@ function runLegacyAdapter(projectRoot: string, args: string[]): never {
 
 export function main(argv: string[]): number {
   const args = argv.slice(2);
-  if (args.length === 1 && isHelpAlias(args[0])) {
+  const resolution = resolveCommand(args);
+  if (resolution.kind === "help") {
     console.log(HELP_LINES);
     return 0;
   }
-
-  const normalized = normalizeArguments(args);
 
   const project = findProjectRoot(process.cwd());
   if (!project) {
@@ -226,14 +378,16 @@ export function main(argv: string[]): number {
     return 2;
   }
 
-  const command = normalized.length === 0 ? ["status"] : normalized;
-  if (command.length > 0 && isValidateAlias(command[0])) {
-    return runValidationCommand(projectRoot, command.slice(1));
+  if (resolution.kind === "unknown") {
+    console.error(resolution.message);
+    return resolution.exitCode;
   }
-  if (command[0] === "status" && command.includes("--json")) {
-    // status is passed through directly with json when requested
+
+  if (resolution.kind === "validate") {
+    return runValidationCommand(projectRoot, resolution.args);
   }
-  return runLegacyAdapter(projectRoot, command);
+
+  return runLegacyAdapter(projectRoot, resolution.args);
 }
 
 if (import.meta.main) {
