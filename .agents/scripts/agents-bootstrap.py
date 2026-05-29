@@ -15,11 +15,11 @@ from pathlib import Path
 from enum import Enum
 from typing import Callable, Dict, Iterable, List, NamedTuple, Sequence, Set, Tuple
 
-from lib.agents_config import now_iso_with_offset
+from lib.agents_config import now_iso_with_offset, source_template_root
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-TEMPLATE_ROOT = ROOT_DIR / "src" / "project-template"
+TEMPLATE_ROOT = source_template_root(ROOT_DIR)
 LOCAL_UNIVERSAL_SKILLS_DIR = Path(".agents/source/universal-skills")
 
 MANDATORY_FILES_TO_COPY = [

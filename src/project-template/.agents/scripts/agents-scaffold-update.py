@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List
 
-from lib.agents_config import load_agents_config
+from lib.agents_config import load_agents_config, resolve_scaffold_source_roots
 
 
 ROOT_DIR, _CONFIG = load_agents_config(Path(__file__).resolve().parent)
@@ -796,36 +796,6 @@ def _write_manifest(
     manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def _resolve_source_roots(source: Path) -> tuple[Path, Path]:
-    source_path = source.expanduser().resolve(strict=False)
-    if source_path.is_symlink():
-        raise RuntimeError(f"Invalid source path: symlink is not allowed: {source_path}")
-
-    template_agents_dir = source_path / "src" / "project-template" / ".agents"
-    if template_agents_dir.is_dir():
-        if template_agents_dir.is_symlink():
-            raise RuntimeError(f"Invalid source path: symlink is not allowed: {template_agents_dir}")
-        return source_path, template_agents_dir
-
-    if (source_path / ".agents").is_dir():
-        agents_dir = source_path / ".agents"
-        if agents_dir.is_symlink():
-            raise RuntimeError(f"Invalid source path: symlink is not allowed: {agents_dir}")
-        return source_path, agents_dir
-
-    looks_like_agents_dir = (source_path / "agents").exists() and (source_path / "scripts").is_dir()
-    if looks_like_agents_dir:
-        for candidate in source_path.parents:
-            if (candidate / "releases" / "channels").is_dir():
-                return candidate, source_path
-        return source_path.parent, source_path
-
-    raise RuntimeError(
-        "Source path must be a repo root containing .agents/ or a direct .agents directory: "
-        f"{source_path}"
-    )
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Secure scaffold update for .agents")
     parser.add_argument("--channel", default="stable", help="Release channel to apply (stable)")
@@ -854,7 +824,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.apply and args.diff_only:
         raise RuntimeError("Use either --apply or --diff-only, not both")
 
-    source_repo_root, source_agents_dir = _resolve_source_roots(Path(args.source))
+    source_repo_root, source_agents_dir = resolve_scaffold_source_roots(Path(args.source))
     metadata = _load_channel_metadata(source_repo_root, str(args.channel).strip())
     _verify_release_artifacts(source_repo_root, metadata)
     _verify_git_commit_when_available(source_repo_root, metadata)
