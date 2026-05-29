@@ -2,13 +2,13 @@
 doc_type: spec-child
 id: 260528_2022_runtime-mirror-cleanup_spec-child_01
 theme: runtime-mirror-cleanup
-status: draft
+status: final
 owners:
 - orchestrator
 workstream_intent: delivery
 artifact_purpose: Capture the canonical child spec for the runtime mirror cleanup slice.
 created_at: 2026-05-28T20:22:03-03:00
-updated_at: 2026-05-28T20:22:03-03:00
+updated_at: 2026-05-29T15:37:22-03:00
 roadmap_feature: F-17
 spec_role: child
 parent_spec: 260413_1849_just-command-runner-migration_spec_01
@@ -16,7 +16,7 @@ links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
   plan: 260528_2022_runtime-mirror-cleanup_plan_01
   task: 260528_2022_runtime-mirror-cleanup_task_01
-  report: null
+  report: .agents/wb/260528_2022_runtime-mirror-cleanup/260528_2022_runtime-mirror-cleanup_report_01.md
 risk_level: low
 ---
 
@@ -65,10 +65,15 @@ risk_level: low
 
 ## Acceptance
 
-- [ ] Child scope is explicit and bounded
-- [ ] Parent spec linkage is explicit
-- [ ] Journey is clear without code
-- [ ] Delivery evidence target is clear in linked report
+- [x] Child scope is explicit and bounded
+- [x] Parent spec linkage is explicit
+- [x] Journey is clear without code
+- [x] Delivery evidence target is clear in linked report
+
+## Closure
+
+- Evidence: `E-20260528202913194559`
+- Report: `.agents/wb/260528_2022_runtime-mirror-cleanup/260528_2022_runtime-mirror-cleanup_report_01.md`
 
 ---
 
