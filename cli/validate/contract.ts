@@ -615,6 +615,15 @@ function failedRuntimeLiveResult(
   };
 }
 
+function runtimeLiveDirectEvidenceNote(
+  evidence: RuntimeLiveEvidence,
+  scenario: Scenario,
+  reason: "runtime-live-direct-evidence-missing" | "runtime-live-direct-evidence-reused",
+): string {
+  const mappedId = scenario.live_runner_scenario_id ?? "missing";
+  return `${reason}:${scenario.scenario_id}:${mappedId};artifact:${evidence.savedResultPathRelative};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`;
+}
+
 function buildRuntimeLiveAgentResults(
   projectRoot: string,
   scenarios: Scenario[],
@@ -635,15 +644,42 @@ function buildRuntimeLiveAgentResults(
   for (const liveScenario of evidence.payload.scenarios) {
     liveById.set(liveScenario.id, liveScenario);
   }
-  const fallbackScenario = evidence.payload.scenarios[0];
+  const usedLiveScenarioIds = new Set<string>();
+  let matchedDirectEvidenceCount = 0;
+  let incompleteArtifact = false;
 
-  const results = scenarios.map((scenario, index) => {
+  const results = scenarios.map((scenario) => {
     const mappingId = scenario.live_runner_scenario_id;
-    const mappedScenario =
-      (mappingId ? liveById.get(mappingId) : undefined)
-      ?? liveById.get(scenario.scenario_id)
-      ?? evidence.payload.scenarios[index]
-      ?? fallbackScenario;
+    if (!mappingId) {
+      incompleteArtifact = true;
+      return failedRuntimeLiveResult(
+        projectRoot,
+        scenario,
+        baselinePath,
+        runtimeLiveDirectEvidenceNote(evidence, scenario, "runtime-live-direct-evidence-missing"),
+      );
+    }
+    const mappedScenario = liveById.get(mappingId);
+    if (!mappedScenario) {
+      incompleteArtifact = true;
+      return failedRuntimeLiveResult(
+        projectRoot,
+        scenario,
+        baselinePath,
+        runtimeLiveDirectEvidenceNote(evidence, scenario, "runtime-live-direct-evidence-missing"),
+      );
+    }
+    if (usedLiveScenarioIds.has(mappedScenario.id)) {
+      incompleteArtifact = true;
+      return failedRuntimeLiveResult(
+        projectRoot,
+        scenario,
+        baselinePath,
+        runtimeLiveDirectEvidenceNote(evidence, scenario, "runtime-live-direct-evidence-reused"),
+      );
+    }
+    usedLiveScenarioIds.add(mappedScenario.id);
+    matchedDirectEvidenceCount += 1;
     const mappedId = mappedScenario.id;
     const status: BenchmarkResult["status"] = mappedScenario.pass ? "passed" : "failed";
     const notes = [
@@ -653,9 +689,6 @@ function buildRuntimeLiveAgentResults(
       `live-runner-generated-at:${evidence.payload.generated_at}`,
       `live-runner-profile:${evidence.payload.benchmark_profile.model}/${evidence.payload.benchmark_profile.reasoning_effort}`,
     ];
-    if (mappingId && mappingId !== mappedId) {
-      notes.push(`live-runner-mapping-fallback:${mappingId}->${mappedId}`);
-    }
     if (!mappedScenario.pass) {
       notes.push("live-runner-scenario-failed");
     }
@@ -687,10 +720,19 @@ function buildRuntimeLiveAgentResults(
     };
   });
 
+  if (matchedDirectEvidenceCount !== scenarios.length) {
+    incompleteArtifact = true;
+  }
+
   return {
     results,
     notes: [
       `runtime-live-agent-artifact:${evidence.savedResultPathRelative}`,
+      ...(incompleteArtifact
+        ? [
+            `runtime-live-artifact-incomplete:${evidence.savedResultPathRelative};matched-direct-evidence:${matchedDirectEvidenceCount}/${scenarios.length};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+          ]
+        : []),
       `runtime-live-agent-refresh:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
     ],
   };

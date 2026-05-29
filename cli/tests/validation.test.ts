@@ -38,6 +38,13 @@ function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
 }
 
+function getRuntimeLiveArtifactPaths(root: string): { snapshotPath: string; savedResultPath: string } {
+  const snapshotPath = join(root, ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json");
+  const snapshot = readJson(snapshotPath);
+  const savedResultPath = join(root, snapshot.saved_result_path as string);
+  return { snapshotPath, savedResultPath };
+}
+
 describe("validation command family", () => {
   test("v emits deterministic selector JSON", () => {
     const proc = runKernel(["v", "--json"]);
@@ -278,28 +285,119 @@ describe("validation command family", () => {
     expect(summary.skipped).toBe(0);
   });
 
-  test("v bench runtime-live-agent consumes saved live artifact and never reports skipped", () => {
+  test("v bench runtime-live-agent fails on a partial live snapshot without fallback mapping", () => {
     const proc = runKernel(["v", "bench", "--pack", "runtime-live-agent", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
-    expect(payload.status).not.toBe("skipped");
-    expect(typeof payload.pass).toBe("boolean");
+    expect(payload.status).toBe("failed");
+    expect(payload.pass).toBe(false);
     const notes = payload.notes as string[];
+    expect(
+      notes.some((entry) => entry.startsWith("runtime-live-agent-artifact:.agents/data/benchmarks/results/")),
+    ).toBe(true);
+    expect(notes).toContain("runtime-live-agent-refresh:./.agents/agents benchmark run --save");
+    expect(notes.some((entry) => entry.startsWith("runtime-live-artifact-incomplete:"))).toBe(true);
+    const results = payload.results as Array<Record<string, unknown>>;
+    expect(results.length).toBe(3);
+    expect(results.every((result) => result.status === "failed")).toBe(true);
+    expect(
+      results.every((result) =>
+        (result.notes as string[]).some((entry) => entry.startsWith("runtime-live-direct-evidence-missing:"))),
+    ).toBe(true);
+    expect(
+      results.flatMap((result) => result.notes as string[]).some((entry) =>
+        entry.startsWith("live-runner-mapping-fallback:")),
+    ).toBe(false);
+    const summary = payload.summary as Record<string, unknown>;
+    expect(summary.total).toBe(3);
+    expect(summary.passed).toBe(0);
+    expect(summary.failed).toBe(3);
+    expect(summary.skipped).toBe(0);
+    expect(summary.baseline_missing).toBe(0);
+  });
+
+  test("v bench runtime-live-agent passes when every scenario has direct live evidence", () => {
+    const fixtureRoot = createValidationFixtureRoot((root) => {
+      mkdirSync(join(root, ".agents", "benchmarks"), { recursive: true });
+      cpSync(
+        join(process.cwd(), ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json"),
+        join(root, ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json"),
+      );
+      const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
+      const savedResult = readJson(savedResultPath);
+      savedResult.scenarios = [
+        {
+          id: "live-implement-start-complete-evidence",
+          pass: true,
+          duration_ms: 120,
+          tool_call_count: 1,
+          tool_success_rate: 1,
+          error_count: 0,
+          retry_count: 0,
+          context_bytes: 1024,
+          prompt_bytes: 240,
+        },
+        {
+          id: "live-tools-benchmark-discovery",
+          pass: true,
+          duration_ms: 140,
+          tool_call_count: 1,
+          tool_success_rate: 1,
+          error_count: 0,
+          retry_count: 0,
+          context_bytes: 1024,
+          prompt_bytes: 240,
+        },
+        {
+          id: "live-implement-next-governance-preflight",
+          pass: true,
+          duration_ms: 160,
+          tool_call_count: 1,
+          tool_success_rate: 1,
+          error_count: 0,
+          retry_count: 0,
+          context_bytes: 1024,
+          prompt_bytes: 240,
+        },
+      ];
+      savedResult.pass = true;
+      savedResult.duration_ms = 420;
+      savedResult.tool_call_count = 3;
+      savedResult.error_count = 0;
+      savedResult.retry_count = 0;
+      savedResult.context_bytes_total = 3072;
+      savedResult.prompt_bytes_total = 720;
+      writeFileSync(savedResultPath, `${JSON.stringify(savedResult, null, 2)}\n`);
+    });
+
+    const proc = runKernel(["v", "bench", "--pack", "runtime-live-agent", "--json"], fixtureRoot);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.status).toBe("passed");
+    expect(payload.pass).toBe(true);
+    const notes = payload.notes as string[];
+    expect(notes.some((entry) => entry.startsWith("runtime-live-artifact-incomplete:"))).toBe(false);
     expect(
       notes.some((entry) => entry.startsWith("runtime-live-agent-artifact:.agents/data/benchmarks/results/")),
     ).toBe(true);
     expect(notes).toContain("runtime-live-agent-refresh:./.agents/agents benchmark run --save");
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
-    for (const result of results) {
-      expect(result.status).not.toBe("skipped");
-      const resultNotes = result.notes as string[];
-      expect(
-        resultNotes.some((entry) => entry.startsWith("live-runner-artifact:.agents/data/benchmarks/results/")),
-      ).toBe(true);
-    }
+    expect(results.every((result) => result.status === "passed")).toBe(true);
+    expect(
+      results.flatMap((result) => result.notes as string[]).some((entry) =>
+        entry.startsWith("live-runner-mapping-fallback:")),
+    ).toBe(false);
+    expect(
+      results.every((result) => {
+        const resultNotes = result.notes as string[];
+        return resultNotes.some((entry) => entry.startsWith("live-runner-artifact:.agents/data/benchmarks/results/"));
+      }),
+    ).toBe(true);
     const summary = payload.summary as Record<string, unknown>;
     expect(summary.total).toBe(3);
+    expect(summary.passed).toBe(3);
+    expect(summary.failed).toBe(0);
     expect(summary.skipped).toBe(0);
     expect(summary.baseline_missing).toBe(0);
   });

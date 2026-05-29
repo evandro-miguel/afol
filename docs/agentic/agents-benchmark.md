@@ -50,10 +50,14 @@ just benchmark-runtime-flow
   saved live benchmark artifact from:
   - `.agents/benchmarks/runtime-flow-live-agent-v4-latest.json`
   - the `saved_result_path` referenced by that snapshot
+- Each `runtime-live-agent` scenario must resolve to direct live evidence via
+  its explicit `live_runner_scenario_id`; index fallback and row reuse are
+  rejected.
 - Refresh live evidence with:
   - `./.agents/agents benchmark run --save`
-- If the saved live artifact is missing, the validation pack returns
-  `status=failed` with an actionable note that points to the refresh command.
+- If the saved live artifact is missing or only covers a partial scenario set,
+  the validation pack returns `status=failed` with an actionable note that
+  points to the refresh command.
 
 ## Contract
 
