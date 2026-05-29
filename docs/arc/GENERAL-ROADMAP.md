@@ -203,11 +203,14 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-13 Agentic Runtime Restructure
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260411_agentic-runtime-restructure_spec_01.md
 - Why: Runtime command/help surfaces, MCP parity, and tool catalog alignment
   must remain consistent while runtime code is restructured.
+- Closure note: the parent spec is final and the accepted native-port slices
+  are final: tool catalog parity, status, session catchup, knowledge pull,
+  knowledge list/search/show, and knowledge index.
 - Exit criteria: runtime source-of-truth drives command/help parity; MCP smoke
   and parity checks stay green; tool catalog/docs align with real gates and
   command surface.

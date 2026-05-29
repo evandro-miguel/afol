@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-05-29T00:38:35+00:00"
+updated_at: "2026-05-29T12:45:12+00:00"
 ---
 
 # SPECS INDEX
@@ -18,8 +18,8 @@ updated_at: "2026-05-29T00:38:35+00:00"
 |--------|-------|
 | Total | 59 |
 | Draft | 19 |
-| Active | 31 |
-| Final | 9 |
+| Active | 30 |
+| Final | 10 |
 
 ## Index
 
@@ -44,7 +44,7 @@ updated_at: "2026-05-29T00:38:35+00:00"
 | 260323_1750_current-state-map-contract_spec_01 | current-state-map-contract | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260323_1751_goal-state-canon_spec_01 |  | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260323_1752_workflow-and-bootstrap-integration_spec_01 | workflow-and-bootstrap-integration | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
-| 260411_agentic-runtime-restructure_spec_01 | agentic-runtime-restructure | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
+| 260411_agentic-runtime-restructure_spec_01 | agentic-runtime-restructure | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_plan_01.md, task: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_task_01.md, report: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_report_01.md |
 | 260412_0000_specs-folder-guide_spec_01 |  | active |  |  |
 | 260412_1110_spec-child-and-spec-test-governance_spec_01 | spec-child-and-spec-test-governance | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260412_1130_spec-child-and-spec-test-governance_spec-test_01 | spec-child-and-spec-test-governance | active | tester | roadmap: docs/arc/GENERAL-ROADMAP.md, workbench_plan: 260412_1130_spec-child-and-spec-test-governance_plan_01 |

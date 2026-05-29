@@ -2,19 +2,19 @@
 doc_type: spec
 id: 260411_agentic-runtime-restructure_spec_01
 theme: agentic-runtime-restructure
-status: active
+status: final
 owners:
 - orchestrator
 created_at: '2026-04-11T22:13:21-03:00'
-updated_at: '2026-04-11T22:14:33-03:00'
+updated_at: '2026-05-29T09:41:20-03:00'
 roadmap_feature: F-13
 spec_role: parent
 parent_spec: ''
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
-  plan: ''
-  task: ''
-  report: ''
+  plan: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_plan_01.md
+  task: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_task_01.md
+  report: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_report_01.md
 scope:
   repo_areas:
   - .agents/runtime
@@ -132,3 +132,15 @@ Out of scope:
   - Did the runtime become the source of operational behavior rather than another parallel layer?
   - Are legacy script surfaces still available or archived only after parity was proven?
   - Can an agent safely inspect, search, validate, mutate, and undo through MCP without broad filesystem guesswork?
+
+## 9) Closure
+
+- Accepted implementation evidence:
+  - `c24d386` - tool catalog parity.
+  - `3e27bac` - status native port.
+  - `b22d45f` and `e9a0f44` - knowledge pull native port.
+  - `8cd4737` - session catchup native port.
+  - `bde5500`, `e918255`, and `7c98199` - knowledge list/search/show native port.
+  - `8bd9466` - knowledge index native port.
+- Closeout session: `.agents/wb/260529_0939_f13-runtime-native-port-closeout/`
+- Status: final
