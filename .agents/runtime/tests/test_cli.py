@@ -319,6 +319,191 @@ def test_cli_registered_knowledge_pull_matches_script(scaffold_repo):
     assert result.stderr == legacy.stderr
 
 
+def test_cli_registered_knowledge_list_type_limit_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    session_id = _seed_knowledge_session(scaffold_repo)
+    session_dir = scaffold_repo / ".agents" / "wb" / session_id
+    (session_dir / f"{session_id}_postmortem_01.md").write_text(
+        "---\n"
+        "doc_type: postmortem\n"
+        f"id: {session_id}_postmortem_01\n"
+        "theme: runtime\n"
+        "status: final\n"
+        "---\n\n"
+        "# Postmortem: parity gap\n\n"
+        "Runtime list parity sample.\n",
+        encoding="utf-8",
+    )
+
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "list", "--type", "research", "--limit", "1"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(
+        app,
+        ["knowledge", "list", "--type", "research", "--limit", "1", "--repo-root", str(scaffold_repo)],
+    )
+    assert result.exit_code == legacy.returncode == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_knowledge_list_empty_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "list"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["knowledge", "list", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == legacy.returncode == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_knowledge_search_order_limit_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    session_id = _seed_knowledge_session(scaffold_repo)
+    session_dir = scaffold_repo / ".agents" / "wb" / session_id
+    (session_dir / f"{session_id}_research_02.md").write_text(
+        "---\n"
+        "doc_type: research\n"
+        f"id: {session_id}_research_02\n"
+        "theme: runtime\n"
+        "status: active\n"
+        "---\n\n"
+        "# Research: additional runtime evidence\n\n"
+        "Runtime runtime runtime repeated for ranking coverage.\n",
+        encoding="utf-8",
+    )
+
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "search", "runtime", "--limit", "1"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(
+        app,
+        ["knowledge", "search", "runtime", "--limit", "1", "--repo-root", str(scaffold_repo)],
+    )
+    assert result.exit_code == legacy.returncode == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+    assert result.stdout.count("\n[") <= 1
+
+
+def test_cli_registered_knowledge_search_no_match_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    _seed_knowledge_session(scaffold_repo)
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "search", "nonexistent-topic"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["knowledge", "search", "nonexistent-topic", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == legacy.returncode == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_knowledge_show_by_doc_id_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    session_id = _seed_knowledge_session(scaffold_repo)
+    doc_id = f"{session_id}_research_01"
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "show", doc_id],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["knowledge", "show", doc_id, "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == legacy.returncode == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_knowledge_show_by_path_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    session_id = _seed_knowledge_session(scaffold_repo)
+    relative_path = f".agents/wb/{session_id}/{session_id}_research_01.md"
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "show", relative_path],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["knowledge", "show", relative_path, "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == legacy.returncode == 0
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_knowledge_show_missing_reference_matches_script(scaffold_repo):
+    knowledge_script = _stage_knowledge_script(scaffold_repo)
+    _seed_knowledge_session(scaffold_repo)
+    legacy = subprocess.run(
+        [sys.executable, str(knowledge_script), "show", "missing-reference"],
+        cwd=scaffold_repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    result = runner.invoke(app, ["knowledge", "show", "missing-reference", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == legacy.returncode == 1
+    assert result.stdout == legacy.stdout
+    assert result.stderr == legacy.stderr
+
+
+def test_cli_registered_knowledge_list_search_show_use_native_path(scaffold_repo, monkeypatch):
+    session_id = _seed_knowledge_session(scaffold_repo)
+    doc_id = f"{session_id}_research_01"
+
+    def _unexpected_run_command(*_args, **_kwargs):
+        raise AssertionError("knowledge list/search/show should not call run_command subprocess path")
+
+    monkeypatch.setattr("agentic_scaffold.registry.run_command", _unexpected_run_command)
+
+    list_result = runner.invoke(app, ["knowledge", "list", "--repo-root", str(scaffold_repo)])
+    assert list_result.exit_code == 0
+    assert doc_id in list_result.stdout
+
+    search_result = runner.invoke(app, ["knowledge", "search", "runtime", "--repo-root", str(scaffold_repo)])
+    assert search_result.exit_code == 0
+    assert doc_id in search_result.stdout
+
+    show_result = runner.invoke(app, ["knowledge", "show", doc_id, "--repo-root", str(scaffold_repo)])
+    assert show_result.exit_code == 0
+    assert f"id: {doc_id}" in show_result.stdout
+
+
+def test_cli_registered_knowledge_index_stays_delegated_subprocess(scaffold_repo, monkeypatch):
+    _stage_knowledge_script(scaffold_repo)
+    calls: list[list[str]] = []
+
+    def _capture_run_command(cmd, **_kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="delegated-index\n", stderr="")
+
+    monkeypatch.setattr("agentic_scaffold.registry.run_command", _capture_run_command)
+    result = runner.invoke(app, ["knowledge", "index", "--repo-root", str(scaffold_repo)])
+    assert result.exit_code == 0
+    assert result.stdout == "delegated-index\n"
+    assert len(calls) == 1
+    assert Path(calls[0][1]).name == "agents-knowledge.py"
+    assert calls[0][2:] == ["index"]
+
+
 def test_cli_registered_knowledge_pull_no_match_matches_script(scaffold_repo):
     knowledge_script = _stage_knowledge_script(scaffold_repo)
     _seed_knowledge_session(scaffold_repo)

@@ -215,6 +215,43 @@ class KnowledgeSearchService:
                 break
         return snippets
 
+    def list_knowledge_docs(self, doc_type: str | None = None, limit: int = 30) -> list[KnowledgeDoc]:
+        docs = [doc for doc in self._iter_knowledge_docs() or () if not doc_type or doc.doc_type == doc_type]
+        return docs[:limit]
+
+    def search_knowledge_docs(self, query: str, limit: int = 10) -> list[tuple[int, KnowledgeDoc]]:
+        normalized_query = query.lower()
+        hits: list[tuple[int, KnowledgeDoc]] = []
+        for doc in self._iter_knowledge_docs() or ():
+            haystack = " ".join(
+                [
+                    doc.doc_id,
+                    doc.doc_type,
+                    doc.theme,
+                    doc.title,
+                    doc.summary,
+                    doc.path.relative_to(self.repo_root).as_posix(),
+                ]
+            ).lower()
+            score = haystack.count(normalized_query)
+            if score > 0:
+                hits.append((score, doc))
+        hits.sort(key=lambda item: (-item[0], item[1].doc_id))
+        return hits[:limit]
+
+    def resolve_knowledge_doc(self, reference: str) -> KnowledgeDoc | None:
+        candidate = Path(reference)
+        if candidate.exists():
+            resolved = candidate.resolve()
+            for doc in self._iter_knowledge_docs() or ():
+                if doc.path.resolve() == resolved:
+                    return doc
+        for doc in self._iter_knowledge_docs() or ():
+            relative_path = doc.path.relative_to(self.repo_root).as_posix()
+            if doc.doc_id == reference or relative_path == reference:
+                return doc
+        return None
+
     def pull(self, query: str, limit: int = 5, snippets: int = 2) -> list[KnowledgePullHit]:
         normalized_query = query.lower()
         hits: list[KnowledgePullHit] = []
