@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-05-29T12:45:12+00:00"
+updated_at: "2026-05-29T14:10:02+00:00"
 ---
 
 # SPECS INDEX
@@ -17,9 +17,9 @@ updated_at: "2026-05-29T12:45:12+00:00"
 | Metric | Count |
 |--------|-------|
 | Total | 59 |
-| Draft | 19 |
+| Draft | 18 |
 | Active | 30 |
-| Final | 10 |
+| Final | 11 |
 
 ## Index
 
@@ -76,7 +76,7 @@ updated_at: "2026-05-29T12:45:12+00:00"
 | 260521_0100_runtime-adapters-and-mcp_spec_01 | runtime-adapters-and-mcp | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0140_runtime-adapters-and-mcp-parity_spec-test_01 | runtime-adapters-and-mcp-parity | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
 | 260521_0145_validation-ci-benchmark-matrix_spec-test_01 | validation-ci-benchmark-matrix | draft | tester | roadmap: docs/arc/GENERAL-ROADMAP.md |
-| 260521_0110_validation-ci-and-benchmarks_spec_01 | validation-ci-and-benchmarks | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
+| 260521_0110_validation-ci-and-benchmarks_spec_01 | validation-ci-and-benchmarks | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260521_0120_public-distribution-and-onboarding_spec_01 | public-distribution-and-onboarding | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md |
 | 260528_1723_map-boundary-cleanup_spec-child_01 | map-boundary-cleanup | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_plan_01.md, task: .agents/wb/260528_1723_map-boundary-cleanup/260528_1723_map-boundary-cleanup_task_01.md |
 | 260528_1745_runtime-registry-parity_spec-child_01 | runtime-registry-parity | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md, plan: .agents/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_plan_01.md, task: .agents/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_task_01.md |

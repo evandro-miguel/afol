@@ -4,7 +4,7 @@ description: "Version-to-version summary of repository-map changes, focusing on 
 doc_kind: "changelog"
 version: "v2026-05-28_1"
 created_at: "2026-05-28T09:48:25Z"
-updated_at: "2026-05-29T12:41:20Z"
+updated_at: "2026-05-29T14:08:02Z"
 ---
 
 # Changelog
@@ -93,3 +93,27 @@ updated_at: "2026-05-29T12:41:20Z"
   - `6fc611a095cca821c9276aad5b29ecc1fbd3ea96`
 - Index state: `docs/arc/SPECS/INDEX.md` now marks the parent spec as `final`.
 - Status: `satisfied` for the docs/catalog lifecycle closeout; residual risk is limited to descriptive metadata, not runtime behavior.
+
+## F-11 Validation, CI, and Benchmarks Closeout
+
+- Feature: `F-11 Validation, CI, and Benchmarks`
+- Accepted session-backed artifacts:
+  - `.agents/wb/260528_1409_f11-validation-benchmark-contract`
+  - `.agents/wb/260529_0958_f11-ci-selector-matrix-pack-map`
+  - `.agents/wb/260529_1018_f11-real-typecheck-gate`
+  - `.agents/wb/260529_1030_f11-routing-accuracy-pack-wave`
+  - `.agents/wb/260529_1043_f11-update-safety-pack-wave`
+  - `.agents/wb/260529_1054_f11-mutation-safety-pack-wave`
+- Accepted implementation evidence:
+  - `3a6456e`
+  - `afe8a79`
+  - `a1fa3e1`
+  - `7760358`
+  - `681c6d0`
+  - `8dd5e20`
+- Matrix state: 8 packs with scenarios and baselines now define the current
+  benchmark surface under `.agents/data/benchmarks/`.
+- Index state: `docs/arc/SPECS/INDEX.md` now marks
+  `260521_0110_validation-ci-and-benchmarks_spec_01` as `final`.
+- Status: `satisfied` for the docs/current-state layer; residual risk is
+  limited to future derived-index drift, not the current refresh.

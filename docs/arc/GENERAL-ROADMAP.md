@@ -183,11 +183,17 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-11 Validation, CI, and Benchmarks
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0110_validation-ci-and-benchmarks_spec_01.md
 - Why: The system needs trust gates before work is marked complete or releases
   are published.
+- Closure note: the accepted F-11 closeout is complete. Accepted evidence is
+  the session-backed contract layer
+  `.agents/wb/260528_1409_f11-validation-benchmark-contract`, selector/matrix
+  pack-map commits `3a6456e` and `afe8a79`, real typecheck gate `a1fa3e1`,
+  routing-accuracy `7760358`, update-safety `681c6d0`, and mutation-safety
+  `8dd5e20`.
 - Exit criteria: type checks; unit tests; schema tests; command parity tests;
   template export tests; workbench validation; MCP parity tests; benchmark
   packs for accuracy, speed, safety, quality, and token cost on risky changes.

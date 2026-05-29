@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260521_0110_validation-ci-and-benchmarks_spec_01
 theme: validation-ci-and-benchmarks
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T01:50:00+08:00'
-updated_at: '2026-05-21T01:50:00+08:00'
+updated_at: '2026-05-29T11:08:02-03:00'
 roadmap_feature: F-11
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -357,3 +357,30 @@ Selective CI maps paths to packs:
 - Benchmark results capture tokens, bytes, baseline id, and runtime profile.
 - Risky runtime changes have a clear benchmark trigger.
 - CI catches schema, command, and template drift before release.
+
+## 13) Closeout
+
+- Status: final.
+- Accepted session-backed artifacts:
+  - `.agents/wb/260528_1409_f11-validation-benchmark-contract`
+  - `.agents/wb/260529_0958_f11-ci-selector-matrix-pack-map`
+  - `.agents/wb/260529_1018_f11-real-typecheck-gate`
+  - `.agents/wb/260529_1030_f11-routing-accuracy-pack-wave`
+  - `.agents/wb/260529_1043_f11-update-safety-pack-wave`
+  - `.agents/wb/260529_1054_f11-mutation-safety-pack-wave`
+- Accepted implementation evidence:
+  - `3a6456e`
+  - `afe8a79`
+  - `a1fa3e1`
+  - `7760358`
+  - `681c6d0`
+  - `8dd5e20`
+- Current benchmark matrix:
+  - `cli-kernel-local`
+  - `workbench-parity`
+  - `routing-accuracy`
+  - `mutation-safety`
+  - `update-safety`
+  - `mcp-parity`
+  - `runtime-live-agent`
+  - `token-economy`

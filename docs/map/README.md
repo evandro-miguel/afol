@@ -60,6 +60,11 @@ This folder is the distilled current-state evidence surface for the repository.
 
 ## Lifecycle Snapshot
 
+- F-11 validation, CI, and benchmarks is now in closeout: the current-state
+  benchmark matrix has 8 packs, the parent spec is final in
+  `docs/arc/SPECS/INDEX.md`, and the accepted waves are the contract layer,
+  selector/matrix pack-map, real typecheck gate, routing-accuracy,
+  update-safety, and mutation-safety.
 - F-13 tool catalog parity keeps the runtime registry, docs, and command
   surface aligned.
 - F-13 `status` command family now runs natively in runtime (`agentic status`)
@@ -94,6 +99,9 @@ This folder is the distilled current-state evidence surface for the repository.
 - Stack signals: `none detected`
 - Runtime versions: `not declared`
 - Stack versions: `not declared`
+- Benchmark matrix: 8 packs in `.agents/data/benchmarks/registry.json` with
+  scenarios and baselines under `.agents/data/benchmarks/scenarios/` and
+  `.agents/data/benchmarks/baselines/`.
 - Dependency graph source: `dependency-cruiser`
 - Modules analyzed: `7`
 - Internal dependency edges: `1`
