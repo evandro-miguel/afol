@@ -32,6 +32,11 @@ Define a command design system optimized for agents.
 The goal is to reduce repeated command tokens and manual file edits while
 keeping every operation auditable by humans.
 
+The intended simple operator surface includes `afol status`, `afol check`, and
+`afol bootstrap <repo> --partial`. The workbench shortcuts `afol start`,
+`afol done --test "..."`, and `afol close` route to existing governed command
+paths and remain part of the simple operator surface.
+
 ## 2) Problem
 
 Long commands are expensive when agents execute them repeatedly. Manual file
@@ -42,28 +47,29 @@ The command grammar must be short, stable, and testable.
 ## 3) Grammar Contract
 
 ```text
-./a <domain> <action> [target] [flags]
+afol <domain> <action> [target] [flags]
 ```
 
 Examples:
 
 ```bash
-./a s
-./a n auth-refactor -F F-02 -S auth-spec
-./a t s T-01
-./a t d T-01 -e E-01
-./a e a -t T-01 -c "bun test" -r pass
-./a l a -t T-01 -m "Added validation"
-./a r g frontend
-./a sk u
-./a q s -t T-02 -f research.md -m "Summary"
-./a v
-./a c
-./a up ck
+afol status
+afol new auth-refactor -F F-02 -S auth-spec
+afol task start T-01
+afol task done T-01 -e E-01
+afol evidence add -t T-01 -c "bun test" -r pass
+afol log add -t T-01 -m "Added validation"
+afol rule get frontend
+afol skill update
+afol query search -t T-02 -f research.md -m "Summary"
+afol verify
+afol close
+afol update check
 ```
 
 Short aliases are canonical for agents. Long aliases are canonical for humans
-and docs.
+and docs. `afol` is the canonical front door; `./a` remains a compatibility
+alias during migration.
 
 ## 4) Locked Domain Aliases
 
@@ -143,12 +149,12 @@ JSON output uses the same typed result envelope.
 Error output must include the next useful command when possible.
 
 ```text
-err missing-evidence task=T-01 hint="run ./a e a -t T-01 -c <cmd> -r pass"
+err missing-evidence task=T-01 hint="run afol evidence add -t T-01 -c <cmd> -r pass"
 ```
 
 ## 8) Help Rules
 
-- `./a -h` must fit in 25 lines or fewer.
+- `afol -h` must fit in 25 lines or fewer.
 - Help must show short and long aliases.
 - Full docs are not printed by default.
 - Unknown commands must return a focused hint, not a long manual.
@@ -163,9 +169,9 @@ err missing-evidence task=T-01 hint="run ./a e a -t T-01 -c <cmd> -r pass"
 
 ## 10) Acceptance
 
-- `./a s` and `./a status` have semantic parity.
-- `./a -j s` emits valid JSON.
-- `./a -h` remains compact.
+- `afol status` and `afol s` have semantic parity.
+- `afol -j status` emits valid JSON.
+- `afol -h` remains compact.
 - Unknown commands fail with an actionable hint.
 - The alias table is snapshot-tested.
 - Agents can perform routine workbench updates without opening raw files.

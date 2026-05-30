@@ -27,6 +27,7 @@ MANDATORY_FILES_TO_COPY = [
     Path("CLAUDE.md"),
     Path("RTK.md"),
     Path("Justfile"),
+    Path("afol"),
     Path("a"),
     Path(".agents/agents"),
     Path(".agents/agents-mcp"),
@@ -180,6 +181,7 @@ BOOTSTRAP_RECONCILE_SCOPE: Sequence[Path] = (
     Path("CLAUDE.md"),
     Path("RTK.md"),
     Path("Justfile"),
+    Path("afol"),
     Path("a"),
     Path(".agents"),
 )

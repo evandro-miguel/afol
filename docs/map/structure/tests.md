@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-05-30T20:23:31+00:00
+**Generated:** 2026-05-30T21:10:09+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 166 files, 37,278 lines, 1790.6 KB
+**Stats:** 166 files, 37,385 lines, 1796.4 KB
 
 ### Files
 
@@ -21,7 +21,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_verify_tasks_strict.py` | 1,330 | 52.6 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_verify_tasks_strict.py` | 1,213 | 47.1 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_cli_utility_coverage.py` | 1,188 | 58.6 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_runtime_compatibility.py` | 861 | 46.8 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_runtime_compatibility.py` | 862 | 46.8 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_runtime_compatibility.py` | 853 | 46.1 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_scenarios.py` | 781 | 40.1 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_execution_command_scenarios.py` | 775 | 39.7 KB | Test file; unit tests |
@@ -39,7 +39,7 @@ Unit tests, integration tests, and E2E tests.
 | `src/project-template/.agents/scripts/tests/test_execution_command_flow.py` | 441 | 22.8 KB | Test file; unit tests |
 | `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md` | 422 | 23.3 KB | Module; functionality |
 | `src/project-template/.agents/scripts/tests/test_agents_bootstrap.py` | 390 | 22.6 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_agents_bootstrap.py` | 371 | 21.4 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_bootstrap.py` | 372 | 21.5 KB | Test file; unit tests |
 | `.agents/scripts/tests/integration/test_critical_workflows.py` | 362 | 16.4 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/integration/test_critical_workflows.py` | 360 | 16.3 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_benchmark.py` | 343 | 14.2 KB | Test file; unit tests |
@@ -67,7 +67,9 @@ Unit tests, integration tests, and E2E tests.
 | `src/project-template/.agents/scripts/tests/test_agents_review.py` | 218 | 12.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260323_1752_workflow-and-bootstrap-integration_spec_01.md` | 211 | 12.2 KB | Module; functionality |
 | `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md` | 211 | 12.0 KB | Module; functionality |
+| `.agents/scripts/tests/test_front_door_a.py` | 208 | 9.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md` | 191 | 8.7 KB | Module; functionality |
+| `cli/tests/kernel.test.ts` | 190 | 8.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_local_state.py` | 189 | 10.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/unit/test_version.py` | 189 | 9.3 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_local_state.py` | 189 | 10.2 KB | Test file; unit tests |
@@ -77,20 +79,18 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_telemetry.py` | 171 | 8.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_primary-agent-runtime-compatibility_spec_01.md` | 171 | 8.4 KB | Module; functionality |
 | `docs/arc/SPECS/F-11/spec-tests/260521_0145_validation-ci-benchmark-matrix_spec-test_01.md` | 170 | 6.4 KB | Test file; unit tests |
-| `cli/tests/kernel.test.ts` | 169 | 7.1 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_knowledge.py` | 163 | 7.5 KB | Test file; unit tests |
 | `.agents/runtime/tests/test_mcp.py` | 162 | 7.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md` | 161 | 7.4 KB | Module; functionality |
+| `docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md` | 159 | 6.2 KB | Module; functionality |
 | `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md` | 154 | 7.2 KB | Test file; unit tests |
-| `docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md` | 153 | 5.8 KB | Module; functionality |
+| `docs/arc/SPECS/260521_0030_agent-command-design-system_spec_01.md` | 151 | 4.6 KB | Module; functionality |
 | `docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md` | 149 | 7.0 KB | Module; functionality |
-| `docs/arc/SPECS/260521_0030_agent-command-design-system_spec_01.md` | 146 | 4.2 KB | Module; functionality |
 | `.agents/runtime/tests/conftest.py` | 144 | 4.4 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_telemetry.py` | 144 | 7.5 KB | Test file; unit tests |
 | `docs/arc/SPECS/260521_0100_runtime-adapters-and-mcp_spec_01.md` | 143 | 5.1 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_doctor_fix.py` | 140 | 7.6 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_doctor_fix.py` | 140 | 7.6 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_front_door_a.py` | 136 | 6.1 KB | Test file; unit tests |
 | `src/project-template/.agents/runtime/tests/test_changes.py` | 136 | 6.3 KB | Test file; unit tests |
 | `docs/arc/SPECS/260521_0020_minimal-project-template_spec_01.md` | 133 | 4.3 KB | Module; functionality |
 | `docs/arc/SPECS/260509_1453_plan-task-execution-integrity-state-model_spec-child_01.md` | 128 | 8.5 KB | Module; functionality |
@@ -159,7 +159,7 @@ Unit tests, integration tests, and E2E tests.
 | `src/project-template/.agents/scripts/tests/test_front_door_a.py` | 54 | 2.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260521_0070_local-state-index-and-event-log_spec_01.md` | 54 | 2.2 KB | Module; functionality |
 | `docs/arc/SPECS/260528_1946_bootstrap-template-justfile-wiring_spec-child_01.md` | 53 | 2.4 KB | Module; functionality |
-| `docs/arc/SPECS/F-03/spec-tests/260521_0135_agent-command-design-system_spec-test_01.md` | 51 | 1.8 KB | Test file; unit tests |
+| `docs/arc/SPECS/F-03/spec-tests/260521_0135_agent-command-design-system_spec-test_01.md` | 52 | 1.9 KB | Test file; unit tests |
 | `docs/arc/SPECS/F-02/spec-tests/260521_0132_minimal-project-template-export_spec-test_01.md` | 48 | 1.8 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_session-pack-structure-and-postmortem_spec_01.md` | 47 | 2.1 KB | Module; functionality |
 | `docs/arc/SPECS/260423_2120_runtime-flow-benchmark-scenarios_spec-child_01.md` | 47 | 1.8 KB | Module; functionality |

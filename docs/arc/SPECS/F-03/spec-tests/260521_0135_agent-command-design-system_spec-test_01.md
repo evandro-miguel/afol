@@ -33,19 +33,20 @@ human-auditable.
 3. CLI returns compact output by default.
 4. CLI returns JSON with `-j`.
 5. Errors suggest a next command.
+6. `./a` remains available as a compatibility alias during migration.
 
 ## 3) Required Test Cases
 
 | Case | Input | Expected result |
 | --- | --- | --- |
 | `TC-01` | alias table snapshot | no ambiguous aliases |
-| `TC-02` | `./a s` vs `./a status` | semantic parity |
-| `TC-03` | `./a t s T-01` | canonical task-start route |
-| `TC-04` | `./a e a -t T-01` | canonical evidence-add route |
-| `TC-05` | `./a up ck` | canonical update-check route |
-| `TC-06` | `./a -j s` | JSON envelope matches compact fields |
+| `TC-02` | `afol s` vs `afol status` | semantic parity |
+| `TC-03` | `afol t s T-01` | canonical task-start route |
+| `TC-04` | `afol e a -t T-01` | canonical evidence-add route |
+| `TC-05` | `afol up ck` | canonical update-check route |
+| `TC-06` | `afol -j s` | JSON envelope matches compact fields |
 | `TC-07` | unknown alias | actionable hint, no long manual |
-| `TC-08` | `./a -h` | <= 25 lines with short and long aliases |
+| `TC-08` | `afol -h` | <= 25 lines with short and long aliases |
 
 ## 4) Metrics
 

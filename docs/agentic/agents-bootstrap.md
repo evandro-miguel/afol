@@ -65,9 +65,10 @@ Public distribution entrypoint:
 
 Front-door checks available in all adopted repos:
 
-- `./a` delegates to this wrapper for status and workflow commands.
-- `./a s` (or `./a status`) reports status.
-- `./a v` reports version metadata when supported by the wrapper in that repo.
+- `afol` delegates to this wrapper for status and workflow commands.
+- `afol s` (or `afol status`) reports status.
+- `afol check` reports validation/runtime metadata when supported by the wrapper in that repo.
+- `./a` remains available as a compatibility alias during migration.
 - Validate the onboarding result with `just --list` and
   `just --justfile Justfile agents_scaffold::doctor` (or root `just doctor` equivalent).
 

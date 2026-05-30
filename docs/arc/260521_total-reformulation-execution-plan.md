@@ -34,7 +34,9 @@ The main conflicts are:
 
 - The current stack is Python 3.11, Bash, uv, Just, and Markdown, while the new
   target is Bun/TypeScript-first.
-- The public front door is `.agents/agents` plus Just aliases, not `./a`.
+- The public low-level dispatcher is `.agents/agents` plus Just aliases; the
+  canonical product command should be `afol`, with `./a` kept as a
+  compatibility alias during migration.
 - `src/project-template` still carries runtime implementation, scripts, broad
   docs, skills source seed, and generated or operational baggage.
 - Existing specs favor compatibility-first runtime migration, which is correct
@@ -46,9 +48,10 @@ Do not perform a Big Bang rewrite.
 
 The correct path is staged parity:
 
-1. Add `./a` as the new command front door.
-2. Make `./a` delegate to existing `.agents/agents` behavior where TypeScript
-   parity does not exist yet.
+1. Add `afol` as the new command front door.
+2. Keep `./a` as a compatibility alias and make both entrypoints delegate to
+   existing `.agents/agents` behavior where TypeScript parity does not exist
+   yet.
 3. Build the Bun/TypeScript CLI kernel behind that wrapper.
 4. Move one high-frequency command family at a time.
 5. Shrink the downstream template only after bootstrap/export tests protect
@@ -100,10 +103,11 @@ Coverage and benchmark lock (applies to the program):
   incluindo outputs JSON de resultado em diretório de artefatos, e aderência à
   matriz do F-11 antes do `T-27`.
 
-### Slice 2: `./a` Compatibility Front Door
+### Slice 2: `afol` Canonical Front Door, `./a` Compatibility Alias
 
 Files likely involved:
 
+- `afol`
 - `./a`
 - `src/project-template/a`
 - `.agents/agents`
@@ -112,16 +116,18 @@ Files likely involved:
 
 Behavior:
 
-- `./a -h` prints compact help.
-- `./a s` maps to compact status.
-- `./a status` is a long alias.
+- `afol -h` prints compact help.
+- `afol status` maps to compact status.
+- `afol s` is the short status alias.
 - Unsupported commands delegate or produce actionable errors.
+- `./a` remains a compatibility alias during migration.
 
 Validation:
 
-- `./a -h`
-- `./a s`
-- `./a status`
+- `afol -h`
+- `afol status`
+- `afol s`
+- `afol -j status`
 - focused wrapper tests
 - legacy `.agents/agents` smoke checks
 
@@ -174,10 +180,10 @@ Behavior:
 Validation:
 
 - alias table snapshot
-- `./a -h`
-- `./a s`
-- `./a status`
-- `./a -j s`
+- `afol -h`
+- `afol s`
+- `afol status`
+- `afol -j status`
 
 ### Slice 3D: Compatibility Delegation
 
@@ -250,7 +256,7 @@ contract can protect parity.
 - `T-02` F-01: implement root detection and state loading.
   Verification: valid root, invalid root, missing config, missing lock.
 - `T-03` F-03: implement short router, aliases, compact output, and JSON.
-  Verification: alias snapshots, `./a -h`, `./a s`, `./a -j s`.
+  Verification: alias snapshots, `afol -h`, `afol s`, `afol -j status`.
 - `T-04` F-01/F-03: implement legacy delegation adapter.
   Verification: stdout, stderr, exit-code, and semantic parity fixtures.
 - `T-05` F-02: lock minimal template export contract.
@@ -321,11 +327,12 @@ contract can protect parity.
 ### Validation, Benchmarks, And Public Readiness
 
 - `T-26` F-11: implement validation command family.
-  Verification: `./a v`, `./a v wb`, `./a v tpl`, `./a v update`.
+  Verification: `afol verify`, `afol verify wb`, `afol verify tpl`,
+  `afol verify update`.
 - `T-27` F-11: implement deterministic benchmark runner and baselines.
   Verification: p50, p95, tokenizer fields, baseline comparison.
 - `T-28` F-12: implement public init and onboarding path.
-  Verification: new fixture can install, run `./a s`, add evidence, close.
+  Verification: new fixture can install, run `afol status`, add evidence, close.
 - `T-29` F-12: prepare public docs and examples.
   Verification: README, 10 commands, examples, no private assumptions.
 
@@ -345,7 +352,8 @@ contract can protect parity.
 
 Start with Slice 2 only after strategic docs and spec-tests are reviewed:
 
-1. implement `./a` as a thin compatibility front door,
-2. add local/template wrappers,
-3. add compact help/status alias mapping,
-4. validate against existing `.agents/agents` behavior.
+1. implement `afol` as the thin compatibility front door,
+2. keep `./a` as a compatibility alias,
+3. add local/template wrappers,
+4. add compact help/status alias mapping,
+5. validate against existing `.agents/agents` behavior.

@@ -30,8 +30,8 @@ semantic drift.
 
 ## 2) Covered Journey
 
-1. Agent runs `./a -h` in a valid project.
-2. Agent runs `./a s`, `./a status`, and `./a -j s`.
+1. Agent runs `afol -h` in a valid project.
+2. Agent runs `afol s`, `afol status`, and `afol -j status`.
 3. CLI loads `.agents/config.json` and `.agents/lock.json`.
 4. Unsupported or not-yet-migrated commands delegate to `.agents/agents`.
 5. Invalid roots or missing state fail before mutation.
@@ -40,10 +40,10 @@ semantic drift.
 
 | Case | Input | Expected result |
 | --- | --- | --- |
-| `TC-01` | `./a -h` | compact help, <= 25 lines |
-| `TC-02` | `./a s` | compact status, exit 0 |
-| `TC-03` | `./a status` | semantic parity with `./a s` |
-| `TC-04` | `./a -j s` | valid JSON result envelope |
+| `TC-01` | `afol -h` | compact help, <= 25 lines |
+| `TC-02` | `afol s` | compact status, exit 0 |
+| `TC-03` | `afol status` | semantic parity with `afol s` |
+| `TC-04` | `afol -j status` | valid JSON result envelope |
 | `TC-05` | outside project | exit 2 and actionable invalid-root hint |
 | `TC-06` | missing config | exit 2 before mutation |
 | `TC-07` | missing lock | exit 2 before mutation |

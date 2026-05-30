@@ -2,6 +2,9 @@
   "name": "agentic-start-folder-ts-kernel",
   "private": true,
   "version": "0.0.0",
+  "bin": {
+    "afol": "./afol"
+  },
   "scripts": {
     "typecheck": "bunx tsc --noEmit -p tsconfig.json",
     "test": "bun test",

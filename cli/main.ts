@@ -17,6 +17,9 @@ const KERNEL_ALIAS_CONTRACT = Object.freeze({
   topLevel: Object.freeze<ReadonlyArray<AliasEntry>>([
     { short: "s", long: "status", route: "status" },
     { short: "v", long: "validate", route: "validate" },
+    { long: "check", route: "validate" },
+    { long: "start", route: "delegate" },
+    { long: "done", route: "delegate" },
     { short: "n", long: "new", route: "delegate" },
     { short: "t", long: "task", route: "delegate" },
     { short: "l", long: "log", route: "delegate" },
@@ -62,31 +65,30 @@ const KERNEL_ALIAS_CONTRACT = Object.freeze({
 });
 
 const HELP_LINES = [
-  "Usage: a [command] [options]",
+  "Usage: afol [command] [options]",
   "",
   "Commands",
   "  s, status              Show status",
-  "  v, validate            Validation contract and benchmark selector",
-  "  n, new                 Create workstream/session",
-  "  task                   Work on session tasks",
-  "  session                Work with session lifecycle",
-  "  verify-tasks           Verify task completion",
-  "  runtime/tools          Runtime and tool helpers",
-  "  inspect-target/adoption-plan  Manage scaffold adoption",
+  "  check                  Run validation checks",
+  "  start                  Start the next or selected workbench task",
+  "  done                   Complete a task with --test evidence",
+  "  close                  Close the active workbench session",
+  "  bootstrap              Install scaffold into another repo",
+  "  validate               Validation contract and benchmark selector",
   "",
   "Flags",
   "  -j, --json             JSON output for status",
   "  -h, --help             Show this compact help",
   "",
   "Aliases",
-  "  s/status v/validate n/new t/task",
-  "  e/evidence r/rule q/query sk/skill",
-  "  c/close u/undo up/update b/bootstrap ix/index ev/event",
+  "  s/status v/validate n/new t/task c/close",
+  "  e/evidence r/rule q/query sk/skill b/bootstrap a=afol",
   "",
   "Examples",
-  "  a s",
-  "  a -j s",
-  "  a v --json",
+  "  afol status",
+  "  afol check",
+  "  afol start --session <id> --task-id T-01",
+  "  afol done --session <id> --task-id T-01 --test \"just lint\"",
 ].join("\n");
 
 const JSON_ALIASES: ReadonlySet<string> = new Set(KERNEL_ALIAS_CONTRACT.flags.json);
@@ -131,7 +133,8 @@ function isStatusAlias(value: string): boolean {
 }
 
 function isValidateAlias(value: string): boolean {
-  return canonicalizeTopLevelAlias(value) === "validate";
+  const canonical = canonicalizeTopLevelAlias(value);
+  return canonical === "validate" || canonical === "check";
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -232,6 +235,47 @@ function normalizeArguments(values: string[]): string[] {
   return [canonicalizeTopLevelAlias(first), ...values.slice(1)];
 }
 
+function normalizeDoneInvocation(rest: string[]): string[] {
+  const normalized = ["implement", "complete"];
+  let hasResult = false;
+
+  for (let index = 0; index < rest.length; index += 1) {
+    const value = rest[index];
+    if (value === "--test") {
+      normalized.push("--command");
+      if (index + 1 < rest.length) {
+        index += 1;
+        normalized.push(rest[index]);
+      }
+      continue;
+    }
+    if (value === "--result") {
+      hasResult = true;
+    }
+    normalized.push(value);
+  }
+
+  if (!hasResult) {
+    normalized.push("--result", "passed");
+  }
+
+  return normalized;
+}
+
+function normalizeDelegatedInvocation(values: string[]): string[] {
+  const [topLevel, ...rest] = values;
+  if (topLevel === "start") {
+    return ["implement", "start", ...rest];
+  }
+  if (topLevel === "done") {
+    return normalizeDoneInvocation(rest);
+  }
+  if (topLevel === "close") {
+    return ["session", "close", ...rest];
+  }
+  return values;
+}
+
 function suggestionFor(command: string): string | null {
   const normalizedInput = command.toLowerCase();
   for (const candidate of KNOWN_CANONICAL_COMMANDS) {
@@ -252,9 +296,9 @@ function suggestionFor(command: string): string | null {
 function formatUnknownCommandHint(command: string): string {
   const suggestion = suggestionFor(command);
   if (suggestion) {
-    return `err unknown-command command=${command} hint=\"run a -h\" did_you_mean=${suggestion}`;
+    return `err unknown-command command=${command} hint=\"run afol -h\" did_you_mean=${suggestion}`;
   }
-  return `err unknown-command command=${command} hint=\"run a -h\"`;
+  return `err unknown-command command=${command} hint=\"run afol -h\"`;
 }
 
 type CommandResolution =
@@ -288,13 +332,13 @@ function resolveCommand(args: string[]): CommandResolution {
   }
 
   if (DELEGATED_COMMANDS.has(topLevel)) {
-    return { kind: "delegate", args: normalized };
+    return { kind: "delegate", args: normalizeDelegatedInvocation(normalized) };
   }
 
   if (topLevel.startsWith("-")) {
     return {
       kind: "unknown",
-      message: `err unknown-flag flag=${topLevel} hint=\"run a -h\"`,
+      message: `err unknown-flag flag=${topLevel} hint=\"run afol -h\"`,
       exitCode: 2,
     };
   }

@@ -54,6 +54,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("AGENTS.md", mandatory_files)
         self.assertIn("CLAUDE.md", mandatory_files)
         self.assertIn("Justfile", mandatory_files)
+        self.assertIn("afol", mandatory_files)
         self.assertIn("a", mandatory_files)
         self.assertIn(".agents/config.json", mandatory_files)
         self.assertIn(".agents/agents.config", mandatory_files)
@@ -83,9 +84,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         self.assertIn("./.agents/agents bootstrap /path/to/target-repo", docs["README"])
         self.assertIn("./.agents/agents bootstrap /path/to/existing-project --partial", docs["README"])
-        self.assertIn("- `./a`", docs["README"])
-        self.assertIn("./a s", docs["README"])
-        self.assertIn("./a v", docs["README"])
+        self.assertIn("- `afol`", docs["README"])
+        self.assertIn("afol s", docs["README"])
+        self.assertIn("afol check", docs["README"])
         self.assertIn("just --justfile Justfile agents_scaffold::doctor", docs["README"])
 
         for doc in docs.values():
@@ -98,10 +99,10 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("## Public onboarding requirements", docs["standards"])
         self.assertIn("## Public onboarding and examples", docs["agentic"])
 
-        self.assertIn("- `./a`", docs["standards"])
-        self.assertIn("- `./a`", docs["agentic"])
-        self.assertIn("./a status", docs["standards"] + docs["agentic"])
-        self.assertIn("./a status", docs["README"])
+        self.assertIn("- `afol`", docs["standards"])
+        self.assertIn("- `afol`", docs["agentic"])
+        self.assertIn("afol status", docs["standards"] + docs["agentic"])
+        self.assertIn("afol status", docs["README"])
 
     def test_public_onboarding_docs_avoid_private_paths(self):
         files = [

@@ -18,6 +18,8 @@ Define how to install the `.agents` scaffold into another repository, including:
 - the skills baseline that should be prepared for future universal-skills contract evolution
 - the preferred project-local skill model, where each repo carries its own `.agents/skills` subset instead of depending on many global Codex skills
 - the export source boundary, where the reusable baseline lives under `src/project-template/` in this repo instead of the live development root
+- the canonical operator front door `afol`, with `./a` kept as a
+  compatibility alias during migration
 
 ## Public onboarding requirements
 
@@ -29,9 +31,10 @@ Define how to install the `.agents` scaffold into another repository, including:
   - `full`: target is empty or new.
   - `partial`: target already has live content and you want scaffold adoption only.
 - Validation minimum:
-  - `./a` confirms the front-door wrapper is present.
-  - `./a status` (or `./a s`) confirms onboarding command visibility.
-  - `./a v` confirms wrapper/runtime toolchain version surface.
+  - `afol` confirms the front-door wrapper is present.
+  - `afol status` (or `afol s`) confirms onboarding command visibility.
+  - `afol check` confirms wrapper/runtime toolchain version surface.
+  - `afol bootstrap /path/to/existing-project --partial` confirms the partial install path.
   - `just --list`
   - `just --justfile Justfile agents_scaffold::doctor`
 

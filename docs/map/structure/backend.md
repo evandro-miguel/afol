@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-05-30T20:23:31+00:00
+**Generated:** 2026-05-30T21:10:09+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,7 +9,7 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 114 files, 43,032 lines, 1791.6 KB
+**Stats:** 114 files, 43,073 lines, 1792.8 KB
 
 ### Files
 
@@ -19,7 +19,7 @@ Services, utilities, and business logic.
 | `src/project-template/.agents/scripts/agents-benchmark.py` | 1,776 | 85.6 KB | Module; functionality |
 | `.agents/scripts/agents-skills-sync.py` | 1,733 | 74.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-skills-sync.py` | 1,733 | 74.2 KB | Module; functionality |
-| `.agents/scripts/agents-bootstrap.py` | 1,513 | 61.6 KB | Module; functionality |
+| `.agents/scripts/agents-bootstrap.py` | 1,515 | 61.7 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-bootstrap.py` | 1,513 | 61.6 KB | Module; functionality |
 | `src/project-template/.agents/scripts/verify-tasks.py` | 1,363 | 54.6 KB | Module; functionality |
 | `.agents/scripts/verify-tasks.py` | 1,334 | 53.2 KB | Module; functionality |
@@ -47,10 +47,10 @@ Services, utilities, and business logic.
 | `.agents/scripts/agents-lint-docs.py` | 443 | 16.8 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-lint-docs.py` | 443 | 16.8 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-structure-map.py` | 434 | 17.0 KB | Module; functionality |
+| `cli/main.ts` | 386 | 13.0 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-repo-map.py` | 361 | 16.3 KB | Module; functionality |
 | `.agents/scripts/agents-repo-map.py` | 359 | 16.2 KB | Module; functionality |
 | `.agents/runtime/src/agentic_scaffold/services/search.py` | 355 | 14.2 KB | Module; functionality |
-| `cli/main.ts` | 347 | 11.7 KB | Module; functionality |
 | `.agents/scripts/agents-patterns.py` | 341 | 13.3 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-patterns.py` | 341 | 13.3 KB | Module; functionality |
 | `.agents/scripts/check-links.py` | 331 | 11.2 KB | Module; functionality |

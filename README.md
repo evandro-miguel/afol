@@ -137,10 +137,10 @@ Public onboarding has two entrypoints:
 ### Onboarding validation (minimum)
 
 - Validate installation from public examples:
-  - `./a` (front-door entrypoint)
-  - `./a s` (status alias)
-  - `./a status`
-  - `./a v` (version)
+  - `afol` (front-door entrypoint)
+  - `afol s` (status alias)
+  - `afol status`
+  - `afol check`
   - `just --list`
   - `just --justfile Justfile agents_scaffold::doctor`
 

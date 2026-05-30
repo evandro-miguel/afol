@@ -48,10 +48,12 @@ describe("kernel front-door", () => {
       expect(proc.status).toBe(0);
       const lines = (proc.stdout as string).trim().split("\n");
       expect(lines.length).toBeLessThanOrEqual(25);
+      expect((proc.stdout as string)).toContain("Usage: afol");
       expect((proc.stdout as string)).toContain("Commands");
       expect((proc.stdout as string)).toContain("s/status");
       expect((proc.stdout as string)).toContain("v/validate");
       expect((proc.stdout as string)).toContain("n/new");
+      expect((proc.stdout as string)).toContain("a=afol");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -72,6 +74,13 @@ describe("kernel front-door", () => {
         { args: ["n", "theme"], expected: "ARGS:new theme" },
         { args: ["sk", "ls"], expected: "ARGS:skill ls" },
         { args: ["up", "ck"], expected: "ARGS:update ck" },
+        { args: ["bootstrap", "/tmp/repo", "--partial"], expected: "ARGS:bootstrap /tmp/repo --partial" },
+        { args: ["start", "--session", "S", "--task-id", "T-01"], expected: "ARGS:implement start --session S --task-id T-01" },
+        {
+          args: ["done", "--session", "S", "--task-id", "T-01", "--test", "just lint"],
+          expected: "ARGS:implement complete --session S --task-id T-01 --command just lint --result passed",
+        },
+        { args: ["close", "--session", "S"], expected: "ARGS:session close --session S" },
         { args: ["inspect-target", "--repo-root", "/tmp/project"], expected: "ARGS:inspect-target --repo-root /tmp/project" },
         { args: ["adoption-plan", "--repo-root", "/tmp/project"], expected: "ARGS:adoption-plan --repo-root /tmp/project" },
       ];
@@ -93,7 +102,7 @@ describe("kernel front-door", () => {
       expect(proc.status).toBe(2);
       expect(proc.stdout as string).toBe("");
       expect(proc.stderr as string).toContain("err unknown-command command=sttaus");
-      expect(proc.stderr as string).toContain("hint=\"run a -h\"");
+      expect(proc.stderr as string).toContain("hint=\"run afol -h\"");
       expect(proc.stderr as string).toContain("did_you_mean=status");
       expect(proc.stderr as string).not.toContain("LEGACY:");
     } finally {
@@ -113,6 +122,19 @@ describe("kernel front-door", () => {
         expect(proc.status).toBe(0);
         expect(proc.stdout as string).toBe(`LEGACY:${args.join(" ")}\n`);
       }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("check routes to validation family", () => {
+    const root = mkProjectRoot("check-route", "#!/usr/bin/env bash\necho LEGACY:$*\n");
+    try {
+      const proc = runKernel(root, ["check", "--nope"]);
+      expect(proc.status).toBe(2);
+      expect(proc.stderr as string).toContain("Unknown validation argument: --nope");
+      expect(proc.stdout as string).toBe("");
+      expect(proc.stdout as string).not.toContain("LEGACY:");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

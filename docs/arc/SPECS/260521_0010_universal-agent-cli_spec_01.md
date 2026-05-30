@@ -29,7 +29,13 @@ risk_level: high
 ## 1) Feature Intent
 
 Build a universal Bun/TypeScript CLI that agents call from any governed project
-through the local wrapper `./a`.
+through the local command `afol`, with `./a` retained as a compatibility alias
+during migration.
+
+The intended simple operator surface includes `afol status`, `afol check`, and
+`afol bootstrap <repo> --partial`. The workbench shortcuts `afol start`,
+`afol done --test "..."`, and `afol close` route to the existing governed
+implementation/session commands while typed parity continues to grow.
 
 The CLI owns behavior. The project owns state.
 
@@ -48,7 +54,8 @@ The first CLI kernel must be small and typed.
 
 Required kernel boundaries:
 
-- `./a` is the stable local entrypoint.
+- `afol` is the stable local entrypoint; `./a` remains a compatibility alias
+  during migration.
 - Bun/TypeScript owns the command router, schemas, output envelope, and project
   loader.
 - The legacy `.agents/agents` command remains the fallback for commands that do
@@ -106,7 +113,7 @@ Errors must be stable and actionable.
 | missing config | `2` | `err missing-config path=.agents/config.json` |
 | missing lock | `2` | `err missing-lock path=.agents/lock.json` |
 | invalid JSON | `2` | `err invalid-json path=<path>` |
-| unsupported command | `2` | `err unsupported-command hint="run ./a -h"` |
+| unsupported command | `2` | `err unsupported-command hint="run afol -h"` |
 | delegated failure | legacy exit | legacy-compatible failure summary |
 | validation failure | `1` | command-specific failure summary |
 
@@ -168,9 +175,9 @@ Implementation starts with failing tests for:
 
 ## 9) Acceptance
 
-- `./a -h` prints compact help.
-- `./a s` and `./a status` resolve to the same semantic status.
-- `./a -j s` returns valid JSON with the same semantic fields.
+- `afol -h` prints compact help.
+- `afol status` and `afol s` resolve to the same semantic status.
+- `afol -j status` returns valid JSON with the same semantic fields.
 - Running outside a project fails with an actionable error.
 - Missing or invalid local state fails before mutation.
 - Delegated commands preserve exit code and failure evidence.

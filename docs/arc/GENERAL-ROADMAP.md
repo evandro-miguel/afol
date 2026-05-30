@@ -58,9 +58,9 @@ disposable history.
 
 The Bun/TypeScript reformulation must be staged:
 
-1. Add ./a as the new project-local front door.
-2. Delegate from ./a to existing .agents/agents commands where parity does not
-   exist yet.
+1. Add `afol` as the new project-local front door.
+2. Keep `./a` as a compatibility alias and delegate from both entrypoints to
+   existing `.agents/agents` commands where parity does not exist yet.
 3. Implement one typed Bun/TypeScript command family at a time.
 4. Keep Python/Bash paths until parity tests prove the replacement.
 5. Shrink src/project-template only after bootstrap/export validation proves
@@ -89,9 +89,9 @@ The Bun/TypeScript reformulation must be staged:
 - Governing spec: docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md
 - Why: Logic should live in one updateable CLI instead of being copied into
   every project.
-- Exit criteria: Bun/TypeScript CLI architecture is defined; CLI runs from ./a;
-- CLI reads local project state; CLI supports version lock and update checks;
-  compatibility delegation preserves current behavior until parity.
+- Exit criteria: Bun/TypeScript CLI architecture is defined; CLI runs from
+  `afol`; CLI reads local project state; CLI supports version lock and update
+  checks; `./a` remains a compatibility alias until parity.
 - Closure note: accepted implementation evidence is `E-20260528215311949499`
   and `E-20260528220141194181`; closeout session
   `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`; strict verification
@@ -319,7 +319,7 @@ The Bun/TypeScript reformulation must be staged:
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command
    system, product/factory boundary, compatibility constraints.
-1. CLI kernel: Bun/TypeScript skeleton, ./a, project detection, config/lock
+1. CLI kernel: Bun/TypeScript skeleton, `afol`, project detection, config/lock
    reading, short router, compact output, compatibility delegation.
 1. Workbench core: session, task state, evidence, log append, plan status,
    verify, close.
@@ -333,9 +333,10 @@ The Bun/TypeScript reformulation must be staged:
 
 ## 7) MVP
 
-The MVP should include ./a, Bun/TypeScript CLI, config and lock, short command
-grammar, status, new, task start/done, evidence add, log add, verify, close,
-rule resolve, skill list/update, template update check, and minimal validation.
+The MVP should include `afol`, Bun/TypeScript CLI, config and lock, short
+command grammar, status, new, task start/done, evidence add, log add, verify,
+close, rule resolve, skill list/update, template update check, and minimal
+validation.
 
 The MVP should not include full autonomous orchestration, complex UI, cloud
 sync, full watcher daemon, large docs, public package polish, or complete
