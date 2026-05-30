@@ -992,6 +992,19 @@ def _load_evidence_ledger(session_path: Path) -> Dict[str, List[Dict[str, Any]]]
     return evidence_by_task
 
 
+def _resolve_evidence_scope(session_path: Path, task_file: Path) -> Path:
+    """Resolve the closest ancestor directory that owns `.evidence.jsonl`."""
+    current = task_file.parent
+    session_root = session_path.resolve()
+
+    while True:
+        if (current / ".evidence.jsonl").exists():
+            return current
+        if current.resolve() == session_root or current.parent == current:
+            return session_path
+        current = current.parent
+
+
 def _unresolved_failed_evidence_entries(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Return failed evidence entries that are not superseded by later success for the same command."""
     unresolved: List[Dict[str, Any]] = []
@@ -1281,9 +1294,16 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
             return True, results  # No tasks = vacuously true in non-strict mode
 
     all_completed = True
-    evidence_ledger = _load_evidence_ledger(session_path) if strict else {}
+    evidence_ledger_by_scope: Dict[Path, Dict[str, List[Dict[str, Any]]]] = {}
 
     for task_file in sorted(task_files):
+        evidence_ledger: Dict[str, List[Dict[str, Any]]] = {}
+        if strict:
+            evidence_scope = _resolve_evidence_scope(session_path, task_file)
+            if evidence_scope not in evidence_ledger_by_scope:
+                evidence_ledger_by_scope[evidence_scope] = _load_evidence_ledger(evidence_scope)
+            evidence_ledger = evidence_ledger_by_scope[evidence_scope]
+
         file_result = {
             'file': task_file,
             'tasks': [],

@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-05-30T19:12:45+00:00
+**Generated:** 2026-05-30T20:23:31+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 166 files, 37,174 lines, 1785.5 KB
+**Stats:** 166 files, 37,278 lines, 1790.6 KB
 
 ### Files
 
@@ -18,9 +18,9 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_skills_sync.py` | 1,596 | 76.7 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_skills_sync.py` | 1,596 | 76.7 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_cli_utility_coverage.py` | 1,348 | 65.9 KB | Test file; unit tests |
-| `.agents/scripts/tests/test_verify_tasks_strict.py` | 1,278 | 50.1 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_verify_tasks_strict.py` | 1,330 | 52.6 KB | Test file; unit tests |
+| `src/project-template/.agents/scripts/tests/test_verify_tasks_strict.py` | 1,213 | 47.1 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_cli_utility_coverage.py` | 1,188 | 58.6 KB | Test file; unit tests |
-| `src/project-template/.agents/scripts/tests/test_verify_tasks_strict.py` | 1,161 | 44.5 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_runtime_compatibility.py` | 861 | 46.8 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_runtime_compatibility.py` | 853 | 46.1 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_scenarios.py` | 781 | 40.1 KB | Test file; unit tests |

@@ -41,3 +41,13 @@ links:
 The finalization path must include the generated docs review, strict workbench
 verification, and a follow-up commit. No additional code refactor is justified
 unless a deterministic gate fails after the workbench artifacts are repaired.
+
+## Sidecar Justification
+
+- Blocking question: Which repository surfaces needed inspection before the
+  Python runtime hardening session could be closed under strict verification?
+- Decision produced: Include generated docs review, strict workbench
+  verification, and a follow-up commit in the finalization path.
+- Execution task affected: T-01
+- Stop condition: The reviewed files, generated maps, and active workbench
+  session support strict verification without new deterministic failures.

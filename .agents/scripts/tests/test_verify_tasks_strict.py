@@ -10,6 +10,7 @@ Covers:
 """
 
 import unittest
+from unittest import mock
 import tempfile
 import shutil
 import sys
@@ -1405,6 +1406,68 @@ status: final
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0][0], "T-01")
         self.assertEqual(tasks[0][2], "done")
+
+
+class TestWorkbenchRootEvidenceResolution(unittest.TestCase):
+    """Strict evidence checks should resolve ledgers per workbench session."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.workbench_root = Path(self.temp_dir) / "wb"
+        self.workbench_root.mkdir(parents=True)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def _write_session(self, session_name: str, *, with_ledger: bool) -> Path:
+        session_dir = self.workbench_root / session_name
+        session_dir.mkdir(parents=True)
+        (session_dir / f"{session_name}_task_01.md").write_text(
+            "# Tasks\n\n"
+            "## State Board\n\n"
+            "| Task | State | Owner | Notes |\n"
+            "|------|-------|-------|-------|\n"
+            "| T-01 | done | worker | completed |\n"
+        )
+        if with_ledger:
+            (session_dir / ".evidence.jsonl").write_text(
+                json.dumps(
+                    {
+                        "id": f"E-{session_name}",
+                        "task_id": "T-01",
+                        "command": "python3 -m unittest",
+                        "result": "passed",
+                        "artifacts": [f"{session_name}_task_01.md"],
+                        "note": "",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        return session_dir
+
+    def test_workbench_root_strict_uses_nearest_session_ledger(self):
+        self._write_session("s1", with_ledger=True)
+        self._write_session("s2", with_ledger=True)
+
+        with mock.patch.object(verify_tasks, "_run_strict_session_checks", return_value=True):
+            all_completed, results = verify_tasks.verify_session(self.workbench_root, strict=True)
+
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["evidence_issues"]), 0)
+
+    def test_workbench_root_does_not_share_evidence_between_sessions(self):
+        session_with_ledger = self._write_session("s1", with_ledger=True)
+        self._write_session("s2", with_ledger=False)
+
+        with mock.patch.object(verify_tasks, "_run_strict_session_checks", return_value=True):
+            all_completed, results = verify_tasks.verify_session(self.workbench_root, strict=True)
+
+        self.assertFalse(all_completed)
+        self.assertEqual(len(results["evidence_issues"]), 1)
+        issue_file = Path(results["evidence_issues"][0]["file"])
+        self.assertEqual(issue_file.parent.name, "s2")
+        self.assertNotEqual(issue_file.parent, session_with_ledger)
 
 
 if __name__ == '__main__':

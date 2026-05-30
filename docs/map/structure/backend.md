@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-05-30T19:12:45+00:00
+**Generated:** 2026-05-30T20:23:31+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,7 +9,7 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 114 files, 43,000 lines, 1789.9 KB
+**Stats:** 114 files, 43,032 lines, 1791.6 KB
 
 ### Files
 
@@ -21,8 +21,8 @@ Services, utilities, and business logic.
 | `src/project-template/.agents/scripts/agents-skills-sync.py` | 1,733 | 74.2 KB | Module; functionality |
 | `.agents/scripts/agents-bootstrap.py` | 1,513 | 61.6 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-bootstrap.py` | 1,513 | 61.6 KB | Module; functionality |
-| `src/project-template/.agents/scripts/verify-tasks.py` | 1,347 | 53.8 KB | Module; functionality |
-| `.agents/scripts/verify-tasks.py` | 1,318 | 52.4 KB | Module; functionality |
+| `src/project-template/.agents/scripts/verify-tasks.py` | 1,363 | 54.6 KB | Module; functionality |
+| `.agents/scripts/verify-tasks.py` | 1,334 | 53.2 KB | Module; functionality |
 | `.agents/scripts/lib/execution_commands.py` | 1,238 | 50.5 KB | Module; functionality |
 | `src/project-template/.agents/scripts/lib/execution_commands.py` | 1,211 | 49.7 KB | Module; functionality |
 | `cli/validate/contract.ts` | 1,003 | 35.8 KB | Module; functionality |
