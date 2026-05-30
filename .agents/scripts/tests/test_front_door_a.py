@@ -186,12 +186,19 @@ class FrontDoorATests(unittest.TestCase):
         fake_body = "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n"
         cases = (
             (["check"], "ARGS:doctor"),
+            (["ck"], "ARGS:doctor"),
             (["start", "--session", "S", "--task-id", "T-01"], "ARGS:implement start --session S --task-id T-01"),
+            (["st", "-S", "S", "-T", "T-01"], "ARGS:implement start --session S --task-id T-01"),
             (
                 ["done", "--session", "S", "--task-id", "T-01", "--test", "just lint"],
                 "ARGS:implement complete --session S --task-id T-01 --command just lint --result passed",
             ),
+            (
+                ["d", "-S", "S", "-T", "T-01", "-x", "just lint"],
+                "ARGS:implement complete --session S --task-id T-01 --command just lint --result passed",
+            ),
             (["close", "--session", "S"], "ARGS:session close --session S"),
+            (["c", "-S", "S"], "ARGS:session close --session S"),
         )
         for args, expected in cases:
             with self.subTest(args=args):

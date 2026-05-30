@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-05-30T21:10:09+00:00
+**Generated:** 2026-05-30T21:43:24+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 166 files, 37,385 lines, 1796.4 KB
+**Stats:** 166 files, 37,417 lines, 1798.1 KB
 
 ### Files
 
@@ -65,11 +65,11 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md` | 222 | 10.6 KB | Module; functionality |
 | `.agents/scripts/tests/test_agents_review.py` | 218 | 12.1 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_review.py` | 218 | 12.1 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_front_door_a.py` | 215 | 10.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260323_1752_workflow-and-bootstrap-integration_spec_01.md` | 211 | 12.2 KB | Module; functionality |
 | `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md` | 211 | 12.0 KB | Module; functionality |
-| `.agents/scripts/tests/test_front_door_a.py` | 208 | 9.7 KB | Test file; unit tests |
+| `cli/tests/kernel.test.ts` | 202 | 8.8 KB | Test file; unit tests |
 | `docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md` | 191 | 8.7 KB | Module; functionality |
-| `cli/tests/kernel.test.ts` | 190 | 8.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_local_state.py` | 189 | 10.2 KB | Test file; unit tests |
 | `.agents/scripts/tests/unit/test_version.py` | 189 | 9.3 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_local_state.py` | 189 | 10.2 KB | Test file; unit tests |
@@ -81,10 +81,10 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/F-11/spec-tests/260521_0145_validation-ci-benchmark-matrix_spec-test_01.md` | 170 | 6.4 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_knowledge.py` | 163 | 7.5 KB | Test file; unit tests |
 | `.agents/runtime/tests/test_mcp.py` | 162 | 7.7 KB | Test file; unit tests |
+| `docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md` | 162 | 6.4 KB | Module; functionality |
 | `docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md` | 161 | 7.4 KB | Module; functionality |
-| `docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md` | 159 | 6.2 KB | Module; functionality |
 | `docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md` | 154 | 7.2 KB | Test file; unit tests |
-| `docs/arc/SPECS/260521_0030_agent-command-design-system_spec_01.md` | 151 | 4.6 KB | Module; functionality |
+| `docs/arc/SPECS/260521_0030_agent-command-design-system_spec_01.md` | 153 | 4.7 KB | Module; functionality |
 | `docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md` | 149 | 7.0 KB | Module; functionality |
 | `.agents/runtime/tests/conftest.py` | 144 | 4.4 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/test_agents_telemetry.py` | 144 | 7.5 KB | Test file; unit tests |
@@ -124,8 +124,8 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260306_artifact-resolution-layer_spec_01.md` | 93 | 4.0 KB | Module; functionality |
 | `.agents/scripts/tests/TEST_STRATEGY.md` | 92 | 3.9 KB | Test file; unit tests |
 | `src/project-template/.agents/scripts/tests/TEST_STRATEGY.md` | 92 | 3.9 KB | Test file; unit tests |
+| `docs/arc/SPECS/F-01/spec-tests/260521_0130_universal-agent-cli-kernel-contract_spec-test_01.md` | 90 | 3.2 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_project-context-canon-and-setup_spec_01.md` | 85 | 3.6 KB | Module; functionality |
-| `docs/arc/SPECS/F-01/spec-tests/260521_0130_universal-agent-cli-kernel-contract_spec-test_01.md` | 84 | 2.8 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_guided-status-and-implementation_spec_01.md` | 82 | 3.1 KB | Module; functionality |
 | `docs/arc/SPECS/INDEX.md` | 82 | 13.6 KB | Module; functionality |
 | `docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md` | 79 | 3.6 KB | Module; functionality |
@@ -158,8 +158,8 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260521_0060_file-first-low-token-execution_spec_01.md` | 55 | 2.2 KB | Module; functionality |
 | `src/project-template/.agents/scripts/tests/test_front_door_a.py` | 54 | 2.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260521_0070_local-state-index-and-event-log_spec_01.md` | 54 | 2.2 KB | Module; functionality |
+| `docs/arc/SPECS/F-03/spec-tests/260521_0135_agent-command-design-system_spec-test_01.md` | 54 | 2.0 KB | Test file; unit tests |
 | `docs/arc/SPECS/260528_1946_bootstrap-template-justfile-wiring_spec-child_01.md` | 53 | 2.4 KB | Module; functionality |
-| `docs/arc/SPECS/F-03/spec-tests/260521_0135_agent-command-design-system_spec-test_01.md` | 52 | 1.9 KB | Test file; unit tests |
 | `docs/arc/SPECS/F-02/spec-tests/260521_0132_minimal-project-template-export_spec-test_01.md` | 48 | 1.8 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_session-pack-structure-and-postmortem_spec_01.md` | 47 | 2.1 KB | Module; functionality |
 | `docs/arc/SPECS/260423_2120_runtime-flow-benchmark-scenarios_spec-child_01.md` | 47 | 1.8 KB | Module; functionality |

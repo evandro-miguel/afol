@@ -75,12 +75,19 @@ describe("kernel front-door", () => {
         { args: ["sk", "ls"], expected: "ARGS:skill ls" },
         { args: ["up", "ck"], expected: "ARGS:update ck" },
         { args: ["bootstrap", "/tmp/repo", "--partial"], expected: "ARGS:bootstrap /tmp/repo --partial" },
+        { args: ["b", "/tmp/repo", "--partial"], expected: "ARGS:bootstrap /tmp/repo --partial" },
         { args: ["start", "--session", "S", "--task-id", "T-01"], expected: "ARGS:implement start --session S --task-id T-01" },
+        { args: ["st", "-S", "S", "-T", "T-01"], expected: "ARGS:implement start --session S --task-id T-01" },
         {
           args: ["done", "--session", "S", "--task-id", "T-01", "--test", "just lint"],
           expected: "ARGS:implement complete --session S --task-id T-01 --command just lint --result passed",
         },
+        {
+          args: ["d", "-S", "S", "-T", "T-01", "-x", "just lint"],
+          expected: "ARGS:implement complete --session S --task-id T-01 --command just lint --result passed",
+        },
         { args: ["close", "--session", "S"], expected: "ARGS:session close --session S" },
+        { args: ["c", "-S", "S"], expected: "ARGS:session close --session S" },
         { args: ["inspect-target", "--repo-root", "/tmp/project"], expected: "ARGS:inspect-target --repo-root /tmp/project" },
         { args: ["adoption-plan", "--repo-root", "/tmp/project"], expected: "ARGS:adoption-plan --repo-root /tmp/project" },
       ];
@@ -130,11 +137,16 @@ describe("kernel front-door", () => {
   test("check routes to validation family", () => {
     const root = mkProjectRoot("check-route", "#!/usr/bin/env bash\necho LEGACY:$*\n");
     try {
-      const proc = runKernel(root, ["check", "--nope"]);
-      expect(proc.status).toBe(2);
-      expect(proc.stderr as string).toContain("Unknown validation argument: --nope");
-      expect(proc.stdout as string).toBe("");
-      expect(proc.stdout as string).not.toContain("LEGACY:");
+      for (const args of [
+        ["check", "--nope"],
+        ["ck", "--nope"],
+      ]) {
+        const proc = runKernel(root, args);
+        expect(proc.status).toBe(2);
+        expect(proc.stderr as string).toContain("Unknown validation argument: --nope");
+        expect(proc.stdout as string).toBe("");
+        expect(proc.stdout as string).not.toContain("LEGACY:");
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

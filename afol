@@ -40,19 +40,19 @@ if [ "${#args[@]}" -gt 0 ]; then
       status_mode=1
       args=("${args[@]:1}")
       ;;
-    check|v|validate)
+    ck|check|v|validate)
       fallback_command=("doctor")
       args=("${args[@]:1}")
       ;;
-    start)
+    st|start)
       fallback_command=("implement" "start")
       args=("${args[@]:1}")
       ;;
-    done)
+    d|done)
       fallback_command=("implement" "complete")
       args=("${args[@]:1}")
       ;;
-    close)
+    c|close)
       fallback_command=("session" "close")
       args=("${args[@]:1}")
       ;;
@@ -84,6 +84,15 @@ if [ "${#fallback_command[@]}" -gt 0 ]; then
   has_result=0
   for arg in "${args[@]}"; do
     case "${arg}" in
+      -S)
+        normalized+=("--session")
+        ;;
+      -T)
+        normalized+=("--task-id")
+        ;;
+      -x)
+        normalized+=("--command")
+        ;;
       --test)
         normalized+=("--command")
         ;;

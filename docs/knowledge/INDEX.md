@@ -3,14 +3,14 @@ doc_type: index
 id: "knowledge_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-05-30T21:10:09+00:00"
+updated_at: "2026-05-30T21:43:24+00:00"
 ---
 
 # Knowledge Index
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 20
+- Total indexed docs: 21
 
 ## Brainstorm
 
@@ -39,6 +39,7 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 - `260529_1319_f04-f08-governance-reconciliation_report_01` | `.agents/wb/260529_1319_f04-f08-governance-reconciliation/260529_1319_f04-f08-governance-reconciliation_report_01.md` | - Roadmap feature: F-04
 - `260529_1410_f01-f03-governance-reconciliation_report_01` | `.agents/wb/260529_1410_f01-f03-governance-reconciliation/260529_1410_f01-f03-governance-reconciliation_report_01.md` | - Roadmap feature: F-01
 - `260530_1744_afol-cli-ux-simplification_report_01` | `.agents/wb/260530_1744_afol-cli-ux-simplification/260530_1744_afol-cli-ux-simplification_report_01.md` | - Roadmap feature: F-03
+- `260530_1838_token-optimized-cli-aliases_report_01` | `.agents/wb/260530_1838_token-optimized-cli-aliases/260530_1838_token-optimized-cli-aliases_report_01.md` | - Added token-optimized aliases for repeated afol workflows:
 
 ## Research
 

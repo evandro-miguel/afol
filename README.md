@@ -139,8 +139,9 @@ Public onboarding has two entrypoints:
 - Validate installation from public examples:
   - `afol` (front-door entrypoint)
   - `afol s` (status alias)
-  - `afol status`
-  - `afol check`
+  - `afol ck` (validation alias)
+  - `afol st -T T-01` (task start alias)
+  - `afol d -T T-01 -x "just lint"` (task completion alias)
   - `just --list`
   - `just --justfile Justfile agents_scaffold::doctor`
 

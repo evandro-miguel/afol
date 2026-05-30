@@ -32,10 +32,10 @@ Define a command design system optimized for agents.
 The goal is to reduce repeated command tokens and manual file edits while
 keeping every operation auditable by humans.
 
-The intended simple operator surface includes `afol status`, `afol check`, and
-`afol bootstrap <repo> --partial`. The workbench shortcuts `afol start`,
-`afol done --test "..."`, and `afol close` route to existing governed command
-paths and remain part of the simple operator surface.
+The intended simple operator surface includes `afol s`, `afol ck`, and
+`afol b <repo> --partial`. The workbench shortcuts `afol st`, `afol d -x "..."`,
+and `afol c` route to existing governed command paths and remain part of the
+simple operator surface. Long aliases remain available for human readability.
 
 ## 2) Problem
 
@@ -53,17 +53,17 @@ afol <domain> <action> [target] [flags]
 Examples:
 
 ```bash
-afol status
+afol s
 afol new auth-refactor -F F-02 -S auth-spec
-afol task start T-01
-afol task done T-01 -e E-01
+afol st -T T-01
+afol d -T T-01 -x "bun test"
 afol evidence add -t T-01 -c "bun test" -r pass
 afol log add -t T-01 -m "Added validation"
 afol rule get frontend
 afol skill update
 afol query search -t T-02 -f research.md -m "Summary"
-afol verify
-afol close
+afol ck
+afol c
 afol update check
 ```
 
@@ -172,6 +172,8 @@ err missing-evidence task=T-01 hint="run afol evidence add -t T-01 -c <cmd> -r p
 - `afol status` and `afol s` have semantic parity.
 - `afol -j status` emits valid JSON.
 - `afol -h` remains compact.
+- `afol ck`, `afol st`, `afol d -x`, `afol c`, and `afol b` have parity with
+  their long forms.
 - Unknown commands fail with an actionable hint.
 - The alias table is snapshot-tested.
 - Agents can perform routine workbench updates without opening raw files.

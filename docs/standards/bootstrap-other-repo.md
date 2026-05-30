@@ -32,9 +32,9 @@ Define how to install the `.agents` scaffold into another repository, including:
   - `partial`: target already has live content and you want scaffold adoption only.
 - Validation minimum:
   - `afol` confirms the front-door wrapper is present.
-  - `afol status` (or `afol s`) confirms onboarding command visibility.
-  - `afol check` confirms wrapper/runtime toolchain version surface.
-  - `afol bootstrap /path/to/existing-project --partial` confirms the partial install path.
+  - `afol s` (or `afol status`) confirms onboarding command visibility.
+  - `afol ck` (or `afol check`) confirms wrapper/runtime toolchain version surface.
+  - `afol b /path/to/existing-project --partial` confirms the partial install path.
   - `just --list`
   - `just --justfile Justfile agents_scaffold::doctor`
 

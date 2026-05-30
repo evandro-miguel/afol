@@ -67,7 +67,9 @@ Front-door checks available in all adopted repos:
 
 - `afol` delegates to this wrapper for status and workflow commands.
 - `afol s` (or `afol status`) reports status.
-- `afol check` reports validation/runtime metadata when supported by the wrapper in that repo.
+- `afol ck` (or `afol check`) reports validation/runtime metadata when supported by the wrapper in that repo.
+- `afol st`, `afol d -x "just lint"`, and `afol c` are the token-optimized
+  workbench lifecycle aliases.
 - `./a` remains available as a compatibility alias during migration.
 - Validate the onboarding result with `just --list` and
   `just --justfile Justfile agents_scaffold::doctor` (or root `just doctor` equivalent).

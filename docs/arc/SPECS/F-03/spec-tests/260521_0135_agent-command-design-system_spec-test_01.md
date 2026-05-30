@@ -41,12 +41,14 @@ human-auditable.
 | --- | --- | --- |
 | `TC-01` | alias table snapshot | no ambiguous aliases |
 | `TC-02` | `afol s` vs `afol status` | semantic parity |
-| `TC-03` | `afol t s T-01` | canonical task-start route |
+| `TC-03` | `afol st -T T-01` | token-optimized task-start route |
 | `TC-04` | `afol e a -t T-01` | canonical evidence-add route |
-| `TC-05` | `afol up ck` | canonical update-check route |
+| `TC-05` | `afol ck` | token-optimized validation route |
 | `TC-06` | `afol -j s` | JSON envelope matches compact fields |
 | `TC-07` | unknown alias | actionable hint, no long manual |
 | `TC-08` | `afol -h` | <= 25 lines with short and long aliases |
+| `TC-09` | `afol d -T T-01 -x "just lint"` | token-optimized done route with evidence command |
+| `TC-10` | `afol c` | token-optimized close route |
 
 ## 4) Metrics
 

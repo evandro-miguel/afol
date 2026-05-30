@@ -17,9 +17,9 @@ const KERNEL_ALIAS_CONTRACT = Object.freeze({
   topLevel: Object.freeze<ReadonlyArray<AliasEntry>>([
     { short: "s", long: "status", route: "status" },
     { short: "v", long: "validate", route: "validate" },
-    { long: "check", route: "validate" },
-    { long: "start", route: "delegate" },
-    { long: "done", route: "delegate" },
+    { short: "ck", long: "check", route: "validate" },
+    { short: "st", long: "start", route: "delegate" },
+    { short: "d", long: "done", route: "delegate" },
     { short: "n", long: "new", route: "delegate" },
     { short: "t", long: "task", route: "delegate" },
     { short: "l", long: "log", route: "delegate" },
@@ -68,27 +68,26 @@ const HELP_LINES = [
   "Usage: afol [command] [options]",
   "",
   "Commands",
-  "  s, status              Show status",
-  "  check                  Run validation checks",
-  "  start                  Start the next or selected workbench task",
-  "  done                   Complete a task with --test evidence",
-  "  close                  Close the active workbench session",
-  "  bootstrap              Install scaffold into another repo",
-  "  validate               Validation contract and benchmark selector",
+  "  s/status               Show status",
+  "  ck/check               Run validation checks",
+  "  st/start               Start workbench task",
+  "  d/done                 Complete task with evidence",
+  "  c/close                Close session",
+  "  b/bootstrap            Install scaffold into another repo",
   "",
   "Flags",
   "  -j, --json             JSON output for status",
   "  -h, --help             Show this compact help",
   "",
   "Aliases",
-  "  s/status v/validate n/new t/task c/close",
-  "  e/evidence r/rule q/query sk/skill b/bootstrap a=afol",
+  "  -S --session  -T --task-id  -x --test",
+  "  v/validate n/new t/task e/evidence sk/skill a=afol",
   "",
   "Examples",
-  "  afol status",
-  "  afol check",
-  "  afol start --session <id> --task-id T-01",
-  "  afol done --session <id> --task-id T-01 --test \"just lint\"",
+  "  afol s",
+  "  afol ck",
+  "  afol st -S <id> -T T-01",
+  "  afol d -S <id> -T T-01 -x \"just lint\"",
 ].join("\n");
 
 const JSON_ALIASES: ReadonlySet<string> = new Set(KERNEL_ALIAS_CONTRACT.flags.json);
@@ -235,17 +234,38 @@ function normalizeArguments(values: string[]): string[] {
   return [canonicalizeTopLevelAlias(first), ...values.slice(1)];
 }
 
+function normalizeTokenOptimizedFlags(values: string[]): string[] {
+  const normalized: string[] = [];
+  for (const value of values) {
+    if (value === "-S") {
+      normalized.push("--session");
+      continue;
+    }
+    if (value === "-T") {
+      normalized.push("--task-id");
+      continue;
+    }
+    if (value === "-x") {
+      normalized.push("--test");
+      continue;
+    }
+    normalized.push(value);
+  }
+  return normalized;
+}
+
 function normalizeDoneInvocation(rest: string[]): string[] {
   const normalized = ["implement", "complete"];
   let hasResult = false;
+  const expanded = normalizeTokenOptimizedFlags(rest);
 
-  for (let index = 0; index < rest.length; index += 1) {
-    const value = rest[index];
+  for (let index = 0; index < expanded.length; index += 1) {
+    const value = expanded[index];
     if (value === "--test") {
       normalized.push("--command");
-      if (index + 1 < rest.length) {
+      if (index + 1 < expanded.length) {
         index += 1;
-        normalized.push(rest[index]);
+        normalized.push(expanded[index]);
       }
       continue;
     }
@@ -264,16 +284,17 @@ function normalizeDoneInvocation(rest: string[]): string[] {
 
 function normalizeDelegatedInvocation(values: string[]): string[] {
   const [topLevel, ...rest] = values;
+  const expandedRest = normalizeTokenOptimizedFlags(rest);
   if (topLevel === "start") {
-    return ["implement", "start", ...rest];
+    return ["implement", "start", ...expandedRest];
   }
   if (topLevel === "done") {
     return normalizeDoneInvocation(rest);
   }
   if (topLevel === "close") {
-    return ["session", "close", ...rest];
+    return ["session", "close", ...expandedRest];
   }
-  return values;
+  return [topLevel, ...expandedRest];
 }
 
 function suggestionFor(command: string): string | null {

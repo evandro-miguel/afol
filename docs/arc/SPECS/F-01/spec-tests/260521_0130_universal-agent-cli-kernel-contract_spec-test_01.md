@@ -32,9 +32,11 @@ semantic drift.
 
 1. Agent runs `afol -h` in a valid project.
 2. Agent runs `afol s`, `afol status`, and `afol -j status`.
-3. CLI loads `.agents/config.json` and `.agents/lock.json`.
-4. Unsupported or not-yet-migrated commands delegate to `.agents/agents`.
-5. Invalid roots or missing state fail before mutation.
+3. Agent runs token-optimized lifecycle aliases: `afol ck`,
+   `afol st -T T-01`, `afol d -T T-01 -x "just lint"`, and `afol c`.
+4. CLI loads `.agents/config.json` and `.agents/lock.json`.
+5. Unsupported or not-yet-migrated commands delegate to `.agents/agents`.
+6. Invalid roots or missing state fail before mutation.
 
 ## 3) Required Test Cases
 
@@ -49,6 +51,10 @@ semantic drift.
 | `TC-07` | missing lock | exit 2 before mutation |
 | `TC-08` | delegated command | stdout/stderr/exit-code parity fixture |
 | `TC-09` | unsupported command | actionable help hint |
+| `TC-10` | `afol ck` | validation route parity with `afol check` |
+| `TC-11` | `afol st -T T-01` | task start route with short flags |
+| `TC-12` | `afol d -T T-01 -x "just lint"` | task completion route with short evidence command |
+| `TC-13` | `afol c` | session close route parity |
 
 ## 4) Normalized Parity Envelope
 

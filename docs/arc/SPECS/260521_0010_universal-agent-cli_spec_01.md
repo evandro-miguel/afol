@@ -32,10 +32,11 @@ Build a universal Bun/TypeScript CLI that agents call from any governed project
 through the local command `afol`, with `./a` retained as a compatibility alias
 during migration.
 
-The intended simple operator surface includes `afol status`, `afol check`, and
-`afol bootstrap <repo> --partial`. The workbench shortcuts `afol start`,
-`afol done --test "..."`, and `afol close` route to the existing governed
-implementation/session commands while typed parity continues to grow.
+The intended simple operator surface includes `afol s`, `afol ck`, and
+`afol b <repo> --partial`. The workbench shortcuts `afol st`,
+`afol d -x "..."`, and `afol c` route to the existing governed
+implementation/session commands while typed parity continues to grow. Long
+aliases remain available for human readability.
 
 The CLI owns behavior. The project owns state.
 
@@ -178,6 +179,8 @@ Implementation starts with failing tests for:
 - `afol -h` prints compact help.
 - `afol status` and `afol s` resolve to the same semantic status.
 - `afol -j status` returns valid JSON with the same semantic fields.
+- `afol ck`, `afol st -T T-01`, `afol d -T T-01 -x "just lint"`, and
+  `afol c` resolve to their long command equivalents.
 - Running outside a project fails with an actionable error.
 - Missing or invalid local state fails before mutation.
 - Delegated commands preserve exit code and failure evidence.

@@ -19,6 +19,8 @@ Define how to install the `.agents` scaffold into another repository, including:
 - the preferred project-local skill model, where each repo carries its own `.agents/skills` subset instead of depending on many global Codex skills
 - the canonical operator front door `afol`, with `./a` kept as a
   compatibility alias during migration
+- the token-optimized aliases `afol s`, `afol ck`, `afol st`, `afol d`, and
+  `afol c` for repeated agent workflows
 
 ## Modes
 

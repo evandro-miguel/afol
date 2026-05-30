@@ -86,7 +86,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("./.agents/agents bootstrap /path/to/existing-project --partial", docs["README"])
         self.assertIn("- `afol`", docs["README"])
         self.assertIn("afol s", docs["README"])
-        self.assertIn("afol check", docs["README"])
+        self.assertIn("afol ck", docs["README"])
         self.assertIn("just --justfile Justfile agents_scaffold::doctor", docs["README"])
 
         for doc in docs.values():
@@ -101,8 +101,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         self.assertIn("- `afol`", docs["standards"])
         self.assertIn("- `afol`", docs["agentic"])
-        self.assertIn("afol status", docs["standards"] + docs["agentic"])
-        self.assertIn("afol status", docs["README"])
+        self.assertIn("afol s", docs["standards"] + docs["agentic"])
+        self.assertIn("afol ck", docs["README"])
 
     def test_public_onboarding_docs_avoid_private_paths(self):
         files = [
