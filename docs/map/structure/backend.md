@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-05-29T18:50:08+00:00
+**Generated:** 2026-05-30T19:12:45+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,7 +9,7 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 114 files, 42,998 lines, 1789.8 KB
+**Stats:** 114 files, 43,000 lines, 1789.9 KB
 
 ### Files
 
@@ -50,7 +50,7 @@ Services, utilities, and business logic.
 | `src/project-template/.agents/scripts/agents-repo-map.py` | 361 | 16.3 KB | Module; functionality |
 | `.agents/scripts/agents-repo-map.py` | 359 | 16.2 KB | Module; functionality |
 | `.agents/runtime/src/agentic_scaffold/services/search.py` | 355 | 14.2 KB | Module; functionality |
-| `cli/main.ts` | 345 | 11.6 KB | Module; functionality |
+| `cli/main.ts` | 347 | 11.7 KB | Module; functionality |
 | `.agents/scripts/agents-patterns.py` | 341 | 13.3 KB | Module; functionality |
 | `src/project-template/.agents/scripts/agents-patterns.py` | 341 | 13.3 KB | Module; functionality |
 | `.agents/scripts/check-links.py` | 331 | 11.2 KB | Module; functionality |

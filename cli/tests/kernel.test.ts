@@ -72,6 +72,8 @@ describe("kernel front-door", () => {
         { args: ["n", "theme"], expected: "ARGS:new theme" },
         { args: ["sk", "ls"], expected: "ARGS:skill ls" },
         { args: ["up", "ck"], expected: "ARGS:update ck" },
+        { args: ["inspect-target", "--repo-root", "/tmp/project"], expected: "ARGS:inspect-target --repo-root /tmp/project" },
+        { args: ["adoption-plan", "--repo-root", "/tmp/project"], expected: "ARGS:adoption-plan --repo-root /tmp/project" },
       ];
 
       for (const testCase of cases) {

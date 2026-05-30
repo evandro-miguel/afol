@@ -70,13 +70,18 @@ The Bun/TypeScript reformulation must be staged:
 
 ### F-00 Total Reformulation Strategy
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260521_0000_total-reformulation-strategy_spec_01.md
 - Why: The project needs one coherent strategy before architecture, command
   design, and migration work begin.
 - Exit criteria: manifesto exists; roadmap exists; feature specs exist;
   product/factory boundary is explicit; Bun/TS migration direction is explicit.
+- Closure note: accepted strategy artifacts are
+  `docs/arc/PROJECT-MANIFESTO.md`,
+  `docs/arc/GENERAL-ROADMAP.md`, and the F-01 through F-17 parent specs. The
+  implementation closed through governed slices while preserving Python/Bash as
+  the compatibility runtime until each command family earns native parity.
 
 ### F-01 Universal Agent CLI
 

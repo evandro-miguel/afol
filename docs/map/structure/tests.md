@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-05-29T18:50:08+00:00
+**Generated:** 2026-05-30T19:12:45+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 166 files, 37,166 lines, 1784.9 KB
+**Stats:** 166 files, 37,174 lines, 1785.5 KB
 
 ### Files
 
@@ -77,7 +77,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_telemetry.py` | 171 | 8.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260306_primary-agent-runtime-compatibility_spec_01.md` | 171 | 8.4 KB | Module; functionality |
 | `docs/arc/SPECS/F-11/spec-tests/260521_0145_validation-ci-benchmark-matrix_spec-test_01.md` | 170 | 6.4 KB | Test file; unit tests |
-| `cli/tests/kernel.test.ts` | 167 | 6.8 KB | Test file; unit tests |
+| `cli/tests/kernel.test.ts` | 169 | 7.1 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_knowledge.py` | 163 | 7.5 KB | Test file; unit tests |
 | `.agents/runtime/tests/test_mcp.py` | 162 | 7.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md` | 161 | 7.4 KB | Module; functionality |
@@ -144,6 +144,7 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260528_1759_python-command-simplification_spec-child_01.md` | 63 | 2.9 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0090_template-update-and-versioning_spec_01.md` | 63 | 2.6 KB | Module; functionality |
 | `docs/arc/SPECS/260413_1250_project-template-source-separation_spec-child_01.md` | 61 | 2.4 KB | Module; functionality |
+| `docs/arc/SPECS/260521_0000_total-reformulation-strategy_spec_01.md` | 61 | 2.5 KB | Module; functionality |
 | `docs/arc/SPECS/260528_2022_runtime-mirror-cleanup_spec-child_01.md` | 61 | 2.7 KB | Module; functionality |
 | `src/project-template/.agents/scripts/tests/test_agents_tools_catalog.py` | 60 | 2.8 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_lint_state_board.py` | 58 | 2.7 KB | Test file; unit tests |
@@ -155,7 +156,6 @@ Unit tests, integration tests, and E2E tests.
 | `docs/arc/SPECS/260521_0080_safe-file-mutation-and-undo_spec_01.md` | 56 | 2.2 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0050_smart-rules-and-skills-routing_spec_01.md` | 56 | 2.2 KB | Module; functionality |
 | `docs/arc/SPECS/260521_0060_file-first-low-token-execution_spec_01.md` | 55 | 2.2 KB | Module; functionality |
-| `docs/arc/SPECS/260521_0000_total-reformulation-strategy_spec_01.md` | 55 | 2.1 KB | Module; functionality |
 | `src/project-template/.agents/scripts/tests/test_front_door_a.py` | 54 | 2.1 KB | Test file; unit tests |
 | `docs/arc/SPECS/260521_0070_local-state-index-and-event-log_spec_01.md` | 54 | 2.2 KB | Module; functionality |
 | `docs/arc/SPECS/260528_1946_bootstrap-template-justfile-wiring_spec-child_01.md` | 53 | 2.4 KB | Module; functionality |

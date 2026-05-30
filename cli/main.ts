@@ -35,6 +35,8 @@ const KERNEL_ALIAS_CONTRACT = Object.freeze({
     { long: "verify-tasks", route: "delegate" },
     { long: "runtime", route: "delegate" },
     { long: "tools", route: "delegate" },
+    { long: "inspect-target", route: "delegate" },
+    { long: "adoption-plan", route: "delegate" },
     { long: "implement", route: "delegate" },
     { long: "wb-update", route: "delegate" },
     { long: "knowledge", route: "delegate" },
@@ -69,8 +71,8 @@ const HELP_LINES = [
   "  task                   Work on session tasks",
   "  session                Work with session lifecycle",
   "  verify-tasks           Verify task completion",
-  "  runtime                Run runtime helpers",
-  "  tools                  Use tools helpers",
+  "  runtime/tools          Runtime and tool helpers",
+  "  inspect-target/adoption-plan  Manage scaffold adoption",
   "",
   "Flags",
   "  -j, --json             JSON output for status",
@@ -87,8 +89,8 @@ const HELP_LINES = [
   "  a v --json",
 ].join("\n");
 
-const JSON_ALIASES = new Set(KERNEL_ALIAS_CONTRACT.flags.json);
-const HELP_ALIASES = new Set(KERNEL_ALIAS_CONTRACT.flags.help);
+const JSON_ALIASES: ReadonlySet<string> = new Set(KERNEL_ALIAS_CONTRACT.flags.json);
+const HELP_ALIASES: ReadonlySet<string> = new Set(KERNEL_ALIAS_CONTRACT.flags.help);
 const PROJECT_CONFIG_CANDIDATES = ["config.json", "agents.config"] as const;
 const TOP_LEVEL_ALIAS_TO_CANONICAL = new Map<string, string>();
 const DELEGATED_COMMANDS = new Set<string>();

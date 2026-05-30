@@ -1,0 +1,133 @@
+---
+doc_type: task
+id: 260528_1251_template-update-and-versioning_task_01
+theme: template-update-and-versioning
+status: active
+owners:
+- worker
+- tester
+workstream_intent: delivery
+artifact_purpose: Track executable work items with owners, state, and evidence expectations.
+created_at: 2026-05-28 12:51:08-03:00
+updated_at: '2026-05-30T16:12:04-03:00'
+roadmap_feature: F-09
+parent_spec: 260521_0090_template-update-and-versioning_spec_01
+child_spec: null
+depends_on:
+- 260528_1251_template-update-and-versioning_plan_01
+links:
+  plan: 260528_1251_template-update-and-versioning_plan_01
+  roadmap: docs/arc/GENERAL-ROADMAP.md
+output_artifacts:
+  primary:
+    task: 260528_1251_template-update-and-versioning_task_01
+    plan: 260528_1251_template-update-and-versioning_plan_01
+  sidecars:
+    brainstorm: null
+    research: null
+    explorer_check: null
+    postmortem: null
+  sidecar_justification:
+    brainstorm: not_required
+    research: not_required
+    explorer_check: not_required
+    postmortem: not_required
+---
+
+# Tasks: template-update-and-versioning
+
+## Output Artifacts (file-first)
+
+- Primary artifact: `task`
+- Sidecars:
+  - brainstorm: ``
+  - research: ``
+  - explorer_check: ``
+  - postmortem: ``
+- Sidecar justification:
+  - Provide one value per optional artifact, or `not_required`.
+
+Each task must be executable by an agent now. Do not create task items whose
+only purpose is to make the plan, research the plan, or gather broad context.
+New tasks must not be created as `done`; seed them as `pending` unless the
+work is actively being executed. Backfilled `done` rows require task-scoped
+ledger evidence and an explicit evidence id.
+
+## State Board
+
+| Task | State | Owner | Notes |
+|------|-------|-------|-------|
+| T-01 | done | worker | Duplicate F-09 session reconciled to canonical closeout; implementation evidence lives in `.agents/wb/260528_2137_f09-closeout/`. (evidence: E-20260530160657835050) |
+
+**State values:** `pending` | `in_progress` | `problem` | `moved` | `implemented_untested` | `tested_needs_spec_validation` | `done`
+
+- `pending` - not started
+- `in_progress` - actively being executed
+- `problem` - a real blocker exists
+- `moved` - deferred to a later plan/session; Notes must include destination + reason
+- `implemented_untested` - code or docs are in place, validation has not run yet
+- `tested_needs_spec_validation` - validation passed, but spec/UX/acceptance validation is still pending
+- `done` - finished; requires task-scoped `.evidence.jsonl` closure evidence,
+  valid `evidence_id`, and no unresolved blocking failed evidence. Use explicit
+  `N/A` only when validation truly does not apply.
+
+**Task ID format:** `T-01`, `T-02`, ... (ou `T-001` para boards grandes)
+
+**State marker rules:** See [../standards/checkbox-protocol.md](../standards/checkbox-protocol.md)
+
+## Governance Context
+
+- Roadmap feature: `F-09`
+- Parent spec: `260521_0090_template-update-and-versioning_spec_01`
+- Child spec: ``
+- Task rule:
+  - Tasks execute approved intent; they do not replace roadmap/spec definition.
+
+## Relevant Lessons
+
+Before starting work, consult relevant resources:
+
+### Prevention Rules
+
+- [ ] Check [../lessons/general-lessons.md](../lessons/general-lessons.md)
+- [ ] Check lesson entries in [../lessons/entries/](../lessons/entries/)
+
+### Useful Resources
+
+- Rules useful for this task:
+  - [ ] <rule-1>
+- Docs useful for this task:
+  - [ ] <doc-1>
+- Skills useful for this task:
+  - [ ] <skill-1>
+- Integrations useful for this task:
+  - [ ] <integration-1>
+
+## Implementation Checkpoint
+
+- Files touched:
+  - <path>
+- Key decisions:
+  - <decision>
+- Deferred work:
+  - Destination: <session/plan or N/A>
+  - Reason: <why the task was moved or N/A>
+- Validation notes:
+  - <evidence or N/A>
+
+## Test Gate
+
+- Move to `implemented_untested` only after the implementation checkpoint.
+- Move to `tested_needs_spec_validation` only when runtime validation passed but spec/UX validation is still pending.
+- Record the real command or gate, result, artifact path or note, and returned evidence id before marking `done`.
+- If validation does not apply, record `N/A` explicitly in the evidence ledger before marking `done`.
+
+### Test Evidence
+
+- Command: `<command>`
+- Result: <pass/fail>
+- Evidence: <paste output snippet or link or N/A>
+
+---
+
+*Template: `docs/templates/task.md`*
