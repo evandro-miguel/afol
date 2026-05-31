@@ -72,3 +72,16 @@ protected paths are blocked; common moves do not require manual file handling.
 - Closeout session: `.agents/wb/260528_1145_f08-safe-file-mutation-undo/`.
 - Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_1145_f08-safe-file-mutation-undo/` passed.
 - Board cleanup accepted in `cb2e024`.
+
+## 9) Hermes Benchmark Decisions
+
+- Pattern: security and approval guard before mutation.
+- Hermes source concept: approval/security guard classifies side effects and
+  requires explicit policy before dangerous operations run.
+- Local decision: adapt as fail-closed noninteractive behavior with
+  path/env/secret guardrails, denylist policy, and auditable bypass records.
+- Acceptance criteria: dangerous noninteractive operations fail closed;
+  protected paths and secret-bearing inputs are blocked or redacted; bypasses
+  require an explicit flag, reason, and event/mutation journal entry.
+- Non-goals: no auto-approval for destructive operations, no mutation outside
+  the project root, no raw browser/CDP control by default.

@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -177,6 +184,60 @@ describe("kernel front-door", () => {
         expect(proc.stdout as string).toContain("Usage: afol verify-tasks");
         expect(proc.stdout as string).not.toContain("LEGACY:");
       }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("new --help is native help only and does not create session", () => {
+    const root = mkdtempSync(join(tmpdir(), "kernel-new-help-"));
+    try {
+      const proc = runKernel(root, ["new", "--help"]);
+
+      expect(proc.status).toBe(0);
+      expect((proc.stdout as string)).toContain("Usage: afol new");
+      expect((proc.stdout as string)).toContain("--intent");
+      expect((proc.stderr as string)).toBe("");
+      expect((proc.stdout as string)).not.toContain("session created:");
+      expect(existsSync(join(root, ".agents", "wb"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("new accepts governed metadata flags and bypasses legacy wrapper", () => {
+    const script = "#!/usr/bin/env bash\necho LEGACY:$*";
+    const root = mkProjectRoot("new-governed-flags", script);
+    try {
+      const proc = runKernel(root, [
+        "n",
+        "retirement-bridge",
+        "--intent",
+        "delivery",
+        "--feature-id",
+        "F-00",
+        "--parent-spec",
+        "260531_parent_spec_01",
+        "--task",
+        "Implement retirement bootstrap parity",
+      ]);
+
+      expect(proc.status).toBe(0);
+      expect((proc.stdout as string)).toContain("session created:");
+      expect((proc.stderr as string)).toBe("");
+      expect((proc.stdout as string)).not.toContain("LEGACY:");
+      const match = /session created:\s*(.*)/.exec(proc.stdout as string);
+      expect(match).not.toBeNull();
+      const session = (match?.[1] ?? "").trim();
+
+      const planPath = join(root, ".agents", "wb", session, `${session}_plan_01.md`);
+      const plan = readFileSync(planPath, "utf8");
+
+      expect(plan).toContain("## Native command metadata");
+      expect(plan).toContain("feature_id: F-00");
+      expect(plan).toContain("parent_spec: 260531_parent_spec_01");
+      expect(plan).toContain("intent: delivery");
+      expect(plan).toContain("task: Implement retirement bootstrap parity");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -2,22 +2,29 @@ import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import type { BootstrapManifestEntry } from "../services/bootstrap/planner";
+import { cleanupBootstrapObsolete, planBootstrapCleanup } from "../services/bootstrap/cleanup";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
 
 type BootstrapArgs = {
   targetRoot: string;
   dryRun: boolean;
   forceManaged: boolean;
+  cleanupObsolete: boolean;
 };
 
 function parseBootstrapArgs(args: string[]): BootstrapArgs {
   let targetRoot = "";
   let dryRun = false;
   let forceManaged = false;
+  let cleanupObsolete = false;
 
   for (const arg of args) {
     if (arg === "--dry-run") {
       dryRun = true;
+      continue;
+    }
+    if (arg === "--cleanup-obsolete") {
+      cleanupObsolete = true;
       continue;
     }
     if (arg === "--force-managed") {
@@ -45,6 +52,7 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
     targetRoot: resolve(targetRoot),
     dryRun,
     forceManaged,
+    cleanupObsolete,
   };
 }
 
@@ -109,6 +117,7 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
     currentFiles,
     manifest,
   });
+  const cleanupPlan = planBootstrapCleanup(parsed.targetRoot);
 
   const conflicts = plan.operations.filter((operation) => operation.kind === "conflict");
   const writable = plan.operations.filter((operation) =>
@@ -122,11 +131,15 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
       `files=${Object.keys(DEFAULT_TEMPLATE_FILES).length}`,
       `operations=${plan.operations.length}`,
       `conflicts=${conflicts.length}`,
+      `cleanup=${cleanupPlan.candidates.length}`,
     ].join(" "),
   );
 
   for (const operation of plan.operations) {
     console.log(`${operation.kind} ${operation.path} ${operation.reason}`);
+  }
+  for (const candidate of cleanupPlan.candidates) {
+    console.log(`cleanup-pending ${candidate.path} ${candidate.reason}`);
   }
 
   if (parsed.dryRun) {
@@ -140,6 +153,12 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
 
   for (const operation of writable) {
     await writeTemplateFile(parsed.targetRoot, operation.path);
+  }
+  if (parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) {
+    cleanupBootstrapObsolete(parsed.targetRoot, cleanupPlan.candidates);
+    for (const candidate of cleanupPlan.candidates) {
+      console.log(`cleanup-removed ${candidate.path} ${candidate.reason}`);
+    }
   }
   if (parsed.forceManaged) {
     for (const operation of conflicts) {

@@ -202,3 +202,16 @@ Implementation starts with failing tests for:
 - Strict verification:
   `./.agents/agents verify-tasks --strict .agents/wb/260528_0722_slice2-cli-kernel-front-door/`
   passed.
+
+## 12) Hermes Benchmark Decisions
+
+- Pattern: registry-defined actions and standardized command results.
+- Hermes source concept: tool specs define metadata, input contracts, guards,
+  and output shape before runtime adapters expose them.
+- Local decision: adapt as CLI-kernel `ActionSpec` and `ResultEnvelope`; defer
+  broader discovery until the command surface is stable.
+- Acceptance criteria: CLI registry exposes command metadata as canonical
+  source; every command returns a typed result envelope for compact and JSON
+  output; unsupported or unsafe roots fail before mutation.
+- Non-goals: no Hermes runtime clone, no progressive tool discovery as an MVP
+  dependency, no auto-install of external tools.

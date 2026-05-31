@@ -40,6 +40,8 @@ risk_level: medium
 - This spec does not replace roadmap/spec/workbench governance with ad hoc root markdown files.
 - This spec does not introduce cloud memory, vector databases, or cross-repo state.
 - This spec does not require heavyweight hooks that are unavailable across runtimes.
+- This spec does not let provider hooks create a second source of truth outside
+  `.agents/wb/`, `.agents/data/`, and explicit draft artifacts.
 
 ## 4) Scope
 
@@ -54,6 +56,8 @@ Out of scope:
 
 - Rebuilding the workbench around separate root-level `task_plan.md`, `findings.md`, and `progress.md` files.
 - Runtime-specific hidden memory systems outside repository artifacts.
+- Automatic durable memory writes from Codex-specific hooks or any other
+  provider-specific runtime integration.
 
 ## 5) Users and Use Cases
 
@@ -89,6 +93,9 @@ Key design choices:
 - Teach runtimes and docs a simple mapping between lightweight memory concepts and governed workbench artifacts.
 - Add validation heuristics for stale research/log artifacts when plans or implementations advance after large exploration bursts.
 - Route all external and instruction-like content to `research` artifacts, never to `plan`.
+- Accept provider-neutral lifecycle events as optional context signals only.
+  They can help catchup, memory lookup, and skill suggestion, but governed
+  workbench artifacts stay canonical.
 
 ## 8) Experience and Behavior
 
@@ -96,6 +103,8 @@ Key design choices:
   - A catchup command reports active session, changed files, stale/missing artifacts, and the next safe planning step.
   - Operators can understand the system through a lightweight "plan/findings/progress" lens while still using workbench docs.
   - Review and verification flows surface when exploration evidence was not persisted.
+  - Lifecycle-event context can suggest missing memory, research, or skill
+    artifacts without silently applying those suggestions.
 - Failure handling:
   - If no active session exists, the system should point to recent sessions and recommend creating or selecting one.
   - If git drift exists without corresponding log/report updates, the system should flag that mismatch before execution continues.
@@ -126,7 +135,25 @@ Key design choices:
 3. Extend status/review/verify with freshness signals.
 4. Update templates and runtime docs only after command semantics are stable.
 
-## 13) Acceptance Checklist
+## 13) Architecture Delta: Event-Assisted Memory
+
+Follow-up delta captured on 2026-05-31: memory integration should be driven by
+the provider-neutral lifecycle event contract, not by code that assumes agents
+run inside a specific provider process.
+
+Lifecycle events may provide:
+
+- session and task references for catchup,
+- artifact paths for recent evidence,
+- redacted summaries for memory lookup,
+- candidate triggers for skill suggestion.
+
+They must not create hidden memory, bypass workbench provenance, or store raw
+private prompts by default. Event-assisted memory is an input to governed
+resume/catchup and explicit suggestion flows; it is not a replacement for
+workbench plans, research, logs, tasks, reports, or evidence.
+
+## 14) Acceptance Checklist
 
 - [x] Objective and non-goals are explicit
 - [x] Canonical mapping is explicit

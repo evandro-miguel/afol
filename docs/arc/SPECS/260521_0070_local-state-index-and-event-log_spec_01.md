@@ -70,3 +70,44 @@ can be rebuilt; stale state is detectable; event data stays local.
 - Accepted implementation evidence: `E-20260528112023377690`.
 - Closeout session: `.agents/wb/260528_1111_f07-local-state-review-fix/`.
 - Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_1111_f07-local-state-review-fix/` passed.
+
+## 9) Architecture Delta: Lifecycle Event Intake
+
+Follow-up delta captured on 2026-05-31: the local event log should accept
+provider-neutral lifecycle events from hooks, wrappers, MCP tools, and manual
+commands through the same CLI core path.
+
+The event/index layer stores local event metadata, freshness stamps, provider
+ids, session/task references, validation outcomes, and artifact references. It
+must not collect raw private prompts by default.
+
+Lifecycle-derived artifacts should stay local and rebuildable:
+
+- durable event records under `.agents/data/events/`
+- derived indexes under `.agents/data/index/`
+- draft skill candidates under `.agents/tmp/skill-suggestions/`
+
+This keeps memory, knowledge, and skill suggestion features queryable without
+turning the scaffold into an always-on daemon, cloud sync service, or hidden
+runtime transcript store.
+
+Pending follow-up:
+
+- Add a typed event schema for lifecycle intake.
+- Define redaction/default-retention rules for provider payloads.
+- Index suggestion artifact provenance so duplicate skill proposals can be
+  detected without rescanning every draft.
+
+## 10) Hermes Benchmark Decisions
+
+- Pattern: local indexes expose typed state without becoming a discovery
+  marketplace.
+- Hermes source concept: tool catalogs and capability metadata are queryable
+  through structured registries.
+- Local decision: adapt registry-derived command, capability, skill, and event
+  indexes; defer progressive tool discovery until core commands justify it.
+- Acceptance criteria: local indexes can rebuild from structured state and
+  events; registry metadata remains canonical; event records include
+  provenance, touched paths, and validation outcome where available.
+- Non-goals: no heavy vector database in the MVP, no private prompt capture by
+  default, no marketplace-style tool discovery.

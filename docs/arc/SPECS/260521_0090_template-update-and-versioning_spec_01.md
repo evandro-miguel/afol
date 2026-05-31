@@ -79,3 +79,17 @@ managed files update safely; validation runs after update.
     lock and manifest.
 - Closeout session: `.agents/wb/260528_2137_f09-closeout/`
 - Status: final
+
+## 9) Hermes Benchmark Decisions
+
+- Pattern: update reports must expose ownership, provenance, and drift.
+- Hermes source concept: mature install/update flows distinguish created,
+  updated, skipped, preserved, and conflicted artifacts.
+- Local decision: adapt as bootstrap/update audit output without adopting a
+  vendor marketplace or lazy install flow.
+- Acceptance criteria: bootstrap and update reports list
+  create/update/skip/preserve/conflict decisions with ownership and provenance;
+  conflicts fail before overwrite; local edits remain preserved or explicitly
+  flagged.
+- Non-goals: no silent automatic updates, no lazy dependency install, no
+  gateway monorepo bootstrap.

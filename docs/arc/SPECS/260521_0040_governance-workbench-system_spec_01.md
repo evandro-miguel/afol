@@ -73,3 +73,16 @@ missing required state.
 - Accepted implementation evidence: `E-20260528084521802724`.
 - Closeout session: `.agents/wb/260528_0833_f04-workbench-core-review-fix/`.
 - Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_0833_f04-workbench-core-review-fix/` passed.
+
+## 9) Hermes Benchmark Decisions
+
+- Pattern: separate structured state from operator-facing projections.
+- Hermes source concept: mature agents keep runtime state queryable through
+  explicit contracts instead of treating prose files as the data model.
+- Local decision: adapt as `WorkbenchState` core with Markdown plans, tasks,
+  reports, and handoffs as projections.
+- Acceptance criteria: structured workbench state is the source of truth;
+  Markdown can be regenerated or checked against state; task completion still
+  requires evidence.
+- Non-goals: no always-on orchestration service, no hidden remote state, no
+  conversion of the workbench into a general issue tracker.

@@ -11,16 +11,18 @@ updated_at: "2026-05-28T09:48:25Z"
 
 ## What This System Appears To Do
 
-- Python utilities or service-side scripts are present and should be considered part of the operating surface.
+- Python utilities or service-side scripts are present only as migration-only factory compatibility
+  surfaces, not as the public runtime entrypoint.
 - Dominant feature clusters: `.agents/scripts, docs, .agents/skills`.
-- Public boundaries currently concentrate in `.agents/agents`, `Justfile`, and the runtime instruction entrypoints.
+- Public boundaries currently concentrate in `afol`/`./a`, `Justfile`, and runtime instruction entrypoints.
 ## Runtime Topology
 
 - Cross-domain flows must be inferred from the available route, symbol, and dependency artifacts.
 
 ## Why The Main Domains Exist
 
-- `.agents/scripts`: Operational Python command family for doctor, bootstrap, sync, repo-map, workbench, and validation flows.
+- `.agents/scripts`: Operational Python command family retained for factory compatibility fallback;
+  not part of downstream public runtime paths.
 - `docs/`: Standards, templates, goal-state canon, patterns, telemetry docs, and other project-facing documentation surfaces.
 - `.agents/skills`: Repo-local skill payloads selected for interactive runtimes.
 - Runtime instruction entrypoints (`AGENTS.md` and the Claude mirror): Thin contract surfaces for interactive runtimes.

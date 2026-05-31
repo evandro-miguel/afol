@@ -52,8 +52,18 @@ const HELP_LINES = [
   "  afol s",
   "  afol validate",
   "  afol init --dry-run",
-  "  afol new <theme>",
+  "  afol new <theme> [--intent ...] [--feature-id ...] [--parent-spec ...] [--task ...]",
   "  afol done -T T-01",
+].join("\n");
+
+const NEW_COMMAND_HELP = [
+  "Usage: afol new <theme> [options]",
+  "",
+  "Options",
+  "  --intent <intent>        Delivery or planning intent",
+  "  --feature-id <id>        Governing roadmap feature ID",
+  "  --parent-spec <spec-id>  Parent spec identifier",
+  "  --task <text>            Initial task summary",
 ].join("\n");
 
 const exit = (code: number): never => {
@@ -122,6 +132,15 @@ export async function main(argv: string[]): Promise<number> {
   if (resolution.kind === "unknown") {
     console.error(resolution.message);
     return resolution.exitCode;
+  }
+
+  if (
+    resolution.kind === "new" &&
+    resolution.args.length === 1 &&
+    (resolution.args[0] === "-h" || resolution.args[0] === "--help")
+  ) {
+    console.log(NEW_COMMAND_HELP);
+    return 0;
   }
 
   if (resolution.kind === "bootstrap") {

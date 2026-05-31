@@ -185,3 +185,16 @@ err missing-evidence task=T-01 hint="run afol evidence add -t T-01 -c <cmd> -r p
 - Strict verification:
   `./.agents/agents verify-tasks --strict .agents/wb/260529_1336_f03-kernel-grammar-alias-help/`
   passed.
+
+## 12) Hermes Benchmark Decisions
+
+- Pattern: generate help, catalogs, and capability views from one registry.
+- Hermes source concept: toolsets/capabilities group tool specs into
+  discoverable surfaces.
+- Local decision: adapt as command groups and generated help/catalog output
+  backed by the CLI registry.
+- Acceptance criteria: aliases, command metadata, help, and capability listings
+  resolve from the registry; `ResultEnvelope` remains the output contract for
+  both compact and JSON modes.
+- Non-goals: no dynamic marketplace discovery, no progressive tool discovery
+  before command groups and help snapshots prove the need.

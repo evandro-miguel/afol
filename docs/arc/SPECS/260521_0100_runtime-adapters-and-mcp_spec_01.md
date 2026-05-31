@@ -179,3 +179,60 @@ Out of scope:
 - Accepted implementation evidence: `E-20260528134556147936`.
 - Closeout session: `.agents/wb/260528_1343_runtime-adapters-and-mcp/`.
 - Status: final
+
+## 12) Architecture Delta: Provider-Neutral Lifecycle Events
+
+Follow-up delta captured on 2026-05-31: provider hooks are adapter triggers,
+not a new core runtime. The core contract should accept lifecycle events
+through one provider-neutral command shape:
+
+```bash
+afol lifecycle event --provider <provider-id> --event <event-name> --json <payload.json>
+```
+
+Initial lifecycle events:
+
+- `session.start`
+- `turn.start`
+- `turn.end`
+- `session.end`
+- `compact.before`
+- `compact.after`
+
+Codex hooks are only one adapter path. A native Codex hook, a shell wrapper,
+an MCP tool, or another provider-specific integration must all call the same
+`afol lifecycle event` contract and receive the same typed result envelope.
+Providers without native hook support can still participate through wrappers,
+manual commands, or MCP-triggered event calls.
+
+Lifecycle events may request read-only context lookup, append local event
+metadata, or emit suggestion artifacts. They must not directly materialize new
+skills, mutate governed workbench state, or write provider-specific runtime
+state without an explicit apply command.
+
+Payloads should default to redacted metadata and artifact references instead
+of raw private prompts. Raw transcript ingestion is out of scope unless a
+future spec adds an explicit opt-in privacy contract.
+
+Pending follow-up:
+
+- Define the typed `LifecycleEvent` and `LifecycleResult` schemas.
+- Add a CLI command and adapter mapping for `afol lifecycle event`.
+- Add at least one Codex hook adapter proof while keeping the provider-neutral
+  command as the stable interface.
+- Add parity tests that prove hook, wrapper, and MCP-triggered calls route
+  through the same core behavior.
+
+## 13) Hermes Benchmark Decisions
+
+- Pattern: adapters and MCP tools are generated from the shared action
+  contract, not hand-built runtime forks.
+- Hermes source concept: tool specs, toolsets, and catalogs define the tool
+  surface before transports expose it.
+- Local decision: adapt `ActionSpec`, `ResultEnvelope`, and curated MCP catalog
+  concepts; keep MCP/adapters deferred unless explicitly enabled and tested.
+- Acceptance criteria: MCP tools map to CLI registry actions through shared
+  core; adapter output uses `ResultEnvelope`; catalog entries are curated,
+  late-bound, and disabled by default until parity tests exist.
+- Non-goals: no raw CDP/browser control by default, no large gateway runtime,
+  no progressive tool discovery before core CLI stability.

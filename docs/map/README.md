@@ -17,6 +17,9 @@ This folder is the live current-state map for the repo.
 - Exportable downstream scaffold source is `src/project-template/**`.
 - Root `.agents/scripts/**` and `.agents/runtime/**` are factory-only legacy/compat surfaces during migration.
 - The clean template excludes `.agents/scripts/**`, `.agents/runtime/**`, `.agents/agents`, `.agents/agents-mcp`, and Python env files such as `**/*.py`, `**/pyproject.toml`, `**/uv.lock`, `**/.venv/**`, and `**/__pycache__/**`.
+- Legacy factory Python/command shim paths are retained for compatibility while any delegated
+  command family remains native-migration-only; they are retired only when parity gates
+  demonstrate full replacement.
 - `docs/map/` is current-state evidence only; goal-state canon stays in `docs/arc/`.
 
 ## Current Commands

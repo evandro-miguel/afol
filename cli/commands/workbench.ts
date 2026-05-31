@@ -6,6 +6,7 @@ import {
   readActiveSession,
   recordEvidence,
   startTask,
+  type NewWorkstreamMetadata,
 } from "../services/workbench/lifecycle";
 import { formatVerifyReport, verifyWorkbenchTasks } from "../services/workbench/verify";
 import { spawnSync } from "node:child_process";
@@ -25,6 +26,11 @@ type DoneArgs = SessionTaskArgs & {
   testCommand: string | null;
 };
 
+type NewCommandArgs = {
+  theme: string;
+  metadata: NewWorkstreamMetadata;
+};
+
 type LogArgs = {
   session: string;
   message: string;
@@ -35,15 +41,58 @@ type VerifyArgs = {
   strict: boolean;
 };
 
-function parseNewArgs(args: string[]): { theme: string } {
+function parseNewArgs(args: string[]): NewCommandArgs {
   const [theme, ...rest] = args;
   if (!theme) {
     throw new Error("Missing theme for new workstream.");
   }
-  if (rest.length > 0) {
-    throw new Error(`Unexpected new arguments: ${rest.join(" ")}`);
+  if (theme === "--help" || theme === "-h") {
+    throw new Error("Missing theme for new workstream.");
   }
-  return { theme };
+  const metadata: NewWorkstreamMetadata = {};
+  if (rest.length > 0) {
+    for (let index = 0; index < rest.length; index += 1) {
+      const arg = rest[index];
+      if (arg === "--intent") {
+        const value = rest[index + 1];
+        if (!value) {
+          throw new Error("Missing value for --intent in new.");
+        }
+        metadata.intent = value;
+        index += 1;
+        continue;
+      }
+      if (arg === "--feature-id") {
+        const value = rest[index + 1];
+        if (!value) {
+          throw new Error("Missing value for --feature-id in new.");
+        }
+        metadata.featureId = value;
+        index += 1;
+        continue;
+      }
+      if (arg === "--parent-spec") {
+        const value = rest[index + 1];
+        if (!value) {
+          throw new Error("Missing value for --parent-spec in new.");
+        }
+        metadata.parentSpec = value;
+        index += 1;
+        continue;
+      }
+      if (arg === "--task") {
+        const value = rest[index + 1];
+        if (!value) {
+          throw new Error("Missing value for --task in new.");
+        }
+        metadata.task = value;
+        index += 1;
+        continue;
+      }
+      throw new Error(`Unknown new argument: ${arg}`);
+    }
+  }
+  return { theme, metadata };
 }
 
 function resolveSession(root: string, session: string, commandName: string): string {
@@ -357,7 +406,7 @@ function runVerification(root: string, command: string): { exitCode: number } {
 export async function runNewCommand(args: string[], root: string = process.cwd()): Promise<number> {
   try {
     const parsed = parseNewArgs(args);
-    const created = newWorkstream(root, parsed.theme);
+    const created = newWorkstream(root, parsed.theme, parsed.metadata);
     console.log(`session created: ${created.session}`);
     return 0;
   } catch (error) {

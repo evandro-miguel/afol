@@ -19,7 +19,9 @@ updated_at: '2026-03-06T22:29:30-03:00'
 
 - `src/project-template/` is the exportable scaffold source
 - `.agents/agents`, `.agents/scripts`, and `.agents/runtime` stay in the
-  factory tree as legacy compatibility during migration
+  factory tree as legacy compatibility during migration; they are retained for
+  fallback-only behavior and are retired only when all delegated command families
+  are covered by native TS implementations.
 - Root `.agents/wb/` is factory workbench history and does not ship downstream
 
 ## Runtime Surface

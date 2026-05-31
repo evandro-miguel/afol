@@ -11,7 +11,12 @@ function parseInitArgs(args: string[]): InitArgs {
   const forwarded: string[] = [];
 
   for (const arg of args) {
-    if (arg === "--dry-run" || arg === "--force-managed" || arg === "--partial") {
+    if (
+      arg === "--dry-run" ||
+      arg === "--force-managed" ||
+      arg === "--cleanup-obsolete" ||
+      arg === "--partial"
+    ) {
       forwarded.push(arg);
       continue;
     }

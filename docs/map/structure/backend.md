@@ -14,11 +14,13 @@ The live backend is the Bun/TypeScript CLI in `cli/`.
 
 ## Compatibility Surfaces
 
-- Root `.agents/scripts/**` and `.agents/runtime/**` still exist, but they are migration-era factory surfaces rather than the primary app backend.
+- Root `.agents/scripts/**` and `.agents/runtime/**` still exist, but they are migration-era factory compatibility surfaces
+  retained until delegated command families are replaced natively.
 - `src/project-template/**` contains the downstream scaffold copy of the current template payload.
 
 ## What The Code Is Doing
 
 - The CLI prefers native Bun/TS commands first.
 - Template generation and bootstrap checks enforce the export boundary.
-- Python-backed surfaces are still present only where the factory repo needs them for compatibility and migration.
+- Python-backed compatibility surfaces are still present only where the factory repo needs them for fallback; they remain until native TS
+  parity reaches the delegated command families they cover.

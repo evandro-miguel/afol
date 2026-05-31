@@ -53,6 +53,17 @@ schema loading. The generated template module exists to support the exported
 baseline, but the factory runtime remains outside `src/project-template/` until
 TypeScript parity is proven.
 
+Safe-retirement rule:
+factory-only Python/legacy compatibility paths remain in root factory state only
+as migration fallbacks and are retired only after delegated command families are
+covered by native TypeScript implementations and gate evidence confirms a safe
+transition.
+
+Provider-specific lifecycle hooks follow the same boundary. Codex hooks,
+wrapper scripts, MCP-triggered events, or future provider adapters belong to
+CLI/factory behavior. The template may carry only provider-neutral policy,
+manifest, lock, and local state needed by the CLI to interpret those events.
+
 ## 4) Product Boundary
 
 ```text
@@ -65,6 +76,11 @@ local governance.
 It must not carry factory runtime, legacy Python command surfaces, or
 development-only scripts.
 
+Lifecycle-event support must not become a reason to export provider-specific
+hook runtimes into `src/project-template/`. Downstream installs should receive
+state and configuration only; `afol lifecycle event` remains universal CLI
+behavior.
+
 Related spec: `260521_0010_universal-agent-cli_spec_01`
 
 ## 5) Scope
@@ -76,6 +92,11 @@ In scope:
 - Generated template module presence.
 - CLI core ownership of registry, router, result, project-root, and schema.
 - Verification for template and bootstrap clean state.
+- Policy/manifest allowance for provider-neutral lifecycle behavior, if needed
+  by the CLI contract.
+- Retirement evidence rule: root legacy command surfaces remain active until
+  native parity is proven for each delegated family; explicit removal is outside
+  the in-scope cleanup.
 
 Out of scope:
 
@@ -84,6 +105,8 @@ Out of scope:
 - Deleting factory runtime surfaces before TypeScript parity exists.
 - Expanding downstream template beyond state-only needs.
 - Moving factory runtime into exported template paths.
+- Shipping Codex-specific hook code, wrapper scripts, or long-lived provider
+  runtimes as downstream template payload.
 
 ## 6) Non-goals
 
@@ -110,11 +133,19 @@ Backout is to preserve the compatibility runtime outside downstream template
 paths and keep the legacy flow available until the Bun-native boundary is
 proven.
 
+Retirement condition:
+`.agents/agents`, `.agents/scripts`, and `.agents/runtime` are only retired by
+a dedicated cleanup stream after all delegated command families are proven native and
+all gate evidence (`validate:template`, `validate:bootstrap`) passes.
+
 ## 9) Acceptance
 
 - `src/project-template` contains no `.py`, `.agents/scripts`, `.agents/runtime`,
   `.agents/agents`, `.agents/agents-mcp`, `pyproject.toml`, `uv.lock`, or
   `.venv`.
+- Root factory legacy compatibility paths (`.agents/agents`, `.agents/scripts`,
+  `.agents/runtime`) are not declared removed in this stream; they remain until
+  full native replacement for all delegated command families is complete.
 - Bootstrap copies only the allowlisted policy and manifest files.
 - The generated template module exists and resolves cleanly.
 - CLI core owns registry, router, result envelope, project-root detection, and
@@ -122,8 +153,23 @@ proven.
 - Bun tests, typecheck, `validate:template`, and `validate:bootstrap` pass.
 - Factory runtime remains only outside downstream template until TS parity is
   complete.
+- Provider hook support, when added, does not expand the template beyond
+  state-only policy, manifest, lock, and local governance files.
 
-## 10) Related Specs
+## 10) Hermes Benchmark Decisions
+
+- Pattern: keep the CLI/template boundary contract-driven.
+- Hermes source concept: mature registry/tool specs separate runtime behavior
+  from project state.
+- Local decision: adapt the contract discipline, but reject copying Hermes as a
+  product, gateway runtime, or monorepo.
+- Acceptance criteria: template export remains free of factory-only runtime,
+  scripts, caches, and legacy Python payloads; CLI registry and result handling
+  remain the canonical behavior surface.
+- Non-goals: no downstream runtime clone, no lazy vendor install, no raw
+  browser/CDP control in the template.
+
+## 11) Related Specs
 
 - Parent boundary: `260521_0020_minimal-project-template_spec_01`
 - CLI foundation: `260521_0010_universal-agent-cli_spec_01`

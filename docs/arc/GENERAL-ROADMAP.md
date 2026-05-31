@@ -66,6 +66,54 @@ The Bun/TypeScript reformulation must be staged:
 5. Shrink src/project-template only after bootstrap/export validation proves
    downstream installs still work.
 
+## 4.1) Hermes-Derived Architecture Hardening
+
+Hermes Agent is a benchmark for mature architectural contracts, not a product
+or monorepo to copy. The local decision is to adapt its strongest contract
+patterns into the existing Bun/TypeScript CLI and minimal template model.
+
+Phases:
+
+1. Phase 1: template/CLI boundary hardening.
+2. Phase 2: `ActionSpec`, `ResultEnvelope`, and generated help/catalog.
+3. Phase 3: `WorkbenchState` core with Markdown as projection.
+4. Phase 4: bootstrap provenance, conflict, and drift audit.
+5. Phase 5: security floor.
+6. Phase 6: optional adapters, MCP catalog, and tool discovery only after core
+   stability.
+
+Adapted patterns:
+
+- Registry/tool specs become CLI-kernel `ActionSpec` metadata and
+  `ResultEnvelope` output/error contracts.
+- Toolsets and capabilities become command groups and generated capability
+  views from the registry.
+- Approval and security guards become fail-closed noninteractive behavior,
+  path/env/secret guardrails, denylist policy, and auditable bypasses.
+- Skills guard becomes explicit scan/install/lock policy for skill material.
+- MCP catalog becomes curated, late-bound, and explicitly enabled instead of a
+  default surface.
+
+Rejected non-goals:
+
+- Raw CDP or browser control by default.
+- Dangerous auto-approval in noninteractive mode.
+- Lazy install or vendor marketplace behavior.
+- Large gateway runtime or monorepo adoption.
+- Progressive tool discovery before the command surface justifies it.
+
+Minimum acceptance:
+
+- CLI registry exposes command metadata as the canonical source.
+- `ResultEnvelope` standardizes command output and errors.
+- Workbench structured state is the source of truth; Markdown is projection.
+- Bootstrap reports create/update/skip/preserve/conflict with ownership and
+  provenance.
+- Noninteractive dangerous operations fail closed.
+- Template export remains free of factory-only runtime, scripts, and cache
+  payloads.
+- MCP/adapters remain deferred unless explicitly enabled and tested.
+
 ## 5) Feature Portfolio
 
 ### F-00 Total Reformulation Strategy

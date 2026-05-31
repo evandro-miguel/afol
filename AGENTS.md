@@ -16,6 +16,9 @@ and bootstrap assets for downstream repos.
 - Root `.agents/agents`, `.agents/scripts`, and `.agents/runtime` are
   factory-only legacy compatibility surfaces during migration; they are not
   part of the downstream template payload.
+- Public runtime usage for this repo remains `afol`/`./a` (TS-native path); the
+  compatibility surfaces above are internal factory fallback and must not be
+  documented as a public entrypoint.
 - Root `.agents/wb/` is development workbench history for this factory repo.
   It may be versioned on development branches such as `main_dev`, but it must
   not be treated as part of the downstream template payload.
@@ -26,6 +29,9 @@ and bootstrap assets for downstream repos.
 - Cleanup work must preserve this boundary: organize factory state in the root
   repo and harden export checks so factory-only material cannot leak into
   `src/project-template/` or downstream bootstrap output.
+- Safe retirement rule: remove or rework factory Python/legacy compatibility
+  surfaces only after all delegated command families have a proven native TS
+  replacement and gates confirm no downstream visibility.
 
 ## Governed Execution
 
@@ -48,7 +54,9 @@ and bootstrap assets for downstream repos.
   `cli/**`.
 - Tooling: Bash wrappers, Just, Markdown, YAML, JSON, and TOML.
 - Legacy compatibility: `.agents/agents`, `.agents/scripts`, and
-  `.agents/runtime` remain in the factory tree during migration only.
+  `.agents/runtime` remain in the factory tree during migration only; legacy
+  Python/uv-backed flows should be retired under the safe condition above, not
+  as a best-effort cleanup.
 - Runtime model: interactive CLI agents. Do not redesign this scaffold around
   long-lived backend agent services unless the roadmap introduces that use case.
 
@@ -92,7 +100,7 @@ and bootstrap assets for downstream repos.
   Keep full precise prose when compression could hide risk, order, or evidence.
 - Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
   CLI, and existing `docs/map/` before broad scans.
-- Prefer `.agents/agents knowledge pull "<topic>"` before opening historical
+- Prefer the native `knowledge pull "<topic>"` command before opening historical
   docs when prior work may answer the question.
 - Use RTK selectively for noisy shell output: `rtk git status`, `rtk find`,
   `rtk summary`, and bounded `rtk grep` with directory scope plus `--glob`.
@@ -198,7 +206,7 @@ and bootstrap assets for downstream repos.
 
 - Repo-local workbench docs and `knowledge` are canonical.
 - External memory is auxiliary retrieval only.
-- `.agents/agents memory search|context|recent|show` emits MCP contracts for
+- `knowledge search|context|recent|show` commands emit MCP contracts for
   host runtimes; it does not execute MCP calls from shell.
 
 <!-- gitnexus:start -->

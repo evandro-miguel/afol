@@ -24,6 +24,13 @@ export type EvidenceEntry = {
   exit_code?: number;
 };
 
+export type NewWorkstreamMetadata = {
+  intent?: string;
+  featureId?: string;
+  parentSpec?: string;
+  task?: string;
+};
+
 export type TimelineEntryResult = {
   logPath: string;
   message: string;
@@ -236,7 +243,11 @@ function insertTimelineEntry(content: string, message: string, now = new Date())
   return `${lines.join("\n").replace(/\n*$/g, "")}\n`;
 }
 
-export function newWorkstream(root: string, theme: string): NewWorkstreamResult {
+export function newWorkstream(
+  root: string,
+  theme: string,
+  metadata?: NewWorkstreamMetadata,
+): NewWorkstreamResult {
   const wbRoot = join(resolve(root), ".agents", "wb");
   mkdirSync(wbRoot, { recursive: true });
 
@@ -245,9 +256,24 @@ export function newWorkstream(root: string, theme: string): NewWorkstreamResult 
   const paths = sessionPaths(root, session);
   mkdirSync(paths.sessionDir, { recursive: true });
 
+  const metadataLines: string[] = [];
+  if (metadata?.intent) {
+    metadataLines.push(`- intent: ${metadata.intent}`);
+  }
+  if (metadata?.featureId) {
+    metadataLines.push(`- feature_id: ${metadata.featureId}`);
+  }
+  if (metadata?.parentSpec) {
+    metadataLines.push(`- parent_spec: ${metadata.parentSpec}`);
+  }
+  if (metadata?.task) {
+    metadataLines.push(`- task: ${metadata.task}`);
+  }
+  const metadataSection = metadataLines.length > 0 ? `\n\n## Native command metadata\n${metadataLines.join("\n")}` : "";
+
   writeFileSync(
     paths.planPath,
-    `# Plan: ${theme.trim()}\n\n- Created by native CLI workbench lifecycle.\n`,
+    `# Plan: ${theme.trim()}\n\n- Created by native CLI workbench lifecycle.${metadataSection}\n`,
     "utf8",
   );
   writeFileSync(
