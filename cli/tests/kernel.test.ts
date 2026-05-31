@@ -243,6 +243,21 @@ describe("kernel front-door", () => {
     }
   });
 
+  test("workbench task command rejects unsafe session identifiers", () => {
+    const root = mkProjectRoot("unsafe-session", "#!/usr/bin/env bash\necho LEGACY:$*");
+    try {
+      const proc = runKernel(root, ["start", "--session", "../bad-session", "T-01"]);
+
+      expect(proc.status).toBe(2);
+      expect(proc.stderr as string).toContain("Invalid session identifier");
+      expect(proc.stdout as string).toBe("");
+      expect(proc.stderr as string).not.toContain("LEGACY:");
+      expect(existsSync(join(root, ".agents", "wb"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("check routes to validation family", () => {
     const root = mkProjectRoot("check-route", "#!/usr/bin/env bash\necho LEGACY:$*\n");
     try {

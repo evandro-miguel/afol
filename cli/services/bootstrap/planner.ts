@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
+import { createPatch } from "diff";
 import { matchesTemplateForbiddenPattern } from "../../schemas/template-policy";
 import type { TemplateFileMap } from "../template/payload";
 
-export type ManagedOwnership = "managed" | "project-owned" | "generated";
+export type ManagedOwnership = "managed" | "project-owned" | "generated" | "ignored" | "conflict";
 
 export type BootstrapManifestEntry = {
   owner: ManagedOwnership;
-  hash: string;
+  hash?: string;
 };
 
 export type BootstrapOperationKind =
@@ -20,6 +21,8 @@ export type BootstrapOperation = {
   kind: BootstrapOperationKind;
   path: string;
   reason: string;
+  owner: ManagedOwnership;
+  diffPreview?: string;
 };
 
 export type BootstrapPlanInput = {
@@ -35,6 +38,14 @@ export type BootstrapPlan = {
 
 function sha256Hex(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function toOperationOwner(manifestOwner: ManagedOwnership | undefined): ManagedOwnership {
+  return manifestOwner ?? "managed";
+}
+
+function buildPatch(path: string, currentContent: string, templateContent: string): string {
+  return createPatch(path, currentContent, templateContent, "current", "template");
 }
 
 export function planBootstrapOperations(input: BootstrapPlanInput): BootstrapPlan {
@@ -54,12 +65,33 @@ export function planBootstrapOperations(input: BootstrapPlanInput): BootstrapPla
     }
     const currentContent = input.currentFiles[path];
     const manifestEntry = input.manifest[path];
+    const owner = toOperationOwner(manifestEntry?.owner);
+    const templateContent = Buffer.from(templateEntry.contentBase64, "base64").toString("utf8");
 
     if (typeof currentContent !== "string") {
+      if (manifestEntry?.owner === "ignored") {
+        operations.push({
+          kind: "preserve-project-owned",
+          path,
+          reason: "manifest-owner-ignored-missing",
+          owner: manifestEntry.owner,
+        });
+        continue;
+      }
+      if (manifestEntry?.owner === "project-owned") {
+        operations.push({
+          kind: "preserve-project-owned",
+          path,
+          reason: "manifest-owner-project-owned-missing",
+          owner: manifestEntry.owner,
+        });
+        continue;
+      }
       operations.push({
         kind: "create",
         path,
         reason: "missing-target-file",
+        owner,
       });
       continue;
     }
@@ -70,6 +102,7 @@ export function planBootstrapOperations(input: BootstrapPlanInput): BootstrapPla
         kind: "skip-identical",
         path,
         reason: "same-content-hash",
+        owner,
       });
       continue;
     }
@@ -79,6 +112,28 @@ export function planBootstrapOperations(input: BootstrapPlanInput): BootstrapPla
         kind: "preserve-project-owned",
         path,
         reason: "manifest-owner-project-owned",
+        owner: manifestEntry.owner,
+      });
+      continue;
+    }
+
+    if (manifestEntry?.owner === "ignored") {
+      operations.push({
+        kind: "preserve-project-owned",
+        path,
+        reason: "manifest-owner-ignored",
+        owner: manifestEntry.owner,
+      });
+      continue;
+    }
+
+    if (manifestEntry?.owner === "conflict") {
+      operations.push({
+        kind: "conflict",
+        path,
+        reason: "manifest-owner-conflict",
+        owner: "conflict",
+        diffPreview: buildPatch(path, currentContent, templateContent),
       });
       continue;
     }
@@ -88,6 +143,8 @@ export function planBootstrapOperations(input: BootstrapPlanInput): BootstrapPla
         kind: "update-managed",
         path,
         reason: "manifest-owner-generated",
+        owner: manifestEntry.owner,
+        diffPreview: buildPatch(path, currentContent, templateContent),
       });
       continue;
     }
@@ -97,6 +154,8 @@ export function planBootstrapOperations(input: BootstrapPlanInput): BootstrapPla
         kind: "update-managed",
         path,
         reason: "managed-hash-matches-manifest",
+        owner: manifestEntry.owner,
+        diffPreview: buildPatch(path, currentContent, templateContent),
       });
       continue;
     }
@@ -105,6 +164,8 @@ export function planBootstrapOperations(input: BootstrapPlanInput): BootstrapPla
       kind: "conflict",
       path,
       reason: "local-drift-or-unknown-ownership",
+      owner: owner === "managed" ? "conflict" : owner,
+      diffPreview: buildPatch(path, currentContent, templateContent),
     });
   }
 

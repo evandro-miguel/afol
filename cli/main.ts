@@ -19,6 +19,7 @@ import {
   runStartCommand,
   runVerifyTasksCommand,
 } from "./commands/workbench";
+import { runFileCommand } from "./commands/file";
 import { resolveCommand } from "./router";
 import { runValidationCommand } from "./validate/contract";
 import { loadProjectRoot } from "./services/project/root";
@@ -207,6 +208,10 @@ export async function main(argv: string[]): Promise<number> {
 
   if (resolution.kind === "close") {
     return runCloseCommand(resolution.args, project.value.root);
+  }
+
+  if (resolution.kind === "file") {
+    return runFileCommand(resolution.args, project.value.root);
   }
 
   return runLegacyAdapter(project.value.root, resolution.args);

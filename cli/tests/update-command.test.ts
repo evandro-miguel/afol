@@ -53,6 +53,10 @@ describe("update command", () => {
       expect(output.stdout.join("\n")).toContain("update check: changes available");
       expect(output.stdout.join("\n")).toContain("revision old -> new");
       expect(output.stdout.join("\n")).toContain("add command validate");
+      expect(output.stdout.join("\n")).toContain("ownership(current):");
+      expect(output.stdout.join("\n")).toContain("ownership(source):");
+      expect(output.stdout.join("\n")).toContain("diff previews:");
+      expect(output.stdout.join("\n")).toContain(".agents/manifest.json [owner=managed] manifest commands changed");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -64,10 +68,19 @@ describe("update command", () => {
       const preview = capture();
       expect(await runUpdateCommand(["preview"], root, preview.io)).toBe(0);
       expect(preview.stdout.join("\n")).toContain("preview operations:");
+      expect(preview.stdout.join("\n")).toContain("diff previews:");
+      expect(preview.stdout.join("\n")).toContain(".agents/lock.json [owner=managed] revision changed");
+      expect(preview.stdout.join("\n")).toContain("@@");
 
       const json = capture();
       expect(await runUpdateCommand(["ck", "--json"], root, json.io)).toBe(0);
-      expect(JSON.parse(json.stdout[0] ?? "{}")).toMatchObject({ hasSource: true, currentRevision: "old" });
+      const parsed = JSON.parse(json.stdout[0] ?? "{}") as {
+        hasSource: boolean;
+        currentRevision: string;
+        ownershipSource: Record<string, number>;
+      };
+      expect(parsed).toMatchObject({ hasSource: true, currentRevision: "old" });
+      expect(parsed.ownershipSource["managed"]).toBe(0);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -105,4 +105,47 @@ describe("project root loader", () => {
       rmSync(outside, { recursive: true, force: true });
     }
   });
+
+  test("rejects path traversal outside root", () => {
+    const root = mkProjectRoot("path-jail-traversal");
+    try {
+      const outside = resolveProjectPath(root, "../../outside");
+      expect(outside.ok).toBe(false);
+      if (!outside.ok) {
+        expect(outside.error).toContain("Path escapes project root");
+      }
+
+      const nestedTraversal = resolveProjectPath(root, "a/b/../../.agents");
+      expect(nestedTraversal.ok).toBe(true);
+      if (nestedTraversal.ok) {
+        expect(nestedTraversal.value.path).toBe(join(root, ".agents"));
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects absolute paths and symlink escapes", () => {
+    const root = mkProjectRoot("path-jail-abs");
+    const outside = mkdtempSync(join(tmpdir(), "project-root-outside-abs-"));
+    try {
+      const escaped = resolveProjectPath(root, outside);
+      expect(escaped.ok).toBe(false);
+      if (!escaped.ok) {
+        expect(escaped.error).toContain("Path escapes project root");
+      }
+
+      const outsideFile = join(outside, "payload.txt");
+      writeFileSync(outsideFile, "escape\n", "utf8");
+      symlinkSync(outside, join(root, "outside-link-abs"));
+      const symlinked = resolveProjectPath(root, "outside-link-abs/payload.txt");
+      expect(symlinked.ok).toBe(false);
+      if (!symlinked.ok) {
+        expect(symlinked.error).toContain("symlink outside project root");
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
 });

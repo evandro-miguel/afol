@@ -90,23 +90,37 @@ export function loadProjectRoot(startPath: string): Result<LoadedProjectRoot, { 
 
 export function resolveProjectPath(projectRoot: string, targetPath: string): Result<ProjectPath, string> {
   const root = realpathSync(projectRoot);
-  const candidate = resolve(root, targetPath);
-  if (!pathIsInsideRoot(root, candidate)) {
+
+  if (isAbsolute(targetPath)) {
     return err(`Path escapes project root: ${targetPath}`);
   }
 
-  let existing = existsSync(candidate) ? candidate : dirname(candidate);
-  while (!existsSync(existing)) {
-    const parent = dirname(existing);
-    if (parent === existing) {
-      return err(`Cannot resolve existing parent for path: ${targetPath}`);
+  let candidate = root;
+  for (const rawPart of targetPath.split(/[\\/]+/).filter((part) => part.length > 0)) {
+    if (rawPart === ".") {
+      continue;
     }
-    existing = parent;
+    if (rawPart === "..") {
+      candidate = dirname(candidate);
+      if (!pathIsInsideRoot(root, candidate)) {
+        return err(`Path escapes project root: ${targetPath}`);
+      }
+      continue;
+    }
+
+    const next = join(candidate, rawPart);
+    if (existsSync(next)) {
+      const realNext = realpathSync(next);
+      if (!pathIsInsideRoot(root, realNext)) {
+        return err(`Path crosses symlink outside project root: ${targetPath}`);
+      }
+    }
+    candidate = next;
   }
 
-  const realExisting = realpathSync(existing);
-  if (!pathIsInsideRoot(root, realExisting)) {
-    return err(`Path crosses symlink outside project root: ${targetPath}`);
+  candidate = resolve(root, targetPath);
+  if (!pathIsInsideRoot(root, candidate)) {
+    return err(`Path escapes project root: ${targetPath}`);
   }
 
   return ok({

@@ -13,6 +13,7 @@ export type CommandKind =
   | "rule"
   | "skill"
   | "update"
+  | "file"
   | "delegate";
 export type CommandSideEffect = "read" | "write" | "append" | "generated";
 
@@ -36,8 +37,8 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
   { command: "rule", aliases: ["r"], kind: "rule", sideEffect: "read" },
   { command: "skill", aliases: ["sk"], kind: "skill", sideEffect: "read" },
   { command: "query", aliases: ["q"], kind: "delegate", sideEffect: "read" },
-  { command: "file", aliases: ["f"], kind: "delegate", sideEffect: "write" },
   { command: "close", aliases: ["c"], kind: "close", sideEffect: "write" },
+  { command: "file", aliases: ["f"], kind: "file", sideEffect: "write" },
   { command: "undo", aliases: ["u"], kind: "delegate", sideEffect: "write" },
   { command: "update", aliases: ["up"], kind: "update", sideEffect: "read" },
   { command: "bootstrap", aliases: ["b"], kind: "bootstrap", sideEffect: "write" },

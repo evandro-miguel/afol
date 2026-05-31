@@ -39,6 +39,9 @@ Future users can install the CLI, initialize a project, run ./a s, create
 governed tasks, add evidence, close sessions, and update the local template
 without reading long internal docs.
 
+The public command name is `afol`; `./a` remains a local compatibility wrapper
+while migration parity is incomplete.
+
 ## 4) Product Boundary
 
 The universal CLI owns reusable behavior. The project-local template owns local
@@ -54,10 +57,46 @@ examples, public-safe assumptions, versioning model.
 Out of scope: Hosted service, marketplace, large plugin ecosystem before core
 stability, public launch before internal MVP works.
 
+## 5.1) Distribution Addendum 2026-05-31
+
+Release packaging should follow the smallest proven path first:
+
+1. Package entrypoint: keep `"bin": { "afol": "./afol" }` for local and package
+   manager installs.
+2. Standalone artifact: build `dist/afol` with `bun build --compile` and smoke
+   `./dist/afol --help`.
+3. Reproducibility: validate release candidates from a clean checkout with
+   `bun install --frozen-lockfile`.
+4. Platform targets: only claim Linux/macOS/Windows targets after each target
+   has native or VM-backed smoke evidence.
+5. Provenance: publish checksums and version metadata with any binary release.
+6. macOS: disclose non-notarized status until signing/notarization is actually
+   implemented.
+7. Installers: Homebrew taps and `curl | bash` scripts are future channels, not
+   MVP requirements.
+
+Rejected for the current public-readiness lane:
+
+- adopting Bunli, meow, Ace CLI/Bejibun, or another framework as a wholesale
+  replacement for the local registry/router;
+- adding Node.js fallback before a concrete downstream stability requirement;
+- shipping interactive-first setup that blocks noninteractive agents.
+
+### 5.1.1) Script Mapping
+
+- `bun run build:deterministic` for frozen-lockfile compile and stable artifact
+  verification.
+- `bun run smoke:dist` for standalone binary smoke validation.
+- `bun run validate:security` for optional OSV/Gitleaks scans (informative when
+  scanners are missing).
+
 ## 6) Acceptance
 
 A new user can understand the tool quickly; first-run setup is simple; example
 project works; private assumptions are removed; docs stay short and practical.
+Before any public release claim, `bun run build`, `bun run smoke:dist`, a clean
+`bun install --frozen-lockfile`, and the target-platform smoke matrix must pass
+for every advertised artifact.
 
 ## 7) Review Questions
 

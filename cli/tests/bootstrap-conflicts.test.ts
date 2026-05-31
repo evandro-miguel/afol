@@ -37,6 +37,9 @@ describe("bootstrap planner conflict handling", () => {
 
     expect(plan.operations).toHaveLength(1);
     expect(plan.operations[0]?.kind).toBe("conflict");
+    expect(plan.operations[0]?.owner).toBe("conflict");
+    expect(plan.operations[0]?.diffPreview?.length).toBeGreaterThan(0);
+    expect(plan.operations[0]?.diffPreview).toContain("@@");
   });
 
   test("marks conflict when ownership is unknown and content differs", () => {
@@ -53,6 +56,9 @@ describe("bootstrap planner conflict handling", () => {
 
     expect(plan.operations).toHaveLength(1);
     expect(plan.operations[0]?.kind).toBe("conflict");
+    expect(plan.operations[0]?.owner).toBe("conflict");
+    expect(plan.operations[0]?.diffPreview?.length).toBeGreaterThan(0);
+    expect(plan.operations[0]?.diffPreview).toContain("@@");
   });
 
   test("filters forbidden paths even if input map is contaminated", () => {

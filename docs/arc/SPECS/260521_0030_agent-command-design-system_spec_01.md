@@ -159,6 +159,22 @@ err missing-evidence task=T-01 hint="run afol evidence add -t T-01 -c <cmd> -r p
 - Full docs are not printed by default.
 - Unknown commands must return a focused hint, not a long manual.
 
+## 8.1) Parser And Interaction Policy
+
+- Command definitions live in the local registry/router. Parser libraries are
+  implementation helpers, not the source of truth.
+- `citty` is the preferred parser helper for registry-backed commands because
+  this system needs aliases, generated help, async handlers, and typed command
+  metadata.
+- `util.parseArgs` is acceptable for narrow internal scripts that do not need
+  command discovery or generated help.
+- Prompt/TUI/spinner behavior must be opt-in human-mode behavior. Default
+  agent-mode commands must not block on interactive input, must keep compact
+  output stable, and must expose the same semantic result in JSON mode.
+- Framework-style scaffolding CLIs such as Bunli, meow-based starter CLIs, or
+  Ace CLI/Bejibun remain reference material unless a future spike proves they
+  reduce local code without expanding runtime scope.
+
 ## 9) Testable Invariants
 
 - Alias resolution is one hop: short and long resolve to one canonical command.
@@ -166,6 +182,9 @@ err missing-evidence task=T-01 hint="run afol evidence add -t T-01 -c <cmd> -r p
 - Compact output and JSON output carry the same semantic fields.
 - Negative paths are actionable.
 - High-frequency workbench updates do not require manual file edits.
+- Parser/help snapshots prove that short aliases, long aliases, and generated
+  help stay synchronized.
+- Interactive affordances, when added, have noninteractive bypass tests.
 
 ## 10) Acceptance
 

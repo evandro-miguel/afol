@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadJsonObject, loadYamlObject } from "../../core/schema";
 import { scanTemplateForbiddenPaths, TEMPLATE_ROOT } from "../../schemas/template-policy";
+import { validateWorkBenchIndex } from "../local-state/workbench-index";
 
 export type ProjectValidationCheck = {
   id:
@@ -10,9 +11,10 @@ export type ProjectValidationCheck = {
     | "manifest"
     | "rules_dir"
     | "skills_dir"
-    | "wb_dir"
-    | "docs_arc_dir"
-    | "template_forbidden";
+  | "wb_dir"
+  | "docs_arc_dir"
+  | "template_forbidden"
+  | "wb_local_state_index";
   ok: boolean;
   message: string;
 };
@@ -110,6 +112,14 @@ export async function validateProjectStructure(projectRoot: string): Promise<Pro
     validateDirectory(projectRoot, "skills_dir", join(projectRoot, ".agents", "skills")),
     validateDirectory(projectRoot, "wb_dir", join(projectRoot, ".agents", "wb")),
     validateDirectory(projectRoot, "docs_arc_dir", join(projectRoot, "docs", "arc")),
+    (() => {
+      const result = validateWorkBenchIndex(projectRoot);
+      return {
+        id: "wb_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
     await validateTemplateForbidden(projectRoot),
   ];
 

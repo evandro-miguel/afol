@@ -1,7 +1,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
-import type { BootstrapManifestEntry } from "../services/bootstrap/planner";
+import type { BootstrapManifestEntry, ManagedOwnership } from "../services/bootstrap/planner";
 import { cleanupBootstrapObsolete, planBootstrapCleanup } from "../services/bootstrap/cleanup";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
 
@@ -11,6 +11,8 @@ type BootstrapArgs = {
   forceManaged: boolean;
   cleanupObsolete: boolean;
 };
+
+type RawManifest = Record<string, unknown>;
 
 function parseBootstrapArgs(args: string[]): BootstrapArgs {
   let targetRoot = "";
@@ -67,38 +69,88 @@ function readTargetFiles(targetRoot: string): Record<string, string> {
   return files;
 }
 
-function loadManifest(targetRoot: string): Record<string, BootstrapManifestEntry> {
+function normalizeManifestPath(path: string): string {
+  const cleaned = path.trim().replace(/^[.\\/]+/, "").replace(/\\+/g, "/");
+  return cleaned;
+}
+
+function isTemplatePathMatch(pattern: string, path: string): boolean {
+  return path === pattern || path.startsWith(`${pattern}/`);
+}
+
+function hasOwnershipOwner(value: unknown): value is ManagedOwnership {
+  return value === "managed" || value === "project-owned" || value === "generated" || value === "ignored" || value === "conflict";
+}
+
+function loadManifest(targetRoot: string, templatePaths: string[]): Record<string, BootstrapManifestEntry> {
   const manifestPath = join(targetRoot, ".agents", "manifest.json");
   if (!existsSync(manifestPath)) {
     return {};
   }
 
-  const raw = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+  const raw = JSON.parse(readFileSync(manifestPath, "utf8")) as RawManifest;
+  const manifest: Record<string, BootstrapManifestEntry> = {};
+  const templatePathSet = new Set(templatePaths);
+
   const managedHashes = raw.managed_hashes;
-  if (!managedHashes || typeof managedHashes !== "object" || Array.isArray(managedHashes)) {
-    return {};
+  if (managedHashes !== undefined && managedHashes !== null && typeof managedHashes === "object" && !Array.isArray(managedHashes)) {
+    for (const [path, hash] of Object.entries(managedHashes)) {
+      if (typeof hash === "string") {
+        const normalized = normalizeManifestPath(path);
+        if (!normalized || !templatePathSet.has(normalized)) {
+          continue;
+        }
+        manifest[normalized] = { owner: "managed", hash };
+      }
+    }
   }
 
-  const manifest: Record<string, BootstrapManifestEntry> = {};
-  for (const [path, hash] of Object.entries(managedHashes)) {
-    if (typeof hash === "string") {
-      manifest[`.agents/${path}`] = { owner: "managed", hash };
+  const ownership = raw.ownership;
+  if (!ownership || typeof ownership !== "object" || Array.isArray(ownership)) {
+    return manifest;
+  }
+  for (const [ownerName, rawPaths] of Object.entries(ownership)) {
+    if (!hasOwnershipOwner(ownerName) || !Array.isArray(rawPaths)) {
+      continue;
+    }
+    for (const rawPath of rawPaths) {
+      if (typeof rawPath !== "string") {
+        continue;
+      }
+      const normalized = normalizeManifestPath(rawPath);
+      for (const templatePath of templatePaths) {
+        if (!isTemplatePathMatch(normalized, templatePath)) {
+          continue;
+        }
+        manifest[templatePath] = {
+          ...manifest[templatePath],
+          owner: ownerName,
+        };
+      }
     }
   }
   return manifest;
 }
 
-async function writeTemplateFile(targetRoot: string, path: string): Promise<void> {
+function loadBootstrapManifest(targetRoot: string, templatePaths: string[]): Record<string, BootstrapManifestEntry> {
+  return loadManifest(targetRoot, templatePaths);
+}
+
+function writeTemplateFile(
+  targetRoot: string,
+  path: string,
+): Promise<void> {
   const entry = DEFAULT_TEMPLATE_FILES[path];
   if (!entry) {
     throw new Error(`Missing generated template entry: ${path}`);
   }
   const absolutePath = join(targetRoot, path);
   mkdirSync(dirname(absolutePath), { recursive: true });
-  await Bun.write(absolutePath, Buffer.from(entry.contentBase64, "base64"));
-  if (path === "a" || path === "afol") {
-    chmodSync(absolutePath, 0o755);
-  }
+  return Bun.write(absolutePath, Buffer.from(entry.contentBase64, "base64")).then(() => {
+    if (path === "a" || path === "afol") {
+      chmodSync(absolutePath, 0o755);
+    }
+  });
 }
 
 export async function runBootstrapCommand(args: string[]): Promise<number> {
@@ -110,8 +162,9 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
     return 2;
   }
 
+  const templatePaths = Object.keys(DEFAULT_TEMPLATE_FILES).sort();
   const currentFiles = readTargetFiles(parsed.targetRoot);
-  const manifest = loadManifest(parsed.targetRoot);
+  const manifest = loadBootstrapManifest(parsed.targetRoot, templatePaths);
   const plan = planBootstrapOperations({
     templateFiles: DEFAULT_TEMPLATE_FILES,
     currentFiles,

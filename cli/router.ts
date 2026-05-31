@@ -16,6 +16,7 @@ export type CommandResolution =
   | { kind: "rule"; args: string[] }
   | { kind: "skill"; args: string[] }
   | { kind: "update"; args: string[] }
+  | { kind: "file"; args: string[] }
   | { kind: "delegate"; args: string[] }
   | { kind: "unknown"; message: string; exitCode: number };
 
@@ -159,9 +160,9 @@ function suggestionFor(command: string): string | null {
 function formatUnknownCommandHint(command: string): string {
   const suggestion = suggestionFor(command);
   if (suggestion) {
-    return `err unknown-command command=${command} hint=\"run afol -h\" did_you_mean=${suggestion}`;
+    return `err unknown-command command=${command} hint="run afol -h" did_you_mean=${suggestion}`;
   }
-  return `err unknown-command command=${command} hint=\"run afol -h\"`;
+  return `err unknown-command command=${command} hint="run afol -h"`;
 }
 
 export function resolveCommand(args: string[]): CommandResolution {
@@ -238,6 +239,10 @@ export function resolveCommand(args: string[]): CommandResolution {
     return { kind: "update", args: rest };
   }
 
+  if (topLevelKind === "file") {
+    return { kind: "file", args: normalizeTokenOptimizedFlags(rest) };
+  }
+
   if (topLevelKind === "delegate") {
     return { kind: "delegate", args: normalizeDelegatedInvocation(normalized) };
   }
@@ -245,7 +250,7 @@ export function resolveCommand(args: string[]): CommandResolution {
   if (topLevel.startsWith("-")) {
     return {
       kind: "unknown",
-      message: `err unknown-flag flag=${topLevel} hint=\"run afol -h\"`,
+      message: `err unknown-flag flag=${topLevel} hint="run afol -h"`,
       exitCode: 2,
     };
   }

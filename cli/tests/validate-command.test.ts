@@ -79,6 +79,7 @@ describe("validate command", () => {
       expect(checks.some((entry) => entry.id === "skills_dir" && entry.ok === true)).toBe(true);
       expect(checks.some((entry) => entry.id === "wb_dir" && entry.ok === true)).toBe(true);
       expect(checks.some((entry) => entry.id === "docs_arc_dir" && entry.ok === true)).toBe(true);
+      expect(checks.some((entry) => entry.id === "wb_local_state_index" && entry.ok === true)).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -97,6 +98,25 @@ describe("validate command", () => {
       const output = captured.stdout[0] ?? "";
       expect(output).toContain("validate: failed");
       expect(output).toContain("fail manifest");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("fails when workbench index snapshot is malformed", async () => {
+    const root = createValidationFixture();
+    try {
+      const indexPath = join(root, ".agents", "data", "index");
+      mkdirSync(indexPath, { recursive: true });
+      writeFileSync(join(indexPath, "workbench.json"), JSON.stringify({ kind: "bad-kind" }), "utf8");
+
+      const captured = captureIo();
+      const code = await runValidateCommand(root, ["--json"], captured.io);
+      expect(code).toBe(2);
+      const payload = JSON.parse(captured.stdout[0] ?? "{}") as { checks: Array<{ id: string; ok: boolean }> };
+      const indexCheck = payload.checks.find((entry) => entry.id === "wb_local_state_index");
+      expect(indexCheck).toBeDefined();
+      expect(indexCheck?.ok).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

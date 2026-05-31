@@ -43,8 +43,17 @@ parity, update safety, and token economy.
   TS7/`tsgo` runs remain informative until the stack is fully stabilized.
 - Security floor adds Biome/Oxlint/Knip and dependency/runtime checks with OSV and
   Gitleaks (or modern equivalent) in the release-quality path.
-- This spec does not assume those tools are currently installed; package evidence
-  is the source of truth for immediate dependency state.
+- `bun run validate:security` drives the release security lane through
+  `security:scan:informative`, and that script exits safely when optional tools are
+  not installed locally.
+- This spec does not require OSV/Gitleaks to be installed everywhere; scripts are
+  informative-by-default when tooling is unavailable.
+- Build validation uses Bun standalone executable smoke tests and clean-room
+  install checks. `bun install --frozen-lockfile` is required in release-quality
+  validation so `bun.lock` cannot change during the gate.
+- Cross-target binaries require per-target smoke evidence before they count as
+  supported. Linux-built macOS or Windows artifacts are build candidates until
+  native or VM-backed smoke validates them.
 
 ## 2) Problem
 
@@ -142,6 +151,8 @@ mutation paths.
 | MCP `status` | tool parity | parity | same semantic envelope as CLI |
 | MCP mutation tools | safe mutation | safety | journal + protected paths |
 | benchmark runner | result schema | quality | stable JSON schema |
+| clean install | reproducibility | release safety | `bun install --frozen-lockfile` exits without lock changes |
+| cross-target binary | platform support | release safety | each claimed target has native/VM smoke evidence |
 
 ## 5) Benchmark Result Schema
 
@@ -372,6 +383,8 @@ Selective CI maps paths to packs:
 - Benchmark results capture tokens, bytes, baseline id, and runtime profile.
 - Release-quality validation includes deterministic standalone build smoke and
   security/toolchain checks where configured.
+- Public release claims include clean install evidence, binary provenance,
+  checksums, and notarization status where relevant.
 - Risky runtime changes have a clear benchmark trigger.
 - CI catches schema, command, and template drift before release.
 

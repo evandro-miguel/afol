@@ -1,8 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { resolveProjectPath } from "../project/root";
+import { appendWorkbenchEvent } from "../local-state/workbench-events";
+import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
 
 const TASK_ROW_RE = /^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
 const BLOCKING_STATES = new Set(["pending", "in_progress", "problem"]);
+const SESSION_NAME_RE = /^[A-Za-z0-9._-]+$/;
 
 export type WorkbenchTaskRef = {
   session: string;
@@ -61,6 +65,19 @@ function sanitizeTheme(theme: string): string {
   return cleaned.slice(0, 80).replace(/-$/g, "");
 }
 
+function resolveSafeSessionPath(root: string, session: string): string {
+  const normalized = session.trim();
+  if (!SESSION_NAME_RE.test(normalized) || normalized.length === 0) {
+    throw new Error(`Invalid session identifier: ${session}`);
+  }
+
+  const result = resolveProjectPath(root, join(".agents", "wb", normalized));
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.value.path;
+}
+
 function twoDigits(value: number): string {
   return value.toString().padStart(2, "0");
 }
@@ -99,7 +116,7 @@ function sessionPaths(root: string, session: string): {
 } {
   const projectRoot = resolve(root);
   const wbRoot = join(projectRoot, ".agents", "wb");
-  const sessionDir = join(wbRoot, session);
+  const sessionDir = resolveSafeSessionPath(root, session);
   return {
     wbRoot,
     sessionDir,
@@ -297,6 +314,14 @@ export function newWorkstream(
   );
   writeFileSync(paths.evidencePath, "", "utf8");
   writeFileSync(paths.activeSessionPath, `${session}\n`, "utf8");
+  appendWorkbenchEvent(root, {
+    type: "workbench.new",
+    session,
+    detail: {
+      theme: theme.trim(),
+    },
+  });
+  rebuildWorkBenchIndex(root, session);
 
   return {
     session,
@@ -312,6 +337,12 @@ export function newWorkstream(
 export function startTask(root: string, input: WorkbenchTaskRef): void {
   const paths = sessionPaths(root, input.session);
   updateTaskState(paths.taskPath, input.taskId, "in_progress");
+  appendWorkbenchEvent(root, {
+    type: "workbench.start_task",
+    session: input.session,
+    taskId: input.taskId,
+  });
+  rebuildWorkBenchIndex(root, input.session);
 }
 
 export function recordEvidence(root: string, input: RecordEvidenceInput): EvidenceEntry {
@@ -331,6 +362,13 @@ export function recordEvidence(root: string, input: RecordEvidenceInput): Eviden
     entry.exit_code = input.exitCode;
   }
   writeFileSync(paths.evidencePath, `${JSON.stringify(entry)}\n`, { encoding: "utf8", flag: "a" });
+  appendWorkbenchEvent(root, {
+    type: "workbench.record_evidence",
+    session: input.session,
+    taskId: input.taskId,
+    command: input.command,
+    result: input.result,
+  });
   return entry;
 }
 
@@ -348,6 +386,11 @@ export function appendTimelineEntry(root: string, session: string, message: stri
   }
   const current = readFileSync(paths.logPath, "utf8");
   writeFileSync(paths.logPath, insertTimelineEntry(current, trimmed), "utf8");
+  appendWorkbenchEvent(root, {
+    type: "workbench.append_log",
+    session,
+    command: trimmed,
+  });
   return { logPath: paths.logPath, message: trimmed };
 }
 
@@ -360,6 +403,12 @@ export function doneTask(root: string, input: WorkbenchTaskRef): void {
     throw new Error(`Task ${input.taskId} requires passed evidence before done.`);
   }
   updateTaskState(paths.taskPath, input.taskId, "done");
+  appendWorkbenchEvent(root, {
+    type: "workbench.mark_done",
+    session: input.session,
+    taskId: input.taskId,
+  });
+  rebuildWorkBenchIndex(root, input.session);
 }
 
 export function closeSession(root: string, session: string): void {
@@ -379,4 +428,8 @@ export function closeSession(root: string, session: string): void {
       unlinkSync(paths.activeSessionPath);
     }
   }
+  appendWorkbenchEvent(root, {
+    type: "workbench.close",
+    session,
+  });
 }

@@ -16,6 +16,18 @@ function mkRoot(name: string): string {
   return mkdtempSync(join(tmpdir(), `wb-lifecycle-${name}-`));
 }
 
+function readLocalStateEvents(root: string): Array<Record<string, unknown>> {
+  const path = join(root, ".agents", "data", "events", "events.jsonl");
+  if (!existsSync(path)) {
+    return [];
+  }
+  return readFileSync(path, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
+}
+
 describe("workbench lifecycle service", () => {
   test("newWorkstream creates plan/task/log/evidence and active session pointer", () => {
     const root = mkRoot("new");
@@ -83,6 +95,45 @@ describe("workbench lifecycle service", () => {
       const logDoc = readFileSync(created.logPath, "utf8");
       expect(logDoc).toContain("## Timeline");
       expect(logDoc).toContain("native timeline event");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("workbench lifecycle updates local state events and index snapshot", () => {
+    const root = mkRoot("local-state");
+    try {
+      const created = newWorkstream(root, "local-state");
+      startTask(root, { session: created.session, taskId: "T-01" });
+      recordEvidence(root, {
+        session: created.session,
+        taskId: "T-01",
+        command: "bun test",
+        result: "passed",
+      });
+      doneTask(root, { session: created.session, taskId: "T-01" });
+      appendTimelineEntry(root, created.session, "local-state event");
+
+      const events = readLocalStateEvents(root);
+      expect(events.map((entry) => entry.type)).toEqual(
+        expect.arrayContaining([
+          "workbench.new",
+          "workbench.start_task",
+          "workbench.record_evidence",
+          "workbench.mark_done",
+          "workbench.append_log",
+        ]),
+      );
+
+      const indexPath = join(root, ".agents", "data", "index", "workbench.json");
+      const indexPayload = JSON.parse(readFileSync(indexPath, "utf8")) as { sessions: Array<{ session: string; completed: number; task_count: number }>; tasks: Array<{ session: string; task_id: string; state: string }> };
+      const sessionEntry = indexPayload.sessions.find((entry) => entry.session === created.session);
+      expect(sessionEntry).toBeDefined();
+      expect(sessionEntry?.completed).toBe(1);
+      expect(sessionEntry?.task_count).toBe(1);
+      expect(indexPayload.tasks.find((task) => task.session === created.session && task.task_id === "T-01")).toMatchObject({
+        state: "done",
+      });
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
