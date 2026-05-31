@@ -37,6 +37,13 @@ Repeated file scans waste tokens and time.
 The CLI maintains local state under .agents/data/events and .agents/data/index
 for workbench, rules, skills, specs, and files.
 
+2026-05-31 DR addendum:
+
+- Store query artifacts as append-only JSONL event streams and deterministic JSON
+  index snapshots.
+- SQLite-based indexing is explicitly out of MVP scope; introduce it only when
+  scale/query pressure demonstrates clear need.
+
 ## 4) Product Boundary
 
 The universal CLI owns reusable behavior. The project-local template owns local
@@ -49,7 +56,8 @@ until Bun/TypeScript parity is proven by focused tests.
 In scope: Event schema, JSONL event log, workbench index, rules index, skills
 index, specs index, compact status queries.
 
-Out of scope: Heavy vector DB in MVP, always-on daemon requirement, cloud sync,
+Out of scope: Heavy vector DB in MVP, Heavy relational index in MVP (including SQLite),
+always-on daemon requirement, cloud sync,
 private prompt collection by default.
 
 ## 6) Acceptance

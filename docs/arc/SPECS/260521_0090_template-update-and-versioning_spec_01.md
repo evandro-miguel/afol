@@ -42,6 +42,14 @@ fragments maintenance.
 Each project has .agents/lock.json and .agents/manifest.json. The CLI supports
 update check, plan, and apply flows with conflict detection.
 
+2026-05-31 DR addendum:
+
+- Lock and manifest processing must classify files by ownership class:
+  `managed`, `project-owned`, `generated`, `ignored`, `conflict`.
+- Update/apply must use diff/jsdiff-style previews so project-owned files are never
+  silently overwritten.
+- Real writes in update/apply are gated by session/task context and manifest state.
+
 ## 4) Product Boundary
 
 The universal CLI owns reusable behavior. The project-local template owns local

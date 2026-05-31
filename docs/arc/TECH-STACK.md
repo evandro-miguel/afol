@@ -8,32 +8,61 @@ updated_at: '2026-03-06T22:29:30-03:00'
 
 # Tech Stack
 
-## Primary Stack
+## Live State
 
-- Bun and TypeScript for the current CLI/kernel under `cli/**`
-- `afol`/`./a` as the public downstream command surface
-- Bash and Just for wrapper automation
-- Markdown, YAML, JSON, and TOML for durable project artifacts
+- Bun runtime: `bun@1.3.14` (`packageManager` field in `package.json`)
+- Bun version gate: `>=1.3.14` (`engines.bun`)
+- TypeScript: `^5.9.3` (`devDependencies.typescript`)
+- Bun test runner (`bun test`) for CLI and focused template-policy checks
+- CLI command surface in progress:
+  - `afol` (public/publicized entrypoint)
+  - `./a` (factory migration wrapper)
+- Template-policy-based runtime hygiene:
+  - `template:check` and `template:check`-adjacent tests in `package.json`
+  - forbidden/allowed path patterns and forbidden-text scan in
+    `cli/schemas/template-policy.ts`
+- TypeScript compilation gate: `bun run typecheck` (`tsc --noEmit`)
 
-## Boundary Notes
+## Target Direction
 
-- `src/project-template/` is the exportable scaffold source
-- `.agents/agents`, `.agents/scripts`, and `.agents/runtime` stay in the
-  factory tree as legacy compatibility during migration; they are retained for
-  fallback-only behavior and are retired only when all delegated command families
-  are covered by native TS implementations.
-- Root `.agents/wb/` is factory workbench history and does not ship downstream
+Planned stack upgrades are direction-only and not yet reflected as installed
+package dependencies in `package.json`:
 
-## Runtime Surface
+- TypeScript 6 release gate
+- Optional TypeScript 7 + native-preview lane (informative only)
+- citty
+- Valibot
+- Biome
+- Oxlint
+- Knip
+- diff / jsdiff
+- OSV
+- Gitleaks or modern equivalent
+- Standalone deterministic build path
 
-- Canonical governance: `AGENTS.md` and `.agents/*`
-- Primary runtimes: OpenCode, Codex, and Qwen
-- Additional mirror: Gemini-facing adapter documentation
+## Boundary Rules
+
+- `src/project-template/`: canonical exportable scaffold payload
+- Runtime implementation remains in factory root and `cli/**`:
+  - no `.agents/scripts` in template payload
+  - no `.agents/runtime` in template payload
+  - no `.agents/agents` in template payload
+  - no Python/uv payload in template payload
+- Root `.agents/wb/` remains factory workbench history, not downstream payload
+- Template tests live in CLI layer; template is not a runtime test host
+
+## Runtime / Tooling Surface
+
+- Canonical governance: `AGENTS.md`, `.agents/*` in factory
+- Primary command runtime: `afol` (shell entrypoint), Bun + TypeScript CLI under
+  `cli/**`
+- Additional docs-facing adapter behavior documented through repository mirrors
+  and local runtime surfaces where configured
 
 ## Verification Stack
 
-- `bun run typecheck` for TypeScript checks
-- `bun test` and focused `bun test cli/tests/...` runs for the CLI
-- `just lint` for docs/prompt/process surfaces when needed
-- Targeted legacy compatibility checks only when touching factory-only
-  `.agents/*` compatibility files
+- Docs/prompt/process: `just lint` (when required by validation scope)
+- CLI checks: `bun run typecheck` and `bun test`
+- Focused template policy checks:
+  `bun test cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts`
+- Template cleanliness checks are driven by `template-policy` schema and tests

@@ -41,6 +41,14 @@ or treating downstream projects as full runtime clones.
 That blurs ownership, increases bootstrap payload, and makes the template harder
 to reason about than a state-only scaffold.
 
+2026-05-31 DR addendum:
+
+- The boundary hardening is additive to the staged reformulation; do not replace
+  existing F-00/F-01/F-02 sequencing.
+- F-02 hard requirement: downstream `src/project-template` and bootstrap output
+  must stay free of Python/uv/scripts/runtime payload and other factory-only
+  command surfaces.
+
 ## 3) Architecture Impact
 
 Do not port Python legacy line-for-line.
@@ -75,6 +83,13 @@ The template may carry only policy and manifest files needed for bootstrap and
 local governance.
 It must not carry factory runtime, legacy Python command surfaces, or
 development-only scripts.
+
+Template boundary tests are the first-class anti-pollution control:
+
+- `template-policy` detects forbidden paths and forbidden legacy runtime references.
+- Bootstrap/export negative tests must fail on `.py`, `uv.lock`, `.venv`,
+  `pyproject.toml`, `.agents/scripts`, `.agents/runtime`, `.agents/agents`,
+  and `.agents/agents-mcp`.
 
 Lifecycle-event support must not become a reason to export provider-specific
 hook runtimes into `src/project-template/`. Downstream installs should receive
@@ -121,6 +136,8 @@ Out of scope:
 - `bun run typecheck`
 - `bun run validate:template`
 - `bun run validate:bootstrap`
+- `bun run build`
+- `bun run smoke:dist` (or equivalent standalone build smoke path)
 - Export checks confirm only allowlisted policy and manifest files copy.
 - Export checks reject the forbidden paths listed above.
 
@@ -143,6 +160,7 @@ all gate evidence (`validate:template`, `validate:bootstrap`) passes.
 - `src/project-template` contains no `.py`, `.agents/scripts`, `.agents/runtime`,
   `.agents/agents`, `.agents/agents-mcp`, `pyproject.toml`, `uv.lock`, or
   `.venv`.
+- Template-boundary failures are hard gates in CI-style smoke and template checks.
 - Root factory legacy compatibility paths (`.agents/agents`, `.agents/scripts`,
   `.agents/runtime`) are not declared removed in this stream; they remain until
   full native replacement for all delegated command families is complete.
@@ -155,6 +173,8 @@ all gate evidence (`validate:template`, `validate:bootstrap`) passes.
   complete.
 - Provider hook support, when added, does not expand the template beyond
   state-only policy, manifest, lock, and local governance files.
+- `afol` is the canonical front door; `./a` remains compatibility/local wrapper
+  during migration.
 
 ## 10) Hermes Benchmark Decisions
 

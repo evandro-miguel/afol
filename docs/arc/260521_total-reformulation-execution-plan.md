@@ -58,6 +58,31 @@ The correct path is staged parity:
 5. Shrink the downstream template only after bootstrap/export tests protect
    required behavior.
 
+## 2.1) DR 2026-05-31 Consolidation Addendum
+
+Apply this as an additive overlay to the existing staged plan (no reset).
+
+Critical path alignment:
+
+1. Harden template hygiene with forbidden-content and export clean-room checks before template shrink.
+2. Finalize CLI kernel ownership for registry/router/result/project-loader/schemas.
+3. Keep `afol` as canonical, with `./a` as compatibility/local wrapper.
+4. Keep embedded template minimal; avoid factory/runtime payload in `src/project-template`.
+5. Complete workbench/evidence and manifest ownership wiring before update-only changes.
+6. Deliver local-state JSONL and index contracts for state/query.
+7. Deliver safe mutation with path-jail, symlink checks, atomic write, journal, backups, and rollback.
+8. Add release/security gates and deterministic standalone build validation.
+
+This stage must preserve template compatibility and migration evidence and only tighten
+constraints where they are test-backed. Required checks map to existing validation families:
+
+- template-policy/forbidden-path and bootstrap/export checks,
+- CLI schema/project-loader tests,
+- mutation safety tests,
+- local-state/index event tests,
+- update conflict/ownership tests,
+- validation/benchmark pack coverage checks.
+
 ## 3) First Workstream
 
 Implement F-00 to F-03 first:

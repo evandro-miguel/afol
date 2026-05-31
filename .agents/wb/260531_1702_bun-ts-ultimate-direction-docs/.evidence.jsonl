@@ -1,0 +1,2 @@
+{"id":"E-20260531170728637","task_id":"T-01","created_at":"2026-05-31T21:07:28.637Z","command":"bun run typecheck && bun test && git diff --check","result":"failed","exit_code":1}
+{"id":"E-20260531170812499","task_id":"T-01","created_at":"2026-05-31T21:08:12.499Z","command":"bun run typecheck && bun test && git diff --check","result":"passed"}

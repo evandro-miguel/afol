@@ -35,6 +35,17 @@ trustworthy.
 The validation system must prove correctness, speed, quality, safety, command
 parity, update safety, and token economy.
 
+2026-05-31 DR addendum:
+
+- Release/security gate set for F-11 includes build determinism, static analysis,
+  and dependency-risk checks.
+- TS minimum compiler floor is TypeScript 6 for the documented baseline and
+  TS7/`tsgo` runs remain informative until the stack is fully stabilized.
+- Security floor adds Biome/Oxlint/Knip and dependency/runtime checks with OSV and
+  Gitleaks (or modern equivalent) in the release-quality path.
+- This spec does not assume those tools are currently installed; package evidence
+  is the source of truth for immediate dependency state.
+
 ## 2) Problem
 
 Agent systems drift easily across docs, commands, templates, runtime adapters,
@@ -62,6 +73,7 @@ mutation paths.
 - Manifest ownership checks.
 - Downstream bootstrap fixture.
 - Wrapper smoke checks.
+- Standalone build checks (`bun run build` and `bun run smoke:dist`).
 
 ### Workbench
 
@@ -125,6 +137,8 @@ mutation paths.
 | `./a u` | undo | safety | supported rollback succeeds |
 | `./a up ck` | update check | safety | read-only, no writes |
 | `./a up ap` | update apply | safety | local edits preserved/flagged |
+| `bun run build` | standalone build | release safety | deterministic artifact produced |
+| `bun run smoke:dist` | standalone smoke | safety + tokens | `./dist/afol --help` succeeds |
 | MCP `status` | tool parity | parity | same semantic envelope as CLI |
 | MCP mutation tools | safe mutation | safety | journal + protected paths |
 | benchmark runner | result schema | quality | stable JSON schema |
@@ -325,6 +339,7 @@ Default CI runs:
 - `bun run typecheck`.
 - `bun test`.
 - lint.
+- `bun run build` + `bun run smoke:dist`.
 - template export validation.
 - focused integration tests.
 - workbench validation where applicable.
@@ -355,6 +370,8 @@ Selective CI maps paths to packs:
 - CLI/MCP parity tests use one normalized envelope and diff helper.
 - Benchmark registry defines required scenarios by pack.
 - Benchmark results capture tokens, bytes, baseline id, and runtime profile.
+- Release-quality validation includes deterministic standalone build smoke and
+  security/toolchain checks where configured.
 - Risky runtime changes have a clear benchmark trigger.
 - CI catches schema, command, and template drift before release.
 

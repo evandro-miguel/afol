@@ -22,29 +22,28 @@ The core product is not a documentation folder.
 
 The core product is an agent operating layer.
 
-## 2) Product Definition
+## 2) Decision-Mother and Product Definition
 
-The product is a minimal local project protocol plus a universal CLI.
-
-The local project keeps state.
+Decision-mother: **CLI = engine/motor, template = editable save file/state**.
 
 The universal CLI owns behavior.
+The template owns project-local mutable state.
 
-This separation is mandatory.
+```text
+CLI = code, commands, validation, bootstrap/update, tests, safety,
+      mutation logic, local-state indexing
+Template = Markdown + JSON config, rules, skills, workbench,
+           evidence/logs/specs, editable local state
+```
 
-~~~text
-universal CLI = logic, commands, validation, updates, file operations
-local project = config, rules, skills, specs, workbench, evidence, logs, state
-~~~
-
-The final system should allow agents to enter any project that uses this
-template and immediately know how to plan, create specs, execute tasks, update
-logs, mark work done, resolve rules, manage skills, save research, mutate files
-safely, validate closure, and update the local agent system.
+The final system should allow agents to enter any project that uses this template
+and immediately know how to plan, create specs, execute tasks, update logs, mark
+work done, resolve rules, manage skills, save research, mutate files, validate
+closure, and keep project state current.
 
 ## 3) Product Surface
 
-The exported project baseline lives under src/project-template/.
+The exported project baseline lives under `src/project-template/`.
 
 This is the template installed into downstream projects. It should be minimal,
 clear, and updateable. It should not contain root development history, root
@@ -66,9 +65,6 @@ product installed into downstream projects.
 
 Every common agent action should avoid unnecessary file reads and writes. Agents
 should use commands instead of manually editing routine state.
-
-Example: ./a t d T-01 -e E-01 instead of opening a task file, reading it,
-editing it, and rewriting it.
 
 ### 5.2 File-first, chat-light
 
@@ -105,11 +101,18 @@ Agents should not mutate project files blindly. File writes, moves, archives,
 patches, and generated artifacts should be tracked with enough metadata to
 inspect, verify, and undo when possible.
 
-### 5.8 Updateable project system
+### 5.8 Downstream boundary discipline
 
-Every downstream project should be able to check for updates, preview changes,
-apply compatible updates, detect conflicts, and preserve local project-specific
-edits.
+The template is editable project state, not runtime implementation.
+
+Template payload excludes:
+
+- `.agents/scripts`
+- `.agents/runtime`
+- `.agents/agents`
+- Python/uv payload
+- factory-only tests
+- tool internals
 
 ### 5.9 Minimalism by default
 
@@ -117,7 +120,13 @@ The template must stay lean. Every file, command, rule, skill, and doc must
 justify its existence by reducing agent friction, reducing token usage,
 improving safety, or improving updateability.
 
-### 5.10 Public-ready design
+### 5.10 Updateable project system
+
+Every downstream project should be able to check for updates, preview changes,
+apply compatible updates, detect conflicts, and preserve local project-specific
+edits.
+
+### 5.11 Public-ready design
 
 The system should start as a personal tool but be designed for future public
 use: clear boundaries, simple onboarding, predictable commands, no
@@ -127,18 +136,20 @@ complexity.
 ## 6) Non-Goals
 
 This project should not become a generic coding agent, a project management
-SaaS, a long-lived backend service by default, a docs-heavy bureaucracy, a giant
-framework, a copied implementation blob, a heavy-governance mandate for small
-tasks, an untraceable file editor, or a template that leaks factory state.
+SaaS, a long-lived backend service by default, a docs-heavy bureaucracy, a
+giant framework, a copied implementation blob, a heavy-governance mandate for
+small tasks, an untraceable file editor, or a template that leaks factory
+state.
 
 ## 7) Target Architecture
 
-~~~text
+```text
 global/universal layer
 - agentic CLI implemented in Bun/TypeScript
 - command router, typed schemas, workbench engine
 - rules engine, skills engine, file mutation engine
 - update engine, validation engine, runtime/MCP adapters
+- template-policy scanner and validator
 
 project-local layer
 - .agents/config.json
@@ -147,35 +158,39 @@ project-local layer
 - .agents/wb, rules, skills, specs, data, tmp
 
 project wrapper
-- ./a
-~~~
+- ./a (local compatibility alias during migration)
+```
+
+The public command entrypoint is `afol`.
+`./a` is the local migration wrapper/compatibility alias.
 
 ## 8) Command Philosophy
 
-The local wrapper should be ./a.
+The local wrapper is `./a` while migration is active.
 
-High-frequency commands should use short names:
+High-frequency commands should use short names through `afol`:
 
-- ./a s
-- ./a n auth-refactor -F F-02 -S auth-spec
-- ./a t s T-01
-- ./a t d T-01 -e E-01
-- ./a l a -t T-01 -m "Added validation"
-- ./a e a -t T-01 -c "bun test" -r pass
-- ./a r g frontend
-- ./a sk u
-- ./a q s -t T-02 -f research.md -m "Summary"
-- ./a v
-- ./a c
-- ./a up ck
+- `afol s`
+- `afol n auth-refactor -F F-02 -S auth-spec`
+- `afol st -T T-01`
+- `afol d -T T-01 -x "bun test"`
+- `afol l -T T-01 -m "Added validation"`
+- `afol e -T T-01 -c "bun test" -r pass`
+- `afol r g frontend`
+- `afol sk u`
+- `afol q s -T T-02 -f research.md -m "Summary"`
+- `afol v`
+- `afol c`
+- `afol up ck`
 
 Long aliases may exist for humans. Agents should prefer short commands.
+`./a` remains a local compatibility alias where migration requires it.
 
 ## 9) Quality Bar
 
-A system feature is acceptable only if it answers what friction it removes, what
-token cost it reduces, what recurring error it prevents, what typed contract it
-creates, what local state it reads or writes, what validation proves it works,
+A system feature is acceptable only if it answers what friction it removes,
+what token cost it reduces, what recurring error it prevents, what typed contract
+it creates, what local state it reads or writes, what validation proves it works,
 how it can be updated, and how it fails safely.
 
 ## 10) Long-Term Vision

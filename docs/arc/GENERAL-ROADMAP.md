@@ -66,7 +66,32 @@ The Bun/TypeScript reformulation must be staged:
 5. Shrink src/project-template only after bootstrap/export validation proves
    downstream installs still work.
 
-## 4.1) Hermes-Derived Architecture Hardening
+## 4.1) DR 2026-05-31 Consolidation (incremental)
+
+This consolidation updates, not replaces, the existing staged migration.
+
+Critical path (in dependency order):
+
+1. Block template pollution with tests before any shrink operations.
+2. Make CLI core ownership explicit for registry, router, result envelope, project loader, and schemas.
+3. Keep the exported template minimal and embedded with only policy/state surfaces.
+4. Implement template bootstrap/update with manifest ownership (`managed`, `project-owned`, `generated`, `ignored`, `conflict`).
+5. Reconcile workbench and evidence flow with strict evidence requirements.
+6. Implement local-state JSONL/event logging and compact indexes.
+7. Complete mutation safety (path-jail, symlink checks, atomic write, journal, backups, rollback, task/session context).
+8. Add release/security gates and deterministic standalone build checks.
+
+`afol` remains the primary command. `./a` remains compatibility alias/local wrapper while parity is incomplete.
+
+Boundary guardrails:
+
+- F-02/template boundary: no Python/uv/scripts/runtime payload in `src/project-template` or downstream bootstrap output.
+- F-07: local state uses JSONL/JSON artifacts; SQLite remains deferred until scale/query pressure justifies it.
+- F-08: mutation writes are session/task constrained with journaling and rollback support.
+- F-09: no blind overwrite of project-owned files; update flow must classify managed/project-owned generated/ignored/conflict with conflicts preserved.
+- F-11: release/security gate set includes deterministic build checks and token-aware validation, without claiming unverified dependency installation.
+
+## 4.2) Hermes-Derived Architecture Hardening
 
 Hermes Agent is a benchmark for mature architectural contracts, not a product
 or monorepo to copy. The local decision is to adapt its strongest contract

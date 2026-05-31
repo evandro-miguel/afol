@@ -49,6 +49,13 @@ lose the shared operating layer this project is meant to provide.
 The current Python, Bash, uv, Just, and Markdown runtime remains the
 compatibility contract until Bun/TypeScript parity is proven by tests.
 
+2026-05-31 DR Addendum:
+
+- Keep this spec as the active CLI core definition; do not replace the staged
+  migration.
+- Core ownership must remain with Bun/TypeScript for registry, router, result
+  envelope, project-root detection, and versioned schema loader.
+
 ## 3) Kernel Contract
 
 The first CLI kernel must be small and typed.
@@ -63,6 +70,7 @@ Required kernel boundaries:
   not have TypeScript parity yet.
 - The CLI must refuse unsafe or ambiguous roots before reading or mutating local
   state.
+- Reads and writes must respect template-safe path scope and symlink policy.
 - Compact text output is default; JSON is opt-in with `-j`.
 - Every command returns a typed result envelope before formatting.
 
@@ -103,6 +111,7 @@ Loader precedence:
 4. Lazy-load workbench, rules, skills, and indexes only when the command needs
    them.
 5. Rebuild or mark stale indexes before trusting indexed state.
+6. Reject paths that are outside project scope, symlinked, or blocked by policy.
 
 ## 5) Failure Semantics
 
@@ -141,7 +150,7 @@ Delegation is explicit and temporary.
 Delegation parity requires stdout, stderr, exit code, and normalized semantic
 fields to match the legacy command for the covered fixture.
 
-## 7) Scope
+## 7) DR 2026-05-31 Scope Addendum
 
 In scope:
 
@@ -154,6 +163,8 @@ In scope:
 - Error model.
 - Compatibility delegation.
 - Focused tests for each boundary above.
+- Standalone build contract: `bun run build` and `bun run smoke:dist` paths are
+  deterministic and smoke-validated in the kernel validation slice.
 
 Out of scope:
 
@@ -162,6 +173,13 @@ Out of scope:
 - GUI.
 - Always-running daemon.
 - Deleting Python/Bash behavior before parity evidence exists.
+
+Manifest ownership and mutation safety requirements are handled by F-09 and F-08
+but remain contractually coupled to CLI command execution:
+
+- Project-owned files are never blind-overwritten.
+- Real writes must be session/task bound and journaled.
+- Update/patch previews use diff artifacts before apply.
 
 ## 8) TDD Entry Point
 

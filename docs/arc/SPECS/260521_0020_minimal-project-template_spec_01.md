@@ -31,6 +31,12 @@ Redesign `src/project-template/` as a minimal local agent-governance template.
 The template contains state and protocol files. It does not contain the full CLI
 implementation.
 
+2026-05-31 DR addendum:
+
+- Keep `.agents` state and governance files minimal and downstream-safe.
+- F-02 boundary is explicit: no Python/uv/scripts/runtime payload in exported
+  template content.
+
 ## 2) Problem
 
 A copied scaffold can become bloated with implementation code, generated state,
@@ -49,6 +55,9 @@ project template = local state, rules, skills, workbench, specs, evidence
 The template must remain usable while legacy Python/Bash compatibility exists,
 but it should converge toward invoking the universal Bun/TypeScript CLI through
 `./a`.
+
+`afol` remains the canonical command in runtime-facing workflows; `./a` stays as
+the compatibility/local entrypoint where native parity is incomplete.
 
 ## 4) Required Template Shape
 
@@ -120,6 +129,7 @@ The template must not export:
 - source seeds not required at runtime,
 - broad factory docs,
 - factory-only implementation experiments.
+- legacy Python/Bash/uv wrapper surfaces, including `.agents/scripts`, `.agents/runtime`, `.agents/agents`, `.agents/agents-mcp`.
 
 ## 7) Export Rules
 
@@ -140,12 +150,19 @@ In scope:
 - Local wrapper.
 - Bootstrap copy rules.
 - Export cleanliness tests.
+- Export policy and diff preview requirements from F-09 (`managed` / `project-owned` / `generated` / `ignored` / `conflict`).
+- Local-state shape that supports F-07 JSONL event and index contracts.
 
 Out of scope:
 
 - Global CLI implementation.
 - Full public release polish.
 - Migrating every legacy script immediately.
+
+DR-specific exclusions:
+
+- Source seeds and generated history remain optional and only included when bootstrap
+  consumes them; they must not replace project-owned edits.
 
 ## 9) Acceptance
 

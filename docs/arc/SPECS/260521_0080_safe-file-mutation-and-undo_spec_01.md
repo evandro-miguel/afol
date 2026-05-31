@@ -38,6 +38,14 @@ inspection and undo are hard.
 Mutating file commands support dry-run, session/task context, reason, mutation
 id, event log, rollback when feasible, and protected path checks.
 
+2026-05-31 DR addendum:
+
+- Real mutation writes require project-scoped path-jail and symlink safety checks.
+- Write operations are atomic and journaling-first.
+- Backup and undo workflows are required where feasible, with mutation ids and
+  session/task traceability.
+- Patch and diff tooling must be deterministic and preview-driven, with diff/jsdiff as safety target.
+
 ## 4) Product Boundary
 
 The universal CLI owns reusable behavior. The project-local template owns local
@@ -55,8 +63,9 @@ broad refactors, mutating files outside project root.
 
 ## 6) Acceptance
 
-Mutations are recorded; dry-run shows intent; undo works where supported;
-protected paths are blocked; common moves do not require manual file handling.
+Mutations are recorded; dry-run shows intent with patch preview; undo works where
+supported; protected paths are blocked; common moves do not require manual file
+handling; backups are retained for supported operations.
 
 ## 7) Review Questions
 
