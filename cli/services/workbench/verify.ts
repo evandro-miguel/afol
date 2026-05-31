@@ -110,8 +110,20 @@ function findTaskFiles(sessionPath: string): string[] {
   if (!existsSync(sessionPath)) {
     return [];
   }
+  const absoluteSessionPath = resolve(sessionPath);
   return walkFiles(sessionPath)
     .filter((path) => {
+      const relativePath = relative(absoluteSessionPath, path).replaceAll("\\", "/");
+      if (
+        relativePath.startsWith(".agents/tmp/") ||
+        relativePath.startsWith("docs/templates/") ||
+        relativePath.startsWith("src/project-template/docs/templates/") ||
+        relativePath.startsWith("docs/lessons/entries/") ||
+        relativePath.startsWith("src/project-template/docs/lessons/entries/") ||
+        relativePath.includes("/references/templates/")
+      ) {
+        return false;
+      }
       const name = basename(path);
       return /_task_\d+\.md$/.test(name) || /^task.*\.md$/i.test(name);
     })
@@ -234,8 +246,34 @@ function evidenceIsFailure(entry: EvidenceEntry): boolean {
   return typeof entry.result === "string" && FAILURE_RESULT_RE.test(entry.result);
 }
 
+function evidenceText(entry: EvidenceEntry): string {
+  return JSON.stringify(entry);
+}
+
+function unresolvedFailedEvidence(entries: EvidenceEntry[]): EvidenceEntry[] {
+  const unresolved: EvidenceEntry[] = [];
+  entries.forEach((entry, index) => {
+    if (!evidenceIsFailure(entry)) {
+      return;
+    }
+    const command = typeof entry.command === "string" ? entry.command.trim() : "";
+    const evidenceId = typeof entry.id === "string" ? entry.id.trim() : "";
+    const superseded = entries.slice(index + 1).some((later) => {
+      if (!evidenceIsSuccess(later)) {
+        return false;
+      }
+      const laterCommand = typeof later.command === "string" ? later.command.trim() : "";
+      return laterCommand === command || (Boolean(evidenceId) && evidenceText(later).includes(evidenceId));
+    });
+    if (!superseded) {
+      unresolved.push(entry);
+    }
+  });
+  return unresolved;
+}
+
 function hasStrictClosureEvidence(entries: EvidenceEntry[]): boolean {
-  if (entries.some((entry) => evidenceIsFailure(entry))) {
+  if (unresolvedFailedEvidence(entries).length > 0) {
     return false;
   }
   return entries.some((entry) => evidenceIsSuccess(entry) && typeof entry.command === "string" && entry.command.trim());
@@ -314,7 +352,7 @@ export function verifyWorkbenchTasks(sessionPath: string, strict = false): Verif
       if (strict && task.state === "done") {
         const entries = scopedEvidence?.get(task.id) ?? [];
         if (!hasStrictClosureEvidence(entries)) {
-          const hasFailure = entries.some((entry) => evidenceIsFailure(entry));
+          const hasFailure = unresolvedFailedEvidence(entries).length > 0;
           result.issues.push({
             type: hasFailure ? "failed_evidence" : "missing_evidence",
             taskId: task.id,

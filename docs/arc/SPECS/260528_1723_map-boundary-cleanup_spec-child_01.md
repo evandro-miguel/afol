@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-05-28T17:23:36-03:00'
-updated_at: '2026-05-28T17:23:36-03:00'
+updated_at: '2026-05-31T15:55:00-03:00'
 roadmap_feature: F-15
 spec_role: child
 parent_spec: 260412_2004_repo-wide-simplification-runtime-parity_spec_01
@@ -73,12 +73,12 @@ risk_level: low
 
 ## Acceptance
 
-- [ ] Child scope is explicit and bounded
-- [ ] Parent spec linkage is explicit
-- [ ] Journey is clear without code
+- [x] Child scope is explicit and bounded
+- [x] Parent spec linkage is explicit
+- [x] Journey is clear without code
 - [x] Delivery evidence target is clear in linked report
-- [ ] `docs/map/structure/` is described as current-state evidence
-- [ ] `docs/arc/structure/` is described only as retired/deprecated
+- [x] `docs/map/structure/` is described as current-state evidence
+- [x] `docs/arc/structure/` is described only as retired/deprecated
 
 ---
 

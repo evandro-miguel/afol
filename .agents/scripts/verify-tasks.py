@@ -159,6 +159,16 @@ EXECPLAN_REQUIRED_HEADINGS = [
     "Interfaces and Dependencies",
 ]
 PROGRESS_MARKER_RE = re.compile(r'^\s*-\s\[( |/|%|&|!|>|x)\]\s+', re.MULTILINE)
+DOC_TASK_EXAMPLE_DIRS = (
+    "docs/templates/",
+    "src/project-template/docs/templates/",
+    "docs/lessons/entries/",
+    "src/project-template/docs/lessons/entries/",
+    "references/templates/",
+)
+IGNORED_VERIFICATION_DIRS = (
+    ".agents/tmp/",
+)
 
 
 def parse_iso_timestamp(value: str) -> datetime:
@@ -167,6 +177,15 @@ def parse_iso_timestamp(value: str) -> datetime:
     if candidate.endswith("Z"):
         candidate = candidate[:-1] + "+00:00"
     return datetime.fromisoformat(candidate)
+
+
+def is_ignored_verification_path(path: Path) -> bool:
+    """Return True for generated/temp docs or task-looking examples."""
+    normalized = path.as_posix()
+    return any(
+        normalized.startswith(prefix) or f"/{prefix}" in normalized
+        for prefix in (*DOC_TASK_EXAMPLE_DIRS, *IGNORED_VERIFICATION_DIRS)
+    )
 
 
 def extract_evidence(content: str, file_path: Path) -> Dict[str, Any]:
@@ -375,6 +394,8 @@ def load_frontmatter_docs(session_dir: Path) -> List[Dict[str, Any]]:
     """Load markdown docs with parsed frontmatter/body."""
     docs: List[Dict[str, Any]] = []
     for doc_file in sorted(session_dir.rglob("*.md")):
+        if is_ignored_verification_path(doc_file):
+            continue
         parsed = parse_markdown_doc(doc_file)
         if parsed is None:
             continue
@@ -775,6 +796,8 @@ def check_artifact_utility(session_dir: Path) -> List[Dict[str, Any]]:
             continue
 
         status = str(fm.get("status", "")).strip().lower()
+        if status in {"superseded", "deprecated"}:
+            continue
         severity = "warning" if status in {"", "draft"} else "error"
         issues.append(
             {
@@ -802,6 +825,8 @@ def check_delivery_closure_readiness(session_dir: Path, completed_tasks: int) ->
 
     total_tasks = 0
     for task_file in sorted(session_dir.rglob("*task*.md")):
+        if is_ignored_verification_path(task_file):
+            continue
         total_tasks += len(extract_tasks(task_file.read_text(), task_file))
 
     all_tasks_done = total_tasks > 0 and completed_tasks > 0 and completed_tasks == total_tasks
@@ -1146,6 +1171,8 @@ def _record_task_verification(
 def _collect_report_contradictions(session_path: Path) -> List[Dict[str, Any]]:
     contradictions: List[Dict[str, Any]] = []
     for report_file in session_path.rglob("*report*.md"):
+        if is_ignored_verification_path(report_file):
+            continue
         contradictions.extend(detect_report_contradictions(report_file.read_text()))
     return contradictions
 
@@ -1284,7 +1311,11 @@ def verify_session(session_path: Path, strict: bool = False) -> Tuple[bool, Dict
         return False, results
 
     # Find all task files (recursive, so .agents/wb/ can be used directly)
-    task_files = list(session_path.rglob('*task*.md'))
+    task_files = [
+        task_file
+        for task_file in session_path.rglob('*task*.md')
+        if not is_ignored_verification_path(task_file)
+    ]
 
     if not task_files:
         if not strict:

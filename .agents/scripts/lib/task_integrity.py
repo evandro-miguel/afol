@@ -36,6 +36,14 @@ SIDECAR_REQUIRED_LABELS = {
     "Execution task affected": re.compile(r"^\s*-\s*Execution task affected:\s*(T-\d{2,3})\s*$", re.IGNORECASE | re.MULTILINE),
     "Stop condition": re.compile(r"^\s*-\s*Stop condition:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE),
 }
+IGNORED_DOC_DIRS = (
+    ".agents/tmp/",
+    "docs/templates/",
+    "src/project-template/docs/templates/",
+    "docs/lessons/entries/",
+    "src/project-template/docs/lessons/entries/",
+    "references/templates/",
+)
 
 
 class TaskIntegrityError(ValueError):
@@ -89,6 +97,9 @@ def _collect_primary_task_lines(doc: Dict[str, Any]) -> List[Tuple[int, str]]:
 def _load_frontmatter_docs(session_dir: Path) -> List[Dict[str, Any]]:
     docs: List[Dict[str, Any]] = []
     for doc_file in sorted(session_dir.rglob("*.md")):
+        normalized = doc_file.as_posix()
+        if any(normalized.startswith(prefix) or f"/{prefix}" in normalized for prefix in IGNORED_DOC_DIRS):
+            continue
         parsed = parse_markdown_doc(doc_file)
         if parsed is None:
             continue

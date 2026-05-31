@@ -1470,5 +1470,75 @@ class TestWorkbenchRootEvidenceResolution(unittest.TestCase):
         self.assertNotEqual(issue_file.parent, session_with_ledger)
 
 
+class TestDocumentationTaskExamples(unittest.TestCase):
+    """Task-looking docs templates/examples are not executable workbench tasks."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.root = Path(self.temp_dir)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def _write(self, relative_path: str, content: str) -> None:
+        path = self.root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    def test_strict_root_ignores_docs_templates_and_lesson_examples(self):
+        task_body = (
+            "# Tasks\n\n"
+            "## State Board\n\n"
+            "| Task | State | Owner | Notes |\n"
+            "|------|-------|-------|-------|\n"
+            "| T-01 | pending | worker | template example |\n"
+        )
+        self._write("docs/templates/task.md", task_body)
+        self._write("src/project-template/docs/templates/task.md", task_body)
+        self._write(
+            "docs/lessons/entries/20260224_1425_task-list-vs-state-board.md",
+            "- [ ] T-03 Example task from documentation.\n",
+        )
+        malformed = self.root / ".agents/tmp/pytest-runtime-basetemp/example/malformed.md"
+        malformed.parent.mkdir(parents=True, exist_ok=True)
+        malformed.write_bytes(b"\xff\xfe# not utf-8")
+
+        with mock.patch.object(verify_tasks, "_run_strict_session_checks", return_value=True):
+            all_completed, results = verify_tasks.verify_session(self.root, strict=True)
+
+        self.assertTrue(all_completed)
+        self.assertEqual(results["total_tasks"], 0)
+        self.assertEqual(results["open_tasks"], [])
+        self.assertEqual(results["evidence_issues"], [])
+
+    def test_strict_root_still_detects_real_workbench_tasks(self):
+        session = "260531_1201_verify"
+        self._write(
+            f".agents/wb/{session}/{session}_task_01.md",
+            "# Tasks\n\n"
+            "## State Board\n\n"
+            "| Task | State | Owner | Notes |\n"
+            "|------|-------|-------|-------|\n"
+            "| T-01 | pending | worker | real workbench task |\n",
+        )
+
+        with mock.patch.object(verify_tasks, "_run_strict_session_checks", return_value=True):
+            all_completed, results = verify_tasks.verify_session(self.root, strict=True)
+
+        self.assertFalse(all_completed)
+        self.assertEqual(results["total_tasks"], 1)
+        self.assertEqual(len(results["open_tasks"]), 1)
+        self.assertIn("/.agents/wb/", results["open_tasks"][0]["file"].as_posix())
+
+    def test_task_integrity_ignores_malformed_tmp_markdown(self):
+        malformed = self.root / ".agents/tmp/pytest-runtime-basetemp/example/malformed.md"
+        malformed.parent.mkdir(parents=True, exist_ok=True)
+        malformed.write_bytes(b"\xff\xfe# not utf-8")
+
+        issues = verify_tasks.check_meta_task_integrity(self.root)
+
+        self.assertEqual(issues, [])
+
+
 if __name__ == '__main__':
     unittest.main()

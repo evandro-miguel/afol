@@ -1,11 +1,12 @@
 ---
-doc_type: execution_plan
+doc_type: plan
 id: 260521_0000_total_reformulation_execution_plan_01
-status: active
+status: final
+theme: total-reformulation-execution-plan
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-05-21T22:16:18-03:00'
+updated_at: '2026-05-31T00:00:00-03:00'
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
   manifesto: docs/arc/PROJECT-MANIFESTO.md
@@ -348,12 +349,34 @@ contract can protect parity.
 - Do not benchmark vague product ideas; benchmark fixed scenarios with expected
   outputs and thresholds.
 
-## 7) Immediate Next Action
+## 7) Closure Note
 
-Start with Slice 2 only after strategic docs and spec-tests are reviewed:
+The roadmap entries for F-00 through F-17 are marked final in
+`docs/arc/GENERAL-ROADMAP.md`. This plan is retained as a historical execution
+record and no longer carries an immediate implementation action.
 
-1. implement `afol` as the thin compatibility front door,
-2. keep `./a` as a compatibility alias,
-3. add local/template wrappers,
-4. add compact help/status alias mapping,
-5. validate against existing `.agents/agents` behavior.
+## Progress
+
+- [x] 2026-05-31 15:55 - Roadmap closure state reconciled with this execution
+  plan; the plan is final and retained as historical execution evidence.
+
+## Concrete Steps
+
+1. Preserve the original staged execution record for F-00 through F-17.
+2. Use `docs/arc/GENERAL-ROADMAP.md` closure notes as the current completion
+   source.
+3. Validate future edits with focused markdown/frontmatter and workbench strict
+   checks.
+
+## Validation and Acceptance
+
+- `bun run typecheck` passes for the current Bun/TypeScript kernel.
+- `bun test` passes for the current CLI test suite.
+- `./.agents/agents verify-tasks --strict` is the closure gate for workbench
+  evidence and task state.
+
+Current documentation validation remains the lightweight gate:
+
+1. markdown/frontmatter lint,
+2. focused spec or closure checks when docs change,
+3. roadmap closure notes as the source of implementation completion evidence.
