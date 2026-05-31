@@ -65,3 +65,12 @@ docs/telemetry/reports/implementation_report.md
 # Makefile in a-docs (keep root Makefile)
 # .agents/a-docs/standards/Makefile
 .gitnexus
+
+# Generated install/build outputs
+node_modules/
+dist/
+.bun-build*
+
+# Reproducible source artifacts that must stay versioned
+!bun.lock
+!cli/generated/template.ts

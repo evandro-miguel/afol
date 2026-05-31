@@ -10,7 +10,8 @@ status: draft
 
 ## Project Overview
 
-`{project_name}` uses a local `.agents` workflow for LLM-assisted delivery.
+`{project_name}` uses the local `afol` front door, with `./a` kept as a
+compatibility alias, for LLM-assisted delivery.
 Replace this section after bootstrap with real product context.
 
 ## Governed Execution
@@ -19,10 +20,10 @@ Replace this section after bootstrap with real product context.
 - Start task before product edits.
 - Close task with evidence.
 - Canonical path:
-  1. `./.agents/agents new {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `./.agents/agents implement start --session {session-id} --task-id T-01`
+  1. `afol n {theme} --feature-id {F-id} --parent-spec {spec-id}`
+  2. `afol st -S {session-id} -T T-01`
   3. Edit and run named verification.
-  4. `./.agents/agents implement complete ... --result passed`
+  4. `afol d -S {session-id} -T T-01 -x "<verification command>"`
 
 ## Stack
 
@@ -33,7 +34,8 @@ Replace this section after bootstrap with real product context.
 
 ## Repository Map
 
-- `.agents/scripts/`, `.agents/runtime/`, `.agents/wb/`
+- `.agents/wb/` governed workbench state
+- `.agents/data/telemetry/` telemetry data and indexes when the downstream CLI exposes them
 - `.agents/rules/` local contracts only
 - `.agents/skills/` only required project-local behavior
 - `docs/` project docs, `docs/map/` evidence only
@@ -60,7 +62,14 @@ Replace this section after bootstrap with real product context.
 - Indexed/structured: MCPs.
 - Exact search: `rg`, `fd`, `jq`.
 - Syntax: `sg`/`ast-grep`.
-- Validation/docs/tasks: `just`, `.agents/agents`.
+- Validation/docs/tasks: `just`, `afol`, `./a`.
+
+## Telemetry And Indexes
+
+Telemetry is a state surface in the template export. If the downstream repo
+ships a native telemetry command, call it through `afol` or `./a`.
+Otherwise, treat telemetry reports, exports, and indexes as CLI-owned future
+work and keep this template focused on the stored data and docs contract.
 
 ## Planning And Evidence
 
@@ -70,7 +79,7 @@ Replace this section after bootstrap with real product context.
 
 ## Verification
 
-- Required gates: `just doctor`, `just lint`, `just verify`.
+- Required template gate: `just validate` or `afol ck`.
 - Choose focused checks first.
 
 ## Docs And Boundaries
@@ -83,7 +92,8 @@ Replace this section after bootstrap with real product context.
 
 - `AGENTS.md` is canonical runtime source.
 - Keep `CLAUDE.md` mirror compatible.
-- Use `skills-sync` flow; do not push direct to universal `main`.
+- Use a configured native skill synchronization flow only when this repo
+  provides one; do not push direct to universal `main`.
 
 ## Optional Memory
 

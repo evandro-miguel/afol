@@ -1,0 +1,155 @@
+import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { runStatusCommand } from "../commands/status";
+
+type CapturedIo = {
+  stdout: string[];
+  stderr: string[];
+  io: {
+    stdout: (message: string) => void;
+    stderr: (message: string) => void;
+  };
+};
+
+function captureIo(): CapturedIo {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  return {
+    stdout,
+    stderr,
+    io: {
+      stdout: (message: string) => {
+        stdout.push(message);
+      },
+      stderr: (message: string) => {
+        stderr.push(message);
+      },
+    },
+  };
+}
+
+function createFixture(options?: { yamlConfig?: boolean }): string {
+  const root = mkdtempSync(join(tmpdir(), "status-command-"));
+  const agentsDir = join(root, ".agents");
+  const wbDir = join(agentsDir, "wb");
+  const sessionId = "260530_2256_cli-native-command-parity";
+  const sessionDir = join(wbDir, sessionId);
+
+  mkdirSync(agentsDir, { recursive: true });
+  mkdirSync(sessionDir, { recursive: true });
+
+  if (options?.yamlConfig) {
+    writeFileSync(
+      join(agentsDir, "agents.config"),
+      [
+        "schema_version: 1",
+        "project:",
+        "  name: status-fixture",
+      ].join("\n"),
+      "utf8",
+    );
+  } else {
+    writeFileSync(
+      join(agentsDir, "config.json"),
+      JSON.stringify({ schema_version: 1, project: { name: "status-fixture" } }),
+      "utf8",
+    );
+  }
+
+  writeFileSync(
+    join(agentsDir, "lock.json"),
+    JSON.stringify({ schema_version: 1, revision: "abc123", project: "status-fixture", locked: true }),
+    "utf8",
+  );
+
+  writeFileSync(join(wbDir, ".active_session"), `${sessionId}\n`, "utf8");
+
+  const taskFile = join(sessionDir, `${sessionId}_task_01.md`);
+  writeFileSync(
+    taskFile,
+    [
+      "---",
+      "task_id: T-01",
+      "status: in_progress",
+      "---",
+      "",
+      "FILES_WRITTEN:",
+      "- cli/commands/status.ts",
+      "VALIDATION_OR_CHECKS:",
+      "- bun test cli/tests/status.test.ts",
+      "BLOCKERS:",
+      "- none",
+      "NEXT:",
+      "- implement validate",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+
+  return root;
+}
+
+describe("status command", () => {
+  test("prints compact STATUS block with required fields", () => {
+    const root = createFixture();
+    try {
+      const captured = captureIo();
+      const code = runStatusCommand(root, [], captured.io);
+      expect(code).toBe(0);
+      expect(captured.stderr).toEqual([]);
+      expect(captured.stdout.length).toBe(1);
+
+      const text = captured.stdout[0] ?? "";
+      expect(text).toContain("STATUS:");
+      expect(text).toContain("TASK:");
+      expect(text).toContain("FILES_WRITTEN:");
+      expect(text).toContain("VALIDATION_OR_CHECKS:");
+      expect(text).toContain("BLOCKERS:");
+      expect(text).toContain("NEXT:");
+      expect(text).toContain("TASK: T-01");
+      expect(text).toContain("STATUS: in_progress");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("supports --json with simple payload and read paths", () => {
+    const root = createFixture();
+    try {
+      const captured = captureIo();
+      const code = runStatusCommand(root, ["--json"], captured.io);
+      expect(code).toBe(0);
+      expect(captured.stderr).toEqual([]);
+      expect(captured.stdout.length).toBe(1);
+
+      const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<string, unknown>;
+      expect(payload.status).toBe("in_progress");
+      expect(payload.task).toBe("T-01");
+      const paths = payload.paths as Record<string, unknown>;
+      expect(typeof paths.config).toBe("string");
+      expect(typeof paths.lock).toBe("string");
+      expect(typeof paths.active_session).toBe("string");
+      expect(typeof paths.task_file).toBe("string");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("reads .agents/agents.config when config.json is absent", () => {
+    const root = createFixture({ yamlConfig: true });
+    try {
+      const captured = captureIo();
+      const code = runStatusCommand(root, ["--json"], captured.io);
+      expect(code).toBe(0);
+      const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<string, unknown>;
+      const paths = payload.paths as Record<string, unknown>;
+      const configPath = paths.config;
+      expect(typeof configPath).toBe("string");
+      expect((configPath as string).endsWith(".agents/agents.config")).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

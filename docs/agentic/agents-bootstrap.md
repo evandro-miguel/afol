@@ -11,7 +11,7 @@ links:
   wrapper: ./agents-wrapper.md
 ---
 
-# agents-bootstrap.py - Bootstrap in Other Repositories
+# afol bootstrap - Bootstrap in Other Repositories
 
 ## Why It Exists
 
@@ -23,7 +23,7 @@ links:
 - Detecting target project stack
 - Validating installation
 
-**Solution:** Automatic bootstrap that installs `.agents` in any repository with one command while exporting a generic baseline instead of this scaffold's local history.
+**Solution:** Native `afol bootstrap` installs `.agents` in any repository with one command while exporting a generic baseline instead of this scaffold's local history.
 The bootstrap also prepares a safe skills baseline for downstream repos so fresh and partial installs share the same adoption model.
 Bootstrap also prepares a repo-local `.agents/source/universal-skills` checkout so project-local skills can stay repo-specific without relying on a large global Codex skill set, and the default path seeds that checkout from committed repo assets instead of cloning over the network.
 
@@ -32,12 +32,12 @@ Bootstrap also prepares a repo-local `.agents/source/universal-skills` checkout 
 Installs `.agents` system in another repository:
 
 1. **Detects stack** - Node.js, Python, Go, etc.
-2. **Copies reusable system assets** - Core configs, scripts, docs, rules, templates, mirror docs, OpenCode adapter
+2. **Copies reusable system assets** - Core configs, docs, rules, templates, mirror docs, and native CLI wrappers
 3. **Generates clean governance baseline** - Starter roadmap, architecture, project brief, tech stack, guidelines, and empty indexes
-4. **Creates folders** - Required structure and runtime agent folders
+4. **Creates folders** - Required structure, local state, workbench, rules, and skill folders
 5. **Configures command runner surface** - Justfile canonical
-6. **Runs system setup** - Sync docs, optional skills sync, and symlink repair
-7. **Validates** - Runs doctor and tools checks
+6. **Runs system setup** - Writes the native front door and exported baseline
+7. **Validates** - Runs native front-door checks
 
 When the target repository already exists, bootstrap must behave as an overlay:
 
@@ -45,7 +45,7 @@ When the target repository already exists, bootstrap must behave as an overlay:
 - `skip` for existing project-owned files
 - `patch-managed` for scaffold-owned files that can be safely updated
 - `adapt-config` for legacy layout or path translation
-- `add-wrapper` for missing compatibility adapters such as `.agents/agents-mcp`
+- `add-wrapper` for missing compatibility adapters such as `afol` or `./a`
 - `reconcile-skills` for manifest/source drift that needs explicit
   classification
 - `conflict` when overwrite would touch project-owned content
@@ -59,20 +59,20 @@ losing its own docs, workbench, or local runtime choices.
 Public distribution entrypoint:
 
 - `full` install command:
-  - `./.agents/agents bootstrap /path/to/target-repo`
+  - `afol bootstrap /path/to/target-repo`
 - `partial` install command:
-  - `./.agents/agents bootstrap /path/to/existing-project --partial`
+  - `afol bootstrap /path/to/existing-project --partial`
 
 Front-door checks available in all adopted repos:
 
-- `afol` delegates to this wrapper for status and workflow commands.
+- `afol` is the public native front door for status and workflow commands.
 - `afol s` (or `afol status`) reports status.
 - `afol ck` (or `afol check`) reports validation/runtime metadata when supported by the wrapper in that repo.
 - `afol st`, `afol d -x "just lint"`, and `afol c` are the token-optimized
   workbench lifecycle aliases.
 - `./a` remains available as a compatibility alias during migration.
-- Validate the onboarding result with `just --list` and
-  `just --justfile Justfile agents_scaffold::doctor` (or root `just doctor` equivalent).
+- Validate the onboarding result with `just --list`, `./a status`, and
+  `./a validate`.
 
 Sanitization rule:
 
@@ -103,16 +103,12 @@ Compatibility mirrors kept for broader reuse:
 | `AGENTS.md` | Canonical instruction template |
 | `CLAUDE.md` | Mandatory agent instruction replica |
 | `RTK.md` | Selective shell-output compression policy |
-| `.agents/agents` | CLI wrapper |
 | `.agents/config.json` | Canonical project config seed |
-| `.agents/agents.config` | Configuration |
-| `.agents/tools.json` | Tool catalog |
 | `.agents/skills-sync.manifest.json` | Skills sync state |
 | `docs/arc/README.md` | Arc folder overview |
 | `docs/arc/SPECS/README.md` | Specs folder guidance |
 | `docs/templates/spec*.md` | Spec templates |
 | `docs/templates/adr.md` | ADR template |
-| `.agents/scripts/` | Python scripts |
 | `docs/` | Documentation, copied with history/report sanitization |
 | `.agents/rules/` | Agent rules |
 | `.agents/skills/` | Project skills |
@@ -137,11 +133,10 @@ Compatibility mirrors kept for broader reuse:
 | `<target>/docs/knowledge/INDEX.md` | Empty starter index generated |
 
 Bootstrap fails fast if any mandatory source file or directory is missing.
-Bootstrap also runs:
-
-- `.agents/agents sync --force`
-- `.agents/agents skills-sync sync` (non-blocking when skills sync is optional)
-- `.agents/agents fix-symlinks --force`
+Python bootstrap compatibility does not define the public downstream install
+contract. New public documentation and installer examples must use
+`afol bootstrap`; `.agents/scripts/agents-bootstrap.py` is factory-only recovery
+tooling while the old Python path is retired.
 
 Primary-vs-compatibility rule:
 
@@ -164,9 +159,9 @@ Generic-export rule:
 
 Installation modes:
 
-- Full bootstrap: target repo is new or mostly empty, so the scaffold provisions the full `.agents` runtime and generic governance baseline.
+- Full bootstrap: target repo is new or mostly empty, so the scaffold provisions the native `.agents` baseline and generic governance baseline.
 - Partial install: target repo already exists, so bootstrap preserves existing files by default and fills only the missing scaffold files and directories.
-- `--force` converts the partial path into an overwrite path for files that already exist.
+- `--force-managed` converts conflicting managed files into an explicit overwrite path.
 - Existing projects should prefer partial install so the bootstrap can add the skills baseline without overwriting project-owned content.
 - Bootstrap prefers a repo-local `.agents/source/universal-skills` checkout as the upstream skill source.
 - The default bootstrap path seeds that source locally; it does not require a clone from GitHub.
@@ -177,19 +172,16 @@ Installation modes:
 
 ```bash
 # Bootstrap in another repository
-./.agents/agents bootstrap /path/to/target-repo
+afol bootstrap /path/to/target-repo
 
 # Partial install in an existing repository
-./.agents/agents bootstrap /path/to/existing-project --partial
+afol bootstrap /path/to/existing-project --partial
 
 # Dry run (show what will be done)
-./.agents/agents bootstrap /path/to/target --dry-run
+afol bootstrap /path/to/target --dry-run
 
 # Force overwrite
-./.agents/agents bootstrap /path/to/target --force
-
-# Skip post-bootstrap validation
-./.agents/agents bootstrap /path/to/target --skip-checks
+afol bootstrap /path/to/target --force-managed
 ```
 
 ### Options
@@ -197,13 +189,12 @@ Installation modes:
 | Option | Description |
 |--------|-------------|
 | `--dry-run` | Preview without writing |
-| `--force` | Overwrite existing files |
+| `--force-managed` | Overwrite managed/conflicting scaffold files |
 | `--partial` | Install the scaffold into an existing project without clobbering project-owned files |
-| `--skip-checks` | Skip doctor/tools-check |
 
 Usage notes:
 
-- Existing repos should use `--partial`; the command skips files that already exist unless `--force` is set.
+- Existing repos should use `--partial`; the command preserves project-owned files unless managed overwrite is explicitly requested.
 - The generated roadmap/spec baseline is generic; project owners should replace the placeholders with the real backlog before non-trivial work starts.
 - Optional upstream skills sync warnings are non-blocking and do not mean the bootstrap failed.
 - The skills baseline is generic by design and should be upgraded by the target repo owner rather than treated as scaffold-local history.
@@ -224,24 +215,15 @@ See the installation playbook: [bootstrap-other-repo.md](../standards/bootstrap-
 
 ### Add Files to Bootstrap
 
-Edit `agents-bootstrap.py`:
+Edit `src/project-template/` and regenerate the native template payload:
 
-```python
-MANDATORY_FILES_TO_COPY = [
-    "AGENTS.md",
-    "CLAUDE.md",
-    "RTK.md",
-    ".agents/agents",
-    ".agents/config.json",
-    ".agents/agents.config",
-    ".agents/tools.json",
-    ".agents/skills-sync.manifest.json",
-    "docs/arc/SPECS/README.md",
-    "docs/templates/spec.md",
-]
+```bash
+bun run template:generate
+bun run validate:bootstrap
 ```
 
-Generated target-project baselines live in `generated_baseline_content()` and sanitization rules for copied directories live in `_ignore_for_dir()`.
+Factory-only compatibility behavior remains in `.agents/scripts/agents-bootstrap.py`
+until all Python bootstrap use has been retired.
 
 ## How to Test
 
@@ -252,7 +234,7 @@ cd /tmp/test-repo
 git init
 
 # Bootstrap
-./.agents/agents bootstrap /tmp/test-repo
+afol bootstrap /tmp/test-repo
 
 # Verify
 ls -la /tmp/test-repo/.agents/
@@ -260,7 +242,7 @@ test ! -f /tmp/test-repo/docs/telemetry/reports/implementation_report.md
 test ! -f /tmp/test-repo/docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md
 ```
 
-For a live project, the partial-install expectation is that pre-existing files remain untouched unless `--force` is used.
+For a live project, the partial-install expectation is that pre-existing files remain untouched unless managed overwrite is explicitly requested.
 
 ## Output
 

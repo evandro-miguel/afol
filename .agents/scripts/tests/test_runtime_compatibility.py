@@ -57,15 +57,25 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("afol", mandatory_files)
         self.assertIn("a", mandatory_files)
         self.assertIn(".agents/config.json", mandatory_files)
-        self.assertIn(".agents/agents.config", mandatory_files)
+        self.assertNotIn(".agents/agents", mandatory_files)
+        self.assertNotIn(".agents/agents-mcp", mandatory_files)
+        self.assertNotIn(".agents/agents.config", mandatory_files)
+        self.assertNotIn(".agents/tools.json", mandatory_files)
         self.assertNotIn("OPENCODE.md", mandatory_files)
         self.assertNotIn("QWEN.md", mandatory_files)
         self.assertNotIn("GEMINI.md", mandatory_files)
         self.assertNotIn("PLANS.md", mandatory_files)
         self.assertNotIn("opencode.json", mandatory_files)
         self.assertIn("docs/arc/SPECS/README.md", mandatory_files)
-        self.assertIn(".agents/runtime", mandatory_dirs)
+        self.assertNotIn("docs/map/structure/README.md", mandatory_files)
+        self.assertNotIn(".agents/scripts", mandatory_dirs)
+        self.assertNotIn(".agents/runtime", mandatory_dirs)
+        self.assertNotIn(".agents/skills", mandatory_dirs)
+        self.assertNotIn("docs/agentic", mandatory_dirs)
+        self.assertNotIn("docs/standards", mandatory_dirs)
         self.assertIn(".agents/tmp", ensure_dirs)
+        self.assertIn(".agents/skills", ensure_dirs)
+        self.assertIn("docs/map/structure", ensure_dirs)
         self.assertNotIn(".opencode", ensure_dirs)
         self.assertNotIn(".qwen", ensure_dirs)
         self.assertNotIn(".gemini", ensure_dirs)
@@ -82,18 +92,19 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             "agentic": Path("docs/agentic/agents-bootstrap.md").read_text(encoding="utf-8"),
         }
 
-        self.assertIn("./.agents/agents bootstrap /path/to/target-repo", docs["README"])
-        self.assertIn("./.agents/agents bootstrap /path/to/existing-project --partial", docs["README"])
+        self.assertIn("afol bootstrap /path/to/target-repo", docs["README"])
+        self.assertIn("afol bootstrap /path/to/existing-project --partial", docs["README"])
         self.assertIn("- `afol`", docs["README"])
         self.assertIn("afol s", docs["README"])
         self.assertIn("afol ck", docs["README"])
-        self.assertIn("just --justfile Justfile agents_scaffold::doctor", docs["README"])
+        self.assertIn("./a validate", docs["README"])
 
         for doc in docs.values():
             self.assertIn("public onboarding", doc.lower())
             self.assertIn("partial", doc.lower())
             self.assertIn("full", doc.lower())
             self.assertIn("bootstrap", doc.lower())
+            self.assertIn("afol", doc.lower())
 
         self.assertIn("## Onboarding validation (minimum)", docs["README"])
         self.assertIn("## Public onboarding requirements", docs["standards"])
@@ -124,96 +135,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             target = Path(td)
-            (target / "Justfile").write_text("import 'docs/standards/Justfile'\n", encoding="utf-8")
-            calls = []
-            cwds = []
-
-            def fake_run(cmd, cwd=None, **kwargs):
-                calls.append(cmd)
-                cwds.append(cwd)
-                result = mock.Mock()
-                if cmd[:3] == ["./.agents/agents", "skills-sync", "sync"]:
-                    result.returncode = 1
-                else:
-                    result.returncode = 0
-                return result
-
-            with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
-                with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
-                    agents_bootstrap.run_post_checks(target)
-
-            self.assertIn(["./.agents/agents", "skills-sync", "sync"], calls)
-            self.assertIn(["./.agents/agents", "hydrate"], calls)
-            self.assertIn(["just", "--justfile", "Justfile", "--fmt", "--check"], calls)
-            self.assertIn(["just", "--justfile", "Justfile", "--list"], calls)
-            self.assertIn(["just", "--justfile", "Justfile", "all"], calls)
-            self.assertEqual(cwds, [target] * len(cwds))
-
-    def test_build_post_check_commands_cover_full_validation_contract(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
-        sys.path.insert(0, str(script_path.parent))
-        agents_bootstrap = load_module("agents_bootstrap_command_contract_test", script_path)
-
-        with tempfile.TemporaryDirectory() as td:
-            target = Path(td)
-            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
-
-            with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
-                commands = agents_bootstrap.build_post_check_commands(target)
-
-        names = [name for name, _, _ in commands]
-        self.assertEqual(
-            names,
-            [
-                "hydrate",
-                "sync-agent-docs",
-                "skills-sync",
-                "fix-symlinks",
-                "fmt-check",
-                "list",
-                "doctor",
-                "lint",
-                "test-scripts",
-                "all",
-            ],
-        )
-        self.assertTrue(all(cmd[0] != "make" for _, cmd, _ in commands))
-        self.assertIn(
-            ["just", "--justfile", "Justfile", "agents_scaffold::all"],
-            [cmd for _, cmd, _ in commands],
-        )
-
-    def test_project_template_justfile_exports_strict_targets(self):
-        template_root = Path("src/project-template")
-        if not template_root.exists():
-            self.skipTest("source project template is only present in the source repo")
-
-        root_list = subprocess.run(
-            ["just", "--justfile", str(template_root / "Justfile"), "--list"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-        standards_list = subprocess.run(
-            ["just", "--justfile", str(template_root / "docs/standards/Justfile"), "--list"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-
-        self.assertRegex(root_list, r"(?m)^\s*validate-strict\b")
-        self.assertRegex(standards_list, r"(?m)^\s*all-strict\b")
-        self.assertRegex(standards_list, r"(?m)^\s*diff-check\b")
-        self.assertRegex(standards_list, r"(?m)^\s*verify-strict-if-present\b")
-
-    def test_bootstrap_post_checks_use_namespaced_recipe_when_justfile_is_module(self):
-        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
-        sys.path.insert(0, str(script_path.parent))
-        agents_bootstrap = load_module("agents_bootstrap_namespaced_just_test", script_path)
-
-        with tempfile.TemporaryDirectory() as td:
-            target = Path(td)
-            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
+            (target / "Justfile").write_text("validate:\n    ./a validate\n", encoding="utf-8")
             calls = []
             cwds = []
 
@@ -228,9 +150,82 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
                     agents_bootstrap.run_post_checks(target)
 
-            self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::doctor"], calls)
-            self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::lint"], calls)
-            self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
+            self.assertIn(["just", "--justfile", "Justfile", "--fmt", "--check"], calls)
+            self.assertIn(["just", "--justfile", "Justfile", "--list"], calls)
+            self.assertIn(["./a", "-h"], calls)
+            self.assertIn(["./a", "status"], calls)
+            self.assertIn(["./a", "validate"], calls)
+            self.assertEqual(cwds, [target] * len(cwds))
+
+    def test_build_post_check_commands_cover_full_validation_contract(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_command_contract_test", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td)
+            (target / "Justfile").write_text("validate:\n    ./a validate\n", encoding="utf-8")
+
+            with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
+                commands = agents_bootstrap.build_post_check_commands(target)
+
+        names = [name for name, _, _ in commands]
+        self.assertEqual(
+            names,
+            [
+                "fmt-check",
+                "list",
+                "frontdoor-help",
+                "status",
+                "validate",
+            ],
+        )
+        self.assertTrue(all(cmd[0] != "make" for _, cmd, _ in commands))
+        self.assertIn(
+            ["./a", "validate"],
+            [cmd for _, cmd, _ in commands],
+        )
+
+    def test_project_template_justfile_exports_strict_targets(self):
+        template_root = Path("src/project-template")
+        if not template_root.exists():
+            self.skipTest("source project template is only present in the source repo")
+
+        root_list = subprocess.run(
+            ["just", "--justfile", str(template_root / "Justfile"), "--list"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        self.assertRegex(root_list, r"(?m)^\s*validate-strict\b")
+        self.assertRegex(root_list, r"(?m)^\s*validate\b")
+        self.assertRegex(root_list, r"(?m)^\s*status\b")
+
+    def test_bootstrap_post_checks_use_namespaced_recipe_when_justfile_is_module(self):
+        script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_bootstrap = load_module("agents_bootstrap_namespaced_just_test", script_path)
+
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td)
+            (target / "Justfile").write_text("validate:\n    ./a validate\n", encoding="utf-8")
+            calls = []
+            cwds = []
+
+            def fake_run(cmd, cwd=None, **kwargs):
+                calls.append(cmd)
+                cwds.append(cwd)
+                result = mock.Mock()
+                result.returncode = 0
+                return result
+
+            with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
+                with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
+                    agents_bootstrap.run_post_checks(target)
+
+            self.assertIn(["./a", "-h"], calls)
+            self.assertIn(["./a", "status"], calls)
+            self.assertIn(["./a", "validate"], calls)
             self.assertEqual(cwds, [target] * len(cwds))
 
     def test_partial_bootstrap_post_checks_downgrade_repo_validation_failures(self):
@@ -240,21 +235,20 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             target = Path(td)
-            (target / "Justfile").write_text("mod agents_scaffold 'docs/standards/Justfile'\n", encoding="utf-8")
+            (target / "Justfile").write_text("validate:\n    ./a validate\n", encoding="utf-8")
             calls = []
 
             def fake_run(cmd, cwd=None, **kwargs):
                 calls.append(cmd)
                 result = mock.Mock()
-                result.returncode = 1 if cmd[:4] == ["just", "--justfile", "Justfile", "agents_scaffold::lint"] else 0
+                result.returncode = 1 if cmd == ["./a", "validate"] else 0
                 return result
 
             with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
                 with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
                     agents_bootstrap.run_post_checks(target, agents_bootstrap.INSTALL_MODE_PARTIAL)
 
-        self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::lint"], calls)
-        self.assertIn(["just", "--justfile", "Justfile", "agents_scaffold::all"], calls)
+        self.assertIn(["./a", "validate"], calls)
 
     def test_bootstrap_post_checks_require_just(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -668,7 +662,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn('run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp', mcp_wrapper)
         self.assertIn('adoption-plan|inspect-target', agents_wrapper)
 
-    def test_partial_bootstrap_refreshes_legacy_runtime_wrappers(self):
+    def test_partial_bootstrap_refreshes_native_front_doors(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
         sys.path.insert(0, str(script_path.parent))
         agents_bootstrap = load_module("agents_bootstrap_runtime_surface_refresh_test", script_path)
@@ -676,22 +670,21 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             target = Path(td)
-            legacy_agents_dir = target / ".agents"
-            legacy_agents_dir.mkdir(parents=True, exist_ok=True)
-            (legacy_agents_dir / "agents").write_text(
+            (target / "afol").write_text(
                 "#!/usr/bin/env bash\n"
                 "echo legacy\n",
                 encoding="utf-8",
             )
+            (target / "a").write_text("#!/usr/bin/env bash\necho legacy\n", encoding="utf-8")
 
             agents_bootstrap.ensure_partial_runtime_surfaces(target, dry_run=False)
 
-            wrapper = (legacy_agents_dir / "agents").read_text(encoding="utf-8")
-            mcp_wrapper = (legacy_agents_dir / "agents-mcp").read_text(encoding="utf-8")
+            afol = (target / "afol").read_text(encoding="utf-8")
+            a_wrapper = (target / "a").read_text(encoding="utf-8")
 
-        self.assertIn("run_runtime_and_record", wrapper)
-        self.assertIn("mcp|agents-mcp)", wrapper)
-        self.assertIn('agentic-mcp "$@"', mcp_wrapper)
+        self.assertIn("AGENTIC_CLI_PATH", afol)
+        self.assertIn("bunx agentic-cli", afol)
+        self.assertIn("AGENTIC_CLI_PATH", a_wrapper)
 
     def test_bootstrap_exports_generic_baseline_without_scaffold_history(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -724,7 +717,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertTrue((target / ".agents/wb").exists())
             self.assertFalse(any((target / ".agents/wb").iterdir()))
             self.assertTrue((target / ".agents/config.json").exists())
-            self.assertTrue((target / ".agents/agents.config").exists())
+            self.assertFalse((target / ".agents/agents").exists())
+            self.assertFalse((target / ".agents/agents-mcp").exists())
+            self.assertFalse((target / ".agents/agents.config").exists())
             self.assertEqual(canonical_config.get("schema_version"), 1)
             self.assertEqual(canonical_config.get("paths", {}).get("agents_dir"), ".agents")
             self.assertFalse((target / ".agents/config.factory.json").exists())
@@ -749,8 +744,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("| Total | 2 |", specs_index)
             self.assertIn("- Total indexed docs: 0", knowledge_index)
             self.assertIn("current-state, descriptive", map_readme)
-            self.assertIn("import 'docs/standards/Justfile'", root_justfile)
-            self.assertTrue((target / "docs/standards/Justfile").exists())
+            self.assertIn("./a validate", root_justfile)
+            self.assertFalse((target / "docs/standards/Justfile").exists())
             self.assertFalse((target / ".agents/arc/map").exists())
             self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
 
@@ -764,8 +759,6 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             template_root / "docs/knowledge/INDEX.md",
             template_root / "docs/knowledge/README.md",
             template_root / "docs/lessons/README.md",
-            template_root / "docs/lessons/general-lessons.md",
-            template_root / "docs/map/structure/README.md",
             template_root / "docs/templates/adr.md",
             template_root / "docs/templates/pattern.md",
             template_root / "docs/templates/spec.md",
@@ -773,6 +766,17 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             template_root / "docs/templates/spec-test.md",
             template_root / "docs/templates/spec-lite.md",
         ]
+        removed_template_payload = [
+            template_root / ".agents/skills/agentic-folder-sys",
+            template_root / ".agents/skills/agentic-scaffold-mcp",
+            template_root / ".agents/scripts/tests",
+            template_root / ".agents/runtime/tests",
+            template_root / "docs/lessons/general-lessons.md",
+            template_root / "docs/map/structure/README.md",
+            template_root / "docs/patterns/INDEX.md",
+        ]
+        for path in removed_template_payload:
+            self.assertFalse(path.exists(), f"{path} should not be shipped by the project template")
 
         forbidden_tokens = [
             "agentic_start_folder",
@@ -841,9 +845,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("## Working Rules", agents_md)
         self.assertIn(".agents/rules/", agents_md)
         self.assertTrue((template_root / "Justfile").exists())
-        self.assertTrue((template_root / "docs/standards/Justfile").exists())
+        self.assertFalse((template_root / "docs/standards/Justfile").exists())
         self.assertIn(
-            "import 'docs/standards/Justfile'",
+            "./a validate",
             (template_root / "Justfile").read_text(encoding="utf-8"),
         )
         self.assertFalse((template_root / "PLANS.md").exists())
@@ -861,7 +865,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertEqual([path.name for path in lesson_entries], ["README.md"])
 
         structure_files = sorted((template_root / "docs/map/structure").glob("*.md"))
-        self.assertEqual([path.name for path in structure_files], ["README.md"])
+        self.assertEqual([path.name for path in structure_files], [])
 
     def test_partial_bootstrap_generates_existing_project_adoption_baseline(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -1007,7 +1011,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
             content = justfile.read_text(encoding="utf-8")
             self.assertIn("default:", content)
-            self.assertIn("mod agents_scaffold 'docs/standards/Justfile'", content)
+            self.assertIn("# .agents scaffold native front-door recipes", content)
+            self.assertIn("agents-validate:", content)
 
 
 if __name__ == "__main__":

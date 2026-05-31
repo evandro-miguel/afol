@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-05-30T19:10:41+00:00"
+updated_at: "2026-05-31T00:48:16+00:00"
 ---
 
 # SPECS INDEX
@@ -16,9 +16,9 @@ updated_at: "2026-05-30T19:10:41+00:00"
 
 | Metric | Count |
 |--------|-------|
-| Total | 59 |
+| Total | 60 |
 | Draft | 5 |
-| Active | 28 |
+| Active | 29 |
 | Final | 26 |
 
 ## Index
@@ -84,6 +84,7 @@ updated_at: "2026-05-30T19:10:41+00:00"
 | 260528_1913_command-parity-gate-hardening_spec-child_01 | command-parity-gate-hardening | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260528_1913_command-parity-gate-hardening_plan_01, task: 260528_1913_command-parity-gate-hardening_task_01 |
 | 260528_2022_runtime-mirror-cleanup_spec-child_01 | runtime-mirror-cleanup | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260528_2022_runtime-mirror-cleanup_plan_01, task: 260528_2022_runtime-mirror-cleanup_task_01, report: .agents/wb/260528_2022_runtime-mirror-cleanup/260528_2022_runtime-mirror-cleanup_report_01.md |
 | 260528_1946_bootstrap-template-justfile-wiring_spec-child_01 | bootstrap-template-justfile-wiring | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260528_1946_bootstrap-template-justfile-wiring_plan_01, task: 260528_1946_bootstrap-template-justfile-wiring_task_01 |
+| 260531_0000_template-cli-boundary-hardening_spec_01 | template-cli-boundary-hardening | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

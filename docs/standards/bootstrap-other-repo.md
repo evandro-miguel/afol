@@ -23,7 +23,7 @@ Define how to install the `.agents` scaffold into another repository, including:
 
 ## Public onboarding requirements
 
-- Command path: `./.agents/agents` inside the scaffold.
+- Command path: `afol bootstrap` from the native Bun/TypeScript CLI.
 - Repo path requirement:
   - provide a normal target directory path such as `/path/to/target-repo`,
     not a private host path.
@@ -36,7 +36,8 @@ Define how to install the `.agents` scaffold into another repository, including:
   - `afol ck` (or `afol check`) confirms wrapper/runtime toolchain version surface.
   - `afol b /path/to/existing-project --partial` confirms the partial install path.
   - `just --list`
-  - `just --justfile Justfile agents_scaffold::doctor`
+  - `./a status`
+  - `./a validate`
 
 ## Modes
 
@@ -47,18 +48,18 @@ Use full bootstrap when the target repo is new or mostly empty.
 What it does:
 
 - creates the target directory when it does not exist yet
-- installs the `.agents` runtime surface
+- installs the native `.agents` baseline
 - generates the generic governance baseline
 - prepares the goal-state canon under `docs/arc/` and the optional current-state map surface under `docs/map/`
-- creates the workbench and runtime directories without copying source-repo workbench history
-- runs post-bootstrap validation unless `--skip-checks` is used
+- creates the workbench/local-state directories without copying source-repo workbench history
+- validates through the native front door after bootstrap
 - prepares `.agents/source/universal-skills` as the preferred repo-local upstream source checkout
 - seeds that checkout from committed scaffold assets, so the default bootstrap path does not require a network clone
 
 Recommended command:
 
 ```bash
-./.agents/agents bootstrap /path/to/target-repo
+afol bootstrap /path/to/target-repo
 ```
 
 ### Partial Installation
@@ -71,8 +72,7 @@ Behavior:
 - missing `.agents` files and folders are added
 - generated governance files are written only where the target does not already have a file
 - the target receives the state-vs-goal split without adding a second planning tree
-- `--force` is required to overwrite existing files
-- if the target repo already owns `just all`, the scaffold preserves that target and exposes the aggregate scaffold validation as `just agents-all`
+- `--force-managed` is required to overwrite managed scaffold conflicts
 - the current skills manifest is treated as a compatibility baseline, not as a copy of scaffold-local history
 - bootstrap copies from `src/project-template/`, so downstream output stays clean even if the development workspace contains extra local-only files
 - the target repo should remain ready for repo/ref/profile-based skill installs when the upstream contract lands
@@ -83,7 +83,7 @@ This is the safe path for adopting the scaffold into a live project without clob
 Recommended command:
 
 ```bash
-./.agents/agents bootstrap /path/to/existing-project --partial
+afol bootstrap /path/to/existing-project --partial
 ```
 
 ## Update Contract
@@ -130,8 +130,7 @@ silently replace additional project content.
 ## Safe Usage
 
 - Use `--dry-run` before applying changes to a production repo.
-- Use `--skip-checks` only when you need the install step but will validate separately.
-- Use `--force` only when you intentionally want to replace existing files.
+- Use `--force-managed` only when you intentionally want to replace managed scaffold files.
 
 ## Limitations
 
@@ -144,10 +143,10 @@ silently replace additional project content.
 - Bootstrap does not copy scaffold-local skill history; it only prepares the baseline needed for the target repo to own its selection and upgrade path.
 - Bootstrap should reinforce project-local skills, not turn global Codex skills into a second project contract.
 - `skills-sync pull` refreshes only a configured external git-backed source; use `skills-sync sync` / `skills-sync update` to actually refresh `.agents/skills/` in the target repo.
-- Bootstrap should keep `uv` as the Python package/runtime manager, but materialize
-  the executable under `.agents/tools/uv/bin/uv` with `./.agents/agents hydrate-uv`
-  before hydrating project-local managed Python under `.agents/tools/uv/python/`
-  and the `.agents/scripts/.venv` and `.agents/runtime/.venv` virtualenvs.
+- Python/uv bootstrap scripts are factory-only compatibility surfaces. Public
+  downstream installs should use the native `afol bootstrap` path and should
+  not require `.agents/scripts`, `.agents/runtime`, or project-local uv
+  virtualenvs.
 
 ## Verification
 
@@ -155,25 +154,15 @@ After install, validate the target repo with:
 
 ```bash
 just --list
-just --justfile Justfile agents_scaffold::doctor
-just --justfile Justfile agents_scaffold::setup-uv
-just --justfile Justfile agents_scaffold::lint
-just --justfile Justfile agents_scaffold::test-scripts
-just --justfile Justfile agents_scaffold::all
+./a status
+./a validate
 ```
 
-If the target repo uses a root `Justfile` that imports scaffold recipes directly
-instead of the default namespaced module wrapper, use the exposed root recipe
-names (`just doctor`, `just lint`, `just test-scripts`, `just agents-all`)
-instead.
-
-For isolated environments, point the wrapper at a known-good script interpreter
-and confirm it works without `uv` on `PATH`:
+For isolated environments, point `AGENTIC_CLI_PATH` at the source checkout's
+native CLI and confirm the exported front door works:
 
 ```bash
-AGENTS_SCRIPT_PYTHON=/path/to/.agents/scripts/.venv/bin/python3 \
-PATH=/usr/bin:/bin \
-./.agents/agents doctor
+AGENTIC_CLI_PATH=/path/to/source/cli/main.ts ./a validate
 ```
 
 ---

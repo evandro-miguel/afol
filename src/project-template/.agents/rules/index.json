@@ -34,21 +34,5 @@
       "work_types": ["delivery", "implementation", "refactor"],
       "priority": 50
     },
-    {
-      "id": "RULE-006",
-      "name": "applicable-rule-resolution",
-      "path": "RULE-006-applicable-rule-resolution.md",
-      "surfaces": ["rules", "routing", "feature", "workbench"],
-      "work_types": ["delivery", "implementation", "routing"],
-      "priority": 100
-    },
-    {
-      "id": "RULE-007",
-      "name": "postmortem-governance-review",
-      "path": "RULE-007-postmortem-governance-review.md",
-      "surfaces": ["postmortem", "closure", "workbench"],
-      "work_types": ["closure"],
-      "priority": 40
-    }
   ]
 }

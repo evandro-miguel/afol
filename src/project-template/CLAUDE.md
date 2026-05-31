@@ -1,22 +1,40 @@
 <!-- Agent-specific instructions for CLAUDE. -->
-<!-- Auto-synced from AGENTS.md. Run sync-agent-docs.py to update. -->
+<!-- Mirror of AGENTS.md. Keep synchronized when runtime instructions change. -->
 
 # AGENTS.md
 
 ## Project Overview
 
-`{project_name}` uses a local `.agents` workflow for LLM-assisted delivery.
+`{project_name}` uses `afol` for LLM-assisted delivery.
 Replace this section after bootstrap with real product purpose and constraints.
+
+## Template Boundary
+
+- This repository was created from the minimal scaffold template.
+- The template owns local protocol/state only: `AGENTS.md`,
+  `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
+  `.agents/rules/`, optional `.agents/skills/`, `.agents/wb/` baseline, and
+  minimal docs.
+- `.agents/wb/` in a downstream project is that project's workbench state. It
+  must start from the template baseline and must not include factory repo
+  history, root workbench sessions, active-session pointers, caches, telemetry
+  events, benchmark results, or development-only evidence.
+- If a future update proposes broad docs, source seeds, factory tests, caches,
+  or root `.agents/wb/` history, treat that as export drift and reject it until
+  the scaffold manifest and docs explicitly justify the payload.
 
 ## Governed Execution
 
 - Use `.agents/wb/` when work includes implementation, validation, or delivery.
 - Before product edits: create/target a session and move task to `in_progress`.
 - Canonical path:
-  1. `./.agents/agents new {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `./.agents/agents implement start --session {session-id} --task-id T-01`
+  1. `afol n {theme} --feature-id {F-id} --parent-spec {spec-id}`
+  2. `afol st -S {session-id} -T T-01`
   3. Edit and run named verification.
-  4. Close with `./.agents/agents implement complete ... --result passed`.
+  4. `afol d -S {session-id} -T T-01 -x "<verification command>"`
+  5. `afol c -S {session-id}`
+- Use `./a` with the same subcommands when the compatibility alias is the
+  active front door.
 - Planning-only or read-only questions stay in chat unless durable artifacts
   are required.
 
@@ -29,9 +47,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 ## Repository Map
 
-- `.agents/scripts/`: CLI helpers.
-- `.agents/runtime/`: runtime package/adapters.
-- `.agents/wb/`: governed sessions.
+- `.agents/wb/`: local governed sessions for this downstream project only.
 - `.agents/rules/`: local operational contracts only.
 - `.agents/skills/`: project-local skills only when needed.
 - `.agents/source/universal-skills/`: local seed, not nested git.
@@ -56,8 +72,8 @@ Replace this section after bootstrap with real product purpose and constraints.
   Keep full precise prose when compression could hide risk, order, or evidence.
 - Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
   CLI, and existing `docs/map/` before broad scans.
-- Prefer `.agents/agents knowledge pull "<topic>"` before broad historical
-  reads.
+- Prefer repo-local `.agents/wb/` and `docs/knowledge/` records before broad
+  historical reads.
 - Use RTK only for noisy shell output:
   `rtk git status`, `rtk find`, `rtk summary`, bounded `rtk grep`.
   Use `RTK.md` when present for detailed command policy.
@@ -72,7 +88,8 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Repo history/context: `git`/`gh`; indexed graph/callers: GitNexus CLI.
 - Browser/UI: `npx playwright` or `bunx playwright`; lightweight checks:
   `lightpanda`.
-- Runtime/tasks: `uv`/`python3`, `bun`/`node`/`npm`, `just`.
+- Runtime/tasks: `bun`/`node`/`npm`, `just`, and project-specific toolchains
+  when present.
 - Docs/ops: `markdownlint`/`lint-md`/`fix-md`/`validate-md`, `markitdown`,
   `yt-dlp`, `docker compose`, `tmux`.
 
@@ -91,10 +108,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Never close work without proof.
 - Gate selection:
   - docs/prompt/process -> `just lint`
-  - `.agents/scripts` -> `just lint-scripts` + focused tests or
-    `just test-scripts-all`
-  - `.agents/runtime` -> `just lint-runtime` + focused tests or
-    `just test-runtime`
+  - front door/workbench -> `afol ck`
   - scaffold/release -> `just agents-all`
 - Run focused checks first; broaden only when risk requires.
 - If runtime guidance changes, report docs/mirror sync status.
@@ -106,8 +120,8 @@ Replace this section after bootstrap with real product purpose and constraints.
 - `docs/map/` is descriptive evidence only.
 - `docs/arc/` is goal-state governance.
 - Use `.agents/tmp/` only for disposable files.
-- Do not manually edit managed `updated_at`; use `just wb-touch` or
-  `./.agents/agents wb-update touch`.
+- Do not manually edit managed `updated_at`; use a configured project command
+  if this repo adds one.
 - Keep project-local rules/docs minimal: only required operational contracts.
 - Do not duplicate long rationale from canonical docs/skills; link to
   canonical source.
@@ -118,21 +132,22 @@ Replace this section after bootstrap with real product purpose and constraints.
 - `CLAUDE.md` is the committed mirror; keep it compatible and synced.
 - Keep committed adapters thin and traceable.
 - Prefer project-local skills only for project-specific behavior.
-- `skills-sync sync` / `skills-sync update` refresh `.agents/skills/`.
-- `skills-sync pull` refreshes configured external source only.
-- `skills-sync push` is branch/PR flow; never direct to universal `main`.
+- Project-local skills are optional; use a native downstream sync command only
+  when this repo provides one.
+- External skill source updates are branch/PR flow; never direct to universal
+  `main`.
 - When local skill behavior changes, record pending propagation to
   universal-skills.
 
 ## Optional Memory
 
-- Repo-local workbench docs and `knowledge` are canonical.
+- Repo-local workbench docs and `docs/knowledge/` are canonical.
 - External memory is auxiliary retrieval only.
-- `.agents/agents memory search|context|recent|show` emits MCP contracts only.
+- Use host runtime memory only when it is explicitly configured.
 
 ---
 
 > **⚠️ IMPORTANT:** THIS FILE IS A REPLICA OF THE `AGENTS.md`.
 >
 > - **DO NOT READ** the `AGENTS.md` AGAIN if you read this one.
-> - This file is auto-synced. Run `.agents/scripts/sync-agent-docs.py` to update.
+> - Keep this mirror synchronized with `AGENTS.md` when instructions change.

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Bootstrap .agents system into another repository."""
+"""Factory-only compatibility bootstrap for the .agents scaffold.
+
+The public bootstrap path is the native Bun/TypeScript `afol bootstrap`
+command. This script remains only as a recovery/factory compatibility surface
+while older Python-driven factory workflows are retired.
+"""
 
 from __future__ import annotations
 
@@ -29,17 +34,12 @@ MANDATORY_FILES_TO_COPY = [
     Path("Justfile"),
     Path("afol"),
     Path("a"),
-    Path(".agents/agents"),
-    Path(".agents/agents-mcp"),
     Path(".agents/config.json"),
-    Path(".agents/agents.config"),
     Path(".agents/lock.json"),
     Path(".agents/manifest.json"),
-    Path(".agents/tools.json"),
     Path(".agents/skills-sync.manifest.json"),
     Path("docs/arc/README.md"),
     Path("docs/arc/SPECS/README.md"),
-    Path("docs/map/structure/README.md"),
 ]
 
 OPTIONAL_FILES_TO_COPY = [
@@ -48,16 +48,11 @@ OPTIONAL_FILES_TO_COPY = [
 ]
 
 MANDATORY_DIRS_TO_COPY = [
-    Path(".agents/scripts"),
     Path(".agents/rules"),
-    Path(".agents/skills"),
-    Path(".agents/runtime"),
     Path(".agents/data/telemetry/schemas"),
-    Path("docs/agentic"),
     Path("docs/knowledge"),
     Path("docs/lessons"),
     Path("docs/patterns"),
-    Path("docs/standards"),
     Path("docs/telemetry"),
     Path("docs/templates"),
 ]
@@ -83,15 +78,26 @@ JUSTFILE_IMPORT_MARKER = f"import '{JUSTFILE_STANDARDS_PATH}'"
 JUSTFILE_IMPORT_MARKER_DOUBLE = f'import "{JUSTFILE_STANDARDS_PATH}"'
 JUSTFILE_MODULE_MARKER = f"mod agents_scaffold '{JUSTFILE_STANDARDS_PATH}'"
 JUSTFILE_MODULE_MARKER_DOUBLE = f'mod agents_scaffold "{JUSTFILE_STANDARDS_PATH}"'
+JUSTFILE_NATIVE_MARKER = "# .agents scaffold native front-door recipes"
 JUSTFILE_WRAPPER = """set unstable := true
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 set working-directory := "."
 
-# .agents scaffold module (safe default for downstream recipe overrides)
-mod agents_scaffold 'docs/standards/Justfile'
+validate:
+    ./a validate
+
+validate-strict:
+    ./a validate
+
+status:
+    ./a status
 """
-JUSTFILE_MODULE_APPEND = """# .agents scaffold module (collision-safe namespaced recipes)
-mod agents_scaffold 'docs/standards/Justfile'
+JUSTFILE_MODULE_APPEND = f"""{JUSTFILE_NATIVE_MARKER}
+agents-status:
+    ./a status
+
+agents-validate:
+    ./a validate
 """
 JUSTFILE_IMPORT_RE = re.compile(r'^\s*import\s+["\']docs/standards/Justfile["\']\s*$')
 JUSTFILE_MODULE_RE = re.compile(r'^\s*mod\s+agents_scaffold\s+["\']docs/standards/Justfile["\']\s*$')
@@ -454,21 +460,20 @@ def _wrapper_needs_runtime_refresh(path: Path, markers: Sequence[str]) -> bool:
 def ensure_partial_runtime_surfaces(target: Path, dry_run: bool):
     managed_surfaces: Sequence[Tuple[Path, Sequence[str], str]] = [
         (
-            Path(".agents/agents"),
+            Path("afol"),
             (
-                "run_runtime_and_record",
-                'run --project "${SCRIPT_DIR}/runtime" --locked',
-                "mcp|agents-mcp)",
-                "command-registry",
+                "AGENTIC_CLI_PATH",
+                "bunx agentic-cli",
             ),
-            "patch managed wrapper",
+            "patch native front door",
         ),
         (
-            Path(".agents/agents-mcp"),
+            Path("a"),
             (
-                'run --project "${SCRIPT_DIR}/runtime" --locked agentic-mcp',
+                "AGENTIC_CLI_PATH",
+                "bunx agentic-cli",
             ),
-            "refresh managed mcp wrapper",
+            "patch compatibility front door",
         ),
     ]
 
@@ -575,8 +580,6 @@ def _ignore_sanitized_docs(src_path: str, names: List[str]) -> Set[str]:
 
     if rel == Path("docs/knowledge"):
         ignored.add("INDEX.md")
-    elif rel == Path("docs/lessons"):
-        ignored.add("general-lessons.md")
     elif rel == Path("docs/lessons/entries"):
         ignored.update(name for name in names if name.endswith(".md") and name != "README.md")
     elif rel == Path("docs/telemetry"):
@@ -594,7 +597,6 @@ def _ignore_for_dir(rel: Path) -> IgnoreFn:
         Path("docs/knowledge"),
         Path("docs/lessons"),
         Path("docs/telemetry"),
-        Path("docs/map/structure"),
     }:
         return _ignore_sanitized_docs
     return _ignore_default
@@ -626,6 +628,8 @@ def ensure_dirs(target: Path, dry_run: bool):
 
 
 def _justfile_has_scaffold_reference(content: str) -> bool:
+    if JUSTFILE_NATIVE_MARKER in content:
+        return True
     return any(
         JUSTFILE_IMPORT_RE.match(line) or JUSTFILE_MODULE_RE.match(line)
         for line in _iter_justfile_directives(content)
@@ -865,7 +869,7 @@ def build_current_state_map_readme(timestamp: str) -> str:
             "# Current-State Map",
             "",
             "- `docs/map/` is the current-state, descriptive evidence surface.",
-            "- Run `./.agents/agents repo-map .` to refresh repository-wide map artifacts.",
+            "- Run `afol validate` after repository-map artifacts are refreshed by project tooling.",
             "- Keep goal-state canon in `docs/arc/` and execution history in `.agents/wb/`.",
             "- Bootstrap ships only this generic entrypoint, not source-repo-specific current-state artifacts.",
             "",
@@ -1021,7 +1025,7 @@ def build_knowledge_index(timestamp: str) -> str:
             "## Status",
             "",
             "- No reusable workbench knowledge has been indexed yet.",
-            "- Run `.agents/agents knowledge index` after the target repo accumulates research, reports, or postmortems.",
+            "- Run `afol validate` after the target repo accumulates research, reports, or postmortems.",
             "",
             "---",
             "*Generated by `.agents/scripts/agents-bootstrap.py`*",
@@ -1218,11 +1222,11 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
             "3. Create or adapt the governing parent spec in `docs/arc/SPECS/` before starting non-trivial implementation.",
             "4. Confirm exported docs are generic baselines only; do not treat scaffold-local workbench, lessons, or knowledge history as project history.",
             "5. Treat skills sync as a baseline install step, not a source of project history.",
-            "6. Update `.agents/agents.config` timezone/path settings if needed.",
+            "6. Update `.agents/config.json` path settings if needed.",
             "7. Define real verification commands in repo docs (`install/dev/lint/typecheck/test/build`).",
             "8. Confirm `AGENTS.md`, `CLAUDE.md`, and the `.claude/` runtime folder are present.",
-            "9. Run `just --fmt --check`, `just --list`, and the scaffold validation recipes exposed by the root `Justfile` (fresh baselines use `just --justfile Justfile agents_scaffold::doctor`, `agents_scaffold::lint`, `agents_scaffold::test-scripts`, and `agents_scaffold::all`).",
-            "10. Create the first workstream with `.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --spec`.",
+            "9. Run `just --fmt --check`, `just --list`, `./a status`, and `./a validate`.",
+            "10. Create the first workstream with `afol new <theme> --feature-id F-01 --parent-spec <spec-id>`.",
             "",
             "## Verification Evidence",
             "",
@@ -1612,42 +1616,16 @@ def post_checks_use_just(target: Path) -> bool:
 
 
 def build_post_check_commands(target: Path, install_mode: str = INSTALL_MODE_FULL) -> List[Tuple[str, List[str], bool]]:
-    recipe_prefix = _just_recipe_prefix(target)
     if not post_checks_use_just(target):
         raise RuntimeError("just is required for post-bootstrap checks")
     repo_validation_required = install_mode != INSTALL_MODE_PARTIAL
     commands: List[Tuple[str, List[str], bool]] = [
-        (
-            "hydrate",
-            ["./.agents/agents", "hydrate"],
-            True,
-        ),
-        (
-            "sync-agent-docs",
-            ["./.agents/agents", "sync", "--force"],
-            True,
-        ),
-        (
-            "skills-sync",
-            ["./.agents/agents", "skills-sync", "sync"],
-            False,
-        ),
-        (
-            "fix-symlinks",
-            ["./.agents/agents", "fix-symlinks", "--force"],
-            True,
-        ),
+        ("fmt-check", _just_post_check_command("--fmt", "--check"), True),
+        ("list", _just_post_check_command("--list"), True),
+        ("frontdoor-help", ["./a", "-h"], True),
+        ("status", ["./a", "status"], True),
+        ("validate", ["./a", "validate"], repo_validation_required),
     ]
-    commands.extend(
-        [
-            ("fmt-check", _just_post_check_command("--fmt", "--check"), True),
-            ("list", _just_post_check_command("--list"), True),
-            ("doctor", _just_post_check_command(f"{recipe_prefix}doctor"), True),
-            ("lint", _just_post_check_command(f"{recipe_prefix}lint"), repo_validation_required),
-            ("test-scripts", _just_post_check_command(f"{recipe_prefix}test-scripts"), repo_validation_required),
-            ("all", _just_post_check_command(f"{recipe_prefix}all"), repo_validation_required),
-        ]
-    )
     return commands
 
 

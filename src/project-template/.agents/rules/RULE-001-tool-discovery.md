@@ -32,7 +32,7 @@ updated_at: '2026-05-14T20:05:00-03:00'
 ```text
 1) Discover: tools list
 2) Scope: tools info <tool-id>
-3) Read: docs/agentic/<tool>.md
+3) Read: ./.agents/agents tools info <tool-id>
 4) Execute: ./.agents/agents <command>
 5) Verify: exit code + output
 ```

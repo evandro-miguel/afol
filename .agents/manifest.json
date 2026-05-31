@@ -3,6 +3,65 @@
   "kernel": "agentic-cli-ts",
   "optional": true,
   "commands": {
-    "status": ["s", "status"]
+    "bootstrap": [
+      "b",
+      "bootstrap"
+    ],
+    "init": [
+      "init"
+    ],
+    "status": [
+      "s",
+      "status"
+    ],
+    "validate": [
+      "v",
+      "ck",
+      "check",
+      "validate"
+    ],
+    "new": [
+      "n",
+      "new"
+    ],
+    "start": [
+      "st",
+      "start"
+    ],
+    "evidence": [
+      "e",
+      "evidence"
+    ],
+    "done": [
+      "d",
+      "done"
+    ],
+    "log": [
+      "l",
+      "log"
+    ],
+    "verify": [
+      "vf",
+      "verify"
+    ],
+    "verify-tasks": [
+      "verify-tasks"
+    ],
+    "rule": [
+      "r",
+      "rule"
+    ],
+    "skill": [
+      "sk",
+      "skill"
+    ],
+    "update": [
+      "up",
+      "update"
+    ],
+    "close": [
+      "c",
+      "close"
+    ]
   }
 }

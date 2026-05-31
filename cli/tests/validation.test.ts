@@ -76,31 +76,36 @@ describe("validation command family", () => {
     expect(selected.includes("runtime-live-agent")).toBe(true);
   });
 
-  test("v changed-path selector routes each supported benchmark pack", () => {
+  test("v changed-path selector routes current services/commands paths to benchmark packs", () => {
     const cliProc = runKernel(["v", "--changed-path", "cli/main.ts", "--json"]);
     expect(cliProc.status).toBe(0);
     const cliPayload = parseJsonOutput(cliProc.stdout as string);
     expect(cliPayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
 
-    const rulesProc = runKernel(["v", "--changed-path", "cli/rules/example.md", "--json"]);
-    expect(rulesProc.status).toBe(0);
-    const rulesPayload = parseJsonOutput(rulesProc.stdout as string);
-    expect(rulesPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
+    const catalogRulesProc = runKernel(["v", "--changed-path", "cli/services/catalog/rules.ts", "--json"]);
+    expect(catalogRulesProc.status).toBe(0);
+    const catalogRulesPayload = parseJsonOutput(catalogRulesProc.stdout as string);
+    expect(catalogRulesPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
 
-    const skillsProc = runKernel(["v", "--changed-path", "cli/skills/example.md", "--json"]);
-    expect(skillsProc.status).toBe(0);
-    const skillsPayload = parseJsonOutput(skillsProc.stdout as string);
-    expect(skillsPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
+    const catalogCommandProc = runKernel(["v", "--changed-path", "cli/commands/catalog.ts", "--json"]);
+    expect(catalogCommandProc.status).toBe(0);
+    const catalogCommandPayload = parseJsonOutput(catalogCommandProc.stdout as string);
+    expect(catalogCommandPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
 
     const mutationProc = runKernel(["v", "--changed-path", "cli/files/example.ts", "--json"]);
     expect(mutationProc.status).toBe(0);
     const mutationPayload = parseJsonOutput(mutationProc.stdout as string);
     expect(mutationPayload.selected_pack_ids).toEqual(["mutation-safety"]);
 
-    const updateProc = runKernel(["v", "--changed-path", "cli/update/example.ts", "--json"]);
-    expect(updateProc.status).toBe(0);
-    const updatePayload = parseJsonOutput(updateProc.stdout as string);
-    expect(updatePayload.selected_pack_ids).toEqual(["update-safety"]);
+    const updateServiceProc = runKernel(["v", "--changed-path", "cli/services/update/check.ts", "--json"]);
+    expect(updateServiceProc.status).toBe(0);
+    const updateServicePayload = parseJsonOutput(updateServiceProc.stdout as string);
+    expect(updateServicePayload.selected_pack_ids).toEqual(["update-safety"]);
+
+    const updateCommandProc = runKernel(["v", "--changed-path", "cli/commands/update.ts", "--json"]);
+    expect(updateCommandProc.status).toBe(0);
+    const updateCommandPayload = parseJsonOutput(updateCommandProc.stdout as string);
+    expect(updateCommandPayload.selected_pack_ids).toEqual(["update-safety"]);
 
     const wbProc = runKernel(["v", "--changed-path", ".agents/wb/session/task.md", "--json"]);
     expect(wbProc.status).toBe(0);
@@ -124,7 +129,7 @@ describe("validation command family", () => {
   });
 
   test("v changed-path keeps generic cli fallback on cli-kernel-local", () => {
-    const proc = runKernel(["v", "--changed-path", "cli/main.ts", "--json"]);
+    const proc = runKernel(["v", "--changed-path", "cli/commands/validate.ts", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
     expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
@@ -163,6 +168,9 @@ describe("validation command family", () => {
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBeGreaterThanOrEqual(6);
     const first = results[0];
+    if (!first) {
+      throw new Error("Expected at least one benchmark result");
+    }
     expect(typeof first.scenario_id).toBe("string");
     expect(typeof first.duration_ms).toBe("number");
     expect(typeof first.status).toBe("string");
@@ -228,6 +236,9 @@ describe("validation command family", () => {
     const savedResults = savedPayload.results as Array<Record<string, unknown>>;
     expect(savedResults.length).toBeGreaterThan(0);
     const first = savedResults[0];
+    if (!first) {
+      throw new Error("Expected at least one saved benchmark result");
+    }
     expect(typeof first.run_id).toBe("string");
     expect(typeof first.pack_id).toBe("string");
     expect(typeof first.baseline_id).toBe("string");

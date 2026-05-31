@@ -41,13 +41,13 @@ function mkProjectRoot(name: string, fakeAgentsBody: string): string {
 }
 
 describe("kernel front-door", () => {
-  test("-h prints compact help", () => {
-    const root = mkProjectRoot("help", "#!/usr/bin/env bash\necho legacy status \"$@\"\n");
+  test("-h prints compact help without requiring project files", () => {
+    const root = mkdtempSync(join(tmpdir(), "kernel-help-no-project-"));
     try {
       const proc = runKernel(root, ["-h"]);
       expect(proc.status).toBe(0);
       const lines = (proc.stdout as string).trim().split("\n");
-      expect(lines.length).toBeLessThanOrEqual(25);
+      expect(lines.length).toBeLessThanOrEqual(30);
       expect((proc.stdout as string)).toContain("Usage: afol");
       expect((proc.stdout as string)).toContain("Commands");
       expect((proc.stdout as string)).toContain("s/status");
@@ -63,36 +63,36 @@ describe("kernel front-door", () => {
     const script = "#!/usr/bin/env bash\necho ARGS:$*";
     const root = mkProjectRoot("aliases", script);
     try {
-      const cases: { args: string[]; expected: string }[] = [
-        { args: ["s"], expected: "ARGS:status" },
-        { args: ["status"], expected: "ARGS:status" },
-        { args: ["-j"], expected: "ARGS:status --json" },
-        { args: ["--json"], expected: "ARGS:status --json" },
-        { args: ["-j", "s"], expected: "ARGS:status --json" },
-        { args: ["s", "-j"], expected: "ARGS:status --json" },
-        { args: ["status", "--json"], expected: "ARGS:status --json" },
-        { args: ["n", "theme"], expected: "ARGS:new theme" },
-        { args: ["sk", "ls"], expected: "ARGS:skill ls" },
-        { args: ["up", "ck"], expected: "ARGS:update ck" },
-        { args: ["bootstrap", "/tmp/repo", "--partial"], expected: "ARGS:bootstrap /tmp/repo --partial" },
-        { args: ["b", "/tmp/repo", "--partial"], expected: "ARGS:bootstrap /tmp/repo --partial" },
-        { args: ["start", "--session", "S", "--task-id", "T-01"], expected: "ARGS:implement start --session S --task-id T-01" },
-        { args: ["st", "-S", "S", "-T", "T-01"], expected: "ARGS:implement start --session S --task-id T-01" },
-        {
-          args: ["done", "--session", "S", "--task-id", "T-01", "--test", "just lint"],
-          expected: "ARGS:implement complete --session S --task-id T-01 --command just lint --result passed",
-        },
-        {
-          args: ["d", "-S", "S", "-T", "T-01", "-x", "just lint"],
-          expected: "ARGS:implement complete --session S --task-id T-01 --command just lint --result passed",
-        },
-        { args: ["close", "--session", "S"], expected: "ARGS:session close --session S" },
-        { args: ["c", "-S", "S"], expected: "ARGS:session close --session S" },
+      const statusCases: string[][] = [
+        ["s"],
+        ["status"],
+        ["-j"],
+        ["--json"],
+        ["-j", "s"],
+        ["s", "-j"],
+        ["status", "--json"],
+      ];
+
+      for (const args of statusCases) {
+        const proc = runKernel(root, args);
+        expect(proc.status).toBe(0);
+        if (args.some((arg) => arg === "-j" || arg === "--json")) {
+          const payload = JSON.parse(proc.stdout as string) as Record<string, unknown>;
+          expect(payload.status).toBe("none");
+          expect(payload.task).toBe("none");
+        } else {
+          expect(proc.stdout as string).toContain("STATUS: none");
+          expect(proc.stdout as string).toContain("TASK: none");
+        }
+      }
+
+      const delegateCases: { args: string[]; expected: string }[] = [
+        { args: ["t", "list"], expected: "ARGS:task list" },
         { args: ["inspect-target", "--repo-root", "/tmp/project"], expected: "ARGS:inspect-target --repo-root /tmp/project" },
         { args: ["adoption-plan", "--repo-root", "/tmp/project"], expected: "ARGS:adoption-plan --repo-root /tmp/project" },
       ];
 
-      for (const testCase of cases) {
+      for (const testCase of delegateCases) {
         const proc = runKernel(root, testCase.args);
         expect(proc.status).toBe(0);
         expect(proc.stdout as string).toBe(`${testCase.expected}\n`);
@@ -117,7 +117,54 @@ describe("kernel front-door", () => {
     }
   });
 
-  test("subcommand help delegates to the legacy adapter unchanged", () => {
+  test("unknown command fails before project-root detection", () => {
+    const root = mkdtempSync(join(tmpdir(), "kernel-unknown-no-project-"));
+    try {
+      const proc = runKernel(root, ["sttaus"]);
+      expect(proc.status).toBe(2);
+      expect(proc.stdout as string).toBe("");
+      expect(proc.stderr as string).toContain("err unknown-command command=sttaus");
+      expect(proc.stderr as string).not.toContain("Could not detect project root");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("bootstrap dry-run uses native template path without requiring project files", () => {
+    const root = mkdtempSync(join(tmpdir(), "kernel-bootstrap-no-project-"));
+    const target = join(root, "target");
+    try {
+      for (const args of [
+        ["bootstrap", target, "--dry-run"],
+        ["b", target, "--dry-run"],
+      ]) {
+        const proc = runKernel(root, args);
+        expect(proc.status).toBe(0);
+        expect(proc.stderr as string).toBe("");
+        expect(proc.stdout as string).toContain("bootstrap:");
+        expect(proc.stdout as string).toContain("mode=dry-run");
+        expect(proc.stdout as string).toContain("create AGENTS.md");
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("init dry-run uses current directory without requiring project files", () => {
+    const root = mkdtempSync(join(tmpdir(), "kernel-init-no-project-"));
+    try {
+      const proc = runKernel(root, ["init", "--dry-run"]);
+      expect(proc.status).toBe(0);
+      expect(proc.stderr as string).toBe("");
+      expect(proc.stdout as string).toContain(`bootstrap: target=${root}`);
+      expect(proc.stdout as string).toContain("mode=dry-run");
+      expect(proc.stdout as string).toContain("create AGENTS.md");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("verify-tasks help is native and does not require legacy adapter", () => {
     const script = "#!/usr/bin/env bash\necho LEGACY:$*";
     const root = mkProjectRoot("subcommand-help", script);
     try {
@@ -127,7 +174,8 @@ describe("kernel front-door", () => {
       ]) {
         const proc = runKernel(root, args);
         expect(proc.status).toBe(0);
-        expect(proc.stdout as string).toBe(`LEGACY:${args.join(" ")}\n`);
+        expect(proc.stdout as string).toContain("Usage: afol verify-tasks");
+        expect(proc.stdout as string).not.toContain("LEGACY:");
       }
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -143,7 +191,7 @@ describe("kernel front-door", () => {
       ]) {
         const proc = runKernel(root, args);
         expect(proc.status).toBe(2);
-        expect(proc.stderr as string).toContain("Unknown validation argument: --nope");
+        expect(proc.stderr as string).toContain("Unknown validate argument: --nope");
         expect(proc.stdout as string).toBe("");
         expect(proc.stdout as string).not.toContain("LEGACY:");
       }
@@ -157,9 +205,10 @@ describe("kernel front-door", () => {
     const nested = join(root, "a", "b", "c");
     mkdirSync(nested, { recursive: true });
     try {
-      const proc = runKernel(nested, ["s"]);
+      const proc = runKernel(nested, ["s", "--json"]);
       expect(proc.status).toBe(0);
-      expect((proc.stdout as string).trim()).toContain(`ROOT:${root}`);
+      const payload = JSON.parse(proc.stdout as string) as { paths: { config: string } };
+      expect(payload.paths.config).toBe(join(root, ".agents", "config.json"));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -201,7 +250,7 @@ describe("kernel front-door", () => {
   test("preserves legacy exit code through adapter", () => {
     const root = mkProjectRoot("exit", "#!/usr/bin/env bash\nexit 11\n");
     try {
-      const proc = runKernel(root, ["status"]);
+      const proc = runKernel(root, ["task"]);
       expect(proc.status).toBe(11);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -211,7 +260,7 @@ describe("kernel front-door", () => {
   test("preserves signal-based termination through adapter", () => {
     const root = mkProjectRoot("signal", "#!/usr/bin/env bash\nkill -TERM $$\n");
     try {
-      const proc = runKernel(root, ["status"]);
+      const proc = runKernel(root, ["task"]);
       expect(proc.status).toBe(143);
     } finally {
       rmSync(root, { recursive: true, force: true });

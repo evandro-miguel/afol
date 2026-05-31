@@ -48,7 +48,8 @@ ledger evidence and an explicit evidence id.
 
 **Task ID format:** `T-01`, `T-02`, ... (ou `T-001` para boards grandes)
 
-**State marker rules:** See [../standards/checkbox-protocol.md](../standards/checkbox-protocol.md)
+**State marker rules:** Use the checklist formats in `RULE-003` and
+`docs/standards/verification.md`.
 
 ## Governance Context
 
@@ -64,8 +65,7 @@ Before starting work, consult relevant resources:
 
 ### Prevention Rules
 
-- [ ] Check [../lessons/general-lessons.md](../lessons/general-lessons.md)
-- [ ] Check lesson entries in [../lessons/entries/](../lessons/entries/)
+- [ ] Check lesson entries in [../lessons/entries/README.md](../lessons/entries/README.md)
 
 ### Useful Resources
 

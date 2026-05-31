@@ -10,10 +10,17 @@ updated_at: '2026-03-06T22:29:30-03:00'
 
 ## Primary Stack
 
-- Python 3.11+ for operational scripts
+- Bun and TypeScript for the current CLI/kernel under `cli/**`
+- `afol`/`./a` as the public downstream command surface
 - Bash and Just for wrapper automation
-- `uv` for environment and dependency management
 - Markdown, YAML, JSON, and TOML for durable project artifacts
+
+## Boundary Notes
+
+- `src/project-template/` is the exportable scaffold source
+- `.agents/agents`, `.agents/scripts`, and `.agents/runtime` stay in the
+  factory tree as legacy compatibility during migration
+- Root `.agents/wb/` is factory workbench history and does not ship downstream
 
 ## Runtime Surface
 
@@ -23,6 +30,8 @@ updated_at: '2026-03-06T22:29:30-03:00'
 
 ## Verification Stack
 
-- `pytest` for script unit tests
-- `ruff` for Python linting
-- `just` targets for aggregate validation (`lint`, `lint-scripts`, `test-scripts`, `all`)
+- `bun run typecheck` for TypeScript checks
+- `bun test` and focused `bun test cli/tests/...` runs for the CLI
+- `just lint` for docs/prompt/process surfaces when needed
+- Targeted legacy compatibility checks only when touching factory-only
+  `.agents/*` compatibility files

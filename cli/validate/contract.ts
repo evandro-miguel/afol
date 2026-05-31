@@ -231,21 +231,31 @@ function parseScenario(data: Record<string, unknown>, sourcePath: string): Scena
       scenario.implementation_status = data.implementation_status;
     }
   }
-  scenario.live_runner_scenario_id = asOptionalString(
+  const liveRunnerScenarioId = asOptionalString(
     data.live_runner_scenario_id,
     `${sourcePath}.live_runner_scenario_id`,
   );
+  if (liveRunnerScenarioId !== undefined) {
+    scenario.live_runner_scenario_id = liveRunnerScenarioId;
+  }
   return scenario;
 }
 
 function parseBaseline(data: Record<string, unknown>, sourcePath: string): Baseline {
-  return {
+  const baseline: Baseline = {
     baseline_id: asString(data.baseline_id, `${sourcePath}.baseline_id`),
     pack_id: parsePackId(data.pack_id, `${sourcePath}.pack_id`),
     schema_version: asString(data.schema_version, `${sourcePath}.schema_version`),
-    timing_p50_ms: asOptionalNumber(data.timing_p50_ms, `${sourcePath}.timing_p50_ms`),
-    timing_p95_ms: asOptionalNumber(data.timing_p95_ms, `${sourcePath}.timing_p95_ms`),
   };
+  const timingP50 = asOptionalNumber(data.timing_p50_ms, `${sourcePath}.timing_p50_ms`);
+  const timingP95 = asOptionalNumber(data.timing_p95_ms, `${sourcePath}.timing_p95_ms`);
+  if (timingP50 !== undefined) {
+    baseline.timing_p50_ms = timingP50;
+  }
+  if (timingP95 !== undefined) {
+    baseline.timing_p95_ms = timingP95;
+  }
+  return baseline;
 }
 
 function getGitCommit(projectRoot: string): string {
@@ -406,12 +416,21 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
       reasons.push(`mcp-change:${changedPath}`);
       continue;
     }
-    if (hasPrefix(normalizedPath, ["cli/rules/", "cli/skills/"])) {
+    if (hasPrefix(normalizedPath, [
+      "cli/rules/",
+      "cli/skills/",
+      "cli/services/catalog/",
+      "cli/commands/catalog.ts",
+    ])) {
       selected.add("routing-accuracy");
       reasons.push(`routing-change:${changedPath}`);
       continue;
     }
-    if (hasPrefix(normalizedPath, ["cli/update/"])) {
+    if (hasPrefix(normalizedPath, [
+      "cli/update/",
+      "cli/services/update/",
+      "cli/commands/update.ts",
+    ])) {
       selected.add("update-safety");
       reasons.push(`update-change:${changedPath}`);
       continue;
@@ -898,13 +917,14 @@ function parseArgs(args: string[]): {
 
   while (index < args.length) {
     const token = args[index];
-    if (token === "--changed-path" && args[index + 1]) {
-      changedPaths.push(args[index + 1]);
+    const nextArg = args[index + 1];
+    if (token === "--changed-path" && nextArg) {
+      changedPaths.push(nextArg);
       index += 2;
       continue;
     }
-    if (token === "--pack" && args[index + 1]) {
-      const pack = args[index + 1];
+    if (token === "--pack" && nextArg) {
+      const pack = nextArg;
       if (!REQUIRED_PACKS.includes(pack as PackId)) {
         throw new Error(`Unknown --pack value: ${pack}`);
       }
@@ -933,14 +953,14 @@ function parseArgs(args: string[]): {
     throw new Error(`Unknown validation argument: ${token}`);
   }
 
-  return {
+  const parsed = {
     mode,
     scope,
     changedPaths,
     explicitPacks,
     save,
-    outputPath,
   };
+  return outputPath === undefined ? parsed : { ...parsed, outputPath };
 }
 
 function handleSelect(snapshot: RegistrySnapshot, scope: ValidationScope, changedPaths: string[]): number {

@@ -10,99 +10,47 @@ updated_at: '2026-04-13T19:37:15-03:00'
 ## Purpose
 
 Track and analyze .agents system usage, session metrics, and work patterns.
+In the template export, telemetry is a data-and-index contract: the stored
+events, schemas, and report locations remain, while any command surface is
+owned by the downstream CLI.
 
 ## Quick Start
 
 **Telemetry is fully automated!** No manual recording needed.
 
-Every time you use `.agents/agents <command>`, telemetry is captured automatically:
+Every time you use the front door (`afol` or `./a`), telemetry is captured
+automatically by the runtime:
 
 - Tool usage
 - Session start/end
 - Task completion
 - Errors and blockers
 
-### Manual Commands (Optional)
+### CLI-Owned / Future Surfaces
+
+If the downstream CLI exposes telemetry commands, invoke them through `afol`
+or `./a`. Otherwise, treat report, export, validation, and index generation as
+future CLI-owned work and inspect the raw event files directly.
 
 ```bash
-# Generate weekly report
-just telemetry-report PERIOD=weekly
+# Recent events
+jq -r '.event_type' .agents/data/telemetry/events.jsonl
 
-# Export all data
-just telemetry-export FORMAT=json OUTPUT=telemetry_backup.json
-
-# Query events
-python3 .agents/scripts/agents-telemetry.py query --limit=20
+# Tool executions only
+jq 'select(.event_type == "tool_exec")' .agents/data/telemetry/events.jsonl
 ```
 
 ## Event Types (Auto-Captured)
 
 | Event Type | When Captured | Source |
 |------------|---------------|--------|
-| `session_start` | Creating new workstream | `agents-new.py` |
-| `tool_exec` | Using any `.agents/agents <tool>` | `.agents/agents` wrapper |
-| `session_end` | Completing workstream | `agents-wb-update.py touch` |
-| `task_complete` | Marking task done | `verify-tasks.py` |
+| `session_start` | Creating new workstream | Front-door runtime |
+| `tool_exec` | Using any front-door command | Front-door wrapper |
+| `session_end` | Completing workstream | Workbench close flow |
+| `task_complete` | Marking task done | Task closure evidence |
 | `blocker` | Manual (optional) | User |
 | `error` | Tool failure | Wrapper |
-| `pattern_applied` | Using pattern suggestion | `agents-patterns.py` |
-
-## Commands
-
-### Query Events
-
-```bash
-# All events
-python3 .agents/scripts/agents-telemetry.py query
-
-# Filter by type
-python3 .agents/scripts/agents-telemetry.py query --event-type=tool_exec
-
-# Filter by session
-python3 .agents/scripts/agents-telemetry.py query --session-id=260223_1800_my-theme
-
-# Date range
-python3 .agents/scripts/agents-telemetry.py query --since=2026-02-20T00:00:00Z --until=2026-02-23T23:59:59Z
-
-# Export as JSON
-python3 .agents/scripts/agents-telemetry.py query --format=json --limit=50
-```
-
-### Generate Report
-
-```bash
-# Weekly report (default)
-just telemetry-report
-
-# Monthly report
-just telemetry-report PERIOD=monthly
-
-# JSON format
-just telemetry-report FORMAT=json
-
-# All time
-just telemetry-report PERIOD=all
-```
-
-### Export Data
-
-```bash
-# JSON export
-just telemetry-export FORMAT=json
-
-# CSV export
-just telemetry-export FORMAT=csv
-
-# Custom output path
-just telemetry-export OUTPUT=/path/to/backup.json
-```
-
-### Validate
-
-```bash
-# Validate all events against schema
-just telemetry-validate
-```
+| `pattern_applied` | Using pattern suggestion | Pattern helper |
 
 ## Data Storage
 
@@ -122,23 +70,19 @@ The following events are captured **automatically** - no manual action needed:
 
 | Event | Trigger |
 |-------|---------|
-| `tool_exec` | Every `.agents/agents <command>` |
-| `session_start` | Running `.agents/agents new <theme>` |
-| `session_end` | Running `.agents/agents wb-update touch` |
-| `task_complete` | Running `.agents/agents verify-tasks` |
+| `tool_exec` | Every front-door command |
+| `session_start` | Running `afol n <theme>` |
+| `session_end` | Closing a workstream through the front door |
+| `task_complete` | Recording task completion evidence |
 
 ## Manual Events (Optional)
 
-For blockers, errors, or custom events, you can manually record:
+For blockers, errors, or custom events, use the downstream CLI when it exists;
+otherwise keep the raw JSONL files as the source of truth.
 
 ```bash
-# Blocker (optional)
-python3 .agents/scripts/agents-telemetry.py record blocker \
-  --metadata='{"blocker_reason":"waiting for review"}'
-
-# Error (optional)
-python3 .agents/scripts/agents-telemetry.py record error \
-  --metadata='{"error_message":"something failed"}'
+# Inspect the latest blocker records
+jq 'select(.event_type == "blocker")' .agents/data/telemetry/events.jsonl
 ```
 
 ## Privacy & Security
@@ -163,22 +107,21 @@ python3 .agents/scripts/agents-telemetry.py record error \
 ### Session Duration Trend
 
 ```bash
-python3 .agents/scripts/agents-telemetry.py query --event-type=session_end --format=json | \
-  jq '.[] | {session: .session_id, duration: .metadata.duration_seconds}'
+jq 'select(.event_type == "session_end") | {session: .session_id, duration: .metadata.duration_seconds}' \
+  .agents/data/telemetry/events.jsonl
 ```
 
 ### Tool Usage Frequency
 
 ```bash
-python3 .agents/scripts/agents-telemetry.py query --event-type=tool_exec --format=json | \
-  jq -r '.[].metadata.tool_name' | sort | uniq -c | sort -rn
+jq -r 'select(.event_type == "tool_exec") | .metadata.tool_name' \
+  .agents/data/telemetry/events.jsonl | sort | uniq -c | sort -rn
 ```
 
 ### Success Rate
 
 ```bash
-just telemetry-report PERIOD=weekly FORMAT=json | \
-  jq '.summary.success_rate'
+echo "Use the downstream CLI report when available; otherwise aggregate from .agents/data/telemetry/events.jsonl"
 ```
 
 ## Troubleshooting
@@ -187,25 +130,25 @@ just telemetry-report PERIOD=weekly FORMAT=json | \
 
 - Check if `events.jsonl` exists: `ls -la .agents/data/telemetry/`
 - Verify write permissions
-- Check event schema: `python3 .agents/scripts/agents-telemetry.py validate`
+- Check event schema with the downstream CLI when available
+- Otherwise inspect the JSONL structure directly with `jq`
 
 ### Invalid JSON
 
-- Run validation: `just telemetry-validate`
 - Check for manual edits to `events.jsonl`
 - Restore from backup if needed
+- Validate against the schema with the downstream CLI when available
 
 ### Missing metadata
 
 - Review event type requirements in schema
 - Ensure all required fields are provided
-- Check script integration points
+- Check the front-door integration points
 
 ## Related
 
 - `docs/patterns/` - Pattern catalog
 - `docs/lessons/` - Lessons learned
-- `.agents/tools.json` - Tool catalog
 
 ---
 
