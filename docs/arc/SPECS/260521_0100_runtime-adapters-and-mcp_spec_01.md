@@ -131,6 +131,10 @@ Primary runtimes:
 - Gemini CLI.
 - Qwen.
 
+For MVP, these runtimes are integration targets only; full native adapters,
+runtime-live-agent transport, and broad cross-platform parity remain deferred
+until release evidence is available.
+
 `AGENTS.md` remains the canonical instruction source. Runtime-specific files
 stay thin, secret-free, and traceable.
 
@@ -162,6 +166,7 @@ In scope:
 Out of scope:
 
 - Building a full agent runtime.
+- Full native MCP adapters, runtime-live-agent transport, and broad cross-platform runtime parity.
 - Replacing existing agent CLIs.
 - Cloud orchestration.
 - Committing local credentials.

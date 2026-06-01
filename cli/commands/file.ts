@@ -76,6 +76,7 @@ const DEFAULT_IO: CommandIo = {
 const DEFAULT_PATCH_PATH = ".agents/data/mutations/.file-probe.txt";
 const DEFAULT_MOVE_SOURCE = ".agents/data/mutations/move-source.txt";
 const DEFAULT_MOVE_DESTINATION = ".agents/data/mutations/move-destination.txt";
+const DEFAULT_ARCHIVE_ROOT = ".agents/data/mutations/archives";
 
 const PROTECTED_PREFIXES = Object.freeze([
   ".agents/runtime/",
@@ -133,6 +134,12 @@ function ensureBackupDir(projectRoot: string): string {
 function backupPath(projectRoot: string, mutationId: string, relativePath: string): string {
   const safe = sanitizeForFilename(relativePath);
   return join(ensureBackupDir(projectRoot), `${mutationId}-${safe}.bak`);
+}
+
+function archiveDestination(projectRoot: string, mutationId: string, relativePath: string): { path: string; relativePath: string } {
+  const safe = sanitizeForFilename(relativePath);
+  const relative = join(DEFAULT_ARCHIVE_ROOT, `${mutationId}-${safe}`);
+  return { path: join(projectRoot, relative), relativePath: relative };
 }
 
 function makeDiffPreview(beforeText: string, afterText: string, pathName: string): string | undefined {
@@ -713,6 +720,104 @@ function undoMoveMutation(args: CommandArgs, mutation: MutationRecord, projectRo
   };
 }
 
+function undoArchiveMutation(args: CommandArgs, mutation: MutationRecord, projectRoot: string): CommandResult {
+  if (mutation.kind !== "archive" || !mutation.sourcePath || !mutation.destinationPath) {
+    throw new Error(`Expected archive mutation for undo, got ${mutation.kind}`);
+  }
+
+  const reason = args.reason || `undo ${mutation.id}`;
+  const source = resolveSafePath(projectRoot, mutation.sourcePath);
+  const destination = resolveSafePath(projectRoot, mutation.destinationPath);
+
+  if (args.dryRun) {
+    const beforeSource = existsSync(source.path) ? readTextOrEmpty(source.path) : "";
+    const beforeDestination = existsSync(destination.path) ? readTextOrEmpty(destination.path) : "";
+
+    return {
+      command: "ud",
+      status: "dry-run",
+      dry_run: true,
+      session: args.session,
+      task_id: args.taskId,
+      reason,
+      path: mutation.sourcePath,
+      destination: mutation.destinationPath,
+      target_mutation_id: mutation.id,
+      before_hash: beforeDestination.length > 0 ? normalizeHash(beforeDestination) : null,
+      after_hash: beforeSource.length > 0 ? normalizeHash(beforeSource) : null,
+      diff_preview: makeDiffPreview(beforeDestination, beforeSource, mutation.sourcePath),
+    };
+  }
+
+  if (existsSync(source.path)) {
+    return {
+      command: "ud",
+      status: "blocked",
+      dry_run: false,
+      session: args.session,
+      task_id: args.taskId,
+      reason,
+      path: mutation.sourcePath,
+      destination: mutation.destinationPath,
+      target_mutation_id: mutation.id,
+      message: `Undo blocked: source already exists: ${mutation.sourcePath}`,
+    };
+  }
+
+  if (!existsSync(destination.path)) {
+    return {
+      command: "ud",
+      status: "blocked",
+      dry_run: false,
+      session: args.session,
+      task_id: args.taskId,
+      reason,
+      path: mutation.sourcePath,
+      destination: mutation.destinationPath,
+      target_mutation_id: mutation.id,
+      message: `Undo blocked: destination missing for ${mutation.destinationPath}`,
+    };
+  }
+
+  const beforeDestination = readTextOrEmpty(destination.path);
+  const beforeDestinationHash = beforeDestination.length > 0 ? normalizeHash(beforeDestination) : null;
+
+  mkdirSync(dirname(source.path), { recursive: true });
+  renameSync(destination.path, source.path);
+
+  const afterSource = existsSync(source.path) ? readTextOrEmpty(source.path) : "";
+  const mutationId = createMutationId();
+
+  appendMutationRecord(projectRoot, {
+    id: mutationId,
+    ts: new Date().toISOString(),
+    kind: "undo",
+    status: "applied",
+    dryRun: false,
+    session: args.session,
+    taskId: args.taskId,
+    reason: `undo ${mutation.id}`,
+    targetMutationId: mutation.id,
+    sourcePath: mutation.sourcePath,
+    destinationPath: mutation.destinationPath,
+  });
+
+  return {
+    command: "ud",
+    status: "write",
+    dry_run: false,
+    session: args.session,
+    task_id: args.taskId,
+    reason,
+    path: mutation.sourcePath,
+    destination: mutation.destinationPath,
+    target_mutation_id: mutation.id,
+    before_hash: beforeDestinationHash,
+    after_hash: afterSource.length > 0 ? normalizeHash(afterSource) : null,
+    diff_preview: makeDiffPreview(beforeDestination, afterSource, mutation.sourcePath),
+  };
+}
+
 function runUndoMutation(args: UndoArgs, projectRoot: string): CommandResult {
   const target = args.mutationId
     ? findMutationById(projectRoot, args.mutationId)
@@ -765,6 +870,11 @@ function runUndoMutation(args: UndoArgs, projectRoot: string): CommandResult {
   if (target.kind === "move") {
     return undoMoveMutation(args, target, projectRoot);
   }
+
+  if (target.kind === "archive") {
+    return undoArchiveMutation(args, target, projectRoot);
+  }
+
   return {
     command: "ud",
     status: "blocked",
@@ -779,6 +889,13 @@ function runUndoMutation(args: UndoArgs, projectRoot: string): CommandResult {
 }
 
 function runArchiveMutation(args: CommandArgs, projectRoot: string): CommandResult {
+  const source = resolveSafePath(projectRoot, args.path);
+  const mutationId = createMutationId();
+  const destination = archiveDestination(projectRoot, mutationId, source.relativePath);
+  const before = existsSync(source.path) ? readTextOrEmpty(source.path) : "";
+  const beforeHash = before.length > 0 ? normalizeHash(before) : null;
+  const diffPreview = makeMovePreview(source.relativePath, destination.relativePath);
+
   if (args.dryRun) {
     return {
       command: "ar",
@@ -787,22 +904,66 @@ function runArchiveMutation(args: CommandArgs, projectRoot: string): CommandResu
       session: args.session,
       task_id: args.taskId,
       reason: args.reason,
-      path: args.path,
-      message: "archive not implemented in this MVP",
+      path: source.relativePath,
+      destination: destination.relativePath,
+      mutation_id: mutationId,
+      before_hash: beforeHash,
+      after_hash: beforeHash,
+      diff_preview: diffPreview,
     };
   }
 
-  resolveSafePath(projectRoot, args.path);
+  if (!existsSync(source.path)) {
+    return {
+      command: "ar",
+      status: "noop",
+      dry_run: false,
+      session: args.session,
+      task_id: args.taskId,
+      reason: args.reason,
+      path: source.relativePath,
+      destination: destination.relativePath,
+      mutation_id: mutationId,
+      before_hash: beforeHash,
+      after_hash: beforeHash,
+    };
+  }
+
   requireWriteContext(args);
+  mkdirSync(dirname(destination.path), { recursive: true });
+  renameSync(source.path, destination.path);
+
+  appendMutationRecord(projectRoot, {
+    id: mutationId,
+    ts: new Date().toISOString(),
+    kind: "archive",
+    status: "applied",
+    dryRun: false,
+    session: args.session,
+    taskId: args.taskId,
+    reason: args.reason,
+    sourcePath: source.relativePath,
+    destinationPath: destination.relativePath,
+    beforeHash,
+    afterHash: beforeHash,
+    backupPath: destination.path,
+    diffPreview,
+  });
+
   return {
     command: "ar",
-    status: "blocked",
+    status: "write",
     dry_run: false,
     session: args.session,
     task_id: args.taskId,
     reason: args.reason,
-    path: args.path,
-    message: "archive not implemented in this MVP",
+    path: source.relativePath,
+    destination: destination.relativePath,
+    mutation_id: mutationId,
+    before_hash: beforeHash,
+    after_hash: beforeHash,
+    backup_path: destination.path,
+    diff_preview: diffPreview,
   };
 }
 

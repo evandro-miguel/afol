@@ -17,6 +17,7 @@ export type CommandResolution =
   | { kind: "skill"; args: string[] }
   | { kind: "update"; args: string[] }
   | { kind: "file"; args: string[] }
+  | { kind: "localState"; args: string[] }
   | { kind: "delegate"; args: string[] }
   | { kind: "unknown"; message: string; exitCode: number };
 
@@ -241,6 +242,10 @@ export function resolveCommand(args: string[]): CommandResolution {
 
   if (topLevelKind === "file") {
     return { kind: "file", args: normalizeTokenOptimizedFlags(rest) };
+  }
+
+  if (topLevelKind === "localState") {
+    return { kind: "localState", args: rest };
   }
 
   if (topLevelKind === "delegate") {

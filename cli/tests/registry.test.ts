@@ -31,6 +31,8 @@ describe("kernel registry", () => {
     expect(kernelRegistry.resolveKind("sk")).toBe("skill");
     expect(kernelRegistry.resolveKind("update")).toBe("update");
     expect(kernelRegistry.resolveKind("up")).toBe("update");
+    expect(kernelRegistry.resolveKind("local-state")).toBe("localState");
+    expect(kernelRegistry.resolveKind("ls")).toBe("localState");
     expect(kernelRegistry.resolveKind("close")).toBe("close");
     expect(kernelRegistry.resolveKind("c")).toBe("close");
   });
@@ -56,7 +58,7 @@ describe("kernel registry", () => {
     expect(byCommand.get("verify-tasks")?.sideEffect).toBe("read");
     expect(byCommand.get("rule")?.sideEffect).toBe("read");
     expect(byCommand.get("skill")?.sideEffect).toBe("read");
-    expect(byCommand.get("update")?.sideEffect).toBe("read");
+    expect(byCommand.get("update")?.sideEffect).toBe("write");
     expect(byCommand.get("evidence")?.sideEffect).toBe("append");
     expect(byCommand.get("local-state")?.sideEffect).toBe("generated");
 

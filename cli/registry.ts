@@ -14,6 +14,7 @@ export type CommandKind =
   | "skill"
   | "update"
   | "file"
+  | "localState"
   | "delegate";
 export type CommandSideEffect = "read" | "write" | "append" | "generated";
 
@@ -40,7 +41,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
   { command: "close", aliases: ["c"], kind: "close", sideEffect: "write" },
   { command: "file", aliases: ["f"], kind: "file", sideEffect: "write" },
   { command: "undo", aliases: ["u"], kind: "delegate", sideEffect: "write" },
-  { command: "update", aliases: ["up"], kind: "update", sideEffect: "read" },
+  { command: "update", aliases: ["up"], kind: "update", sideEffect: "write" },
   { command: "bootstrap", aliases: ["b"], kind: "bootstrap", sideEffect: "write" },
   { command: "index", aliases: ["ix"], kind: "delegate", sideEffect: "generated" },
   { command: "event", aliases: ["ev"], kind: "delegate", sideEffect: "append" },
@@ -65,7 +66,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
   { command: "revert", aliases: [], kind: "delegate", sideEffect: "write" },
   { command: "repo-map", aliases: [], kind: "delegate", sideEffect: "generated" },
   { command: "lint-docs", aliases: [], kind: "delegate", sideEffect: "read" },
-  { command: "local-state", aliases: [], kind: "delegate", sideEffect: "generated" },
+  { command: "local-state", aliases: ["ls"], kind: "localState", sideEffect: "generated" },
   { command: "tools-smoke", aliases: [], kind: "delegate", sideEffect: "read" },
   { command: "fix-symlinks", aliases: [], kind: "delegate", sideEffect: "write" },
 ]);

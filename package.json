@@ -33,7 +33,8 @@
     "security:deps:informative": "bun run cli/dev/security-scan.ts deps",
     "security:secrets:informative": "bun run cli/dev/security-scan.ts secrets",
     "security:scan:informative": "bun run security:deps:informative && bun run security:secrets:informative",
-    "validate:release": "bun run validate:toolchain && bun run validate:template && bun run validate:bootstrap && bun run build:deterministic && bun run smoke:dist && bun run validate:security",
+    "validate:release": "bun run validate:toolchain && bun run validate:template && bun run validate:bootstrap && bun run build:deterministic && bun run smoke:dist && bun run validate:security && bun run release:provenance",
+    "release:provenance": "bun run cli/dev/release-provenance.ts",
     "smoke:dist": "bun run build && ./dist/afol --help > /dev/null",
     "smoke:clean": "bash -lc 'set -euo pipefail; tmpdir=$(mktemp -d); trap \"rm -rf \\\"$tmpdir\\\"\" EXIT; checkout=\"$tmpdir/checkout\"; mkdir -p \"$checkout\"; tar -C \"$PWD\" --exclude .git --exclude node_modules --exclude dist --exclude .bun-build\\* -cf - . | tar -C \"$checkout\" -xf -; cd \"$checkout\"; bun install --frozen-lockfile; bun run build; ./dist/afol --help > /dev/null'"
   },

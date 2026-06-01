@@ -57,6 +57,19 @@ parity, update safety, and token economy.
   supported. Linux-built macOS or Windows artifacts are build candidates until
   native or VM-backed smoke validates them.
 
+### 1.1) Release policy for MVP
+
+MVP hardening treats the release lane as:
+
+- `bun run validate:release` as the required release gate equivalent in CI.
+- Hard checks inside that lane: toolchain, template, bootstrap, deterministic
+  build, smoke, checksum/provenance generation, and security scan orchestration.
+- Security is informative in this phase: `bun run validate:security` can skip
+  when scanners are unavailable, but every non-local release must document that
+  waiver explicitly with the missing-tool reason.
+- MCP full/native adapters, runtime-live-agent transport, and broad cross-platform
+  claims remain deferred until explicit evidence packs pass for those lanes.
+
 ## 2) Problem
 
 Agent systems drift easily across docs, commands, templates, runtime adapters,

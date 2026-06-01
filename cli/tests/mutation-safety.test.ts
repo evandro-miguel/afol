@@ -183,6 +183,90 @@ describe("mutation safety command family", () => {
     }
   });
 
+  test("ar dry-run reports deterministic destination and does not mutate", () => {
+    const root = mkProjectRoot();
+    try {
+      const target = join(root, "notes", "to-archive.txt");
+      mkdirSync(join(root, "notes"), { recursive: true });
+      writeFileSync(target, "transient", "utf8");
+
+      const proc = runKernel(root, [
+        "f",
+        "ar",
+        "--path",
+        "notes/to-archive.txt",
+        "--dry-run",
+        "--json",
+      ]);
+      expect(proc.status).toBe(0);
+      const result = parseJsonOutput(proc.stdout as string);
+      expect(result.command).toBe("ar");
+      expect(result.status).toBe("dry-run");
+      expect(result.path).toBe("notes/to-archive.txt");
+      expect(typeof result.destination).toBe("string");
+      expect((result.destination as string)).toContain(".agents/data/mutations/archives/");
+      expect(readFileSync(target, "utf8")).toBe("transient");
+      expect(readMutationJournal(root).length).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("ar write moves file to archive and undo restores it", () => {
+    const root = mkProjectRoot();
+    try {
+      const target = join(root, "notes", "to-archive.txt");
+      mkdirSync(join(root, "notes"), { recursive: true });
+      writeFileSync(target, "for-archive", "utf8");
+
+      const archiveProc = runKernel(root, [
+        "f",
+        "ar",
+        "--session",
+        "S-06",
+        "--task-id",
+        "T-06",
+        "--reason",
+        "archive then restore",
+        "--path",
+        "notes/to-archive.txt",
+        "--json",
+      ]);
+      expect(archiveProc.status).toBe(0);
+      const archiveResult = parseJsonOutput(archiveProc.stdout as string);
+      expect(archiveResult.status).toBe("write");
+      expect(archiveResult.path).toBe("notes/to-archive.txt");
+
+      const destination = archiveResult.destination as string;
+      expect(typeof destination).toBe("string");
+      expect(destination).toContain(".agents/data/mutations/archives/");
+      const archivedPath = join(root, destination);
+      expect(existsSync(archivedPath)).toBe(true);
+      expect(readFileSync(archivedPath, "utf8")).toBe("for-archive");
+      expect(existsSync(target)).toBe(false);
+
+      const undoProc = runKernel(root, [
+        "f",
+        "ud",
+        "--session",
+        "S-06",
+        "--task-id",
+        "T-06",
+        "--reason",
+        "undo archive",
+        "--json",
+      ]);
+      expect(undoProc.status).toBe(0);
+      const undoResult = parseJsonOutput(undoProc.stdout as string);
+      expect(undoResult.status).toBe("write");
+      expect(undoResult.target_mutation_id).toBe(archiveResult.mutation_id);
+      expect(readFileSync(target, "utf8")).toBe("for-archive");
+      expect(existsSync(archivedPath)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("protected paths are blocked", () => {
     const root = mkProjectRoot();
     try {

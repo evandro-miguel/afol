@@ -3,17 +3,27 @@ import { join } from "node:path";
 import { loadJsonObject, loadYamlObject } from "../../core/schema";
 import { scanTemplateForbiddenPaths, TEMPLATE_ROOT } from "../../schemas/template-policy";
 import { validateWorkBenchIndex } from "../local-state/workbench-index";
+import {
+  validateFilesIndex,
+  validateRulesIndex,
+  validateSkillsIndex,
+  validateSpecsIndex,
+} from "../local-state/project-indexes";
 
 export type ProjectValidationCheck = {
   id:
     | "config"
     | "lock"
     | "manifest"
-    | "rules_dir"
-    | "skills_dir"
+  | "rules_dir"
+  | "skills_dir"
   | "wb_dir"
   | "docs_arc_dir"
   | "template_forbidden"
+  | "rules_local_state_index"
+  | "skills_local_state_index"
+  | "specs_local_state_index"
+  | "files_local_state_index"
   | "wb_local_state_index";
   ok: boolean;
   message: string;
@@ -116,6 +126,38 @@ export async function validateProjectStructure(projectRoot: string): Promise<Pro
       const result = validateWorkBenchIndex(projectRoot);
       return {
         id: "wb_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
+    (() => {
+      const result = validateRulesIndex(projectRoot);
+      return {
+        id: "rules_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
+    (() => {
+      const result = validateSkillsIndex(projectRoot);
+      return {
+        id: "skills_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
+    (() => {
+      const result = validateSpecsIndex(projectRoot);
+      return {
+        id: "specs_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
+    (() => {
+      const result = validateFilesIndex(projectRoot);
+      return {
+        id: "files_local_state_index",
         ok: result.ok,
         message: result.message,
       };

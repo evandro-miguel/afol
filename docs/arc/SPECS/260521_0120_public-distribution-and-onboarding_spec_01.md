@@ -74,6 +74,11 @@ Release packaging should follow the smallest proven path first:
    implemented.
 7. Installers: Homebrew taps and `curl | bash` scripts are future channels, not
    MVP requirements.
+8. MCP full/native adapters, runtime-live-agent transport, and broad cross-platform
+   parity are deferred until benchmark and smoke evidence is complete per target/runtime.
+9. Security checks are required by policy, but the release lane is allowed to proceed
+   with explicit waiver if OSV/Gitleaks are absent; waiver must name missing tools
+   and reason.
 
 Rejected for the current public-readiness lane:
 

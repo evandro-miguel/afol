@@ -90,9 +90,11 @@ Boundary guardrails:
 - F-08: mutation writes are session/task constrained with journaling and rollback support.
 - F-09: no blind overwrite of project-owned files; update flow must classify managed/project-owned generated/ignored/conflict with conflicts preserved.
 - F-11: release/security gate set includes deterministic build checks and token-aware validation, without claiming unverified dependency installation.
+- F-11 (MVP): release is hard-gated by `bun run validate:release`; security checks are informative by default and require an explicit release waiver record only when OSV/Gitleaks are absent in environment.
 - F-12: public distribution remains gated on reproducible `bun install
   --frozen-lockfile`, standalone binary smoke, platform-target evidence,
   checksum/provenance, and explicit macOS notarization disclosure.
+- F-12 addendum (MVP): MCP full/native adapters, runtime-live-agent transport, and broad cross-platform binaries remain deferred/waived until validated evidence exists.
 - CLI parser/tooling: prefer the local registry plus `citty`; treat Bunli,
   meow, Ace CLI/Bejibun, and other frameworks as references until a spike proves
   a smaller and safer fit.

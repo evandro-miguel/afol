@@ -10,6 +10,7 @@ import { runInitCommand } from "./commands/init";
 import { runStatusCommand } from "./commands/status";
 import { runUpdateCommand } from "./commands/update";
 import { runValidateCommand } from "./commands/validate";
+import { runLocalStateCommand } from "./commands/local-state";
 import {
   runCloseCommand,
   runDoneCommand,
@@ -37,7 +38,7 @@ const HELP_LINES = [
   "  d/done                 Complete task with evidence",
   "  l/log                  Append session log timeline entry",
   "  vf/verify, verify-tasks Verify workbench tasks",
-  "  r/rule sk/skill up/update Inspect routing and updates",
+  "  r/rule sk/skill up/update ls/local-state Inspect routing, updates, indexes",
   "  c/close                Close active session",
   "  b/bootstrap            Install scaffold into another repo",
   "",
@@ -212,6 +213,10 @@ export async function main(argv: string[]): Promise<number> {
 
   if (resolution.kind === "file") {
     return runFileCommand(resolution.args, project.value.root);
+  }
+
+  if (resolution.kind === "localState") {
+    return runLocalStateCommand(resolution.args, project.value.root);
   }
 
   return runLegacyAdapter(project.value.root, resolution.args);
