@@ -23,7 +23,7 @@
     "test:unit": "bun test cli/tests",
     "test:ci": "AGENT=1 bun test --concurrent --max-concurrency 4 --bail=1",
     "validate": "bun run typecheck && bun test",
-    "typecheck:ts7:informative": "if bunx --bun typescript@next tsc --noEmit --project tsconfig.json; then exit 0; else echo 'TypeScript 7 lane not available or not safe to run locally'; fi",
+    "typecheck:ts7:informative": "if bunx --bun -p typescript@next tsc --noEmit --project tsconfig.json; then exit 0; else echo 'TypeScript 7 lane not available or not safe to run locally'; fi",
     "validate:template": "bun run template:generate && bun test cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts",
     "validate:bootstrap": "bun test cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts",
     "kernel": "bun run cli/main.ts",
