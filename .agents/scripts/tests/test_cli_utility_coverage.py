@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 import pytest
 
-
 SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 
 
@@ -1247,7 +1246,11 @@ def test_agents_new_creates_workstream_quick_mode_and_error_branches(tmp_path, m
     monkeypatch.setattr(agents_new, "ACTIVE_SESSION_FILE", active)
     monkeypatch.setattr(agents_new, "ROADMAP_FILE", roadmap)
     monkeypatch.setattr(agents_new, "SPECS_DIR", specs)
-    monkeypatch.setattr(agents_new, "TEMPLATES_DIR", Path(__file__).resolve().parent.parent.parent.parent / "docs" / "templates")
+    monkeypatch.setattr(
+        agents_new,
+        "TEMPLATES_DIR",
+        Path(__file__).resolve().parent.parent.parent.parent / "docs" / "templates",
+    )
     monkeypatch.setattr(agents_new, "TELEMETRY_SCRIPT", telemetry)
     monkeypatch.setattr(agents_new, "PATTERNS_SCRIPT", patterns)
     monkeypatch.setattr(agents_new, "get_timestamp", lambda: "2026-04-12T12:00:00-03:00")

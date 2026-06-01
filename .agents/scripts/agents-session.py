@@ -12,8 +12,8 @@ from typing import Any, Dict, Optional
 from lib.agents_config import get_active_session_file_path, get_cfg_path, load_agents_config
 from lib.cli_output import to_json_text
 from lib.execution_commands import (
-    ExecutionError,
     TERMINAL_ARTIFACT_STATUSES,
+    ExecutionError,
     artifact_snapshot,
     build_session_catchup,
     find_session,

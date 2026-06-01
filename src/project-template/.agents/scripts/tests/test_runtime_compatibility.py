@@ -929,8 +929,12 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             target = Path(td) / "demo-repo"
             target.mkdir(parents=True, exist_ok=True)
             with mock.patch.object(agents_bootstrap.subprocess, "run") as patched_run:
-                with mock.patch.object(agents_bootstrap, "external_universal_skills_source_candidates", return_value=[]):
-                    agents_bootstrap.prepare_sibling_universal_skills_checkout(target, dry_run=False)
+                with mock.patch.object(
+                    agents_bootstrap, "external_universal_skills_source_candidates", return_value=[]
+                ):
+                    agents_bootstrap.prepare_sibling_universal_skills_checkout(
+                        target, dry_run=False
+                    )
 
             checkout = target / ".agents/source/universal-skills"
             self.assertTrue(agents_bootstrap.is_valid_universal_skills_checkout(checkout))

@@ -20,7 +20,7 @@ Examples:
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 from lib.agents_config import get_cfg_path, load_agents_config
 
@@ -95,6 +95,7 @@ VALID_DOC_TYPES = [
     "lesson_entry",
     "tool-doc",
     "reference",
+    "rule",
     "pattern",
     "pattern_index",
     "quick_reference",

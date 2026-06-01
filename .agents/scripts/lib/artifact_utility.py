@@ -6,7 +6,6 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
-
 PLACEHOLDER_RE = re.compile(
     r"<[^>\n]+>|YYYY-MM-DD(?:THH:MM:SSZ|\s+HH:MMZ)?|<yes/no>|<pass/fail>|<successful/partial/blocked>",
     re.IGNORECASE,

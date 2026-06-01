@@ -1,6 +1,6 @@
 import sys
+from datetime import timedelta, timezone
 from pathlib import Path
-from datetime import timezone, timedelta
 
 import pytest
 

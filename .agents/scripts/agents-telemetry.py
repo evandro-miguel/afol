@@ -32,20 +32,19 @@ Options:
     --until=<date>            Filter events until date (ISO 8601)
 """
 
+import argparse
+import hashlib
 import json
 import os
 import sys
-import uuid
-import hashlib
 import time
-from datetime import datetime, timezone, timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import argparse
 
 from lib.agents_config import now_iso_with_offset
 from lib.cli_output import to_json_text
-
 
 # Configuration
 TELEMETRY_DATA_DIR = Path(

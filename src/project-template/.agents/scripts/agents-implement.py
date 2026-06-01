@@ -6,22 +6,22 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from lib.agents_config import load_agents_config
 from lib.execution_commands import (
     ExecutionError,
+    append_evidence,
     append_timeline_entry,
     assert_task_sequence,
     find_session,
-    load_feature_operation_governance,
     find_task_by_id,
+    load_feature_operation_governance,
     next_task,
     normalize_task_state,
-    parse_task_rows,
     parse_state_summary,
-    append_evidence,
+    parse_task_rows,
     update_task_state,
     validate_closure_evidence,
 )
-from lib.agents_config import load_agents_config
 
 _ROOT_DIR, _CONFIG = load_agents_config(Path(__file__).resolve().parent)
 

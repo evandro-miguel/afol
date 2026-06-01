@@ -4,16 +4,16 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from lib.agents_config import get_active_session_file_path, get_cfg_path, load_agents_config
 from lib.execution_commands import (
-    ExecutionError,
     TERMINAL_ARTIFACT_STATUSES,
+    ExecutionError,
     artifact_snapshot,
     build_session_catchup,
     find_session,
