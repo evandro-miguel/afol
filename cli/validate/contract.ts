@@ -453,7 +453,6 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
     if (isPromptContextDoc(normalizedPath)) {
       selected.add("token-economy");
       reasons.push(`prompt-context-doc-change:${changedPath}`);
-      continue;
     }
   }
   if (selected.size === 0) {

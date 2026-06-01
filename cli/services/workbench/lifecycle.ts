@@ -224,9 +224,7 @@ function loadEvidenceEntries(evidencePath: string): EvidenceEntry[] {
         }
         entries.push(entry);
       }
-    } catch {
-      continue;
-    }
+    } catch {}
   }
   return entries;
 }
@@ -237,7 +235,7 @@ function currentTimelineStamp(now = new Date()): string {
 
 function insertTimelineEntry(content: string, message: string, now = new Date()): string {
   const lines = content.split("\n");
-  let timelineIndex = lines.findIndex((line) => line.trim() === "## Timeline");
+  const timelineIndex = lines.findIndex((line) => line.trim() === "## Timeline");
 
   if (timelineIndex < 0) {
     const trimmed = content.replace(/\n*$/g, "");

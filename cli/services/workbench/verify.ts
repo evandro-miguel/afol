@@ -231,9 +231,7 @@ function loadEvidence(scope: string): Map<string, EvidenceEntry[]> {
       const entries = byTask.get(taskId) ?? [];
       entries.push(entry);
       byTask.set(taskId, entries);
-    } catch {
-      continue;
-    }
+    } catch {}
   }
   return byTask;
 }

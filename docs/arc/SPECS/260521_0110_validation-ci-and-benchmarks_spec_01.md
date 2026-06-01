@@ -44,10 +44,12 @@ parity, update safety, and token economy.
 - Security floor adds Biome/Oxlint/Knip and dependency/runtime checks with OSV and
   Gitleaks (or modern equivalent) in the release-quality path.
 - `bun run validate:security` drives the release security lane through
-  `security:scan:informative`, and that script exits safely when optional tools are
-  not installed locally.
-- This spec does not require OSV/Gitleaks to be installed everywhere; scripts are
-  informative-by-default when tooling is unavailable.
+  `security:scan:informative`; with `osv-scanner` v2 installed it scans
+  `bun.lock`, and with `gitleaks` installed it scans project content using
+  `.gitleaks.toml`.
+- This spec does not require OSV/Gitleaks to be installed everywhere; scripts
+  still skip safely when tooling is unavailable, but this factory checkout has
+  both tools installed and validated locally.
 - Build validation uses Bun standalone executable smoke tests and clean-room
   install checks. `bun install --frozen-lockfile` is required in release-quality
   validation so `bun.lock` cannot change during the gate.

@@ -16,13 +16,15 @@ updated_at: '2026-03-06T22:29:30-03:00'
 - Installed toolchain gate dependencies:
   - `citty` `^0.2.2`
   - `valibot` `^1.4.1`
-  - `biome` `^0.3.3`
+  - `@biomejs/biome` `^2.4.16`
   - `oxlint` `^1.67.0`
   - `knip` `^6.15.0`
   - `diff` `^9.0.0`
   - `jsdiff` `^1.1.1`
-- `OSV` (optional, release-security lane when installed)
-- `gitleaks` (optional, release-security lane when installed)
+- `osv-scanner` `2.3.8` installed in the user-local Go bin; release-security
+  lane scans `bun.lock`
+- `gitleaks` installed in the user-local Go bin; release-security lane scans
+  tracked project content with `.gitleaks.toml` allowlists
 - Bun test runner (`bun test`) for CLI and focused template-policy checks
 - CLI command surface in progress:
   - `afol` (public/publicized entrypoint)
@@ -36,8 +38,8 @@ updated_at: '2026-03-06T22:29:30-03:00'
   - `bun run validate:toolchain` (Biome/Oxlint/Knip + diff libraries)
   - `bun run typecheck:ts7:informative` (TS7/native-preview lane, non-blocking)
 - `bun run build:deterministic` for release-like frozen lockfile compile validation
-- `bun run validate:security` for optional OSV/Gitleaks scans and graceful skip when
-  missing.
+- `bun run validate:security` for OSV/Gitleaks scans with graceful skip only when
+  the external CLI is missing.
 
 ## Target Direction
 

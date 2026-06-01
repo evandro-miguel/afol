@@ -124,7 +124,7 @@ function parseTaskRows(session: string, file: string): WorkbenchIndexTask[] {
       }
 
       const match = trimmed.match(TASK_ROW_RE);
-      if (!match || !match[1]) {
+      if (!match?.[1]) {
         continue;
       }
 
@@ -271,9 +271,7 @@ function sessionSourceLatestTime(root: string, session: string): number {
   for (const file of sessionTaskFiles(sessionDir)) {
     try {
       latest = Math.max(latest, statSync(file).mtimeMs);
-    } catch {
-      continue;
-    }
+    } catch {}
   }
   return latest;
 }

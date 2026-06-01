@@ -59,7 +59,7 @@ function validateJsonFile(projectRoot: string, id: "lock" | "manifest", name: st
 }
 
 function validateDirectory(
-  projectRoot: string,
+  _projectRoot: string,
   id: "rules_dir" | "skills_dir" | "wb_dir" | "docs_arc_dir",
   path: string,
 ): ProjectValidationCheck {

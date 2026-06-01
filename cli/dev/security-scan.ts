@@ -65,6 +65,6 @@ function runOptionalScan(opts: {
 }
 
 function supportedDependencyLockfile(): string | null {
-  const lockfiles = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml"];
+  const lockfiles = ["bun.lock", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml"];
   return lockfiles.find((path) => existsSync(path)) ?? null;
 }

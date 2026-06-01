@@ -80,7 +80,7 @@ describe("update command", () => {
         ownershipSource: Record<string, number>;
       };
       expect(parsed).toMatchObject({ hasSource: true, currentRevision: "old" });
-      expect(parsed.ownershipSource["managed"]).toBe(0);
+      expect(parsed.ownershipSource.managed).toBe(0);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

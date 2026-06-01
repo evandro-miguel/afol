@@ -1,7 +1,7 @@
 import { parseArgs, type ParsedArgs } from "citty";
 import * as v from "valibot";
 import { createPatch, diffWords } from "diff";
-// @ts-ignore: jsdiff ships JavaScript-only runtime package without bundled types
+// @ts-expect-error: jsdiff ships JavaScript-only runtime package without bundled types
 import jsdiff from "jsdiff";
 
 const commandName = "toolchain-smoke";

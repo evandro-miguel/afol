@@ -55,7 +55,7 @@ function parseStatusArgs(args: string[]): { json: boolean } {
 
 function parseFrontmatter(text: string): Record<string, string> {
   const match = /^---\n([\s\S]*?)\n---/m.exec(text);
-  if (!match || !match[1]) {
+  if (!match?.[1]) {
     return {};
   }
 
