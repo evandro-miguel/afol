@@ -14,6 +14,7 @@ import {
   validateRulesIndex,
   validateSpecsIndex,
 } from "../services/local-state/project-indexes";
+import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
 import type {
   FilesIndexSnapshot,
   SkillIndexEntry,
@@ -306,11 +307,17 @@ describe("local-state project indexer", () => {
       };
 
       expect(await runLocalStateCommand(["rebuild", "--json"], root, io)).toBe(0);
-      const rebuildPayload = JSON.parse(stdout.at(-1) ?? "{}") as { ok: boolean };
+      const rebuildPayload = JSON.parse(stdout.at(-1) ?? "{}") as {
+        ok: boolean;
+        snapshot?: { workbench?: { kind?: string } };
+      };
       expect(rebuildPayload.ok).toBe(true);
+      expect(rebuildPayload.snapshot?.workbench?.kind).toBe("workbench_index_v1");
+      expect(validateWorkBenchIndex(root).ok).toBe(true);
 
       expect(await runLocalStateCommand(["freshness"], root, io)).toBe(0);
       expect(stdout.at(-1)).toContain("local-state freshness: ok");
+      expect(stdout.at(-1)).toContain("ok workbench");
       expect(stderr).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });

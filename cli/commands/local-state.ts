@@ -5,6 +5,7 @@ import {
   validateSkillsIndex,
   validateSpecsIndex,
 } from "../services/local-state/project-indexes";
+import { rebuildWorkBenchIndex, validateWorkBenchIndex } from "../services/local-state/workbench-index";
 
 type CommandIo = {
   stdout: (message: string) => void;
@@ -30,6 +31,7 @@ function normalizeCommand(value: string | undefined): LocalStateCommand {
 
 function formatFreshness(root: string): { ok: boolean; checks: { id: string; ok: boolean; message: string }[] } {
   const checks = [
+    { id: "workbench", ...validateWorkBenchIndex(root) },
     { id: "rules", ...validateRulesIndex(root) },
     { id: "skills", ...validateSkillsIndex(root) },
     { id: "specs", ...validateSpecsIndex(root) },
@@ -60,13 +62,15 @@ export async function runLocalStateCommand(
     }
 
     if (command === "rebuild") {
-      const snapshot = rebuildProjectIndexes(projectRoot);
+      const workbench = rebuildWorkBenchIndex(projectRoot);
+      const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
       if (json) {
         io.stdout(JSON.stringify({ ok: true, command, snapshot }));
       } else {
         io.stdout(
           [
             "local-state rebuild: ok",
+            `workbench: ${snapshot.workbench.sessions.length} sessions, ${snapshot.workbench.tasks.length} tasks`,
             `rules: ${snapshot.rules.rules.length}`,
             `skills: ${snapshot.skills.skills.length}`,
             `specs: ${snapshot.specs.specs.length}`,
