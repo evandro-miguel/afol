@@ -1,3 +1,12 @@
+---
+doc_type: task
+id: 260531_2106_mvp-finalization-gap-implementation_task_01
+theme: mvp-finalization-gap-implementation
+status: active
+created_at: '2026-05-31T23:46:29-03:00'
+updated_at: '2026-05-31T23:46:29-03:00'
+---
+
 # Tasks: mvp-finalization-gap-implementation
 
 ## State Board

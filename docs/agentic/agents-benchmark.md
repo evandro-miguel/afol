@@ -11,8 +11,9 @@ updated_at: '2026-04-24T12:29:13-03:00'
 
 ## Purpose
 
-Provide a selective benchmark family for risky scaffold execution changes using
-a real mini-tier agent, real tool calls, and bounded fixture tasks.
+Provide a selective, development-only benchmark family for risky scaffold
+execution changes using a real mini-tier agent, real tool calls, and bounded
+fixture tasks.
 
 ## Default Profile
 
@@ -85,8 +86,8 @@ just benchmark-runtime-flow
 
 ## Usage Policy
 
-- Run this selectively after risky runtime-flow changes.
-- Do not turn it into a universal gate for every task.
+- Run this selectively after risky runtime-flow changes during development.
+- Do not turn it into a daily or universal production gate.
 - The benchmark is only meaningful when the live agent actually uses tools.
 
 ---

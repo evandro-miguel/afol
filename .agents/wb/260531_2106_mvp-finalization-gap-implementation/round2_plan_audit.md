@@ -1,3 +1,14 @@
+---
+doc_type: standard
+id: round2-plan-audit
+theme: 260531_2106_mvp-finalization-gap-implementation
+status: active
+created_at: '2026-05-31T23:46:29-03:00'
+updated_at: '2026-05-31T23:46:29-03:00'
+roadmap_feature: F-12
+parent_spec: 260521_0120_public-distribution-and-onboarding_spec_01
+---
+
 # STATUS
 Parcial. O plano está em direção correta, mas não está builder-ready completo: há tarefas redundantes/abstratas, falta de critérios de fechamento operacional em dois pontos de release e ausência de alguns pré-requisitos explícitos de risco.
 

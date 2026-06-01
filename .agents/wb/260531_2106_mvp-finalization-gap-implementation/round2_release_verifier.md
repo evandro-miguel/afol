@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: round2-release-verifier
+theme: 260531_2106_mvp-finalization-gap-implementation
+status: active
+created_at: '2026-05-31T23:46:29-03:00'
+updated_at: '2026-05-31T23:46:29-03:00'
+---
+
 ## STATUS
 - `validate:release` atual é forte para higiene técnica (`typecheck`, template/bootstrap validation, `build:deterministic`, `smoke:dist`), mas **não fecha release público por si só**.
 - `cli/dev/security-scan.ts` confirma que o caminho de segurança é **informativo** (continua com falha quando ferramenta indisponível e só para se a ferramenta encontra erro), então não atende “hard-fail” de política.

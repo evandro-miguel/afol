@@ -1,3 +1,12 @@
+---
+doc_type: standard
+id: round2-docs-code-verifier
+theme: 260531_2106_mvp-finalization-gap-implementation
+status: active
+created_at: '2026-05-31T23:46:29-03:00'
+updated_at: '2026-05-31T23:46:29-03:00'
+---
+
 STATUS
 - Round 2 de verificação concluído. Foram validados os gaps do Round 1 contra o código atual e testes, sem alterar plano/código.
 

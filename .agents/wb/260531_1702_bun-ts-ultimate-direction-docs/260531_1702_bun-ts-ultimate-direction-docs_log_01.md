@@ -1,3 +1,12 @@
+---
+doc_type: log
+id: 260531_1702_bun-ts-ultimate-direction-docs_log_01
+theme: bun-ts-ultimate-direction-docs
+status: active
+created_at: '2026-05-31T23:46:29-03:00'
+updated_at: '2026-05-31T23:46:29-03:00'
+---
+
 # Log
 
 ## Timeline

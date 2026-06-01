@@ -1,3 +1,14 @@
+---
+doc_type: plan
+id: 260531_1702_bun-ts-ultimate-direction-docs_plan_01
+theme: bun-ts-ultimate-direction-docs
+status: active
+created_at: '2026-05-31T23:46:29-03:00'
+updated_at: '2026-05-31T23:46:29-03:00'
+roadmap_feature: F-00
+parent_spec: 260521_0000_total-reformulation-strategy_spec_01
+---
+
 # Plan: bun-ts-ultimate-direction-docs
 
 ## Context
@@ -92,3 +103,20 @@
 - Do not start later slices that touch write-paths before slices 3-5 prove safe contracts.
 - Preserve `src/project-template/` state-only boundary before any template downsizing.
 - Use slice completion evidence as blockers: each slice must produce passing validation commands and explicit acceptance notes before proceeding.
+
+## Progress
+
+- [x] 2026-05-31 - Baseline audit, toolchain planning, loader/path-jail checks, bootstrap/update ownership, local-state JSONL/index, mutation safety, release/security, and final acceptance slices are all recorded in the task board.
+- [x] 2026-05-31 - The implementation-ready docs set is consolidated in `docs/arc/PROJECT-MANIFESTO.md`, `docs/arc/TECH-STACK.md`, `docs/arc/GENERAL-ROADMAP.md`, and the active spec set.
+
+## Concrete Steps
+
+- Keep the slice order and validations in this plan as the execution path.
+- Preserve the dependency order constraints and the F-00 / F-02 / F-07 / F-08 / F-09 / F-11 / F-12 boundaries.
+- Use the documented evidence inputs as the source of truth for the already-completed slices.
+
+## Validation and Acceptance
+
+- `bun run typecheck`
+- `bun test`
+- `./.agents/agents verify-tasks --strict`

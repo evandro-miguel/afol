@@ -75,9 +75,9 @@ MVP hardening treats the release lane as:
 Agent systems drift easily across docs, commands, templates, runtime adapters,
 workbench files, and tool behavior.
 
-Static tests are necessary but insufficient. Runtime-flow benchmarks are needed
-for changes that affect how agents choose commands, tools, rules, skills, or
-mutation paths.
+Static tests are necessary but insufficient. Runtime-flow benchmarks are a
+selective development-time regression check for changes that affect how agents
+choose commands, tools, rules, skills, or mutation paths.
 
 ## 3) Validation Layers
 
@@ -369,10 +369,11 @@ Default CI runs:
 - template export validation.
 - focused integration tests.
 - workbench validation where applicable.
-- Smoke benchmark runs are acceptable for early continuity checks, but global closure
-  requires full artifacts persisted for selected packs (`.agents/data/benchmarks/results/...`)
-  and evidence that all F-11 required pack scenarios were executed or explicitly
-  waived with artifact-backed reasoning.
+- Smoke benchmark runs are acceptable for early continuity checks, but they are
+  not a daily production gate. Global closure requires full artifacts persisted
+  for selected packs (`.agents/data/benchmarks/results/...`) and evidence that
+  all F-11 required pack scenarios were executed or explicitly waived with
+  artifact-backed reasoning.
 
 Selective CI maps paths to packs:
 
@@ -400,7 +401,7 @@ Selective CI maps paths to packs:
   security/toolchain checks where configured.
 - Public release claims include clean install evidence, binary provenance,
   checksums, and notarization status where relevant.
-- Risky runtime changes have a clear benchmark trigger.
+- Risky runtime changes have a clear, selective benchmark trigger.
 - CI catches schema, command, and template drift before release.
 
 ## 13) Closeout

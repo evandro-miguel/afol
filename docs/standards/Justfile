@@ -203,7 +203,7 @@ tools-check:
   @echo "✓ Tools catalog and CLI smoke validated"
 
 benchmark-runtime-flow:
-  @echo "→ Running controlled runtime-flow benchmarks..."
+  @echo "→ Running controlled development-time runtime-flow benchmarks..."
   @cmd=(./.agents/agents benchmark run); \
   if [ -n "${SCENARIOS:-}" ]; then IFS=, read -r -a scenario_list <<< "${SCENARIOS}"; cmd+=("${scenario_list[@]}"); fi; \
   if [ -n "${MODEL:-}" ]; then cmd+=(--model "${MODEL}"); fi; \

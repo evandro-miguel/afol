@@ -1,3 +1,14 @@
+---
+doc_type: plan
+id: 260531_2106_mvp-finalization-gap-implementation_plan_01
+theme: mvp-finalization-gap-implementation
+status: active
+created_at: '2026-05-31T23:46:29-03:00'
+updated_at: '2026-05-31T23:46:29-03:00'
+roadmap_feature: F-12
+parent_spec: 260521_0120_public-distribution-and-onboarding_spec_01
+---
+
 # Plan: mvp-finalization-gap-implementation
 
 ## Native command metadata
@@ -220,3 +231,23 @@ Additional release evidence when applicable:
 - Medium risk: local-state expansion can create stale trust if freshness is not fail-closed.
 - Medium risk: adapter/MCP documentation can overstate parity while legacy delegation remains.
 - Low risk: archive implementation can be safely scoped if it stays project-local, journaled, and reversible where feasible.
+
+## Progress
+
+- [x] 2026-06-01 - Round 1 docs, code, and release audits identified the MVP-critical gaps.
+- [x] 2026-06-01 - Round 2 docs/code and release verifiers confirmed the remaining closeout work.
+- [x] 2026-06-01 - The implementation tasks now enumerate T-01 through T-08 in priority order.
+
+## Concrete Steps
+
+- Implement T-01 through T-08 in priority order.
+- Keep the evidence inputs aligned with the round 1 and round 2 audit artifacts.
+- Reconcile docs/spec/roadmap status only after the implementation gates pass.
+
+## Validation and Acceptance
+
+- `bun run typecheck`
+- `bun test`
+- `bun run validate:release`
+- `bun run smoke:clean`
+- `./.agents/agents verify-tasks --strict`

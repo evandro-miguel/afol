@@ -166,7 +166,8 @@ and bootstrap assets for downstream repos.
 - Runtime/tool-routing/prompt/rule-loading changes should run the controlled
   runtime-flow benchmark family when regression risk is material.
 - Use `gpt-5.4-mini` with medium reasoning as the default benchmark baseline
-  unless a benchmark spec says otherwise.
+  for selective development-time regression checks unless a benchmark spec
+  says otherwise.
 - Final reports must state changes, verification, remaining risk/skipped gates,
   documentation-drift status, and mirror sync status when runtime guidance
   changed.
