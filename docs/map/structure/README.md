@@ -1,31 +1,22 @@
----
-doc_type: standard
-id: readme
-theme: structure
-status: active
-created_at: '2026-05-05T11:44:41+00:00'
-updated_at: '2026-05-05T11:44:41+00:00'
----
-
 # 📁 Project Structure - Complete Index
 
-**Generated:** 2026-05-15T01:08:58+00:00
+**Generated:** 2026-06-05T03:03:34+00:00
 **Last Update:** First run
 
 ## 📊 Overview
 
 | Metric | Value |
 |--------|-------|
-| **Total Files** | 252 |
-| **Total Lines** | 71,437 |
+| **Total Files** | 253 |
+| **Total Lines** | 72,766 |
 
 ## 📂 Documentation Sections
 
 | Section | Description | Files |
 |---------|-------------|-------|
-| [Backend](./backend.md) | Services, utilities, and business logic | 103 |
-| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 133 |
-| [Data](./data.md) | Data files, constants, and configuration | 16 |
+| [Backend](./backend.md) | Services, utilities, and business logic | 106 |
+| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 135 |
+| [Data](./data.md) | Data files, constants, and configuration | 12 |
 
 ## 🔄 Change Detection
 
@@ -37,7 +28,7 @@ This documentation uses **incremental updates**:
 ## 🌳 Quick Directory Tree
 
 ```
-agentic_start_folder/
+agentic-standard-folder/
 ├── 📁 docs/
 ├── 📁 src/
 ```

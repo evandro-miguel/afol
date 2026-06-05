@@ -274,3 +274,17 @@ def test_workspace_inspect_generated_and_hidden_filters(scaffold_repo):
     assert ".agents/data/telemetry/events.jsonl" in generated_paths
     assert ".git/HEAD" in generated_paths
     assert ".hidden-keep/note.md" not in generated_paths
+
+
+def test_workspace_inspection_reports_truncation_at_max_entries(scaffold_repo):
+    (scaffold_repo / "docs" / "a.md").write_text("# A\n", encoding="utf-8")
+    (scaffold_repo / "docs" / "b.md").write_text("# B\n", encoding="utf-8")
+    (scaffold_repo / "docs" / "c.md").write_text("# C\n", encoding="utf-8")
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+
+    summary = runtime.workspace.inspect(depth=2, max_entries=2)
+    paths = _tree_paths(summary.tree)
+
+    assert summary.truncated is True
+    assert summary.file_count + summary.dir_count == 2
+    assert len(paths) == 2

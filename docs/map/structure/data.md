@@ -1,15 +1,6 @@
----
-doc_type: structure
-id: data
-theme: structure
-status: active
-created_at: '2026-05-10T16:27:41+00:00'
-updated_at: '2026-05-10T16:27:41+00:00'
----
-
 # 🎨 Data Structure
 
-**Generated:** 2026-05-15T01:08:58+00:00
+**Generated:** 2026-06-05T03:03:34+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -18,27 +9,23 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 16 files, 8,696 lines, 1812.2 KB
+**Stats:** 12 files, 1,876 lines, 88.1 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/data/telemetry/events.jsonl` | 6,579 | 1735.7 KB | Module; functionality |
-| `.agents/agents.config` | 364 | 9.0 KB | Module; functionality |
 | `src/project-template/.agents/agents.config` | 364 | 9.0 KB | Module; functionality |
+| `.agents/agents.config` | 364 | 9.0 KB | Module; functionality |
 | `.agents/data/benchmarks/results/20260424_141508_runtime-flow-live-agent-v4.json` | 268 | 15.5 KB | Module; functionality |
 | `.agents/data/benchmarks/results/20260424_153445_runtime-flow-live-agent-v4.json` | 214 | 13.6 KB | Module; functionality |
-| `.agents/arc/map/extra/metadata.json` | 157 | 4.3 KB | Module; functionality |
 | `docs/agentic/agents-config.md` | 155 | 4.6 KB | Module; functionality |
-| `.agents/arc/map/extra/previous-metadata.json` | 151 | 4.2 KB | Module; functionality |
-| `.agents/runtime/src/agentic_scaffold/config.py` | 108 | 4.2 KB | Module; functionality |
-| `src/project-template/.agents/runtime/src/agentic_scaffold/config.py` | 108 | 4.2 KB | Module; functionality |
-| `.agents/data/telemetry/schemas/event.json` | 78 | 2.3 KB | Module; functionality |
+| `src/project-template/.agents/runtime/src/agentic_scaffold/config.py` | 116 | 4.3 KB | Module; functionality |
+| `.agents/runtime/src/agentic_scaffold/config.py` | 116 | 4.3 KB | Module; functionality |
+| `.agents/data/telemetry/events.jsonl` | 80 | 20.6 KB | Module; functionality |
 | `src/project-template/.agents/data/telemetry/schemas/event.json` | 78 | 2.3 KB | Module; functionality |
-| `docs/map/structure/data.md` | 28 | 1.8 KB | Module; functionality |
-| `.agents/arc/map/extra/phase2/config-boundary-files.json` | 27 | 0.6 KB | Module; functionality |
-| `.agents/arc/map/extra/phase5/data-models.json` | 10 | 0.2 KB | Module; functionality |
+| `.agents/data/telemetry/schemas/event.json` | 78 | 2.3 KB | Module; functionality |
+| `docs/map/structure/data.md` | 36 | 1.9 KB | Module; functionality |
 | `.agents/data/benchmarks/README.md` | 7 | 0.4 KB | Module; functionality |
 
 ---
