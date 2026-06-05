@@ -77,6 +77,7 @@ VALID_DOC_TYPES = [
     "spec-child",
     "spec-lite",
     "spec-test",
+    "rule",
     "spec_child",
     "spec_lite",
     "spec_test",
