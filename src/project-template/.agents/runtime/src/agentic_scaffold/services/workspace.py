@@ -2,8 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TypedDict
 
 from agentic_scaffold.models import TreeNode, WorkspaceSummary
+
+
+class EntryCounters(TypedDict):
+    files: int
+    dirs: int
+    seen: int
+    truncated: bool
 
 
 class WorkspaceInspector:
@@ -13,7 +21,7 @@ class WorkspaceInspector:
     def inspect(
         self, depth: int = 3, include_hidden: bool = False, max_entries: int = 500
     ) -> WorkspaceSummary:
-        counters = {"files": 0, "dirs": 0, "seen": 0, "truncated": False}
+        counters: EntryCounters = {"files": 0, "dirs": 0, "seen": 0, "truncated": False}
         tree = self._build_tree(
             self.repo_root,
             depth,
@@ -38,7 +46,7 @@ class WorkspaceInspector:
         *,
         include_hidden: bool,
         max_entries: int,
-        counters: dict[str, int | bool],
+        counters: EntryCounters,
     ) -> list[TreeNode]:
         if remaining < 0 or self._entry_limit_reached(counters, max_entries):
             counters["truncated"] = True
@@ -72,7 +80,7 @@ class WorkspaceInspector:
         remaining: int,
         include_hidden: bool,
         max_entries: int,
-        counters: dict[str, int | bool],
+        counters: EntryCounters,
     ) -> TreeNode:
         counters["seen"] += 1
         node = self._create_node(entry, relative_path)
@@ -93,7 +101,7 @@ class WorkspaceInspector:
     def _iter_sorted_entries(path: Path) -> list[Path]:
         try:
             return sorted(path.iterdir(), key=lambda entry: (entry.is_file(), entry.name.lower()))
-        except PermissionError:
+        except OSError:
             return []
 
     @staticmethod
@@ -117,5 +125,5 @@ class WorkspaceInspector:
         )
 
     @staticmethod
-    def _entry_limit_reached(counters: dict[str, int | bool], max_entries: int) -> bool:
-        return int(counters["seen"]) >= max_entries
+    def _entry_limit_reached(counters: EntryCounters, max_entries: int) -> bool:
+        return counters["seen"] >= max_entries
