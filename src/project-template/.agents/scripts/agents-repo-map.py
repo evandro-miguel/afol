@@ -13,7 +13,6 @@ from typing import Iterable, List
 from lib.agents_config import load_agents_config
 from lib.process_utils import run_command
 
-
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 MAP_CFG = CONFIG.get("repo_map", {})
 PATHS_CFG = CONFIG.get("paths", {})

@@ -18,7 +18,6 @@ from typing import Any, Callable
 
 from lib.cli_output import to_json_text
 
-
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 AGENTS_DIR = ROOT_DIR / ".agents"
 DOCS_DIR = ROOT_DIR / "docs"

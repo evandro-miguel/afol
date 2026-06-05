@@ -1,4 +1,5 @@
 ---
+doc_type: rule
 id: RULE-007
 theme: postmortem-governance-review
 version: 1.0

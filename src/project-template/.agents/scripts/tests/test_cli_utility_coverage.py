@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 import pytest
 
-
 SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 
 
@@ -574,7 +573,7 @@ def test_check_links_extracts_resolves_reports_and_cli(tmp_path, monkeypatch, ca
     assert "LINK CHECK REPORT" in capsys.readouterr().out
 
 
-def test_lint_fix_scripts_process_files_and_cli(tmp_path, monkeypatch):
+def test_lint_fix_scripts_process_files_and_cli(tmp_path, monkeypatch, capsys):
     checkboxes = load_module("fix_lint_checkboxes_coverage_test", "fix-lint-checkboxes.py")
     frontmatter = load_module("fix_lint_frontmatter_coverage_test", "fix-lint-frontmatter.py")
     doctypes = load_module("fix_lint_doctypes_coverage_test", "fix-lint-doctypes.py")
@@ -623,6 +622,14 @@ def test_lint_fix_scripts_process_files_and_cli(tmp_path, monkeypatch):
     run_doc = docs / "needs_fix.md"
     run_doc.write_text("# Needs Fix\n\n- [x]done\n", encoding="utf-8")
     assert fix_all.LintFixer(str(docs), check_only=True).run() == 1
+    capsys.readouterr()
+    original = run_doc.read_text(encoding="utf-8")
+    assert fix_all.LintFixer(str(docs), dry_run=True).run() == 0
+    dry_run_output = capsys.readouterr().out
+    assert "Lint Fix - Mode: DRY RUN" in dry_run_output
+    assert "Would fix 1 checkbox(es)" in dry_run_output
+    assert "Run without --dry-run to apply fixes." in dry_run_output
+    assert run_doc.read_text(encoding="utf-8") == original
 
     monkeypatch.setattr(sys, "argv", ["fix-lint-checkboxes.py", "--dry-run", str(docs)])
     assert checkboxes.main() == 0

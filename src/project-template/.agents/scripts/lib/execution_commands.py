@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
-import subprocess
 import json
 import os
 import re
+import subprocess
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -532,9 +532,8 @@ def infer_session_intent(session_dir: Path) -> str:
     return DEFAULT_WORKSTREAM_INTENT
 
 
-def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
-    """Return manifest-backed readiness state for session artifacts."""
-    intent = infer_session_intent(session_dir)
+def _selected_manifest_entries(session_dir: Path, intent: str) -> List[Dict[str, Any]]:
+    """Return manifest entries required by intent plus present artifacts."""
     profile = ARTIFACT_POLICY.get(intent, {})
     default_doc_types = set(profile.get("create", []))
     optional_doc_types = {entry["doc_type"] for entry in ARTIFACT_MANIFEST if entry.get("flag")}
@@ -543,13 +542,10 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
         for entry in ARTIFACT_MANIFEST
         if latest_file(session_dir, entry["doc_type"])
     }
-    present_optional_doc_types = {
-        entry["doc_type"]
-        for entry in ARTIFACT_MANIFEST
-        if entry["doc_type"] in optional_doc_types and latest_file(session_dir, entry["doc_type"])
-    }
+    present_optional_doc_types = present_doc_types & optional_doc_types
     selected_doc_types = default_doc_types | present_doc_types
-    manifest_entries = [
+
+    return [
         entry
         for entry in ARTIFACT_MANIFEST
         if entry["doc_type"] in selected_doc_types
@@ -558,57 +554,92 @@ def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
             or entry["doc_type"] in present_optional_doc_types
         )
     ]
-    snapshots = {
+
+
+def _artifact_snapshots(
+    session_dir: Path,
+    manifest_entries: Iterable[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Load snapshots for selected manifest entries."""
+    return {
         entry["doc_type"]: artifact_snapshot(latest_file(session_dir, entry["doc_type"]))
         for entry in manifest_entries
     }
+
+
+def _closure_mode_enabled(session_dir: Path, snapshots: Dict[str, Dict[str, Any]]) -> bool:
+    """Return whether artifact states should enforce closure-only optional docs."""
     task_file = resolve_artifact(session_dir, "task")
     total_tasks, done_tasks, _, _, _ = parse_state_summary(task_file)
     report_snapshot = snapshots.get("report", {})
     report_is_final = str(report_snapshot.get("status") or "").strip().lower() == "final"
     all_tasks_done = total_tasks > 0 and done_tasks == total_tasks
-    is_closure_mode = report_is_final or all_tasks_done
+    return report_is_final or all_tasks_done
+
+
+def _dependency_blockers(
+    depends_on: Iterable[str],
+    snapshots: Dict[str, Dict[str, Any]],
+) -> List[str]:
+    """Return blockers for manifest dependencies that are absent or not terminal."""
+    blockers: List[str] = []
+    for dependency in depends_on:
+        dependency_snapshot = snapshots.get(dependency, {"exists": False, "status": ""})
+        if not dependency_snapshot.get("exists"):
+            blockers.append(f"{dependency}: missing")
+            continue
+        if not _dependency_ready(dependency_snapshot):
+            utility = dependency_snapshot.get("utility", {})
+            if dependency_snapshot.get("exists") and not utility.get("useful"):
+                blockers.append(f"{dependency}: invalid")
+            else:
+                blockers.append(f"{dependency}: {dependency_snapshot.get('status') or 'unknown'}")
+    return blockers
+
+
+def _artifact_workflow_state(
+    doc_type: str,
+    snapshot: Dict[str, Any],
+    blockers: List[str],
+    is_closure_mode: bool,
+) -> str:
+    """Classify one artifact snapshot into its workflow state."""
     closure_optional_doc_types = {"brainstorm", "research", "explorer-check", "postmortem"}
+    if not snapshot.get("exists"):
+        return "missing"
+    if (
+        is_closure_mode
+        and doc_type in closure_optional_doc_types
+        and str(snapshot.get("status") or "").strip().lower() != "final"
+    ):
+        blockers.append(
+            f"closure gate: optional '{doc_type}' is present with status="
+            f"'{str(snapshot.get('status') or '').strip() or 'missing'}'; set status=final"
+        )
+        return "blocked"
+    if _artifact_done(snapshot):
+        return "done"
+    if not snapshot.get("utility", {}).get("useful"):
+        return "invalid"
+    if blockers:
+        return "blocked"
+    return "ready"
+
+
+def workflow_artifact_states(session_dir: Path) -> List[Dict[str, Any]]:
+    """Return manifest-backed readiness state for session artifacts."""
+    intent = infer_session_intent(session_dir)
+    manifest_entries = _selected_manifest_entries(session_dir, intent)
+    snapshots = _artifact_snapshots(session_dir, manifest_entries)
+    is_closure_mode = _closure_mode_enabled(session_dir, snapshots)
     states: List[Dict[str, Any]] = []
 
     for entry in manifest_entries:
         doc_type = entry["doc_type"]
         snapshot = snapshots[doc_type]
         depends_on = list(entry.get("depends_on", []))
-        blockers: List[str] = []
-        for dependency in depends_on:
-            dependency_snapshot = snapshots.get(dependency, {"exists": False, "status": ""})
-            if not dependency_snapshot.get("exists"):
-                blockers.append(f"{dependency}: missing")
-                continue
-            if not _dependency_ready(dependency_snapshot):
-                utility = dependency_snapshot.get("utility", {})
-                if dependency_snapshot.get("exists") and not utility.get("useful"):
-                    blockers.append(f"{dependency}: invalid")
-                else:
-                    blockers.append(
-                        f"{dependency}: {dependency_snapshot.get('status') or 'unknown'}"
-                    )
-
-        state = "ready"
-        if not snapshot.get("exists"):
-            state = "missing"
-        elif (
-            is_closure_mode
-            and doc_type in closure_optional_doc_types
-            and str(snapshot.get("status") or "").strip().lower() != "final"
-        ):
-            blockers.append(
-                f"closure gate: optional '{doc_type}' is present with status="
-                f"'{str(snapshot.get('status') or '').strip() or 'missing'}'; set status=final"
-            )
-            state = "blocked"
-        elif _artifact_done(snapshot):
-            state = "done"
-        elif not snapshot.get("utility", {}).get("useful"):
-            state = "invalid"
-        elif blockers:
-            state = "blocked"
+        blockers = _dependency_blockers(depends_on, snapshots)
+        state = _artifact_workflow_state(doc_type, snapshot, blockers, is_closure_mode)
 
         states.append(
             {

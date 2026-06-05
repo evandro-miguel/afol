@@ -22,12 +22,12 @@ Strict Mode (--strict):
     - Timeline/frontmatter temporal inconsistencies are flagged
 """
 
+import json
 import re
 import sys
-import json
-from pathlib import Path
-from typing import List, Tuple, Dict, Any
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 from lib.agents_config import get_cfg_path, load_agents_config
 from lib.artifact_utility import analyze_artifact_utility

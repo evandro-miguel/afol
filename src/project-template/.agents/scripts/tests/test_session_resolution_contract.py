@@ -5,7 +5,6 @@ from types import SimpleNamespace
 
 import pytest
 
-
 SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 
 

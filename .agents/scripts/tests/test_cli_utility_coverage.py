@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 import pytest
 
-
 SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 
 
@@ -574,7 +573,7 @@ def test_check_links_extracts_resolves_reports_and_cli(tmp_path, monkeypatch, ca
     assert "LINK CHECK REPORT" in capsys.readouterr().out
 
 
-def test_lint_fix_scripts_process_files_and_cli(tmp_path, monkeypatch):
+def test_lint_fix_scripts_process_files_and_cli(tmp_path, monkeypatch, capsys):
     checkboxes = load_module("fix_lint_checkboxes_coverage_test", "fix-lint-checkboxes.py")
     frontmatter = load_module("fix_lint_frontmatter_coverage_test", "fix-lint-frontmatter.py")
     doctypes = load_module("fix_lint_doctypes_coverage_test", "fix-lint-doctypes.py")
@@ -623,6 +622,14 @@ def test_lint_fix_scripts_process_files_and_cli(tmp_path, monkeypatch):
     run_doc = docs / "needs_fix.md"
     run_doc.write_text("# Needs Fix\n\n- [x]done\n", encoding="utf-8")
     assert fix_all.LintFixer(str(docs), check_only=True).run() == 1
+    capsys.readouterr()
+    original = run_doc.read_text(encoding="utf-8")
+    assert fix_all.LintFixer(str(docs), dry_run=True).run() == 0
+    dry_run_output = capsys.readouterr().out
+    assert "Lint Fix - Mode: DRY RUN" in dry_run_output
+    assert "Would fix 1 checkbox(es)" in dry_run_output
+    assert "Run without --dry-run to apply fixes." in dry_run_output
+    assert run_doc.read_text(encoding="utf-8") == original
 
     monkeypatch.setattr(sys, "argv", ["fix-lint-checkboxes.py", "--dry-run", str(docs)])
     assert checkboxes.main() == 0
@@ -1247,7 +1254,11 @@ def test_agents_new_creates_workstream_quick_mode_and_error_branches(tmp_path, m
     monkeypatch.setattr(agents_new, "ACTIVE_SESSION_FILE", active)
     monkeypatch.setattr(agents_new, "ROADMAP_FILE", roadmap)
     monkeypatch.setattr(agents_new, "SPECS_DIR", specs)
-    monkeypatch.setattr(agents_new, "TEMPLATES_DIR", Path(__file__).resolve().parent.parent.parent.parent / "docs" / "templates")
+    monkeypatch.setattr(
+        agents_new,
+        "TEMPLATES_DIR",
+        Path(__file__).resolve().parent.parent.parent.parent / "docs" / "templates",
+    )
     monkeypatch.setattr(agents_new, "TELEMETRY_SCRIPT", telemetry)
     monkeypatch.setattr(agents_new, "PATTERNS_SCRIPT", patterns)
     monkeypatch.setattr(agents_new, "get_timestamp", lambda: "2026-04-12T12:00:00-03:00")

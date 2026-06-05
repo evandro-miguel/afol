@@ -7,7 +7,6 @@ import tempfile
 from datetime import timedelta
 from pathlib import Path
 
-
 SCRIPTS_DIR = Path(__file__).parent.parent.parent
 
 

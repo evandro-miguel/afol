@@ -27,17 +27,16 @@ Options:
     --session=<session>       Session ID for apply command
 """
 
+import argparse
 import json
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import argparse
 
 from lib.agents_config import get_active_session_file_path, get_cfg_path, load_agents_config
 from lib.markdown_docs import split_markdown_frontmatter
-
 
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)

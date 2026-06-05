@@ -1,5 +1,5 @@
-import importlib.util
 import argparse
+import importlib.util
 import json
 import tempfile
 import unittest

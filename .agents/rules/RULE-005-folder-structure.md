@@ -1,4 +1,5 @@
 ---
+doc_type: rule
 id: RULE-005
 theme: folder-structure
 version: 1.0

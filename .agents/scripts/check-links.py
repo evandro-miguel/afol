@@ -14,12 +14,12 @@ Examples:
     python check-links.py --fix                    # Generate fix report
 """
 
-import re
-import os
-import sys
 import argparse
-from typing import List, Tuple, Optional
+import os
+import re
+import sys
 from dataclasses import dataclass
+from typing import List, Optional, Tuple
 
 
 @dataclass

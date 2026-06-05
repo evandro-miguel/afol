@@ -5,7 +5,6 @@ import json
 import sys
 from pathlib import Path
 
-
 SCRIPT_PATH = Path(".agents/scripts/agents-benchmark.py").resolve()
 
 

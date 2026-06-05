@@ -6,9 +6,9 @@ Este arquivo contém testes para a funcionalidade de verificação
 de versões do update system.
 """
 
-import pytest
 import re
 
+import pytest
 
 # ═══════════════════════════════════════════════════════════════
 #  Version Functions (Reference Implementation)

@@ -4,19 +4,18 @@
 from __future__ import annotations
 
 import argparse
-import json
 import hashlib
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
 from typing import Callable, Dict, Iterable, List, NamedTuple, Sequence, Set, Tuple
 
 from lib.agents_config import now_iso_with_offset
-
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 TEMPLATE_ROOT = ROOT_DIR / "src" / "project-template"
@@ -1297,11 +1296,7 @@ def is_skill_directory(path: Path) -> bool:
 
 
 def _checkout_skill_names(skills_dir: Path) -> Set[str]:
-    return {
-        item.name
-        for item in skills_dir.iterdir()
-        if is_skill_directory(item)
-    }
+    return {item.name for item in skills_dir.iterdir() if is_skill_directory(item)}
 
 
 def _profile_skill_names(profile_file: Path) -> List[str] | None:
@@ -1354,11 +1349,7 @@ def local_project_skill_names() -> List[str]:
     skills_root = local_project_skills_root()
     if not skills_root.exists():
         return []
-    return sorted(
-        item.name
-        for item in skills_root.iterdir()
-        if is_skill_directory(item)
-    )
+    return sorted(item.name for item in skills_root.iterdir() if is_skill_directory(item))
 
 
 def _profile_names_from_installs(installs: object) -> Set[str]:

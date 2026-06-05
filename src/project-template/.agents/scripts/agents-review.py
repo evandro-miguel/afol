@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from lib.agents_config import load_agents_config
 from lib.execution_commands import (
     build_session_catchup,
     find_session,
@@ -16,7 +17,6 @@ from lib.execution_commands import (
     parse_task_rows,
     split_frontmatter,
 )
-from lib.agents_config import load_agents_config
 
 ROOT_DIR, _CONFIG = load_agents_config(Path(__file__).resolve().parent)
 

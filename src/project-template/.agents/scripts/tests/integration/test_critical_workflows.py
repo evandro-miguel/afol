@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT_DIR = Path(__file__).parent.parent.parent.parent.parent
 SESSION_ID = "260402_0000_integration"
 pytestmark = pytest.mark.integration

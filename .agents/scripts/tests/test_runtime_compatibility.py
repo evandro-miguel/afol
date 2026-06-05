@@ -709,7 +709,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
 
     def test_project_template_stays_generic_and_history_free(self):
-        template_root = Path(__file__).resolve().parent.parent.parent.parent / "src" / "project-template"
+        template_root = (
+            Path(__file__).resolve().parent.parent.parent.parent / "src" / "project-template"
+        )
         if not template_root.exists():
             self.skipTest("source project template is only present in the source repo")
         generic_files = [
@@ -928,8 +930,12 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             target = Path(td) / "demo-repo"
             target.mkdir(parents=True, exist_ok=True)
             with mock.patch.object(agents_bootstrap.subprocess, "run") as patched_run:
-                with mock.patch.object(agents_bootstrap, "external_universal_skills_source_candidates", return_value=[]):
-                    agents_bootstrap.prepare_sibling_universal_skills_checkout(target, dry_run=False)
+                with mock.patch.object(
+                    agents_bootstrap, "external_universal_skills_source_candidates", return_value=[]
+                ):
+                    agents_bootstrap.prepare_sibling_universal_skills_checkout(
+                        target, dry_run=False
+                    )
 
             checkout = target / ".agents/source/universal-skills"
             self.assertTrue(agents_bootstrap.is_valid_universal_skills_checkout(checkout))
@@ -945,9 +951,14 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                     "skills"
                 ],
                 json.loads(
-                    (Path(__file__).resolve().parent.parent.parent.parent / ".agents" / "source" / "universal-skills" / "profiles" / "core.json").read_text(
-                        encoding="utf-8"
-                    )
+                    (
+                        Path(__file__).resolve().parent.parent.parent.parent
+                        / ".agents"
+                        / "source"
+                        / "universal-skills"
+                        / "profiles"
+                        / "core.json"
+                    ).read_text(encoding="utf-8")
                 )["skills"],
             )
             self.assertIn(

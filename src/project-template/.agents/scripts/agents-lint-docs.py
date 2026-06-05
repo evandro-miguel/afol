@@ -20,7 +20,7 @@ Examples:
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 from lib.agents_config import get_cfg_path, load_agents_config
 
@@ -77,6 +77,7 @@ VALID_DOC_TYPES = [
     "spec-child",
     "spec-lite",
     "spec-test",
+    "rule",
     "spec_child",
     "spec_lite",
     "spec_test",

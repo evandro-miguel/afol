@@ -18,10 +18,10 @@ Examples:
     python agents-new.py bugfix-login --spec-child
 """
 
+import json
 import re
 import subprocess
 import sys
-import json
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -34,8 +34,8 @@ from lib.agents_config import (
 )
 from lib.markdown_docs import split_markdown_frontmatter
 from lib.workflow_manifest import (
-    ArtifactManifestEntry,
     ArtifactIntentProfile,
+    ArtifactManifestEntry,
     coerce_artifact_manifest as _coerce_artifact_manifest_impl,
     coerce_manifest_entry as _coerce_manifest_entry_impl,
     default_doc_id_placeholder as _default_doc_id_placeholder_impl,
