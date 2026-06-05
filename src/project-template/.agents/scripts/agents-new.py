@@ -36,19 +36,11 @@ from lib.markdown_docs import split_markdown_frontmatter
 from lib.workflow_manifest import (
     ArtifactIntentProfile,
     ArtifactManifestEntry,
+    coerce_artifact_manifest as _coerce_artifact_manifest_impl,
+    coerce_manifest_entry as _coerce_manifest_entry_impl,
+    default_doc_id_placeholder as _default_doc_id_placeholder_impl,
     load_artifact_manifest,
     load_artifact_policy,
-)
-from lib.workflow_manifest import (
-    coerce_artifact_manifest as _coerce_artifact_manifest_impl,
-)
-from lib.workflow_manifest import (
-    coerce_manifest_entry as _coerce_manifest_entry_impl,
-)
-from lib.workflow_manifest import (
-    default_doc_id_placeholder as _default_doc_id_placeholder_impl,
-)
-from lib.workflow_manifest import (
     manifest_id_placeholders as _manifest_id_placeholders_impl,
 )
 

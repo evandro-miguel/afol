@@ -96,14 +96,12 @@ VALID_DOC_TYPES = [
     "lesson_entry",
     "tool-doc",
     "reference",
-    "rule",
     "pattern",
     "pattern_index",
     "quick_reference",
     "telemetry_guide",
     "telemetry_dashboard",
     "telemetry_feature",
-    "rule",
 ]
 
 # Checkbox markers
