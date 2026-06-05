@@ -16,14 +16,14 @@ Examples:
     python agents-structure-map.py /path/to/my-project --output docs/map/structure/
 """
 
+import hashlib
+import json
 import os
 import sys
-import json
-import hashlib
-from pathlib import Path
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Dict, List, Any
-from dataclasses import dataclass, asdict
+from pathlib import Path
+from typing import Any, Dict, List
 
 from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
 

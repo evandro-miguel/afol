@@ -4,19 +4,18 @@
 from __future__ import annotations
 
 import argparse
-import json
 import hashlib
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
 from typing import Callable, Dict, Iterable, List, NamedTuple, Sequence, Set, Tuple
 
 from lib.agents_config import now_iso_with_offset
-
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 TEMPLATE_ROOT = ROOT_DIR / "src" / "project-template"

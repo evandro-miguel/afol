@@ -1,10 +1,10 @@
 import importlib.util
 import sys
 import tempfile
-import unittest
 import types
-from unittest import mock
+import unittest
 from pathlib import Path
+from unittest import mock
 
 
 def load_module(module_name: str, file_path: Path):

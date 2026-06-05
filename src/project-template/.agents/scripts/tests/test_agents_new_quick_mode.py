@@ -4,8 +4,8 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
-from unittest import mock
 from pathlib import Path
+from unittest import mock
 
 
 def load_module(module_name: str, file_path: Path):

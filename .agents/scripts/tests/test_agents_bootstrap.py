@@ -3,8 +3,8 @@ import io
 import os
 import tempfile
 import unittest
-from pathlib import Path
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest import mock
 
 

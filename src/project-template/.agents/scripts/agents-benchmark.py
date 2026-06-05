@@ -16,7 +16,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 AGENTS_DIR = ROOT_DIR / ".agents"
 DOCS_DIR = ROOT_DIR / "docs"

@@ -22,7 +22,6 @@ from typing import Iterable, List
 
 from lib.agents_config import load_agents_config
 
-
 ROOT_DIR, _CONFIG = load_agents_config(Path(__file__).resolve().parent)
 TARGET_AGENTS_DIR = ROOT_DIR / ".agents"
 STAGING_ROOT = TARGET_AGENTS_DIR / "tmp" / "scaffold-update" / "staging"
