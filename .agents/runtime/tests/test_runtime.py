@@ -288,3 +288,16 @@ def test_workspace_inspection_reports_truncation_at_max_entries(scaffold_repo):
     assert summary.truncated is True
     assert summary.file_count + summary.dir_count == 2
     assert len(paths) == 2
+
+
+def test_workspace_inspection_depth_limit_does_not_truncate(scaffold_repo):
+    (scaffold_repo / "alpha" / "beta").mkdir(parents=True, exist_ok=True)
+    (scaffold_repo / "alpha" / "beta" / "deep.md").write_text("# deep\n", encoding="utf-8")
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+
+    summary = runtime.workspace.inspect(depth=0, max_entries=2000)
+    paths = _tree_paths(summary.tree)
+
+    assert summary.truncated is False
+    assert "alpha" in paths
+    assert "alpha/beta/deep.md" not in paths

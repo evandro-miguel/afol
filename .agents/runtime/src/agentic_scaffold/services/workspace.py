@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict
@@ -75,7 +76,9 @@ class WorkspaceInspector:
         max_entries: int,
         counters: EntryCounters,
     ) -> list[TreeNode]:
-        if remaining < 0 or self._entry_limit_reached(counters, max_entries):
+        if remaining < 0:
+            return []
+        if self._entry_limit_reached(counters, max_entries):
             counters["truncated"] = True
             return []
 
@@ -135,9 +138,18 @@ class WorkspaceInspector:
     @staticmethod
     def _iter_sorted_entries(path: Path) -> list[Path]:
         try:
-            return sorted(path.iterdir(), key=lambda entry: (entry.is_file(), entry.name.lower()))
+            entries: list[tuple[bool, str, Path]] = []
+            with os.scandir(path) as it:
+                for entry in it:
+                    try:
+                        is_dir = entry.is_dir(follow_symlinks=False)
+                    except OSError:
+                        continue
+                    entries.append((not is_dir, entry.name.lower(), Path(entry.path)))
         except OSError:
             return []
+        entries.sort()
+        return [entry_path for _, _, entry_path in entries]
 
     def _should_skip_entry(
         self,
