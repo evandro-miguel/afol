@@ -590,7 +590,7 @@ def _dependency_blockers(
             continue
         if not _dependency_ready(dependency_snapshot):
             utility = dependency_snapshot.get("utility", {})
-            if dependency_snapshot.get("exists") and not utility.get("useful"):
+            if not utility.get("useful"):
                 blockers.append(f"{dependency}: invalid")
             else:
                 blockers.append(f"{dependency}: {dependency_snapshot.get('status') or 'unknown'}")
