@@ -162,48 +162,73 @@ updated_at: '{now}'
 
         return result
 
-    def run(self):
-        """Run all fixes."""
-        files = self.find_files()
+    def _mode_label(self) -> str:
+        """Return the current execution mode label."""
+        if self.check_only:
+            return "CHECK"
+        if self.dry_run:
+            return "DRY RUN"
+        return "APPLY"
 
-        if not files:
-            print("No markdown files found.")
-            return 0
+    def _has_fixable_changes(self) -> bool:
+        """Return whether any non-error lint fix was detected."""
+        return self.stats["checkbox_fixed"] > 0 or self.stats["frontmatter_added"] > 0
 
-        mode = "CHECK" if self.check_only else ("DRY RUN" if self.dry_run else "APPLY")
-        print(f"{'=' * 60}")
-        print(f"Lint Fix - Mode: {mode}")
-        print(f"{'=' * 60}\n")
-        print(f"Files to process: {len(files)}\n")
+    def _is_reportable_result(self, result: dict) -> bool:
+        """Return whether a file result should be printed."""
+        return (
+            result["checkbox_fixes"] > 0
+            or result["frontmatter_added"]
+            or bool(result["errors"])
+        )
 
+    def _result_status_lines(self, result: dict) -> list[str]:
+        """Build human-readable status lines for one file result."""
+        status = []
+        preview_mode = self.dry_run or self.check_only
+
+        if result["checkbox_fixes"] > 0:
+            action = "Would fix" if preview_mode else "Fixed"
+            status.append(f"{action} {result['checkbox_fixes']} checkbox(es)")
+        if result["frontmatter_added"]:
+            action = "Would add" if preview_mode else "Added"
+            status.append(f"{action} frontmatter")
+        if result["errors"]:
+            status.append(f"Errors: {', '.join(result['errors'])}")
+
+        return status
+
+    def _collect_results(self, files: list[Path]) -> list[dict]:
+        """Process files and return only reportable results."""
         results = []
         for file_path in files:
             result = self.process_file(file_path)
-            if result["checkbox_fixes"] > 0 or result["frontmatter_added"] or result["errors"]:
+            if self._is_reportable_result(result):
                 results.append(result)
+        return results
 
-        # Print summary
+    def _print_header(self, file_count: int) -> None:
+        """Print run header."""
+        print(f"{'=' * 60}")
+        print(f"Lint Fix - Mode: {self._mode_label()}")
+        print(f"{'=' * 60}\n")
+        print(f"Files to process: {file_count}\n")
+
+    def _print_results(self, results: list[dict]) -> None:
+        """Print per-file results."""
         print(f"{'=' * 60}")
         print("RESULTS")
         print(f"{'=' * 60}")
 
         if results:
-            for r in results:
-                status = []
-                if r["checkbox_fixes"] > 0:
-                    action = "Would fix" if (self.dry_run or self.check_only) else "Fixed"
-                    status.append(f"{action} {r['checkbox_fixes']} checkbox(es)")
-                if r["frontmatter_added"]:
-                    action = "Would add" if (self.dry_run or self.check_only) else "Added"
-                    status.append(f"{action} frontmatter")
-                if r["errors"]:
-                    status.append(f"Errors: {', '.join(r['errors'])}")
-
-                print(f"  {r['file']}")
-                for s in status:
-                    print(f"    - {s}")
+            for result in results:
+                print(f"  {result['file']}")
+                for status in self._result_status_lines(result):
+                    print(f"    - {status}")
             print()
 
+    def _print_summary(self) -> None:
+        """Print aggregate run summary."""
         print(f"{'=' * 60}")
         print("SUMMARY")
         print(f"{'=' * 60}")
@@ -212,17 +237,28 @@ updated_at: '{now}'
         print(f"Frontmatter added: {self.stats['frontmatter_added']}")
         print(f"Errors: {self.stats['errors']}")
 
-        if self.check_only and (
-            self.stats["checkbox_fixed"] > 0 or self.stats["frontmatter_added"] > 0
-        ):
+    def _exit_code(self) -> int:
+        """Return process exit code for the current run mode."""
+        if self.check_only and self._has_fixable_changes():
             print("\n⚠️  Lint issues found. Run without --check to fix.")
             return 1
-        elif self.dry_run and (
-            self.stats["checkbox_fixed"] > 0 or self.stats["frontmatter_added"] > 0
-        ):
+        if self.dry_run and self._has_fixable_changes():
             print("\nℹ️  Run without --dry-run to apply fixes.")
-
         return 0
+
+    def run(self):
+        """Run all fixes."""
+        files = self.find_files()
+
+        if not files:
+            print("No markdown files found.")
+            return 0
+
+        self._print_header(len(files))
+        results = self._collect_results(files)
+        self._print_results(results)
+        self._print_summary()
+        return self._exit_code()
 
 
 def main():

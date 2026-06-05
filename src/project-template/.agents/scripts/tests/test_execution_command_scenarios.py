@@ -430,6 +430,30 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             self.assertIsNotNone(next_artifact)
             self.assertEqual(next_artifact["doc_type"], "brainstorm")
 
+    def test_workflow_artifact_states_use_completed_tasks_as_closure_gate(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            session_dir = Path(td) / "260307_0109b_tasks_done_closure"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_doc_file(session_dir, "research", status="active")
+            write_plan_file(session_dir)
+            write_task_file(
+                session_dir,
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | finished |",
+            )
+            write_log_file(session_dir)
+            write_report_file(session_dir, status="active")
+
+            states = self.execution_commands.workflow_artifact_states(session_dir)
+            by_doc_type = {item["doc_type"]: item for item in states}
+
+            self.assertEqual(by_doc_type["research"]["state"], "blocked")
+            self.assertIn(
+                "closure gate: optional 'research'",
+                by_doc_type["research"]["blockers"][0],
+            )
+
 
 class ImplementAndReviewScenarioTests(unittest.TestCase):
     @classmethod
