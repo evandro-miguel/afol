@@ -1,4 +1,5 @@
 ---
+doc_type: rule
 id: RULE-004
 theme: validation-linting
 version: 1.0

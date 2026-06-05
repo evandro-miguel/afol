@@ -1,4 +1,5 @@
 ---
+doc_type: rule
 id: RULE-006
 theme: applicable-rule-resolution
 version: 1.0

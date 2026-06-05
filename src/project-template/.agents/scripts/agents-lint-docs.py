@@ -102,6 +102,7 @@ VALID_DOC_TYPES = [
     "telemetry_guide",
     "telemetry_dashboard",
     "telemetry_feature",
+    "rule",
 ]
 
 # Checkbox markers
