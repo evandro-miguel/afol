@@ -342,6 +342,42 @@ def test_validate_code_task_planner_accepts_meaningful_afol_plan_and_task(tmp_pa
     assert failures == []
 
 
+def test_score_code_task_plan_quality_uses_weighted_rubric():
+    benchmark = load_module()
+    plan_text = (
+        "# Plan\n\n"
+        "## Steps\n"
+        "- T-01: Implement slugify in test-code-task-project/src/text_utils.py inside .afol benchmark scope.\n"
+        "- Verify with python3 scripts/check_slugify.py.\n"
+        "- Record evidence before marking T-01 done.\n\n"
+        "## Closure Criteria\n"
+        "- T-01 is done after passed evidence exists.\n"
+    )
+    task_text = (
+        "| T-01 | pending | worker | Implement slugify(text) in "
+        "test-code-task-project/src/text_utils.py and verify with python3 scripts/check_slugify.py. |\n"
+    )
+
+    quality = benchmark._score_code_task_plan_quality(plan_text, task_text)
+
+    assert quality["score"] == 100
+    assert quality["pass"] is True
+    assert sum(item["weight"] for item in quality["criteria"]) == 100
+
+
+def test_score_code_task_plan_quality_penalizes_vague_artifacts():
+    benchmark = load_module()
+
+    quality = benchmark._score_code_task_plan_quality(
+        "# Plan\n\n- feature_id: F-CODE\n- task: slugify\n",
+        "| T-01 | pending | worker | slugify |\n",
+    )
+
+    assert quality["score"] < benchmark.CODE_TASK_PLAN_QUALITY_THRESHOLD
+    failed_ids = {item["id"] for item in quality["criteria"] if not item["passed"]}
+    assert {"scope_target", "execution_path", "validation_evidence", "task_executability"} <= failed_ids
+
+
 def test_validate_code_task_planner_rejects_metadata_only_plan_and_vague_task(tmp_path):
     benchmark = load_module()
     session_id = "260607_1300_code-task-benchmark"
@@ -439,6 +475,49 @@ def test_validate_code_task_executor_accepts_completed_slugify_task(tmp_path):
     )
 
     assert failures == []
+
+
+def test_score_code_task_delivery_quality_combines_plan_and_report_rubrics():
+    benchmark = load_module()
+    session_id = "260607_1300_code-task-benchmark"
+    plan_text = (
+        "# Plan\n\n"
+        "## Steps\n"
+        "- T-01: Implement slugify in test-code-task-project/src/text_utils.py inside .afol benchmark scope.\n"
+        "- Verify with python3 scripts/check_slugify.py and record evidence.\n\n"
+        "## Closure Criteria\n"
+        "- T-01 done after evidence.\n"
+    )
+    task_text = (
+        "| T-01 | done | worker | Implement slugify(text) in "
+        "test-code-task-project/src/text_utils.py and verify with python3 scripts/check_slugify.py. |\n"
+    )
+    report_text = (
+        "# Benchmark Report\n\n"
+        f"Session: {session_id}\n"
+        "Task: T-01 done.\n"
+        "Summary: slugify implemented in test-code-task-project/src/text_utils.py.\n"
+        "Verification: python3 scripts/check_slugify.py passed.\n"
+        "Evidence: recorded in AFOL ledger.\n"
+        "Changed files: test-code-task-project/src/text_utils.py, test-code-task-project/benchmark_report.md.\n"
+    )
+    evidence_text = (
+        '{"task_id":"T-01","command":"python3 scripts/check_slugify.py",'
+        '"result":"passed","artifact":"test-code-task-project/benchmark_report.md"}\n'
+    )
+
+    quality = benchmark._score_code_task_delivery_quality(
+        session_id,
+        plan_text,
+        task_text,
+        report_text,
+        evidence_text,
+        ["test-code-task-project/src/text_utils.py", "test-code-task-project/benchmark_report.md"],
+    )
+
+    assert quality["score"] == 100
+    assert quality["pass"] is True
+    assert quality["weights"] == {"plan_task": 0.4, "report_execution": 0.6}
 
 
 def test_validate_code_task_executor_rejects_incoherent_delivery_report(tmp_path):

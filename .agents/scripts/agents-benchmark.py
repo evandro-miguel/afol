@@ -41,6 +41,12 @@ LIVE_COMPLETE_COMMAND = "live benchmark fixture command"
 AFOL_POLICY_CHECK_COMMAND = "python3 scripts/check_afol_policy.py"
 CODE_TASK_CHECK_COMMAND = "python3 scripts/check_slugify.py"
 CODE_TASK_PROJECT_DIR = "test-code-task-project"
+CODE_TASK_PLAN_QUALITY_THRESHOLD = 80
+CODE_TASK_REPORT_QUALITY_THRESHOLD = 85
+CODE_TASK_OVERALL_QUALITY_THRESHOLD = 85
+CODE_TASK_PLAN_MAX_CHARS = 1800
+CODE_TASK_TASK_MAX_CHARS = 900
+CODE_TASK_REPORT_MAX_CHARS = 1400
 EXIT_CODE_RE = re.compile(r"Process exited with code\s+(-?\d+)")
 COMPARISON_METRICS: tuple[tuple[str, str, bool], ...] = (
     ("duration_ms", "lower", False),
@@ -1606,6 +1612,163 @@ def _validate_code_task_session_id(output: dict[str, Any]) -> tuple[str, list[st
     return session_id, failures
 
 
+def _task_has_valid_state(task_text: str, state: str | None = None) -> bool:
+    if state is None:
+        state_pattern = r"pending|in_progress|done"
+    else:
+        state_pattern = re.escape(state)
+    task_state_re = re.compile(rf"\|\s*T-01\s*\|\s*({state_pattern})\s*\|", re.IGNORECASE)
+    checkbox_done = state == "done" and "- [x] T-01" in task_text
+    return bool(task_state_re.search(task_text) or checkbox_done)
+
+
+def _quality_criterion(
+    criterion_id: str,
+    label: str,
+    weight: int,
+    passed: bool,
+    evidence: str,
+) -> dict[str, Any]:
+    return {
+        "id": criterion_id,
+        "label": label,
+        "weight": weight,
+        "passed": passed,
+        "score": weight if passed else 0,
+        "evidence": evidence,
+    }
+
+
+def _finalize_quality_score(phase: str, threshold: int, criteria: list[dict[str, Any]]) -> dict[str, Any]:
+    max_score = sum(int(item["weight"]) for item in criteria)
+    score = sum(int(item["score"]) for item in criteria)
+    if max_score != 100:
+        raise ValueError(f"{phase} quality rubric must total 100 points")
+    return {
+        "phase": phase,
+        "score": score,
+        "max_score": max_score,
+        "threshold": threshold,
+        "pass": score >= threshold,
+        "criteria": criteria,
+    }
+
+
+def _quality_failures(prefix: str, quality: dict[str, Any]) -> list[str]:
+    if quality.get("pass") is True:
+        return []
+    failures = [f"{prefix} quality score {quality.get('score')}/100 below threshold {quality.get('threshold')}"]
+    failures.extend(
+        f"{prefix} quality criterion failed: {criterion['id']} - {criterion['evidence']}"
+        for criterion in quality.get("criteria", [])
+        if not criterion.get("passed")
+    )
+    return failures
+
+
+def _parse_evidence_records(evidence_text: str) -> tuple[list[dict[str, Any]], int]:
+    evidence_records: list[dict[str, Any]] = []
+    invalid_count = 0
+    for raw_line in evidence_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            invalid_count += 1
+            continue
+        if isinstance(record, dict):
+            evidence_records.append(record)
+    return evidence_records, invalid_count
+
+
+def _code_task_report_path() -> str:
+    return f"{CODE_TASK_PROJECT_DIR}/benchmark_report.md"
+
+
+def _code_task_source_path() -> str:
+    return f"{CODE_TASK_PROJECT_DIR}/src/text_utils.py"
+
+
+def _has_passed_code_task_report_evidence(evidence_records: list[dict[str, Any]]) -> bool:
+    report_path = _code_task_report_path()
+    return any(
+        record.get("task_id") == "T-01"
+        and record.get("command") == CODE_TASK_CHECK_COMMAND
+        and record.get("result") == "passed"
+        and record.get("artifact") == report_path
+        for record in evidence_records
+    )
+
+
+def _code_task_changed_paths(repo_root: Path) -> list[str]:
+    status = subprocess.run(["git", "status", "--short"], cwd=repo_root, capture_output=True, text=True, timeout=10)
+    return [line[3:] for line in status.stdout.splitlines() if len(line) > 3]
+
+
+def _score_code_task_plan_quality(plan_text: str, task_text: str) -> dict[str, Any]:
+    combined_text = f"{plan_text}\n{task_text}"
+    normalized_plan_text = plan_text.lower()
+    normalized_combined_text = combined_text.lower()
+    source_path = _code_task_source_path()
+    task_state_ok = _task_has_valid_state(task_text)
+
+    criteria = [
+        _quality_criterion(
+            "scope_target",
+            "Scope and target are explicit",
+            25,
+            "slugify" in normalized_combined_text
+            and source_path in combined_text
+            and CODE_TASK_PROJECT_DIR in combined_text,
+            "requires slugify, project dir, and exact source file",
+        ),
+        _quality_criterion(
+            "execution_path",
+            "Execution path is actionable",
+            20,
+            ("## Execution Plan" in plan_text or "## Steps" in plan_text)
+            and "T-01" in combined_text
+            and task_state_ok
+            and ("implement" in normalized_combined_text or "fix" in normalized_combined_text),
+            "requires steps, T-01, valid task row, and implementation action",
+        ),
+        _quality_criterion(
+            "validation_evidence",
+            "Validation and evidence are named",
+            20,
+            CODE_TASK_CHECK_COMMAND in combined_text and "evidence" in normalized_plan_text,
+            "requires exact acceptance command and evidence guidance",
+        ),
+        _quality_criterion(
+            "constraints_safety",
+            "Sandbox limits are clear",
+            15,
+            source_path in combined_text
+            and (".afol" in normalized_combined_text or "evidence" in normalized_combined_text)
+            and ".agents/agents" not in combined_text
+            and "/home/ozy/.codex" not in combined_text,
+            "requires allowed mutable scope without provider-hostile paths",
+        ),
+        _quality_criterion(
+            "concision_token_economy",
+            "Plan and task are concise",
+            10,
+            0 < len(plan_text) <= CODE_TASK_PLAN_MAX_CHARS and 0 < len(task_text) <= CODE_TASK_TASK_MAX_CHARS,
+            f"requires plan <= {CODE_TASK_PLAN_MAX_CHARS} chars and task <= {CODE_TASK_TASK_MAX_CHARS} chars",
+        ),
+        _quality_criterion(
+            "task_executability",
+            "Task can be executed by another agent",
+            10,
+            task_state_ok and "T-01" in task_text and source_path in task_text and CODE_TASK_CHECK_COMMAND in task_text,
+            "requires task id, state, source file, and acceptance command",
+        ),
+    ]
+    return _finalize_quality_score("plan_task", CODE_TASK_PLAN_QUALITY_THRESHOLD, criteria)
+
+
 def _validate_code_task_plan_quality(plan_text: str, task_text: str) -> list[str]:
     failures: list[str] = []
     normalized_plan_text = plan_text.lower()
@@ -1629,16 +1792,114 @@ def _validate_code_task_plan_quality(plan_text: str, task_text: str) -> list[str
         failures.append("planner task missing acceptance command")
     if "T-01" not in task_text:
         failures.append("planner task missing task id")
-    task_state_re = re.compile(r"\|\s*T-01\s*\|\s*(pending|in_progress|done)\s*\|", re.IGNORECASE)
-    if not task_state_re.search(task_text):
+    if not _task_has_valid_state(task_text):
         failures.append("planner task missing valid T-01 state row")
+    failures.extend(_quality_failures("planner plan/task", _score_code_task_plan_quality(plan_text, task_text)))
     return failures
 
 
-def _validate_code_task_report_quality(session_id: str, report_text: str, evidence_text: str) -> list[str]:
+def _score_code_task_report_quality(
+    session_id: str,
+    report_text: str,
+    evidence_text: str,
+    task_text: str = "",
+    changed_paths: list[str] | None = None,
+) -> dict[str, Any]:
+    normalized_report_text = report_text.lower()
+    evidence_records, invalid_evidence_count = _parse_evidence_records(evidence_text)
+    source_path = _code_task_source_path()
+    report_path = _code_task_report_path()
+    has_passed_report_evidence = _has_passed_code_task_report_evidence(evidence_records)
+    allowed_prefixes = (f"{CODE_TASK_PROJECT_DIR}/", ".afol/")
+    changed_paths = changed_paths or []
+    disallowed_changes = [path for path in changed_paths if not path.startswith(allowed_prefixes)]
+    task_done = _task_has_valid_state(task_text, "done") if task_text else "T-01" in report_text and "done" in normalized_report_text
+
+    criteria = [
+        _quality_criterion(
+            "functional_correctness",
+            "Functional result is verified",
+            30,
+            "slugify" in normalized_report_text
+            and CODE_TASK_CHECK_COMMAND in report_text
+            and "passed" in normalized_report_text
+            and has_passed_report_evidence,
+            "requires slugify, exact acceptance command, passed status, and matching evidence",
+        ),
+        _quality_criterion(
+            "evidence_task_state",
+            "Evidence and task state agree",
+            20,
+            task_done and has_passed_report_evidence and invalid_evidence_count == 0,
+            "requires done T-01, valid JSONL, and passed report artifact evidence",
+        ),
+        _quality_criterion(
+            "report_clarity",
+            "Report is clear and complete",
+            20,
+            all(
+                token.lower() in normalized_report_text
+                for token in (session_id, "T-01", "changed", "evidence", source_path, report_path)
+            ),
+            "requires session, task, changed files, evidence, source path, and report path",
+        ),
+        _quality_criterion(
+            "scope_control",
+            "Changed scope stays bounded",
+            15,
+            source_path in report_text and report_path in report_text and not disallowed_changes,
+            "requires source/report paths and no disallowed git changes",
+        ),
+        _quality_criterion(
+            "concision_token_economy",
+            "Report is concise",
+            10,
+            0 < len(report_text) <= CODE_TASK_REPORT_MAX_CHARS,
+            f"requires report <= {CODE_TASK_REPORT_MAX_CHARS} chars",
+        ),
+        _quality_criterion(
+            "reviewer_readability",
+            "Reviewer can read status quickly",
+            5,
+            ("passed" in normalized_report_text or "done" in normalized_report_text)
+            and "failed" not in normalized_report_text,
+            "requires clear passed/done status and no contradictory failed status",
+        ),
+    ]
+    return _finalize_quality_score("report_execution", CODE_TASK_REPORT_QUALITY_THRESHOLD, criteria)
+
+
+def _score_code_task_delivery_quality(
+    session_id: str,
+    plan_text: str,
+    task_text: str,
+    report_text: str,
+    evidence_text: str,
+    changed_paths: list[str] | None = None,
+) -> dict[str, Any]:
+    plan_quality = _score_code_task_plan_quality(plan_text, task_text)
+    report_quality = _score_code_task_report_quality(session_id, report_text, evidence_text, task_text, changed_paths)
+    overall_score = round((float(plan_quality["score"]) * 0.4) + (float(report_quality["score"]) * 0.6), 2)
+    return {
+        "score": overall_score,
+        "max_score": 100,
+        "threshold": CODE_TASK_OVERALL_QUALITY_THRESHOLD,
+        "pass": bool(plan_quality["pass"] and report_quality["pass"] and overall_score >= CODE_TASK_OVERALL_QUALITY_THRESHOLD),
+        "weights": {"plan_task": 0.4, "report_execution": 0.6},
+        "phases": {"plan_task": plan_quality, "report_execution": report_quality},
+    }
+
+
+def _validate_code_task_report_quality(
+    session_id: str,
+    report_text: str,
+    evidence_text: str,
+    task_text: str = "",
+    changed_paths: list[str] | None = None,
+) -> list[str]:
     failures: list[str] = []
     normalized_report_text = report_text.lower()
-    report_path = f"{CODE_TASK_PROJECT_DIR}/benchmark_report.md"
+    report_path = _code_task_report_path()
     required_report_tokens = (
         session_id,
         "T-01",
@@ -1647,7 +1908,7 @@ def _validate_code_task_report_quality(session_id: str, report_text: str, eviden
         "passed",
         "evidence",
         "changed",
-        f"{CODE_TASK_PROJECT_DIR}/src/text_utils.py",
+        _code_task_source_path(),
         report_path,
     )
     for token in required_report_tokens:
@@ -1658,27 +1919,17 @@ def _validate_code_task_report_quality(session_id: str, report_text: str, eviden
     for token in evidence_tokens:
         if token not in compact_evidence_text:
             failures.append(f"code task evidence ledger missing {token}")
-    evidence_records: list[dict[str, Any]] = []
-    for raw_line in evidence_text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            failures.append("code task evidence ledger contains invalid JSON")
-            continue
-        if isinstance(record, dict):
-            evidence_records.append(record)
-    has_matching_report_evidence = any(
-        record.get("task_id") == "T-01"
-        and record.get("command") == CODE_TASK_CHECK_COMMAND
-        and record.get("result") == "passed"
-        and record.get("artifact") == report_path
-        for record in evidence_records
-    )
-    if not has_matching_report_evidence:
+    evidence_records, invalid_evidence_count = _parse_evidence_records(evidence_text)
+    if invalid_evidence_count:
+        failures.append("code task evidence ledger contains invalid JSON")
+    if not _has_passed_code_task_report_evidence(evidence_records):
         failures.append("code task evidence ledger missing passed T-01 report artifact record")
+    failures.extend(
+        _quality_failures(
+            "executor report",
+            _score_code_task_report_quality(session_id, report_text, evidence_text, task_text, changed_paths),
+        )
+    )
     return failures
 
 
@@ -1763,12 +2014,11 @@ def _validate_code_task_executor(output: dict[str, Any], repo_root: Path) -> lis
         failures.append("code task report missing")
     if "check_slugify.py" not in evidence_text:
         failures.append("code task evidence ledger missing slugify check")
-    failures.extend(_validate_code_task_report_quality(session_id, report_text, evidence_text))
 
-    status = subprocess.run(["git", "status", "--short"], cwd=repo_root, capture_output=True, text=True, timeout=10)
-    changed_paths = [line[3:] for line in status.stdout.splitlines() if len(line) > 3]
+    changed_paths = _code_task_changed_paths(repo_root)
     allowed_prefixes = (f"{CODE_TASK_PROJECT_DIR}/", ".afol/")
     disallowed = [path for path in changed_paths if not path.startswith(allowed_prefixes)]
+    failures.extend(_validate_code_task_report_quality(session_id, report_text, evidence_text, task_text, changed_paths))
     if disallowed:
         failures.append("code task changed disallowed paths: " + ", ".join(disallowed))
     return failures
@@ -2985,6 +3235,19 @@ def _run_orchestrated_code_task_scenario(
         retry_count = sum(int(phase["retry_count"]) for phase in phases)
         tool_success_count = max(len(tool_calls) - error_count, 0)
         delivery_artifacts = _collect_code_task_delivery_artifacts(executor_output or planner_output, fixture_root)
+        artifact_content = {
+            key: str(value.get("content", ""))
+            for key, value in delivery_artifacts.items()
+            if isinstance(value, dict)
+        }
+        quality_score = _score_code_task_delivery_quality(
+            session_id,
+            artifact_content.get("plan", ""),
+            artifact_content.get("task", ""),
+            artifact_content.get("report", ""),
+            artifact_content.get("evidence_jsonl", ""),
+            _code_task_changed_paths(fixture_root),
+        )
 
         return {
             "id": scenario.id,
@@ -3010,6 +3273,7 @@ def _run_orchestrated_code_task_scenario(
             "command": [phase["command"] for phase in phases],
             "phase_runs": phases,
             "token_usage": token_usage,
+            "quality_score": quality_score,
             "delivery_artifacts": delivery_artifacts,
         }
 

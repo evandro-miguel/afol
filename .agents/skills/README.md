@@ -33,6 +33,21 @@ Skills are modular definitions that provide:
 
 ## Available Skills
 
+### agentic-benchmarking
+
+Controlled AFOL/runtime-flow live-agent benchmark design and review, including
+compact plan/task/report quality scoring, token/tool efficiency, and delivery
+evidence checks.
+
+**Capabilities:**
+
+- Define small controlled live-agent benchmark scenarios
+- Score plan/task/report quality with weighted, low-token rubrics
+- Keep scripted checks primary and use qualitative review only where needed
+- Review token/tool efficiency, scope control, evidence, and report clarity
+
+**Location:** `.agents/skills/agentic-benchmarking/`
+
 ### agentic-folder-sys
 
 Operational entrypoint for installing, upgrading, validating, and operating the

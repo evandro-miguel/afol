@@ -31,6 +31,8 @@ fixture tasks.
 - `live-autonomous-agentic-folder-delivery`
 - `live-wb-update-status-touch`
 - `live-wb-update-link`
+- `live-afol-provider-compatible-delivery`
+- `live-afol-python-code-task-orchestrated`
 
 ## Commands
 
@@ -42,6 +44,8 @@ fixture tasks.
 .agents/agents benchmark run live-wb-update-task-evidence-timeline --save
 .agents/agents benchmark run live-wb-session-create-scripted-progress --save
 .agents/agents benchmark run live-autonomous-agentic-folder-delivery --save
+.agents/agents benchmark run live-afol-provider-compatible-delivery --save
+.agents/agents benchmark run live-afol-python-code-task-orchestrated --save
 just benchmark-runtime-flow
 ```
 
@@ -77,12 +81,45 @@ just benchmark-runtime-flow
   - `prompt_bytes`
   - `checks_total`
   - `checks_passed`
-- `accuracy`
+  - `accuracy`
+  - `token_usage` when the runtime exposes it
+  - `quality_score` for interpretive plan/task/report scenarios
 - Validates that live agents call the expected scripts instead of only returning a plausible answer.
 - Fails targeted scenarios when forbidden manual workbench edits are observed.
 - Includes script-writing flows for session creation, task state, evidence, timeline entries, frontmatter status/touch, and frontmatter links.
 - Includes an autonomous hypothetical delivery scenario where the prompt does not name the exact scaffold commands; the agent must discover operations from AGENTS.md and the public tool catalog, prefer `.agents/agents` wrapper commands, create a governed session/plan, implement a tiny fixture fix, record evidence, complete the task, and run bounded acceptance verification.
+- Includes AFOL provider-compatible scenarios where mutable operational state stays under `.afol/` instead of `.agents/wb/`.
 - Autonomous benchmark scenarios should not rely on reading `.agents/scripts/*.py` internals to infer command routing.
+
+## Qualitative Score
+
+Scripted checks are primary. Qualitative scoring is used only for artifacts that
+need reading judgment, such as plan/task/report coherence.
+
+Plan/task threshold: 80/100.
+
+| Criterion | Weight | Checks |
+| --- | ---: | --- |
+| Scope and target | 25 | Objective, project folder, and exact files are named. |
+| Execution path | 20 | Steps are ordered, actionable, and tied to task IDs. |
+| Validation/evidence | 20 | Exact acceptance command and evidence requirement are named. |
+| Constraints/safety | 15 | Allowed boundaries are clear; provider-hostile paths are absent. |
+| Concision | 10 | Artifact is short enough for a small executor. |
+| Task executability | 10 | Task has state, target, and acceptance command. |
+
+Execution/report threshold: 85/100.
+
+| Criterion | Weight | Checks |
+| --- | ---: | --- |
+| Functional correctness | 30 | Acceptance command passed and matches evidence. |
+| Evidence/task state | 20 | Task is done only with valid evidence. |
+| Report clarity | 20 | Session, task, change, verification, evidence, and files are clear. |
+| Scope control | 15 | Changed files stay inside allowed fixture/AFOL paths. |
+| Concision | 10 | Report is compact and not a transcript. |
+| Reviewer readability | 5 | Status is obvious and not contradictory. |
+
+Overall code-task score: 40% plan/task and 60% execution/report, threshold
+85/100.
 
 ## Usage Policy
 
