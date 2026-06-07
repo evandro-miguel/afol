@@ -104,7 +104,7 @@ Forbidden dependencies:
 
 - `cli/` -> Bun/TypeScript implementation and tests.
 - `src/project-template/` -> only source for downstream template payload.
-- `docs/plans/` -> factory workbench history and active local sessions.
+- `.afol/wb/` -> factory workbench history and active local sessions.
 - `.agents/scripts/`, `.agents/runtime/`, `.agents/agents` -> factory-only
   compatibility surfaces during migration.
 - `.agents/skills/` -> project-local skills.
@@ -136,7 +136,7 @@ Primary stores:
 - `.agents/config.json`: project-local configuration.
 - `.agents/lock.json`: scaffold version and compatibility lock.
 - `.agents/manifest.json`: managed-file ownership and provenance.
-- `docs/plans/`: local workbench state, evidence, logs, reports, and sidecars.
+- `.afol/wb/`: local workbench state, evidence, logs, reports, and sidecars.
 - `.agents/data/events/`: local command and lifecycle event log.
 - `.agents/data/index/`: rebuildable local indexes.
 

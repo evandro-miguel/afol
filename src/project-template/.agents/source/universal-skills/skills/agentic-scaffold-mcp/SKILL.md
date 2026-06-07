@@ -56,7 +56,7 @@ Inputs:
 - `query`: string
 - `limit`: integer, default `8`
 
-It searches `docs/`, `docs/arc/`, `docs/map/`, `docs/knowledge/`, `docs/agentic/`, `docs/plans/`, and `.agents/skills/`.
+It searches `docs/`, `docs/arc/`, `docs/map/`, `docs/knowledge/`, `docs/agentic/`, `.afol/wb/`, and `.agents/skills/`.
 
 ### `validate_structure`
 

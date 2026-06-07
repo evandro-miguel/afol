@@ -167,10 +167,10 @@ links:
 
 ```bash
 # Validate frontmatter
-./.agents/agents lint-docs docs/plans/
+./.agents/agents lint-docs .afol/wb/
 
 # Fix issues automatically
-./.agents/agents lint-docs docs/plans --fix
+./.agents/agents lint-docs .afol/wb --fix
 ```
 
 ---

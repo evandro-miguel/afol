@@ -17,11 +17,11 @@ This folder exists to support low-token discovery of prior workbench knowledge.
 
 ## Source Artifacts
 
-- `docs/plans/**/_research_*.md`
-- `docs/plans/**/_brainstorm_*.md`
-- `docs/plans/**/_explorer-check_*.md`
-- `docs/plans/**/_report_*.md`
-- `docs/plans/**/_postmortem_*.md`
+- `.afol/wb/**/_research_*.md`
+- `.afol/wb/**/_brainstorm_*.md`
+- `.afol/wb/**/_explorer-check_*.md`
+- `.afol/wb/**/_report_*.md`
+- `.afol/wb/**/_postmortem_*.md`
 
 ## Commands
 

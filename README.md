@@ -151,8 +151,8 @@ afol bootstrap /path/to/existing-project --partial
 - `CLAUDE.md` is the only committed runtime-facing mirror generated from it.
 - OpenCode, Qwen, Gemini, and Codex do not need committed root mirrors in this scaffold; they use `AGENTS.md` directly or global runtime configuration.
 - `.claude/` should only contain project-safe adapter notes and links.
-- Project-owned documentation belongs under `docs/`; durable plans live in `docs/plans/`. `.agents/` is reserved for skills, telemetry, local state, and runtime automation.
-- `.agents/data/session/.active_session` is a project-local convenience pointer for a
+- Project-owned documentation belongs under `docs/`; durable plans live in `.afol/wb/`. `.agents/` is reserved for skills, telemetry, local state, and runtime automation.
+- `.afol/wb/.active_session` is a project-local convenience pointer for a
   single operator; parallel agents should not use it as a shared
   synchronization primitive.
 - The scaffold should be optimized for interactive CLI agent execution paths first; embedded SDK/server use cases are secondary and should not drive the default structure.
@@ -212,7 +212,7 @@ afol bootstrap /path/to/existing-project --partial
 
 - `memory` is a governed adapter for interactive runtimes, not a shell-side MCP executor.
 - Use repo-local `knowledge` first, then `memory`, then targeted repo rereads when needed.
-- External memory remains auxiliary; `docs/plans/` and repo-local `knowledge` stay canonical.
+- External memory remains auxiliary; `.afol/wb/` and repo-local `knowledge` stay canonical.
 
 ### 3. Work
 
@@ -376,7 +376,7 @@ afol validate
 
 - Non-trivial work should use the durable plan as a living ExecPlan.
 - The canonical contract lives in `PLANS.md`.
-- The canonical file path is `docs/plans/<session_id>/<session_id>_plan_01.md`.
+- The canonical file path is `.afol/wb/<session_id>/<session_id>_plan_01.md`.
 - Finalized plans are strictly verified for required ExecPlan sections and maintained `Progress`.
 
 ### Required Frontmatter

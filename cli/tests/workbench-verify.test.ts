@@ -14,7 +14,7 @@ function write(path: string, content: string): void {
 }
 
 function seedDoneWorkbenchTask(root: string, session = "260531_1200_verify"): void {
-  const sessionDir = join(root, "docs", "plans", session);
+  const sessionDir = join(root, ".afol", "wb", session);
   write(
     join(sessionDir, `${session}_task_01.md`),
     [
@@ -86,7 +86,7 @@ describe("verifyWorkbenchTasks", () => {
     const root = mkRoot("wb-detect");
     try {
       const session = "260531_1201_verify";
-      const sessionDir = join(root, "docs", "plans", session);
+      const sessionDir = join(root, ".afol", "wb", session);
       write(
         join(sessionDir, `${session}_task_01.md`),
         [
@@ -106,7 +106,7 @@ describe("verifyWorkbenchTasks", () => {
       expect(result.allCompleted).toBe(false);
       expect(result.totalTasks).toBe(1);
       expect(result.openTasks).toHaveLength(1);
-      expect(result.openTasks[0]?.file).toContain("/docs/plans/");
+      expect(result.openTasks[0]?.file).toContain("/.afol/wb/");
       expect(result.openTasks[0]?.id).toBe("T-01");
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -117,7 +117,7 @@ describe("verifyWorkbenchTasks", () => {
     const root = mkRoot("superseded-failure");
     try {
       const session = "260531_1202_verify";
-      const sessionDir = join(root, "docs", "plans", session);
+      const sessionDir = join(root, ".afol", "wb", session);
       write(
         join(sessionDir, `${session}_task_01.md`),
         [

@@ -38,8 +38,8 @@ function writeProviderCompatibleConfig(root: string): void {
         paths: {
           agents_dir: ".agents",
           mutable_dir: ".afol",
-          wb_dir: "docs/plans",
-          active_session_file: ".afol/data/session/.active_session",
+          wb_dir: ".afol/wb",
+          active_session_file: ".afol/wb/.active_session",
           data_dir: ".afol/data",
           data_index_dir: ".afol/data/index",
           events_file: ".afol/data/events/events.jsonl",
@@ -171,9 +171,9 @@ describe("workbench lifecycle service", () => {
       const created = newWorkstream(root, "provider paths");
       startTask(root, { session: created.session, taskId: "T-01" });
 
-      expect(created.sessionDir).toContain("/docs/plans/");
-      expect(created.activeSessionPath).toBe(join(root, ".afol", "data", "session", ".active_session"));
-      expect(existsSync(join(root, "docs", "plans", created.session))).toBe(true);
+      expect(created.sessionDir).toContain("/.afol/wb/");
+      expect(created.activeSessionPath).toBe(join(root, ".afol", "wb", ".active_session"));
+      expect(existsSync(join(root, ".afol", "wb", created.session))).toBe(true);
       expect(existsSync(join(root, ".afol", "data", "events", "events.jsonl"))).toBe(true);
       expect(existsSync(join(root, ".afol", "data", "index", "workbench.json"))).toBe(true);
       expect(existsSync(join(root, ".agents", "wb"))).toBe(false);

@@ -39,7 +39,7 @@ export const TEMPLATE_ALLOWED_PATTERNS = [
   ".agents/data/**",
   ".agents/tmp/**",
   "docs/arc/**",
-  "docs/plans/**",
+  ".afol/wb/**",
   "docs/knowledge/**",
   "docs/lessons/**",
   "docs/telemetry/**",

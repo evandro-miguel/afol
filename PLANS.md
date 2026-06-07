@@ -2,7 +2,7 @@
 
 This repository uses an ExecPlan-style planning system for non-trivial work. In this scaffold, the canonical ExecPlan lives inside the governed plan directory at:
 
-- `docs/plans/<session_id>/<session_id>_plan_01.md`
+- `.afol/wb/<session_id>/<session_id>_plan_01.md`
 
 Treat that plan as the execution contract for the session. It must remain readable, self-contained, and useful even to a contributor who only has the current working tree and the plan file.
 
@@ -20,7 +20,7 @@ Do not use an ExecPlan as a replacement for roadmap or parent spec governance. I
 
 - roadmap defines feature inventory and status
 - parent spec defines feature philosophy and acceptance
-- `docs/plans/` ExecPlan defines the concrete execution path for a session
+- `.afol/wb/` ExecPlan defines the concrete execution path for a session
 
 An ExecPlan is not a container for pre-planning, generic discovery, broad
 research, or "create the real plan" tasks. Do needed discovery before writing or

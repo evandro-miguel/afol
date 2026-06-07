@@ -71,8 +71,8 @@ version: 1
 
 paths:
   agents_dir: .agents
-  wb_dir: docs/plans
-  active_session_file: .agents/data/session/.active_session
+  wb_dir: .afol/wb
+  active_session_file: .afol/wb/.active_session
   templates_dir: docs/templates
   arc_dir: docs/arc
   specs_dir: docs/arc/SPECS

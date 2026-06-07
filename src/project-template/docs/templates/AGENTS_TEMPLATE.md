@@ -16,7 +16,7 @@ Replace this section after bootstrap with real product context.
 ## Governed Execution
 
 - Use the configured plan path for implementation, validation, and delivery
-  work. It defaults to `docs/plans/`.
+  work. It defaults to `.afol/wb/`.
 - Start task before product edits.
 - Close task with evidence.
 - Canonical path:
@@ -36,7 +36,7 @@ Replace this section after bootstrap with real product context.
 
 - `.agents/config.json` path contract for mutable state, plan storage, skills,
   tmp, and data locations
-- `docs/plans/` or configured `paths.wb_dir` governed plan state
+- `.afol/wb/` or configured `paths.wb_dir` governed plan state
 - `.agents/data/telemetry/` or configured data path for telemetry data and indexes when the downstream CLI exposes them
 - `.agents/rules/` local contracts only
 - `.agents/skills/` or `.afol/skills/` only required project-local behavior
@@ -99,5 +99,5 @@ work and keep this template focused on the stored data and docs contract.
 
 ## Optional Memory
 
-- Repo-local `docs/plans/` and `knowledge` are canonical.
+- Repo-local `.afol/wb/` and `knowledge` are canonical.
 - External memory is auxiliary only.

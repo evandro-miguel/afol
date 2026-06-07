@@ -53,7 +53,7 @@ Creating multiple parallel workstreams without completing current ones.
 
 - More than 3 sessions with `status: active`
 - Sessions older than 1 week without progress
-- `docs/plans/` has 10+ folders from current month
+- `.afol/wb/` has 10+ folders from current month
 - Can't answer "what are you working on?" clearly
 - Multiple sessions reference each other as "related"
 
@@ -72,7 +72,7 @@ Use **PAT-002: Single Active Session**:
 
 ```bash
 # Parallel sessions without completion
-docs/plans/
+.afol/wb/
   260220_1000_auth-refactor/     # status: active (5 days old)
   260221_1400_oauth-integration/ # status: active (3 days old)
   260222_0900_session-mgmt/      # status: active (2 days old)
@@ -83,13 +83,13 @@ docs/plans/
 
 ```bash
 # Focused completion
-docs/plans/
+.afol/wb/
   260220_1000_auth-refactor/     # status: done
   260221_1400_oauth-integration/ # status: active (current)
   260223_1100_telemetry/         # status: draft (queued)
 
 # Quick tasks in same session
-docs/plans/
+.afol/wb/
   260221_1400_oauth-integration/
     260221_1400_oauth-integration_task_01.md
     260221_1400_oauth-integration_task_02.md  # quick task
@@ -109,7 +109,7 @@ docs/plans/
 
 ## Prevention
 
-- Check `.agents/data/session/.active_session` before creating new local work
+- Check `.afol/wb/.active_session` before creating new local work
 - Run `.agents/agents session list` and `.agents/agents session sweep` before
   opening another parallel session
 - Run `.agents/agents verify-tasks` on current session
@@ -120,7 +120,7 @@ docs/plans/
 
 If you already have sprawl:
 
-1. List all active sessions: `find docs/plans -name "task*.md" -exec grep -l "status: active" {} \;`
+1. List all active sessions: `find .afol/wb -name "task*.md" -exec grep -l "status: active" {} \;`
 2. Pick one to complete
 3. Mark others as `status: blocked` or `deprecated`
 4. Archive completed ones to `.agents/z-arq/`

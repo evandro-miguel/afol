@@ -44,7 +44,7 @@ docs/
 | Folder | Purpose |
 | --- | --- |
 | `docs/templates/` | Reusable templates |
-| `docs/plans/` | Durable governed plan sessions |
+| `.afol/wb/` | Durable governed plan sessions |
 | `docs/standards/` | Human standards |
 | `docs/lessons/` | Lessons learned |
 | `docs/agentic/` | Tool docs |

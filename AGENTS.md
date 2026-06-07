@@ -27,7 +27,7 @@ entrypoint and must be the only documented downstream path.
   downstream template payload.
 - Downstream installs receive only the exportable scaffold from
   `src/project-template/`, including the durable plan baseline in
-  `src/project-template/docs/plans/`, not root workbench sessions, active
+  `src/project-template/.afol/wb/`, not root workbench sessions, active
   session pointers, caches, telemetry events, or factory evidence.
 - Downstream installs must not receive legacy aliases or just command runners
   after the AFOL-only cutover; any remaining payload, test, or documentation
@@ -44,7 +44,7 @@ entrypoint and must be the only documented downstream path.
 
 - If work requires implementation, validation, or delivery and references
   governed work, evidence, task state, or closure, use the configured plan
-  directory. The default is `docs/plans/`; active-session pointers and local
+  directory. The default is `.afol/wb/`; active-session pointers and local
   runtime state live under `.agents/data/` or the configured mutable directory.
 - Before product edits: create or target a session, then move the executable
   task to `in_progress`.
@@ -86,7 +86,7 @@ entrypoint and must be the only documented downstream path.
   migration.
 - `.agents/wb/`: discontinued legacy local workbench history; ignored and not
   exportable template payload.
-- `docs/plans/`: versioned durable ExecPlans and governed plan sessions.
+- `.afol/wb/`: versioned durable ExecPlans and governed plan sessions.
 - `.agents/rules/`: operational guardrails.
 - `.agents/skills/`: project-local skills and workflows.
 - `.agents/source/universal-skills/`: repo-local seed, not a nested git checkout.
@@ -159,7 +159,7 @@ entrypoint and must be the only documented downstream path.
 ## Planning And Evidence
 
 - Roadmap-first delivery is mandatory for meaningful feature work:
-  roadmap feature -> parent spec -> optional child spec -> `docs/plans/`.
+  roadmap feature -> parent spec -> optional child spec -> `.afol/wb/`.
 - For ambiguous, product-shaped, benchmark-heavy, or prioritization-heavy work,
   run the smallest useful `docs/standards/decision-intake.md` lane before
   planning, delegation, benchmarking, or implementation.
@@ -201,7 +201,7 @@ entrypoint and must be the only documented downstream path.
 
 - `docs/` is project-owned documentation, not runtime state.
 - Keep runtime state, caches, mirrors, generated operational artifacts, and
-  local evidence outside `docs/`. Durable plans live in `docs/plans/`.
+  local evidence outside `docs/`. Durable plans live in `.afol/wb/`.
 - `docs/map/` describes current state; it must not contain roadmap items,
   feature specs, ADRs, briefs, desired architecture, or product philosophy.
 - `docs/arc/` is goal-state governance: roadmap, specs, decisions,
@@ -232,7 +232,7 @@ entrypoint and must be the only documented downstream path.
 
 ## Optional Memory
 
-- Repo-local `docs/plans/` and `knowledge` are canonical.
+- Repo-local `.afol/wb/` and `knowledge` are canonical.
 - External memory is auxiliary retrieval only.
 - `knowledge search|context|recent|show` commands emit MCP contracts for
   host runtimes; it does not execute MCP calls from shell.

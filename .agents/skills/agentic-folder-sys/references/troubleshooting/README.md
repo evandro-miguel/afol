@@ -82,5 +82,5 @@ make test-scripts
 For governed workstreams:
 
 ```bash
-./.agents/agents verify-tasks --strict docs/plans/$(cat .agents/data/session/.active_session)
+./.agents/agents verify-tasks --strict .afol/wb/$(cat .afol/wb/.active_session)
 ```

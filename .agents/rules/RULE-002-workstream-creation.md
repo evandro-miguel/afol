@@ -121,11 +121,11 @@ Quick mode is only valid when the work is already inside an approved feature con
 # Preferred governed execution path
 ./.agents/agents implement start --session <session-id> --task-id T-01
 ./.agents/agents implement complete --session <session-id> --task-id T-01 \
-  --command "just verify" --result passed --artifact docs/plans/<session-id>/<report-or-log>
+  --command "just verify" --result passed --artifact .afol/wb/<session-id>/<report-or-log>
 
 # Manual evidence path when implement complete is not the right wrapper
 ./.agents/agents wb-update evidence T-01 --session <session-id> \
-  --command "just verify" --result passed --artifact docs/plans/<session-id>/<report-or-log>
+  --command "just verify" --result passed --artifact .afol/wb/<session-id>/<report-or-log>
 ./.agents/agents wb-update task T-01 --session <session-id> --mark-done --evidence-id E-...
 
 # Intermediate/problem states
@@ -190,7 +190,7 @@ just new THEME=feature-name FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 
 # 10. Work on tasks, validate, and close with evidence
 ./.agents/agents implement complete --session <session-id> --task-id T-01 \
-  --command "just verify" --result passed --artifact docs/plans/<session-id>/<report-or-log>
+  --command "just verify" --result passed --artifact .afol/wb/<session-id>/<report-or-log>
 
 # 11. Finalize optional artifacts that exist before closing report
 ./.agents/agents wb-update status --session <session-id> --file report --value final

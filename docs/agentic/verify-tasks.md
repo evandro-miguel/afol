@@ -41,9 +41,9 @@ Checks evidence-backed task completion:
 
 | File | Purpose |
 |------|---------|
-| `docs/plans/*/`*`_task_*.md` | Task files to verify |
-| `docs/plans/*/.evidence.jsonl` | Task-scoped closure evidence ledger in strict mode |
-| `docs/plans/*/`*`_plan_*.md` | Final ExecPlan sections and progress state in strict mode |
+| `.afol/wb/*/`*`_task_*.md` | Task files to verify |
+| `.afol/wb/*/.evidence.jsonl` | Task-scoped closure evidence ledger in strict mode |
+| `.afol/wb/*/`*`_plan_*.md` | Final ExecPlan sections and progress state in strict mode |
 | `PLANS.md` | Canonical planning contract referenced by docs and templates |
 
 ### Files Written
@@ -85,16 +85,16 @@ Edit regex `TASK_LINE_RE`.
 
 ```bash
 # Verify specific session
-./.agents/agents verify-tasks docs/plans/260223_1800_auth-refactor/
+./.agents/agents verify-tasks .afol/wb/260223_1800_auth-refactor/
 
 # Verify all
-./.agents/agents verify-tasks docs/plans/
+./.agents/agents verify-tasks .afol/wb/
 
 # Via legacy just command runner
 AFOL-native command pending; do not use legacy just command runners.
 
 # Strict verification for session closure
-./.agents/scripts/.venv/bin/python .agents/scripts/verify-tasks.py --strict docs/plans/<session>/
+./.agents/scripts/.venv/bin/python .agents/scripts/verify-tasks.py --strict .afol/wb/<session>/
 ```
 
 ## Output

@@ -33,8 +33,8 @@ function captureIo(): CapturedIo {
 function createFixture(options?: { yamlConfig?: boolean }): string {
   const root = mkdtempSync(join(tmpdir(), "status-command-"));
   const agentsDir = join(root, ".agents");
-  const wbDir = join(root, "docs", "plans");
-  const activeSessionFile = join(agentsDir, "data", "session", ".active_session");
+  const wbDir = join(root, ".afol", "wb");
+  const activeSessionFile = join(wbDir, ".active_session");
   const sessionId = "260530_2256_cli-native-command-parity";
   const sessionDir = join(wbDir, sessionId);
 
@@ -65,7 +65,6 @@ function createFixture(options?: { yamlConfig?: boolean }): string {
     "utf8",
   );
 
-  mkdirSync(join(agentsDir, "data", "session"), { recursive: true });
   writeFileSync(activeSessionFile, `${sessionId}\n`, "utf8");
 
   const taskFile = join(sessionDir, `${sessionId}_task_01.md`);
@@ -172,7 +171,7 @@ describe("status command", () => {
   test("reports no active task when active session points to missing task files", () => {
     const root = createFixture();
     try {
-      const activeSessionFile = join(root, ".agents", "data", "session", ".active_session");
+      const activeSessionFile = join(root, ".afol", "wb", ".active_session");
       writeFileSync(activeSessionFile, "260530_9999_missing-tasks\n", "utf8");
 
       const captured = captureIo();
@@ -192,7 +191,7 @@ describe("status command", () => {
     const root = createFixture();
     try {
       const sessionId = "260530_2256_cli-native-command-parity";
-      const sessionDir = join(root, "docs", "plans", sessionId);
+      const sessionDir = join(root, ".afol", "wb", sessionId);
       writeFileSync(
         join(sessionDir, `${sessionId}_task_01.md`),
         [

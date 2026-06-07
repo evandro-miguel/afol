@@ -51,7 +51,7 @@ evidence checks.
 ### agentic-folder-sys
 
 Operational entrypoint for installing, upgrading, validating, and operating the
-scaffold plus governed `docs/plans/` sessions.
+scaffold plus governed `.afol/wb/` sessions.
 
 **Capabilities:**
 

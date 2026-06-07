@@ -71,7 +71,7 @@ The standard `run-repo-map.sh` runner also expects these host tools to be availa
 - `ctags` in `PATH` (Universal Ctags compatible CLI)
 - `docker` in `PATH`
 
-Before invoking the runner, the scaffold prepares a temporary shadow copy of the repository for analysis. That shadow excludes non-canonical or operational surfaces such as `.git/`, `.agents/cache/`, `.agents/.cache/`, `docs/plans/`, `.agents/z-arq/`, `.agents/tmp/`, previously generated `docs/map/`, legacy `docs/map/`, and `docs/map/structure/` output.
+Before invoking the runner, the scaffold prepares a temporary shadow copy of the repository for analysis. That shadow excludes non-canonical or operational surfaces such as `.git/`, `.agents/cache/`, `.agents/.cache/`, `.afol/wb/`, `.agents/z-arq/`, `.agents/tmp/`, previously generated `docs/map/`, legacy `docs/map/`, and `docs/map/structure/` output.
 
 ## Output Contract
 

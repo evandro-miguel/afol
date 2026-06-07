@@ -36,7 +36,7 @@ function createValidationFixture(): string {
 
   mkdirSync(join(agentsDir, "rules"), { recursive: true });
   mkdirSync(join(agentsDir, "skills"), { recursive: true });
-  mkdirSync(join(root, "docs", "plans"), { recursive: true });
+  mkdirSync(join(root, ".afol", "wb"), { recursive: true });
   mkdirSync(join(root, "docs", "arc"), { recursive: true });
 
   writeFileSync(

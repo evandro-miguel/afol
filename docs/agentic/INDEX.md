@@ -122,7 +122,7 @@ Central index for all `.agents` system documentation.
 - [Main README](../../../README.md) - Project overview
 - [AGENTS.md](../../../AGENTS.md) - Agent instructions
 - [Rules](../../../.agents/rules/) - Operational rules
-- [Workbench](../../../docs/plans/) - Active workstreams
+- [Workbench](../../../.afol/wb/) - Active workstreams
 
 ---
 

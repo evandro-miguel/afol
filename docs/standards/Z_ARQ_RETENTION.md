@@ -16,8 +16,8 @@ Define how archived workbench sessions in `.agents/z-arq/` are retained, cleaned
 | Rule | Value | Rationale |
 |------|-------|-----------|
 | **Archive destination** | `.agents/z-arq/` | Single canonical archive surface |
-| **What gets archived** | Finalized sessions (status: `final`, `draft`, `deprecated`) only | Active sessions must stay in `docs/plans/` |
-| **Archive trigger** | When `docs/plans/` has more than 3 finalized sessions | Keeps active surface low-noise for agents |
+| **What gets archived** | Finalized sessions (status: `final`, `draft`, `deprecated`) only | Active sessions must stay in `.afol/wb/` |
+| **Archive trigger** | When `.afol/wb/` has more than 3 finalized sessions | Keeps active surface low-noise for agents |
 | **Retention period** | 180 days from archive date | Balances reference value with storage |
 | **Cleanup action** | Delete sessions older than 180 days after manual review | Prevents indefinite growth |
 | **Index maintenance** | Update `docs/knowledge/INDEX.md` after archiving | Keeps knowledge index accurate |
@@ -26,7 +26,7 @@ Define how archived workbench sessions in `.agents/z-arq/` are retained, cleaned
 
 ```bash
 # Archive a finalized session
-mv docs/plans/<session-id> .agents/z-arq/<session-id>
+mv .afol/wb/<session-id> .agents/z-arq/<session-id>
 
 # Rebuild knowledge index after archiving
 .agents/scripts/.venv/bin/python .agents/scripts/agents-knowledge.py index

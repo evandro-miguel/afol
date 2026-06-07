@@ -57,7 +57,7 @@ docs/map/extra/
 # Legacy implementation report generated during migration work.
 docs/telemetry/reports/implementation_report.md
 
-# Legacy workbench sessions (local-only; plans now live in docs/plans/)
+# Legacy workbench sessions (local-only; plans live in .afol/wb/)
 .agents/wb/
 .afol/tmp/*
 !.afol/tmp/README.md

@@ -18,7 +18,7 @@ This folder stores reusable project knowledge after the project starts.
 ## Source Artifacts
 
 Read the governed plan root from `.agents/config.json` `paths.wb_dir` before
-collecting source artifacts. The default is `docs/plans`.
+collecting source artifacts. The default is `.afol/wb`.
 
 - `<configured-plan-dir>/**/_research_*.md`
 - `<configured-plan-dir>/**/_brainstorm_*.md`

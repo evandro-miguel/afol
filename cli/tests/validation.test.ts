@@ -119,7 +119,7 @@ describe("validation command family", () => {
     const updateCommandPayload = parseJsonOutput(updateCommandProc.stdout as string);
     expect(updateCommandPayload.selected_pack_ids).toEqual(["update-safety"]);
 
-    const wbProc = runKernel(["v", "select", "--changed-path", "docs/plans/session/task.md", "--json"]);
+    const wbProc = runKernel(["v", "select", "--changed-path", ".afol/wb/session/task.md", "--json"]);
     expect(wbProc.status).toBe(0);
     const wbPayload = parseJsonOutput(wbProc.stdout as string);
     expect(wbPayload.selected_pack_ids).toEqual(["workbench-parity"]);

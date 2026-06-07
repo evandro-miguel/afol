@@ -25,7 +25,7 @@ Compatibility runtimes kept in sync for broader reuse:
 
 - `AGENTS.md` is the canonical instruction source.
 - `docs/arc/GENERAL-ROADMAP.md` and `docs/arc/SPECS/` remain the canonical strategic layer.
-- `docs/plans/` remains the canonical execution layer.
+- `.afol/wb/` remains the canonical execution layer.
 
 Runtime-specific files must adapt this canonical layer, not redefine it.
 

@@ -43,8 +43,8 @@ Automates workbench updates:
 
 | File | Purpose |
 |------|---------|
-| `.agents/data/session/.active_session` | Project-local convenience pointer |
-| `docs/plans/*/*.md` | Plan/session documents |
+| `.afol/wb/.active_session` | Project-local convenience pointer |
+| `.afol/wb/*/*.md` | Plan/session documents |
 | `.agents/agents.config` | Config (WB_OFFSET, etc.) |
 
 ### Files Written
@@ -86,7 +86,7 @@ def cmd_new_command(args):
 ./.agents/agents wb-update touch
 
 # Mark task as done only after recording passing closure evidence
-./.agents/agents wb-update evidence T-01 --session <session-id> --command "just lint" --result passed --artifact docs/plans/<session-id>/<session-id>_report_01.md
+./.agents/agents wb-update evidence T-01 --session <session-id> --command "just lint" --result passed --artifact .afol/wb/<session-id>/<session-id>_report_01.md
 ./.agents/agents wb-update task T-01 --session <session-id> --mark-done --evidence-id E-...
 
 # Target a session through the process environment when the wrapper supports it.

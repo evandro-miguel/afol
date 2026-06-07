@@ -51,7 +51,7 @@ Event logs should be stored in:
 Or in session-specific logs:
 
 ```text
-docs/plans/<session_id>/session.log
+.afol/wb/<session_id>/session.log
 ```
 
 ### Session Analysis

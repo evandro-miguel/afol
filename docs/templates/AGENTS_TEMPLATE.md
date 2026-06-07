@@ -15,7 +15,7 @@ Replace this section after bootstrap with real product context.
 
 ## Governed Execution
 
-- Use `docs/plans/` for implementation, validation, and delivery work.
+- Use `.afol/wb/` for implementation, validation, and delivery work.
 - Start task before product edits.
 - Close task with evidence.
 - Canonical path:
@@ -33,7 +33,7 @@ Replace this section after bootstrap with real product context.
 
 ## Repository Map
 
-- `docs/plans/`
+- `.afol/wb/`
 - `.agents/rules/` local contracts only
 - `.agents/skills/` only required project-local behavior
 - `docs/` project docs, `docs/map/` evidence only

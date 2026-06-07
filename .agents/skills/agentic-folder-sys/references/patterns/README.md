@@ -73,7 +73,7 @@ When the change is non-trivial, use the scaffold's workbench flow:
 ```bash
 ./.agents/agents new <theme> --feature-id F-10 --parent-spec <spec-id>
 ./.agents/agents wb-update touch
-./.agents/agents verify-tasks --strict docs/plans/$(cat .agents/data/session/.active_session)
+./.agents/agents verify-tasks --strict .afol/wb/$(cat .afol/wb/.active_session)
 ```
 
 State rules:

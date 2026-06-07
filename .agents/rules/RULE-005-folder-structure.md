@@ -50,7 +50,7 @@ src/
 | Folder | Purpose |
 |--------|---------|
 | `docs/templates/` | Document templates |
-| `docs/plans/` | Durable ExecPlans and governed plan sessions |
+| `.afol/wb/` | Durable ExecPlans and governed plan sessions |
 | `docs/standards/` | Human standards |
 | `docs/lessons/` | Lessons learned |
 | `docs/agentic/` | Tool documentation |
@@ -82,8 +82,8 @@ version: 1
 paths:
   agents_dir: .agents
   docs_dir: docs
-  wb_dir: docs/plans
-  active_session_file: .agents/data/session/.active_session
+  wb_dir: .afol/wb
+  active_session_file: .afol/wb/.active_session
   templates_dir: docs/templates
   arc_dir: docs/arc
 
@@ -146,7 +146,7 @@ python -m json.tool .agents/tools.json
 
 **Purpose:** Points to current workstream
 
-**Location:** `.agents/data/session/.active_session`
+**Location:** `.afol/wb/.active_session`
 
 **Update automatically:**
 
@@ -175,7 +175,7 @@ python -m json.tool .agents/tools.json
 ## Workstream Structure
 
 ```text
-docs/plans/
+.afol/wb/
 └── 260223_1800_auth-refactor/
     ├── 260223_1800_auth-refactor_plan_01.md
     ├── 260223_1800_auth-refactor_task_01.md
@@ -195,7 +195,7 @@ docs/plans/
 
 **DO:**
 
-- ✅ Use `docs/plans/` for durable plan/session files
+- ✅ Use `.afol/wb/` for durable plan/session files
 - ✅ Use `.agents/` for runtime state and agent-owned local files
 - ✅ Keep configuration in `.agents/agents.config`
 - ✅ Store tool docs in `docs/agentic/`
@@ -230,10 +230,10 @@ python -c "import yaml; yaml.safe_load(open('.agents/agents.config'))"
 python -m json.tool .agents/tools.json
 
 # List governed plan sessions
-ls -la docs/plans/
+ls -la .afol/wb/
 
 # Check active session
-cat .agents/data/session/.active_session
+cat .afol/wb/.active_session
 ```
 
 ---

@@ -58,7 +58,7 @@ the project-owned subset that the agent actually uses.
 ## 9. Do Not Split Scaffold And Workbench Routing
 
 Use `agentic-folder-sys` for both scaffold lifecycle operations and governed
-`docs/plans/` work. Do not reintroduce separate `agentic-system-workflow` and
+`.afol/wb/` work. Do not reintroduce separate `agentic-system-workflow` and
 `workbench-agent-teams` skills in this repo.
 
 ## 10. Verify Before Closing

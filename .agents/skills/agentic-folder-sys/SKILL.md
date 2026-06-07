@@ -23,7 +23,7 @@ If a request is governed implementation, validation, or delivery, the first
 mutable repository state should be the governed workbench session/task state,
 not the product file. Use the scaffold wrapper to discover and perform that
 state transition, then make the product change. If the request is planning-only
-or read-only, avoid creating `docs/plans/` artifacts.
+or read-only, avoid creating `.afol/wb/` artifacts.
 
 ## Canonical CLI Surface
 
@@ -48,7 +48,7 @@ Token-optimized routine commands:
 Short flags are part of the contract: `-S` means `--session`, `-T` means
 `--task-id`, and `-x` means `--test`/evidence command. In parallel or delegated
 work, prefer explicit `-S <session-id>` or
-`AGENTS_SESSION_ID=<session-id>` over implicit `.agents/data/session/.active_session`.
+`AGENTS_SESSION_ID=<session-id>` over implicit `.afol/wb/.active_session`.
 
 ## Non-Negotiable Governed Delivery Gate
 
@@ -56,7 +56,7 @@ For any governed request that includes implementation, validation, or delivery,
 the workbench workflow is part of the work, not documentation after the fact.
 Run this sequence before product completion can be claimed:
 
-1. Create or target a session under `docs/plans/` with `afol n <theme>
+1. Create or target a session under `.afol/wb/` with `afol n <theme>
    --feature-id <F-id> --parent-spec <spec-id>`. Fallback:
    `./.agents/agents new <theme> --feature-id <F-id> --parent-spec <spec-id>`.
 2. Move the execution task to in_progress with
@@ -77,13 +77,13 @@ If step 1 or step 2 fails, stop and fix the workflow blocker before editing the
 product. Do not create tasks already marked `[x]`, do not manually edit
 `.evidence.jsonl`, and do not claim `plan_created`, `task_completed`,
 `evidence_recorded`, or `used_governed_session` unless the corresponding files
-and command-created state exist under `docs/plans/<session-id>/`.
+and command-created state exist under `.afol/wb/<session-id>/`.
 
 ## Artifact Economy Gate
 
 Workbench files are not scratch notes. Do not create a session, plan, task,
 research, brainstorm, explorer-check, log, report, spec, or postmortem just to
-think, save context, or satisfy habit. Create or update `docs/plans/` only when
+think, save context, or satisfy habit. Create or update `.afol/wb/` only when
 the current work needs governed execution, durable evidence, or a durable
 decision record.
 
@@ -118,7 +118,7 @@ patch, or undo inside the scaffold?
 
 - Use the Runtime MCP Lane below.
 
-Need to organize a governed `docs/plans/` session?
+Need to organize a governed `.afol/wb/` session?
 
 - Use the workbench rules below and start from the
   [plan](./references/templates/plan.md) and
@@ -165,8 +165,8 @@ over speed; for trivial tasks, use judgment.
   `make agents-all` in adopted repos when the project already owns `make all`.
   Treat skill and profile identifiers as single path components: reject empty
   values, absolute paths, path separators, NUL bytes, `.`, and `..` before
-  applying, syncing, or proposing skills. Workbench lives at `docs/plans/`; keep
-  one session folder per workstream. Treat `.agents/data/session/.active_session` as local
+  applying, syncing, or proposing skills. Workbench lives at `.afol/wb/`; keep
+  one session folder per workstream. Treat `.afol/wb/.active_session` as local
   operator state. It is a project-local convenience pointer, not shared
   synchronization for parallel agents. Use `AGENTS_SESSION_ID=<session-id>` when
   the shell or wrapper honors the session context contract. Use
@@ -218,7 +218,7 @@ over speed; for trivial tasks, use judgment.
 
 Mandatory order for governed execution:
 
-1. Create or target the `docs/plans/` session before implementation edits.
+1. Create or target the `.afol/wb/` session before implementation edits.
 2. Move the relevant task to `in_progress` before changing product files.
 3. Implement the smallest scoped change.
 4. Run the required validation command.
@@ -259,8 +259,8 @@ Verification rule:
 
 1. Create or target a session through `./.agents/agents new ...` so
    `.active_session` stays aligned for the local operator fast path. Session
-   state must live under the repo's `docs/plans/`; do not create, reuse, or
-   point `--into-session` at `/tmp` or any path outside `docs/plans/`.
+   state must live under the repo's `.afol/wb/`; do not create, reuse, or
+   point `--into-session` at `/tmp` or any path outside `.afol/wb/`.
 2. Keep `roadmap_feature` and `parent_spec` context on major workstreams.
 3. Run the smallest useful decision-intake lane when the request needs problem
    framing, challenge, benchmark order, qualitative prioritization, optional
@@ -298,7 +298,7 @@ Runtime tool surface:
 
 - `inspect_workspace`: compact repository tree without broad context expansion.
   `search_docs`: search `docs/`, `docs/arc/`, `docs/map/`, `docs/knowledge/`,
-  `docs/agentic/`, `docs/plans/`, and `.agents/skills/`. `validate_structure`:
+  `docs/agentic/`, `.afol/wb/`, and `.agents/skills/`. `validate_structure`:
   detect missing scaffold folders, templates, and runtime docs; use
   `auto_fix=true` only when creating missing directories is intended.
   `generate_manifest`: summarize repository surfaces, scripts, skills, runtime
@@ -358,6 +358,6 @@ workbench files.
 
 ```bash
 ./.agents/agents skills-sync check --skills agentic-folder-sys
-./.agents/agents verify-tasks --strict docs/plans/$(cat .agents/data/session/.active_session)
+./.agents/agents verify-tasks --strict .afol/wb/$(cat .afol/wb/.active_session)
 make lint
 ```
