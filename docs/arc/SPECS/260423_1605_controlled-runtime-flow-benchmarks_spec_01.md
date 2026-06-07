@@ -98,7 +98,7 @@ Expected behavior:
   - the benchmark model tier
   - the expected output or observable completion condition
   - the metrics that must be recorded
-- The default benchmark tier for this family is `gpt-5.4-mini` with `medium`
+- The default benchmark tier for this family is `gpt-5.4-mini` with `low`
   reasoning unless a benchmark spec or scenario explicitly overrides it.
 - Runtime-flow benchmarks are targeted regression measurement for risky
   execution changes. They are not a universal gate for every repo edit.
@@ -180,7 +180,7 @@ Out of scope:
 1. Define the benchmark philosophy and target only runtime-flow regression
    measurement, not a universal benchmark gate.
 2. Define the default benchmark model contract:
-   `gpt-5.4-mini` + `medium` reasoning for the standard baseline.
+   `gpt-5.4-mini` + `low` reasoning for the standard baseline.
 3. Define scenario shape for controlled tasks, expected tools, and allowed
    scope.
 4. Define required metrics: pass/fail, timing, tool success/failure, retries,
@@ -233,7 +233,7 @@ Review questions:
 ## 11) Risks and Tradeoffs
 
 - Risk: benchmarks become too expensive -> Mitigation: default to
-  `gpt-5.4-mini` medium and controlled tasks.
+  `gpt-5.4-mini` low and controlled tasks.
 - Risk: benchmarks become ceremonial -> Mitigation: define clear
   when-to-run triggers tied to risky execution changes.
 - Risk: timing-only results hide quality regressions -> Mitigation: require

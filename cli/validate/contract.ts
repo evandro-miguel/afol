@@ -8,7 +8,8 @@ const BASELINES_RELATIVE_PATH = ".agents/data/benchmarks/baselines";
 const RESULTS_RELATIVE_PATH = ".agents/data/benchmarks/results";
 const LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH = ".agents/benchmarks/runtime-flow-live-agent-v4-latest.json";
 const LIVE_BENCHMARK_EXPECTED_PACK_ID = "runtime-flow-live-agent-v4";
-const LIVE_BENCHMARK_REFRESH_COMMAND = "./afol benchmark run --save";
+const LIVE_BENCHMARK_REFRESH_COMMAND =
+  "python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low";
 
 export const VALIDATION_SCHEMA_VERSION = "1.0.0";
 export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
@@ -181,6 +182,9 @@ interface LiveRunnerScenarioResult {
   retry_count: number;
   context_bytes: number;
   prompt_bytes: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
 }
 
 interface LiveRunnerResultPayload {
@@ -585,6 +589,7 @@ function parseLiveRunnerScenarioResult(
   }
   const toolCallCount = asOptionalNumber(data.tool_call_count, `${sourcePath}.tool_call_count`) ?? 0;
   const errorCount = asOptionalNumber(data.error_count, `${sourcePath}.error_count`) ?? 0;
+  const tokenUsage = asOptionalObject(data.token_usage, `${sourcePath}.token_usage`);
   return {
     id: asString(data.id, `${sourcePath}.id`),
     pass: asBoolean(data.pass, `${sourcePath}.pass`),
@@ -597,6 +602,12 @@ function parseLiveRunnerScenarioResult(
     retry_count: asOptionalNumber(data.retry_count, `${sourcePath}.retry_count`) ?? 0,
     context_bytes: asOptionalNumber(data.context_bytes, `${sourcePath}.context_bytes`) ?? 0,
     prompt_bytes: asOptionalNumber(data.prompt_bytes, `${sourcePath}.prompt_bytes`) ?? 0,
+    input_tokens:
+      asOptionalNumber(tokenUsage?.input_tokens, `${sourcePath}.token_usage.input_tokens`) ?? 0,
+    output_tokens:
+      asOptionalNumber(tokenUsage?.output_tokens, `${sourcePath}.token_usage.output_tokens`) ?? 0,
+    total_tokens:
+      asOptionalNumber(tokenUsage?.total_tokens, `${sourcePath}.token_usage.total_tokens`) ?? 0,
   };
 }
 
@@ -669,9 +680,9 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
     );
   }
   const snapshotProfile = parseLiveRunnerProfile(snapshot.benchmark_profile, `${snapshotPath}.benchmark_profile`);
-  if (snapshotProfile.model !== "gpt-5.4-mini" || snapshotProfile.reasoning_effort !== "medium") {
+  if (snapshotProfile.model !== "gpt-5.4-mini" || snapshotProfile.reasoning_effort !== "low") {
     throw new Error(
-      `runtime-live-profile-mismatch:model=${snapshotProfile.model},reasoning=${snapshotProfile.reasoning_effort};expected:gpt-5.4-mini/medium;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+      `runtime-live-profile-mismatch:model=${snapshotProfile.model},reasoning=${snapshotProfile.reasoning_effort};expected:gpt-5.4-mini/low;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
     );
   }
   const savedResultPathRaw = asString(snapshot.saved_result_path, `${snapshotPath}.saved_result_path`);
@@ -685,9 +696,9 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
       `runtime-live-artifact-pack-mismatch:${payload.pack_id};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
     );
   }
-  if (payload.benchmark_profile.model !== "gpt-5.4-mini" || payload.benchmark_profile.reasoning_effort !== "medium") {
+  if (payload.benchmark_profile.model !== "gpt-5.4-mini" || payload.benchmark_profile.reasoning_effort !== "low") {
     throw new Error(
-      `runtime-live-profile-mismatch:model=${payload.benchmark_profile.model},reasoning=${payload.benchmark_profile.reasoning_effort};expected:gpt-5.4-mini/medium;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+      `runtime-live-profile-mismatch:model=${payload.benchmark_profile.model},reasoning=${payload.benchmark_profile.reasoning_effort};expected:gpt-5.4-mini/low;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
     );
   }
   return {
@@ -836,9 +847,10 @@ function buildRuntimeLiveAgentResults(
       timing_p95_ms: mappedScenario.duration_ms,
       error_count: mappedScenario.error_count,
       retry_count: mappedScenario.retry_count,
-      context_tokens: 0,
-      prompt_tokens: 0,
-      output_tokens: 0,
+      context_tokens: mappedScenario.input_tokens,
+      prompt_tokens: mappedScenario.input_tokens,
+      output_tokens: mappedScenario.output_tokens,
+      total_tokens: mappedScenario.total_tokens,
       context_bytes: mappedScenario.context_bytes,
       output_bytes: mappedScenario.prompt_bytes,
       tool_call_count: mappedScenario.tool_call_count,

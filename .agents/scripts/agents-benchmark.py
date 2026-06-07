@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -38,9 +39,13 @@ FIXTURE_CHILD_SPEC_FILE = (
 )
 BENCHMARK_PACK_ID = "runtime-flow-live-agent-v4"
 LIVE_COMPLETE_COMMAND = "live benchmark fixture command"
+RUNTIME_POLICY_CHECK_COMMAND = "python scripts/check_runtime_policy.py"
 AFOL_POLICY_CHECK_COMMAND = "python3 scripts/check_afol_policy.py"
 CODE_TASK_CHECK_COMMAND = "python3 scripts/check_slugify.py"
 CODE_TASK_PROJECT_DIR = "test-code-task-project"
+AUTONOMOUS_PLAN_QUALITY_THRESHOLD = 80
+AUTONOMOUS_PLAN_MAX_CHARS = 1800
+AUTONOMOUS_TASK_MAX_CHARS = 900
 CODE_TASK_PLAN_QUALITY_THRESHOLD = 80
 CODE_TASK_REPORT_QUALITY_THRESHOLD = 85
 CODE_TASK_OVERALL_QUALITY_THRESHOLD = 85
@@ -48,6 +53,14 @@ CODE_TASK_PLAN_MAX_CHARS = 1800
 CODE_TASK_TASK_MAX_CHARS = 900
 CODE_TASK_REPORT_MAX_CHARS = 1400
 EXIT_CODE_RE = re.compile(r"Process exited with code\s+(-?\d+)")
+AFOL_FIXTURE_SCENARIOS = {
+    "live-afol-provider-compatible-delivery",
+    "live-afol-python-code-task-orchestrated",
+}
+BARE_AFOL_DISCOVERY_COMMANDS = ("command -v afol", "which afol", "type afol")
+AFOLD_LAUNCHER = "afold"
+AFOLD_COMMAND = f"./{AFOLD_LAUNCHER}"
+AFOLD_RUNTIME_NAME = "afold-runtime"
 COMPARISON_METRICS: tuple[tuple[str, str, bool], ...] = (
     ("duration_ms", "lower", False),
     ("tool_call_count", "lower", False),
@@ -57,14 +70,45 @@ COMPARISON_METRICS: tuple[tuple[str, str, bool], ...] = (
     ("context_bytes_total", "lower", False),
     ("prompt_bytes_total", "lower", False),
     ("token_usage_total", "lower", False),
+    ("token_usage_uncached_total", "lower", False),
 )
+RAW_TOKEN_USAGE_KEYS = {
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "cached_input_tokens",
+    "reasoning_output_tokens",
+}
+DERIVED_TOKEN_USAGE_KEYS = {
+    "uncached_input_tokens",
+    "uncached_total_tokens",
+}
+TOKEN_USAGE_KEYS = RAW_TOKEN_USAGE_KEYS | DERIVED_TOKEN_USAGE_KEYS
+MAX_UNCACHED_TOKENS_BY_SCENARIO: dict[str, int] = {
+    "live-tools-benchmark-discovery": 50_000,
+    "live-implement-next-governance-preflight": 75_000,
+    "live-implement-start-complete-evidence": 100_000,
+    "live-wb-update-link": 75_000,
+    "live-wb-update-status-touch": 100_000,
+    "live-wb-update-task-evidence-timeline": 125_000,
+    "live-wb-session-create-scripted-progress": 150_000,
+    "live-afol-provider-compatible-delivery": 150_000,
+    "live-afol-python-code-task-orchestrated": 150_000,
+    "live-autonomous-agentic-folder-delivery": 200_000,
+}
+MAX_TOOL_CALLS_BY_SCENARIO: dict[str, int] = {
+    "live-autonomous-agentic-folder-delivery": 10,
+    "live-afol-provider-compatible-delivery": 16,
+    "live-afol-python-code-task-orchestrated": 16,
+}
+AGENTIC_FOLDER_SKILL_PATH = ".agents/skills/agentic-folder-sys/SKILL.md"
 
 
 @dataclass(frozen=True)
 class BenchmarkProfile:
     runtime: str = "codex"
     model: str = "gpt-5.4-mini"
-    reasoning_effort: str = "medium"
+    reasoning_effort: str = "low"
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -160,6 +204,9 @@ def _efficiency_metrics(payload: dict[str, Any]) -> dict[str, float]:
     tool_call_count = int(payload.get("tool_call_count", 0))
     token_usage = payload.get("token_usage", {})
     total_tokens = int(token_usage.get("total_tokens", 0)) if isinstance(token_usage, dict) else 0
+    uncached_total_tokens = (
+        int(token_usage.get("uncached_total_tokens", 0)) if isinstance(token_usage, dict) else 0
+    )
     total_bytes = int(payload.get("context_bytes_total", 0)) + int(payload.get("prompt_bytes_total", 0))
     duration_seconds = _safe_division(duration_ms, 1000, digits=6)
 
@@ -178,7 +225,99 @@ def _efficiency_metrics(payload: dict[str, Any]) -> dict[str, float]:
         "bytes_per_second": bytes_per_second,
         "bytes_per_tool_call": _safe_division(total_bytes, tool_call_count, digits=2),
         "tokens_per_tool_call": _safe_division(total_tokens, tool_call_count, digits=2),
+        "uncached_tokens_per_tool_call": _safe_division(
+            uncached_total_tokens, tool_call_count, digits=2
+        ),
     }
+
+
+def _non_negative_int(value: Any) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)) and value >= 0:
+        return int(value)
+    return 0
+
+
+def _snapshot_token_usage(token_usage: Any) -> dict[str, Any]:
+    if not isinstance(token_usage, dict):
+        return {"available": False, **{key: 0 for key in TOKEN_USAGE_KEYS}}
+    normalized = _normalized_token_usage(token_usage)
+    return {
+        "available": bool(token_usage.get("available")),
+        **normalized,
+    }
+
+
+def _normalized_token_usage(token_usage: dict[str, Any]) -> dict[str, int]:
+    normalized = {
+        key: _non_negative_int(token_usage.get(key)) for key in RAW_TOKEN_USAGE_KEYS
+    }
+    if normalized["total_tokens"] == 0:
+        normalized["total_tokens"] = (
+            normalized["input_tokens"] + normalized["output_tokens"]
+        )
+    normalized["uncached_input_tokens"] = max(
+        normalized["input_tokens"] - normalized["cached_input_tokens"], 0
+    )
+    normalized["uncached_total_tokens"] = max(
+        normalized["total_tokens"] - normalized["cached_input_tokens"], 0
+    )
+    return normalized
+
+
+def _token_budget_failures(scenario_id: str, token_usage: Any) -> list[str]:
+    budget = MAX_UNCACHED_TOKENS_BY_SCENARIO.get(scenario_id)
+    if budget is None:
+        return []
+    if not isinstance(token_usage, dict) or not bool(token_usage.get("available")):
+        return [f"token usage unavailable for budgeted scenario {scenario_id}"]
+
+    usage = _normalized_token_usage(token_usage)
+    uncached_total_tokens = usage["uncached_total_tokens"]
+    if uncached_total_tokens > budget:
+        return [
+            f"token budget exceeded: uncached_total_tokens {uncached_total_tokens} > {budget}"
+        ]
+    return []
+
+
+def _tool_budget_failures(scenario_id: str, tool_call_count: Any) -> list[str]:
+    budget = MAX_TOOL_CALLS_BY_SCENARIO.get(scenario_id)
+    if budget is None:
+        return []
+    observed = _non_negative_int(tool_call_count)
+    if observed > budget:
+        return [f"tool call budget exceeded: tool_call_count {observed} > {budget}"]
+    return []
+
+
+def _enforce_token_budget(result: dict[str, Any]) -> dict[str, Any]:
+    scenario_id = str(result.get("id", ""))
+    failures = [
+        *_token_budget_failures(scenario_id, result.get("token_usage")),
+        *_tool_budget_failures(scenario_id, result.get("tool_call_count")),
+    ]
+    if not failures:
+        return result
+
+    updated = dict(result)
+    failure_reasons = [
+        str(reason)
+        for reason in updated.get("failure_reasons", [])
+        if str(reason).strip()
+    ]
+    for failure in failures:
+        if failure not in failure_reasons:
+            failure_reasons.append(failure)
+
+    checks_total = _non_negative_int(updated.get("checks_total"))
+    checks_passed = max(checks_total - len(failure_reasons), 0) if checks_total else 0
+    updated["pass"] = False
+    updated["failure_reasons"] = failure_reasons
+    updated["checks_passed"] = checks_passed
+    updated["accuracy"] = round(checks_passed / checks_total, 4) if checks_total else 0.0
+    return updated
 
 
 def _stable_pack_filename(pack_id: str) -> str:
@@ -307,6 +446,7 @@ def _build_stable_snapshot(
                 "checks_passed": int(scenario.get("checks_passed", 0)),
                 "error_count": int(scenario.get("error_count", 0)),
                 "retry_count": int(scenario.get("retry_count", 0)),
+                "token_usage": _snapshot_token_usage(scenario.get("token_usage")),
             }
         )
 
@@ -325,6 +465,16 @@ def _build_stable_snapshot(
         "context_bytes_total": int(payload.get("context_bytes_total", 0)),
         "prompt_bytes_total": int(payload.get("prompt_bytes_total", 0)),
         "token_usage_total": int(payload.get("token_usage", {}).get("total_tokens", 0))
+        if isinstance(payload.get("token_usage"), dict)
+        else 0,
+        "token_usage_cached_input": int(
+            payload.get("token_usage", {}).get("cached_input_tokens", 0)
+        )
+        if isinstance(payload.get("token_usage"), dict)
+        else 0,
+        "token_usage_uncached_total": int(
+            payload.get("token_usage", {}).get("uncached_total_tokens", 0)
+        )
         if isinstance(payload.get("token_usage"), dict)
         else 0,
         "token_usage_available": bool(payload.get("token_usage", {}).get("available"))
@@ -517,6 +667,7 @@ def _fixture_agents_text() -> str:
         "When the request requires implementation, validation, or delivery and references governed work, "
         "workbench state, evidence, or task completion, the `.agents/wb/` workflow is part of the work.\n\n"
         "Use the scaffold wrapper as the source of truth:\n\n"
+        f"Before operating the scaffold, read `{AGENTIC_FOLDER_SKILL_PATH}`. Treat it as the local workflow contract. Do not inspect global skills.\n\n"
         "1. `./.agents/agents new <theme> --feature-id <F-id> --parent-spec <spec-id> --child-spec <spec-id>` creates the governed session.\n"
         "2. `./.agents/agents implement start --session <session-id> --task-id T-01` begins the executable task before product edits.\n"
         "3. Edit the product and run the acceptance check named by the request.\n"
@@ -731,15 +882,17 @@ def _afol_agents_text() -> str:
     return (
         "# AGENTS.md\n\n"
         "## Governed Execution\n\n"
-        "Use `./afol` for all workbench operations. This repository is provider-compatible: "
+        f"Use `{AFOLD_COMMAND}` for all workbench operations. This repository is provider-compatible: "
         "mutable state belongs under `.afol/`, and `.agents/` contains only provider-safe static config.\n\n"
         "Required order for implementation work:\n\n"
-        "1. Create a short session with `./afol new <theme> --feature-id <id> --parent-spec <id> --task <text>`.\n"
-        "2. Start `T-01` with `./afol start --session <session-id> --task-id T-01` before product edits.\n"
+        f"1. Create a short session with `{AFOLD_COMMAND} new <theme> --feature-id <id> --parent-spec <id> --task <text>`.\n"
+        f"2. Start `T-01` with `{AFOLD_COMMAND} start --session <session-id> --task-id T-01` before product edits.\n"
         "3. Run the acceptance check.\n"
-        "4. Record evidence with `./afol evidence --session <session-id> --task-id T-01 --command \"<command>\" --result passed --artifact <path>`.\n"
-        "5. Close the task with `./afol done --session <session-id> --task-id T-01`.\n\n"
-        "Do not manually create, edit, or append `.afol/wb` files. Do not use `.agents/agents` in this project.\n"
+        f"4. Record evidence with `{AFOLD_COMMAND} evidence --session <session-id> --task-id T-01 --command \"<command>\" --result passed --artifact <path>`.\n"
+        f"5. Close the task with `{AFOLD_COMMAND} done --session <session-id> --task-id T-01`.\n\n"
+        "This benchmark fixture intentionally provides a development launcher named `afold`. "
+        "Do not use `./afol`, `./a`, or `.agents/agents` in this project. "
+        "Do not manually create, edit, or append `.afol/wb` files.\n"
     )
 
 
@@ -751,7 +904,7 @@ def _afol_problem_text() -> str:
         "## Acceptance\n\n"
         f"- `{AFOL_POLICY_CHECK_COMMAND}` must pass.\n"
         "- Keep the product change minimal.\n"
-        "- Use `./afol` for session, task, and evidence state.\n"
+        f"- Use `{AFOLD_COMMAND}` for session, task, and evidence state.\n"
         "- Do not manually edit `.afol/wb`.\n"
     )
 
@@ -838,7 +991,9 @@ def _code_task_agents_text() -> str:
         "## Benchmark Scope\n\n"
         f"Work only in `{CODE_TASK_PROJECT_DIR}/` and `.afol/` for this benchmark. "
         "Do not edit repository files outside those paths.\n\n"
-        "Use `./afol` for all plan, task, evidence, and closure operations. "
+        f"Use `{AFOLD_COMMAND}` for all plan, task, evidence, and closure operations. "
+        "This benchmark fixture intentionally provides a development launcher named `afold`; "
+        "do not use `./afol`, `./a`, or `.agents/agents`. "
         "Do not manually create, edit, or append `.afol/wb` files.\n"
     )
 
@@ -912,22 +1067,29 @@ def _build_afol_dist() -> Path:
     return dist_binary
 
 
-def _write_afol_fixture_launcher(target: Path, dist_binary: Path) -> None:
+def _write_afold_fixture_launcher(target: Path, dist_binary: Path) -> None:
     bin_dir = target / ".afol" / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
-    runtime = bin_dir / "afol-runtime"
+    runtime = bin_dir / AFOLD_RUNTIME_NAME
     shutil.copy2(dist_binary, runtime)
     runtime.chmod(0o755)
     launcher = (
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
         'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
-        'exec "${SCRIPT_DIR}/.afol/bin/afol-runtime" "$@"\n'
+        f'exec "${{SCRIPT_DIR}}/.afol/bin/{AFOLD_RUNTIME_NAME}" "$@"\n'
     )
-    for name in ("afol", "a"):
-        path = target / name
-        _write_text(path, launcher)
-        path.chmod(0o755)
+    for stale_name in ("afol", "a"):
+        stale_path = target / stale_name
+        if stale_path.exists() or stale_path.is_symlink():
+            stale_path.unlink()
+    path = target / AFOLD_LAUNCHER
+    _write_text(path, launcher)
+    path.chmod(0o755)
+    _write_text(
+        target / ".env",
+        f"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nAFOL_BIN={AFOLD_COMMAND}\nAFOLD_BIN={AFOLD_COMMAND}\n",
+    )
 
 
 def _git_baseline_fixture(target: Path) -> None:
@@ -961,7 +1123,7 @@ def _prepare_afol_fixture_repo(temp_root: Path) -> Path:
         capture_output=True,
         text=True,
     )
-    _write_afol_fixture_launcher(target, dist_binary)
+    _write_afold_fixture_launcher(target, dist_binary)
     _write_text(target / "AGENTS.md", _afol_agents_text())
     _write_text(target / "docs" / "benchmark_problem.md", _afol_problem_text())
     _write_text(target / "app" / "runtime_policy.json", _afol_runtime_policy_text())
@@ -982,7 +1144,7 @@ def _prepare_code_task_fixture_repo(temp_root: Path) -> Path:
         capture_output=True,
         text=True,
     )
-    _write_afol_fixture_launcher(target, dist_binary)
+    _write_afold_fixture_launcher(target, dist_binary)
     _write_text(target / "AGENTS.md", _code_task_agents_text())
     _write_text(target / "docs" / "benchmark_problem.md", _code_task_problem_text())
     project_root = target / CODE_TASK_PROJECT_DIR
@@ -1004,12 +1166,47 @@ def _context_bytes(repo_root: Path, artifacts: tuple[str, ...]) -> int:
     return total
 
 
-def _benchmark_env() -> dict[str, str]:
+def _path_without_bare_afol(path_value: str) -> str:
+    parts: list[str] = []
+    for raw_part in path_value.split(os.pathsep):
+        if not raw_part:
+            continue
+        part = Path(raw_part)
+        if (part / "afol").exists():
+            continue
+        parts.append(raw_part)
+    return os.pathsep.join(parts)
+
+
+def _write_isolated_zdotdir(zdotdir: Path, path_value: str) -> None:
+    zdotdir.mkdir(parents=True, exist_ok=True)
+    shell_env = f"export PATH={shlex.quote(path_value)}\nunset BASH_ENV ENV\n"
+    for name in (".zshenv", ".zprofile", ".zshrc", ".zlogin"):
+        _write_text(zdotdir / name, shell_env)
+
+
+def _codex_executable() -> str:
+    path = shutil.which("codex")
+    if path is None:
+        raise FileNotFoundError("codex executable not found in PATH")
+    return path
+
+
+def _benchmark_env(
+    *, hide_bare_afol: bool = False, isolated_zdotdir: Path | None = None
+) -> dict[str, str]:
     env = os.environ.copy()
     env.setdefault("NO_COLOR", "1")
     env.setdefault("PYTHONUTF8", "1")
     for key in ("http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):
         env.pop(key, None)
+    if hide_bare_afol:
+        env["PATH"] = _path_without_bare_afol(env.get("PATH", ""))
+    if isolated_zdotdir is not None:
+        _write_isolated_zdotdir(isolated_zdotdir, env.get("PATH", ""))
+        env["ZDOTDIR"] = str(isolated_zdotdir)
+        env.pop("BASH_ENV", None)
+        env.pop("ENV", None)
     return env
 
 
@@ -1458,12 +1655,15 @@ def _validate_governed_session_delivery(session_id: str, repo_root: Path) -> lis
     if not task_files:
         failures.append("created governed task file missing")
 
+    plan_text = plan_files[0].read_text(encoding="utf-8") if plan_files else ""
     task_text = task_files[0].read_text(encoding="utf-8") if task_files else ""
     evidence_text = evidence_file.read_text(encoding="utf-8") if evidence_file.exists() else ""
     if "| T-01 | done |" not in task_text and "- [x] T-01" not in task_text:
         failures.append("created governed task T-01 not marked done")
     if '"task_id": "T-01"' not in evidence_text or "check_runtime_policy.py" not in evidence_text:
         failures.append("evidence ledger missing expected verification record")
+    if plan_files and task_files:
+        failures.extend(_validate_autonomous_plan_quality(plan_text, task_text))
     return failures
 
 
@@ -1694,6 +1894,131 @@ def _parse_evidence_records(evidence_text: str) -> tuple[list[dict[str, Any]], i
         if isinstance(record, dict):
             evidence_records.append(record)
     return evidence_records, invalid_count
+
+
+def _contains_template_placeholder(text: str) -> bool:
+    placeholder_fragments = (
+        "<item>",
+        "<path>",
+        "<decision>",
+        "<command",
+        "<exact edit",
+        "<observable proof",
+        "<evidence or N/A>",
+        "Replace this line",
+        "Explain what this change enables",
+        "Describe the smallest useful slice",
+        "YYYY-MM-DD",
+    )
+    return any(fragment in text for fragment in placeholder_fragments)
+
+
+def _score_autonomous_plan_quality(plan_text: str, task_text: str) -> dict[str, Any]:
+    combined_text = f"{plan_text}\n{task_text}"
+    normalized_plan_text = plan_text.lower()
+    normalized_combined_text = combined_text.lower()
+    task_state_ok = _task_has_valid_state(task_text, "done")
+    no_placeholders = not _contains_template_placeholder(combined_text)
+
+    criteria = [
+        _quality_criterion(
+            "scope_target",
+            "Scope and target are explicit",
+            25,
+            no_placeholders
+            and (
+                "runtime policy" in normalized_combined_text
+                or "runtime-policy" in normalized_combined_text
+                or "runtime_policy" in normalized_combined_text
+            )
+            and "app/runtime_policy.json" in combined_text
+            and ("agentic-folder" in normalized_combined_text or "governed" in normalized_combined_text),
+            "requires runtime policy objective, exact policy file, governed workflow, and no template placeholders",
+        ),
+        _quality_criterion(
+            "execution_path",
+            "Execution path is actionable",
+            20,
+            no_placeholders
+            and ("## Execution Plan" in plan_text or "## Steps" in plan_text or "## Concrete Steps" in plan_text)
+            and "T-01" in combined_text
+            and task_state_ok
+            and ("fix" in normalized_combined_text or "update" in normalized_combined_text or "edit" in normalized_combined_text),
+            "requires concrete steps, T-01, valid task row, implementation action, and no template placeholders",
+        ),
+        _quality_criterion(
+            "validation_evidence",
+            "Validation and evidence are named",
+            20,
+            no_placeholders and RUNTIME_POLICY_CHECK_COMMAND in combined_text and "evidence" in normalized_plan_text,
+            "requires exact acceptance command, evidence guidance, and no template placeholders",
+        ),
+        _quality_criterion(
+            "constraints_safety",
+            "Sandbox limits are clear",
+            15,
+            no_placeholders
+            and "app/runtime_policy.json" in combined_text
+            and "scripts/check_runtime_policy.py" in combined_text
+            and (".agents/agents" in combined_text or ".agents/wb" in combined_text)
+            and "/home/ozy/.codex" not in combined_text
+            and "/home/ozy/.agents" not in combined_text
+            and "command -v afol" not in combined_text
+            and "which afol" not in combined_text,
+            "requires allowed local scaffold scope without global/provider-hostile paths",
+        ),
+        _quality_criterion(
+            "concision_token_economy",
+            "Plan and task are concise",
+            10,
+            0 < len(plan_text) <= AUTONOMOUS_PLAN_MAX_CHARS
+            and 0 < len(task_text) <= AUTONOMOUS_TASK_MAX_CHARS,
+            f"requires plan <= {AUTONOMOUS_PLAN_MAX_CHARS} chars and task <= {AUTONOMOUS_TASK_MAX_CHARS} chars",
+        ),
+        _quality_criterion(
+            "task_executability",
+            "Task can be executed by another agent",
+            10,
+            no_placeholders
+            and task_state_ok
+            and "T-01" in task_text
+            and "app/runtime_policy.json" in task_text
+            and RUNTIME_POLICY_CHECK_COMMAND in task_text,
+            "requires done T-01 row, exact target file, acceptance command, and no template placeholders",
+        ),
+    ]
+    return _finalize_quality_score(
+        "plan_task",
+        AUTONOMOUS_PLAN_QUALITY_THRESHOLD,
+        criteria,
+        {"scope_target", "validation_evidence", "constraints_safety", "task_executability"},
+    )
+
+
+def _validate_autonomous_plan_quality(plan_text: str, task_text: str) -> list[str]:
+    failures: list[str] = []
+    if _contains_template_placeholder(f"{plan_text}\n{task_text}"):
+        failures.append("autonomous plan/task still contains scaffold template placeholders")
+    if "## Execution Plan" not in plan_text and "## Steps" not in plan_text and "## Concrete Steps" not in plan_text:
+        failures.append("autonomous plan missing execution steps section")
+    if "## Validation" not in plan_text and "Verify" not in plan_text:
+        failures.append("autonomous plan missing validation section")
+    if "evidence" not in plan_text.lower():
+        failures.append("autonomous plan missing evidence guidance")
+    if RUNTIME_POLICY_CHECK_COMMAND not in plan_text:
+        failures.append("autonomous plan missing acceptance command")
+    if "app/runtime_policy.json" not in plan_text:
+        failures.append("autonomous plan missing target policy path")
+    if "T-01" not in plan_text:
+        failures.append("autonomous plan missing task id")
+    if "app/runtime_policy.json" not in task_text:
+        failures.append("autonomous task missing target policy path")
+    if RUNTIME_POLICY_CHECK_COMMAND not in task_text:
+        failures.append("autonomous task missing acceptance command")
+    if "T-01" not in task_text:
+        failures.append("autonomous task missing task id")
+    failures.extend(_quality_failures("autonomous plan/task", _score_autonomous_plan_quality(plan_text, task_text)))
+    return failures
 
 
 def _code_task_report_path() -> str:
@@ -2094,6 +2419,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             scope="Read-only bounded discovery against the benchmark tool metadata.",
             context_artifacts=(
                 "AGENTS.md",
+                AGENTIC_FOLDER_SKILL_PATH,
                 ".agents/agents",
                 ".agents/tools.json",
                 "docs/agentic/agents-benchmark.md",
@@ -2294,17 +2620,17 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             tool_families=("exec_command", "new", "implement", "wb-update", "python"),
             scope="Controlled end-to-end mutation of a tiny fixture app plus one governed workbench session.",
             context_artifacts=(
-                "AGENTS.md",
+                AGENTIC_FOLDER_SKILL_PATH,
                 ".agents/agents",
-                ".agents/tools.json",
                 "docs/benchmark_problem.md",
                 "app/runtime_policy.json",
                 "scripts/check_runtime_policy.py",
-                f"docs/arc/SPECS/{FIXTURE_PARENT_SPEC_FILE.name}",
-                f"docs/arc/SPECS/{FIXTURE_CHILD_SPEC_FILE.name}",
             ),
             required_command_substrings=(
+                AGENTIC_FOLDER_SKILL_PATH,
                 ".agents/agents new",
+                "--intent delivery",
+                "--task",
                 "scripts/check_runtime_policy.py",
             ),
             any_required_command_groups=(
@@ -2313,12 +2639,21 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 ("--mark-done --evidence-id", "--evidence-id", "implement complete --session"),
             ),
             forbidden_command_substrings=(
+                *BARE_AFOL_DISCOVERY_COMMANDS,
                 "cp -a .",
                 "rsync",
                 "mkdir -p sandbox",
                 "cd sandbox",
                 "cp .agents/agents sandbox",
                 "cp -R .agents",
+                "--help",
+                "rg ",
+                "find .agents/wb",
+                "xargs",
+                f".agents/wb/{FIXTURE_WORKSTREAM_ID}",
+                ".agents/policy.md",
+                "ls -1 .agents",
+                "ls -1 .agents/rules",
                 "AGENTS_SCRIPT_PYTHON",
                 "PYTHONPATH=",
                 "uv run --with",
@@ -2328,28 +2663,20 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 "> .agents/wb",
                 ">> .agents/wb",
                 "verify-tasks --strict",
+                "/home/ozy/.codex",
+                "/home/ozy/.agents",
             ),
             response_schema=_autonomous_delivery_schema(),
             prompt=(
                 "You are running inside a controlled benchmark fixture.\n"
-                "Rules:\n"
-                "- Use tools and inspect the repository as needed. Do not answer from memory.\n"
-                "- Do not manually edit workbench task state or evidence ledgers.\n"
-                "- When closing a task, record task-scoped closure evidence with the real verification command, a passed result, and an artifact path or note before marking it done.\n"
-                "- You are not being given the exact scaffold commands; discover the normal repository workflow from local context.\n"
-                "- Keep the product change minimal.\n"
-                "- Keep this bounded: do not run broad lint suites, repository-wide tests, package installs, bootstrap, sync, or full session closure.\n"
-                "- Operate in the current benchmark repository only; do not copy the repo or switch to a copied working tree.\n"
-                "- Use the scaffold wrapper as provided; do not override AGENTS_SCRIPT_PYTHON, PYTHONPATH, UV cache settings, or install ad hoc Python packages.\n"
-                "- Final verification for this scenario means the acceptance check named in the problem brief plus inspection of the workbench task/evidence files; do not run strict session verification or closure.\n"
-                "- Do not polish or repair template prose in workbench files; the scaffold-created plan/task plus scripted task/evidence updates are sufficient.\n"
-                "- Use repository docs, the tool catalog, and the scaffold command wrapper for operations; do not call `.agents/scripts/*.py` directly.\n"
-                "- Do not inspect benchmark runner source or scaffold implementation internals unless a wrapper command fails.\n"
-                "- Use at most 12 shell commands unless a command fails and needs one focused recovery.\n"
-                "- Return JSON only that matches the provided schema after the work is complete.\n\n"
-                "Task:\n"
-                f"Deliver the request in `docs/benchmark_problem.md` end-to-end. Analyze the problem, create a new governed work plan/session for this request, do not reuse the existing `{FIXTURE_WORKSTREAM_ID}` fixture session, implement the smallest fix, record evidence, complete the work item, and run final verification.\n"
-                "In the JSON response, report the session id you created or used, whether the runtime policy was fixed, whether verification passed, whether a plan exists, whether the task is completed, whether evidence was recorded, whether you used the governed session workflow, whether task state was changed through the scripted workflow, and whether you manually edited workbench task state."
+                "Work only inside this project. Do not inspect global skills or files outside it.\n"
+                "I have a problem in this project. Read the local instructions, make a short plan, "
+                "solve the issue described in `docs/benchmark_problem.md`, validate it, record evidence if "
+                "the local workflow requires it, and return JSON only matching the provided schema.\n"
+                "Report the session id if one exists, whether the runtime policy was fixed, whether "
+                "verification passed, whether a plan exists, whether the task is completed, whether evidence "
+                "was recorded, whether a governed session workflow was used, whether task state changed "
+                "through scripted workflow, and whether workbench task state was manually edited."
             ),
             validator=_validate_autonomous_delivery,
             validation_check_count=10,
@@ -2360,14 +2687,15 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             id="live-afol-provider-compatible-delivery",
             description="Use a mini live agent to deliver a tiny downstream task through provider-compatible AFOL state.",
             purpose=(
-                "Measure whether a mini-tier agent can use `afol` directly for fast plan/task/evidence operations "
+                "Measure whether a mini-tier agent can use the benchmark-local `afold` launcher for fast plan/task/evidence operations "
                 "in a downstream project where mutable state belongs under `.afol/` instead of `.agents/`."
             ),
-            tool_families=("exec_command", "afol", "new", "start", "done", "python"),
+            tool_families=("exec_command", "afold", "new", "start", "done", "python"),
             scope="Controlled end-to-end mutation of a tiny downstream project plus one `.afol/wb` session.",
             context_artifacts=(
                 "AGENTS.md",
-                "afol",
+                ".env",
+                "afold",
                 ".agents/agents.config",
                 "docs/benchmark_problem.md",
                 "app/runtime_policy.json",
@@ -2377,13 +2705,16 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 AFOL_POLICY_CHECK_COMMAND,
             ),
             any_required_command_groups=(
-                ("./afol new", "./afol n"),
-                ("./afol start", "./afol st"),
-                ("./afol evidence", "./afol e"),
-                ("./afol done", "./afol d", "['./afol', 'done'"),
+                (f"{AFOLD_COMMAND} new", f"{AFOLD_COMMAND} n"),
+                (f"{AFOLD_COMMAND} start", f"{AFOLD_COMMAND} st"),
+                (f"{AFOLD_COMMAND} evidence", f"{AFOLD_COMMAND} e"),
+                (f"{AFOLD_COMMAND} done", f"{AFOLD_COMMAND} d", f"['{AFOLD_COMMAND}', 'done'"),
             ),
             forbidden_command_substrings=(
+                *BARE_AFOL_DISCOVERY_COMMANDS,
                 ".agents/agents",
+                "./afol ",
+                "['./afol'",
                 "./a ",
                 "cat > .afol/wb",
                 "tee .afol/wb",
@@ -2400,27 +2731,14 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             ),
             response_schema=_afol_provider_delivery_schema(),
             prompt=(
-                "You are running inside a controlled downstream AFOL benchmark project.\n"
-                "Rules:\n"
-                "- Use tools and inspect local files as needed. Do not answer from memory.\n"
-                "- Do not inspect global skills, `/home/ozy/.codex`, `/home/ozy/.agents`, or files outside this downstream project.\n"
-                "- Use `./afol` for all workbench/session/task/evidence operations.\n"
-                "- Do not use `.agents/agents`.\n"
-                "- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n"
-                "- Keep this bounded: at most 10 shell commands unless a command fails and needs one focused recovery.\n"
-                "- Implement the smallest product change only.\n"
-                "- Return JSON only that matches the provided schema.\n\n"
-                "Task:\n"
-                "Deliver `docs/benchmark_problem.md` end-to-end in this downstream project.\n"
-                "Expected fast path:\n"
-                "1. Run `./afol new afol-provider-benchmark --feature-id F-AFOL --parent-spec BENCH-AFOL --task \"Update runtime policy for AFOL provider-compatible state\"` and capture the session id.\n"
-                "2. Run `./afol start --session <session-id> --task-id T-01` before product edits.\n"
-                "3. Edit only `app/runtime_policy.json` so the acceptance check can pass.\n"
-                f"4. Run `{AFOL_POLICY_CHECK_COMMAND}`.\n"
-                f"5. Run `./afol evidence --session <session-id> --task-id T-01 --command \"{AFOL_POLICY_CHECK_COMMAND}\" --result passed --artifact app/runtime_policy.json`.\n"
-                "6. Run `./afol done --session <session-id> --task-id T-01`.\n"
-                "7. Inspect `.afol/wb/<session-id>/.evidence.jsonl`, the task file, and `./afol status --json`.\n"
-                "Report the created session id, whether the problem was fixed, whether verification passed, whether `afol new/start/evidence/done` were used, whether T-01 is done, whether evidence exists, whether you manually edited `.afol/wb`, and whether `.agents/wb` was created."
+                "You are running inside a controlled downstream benchmark project.\n"
+                "Work only inside this project. Do not inspect global skills or files outside it.\n"
+                "I have a problem in this project. Read the local instructions, make a short plan, "
+                "solve the issue described in `docs/benchmark_problem.md`, validate it, record evidence if "
+                "the local workflow requires it, and return JSON only matching the provided schema.\n"
+                "Report the session id if one exists, whether the problem was fixed, whether verification "
+                "passed, whether expected local lifecycle commands were used, whether T-01 is done, whether "
+                "evidence exists, whether workbench files were manually edited, and whether `.agents/wb` was created."
             ),
             validator=_validate_afol_provider_delivery,
             validation_check_count=12,
@@ -2431,15 +2749,16 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             id="live-afol-python-code-task-orchestrated",
             description="Run a planner/executor live-agent benchmark against a tiny Python code task through AFOL.",
             purpose=(
-                "Measure whether lightweight agents can create meaningful AFOL plan/task artifacts, execute a bounded "
+                "Measure whether lightweight agents can create meaningful AFOL plan/task artifacts through `afold`, execute a bounded "
                 "code task, write a coherent delivery report, mark task state correctly, record evidence, and stay fast "
                 "with low tool and token cost."
             ),
-            tool_families=("exec_command", "afol", "planner", "executor", "python"),
+            tool_families=("exec_command", "afold", "planner", "executor", "python"),
             scope=f"Controlled mutation of `{CODE_TASK_PROJECT_DIR}` plus one `.afol/wb` session.",
             context_artifacts=(
                 "AGENTS.md",
-                "afol",
+                ".env",
+                "afold",
                 "docs/benchmark_problem.md",
                 f"{CODE_TASK_PROJECT_DIR}/README.md",
                 f"{CODE_TASK_PROJECT_DIR}/src/text_utils.py",
@@ -2447,13 +2766,16 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             ),
             required_command_substrings=(CODE_TASK_CHECK_COMMAND,),
             any_required_command_groups=(
-                ("./afol new", "./afol n"),
-                ("./afol start", "./afol st"),
-                ("./afol evidence", "./afol e"),
-                ("./afol done", "./afol d", "['./afol', 'done'"),
+                (f"{AFOLD_COMMAND} new", f"{AFOLD_COMMAND} n"),
+                (f"{AFOLD_COMMAND} start", f"{AFOLD_COMMAND} st"),
+                (f"{AFOLD_COMMAND} evidence", f"{AFOLD_COMMAND} e"),
+                (f"{AFOLD_COMMAND} done", f"{AFOLD_COMMAND} d", f"['{AFOLD_COMMAND}', 'done'"),
             ),
             forbidden_command_substrings=(
+                *BARE_AFOL_DISCOVERY_COMMANDS,
                 ".agents/agents",
+                "./afol ",
+                "['./afol'",
                 "./a ",
                 "cat > .afol/wb",
                 "tee .afol/wb",
@@ -2707,15 +3029,6 @@ def _parse_observed_tool_data(stdout: str) -> tuple[list[dict[str, Any]], int, i
     return tool_calls, error_count, retry_count
 
 
-TOKEN_USAGE_KEYS = {
-    "input_tokens",
-    "output_tokens",
-    "total_tokens",
-    "cached_input_tokens",
-    "reasoning_output_tokens",
-}
-
-
 def _walk_dicts(value: Any) -> list[dict[str, Any]]:
     dicts: list[dict[str, Any]] = []
     if isinstance(value, dict):
@@ -2729,29 +3042,28 @@ def _walk_dicts(value: Any) -> list[dict[str, Any]]:
 
 
 def _parse_token_usage(stdout: str) -> dict[str, Any]:
-    usage: dict[str, int] = {key: 0 for key in TOKEN_USAGE_KEYS}
+    usage: dict[str, int] = {key: 0 for key in RAW_TOKEN_USAGE_KEYS}
     for event in _observed_events_from_stdout(stdout):
         for candidate in _walk_dicts(event):
-            if not any(key in candidate for key in TOKEN_USAGE_KEYS):
+            if not any(key in candidate for key in RAW_TOKEN_USAGE_KEYS):
                 continue
-            for key in TOKEN_USAGE_KEYS:
+            for key in RAW_TOKEN_USAGE_KEYS:
                 value = candidate.get(key)
                 if isinstance(value, (int, float)) and value >= 0:
                     usage[key] = max(usage[key], int(value))
     available = any(value > 0 for value in usage.values())
-    if available and usage["total_tokens"] == 0:
-        usage["total_tokens"] = usage["input_tokens"] + usage["output_tokens"]
     return {
         "available": available,
-        **usage,
+        **_normalized_token_usage(usage),
     }
 
 
 def _merge_token_usage(usages: list[dict[str, Any]]) -> dict[str, Any]:
     merged = {key: 0 for key in TOKEN_USAGE_KEYS}
     for usage in usages:
+        normalized = _normalized_token_usage(usage)
         for key in TOKEN_USAGE_KEYS:
-            value = usage.get(key)
+            value = normalized.get(key)
             if isinstance(value, int):
                 merged[key] += value
     return {
@@ -2834,7 +3146,7 @@ def _artifact_text(path: Path, repo_root: Path, *, max_chars: int = 8000) -> dic
 def _afol_status_json(repo_root: Path) -> dict[str, Any]:
     try:
         completed = subprocess.run(
-            ["./afol", "status", "--json"],
+            [AFOLD_COMMAND, "status", "--json"],
             cwd=repo_root,
             capture_output=True,
             text=True,
@@ -2915,7 +3227,7 @@ def _live_scenario_command(
 ) -> list[str]:
     mutable_state_dir = ".afol" if scenario.id == "live-afol-provider-compatible-delivery" else ".agents"
     command = [
-        "codex",
+        _codex_executable(),
         "exec",
         "--json",
         "--ephemeral",
@@ -2964,7 +3276,7 @@ def _codex_phase_command(
     mutable_state_dir: str = ".afol",
 ) -> list[str]:
     return [
-        "codex",
+        _codex_executable(),
         "exec",
         "--json",
         "--ephemeral",
@@ -3001,22 +3313,13 @@ def _codex_phase_command(
 def _code_task_planner_prompt() -> str:
     return (
         "You are the planner agent in a controlled AFOL code-task benchmark.\n"
-        "Rules:\n"
-        "- Use shell tools. Do not answer from memory.\n"
-        f"- Work only with `docs/benchmark_problem.md`, `{CODE_TASK_PROJECT_DIR}/`, and `.afol/`.\n"
-        "- Use `./afol` for plan/task operations.\n"
-        f"- The acceptance script is `{CODE_TASK_CHECK_COMMAND}` at repository root; there is no `{CODE_TASK_PROJECT_DIR}/scripts/` directory.\n"
-        "- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n"
-        "- Do not edit product code; planner only creates the AFOL session.\n"
-        "- Keep this ultra fast: at most 4 shell commands.\n"
-        "- Return JSON only that matches the provided schema.\n\n"
-        "Task:\n"
-        "1. Inspect `docs/benchmark_problem.md` and the tiny Python project enough to understand the task.\n"
-        "2. Run `./afol new code-task-benchmark --feature-id F-CODE --parent-spec BENCH-CODE --task \"Implement slugify(text) in test-code-task-project/src/text_utils.py and verify with python3 scripts/check_slugify.py\"` and capture the session id.\n"
-        "3. Inspect the generated `.afol/wb/<session>/<session>_plan_01.md` and `.afol/wb/<session>/<session>_task_01.md` files only; do not inspect or assume a nested project `.afol` directory.\n"
-        f"4. Confirm the plan/task mention `slugify`, `{CODE_TASK_PROJECT_DIR}`, `{CODE_TASK_PROJECT_DIR}/src/text_utils.py`, `T-01`, and `{CODE_TASK_CHECK_COMMAND}`.\n"
-        "5. Judge whether the generated plan is coherent/actionable and the generated task is specific/actionable.\n"
-        "6. Return the session id and planner checks."
+        "Work only inside this project. Do not inspect global skills or files outside it.\n"
+        "Read the local instructions and `docs/benchmark_problem.md`, then create the local workflow "
+        "plan/task needed for the described code problem. This phase is planning only; do not edit "
+        "product code. Return JSON only matching the provided schema.\n"
+        "Report the session id if one exists, whether a plan and task were created, whether expected "
+        "local lifecycle commands were used, whether the plan/task are coherent and actionable, and "
+        "whether they name the problem, target path, task id, and acceptance check."
     )
 
 
@@ -3030,31 +3333,26 @@ def _code_task_executor_prompt(session_id: str, *, recovery: bool = False) -> st
     )
     return (
         f"You are the {phase} agent in a controlled AFOL code-task benchmark.\n"
-        "Rules:\n"
-        "- Use shell tools. Do not answer from memory.\n"
-        f"- Work only in `{CODE_TASK_PROJECT_DIR}/`, `.afol/`, and the read-only check script `scripts/check_slugify.py`.\n"
-        f"- The acceptance script is `scripts/check_slugify.py`; do not look for a `{CODE_TASK_PROJECT_DIR}/scripts/` directory.\n"
-        f"- You may edit only `{CODE_TASK_PROJECT_DIR}/src/text_utils.py` and `{CODE_TASK_PROJECT_DIR}/benchmark_report.md`.\n"
-        "- Use `./afol` for task state, evidence, and closure.\n"
-        "- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n"
-        "- Keep this ultra fast: at most 8 shell commands unless one command fails and needs one focused recovery.\n"
-        "- Return JSON only that matches the provided schema.\n\n"
+        "Work only inside this project. Do not inspect global skills or files outside it.\n"
         f"{recovery_note}"
-        "Task:\n"
-        f"1. Use existing session `{session_id}`.\n"
-        f"2. Run `./afol start --session {session_id} --task-id T-01` if T-01 is not already started.\n"
-        f"3. Implement `slugify(text)` in `{CODE_TASK_PROJECT_DIR}/src/text_utils.py`.\n"
-        f"4. Run `{CODE_TASK_CHECK_COMMAND}`.\n"
-        f"5. Write `{CODE_TASK_PROJECT_DIR}/benchmark_report.md` with a concise coherent report containing the session id, T-01 status, slugify fix summary, `{CODE_TASK_CHECK_COMMAND}` result, evidence status, and changed files.\n"
-        f"6. Run `./afol evidence --session {session_id} --task-id T-01 --command \"{CODE_TASK_CHECK_COMMAND}\" --result passed --artifact {CODE_TASK_PROJECT_DIR}/benchmark_report.md`.\n"
-        f"7. Run `./afol done --session {session_id} --task-id T-01`.\n"
-        f"8. Inspect `.afol/wb/{session_id}/.evidence.jsonl`, `.afol/wb/{session_id}/{session_id}_task_01.md`, `{CODE_TASK_PROJECT_DIR}/benchmark_report.md`, and `git status --short`.\n"
-        f"9. Return phase `{phase}`, session id, whether the problem was fixed, verification passed, AFOL commands were used, T-01 is done, evidence exists, report is written/coherent, task is marked correct, no manual `.afol/wb` edit happened, and only allowed paths changed."
+        f"Use existing session `{session_id}`. Read the local instructions, the problem brief, and the "
+        "created plan/task. Complete the described code task through the local workflow, make the "
+        "smallest product change, run the acceptance check, write a compact delivery report, and record "
+        "evidence if the workflow requires it. Return JSON only matching the provided schema.\n"
+        f"Report phase `{phase}`, session id, whether the problem was fixed, verification passed, expected "
+        "local lifecycle commands were used, T-01 is done, evidence exists, report is written and "
+        "coherent, task state is correct, no workbench files were manually edited, and only allowed paths changed."
     )
 
 
-def _live_scenario_env(scenario: LiveBenchmarkScenario) -> dict[str, str]:
-    env = _benchmark_env()
+def _live_scenario_env(scenario: LiveBenchmarkScenario, fixture_root: Path) -> dict[str, str]:
+    hide_bare_afol = scenario.id in AFOL_FIXTURE_SCENARIOS
+    env = _benchmark_env(
+        hide_bare_afol=hide_bare_afol,
+        isolated_zdotdir=fixture_root / ".afol" / "tmp" / "benchmarks" / "zdotdir"
+        if hide_bare_afol
+        else None,
+    )
     if scenario.id == "live-autonomous-agentic-folder-delivery":
         env["AGENTS_PROTECTED_SESSION_IDS"] = FIXTURE_WORKSTREAM_ID
     return env
@@ -3096,7 +3394,7 @@ def _run_codex_phase(
             capture_output=True,
             text=True,
             timeout=timeout_seconds,
-            env=_benchmark_env(),
+            env=_benchmark_env(hide_bare_afol=True, isolated_zdotdir=tmp_dir / "zdotdir"),
         )
         returncode = completed.returncode
         stdout = completed.stdout or ""
@@ -3332,7 +3630,7 @@ def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfil
                 capture_output=True,
                 text=True,
                 timeout=scenario.timeout_seconds,
-                env=_live_scenario_env(scenario),
+                env=_live_scenario_env(scenario, fixture_root),
             )
             returncode = completed.returncode
             stdout = completed.stdout or ""
@@ -3441,7 +3739,10 @@ def run_suite(
     run_scenario = executor or _run_default_scenario
 
     started_at = time.perf_counter()
-    scenario_results = [run_scenario(SCENARIOS[scenario_id], profile) for scenario_id in selected_ids]
+    scenario_results = [
+        _enforce_token_budget(run_scenario(SCENARIOS[scenario_id], profile))
+        for scenario_id in selected_ids
+    ]
     total_duration_ms = round((time.perf_counter() - started_at) * 1000)
 
     payload = {

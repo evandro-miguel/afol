@@ -15,8 +15,6 @@ The maintained command surface is `afol`.
 afol --help
 afol status
 afol validate
-afol benchmark list
-afol benchmark run --save
 afol new <theme> --feature-id F-01 --parent-spec <spec-id>
 afol start --task-id T-01
 afol evidence T-01 --command "afol validate" --result passed

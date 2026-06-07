@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -33,8 +34,86 @@ def test_catalog_contains_live_scenarios():
         "live-afol-python-code-task-orchestrated",
     } <= set(benchmark.SCENARIOS)
     assert benchmark.DEFAULT_PROFILE.model == "gpt-5.4-mini"
-    assert benchmark.DEFAULT_PROFILE.reasoning_effort == "medium"
+    assert benchmark.DEFAULT_PROFILE.reasoning_effort == "low"
     assert benchmark.BENCHMARK_PACK_ID == "runtime-flow-live-agent-v4"
+
+
+def test_autonomous_scenario_requires_project_local_skill_without_prompt_recipe():
+    benchmark = load_module()
+    scenario = benchmark.SCENARIOS["live-autonomous-agentic-folder-delivery"]
+    prompt = scenario.prompt
+
+    assert benchmark.AGENTIC_FOLDER_SKILL_PATH in scenario.context_artifacts
+    assert benchmark.AGENTIC_FOLDER_SKILL_PATH in scenario.required_command_substrings
+    assert benchmark.AGENTIC_FOLDER_SKILL_PATH not in prompt
+    assert "--task" in scenario.required_command_substrings
+    assert "--intent delivery" in scenario.required_command_substrings
+    assert "docs/benchmark_problem.md" in prompt
+    assert "Fast path:" not in prompt
+    assert "at most 7 shell commands" not in prompt
+    assert "./.agents/agents new" not in prompt
+    assert "./.agents/agents implement start" not in prompt
+    assert "./.agents/agents implement complete" not in prompt
+    assert benchmark.RUNTIME_POLICY_CHECK_COMMAND not in prompt
+    assert "/home/ozy/.codex" in scenario.forbidden_command_substrings
+    assert "/home/ozy/.agents" in scenario.forbidden_command_substrings
+    for forbidden in (
+        *benchmark.BARE_AFOL_DISCOVERY_COMMANDS,
+        "--help",
+        "rg ",
+        "find .agents/wb",
+        "xargs",
+        f".agents/wb/{benchmark.FIXTURE_WORKSTREAM_ID}",
+        ".agents/policy.md",
+        "ls -1 .agents",
+        "ls -1 .agents/rules",
+    ):
+        assert forbidden in scenario.forbidden_command_substrings
+
+
+def test_afol_fixture_scenarios_use_development_afold_launcher():
+    benchmark = load_module()
+
+    for scenario_id in benchmark.AFOL_FIXTURE_SCENARIOS:
+        scenario = benchmark.SCENARIOS[scenario_id]
+        command_groups = [command for group in scenario.any_required_command_groups for command in group]
+
+        assert "afold" in scenario.context_artifacts
+        assert "afol" not in scenario.context_artifacts
+        assert "./afold new" in command_groups
+        assert "./afold start" in command_groups
+        assert "./afold evidence" in command_groups
+        assert "./afold done" in command_groups
+        assert "./afol " in scenario.forbidden_command_substrings
+        assert "['./afol'" in scenario.forbidden_command_substrings
+        assert "./afol new" not in command_groups
+        assert "./afol start" not in command_groups
+        assert "./afol evidence" not in command_groups
+        assert "./afol done" not in command_groups
+
+
+def test_afol_provider_delivery_prompt_is_not_a_lifecycle_recipe():
+    benchmark = load_module()
+    scenario_id = "live-afol-provider-compatible-delivery"
+    prompt = benchmark.SCENARIOS[scenario_id].prompt
+
+    assert benchmark.MAX_TOOL_CALLS_BY_SCENARIO[scenario_id] == 16
+    assert "docs/benchmark_problem.md" in prompt
+    assert "Expected fast path" not in prompt
+    assert "at most 16 shell commands" not in prompt
+    assert "Use `./afold`" not in prompt
+    assert "./afold new" not in prompt
+    assert "./afold start" not in prompt
+    assert "./afold evidence" not in prompt
+    assert "./afold done" not in prompt
+
+
+def test_fixture_agents_text_points_to_project_local_skill():
+    benchmark = load_module()
+    agents_text = benchmark._fixture_agents_text()
+
+    assert benchmark.AGENTIC_FOLDER_SKILL_PATH in agents_text
+    assert "Do not inspect global skills" in agents_text
 
 
 def test_fixture_roadmap_matches_agents_new_feature_heading_contract():
@@ -79,6 +158,85 @@ def test_live_scenario_command_uses_current_sandbox_flag(tmp_path):
     assert command[command.index("-s") + 1] == "workspace-write"
 
 
+def test_benchmark_env_can_hide_bare_afol_path(tmp_path, monkeypatch):
+    benchmark = load_module()
+    afol_bin = tmp_path / "global-bin"
+    keep_bin = tmp_path / "keep-bin"
+    afol_bin.mkdir()
+    keep_bin.mkdir()
+    afol = afol_bin / "afol"
+    afol.write_text("#!/bin/sh\n", encoding="utf-8")
+    afol.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{afol_bin}:{keep_bin}")
+
+    env = benchmark._benchmark_env(hide_bare_afol=True)
+
+    assert str(afol_bin) not in env["PATH"].split(":")
+    assert str(keep_bin) in env["PATH"].split(":")
+
+
+def test_benchmark_env_isolates_zsh_login_shell(tmp_path, monkeypatch):
+    benchmark = load_module()
+    afol_bin = tmp_path / "global-bin"
+    keep_bin = tmp_path / "keep-bin"
+    zdotdir = tmp_path / "zdotdir"
+    afol_bin.mkdir()
+    keep_bin.mkdir()
+    afol = afol_bin / "afol"
+    afol.write_text("#!/bin/sh\n", encoding="utf-8")
+    afol.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{afol_bin}:{keep_bin}")
+
+    env = benchmark._benchmark_env(hide_bare_afol=True, isolated_zdotdir=zdotdir)
+    completed = subprocess.run(
+        ["/usr/bin/zsh", "-lc", "printf '%s\n' \"$PATH\"; command -v afol || true"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert (zdotdir / ".zshenv").exists()
+    assert str(keep_bin) in completed.stdout
+    assert str(afol_bin) not in completed.stdout
+
+
+def test_afold_fixture_launcher_writes_local_env(tmp_path):
+    benchmark = load_module()
+    dist_binary = tmp_path / "dist-afol"
+    dist_binary.write_text("#!/bin/sh\n", encoding="utf-8")
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / "afol").write_text("#!/bin/sh\n", encoding="utf-8")
+    (target / "a").write_text("#!/bin/sh\n", encoding="utf-8")
+
+    benchmark._write_afold_fixture_launcher(target, dist_binary)
+
+    assert (target / "afold").exists()
+    assert not (target / "afol").exists()
+    assert not (target / "a").exists()
+    assert (target / ".afol" / "bin" / "afold-runtime").exists()
+    assert (target / ".env").read_text(encoding="utf-8") == (
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nAFOL_BIN=./afold\nAFOLD_BIN=./afold\n"
+    )
+
+
+def test_live_scenario_command_uses_absolute_codex_path(tmp_path, monkeypatch):
+    benchmark = load_module()
+    scenario = benchmark.SCENARIOS["live-tools-benchmark-discovery"]
+    monkeypatch.setattr(benchmark.shutil, "which", lambda name: "/tmp/codex" if name == "codex" else None)
+
+    command = benchmark._live_scenario_command(
+        scenario,
+        benchmark.DEFAULT_PROFILE,
+        tmp_path,
+        tmp_path / "schema.json",
+        tmp_path / "output.json",
+    )
+
+    assert command[0] == "/tmp/codex"
+
+
 def test_parse_observed_tool_data_counts_errors_and_retries():
     benchmark = load_module()
     stdout = "\n".join(
@@ -114,6 +272,8 @@ def test_parse_token_usage_collects_response_usage():
     assert usage["output_tokens"] == 7
     assert usage["total_tokens"] == 19
     assert usage["cached_input_tokens"] == 3
+    assert usage["uncached_input_tokens"] == 9
+    assert usage["uncached_total_tokens"] == 16
     assert usage["reasoning_output_tokens"] == 2
 
 
@@ -125,6 +285,7 @@ def test_parse_token_usage_derives_total_when_codex_omits_it():
 
     assert usage["available"] is True
     assert usage["total_tokens"] == 29
+    assert usage["uncached_total_tokens"] == 16
 
 
 def test_forbidden_commands_absent_reports_manual_wb_edits():
@@ -282,7 +443,7 @@ def test_collect_afol_delivery_artifacts_preserves_generated_files(tmp_path):
         '{"workflow_mode":"afol","mutable_state":".afol","evidence_required":true}\n',
         encoding="utf-8",
     )
-    launcher = tmp_path / "afol"
+    launcher = tmp_path / "afold"
     launcher.write_text(
         "#!/usr/bin/env bash\nprintf '%s\\n' '{\"status\":\"done\",\"session_count\":1}'\n",
         encoding="utf-8",
@@ -302,6 +463,158 @@ def test_collect_afol_delivery_artifacts_preserves_generated_files(tmp_path):
     assert artifacts["task"]["content"].startswith("| T-01 | done |")
     assert "check_afol_policy.py" in artifacts["evidence_jsonl"]["content"]
     assert '"mutable_state":".afol"' in artifacts["runtime_policy"]["content"]
+
+
+def test_score_autonomous_plan_quality_accepts_concrete_plan_and_task():
+    benchmark = load_module()
+    plan_text = (
+        "# Plan\n\n"
+        "## Steps\n"
+        "- T-01: Fix runtime policy in app/runtime_policy.json for agentic-folder governed workflow.\n"
+        "- Use .agents/agents for governed task state and evidence; keep scripts/check_runtime_policy.py read-only.\n"
+        "- Verify with python scripts/check_runtime_policy.py.\n\n"
+        "## Validation\n"
+        "- Record evidence from python scripts/check_runtime_policy.py before marking T-01 done.\n"
+    )
+    task_text = (
+        "| T-01 | done | worker | Fix app/runtime_policy.json for agentic-folder governed workflow "
+        "and verify with python scripts/check_runtime_policy.py. |\n"
+    )
+
+    quality = benchmark._score_autonomous_plan_quality(plan_text, task_text)
+
+    assert quality["score"] == 100
+    assert quality["pass"] is True
+    assert sum(item["weight"] for item in quality["criteria"]) == 100
+
+
+def test_score_autonomous_plan_quality_accepts_runtime_policy_identifier_style():
+    benchmark = load_module()
+    plan_text = (
+        "# Plan\n\n"
+        "## Execution Plan\n"
+        "- T-01: Fix app/runtime_policy.json to require agentic-folder governed workflow.\n"
+        "- Use .agents/agents for governed task state and evidence in .agents/wb.\n\n"
+        "## Validation\n"
+        "- Run python scripts/check_runtime_policy.py and record evidence before marking T-01 done.\n"
+    )
+    task_text = (
+        "| T-01 | done | worker | Fix app/runtime_policy.json to require agentic-folder governed workflow "
+        "and verify with python scripts/check_runtime_policy.py. |\n"
+    )
+
+    quality = benchmark._score_autonomous_plan_quality(plan_text, task_text)
+
+    assert quality["score"] == 100
+    assert quality["pass"] is True
+
+
+def test_score_autonomous_plan_quality_rejects_template_placeholders():
+    benchmark = load_module()
+
+    quality = benchmark._score_autonomous_plan_quality(
+        "# Plan\n\n## Concrete Steps\n- <exact edit or command and expected outcome>\n",
+        "| T-01 | done | worker | <path> <command> |\n",
+    )
+
+    assert quality["score"] < benchmark.AUTONOMOUS_PLAN_QUALITY_THRESHOLD
+    assert quality["pass"] is False
+    failed_ids = {item["id"] for item in quality["criteria"] if not item["passed"]}
+    assert {"scope_target", "execution_path", "validation_evidence", "task_executability"} <= failed_ids
+
+
+def test_score_autonomous_plan_quality_rejects_placeholders_in_otherwise_valid_artifact():
+    benchmark = load_module()
+    plan_text = (
+        "# Plan\n\n"
+        "## Steps\n"
+        "- T-01: Fix runtime policy in app/runtime_policy.json for agentic-folder governed workflow.\n"
+        "- Use .agents/agents for governed task state and evidence; keep scripts/check_runtime_policy.py read-only.\n"
+        "- Verify with python scripts/check_runtime_policy.py.\n"
+        "- <observable proof or metric>\n\n"
+        "## Validation\n"
+        "- Record evidence from python scripts/check_runtime_policy.py before marking T-01 done.\n"
+    )
+    task_text = (
+        "| T-01 | done | worker | Fix app/runtime_policy.json for agentic-folder governed workflow "
+        "and verify with python scripts/check_runtime_policy.py. |\n"
+    )
+
+    quality = benchmark._score_autonomous_plan_quality(plan_text, task_text)
+
+    assert quality["pass"] is False
+    assert "scope_target" in quality["required_failures"]
+
+
+def test_validate_autonomous_delivery_rejects_template_plan_and_task(tmp_path):
+    benchmark = load_module()
+    session_id = "260607_1750_runtime-policy-fix"
+    session_dir = tmp_path / ".agents" / "wb" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_plan_01.md").write_text(
+        "# Runtime Policy Fix Plan\n\n"
+        "## Purpose\n"
+        "Explain what this change enables and how it supports F-19.\n\n"
+        "## Concrete Steps\n"
+        "- <exact edit or command and expected outcome>\n",
+        encoding="utf-8",
+    )
+    (session_dir / f"{session_id}_task_01.md").write_text(
+        "| T-01 | done | worker | <path> <command> |\n",
+        encoding="utf-8",
+    )
+    (session_dir / ".evidence.jsonl").write_text(
+        '{"task_id": "T-01", "command": "python scripts/check_runtime_policy.py", "result": "passed"}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "app").mkdir()
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "app" / "runtime_policy.json").write_text(
+        json.dumps(
+            {
+                "workflow_mode": "agentic-folder",
+                "default_execution": "governed",
+                "evidence_required": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "scripts" / "check_runtime_policy.py").write_text(
+        benchmark._runtime_policy_check_text(),
+        encoding="utf-8",
+    )
+
+    failures = benchmark._validate_autonomous_delivery(
+        {
+            "session_id": session_id,
+            "problem_fixed": True,
+            "verification_passed": True,
+            "plan_created": True,
+            "task_completed": True,
+            "evidence_recorded": True,
+            "used_governed_session": True,
+            "used_scripted_task_flow": True,
+            "manual_wb_task_edit": False,
+        },
+        tmp_path,
+    )
+
+    assert "autonomous plan/task still contains scaffold template placeholders" in failures
+    assert any("autonomous plan/task quality score" in failure for failure in failures)
+
+
+def test_autonomous_delivery_prompt_stays_simple_and_evaluator_owned():
+    benchmark = load_module()
+    prompt = benchmark.SCENARIOS["live-autonomous-agentic-folder-delivery"].prompt
+
+    assert "Read the local instructions" in prompt
+    assert "docs/benchmark_problem.md" in prompt
+    assert "return JSON only matching the provided schema" in prompt
+    assert "Do not polish or repair template prose" not in prompt
+    assert "must already be concrete" not in prompt
+    assert "do not manually rewrite workbench prose" not in prompt
+    assert "Do not manually edit workbench task state or evidence ledgers" not in prompt
+    assert "update only the created plan/task content" not in prompt
 
 
 def test_validate_code_task_planner_accepts_meaningful_afol_plan_and_task(tmp_path):
@@ -823,6 +1136,163 @@ def test_run_suite_aggregates_results_and_writes_output(tmp_path):
     assert output_path.exists()
 
 
+def test_run_suite_fails_when_scenario_exceeds_token_budget(tmp_path):
+    benchmark = load_module()
+    scenario_id = "live-tools-benchmark-discovery"
+    budget = benchmark.MAX_UNCACHED_TOKENS_BY_SCENARIO[scenario_id]
+
+    def fake_executor(scenario, profile):
+        return {
+            "id": scenario.id,
+            "backend": "live_agent",
+            "pass": True,
+            "duration_ms": 12,
+            "context_bytes": 100,
+            "prompt_bytes": 50,
+            "tool_call_count": 2,
+            "tool_success_count": 2,
+            "tool_success_rate": 1.0,
+            "error_count": 0,
+            "retry_count": 0,
+            "checks_total": 8,
+            "checks_passed": 8,
+            "accuracy": 1.0,
+            "observed_tool_calls": [{"name": "exec_command", "command_excerpt": "dummy"}],
+            "failure_reasons": [],
+            "output_json": {"scenario_id": scenario.id},
+            "output_excerpt": '{"scenario_id":"x"}',
+            "stdout_excerpt": "",
+            "stderr_excerpt": "",
+            "command": ["codex", "exec"],
+            "token_usage": {
+                "available": True,
+                "input_tokens": budget + 1,
+                "output_tokens": 0,
+                "total_tokens": budget + 1,
+                "cached_input_tokens": 0,
+                "reasoning_output_tokens": 0,
+            },
+        }
+
+    payload = benchmark.run_suite(
+        [scenario_id],
+        benchmark.DEFAULT_PROFILE,
+        tmp_path / "runtime-flow-live-agent.json",
+        executor=fake_executor,
+    )
+
+    scenario = payload["scenarios"][0]
+    assert payload["pass"] is False
+    assert scenario["pass"] is False
+    assert scenario["checks_total"] == 8
+    assert scenario["checks_passed"] == 7
+    assert scenario["accuracy"] == 0.875
+    assert scenario["failure_reasons"] == [
+        f"token budget exceeded: uncached_total_tokens {budget + 1} > {budget}"
+    ]
+
+
+def test_run_suite_does_not_fail_token_budget_on_cached_input(tmp_path):
+    benchmark = load_module()
+    scenario_id = "live-tools-benchmark-discovery"
+    budget = benchmark.MAX_UNCACHED_TOKENS_BY_SCENARIO[scenario_id]
+
+    def fake_executor(scenario, profile):
+        return {
+            "id": scenario.id,
+            "backend": "live_agent",
+            "pass": True,
+            "duration_ms": 12,
+            "context_bytes": 100,
+            "prompt_bytes": 50,
+            "tool_call_count": 2,
+            "tool_success_count": 2,
+            "tool_success_rate": 1.0,
+            "error_count": 0,
+            "retry_count": 0,
+            "checks_total": 8,
+            "checks_passed": 8,
+            "accuracy": 1.0,
+            "observed_tool_calls": [{"name": "exec_command", "command_excerpt": "dummy"}],
+            "failure_reasons": [],
+            "output_json": {"scenario_id": scenario.id},
+            "output_excerpt": '{"scenario_id":"x"}',
+            "stdout_excerpt": "",
+            "stderr_excerpt": "",
+            "command": ["codex", "exec"],
+            "token_usage": {
+                "available": True,
+                "input_tokens": 1_000_000,
+                "output_tokens": budget,
+                "total_tokens": 1_000_000 + budget,
+                "cached_input_tokens": 1_000_000,
+                "reasoning_output_tokens": 0,
+            },
+        }
+
+    payload = benchmark.run_suite(
+        [scenario_id],
+        benchmark.DEFAULT_PROFILE,
+        tmp_path / "runtime-flow-live-agent.json",
+        executor=fake_executor,
+    )
+
+    assert payload["pass"] is True
+    assert payload["token_usage"]["uncached_total_tokens"] == budget
+
+
+def test_run_suite_fails_when_scenario_exceeds_tool_budget(tmp_path):
+    benchmark = load_module()
+    scenario_id = "live-autonomous-agentic-folder-delivery"
+    budget = benchmark.MAX_TOOL_CALLS_BY_SCENARIO[scenario_id]
+
+    def fake_executor(scenario, profile):
+        return {
+            "id": scenario.id,
+            "backend": "live_agent",
+            "pass": True,
+            "duration_ms": 12,
+            "context_bytes": 100,
+            "prompt_bytes": 50,
+            "tool_call_count": budget + 1,
+            "tool_success_count": budget + 1,
+            "tool_success_rate": 1.0,
+            "error_count": 0,
+            "retry_count": 0,
+            "checks_total": 8,
+            "checks_passed": 8,
+            "accuracy": 1.0,
+            "observed_tool_calls": [{"name": "exec_command", "command_excerpt": "dummy"}],
+            "failure_reasons": [],
+            "output_json": {"scenario_id": scenario.id},
+            "output_excerpt": '{"scenario_id":"x"}',
+            "stdout_excerpt": "",
+            "stderr_excerpt": "",
+            "command": ["codex", "exec"],
+            "token_usage": {
+                "available": True,
+                "input_tokens": 1,
+                "output_tokens": 1,
+                "total_tokens": 2,
+                "cached_input_tokens": 0,
+                "reasoning_output_tokens": 0,
+            },
+        }
+
+    payload = benchmark.run_suite(
+        [scenario_id],
+        benchmark.DEFAULT_PROFILE,
+        tmp_path / "runtime-flow-live-agent.json",
+        executor=fake_executor,
+    )
+
+    scenario = payload["scenarios"][0]
+    assert payload["pass"] is False
+    assert scenario["failure_reasons"] == [
+        f"tool call budget exceeded: tool_call_count {budget + 1} > {budget}"
+    ]
+
+
 def test_save_payload_updates_stable_snapshot_files(tmp_path):
     benchmark = load_module()
     benchmark.ROOT_DIR = tmp_path
@@ -848,6 +1318,14 @@ def test_save_payload_updates_stable_snapshot_files(tmp_path):
         "prompt_bytes_total": 80,
         "accuracy": 1.0,
         "tool_success_rate": 1.0,
+        "token_usage": {
+            "available": True,
+            "input_tokens": 9,
+            "output_tokens": 6,
+            "total_tokens": 15,
+            "cached_input_tokens": 3,
+            "reasoning_output_tokens": 2,
+        },
         "scenarios": [
             {
                 "id": "s1",
@@ -858,6 +1336,14 @@ def test_save_payload_updates_stable_snapshot_files(tmp_path):
                 "checks_passed": 5,
                 "error_count": 0,
                 "retry_count": 0,
+                "token_usage": {
+                    "available": True,
+                    "input_tokens": 4,
+                    "output_tokens": 3,
+                    "total_tokens": 7,
+                    "cached_input_tokens": 1,
+                    "reasoning_output_tokens": 1,
+                },
             },
             {
                 "id": "s2",
@@ -868,6 +1354,14 @@ def test_save_payload_updates_stable_snapshot_files(tmp_path):
                 "checks_passed": 5,
                 "error_count": 0,
                 "retry_count": 0,
+                "token_usage": {
+                    "available": True,
+                    "input_tokens": 5,
+                    "output_tokens": 3,
+                    "total_tokens": 8,
+                    "cached_input_tokens": 2,
+                    "reasoning_output_tokens": 1,
+                },
             },
         ],
     }
@@ -886,6 +1380,9 @@ def test_save_payload_updates_stable_snapshot_files(tmp_path):
     assert current_snapshot["saved_result_path"] == str(saved_path.relative_to(tmp_path))
     assert current_snapshot["summary"]["scenario_count"] == 2
     assert current_snapshot["summary"]["duration_ms"] == 200
+    assert current_snapshot["summary"]["token_usage_total"] == 15
+    assert current_snapshot["scenarios"][0]["token_usage"]["total_tokens"] == 7
+    assert current_snapshot["scenarios"][1]["token_usage"]["total_tokens"] == 8
     assert current_snapshot["efficiency"]["duration_ms_per_scenario"] == 100.0
     assert current_snapshot["efficiency"]["checks_per_second"] == 50.0
     assert current_snapshot["efficiency"]["tool_calls_per_second"] == 20.0

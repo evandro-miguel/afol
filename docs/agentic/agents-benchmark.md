@@ -19,7 +19,7 @@ fixture tasks.
 
 - runtime: `codex`
 - model: `gpt-5.4-mini`
-- reasoning_effort: `medium`
+- reasoning_effort: `low`
 
 ## Scenarios
 
@@ -37,15 +37,15 @@ fixture tasks.
 ## Commands
 
 ```bash
-./afol benchmark list
-./afol benchmark show live-implement-next-governance-preflight
-./afol benchmark run
-./afol benchmark run live-implement-start-complete-evidence --save
-./afol benchmark run live-wb-update-task-evidence-timeline --save
-./afol benchmark run live-wb-session-create-scripted-progress --save
-./afol benchmark run live-autonomous-agentic-folder-delivery --save
-./afol benchmark run live-afol-provider-compatible-delivery --save
-./afol benchmark run live-afol-python-code-task-orchestrated --save
+python3 .agents/scripts/agents-benchmark.py list
+python3 .agents/scripts/agents-benchmark.py show live-implement-next-governance-preflight
+python3 .agents/scripts/agents-benchmark.py run --model gpt-5.4-mini --reasoning-effort low
+python3 .agents/scripts/agents-benchmark.py run live-implement-start-complete-evidence --save --model gpt-5.4-mini --reasoning-effort low
+python3 .agents/scripts/agents-benchmark.py run live-wb-update-task-evidence-timeline --save --model gpt-5.4-mini --reasoning-effort low
+python3 .agents/scripts/agents-benchmark.py run live-wb-session-create-scripted-progress --save --model gpt-5.4-mini --reasoning-effort low
+python3 .agents/scripts/agents-benchmark.py run live-autonomous-agentic-folder-delivery --save --model gpt-5.4-mini --reasoning-effort low
+python3 .agents/scripts/agents-benchmark.py run live-afol-provider-compatible-delivery --save --model gpt-5.4-mini --reasoning-effort low
+python3 .agents/scripts/agents-benchmark.py run live-afol-python-code-task-orchestrated --save --model gpt-5.4-mini --reasoning-effort low
 ```
 
 ## Validation Bridge
@@ -63,7 +63,7 @@ fixture tasks.
   artifact with `pass=true` still fails validation when duration, tool success,
   or other scenario thresholds are violated.
 - Refresh live evidence with:
-  - `./afol benchmark run --save`
+  - `python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low`
 - If the tracked live snapshot is missing or only covers a partial scenario set,
   the validation pack returns `status=failed` with an actionable note that
   points to the refresh command.
@@ -71,6 +71,9 @@ fixture tasks.
 ## Contract
 
 - Runs `codex exec --json` in an isolated fixture repo
+- AFOL fixture scenarios install a local development launcher named `./afold`
+  inside the fixture. It points at the freshly built development binary and is
+  not packaged as the production `afol` CLI.
 - Requires bounded tool-driven task execution
 - Captures:
   - pass/fail
@@ -91,8 +94,11 @@ fixture tasks.
 - Validates that live agents call the expected scripts instead of only returning a plausible answer.
 - Fails targeted scenarios when forbidden manual workbench edits are observed.
 - Includes script-writing flows for session creation, task state, evidence, timeline entries, frontmatter status/touch, and frontmatter links.
-- Includes an autonomous hypothetical delivery scenario where the prompt does not name the exact scaffold commands; the agent must discover operations from AGENTS.md and the public tool catalog, prefer `.agents/agents` wrapper commands, create a governed session/plan, implement a tiny fixture fix, record evidence, complete the task, and run bounded acceptance verification.
+- Includes an autonomous hypothetical delivery scenario where the prompt does not name the exact scaffold commands; the agent must read `.agents/skills/agentic-folder-sys/SKILL.md`, discover operations from AGENTS.md and the public tool catalog, prefer `.agents/agents` wrapper commands, create a governed session/plan, implement a tiny fixture fix, record evidence, complete the task, and run bounded acceptance verification.
 - Includes AFOL provider-compatible scenarios where mutable operational state stays under `.afol/` instead of `.agents/wb/`.
+- AFOL provider-compatible scenarios must use `./afold`; `./afol`, `./a`, bare
+  `afol` discovery, global skills, and manual `.afol/wb` edits are failure
+  signals.
 - Autonomous benchmark scenarios should not rely on reading `.agents/scripts/*.py` internals to infer command routing.
 
 ## Qualitative Score

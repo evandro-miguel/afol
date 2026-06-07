@@ -73,7 +73,7 @@ risk_level: medium
 - Default benchmark profile:
   - `runtime`: `codex`
   - `model`: `gpt-5.4-mini`
-  - `reasoning_effort`: `medium`
+  - `reasoning_effort`: `low`
 - Default output contract:
   - overall `pass` / `fail`
   - total duration in milliseconds
@@ -123,7 +123,7 @@ risk_level: medium
 - [ ] A first controlled scenario pack runs without mutating the live workbench
 - [ ] JSON results include pass/fail, timing, retries/errors, and `context_bytes`
 - [ ] The default benchmark profile is explicit and uses `gpt-5.4-mini` with
-      `medium`
+      `low`
 - [ ] Docs and tests cover the new command surface and first scenario pack
 
 ---

@@ -5,6 +5,11 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
+const runtimeLiveBenchmarkProfile = {
+  runtime: "codex",
+  model: "gpt-5.4-mini",
+  reasoning_effort: "low",
+};
 
 function runKernel(args: string[], cwd = process.cwd()): ReturnType<typeof spawnSync> {
   return spawnSync("bun", [kernelPath, ...args], {
@@ -41,7 +46,14 @@ function readJson(path: string): Record<string, unknown> {
 function getRuntimeLiveArtifactPaths(root: string): { snapshotPath: string; savedResultPath: string } {
   const snapshotPath = join(root, ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json");
   const snapshot = readJson(snapshotPath);
+  snapshot.benchmark_profile = runtimeLiveBenchmarkProfile;
+  writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
   const savedResultPath = join(root, snapshot.saved_result_path as string);
+  if (existsSync(savedResultPath)) {
+    const savedResult = readJson(savedResultPath);
+    savedResult.benchmark_profile = runtimeLiveBenchmarkProfile;
+    writeFileSync(savedResultPath, `${JSON.stringify(savedResult, null, 2)}\n`);
+  }
   return { snapshotPath, savedResultPath };
 }
 
@@ -354,7 +366,9 @@ describe("validation command family", () => {
     expect(
       notes.some((entry) => entry.startsWith("runtime-live-agent-artifact:.agents/data/benchmarks/results/")),
     ).toBe(true);
-    expect(notes).toContain("runtime-live-agent-refresh:./afol benchmark run --save");
+    expect(notes).toContain(
+      "runtime-live-agent-refresh:python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low",
+    );
     expect(notes.some((entry) => entry.startsWith("runtime-live-artifact-incomplete:"))).toBe(true);
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
@@ -440,7 +454,9 @@ describe("validation command family", () => {
     expect(
       notes.some((entry) => entry.startsWith("runtime-live-agent-artifact:.agents/data/benchmarks/results/")),
     ).toBe(true);
-    expect(notes).toContain("runtime-live-agent-refresh:./afol benchmark run --save");
+    expect(notes).toContain(
+      "runtime-live-agent-refresh:python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low",
+    );
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
     expect(results.every((result) => result.status === "passed")).toBe(true);
@@ -531,6 +547,14 @@ describe("validation command family", () => {
           retry_count: 0,
           context_bytes: 1024,
           prompt_bytes: 240,
+          token_usage: {
+            available: true,
+            input_tokens: 1200,
+            output_tokens: 401,
+            total_tokens: 1601,
+            cached_input_tokens: 0,
+            reasoning_output_tokens: 0,
+          },
         },
       ];
       savedResult.pass = true;
@@ -555,6 +579,7 @@ describe("validation command family", () => {
     expect(target?.tool_success_rate).toBe(0.75);
     const notes = target?.notes as string[];
     expect(notes).toContain("threshold-below-min:min_tool_success_rate:0.75<0.98");
+    expect(notes).toContain("threshold-exceeded:max_output_tokens:401>400");
     const summary = payload.summary as Record<string, unknown>;
     expect(summary.passed).toBe(2);
     expect(summary.failed).toBe(1);
@@ -570,7 +595,7 @@ describe("validation command family", () => {
     expect(payload.pass).toBe(false);
     const notes = payload.notes as string[];
     expect(notes).toContain(
-      "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:./afol benchmark run --save",
+      "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low",
     );
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
@@ -578,7 +603,7 @@ describe("validation command family", () => {
     expect(
       results.every((entry) =>
         (entry.notes as string[]).includes(
-          "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:./afol benchmark run --save",
+          "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low",
         )),
     ).toBe(true);
     expect(payload.summary).toEqual({

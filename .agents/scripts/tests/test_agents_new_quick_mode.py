@@ -586,6 +586,59 @@ class AgentsNewQuickModeTests(unittest.TestCase):
             content,
         )
 
+    def test_delivery_artifacts_render_concrete_plan_and_task_without_template_placeholders(self):
+        script_path = Path(".agents/scripts/agents-new.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        agents_new = load_module("agents_new_delivery_artifacts_render_test", script_path)
+
+        args = {
+            "feature_id": "F-19",
+            "parent_spec": "260607_agentic-folder-benchmark_spec_01",
+            "child_spec": "260607_agentic-folder-benchmark_spec_02",
+            "pack": "",
+            "intent": "delivery",
+            "task": (
+                "Fix app/runtime_policy.json to require agentic-folder governed workflow "
+                "and verify with python scripts/check_runtime_policy.py"
+            ),
+        }
+
+        plan = agents_new._render_delivery_plan(
+            "260607_1750_runtime-policy-fix",
+            "runtime-policy-fix",
+            "2026-06-07T17:50:00-03:00",
+            args,
+        )
+        task = agents_new._render_delivery_task(
+            "260607_1750_runtime-policy-fix",
+            "runtime-policy-fix",
+            "2026-06-07T17:50:00-03:00",
+            args,
+        )
+        combined = f"{plan}\n{task}"
+
+        self.assertIn("app/runtime_policy.json", plan)
+        self.assertIn("python scripts/check_runtime_policy.py", plan)
+        self.assertIn(".agents/agents", plan)
+        self.assertIn(".agents/wb", plan)
+        self.assertIn("app/runtime_policy.json", task)
+        self.assertIn("python scripts/check_runtime_policy.py", task)
+        self.assertIn(
+            "| T-01 | pending | worker | Fix app/runtime_policy.json to require agentic-folder governed workflow and verify with python scripts/check_runtime_policy.py |",
+            task,
+        )
+        for placeholder in (
+            "<item>",
+            "<path>",
+            "<command",
+            "<exact edit",
+            "<observable proof",
+            "Replace this line",
+            "Explain what this change enables",
+            "YYYY-MM-DD",
+        ):
+            self.assertNotIn(placeholder, combined)
+
     def test_ordered_selected_doc_types_rejects_disallowed_artifacts_for_intent(self):
         script_path = Path(__file__).resolve().parent.parent / "agents-new.py"
         sys.path.insert(0, str(script_path.parent))

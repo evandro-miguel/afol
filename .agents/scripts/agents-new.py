@@ -647,6 +647,112 @@ def _build_template_replacements(session_id: str, args: Dict[str, object]) -> Di
     return replacements
 
 
+def _safe_markdown_cell(text: str) -> str:
+    """Keep generated task table cells valid."""
+    return " ".join(str(text or "").strip().replace("|", "/").split())
+
+
+def _delivery_artifact_frontmatter(
+    doc_type: str,
+    doc_prefix: str,
+    theme: str,
+    timestamp: str,
+    args: Dict[str, object],
+) -> list[str]:
+    """Build concrete frontmatter for task-backed delivery artifacts."""
+    doc_id = _artifact_doc_id(doc_prefix, doc_type)
+    other_type = "task" if doc_type == "plan" else "plan"
+    other_id = _artifact_doc_id(doc_prefix, other_type)
+    owners = ["orchestrator"] if doc_type == "plan" else ["worker", "tester"]
+    lines = [
+        "---",
+        f"doc_type: {doc_type}",
+        f"id: {doc_id}",
+        f"theme: {theme}",
+        "status: active",
+        "owners:",
+        *[f"- {owner}" for owner in owners],
+        "workstream_intent: delivery",
+        f"created_at: {timestamp}",
+        f"updated_at: {timestamp}",
+        f"roadmap_feature: {str(args.get('feature_id') or '')}",
+        f"parent_spec: {str(args.get('parent_spec') or '')}",
+        f"child_spec: {str(args.get('child_spec') or '')}",
+        "links:",
+        f"  roadmap: docs/arc/{ROADMAP_FILE.name}",
+        f"  {other_type}: {other_id}",
+        "---",
+        "",
+    ]
+    return lines
+
+
+def _render_delivery_plan(
+    doc_prefix: str,
+    theme: str,
+    timestamp: str,
+    args: Dict[str, object],
+) -> str:
+    """Render a concrete delivery plan from the executable task text."""
+    task = _safe_markdown_cell(args.get("task") or "Complete the selected delivery task and record evidence")
+    lines = _delivery_artifact_frontmatter("plan", doc_prefix, theme, timestamp, args)
+    lines.extend(
+        [
+            f"# Plan: {theme}",
+            "",
+            "## Purpose",
+            "",
+            f"- Deliver T-01: {task}",
+            "",
+            "## Execution Plan",
+            "",
+            f"- T-01: {task}",
+            "- Keep product edits scoped to the files named by T-01 or the governing brief.",
+            "- Use .agents/agents for task state and evidence in .agents/wb.",
+            "",
+            "## Validation",
+            "",
+            "- Run the verification command named in T-01 or the governing brief.",
+            "- Record passed evidence before marking T-01 done.",
+            "",
+            "## Closure Criteria",
+            "",
+            "- T-01 is done only after passed evidence exists.",
+            "- Final notes identify changed files and verification result.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _render_delivery_task(
+    doc_prefix: str,
+    theme: str,
+    timestamp: str,
+    args: Dict[str, object],
+) -> str:
+    """Render a concrete delivery task board from the executable task text."""
+    task = _safe_markdown_cell(args.get("task") or "Complete the selected delivery task and record evidence")
+    lines = _delivery_artifact_frontmatter("task", doc_prefix, theme, timestamp, args)
+    lines.extend(
+        [
+            f"# Tasks: {theme}",
+            "",
+            "## State Board",
+            "",
+            "| Task | State | Owner | Notes |",
+            "|------|-------|-------|-------|",
+            f"| T-01 | pending | worker | {task} |",
+            "",
+            "## Evidence Rule",
+            "",
+            "- T-01 can move to done only through task-scoped passed evidence.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _doc_prefix(session_id: str, args: Dict[str, object]) -> str:
     pack = str(args.get("pack") or "").strip()
     return f"{session_id}-{pack}" if pack else session_id
@@ -725,17 +831,35 @@ def _create_manifest_artifacts(
 ) -> None:
     """Render and create workstream artifacts from the declarative manifest."""
     for entry in _iter_workstream_artifacts(args):
-        template = load_template(entry["template"])
-        artifact_replacements = dict(replacements)
-        artifact_replacements.update(entry.get("replacements", {}))
-        artifact_replacements["<artifact_purpose>"] = entry.get("purpose", "")
-        content = fill_template(
-            template,
-            doc_prefix,
-            theme,
-            timestamp,
-            artifact_replacements,
-        )
+        if str(args.get("intent") or "") == "delivery" and str(args.get("task") or "").strip():
+            if entry["doc_type"] == "plan":
+                content = _render_delivery_plan(doc_prefix, theme, timestamp, args)
+            elif entry["doc_type"] == "task":
+                content = _render_delivery_task(doc_prefix, theme, timestamp, args)
+            else:
+                template = load_template(entry["template"])
+                artifact_replacements = dict(replacements)
+                artifact_replacements.update(entry.get("replacements", {}))
+                artifact_replacements["<artifact_purpose>"] = entry.get("purpose", "")
+                content = fill_template(
+                    template,
+                    doc_prefix,
+                    theme,
+                    timestamp,
+                    artifact_replacements,
+                )
+        else:
+            template = load_template(entry["template"])
+            artifact_replacements = dict(replacements)
+            artifact_replacements.update(entry.get("replacements", {}))
+            artifact_replacements["<artifact_purpose>"] = entry.get("purpose", "")
+            content = fill_template(
+                template,
+                doc_prefix,
+                theme,
+                timestamp,
+                artifact_replacements,
+            )
         if entry["doc_type"] == "task":
             try:
                 validate_task_board(content, source=f"{entry['doc_type']} artifact")

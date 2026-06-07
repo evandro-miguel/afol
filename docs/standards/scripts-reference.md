@@ -18,8 +18,6 @@ legacy aliases or legacy just command runners as current entrypoints.
 afol --help
 afol status
 afol validate
-afol benchmark list
-afol benchmark run --save
 afol new <theme> --feature-id F-01 --parent-spec <spec-id>
 afol start --task-id T-01
 afol evidence T-01 --command "afol validate" --result passed
@@ -58,8 +56,11 @@ afol validate --json
 Runtime-flow benchmark refresh:
 
 ```bash
-afol benchmark run --save
+python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low
 ```
+
+The runtime-flow benchmark is a development test tool, not a public downstream
+AFOL command surface.
 
 ## Legacy Boundary
 

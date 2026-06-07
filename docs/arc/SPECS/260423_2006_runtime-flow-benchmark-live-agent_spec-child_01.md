@@ -42,7 +42,7 @@ risk_level: medium
    rule visibility, tool access, or governed command behavior.
 2. The maintainer runs the standard benchmark command.
 3. The runner creates a bounded fixture repo and launches `codex exec` with the
-   default `gpt-5.4-mini` + `medium` profile.
+   default `gpt-5.4-mini` + `low` profile.
 4. The live agent must use tools to finish a fixed-scope task.
 5. The runner captures the structured result, observed tool calls, timing,
    error/retry signals, and declared context footprint.
@@ -66,7 +66,7 @@ risk_level: medium
 - Default live benchmark profile:
   - `runtime`: `codex`
   - `model`: `gpt-5.4-mini`
-  - `reasoning_effort`: `medium`
+  - `reasoning_effort`: `low`
 - The runner must:
   - execute `codex exec --json` in an isolated fixture repo
   - require a bounded task and structured final output
@@ -105,7 +105,7 @@ risk_level: medium
 ## Acceptance
 
 - [ ] The benchmark runner supports a live-agent backend through `codex exec`
-- [ ] The default profile remains `gpt-5.4-mini` with `medium`
+- [ ] The default profile remains `gpt-5.4-mini` with `low`
 - [ ] The first live scenario pack requires and verifies tool usage
 - [ ] Result JSON includes tool-call metrics in addition to pass/fail and timing
 - [ ] Docs, tests, and template parity reflect the live-agent contract
