@@ -14,7 +14,7 @@ scope:
     - docs/arc
     - docs
     - .agents/scripts
-    - .agents/wb
+    - .afol/wb
   packages:
     - planning rigor
     - knowledge reuse

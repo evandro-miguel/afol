@@ -21,7 +21,7 @@ scope:
   - docs/arc
   - docs
   - .agents/scripts
-  - .agents/wb
+  - .afol/wb
   packages:
   - structure-maps
   - architecture-docs

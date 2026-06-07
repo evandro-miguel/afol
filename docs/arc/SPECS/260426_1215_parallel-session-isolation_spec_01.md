@@ -16,7 +16,7 @@ links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
 scope:
   repo_areas:
-  - .agents/wb
+  - .afol/wb
   - .agents/scripts/agents-new.py
   - .agents/scripts/agents-session.py
   - .agents/scripts/agents-status.py
@@ -39,7 +39,7 @@ risk_level: high
   repository without corrupting or overwriting each other's workbench session
   context.
 - Why now: Jules created multiple PRs against stale `main` and repeatedly
-  changed `.agents/wb/.active_session` as a CI workaround. That exposed a real
+  changed `.afol/wb/.active_session` as a CI workaround. That exposed a real
   design gap: one global pointer is too fragile for parallel sessions.
 - Roadmap feature: `F-20`
 - Role of this spec: parent plan for active-session isolation and concurrent
@@ -47,7 +47,7 @@ risk_level: high
 
 ## 2) Problem
 
-- `.agents/wb/.active_session` is a single mutable global pointer.
+- `.afol/wb/.active_session` is a single mutable global pointer.
 - CI, remote agents, local agents, and quick tasks can all mutate or rely on the
   same pointer.
 - Pull requests can accidentally include pointer changes, making unrelated
@@ -73,7 +73,7 @@ User journey:
 
 Failure or friction points:
 
-- A PR modifies `.agents/wb/.active_session` -> validation warns unless the PR is
+- A PR modifies `.afol/wb/.active_session` -> validation warns unless the PR is
   explicitly a session-management change.
 - A command runs without a session in a parallel context -> command fails with a
   short hint to pass `--session` or set a context-local session.
@@ -88,7 +88,7 @@ Expected behavior:
   operator work.
 - Parallel contexts use explicit or context-local session selection instead of
   the repository-global pointer.
-- `.agents/wb/.active_session` remains a local convenience pointer, not a safe
+- `.afol/wb/.active_session` remains a local convenience pointer, not a safe
   cross-agent synchronization primitive.
 - CI treats pointer changes as suspicious unless they are part of an explicit
   session-management task.
@@ -108,7 +108,7 @@ In scope:
 
 - Session resolution policy for local, CI, and remote-agent contexts.
 - A context-local active-session mechanism, such as environment override,
-  branch/worktree mapping, or `.agents/wb/session-context.json`.
+  branch/worktree mapping, or `.afol/wb/session-context.json`.
 - CLI warnings and validation for pointer mutations in PRs.
 - Documentation for safe parallel Jules-style review.
 - Tests for explicit-session behavior and contamination prevention.
@@ -122,7 +122,7 @@ Out of scope:
 ## 6) Delivery Plan
 
 1. Inventory current implicit active-session reads and writes.
-   - Map every command that reads `.agents/wb/.active_session`.
+   - Map every command that reads `.afol/wb/.active_session`.
    - Map every command that writes it.
    - Classify each command as interactive-only, CI-safe, or explicit-session
      required.
@@ -133,12 +133,12 @@ Out of scope:
      explicitly allowed.
    - Error messages should name the exact fix.
 3. Add branch/worktree-aware session context.
-   - Store mappings outside final docs, under `.agents/wb/session-context.json`
+   - Store mappings outside final docs, under `.afol/wb/session-context.json`
      or another `.agents/` runtime surface.
    - Track session id, branch, worktree path, actor label, and last touched time.
    - Keep this surface safe to ignore or regenerate.
 4. Harden PR and CI validation.
-   - Add a check that flags `.agents/wb/.active_session` changes unless the
+   - Add a check that flags `.afol/wb/.active_session` changes unless the
      change is scoped to session-management work.
    - Add review output that distinguishes stale base, active-pointer drift, and
      valid session metadata changes.
@@ -157,9 +157,9 @@ Out of scope:
 
 - [ ] Commands that mutate workbench state can run without relying on the global
       active pointer when `--session` or a context binding exists.
-- [ ] CI can validate PRs without requiring `.agents/wb/.active_session` to
+- [ ] CI can validate PRs without requiring `.afol/wb/.active_session` to
       point at an existing local session folder.
-- [ ] PRs that modify `.agents/wb/.active_session` produce a clear warning or
+- [ ] PRs that modify `.afol/wb/.active_session` produce a clear warning or
       failure unless explicitly allowed.
 - [ ] Parallel sessions can be listed, inspected, and resumed without changing
       the repository-global pointer.
@@ -172,6 +172,6 @@ Out of scope:
   Mitigation: keep the existing global pointer as a local convenience fallback.
 - Risk: adding another state file creates a second governance system.
   Mitigation: keep context binding operational only; plans/tasks/reports remain
-  in `.agents/wb/<session>/`.
+  in `.afol/wb/<session>/`.
 - Risk: CI blocks legitimate session-management changes.
   Mitigation: allow explicit bypass labels or scoped command flags with tests.

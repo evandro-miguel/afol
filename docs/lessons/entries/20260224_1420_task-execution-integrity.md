@@ -81,11 +81,11 @@ Before marking any task `done`:
 
 ```bash
 # Before marking task done, run:
-.agents/agents verify-tasks .agents/wb/<session>/
+.agents/agents verify-tasks .afol/wb/<session>/
 make doctor && make lint && make test-scripts
 
 # Record task completion with telemetry:
-.agents/agents wb-update evidence T-03 --command "make test-scripts" --result passed --artifact .agents/wb/<session>/<session>_report_01.md
+.agents/agents wb-update evidence T-03 --command "make test-scripts" --result passed --artifact .afol/wb/<session>/<session>_report_01.md
 .agents/agents wb-update task T-03 --mark-done --evidence-id E-...
 .agents/agents wb-update timeline --message "T-03 completed: refactored X, Y, Z"
 ```

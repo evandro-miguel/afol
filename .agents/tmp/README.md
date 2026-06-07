@@ -19,7 +19,7 @@ Rules:
 - safe to remove only after the payload is proven disposable and its useful
   evidence has been copied into a governed location
 - never treat content here as final evidence
-- move durable artifacts into `.agents/wb/`, `docs/arc/`, `docs/map/`,
+- move durable artifacts into `.afol/wb/`, `docs/arc/`, `docs/map/`,
   `docs/knowledge/`, `docs/lessons/`, or another governed location once they
   become real project assets
 

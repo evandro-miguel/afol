@@ -15,7 +15,7 @@ links:
   manifesto: docs/arc/PROJECT-MANIFESTO.md
 scope:
   repo_areas:
-  - .agents/wb cli/workbench cli/output
+  - .afol/wb cli/workbench cli/output
   packages:
   - agentic-cli
 risk_level: medium
@@ -69,5 +69,5 @@ flooding; routine logs avoid manual edits; handoffs are standardized.
 ## 8) Closure
 
 - Accepted implementation evidence: `E-20260528103543755917`.
-- Closeout session: `.agents/wb/260528_1029_f06-review-fix/`.
-- Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_1029_f06-review-fix/` passed.
+- Closeout session: `.afol/wb/260528_1029_f06-review-fix/`.
+- Strict verification: `./.agents/agents verify-tasks --strict .afol/wb/260528_1029_f06-review-fix/` passed.

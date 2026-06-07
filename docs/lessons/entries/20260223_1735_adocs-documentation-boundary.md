@@ -26,4 +26,4 @@ Never store runtime state, cache, mirrors, generated artifacts, or operational d
 
 ## Guardrail
 
-Keep runtime/state in dedicated operational paths (for example `.agents/cache/`, `.agents/wb/`) and enforce this rule in `AGENTS.md`.
+Keep runtime/state in dedicated operational paths (for example `.agents/cache/`, `.afol/wb/`) and enforce this rule in `AGENTS.md`.

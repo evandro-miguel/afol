@@ -12,9 +12,9 @@ spec_role: parent
 parent_spec: ''
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
-  plan: .agents/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_plan_01.md
-  task: .agents/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_task_01.md
-  report: .agents/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_report_01.md
+  plan: .afol/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_plan_01.md
+  task: .afol/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_task_01.md
+  report: .afol/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_report_01.md
 scope:
   repo_areas:
   - src/project-template

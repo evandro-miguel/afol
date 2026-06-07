@@ -78,8 +78,8 @@ handling; backups are retained for supported operations.
 ## 8) Closure
 
 - Accepted implementation evidence: `E-20260528122615973830`.
-- Closeout session: `.agents/wb/260528_1145_f08-safe-file-mutation-undo/`.
-- Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_1145_f08-safe-file-mutation-undo/` passed.
+- Closeout session: `.afol/wb/260528_1145_f08-safe-file-mutation-undo/`.
+- Strict verification: `./.agents/agents verify-tasks --strict .afol/wb/260528_1145_f08-safe-file-mutation-undo/` passed.
 - Board cleanup accepted in `cb2e024`.
 
 ## 9) Hermes Benchmark Decisions

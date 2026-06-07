@@ -97,7 +97,7 @@ Authoritative local files:
 .agents/config.json
 .agents/lock.json
 .agents/manifest.json
-.agents/wb/
+.afol/wb/
 .agents/rules/
 .agents/skills/
 .agents/data/
@@ -216,9 +216,9 @@ Implementation starts with failing tests for:
 - Accepted implementation evidence:
   - `E-20260528215311949499`
   - `E-20260528220141194181`
-- Closeout session: `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`
+- Closeout session: `.afol/wb/260528_0722_slice2-cli-kernel-front-door/`
 - Strict verification:
-  `./.agents/agents verify-tasks --strict .agents/wb/260528_0722_slice2-cli-kernel-front-door/`
+  `./.agents/agents verify-tasks --strict .afol/wb/260528_0722_slice2-cli-kernel-front-door/`
   passed.
 
 ## 12) Hermes Benchmark Decisions

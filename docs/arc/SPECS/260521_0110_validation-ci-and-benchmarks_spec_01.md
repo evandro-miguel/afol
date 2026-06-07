@@ -408,12 +408,12 @@ Selective CI maps paths to packs:
 
 - Status: final.
 - Accepted session-backed artifacts:
-  - `.agents/wb/260528_1409_f11-validation-benchmark-contract`
-  - `.agents/wb/260529_0958_f11-ci-selector-matrix-pack-map`
-  - `.agents/wb/260529_1018_f11-real-typecheck-gate`
-  - `.agents/wb/260529_1030_f11-routing-accuracy-pack-wave`
-  - `.agents/wb/260529_1043_f11-update-safety-pack-wave`
-  - `.agents/wb/260529_1054_f11-mutation-safety-pack-wave`
+  - `.afol/wb/260528_1409_f11-validation-benchmark-contract`
+  - `.afol/wb/260529_0958_f11-ci-selector-matrix-pack-map`
+  - `.afol/wb/260529_1018_f11-real-typecheck-gate`
+  - `.afol/wb/260529_1030_f11-routing-accuracy-pack-wave`
+  - `.afol/wb/260529_1043_f11-update-safety-pack-wave`
+  - `.afol/wb/260529_1054_f11-mutation-safety-pack-wave`
 - Accepted implementation evidence:
   - `3a6456e`
   - `afe8a79`

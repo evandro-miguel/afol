@@ -16,7 +16,7 @@ links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
   plan: 260528_2022_runtime-mirror-cleanup_plan_01
   task: 260528_2022_runtime-mirror-cleanup_task_01
-  report: .agents/wb/260528_2022_runtime-mirror-cleanup/260528_2022_runtime-mirror-cleanup_report_01.md
+  report: .afol/wb/260528_2022_runtime-mirror-cleanup/260528_2022_runtime-mirror-cleanup_report_01.md
 risk_level: low
 ---
 
@@ -73,7 +73,7 @@ risk_level: low
 ## Closure
 
 - Evidence: `E-20260528202913194559`
-- Report: `.agents/wb/260528_2022_runtime-mirror-cleanup/260528_2022_runtime-mirror-cleanup_report_01.md`
+- Report: `.afol/wb/260528_2022_runtime-mirror-cleanup/260528_2022_runtime-mirror-cleanup_report_01.md`
 
 ---
 

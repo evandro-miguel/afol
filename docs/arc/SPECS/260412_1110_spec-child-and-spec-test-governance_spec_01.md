@@ -20,7 +20,7 @@ scope:
   - docs/arc
   - docs/templates
   - docs/standards
-  - .agents/wb
+  - .afol/wb
   - .agents/scripts
   - .agents/skills
   packages:
@@ -176,6 +176,6 @@ Out of scope for this planning record:
 ## 9) Closure
 
 - Accepted governance evidence: `E-20260528153442093351`.
-- Closeout session: `.agents/wb/260528_1528_spec-child-and-spec-test-governance/`.
-- Report: `.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_report_01.md`.
+- Closeout session: `.afol/wb/260528_1528_spec-child-and-spec-test-governance/`.
+- Report: `.afol/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_report_01.md`.
 - Status: final

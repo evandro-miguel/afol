@@ -13,8 +13,8 @@ parent_spec: 260412_2004_repo-wide-simplification-runtime-parity_spec_01
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
   parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md
-  plan: .agents/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_plan_01.md
-  task: .agents/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_task_01.md
+  plan: .afol/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_plan_01.md
+  task: .afol/wb/260528_1745_runtime-registry-parity/260528_1745_runtime-registry-parity_task_01.md
   report:
 risk_level: low
 ---

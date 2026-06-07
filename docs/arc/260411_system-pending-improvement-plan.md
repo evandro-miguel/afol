@@ -31,7 +31,7 @@ cannot accept new workbench artifacts.
 - `./.agents/agents doctor` passed with no issues.
 - `just lint` passed with 0 issues across the configured lint scope.
 - `just test-scripts` passed with 201 tests selected, 201 passed, and 6 deselected.
-- `just verify-active` passed for `.agents/wb/260404_1558_repo-quality-and-governance`.
+- `just verify-active` passed for `.afol/wb/260404_1558_repo-quality-and-governance`.
 - `just verify-strict-if-present` failed because completed tasks exist but no report
   document was found.
 - `./.agents/agents status --json` reports the active plan blocked by missing
@@ -72,7 +72,7 @@ cannot accept new workbench artifacts.
 2. Close the active session evidence gap.
    Create the report artifact under the active session folder:
 
-   Use `.agents/wb/260404_1558_repo-quality-and-governance/` as the session folder.
+   Use `.afol/wb/260404_1558_repo-quality-and-governance/` as the session folder.
 
    Create `260404_1558_repo-quality-and-governance_report_01.md` inside it.
 
@@ -98,7 +98,7 @@ cannot accept new workbench artifacts.
 
 6. Add a guardrail for direct verification ergonomics.
    Consider teaching `./.agents/agents verify-tasks <session-id>` to resolve
-   `.agents/wb/<session-id>` automatically, matching the legacy just command-runner wrapper behavior and
+   `.afol/wb/<session-id>` automatically, matching the legacy just command-runner wrapper behavior and
    avoiding false "session folder not found" failures.
 
 ## Acceptance Criteria

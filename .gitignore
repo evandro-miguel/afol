@@ -42,6 +42,7 @@ src/project-template/.agents/data/index/
 # Local temporary/reference workspace
 .agents/.tmp/
 .agents/tmp/*
+!.agents/tmp/
 !.agents/tmp/README.md
 
 # Archived workstream payloads; keep the placeholder only.
@@ -60,6 +61,7 @@ docs/telemetry/reports/implementation_report.md
 # Legacy workbench sessions (local-only; plans live in .afol/wb/)
 .agents/wb/
 .afol/tmp/*
+!.afol/tmp/
 !.afol/tmp/README.md
 .afol/data/events/
 .afol/data/index/

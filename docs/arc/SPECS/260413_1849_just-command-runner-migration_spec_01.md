@@ -12,9 +12,9 @@ spec_role: parent
 parent_spec: ''
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
-  plan: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_plan_01.md
-  task: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_task_01.md
-  report: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_report_01.md
+  plan: .afol/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_plan_01.md
+  task: .afol/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_task_01.md
+  report: .afol/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_report_01.md
 scope:
   repo_areas:
   - legacy just command runner

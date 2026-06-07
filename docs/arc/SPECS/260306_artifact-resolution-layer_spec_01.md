@@ -17,7 +17,7 @@ links:
 scope:
   repo_areas:
   - .agents/scripts
-  - .agents/wb
+  - .afol/wb
   packages:
   - agents-status
 risk_level: medium
@@ -86,7 +86,7 @@ Out of scope:
 ## 7) Constraints and Assumptions
 
 - Assumptions:
-  - Session artifacts remain in the existing `*.agents/wb/<session>/` layout.
+  - Session artifacts remain in the existing `*.afol/wb/<session>/` layout.
 - Constraints:
   - Compatibility with existing templates and naming conventions.
   - Resolver must be deterministic and side-effect free.

@@ -182,7 +182,7 @@ Out of scope:
 ## 11) Closure
 
 - Accepted implementation evidence: `E-20260528134556147936`.
-- Closeout session: `.agents/wb/260528_1343_runtime-adapters-and-mcp/`.
+- Closeout session: `.afol/wb/260528_1343_runtime-adapters-and-mcp/`.
 - Status: final
 
 ## 12) Architecture Delta: Provider-Neutral Lifecycle Events

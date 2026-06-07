@@ -16,7 +16,7 @@ scope:
   - docs/arc
   - docs
   - .agents/scripts
-  - .agents/wb
+  - .afol/wb
   packages:
   - agentic scaffold governance
 risk_level: high
@@ -105,7 +105,7 @@ Touched layers:
 - Templates and standards (`docs/`)
 - Workflow rules (`.agents/rules/`)
 - Operational scripts and validators (`.agents/scripts/`)
-- Workbench execution artifacts (`.agents/wb/`)
+- Workbench execution artifacts (`.afol/wb/`)
 
 New conceptual components:
 

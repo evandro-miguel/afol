@@ -200,9 +200,9 @@ err missing-evidence task=T-01 hint="run afol evidence add -t T-01 -c <cmd> -r p
 ## 11) Closure
 
 - Accepted implementation evidence: `E-20260529134101240986`.
-- Closeout session: `.agents/wb/260529_1336_f03-kernel-grammar-alias-help/`
+- Closeout session: `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`
 - Strict verification:
-  `./.agents/agents verify-tasks --strict .agents/wb/260529_1336_f03-kernel-grammar-alias-help/`
+  `./.agents/agents verify-tasks --strict .afol/wb/260529_1336_f03-kernel-grammar-alias-help/`
   passed.
 
 ## 12) Hermes Benchmark Decisions

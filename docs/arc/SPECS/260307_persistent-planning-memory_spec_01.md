@@ -14,7 +14,7 @@ scope:
   - .agents/scripts
   - docs/templates
   - docs/standards
-  - .agents/wb
+  - .afol/wb
   packages:
   - session catchup
   - planning memory
@@ -26,7 +26,7 @@ risk_level: medium
 
 ## 1) Objective
 
-- Add a native, repo-local working-memory model that preserves the value of the three-file planning pattern while keeping `.agents/wb/` as the canonical execution system.
+- Add a native, repo-local working-memory model that preserves the value of the three-file planning pattern while keeping `.afol/wb/` as the canonical execution system.
 
 ## 2) Problem
 
@@ -41,7 +41,7 @@ risk_level: medium
 - This spec does not introduce cloud memory, vector databases, or cross-repo state.
 - This spec does not require heavyweight hooks that are unavailable across runtimes.
 - This spec does not let provider hooks create a second source of truth outside
-  `.agents/wb/`, `.agents/data/`, and explicit draft artifacts.
+  `.afol/wb/`, `.agents/data/`, and explicit draft artifacts.
 
 ## 4) Scope
 
@@ -88,7 +88,7 @@ Summary:
 
 Key design choices:
 
-- Keep `.agents/wb/` canonical; do not standardize separate root planning files.
+- Keep `.afol/wb/` canonical; do not standardize separate root planning files.
 - Add a `session catchup` workflow that checks active session docs, `git status`, and recent diffs before work resumes.
 - Teach runtimes and docs a simple mapping between lightweight memory concepts and governed workbench artifacts.
 - Add validation heuristics for stale research/log artifacts when plans or implementations advance after large exploration bursts.

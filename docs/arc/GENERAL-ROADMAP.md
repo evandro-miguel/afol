@@ -175,7 +175,7 @@ Minimum acceptance:
   checks; `afol` remains a compatibility alias until parity.
 - Closure note: accepted implementation evidence is `E-20260528215311949499`
   and `E-20260528220141194181`; closeout session
-  `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`; strict verification
+  `.afol/wb/260528_0722_slice2-cli-kernel-front-door/`; strict verification
   passed.
 
 ### F-02 Minimal Project Template
@@ -189,7 +189,7 @@ Minimum acceptance:
   noise is excluded; bootstrap/export validates cleanliness.
 - Closure note: accepted implementation evidence is
   `E-20260529135617802715`; closeout session
-  `.agents/wb/260529_1350_f02-template-export-alignment/`; strict verification
+  `.afol/wb/260529_1350_f02-template-export-alignment/`; strict verification
   passed.
 
 ### F-03 Agent Command Design System
@@ -204,7 +204,7 @@ Minimum acceptance:
   available.
 - Closure note: accepted implementation evidence is
   `E-20260529134101240986`; closeout session
-  `.agents/wb/260529_1336_f03-kernel-grammar-alias-help/`; strict verification
+  `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/`; strict verification
   passed.
 
 ### F-04 Governance Workbench System
@@ -218,7 +218,7 @@ Minimum acceptance:
   plans/tasks/logs/evidence/reports/sidecars; evidence required for completion;
   closure validation catches drift.
 - Closure note: accepted implementation evidence is `E-20260528084521802724`;
-  closeout session `.agents/wb/260528_0833_f04-workbench-core-review-fix/`.
+  closeout session `.afol/wb/260528_0833_f04-workbench-core-review-fix/`.
 
 ### F-05 Smart Rules and Skills Routing
 
@@ -230,7 +230,7 @@ Minimum acceptance:
 - Exit criteria: rule router; skill router; surface detection; compact
   delegation context; project-local updateable rules and skills.
 - Closure note: accepted implementation evidence is `E-20260528100236370279`;
-  closeout session `.agents/wb/260528_0956_f05-review-parity-strict/`.
+  closeout session `.afol/wb/260528_0956_f05-review-parity-strict/`.
 
 ### F-06 File-First Low-Token Execution
 
@@ -242,7 +242,7 @@ Minimum acceptance:
 - Exit criteria: research save flow; log append flow; compact handoff format;
   summary plus paths; routine updates avoid manual file editing.
 - Closure note: accepted implementation evidence is `E-20260528103543755917`;
-  closeout session `.agents/wb/260528_1029_f06-review-fix/`.
+  closeout session `.afol/wb/260528_1029_f06-review-fix/`.
 
 ### F-07 Local State Index and Event Log
 
@@ -255,7 +255,7 @@ Minimum acceptance:
   event log records command and file activity; compact queries; optional watcher
   plan.
 - Closure note: accepted implementation evidence is `E-20260528112023377690`;
-  closeout session `.agents/wb/260528_1111_f07-local-state-review-fix/`.
+  closeout session `.afol/wb/260528_1111_f07-local-state-review-fix/`.
 
 ### F-08 Safe File Mutation and Undo
 
@@ -266,7 +266,7 @@ Minimum acceptance:
 - Exit criteria: mutation journal; session/task context; dry-run; undo where
   feasible; protected dangerous paths.
 - Closure note: accepted implementation evidence is `E-20260528122615973830`;
-  closeout session `.agents/wb/260528_1145_f08-safe-file-mutation-undo/`;
+  closeout session `.afol/wb/260528_1145_f08-safe-file-mutation-undo/`;
   board cleanup was accepted in `cb2e024`.
 
 ### F-09 Template Update and Versioning
@@ -291,7 +291,7 @@ Minimum acceptance:
   logic; runtime-specific docs remain minimal.
 - Closure note: accepted implementation evidence is
   `E-20260528134556147936`; closeout session
-  `.agents/wb/260528_1343_runtime-adapters-and-mcp/`.
+  `.afol/wb/260528_1343_runtime-adapters-and-mcp/`.
 
 ### F-11 Validation, CI, and Benchmarks
 
@@ -302,7 +302,7 @@ Minimum acceptance:
   are published.
 - Closure note: the accepted F-11 closeout is complete. Accepted evidence is
   the session-backed contract layer
-  `.agents/wb/260528_1409_f11-validation-benchmark-contract`, selector/matrix
+  `.afol/wb/260528_1409_f11-validation-benchmark-contract`, selector/matrix
   pack-map commits `3a6456e` and `afe8a79`, real typecheck gate `a1fa3e1`,
   routing-accuracy `7760358`, update-safety `681c6d0`, and mutation-safety
   `8dd5e20`.
@@ -327,7 +327,7 @@ Minimum acceptance:
   reproducible install gates pass before any public release claim.
 - Closure note: accepted implementation evidence is
   `E-20260528144544308053`; closeout session
-  `.agents/wb/260528_1444_public-distribution-and-onboarding/`.
+  `.afol/wb/260528_1444_public-distribution-and-onboarding/`.
 
 ### F-13 Agentic Runtime Restructure
 
@@ -356,7 +356,7 @@ Minimum acceptance:
   `docs/arc/SPECS/F-14/spec-tests/` is explicit.
 - Closure note: accepted governance evidence is
   `E-20260528153442093351`; verified outcome summarized in
-  `.agents/wb/260528_1528_spec-child-and-spec-test-governance/`
+  `.afol/wb/260528_1528_spec-child-and-spec-test-governance/`
   and its final report.
 
 ### F-15 Repo-Wide Simplification Runtime Parity

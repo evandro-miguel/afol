@@ -17,7 +17,7 @@ links:
 scope:
   repo_areas:
   - .agents/scripts
-  - .agents/wb
+  - .afol/wb
   packages:
   - agents-status
   - agents-implement

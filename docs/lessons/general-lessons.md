@@ -90,7 +90,7 @@ Lessons should be reviewed periodically:
 
 **Prevention rule:** Use quick mode for small changes; only open new workstream with `--force-new` when change is significant.
 
-**Guardrail:** `agents-new.py` now enforces one active session via `.agents/wb/.active_session` and provides `--quick` mode.
+**Guardrail:** `agents-new.py` now enforces one active session via `.afol/wb/.active_session` and provides `--quick` mode.
 
 ### 2026-02-23 - Centralize tool config in one file
 

@@ -145,7 +145,7 @@ Out of scope:
     scope.
 - Constraints:
   - Compatibility: preserve `.agents/agents <command>` behavior.
-  - Operational: use `.agents/wb/` artifacts and `agentic-folder-sys` for
+  - Operational: use `.afol/wb/` artifacts and `agentic-folder-sys` for
     governed execution.
   - Documentation: keep current-state evidence in `docs/map/` and goal-state
     governance in `docs/arc/`.
@@ -186,7 +186,7 @@ Out of scope:
 ## 10) Rollout and Lifecycle
 
 - Rollout approach:
-  - Execute in a new `.agents/wb/` session; do not reuse the completed F-05
+  - Execute in a new `.afol/wb/` session; do not reuse the completed F-05
     coverage session.
   - Start with governance, then implement child slices in small batches.
 - Workstream linkage:

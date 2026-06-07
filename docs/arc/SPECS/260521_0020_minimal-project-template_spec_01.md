@@ -94,7 +94,7 @@ Required local files:
 | `.agents/config.json` | project | local feature flags and paths |
 | `.agents/lock.json` | managed | CLI/template version lock |
 | `.agents/manifest.json` | managed | managed file hashes and ownership |
-| `.agents/wb/` | project | sessions, tasks, logs, evidence |
+| `.afol/wb/` | project | sessions, tasks, logs, evidence |
 | `.agents/rules/` | project | local rules and routing metadata |
 | `.agents/skills/` | project | local skills and metadata |
 | `.agents/data/` | generated | indexes, events, benchmark results |
@@ -176,7 +176,7 @@ DR-specific exclusions:
 ## 10) Closure
 
 - Accepted implementation evidence: `E-20260529135617802715`.
-- Closeout session: `.agents/wb/260529_1350_f02-template-export-alignment/`
+- Closeout session: `.afol/wb/260529_1350_f02-template-export-alignment/`
 - Strict verification:
-  `./.agents/agents verify-tasks --strict .agents/wb/260529_1350_f02-template-export-alignment/`
+  `./.agents/agents verify-tasks --strict .afol/wb/260529_1350_f02-template-export-alignment/`
   passed.

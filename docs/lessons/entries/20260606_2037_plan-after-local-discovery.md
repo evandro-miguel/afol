@@ -34,5 +34,5 @@ organizational workbench/configuration artifacts.
 - For `.agents` / `.afol` layout changes, run focused discovery over config,
   bootstrap, runtime, workbench, skills sync, and docs before proposing the
   implementation path.
-- Do not treat `.agents/wb/`, local active-session state, or organization-only
+- Do not treat `.afol/wb/`, local active-session state, or organization-only
   config as the deliverable unless the user explicitly asks for those surfaces.

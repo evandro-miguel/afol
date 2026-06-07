@@ -15,7 +15,7 @@ links:
   manifesto: docs/arc/PROJECT-MANIFESTO.md
 scope:
   repo_areas:
-  - .agents/wb src/project-template/.agents/wb cli/workbench
+  - .afol/wb src/project-template/.afol/wb cli/workbench
   packages:
   - agentic-cli
 risk_level: high
@@ -71,8 +71,8 @@ missing required state.
 ## 8) Closure
 
 - Accepted implementation evidence: `E-20260528084521802724`.
-- Closeout session: `.agents/wb/260528_0833_f04-workbench-core-review-fix/`.
-- Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_0833_f04-workbench-core-review-fix/` passed.
+- Closeout session: `.afol/wb/260528_0833_f04-workbench-core-review-fix/`.
+- Strict verification: `./.agents/agents verify-tasks --strict .afol/wb/260528_0833_f04-workbench-core-review-fix/` passed.
 
 ## 9) Hermes Benchmark Decisions
 

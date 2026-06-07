@@ -32,7 +32,7 @@ Every critical rule must have a deterministic automated check that can fail exec
 Before accepting agent execution as complete, run:
 
 ```bash
-./.agents/agents verify-tasks .agents/wb/<session> --strict
+./.agents/agents verify-tasks .afol/wb/<session> --strict
 ```
 
 Completion is valid only when strict mode passes with zero errors.

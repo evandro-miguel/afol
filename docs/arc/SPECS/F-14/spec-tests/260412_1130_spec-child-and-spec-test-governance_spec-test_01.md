@@ -76,7 +76,7 @@ risk_level: medium
 
 ## 7) Open Risks
 
-- Direct CLI workstream creation can mutate `.agents/wb`; prefer temporary test
+- Direct CLI workstream creation can mutate `.afol/wb`; prefer temporary test
   fixtures when possible.
 - Historical `spec-lite` references in lessons and archived workbench artifacts
   should stay unchanged unless a later migration explicitly scopes them.

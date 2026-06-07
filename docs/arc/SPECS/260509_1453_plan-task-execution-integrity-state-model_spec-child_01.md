@@ -16,8 +16,8 @@ parent_spec: 260418_2115_agent-governance-preflight-and-recurrence-guardrails_sp
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
   parent_spec: docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md
-  plan: .agents/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_plan_01.md
-  task: .agents/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_task_01.md
+  plan: .afol/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_plan_01.md
+  task: .afol/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_task_01.md
 risk_level: high
 ---
 
@@ -155,7 +155,7 @@ Out of scope:
   - done requires evidence;
   - moved requires target/reason when supported by the command surface.
 - Workstream validation:
-  - `./.agents/agents verify-tasks --strict .agents/wb/260509_1453_plan-task-execution-integrity`
+  - `./.agents/agents verify-tasks --strict .afol/wb/260509_1453_plan-task-execution-integrity`
   - `./.agents/agents runtime validate`
   - `just lint`
 

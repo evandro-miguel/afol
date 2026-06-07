@@ -33,7 +33,7 @@ Before declaring completion, validate all three layers:
 Run all items before final completion:
 
 ```bash
-./.agents/agents verify-tasks .agents/wb/<session> --strict
+./.agents/agents verify-tasks .afol/wb/<session> --strict
 python3 -m unittest discover -s .agents/scripts/tests -p "test_*.py" -v
 ```
 

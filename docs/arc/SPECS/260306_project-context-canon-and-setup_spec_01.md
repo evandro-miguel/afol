@@ -17,7 +17,7 @@ links:
 scope:
   repo_areas:
   - docs/arc
-  - .agents/wb
+  - .afol/wb
   packages:
   - agents-bootstrap
   - session context
@@ -83,7 +83,7 @@ Out of scope:
 ## 7) Constraints and Assumptions
 
 - Assumptions:
-  - `docs/arc` and `.agents/wb` remain canonical.
+  - `docs/arc` and `.afol/wb` remain canonical.
 - Constraints:
   - Runtime adapters remain thin and should render these definitions without extending semantics.
 

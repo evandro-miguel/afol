@@ -14,7 +14,7 @@ links:
   roadmap: 260223_0000_arc_roadmap_01
 scope:
   repo_areas:
-  - .agents/wb
+  - .afol/wb
   - .agents/scripts/agents-new.py
   - .agents/scripts/agents-wb-update.py
   - .agents/scripts/verify-tasks.py

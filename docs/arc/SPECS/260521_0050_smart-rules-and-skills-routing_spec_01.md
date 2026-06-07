@@ -70,8 +70,8 @@ updateable.
 ## 8) Closure
 
 - Accepted implementation evidence: `E-20260528100236370279`.
-- Closeout session: `.agents/wb/260528_0956_f05-review-parity-strict/`.
-- Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_0956_f05-review-parity-strict/` passed.
+- Closeout session: `.afol/wb/260528_0956_f05-review-parity-strict/`.
+- Strict verification: `./.agents/agents verify-tasks --strict .afol/wb/260528_0956_f05-review-parity-strict/` passed.
 
 ## 9) Architecture Delta: Skill Suggestion Routing
 

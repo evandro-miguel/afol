@@ -18,7 +18,7 @@ scope:
   repo_areas:
   - .agents/scripts
   - docs/arc
-  - .agents/wb
+  - .afol/wb
   - runtime mirrors
   packages:
   - agents CLI
@@ -125,7 +125,7 @@ Out of scope:
 
 ## 9) Risks and Tradeoffs
 
-- Risk: a second governance system emerges by accident -> Mitigation: keep `docs/arc`, `.agents/wb`, and runtime mirrors canonical; forbid parallel track trees.
+- Risk: a second governance system emerges by accident -> Mitigation: keep `docs/arc`, `.afol/wb`, and runtime mirrors canonical; forbid parallel track trees.
 - Risk: command UX becomes runtime-specific -> Mitigation: define semantics in canonical specs first and adapters second.
 - Tradeoff: introducing a canonical project-context layer adds more docs -> Why accepted: it reduces repeated prompt context and gives commands a stable contract.
 

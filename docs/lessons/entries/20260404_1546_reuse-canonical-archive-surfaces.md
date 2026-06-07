@@ -6,7 +6,7 @@ updated_at: '2026-04-04T11:37:54-03:00'
 owner: codex
 related:
 - AGENTS.md
-- .agents/wb/260404_1356_scaffold-quality-review/260404_1356_scaffold-quality-review_plan_01.md
+- .afol/wb/260404_1356_scaffold-quality-review/260404_1356_scaffold-quality-review_plan_01.md
 ---
 
 # Lesson

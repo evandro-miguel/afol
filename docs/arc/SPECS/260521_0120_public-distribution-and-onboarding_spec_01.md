@@ -114,5 +114,5 @@ for every advertised artifact.
 ## 8) Closure
 
 - Accepted implementation evidence: `E-20260528144544308053`.
-- Closeout session: `.agents/wb/260528_1444_public-distribution-and-onboarding/`.
+- Closeout session: `.afol/wb/260528_1444_public-distribution-and-onboarding/`.
 - Status: final

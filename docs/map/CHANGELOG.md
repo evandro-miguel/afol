@@ -33,9 +33,9 @@ updated_at: "2026-05-29T16:03:04-03:00"
   - `E-20260529135617802715`
   - `E-20260529134101240986`
 - Strict verification: the representative sessions
-  `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`,
-  `.agents/wb/260529_1350_f02-template-export-alignment/`, and
-  `.agents/wb/260529_1336_f03-kernel-grammar-alias-help/` all passed
+  `.afol/wb/260528_0722_slice2-cli-kernel-front-door/`,
+  `.afol/wb/260529_1350_f02-template-export-alignment/`, and
+  `.afol/wb/260529_1336_f03-kernel-grammar-alias-help/` all passed
   `verify-tasks --strict`.
 - Status: satisfied for the docs/current-state layer; residual risk is limited
   to future derived-index drift, not the current refresh.
@@ -53,11 +53,11 @@ updated_at: "2026-05-29T16:03:04-03:00"
   - `E-20260528112023377690`
   - `E-20260528122615973830`
 - Strict verification: the representative sessions
-  `.agents/wb/260528_0833_f04-workbench-core-review-fix/`,
-  `.agents/wb/260528_0956_f05-review-parity-strict/`,
-  `.agents/wb/260528_1029_f06-review-fix/`,
-  `.agents/wb/260528_1111_f07-local-state-review-fix/`, and
-  `.agents/wb/260528_1145_f08-safe-file-mutation-undo/` all passed
+  `.afol/wb/260528_0833_f04-workbench-core-review-fix/`,
+  `.afol/wb/260528_0956_f05-review-parity-strict/`,
+  `.afol/wb/260528_1029_f06-review-fix/`,
+  `.afol/wb/260528_1111_f07-local-state-review-fix/`, and
+  `.afol/wb/260528_1145_f08-safe-file-mutation-undo/` all passed
   `verify-tasks --strict`.
 - F-08 board cleanup accepted stale task removal in `cb2e024`.
 - Status: satisfied for the docs/current-state layer; residual risk is limited
@@ -146,12 +146,12 @@ updated_at: "2026-05-29T16:03:04-03:00"
 
 - Feature: `F-11 Validation, CI, and Benchmarks`
 - Accepted session-backed artifacts:
-  - `.agents/wb/260528_1409_f11-validation-benchmark-contract`
-  - `.agents/wb/260529_0958_f11-ci-selector-matrix-pack-map`
-  - `.agents/wb/260529_1018_f11-real-typecheck-gate`
-  - `.agents/wb/260529_1030_f11-routing-accuracy-pack-wave`
-  - `.agents/wb/260529_1043_f11-update-safety-pack-wave`
-  - `.agents/wb/260529_1054_f11-mutation-safety-pack-wave`
+  - `.afol/wb/260528_1409_f11-validation-benchmark-contract`
+  - `.afol/wb/260529_0958_f11-ci-selector-matrix-pack-map`
+  - `.afol/wb/260529_1018_f11-real-typecheck-gate`
+  - `.afol/wb/260529_1030_f11-routing-accuracy-pack-wave`
+  - `.afol/wb/260529_1043_f11-update-safety-pack-wave`
+  - `.afol/wb/260529_1054_f11-mutation-safety-pack-wave`
 - Accepted implementation evidence:
   - `3a6456e`
   - `afe8a79`
@@ -184,9 +184,9 @@ updated_at: "2026-05-29T16:03:04-03:00"
 
 - Feature: `F-15 Repo-Wide Simplification Runtime Parity`
 - Accepted child slices:
-  - `scripts-cleanup-optimization` (`.agents/wb/260528_1606_scripts-cleanup-optimization/`)
-  - `map-boundary-cleanup` (`.agents/wb/260528_1723_map-boundary-cleanup/`)
-  - `runtime-registry-parity` (`.agents/wb/260528_1745_runtime-registry-parity/`)
+  - `scripts-cleanup-optimization` (`.afol/wb/260528_1606_scripts-cleanup-optimization/`)
+  - `map-boundary-cleanup` (`.afol/wb/260528_1723_map-boundary-cleanup/`)
+  - `runtime-registry-parity` (`.afol/wb/260528_1745_runtime-registry-parity/`)
   - `python-command-simplification` (`6851c27`)
 - Index state: `docs/arc/SPECS/INDEX.md` now marks the parent spec and accepted child specs as `final`.
 - Status: `satisfied` for the current-state docs/map layer; residual risk is limited to future follow-up planning, not the closed F-15 slices.
@@ -195,7 +195,7 @@ updated_at: "2026-05-29T16:03:04-03:00"
 
 - Scope: current-state docs reconciliation for the F-14 governance slice.
 - Status: roadmap entry and parent spec are `final`; verified report is
-  `.agents/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_report_01.md`.
+  `.afol/wb/260528_1528_spec-child-and-spec-test-governance/260528_1528_spec-child-and-spec-test-governance_report_01.md`.
 - Evidence: `E-20260528153442093351`.
 
 ## F-12 Public Distribution And Onboarding Closeout

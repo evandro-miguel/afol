@@ -18,7 +18,7 @@ scope:
   repo_areas:
   - docs/arc
   - docs
-  - .agents/wb
+  - .afol/wb
   packages:
   - architecture-docs
   - roadmap-governance

@@ -20,7 +20,7 @@ scope:
   - docs/arc
   - docs
   - .agents/scripts
-  - .agents/wb
+  - .afol/wb
   - AGENTS.md
   - README.md
   packages:
@@ -107,7 +107,7 @@ Out of scope:
 
 - Assumptions:
   - `docs/arc/GENERAL-ROADMAP.md` and `SPECS/` remain the canonical governance layer.
-  - `.agents/wb/` remains the canonical place for execution artifacts.
+  - `.afol/wb/` remains the canonical place for execution artifacts.
   - `docs/map/` is evidence-oriented and may be absent in some repos until adopted.
 - Constraints:
   - Compatibility: existing roadmap/spec/workbench semantics must keep working
@@ -180,7 +180,7 @@ Entities:
 
 Storage:
 
-- Session folder: `.agents/wb/<session>/` key: session id
+- Session folder: `.afol/wb/<session>/` key: session id
 - Governance docs: `docs/arc/` key: roadmap feature and spec id
 - Current-state evidence: `docs/map/` key: repo-specific artifact name
 

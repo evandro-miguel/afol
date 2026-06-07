@@ -46,7 +46,7 @@ All task state changes were done via direct `edit` tool on markdown files, bypas
 
 ```bash
 # Mark task as done (with telemetry and evidence)
-.agents/agents wb-update evidence T-03 --command "make test-scripts" --result passed --artifact .agents/wb/<session>/<session>_report_01.md
+.agents/agents wb-update evidence T-03 --command "make test-scripts" --result passed --artifact .afol/wb/<session>/<session>_report_01.md
 .agents/agents wb-update task T-03 --mark-done --evidence-id E-...
 
 # Mark task as in_progress (with telemetry)
@@ -79,7 +79,7 @@ Event available for: heat scoring, reports, audits
 
 ```bash
 # View task status
-.agents/agents verify-tasks .agents/wb/<session>/
+.agents/agents verify-tasks .afol/wb/<session>/
 
 # Update task with all state options
 .agents/agents wb-update task --help

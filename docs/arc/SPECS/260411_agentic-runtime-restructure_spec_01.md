@@ -12,9 +12,9 @@ spec_role: parent
 parent_spec: ''
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
-  plan: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_plan_01.md
-  task: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_task_01.md
-  report: .agents/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_report_01.md
+  plan: .afol/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_plan_01.md
+  task: .afol/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_task_01.md
+  report: .afol/wb/260529_0939_f13-runtime-native-port-closeout/260529_0939_f13-runtime-native-port-closeout_report_01.md
 scope:
   repo_areas:
   - .agents/runtime
@@ -142,5 +142,5 @@ Out of scope:
   - `8cd4737` - session catchup native port.
   - `bde5500`, `e918255`, and `7c98199` - knowledge list/search/show native port.
   - `8bd9466` - knowledge index native port.
-- Closeout session: `.agents/wb/260529_0939_f13-runtime-native-port-closeout/`
+- Closeout session: `.afol/wb/260529_0939_f13-runtime-native-port-closeout/`
 - Status: final

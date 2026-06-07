@@ -76,8 +76,8 @@ can be rebuilt; stale state is detectable; event data stays local.
 ## 8) Closure
 
 - Accepted implementation evidence: `E-20260528112023377690`.
-- Closeout session: `.agents/wb/260528_1111_f07-local-state-review-fix/`.
-- Strict verification: `./.agents/agents verify-tasks --strict .agents/wb/260528_1111_f07-local-state-review-fix/` passed.
+- Closeout session: `.afol/wb/260528_1111_f07-local-state-review-fix/`.
+- Strict verification: `./.agents/agents verify-tasks --strict .afol/wb/260528_1111_f07-local-state-review-fix/` passed.
 
 ## 9) Architecture Delta: Lifecycle Event Intake
 
