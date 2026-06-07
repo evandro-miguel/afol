@@ -36,6 +36,7 @@ src/project-template/.agents/tmp/
 .agents/.tmp/
 .agents/tmp/*
 !.agents/tmp/README.md
+.worktree/
 
 # Archived workstream payloads; keep the placeholder only.
 .agents/z-arq/*
