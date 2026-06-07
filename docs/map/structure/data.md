@@ -1,6 +1,6 @@
 # 🎨 Data Structure
 
-**Generated:** 2026-06-07T09:03:59+00:00
+**Generated:** 2026-06-07T11:53:51+00:00
 **Last Update:** First run
 
 Data files, constants, and configuration.
@@ -9,16 +9,28 @@ Data files, constants, and configuration.
 
 ## 📁 Directory Overview
 
-**Stats:** 60 files, 2,707 lines, 89.3 KB
+**Stats:** 72 files, 8,372 lines, 626.4 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
+| `.agents/data/benchmarks/results/20260607_083107_runtime-flow-live-agent-v4.json` | 640 | 61.2 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_084002_runtime-flow-live-agent-v4.json` | 605 | 61.5 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_083600_runtime-flow-live-agent-v4.json` | 593 | 55.9 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_080155_runtime-flow-live-agent-v4.json` | 589 | 54.6 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_085056_runtime-flow-live-agent-v4.json` | 573 | 58.2 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_083719_runtime-flow-live-agent-v4.json` | 559 | 57.9 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_075909_runtime-flow-live-agent-v4.json` | 541 | 53.3 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_080418_runtime-flow-live-agent-v4.json` | 525 | 48.5 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_080313_runtime-flow-live-agent-v4.json` | 511 | 47.1 KB | Module; functionality |
 | `.agents/agents.config` | 364 | 9.0 KB | Module; functionality |
 | `.agents/data/benchmarks/results/20260424_141508_runtime-flow-live-agent-v4.json` | 268 | 15.5 KB | Module; functionality |
 | `.agents/data/benchmarks/results/20260424_153445_runtime-flow-live-agent-v4.json` | 214 | 13.6 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_071247_runtime-flow-live-agent-v4.json` | 211 | 14.6 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_065240_runtime-flow-live-agent-v4.json` | 179 | 13.1 KB | Module; functionality |
 | `docs/agentic/agents-config.md` | 155 | 4.6 KB | Module; functionality |
+| `.agents/data/benchmarks/results/20260607_065437_runtime-flow-live-agent-v4.json` | 139 | 11.2 KB | Module; functionality |
 | `.agents/runtime/src/agentic_scaffold/config.py` | 116 | 4.3 KB | Module; functionality |
 | `.agents/skills/typescript-expert/references/tsconfig-strict.json` | 92 | 3.3 KB | Module; functionality |
 | `src/project-template/.agents/data/telemetry/schemas/event.json` | 78 | 2.3 KB | Module; functionality |

@@ -1,6 +1,6 @@
 # 🎨 Tests Structure
 
-**Generated:** 2026-06-07T09:09:44+00:00
+**Generated:** 2026-06-07T11:53:51+00:00
 **Last Update:** First run
 
 Unit tests, integration tests, and E2E tests.
@@ -9,7 +9,7 @@ Unit tests, integration tests, and E2E tests.
 
 ## 📁 Directory Overview
 
-**Stats:** 136 files, 28,077 lines, 1288.4 KB
+**Stats:** 136 files, 28,555 lines, 1309.9 KB
 
 ### Files
 
@@ -18,6 +18,7 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_skills_sync.py` | 1,763 | 79.3 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_cli_utility_coverage.py` | 1,537 | 68.3 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_verify_tasks_strict.py` | 1,386 | 55.5 KB | Test file; unit tests |
+| `.agents/scripts/tests/test_agents_benchmark.py` | 885 | 37.8 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_runtime_compatibility.py` | 868 | 46.9 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_execution_command_scenarios.py` | 781 | 40.1 KB | Test file; unit tests |
 | `.agents/runtime/tests/test_cli.py` | 674 | 30.4 KB | Test file; unit tests |
@@ -31,12 +32,11 @@ Unit tests, integration tests, and E2E tests.
 | `.agents/scripts/tests/test_agents_implement.py` | 446 | 20.1 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_bootstrap.py` | 431 | 22.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md` | 422 | 23.3 KB | Module; functionality |
-| `.agents/scripts/tests/test_agents_benchmark.py` | 414 | 16.8 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_session.py` | 392 | 18.5 KB | Test file; unit tests |
 | `.agents/scripts/tests/integration/test_critical_workflows.py` | 387 | 16.7 KB | Test file; unit tests |
 | `docs/arc/SPECS/260521_0110_validation-ci-and-benchmarks_spec_01.md` | 372 | 14.5 KB | Module; functionality |
 | `cli/tests/mutation-safety.test.ts` | 344 | 11.0 KB | Test file; unit tests |
-| `cli/tests/kernel.test.ts` | 335 | 13.7 KB | Test file; unit tests |
+| `cli/tests/kernel.test.ts` | 342 | 14.1 KB | Test file; unit tests |
 | `.agents/skills/node/rules/flaky-tests.md` | 331 | 10.4 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_status.py` | 316 | 16.3 KB | Test file; unit tests |
 | `.agents/scripts/tests/test_agents_review.py` | 312 | 13.9 KB | Test file; unit tests |

@@ -1608,10 +1608,15 @@ def _validate_code_task_session_id(output: dict[str, Any]) -> tuple[str, list[st
 
 def _validate_code_task_plan_quality(plan_text: str, task_text: str) -> list[str]:
     failures: list[str] = []
+    normalized_plan_text = plan_text.lower()
     if "## Execution Plan" not in plan_text and "## Steps" not in plan_text:
         failures.append("planner plan missing execution steps section")
     if "## Validation" not in plan_text and "Verify" not in plan_text:
         failures.append("planner plan missing validation section")
+    if "closure" not in normalized_plan_text and "done" not in normalized_plan_text:
+        failures.append("planner plan missing closure criteria")
+    if "evidence" not in normalized_plan_text:
+        failures.append("planner plan missing evidence guidance")
     if CODE_TASK_CHECK_COMMAND not in plan_text:
         failures.append("planner plan missing acceptance command")
     if f"{CODE_TASK_PROJECT_DIR}/src/text_utils.py" not in plan_text:
@@ -1633,6 +1638,7 @@ def _validate_code_task_plan_quality(plan_text: str, task_text: str) -> list[str
 def _validate_code_task_report_quality(session_id: str, report_text: str, evidence_text: str) -> list[str]:
     failures: list[str] = []
     normalized_report_text = report_text.lower()
+    report_path = f"{CODE_TASK_PROJECT_DIR}/benchmark_report.md"
     required_report_tokens = (
         session_id,
         "T-01",
@@ -1640,15 +1646,39 @@ def _validate_code_task_report_quality(session_id: str, report_text: str, eviden
         CODE_TASK_CHECK_COMMAND,
         "passed",
         "evidence",
+        "changed",
+        f"{CODE_TASK_PROJECT_DIR}/src/text_utils.py",
+        report_path,
     )
     for token in required_report_tokens:
         if token.lower() not in normalized_report_text:
             failures.append(f"code task report missing {token}")
     compact_evidence_text = evidence_text.replace(" ", "")
-    evidence_tokens = ("benchmark_report.md", CODE_TASK_CHECK_COMMAND.replace(" ", ""), '"result":"passed"')
+    evidence_tokens = (report_path, CODE_TASK_CHECK_COMMAND.replace(" ", ""), '"result":"passed"')
     for token in evidence_tokens:
         if token not in compact_evidence_text:
             failures.append(f"code task evidence ledger missing {token}")
+    evidence_records: list[dict[str, Any]] = []
+    for raw_line in evidence_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            failures.append("code task evidence ledger contains invalid JSON")
+            continue
+        if isinstance(record, dict):
+            evidence_records.append(record)
+    has_matching_report_evidence = any(
+        record.get("task_id") == "T-01"
+        and record.get("command") == CODE_TASK_CHECK_COMMAND
+        and record.get("result") == "passed"
+        and record.get("artifact") == report_path
+        for record in evidence_records
+    )
+    if not has_matching_report_evidence:
+        failures.append("code task evidence ledger missing passed T-01 report artifact record")
     return failures
 
 

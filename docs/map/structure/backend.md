@@ -1,6 +1,6 @@
 # 🎨 Backend Structure
 
-**Generated:** 2026-06-07T09:09:44+00:00
+**Generated:** 2026-06-07T11:53:51+00:00
 **Last Update:** First run
 
 Services, utilities, and business logic.
@@ -9,13 +9,13 @@ Services, utilities, and business logic.
 
 ## 📁 Directory Overview
 
-**Stats:** 94 files, 30,839 lines, 1383.2 KB
+**Stats:** 94 files, 32,069 lines, 1440.1 KB
 
 ### Files
 
 | File | Lines | Size | Description |
 |------|-------|------|-------------|
-| `.agents/scripts/agents-benchmark.py` | 1,796 | 86.5 KB | Module; functionality |
+| `.agents/scripts/agents-benchmark.py` | 2,995 | 142.3 KB | Module; functionality |
 | `.agents/scripts/agents-skills-sync.py` | 1,733 | 74.2 KB | Module; functionality |
 | `.agents/scripts/agents-bootstrap.py` | 1,488 | 60.4 KB | Module; functionality |
 | `.agents/scripts/verify-tasks.py` | 1,363 | 54.1 KB | Module; functionality |
@@ -36,8 +36,8 @@ Services, utilities, and business logic.
 | `cli/services/local-state/project-indexes.ts` | 490 | 15.6 KB | Module; functionality |
 | `cli/generated/template.ts` | 482 | 197.7 KB | Module; functionality |
 | `.agents/scripts/agents-lint-docs.py` | 475 | 17.7 KB | Module; functionality |
+| `cli/services/workbench/lifecycle.ts` | 458 | 15.1 KB | Module; functionality |
 | `.agents/runtime/src/agentic_scaffold/services/changes.py` | 449 | 19.4 KB | Module; functionality |
-| `cli/services/workbench/lifecycle.ts` | 427 | 14.1 KB | Module; functionality |
 | `cli/commands/bootstrap.ts` | 393 | 14.2 KB | Module; functionality |
 | `.agents/scripts/agents-repo-map.py` | 393 | 16.5 KB | Module; functionality |
 | `cli/services/workbench/verify.ts` | 382 | 11.9 KB | Module; functionality |

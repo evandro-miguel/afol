@@ -313,7 +313,10 @@ def test_validate_code_task_planner_accepts_meaningful_afol_plan_and_task(tmp_pa
         "# Plan\n\n"
         "## Steps\n"
         "- T-01: Implement slugify in test-code-task-project/src/text_utils.py.\n"
-        "- Verify with python3 scripts/check_slugify.py.\n",
+        "- Verify with python3 scripts/check_slugify.py.\n"
+        "- Record evidence before marking T-01 done.\n\n"
+        "## Closure Criteria\n"
+        "- T-01 is done after passed evidence exists.\n",
         encoding="utf-8",
     )
     (session_dir / f"{session_id}_task_01.md").write_text(
@@ -337,6 +340,43 @@ def test_validate_code_task_planner_accepts_meaningful_afol_plan_and_task(tmp_pa
     )
 
     assert failures == []
+
+
+def test_validate_code_task_planner_rejects_metadata_only_plan_and_vague_task(tmp_path):
+    benchmark = load_module()
+    session_id = "260607_1300_code-task-benchmark"
+    session_dir = tmp_path / ".afol" / "wb" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_plan_01.md").write_text(
+        "# Plan\n\n- feature_id: F-CODE\n- task: slugify\n",
+        encoding="utf-8",
+    )
+    (session_dir / f"{session_id}_task_01.md").write_text(
+        "| T-01 | pending | worker | slugify |\n",
+        encoding="utf-8",
+    )
+
+    failures = benchmark._validate_code_task_planner(
+        {
+            "session_id": session_id,
+            "used_afol_new": True,
+            "plan_created": True,
+            "task_created": True,
+            "plan_mentions_slugify": True,
+            "task_mentions_slugify": True,
+            "plan_quality_passed": True,
+            "task_quality_passed": True,
+            "manual_afol_wb_edit": False,
+        },
+        tmp_path,
+    )
+
+    assert "planner plan missing execution steps section" in failures
+    assert "planner plan missing validation section" in failures
+    assert "planner plan missing closure criteria" in failures
+    assert "planner plan missing evidence guidance" in failures
+    assert "planner task missing target source path" in failures
+    assert "planner task missing acceptance command" in failures
 
 
 def test_validate_code_task_executor_accepts_completed_slugify_task(tmp_path):
@@ -374,7 +414,8 @@ def test_validate_code_task_executor_accepts_completed_slugify_task(tmp_path):
         "Task: T-01 done.\n"
         "Summary: slugify implemented in test-code-task-project/src/text_utils.py.\n"
         "Verification: python3 scripts/check_slugify.py passed.\n"
-        "Evidence: recorded in AFOL ledger.\n",
+        "Evidence: recorded in AFOL ledger.\n"
+        "Changed files: test-code-task-project/src/text_utils.py, test-code-task-project/benchmark_report.md.\n",
         encoding="utf-8",
     )
 
@@ -398,6 +439,128 @@ def test_validate_code_task_executor_accepts_completed_slugify_task(tmp_path):
     )
 
     assert failures == []
+
+
+def test_validate_code_task_executor_rejects_incoherent_delivery_report(tmp_path):
+    benchmark = load_module()
+    session_id = "260607_1300_code-task-benchmark"
+    session_dir = tmp_path / ".afol" / "wb" / session_id
+    project_src = tmp_path / benchmark.CODE_TASK_PROJECT_DIR / "src"
+    scripts_dir = tmp_path / "scripts"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    project_src.mkdir(parents=True, exist_ok=True)
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_task_01.md").write_text(
+        "| T-01 | done | worker | Implement slugify(text) in test-code-task-project/src/text_utils.py. |\n",
+        encoding="utf-8",
+    )
+    (session_dir / ".evidence.jsonl").write_text(
+        '{"task_id":"T-01","command":"python3 scripts/check_slugify.py","result":"passed","artifact":"test-code-task-project/benchmark_report.md"}\n',
+        encoding="utf-8",
+    )
+    (project_src / "text_utils.py").write_text(
+        "from __future__ import annotations\n\n"
+        "import re\n\n\n"
+        "def slugify(text: str) -> str:\n"
+        "    lowered = text.strip().lower()\n"
+        "    slug = re.sub(r'[^a-z0-9]+', '-', lowered)\n"
+        "    return slug.strip('-')\n",
+        encoding="utf-8",
+    )
+    check_file = scripts_dir / "check_slugify.py"
+    check_file.write_text(benchmark._code_task_check_text(), encoding="utf-8")
+    check_file.chmod(0o755)
+    (tmp_path / benchmark.CODE_TASK_PROJECT_DIR / "benchmark_report.md").write_text(
+        "# Benchmark Report\n\nDone.\n",
+        encoding="utf-8",
+    )
+
+    failures = benchmark._validate_code_task_executor(
+        {
+            "session_id": session_id,
+            "problem_fixed": True,
+            "verification_passed": True,
+            "used_afol_start": True,
+            "used_afol_evidence": True,
+            "used_afol_done": True,
+            "task_completed": True,
+            "evidence_recorded": True,
+            "report_written": True,
+            "report_coherent": True,
+            "task_marked_correct": True,
+            "manual_afol_wb_edit": False,
+            "edited_only_allowed_paths": True,
+        },
+        tmp_path,
+    )
+
+    assert f"code task report missing {session_id}" in failures
+    assert "code task report missing slugify" in failures
+    assert "code task report missing python3 scripts/check_slugify.py" in failures
+    assert "code task report missing test-code-task-project/benchmark_report.md" in failures
+
+
+def test_validate_code_task_executor_rejects_evidence_without_report_artifact(tmp_path):
+    benchmark = load_module()
+    session_id = "260607_1300_code-task-benchmark"
+    session_dir = tmp_path / ".afol" / "wb" / session_id
+    project_src = tmp_path / benchmark.CODE_TASK_PROJECT_DIR / "src"
+    scripts_dir = tmp_path / "scripts"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    project_src.mkdir(parents=True, exist_ok=True)
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_task_01.md").write_text(
+        "| T-01 | done | worker | Implement slugify(text) in test-code-task-project/src/text_utils.py. |\n",
+        encoding="utf-8",
+    )
+    (session_dir / ".evidence.jsonl").write_text(
+        '{"task_id":"T-01","command":"python3 scripts/check_slugify.py","result":"passed"}\n',
+        encoding="utf-8",
+    )
+    (project_src / "text_utils.py").write_text(
+        "from __future__ import annotations\n\n"
+        "import re\n\n\n"
+        "def slugify(text: str) -> str:\n"
+        "    lowered = text.strip().lower()\n"
+        "    slug = re.sub(r'[^a-z0-9]+', '-', lowered)\n"
+        "    return slug.strip('-')\n",
+        encoding="utf-8",
+    )
+    check_file = scripts_dir / "check_slugify.py"
+    check_file.write_text(benchmark._code_task_check_text(), encoding="utf-8")
+    check_file.chmod(0o755)
+    (tmp_path / benchmark.CODE_TASK_PROJECT_DIR / "benchmark_report.md").write_text(
+        "# Benchmark Report\n\n"
+        f"Session: {session_id}\n"
+        "Task: T-01 done.\n"
+        "Summary: slugify implemented in test-code-task-project/src/text_utils.py.\n"
+        "Verification: python3 scripts/check_slugify.py passed.\n"
+        "Evidence: recorded in AFOL ledger.\n"
+        "Changed files: test-code-task-project/src/text_utils.py, test-code-task-project/benchmark_report.md.\n",
+        encoding="utf-8",
+    )
+
+    failures = benchmark._validate_code_task_executor(
+        {
+            "session_id": session_id,
+            "problem_fixed": True,
+            "verification_passed": True,
+            "used_afol_start": True,
+            "used_afol_evidence": True,
+            "used_afol_done": True,
+            "task_completed": True,
+            "evidence_recorded": True,
+            "report_written": True,
+            "report_coherent": True,
+            "task_marked_correct": True,
+            "manual_afol_wb_edit": False,
+            "edited_only_allowed_paths": True,
+        },
+        tmp_path,
+    )
+
+    assert "code task evidence ledger missing test-code-task-project/benchmark_report.md" in failures
+    assert "code task evidence ledger missing passed T-01 report artifact record" in failures
 
 
 def test_validate_code_task_executor_rejects_missing_delivery_report(tmp_path):
