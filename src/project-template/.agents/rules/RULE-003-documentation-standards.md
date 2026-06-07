@@ -83,7 +83,7 @@ updated_at: 2026-02-23T14:30:00-03:00
 ## Validation
 
 ```bash
-./.agents/agents lint-docs .agents/wb/
-./.agents/agents lint-docs .agents/wb --fix
-./.agents/agents wb-update normalize-time --all-wb
+./afol validate
+./afol status
+just lint
 ```

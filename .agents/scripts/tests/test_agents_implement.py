@@ -445,6 +445,15 @@ class ImplementHelperTests(unittest.TestCase):
             "child_spec_path": "docs/arc/SPECS/child_spec_01.md",
             "plan_path": ".agents/wb/s1/s1_plan_01.md",
             "task_path": ".agents/wb/s1/s1_task_01.md",
+            "route_metadata": {
+                "payload_key": "rule_skill_context_payload",
+                "payload_schema_version": "1.0.0",
+                "routing": {
+                    "work_type": "delivery",
+                    "surfaces": ["feature", "validation", "workbench"],
+                    "rule_ids": ["RULE-002", "RULE-006"],
+                },
+            },
             "rules": [
                 {"id": "RULE-002", "path": ".agents/rules/RULE-002-workstream-creation.md"},
                 {"id": "RULE-006", "path": ".agents/rules/RULE-006-applicable-rule-resolution.md"},
@@ -461,6 +470,7 @@ class ImplementHelperTests(unittest.TestCase):
         self.assertIn("Governance preflight:", output)
         self.assertIn("feature: F-18", output)
         self.assertIn("RULE-006", output)
+        self.assertIn("delegation_transport:", output)
 
 
 class ImplementMainTests(unittest.TestCase):

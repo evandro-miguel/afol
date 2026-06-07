@@ -110,6 +110,57 @@ def test_forbidden_commands_absent_reports_manual_wb_edits():
     assert failures == ["forbidden tool command observed: apply_patch"]
 
 
+def test_live_scenario_command_keeps_agents_dir_writable_mount(tmp_path):
+    benchmark = load_module()
+    scenario = benchmark.SCENARIOS["live-implement-start-complete-evidence"]
+    fixture_root = tmp_path / "fixture"
+    fixture_root.mkdir(parents=True, exist_ok=True)
+    schema_path = tmp_path / "schema.json"
+    output_path = tmp_path / "output.json"
+
+    command = benchmark._live_scenario_command(
+        scenario,
+        benchmark.DEFAULT_PROFILE,
+        fixture_root,
+        schema_path,
+        output_path,
+    )
+
+    assert "--add-dir" in command
+    assert command[command.index("--add-dir") + 1] == str(fixture_root / ".agents")
+    assert "-C" in command
+    assert command[command.index("-C") + 1] == str(fixture_root)
+
+
+def test_validate_completion_accepts_done_row_with_evidence_suffix(tmp_path):
+    benchmark = load_module()
+    session_dir = tmp_path / ".agents" / "wb" / benchmark.FIXTURE_WORKSTREAM_ID
+    session_dir.mkdir(parents=True, exist_ok=True)
+    task_file = session_dir / f"{benchmark.FIXTURE_WORKSTREAM_ID}_task_01.md"
+    evidence_file = session_dir / ".evidence.jsonl"
+
+    task_file.write_text(
+        "| T-01 | done | worker | Run the controlled live benchmark fixture flow. "
+        "(evidence: E-20260529152307831530) |\n",
+        encoding="utf-8",
+    )
+    evidence_file.write_text(
+        '{"command": "live benchmark fixture command", "result": "passed"}\n',
+        encoding="utf-8",
+    )
+
+    failures = benchmark._validate_completion(
+        {
+            "task_id": "T-01",
+            "completed": True,
+            "evidence_recorded": True,
+        },
+        tmp_path,
+    )
+
+    assert failures == []
+
+
 def test_run_suite_aggregates_results_and_writes_output(tmp_path):
     benchmark = load_module()
 

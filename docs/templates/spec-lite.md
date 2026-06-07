@@ -8,7 +8,7 @@ owners:
 workstream_intent: <workstream_intent>
 artifact_purpose: <artifact_purpose>
 created_at: YYYY-MM-DDTHH:MM:SSZ
-updated_at: YYYY-MM-DDTHH:MM:SSZ
+updated_at: 2026-05-28T18:29:58Z
 roadmap_feature: <feature_id>
 spec_role: workstream
 parent_spec: <parent_spec_id>
@@ -24,6 +24,7 @@ risk_level: low
 
 - `spec-child` is the canonical future child-spec name.
 - Keep `spec-lite` only for historical compatibility or toolchains that still emit `spec-lite`.
+- New child/local spec work should use `spec-child` instead of `spec-lite`.
 
 ## Intent
 

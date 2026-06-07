@@ -1,5 +1,6 @@
 import argparse
 import importlib.util
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,6 +17,8 @@ def load_module(module_name: str, file_path: Path):
 
 
 SCRIPT_PATH = Path(".agents/scripts/agents-review.py").resolve()
+
+sys.path.insert(0, str(SCRIPT_PATH.parent))
 
 
 class ReviewInspectTests(unittest.TestCase):
@@ -253,6 +256,26 @@ class ReviewScopeTests(unittest.TestCase):
         ):
             result = self.review.cmd_scope(session_dir, "all")
         self.assertEqual(result, 0)
+
+    def test_run_verify_tasks_uses_strict_flag(self):
+        """run_verify_tasks always calls verify-tasks with --strict."""
+        session_dir = Path("/tmp/session")
+        completed = mock.Mock(returncode=0, stdout="ok", stderr="")
+        with mock.patch.object(self.review.subprocess, "run", return_value=completed) as run_mock:
+            code, out, err = self.review.run_verify_tasks(session_dir)
+        cmd = run_mock.call_args.args[0]
+        self.assertIn("--strict", cmd)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "ok")
+        self.assertEqual(err, "")
+
+    def test_run_verify_tasks_real_session_uses_strict_gate(self):
+        """A real governed session still passes through strict verification."""
+        session_dir = Path(".agents/wb/260528_0811_workbench-core-f04-t07-t10")
+        code, out, err = self.review.run_verify_tasks(session_dir)
+        self.assertEqual(code, 0)
+        self.assertIn("✅ All tasks completed!", out)
+        self.assertEqual(err, "")
 
 
 class ReviewMainTests(unittest.TestCase):

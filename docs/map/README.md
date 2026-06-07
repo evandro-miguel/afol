@@ -1,101 +1,42 @@
 ---
 title: "Repository Map"
-description: "Entry point for the generated repository map, including reading order, scope, and current structural signals."
+description: "Current-state evidence for the Bun/TypeScript app and template boundary."
 doc_kind: "codemap-index"
-version: "v2026-04-02_1"
-created_at: "2026-04-02T23:28:28Z"
-updated_at: "2026-04-02T23:28:28Z"
+version: "v2026-05-31_1"
+created_at: "2026-05-31T00:00:00Z"
+updated_at: "2026-05-31T00:00:00-03:00"
 ---
 
-## Repository Map
+# Repository Map
 
-This folder is the distilled architecture view of the repository.
+This folder is the live current-state map for the repo.
 
-### Scaffold Contract
+## Current Shape
 
-- `docs/map/` is the only durable current-state, descriptive evidence surface for repository mapping.
-- Goal-state canon stays outside this folder in `docs/arc/`, roadmap, specs, ADRs, and related architecture docs.
-- `docs/map/structure/` is the canonical current-state structure index for physical layout and folder-convention evidence.
-- `docs/arc/structure/` is a legacy generated surface and is retired rather than maintained as a second current-state map.
-- Use this map for refreshable observation and analysis, not as approval authority for desired-state decisions.
+- Active app source is Bun/TypeScript in `cli/**`.
+- Exportable downstream scaffold source is `src/project-template/**`.
+- Root `.agents/scripts/**` and `.agents/runtime/**` are factory-only legacy/compat surfaces during migration.
+- The clean template excludes `.agents/scripts/**`, `.agents/runtime/**`, `.agents/agents`, `.agents/agents-mcp`, and Python env files such as `**/*.py`, `**/pyproject.toml`, `**/uv.lock`, `**/.venv/**`, and `**/__pycache__/**`.
+- Legacy factory Python/command shim paths are retained for compatibility while any delegated
+  command family remains native-migration-only; they are retired only when parity gates
+  demonstrate full replacement.
+- `docs/map/` is current-state evidence only; goal-state canon stays in `docs/arc/`.
 
-### Read This First
+## Current Commands
 
-- Repo: `agentic_start_folder`
-- Current version: `v2026-04-02_1`
-- Targets analyzed: `.`
-- Raw evidence: `extra/`
+- Primary package scripts: `typecheck`, `test`, `validate`, `validate:template`, `validate:bootstrap`, `build`.
+- Template and bootstrap checks are enforced from `cli/tests/template-policy.test.ts` and `cli/tests/bootstrap-template-cleanliness.test.ts`.
 
-### What This Map Is Supposed To Answer
+## Reading Order
 
-- Which domains exist and why they exist.
-- Which files define the public boundaries and integration points.
-- Which files other code depends on most heavily.
-- Which hotspots and static findings deserve attention first.
-- Where the main classes, functions, interfaces, and constants live.
+- `structure/README.md`
+- `structure/backend.md`
+- `structure/tests.md`
+- `structure/data.md`
+- `structure/types.md`
 
-### Recommended Reading Order
+## What To Expect
 
-- `README.md`
-- `CHANGELOG.md`
-- `ARCHITECTURE.md`
-- `FEATURES.md`
-- `BACKEND.md`
-- `FRONTEND.md`
-- `API_MAP.md`
-- `CONNECTIONS.md`
-- `DEPENDENCY_GRAPH.md`
-- `HOTSPOTS.md`
-- `SYMBOLS.md`
-- `domains/`
-- `extra/`
-
-### What Lives Where
-
-- Root `.md` files: distilled explanations for agents and humans.
-- `domains/`: domain-focused breakdowns with responsibilities, key files, and risks.
-- `structure/`: the current-state physical layout view and section files.
-- `extra/`: raw tool outputs, logs, and machine-readable evidence.
-
-### System Overview
-
-- The root README describes `.agents` as a terminal-first operating system for
-  interactive agentic CLI workflows with planning rigor, telemetry, reusable
-  knowledge, and standardized documentation.
-
-### Major Runtime Surfaces
-
-- `.agents/scripts`: Python command surface for governance, validation, bootstrap, repo maps, and runtime adapters.
-- `docs/`: Canonical project documentation surface for standards, architecture, patterns, templates, and telemetry guidance.
-- `.agents/skills`: Project-local skill surface synced into the repository for interactive runtimes.
-- `AGENTS.md`, `CLAUDE.md`: Operator/runtime instruction entrypoints; other runtimes use `AGENTS.md` directly or global runtime config.
-
-### Cross-Domain Flow
-
-- Cross-domain flows must be inferred from the available route, symbol, and dependency artifacts.
-
-### Product And Platform Signals
-
-- README feature signals: consistent documentation, planning rigor, knowledge
-  reuse, automated telemetry, heat scoring, pattern catalog, and
-  self-improvement.
-
-### Current System Shape
-
-- Stack signals: `none detected`
-- Runtime versions: `not declared`
-- Stack versions: `not declared`
-- Dependency graph source: `dependency-cruiser`
-- Modules analyzed: `43`
-- Internal dependency edges: `0`
-- Route-bearing files: `0`
-- Public boundary files: `0`
-- Hotspots ranked: `50`
-
-### Critical Signals
-
-- Top hotspot: `n/a`
-- Circular dependencies: `0`
-- Orphan modules: `41`
-- Semgrep auto findings: `260`
-- Semgrep custom findings: `28`
+- Concise observations, not giant generated inventories.
+- Current file ownership and boundary notes.
+- Enough evidence to reason about the live architecture without guessing.

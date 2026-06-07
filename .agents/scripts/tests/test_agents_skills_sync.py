@@ -1801,6 +1801,151 @@ class AgentsSkillsSyncTests(unittest.TestCase):
                 ],
             )
 
+    def test_cmd_list_with_metadata_shows_manifest_status(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            self._make_source_skill(root, "writing-skills", description="Write and improve skills")
+            self._make_profile(root, "core", ["writing-skills"])
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                    "skill_metadata": {
+                        "writing-skills": {
+                            "status": "preferred",
+                            "note": "baseline",
+                        }
+                    },
+                }
+            )
+
+            buffer = io.StringIO()
+            args = type(
+                "Args",
+                (),
+                {
+                    "selected": False,
+                    "installed": False,
+                    "metadata": True,
+                    "runtime": None,
+                    "skills": None,
+                    "profile": None,
+                },
+            )()
+            with redirect_stdout(buffer):
+                module.cmd_list(args)
+
+            output = buffer.getvalue()
+            self.assertIn("writing-skills", output)
+            self.assertIn("status=preferred", output)
+            self.assertIn("desc: Write and improve skills", output)
+
+    def test_cmd_get_prints_skill_metadata(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            self._make_source_skill(root, "writing-skills", description="Write and improve skills")
+            self._make_profile(root, "core", ["writing-skills"])
+
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                module.cmd_get(type("Args", (), {"skill": "writing-skills"})())
+
+            output = buffer.getvalue()
+            self.assertIn("SKILL", output)
+            self.assertIn("- name: writing-skills", output)
+            self.assertIn("- source_exists: True", output)
+            self.assertIn("- description: Write and improve skills", output)
+
+    def test_cmd_update_metadata_persists_entry(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            self._seed_source_repo(root)
+            self._make_source_skill(root, "writing-skills", description="Write and improve skills")
+            self._make_profile(root, "core", ["writing-skills"])
+            module.save_manifest(
+                {
+                    "version": 2,
+                    "repo": "https://github.com/example/skill-universal.git",
+                    "ref": "main",
+                    "mode": "copy",
+                    "installs": [{"app": "all", "profile": "core"}],
+                }
+            )
+
+            args = type(
+                "Args",
+                (),
+                {
+                    "skill": "writing-skills",
+                    "status": "candidate",
+                    "note": "needs review",
+                    "clear_note": False,
+                },
+            )()
+            module.cmd_update(args)
+
+            loaded = module.load_manifest()
+            self.assertEqual(loaded["skill_metadata"]["writing-skills"]["status"], "candidate")
+            self.assertEqual(loaded["skill_metadata"]["writing-skills"]["note"], "needs review")
+            self.assertIn("updated_at", loaded["skill_metadata"]["writing-skills"])
+
+    def test_cmd_update_metadata_requires_known_skill_without_create(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            module.save_manifest(module._default_manifest())
+
+            args = type(
+                "Args",
+                (),
+                {
+                    "skill": "ghost-skill",
+                    "status": "candidate",
+                    "note": "needs review",
+                    "clear_note": False,
+                    "create": False,
+                },
+            )()
+
+            with self.assertRaisesRegex(RuntimeError, "--create"):
+                module.cmd_update(args)
+
+            loaded = module.load_manifest()
+            self.assertNotIn("skill_metadata", loaded)
+
+    def test_cmd_update_metadata_create_allows_new_skill_entry(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            module = self._load_with_root(root)
+            module.save_manifest(module._default_manifest())
+
+            args = type(
+                "Args",
+                (),
+                {
+                    "skill": "ghost-skill",
+                    "status": "candidate",
+                    "note": "needs review",
+                    "clear_note": False,
+                    "create": True,
+                },
+            )()
+
+            module.cmd_update(args)
+
+            loaded = module.load_manifest()
+            self.assertEqual(loaded["skill_metadata"]["ghost-skill"]["status"], "candidate")
+            self.assertEqual(loaded["skill_metadata"]["ghost-skill"]["note"], "needs review")
+            self.assertIn("updated_at", loaded["skill_metadata"]["ghost-skill"])
+
 
 if __name__ == "__main__":
     unittest.main()

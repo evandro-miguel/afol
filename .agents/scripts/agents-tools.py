@@ -22,6 +22,7 @@ import re
 import subprocess
 import sys
 import unicodedata
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -65,6 +66,11 @@ def _load_json_dict(value: str) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("Tools catalog must be a JSON object")
     return payload
+
+
+def _find_duplicates(values: List[str]) -> List[str]:
+    """Return sorted duplicate values preserving deterministic output."""
+    return sorted([value for value, count in Counter(values).items() if count > 1])
 
 
 def load_tools() -> Dict[str, Any]:
@@ -150,10 +156,7 @@ def list_tools(tools_data: Dict[str, Any], filter_type: Optional[str] = None) ->
     # Group by type
     by_type: Dict[str, List[Dict]] = {}
     for tool in tools:
-        t = tool["type"]
-        if t not in by_type:
-            by_type[t] = []
-        by_type[t].append(tool)
+        by_type.setdefault(tool["type"], []).append(tool)
 
     for tool_type, type_tools in sorted(by_type.items()):
         print(f"\n{format_type_badge(tool_type)}")
@@ -524,7 +527,7 @@ def validate_catalog(tools_data: Dict[str, Any]) -> int:
     _validate_tool_entries(tools, ids, type_set, errors)
 
     # Check for duplicate IDs
-    duplicates = sorted({tid for tid in ids if ids.count(tid) > 1})
+    duplicates = _find_duplicates(ids)
     if duplicates:
         errors.append(f"Duplicate tool IDs: {', '.join(duplicates)}")
 

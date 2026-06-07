@@ -15,37 +15,39 @@ updated_at: '2026-05-14T20:05:00-03:00'
 ## Mandatory First Step
 
 ```bash
-./.agents/agents tools list
+./afol --help
+./afol rule list
+./afol skill list
 ```
 
 ## Tool Discovery Commands
 
 | Command | Purpose |
 | --- | --- |
-| `./.agents/agents tools list` | List available tools |
-| `./.agents/agents tools list --type validation` | Show validation tools |
-| `./.agents/agents tools search <keyword>` | Find tool by keyword |
-| `./.agents/agents tools info <tool-id>` | Show tool details |
-| `./.agents/agents tools help` | Command help |
+| `./afol --help` | Show CLI command surface |
+| `./afol rule list` | List local rules |
+| `./afol rule show <rule-id>` | Show rule metadata |
+| `./afol skill list` | List project skills |
+| `./afol skill search <keyword>` | Find skill by keyword |
+| `./afol validate` | Run scaffold validation |
 
 ## Tool Usage Pattern
 
 ```text
-1) Discover: tools list
-2) Scope: tools info <tool-id>
-3) Read: docs/agentic/<tool>.md
-4) Execute: ./.agents/agents <command>
+1) Discover: ./afol --help
+2) Scope: ./afol rule list or ./afol skill list
+3) Read: ./afol rule show <rule-id> or ./afol skill show <skill-name>
+4) Execute: ./afol <command>
 5) Verify: exit code + output
 ```
 
 ## Common Commands
 
 ```bash
-./.agents/agents doctor
-./.agents/agents new <theme> --feature-id F-01 --parent-spec <parent-spec-id>
-./.agents/agents verify-tasks .agents/wb/<session>/
-./.agents/agents wb-update touch
-./.agents/agents lint-docs .agents/wb/
+./afol validate
+./afol status
+./afol n <theme> --feature-id F-01 --parent-spec <parent-spec-id>
+./afol verify-tasks <configured-wb-dir>/<session>/
 ```
 
 ## Justfile Quick Reference

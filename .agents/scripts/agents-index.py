@@ -15,18 +15,18 @@ Usage:
 """
 
 import sys
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
 from typing import List
 
 try:
     import yaml
-
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
 
 from lib.agents_config import get_cfg_path, load_agents_config, parse_offset
+from lib.markdown_docs import split_markdown_frontmatter as split_frontmatter
 
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
@@ -71,7 +71,13 @@ class DocEntry:
                 self.status = fm.get("status", "")
                 owners = fm.get("owners", [])
                 self.owner = owners[0] if owners else ""
-                self.created_at = fm.get("created_at", fm.get("created", ""))
+                created_at = fm.get("created_at", fm.get("created", ""))
+                if created_at is None:
+                    self.created_at = ""
+                elif hasattr(created_at, "isoformat"):
+                    self.created_at = created_at.isoformat()
+                else:
+                    self.created_at = str(created_at).strip()
                 self.links = fm.get("links", {})
             except yaml.YAMLError:
                 pass
@@ -99,19 +105,16 @@ class DocEntry:
         return f"| {self.id} | {self.theme} | {self.status} | {self.owner} | {links_str} |"
 
 
-def scan_docs(directory: Path, pattern: str) -> List[DocEntry]:
+def scan_docs(directory: Path, pattern: str, recursive: bool = False) -> List[DocEntry]:
     """Scan directory for doc files."""
     if not directory.exists():
         return []
 
     entries = []
+    files = directory.rglob(pattern) if recursive else directory.glob(pattern)
 
-    for file_path in directory.glob(pattern):
-        if (
-            file_path.name.startswith("TEMPLATE_")
-            or file_path.name == "INDEX.md"
-            or file_path.name == "README.md"
-        ):
+    for file_path in files:
+        if file_path.name.startswith("TEMPLATE_") or file_path.name == "INDEX.md" or file_path.name == "README.md":
             continue
 
         # Determine doc type from filename
@@ -131,9 +134,16 @@ def scan_docs(directory: Path, pattern: str) -> List[DocEntry]:
     return entries
 
 
-def generate_index(entries: List[DocEntry], doc_type: str) -> str:
+def generate_index(
+    entries: List[DocEntry],
+    doc_type: str,
+    created_at: str | None = None,
+    updated_at: str | None = None,
+) -> str:
     """Generate INDEX.md content."""
-    timestamp = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
+    now_ts = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
+    created_at = created_at or now_ts
+    updated_at = updated_at or now_ts
     frontmatter_doc_type = "specs_index" if doc_type == "spec" else "adr_index"
     index_id = "specs_index" if doc_type == "spec" else "adr_index"
     title = "SPECS" if doc_type == "spec" else "ADRS"
@@ -144,8 +154,8 @@ def generate_index(entries: List[DocEntry], doc_type: str) -> str:
 doc_type: {frontmatter_doc_type}
 id: "{index_id}"
 status: active
-created_at: "{timestamp}"
-updated_at: "{timestamp}"
+created_at: "{created_at}"
+updated_at: "{updated_at}"
 ---
 
 # {title} INDEX
@@ -154,12 +164,14 @@ updated_at: "{timestamp}"
 
 ## Summary
 
+<!-- markdownlint-disable MD013 MD060 -->
+
 | Metric | Count |
 |--------|-------|
 | Total | {len(entries)} |
-| Draft | {len([e for e in entries if e.status == "draft"])} |
-| Active | {len([e for e in entries if e.status == "active"])} |
-| Final | {len([e for e in entries if e.status == "final"])} |
+| Draft | {len([e for e in entries if e.status == 'draft'])} |
+| Active | {len([e for e in entries if e.status == 'active'])} |
+| Final | {len([e for e in entries if e.status == 'final'])} |
 
 ## Index
 
@@ -174,11 +186,50 @@ updated_at: "{timestamp}"
         content += "| - | - | - | - | - |\n"
 
     content += f"""
+<!-- markdownlint-enable MD013 MD060 -->
+
 ---
 *Index: `{path_label}`*
 """
 
     return content
+
+
+def extract_existing_timestamps(path: Path) -> tuple[str | None, str | None]:
+    if not path.exists():
+        return None, None
+    parsed = split_frontmatter(path.read_text())
+    if not parsed:
+        return None, None
+    frontmatter, _ = parsed
+    created_at = frontmatter.get("created_at")
+    updated_at = frontmatter.get("updated_at")
+    return (
+        str(created_at).strip() if created_at else None,
+        str(updated_at).strip() if updated_at else None,
+    )
+
+
+def write_index_if_changed(index_path: Path, entries: List[DocEntry], doc_type: str, dry_run: bool) -> str:
+    now_ts = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
+    previous = index_path.read_text() if index_path.exists() else ""
+    created_at, updated_at = extract_existing_timestamps(index_path)
+    created_at = created_at or now_ts
+    stable_updated_at = updated_at or now_ts
+
+    stable_content = generate_index(entries, doc_type, created_at, stable_updated_at)
+    if previous == stable_content:
+        return "unchanged"
+
+    next_content = generate_index(entries, doc_type, created_at, now_ts)
+    if previous == next_content:
+        return "unchanged"
+
+    if dry_run:
+        return "would_update"
+
+    index_path.write_text(next_content)
+    return "updated"
 
 
 def main():
@@ -191,7 +242,7 @@ def main():
 
     # Scan SPECS
     print("Scanning SPECS...")
-    spec_entries = scan_docs(SPECS_DIR, "*.md")
+    spec_entries = scan_docs(SPECS_DIR, "*.md", recursive=True)
     print(f"  Found {len(spec_entries)} spec file(s)")
 
     # Scan DECISIONS
@@ -204,26 +255,26 @@ def main():
     # Generate SPECS index
     if spec_entries:
         specs_index_path = SPECS_DIR / "INDEX.md"
-        specs_content = generate_index(spec_entries, "spec")
-
-        if dry_run:
+        status = write_index_if_changed(specs_index_path, spec_entries, "spec", dry_run)
+        if status == "would_update":
             print(f"[DRY RUN] Would update: {specs_index_path}")
-        else:
-            specs_index_path.write_text(specs_content)
+        elif status == "updated":
             print(f"✓ Updated: {specs_index_path}")
+        else:
+            print(f"= Unchanged: {specs_index_path}")
     else:
         print("⚠️  No spec files found, skipping SPECS index")
 
     # Generate ADRs index
     if adr_entries:
         adrs_index_path = DECISIONS_DIR / "INDEX.md"
-        adrs_content = generate_index(adr_entries, "adr")
-
-        if dry_run:
+        status = write_index_if_changed(adrs_index_path, adr_entries, "adr", dry_run)
+        if status == "would_update":
             print(f"[DRY RUN] Would update: {adrs_index_path}")
-        else:
-            adrs_index_path.write_text(adrs_content)
+        elif status == "updated":
             print(f"✓ Updated: {adrs_index_path}")
+        else:
+            print(f"= Unchanged: {adrs_index_path}")
     else:
         print("⚠️  No ADR files found, skipping ADRS index")
 

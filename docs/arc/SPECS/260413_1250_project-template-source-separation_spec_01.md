@@ -2,19 +2,19 @@
 doc_type: spec
 id: 260413_1250_project-template-source-separation_spec_01
 theme: project-template-source-separation
-status: active
+status: final
 owners:
 - orchestrator
 created_at: '2026-04-13T12:50:00-03:00'
-updated_at: '2026-04-13T12:53:44-03:00'
+updated_at: '2026-05-29T12:50:42-03:00'
 roadmap_feature: F-16
 spec_role: parent
 parent_spec: ''
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
-  plan: ''
-  task: ''
-  report: ''
+  plan: .agents/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_plan_01.md
+  task: .agents/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_task_01.md
+  report: .agents/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_report_01.md
 scope:
   repo_areas:
   - src/project-template
@@ -39,6 +39,8 @@ risk_level: high
   of exporting development history, caches, or duplicated command surfaces.
 - Roadmap feature: `F-16`
 - Role of this spec: parent feature intent.
+- Closeout note: accepted implementation evidence `b520f23` and `75cf349` is
+  complete, and the remaining docs/governance surfaces now mark F-16 final.
 
 ## 2) Scope
 

@@ -2,19 +2,19 @@
 doc_type: spec
 id: 260413_1849_just-command-runner-migration_spec_01
 theme: just-command-runner-migration
-status: active
+status: final
 owners:
 - orchestrator
 created_at: '2026-04-13T18:49:41-03:00'
-updated_at: '2026-04-13T19:37:16-03:00'
+updated_at: '2026-05-28T20:45:06-03:00'
 roadmap_feature: F-17
 spec_role: parent
 parent_spec: ''
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
-  plan: ''
-  task: ''
-  report: ''
+  plan: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_plan_01.md
+  task: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_task_01.md
+  report: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_report_01.md
 scope:
   repo_areas:
   - Justfile

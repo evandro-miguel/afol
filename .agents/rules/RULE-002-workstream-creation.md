@@ -40,6 +40,20 @@ required evidence, or preserve a durable decision.
   feature`, `Parent spec`, or `Child spec`, use those values directly for the
   governed session instead of searching for alternate governance context.
 
+### File-First Output Contract
+
+For `plan`, `task`, and `report` artifacts in this workstream:
+
+- Required output fields: explicit primary artifact links and optional sidecar links
+  (`brainstorm`, `research`, `explorer-check`, `postmortem`).
+- Required justification: every optional sidecar must include a
+  `sidecar_justification` value.
+- `sidecar_justification` must state `not_required` when an optional sidecar is
+  intentionally skipped.
+- Final completion reports should follow the compact handoff format:
+  `STATUS`, `TASK`, `FILES_WRITTEN`, `VALIDATION_OR_CHECKS`, `SUMMARY`,
+  `BLOCKERS`, and `NEXT`.
+
 ### Standard Workstream
 
 ```bash

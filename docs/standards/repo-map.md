@@ -18,7 +18,8 @@ Use this standard when the project needs more than a lightweight file inventory.
 
 - Project-owned documentation belongs under `docs/` at the repository root.
 - `docs/map/` is the current-state, descriptive evidence surface.
-- `docs/map/structure/` is the lightweight physical layout view.
+- `docs/map/structure/` is the lightweight physical-layout current-state
+  evidence view.
 - `docs/arc/README.md`, `PROJECT-BRIEF.md`, `ARCHITECTURE.md`, `TECH-STACK.md`, `GENERAL-ROADMAP.md`, `SPECS/`, and `DECISIONS/` remain the goal-state canon.
 - Workbench artifacts remain the execution surface.
 - `.agents/` remains the agent-system surface for workbench, runtime rules,

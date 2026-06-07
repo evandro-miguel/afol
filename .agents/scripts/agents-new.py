@@ -18,10 +18,10 @@ Examples:
     python agents-new.py bugfix-login --spec-child
 """
 
-import json
 import re
 import subprocess
 import sys
+import json
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -34,8 +34,8 @@ from lib.agents_config import (
 )
 from lib.markdown_docs import split_markdown_frontmatter
 from lib.workflow_manifest import (
-    ArtifactIntentProfile,
     ArtifactManifestEntry,
+    ArtifactIntentProfile,
     coerce_artifact_manifest as _coerce_artifact_manifest_impl,
     coerce_manifest_entry as _coerce_manifest_entry_impl,
     default_doc_id_placeholder as _default_doc_id_placeholder_impl,
@@ -44,6 +44,57 @@ from lib.workflow_manifest import (
     manifest_id_placeholders as _manifest_id_placeholders_impl,
 )
 
+try:
+    from lib.task_integrity import (
+        validate_task_board as _validate_task_board_impl,
+        validate_plan_concrete_steps as _validate_plan_concrete_steps_impl,
+        validate_task_text as _validate_task_text_impl,
+    )
+except Exception:
+    _validate_task_board_impl = None
+    _validate_plan_concrete_steps_impl = None
+    _validate_task_text_impl = None
+
+
+META_TASK_RE = re.compile(
+    r"\b(?:create|write|make|prepare|draft|build|delega|assign|plan|plano)\b",
+    re.IGNORECASE,
+)
+PLACEHOLDER_TASK_RE = re.compile(r"^\s*(?:<note>|<task description>|todo|tbd)\s*$", re.IGNORECASE)
+
+
+def _validate_task_text_fallback(task_text: str, source: str = "task") -> None:
+    """Fallback task validation when shared integrity module is unavailable."""
+    normalized = " ".join(str(task_text or "").split())
+    if not normalized:
+        raise ValueError(f"{source} requires executable task text.")
+    if PLACEHOLDER_TASK_RE.match(normalized):
+        raise ValueError(f"{source} contains placeholder task text: '{normalized}'")
+    if "plan" in normalized.lower() and META_TASK_RE.search(normalized):
+        raise ValueError(f"{source} contains meta-planning task text: '{normalized}'")
+
+
+def validate_task_text(task_text: str, source: str = "task") -> None:
+    """Validate task text for placeholder/meta-planning patterns."""
+    if _validate_task_text_impl is not None:
+        return _validate_task_text_impl(task_text, source=source)
+    return _validate_task_text_fallback(task_text, source=source)
+
+
+def validate_task_board(body: str, source: str = "task board") -> None:
+    """Validate task board text for executable task presence."""
+    if _validate_task_board_impl is not None:
+        return _validate_task_board_impl(body, source=source)
+    if not body or not str(body).strip():
+        raise ValueError(f"{source} requires at least one executable task.")
+
+
+def validate_plan_concrete_steps(body: str, source: str = "plan") -> None:
+    """Validate plan concrete steps for executable content."""
+    if _validate_plan_concrete_steps_impl is not None:
+        return _validate_plan_concrete_steps_impl(body, source=source)
+    if not body or not str(body).strip():
+        raise ValueError(f"{source} requires at least one concrete step.")
 # Configuration
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -88,25 +139,9 @@ DEFAULT_WORKSTREAM_INTENT, ARTIFACT_POLICY = load_artifact_policy(WORKFLOW_CFG, 
 VALID_WORKSTREAM_INTENTS = set(ARTIFACT_POLICY.keys())
 VALID_ARTIFACT_DOC_TYPES = {entry["doc_type"] for entry in ARTIFACT_MANIFEST}
 THEME_INTENT_HINTS = {
-    "research": (
-        "research",
-        "investigate",
-        "investigation",
-        "analysis",
-        "analyze",
-        "discovery",
-        "spike",
-    ),
+    "research": ("research", "investigate", "investigation", "analysis", "analyze", "discovery", "spike"),
     "brainstorming": ("brainstorm", "options", "direction"),
-    "exploration": (
-        "explore",
-        "exploration",
-        "inventory",
-        "audit",
-        "survey",
-        "repo-map",
-        "codemap",
-    ),
+    "exploration": ("explore", "exploration", "inventory", "audit", "survey", "repo-map", "codemap"),
     "closure": ("closure", "wrap-up", "postmortem", "retro", "retrospective"),
 }
 DOC_TYPE_ALIASES = {
@@ -253,11 +288,7 @@ def resolve_existing_session(session_id: str) -> Path:
     """Resolve an existing session directory by id or path."""
     candidate = Path(session_id)
     if not candidate.is_absolute():
-        candidate = (
-            (ROOT_DIR / session_id).resolve()
-            if "/" in session_id
-            else (WB_DIR / session_id).resolve()
-        )
+        candidate = (ROOT_DIR / session_id).resolve() if "/" in session_id else (WB_DIR / session_id).resolve()
     if not candidate.exists() or not candidate.is_dir():
         raise FileNotFoundError(f"Session folder not found: {session_id}")
     require_canonical_session_path(candidate, source="--into-session")
@@ -423,7 +454,7 @@ def _get_cli_flag_value(flag: str) -> str:
         if arg == flag and idx + 1 < len(sys.argv):
             return sys.argv[idx + 1].strip()
         if arg.startswith(prefix):
-            return arg[len(prefix) :].strip()
+            return arg[len(prefix):].strip()
     return ""
 
 
@@ -441,7 +472,7 @@ def _get_cli_flag_values(flag: str) -> list[str]:
             idx += 2
             continue
         if arg.startswith(prefix):
-            candidate = arg[len(prefix) :].strip()
+            candidate = arg[len(prefix):].strip()
             if candidate:
                 values.append(candidate)
         idx += 1
@@ -466,9 +497,7 @@ def _normalize_spec_reference(reference: str, role: str) -> str:
     spec_path = _resolve_spec_reference(reference)
     if spec_path is None:
         print(f"❌ {role} spec not found: {reference}")
-        print(
-            f"Expected a file under {SPECS_DIR.relative_to(ROOT_DIR)} or a matching frontmatter id."
-        )
+        print(f"Expected a file under {SPECS_DIR.relative_to(ROOT_DIR)} or a matching frontmatter id.")
         sys.exit(1)
 
     try:
@@ -480,13 +509,8 @@ def _normalize_spec_reference(reference: str, role: str) -> str:
     return _doc_id_from_path(spec_path)
 
 
-def _validate_governance_requirements(args: Dict[str, object]) -> None:
-    """Enforce roadmap/spec linkage for standard workstreams."""
-    if args.get("quick_mode") and QUICK_MODE_BYPASSES_GOVERNANCE:
-        return
-    if not GOVERNANCE_REQUIRED:
-        return
-
+def _validate_governance_scope(args: Dict[str, object]) -> None:
+    """Validate required governance scope fields for standard workstreams."""
     missing_flags = []
     if not args.get("feature_id"):
         missing_flags.append("--feature-id")
@@ -517,22 +541,57 @@ def _validate_governance_requirements(args: Dict[str, object]) -> None:
     args["feature_id"] = feature_id
     args["parent_spec"] = _normalize_spec_reference(str(args["parent_spec"]), "Parent")
 
+
+def _validate_governance_child_spec(args: Dict[str, object]) -> None:
+    """Validate and normalize optional child-spec linkage semantics."""
     child_spec = str(args.get("child_spec") or "").strip()
     if child_spec:
         if args.get("use_spec_child") or args.get("use_spec_lite"):
             print("❌ Do not combine --child-spec with --spec-child/--spec-lite.")
             print("Use --child-spec <spec-id> to link an existing child spec.")
-            print(
-                "Use --spec-child only when this session must create a new local child-spec artifact."
-            )
+            print("Use --spec-child only when this session must create a new local child-spec artifact.")
             sys.exit(1)
         normalized_child = _normalize_spec_reference(child_spec, "Child")
         if normalized_child == args["parent_spec"]:
             print("❌ --child-spec must differ from --parent-spec")
             sys.exit(1)
         args["child_spec"] = normalized_child
-    else:
-        args["child_spec"] = ""
+        return
+
+    args["child_spec"] = ""
+
+
+def _validate_governance_requirements(args: Dict[str, object]) -> None:
+    """Enforce roadmap/spec linkage for standard workstreams."""
+    if args.get("quick_mode") and QUICK_MODE_BYPASSES_GOVERNANCE:
+        return
+    if not GOVERNANCE_REQUIRED:
+        return
+
+    _validate_governance_scope(args)
+    _validate_governance_child_spec(args)
+
+
+def _validate_nonquick_delivery_task_text(args: Dict[str, object]) -> None:
+    """Require an executable delivery task for non-quick delivery workstreams."""
+    if args.get("quick_mode"):
+        return
+
+    if str(args.get("intent") or "").strip() != "delivery":
+        return
+
+    task_text = str(args.get("task") or "").strip()
+    if not task_text:
+        print("❌ Delivery workstreams require --task text.")
+        print("Example:")
+        print("  ./.agents/agents new <theme> --intent delivery --task \"Implement X and verify Y\"")
+        sys.exit(1)
+
+    try:
+        validate_task_text(task_text, source="Delivery task")
+    except ValueError as exc:
+        print(f"❌ {exc}")
+        sys.exit(1)
 
 
 def _get_repo_name() -> str:
@@ -559,6 +618,10 @@ def _get_branch_or_worktree() -> str:
 def _build_template_replacements(session_id: str, args: Dict[str, object]) -> Dict[str, str]:
     """Build placeholder replacements for workstream templates."""
     doc_prefix = _doc_prefix(session_id, args)
+    task_seed = str(args.get("task") or "").strip()
+    fallback_task = "Complete the selected workstream artifact and record verification evidence"
+    task_note = task_seed if task_seed else fallback_task
+    task_description = task_seed if task_seed else fallback_task
     replacements = {
         "<repo_name>": _get_repo_name(),
         "<branch_or_worktree>": _get_branch_or_worktree(),
@@ -566,12 +629,21 @@ def _build_template_replacements(session_id: str, args: Dict[str, object]) -> Di
         "<parent_spec_id>": str(args.get("parent_spec") or ""),
         "<parent_spec_id_or_empty>": str(args.get("parent_spec") or ""),
         "<child_spec_id_or_empty>": str(args.get("child_spec") or ""),
+        "<note>": task_note,
+        "<task description>": task_description,
         "<roadmap_path>": f"docs/arc/{ROADMAP_FILE.name}",
         "<spec_role>": "workstream",
         "<workstream_intent>": str(args.get("intent") or DEFAULT_WORKSTREAM_INTENT),
+        "<required|not_required>": "not_required",
     }
+    selected_doc_types = set(_ordered_selected_doc_types(args))
     for doc_type, placeholder in WORKFLOW_ARTIFACT_DOC_PLACEHOLDERS.items():
-        replacements[placeholder] = _artifact_doc_id(doc_prefix, doc_type)
+        artifact_id = _artifact_doc_id(doc_prefix, doc_type)
+        replacements[placeholder] = artifact_id
+        # Compatibility alias used by current templates and historical docs.
+        replacements[f"<{doc_type.replace('-', '_')}_doc_id_or_empty>"] = (
+            artifact_id if doc_type in selected_doc_types else ""
+        )
     return replacements
 
 
@@ -606,9 +678,7 @@ def _ordered_selected_doc_types(args: Dict[str, object]) -> list[str]:
     selected = list(_intent_profile(intent).get("create", []))
     if args.get("plan_only"):
         selected = ["plan"]
-    selected.extend(
-        _normalize_doc_type_alias(str(doc_type)) for doc_type in args.get("with_artifacts") or []
-    )
+    selected.extend(_normalize_doc_type_alias(str(doc_type)) for doc_type in args.get("with_artifacts") or [])
 
     selected_set = {doc_type for doc_type in selected if doc_type in VALID_ARTIFACT_DOC_TYPES}
     if args.get("use_spec"):
@@ -666,6 +736,12 @@ def _create_manifest_artifacts(
             timestamp,
             artifact_replacements,
         )
+        if entry["doc_type"] == "task":
+            try:
+                validate_task_board(content, source=f"{entry['doc_type']} artifact")
+            except ValueError as exc:
+                print(f"❌ {exc}")
+                sys.exit(1)
         create_file(target_dir, _artifact_filename(doc_prefix, entry["doc_type"]), content)
 
 
@@ -734,9 +810,7 @@ def insert_log_timeline(content: str, entry: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def add_quick_task_to_active_session(
-    active_session: str, theme: str, timestamp: str
-) -> tuple[str, Path, Path]:
+def add_quick_task_to_active_session(active_session: str, theme: str, timestamp: str) -> tuple[str, Path, Path]:
     """Append a quick task and timeline entry to the active session docs."""
     session_path = WB_DIR / active_session
     require_canonical_session_path(session_path, source="Quick mode")
@@ -783,9 +857,8 @@ def _parse_args():
         "feature_id": _get_cli_flag_value("--feature-id"),
         "parent_spec": _get_cli_flag_value("--parent-spec"),
         "child_spec": _get_cli_flag_value("--child-spec"),
-        "pack": sanitize_theme(_get_cli_flag_value("--pack"))
-        if _get_cli_flag_value("--pack")
-        else "",
+        "task": _get_cli_flag_value("--task"),
+        "pack": sanitize_theme(_get_cli_flag_value("--pack")) if _get_cli_flag_value("--pack") else "",
         "into_session": _get_cli_flag_value("--into-session"),
         "with_artifacts": [
             _normalize_doc_type_alias(value)
@@ -803,6 +876,7 @@ def _print_usage():
         "Usage: ./.agents/agents new <theme> "
         "[--feature-id F-01 --parent-spec <spec-id> [--child-spec <spec-id>]] "
         "[--intent delivery|planning|research|brainstorming|exploration|specification|closure] "
+        "[--task \"<task text>\"] "
         "[--with <doc-type>] [--spec | --spec-child | --spec-lite] [--spec-test] [--pack <pack-slug>] "
         "[--into-session <session-id>] [--plan-only] [--force-new | --quick]"
     )
@@ -815,28 +889,15 @@ def _print_usage():
     print()
     print("Examples:")
     print("  ./.agents/agents new auth-refactor --feature-id F-01 --parent-spec my-parent-spec")
-    print(
-        "  ./.agents/agents new api-endpoint --feature-id F-02 --parent-spec my-parent-spec --spec"
-    )
-    print(
-        "  ./.agents/agents new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --child-spec existing-child-spec"
-    )
-    print(
-        "  ./.agents/agents new new-child-spec --feature-id F-03 --parent-spec my-parent-spec --spec-child"
-    )
-    print(
-        "  ./.agents/agents new hardening-tests --feature-id F-03 --parent-spec my-parent-spec --spec-test"
-    )
-    print(
-        "  ./.agents/agents new investigate-auth --feature-id F-03 --parent-spec my-parent-spec --intent research"
-    )
-    print(
-        "  ./.agents/agents new api-follow-up --feature-id F-07 --parent-spec parent --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec"
-    )
+    print("  ./.agents/agents new api-endpoint --feature-id F-02 --parent-spec my-parent-spec --spec")
+    print("  ./.agents/agents new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --child-spec existing-child-spec")
+    print("  ./.agents/agents new new-child-spec --feature-id F-03 --parent-spec my-parent-spec --spec-child")
+    print("  ./.agents/agents new hardening-tests --feature-id F-03 --parent-spec my-parent-spec --spec-test")
+    print("  ./.agents/agents new investigate-auth --feature-id F-03 --parent-spec my-parent-spec --intent research")
+    print("  ./.agents/agents new api-follow-up --feature-id F-07 --parent-spec parent --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec")
     print("  ./.agents/agents new tiny-fix --quick")
-    print(
-        "  ./.agents/agents new new-epic --feature-id F-04 --parent-spec parent --child-spec child --force-new"
-    )
+    print("  ./.agents/agents new delivery-task --feature-id F-02 --parent-spec parent-spec --intent delivery --task \"Fix input validation bug\"")
+    print("  ./.agents/agents new new-epic --feature-id F-04 --parent-spec parent --child-spec child --force-new")
     print()
     print("Spec linking vs artifact creation:")
     print("  --child-spec <spec-id> links an existing child spec and creates no spec artifact.")
@@ -849,16 +910,22 @@ def _handle_quick_mode(args: Dict, active_session: str) -> bool:
     if not args["quick_mode"]:
         return False
 
+    quick_task_text = str(args.get("task") or args["theme"]).strip()
+    if _validate_task_text_impl is not None:
+        try:
+            validate_task_text(quick_task_text, source="Quick task")
+        except ValueError as exc:
+            print(f"❌ {exc}")
+            sys.exit(1)
+
     if not active_session:
         print("❌ No active session found for quick mode.")
         print("Create one significant workstream first with:")
-        print(
-            "  .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> [--spec|--spec-child|--spec-lite]"
-        )
+        print("  .agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> [--spec|--spec-child|--spec-lite]")
         sys.exit(1)
 
     print("=" * 60)
-    print(f"Quick task mode: {args['theme']}")
+    print(f"Quick task mode: {quick_task_text}")
     print("=" * 60)
     print()
     print(f"Active session: {active_session}")
@@ -868,7 +935,7 @@ def _handle_quick_mode(args: Dict, active_session: str) -> bool:
     try:
         task_id, task_file, log_file = add_quick_task_to_active_session(
             active_session=active_session,
-            theme=args["theme"],
+            theme=quick_task_text,
             timestamp=get_timestamp(),
         )
     except FileNotFoundError as exc:
@@ -882,9 +949,7 @@ def _handle_quick_mode(args: Dict, active_session: str) -> bool:
     return True
 
 
-def _check_active_session_policy(
-    active_session: Optional[str], theme: str, force_new: bool
-) -> None:
+def _check_active_session_policy(active_session: Optional[str], theme: str, force_new: bool) -> None:
     """Check active session policy and inform user (non-blocking)."""
     if active_session and not force_new:
         print(f"⚠️  Note: Another session is currently active: {active_session}")
@@ -936,25 +1001,19 @@ def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) 
     print()
     print("=" * 60)
     print("Next steps:")
-    print(
-        f"0. Confirm roadmap feature `{args['feature_id']}` and parent spec `{args['parent_spec']}` stay current"
-    )
+    print(f"0. Confirm roadmap feature `{args['feature_id']}` and parent spec `{args['parent_spec']}` stay current")
     if str(args.get("intent") or "") == "delivery":
-        print(
-            f"1. Start execution: ./.agents/agents implement start --session {session_id} --task-id T-01"
-        )
+        print(f"1. Start execution: ./.agents/agents implement start --session {session_id} --task-id T-01")
         print("2. Make the scoped product change and run the named verification command")
         print(
             "3. Complete with evidence: ./.agents/agents implement complete "
-            f'--session {session_id} --task-id T-01 --command "<verification command>" '
+            f"--session {session_id} --task-id T-01 --command \"<verification command>\" "
             "--result passed --artifact <path-or-report>"
         )
         print("4. Edit plan/task only when their scaffolded content is materially wrong")
     else:
         for idx, doc_type in enumerate(created_doc_types, start=1):
-            print(
-                f"{idx}. Edit: {target_dir.relative_to(ROOT_DIR)}/{_artifact_filename(doc_prefix, doc_type)}"
-            )
+            print(f"{idx}. Edit: {target_dir.relative_to(ROOT_DIR)}/{_artifact_filename(doc_prefix, doc_type)}")
     print()
     print("Session folder:")
     print(f"  .agents/wb/{session_id}/")
@@ -972,6 +1031,30 @@ def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) 
     )
     # Auto-suggest patterns
     suggest_patterns_for_theme(theme)
+
+
+def _print_creation_context(args: Dict[str, object], session_id: str, timestamp: str, active_session: Optional[str]) -> None:
+    """Print creation context summary before file generation."""
+    print("=" * 60)
+    print(f"Creating new workstream: {args['theme']}")
+    print("=" * 60)
+    print()
+    print(f"Session ID: {session_id}")
+    print(f"Timestamp: {timestamp}")
+    print(f"Roadmap feature: {args['feature_id']}")
+    print(f"Parent spec: {args['parent_spec']}")
+    print(f"Intent: {args['intent']}")
+    if args.get("child_spec"):
+        print(f"Child spec: {args['child_spec']}")
+    if args.get("pack"):
+        print(f"Pack: {args['pack']}")
+    if args.get("into_session"):
+        print(f"Into existing session: {args['into_session']}")
+    if args.get("with_artifacts"):
+        print(f"Explicit artifacts: {', '.join(args['with_artifacts'])}")
+    if active_session and args["force_new"]:
+        print(f"Previous active session: {active_session}")
+    print()
 
 
 def main():
@@ -992,15 +1075,14 @@ def main():
         return
 
     _validate_governance_requirements(args)
+    _validate_nonquick_delivery_task_text(args)
 
     if args["intent"] not in VALID_WORKSTREAM_INTENTS:
         print(f"❌ Invalid --intent: {args['intent']}")
         print(f"Allowed intents: {', '.join(sorted(VALID_WORKSTREAM_INTENTS))}")
         sys.exit(1)
 
-    invalid_doc_types = sorted(
-        doc_type for doc_type in args["with_artifacts"] if doc_type not in VALID_ARTIFACT_DOC_TYPES
-    )
+    invalid_doc_types = sorted(doc_type for doc_type in args["with_artifacts"] if doc_type not in VALID_ARTIFACT_DOC_TYPES)
     if invalid_doc_types:
         print(f"❌ Invalid --with doc_type(s): {', '.join(invalid_doc_types)}")
         print(f"Allowed doc types: {', '.join(sorted(VALID_ARTIFACT_DOC_TYPES))}")
@@ -1022,26 +1104,7 @@ def main():
         session_id = next_available_session_id(get_session_id(args["theme"]))
     timestamp = get_timestamp()
 
-    print("=" * 60)
-    print(f"Creating new workstream: {args['theme']}")
-    print("=" * 60)
-    print()
-    print(f"Session ID: {session_id}")
-    print(f"Timestamp: {timestamp}")
-    print(f"Roadmap feature: {args['feature_id']}")
-    print(f"Parent spec: {args['parent_spec']}")
-    print(f"Intent: {args['intent']}")
-    if args.get("child_spec"):
-        print(f"Child spec: {args['child_spec']}")
-    if args.get("pack"):
-        print(f"Pack: {args['pack']}")
-    if args.get("into_session"):
-        print(f"Into existing session: {args['into_session']}")
-    if args.get("with_artifacts"):
-        print(f"Explicit artifacts: {', '.join(args['with_artifacts'])}")
-    if active_session and args["force_new"]:
-        print(f"Previous active session: {active_session}")
-    print()
+    _print_creation_context(args, session_id, timestamp, active_session)
 
     _create_workstream(session_id, args["theme"], timestamp, args)
 
@@ -1067,18 +1130,11 @@ def record_session_start(session_id: str, theme: str, has_spec: bool, args: Opti
 
     try:
         subprocess.run(
-            [
-                sys.executable,
-                str(TELEMETRY_SCRIPT),
-                "record",
-                "session_start",
-                "--session-id",
-                session_id,
-                "--metadata",
-                json.dumps(metadata),
-            ],
+            [sys.executable, str(TELEMETRY_SCRIPT), "record", "session_start",
+             "--session-id", session_id,
+             "--metadata", json.dumps(metadata)],
             capture_output=True,
-            timeout=5,
+            timeout=5
         )
     except Exception:
         pass  # Silent fail - telemetry is non-blocking
@@ -1094,7 +1150,7 @@ def suggest_patterns_for_theme(theme: str):
             [sys.executable, str(PATTERNS_SCRIPT), "suggest", "--theme", theme, "--limit", "3"],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=5
         )
 
         if result.stdout.strip():

@@ -23,7 +23,6 @@ corrections or process gaps.
 lessons/
 ├── entries/                                # One lesson per file
 │   └── README.md
-├── general-lessons.md                      # Optional aggregate summary
 └── README.md
 ```
 

@@ -2,46 +2,51 @@
 title: "LLM Quick Start Guide"
 description: "Agent-facing orientation doc for understanding the repository quickly and safely."
 doc_kind: "quickstart"
-version: "v2026-04-02_1"
-created_at: "2026-04-02T23:28:28Z"
-updated_at: "2026-04-02T23:28:28Z"
+version: "v2026-05-28_1"
+created_at: "2026-05-28T09:48:25Z"
+updated_at: "2026-05-28T09:48:25Z"
 ---
 
-## LLM Quick Start Guide
+# LLM Quick Start Guide
 
 Read this first. This document is the orientation layer for agents entering the repository.
 
-### What This Repo Is
+## What This Repo Is
 
-- Repository: `agentic_start_folder`
+- Repository: `agentic_start_folder_dev_refactor_TS`
 - Analysis mode: `standard`
 - Runtime surfaces: `.agents/scripts`, `docs/`, `.agents/skills`, `AGENTS.md`, `CLAUDE.md`
 - Stack signals: `none detected`
 
-### Start Here
+## Start Here
 
 - Read `README.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` first.
 - Use `API_MAP.md` and `BACKEND.md` to navigate backend route handlers, CLI entrypoints, MCP servers, and config boundaries.
 - Use `FRONTEND.md` when the change touches client-side routes or UI wiring.
 - Use `HOTSPOTS.md` and `SYMBOLS.md` when choosing where to implement or debug changes.
 
-### Public Boundaries
+## Public Boundaries
 
-- No public boundaries were detected.
+- `docs/standards/Justfile`
+- `src/project-template/docs/standards/Justfile`
 
-### Boundary Families
+## Boundary Families
 
 - Backend route files: none detected
 - No backend route boundaries were detected.
 
-- CLI boundary files: none detected
-- No CLI boundaries were detected.
+- CLI boundary files: `2`
+- `docs/standards/Justfile`
+- `src/project-template/docs/standards/Justfile`
 
 - MCP entrypoints: none detected
 - No MCP entrypoints were detected.
 
-- Config boundary files: none detected
-- No config boundaries were detected.
+- Config boundary files: `4`
+- `Justfile`
+- `docs/standards/Justfile`
+- `src/project-template/Justfile`
+- `src/project-template/docs/standards/Justfile`
 
 - Frontend route files: none detected
 - No frontend route-like boundaries were detected.
@@ -52,10 +57,10 @@ Read this first. This document is the orientation layer for agents entering the 
 - External fetch files: none detected
 - No outbound fetch boundaries were detected.
 
-### Risk-Heavy Files
+## Risk-Heavy Files
 
 - No hotspots were ranked.
 
-### Key Working Rule
+## Key Working Rule
 
 - Prefer the codemap and artifacts first. Only widen into raw source when a boundary, hotspot, or missing contract requires it.

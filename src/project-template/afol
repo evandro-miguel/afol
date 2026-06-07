@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -n "${AGENTIC_CLI_PATH:-}" ] && command -v bun >/dev/null 2>&1; then
+  exec bun "${AGENTIC_CLI_PATH}" "$@"
+fi
+
+if command -v afol >/dev/null 2>&1; then
+  FOUND_AFOL="$(command -v afol)"
+  if [ "$(realpath "${FOUND_AFOL}")" != "$(realpath "${SCRIPT_DIR}/afol")" ]; then
+    exec "${FOUND_AFOL}" "$@"
+  fi
+fi
+
+if command -v bunx >/dev/null 2>&1; then
+  exec bunx agentic-cli "$@"
+fi
+
+echo "agentic CLI not found. Install it with: bun add -g agentic-cli" >&2
+exit 127

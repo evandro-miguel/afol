@@ -29,23 +29,25 @@ just all
 ## Validation Commands
 
 ```bash
-./.agents/agents doctor
-./.agents/agents lint-docs .agents/wb/
-./.agents/agents lint-docs .agents/wb --fix
-./.agents/agents verify-tasks .agents/wb/<session>/
-./.agents/agents wb-update normalize-time --all-wb
+./afol validate
+./afol status
+./afol verify-tasks <configured-wb-dir>/<session>/
+just doctor
+just lint
+just verify
 ```
 
 ## Exit Codes
 
-- `doctor`: `0` pass, `1` errors
-- `verify-tasks`: `0` complete, `1` pending/invalid
+- `validate`: `0` pass, non-zero on errors
+- `verify-tasks`: `0` complete, non-zero on pending/invalid tasks
 
 ## Validation Checklist
 
 - [ ] `just doctor` passes
 - [ ] `just lint` passes
 - [ ] `just verify` passes
+- [ ] `./afol validate` passes
 - [ ] Frontmatter valid
 - [ ] Task markers valid
 - [ ] Timestamps include timezone

@@ -54,7 +54,7 @@ docs/
 ├── tmp/                     # Temporary non-canonical artifacts
 │
 ├── rules/                   # Operational rules
-├── runtime/                 # Central Python runtime and FastMCP adapter
+├── runtime/                 # Legacy compatibility runtime support during migration
 ├── skills/                  # Project skills
 └── tools.json               # Tool catalog
 
@@ -111,15 +111,20 @@ just doctor
 .agents/agents new update-docs --quick
 ```
 
-### Bootstrap Another Repo
+### Public onboarding (full + partial bootstrap)
+
+Public onboarding has two entrypoints:
+
+- `full`: install this scaffold into a new or mostly empty repository.
+- `partial`: adopt the scaffold into an existing repository while preserving project-owned files by default.
 
 ```bash
-# Full bootstrap for a new or mostly empty repo
+# Full bootstrap for a new or mostly empty repo.
 # The target directory is created automatically if it does not exist yet.
-./.agents/agents bootstrap /path/to/target-repo
+afol bootstrap /path/to/target-repo
 
 # Partial install for an existing project with live content
-./.agents/agents bootstrap /path/to/existing-project --partial
+afol bootstrap /path/to/existing-project --partial
 
 # Bootstrap prepares a repo-local upstream source checkout at
 # .agents/source/universal-skills inside the target repository.
@@ -128,6 +133,18 @@ just doctor
 # The exportable project baseline is sourced from `src/project-template/`
 # inside this repo, not from the live development root.
 ```
+
+### Onboarding validation (minimum)
+
+- Validate installation from public examples:
+  - `afol` (front-door entrypoint)
+  - `afol s` (status alias)
+  - `afol ck` (validation alias)
+  - `afol st -T T-01` (task start alias)
+  - `afol d -T T-01 -x "just lint"` (task completion alias)
+  - `just --list`
+  - `./a status`
+  - `./a validate`
 
 ### Runtime Entry Points
 
@@ -415,15 +432,11 @@ updated_at: "2026-02-23T00:00:00-03:00"
 ### Setup & Validation
 
 ```bash
-just setup-uv       # Install/copy project-local uv
 just setup          # Setup project-local uv, managed Python, and virtualenvs
-just setup-runtime  # Setup central runtime environment
 just doctor         # Validate .agents structure
 just clean          # Clean caches
-just lint-scripts   # Lint Python operational scripts
 just test-scripts-all # Run script unit + integration tests with 80% coverage gate
 just lint-runtime   # Lint central runtime package
-just test-runtime   # Run central runtime tests
 just benchmark-runtime-flow # Run controlled live-agent runtime-flow benchmarks selectively after risky execution changes
 just runtime-mcp-smoke # Smoke runtime and MCP CLIs
 just agents-all     # Full scaffold validation, including docs, scripts, runtime, tools, telemetry, and MCP smoke
@@ -476,8 +489,8 @@ just patterns-rate      # Rate pattern
 .agents/agents benchmark run live-implement-next-governance-preflight --save  # Run one live benchmark and persist JSON output
 .agents/agents benchmark run live-wb-update-task-evidence-timeline --save  # Measure script-based task/evidence/timeline flow
 .agents/agents wb-update touch  # Update session
-.agents/agents bootstrap /path/to/target-repo --dry-run  # Preview generic export to another repo
-.agents/agents bootstrap /path/to/existing-project --partial  # Partial install for a live repo
+afol bootstrap /path/to/target-repo --dry-run  # Preview generic export to another repo
+afol bootstrap /path/to/existing-project --partial  # Partial install for a live repo
 just agents-all  # Aggregate scaffold validations when the target Justfile already owns `all`
 .agents/agents tools list       # List tools
 .agents/agents structure-map .  # Map structure

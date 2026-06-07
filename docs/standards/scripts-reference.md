@@ -21,6 +21,7 @@ just new THEME=x   # Create workstream
 just structure     # Generate project structure docs
 just agents-all    # Full scaffold validation workflow
 just all           # Alias for just agents-all
+just all-strict    # agents-all + diff-check + strict session verify (if active session exists)
 ```
 
 ### Complete List
@@ -42,7 +43,11 @@ just all           # Alias for just agents-all
 | `just verify` | Check task completion and evidence across all sessions | - |
 | `just verify-session` | Check task completion for one session | `SESSION_ID=<session-id>` |
 | `just verify-active` | Check task completion for active session only | - |
+| `just verify-active-if-present` | Check active session only when `.agents/wb/.active_session` exists | - |
+| `just verify-strict` | Run strict verification on the active session | - |
+| `just verify-strict-if-present` | Run strict active-session verification only when `.agents/wb/.active_session` exists | - |
 | `just lint` | Lint markdown docs | - |
+| `just diff-check` | Run `git diff --check` for whitespace/conflict-marker hygiene | - |
 | `just test-scripts` | Run script unit tests | - |
 | `just test-scripts-integration` | Run isolated script integration tests | - |
 | `just test-scripts-all` | Run script unit + integration tests with the 80% scripts coverage gate | - |
@@ -72,6 +77,8 @@ just all           # Alias for just agents-all
 | `just wb-link` | Set `links.<key>` in one session doc frontmatter | `SESSION_ID=<session-id>` `FILE=<doc>` `KEY=<k>` `VALUE=<v>` |
 | `just agents-all` | Full scaffold validation (`doctor`, `structure`, `index`, `knowledge-index`, `sync`, markdown/script/runtime lint, skills/tools/telemetry checks, script coverage gate, runtime tests, and MCP smoke) | - |
 | `just all` | Alias for `just agents-all` | - |
+| `just all-strict` | Gate-hardened aggregate validation (`just agents-all`, `just diff-check`, and `just verify-strict-if-present`) | - |
+| `just validate-strict` | Root alias for `just all-strict` | - |
 | `just refresh` | Clean + setup + structure | - |
 
 The `just wb-task` wrapper row above remains a compatibility surface. Use the
@@ -89,7 +96,7 @@ of truth; do not treat `skipped` as the semantic contract for `- [>]`.
 | `just va` | `just verify-active` |
 | `just dr` | `just doctor` |
 | `just docs` | `just structure index sync` |
-| `just check` | `just doctor lint verify-active` |
+| `just check` | `just doctor lint verify-active-if-present` |
 | `just init` | `just setup doctor` |
 
 ## Examples
@@ -133,6 +140,9 @@ just doctor
 
 # Full validation
 just all
+
+# Gate-hardened aggregate validation for governed closure
+just all-strict
 
 # Check only
 just check

@@ -260,8 +260,8 @@ python .agents/scripts/agents-memory.py show projects/260311-basic-memory-implem
 
 ### agents-benchmark.py
 
-Runs the controlled live-agent runtime-flow benchmark family for risky scaffold execution
-changes.
+Runs the controlled live-agent runtime-flow benchmark family for risky scaffold
+execution changes as selective development-time regression validation.
 
 **Default benchmark profile:**
 
@@ -292,6 +292,9 @@ python .agents/scripts/agents-benchmark.py run live-tools-benchmark-discovery --
 
 This runner uses isolated temporary fixture repos so benchmark scenarios do not
 mutate the live workbench session of the current repository.
+
+Use it for targeted regression checks after risky changes, not as a daily
+production workflow.
 
 ---
 

@@ -18,6 +18,7 @@ from typing import Any, Callable
 
 from lib.cli_output import to_json_text
 
+
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 AGENTS_DIR = ROOT_DIR / ".agents"
 DOCS_DIR = ROOT_DIR / "docs"
@@ -147,9 +148,7 @@ def _efficiency_metrics(payload: dict[str, Any]) -> dict[str, float]:
     scenario_count = int(payload.get("scenario_count", 0))
     checks_total = int(payload.get("checks_total", 0))
     tool_call_count = int(payload.get("tool_call_count", 0))
-    total_bytes = int(payload.get("context_bytes_total", 0)) + int(
-        payload.get("prompt_bytes_total", 0)
-    )
+    total_bytes = int(payload.get("context_bytes_total", 0)) + int(payload.get("prompt_bytes_total", 0))
     duration_seconds = _safe_division(duration_ms, 1000, digits=6)
 
     checks_per_second = 0.0
@@ -246,7 +245,9 @@ def _build_previous_comparison(
 
     previous_scenarios = previous_snapshot.get("scenarios")
     previous_scenario_ids = (
-        _snapshot_scenario_ids(previous_scenarios) if isinstance(previous_scenarios, list) else []
+        _snapshot_scenario_ids(previous_scenarios)
+        if isinstance(previous_scenarios, list)
+        else []
     )
     comparison["baseline_saved_result_path"] = previous_snapshot.get("saved_result_path")
     comparison["baseline_generated_at"] = previous_snapshot.get("generated_at")
@@ -500,7 +501,7 @@ def _fixture_agents_text() -> str:
         "1. `./.agents/agents new <theme> --feature-id <F-id> --parent-spec <spec-id> --child-spec <spec-id>` creates the governed session.\n"
         "2. `./.agents/agents implement start --session <session-id> --task-id T-01` begins the executable task before product edits.\n"
         "3. Edit the product and run the acceptance check named by the request.\n"
-        '4. `./.agents/agents implement complete --session <session-id> --task-id T-01 --command "<verification command>" --result passed --artifact <path-or-report>` records evidence and marks the task done.\n\n'
+        "4. `./.agents/agents implement complete --session <session-id> --task-id T-01 --command \"<verification command>\" --result passed --artifact <path-or-report>` records evidence and marks the task done.\n\n"
         "Do not reuse fixture sessions for new delivery work. Do not create tasks already marked `[x]`. "
         "Do not manually edit `.agents/wb` task state or `.evidence.jsonl`.\n\n"
         "## Task State Markers\n\n"
@@ -579,8 +580,8 @@ def _runtime_policy_check_text() -> str:
         '    "x": "done",\n'
         "}\n"
         'STARTED_STATES = {"in_progress", "implemented_untested", "tested_needs_spec_validation", "done"}\n\n\n'
-        'def _task_state(task_file: Path, task_id: str = "T-01") -> str | None:\n'
-        '    for raw_line in task_file.read_text(encoding="utf-8").splitlines():\n'
+        "def _task_state(task_file: Path, task_id: str = \"T-01\") -> str | None:\n"
+        "    for raw_line in task_file.read_text(encoding=\"utf-8\").splitlines():\n"
         "        line = raw_line.strip()\n"
         "        table = TASK_TABLE_RE.match(line)\n"
         "        if table and table.group(1) == task_id:\n"
@@ -595,8 +596,8 @@ def _runtime_policy_check_text() -> str:
         "    for session_dir in WB_DIR.iterdir():\n"
         "        if not session_dir.is_dir() or session_dir.name == FIXTURE_SESSION_ID:\n"
         "            continue\n"
-        '        has_plan = any(session_dir.glob("*_plan_*.md"))\n'
-        '        for task_file in session_dir.glob("*_task_*.md"):\n'
+        "        has_plan = any(session_dir.glob(\"*_plan_*.md\"))\n"
+        "        for task_file in session_dir.glob(\"*_task_*.md\"):\n"
         "            state = _task_state(task_file)\n"
         "            if has_plan and state in STARTED_STATES:\n"
         "                return True\n"
@@ -604,36 +605,36 @@ def _runtime_policy_check_text() -> str:
         "def _governance_failures() -> list[str]:\n"
         "    if Path.cwd().resolve() != SCRIPT_REPO_ROOT:\n"
         "        return [\n"
-        '            "runtime policy check must run from the repository root, not a copied or nested working tree",\n'
-        '            f"expected cwd {SCRIPT_REPO_ROOT}, got {Path.cwd().resolve()}",\n'
+        "            \"runtime policy check must run from the repository root, not a copied or nested working tree\",\n"
+        "            f\"expected cwd {SCRIPT_REPO_ROOT}, got {Path.cwd().resolve()}\",\n"
         "        ]\n"
         "    if _governed_session_started():\n"
         "        return []\n"
         "    return [\n"
-        '        "governed workbench state is not started for this delivery request",\n'
-        '        "expected a non-fixture .agents/wb session with a plan and T-01 beyond pending before product validation",\n'
+        "        \"governed workbench state is not started for this delivery request\",\n"
+        "        \"expected a non-fixture .agents/wb session with a plan and T-01 beyond pending before product validation\",\n"
         "    ]\n\n\n"
         "def main() -> int:\n"
-        '    data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))\n'
+        "    data = json.loads(POLICY_PATH.read_text(encoding=\"utf-8\"))\n"
         "    expected = {\n"
-        '        "workflow_mode": "agentic-folder",\n'
-        '        "default_execution": "governed",\n'
-        '        "evidence_required": True,\n'
+        "        \"workflow_mode\": \"agentic-folder\",\n"
+        "        \"default_execution\": \"governed\",\n"
+        "        \"evidence_required\": True,\n"
         "    }\n"
         "    failures = [\n"
-        '        f"{key}: expected {value!r}, got {data.get(key)!r}"\n'
+        "        f\"{key}: expected {value!r}, got {data.get(key)!r}\"\n"
         "        for key, value in expected.items()\n"
         "        if data.get(key) != value\n"
         "    ]\n"
         "    failures.extend(_governance_failures())\n"
         "    if failures:\n"
-        '        print("runtime policy check failed")\n'
+        "        print(\"runtime policy check failed\")\n"
         "        for failure in failures:\n"
-        '            print(f"- {failure}")\n'
+        "            print(f\"- {failure}\")\n"
         "        return 1\n"
-        '    print("runtime policy check passed")\n'
+        "    print(\"runtime policy check passed\")\n"
         "    return 0\n\n\n"
-        'if __name__ == "__main__":\n'
+        "if __name__ == \"__main__\":\n"
         "    raise SystemExit(main())\n"
     )
 
@@ -731,13 +732,13 @@ def _tool_info_schema() -> dict[str, Any]:
         "additionalProperties": False,
         "properties": {
             "scenario_id": {"type": "string", "const": "live-tools-benchmark-discovery"},
-            "tool_id": {"type": "string"},
+            "tool_surface": {"type": "string"},
             "default_model": {"type": "string"},
             "default_reasoning_effort": {"type": "string"},
         },
         "required": [
             "scenario_id",
-            "tool_id",
+            "tool_surface",
             "default_model",
             "default_reasoning_effort",
         ],
@@ -903,8 +904,8 @@ def _wb_update_link_schema() -> dict[str, Any]:
 
 def _validate_tool_info(output: dict[str, Any], _repo_root: Path) -> list[str]:
     failures: list[str] = []
-    if output.get("tool_id") != "benchmark":
-        failures.append("tool_id != benchmark")
+    if output.get("tool_surface") != "benchmark":
+        failures.append("tool_surface != benchmark")
     if output.get("default_model") != DEFAULT_PROFILE.model:
         failures.append(f"default_model != {DEFAULT_PROFILE.model}")
     if output.get("default_reasoning_effort") != DEFAULT_PROFILE.reasoning_effort:
@@ -938,16 +939,15 @@ def _validate_completion(output: dict[str, Any], repo_root: Path) -> list[str]:
     if output.get("evidence_recorded") is not True:
         failures.append("evidence_recorded != true")
 
-    task_file = (
-        repo_root / ".agents" / "wb" / FIXTURE_WORKSTREAM_ID / f"{FIXTURE_WORKSTREAM_ID}_task_01.md"
-    )
+    task_file = repo_root / ".agents" / "wb" / FIXTURE_WORKSTREAM_ID / f"{FIXTURE_WORKSTREAM_ID}_task_01.md"
     evidence_file = repo_root / ".agents" / "wb" / FIXTURE_WORKSTREAM_ID / ".evidence.jsonl"
     task_text = task_file.read_text(encoding="utf-8") if task_file.exists() else ""
     evidence_text = evidence_file.read_text(encoding="utf-8") if evidence_file.exists() else ""
-    if (
-        "| T-01 | done | worker | Run the controlled live benchmark fixture flow. |"
-        not in task_text
-    ):
+    done_row_re = re.compile(
+        r"\|\s*T-01\s*\|\s*done\s*\|\s*worker\s*\|\s*Run the controlled live benchmark fixture flow\."
+        r"(?:\s*\(evidence:\s*E-[^)]+\))?\s*\|"
+    )
+    if not done_row_re.search(task_text):
         failures.append("fixture task not marked done")
     if LIVE_COMPLETE_COMMAND not in evidence_text or '"result": "passed"' not in evidence_text:
         failures.append("fixture evidence missing expected completion record")
@@ -973,10 +973,7 @@ def _validate_wb_update_task(output: dict[str, Any], repo_root: Path) -> list[st
     task_text = task_file.read_text(encoding="utf-8") if task_file.exists() else ""
     log_text = log_file.read_text(encoding="utf-8") if log_file.exists() else ""
     evidence_text = evidence_file.read_text(encoding="utf-8") if evidence_file.exists() else ""
-    if (
-        "| T-02 | done | worker | Mark task progress through wb-update evidence and task commands. |"
-        not in task_text
-    ):
+    if "| T-02 | done | worker | Mark task progress through wb-update evidence and task commands. |" not in task_text:
         failures.append("fixture task T-02 not marked done with evidence")
     if "T-02 completed via wb-update benchmark" not in log_text:
         failures.append("timeline entry missing expected message")
@@ -1077,12 +1074,7 @@ def _validate_governed_session_delivery(session_id: str, repo_root: Path) -> lis
 def _validate_autonomous_delivery(output: dict[str, Any], repo_root: Path) -> list[str]:
     failures: list[str] = []
     session_id = str(output.get("session_id", "")).strip()
-    if (
-        not session_id
-        or session_id == FIXTURE_WORKSTREAM_ID
-        or "/" in session_id
-        or ".." in session_id
-    ):
+    if not session_id or session_id == FIXTURE_WORKSTREAM_ID or "/" in session_id or ".." in session_id:
         failures.append("session_id is missing or invalid")
 
     for key in (
@@ -1113,13 +1105,7 @@ def _validate_wb_update_status_touch(output: dict[str, Any], repo_root: Path) ->
     if output.get("updated_at_changed") is not True:
         failures.append("updated_at_changed != true")
 
-    report_file = (
-        repo_root
-        / ".agents"
-        / "wb"
-        / FIXTURE_WORKSTREAM_ID
-        / f"{FIXTURE_WORKSTREAM_ID}_report_01.md"
-    )
+    report_file = repo_root / ".agents" / "wb" / FIXTURE_WORKSTREAM_ID / f"{FIXTURE_WORKSTREAM_ID}_report_01.md"
     report_text = report_file.read_text(encoding="utf-8") if report_file.exists() else ""
     if "status: active" not in report_text:
         failures.append("report status was not active")
@@ -1137,13 +1123,7 @@ def _validate_wb_update_link(output: dict[str, Any], repo_root: Path) -> list[st
     if output.get("link_written") is not True:
         failures.append("link_written != true")
 
-    report_file = (
-        repo_root
-        / ".agents"
-        / "wb"
-        / FIXTURE_WORKSTREAM_ID
-        / f"{FIXTURE_WORKSTREAM_ID}_report_01.md"
-    )
+    report_file = repo_root / ".agents" / "wb" / FIXTURE_WORKSTREAM_ID / f"{FIXTURE_WORKSTREAM_ID}_report_01.md"
     report_text = report_file.read_text(encoding="utf-8") if report_file.exists() else ""
     if "postmortem: docs/postmortem.md" not in report_text:
         failures.append("report link postmortem missing expected value")
@@ -1241,7 +1221,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 "- Return JSON only that matches the provided schema.\n\n"
                 "Task:\n"
                 f"1. Run `./.agents/agents implement start --session {FIXTURE_WORKSTREAM_ID} --task-id T-01`.\n"
-                f'2. Run `./.agents/agents implement complete --session {FIXTURE_WORKSTREAM_ID} --task-id T-01 --command "{LIVE_COMPLETE_COMMAND}" --result passed --artifact .agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md`.\n'
+                f"2. Run `./.agents/agents implement complete --session {FIXTURE_WORKSTREAM_ID} --task-id T-01 --command \"{LIVE_COMPLETE_COMMAND}\" --result passed --artifact .agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md`.\n"
                 f"3. Inspect `.agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md` and `.agents/wb/{FIXTURE_WORKSTREAM_ID}/.evidence.jsonl`.\n"
                 "4. Return whether completion and evidence recording both succeeded."
             ),
@@ -1276,9 +1256,9 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 "- Run only the three wb-update commands, then inspect the task, log, and evidence files.\n"
                 "- Return JSON only that matches the provided schema.\n\n"
                 "Task:\n"
-                f'1. Run `./.agents/agents wb-update evidence T-02 --session {FIXTURE_WORKSTREAM_ID} --command "benchmark wb-update evidence" --result passed --artifact .agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_log_01.md` and capture the returned evidence id.\n'
+                f"1. Run `./.agents/agents wb-update evidence T-02 --session {FIXTURE_WORKSTREAM_ID} --command \"benchmark wb-update evidence\" --result passed --artifact .agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_log_01.md` and capture the returned evidence id.\n"
                 f"2. Run `./.agents/agents wb-update task T-02 --session {FIXTURE_WORKSTREAM_ID} --mark-done --evidence-id <captured-id>`.\n"
-                f'3. Run `./.agents/agents wb-update timeline --session {FIXTURE_WORKSTREAM_ID} --message "T-02 completed via wb-update benchmark"`.\n'
+                f"3. Run `./.agents/agents wb-update timeline --session {FIXTURE_WORKSTREAM_ID} --message \"T-02 completed via wb-update benchmark\"`.\n"
                 "4. Inspect the fixture task/log/evidence files and return whether the task was marked done and the timeline entry was written."
             ),
             validator=_validate_wb_update_task,
@@ -1309,7 +1289,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 "wb-update task T-01 --session",
                 "--mark-in-progress",
                 "wb-update evidence T-01 --session",
-                '--command "benchmark created session scripted progress" --result passed',
+                "--command \"benchmark created session scripted progress\" --result passed",
                 "wb-update task T-01 --session",
                 "--mark-done --evidence-id",
             ),
@@ -1342,7 +1322,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 f"`./.agents/agents new benchmark-created-session --feature-id {FIXTURE_FEATURE_ID} --parent-spec {FIXTURE_PARENT_SPEC_ID} --child-spec {FIXTURE_CHILD_SPEC_ID}` "
                 "and capture the created session id.\n"
                 "2. Run `./.agents/agents wb-update task T-01 --session <created-session-id> --mark-in-progress`.\n"
-                '3. Run `./.agents/agents wb-update evidence T-01 --session <created-session-id> --command "benchmark created session scripted progress" --result passed --artifact .agents/wb/<created-session-id>/<created-session-id>_task_01.md` and capture the evidence id.\n'
+                "3. Run `./.agents/agents wb-update evidence T-01 --session <created-session-id> --command \"benchmark created session scripted progress\" --result passed --artifact .agents/wb/<created-session-id>/<created-session-id>_task_01.md` and capture the evidence id.\n"
                 "4. Run `./.agents/agents wb-update task T-01 --session <created-session-id> --mark-done --evidence-id <captured-id>`.\n"
                 "5. Inspect the created session task file and `.evidence.jsonl` ledger.\n"
                 "6. Return the created session id, captured evidence id, whether each scripted command was used, whether T-01 is done, and `manual_markdown_edit: false`."
@@ -1375,17 +1355,8 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 "scripts/check_runtime_policy.py",
             ),
             any_required_command_groups=(
-                (
-                    "wb-update evidence T-01 --session",
-                    "wb-update evidence --session",
-                    "implement complete --session",
-                ),
-                (
-                    "wb-update task T-01 --session",
-                    "wb-update task --session",
-                    "implement start --session",
-                    "implement complete --session",
-                ),
+                ("wb-update evidence T-01 --session", "wb-update evidence --session", "implement complete --session"),
+                ("wb-update task T-01 --session", "wb-update task --session", "implement start --session", "implement complete --session"),
                 ("--mark-done --evidence-id", "--evidence-id", "implement complete --session"),
             ),
             forbidden_command_substrings=(
@@ -1623,17 +1594,13 @@ def _handle_command_execution_event(
         call_entry = call_index.get(item_id)
         if call_entry is not None:
             call_entry["exit_code"] = item.get("exit_code")
-            call_entry["aggregated_output_excerpt"] = _excerpt(
-                str(item.get("aggregated_output", "")), 1000
-            )
+            call_entry["aggregated_output_excerpt"] = _excerpt(str(item.get("aggregated_output", "")), 1000)
         return _handle_failed_call_output(item_id, call_index, prior_failures), 0
     if event_type in {"item.completed", "item.complete"}:
         call_entry = call_index.get(item_id)
         if call_entry is not None:
             call_entry["exit_code"] = item.get("exit_code")
-            call_entry["aggregated_output_excerpt"] = _excerpt(
-                str(item.get("aggregated_output", "")), 1000
-            )
+            call_entry["aggregated_output_excerpt"] = _excerpt(str(item.get("aggregated_output", "")), 1000)
     return 0, 0
 
 
@@ -1649,16 +1616,12 @@ def _parse_observed_tool_data(stdout: str) -> tuple[list[dict[str, Any]], int, i
         if isinstance(payload, dict):
             payload_type = payload.get("type")
             if payload_type == "function_call":
-                retry_count += _handle_function_call_payload(
-                    payload, tool_calls, call_index, prior_failures
-                )
+                retry_count += _handle_function_call_payload(payload, tool_calls, call_index, prior_failures)
             elif payload_type == "function_call_output":
                 output_text = str(payload.get("output", ""))
                 match = EXIT_CODE_RE.search(output_text)
                 if match and match.group(1) != "0":
-                    error_count += _handle_failed_call_output(
-                        payload.get("call_id"), call_index, prior_failures
-                    )
+                    error_count += _handle_failed_call_output(payload.get("call_id"), call_index, prior_failures)
             elif payload_type == "error" or event.get("type") == "error":
                 error_count += 1
         item = event.get("item")
@@ -1682,9 +1645,7 @@ def _load_structured_output(path: Path) -> dict[str, Any]:
     return parsed
 
 
-def _required_commands_present(
-    tool_calls: list[dict[str, Any]], required: tuple[str, ...]
-) -> list[str]:
+def _required_commands_present(tool_calls: list[dict[str, Any]], required: tuple[str, ...]) -> list[str]:
     failures: list[str] = []
     call_haystack = "\n".join(
         f"{call.get('name', '')} {call.get('arguments_excerpt', '')} {call.get('command_excerpt', '')}"
@@ -1711,9 +1672,7 @@ def _any_required_commands_present(
     return failures
 
 
-def _forbidden_commands_absent(
-    tool_calls: list[dict[str, Any]], forbidden: tuple[str, ...]
-) -> list[str]:
+def _forbidden_commands_absent(tool_calls: list[dict[str, Any]], forbidden: tuple[str, ...]) -> list[str]:
     failures: list[str] = []
     call_haystack = "\n".join(
         f"{call.get('name', '')} {call.get('arguments_excerpt', '')} {call.get('command_excerpt', '')}"
@@ -1750,6 +1709,7 @@ def _live_scenario_command(
         "apps._default.enabled=false",
         "-c",
         "apps._default.default_tools_enabled=false",
+        "--full-auto",
         "-C",
         str(fixture_root),
         "--add-dir",
@@ -1760,8 +1720,9 @@ def _live_scenario_command(
         str(output_path),
         scenario.prompt,
     ]
-    sandbox_insert_at = command.index("-C")
+    sandbox_insert_at = command.index("--full-auto")
     if scenario.id == "live-autonomous-agentic-folder-delivery":
+        command.remove("--full-auto")
         command.insert(sandbox_insert_at, "--dangerously-bypass-approvals-and-sandbox")
     else:
         command[sandbox_insert_at:sandbox_insert_at] = ["-s", "workspace-write"]
@@ -1786,9 +1747,7 @@ def _timeout_streams(exc: subprocess.TimeoutExpired) -> tuple[str, str]:
     return stdout, stderr
 
 
-def _run_live_scenario(
-    scenario: LiveBenchmarkScenario, profile: BenchmarkProfile
-) -> dict[str, Any]:
+def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfile) -> dict[str, Any]:
     prompt_bytes = _json_size(scenario.prompt)
     temp_parent = Path(os.environ.get("AGENTS_BENCHMARK_TEMP_PARENT", "/tmp/agents-benchmark-live"))
     temp_parent.mkdir(parents=True, exist_ok=True)
@@ -1842,19 +1801,11 @@ def _run_live_scenario(
                 failures.append(str(exc))
 
         if len(tool_calls) < scenario.min_tool_calls:
-            failures.append(
-                f"observed tool_call_count {len(tool_calls)} < {scenario.min_tool_calls}"
-            )
+            failures.append(f"observed tool_call_count {len(tool_calls)} < {scenario.min_tool_calls}")
 
-        failures.extend(
-            _required_commands_present(tool_calls, scenario.required_command_substrings)
-        )
-        failures.extend(
-            _any_required_commands_present(tool_calls, scenario.any_required_command_groups)
-        )
-        failures.extend(
-            _forbidden_commands_absent(tool_calls, scenario.forbidden_command_substrings)
-        )
+        failures.extend(_required_commands_present(tool_calls, scenario.required_command_substrings))
+        failures.extend(_any_required_commands_present(tool_calls, scenario.any_required_command_groups))
+        failures.extend(_forbidden_commands_absent(tool_calls, scenario.forbidden_command_substrings))
         if output_json is not None:
             failures.extend(scenario.validator(output_json, fixture_root))
 
@@ -1916,9 +1867,7 @@ def run_suite(
     run_scenario = executor or _run_live_scenario
 
     started_at = time.perf_counter()
-    scenario_results = [
-        run_scenario(SCENARIOS[scenario_id], profile) for scenario_id in selected_ids
-    ]
+    scenario_results = [run_scenario(SCENARIOS[scenario_id], profile) for scenario_id in selected_ids]
     total_duration_ms = round((time.perf_counter() - started_at) * 1000)
 
     payload = {
@@ -1982,9 +1931,7 @@ def _print_show(scenario_id: str, pretty: bool = False) -> None:
         "scope": scenario.scope,
         "context_artifacts": list(scenario.context_artifacts),
         "required_command_substrings": list(scenario.required_command_substrings),
-        "any_required_command_groups": [
-            list(group) for group in scenario.any_required_command_groups
-        ],
+        "any_required_command_groups": [list(group) for group in scenario.any_required_command_groups],
         "forbidden_command_substrings": list(scenario.forbidden_command_substrings),
         "min_tool_calls": scenario.min_tool_calls,
         "timeout_seconds": scenario.timeout_seconds,
@@ -1994,9 +1941,7 @@ def _print_show(scenario_id: str, pretty: bool = False) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Run controlled live-agent runtime-flow benchmark scenarios."
-    )
+    parser = argparse.ArgumentParser(description="Run controlled live-agent runtime-flow benchmark scenarios.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("list", help="List available benchmark scenarios")
@@ -2007,12 +1952,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     run_parser = subparsers.add_parser("run", help="Run one or more benchmark scenarios")
     run_parser.add_argument("scenario_ids", nargs="*", help="Optional benchmark scenario ids")
-    run_parser.add_argument(
-        "--save", action="store_true", help="Save results under .agents/data/benchmarks/results/"
-    )
-    run_parser.add_argument(
-        "--output", type=Path, help="Write the JSON payload to an explicit path"
-    )
+    run_parser.add_argument("--save", action="store_true", help="Save results under .agents/data/benchmarks/results/")
+    run_parser.add_argument("--output", type=Path, help="Write the JSON payload to an explicit path")
     run_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
     return parser
 

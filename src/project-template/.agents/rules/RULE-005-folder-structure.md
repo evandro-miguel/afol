@@ -24,12 +24,20 @@ docs/
 └── agentic/
 
 .agents/
-├── agents.config
-├── tools.json
-├── agents
+├── config.json
+├── lock.json
+├── manifest.json
+├── rules/
+├── skills/
 ├── wb/
-├── scripts/
-└── rules/
+├── tmp/
+└── data/
+
+.afol/
+├── skills/
+├── wb/
+├── tmp/
+└── data/
 ```
 
 ## Required Folders
@@ -42,26 +50,33 @@ docs/
 | `docs/agentic/` | Tool docs |
 | `docs/arc/` | Goal-state docs |
 | `docs/map/` | Current-state evidence |
-| `.agents/wb/` | Workbench sessions |
+| `.agents/config.json` | Path contract for thin scaffold and mutable state |
 | `.agents/rules/` | Local rules |
-| `.agents/scripts/` | CLI scripts |
-| `.agents/skills/` | Project-local skills |
+| `.agents/manifest.json` | Template ownership metadata |
+| `.agents/lock.json` | Scaffold lock metadata |
+| `.agents/skills/` | Baseline skills when `paths.mutable_dir` is `.agents` |
+| `.agents/wb/` | Baseline workbench when `paths.mutable_dir` is `.agents` |
+| `.afol/skills/` | Provider-compatible project skills |
+| `.afol/wb/` | Provider-compatible workbench sessions |
+| `.afol/tmp/` | Provider-compatible temporary files |
+| `.afol/data/` | Provider-compatible local data |
 
 ## Required Config Files
 
-- `.agents/agents.config`
-- `.agents/tools.json`
-- `.agents/wb/.active_session`
+- `.agents/config.json`
+- `.agents/manifest.json`
+- `.agents/lock.json`
+- configured `paths.wb_dir` and `paths.mutable_dir`
 
 ## Validation
 
 ```bash
 just doctor
-python -m json.tool .agents/tools.json
-python -c "import yaml; yaml.safe_load(open('.agents/agents.config'))"
+./afol validate
 ```
 
 ## Rule
 
 - Keep structure minimal and predictable.
 - Do not add parallel folders for existing contracts.
+- Read `.agents/config.json` before writing mutable state.

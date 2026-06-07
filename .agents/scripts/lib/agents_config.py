@@ -430,8 +430,48 @@ def find_repo_root(start: Path | None = None) -> Path:
             return candidate
         # Backward compatibility: root-level agents.config plus .agents folder.
         if (candidate / "agents.config").exists() and (candidate / ".agents").exists():
+            # Guard against false-positive roots when runtime overlays expose a writable
+            # mirror under <repo>/.agents and discovery starts inside that mirror.
+            if candidate.name == ".agents" and (candidate.parent / ".agents" / "agents.config").exists():
+                continue
             return candidate
     return current
+
+
+def source_template_root(repo_root: Path) -> Path:
+    """Return the canonical scaffold template root under a repository root."""
+    return repo_root / "src" / "project-template"
+
+
+def resolve_scaffold_source_roots(source: Path) -> tuple[Path, Path]:
+    """Resolve source repo root and .agents payload directory for scaffold-update."""
+    source_path = source.expanduser().resolve(strict=False)
+    if source_path.is_symlink():
+        raise RuntimeError(f"Invalid source path: symlink is not allowed: {source_path}")
+
+    template_agents_dir = source_template_root(source_path) / ".agents"
+    if template_agents_dir.is_dir():
+        if template_agents_dir.is_symlink():
+            raise RuntimeError(f"Invalid source path: symlink is not allowed: {template_agents_dir}")
+        return source_path, template_agents_dir
+
+    agents_dir = source_path / ".agents"
+    if agents_dir.is_dir():
+        if agents_dir.is_symlink():
+            raise RuntimeError(f"Invalid source path: symlink is not allowed: {agents_dir}")
+        return source_path, agents_dir
+
+    looks_like_agents_dir = (source_path / "agents").exists() and (source_path / "scripts").is_dir()
+    if looks_like_agents_dir:
+        for candidate in source_path.parents:
+            if (candidate / "releases" / "channels").is_dir():
+                return candidate, source_path
+        return source_path.parent, source_path
+
+    raise RuntimeError(
+        "Source path must be a repo root containing .agents/ or a direct .agents directory: "
+        f"{source_path}"
+    )
 
 
 def load_agents_config(repo_root: Path | None = None) -> tuple[Path, Dict[str, Any]]:

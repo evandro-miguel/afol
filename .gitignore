@@ -28,6 +28,12 @@ uv.lock
 .agents/tools/uv/
 src/project-template/.agents/tmp/
 .agents/journal/
+.agents/scripts/.agents/
+src/project-template/.agents/scripts/.agents/
+.agents/data/events/
+.agents/data/index/
+src/project-template/.agents/data/events/
+src/project-template/.agents/data/index/
 
 # Universal-skills must not be a repo-local git cache or nested checkout.
 .agents/cache/universal-skills/
@@ -36,7 +42,6 @@ src/project-template/.agents/tmp/
 .agents/.tmp/
 .agents/tmp/*
 !.agents/tmp/README.md
-.worktree/
 
 # Archived workstream payloads; keep the placeholder only.
 .agents/z-arq/*
@@ -53,6 +58,15 @@ docs/telemetry/reports/implementation_report.md
 
 # Workbench sessions (operational state; should not be cloned)
 .agents/wb/
+.afol/wb/
+.afol/tmp/*
+!.afol/tmp/README.md
+.afol/data/events/
+.afol/data/index/
+.afol/data/mutations/
+
+# Local merge worktrees
+.worktree/
 
 # Local coverage artifact
 .coverage
@@ -60,4 +74,12 @@ docs/telemetry/reports/implementation_report.md
 # Makefile in a-docs (keep root Makefile)
 # .agents/a-docs/standards/Makefile
 .gitnexus
-.agents/tmp/
+
+# Generated install/build outputs
+node_modules/
+dist/
+.bun-build*
+
+# Reproducible source artifacts that must stay versioned
+!bun.lock
+!cli/generated/template.ts

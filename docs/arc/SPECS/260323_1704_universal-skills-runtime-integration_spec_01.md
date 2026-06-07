@@ -68,9 +68,12 @@ Failure or friction points:
   - The scaffold can represent skills configuration as a reproducible contract, not only a mutable selected list.
   - Operators can install skills by profile or by explicit skill selection for supported interactive runtimes.
   - Bootstrap can prepare downstream repos with a valid skills baseline that does not require manual structure invention.
+  - Agents can propose skill candidates from local memory, knowledge, and session evidence without applying them automatically.
+  - Skill creation from suggestions is explicit, reviewable, and idempotent.
 - Boundaries:
   - The scaffold should not become the source repository for universal-skills itself.
   - Runtime-specific skill adapters must stay thin and must not duplicate the scaffold governance tree.
+  - Provider hooks can only create suggestion artifacts; they cannot directly install or overwrite skills.
 
 ## 5) Scope
 
@@ -80,11 +83,16 @@ In scope:
 - skills-sync command surface evolution
 - bootstrap integration for skills baseline creation
 - validation, docs, and tests for the new behavior
+- provider-neutral skill suggestion artifacts under `.agents/tmp/skill-suggestions/`
+- explicit skill materialization command flow with dry-run and apply modes
+- duplicate/provenance checks before creating or updating a project-local skill
 
 Out of scope:
 
 - replacing the upstream universal-skills repository
 - implementing every upstream helper command on day one
+- autonomous skill writes from lifecycle hooks or runtime adapters
+- treating Codex-specific hooks as the skills runtime contract
 
 ## 6) Child Spec Strategy
 
@@ -123,10 +131,12 @@ Out of scope:
 - Rollout approach:
   - start by defining the scaffold-local contract and a migration path from the existing manifest
   - then integrate bootstrap and validation
+  - add skill suggestion as a read-only producer before enabling any apply path
 - Workstream linkage:
   - Execution must reference `roadmap_feature` and `parent_spec`
 - Backout or deferral:
   - the scaffold can keep the current simple manifest path temporarily if migration takes longer than expected
+  - auto-suggestion can remain a pending enhancement while manual `skills-sync` stays the supported path
 
 ## 11) Verification Philosophy
 
@@ -136,8 +146,29 @@ Out of scope:
 - Open questions:
   - Q-01 Which subset of upstream lockfile policy should be adopted immediately?
   - Q-02 Which runtime targets should be required in the first validation pass?
+  - Q-03 Should `skill create-from-suggestion` update an existing project-local skill by default, or require a separate explicit update command?
 
-## 12) Acceptance Checklist
+## 12) Architecture Delta: Tool-First Skill Suggestion
+
+Follow-up delta captured on 2026-05-31: automatic skill creation should be
+modeled as a tool-first suggestion pipeline, not as provider code running
+inside Codex or any other agent runtime.
+
+Candidate flow:
+
+1. `afol skill suggest` or a lifecycle event producer analyzes local evidence
+   and writes a candidate JSON artifact under `.agents/tmp/skill-suggestions/`.
+2. The artifact records source events, observed triggers, proposed skill name,
+   duplicate checks, target scope, and safety notes.
+3. `afol skill create-from-suggestion <artifact> --dry-run` renders the
+   proposed `SKILL.md` and validation summary without writing the skill.
+4. `afol skill create-from-suggestion <artifact> --apply` writes only the
+   reviewed project-local skill and records provenance.
+
+This keeps automatic discovery useful while preserving explicit operator
+control over durable skill changes and provider-neutral runtime behavior.
+
+## 13) Acceptance Checklist
 
 - User journey is explicit.
 - Scope and non-goals are explicit.

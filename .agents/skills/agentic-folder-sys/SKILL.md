@@ -6,8 +6,8 @@ metadata:
   tags: "agentic-folder-sys, agentic-system, workflow, bootstrap, scaffold-update, upgrade, skills-sync, workbench, wb, runtime, mcp, git, validation"
   triggers: "agentic folder sys, agentic-folder-sys, .agents scaffold, bootstrap repo, install scaffold, scaffold-update, stable scaffold update, update framework, upgrade scaffold, skills-sync, universal-skills, runtime manifest, runtime validate, scaffold mcp, workbench, wb-update, verify-tasks, reporting, planning, execution"
   references: "core, patterns, troubleshooting, workbench, templates, gotchas"
-  version: "1.0.10"
-  updated_at: "2026-05-15T14:35:00Z"
+  version: "1.0.12"
+  updated_at: "2026-05-30T21:50:11Z"
   target_provider: universal
 ---
 
@@ -25,23 +25,53 @@ not the product file. Use the scaffold wrapper to discover and perform that
 state transition, then make the product change. If the request is planning-only
 or read-only, avoid creating `.agents/wb/` artifacts.
 
+## Canonical CLI Surface
+
+Use `afol` as the preferred scaffold command when it exists. Keep
+`./.agents/agents` as the recovery and compatibility fallback, especially in
+older adopted repos or before the Bun kernel is available. Treat `./a` as a
+temporary compatibility alias only; do not make it the primary command in new
+docs, plans, or handoffs.
+
+Token-optimized routine commands:
+
+- `afol s` -> status.
+- `afol ck` -> validation/check route.
+- `afol n <theme> --feature-id <F-id> --parent-spec <spec-id>` -> create or
+  target a governed session when the current repo has the `afol` kernel.
+- `afol st -S <session-id> -T T-01` -> start a task.
+- `afol d -S <session-id> -T T-01 -x "<verification command>"` -> record
+  evidence and complete a task.
+- `afol c -S <session-id>` -> close a session.
+- `afol b <repo> --partial` -> partial bootstrap into an existing repo.
+
+Short flags are part of the contract: `-S` means `--session`, `-T` means
+`--task-id`, and `-x` means `--test`/evidence command. In parallel or delegated
+work, prefer explicit `-S <session-id>` or
+`AGENTS_SESSION_ID=<session-id>` over implicit `.agents/wb/.active_session`.
+
 ## Non-Negotiable Governed Delivery Gate
 
 For any governed request that includes implementation, validation, or delivery,
 the workbench workflow is part of the work, not documentation after the fact.
 Run this sequence before product completion can be claimed:
 
-1. Create or target a session under `.agents/wb/` with `./.agents/agents new
-   <theme> --feature-id <F-id> --parent-spec <spec-id>`.
-2. Move the execution task to in_progress with `./.agents/agents implement start
-   --session <session-id> --task-id T-01` or the equivalent `wb-update task ...
-   --mark-in-progress`.
+1. Create or target a session under `.agents/wb/` with `afol n <theme>
+   --feature-id <F-id> --parent-spec <spec-id>`. Fallback:
+   `./.agents/agents new <theme> --feature-id <F-id> --parent-spec <spec-id>`.
+2. Move the execution task to in_progress with
+   `afol st -S <session-id> -T T-01`. Fallback:
+   `./.agents/agents implement start --session <session-id> --task-id T-01` or
+   the equivalent `wb-update task ... --mark-in-progress`.
 3. Only then edit product files.
 4. Run the requested verification command.
-5. Close the task with `./.agents/agents implement complete --session
-   <session-id> --task-id T-01 --command "<verification command>" --result
-   passed --artifact <path-or-report>` or record evidence with `wb-update
-   evidence` and then use `wb-update task ... --mark-done --evidence-id <E-id>`.
+5. Close the task with
+   `afol d -S <session-id> -T T-01 -x "<verification command>"` when the task
+   can be completed as passed. Fallback: `./.agents/agents implement complete
+   --session <session-id> --task-id T-01 --command "<verification command>"
+   --result passed --artifact <path-or-report>` or record evidence with
+   `wb-update evidence` and then use
+   `wb-update task ... --mark-done --evidence-id <E-id>`.
 
 If step 1 or step 2 fails, stop and fix the workflow blocker before editing the
 product. Do not create tasks already marked `[x]`, do not manually edit
@@ -56,6 +86,11 @@ research, brainstorm, explorer-check, log, report, spec, or postmortem just to
 think, save context, or satisfy habit. Create or update `.agents/wb/` only when
 the current work needs governed execution, durable evidence, or a durable
 decision record.
+
+Write governed artifacts with Caveman discipline: concise facts, exact commands,
+evidence ids, changed paths, and risks. Do not paste raw logs when a command,
+result, and artifact reference prove the same point. Keep raw output only for
+critical failure evidence.
 
 If the user asks only for a plan, answer in the conversation unless they also
 ask for a durable governed artifact. If a governed session is warranted, start
@@ -110,9 +145,10 @@ over speed; for trivial tasks, use judgment.
 
 ## Operating Rules
 
-- Treat `./.agents/agents bootstrap` as the installer for this scaffold. Full
-  bootstrap can create the target directory for a brand new repo. Use `bootstrap
-  --partial` for existing projects so project-owned files stay intact. Keep
+- Use `afol b <target> --partial` as the preferred installer path for existing
+  projects so project-owned files stay intact. Fallback to `./.agents/agents
+  bootstrap --partial` when `afol` is unavailable. Full `./.agents/agents
+  bootstrap` can create the target directory for a brand new repo. Keep
   project-owned repository docs outside `.agents/`; use `docs/map/` for
   current-state repository mapping and analysis evidence. Treat git as the
   upstream source of truth for universal-skills, but keep that checkout outside
@@ -136,11 +172,13 @@ over speed; for trivial tasks, use judgment.
   the shell or wrapper honors the session context contract. Use
   `AGENTS_SESSION_STRICT=1` when you need to reject repository-global
   active-session fallback in strict or parallel contexts. Keep session
-  management per project: list sessions with `./.agents/agents session list`,
-  sweep stale or overlapping sessions with `./.agents/agents session sweep` as a
-  read-only pass, resume with `./.agents/agents session catchup --session
-  <session-id>`, and close with `./.agents/agents session close --session
-  <session-id>`. Do not treat this as a global multi-project dashboard or index.
+  management per project: prefer `afol s`, `afol ck`,
+  `afol st -S <session-id> -T T-01`, and `afol c -S <session-id>` for routine
+  status, check, start, and close flows. Fallbacks are
+  `./.agents/agents session list`, `./.agents/agents session sweep` as a
+  read-only pass, `./.agents/agents session catchup --session <session-id>`,
+  and `./.agents/agents session close --session <session-id>`. Do not treat
+  this as a global multi-project dashboard or index.
   Use standardized workbench artifacts: `plan`, `task`, `log`, and `report`. For
   major work, `brainstorm`, `research`, `explorer-check`, and `postmortem` are
   optional companion artifacts when they materially help the workstream, but
@@ -158,17 +196,19 @@ over speed; for trivial tasks, use judgment.
   not planning theater: each task should describe a concrete action an agent can
   take now, and deferred work must be marked `moved` with destination plus
   reason instead of a generic skip. For governed feature execution, prefer
-  `./.agents/agents implement ...` because it should surface the active
-  feature/spec/rule bundle before task transitions run. For ambiguous,
-  product-shaped, benchmark-heavy, or prioritization-heavy work, run the
+  `afol st`, `afol d -x`, or the fallback `./.agents/agents implement ...`
+  because the route should surface the active feature/spec/rule bundle before
+  task transitions run. For ambiguous, product-shaped, benchmark-heavy, or
+  prioritization-heavy work, run the
   smallest useful decision-intake lane before creating plans, delegating agents,
   benchmarking, or implementing. Treat it as a ladder, not a mandatory pipeline.
   For every feature addition or meaningful feature behavior change, update the
   affected project-local skill under `.agents/skills/` and the affected project
   docs. Pending: mirror behavior-changing edits in this skill back to
-  universal-skills through the approved branch/PR flow. Prefer `./.agents/agents
-  wb-update ...` over manual timestamp, task-state, evidence, and file-list
-  edits. Never create new tasks already marked `[x]` or `done`; seed them as
+  universal-skills through the approved branch/PR flow. Prefer `afol d -x`,
+  `afol st`, and `./.agents/agents wb-update ...` over manual timestamp,
+  task-state, evidence, and file-list edits. Never create new tasks already
+  marked `[x]` or `done`; seed them as
   `pending` unless execution has started. Mark tasks `[x]` only through
   task-scoped `.evidence.jsonl` closure evidence, a valid `evidence_id`, passing
   required gates, no unresolved blocking failed evidence, and strict
@@ -191,13 +231,19 @@ state afterward.
 
 Session command quick reference:
 
-- `session list`
+- `afol s`
 
-- `session sweep`
+- `afol ck`
 
-- `session catchup --session <session-id>`
+- `afol st -S <session-id> -T T-01`
 
-- `session close --session <session-id>`
+- `afol d -S <session-id> -T T-01 -x "<verification command>"`
+
+- `afol c -S <session-id>`
+
+- Fallbacks: `./.agents/agents session list`,
+  `./.agents/agents session catchup --session <session-id>`, and
+  `./.agents/agents session close --session <session-id>`.
 
 Verification rule:
 

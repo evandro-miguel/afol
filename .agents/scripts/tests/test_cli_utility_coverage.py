@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import re
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -150,6 +152,97 @@ def test_agents_index_scans_generates_and_runs_main(tmp_path, monkeypatch, capsy
     monkeypatch.setattr(sys, "argv", ["agents-index.py", "--dry-run"])
     agents_index.main()
     assert "DRY RUN" in capsys.readouterr().out
+
+
+def test_agents_index_idempotent_when_entries_unchanged(tmp_path, monkeypatch):
+    agents_index = load_module("agents_index_idempotency_test", "agents-index.py")
+    specs = tmp_path / "docs" / "arc" / "SPECS"
+    decisions = tmp_path / "docs" / "arc" / "DECISIONS"
+    specs.mkdir(parents=True)
+    decisions.mkdir(parents=True)
+    (specs / "260101_0100_test_spec_01.md").write_text(
+        "---\n"
+        'id: "260101_0100_test_spec_01"\n'
+        "theme: Testing\n"
+        "status: active\n"
+        "owners: [agent]\n"
+        'created_at: "2026-01-01T01:00:00Z"\n'
+        "---\n\n# Spec\n",
+        encoding="utf-8",
+    )
+    (decisions / "260101_0200_test_adr_01.md").write_text(
+        "---\n"
+        'id: "260101_0200_test_adr_01"\n'
+        "topic: Decision\n"
+        "status: final\n"
+        "owners: [architect]\n"
+        'created: "2026-01-01T02:00:00Z"\n'
+        "---\n\n# ADR\n",
+        encoding="utf-8",
+    )
+
+    class FakeDateTime:
+        tick = 0
+
+        @classmethod
+        def now(cls, _tz):
+            value = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc) + timedelta(seconds=cls.tick)
+            cls.tick += 1
+            return value
+
+    monkeypatch.setattr(agents_index, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(agents_index, "SPECS_DIR", specs)
+    monkeypatch.setattr(agents_index, "DECISIONS_DIR", decisions)
+    monkeypatch.setattr(agents_index, "datetime", FakeDateTime)
+
+    monkeypatch.setattr(sys, "argv", ["agents-index.py"])
+    agents_index.main()
+    first_specs = (specs / "INDEX.md").read_text(encoding="utf-8")
+    first_adrs = (decisions / "INDEX.md").read_text(encoding="utf-8")
+
+    monkeypatch.setattr(sys, "argv", ["agents-index.py"])
+    agents_index.main()
+    second_specs = (specs / "INDEX.md").read_text(encoding="utf-8")
+    second_adrs = (decisions / "INDEX.md").read_text(encoding="utf-8")
+
+    assert first_specs == second_specs
+    assert first_adrs == second_adrs
+
+
+def test_agents_index_handles_mixed_yaml_timestamp_types(tmp_path, monkeypatch):
+    agents_index = load_module("agents_index_mixed_timestamp_types_test", "agents-index.py")
+    specs = tmp_path / "docs" / "arc" / "SPECS"
+    specs.mkdir(parents=True)
+
+    (specs / "260101_0100_first_spec_01.md").write_text(
+        "---\n"
+        'id: "260101_0100_first_spec_01"\n'
+        "theme: One\n"
+        "status: active\n"
+        "owners: [agent]\n"
+        "created_at: 2026-01-01\n"
+        "---\n\n# Spec\n",
+        encoding="utf-8",
+    )
+    (specs / "260101_0200_second_spec_01.md").write_text(
+        "---\n"
+        'id: "260101_0200_second_spec_01"\n'
+        "theme: Two\n"
+        "status: active\n"
+        "owners: [agent]\n"
+        'created_at: "2026-01-02T00:00:00Z"\n'
+        "---\n\n# Spec\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(agents_index, "SPECS_DIR", specs)
+    entries = agents_index.scan_docs(specs, "*.md")
+
+    assert [entry.id for entry in entries] == [
+        "260101_0100_first_spec_01",
+        "260101_0200_second_spec_01",
+    ]
+    assert all(isinstance(entry.created_at, str) for entry in entries)
 
 
 def test_agents_patterns_load_filter_apply_rate_and_cli(tmp_path, monkeypatch, capsys):
@@ -305,6 +398,77 @@ def test_structure_mapper_scan_uses_single_pass_metrics(tmp_path, monkeypatch):
     sections = mapper.scan_files()
     assert "backend" in sections
     assert sections["backend"].files[0].lines == 2
+
+
+def test_structure_mapper_prunes_output_subtree_from_scan_and_cache(tmp_path):
+    struct = load_module("agents_structure_map_output_prune_test", "agents-structure-map.py")
+    project = tmp_path / "project"
+    output = project / "docs" / "arc" / "structure"
+    (project / "services").mkdir(parents=True)
+    (output / "data").mkdir(parents=True)
+    (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
+    (output / "data" / "generated.json").write_text("{\"generated\": true}\n", encoding="utf-8")
+
+    mapper = struct.StructureMapper(project, output)
+    sections = mapper.scan_files()
+    collected_paths = {file.relative_path for stats in sections.values() for file in stats.files}
+
+    assert "services/UserService.py" in collected_paths
+    assert "docs/arc/structure/data/generated.json" not in collected_paths
+    assert "docs/arc/structure/data/generated.json" not in mapper.cache["files"]
+    assert not any(path.startswith("docs/arc/structure/") for path in mapper.cache["files"])
+
+
+def test_structure_mapper_ignores_volatile_telemetry_events(tmp_path):
+    struct = load_module("agents_structure_map_telemetry_events_test", "agents-structure-map.py")
+    project = tmp_path / "project"
+    output = project / "docs" / "map" / "structure"
+    (project / ".agents" / "data" / "telemetry").mkdir(parents=True)
+    (project / "services").mkdir(parents=True)
+    (project / ".agents" / "data" / "telemetry" / "events.jsonl").write_text(
+        "{\"event_type\":\"tool_exec\"}\n",
+        encoding="utf-8",
+    )
+    (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
+
+    mapper = struct.StructureMapper(project, output)
+    sections = mapper.scan_files()
+    collected_paths = {file.relative_path for stats in sections.values() for file in stats.files}
+
+    assert "services/UserService.py" in collected_paths
+    assert ".agents/data/telemetry/events.jsonl" not in collected_paths
+    assert ".agents/data/telemetry/events.jsonl" not in mapper.cache["files"]
+
+
+def test_structure_mapper_idempotent_when_scan_results_unchanged(tmp_path, monkeypatch):
+    struct = load_module("agents_structure_map_idempotency_test", "agents-structure-map.py")
+    project = tmp_path / "project"
+    output = project / "docs" / "map" / "structure"
+    (project / "services").mkdir(parents=True)
+    (project / "services" / "UserService.py").write_text("def run():\n    return True\n", encoding="utf-8")
+
+    class FakeDateTime:
+        tick = 0
+
+        @classmethod
+        def now(cls, _tz):
+            value = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc) + timedelta(seconds=cls.tick)
+            cls.tick += 1
+            return value
+
+    monkeypatch.setattr(struct, "datetime", FakeDateTime)
+    mapper = struct.StructureMapper(project, output)
+    mapper.run()
+    first_readme = (output / "README.md").read_text(encoding="utf-8")
+    first_backend = (output / "backend.md").read_text(encoding="utf-8")
+
+    mapper = struct.StructureMapper(project, output)
+    mapper.run()
+    second_readme = (output / "README.md").read_text(encoding="utf-8")
+    second_backend = (output / "backend.md").read_text(encoding="utf-8")
+
+    assert first_readme == second_readme
+    assert first_backend == second_backend
 
 
 def test_tools_catalog_display_validation_and_cli(monkeypatch, capsys):
@@ -1307,6 +1471,8 @@ def test_agents_new_creates_workstream_quick_mode_and_error_branches(tmp_path, m
             "log",
             "--with=report",
             "--force-new",
+            "--task",
+            "Implement coverage feature workflow and verify generated artifacts",
         ],
     )
     agents_new.main()
@@ -1499,3 +1665,29 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     monkeypatch.setattr(sys, "argv", ["agents-bootstrap.py", str(source), "--dry-run"])
     assert bootstrap.main() == 1
     assert "bootstrap:" in capsys.readouterr().out
+
+
+def test_wrapper_command_map_matches_runtime_registry_payload():
+    repo_root = Path(__file__).resolve().parents[3]
+    wrapper = repo_root / ".agents" / "agents"
+    payload = json.loads(
+        subprocess.run(
+            ["./.agents/agents", "runtime", "command-registry", "--repo-root", str(repo_root)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
+
+    wrapper_text = wrapper.read_text(encoding="utf-8")
+    block_match = re.search(r'declare -A COMMAND_MAP=\((.*?)\n\)', wrapper_text, re.S)
+    assert block_match is not None
+    wrapper_commands = {
+        match.group(1)
+        for match in re.finditer(r'\["([^"]+)"\]="[^"]+"', block_match.group(1))
+    }
+
+    registry_commands = {item["name"] for item in payload["commands"]}
+    assert wrapper_commands == registry_commands
+    assert any(item.get("name") == "local-state" for item in payload["help_commands"])

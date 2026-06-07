@@ -7,6 +7,7 @@ Commands:
   normalize-time Normalize frontmatter timestamps to configured WB offset
   files-changed  Refresh "## Files Changed" in report file(s)
   evidence       Register execution evidence in session ledger
+  ensure         Create a missing allowed workbench artifact
   task           Mark task checklist/state by task ID
   status         Set frontmatter status in one or more docs
   timeline       Append entry to log timeline
@@ -38,6 +39,7 @@ from lib.agents_config import (
     parse_offset,
 )
 from lib.execution_commands import evidence_record_closure_error
+from lib.cli_output import to_json_text
 from lib.markdown_docs import split_markdown_frontmatter as split_frontmatter
 from lib.postmortem_governance import postmortem_governance_review_issues
 
@@ -47,6 +49,7 @@ WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 CANONICAL_WB_DIR = AGENTS_DIR / "wb"
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 TELEMETRY_SCRIPT = Path(__file__).resolve().parent / "agents-telemetry.py"
+TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")
 WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
 WB_TZ = parse_offset(WB_OFFSET)
 
@@ -82,6 +85,15 @@ LEGACY_TASK_ACTION_ALIASES = {
 TIMESTAMP_FIELDS = ("created_at", "updated_at")
 TASK_ID_RE = re.compile(r"^T-\d{2,3}$")
 EVIDENCE_TAG_RE = re.compile(r"\s+\(evidence:\s*([^)]+)\)\s*$", re.IGNORECASE)
+ENSURABLE_DOC_TYPES = {"report", "log", "research", "brainstorm", "explorer-check"}
+SIDECAR_DOC_TYPES = {"research", "brainstorm", "explorer-check"}
+SIDECAR_REQUIRED_LABELS = {
+    "Blocking question": re.compile(r"^\s*-\s*Blocking question:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE),
+    "Decision produced": re.compile(r"^\s*-\s*Decision produced:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE),
+    "Execution task affected": re.compile(r"^\s*-\s*Execution task affected:\s*(T-\d{2,3})\s*$", re.IGNORECASE | re.MULTILINE),
+    "Stop condition": re.compile(r"^\s*-\s*Stop condition:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE),
+}
+SIDECAR_JUSTIFICATION_ALLOWED = {"required", "not_required"}
 
 
 def now_iso_gmt3() -> str:
@@ -316,6 +328,246 @@ def ensure_postmortems_ready_for_final(session_dir: Path) -> None:
         raise ValueError(
             "Cannot finalize postmortem without governance review: " + " | ".join(issues)
         )
+
+
+def _is_placeholder_value(value: str) -> bool:
+    stripped = str(value or "").strip()
+    return not stripped or stripped.upper() in {"N/A", "NA", "NONE"} or "<" in stripped or ">" in stripped
+
+
+def _section_body(body: str, heading: str) -> str:
+    pattern = re.compile(
+        rf"^##\s+{re.escape(heading)}\s*$\n(?P<body>.*?)(?=^##\s+|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(body)
+    return match.group("body") if match else ""
+
+
+def _sidecar_justification_value(frontmatter: dict) -> str:
+    raw = frontmatter.get("sidecar_justification")
+    if raw is None:
+        return ""
+    return str(raw).strip().lower()
+
+
+def validate_sidecar_justification(path: Path) -> None:
+    parsed = split_frontmatter(path.read_text())
+    if not parsed:
+        raise ValueError(f"{path.name} is missing valid frontmatter")
+    fm, body = parsed
+    doc_type = str(fm.get("doc_type", "")).strip()
+    if doc_type not in SIDECAR_DOC_TYPES:
+        return
+
+    mode = _sidecar_justification_value(fm)
+    if not mode:
+        raise ValueError(f"{path.name} is missing sidecar_justification frontmatter value")
+    if mode not in SIDECAR_JUSTIFICATION_ALLOWED:
+        raise ValueError(
+            f"{path.name} has invalid sidecar_justification '{mode}'; expected required|not_required"
+        )
+    if mode == "not_required":
+        return
+
+    section = _section_body(body, "Sidecar Justification")
+    if not section:
+        raise ValueError(f"{path.name} is missing Sidecar Justification")
+
+    missing: list[str] = []
+    for label, pattern in SIDECAR_REQUIRED_LABELS.items():
+        match = pattern.search(section)
+        if not match or _is_placeholder_value(match.group(1)):
+            missing.append(label)
+
+    if missing:
+        raise ValueError(f"{path.name} has incomplete Sidecar Justification: {', '.join(missing)}")
+
+
+def ensure_sidecars_ready_for_final(session_dir: Path, aliases: Iterable[str]) -> None:
+    issues: list[str] = []
+    for alias in aliases:
+        if alias not in SIDECAR_DOC_TYPES:
+            continue
+        for doc_path in doc_files(session_dir, alias):
+            try:
+                validate_sidecar_justification(doc_path)
+            except ValueError as exc:
+                issues.append(str(exc))
+    if issues:
+        raise ValueError("Cannot finalize sidecar without justification: " + " | ".join(issues))
+
+
+def _theme_from_session(session_dir: Path) -> str:
+    parts = session_dir.name.split("_", 2)
+    return parts[2] if len(parts) == 3 else session_dir.name
+
+
+def _doc_id(session_dir: Path, doc_type: str) -> str:
+    return f"{session_dir.name}_{doc_type}_01"
+
+
+def _latest_doc_id(session_dir: Path, alias: str) -> str:
+    try:
+        path = latest_doc_file(session_dir, alias)
+    except FileNotFoundError:
+        return ""
+    parsed = split_frontmatter(path.read_text())
+    if not parsed:
+        return path.stem
+    fm, _ = parsed
+    return str(fm.get("id") or path.stem)
+
+
+def _session_governance_context(session_dir: Path) -> dict[str, str]:
+    context = {
+        "roadmap_feature": "",
+        "parent_spec": "",
+        "child_spec": "",
+        "roadmap_path": "docs/arc/GENERAL-ROADMAP.md",
+    }
+    for alias in ("plan", "task"):
+        try:
+            doc = latest_doc_file(session_dir, alias)
+        except FileNotFoundError:
+            continue
+        parsed = split_frontmatter(doc.read_text())
+        if not parsed:
+            continue
+        fm, _ = parsed
+        context["roadmap_feature"] = context["roadmap_feature"] or str(fm.get("roadmap_feature") or "")
+        context["parent_spec"] = context["parent_spec"] or str(fm.get("parent_spec") or "")
+        context["child_spec"] = context["child_spec"] or str(fm.get("child_spec") or "")
+        links = fm.get("links")
+        if isinstance(links, dict):
+            context["roadmap_path"] = str(links.get("roadmap") or context["roadmap_path"])
+    return context
+
+
+def _template_replacements(session_dir: Path, doc_type: str) -> dict[str, str]:
+    context = _session_governance_context(session_dir)
+    replacements = {
+        "YYMMDD_HHMM_<theme>": session_dir.name,
+        "<theme>": _theme_from_session(session_dir),
+        "<feature_id>": context["roadmap_feature"],
+        "<parent_spec_id>": context["parent_spec"],
+        "<parent_spec_id_or_empty>": context["parent_spec"],
+        "<child_spec_id_or_empty>": context["child_spec"],
+        "<roadmap_path>": context["roadmap_path"],
+        "<workstream_intent>": "delivery",
+        "<artifact_purpose>": f"Created by wb-update ensure for {doc_type}.",
+        "<task_doc_id>": _latest_doc_id(session_dir, "task"),
+        "<plan_doc_id>": _latest_doc_id(session_dir, "plan"),
+        "<report_doc_id_or_empty>": _latest_doc_id(session_dir, "report"),
+        "<postmortem_doc_id_or_empty>": _latest_doc_id(session_dir, "postmortem"),
+        "<brainstorm_doc_id_or_empty>": _latest_doc_id(session_dir, "brainstorm"),
+        "<research_doc_id_or_empty>": _latest_doc_id(session_dir, "research"),
+        "<explorer_check_doc_id_or_empty>": _latest_doc_id(session_dir, "explorer-check"),
+        "<task_doc_id_or_empty>": _latest_doc_id(session_dir, "task"),
+        "<optional_task_id>": "",
+        "YYYY-MM-DDTHH:MM:SSZ": now_iso_gmt3(),
+        "'2026-04-04T10:08:11-03:00'": f"'{now_iso_gmt3()}'",
+        "'2026-04-04T10:08:12-03:00'": f"'{now_iso_gmt3()}'",
+    }
+    replacements[f"<{doc_type.replace('-', '_')}_doc_id_or_empty>"] = _doc_id(session_dir, doc_type)
+    return replacements
+
+
+def _apply_replacements(content: str, replacements: dict[str, str]) -> str:
+    rendered = content
+    for key, value in replacements.items():
+        rendered = rendered.replace(key, value)
+    return rendered
+
+
+def _append_sidecar_justification(
+    body: str,
+    *,
+    task_id: str,
+    blocking_question: str,
+    decision_produced: str,
+    stop_condition: str,
+) -> str:
+    section = (
+        "## Sidecar Justification\n\n"
+        f"- Blocking question: {blocking_question}\n"
+        f"- Decision produced: {decision_produced}\n"
+        f"- Execution task affected: {task_id}\n"
+        f"- Stop condition: {stop_condition}\n"
+    )
+    if _section_body(body, "Sidecar Justification"):
+        body = re.sub(
+            r"^##\s+Sidecar Justification\s*$\n.*?(?=^##\s+|\Z)",
+            section.rstrip() + "\n\n",
+            body,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+        return body.rstrip() + "\n"
+    return body.rstrip() + "\n\n" + section
+
+
+def ensure_artifact(
+    session_dir: Path,
+    doc_type: str,
+    *,
+    task_id: str | None = None,
+    blocking_question: str | None = None,
+    decision_produced: str | None = None,
+    stop_condition: str | None = None,
+) -> Path:
+    if doc_type not in ENSURABLE_DOC_TYPES:
+        raise ValueError(f"Cannot ensure unsupported artifact type: {doc_type}")
+    existing = doc_files(session_dir, doc_type)
+    if existing:
+        target = existing[-1]
+        if doc_type in SIDECAR_DOC_TYPES:
+            validate_sidecar_justification(target)
+        return target
+
+    if doc_type in SIDECAR_DOC_TYPES:
+        missing = [
+            name
+            for name, value in (
+                ("--task-id", task_id),
+                ("--blocking-question", blocking_question),
+                ("--decision-produced", decision_produced),
+                ("--stop-condition", stop_condition),
+            )
+            if _is_placeholder_value(value or "")
+        ]
+        if missing:
+            raise ValueError(f"Sidecar artifact '{doc_type}' requires {', '.join(missing)}")
+        if not TASK_ID_RE.match(str(task_id)):
+            raise ValueError(f"Invalid task id '{task_id}'. Expected format like T-01 or T-001")
+
+    template_path = TEMPLATES_DIR / f"{doc_type}.md"
+    if not template_path.exists():
+        raise FileNotFoundError(f"Template not found: {template_path}")
+    rendered = _apply_replacements(template_path.read_text(), _template_replacements(session_dir, doc_type))
+    target = session_dir / f"{_doc_id(session_dir, doc_type)}.md"
+    parsed = split_frontmatter(rendered)
+    if parsed:
+        fm, body = parsed
+        fm["id"] = _doc_id(session_dir, doc_type)
+        fm["theme"] = _theme_from_session(session_dir)
+        fm["status"] = "draft" if doc_type in SIDECAR_DOC_TYPES | {"report"} else "active"
+        fm["created_at"] = now_iso_gmt3()
+        fm["updated_at"] = now_iso_gmt3()
+        if doc_type in SIDECAR_DOC_TYPES:
+            fm["sidecar_justification"] = "required"
+            body = _append_sidecar_justification(
+                body,
+                task_id=str(task_id),
+                blocking_question=str(blocking_question),
+                decision_produced=str(decision_produced),
+                stop_condition=str(stop_condition),
+            )
+        write_frontmatter(target, fm, body)
+    else:
+        target.write_text(rendered)
+    if doc_type in SIDECAR_DOC_TYPES:
+        validate_sidecar_justification(target)
+    return target
 
 
 def touch_file(path: Path, timestamp: str) -> bool:
@@ -672,6 +924,10 @@ def cmd_files_changed(args: argparse.Namespace):
 def cmd_status(args: argparse.Namespace):
     require_explicit_session(args, "status")
     session_dir = resolve_session(args.session)
+    finalizing = args.value.strip().lower() == "final"
+    target_aliases = set(DOC_ALIAS_TO_GLOB) if args.file == "all" else {args.file}
+    if finalizing:
+        ensure_sidecars_ready_for_final(session_dir, target_aliases)
     if args.value.strip().lower() == "final" and args.file in {"report", "all"}:
         ensure_optional_artifacts_ready_for_report_final(session_dir)
     if args.value.strip().lower() == "final" and args.file in {"postmortem", "all"}:
@@ -744,6 +1000,46 @@ def cmd_evidence(args: argparse.Namespace):
     print(f"✓ evidence recorded: {record['id']} for {record['task_id']} in {ledger}")
 
 
+def cmd_ensure(args: argparse.Namespace):
+    require_explicit_session(args, "ensure")
+    session_dir = resolve_session(args.session)
+    before_paths = doc_files(session_dir, args.file)
+    before_latest = before_paths[-1] if before_paths else None
+    path = ensure_artifact(
+        session_dir,
+        args.file,
+        task_id=args.task_id,
+        blocking_question=args.blocking_question,
+        decision_produced=args.decision_produced,
+        stop_condition=args.stop_condition,
+    )
+    created = before_latest is None or before_latest != path
+    payload = {
+        "status": "saved" if created else "exists",
+        "artifact": args.file,
+        "path": display_path(path),
+        "summary": (
+            f"{args.file} sidecar ready for governed handoff"
+            if args.file in SIDECAR_DOC_TYPES
+            else f"{args.file} artifact ready"
+        ),
+    }
+    if args.file in SIDECAR_DOC_TYPES:
+        parsed = split_frontmatter(path.read_text())
+        if parsed:
+            fm, _ = parsed
+            payload["sidecar_justification"] = _sidecar_justification_value(fm) or "missing"
+    if getattr(args, "json", False):
+        print(to_json_text(payload, pretty=False, sort_keys=True))
+        return
+    sidecar_label = payload.get("sidecar_justification")
+    extra = f" | sidecar={sidecar_label}" if sidecar_label else ""
+    print(
+        f"STATUS: {payload['status'].upper()} | ARTIFACT: {payload['artifact']} | "
+        f"PATH: {payload['path']} | SUMMARY: {payload['summary']}{extra}"
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Automate workbench metadata updates")
     sub = p.add_subparsers(dest="command", required=True)
@@ -814,6 +1110,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_evidence.add_argument("--note", help="optional note")
     p_evidence.set_defaults(func=cmd_evidence)
+
+    p_ensure = sub.add_parser("ensure", help="create a missing allowed workbench artifact")
+    p_ensure.add_argument("--session", help="session id/path (required)")
+    p_ensure.add_argument("--file", choices=sorted(ENSURABLE_DOC_TYPES), required=True)
+    p_ensure.add_argument("--task-id", help="required for sidecar artifacts")
+    p_ensure.add_argument("--blocking-question", help="required for sidecar artifacts")
+    p_ensure.add_argument("--decision-produced", help="required for sidecar artifacts")
+    p_ensure.add_argument("--stop-condition", help="required for sidecar artifacts")
+    p_ensure.add_argument("--json", action="store_true", help="Emit compact JSON output")
+    p_ensure.set_defaults(func=cmd_ensure)
 
     p_status = sub.add_parser("status", help="set frontmatter status in session docs")
     p_status.add_argument("--session", help="session id/path (required)")

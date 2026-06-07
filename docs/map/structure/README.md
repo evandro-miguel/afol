@@ -1,39 +1,23 @@
-# 📁 Project Structure - Complete Index
+# Structure Map
 
-**Generated:** 2026-06-07T01:11:04+00:00
-**Last Update:** First run
+This section is a compact physical-layout snapshot, not a full file inventory.
 
-## 📊 Overview
+## Top-Level Surfaces
 
-| Metric | Value |
-|--------|-------|
-| **Total Files** | 253 |
-| **Total Lines** | 73,521 |
+- `cli/`: live Bun/TypeScript CLI, routing, commands, schema checks, and tests.
+- `src/project-template/`: exportable downstream template source.
+- `.agents/`: factory repo state, including legacy Python compatibility surfaces kept as safe migration fallbacks, workbench data, skills, rules, and generated evidence.
+- `docs/`: project documentation, with `docs/map/` for current-state evidence and `docs/arc/` for goal-state canon.
 
-## 📂 Documentation Sections
+## Boundary Notes
 
-| Section | Description | Files |
-|---------|-------------|-------|
-| [Backend](./backend.md) | Services, utilities, and business logic | 106 |
-| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 135 |
-| [Data](./data.md) | Data files, constants, and configuration | 12 |
+- Template payload generation starts from `src/project-template/`.
+- The clean template excludes root `.agents/scripts/**`, `.agents/runtime/**`, `.agents/agents`, `.agents/agents-mcp`, and Python env artifacts.
+- Legacy compatibility paths remain in the factory root until native delegation parity is complete.
+- `cli/tests/` is the live policy and bootstrap verification surface for that boundary.
 
-## 🔄 Change Detection
+## Use This Section For
 
-This documentation uses **incremental updates**:
-- ✅ Descriptions cached to avoid regenerating everything
-- ✅ Only new/changed files get new descriptions
-- ✅ Detects when file purpose changes
-
-## 🌳 Quick Directory Tree
-
-```
-agentic-standard-folder/
-├── 📁 docs/
-├── 📁 src/
-```
-
----
-
-*Generated automatically by `agents-structure-map.py`*
-*For detailed structure, see individual section files*
+- Fast orientation on where the live app and template live.
+- Checking which tree is active versus migration-only.
+- Finding the right follow-up file before opening source.

@@ -1,0 +1,173 @@
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { loadJsonObject, loadYamlObject } from "../../core/schema";
+import { scanTemplateForbiddenPaths, TEMPLATE_ROOT } from "../../schemas/template-policy";
+import { validateWorkBenchIndex } from "../local-state/workbench-index";
+import {
+  validateFilesIndex,
+  validateRulesIndex,
+  validateSkillsIndex,
+  validateSpecsIndex,
+} from "../local-state/project-indexes";
+import { resolveProjectPaths } from "./paths";
+
+export type ProjectValidationCheck = {
+  id:
+    | "config"
+    | "lock"
+    | "manifest"
+  | "rules_dir"
+  | "skills_dir"
+  | "wb_dir"
+  | "docs_arc_dir"
+  | "template_forbidden"
+  | "rules_local_state_index"
+  | "skills_local_state_index"
+  | "specs_local_state_index"
+  | "files_local_state_index"
+  | "wb_local_state_index";
+  ok: boolean;
+  message: string;
+};
+
+export type ProjectValidationReport = {
+  ok: boolean;
+  checks: ProjectValidationCheck[];
+};
+
+function configCandidates(projectRoot: string): { path: string; kind: "json" | "yaml" }[] {
+  return [
+    { path: join(projectRoot, ".agents", "config.json"), kind: "json" },
+    { path: join(projectRoot, ".agents", "agents.config"), kind: "yaml" },
+  ];
+}
+
+function validateConfig(projectRoot: string): ProjectValidationCheck {
+  for (const candidate of configCandidates(projectRoot)) {
+    if (!existsSync(candidate.path)) {
+      continue;
+    }
+    const loaded = candidate.kind === "json" ? loadJsonObject(candidate.path) : loadYamlObject(candidate.path);
+    if (!loaded.ok) {
+      return { id: "config", ok: false, message: loaded.error };
+    }
+    return { id: "config", ok: true, message: `ok ${candidate.path}` };
+  }
+  return {
+    id: "config",
+    ok: false,
+    message: `missing .agents/config.json or .agents/agents.config under ${projectRoot}`,
+  };
+}
+
+function validateJsonFile(id: "lock" | "manifest", path: string): ProjectValidationCheck {
+  const loaded = loadJsonObject(path);
+  if (!loaded.ok) {
+    return { id, ok: false, message: loaded.error };
+  }
+  return { id, ok: true, message: `ok ${path}` };
+}
+
+function validateDirectory(
+  _projectRoot: string,
+  id: "rules_dir" | "skills_dir" | "wb_dir" | "docs_arc_dir",
+  path: string,
+): ProjectValidationCheck {
+  if (!existsSync(path)) {
+    return { id, ok: false, message: `missing directory: ${path}` };
+  }
+  try {
+    const stat = statSync(path);
+    if (!stat.isDirectory()) {
+      return { id, ok: false, message: `not a directory: ${path}` };
+    }
+  } catch (error) {
+    return { id, ok: false, message: `cannot inspect ${path}: ${(error as Error).message}` };
+  }
+  return { id, ok: true, message: `ok ${path}` };
+}
+
+async function validateTemplateForbidden(projectRoot: string): Promise<ProjectValidationCheck> {
+  const templateRoot = join(projectRoot, TEMPLATE_ROOT);
+  if (!existsSync(templateRoot)) {
+    return {
+      id: "template_forbidden",
+      ok: true,
+      message: `skipped ${templateRoot} missing`,
+    };
+  }
+
+  const forbidden = await scanTemplateForbiddenPaths(templateRoot);
+  if (forbidden.length > 0) {
+    return {
+      id: "template_forbidden",
+      ok: false,
+      message: `forbidden paths in ${TEMPLATE_ROOT}: ${forbidden.join(", ")}`,
+    };
+  }
+
+  return {
+    id: "template_forbidden",
+    ok: true,
+    message: `ok ${templateRoot}`,
+  };
+}
+
+export async function validateProjectStructure(projectRoot: string): Promise<ProjectValidationReport> {
+  const projectPaths = resolveProjectPaths(projectRoot);
+  const checks: ProjectValidationCheck[] = [
+    validateConfig(projectRoot),
+    validateJsonFile("lock", projectPaths.abs.lockFile),
+    validateJsonFile("manifest", projectPaths.abs.manifestFile),
+    validateDirectory(projectRoot, "rules_dir", projectPaths.abs.rulesDir),
+    validateDirectory(projectRoot, "skills_dir", projectPaths.abs.skillsDir),
+    validateDirectory(projectRoot, "wb_dir", projectPaths.abs.wbDir),
+    validateDirectory(projectRoot, "docs_arc_dir", join(projectRoot, "docs", "arc")),
+    (() => {
+      const result = validateWorkBenchIndex(projectRoot);
+      return {
+        id: "wb_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
+    (() => {
+      const result = validateRulesIndex(projectRoot);
+      return {
+        id: "rules_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
+    (() => {
+      const result = validateSkillsIndex(projectRoot);
+      return {
+        id: "skills_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
+    (() => {
+      const result = validateSpecsIndex(projectRoot);
+      return {
+        id: "specs_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
+    (() => {
+      const result = validateFilesIndex(projectRoot);
+      return {
+        id: "files_local_state_index",
+        ok: result.ok,
+        message: result.message,
+      };
+    })(),
+    await validateTemplateForbidden(projectRoot),
+  ];
+
+  return {
+    ok: checks.every((check) => check.ok),
+    checks,
+  };
+}

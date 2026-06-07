@@ -2,17 +2,19 @@
 doc_type: spec-child
 id: 260415_2121_scripts-cleanup-optimization_spec-child_01
 theme: scripts-cleanup-optimization
-status: active
+status: final
 owners:
 - orchestrator
 created_at: '2026-04-15T21:21:55-03:00'
-updated_at: '2026-04-15T21:21:55-03:00'
+updated_at: '2026-05-28T16:24:04-03:00'
 roadmap_feature: F-15
 spec_role: child
 parent_spec: 260412_2004_repo-wide-simplification-runtime-parity_spec_01
 links:
   roadmap: docs/arc/GENERAL-ROADMAP.md
   parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md
+  plan: .agents/wb/260528_1606_scripts-cleanup-optimization/260528_1606_scripts-cleanup-optimization_plan_01.md
+  task: .agents/wb/260528_1606_scripts-cleanup-optimization/260528_1606_scripts-cleanup-optimization_task_01.md
 ---
 
 # SPEC-CHILD: scripts-cleanup-optimization

@@ -8,7 +8,7 @@ owners:
 workstream_intent: <workstream_intent>
 artifact_purpose: <artifact_purpose>
 created_at: YYYY-MM-DDTHH:MM:SSZ
-updated_at: YYYY-MM-DDTHH:MM:SSZ
+updated_at: 2026-05-28T18:29:58Z
 roadmap_feature: <feature_id>
 parent_spec: <parent_spec_id>
 child_spec: <spec_child_id_or_empty>
@@ -28,6 +28,11 @@ risk_level: medium
 - Why this test strategy is needed now: <reason>
 - Related feature: `<feature_id>`
 - Parent spec: `<parent_spec_id>`
+
+## Canonical Position
+
+- `spec-test` is a pre-test strategy artifact, not executable test code.
+- Create or update it before implementing or changing tests.
 
 ## Journey
 

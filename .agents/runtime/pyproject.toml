@@ -36,8 +36,8 @@ packages = ["src/agentic_scaffold"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 asyncio_mode = "auto"
-addopts = ["-q", "-s", "--basetemp=.agents/tmp/pytest-runtime-basetemp"]
-log_file = ".agents/tmp/pytest-runtime.log"
+addopts = ["-q", "-s", "--basetemp=../tmp/pytest-runtime-basetemp"]
+log_file = "../tmp/pytest-runtime.log"
 
 [tool.ruff]
 line-length = 100

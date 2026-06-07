@@ -105,6 +105,10 @@ IGNORED_DIRS = {
 IGNORED_PATH_SUFFIXES = {
     ".agents/tools/uv",
 }
+IGNORED_RELATIVE_PATHS = {
+    ".agents/data/telemetry/events.jsonl",
+    "src/project-template/.agents/data/telemetry/events.jsonl",
+}
 
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 MAP_DIR = get_cfg_path(ROOT_DIR, CONFIG, "map_dir")
@@ -299,10 +303,26 @@ class StructureMapper:
 
         sections: Dict[str, List[FileInfo]] = {name: [] for name in DEFAULT_SECTIONS}
         next_cache: Dict[str, Any] = {}
+        prune_output_subtree = False
+        if self.output_path != self.project_path:
+            try:
+                self.output_path.relative_to(self.project_path)
+                prune_output_subtree = True
+            except ValueError:
+                prune_output_subtree = False
 
         # Walk through project directory
         for root, dirs, files in os.walk(self.project_path):
-            rel_root = Path(root).relative_to(self.project_path)
+            root_path = Path(root).resolve()
+            if prune_output_subtree:
+                try:
+                    root_path.relative_to(self.output_path)
+                    dirs[:] = []
+                    continue
+                except ValueError:
+                    pass
+
+            rel_root = root_path.relative_to(self.project_path)
             # Keep selected hidden dirs like .agents, while ignoring common heavy/cache dirs.
             dirs[:] = [
                 d
@@ -310,11 +330,14 @@ class StructureMapper:
                 if (not d.startswith(".") or d in ALLOWED_HIDDEN_DIRS)
                 and d not in IGNORED_DIRS
                 and (rel_root / d).as_posix() not in IGNORED_PATH_SUFFIXES
+                and (not prune_output_subtree or (root_path / d).resolve() != self.output_path)
             ]
 
             for file in files:
                 file_path = Path(root) / file
-                rel_path = str(file_path.relative_to(self.project_path))
+                rel_path = str(file_path.relative_to(self.project_path)).replace("\\", "/")
+                if rel_path in IGNORED_RELATIVE_PATHS:
+                    continue
                 extension = file_path.suffix.lower()
 
                 # Classify file
@@ -391,6 +414,10 @@ class StructureMapper:
     def generate_readme(self, sections: Dict[str, SectionStats]) -> str:
         """Generate main README.md for structure folder."""
         timestamp = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
+        return self.generate_readme_with_timestamp(sections, timestamp)
+
+    def generate_readme_with_timestamp(self, sections: Dict[str, SectionStats], timestamp: str) -> str:
+        """Generate README with an explicit generated timestamp."""
 
         content = f"""# 📁 Project Structure - Complete Index
 
@@ -449,6 +476,10 @@ This documentation uses **incremental updates**:
     def generate_section_md(self, stats: SectionStats) -> str:
         """Generate markdown for a section."""
         timestamp = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
+        return self.generate_section_md_with_timestamp(stats, timestamp)
+
+    def generate_section_md_with_timestamp(self, stats: SectionStats, timestamp: str) -> str:
+        """Generate section markdown with an explicit generated timestamp."""
 
         content = f"""# 🎨 {stats.title} Structure
 
@@ -480,6 +511,43 @@ This documentation uses **incremental updates**:
 
         return content
 
+    @staticmethod
+    def extract_generated_timestamp(content: str | None) -> str | None:
+        if not content:
+            return None
+        for line in content.splitlines():
+            if line.startswith("**Generated:** "):
+                return line.removeprefix("**Generated:** ").strip()
+        return None
+
+    def write_generated_doc(
+        self,
+        path: Path,
+        render_with_timestamp,
+        *,
+        summary_label: str,
+    ) -> bool:
+        now_ts = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
+        previous = path.read_text() if path.exists() else ""
+        preserved_ts = self.extract_generated_timestamp(previous) or now_ts
+        stable_content = render_with_timestamp(preserved_ts)
+
+        if previous == stable_content:
+            if self.verbose:
+                print(f"= Unchanged: {summary_label}")
+            return False
+
+        next_content = render_with_timestamp(now_ts)
+        if previous == next_content:
+            if self.verbose:
+                print(f"= Unchanged: {summary_label}")
+            return False
+
+        path.write_text(next_content)
+        if self.verbose:
+            print(f"✓ Created: {summary_label}")
+        return True
+
     def run(self):
         """Run the structure mapping process."""
         # Load cache
@@ -496,19 +564,21 @@ This documentation uses **incremental updates**:
         self.output_path.mkdir(parents=True, exist_ok=True)
 
         # Generate README
-        readme_content = self.generate_readme(sections)
         readme_path = self.output_path / "README.md"
-        readme_path.write_text(readme_content)
-        if self.verbose:
-            print(f"✓ Created: {readme_path.relative_to(self.project_path)}")
+        self.write_generated_doc(
+            readme_path,
+            lambda ts: self.generate_readme_with_timestamp(sections, ts),
+            summary_label=str(readme_path.relative_to(self.project_path)),
+        )
 
         # Generate section files
         for name, stats in sections.items():
-            section_content = self.generate_section_md(stats)
             section_path = self.output_path / f"{name}.md"
-            section_path.write_text(section_content)
-            if self.verbose:
-                print(f"✓ Created: {section_path.relative_to(self.project_path)}")
+            self.write_generated_doc(
+                section_path,
+                lambda ts, stats=stats: self.generate_section_md_with_timestamp(stats, ts),
+                summary_label=str(section_path.relative_to(self.project_path)),
+            )
 
         # Save cache
         self.save_cache()

@@ -11,21 +11,30 @@ updated_at: '2026-03-06T22:29:30-03:00'
 ## Purpose
 
 - Provide a canonical, repo-local summary of what this scaffold is for.
-- Give operators and runtime adapters one stable product reference without creating a second governance tree.
+- Give operators and runtime adapters one stable product reference without
+  creating a second governance tree.
 
 ## Product Goal
 
-- This repository is a base scaffold for an AGENTS-governed development workflow.
-- It standardizes roadmap/spec-first delivery, workbench execution tracking, verification, telemetry, and runtime compatibility.
+- This repository is a Bun/TypeScript-first factory for an AGENTS-governed
+  development workflow.
+- The public downstream CLI is `afol`/`./a`, implemented under `cli/**`.
+- The exportable template source is `src/project-template/`.
+- Root `.agents/` compatibility surfaces remain in the factory tree during
+  migration and are not part of the downstream payload.
 
 ## Core Outcomes
 
-- Downstream repos should start with mandatory roadmap and spec governance.
+- Downstream repos should start from the exportable template payload, not the
+  factory-only root `.agents` tree.
 - Agents should work from durable artifacts instead of hidden memory.
-- Runtime adapters should stay thin, secret-free, and traceable to canonical `.agents` guidance.
+- Runtime adapters and mirrors should stay thin, secret-free, and traceable to
+  canonical `.agents` guidance.
 
 ## Canonical Sources
 
+- CLI implementation: `cli/**`
+- Template source: `src/project-template/`
+- Governance: `AGENTS.md`
 - Roadmap: `docs/arc/GENERAL-ROADMAP.md`
 - Primary workflow standard: `docs/standards/workflow.md`
-- Runtime governance source: `AGENTS.md`

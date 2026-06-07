@@ -42,24 +42,89 @@ DOCS_TO_DISPLAY = [
 ]
 
 
-def print_status(data: Dict[str, object]) -> None:
-    print(f"session: {data['session']}")
-    print(
-        f"ready_state: {data['ready_state']} context_ready={data['context_ready']} roadmap_feature={data['roadmap_feature']}"
+def _ready_state_to_status(ready_state: str) -> str:
+    normalized = str(ready_state or "").strip().lower()
+    if normalized == "complete":
+        return "DONE"
+    if normalized == "blocked":
+        return "BLOCKED"
+    return "PARTIAL"
+
+
+def _build_compact_handoff(
+    *,
+    session_name: str,
+    ready_state: str,
+    tasks: Dict[str, object],
+    artifacts: Dict[str, str],
+    blocked_tasks: List[str],
+    workflow_next: str | None,
+) -> Dict[str, object]:
+    next_task = str(tasks.get("next") or "").strip()
+    task_value = next_task.split(" ", 1)[0] if next_task else "none"
+    files_written = [f"{alias}: {path}" for alias, path in artifacts.items() if alias in {"task", "plan", "report", "log"} and path]
+    summary = (
+        f"session={session_name} ready_state={ready_state} tasks={tasks.get('done', 0)}/{tasks.get('total', 0)}"
     )
+    return {
+        "STATUS": _ready_state_to_status(ready_state),
+        "TASK": task_value,
+        "FILES_WRITTEN": files_written or ["none"],
+        "VALIDATION_OR_CHECKS": [f"ready_state={ready_state}", f"workflow_next={workflow_next or 'none'}"],
+        "SUMMARY": [summary],
+        "BLOCKERS": blocked_tasks or ["none"],
+        "NEXT": [workflow_next or "none"],
+    }
 
-    _print_missing_context(data["missing_context"])
 
-    tasks = data["tasks"]
-    print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
-    if tasks["next"]:
-        print(f"next_task: {tasks['next']}")
-    if data["ready_state"] != "complete" and data["workflow_next"]:
-        print(f"next_artifact: {data['workflow_next']}")
-    _print_blocked_tasks(data["blocked_tasks"])
+def print_status(data: Dict[str, object], legacy: bool = False) -> None:
+    compact = data.get("compact_handoff", {})
+    if not isinstance(compact, dict) or not compact:
+        compact = _build_compact_handoff(
+            session_name=str(data.get("session", "")),
+            ready_state=str(data.get("ready_state", "idle")),
+            tasks=data.get("tasks", {}) if isinstance(data.get("tasks"), dict) else {},
+            artifacts=data.get("artifacts", {}) if isinstance(data.get("artifacts"), dict) else {},
+            blocked_tasks=data.get("blocked_tasks", []) if isinstance(data.get("blocked_tasks"), list) else [],
+            workflow_next=data.get("workflow_next") if isinstance(data.get("workflow_next"), str) else None,
+        )
+    if isinstance(compact, dict) and compact:
+        print(f"STATUS: {compact.get('STATUS', 'PARTIAL')}")
+        print(f"TASK: {compact.get('TASK', 'none')}")
+        print("FILES_WRITTEN:")
+        for line in compact.get("FILES_WRITTEN", []):
+            print(f"- {line}")
+        print("VALIDATION_OR_CHECKS:")
+        for line in compact.get("VALIDATION_OR_CHECKS", []):
+            print(f"- {line}")
+        print("SUMMARY:")
+        for line in compact.get("SUMMARY", []):
+            print(f"- {line}")
+        print("BLOCKERS:")
+        for line in compact.get("BLOCKERS", []):
+            print(f"- {line}")
+        print("NEXT:")
+        for line in compact.get("NEXT", []):
+            print(f"- {line}")
 
-    _print_workflow_artifacts(data["workflow_artifacts"])
-    _print_artifacts(data["artifacts"])
+    if legacy:
+        print(f"session: {data['session']}")
+        print(
+            f"ready_state: {data['ready_state']} context_ready={data['context_ready']} roadmap_feature={data['roadmap_feature']}"
+        )
+
+        _print_missing_context(data["missing_context"])
+
+        tasks = data["tasks"]
+        print(f"tasks: {tasks['done']}/{tasks['total']} done, {tasks['remaining']} remaining")
+        if tasks['next']:
+            print(f"next_task: {tasks['next']}")
+        if data["ready_state"] != "complete" and data["workflow_next"]:
+            print(f"next_artifact: {data['workflow_next']}")
+        _print_blocked_tasks(data["blocked_tasks"])
+
+        _print_workflow_artifacts(data["workflow_artifacts"])
+        _print_artifacts(data["artifacts"])
 
 
 def _print_missing_context(missing_context) -> None:
@@ -94,9 +159,7 @@ def _print_workflow_artifacts(workflow_artifacts) -> None:
             utility_notes = ""
             if item["state"] == "invalid" and utility.get("reasons"):
                 utility_notes = f" reasons={'; '.join(utility['reasons'])}"
-            print(
-                f" - {item['doc_type']}: {item['state']} (status={status}){blockers}{utility_notes}"
-            )
+            print(f" - {item['doc_type']}: {item['state']} (status={status}){blockers}{utility_notes}")
 
 
 def _print_artifacts(artifacts) -> None:
@@ -166,6 +229,19 @@ def summarize_session(session_path: Path, check_context: bool = False) -> Dict[s
         "missing_context": missing_context,
         "workflow_artifacts": manifest_states,
         "workflow_next": workflow_next,
+        "compact_handoff": _build_compact_handoff(
+            session_name=session_path.name,
+            ready_state=ready_state,
+            tasks={
+                "total": total,
+                "done": done,
+                "remaining": remaining,
+                "next": _format_next_task(rows),
+            },
+            artifacts=artifacts,
+            blocked_tasks=blocked_rows,
+            workflow_next=workflow_next,
+        ),
     }
 
 
@@ -189,20 +265,13 @@ def _format_next_artifact(item):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Show workstream status from canonical .agents artifacts"
-    )
+    parser = argparse.ArgumentParser(description="Show workstream status from canonical .agents artifacts")
     parser.add_argument("--session", help="Session id/path (default: active session)")
-    parser.add_argument(
-        "--json", action="store_true", help="Emit JSON payload (compact by default)"
-    )
-    parser.add_argument(
-        "--pretty", action="store_true", help="Pretty-print JSON output (requires --json)"
-    )
+    parser.add_argument("--json", action="store_true", help="Emit JSON payload (compact by default)")
+    parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output (requires --json)")
+    parser.add_argument("--legacy", "--details", dest="legacy", action="store_true", help="Emit legacy detailed text output")
     parser.add_argument("--artifact", action="append", help="Resolve a logical artifact name")
-    parser.add_argument(
-        "--check-context", action="store_true", help="Include missing context details"
-    )
+    parser.add_argument("--check-context", action="store_true", help="Include missing context details")
     return parser.parse_args()
 
 
@@ -231,7 +300,7 @@ def main() -> int:
     if args.json:
         print(to_json_text(payload, pretty=args.pretty, sort_keys=True))
     else:
-        print_status(payload)
+        print_status(payload, legacy=args.legacy)
 
     return 0
 

@@ -9,7 +9,12 @@ updated_at: '2026-05-05T11:44:41+00:00'
 
 # Scripts
 
-Python operational scripts for the `.agents/` system.
+Factory-only Python operational scripts for the `.agents/` system.
+
+Public downstream onboarding uses the native Bun/TypeScript front door:
+`afol bootstrap /path/to/repo` or `afol b /path/to/repo`. Python bootstrap is a
+compatibility/recovery surface for this factory repo while older script flows
+are retired.
 
 ## Location
 
@@ -37,7 +42,7 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 | `agents-benchmark.py` | Run controlled live-agent runtime-flow benchmark scenarios |
 | `agents-tools.py` | Discover and inspect available tools |
 | `agents-tools-smoke.py` | Smoke-test `tools` CLI behavior |
-| `agents-bootstrap.py` | Bootstrap a generic .agents baseline into another repository, including partial install for live projects |
+| `agents-bootstrap.py` | Factory-only compatibility bootstrap for a generic .agents baseline |
 | `agents-fix-symlinks.py` | Repair agent symlinks and fallback to copy replication |
 | `agents-skills-sync.py` | Sync, discover, and ensure project skills from universal-skills |
 | `agents-knowledge.py` | Search and pull reusable workbench knowledge |
@@ -87,8 +92,8 @@ The scaffold uses repo-local UV surfaces during setup and validation:
 
 Bootstrap exports are sanitized by design: the target repo gets generic roadmap/spec baselines and empty knowledge indexes, not this scaffold's local `wb/`, lessons history, telemetry reports, or live roadmap/spec backlog.
 Bootstrap also copies `docs/templates/plan.md` so downstream repos inherit the reusable ExecPlan starter.
-For full bootstrap, the target directory is created automatically when missing.
-For existing projects, use `--partial` so bootstrap fills only the missing scaffold surface and leaves project-owned files intact.
+For public full bootstrap, run `afol bootstrap /path/to/target-repo`; the target directory is created automatically when missing.
+For existing projects, run `afol bootstrap /path/to/existing-project --partial` so bootstrap fills only the missing scaffold surface and leaves project-owned files intact.
 The preferred source seed is `.agents/source/universal-skills/` inside the repo. It must not be a nested git checkout.
 Bootstrap first tries to refresh an external `universal-skills` checkout from `AGENTS_UNIVERSAL_SKILLS_SOURCE` or a sibling `universal-skills` / `skill-universal` repo, then writes a plain repo-local seed. If no external source is available, it falls back to committed project assets so the default downstream install path is self-contained.
 `skills-sync pull` refreshes an external git checkout only when `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir` is configured.
@@ -106,7 +111,7 @@ Discovery examples:
 ./.agents/agents skills-sync ensure agentic-folder-sys --runtime codex
 ```
 
-Use `./.agents/agents bootstrap /path/to/existing-project --partial` when adopting the scaffold into an existing repo. Existing files stay in place unless `--force` is used. If that repo already has its own `just all`, use `just agents-all` for the scaffold aggregate validation. See `docs/standards/bootstrap-other-repo.md` for the full/partial install split and limitations.
+Use `afol bootstrap /path/to/existing-project --partial` when adopting the scaffold into an existing repo. Existing files stay in place unless managed overwrite is explicitly requested. See `docs/standards/bootstrap-other-repo.md` for the full/partial install split and limitations.
 
 ## Tests
 

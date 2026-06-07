@@ -5,6 +5,9 @@ import os
 
 import pytest
 
+from agentic_scaffold.models import ActionResult
+from agentic_scaffold.runtime import AgenticRuntime
+
 
 def _urandom_available() -> bool:
     try:
@@ -32,8 +35,9 @@ async def test_mcp_lists_tools_resources_and_prompts(scaffold_repo):
     async with Client(mcp) as client:
         tools = await client.list_tools()
         tool_names = {tool.name for tool in tools}
+        action_tool_names = {spec.mcp_tool for spec in AgenticRuntime.action_specs()}
+        assert action_tool_names <= tool_names
         assert {
-            "inspect_workspace",
             "search_docs",
             "validate_structure",
             "generate_manifest",
@@ -109,11 +113,12 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
     command_registry = json.loads(command_registry_resource.fn())
     assert command_registry["available"] is True
     commands = {item["name"]: item for item in command_registry["commands"]}
-    assert {"status", "knowledge", "session", "doctor", "skills-sync", "verify-tasks"} <= set(
-        commands
-    )
+    assert {"status", "knowledge", "session", "local-state", "doctor", "skills-sync", "verify-tasks"} <= set(commands)
     assert commands["status"]["script_name"] == "agents-status.py"
+    assert commands["status"]["phase"] == "native"
     assert commands["verify"]["alias_of"] == "verify-tasks"
+    help_commands = {item["name"]: item for item in command_registry["help_commands"]}
+    assert "local-state" in help_commands
 
     adoption_resource = await mcp.get_resource("repo://adoption-plan")
     assert adoption_resource is not None
@@ -121,6 +126,24 @@ async def test_mcp_tool_registration_and_resource_output(scaffold_repo):
     adoption_payload = json.loads(adoption_resource.fn())
     assert adoption_payload["repo_root"] == str(scaffold_repo)
     assert "benchmark" in {action["kind"] for action in adoption_payload["actions"]}
+
+
+async def test_mcp_runtime_health_smoke(scaffold_repo):
+    _Client, build_mcp = _require_mcp_runtime()
+    mcp = build_mcp(scaffold_repo)
+
+    health_tool = await mcp.get_tool("runtime_health")
+    assert health_tool is not None
+    health_payload = health_tool.fn()
+    assert isinstance(health_payload, dict)
+    assert health_payload["status"] == "healthy"
+    checks = health_payload["checks"]
+    assert checks["repo_root"]["exists"] is True
+    assert checks["repo_root"]["label"] == scaffold_repo.name
+    assert checks["command_registry"]["required_available"] is True
+    assert checks["tool_catalog"]["available"] is True
+    assert str(scaffold_repo) not in str(health_payload)
+    assert "AGENTIC_REPO_ROOT" not in str(health_payload)
 
 
 async def test_mcp_inspect_workspace_rejects_invalid_depth(scaffold_repo):
@@ -131,6 +154,46 @@ async def test_mcp_inspect_workspace_rejects_invalid_depth(scaffold_repo):
     assert inspect_tool is not None
     with pytest.raises(ValueError, match="depth must be between 0 and 10"):
         inspect_tool.fn(depth=99)
+
+
+async def test_mcp_inspect_workspace_accepts_core_max_entries_floor(scaffold_repo):
+    _Client, build_mcp = _require_mcp_runtime()
+    mcp = build_mcp(scaffold_repo)
+    inspect_tool = await mcp.get_tool("inspect_workspace")
+
+    assert inspect_tool is not None
+    payload = inspect_tool.fn(max_entries=10)
+    assert isinstance(payload, dict)
+    assert payload["max_depth"] == 3
+
+
+async def test_mcp_runtime_health_error_preserves_structured_payload(scaffold_repo, monkeypatch):
+    _Client, build_mcp = _require_mcp_runtime()
+    original_run_action = AgenticRuntime.run_action
+
+    def _mock_error(self, action_id: str, **_kwargs: object) -> ActionResult:
+        if action_id == "health":
+            return ActionResult(
+                status="error",
+                message="runtime health check failed",
+                payload={
+                    "status": "unhealthy",
+                    "checks": {"command_registry": {"required_available": False}},
+                    "missing": [{"type": "command_registry", "name": "verify-tasks"}],
+                },
+            )
+        return original_run_action(self, action_id, **_kwargs)
+
+    monkeypatch.setattr(AgenticRuntime, "run_action", _mock_error)
+
+    mcp = build_mcp(scaffold_repo)
+    health_tool = await mcp.get_tool("runtime_health")
+    assert health_tool is not None
+
+    payload = health_tool.fn()
+    assert payload["status"] == "unhealthy"
+    assert payload["checks"]["command_registry"]["required_available"] is False
+    assert payload["missing"][0]["name"] == "verify-tasks"
 
 
 async def test_mcp_search_docs_rejects_empty_query(scaffold_repo):

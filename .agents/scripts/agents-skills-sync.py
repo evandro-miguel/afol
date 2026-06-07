@@ -19,6 +19,7 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 from lib.agents_config import load_agents_config, resolve_repo_path
 from lib.process_utils import run_command
 
+
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 
 DEFAULTS = {
@@ -98,9 +99,7 @@ def normalize_runtime(value: str | None) -> str:
 def is_supported_runtime(runtime: str) -> bool:
     if runtime == SPECIAL_APP_ALL:
         return True
-    return normalize_runtime(runtime) in [
-        normalize_runtime(item) for item in cfg("runtime_targets")
-    ]
+    return normalize_runtime(runtime) in [normalize_runtime(item) for item in cfg("runtime_targets")]
 
 
 def dedupe(items: Iterable[str]) -> List[str]:
@@ -174,9 +173,7 @@ def _normalize_skill_list(value: Any, fallback: List[str] | None = None) -> List
 
 
 def _normalize_profile_list(value: Any, fallback: List[str] | None = None) -> List[str]:
-    return dedupe(
-        [normalize_profile_name(item) for item in _normalize_string_list(value, fallback)]
-    )
+    return dedupe([normalize_profile_name(item) for item in _normalize_string_list(value, fallback)])
 
 
 def _normalize_install(entry: Any) -> Dict[str, Any] | None:
@@ -186,9 +183,7 @@ def _normalize_install(entry: Any) -> Dict[str, Any] | None:
     app = normalize_runtime(str(entry.get("app", SPECIAL_APP_ALL)))
     skills = _normalize_skill_list(entry.get("skills"), [])
     profile = entry.get("profile")
-    profile_name = (
-        normalize_profile_name(profile) if isinstance(profile, str) and profile.strip() else ""
-    )
+    profile_name = normalize_profile_name(profile) if isinstance(profile, str) and profile.strip() else ""
     if not skills and not profile_name:
         return None
 
@@ -202,11 +197,7 @@ def _normalize_install(entry: Any) -> Dict[str, Any] | None:
 
 def _default_manifest() -> Dict[str, Any]:
     default_skills = _normalize_skill_list(cfg("default_skills"))
-    default_profile = (
-        normalize_profile_name(str(cfg("default_profile")))
-        if str(cfg("default_profile")).strip()
-        else ""
-    )
+    default_profile = normalize_profile_name(str(cfg("default_profile"))) if str(cfg("default_profile")).strip() else ""
 
     installs = []
     if default_profile:
@@ -335,6 +326,30 @@ def _normalize_v2_installs(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     return _default_manifest()["installs"]
 
 
+def _normalize_skill_metadata_map(raw_skill_metadata: Any) -> Dict[str, Dict[str, str]]:
+    if not isinstance(raw_skill_metadata, dict):
+        return {}
+
+    skill_metadata: Dict[str, Dict[str, str]] = {}
+    for skill_name, raw_entry in raw_skill_metadata.items():
+        try:
+            normalized_name = normalize_skill_name(skill_name)
+        except RuntimeError:
+            continue
+        if not isinstance(raw_entry, dict):
+            continue
+        normalized_entry: Dict[str, str] = {}
+        for key, value in raw_entry.items():
+            if not isinstance(key, str) or not isinstance(value, str):
+                continue
+            text_value = value.strip()
+            if text_value:
+                normalized_entry[key] = text_value
+        if normalized_entry:
+            skill_metadata[normalized_name] = normalized_entry
+    return skill_metadata
+
+
 def _normalize_v2_manifest(data: Dict[str, Any]) -> Dict[str, Any]:
     manifest = {
         "version": MANIFEST_VERSION,
@@ -364,6 +379,10 @@ def _normalize_v2_manifest(data: Dict[str, Any]) -> Dict[str, Any]:
             normalize_profile_name(str(name)): _normalize_skill_list(skills)
             for name, skills in profiles.items()
         }
+
+    skill_metadata = _normalize_skill_metadata_map(data.get("skill_metadata"))
+    if skill_metadata:
+        manifest["skill_metadata"] = skill_metadata
 
     return manifest
 
@@ -486,13 +505,8 @@ def _require_channel_policy(channel_data: Dict[str, Any], channel: str):
         raise RuntimeError(f"Release channel '{channel}' must require signed tags")
     if policy.get("requireSourceChecksum") is not True:
         raise RuntimeError(f"Release channel '{channel}' must require source checksum")
-    if (
-        policy.get("requireReleaseManifest") is not True
-        or policy.get("requireSkillBom") is not True
-    ):
-        raise RuntimeError(
-            f"Release channel '{channel}' must require release manifest and skill BOM"
-        )
+    if policy.get("requireReleaseManifest") is not True or policy.get("requireSkillBom") is not True:
+        raise RuntimeError(f"Release channel '{channel}' must require release manifest and skill BOM")
 
 
 def _verify_release_channel_artifacts(repo: Path, channel_data: Dict[str, Any]) -> Dict[str, str]:
@@ -721,7 +735,9 @@ def _repo_skill_names(repo: Path) -> List[str]:
     root = skills_root_for_repo(repo)
     if not root.exists():
         return []
-    return sorted([d.name for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").exists()])
+    return sorted(
+        [d.name for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
+    )
 
 
 def _read_profile_skills(repo: Path, profile_name: str) -> List[str]:
@@ -753,11 +769,7 @@ def _configured_profile_names(manifest: Dict[str, Any] | None = None) -> List[st
     if profile_names:
         return dedupe(profile_names)
 
-    default_profile = (
-        normalize_profile_name(str(cfg("default_profile")))
-        if str(cfg("default_profile")).strip()
-        else ""
-    )
+    default_profile = normalize_profile_name(str(cfg("default_profile"))) if str(cfg("default_profile")).strip() else ""
     return [default_profile] if default_profile else []
 
 
@@ -783,9 +795,7 @@ def _write_local_index(index_path: Path, skills: Sequence[str], profiles: Sequen
     index_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def _sync_local_source_metadata(
-    local_source: Path, source_repo: Path, manifest: Dict[str, Any] | None = None
-):
+def _sync_local_source_metadata(local_source: Path, source_repo: Path, manifest: Dict[str, Any] | None = None):
     manifest = manifest or {}
     local_skills = _repo_skill_names(local_source)
     profile_names = _configured_profile_names(manifest)
@@ -889,9 +899,7 @@ def _refresh_standard_ref(
     allow_floating_ref: bool = False,
 ) -> str:
     if _is_floating_ref(ref) and not allow_floating_ref and release_tag:
-        raise RuntimeError(
-            f"Refusing floating skills source ref '{ref}' without --allow-floating-ref"
-        )
+        raise RuntimeError(f"Refusing floating skills source ref '{ref}' without --allow-floating-ref")
     if release_tag:
         ref = _normalize_release_tag(release_tag)
         manifest["ref"] = ref
@@ -967,9 +975,7 @@ def refresh_git_sync_repo(
     return repo
 
 
-def mirror_skills_to_local_source(
-    source_repo: Path, skills: Sequence[str], manifest: Dict[str, Any] | None = None
-):
+def mirror_skills_to_local_source(source_repo: Path, skills: Sequence[str], manifest: Dict[str, Any] | None = None):
     local_source = preferred_local_source_repo_path()
     if local_source.resolve() == source_repo.resolve():
         return
@@ -1086,7 +1092,9 @@ def installed_skills() -> List[str]:
     root = project_skills_root()
     if not root.exists():
         return []
-    return sorted([d.name for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").exists()])
+    return sorted(
+        [d.name for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
+    )
 
 
 def skill_digest(skill_dir: Path) -> str:
@@ -1102,7 +1110,9 @@ def available_skills(source_repo: Path | None = None) -> List[str]:
     root = skills_root_for_repo(source_repo or source_repo_path())
     if not root.exists():
         return []
-    return sorted([d.name for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").exists()])
+    return sorted(
+        [d.name for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
+    )
 
 
 def _skill_doc_path(name: str, source_repo: Path | None = None) -> Path:
@@ -1124,9 +1134,69 @@ def _skill_search_blob(name: str, source_repo: Path | None = None) -> str:
     return f"{name.lower()}\n{body}"
 
 
-def _matching_skills(
-    query: str, *, skills: Iterable[str], source_repo: Path | None = None
-) -> List[str]:
+def _frontmatter_key_values(text: str) -> Dict[str, str]:
+    if not text.startswith("---\n"):
+        return {}
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return {}
+    block = text[4:end]
+    values: Dict[str, str] = {}
+    for raw_line in block.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip()
+        if not key:
+            continue
+        values[key] = value.strip().strip("'\"")
+    return values
+
+
+def _manifest_skill_metadata(manifest: Dict[str, Any], skill: str) -> Dict[str, str]:
+    raw = manifest.get("skill_metadata")
+    if not isinstance(raw, dict):
+        return {}
+    entry = raw.get(skill)
+    if not isinstance(entry, dict):
+        return {}
+    result: Dict[str, str] = {}
+    for key, value in entry.items():
+        if isinstance(key, str) and isinstance(value, str):
+            result[key] = value
+    return result
+
+
+def _skill_metadata(name: str, *, source_repo: Path | None = None, manifest: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    normalized_name = normalize_skill_name(name)
+    doc_path = _skill_doc_path(normalized_name, source_repo=source_repo)
+    installed_path = project_skills_root() / normalized_name / "SKILL.md"
+    metadata: Dict[str, Any] = {
+        "name": normalized_name,
+        "source_path": str(doc_path),
+        "source_exists": doc_path.exists(),
+        "installed": installed_path.exists(),
+    }
+    if doc_path.exists():
+        text = doc_path.read_text(encoding="utf-8")
+        frontmatter = _frontmatter_key_values(text)
+        metadata["title"] = frontmatter.get("name", normalized_name)
+        metadata["description"] = frontmatter.get("description", "")
+        metadata["version"] = frontmatter.get("version", "")
+        metadata["updated_at"] = frontmatter.get("updated_at", "")
+    if manifest:
+        metadata["manifest_metadata"] = _manifest_skill_metadata(manifest, normalized_name)
+    return metadata
+
+
+def _skill_exists_in_catalog_or_project(name: str, *, source_repo: Path | None = None) -> bool:
+    normalized_name = normalize_skill_name(name)
+    source = source_repo or catalog_source_repo_path()
+    return normalized_name in installed_skills() or normalized_name in available_skills(source_repo=source)
+
+
+def _matching_skills(query: str, *, skills: Iterable[str], source_repo: Path | None = None) -> List[str]:
     wanted = query.strip().lower()
     if not wanted:
         return list(skills)
@@ -1174,9 +1244,7 @@ def resolve_skills_for_request(
     profile: str | None,
 ) -> List[str]:
     explicit = _normalize_skill_list(cli_skills)
-    profile = (
-        normalize_profile_name(profile) if isinstance(profile, str) and profile.strip() else None
-    )
+    profile = normalize_profile_name(profile) if isinstance(profile, str) and profile.strip() else None
     if explicit:
         return explicit
 
@@ -1258,9 +1326,7 @@ def cmd_pull(args: argparse.Namespace):
     print(f"OK: updated git skills source at {repo} (ref={ref})")
     if repo != source_repo_path():
         print(f"- local source remains at {source_repo_path()}")
-        print(
-            "- use `skills-sync sync` (or `skills-sync update`) to install refreshed skills into .agents/skills"
-        )
+        print("- use `skills-sync sync` (or `skills-sync update`) to install refreshed skills into .agents/skills")
 
 
 def _compare(skills: Iterable[str], mode: str) -> Tuple[List[str], List[str], List[str]]:
@@ -1317,6 +1383,7 @@ def cmd_list(args: argparse.Namespace):
     if not ensure_enabled():
         return
 
+    manifest = load_manifest()
     source_repo = source_repo_path()
     if getattr(args, "selected", False):
         skills = _selected_skills_for_args(args)
@@ -1335,7 +1402,16 @@ def cmd_list(args: argparse.Namespace):
     print(f"- count: {len(skills)}")
     for name in skills:
         state = "installed" if name in installed else "available"
-        print(f"  - {name} [{state}]")
+        if getattr(args, "metadata", False):
+            details = _skill_metadata(name, source_repo=source_repo, manifest=manifest)
+            description = details.get("description", "")
+            status = details.get("manifest_metadata", {}).get("status", "")
+            suffix = f" status={status}" if status else ""
+            print(f"  - {name} [{state}]{suffix}")
+            if description:
+                print(f"    desc: {description}")
+        else:
+            print(f"  - {name} [{state}]")
 
 
 def cmd_search(args: argparse.Namespace):
@@ -1362,6 +1438,97 @@ def cmd_search(args: argparse.Namespace):
         print(f"  - {name} [{state}]")
     if not matches:
         print("  - none")
+
+
+def cmd_get(args: argparse.Namespace):
+    if not ensure_enabled():
+        return
+
+    manifest = load_manifest()
+    source_repo = catalog_source_repo_path()
+    name = normalize_skill_name(args.skill)
+    details = _skill_metadata(name, source_repo=source_repo, manifest=manifest)
+    print("SKILL")
+    print(f"- name: {details['name']}")
+    print(f"- source_path: {details['source_path']}")
+    print(f"- source_exists: {details['source_exists']}")
+    print(f"- installed: {details['installed']}")
+    if details.get("description"):
+        print(f"- description: {details['description']}")
+    if details.get("version"):
+        print(f"- version: {details['version']}")
+    if details.get("updated_at"):
+        print(f"- updated_at: {details['updated_at']}")
+    manifest_meta = details.get("manifest_metadata", {})
+    if manifest_meta:
+        print(f"- manifest_metadata: {json.dumps(manifest_meta, ensure_ascii=False, sort_keys=True)}")
+
+
+def _update_manifest_skill_metadata(
+    manifest: Dict[str, Any],
+    *,
+    skill: str,
+    status: str | None,
+    note: str | None,
+    clear_note: bool,
+) -> Dict[str, str]:
+    metadata = manifest.get("skill_metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+        manifest["skill_metadata"] = metadata
+
+    skill_entry_raw = metadata.get(skill)
+    if not isinstance(skill_entry_raw, dict):
+        skill_entry_raw = {}
+        metadata[skill] = skill_entry_raw
+    skill_entry: Dict[str, str] = {
+        str(key): str(value)
+        for key, value in skill_entry_raw.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+
+    if status is not None:
+        cleaned_status = status.strip()
+        if cleaned_status:
+            skill_entry["status"] = cleaned_status
+        else:
+            skill_entry.pop("status", None)
+    if note is not None:
+        cleaned_note = note.strip()
+        if cleaned_note:
+            skill_entry["note"] = cleaned_note
+        else:
+            skill_entry.pop("note", None)
+    if clear_note:
+        skill_entry.pop("note", None)
+
+    skill_entry["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+    metadata[skill] = skill_entry
+    return skill_entry
+
+
+def cmd_update(args: argparse.Namespace):
+    if not ensure_enabled():
+        return
+
+    skill = normalize_skill_name(args.skill)
+    create = bool(getattr(args, "create", False))
+    if not create and not _skill_exists_in_catalog_or_project(skill):
+        raise RuntimeError(
+            f"Skill '{skill}' is not installed or present in the catalog; pass --create to add metadata for a new skill"
+        )
+    manifest = load_manifest()
+    entry = _update_manifest_skill_metadata(
+        manifest,
+        skill=skill,
+        status=getattr(args, "status", None),
+        note=getattr(args, "note", None),
+        clear_note=bool(getattr(args, "clear_note", False)),
+    )
+    _normalize_manifest_header(manifest)
+    save_manifest(manifest)
+    print(f"UPDATED: {skill}")
+    print(f"- metadata: {json.dumps(entry, ensure_ascii=False, sort_keys=True)}")
 
 
 def apply_skill(name: str, source_repo: Path | None = None):
@@ -1416,10 +1583,7 @@ def _persist_explicit_skill_selection(
         explicit["profile"] = normalize_profile_name(profile)
 
     for install in installs:
-        if (
-            isinstance(install, dict)
-            and normalize_runtime(str(install.get("app", SPECIAL_APP_ALL))) == runtime
-        ):
+        if isinstance(install, dict) and normalize_runtime(str(install.get("app", SPECIAL_APP_ALL))) == runtime:
             install.clear()
             install.update(explicit)
             return
@@ -1474,7 +1638,9 @@ def cmd_apply(args: argparse.Namespace):
         raise RuntimeError("; ".join(problems))
 
     if not upstream_skills_root().exists():
-        raise RuntimeError(f"skills source not initialized: {source_repo_path()}")
+        raise RuntimeError(
+            f"skills source not initialized: {source_repo_path()}"
+        )
 
     apply_skills_from_repo(skills)
 
@@ -1500,11 +1666,7 @@ def cmd_ensure(args: argparse.Namespace):
 
     manifest = load_manifest()
     refreshed_repo: Path | None = None
-    if (
-        getattr(args, "pull", False)
-        or getattr(args, "channel", None)
-        or getattr(args, "release_tag", None)
-    ):
+    if getattr(args, "pull", False) or getattr(args, "channel", None) or getattr(args, "release_tag", None):
         refreshed_repo = refresh_git_sync_repo(
             manifest,
             channel=getattr(args, "channel", None),
@@ -1573,15 +1735,11 @@ def _explicit_manifest_skills(manifest: Dict[str, Any], runtime: str) -> set[str
     }
 
 
-def _check_drift_state(
-    manifest: Dict[str, Any], skills: List[str], runtime: str
-) -> Dict[str, List[str]]:
+def _check_drift_state(manifest: Dict[str, Any], skills: List[str], runtime: str) -> Dict[str, List[str]]:
     explicit_skills = _explicit_manifest_skills(manifest, runtime)
     missing_source, missing_project, drift = _compare(skills, manifest.get("mode", cfg("mode")))
     return {
-        "stale_manifest_entries": sorted(
-            name for name in missing_source if name in explicit_skills
-        ),
+        "stale_manifest_entries": sorted(name for name in missing_source if name in explicit_skills),
         "real_source_drift": sorted(name for name in missing_source if name not in explicit_skills),
         "missing_project": missing_project,
         "drift": drift,
@@ -1603,9 +1761,7 @@ def _print_check_drift(state: Dict[str, List[str]]) -> None:
 
 
 def _has_check_errors(problems: List[str], state: Dict[str, List[str]]) -> bool:
-    return bool(
-        problems or state["real_source_drift"] or state["missing_project"] or state["drift"]
-    )
+    return bool(problems or state["real_source_drift"] or state["missing_project"] or state["drift"])
 
 
 def cmd_check(args: argparse.Namespace):
@@ -1671,9 +1827,7 @@ def cmd_status(args: argparse.Namespace):
     print(f"- project_dir: {project_skills_root()}")
     print(f"- manifest: {cfg_path('manifest_file')}")
     print(f"- installs: {len(manifest.get('installs', []))}")
-    print(
-        f"- available in active source: {len(available_skills(source_repo=active_source)) if active_source else 0}"
-    )
+    print(f"- available in active source: {len(available_skills(source_repo=active_source)) if active_source else 0}")
     print(f"- available in catalog source: {len(available_skills(source_repo=catalog_source))}")
 
 
@@ -1700,9 +1854,7 @@ def cmd_sync(args: argparse.Namespace):
             release_tag=getattr(args, "release_tag", None),
             allow_floating_ref=bool(getattr(args, "allow_floating_ref", False)),
         )
-        if getattr(args, "pull", False)
-        or getattr(args, "channel", None)
-        or getattr(args, "release_tag", None)
+        if getattr(args, "pull", False) or getattr(args, "channel", None) or getattr(args, "release_tag", None)
         else None
     )
     source_repo = refreshed_repo or source_repo_path()
@@ -1788,8 +1940,10 @@ def _validate_proposal_branch(branch: str, base: str):
 
 
 def _default_pr_body(skills: Sequence[str]) -> str:
-    return "Proposes updates from the project-local skills surface.\n\nSkills:\n" + "\n".join(
-        f"- {name}" for name in skills
+    return (
+        "Proposes updates from the project-local skills surface.\n\n"
+        "Skills:\n"
+        + "\n".join(f"- {name}" for name in skills)
     )
 
 
@@ -1817,16 +1971,12 @@ def cmd_push(args: argparse.Namespace):
     manifest = load_manifest()
     git_repo = ensure_git_sync_repo(manifest)
     if git_repo is None or not (git_repo / ".git").exists():
-        raise RuntimeError(
-            "Git-backed external skills source is required to propose upstream skill changes"
-        )
+        raise RuntimeError("Git-backed external skills source is required to propose upstream skill changes")
 
     skills = _push_skill_names(args)
     base = str(getattr(args, "base", None) or manifest.get("ref") or cfg("upstream_branch")).strip()
     if not base:
-        raise RuntimeError(
-            "Manifest ref/upstream_branch is required for an upstream skill proposal"
-        )
+        raise RuntimeError("Manifest ref/upstream_branch is required for an upstream skill proposal")
     branch = str(getattr(args, "branch", None) or _default_proposal_branch(skills)).strip()
     _validate_proposal_branch(branch, base)
 
@@ -1853,14 +2003,10 @@ def cmd_push(args: argparse.Namespace):
         return
 
     pathspecs = [f"{cfg('upstream_skills_dir')}/{name}" for name in changed]
-    should_commit = bool(
-        getattr(args, "commit", False) or getattr(args, "push", False) or getattr(args, "pr", False)
-    )
+    should_commit = bool(getattr(args, "commit", False) or getattr(args, "push", False) or getattr(args, "pr", False))
     should_push = bool(getattr(args, "push", False) or getattr(args, "pr", False))
     if should_commit:
-        commit_message = _append_codex_trailer(
-            getattr(args, "message", None) or _default_push_message(changed)
-        )
+        commit_message = _append_codex_trailer(getattr(args, "message", None) or _default_push_message(changed))
         run(["git", "add", "--", *pathspecs], cwd=git_repo)
         run(
             [
@@ -1883,22 +2029,7 @@ def cmd_push(args: argparse.Namespace):
     if getattr(args, "pr", False):
         title = getattr(args, "title", None) or _default_push_message(changed)
         body = getattr(args, "body", None) or _default_pr_body(changed)
-        run(
-            [
-                "gh",
-                "pr",
-                "create",
-                "--base",
-                base,
-                "--head",
-                branch,
-                "--title",
-                title,
-                "--body",
-                body,
-            ],
-            cwd=git_repo,
-        )
+        run(["gh", "pr", "create", "--base", base, "--head", branch, "--title", title, "--body", body], cwd=git_repo)
         print(f"PR REQUESTED: {branch} -> {base}")
 
 
@@ -1911,7 +2042,9 @@ def build_parser() -> argparse.ArgumentParser:
         ("pull", cmd_pull),
         ("status", cmd_status),
         ("list", cmd_list),
+        ("get", cmd_get),
         ("search", cmd_search),
+        ("update-metadata", cmd_update),
         ("plan", cmd_plan),
         ("apply", cmd_apply),
         ("ensure", cmd_ensure),
@@ -1941,55 +2074,36 @@ def build_parser() -> argparse.ArgumentParser:
                 help="Refresh the external source before syncing",
             )
         if name == "list":
+            sp.add_argument("--installed", action="store_true", help="Show only currently installed project skills")
+            sp.add_argument("--selected", action="store_true", help="Show only skills resolved from the manifest for this runtime/profile")
+            sp.add_argument("--metadata", action="store_true", help="Include compact metadata summary for each skill")
+        if name == "get":
+            sp.add_argument("skill", help="Skill name to inspect metadata")
+        if name == "update-metadata":
+            sp.add_argument("skill", help="Skill name to update metadata for")
             sp.add_argument(
-                "--installed",
+                "--create",
                 action="store_true",
-                help="Show only currently installed project skills",
+                help="Allow creating metadata for a skill that is not installed or present in the catalog",
             )
-            sp.add_argument(
-                "--selected",
-                action="store_true",
-                help="Show only skills resolved from the manifest for this runtime/profile",
-            )
+            sp.add_argument("--status", help="Status label to persist in manifest metadata")
+            sp.add_argument("--note", help="Short note to persist in manifest metadata")
+            sp.add_argument("--clear-note", action="store_true", help="Clear any persisted note from manifest metadata")
         if name == "search":
             sp.add_argument("query", help="Keyword to search in source skills")
             sp.add_argument("--limit", type=int, default=20, help="Maximum matches to print")
-            sp.add_argument(
-                "--selected",
-                action="store_true",
-                help="Search only manifest-selected skills for the runtime/profile",
-            )
+            sp.add_argument("--selected", action="store_true", help="Search only manifest-selected skills for the runtime/profile")
         if name == "ensure":
             sp.add_argument("skill", help="Skill name to ensure in the project")
-            sp.add_argument(
-                "--persist",
-                action="store_true",
-                help="Persist the ensured skill into the manifest for the selected runtime",
-            )
-            sp.add_argument(
-                "--pull",
-                action="store_true",
-                help="Refresh the source checkout before ensuring the skill",
-            )
+            sp.add_argument("--persist", action="store_true", help="Persist the ensured skill into the manifest for the selected runtime")
+            sp.add_argument("--pull", action="store_true", help="Refresh the source checkout before ensuring the skill")
         if name == "push":
-            sp.add_argument(
-                "skill",
-                nargs="?",
-                help="Single skill name to propose back to the external git source",
-            )
+            sp.add_argument("skill", nargs="?", help="Single skill name to propose back to the external git source")
             sp.add_argument("--base", help="Base branch for the upstream PR proposal")
             sp.add_argument("--branch", help="Proposal branch name to create/update")
-            sp.add_argument(
-                "--commit",
-                action="store_true",
-                help="Create a git commit for the proposed skill changes",
-            )
-            sp.add_argument(
-                "--push", action="store_true", help="Push the proposal branch to origin/<branch>"
-            )
-            sp.add_argument(
-                "--pr", action="store_true", help="Push the proposal branch and open a GitHub PR"
-            )
+            sp.add_argument("--commit", action="store_true", help="Create a git commit for the proposed skill changes")
+            sp.add_argument("--push", action="store_true", help="Push the proposal branch to origin/<branch>")
+            sp.add_argument("--pr", action="store_true", help="Push the proposal branch and open a GitHub PR")
             sp.add_argument("--message", help="Commit message to use with --commit/--push")
             sp.add_argument("--title", help="PR title to use with --pr")
             sp.add_argument("--body", help="PR body to use with --pr")

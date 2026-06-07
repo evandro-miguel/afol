@@ -37,3 +37,13 @@ links:
 - Command evidence: `make verify-active-if-present`
 - Command evidence: `make verify-strict-if-present`
 - RAG evidence: `verify_project_index(projectId="md7608d8126cjr7mxyb7w6f9jd84szzy")`
+
+## Sidecar Justification
+
+- Blocking question: Which concrete command and retrieval evidence supported
+  the Python runtime hardening closeout?
+- Decision produced: Preserve the command and RAG evidence as the basis for the
+  historical strict-verification reconciliation.
+- Execution task affected: T-01
+- Stop condition: Strict verification accepts the reconciled session and the
+  recorded sources remain tied to passed validation gates.

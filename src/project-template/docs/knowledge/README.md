@@ -17,11 +17,15 @@ This folder stores reusable project knowledge after the project starts.
 
 ## Source Artifacts
 
-- `.agents/wb/**/_research_*.md`
-- `.agents/wb/**/_brainstorm_*.md`
-- `.agents/wb/**/_explorer-check_*.md`
-- `.agents/wb/**/_report_*.md`
-- `.agents/wb/**/_postmortem_*.md`
+Read the workbench root from `.agents/config.json` `paths.wb_dir` before
+collecting source artifacts. Defaults use `.agents/wb`; provider-compatible
+projects usually use `.afol/wb`.
+
+- `<configured-wb-dir>/**/_research_*.md`
+- `<configured-wb-dir>/**/_brainstorm_*.md`
+- `<configured-wb-dir>/**/_explorer-check_*.md`
+- `<configured-wb-dir>/**/_report_*.md`
+- `<configured-wb-dir>/**/_postmortem_*.md`
 
 ## Files
 

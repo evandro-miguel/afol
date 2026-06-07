@@ -215,7 +215,19 @@ def cmd_show(args: argparse.Namespace) -> int:
 def cmd_index(args: argparse.Namespace) -> int:
     docs = list(iter_knowledge_docs())
     KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
+    now_ts = datetime.now(DEFAULT_TZ).strftime(f"%Y-%m-%dT%H:%M:%S{DEFAULT_OFFSET}")
+    previous = INDEX_FILE.read_text() if INDEX_FILE.exists() else ""
+    created_at = now_ts
+    updated_at = now_ts
+    parsed_previous = split_frontmatter(previous) if previous else None
+    if parsed_previous:
+        frontmatter, _ = parsed_previous
+        existing_created = frontmatter.get("created_at")
+        existing_updated = frontmatter.get("updated_at")
+        if existing_created:
+            created_at = str(existing_created).strip()
+        if existing_updated:
+            updated_at = str(existing_updated).strip()
     grouped = {}
     for doc in docs:
         grouped.setdefault(doc.doc_type, []).append(doc)
@@ -225,8 +237,8 @@ def cmd_index(args: argparse.Namespace) -> int:
         "doc_type: index",
         'id: "knowledge_index"',
         "status: active",
-        f'created_at: "{timestamp}"',
-        f'updated_at: "{timestamp}"',
+        f'created_at: "{created_at}"',
+        f'updated_at: "{updated_at}"',
         "---",
         "",
         "# Knowledge Index",
@@ -242,7 +254,18 @@ def cmd_index(args: argparse.Namespace) -> int:
             lines.append(f"- `{doc.doc_id}` | `{relative(doc.path)}` | {doc.summary or doc.title}")
         lines.append("")
 
-    INDEX_FILE.write_text("\n".join(lines).rstrip() + "\n")
+    stable_content = "\n".join(lines).rstrip() + "\n"
+    if stable_content == previous:
+        print(f"= knowledge index unchanged: {relative(INDEX_FILE)} ({len(docs)} docs)")
+        return 0
+
+    lines[5] = f'updated_at: "{now_ts}"'
+    next_content = "\n".join(lines).rstrip() + "\n"
+    if next_content == previous:
+        print(f"= knowledge index unchanged: {relative(INDEX_FILE)} ({len(docs)} docs)")
+        return 0
+
+    INDEX_FILE.write_text(next_content)
     print(f"✓ knowledge index updated: {relative(INDEX_FILE)} ({len(docs)} docs)")
     return 0
 

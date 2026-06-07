@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -130,6 +131,59 @@ class AgentsKnowledgeTests(unittest.TestCase):
             self.assertIn("# Knowledge Pull: OpenCode", output)
             self.assertIn("snippet", output)
             self.assertIn("knowledge show 260306_0000_sample_research_01", output)
+
+    def test_index_is_idempotent_when_knowledge_docs_unchanged(self):
+        script_path = Path(".agents/scripts/agents-knowledge.py").resolve()
+        sys.path.insert(0, str(script_path.parent))
+        knowledge = load_module("agents_knowledge_idempotent_test", script_path)
+
+        class FakeDateTime:
+            tick = 0
+
+            @classmethod
+            def now(cls, _tz):
+                base = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+                value = base + timedelta(seconds=cls.tick)
+                cls.tick += 1
+                return value
+
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            wb_dir = root / ".agents" / "wb"
+            knowledge_dir = root / "docs" / "knowledge"
+            session_dir = wb_dir / "260306_0000_sample"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            (session_dir / "260306_0000_sample_report_01.md").write_text(
+                "---\n"
+                "doc_type: report\n"
+                "id: 260306_0000_sample_report_01\n"
+                "theme: sample\n"
+                "status: active\n"
+                "---\n\n"
+                "# Report: sample\n\n"
+                "Stable summary content.\n"
+            )
+
+            original_wb = knowledge.WB_DIR
+            original_dir = knowledge.KNOWLEDGE_DIR
+            original_index = knowledge.INDEX_FILE
+            original_datetime = knowledge.datetime
+            knowledge.WB_DIR = wb_dir
+            knowledge.KNOWLEDGE_DIR = knowledge_dir
+            knowledge.INDEX_FILE = knowledge_dir / "INDEX.md"
+            knowledge.datetime = FakeDateTime
+            try:
+                self.assertEqual(knowledge.cmd_index(type("Args", (), {})()), 0)
+                first = (knowledge_dir / "INDEX.md").read_text()
+                self.assertEqual(knowledge.cmd_index(type("Args", (), {})()), 0)
+                second = (knowledge_dir / "INDEX.md").read_text()
+            finally:
+                knowledge.WB_DIR = original_wb
+                knowledge.KNOWLEDGE_DIR = original_dir
+                knowledge.INDEX_FILE = original_index
+                knowledge.datetime = original_datetime
+
+            self.assertEqual(first, second)
 
 
 if __name__ == "__main__":

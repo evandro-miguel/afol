@@ -191,6 +191,10 @@ lint:
   @echo "→ Linting markdown docs..."
   @./.agents/agents lint-docs .agents/ docs/ README.md AGENTS.md CLAUDE.md
 
+diff-check:
+  @echo "→ Checking patch whitespace..."
+  @git diff --check
+
 tools-check:
   @echo "→ Validating tools catalog..."
   @./.agents/agents tools validate
@@ -199,7 +203,7 @@ tools-check:
   @echo "✓ Tools catalog and CLI smoke validated"
 
 benchmark-runtime-flow:
-  @echo "→ Running controlled runtime-flow benchmarks..."
+  @echo "→ Running controlled development-time runtime-flow benchmarks..."
   @cmd=(./.agents/agents benchmark run); \
   if [ -n "${SCENARIOS:-}" ]; then IFS=, read -r -a scenario_list <<< "${SCENARIOS}"; cmd+=("${scenario_list[@]}"); fi; \
   if [ -n "${MODEL:-}" ]; then cmd+=(--model "${MODEL}"); fi; \
@@ -262,6 +266,8 @@ agents-all: doctor structure index knowledge-index sync lint lint-scripts lint-r
   @echo "╚═══════════════════════════════════════════════════════════╝"
 
 all: agents-all
+
+all-strict: agents-all diff-check verify-strict-if-present
 
 refresh: clean setup structure
   @echo ""

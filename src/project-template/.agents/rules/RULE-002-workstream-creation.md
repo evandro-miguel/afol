@@ -22,13 +22,13 @@ updated_at: '2026-05-14T20:05:00-03:00'
 ## Standard Workstream
 
 ```bash
-./.agents/agents new <theme-name> --feature-id F-01 \
+./afol n <theme-name> --feature-id F-01 \
   --parent-spec <parent-spec-id>
-./.agents/agents new <theme-name> --feature-id F-01 \
+./afol n <theme-name> --feature-id F-01 \
   --parent-spec <parent-spec-id> --spec
-./.agents/agents new <theme-name> --feature-id F-01 \
+./afol n <theme-name> --feature-id F-01 \
   --parent-spec <parent-spec-id> --spec-lite
-./.agents/agents new <theme-name> --feature-id F-01 \
+./afol n <theme-name> --feature-id F-01 \
   --parent-spec <parent-spec-id> --child-spec <child-spec-id>
 just new THEME=<theme-name> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 ```
@@ -36,7 +36,7 @@ just new THEME=<theme-name> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 ## Quick Task (active session only)
 
 ```bash
-./.agents/agents new "Quick task description" --quick
+./afol n "Quick task description" --quick
 ```
 
 ## Naming Conventions
@@ -67,15 +67,12 @@ just new THEME=<theme-name> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 ## Task State Commands
 
 ```bash
-./.agents/agents implement start --session <session-id> --task-id T-01
-./.agents/agents implement complete --session <session-id> --task-id T-01 \
+./afol st -S <session-id> -T T-01
+./afol d -S <session-id> -T T-01 -x "just verify"
+./afol evidence T-01 -S <session-id> \
   --command "just verify" --result passed \
-  --artifact .agents/wb/<session-id>/<report-or-log>
-./.agents/agents wb-update evidence T-01 --session <session-id> \
-  --command "just verify" --result passed \
-  --artifact .agents/wb/<session-id>/<report-or-log>
-./.agents/agents wb-update task T-01 --session <session-id> \
-  --mark-done --evidence-id E-...
+  --artifact <configured-wb-dir>/<session-id>/<report-or-log>
+./afol done -S <session-id> -T T-01
 ```
 
 ## Workflow Rules

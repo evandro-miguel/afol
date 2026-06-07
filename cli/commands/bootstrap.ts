@@ -1,0 +1,380 @@
+import { createHash } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
+import type { BootstrapManifestEntry, ManagedOwnership } from "../services/bootstrap/planner";
+import { cleanupBootstrapObsolete, planBootstrapCleanup } from "../services/bootstrap/cleanup";
+import { planBootstrapOperations } from "../services/bootstrap/planner";
+import { normalizeProjectRelativePath } from "../services/project/paths";
+import type { TemplateFileMap } from "../services/template/payload";
+
+type BootstrapArgs = {
+  targetRoot: string;
+  dryRun: boolean;
+  forceManaged: boolean;
+  cleanupObsolete: boolean;
+  mutableDir: string;
+};
+
+type RawManifest = Record<string, unknown>;
+
+type MutableBaselineOperation = {
+  kind: "create" | "skip-existing";
+  path: string;
+  reason: string;
+  sourcePath: string;
+};
+
+const MUTABLE_BASELINE_SOURCES = [
+  { suffix: "skills/README.md", sourcePath: ".agents/skills/README.md" },
+  { suffix: "wb/README.md", sourcePath: ".agents/wb/README.md" },
+  { suffix: "tmp/README.md", sourcePath: ".agents/tmp/README.md" },
+  { suffix: "data/README.md", sourcePath: ".agents/data/README.md" },
+  { suffix: "data/events/README.md", sourcePath: ".agents/data/events/README.md" },
+  { suffix: "data/index/README.md", sourcePath: ".agents/data/index/README.md" },
+] as const;
+
+function sha256Hex(content: Buffer): string {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+function parseBootstrapArgs(args: string[]): BootstrapArgs {
+  let targetRoot = "";
+  let dryRun = false;
+  let forceManaged = false;
+  let cleanupObsolete = false;
+  let mutableDir = ".agents";
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === undefined) {
+      continue;
+    }
+    if (arg === "--dry-run") {
+      dryRun = true;
+      continue;
+    }
+    if (arg === "--provider-compatible") {
+      mutableDir = ".afol";
+      continue;
+    }
+    if (arg === "--mutable-dir") {
+      const value = args[index + 1];
+      if (!value) {
+        throw new Error("Missing value for --mutable-dir");
+      }
+      mutableDir = normalizeProjectRelativePath(value, ".agents");
+      index += 1;
+      continue;
+    }
+    if (arg === "--cleanup-obsolete") {
+      cleanupObsolete = true;
+      continue;
+    }
+    if (arg === "--force-managed") {
+      forceManaged = true;
+      continue;
+    }
+    if (arg === "--partial") {
+      continue;
+    }
+    if (arg.startsWith("-")) {
+      throw new Error(`Unknown bootstrap argument: ${arg}`);
+    }
+    if (!targetRoot) {
+      targetRoot = arg;
+      continue;
+    }
+    throw new Error(`Unexpected bootstrap argument: ${arg}`);
+  }
+
+  if (!targetRoot) {
+    throw new Error("Missing bootstrap target path");
+  }
+
+  return {
+    targetRoot: resolve(targetRoot),
+    dryRun,
+    forceManaged,
+    cleanupObsolete,
+    mutableDir,
+  };
+}
+
+function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
+  const config = JSON.parse(content.toString("utf8")) as Record<string, unknown>;
+  const paths = config.paths !== null && typeof config.paths === "object" && !Array.isArray(config.paths)
+    ? { ...(config.paths as Record<string, unknown>) }
+    : {};
+  const dataDir = `${mutableDir}/data`;
+  const mutationsDir = `${dataDir}/mutations`;
+  config.paths = {
+    ...paths,
+    agents_dir: ".agents",
+    mutable_dir: mutableDir,
+    rules_dir: ".agents/rules",
+    skills_dir: `${mutableDir}/skills`,
+    wb_dir: `${mutableDir}/wb`,
+    active_session_file: `${mutableDir}/wb/.active_session`,
+    tmp_dir: `${mutableDir}/tmp`,
+    data_dir: dataDir,
+    data_index_dir: `${dataDir}/index`,
+    events_file: `${dataDir}/events/events.jsonl`,
+    mutations_dir: mutationsDir,
+    mutation_backups_dir: `${mutationsDir}/backups`,
+    mutation_archives_dir: `${mutationsDir}/archives`,
+    lock_file: ".agents/lock.json",
+    manifest_file: ".agents/manifest.json",
+  };
+  config.skills_sync = {
+    ...(
+      config.skills_sync !== null && typeof config.skills_sync === "object" && !Array.isArray(config.skills_sync)
+        ? (config.skills_sync as Record<string, unknown>)
+        : {}
+    ),
+    project_dir: `${mutableDir}/skills`,
+  };
+  return Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+function buildBootstrapTemplateFiles(mutableDir: string): TemplateFileMap {
+  const templateFiles: TemplateFileMap = { ...DEFAULT_TEMPLATE_FILES };
+  if (mutableDir === ".agents") {
+    return templateFiles;
+  }
+
+  const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
+  if (!configEntry) {
+    return templateFiles;
+  }
+  const payload = mutableConfigPayload(Buffer.from(configEntry.contentBase64, "base64"), mutableDir);
+  templateFiles[".agents/config.json"] = {
+    path: ".agents/config.json",
+    contentBase64: payload.toString("base64"),
+    sha256: sha256Hex(payload),
+    bytes: payload.byteLength,
+  };
+  return templateFiles;
+}
+
+function planMutableBaselines(targetRoot: string, mutableDir: string): MutableBaselineOperation[] {
+  if (mutableDir === ".agents") {
+    return [];
+  }
+
+  const operations: MutableBaselineOperation[] = [];
+  for (const baseline of MUTABLE_BASELINE_SOURCES) {
+    const source = DEFAULT_TEMPLATE_FILES[baseline.sourcePath];
+    if (!source) {
+      continue;
+    }
+    const targetPath = `${mutableDir}/${baseline.suffix}`;
+    operations.push({
+      kind: existsSync(join(targetRoot, targetPath)) ? "skip-existing" : "create",
+      path: targetPath,
+      reason: existsSync(join(targetRoot, targetPath)) ? "existing-target-file" : "missing-target-file",
+      sourcePath: baseline.sourcePath,
+    });
+  }
+  return operations;
+}
+
+async function writeMutableBaselines(targetRoot: string, operations: MutableBaselineOperation[]): Promise<void> {
+  for (const operation of operations) {
+    if (operation.kind !== "create") {
+      continue;
+    }
+    const source = DEFAULT_TEMPLATE_FILES[operation.sourcePath];
+    if (!source) {
+      continue;
+    }
+    const targetPath = operation.path;
+    const absolutePath = join(targetRoot, targetPath);
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    await Bun.write(absolutePath, Buffer.from(source.contentBase64, "base64"));
+  }
+}
+
+function readTargetFiles(targetRoot: string, templatePaths: string[]): Record<string, string> {
+  const files: Record<string, string> = {};
+  for (const path of templatePaths) {
+    const absolutePath = join(targetRoot, path);
+    if (existsSync(absolutePath)) {
+      files[path] = readFileSync(absolutePath, "utf8");
+    }
+  }
+  return files;
+}
+
+function normalizeManifestPath(path: string): string {
+  return path.trim().replace(/\\/g, "/").replace(/^\.\/+/, "").replace(/^\/+/, "").replace(/\/+/g, "/");
+}
+
+function manifestTemplatePatterns(path: string): string[] {
+  const normalized = normalizeManifestPath(path);
+  if (!normalized) {
+    return [];
+  }
+  return normalized.startsWith(".agents/") ? [normalized] : [normalized, `.agents/${normalized}`];
+}
+
+function resolveManifestTemplatePath(path: string, templatePathSet: Set<string>): string | undefined {
+  return manifestTemplatePatterns(path).find((candidate) => templatePathSet.has(candidate));
+}
+
+function isTemplatePathMatch(pattern: string, path: string): boolean {
+  return path === pattern || path.startsWith(`${pattern}/`);
+}
+
+function hasOwnershipOwner(value: unknown): value is ManagedOwnership {
+  return value === "managed" || value === "project-owned" || value === "generated" || value === "ignored" || value === "conflict";
+}
+
+function loadManifest(targetRoot: string, templatePaths: string[]): Record<string, BootstrapManifestEntry> {
+  const manifestPath = join(targetRoot, ".agents", "manifest.json");
+  if (!existsSync(manifestPath)) {
+    return {};
+  }
+
+  const raw = JSON.parse(readFileSync(manifestPath, "utf8")) as RawManifest;
+  const manifest: Record<string, BootstrapManifestEntry> = {};
+  const templatePathSet = new Set(templatePaths);
+
+  const managedHashes = raw.managed_hashes;
+  if (managedHashes !== undefined && managedHashes !== null && typeof managedHashes === "object" && !Array.isArray(managedHashes)) {
+    for (const [path, hash] of Object.entries(managedHashes)) {
+      if (typeof hash === "string") {
+        const resolvedPath = resolveManifestTemplatePath(path, templatePathSet);
+        if (!resolvedPath) {
+          continue;
+        }
+        manifest[resolvedPath] = { owner: "managed", hash };
+      }
+    }
+  }
+
+  const ownership = raw.ownership;
+  if (!ownership || typeof ownership !== "object" || Array.isArray(ownership)) {
+    return manifest;
+  }
+  for (const [ownerName, rawPaths] of Object.entries(ownership)) {
+    if (!hasOwnershipOwner(ownerName) || !Array.isArray(rawPaths)) {
+      continue;
+    }
+    for (const rawPath of rawPaths) {
+      if (typeof rawPath !== "string") {
+        continue;
+      }
+      const patterns = manifestTemplatePatterns(rawPath);
+      for (const templatePath of templatePaths) {
+        if (!patterns.some((pattern) => isTemplatePathMatch(pattern, templatePath))) {
+          continue;
+        }
+        manifest[templatePath] = {
+          ...manifest[templatePath],
+          owner: ownerName,
+        };
+      }
+    }
+  }
+  return manifest;
+}
+
+function loadBootstrapManifest(targetRoot: string, templatePaths: string[]): Record<string, BootstrapManifestEntry> {
+  return loadManifest(targetRoot, templatePaths);
+}
+
+function writeTemplateFile(
+  targetRoot: string,
+  path: string,
+  templateFiles: TemplateFileMap,
+): Promise<void> {
+  const entry = templateFiles[path];
+  if (!entry) {
+    throw new Error(`Missing generated template entry: ${path}`);
+  }
+  const absolutePath = join(targetRoot, path);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  const payload = Buffer.from(entry.contentBase64, "base64");
+  return Bun.write(absolutePath, payload).then(() => {
+    if (path === "a" || path === "afol") {
+      chmodSync(absolutePath, 0o755);
+    }
+  });
+}
+
+export async function runBootstrapCommand(args: string[]): Promise<number> {
+  let parsed: BootstrapArgs;
+  try {
+    parsed = parseBootstrapArgs(args);
+  } catch (error) {
+    console.error((error as Error).message);
+    return 2;
+  }
+
+  const templateFiles = buildBootstrapTemplateFiles(parsed.mutableDir);
+  const templatePaths = Object.keys(templateFiles).sort();
+  const currentFiles = readTargetFiles(parsed.targetRoot, templatePaths);
+  const manifest = loadBootstrapManifest(parsed.targetRoot, templatePaths);
+  const plan = planBootstrapOperations({
+    templateFiles,
+    currentFiles,
+    manifest,
+  });
+  const cleanupPlan = planBootstrapCleanup(parsed.targetRoot);
+  const mutableBaselinePlan = planMutableBaselines(parsed.targetRoot, parsed.mutableDir);
+
+  const conflicts = plan.operations.filter((operation) => operation.kind === "conflict");
+  const writable = plan.operations.filter((operation) =>
+    operation.kind === "create" || operation.kind === "update-managed",
+  );
+
+  console.log(
+    [
+      `bootstrap: target=${parsed.targetRoot}`,
+      `mode=${parsed.dryRun ? "dry-run" : "apply"}`,
+      `mutable=${parsed.mutableDir}`,
+      `files=${Object.keys(templateFiles).length}`,
+      `operations=${plan.operations.length}`,
+      `conflicts=${conflicts.length}`,
+      `cleanup=${cleanupPlan.candidates.length}`,
+    ].join(" "),
+  );
+
+  for (const operation of plan.operations) {
+    console.log(`${operation.kind} ${operation.path} ${operation.reason}`);
+  }
+  for (const candidate of cleanupPlan.candidates) {
+    console.log(`cleanup-pending ${candidate.path} ${candidate.reason}`);
+  }
+  for (const operation of mutableBaselinePlan) {
+    console.log(`mutable-baseline-${operation.kind} ${operation.path} source=${operation.sourcePath} ${operation.reason}`);
+  }
+
+  if (parsed.dryRun) {
+    return conflicts.length > 0 ? 4 : 0;
+  }
+
+  if (conflicts.length > 0 && !parsed.forceManaged) {
+    console.error("Bootstrap has conflicts. Re-run with --force-managed to overwrite managed files.");
+    return 4;
+  }
+
+  for (const operation of writable) {
+    await writeTemplateFile(parsed.targetRoot, operation.path, templateFiles);
+  }
+  if (parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) {
+    cleanupBootstrapObsolete(parsed.targetRoot, cleanupPlan.candidates);
+    for (const candidate of cleanupPlan.candidates) {
+      console.log(`cleanup-removed ${candidate.path} ${candidate.reason}`);
+    }
+  }
+  if (parsed.forceManaged) {
+    for (const operation of conflicts) {
+      await writeTemplateFile(parsed.targetRoot, operation.path, templateFiles);
+    }
+  }
+  await writeMutableBaselines(parsed.targetRoot, mutableBaselinePlan);
+
+  return 0;
+}

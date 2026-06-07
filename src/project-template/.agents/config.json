@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "project": {
+    "name": "agentic-start-folder-template"
+  },
+  "paths": {
+    "agents_dir": ".agents",
+    "mutable_dir": ".agents",
+    "rules_dir": ".agents/rules",
+    "skills_dir": ".agents/skills",
+    "wb_dir": ".agents/wb",
+    "active_session_file": ".agents/wb/.active_session",
+    "tmp_dir": ".agents/tmp",
+    "data_dir": ".agents/data",
+    "data_index_dir": ".agents/data/index",
+    "events_file": ".agents/data/events/events.jsonl",
+    "mutations_dir": ".agents/data/mutations",
+    "mutation_backups_dir": ".agents/data/mutations/backups",
+    "mutation_archives_dir": ".agents/data/mutations/archives",
+    "lock_file": ".agents/lock.json",
+    "manifest_file": ".agents/manifest.json",
+    "docs_dir": "docs"
+  },
+  "skills_sync": {
+    "project_dir": ".agents/skills"
+  }
+}

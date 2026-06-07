@@ -30,9 +30,9 @@ addopts = [
     "--tb=short",
     "-p",
     "no:cacheprovider",
-    "--basetemp=.agents/tmp/pytest-scripts-basetemp",
+    "--basetemp=/tmp/pytest-scripts-basetemp",
 ]
-log_file = ".agents/tmp/pytest-scripts.log"
+log_file = "/tmp/pytest-scripts.log"
 markers = [
     "unit: Unit tests",
     "integration: Integration tests",
@@ -81,13 +81,6 @@ select = ["E", "F", "W", "C901"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"agents-fix-symlinks.py" = ["C901"]
-"agents-new.py" = ["C901"]
-"agents-telemetry.py" = ["C901"]
-"agents-tools.py" = ["C901"]
-"check-links.py" = ["C901"]
-"sync-agent-docs.py" = ["C901"]
-"verify-tasks.py" = ["C901"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 12

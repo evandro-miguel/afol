@@ -27,8 +27,8 @@ arc/
 └── README.md            # This file
 ```
 
-Current-state map evidence lives outside `docs/arc/` under `docs/map/`,
-including the structure files in `docs/map/structure/`.
+Current-state map evidence lives outside `docs/arc/` under `docs/map/`.
+Generated structure output belongs under `docs/map/structure/` when present.
 Reusable templates live only under `docs/templates/`.
 
 ## Document types
@@ -48,19 +48,12 @@ Reusable templates live only under `docs/templates/`.
 - Milestones
 - Prioritization rules
 
-### structure/
-
-- Physical directory layout under `docs/map/structure/`
-- Folder conventions for the current-state structure view
-- Entry points and import conventions for the map surface
-
 ### map/
 
 - Current-state descriptive repository maps
 - Analysis evidence and codemap-style surfaces
 - Refreshable operator references
 - Never the approval source for roadmap/spec intent
-- Includes the canonical structure index in `docs/map/structure/`
 
 ### Specifications (SPECS/)
 
@@ -98,7 +91,7 @@ Plans and tasks should reference architecture docs:
 - Link ADRs to implementation tasks
 - Update SPECS INDEX for every new spec
 - Keep `map/` descriptive and refreshable; keep desired-state decisions in roadmap/spec/ADR docs outside that folder
-- Keep the structure view in `docs/map/structure/`; do not recreate `docs/arc/structure/` as a second current-state surface
+- Keep generated structure output under `docs/map/structure/`; do not recreate `docs/arc/structure/` as a second current-state surface
 
 ---
 

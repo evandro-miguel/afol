@@ -3,7 +3,7 @@ doc_type: standard
 id: 000000_000000_workflow-standard_standard_01
 status: active
 created_at: 2026-02-23 00:00:00+00:00
-updated_at: '2026-04-19T18:34:47-03:00'
+updated_at: '2026-05-28T18:29:58Z'
 title: Workflow Standards
 ---
 
@@ -46,8 +46,10 @@ Create or update the governing feature spec in `docs/arc/SPECS/`
 - Define feature intent, user journey, constraints, and acceptance
 - Keep implementation detail out of the spec
 - Use child specs when decomposition improves clarity or coordination
-- Local workstreams may choose `spec` or `spec-child` as needed after the parent spec exists
-- Keep `spec-lite` as a historical compatibility alias while migration remains in progress
+- Local workstreams may choose `spec` or `spec-child` after the parent spec exists.
+- Use `spec-child` for new child/local specs.
+- Keep `spec-lite` as a historical compatibility alias, not the default for
+  new work.
 - Test-focused workstreams should link a `spec-test` strategy artifact before implementing or changing tests
 - Keep current-state evidence in `docs/map/` when needed, and keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder
 

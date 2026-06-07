@@ -13,22 +13,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-
-      - name: Install just
-        uses: taiki-e/install-action@just
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          python-version: "3.11"
+          bun-version: "1.3.14"
 
-      - name: Validate setup recipe
-        run: just setup
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
-      - name: Validate runtime setup recipe
-        run: just setup-runtime
+      - name: Release validation
+        run: bun run validate:release
 
-      - name: Validate scaffold
-        run: just all
+      - name: Clean checkout smoke
+        run: bun run smoke:clean
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: afol-release-evidence
+          path: |
+            dist/afol
+            dist/afol.sha256
+            dist/afol.provenance.json

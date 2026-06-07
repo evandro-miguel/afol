@@ -88,6 +88,24 @@ def test_search_docs_ignores_malformed_frontmatter(scaffold_repo):
     assert any(hit.path == "docs/knowledge/BROKEN-FRONTMATTER.md" for hit in response.hits)
 
 
+def test_search_docs_ignores_malformed_utf8_bytes(scaffold_repo):
+    malformed_doc = scaffold_repo / "docs" / "knowledge" / "MALFORMED-UTF8.md"
+    malformed_doc.write_bytes(
+        b"---\n"
+        b"doc_type: report\n"
+        b"title: Malformed UTF8\n"
+        b"---\n"
+        b"# Malformed utf8 fixture\n\n"
+        b"generic malformed utf8 sentinel\n"
+        b"\xff\xfe\xfa\n"
+    )
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+
+    response = runtime.search.search("generic malformed utf8 sentinel", limit=5)
+
+    assert any(hit.path == "docs/knowledge/MALFORMED-UTF8.md" for hit in response.hits)
+
+
 def test_tool_catalog_resource_handles_corrupt_json(scaffold_repo):
     tool_catalog = scaffold_repo / ".agents" / "tools.json"
     tool_catalog.write_text("{bad-json", encoding="utf-8")
@@ -135,18 +153,58 @@ def test_validate_structure_ok(scaffold_repo):
 def test_command_registry_resource_includes_help_manifest(scaffold_repo):
     runtime = AgenticRuntime.from_repo_root(scaffold_repo)
     registry = runtime.command_registry_resource()
-    help_manifest = runtime.registry.help_manifest()
 
     assert registry["available"] is True
     commands = {item["name"]: item for item in registry["commands"]}
     assert commands["benchmark"]["script_name"] == "agents-benchmark.py"
+    assert commands["local-state"]["script_name"] == "agents-local-state.py"
     assert commands["scaffold-update"]["script_name"] == "agents-scaffold-update.py"
     assert commands["wb"]["alias_of"] == "wb-update"
 
-    help_commands = {item["name"]: item for item in help_manifest}
+    help_commands = {item["name"]: item for item in registry["help_commands"]}
     assert "benchmark" in help_commands
+    assert "local-state" in help_commands
     assert "scaffold-update" in help_commands
     assert help_commands["wb-update"]["aliases"] == ["wb"]
+
+
+def test_runtime_action_spec_source_of_truth(scaffold_repo):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    specs = {spec.action_id: spec for spec in runtime.action_specs()}
+    assert specs["inspect"].cli_command == "inspect"
+    assert specs["inspect"].mcp_tool == "inspect_workspace"
+    assert specs["health"].cli_command == "health"
+    assert specs["health"].mcp_tool == "runtime_health"
+    assert runtime.action_spec_for_cli_command("inspect") == specs["inspect"]
+    assert runtime.action_spec_for_mcp_tool("runtime_health") == specs["health"]
+
+
+def test_run_action_inspect_valid_and_invalid(scaffold_repo):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    positive = runtime.run_action("inspect", depth=2, max_entries=10)
+    assert positive.status == "ok"
+    payload = positive.payload
+    assert isinstance(payload, dict)
+    assert payload["max_depth"] == 2
+
+    invalid = runtime.run_action("inspect", depth=99)
+    assert invalid.status == "error"
+    assert invalid.message == "depth must be between 0 and 10"
+
+
+def test_runtime_health_action_returns_minimal_checks(scaffold_repo):
+    runtime = AgenticRuntime.from_repo_root(scaffold_repo)
+    health = runtime.run_action("health")
+
+    assert health.status == "ok"
+    assert isinstance(health.payload, dict)
+    assert health.payload["status"] == "healthy"
+    assert health.payload["checks"]["repo_root"]["exists"] is True
+    assert health.payload["checks"]["repo_root"]["label"] == scaffold_repo.name
+    assert "command_registry" in health.payload["checks"]
+    assert "required_available" in health.payload["checks"]["command_registry"]
+    assert health.payload["checks"]["search_roots"]["count"] >= 1
+    assert str(scaffold_repo) not in str(health.payload)
 
 
 def test_adoption_inspection_detects_missing_overlay_surfaces(scaffold_repo):

@@ -9,11 +9,20 @@
       "app": "all",
       "skills": [
         "agentic-folder-sys",
-        "agentic-scaffold-mcp",
-        "mutation-testing-guardian",
-        "reducao-segura-complexidade-ciclomatica"
+        "agentic-scaffold-mcp"
+      ]
+    },
+    {
+      "app": "codex",
+      "skills": [
+        "agentic-folder-sys"
       ]
     }
   ],
-  "channel": "stable"
+  "channel": "stable",
+  "source": {
+    "path": ".agents/source/universal-skills",
+    "source_type": "local",
+    "ref": "v0.3.1"
+  }
 }

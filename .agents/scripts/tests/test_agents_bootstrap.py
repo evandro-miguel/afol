@@ -55,10 +55,31 @@ class BootstrapTests(unittest.TestCase):
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn(".agents/agents.config", mandatory)
 
+    def test_mandatory_files_include_canonical_config_json(self):
+        """The canonical JSON config must be in the mandatory files list."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn(".agents/config.json", mandatory)
+
+    def test_mandatory_files_include_lock_file(self):
+        """The lock file must be in the mandatory files list."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn(".agents/lock.json", mandatory)
+
+    def test_mandatory_files_include_manifest_file(self):
+        """The lock manifest must be in the mandatory files list."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn(".agents/manifest.json", mandatory)
+
     def test_mandatory_files_include_just_wrapper(self):
         """The Justfile wrapper must be in the mandatory files list."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn("Justfile", mandatory)
+
+    def test_mandatory_files_include_front_door_wrappers(self):
+        """Root front door wrappers must be part of bootstrap mandatory files."""
+        mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
+        self.assertIn("afol", mandatory)
+        self.assertIn("a", mandatory)
 
     def test_mandatory_files_exclude_opencode_json(self):
         """opencode.json should not be in the minimal root bootstrap surface."""

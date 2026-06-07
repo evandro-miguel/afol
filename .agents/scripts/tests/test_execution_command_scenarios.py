@@ -177,10 +177,21 @@ def write_global_context(root: Path) -> dict[str, Path]:
     }
 
 
+def write_rule_catalog(root: Path, entries: list[dict]) -> Path:
+    rules_dir = root / ".agents/rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    catalog = rules_dir / "index.json"
+    catalog.write_text(
+        json.dumps({"version": 1, "generated_by": "test", "rules": entries}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return catalog
+
+
 class ExecutionCommandsScenarioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        scripts_dir = Path(__file__).resolve().parent.parent
+        scripts_dir = Path(".agents/scripts").resolve()
         sys.path.insert(0, str(scripts_dir))
         cls.execution_commands = importlib.import_module("lib.execution_commands")
 
@@ -209,9 +220,7 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
 
     def test_next_task_prefers_first_actionable_when_no_in_progress(self):
         rows = [
-            self.execution_commands.TaskRow(
-                "T-01", "implemented_untested", "qa", "ready", 0, "table"
-            ),
+            self.execution_commands.TaskRow("T-01", "implemented_untested", "qa", "ready", 0, "table"),
             self.execution_commands.TaskRow("T-02", "pending", "worker", "pending", 1, "table"),
         ]
         nxt = self.execution_commands.next_task(rows)
@@ -293,9 +302,7 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
                 result="passed",
             )
             evidence_path = session_dir / ".evidence.jsonl"
-            evidence_path.write_text(
-                evidence_path.read_text(encoding="utf-8") + "{invalid\n", encoding="utf-8"
-            )
+            evidence_path.write_text(evidence_path.read_text(encoding="utf-8") + "{invalid\n", encoding="utf-8")
             count = self.execution_commands.evidence_count(session_dir, "T-01")
             self.assertEqual(count, 1)
 
@@ -326,9 +333,7 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             session_dir = temp_root / "260307_0107_alias"
             session_dir.mkdir(parents=True, exist_ok=True)
             context = write_global_context(temp_root)
-            with mock.patch.dict(
-                self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False
-            ):
+            with mock.patch.dict(self.execution_commands.GLOBAL_ARTIFACT_PATHS, context, clear=False):
                 a = self.execution_commands.resolve_artifact(session_dir, "tech-stack")
                 b = self.execution_commands.resolve_artifact(session_dir, "tech_stack")
             self.assertIsNotNone(a)
@@ -409,63 +414,235 @@ class ExecutionCommandsScenarioTests(unittest.TestCase):
             by_doc_type = {item["doc_type"]: item for item in states}
 
             self.assertEqual(by_doc_type["brainstorm"]["state"], "blocked")
-            self.assertIn(
-                "closure gate: optional 'brainstorm'", by_doc_type["brainstorm"]["blockers"][0]
-            )
+            self.assertIn("closure gate: optional 'brainstorm'", by_doc_type["brainstorm"]["blockers"][0])
             self.assertEqual(by_doc_type["explorer-check"]["state"], "blocked")
-            self.assertIn(
-                "closure gate: optional 'explorer-check'",
-                by_doc_type["explorer-check"]["blockers"][0],
-            )
+            self.assertIn("closure gate: optional 'explorer-check'", by_doc_type["explorer-check"]["blockers"][0])
             self.assertEqual(by_doc_type["plan"]["state"], "ready")
             self.assertEqual(by_doc_type["task"]["state"], "blocked")
             self.assertIn("plan: draft", by_doc_type["task"]["blockers"])
             self.assertEqual(by_doc_type["report"]["state"], "done")
             self.assertEqual(by_doc_type["postmortem"]["state"], "blocked")
-            self.assertIn(
-                "closure gate: optional 'postmortem'", by_doc_type["postmortem"]["blockers"][0]
-            )
+            self.assertIn("closure gate: optional 'postmortem'", by_doc_type["postmortem"]["blockers"][0])
 
             next_artifact = self.execution_commands.next_workflow_artifact(states)
             self.assertIsNotNone(next_artifact)
             self.assertEqual(next_artifact["doc_type"], "brainstorm")
 
-    def test_workflow_artifact_states_use_completed_tasks_as_closure_gate(self):
+    def test_rule_metadata_lookup_by_id_and_name(self):
+        by_id = self.execution_commands.get_rule_metadata("RULE-006")
+        self.assertIsNotNone(by_id)
+        self.assertEqual(by_id["id"], "RULE-006")
+
+        by_name = self.execution_commands.get_rule_metadata("applicable-rule-resolution")
+        self.assertIsNotNone(by_name)
+        self.assertEqual(by_name["id"], "RULE-006")
+
+    def test_resolve_applicable_rules_filters_by_surface_and_work_type(self):
+        resolved = self.execution_commands.resolve_applicable_rules(
+            surfaces=["feature", "validation", "workbench"],
+            work_type="delivery",
+        )
+        ids = [entry["id"] for entry in resolved]
+        self.assertIn("RULE-002", ids)
+        self.assertIn("RULE-004", ids)
+        self.assertIn("RULE-006", ids)
+        self.assertNotIn("RULE-007", ids)
+
+    def test_load_feature_operation_governance_includes_rule_skill_context_payload(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
-            session_dir = Path(td) / "260307_0109b_tasks_done_closure"
+            session_dir = Path(td) / "260307_0110_governance-payload"
             session_dir.mkdir(parents=True, exist_ok=True)
-            write_doc_file(session_dir, "research", status="active")
             write_plan_file(session_dir)
             write_task_file(
                 session_dir,
                 "| Task | State | Owner | Notes |\n"
                 "|------|-------|-------|-------|\n"
-                "| T-01 | done | worker | finished |",
+                "| T-11 | in_progress | worker | route rules and skills with payload schema |",
             )
-            write_log_file(session_dir)
-            write_report_file(session_dir, status="active")
-
-            states = self.execution_commands.workflow_artifact_states(session_dir)
-            by_doc_type = {item["doc_type"]: item for item in states}
-
-            self.assertEqual(by_doc_type["research"]["state"], "blocked")
-            self.assertIn(
-                "closure gate: optional 'research'",
-                by_doc_type["research"]["blockers"][0],
+            specs_dir = Path(td) / "docs/arc/SPECS"
+            specs_dir.mkdir(parents=True, exist_ok=True)
+            (specs_dir / "scenario-parent.md").write_text(
+                "---\n"
+                "doc_type: spec\n"
+                "id: scenario-parent-spec\n"
+                "---\n\n"
+                "# Scenario Parent Spec\n",
+                encoding="utf-8",
             )
+            with (
+                mock.patch.object(self.execution_commands, "WB_DIR", session_dir.parent),
+                mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", session_dir.parent.resolve()),
+                mock.patch.object(self.execution_commands, "SPECS_DIR", specs_dir),
+            ):
+                bundle = self.execution_commands.load_feature_operation_governance(session_dir)
+
+            self.assertIsNotNone(bundle)
+            self.assertIn("rule_skill_context_payload", bundle)
+            payload = bundle["rule_skill_context_payload"]
+            self.assertEqual(payload["schema"]["version"], "1.0.0")
+            self.assertEqual(payload["governance"]["feature_id"], "F-08")
+            self.assertIn("rules", payload)
+            self.assertIn("skills", payload)
+            self.assertIn("route_metadata", bundle)
+            route_metadata = bundle["route_metadata"]
+            self.assertEqual(route_metadata["payload_key"], "rule_skill_context_payload")
+            self.assertEqual(route_metadata["payload_schema_version"], "1.0.0")
+            self.assertEqual(route_metadata["routing"]["work_type"], "delivery")
+            self.assertIn("RULE-002", route_metadata["routing"]["rule_ids"])
+
+    def test_load_feature_operation_governance_warns_and_skips_optional_missing_rule(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            session_dir = root / ".agents/wb/260307_0111_optional-rule-skip"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_plan_file(session_dir)
+            write_task_file(
+                session_dir,
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-11 | in_progress | worker | docs validation feature workbench routing |",
+            )
+            specs_dir = root / "docs/arc/SPECS"
+            specs_dir.mkdir(parents=True, exist_ok=True)
+            (specs_dir / "scenario-parent.md").write_text(
+                "---\n"
+                "doc_type: spec\n"
+                "id: scenario-parent-spec\n"
+                "---\n\n"
+                "# Scenario Parent Spec\n",
+                encoding="utf-8",
+            )
+            rules_dir = root / ".agents/rules"
+            rules_dir.mkdir(parents=True, exist_ok=True)
+            (rules_dir / "RULE-002-workstream-creation.md").write_text("# rule 002\n", encoding="utf-8")
+            (rules_dir / "RULE-004-validation-linting.md").write_text("# rule 004\n", encoding="utf-8")
+            (rules_dir / "RULE-006-applicable-rule-resolution.md").write_text("# rule 006\n", encoding="utf-8")
+            write_rule_catalog(
+                root,
+                [
+                    {
+                        "id": "RULE-002",
+                        "name": "workstream-creation",
+                        "path": "RULE-002-workstream-creation.md",
+                        "surfaces": ["feature", "workbench", "planning"],
+                        "work_types": ["delivery", "implementation"],
+                        "priority": 100,
+                    },
+                    {
+                        "id": "RULE-003",
+                        "name": "documentation-standards",
+                        "path": "RULE-003-documentation-standards.md",
+                        "surfaces": ["docs", "documentation"],
+                        "work_types": ["delivery", "implementation", "docs"],
+                        "priority": 60,
+                    },
+                    {
+                        "id": "RULE-004",
+                        "name": "validation-linting",
+                        "path": "RULE-004-validation-linting.md",
+                        "surfaces": ["validation", "testing", "feature"],
+                        "work_types": ["delivery", "implementation", "validation"],
+                        "priority": 100,
+                    },
+                    {
+                        "id": "RULE-006",
+                        "name": "applicable-rule-resolution",
+                        "path": "RULE-006-applicable-rule-resolution.md",
+                        "surfaces": ["rules", "routing", "feature", "workbench"],
+                        "work_types": ["delivery", "implementation", "routing"],
+                        "priority": 100,
+                    },
+                ],
+            )
+            with (
+                mock.patch.object(self.execution_commands, "ROOT_DIR", root),
+                mock.patch.object(self.execution_commands, "WB_DIR", root / ".agents/wb"),
+                mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", root / ".agents/wb"),
+                mock.patch.object(self.execution_commands, "RULES_DIR", rules_dir),
+                mock.patch.object(self.execution_commands, "RULE_METADATA_FILE", rules_dir / "index.json"),
+                mock.patch.object(self.execution_commands, "SPECS_DIR", specs_dir),
+            ):
+                bundle = self.execution_commands.load_feature_operation_governance(session_dir)
+
+            self.assertIsNotNone(bundle)
+            self.assertIn("rule_warnings", bundle)
+            self.assertTrue(any("RULE-003" in warning for warning in bundle["rule_warnings"]))
+            self.assertNotIn("RULE-003", [rule["id"] for rule in bundle["rules"]])
+
+    def test_load_feature_operation_governance_fails_when_required_rule_missing(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            session_dir = root / ".agents/wb/260307_0112_required-rule-missing"
+            session_dir.mkdir(parents=True, exist_ok=True)
+            write_plan_file(session_dir)
+            write_task_file(
+                session_dir,
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-11 | in_progress | worker | validation feature workbench |",
+            )
+            specs_dir = root / "docs/arc/SPECS"
+            specs_dir.mkdir(parents=True, exist_ok=True)
+            (specs_dir / "scenario-parent.md").write_text(
+                "---\n"
+                "doc_type: spec\n"
+                "id: scenario-parent-spec\n"
+                "---\n\n"
+                "# Scenario Parent Spec\n",
+                encoding="utf-8",
+            )
+            rules_dir = root / ".agents/rules"
+            rules_dir.mkdir(parents=True, exist_ok=True)
+            (rules_dir / "RULE-002-workstream-creation.md").write_text("# rule 002\n", encoding="utf-8")
+            (rules_dir / "RULE-006-applicable-rule-resolution.md").write_text("# rule 006\n", encoding="utf-8")
+            write_rule_catalog(
+                root,
+                [
+                    {
+                        "id": "RULE-002",
+                        "name": "workstream-creation",
+                        "path": "RULE-002-workstream-creation.md",
+                        "surfaces": ["feature", "workbench", "planning"],
+                        "work_types": ["delivery", "implementation"],
+                        "priority": 100,
+                    },
+                    {
+                        "id": "RULE-004",
+                        "name": "validation-linting",
+                        "path": "RULE-004-validation-linting.md",
+                        "surfaces": ["validation", "testing", "feature"],
+                        "work_types": ["delivery", "implementation", "validation"],
+                        "priority": 100,
+                    },
+                    {
+                        "id": "RULE-006",
+                        "name": "applicable-rule-resolution",
+                        "path": "RULE-006-applicable-rule-resolution.md",
+                        "surfaces": ["rules", "routing", "feature", "workbench"],
+                        "work_types": ["delivery", "implementation", "routing"],
+                        "priority": 100,
+                    },
+                ],
+            )
+            with (
+                mock.patch.object(self.execution_commands, "ROOT_DIR", root),
+                mock.patch.object(self.execution_commands, "WB_DIR", root / ".agents/wb"),
+                mock.patch.object(self.execution_commands, "CANONICAL_WB_DIR", root / ".agents/wb"),
+                mock.patch.object(self.execution_commands, "RULES_DIR", rules_dir),
+                mock.patch.object(self.execution_commands, "RULE_METADATA_FILE", rules_dir / "index.json"),
+                mock.patch.object(self.execution_commands, "SPECS_DIR", specs_dir),
+            ):
+                with self.assertRaisesRegex(self.execution_commands.ExecutionError, "RULE-004"):
+                    self.execution_commands.load_feature_operation_governance(session_dir)
 
 
 class ImplementAndReviewScenarioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        scripts_dir = Path(__file__).resolve().parent.parent
+        scripts_dir = Path(".agents/scripts").resolve()
         sys.path.insert(0, str(scripts_dir))
-        cls.agents_implement = load_module(
-            "agents_implement_scenario_test", scripts_dir / "agents-implement.py"
-        )
-        cls.agents_review = load_module(
-            "agents_review_scenario_test", scripts_dir / "agents-review.py"
-        )
+        cls.agents_implement = load_module("agents_implement_scenario_test", scripts_dir / "agents-implement.py")
+        cls.agents_review = load_module("agents_review_scenario_test", scripts_dir / "agents-review.py")
         cls.execution_commands = importlib.import_module("lib.execution_commands")
 
     def _allow_temp_workbench(self, session_dir: Path) -> None:
@@ -486,9 +663,7 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
             )
             write_log_file(session_dir)
             args = argparse.Namespace(session=str(session_dir), task_id=None)
-            with mock.patch.object(
-                self.agents_implement, "load_feature_operation_governance", return_value=None
-            ):
+            with mock.patch.object(self.agents_implement, "load_feature_operation_governance", return_value=None):
                 code = self.agents_implement.cmd_start(args)
             self.assertEqual(code, 0)
             content = (session_dir / f"{session_dir.name}_task_01.md").read_text(encoding="utf-8")
@@ -532,21 +707,13 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
                 no_evidence=False,
                 force=False,
             )
-            with mock.patch.object(
-                self.agents_implement, "load_feature_operation_governance", return_value=None
-            ):
+            with mock.patch.object(self.agents_implement, "load_feature_operation_governance", return_value=None):
                 code = self.agents_implement.cmd_complete(args)
             self.assertEqual(code, 0)
-            task_content = (session_dir / f"{session_dir.name}_task_01.md").read_text(
-                encoding="utf-8"
-            )
+            task_content = (session_dir / f"{session_dir.name}_task_01.md").read_text(encoding="utf-8")
             self.assertIn("| T-01 | done |", task_content)
             evidence_path = session_dir / ".evidence.jsonl"
-            data = [
-                json.loads(line)
-                for line in evidence_path.read_text(encoding="utf-8").splitlines()
-                if line.strip()
-            ]
+            data = [json.loads(line) for line in evidence_path.read_text(encoding="utf-8").splitlines() if line.strip()]
             self.assertEqual(len(data), 1)
             self.assertEqual(data[0]["task_id"], "T-01")
             self.assertEqual(data[0]["command"], "just test-scripts")
@@ -563,9 +730,7 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
                 "| T-01 | done | worker | first |",
             )
             write_report_file(session_dir, status="final")
-            with mock.patch.object(
-                self.agents_review, "run_verify_tasks", return_value=(0, "ok\n", "")
-            ):
+            with mock.patch.object(self.agents_review, "run_verify_tasks", return_value=(0, "ok\n", "")):
                 buf = io.StringIO()
                 with contextlib.redirect_stdout(buf):
                     code = self.agents_review.cmd_scope(session_dir, "verify")
@@ -584,9 +749,7 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
                     {"scope": "task", "severity": "error", "message": "task error"},
                 ],
             ):
-                with mock.patch.object(
-                    self.agents_review, "run_verify_tasks", return_value=(0, "", "")
-                ):
+                with mock.patch.object(self.agents_review, "run_verify_tasks", return_value=(0, "", "")):
                     buf = io.StringIO()
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_review.cmd_scope(session_dir, "task")
@@ -600,9 +763,7 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
             session_dir = Path(td) / "260307_0205_review-verify-fail"
             session_dir.mkdir(parents=True, exist_ok=True)
             with mock.patch.object(self.agents_review, "inspect_artifacts", return_value=[]):
-                with mock.patch.object(
-                    self.agents_review, "run_verify_tasks", return_value=(1, "bad\n", "err\n")
-                ):
+                with mock.patch.object(self.agents_review, "run_verify_tasks", return_value=(1, "bad\n", "err\n")):
                     buf = io.StringIO()
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_review.cmd_scope(session_dir, "verify")
@@ -614,11 +775,9 @@ class ImplementAndReviewScenarioTests(unittest.TestCase):
 class SessionCloseScenarioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        scripts_dir = Path(__file__).resolve().parent.parent
+        scripts_dir = Path(".agents/scripts").resolve()
         sys.path.insert(0, str(scripts_dir))
-        cls.agents_session = load_module(
-            "agents_session_scenario_test", scripts_dir / "agents-session.py"
-        )
+        cls.agents_session = load_module("agents_session_scenario_test", scripts_dir / "agents-session.py")
         cls.execution_commands = importlib.import_module("lib.execution_commands")
 
     def _allow_temp_workbench(self, session_dir: Path) -> None:
@@ -642,9 +801,7 @@ class SessionCloseScenarioTests(unittest.TestCase):
             missing_active = Path(td) / ".active_missing"
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", missing_active):
-                with mock.patch.object(
-                    self.agents_session, "_run_strict_verify", return_value=verify
-                ):
+                with mock.patch.object(self.agents_session, "_run_strict_verify", return_value=verify):
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_session.cmd_close(args)
             self.assertEqual(code, 0)
@@ -663,18 +820,14 @@ class SessionCloseScenarioTests(unittest.TestCase):
             verify = mock.Mock(returncode=1, stdout="stdout fail\n", stderr="stderr fail\n")
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", active_file):
-                with mock.patch.object(
-                    self.agents_session, "_run_strict_verify", return_value=verify
-                ):
+                with mock.patch.object(self.agents_session, "_run_strict_verify", return_value=verify):
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_session.cmd_close(args)
             output = buf.getvalue()
             self.assertEqual(code, 1)
             self.assertIn("stdout fail", output)
             self.assertIn("stderr fail", output)
-            self.assertEqual(
-                active_file.read_text(encoding="utf-8").strip(), "260307_0302_close-fail"
-            )
+            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), "260307_0302_close-fail")
 
     def test_close_repoint_from_unset_active(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
@@ -684,15 +837,11 @@ class SessionCloseScenarioTests(unittest.TestCase):
             next_target.mkdir(parents=True, exist_ok=True)
             self._allow_temp_workbench(target)
             active_file = Path(td) / ".active_session"
-            args = argparse.Namespace(
-                **{"session": str(target), "next_session": str(next_target), "json": False}
-            )
+            args = argparse.Namespace(**{"session": str(target), "next_session": str(next_target), "json": False})
             verify = mock.Mock(returncode=0, stdout="ok\n", stderr="")
             buf = io.StringIO()
             with mock.patch.object(self.agents_session, "ACTIVE_SESSION_FILE", active_file):
-                with mock.patch.object(
-                    self.agents_session, "_run_strict_verify", return_value=verify
-                ):
+                with mock.patch.object(self.agents_session, "_run_strict_verify", return_value=verify):
                     with contextlib.redirect_stdout(buf):
                         code = self.agents_session.cmd_close(args)
             self.assertEqual(code, 0)

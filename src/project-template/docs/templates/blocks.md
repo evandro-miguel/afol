@@ -58,4 +58,4 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 ---
 
-*Blocks file: `.agents/wb/<session>/<task-id>-blocks.md`*
+*Blocks file: `<configured-wb-dir>/<session>/<task-id>-blocks.md`*

@@ -11,8 +11,9 @@ updated_at: '2026-04-24T12:29:13-03:00'
 
 ## Purpose
 
-Provide a selective benchmark family for risky scaffold execution changes using
-a real mini-tier agent, real tool calls, and bounded fixture tasks.
+Provide a selective, development-only benchmark family for risky scaffold
+execution changes using a real mini-tier agent, real tool calls, and bounded
+fixture tasks.
 
 ## Default Profile
 
@@ -44,6 +45,21 @@ a real mini-tier agent, real tool calls, and bounded fixture tasks.
 just benchmark-runtime-flow
 ```
 
+## Validation Bridge
+
+- `bun run cli/main.ts v bench --pack runtime-live-agent --json` consumes the
+  saved live benchmark artifact from:
+  - `.agents/benchmarks/runtime-flow-live-agent-v4-latest.json`
+  - the `saved_result_path` referenced by that snapshot
+- Each `runtime-live-agent` scenario must resolve to direct live evidence via
+  its explicit `live_runner_scenario_id`; index fallback and row reuse are
+  rejected.
+- Refresh live evidence with:
+  - `./.agents/agents benchmark run --save`
+- If the saved live artifact is missing or only covers a partial scenario set,
+  the validation pack returns `status=failed` with an actionable note that
+  points to the refresh command.
+
 ## Contract
 
 - Runs `codex exec --json` in an isolated fixture repo
@@ -70,8 +86,8 @@ just benchmark-runtime-flow
 
 ## Usage Policy
 
-- Run this selectively after risky runtime-flow changes.
-- Do not turn it into a universal gate for every task.
+- Run this selectively after risky runtime-flow changes during development.
+- Do not turn it into a daily or universal production gate.
 - The benchmark is only meaningful when the live agent actually uses tools.
 
 ---

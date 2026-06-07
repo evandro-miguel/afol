@@ -2,11 +2,11 @@
 doc_type: spec
 id: 260412_2004_repo-wide-simplification-runtime-parity_spec_01
 theme: repo-wide-simplification-runtime-parity
-status: active
+status: final
 owners:
 - orchestrator
 created_at: '2026-04-12T20:04:38-03:00'
-updated_at: '2026-04-12T20:05:58-03:00'
+updated_at: '2026-05-29T11:59:24-03:00'
 roadmap_feature: F-15
 spec_role: parent
 parent_spec: ''
@@ -127,13 +127,13 @@ Out of scope:
   - Use `spec-child` for map boundary cleanup, runtime registry parity, and
     Python command simplification slices when each begins.
   - Use `spec-test` only when the test strategy is itself part of the risk.
-- Planned child specs:
-  - Map boundary cleanup: decide and implement the `docs/map` vs
+- Accepted child specs:
+  - Map boundary cleanup: decided and implemented the `docs/map` vs
     `docs/map/structure` policy while retiring `docs/arc/structure`
     references.
-  - Runtime registry parity: reduce metadata drift while preserving public CLI
-    behavior.
-  - Python command simplification: reduce complexity hotspots in batches.
+  - Runtime registry parity: reduced metadata drift while preserving public
+    CLI behavior.
+  - Python command simplification: reduced complexity hotspots in batches.
 
 ## 7) Constraints and Assumptions
 
@@ -191,6 +191,10 @@ Out of scope:
   - Start with governance, then implement child slices in small batches.
 - Workstream linkage:
   - Execution must reference `roadmap_feature: F-15` and this parent spec.
+- Closure note:
+  - The accepted child slices are final in `docs/arc/SPECS/INDEX.md`.
+  - The F-15 roadmap entry is final and the current-state map docs are
+    reconciled.
 - Backout or deferral:
   - Archive moves must be reversible via `.agents/z-arq/`.
   - Runtime and script changes must remain small enough to revert per task.
@@ -212,9 +216,9 @@ Out of scope:
 
 ## 12) Acceptance Checklist
 
-- [ ] User journey is explicit
-- [ ] Scope and non-goals are explicit
-- [ ] Child-spec policy is defined
-- [ ] Constraints and risks are explicit
-- [ ] Feature intent is understandable without implementation detail
-- [ ] Verification philosophy explains how execution will be validated
+- [x] User journey is explicit
+- [x] Scope and non-goals are explicit
+- [x] Child-spec policy is defined
+- [x] Constraints and risks are explicit
+- [x] Feature intent is understandable without implementation detail
+- [x] Verification philosophy explains how execution will be validated

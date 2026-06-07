@@ -9,19 +9,21 @@ Covers:
 - Strict mode pass/fail scenarios
 """
 
-import importlib.util
-import json
+import unittest
+from unittest import mock
+import tempfile
 import shutil
 import sys
-import tempfile
-import unittest
-from datetime import datetime, timedelta
+import json
 from pathlib import Path
+from datetime import datetime, timedelta
+import importlib.util
 
 # Load the module under test dynamically
 sys.path.insert(0, str((Path(__file__).parent.parent).resolve()))
 spec = importlib.util.spec_from_file_location(
-    "verify_tasks", Path(__file__).parent.parent / "verify-tasks.py"
+    "verify_tasks",
+    Path(__file__).parent.parent / "verify-tasks.py"
 )
 verify_tasks = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(verify_tasks)
@@ -42,8 +44,8 @@ class TestEvidenceExtraction(unittest.TestCase):
         More text.
         """
         evidence = verify_tasks.extract_evidence(content, Path("test.md"))
-        self.assertTrue(evidence["has_command"])
-        self.assertGreater(evidence["evidence_count"], 0)
+        self.assertTrue(evidence['has_command'])
+        self.assertGreater(evidence['evidence_count'], 0)
 
     def test_result_evidence(self):
         """Detect result/output mentions as evidence."""
@@ -54,7 +56,7 @@ class TestEvidenceExtraction(unittest.TestCase):
         Status: success
         """
         evidence = verify_tasks.extract_evidence(content, Path("test.md"))
-        self.assertTrue(evidence["has_result"])
+        self.assertTrue(evidence['has_result'])
 
     def test_artifact_evidence(self):
         """Detect artifact file references as evidence."""
@@ -66,7 +68,7 @@ class TestEvidenceExtraction(unittest.TestCase):
         evidence: proof.md
         """
         evidence = verify_tasks.extract_evidence(content, Path("test.md"))
-        self.assertTrue(evidence["has_artifact"])
+        self.assertTrue(evidence['has_artifact'])
 
     def test_verification_evidence(self):
         """Detect verification statements as evidence."""
@@ -76,7 +78,7 @@ class TestEvidenceExtraction(unittest.TestCase):
         Tests passed successfully.
         """
         evidence = verify_tasks.extract_evidence(content, Path("test.md"))
-        self.assertTrue(evidence["has_verification"])
+        self.assertTrue(evidence['has_verification'])
 
     def test_sufficient_evidence(self):
         """Test evidence sufficiency threshold (2 of 4 criteria)."""
@@ -100,11 +102,11 @@ class TestEvidenceExtraction(unittest.TestCase):
         """Test content with no evidence."""
         content = "Just some plain text without any evidence markers."
         evidence = verify_tasks.extract_evidence(content, Path("test.md"))
-        self.assertFalse(evidence["has_command"])
-        self.assertFalse(evidence["has_result"])
-        self.assertFalse(evidence["has_artifact"])
-        self.assertFalse(evidence["has_verification"])
-        self.assertEqual(evidence["evidence_count"], 0)
+        self.assertFalse(evidence['has_command'])
+        self.assertFalse(evidence['has_result'])
+        self.assertFalse(evidence['has_artifact'])
+        self.assertFalse(evidence['has_verification'])
+        self.assertEqual(evidence['evidence_count'], 0)
 
 
 class TestReportContradictions(unittest.TestCase):
@@ -121,7 +123,7 @@ class TestReportContradictions(unittest.TestCase):
         """
         contradictions = verify_tasks.detect_report_contradictions(content)
         self.assertTrue(len(contradictions) > 0)
-        self.assertEqual(contradictions[0]["type"], "completion_conflict")
+        self.assertEqual(contradictions[0]['type'], 'completion_conflict')
 
     def test_all_completed_with_blocked(self):
         """Detect contradiction: all completed + blocked items."""
@@ -197,7 +199,7 @@ Some content here.
         doc_file.write_text(content)
 
         issues = verify_tasks.check_temporal_consistency(self.session_dir)
-        temporal_errors = [i for i in issues if i.get("severity") == "error"]
+        temporal_errors = [i for i in issues if i.get('severity') == 'error']
         self.assertTrue(len(temporal_errors) > 0)
 
     def test_timeline_later_than_updated_at(self):
@@ -221,7 +223,7 @@ status: active
         doc_file.write_text(content)
 
         issues = verify_tasks.check_temporal_consistency(self.session_dir)
-        temporal_errors = [i for i in issues if i.get("severity") == "error"]
+        temporal_errors = [i for i in issues if i.get('severity') == 'error']
         self.assertTrue(len(temporal_errors) > 0)
 
     def test_consistent_timestamps(self):
@@ -243,7 +245,7 @@ Some content.
         doc_file.write_text(content)
 
         issues = verify_tasks.check_temporal_consistency(self.session_dir)
-        temporal_errors = [i for i in issues if i.get("severity") == "error"]
+        temporal_errors = [i for i in issues if i.get('severity') == 'error']
         self.assertEqual(len(temporal_errors), 0)
 
     def test_future_frontmatter_timestamp_fails(self):
@@ -261,10 +263,8 @@ status: active
         doc_file.write_text(content)
 
         issues = verify_tasks.check_temporal_consistency(self.session_dir)
-        temporal_errors = [i for i in issues if i.get("severity") == "error"]
-        self.assertTrue(
-            any("is in the future" in i.get("description", "") for i in temporal_errors)
-        )
+        temporal_errors = [i for i in issues if i.get('severity') == 'error']
+        self.assertTrue(any("is in the future" in i.get("description", "") for i in temporal_errors))
 
 
 class TestStrictVerification(unittest.TestCase):
@@ -318,10 +318,18 @@ class TestStrictVerification(unittest.TestCase):
             "- Governing spec: `docs/arc/SPECS/test-parent-spec_01.md`\n"
         )
         (specs_dir / "test-parent-spec_01.md").write_text(
-            "---\ndoc_type: spec\nid: test-parent-spec_01\n---\n\n# Parent Spec\n"
+            "---\n"
+            "doc_type: spec\n"
+            "id: test-parent-spec_01\n"
+            "---\n\n"
+            "# Parent Spec\n"
         )
         (specs_dir / "test-child-spec_01.md").write_text(
-            "---\ndoc_type: spec\nid: test-child-spec_01\n---\n\n# Child Spec\n"
+            "---\n"
+            "doc_type: spec\n"
+            "id: test-child-spec_01\n"
+            "---\n\n"
+            "# Child Spec\n"
         )
 
         verify_tasks.ROOT_DIR = self.session_dir
@@ -453,7 +461,12 @@ class TestStrictVerification(unittest.TestCase):
             "1. Keep the current workflow.\n"
             "2. Enforce stronger verification.\n\n"
             "## Preferred Direction\n"
-            "- Selected: stronger verification with evidence.\n"
+            "- Selected: stronger verification with evidence.\n\n"
+            "## Sidecar Justification\n\n"
+            "- Blocking question: Which verification lane should own strict evidence checks?\n"
+            "- Decision produced: Keep strict verification as the closure gate.\n"
+            "- Execution task affected: T-01\n"
+            "- Stop condition: The task has passing evidence.\n"
         )
         explorer_content = (
             "---\n"
@@ -469,7 +482,12 @@ class TestStrictVerification(unittest.TestCase):
             "## Findings\n"
             "- The repo already validates evidence and coherence.\n\n"
             "## Impact on the Plan\n"
-            "- Keep strict verification central.\n"
+            "- Keep strict verification central.\n\n"
+            "## Sidecar Justification\n\n"
+            "- Blocking question: Which files control strict task verification?\n"
+            "- Decision produced: verify-tasks.py remains the central strict verifier.\n"
+            "- Execution task affected: T-01\n"
+            "- Stop condition: Relevant verification files were inspected.\n"
         )
 
         (self.session_dir / "test_plan_01.md").write_text(plan_content)
@@ -529,9 +547,9 @@ class TestStrictVerification(unittest.TestCase):
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertTrue(all_completed)
-        self.assertEqual(len(results["evidence_issues"]), 0)
-        self.assertEqual(len(results["contradictions"]), 0)
-        self.assertEqual(len(results["governance_issues"]), 0)
+        self.assertEqual(len(results['evidence_issues']), 0)
+        self.assertEqual(len(results['contradictions']), 0)
+        self.assertEqual(len(results['governance_issues']), 0)
 
     def test_strict_mode_fails_without_evidence(self):
         """Strict mode fails when completed tasks lack evidence."""
@@ -548,8 +566,8 @@ class TestStrictVerification(unittest.TestCase):
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results["evidence_issues"]), 0)
-        self.assertEqual(len(results["governance_issues"]), 0)
+        self.assertGreater(len(results['evidence_issues']), 0)
+        self.assertEqual(len(results['governance_issues']), 0)
 
     def test_strict_mode_fails_with_contradictions(self):
         """Strict mode fails when report has contradictions."""
@@ -565,13 +583,16 @@ class TestStrictVerification(unittest.TestCase):
                 "```\n\n"
                 "Result: Success.\n"
             ),
-            report_body=("All tasks completed!\n\nHowever, some items are still pending review.\n"),
+            report_body=(
+                "All tasks completed!\n\n"
+                "However, some items are still pending review.\n"
+            ),
         )
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results["contradictions"]), 0)
-        self.assertEqual(len(results["governance_issues"]), 0)
+        self.assertGreater(len(results['contradictions']), 0)
+        self.assertEqual(len(results['governance_issues']), 0)
 
     def test_strict_mode_fails_done_task_with_failed_evidence_ledger(self):
         """Strict mode rejects done tasks that cite blocking failed evidence."""
@@ -755,7 +776,13 @@ class TestStrictVerification(unittest.TestCase):
             "# Report\n"
         )
         (self.session_dir / "test_log_01.md").write_text(
-            f"---\ndoc_type: log\nid: test_log_01\nstatus: active\n{governance}---\n\n# Log\n"
+            "---\n"
+            "doc_type: log\n"
+            "id: test_log_01\n"
+            "status: active\n"
+            f"{governance}"
+            "---\n\n"
+            "# Log\n"
         )
         self._write_valid_evidence()
 
@@ -778,9 +805,7 @@ class TestStrictVerification(unittest.TestCase):
             plan_body="# Plan\n\n## Progress\n- [x] 2026-03-23 18:00Z - Only progress present.\n",
         )
         report_file = self.session_dir / "test_report_01.md"
-        report_file.write_text(
-            report_file.read_text().replace("status: active", "status: final", 1)
-        )
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
         postmortem_file = self.session_dir / "test_postmortem_01.md"
         postmortem_file.write_text(
             "---\n"
@@ -789,7 +814,7 @@ class TestStrictVerification(unittest.TestCase):
             "status: final\n"
             "roadmap_feature: F-01\n"
             "parent_spec: test-parent-spec_01\n"
-            'child_spec: ""\n'
+            "child_spec: \"\"\n"
             "---\n\n"
             "# Postmortem\n"
         )
@@ -828,9 +853,7 @@ class TestStrictVerification(unittest.TestCase):
             plan_body=plan_body,
         )
         report_file = self.session_dir / "test_report_01.md"
-        report_file.write_text(
-            report_file.read_text().replace("status: active", "status: final", 1)
-        )
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
         postmortem_file = self.session_dir / "test_postmortem_01.md"
         postmortem_file.write_text(
             "---\n"
@@ -839,7 +862,7 @@ class TestStrictVerification(unittest.TestCase):
             "status: final\n"
             "roadmap_feature: F-01\n"
             "parent_spec: test-parent-spec_01\n"
-            'child_spec: ""\n'
+            "child_spec: \"\"\n"
             "---\n\n"
             "# Postmortem\n"
         )
@@ -883,9 +906,7 @@ class TestStrictVerification(unittest.TestCase):
             report_body="Implementation completed and verified.\n",
         )
         report_file = self.session_dir / "test_report_01.md"
-        report_file.write_text(
-            report_file.read_text().replace("status: active", "status: final", 1)
-        )
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
         (self.session_dir / "test_postmortem_01.md").write_text(
             "---\n"
             "doc_type: postmortem\n"
@@ -893,7 +914,7 @@ class TestStrictVerification(unittest.TestCase):
             "status: final\n"
             "roadmap_feature: F-01\n"
             "parent_spec: test-parent-spec_01\n"
-            'child_spec: ""\n'
+            "child_spec: \"\"\n"
             "---\n\n"
             "# Postmortem\n"
         )
@@ -916,9 +937,7 @@ class TestStrictVerification(unittest.TestCase):
             report_body="Implementation completed and verified.\n",
         )
         report_file = self.session_dir / "test_report_01.md"
-        report_file.write_text(
-            report_file.read_text().replace("status: active", "status: final", 1)
-        )
+        report_file.write_text(report_file.read_text().replace("status: active", "status: final", 1))
         (self.session_dir / "test_postmortem_01.md").write_text(
             "---\n"
             "doc_type: postmortem\n"
@@ -926,8 +945,9 @@ class TestStrictVerification(unittest.TestCase):
             "status: final\n"
             "roadmap_feature: F-01\n"
             "parent_spec: test-parent-spec_01\n"
-            'child_spec: ""\n'
-            "---\n\n" + self._valid_postmortem_body()
+            "child_spec: \"\"\n"
+            "---\n\n"
+            + self._valid_postmortem_body()
         )
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
@@ -1030,7 +1050,7 @@ id: test_task_01
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=False)
         self.assertTrue(all_completed)
         # Evidence issues should not be populated in non-strict mode
-        self.assertEqual(len(results.get("evidence_issues", [])), 0)
+        self.assertEqual(len(results.get('evidence_issues', [])), 0)
 
     def test_strict_mode_fails_on_plan_task_link_mismatch(self):
         """Strict mode fails when latest plan links task that does not reference the plan."""
@@ -1110,8 +1130,8 @@ links:
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results.get("coherence_issues", [])), 0)
-        self.assertEqual(len(results.get("governance_issues", [])), 0)
+        self.assertGreater(len(results.get('coherence_issues', [])), 0)
+        self.assertEqual(len(results.get('governance_issues', [])), 0)
 
     def test_strict_mode_fails_when_final_doc_has_open_checklist(self):
         """Strict mode fails when status=final doc still has open checklist markers."""
@@ -1185,7 +1205,7 @@ status: final
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results.get("final_doc_issues", [])), 0)
+        self.assertGreater(len(results.get('final_doc_issues', [])), 0)
 
     def test_strict_mode_fails_on_governance_mismatch(self):
         """Strict mode fails when latest task/log/report do not match plan governance."""
@@ -1236,7 +1256,8 @@ status: final
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results.get("meta_task_issues", [])), 0)
+        self.assertEqual(len(results.get("meta_task_issues", [])), 1)
+        self.assertIn("contains meta-planning as primary task", results["meta_task_issues"][0]["description"])
 
     def test_strict_mode_rejects_task_meta_planning_rows(self):
         self._write_standard_docs(
@@ -1253,7 +1274,119 @@ status: final
 
         all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
         self.assertFalse(all_completed)
-        self.assertGreater(len(results.get("meta_task_issues", [])), 0)
+        self.assertEqual(len(results.get("meta_task_issues", [])), 1)
+        self.assertIn("contains meta-planning as primary task", results["meta_task_issues"][0]["description"])
+
+    def test_meta_task_integrity_allows_direct_executable_tasks(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Run pytest and verify results |\n\n"
+                "```bash\npython3 test.py\n```\n"
+                "Result: passed\n"
+            ),
+            plan_body=(
+                "# Plan\n\n"
+                "## Purpose / Big Picture\n"
+                "Drive the implementation forward.\n\n"
+                "## Progress\n"
+                "- [x] 2026-03-23 18:00Z - Baseline planning completed.\n\n"
+                "## Surprises & Discoveries\n"
+                "- Observation: execution completed.\n\n"
+                "## Decision Log\n"
+                "- Decision: keep the workbench plan canonical.\n"
+                "  Rationale: execution is explicit.\n"
+                "  Date/Author: 2026-03-23 / test\n\n"
+                "## Outcomes & Retrospective\n"
+                "- Outcome: baseline prepared.\n"
+                "- Remaining: implementation.\n"
+                "- Lesson: use direct execution.\n\n"
+                "## Context and Orientation\n"
+                "Current repo state and key files.\n\n"
+                "## Plan of Work\n"
+                "Describe the sequence of changes.\n\n"
+                "## Concrete Steps\n"
+                "1. Run tests.\n"
+                "2. Review outputs and merge.\n\n"
+                "## Validation and Acceptance\n"
+                "- Run pytest and expect success.\n\n"
+                "## Idempotence and Recovery\n"
+                "Safe to rerun validation.\n\n"
+                "## Artifacts and Notes\n"
+                "- None.\n\n"
+                "## Interfaces and Dependencies\n"
+                "- verify-tasks.py\n"
+            ),
+        )
+
+        issues = verify_tasks.check_meta_task_integrity(verify_tasks.load_frontmatter_docs(self.session_dir))
+        self.assertEqual(len(issues), 0)
+
+    def test_strict_mode_rejects_sidecar_without_justification(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npython3 test.py\n```\n"
+                "Result: passed\n"
+            ),
+        )
+        (self.session_dir / "test_research_01.md").write_text(
+            "---\n"
+            "doc_type: research\n"
+            "id: test_research_01\n"
+            "status: active\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            'child_spec: ""\n'
+            "---\n\n"
+            "# Research\n\n"
+            "Focused investigation that affects implementation.\n"
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertFalse(all_completed)
+        self.assertEqual(len(results.get("sidecar_justification_issues", [])), 1)
+        self.assertIn("missing Sidecar Justification", results["sidecar_justification_issues"][0]["description"])
+
+    def test_strict_mode_allows_sidecar_with_execution_justification(self):
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with evidence |\n\n"
+                "```bash\npython3 test.py\n```\n"
+                "Result: passed\n"
+            ),
+        )
+        (self.session_dir / "test_research_01.md").write_text(
+            "---\n"
+            "doc_type: research\n"
+            "id: test_research_01\n"
+            "status: active\n"
+            "roadmap_feature: F-01\n"
+            "parent_spec: test-parent-spec_01\n"
+            'child_spec: ""\n'
+            "---\n\n"
+            "# Research\n\n"
+            "Focused investigation that affects implementation.\n\n"
+            "## Sidecar Justification\n\n"
+            "- Blocking question: Which validation hook owns the regression check?\n"
+            "- Decision produced: verify-tasks strict owns persisted sidecar validation.\n"
+            "- Execution task affected: T-01\n"
+            "- Stop condition: The strict check has a focused passing test.\n"
+        )
+
+        _, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertEqual(len(results.get("sidecar_justification_issues", [])), 0)
 
     def test_state_board_parses_compound_owner_values(self):
         self._write_standard_docs(
@@ -1275,5 +1408,137 @@ status: final
         self.assertEqual(tasks[0][2], "done")
 
 
-if __name__ == "__main__":
+class TestWorkbenchRootEvidenceResolution(unittest.TestCase):
+    """Strict evidence checks should resolve ledgers per workbench session."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.workbench_root = Path(self.temp_dir) / "wb"
+        self.workbench_root.mkdir(parents=True)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def _write_session(self, session_name: str, *, with_ledger: bool) -> Path:
+        session_dir = self.workbench_root / session_name
+        session_dir.mkdir(parents=True)
+        (session_dir / f"{session_name}_task_01.md").write_text(
+            "# Tasks\n\n"
+            "## State Board\n\n"
+            "| Task | State | Owner | Notes |\n"
+            "|------|-------|-------|-------|\n"
+            "| T-01 | done | worker | completed |\n"
+        )
+        if with_ledger:
+            (session_dir / ".evidence.jsonl").write_text(
+                json.dumps(
+                    {
+                        "id": f"E-{session_name}",
+                        "task_id": "T-01",
+                        "command": "python3 -m unittest",
+                        "result": "passed",
+                        "artifacts": [f"{session_name}_task_01.md"],
+                        "note": "",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        return session_dir
+
+    def test_workbench_root_strict_uses_nearest_session_ledger(self):
+        self._write_session("s1", with_ledger=True)
+        self._write_session("s2", with_ledger=True)
+
+        with mock.patch.object(verify_tasks, "_run_strict_session_checks", return_value=True):
+            all_completed, results = verify_tasks.verify_session(self.workbench_root, strict=True)
+
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["evidence_issues"]), 0)
+
+    def test_workbench_root_does_not_share_evidence_between_sessions(self):
+        session_with_ledger = self._write_session("s1", with_ledger=True)
+        self._write_session("s2", with_ledger=False)
+
+        with mock.patch.object(verify_tasks, "_run_strict_session_checks", return_value=True):
+            all_completed, results = verify_tasks.verify_session(self.workbench_root, strict=True)
+
+        self.assertFalse(all_completed)
+        self.assertEqual(len(results["evidence_issues"]), 1)
+        issue_file = Path(results["evidence_issues"][0]["file"])
+        self.assertEqual(issue_file.parent.name, "s2")
+        self.assertNotEqual(issue_file.parent, session_with_ledger)
+
+
+class TestDocumentationTaskExamples(unittest.TestCase):
+    """Task-looking docs templates/examples are not executable workbench tasks."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.root = Path(self.temp_dir)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def _write(self, relative_path: str, content: str) -> None:
+        path = self.root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    def test_strict_root_ignores_docs_templates_and_lesson_examples(self):
+        task_body = (
+            "# Tasks\n\n"
+            "## State Board\n\n"
+            "| Task | State | Owner | Notes |\n"
+            "|------|-------|-------|-------|\n"
+            "| T-01 | pending | worker | template example |\n"
+        )
+        self._write("docs/templates/task.md", task_body)
+        self._write("src/project-template/docs/templates/task.md", task_body)
+        self._write(
+            "docs/lessons/entries/20260224_1425_task-list-vs-state-board.md",
+            "- [ ] T-03 Example task from documentation.\n",
+        )
+        malformed = self.root / ".agents/tmp/pytest-runtime-basetemp/example/malformed.md"
+        malformed.parent.mkdir(parents=True, exist_ok=True)
+        malformed.write_bytes(b"\xff\xfe# not utf-8")
+
+        with mock.patch.object(verify_tasks, "_run_strict_session_checks", return_value=True):
+            all_completed, results = verify_tasks.verify_session(self.root, strict=True)
+
+        self.assertTrue(all_completed)
+        self.assertEqual(results["total_tasks"], 0)
+        self.assertEqual(results["open_tasks"], [])
+        self.assertEqual(results["evidence_issues"], [])
+
+    def test_strict_root_still_detects_real_workbench_tasks(self):
+        session = "260531_1201_verify"
+        self._write(
+            f".agents/wb/{session}/{session}_task_01.md",
+            "# Tasks\n\n"
+            "## State Board\n\n"
+            "| Task | State | Owner | Notes |\n"
+            "|------|-------|-------|-------|\n"
+            "| T-01 | pending | worker | real workbench task |\n",
+        )
+
+        with mock.patch.object(verify_tasks, "_run_strict_session_checks", return_value=True):
+            all_completed, results = verify_tasks.verify_session(self.root, strict=True)
+
+        self.assertFalse(all_completed)
+        self.assertEqual(results["total_tasks"], 1)
+        self.assertEqual(len(results["open_tasks"]), 1)
+        self.assertIn("/.agents/wb/", results["open_tasks"][0]["file"].as_posix())
+
+    def test_task_integrity_ignores_malformed_tmp_markdown(self):
+        malformed = self.root / ".agents/tmp/pytest-runtime-basetemp/example/malformed.md"
+        malformed.parent.mkdir(parents=True, exist_ok=True)
+        malformed.write_bytes(b"\xff\xfe# not utf-8")
+
+        issues = verify_tasks.check_meta_task_integrity(self.root)
+
+        self.assertEqual(issues, [])
+
+
+if __name__ == '__main__':
     unittest.main()

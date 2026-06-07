@@ -43,7 +43,9 @@ Mandatory local rules for downstream bootstrap.
 ## Quick Start
 
 ```bash
-./.agents/agents tools list
+./afol --help
+./afol rule list
+./afol skill list
 just doctor
 just lint
 just verify

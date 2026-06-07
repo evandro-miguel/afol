@@ -40,7 +40,7 @@ def _latest_spec_artifact(session_dir: Path) -> Path | None:
 
 def run_verify_tasks(session_dir: Path) -> Tuple[int, str, str]:
     proc = subprocess.run(
-        [sys.executable, str(ROOT_DIR / ".agents/scripts/verify-tasks.py"), str(session_dir)],
+        [sys.executable, str(ROOT_DIR / ".agents/scripts/verify-tasks.py"), "--strict", str(session_dir)],
         capture_output=True,
         text=True,
     )

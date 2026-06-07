@@ -39,3 +39,13 @@ initial plan that governed the work.
 Use the aggregate validation gate, fix concrete findings only, and add concise
 workbench artifacts tied to real evidence. Defer broader cleanup unless a gate
 or code review finding proves it is necessary.
+
+## Sidecar Justification
+
+- Blocking question: Which closure path should repair the Python runtime
+  hardening governance gaps without expanding the feature scope?
+- Decision produced: Keep the aggregate validation gate and add only concise
+  workbench artifacts tied to real evidence.
+- Execution task affected: T-01
+- Stop condition: Strict verification accepts the historical session evidence
+  and no deterministic gate reports a remaining blocker.

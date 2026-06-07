@@ -15,6 +15,16 @@ links:
   plan: <plan_doc_id>
 created_at: YYYY-MM-DDTHH:MM:SSZ
 updated_at: '2026-04-04T10:08:11-03:00'
+output_artifacts:
+  primary:
+    research: YYMMDD_HHMM_<theme>_research_01
+  links:
+    roadmap: <roadmap_path>
+    plan: <plan_doc_id>
+    task: <task_doc_id_or_empty>
+    report: <report_doc_id_or_empty>
+    postmortem: <postmortem_doc_id_or_empty>
+  sidecar_justification: <required|not_required>
 ---
 
 # Research: <theme>
@@ -40,6 +50,19 @@ updated_at: '2026-04-04T10:08:11-03:00'
 ## Open Unknowns
 
 - <unknown that still blocks action>
+
+## Output Artifact Contract
+
+- If this sidecar exists, record `sidecar_justification` as `required`.
+- If not required, set `sidecar_justification` to `not_required` and still keep
+  the field explicit.
+
+## Sidecar Justification
+
+- Blocking question: <question this sidecar must answer>
+- Decision produced: <decision or N/A until answered>
+- Execution task affected: <T-XX>
+- Stop condition: <what makes this sidecar complete>
 
 ---
 

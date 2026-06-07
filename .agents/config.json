@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "project": {
+    "name": "agentic-start-folder-dev-refactor-ts"
+  },
+  "paths": {
+    "agents_dir": ".agents",
+    "wb_dir": ".agents/wb",
+    "docs_dir": "docs"
+  }
+}
