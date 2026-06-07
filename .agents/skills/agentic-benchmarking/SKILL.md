@@ -29,6 +29,8 @@ benchmarks small, bounded, and evidence-driven.
 ## Plan And Task Rubric
 
 Threshold: 80/100.
+Required gates: scope/target, validation/evidence, constraints/safety, and task
+executability.
 
 | Criterion | Weight | Pass signal |
 | --- | ---: | --- |
@@ -42,6 +44,7 @@ Threshold: 80/100.
 ## Execution And Report Rubric
 
 Threshold: 85/100.
+Required gates: functional correctness, evidence/task state, and scope control.
 
 | Criterion | Weight | Pass signal |
 | --- | ---: | --- |

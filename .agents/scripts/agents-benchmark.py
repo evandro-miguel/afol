@@ -1639,17 +1639,30 @@ def _quality_criterion(
     }
 
 
-def _finalize_quality_score(phase: str, threshold: int, criteria: list[dict[str, Any]]) -> dict[str, Any]:
+def _finalize_quality_score(
+    phase: str,
+    threshold: int,
+    criteria: list[dict[str, Any]],
+    required_ids: set[str] | None = None,
+) -> dict[str, Any]:
     max_score = sum(int(item["weight"]) for item in criteria)
     score = sum(int(item["score"]) for item in criteria)
     if max_score != 100:
         raise ValueError(f"{phase} quality rubric must total 100 points")
+    required_ids = required_ids or set()
+    required_failures = [
+        str(item["id"])
+        for item in criteria
+        if str(item["id"]) in required_ids and not item.get("passed")
+    ]
     return {
         "phase": phase,
         "score": score,
         "max_score": max_score,
         "threshold": threshold,
-        "pass": score >= threshold,
+        "pass": score >= threshold and not required_failures,
+        "required_ids": sorted(required_ids),
+        "required_failures": required_failures,
         "criteria": criteria,
     }
 
@@ -1704,6 +1717,8 @@ def _has_passed_code_task_report_evidence(evidence_records: list[dict[str, Any]]
 
 def _code_task_changed_paths(repo_root: Path) -> list[str]:
     status = subprocess.run(["git", "status", "--short"], cwd=repo_root, capture_output=True, text=True, timeout=10)
+    if status.returncode != 0:
+        return ["<git-status-unavailable>"]
     return [line[3:] for line in status.stdout.splitlines() if len(line) > 3]
 
 
@@ -1766,7 +1781,12 @@ def _score_code_task_plan_quality(plan_text: str, task_text: str) -> dict[str, A
             "requires task id, state, source file, and acceptance command",
         ),
     ]
-    return _finalize_quality_score("plan_task", CODE_TASK_PLAN_QUALITY_THRESHOLD, criteria)
+    return _finalize_quality_score(
+        "plan_task",
+        CODE_TASK_PLAN_QUALITY_THRESHOLD,
+        criteria,
+        {"scope_target", "validation_evidence", "constraints_safety", "task_executability"},
+    )
 
 
 def _validate_code_task_plan_quality(plan_text: str, task_text: str) -> list[str]:
@@ -1866,7 +1886,12 @@ def _score_code_task_report_quality(
             "requires clear passed/done status and no contradictory failed status",
         ),
     ]
-    return _finalize_quality_score("report_execution", CODE_TASK_REPORT_QUALITY_THRESHOLD, criteria)
+    return _finalize_quality_score(
+        "report_execution",
+        CODE_TASK_REPORT_QUALITY_THRESHOLD,
+        criteria,
+        {"functional_correctness", "evidence_task_state", "scope_control"},
+    )
 
 
 def _score_code_task_delivery_quality(

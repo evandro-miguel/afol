@@ -97,6 +97,8 @@ Scripted checks are primary. Qualitative scoring is used only for artifacts that
 need reading judgment, such as plan/task/report coherence.
 
 Plan/task threshold: 80/100.
+Required gates: scope/target, validation/evidence, constraints/safety, and task
+executability.
 
 | Criterion | Weight | Checks |
 | --- | ---: | --- |
@@ -108,6 +110,7 @@ Plan/task threshold: 80/100.
 | Task executability | 10 | Task has state, target, and acceptance command. |
 
 Execution/report threshold: 85/100.
+Required gates: functional correctness, evidence/task state, and scope control.
 
 | Criterion | Weight | Checks |
 | --- | ---: | --- |

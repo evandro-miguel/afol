@@ -374,8 +374,10 @@ def test_score_code_task_plan_quality_penalizes_vague_artifacts():
     )
 
     assert quality["score"] < benchmark.CODE_TASK_PLAN_QUALITY_THRESHOLD
+    assert quality["pass"] is False
     failed_ids = {item["id"] for item in quality["criteria"] if not item["passed"]}
     assert {"scope_target", "execution_path", "validation_evidence", "task_executability"} <= failed_ids
+    assert "scope_target" in quality["required_failures"]
 
 
 def test_validate_code_task_planner_rejects_metadata_only_plan_and_vague_task(tmp_path):
@@ -454,6 +456,7 @@ def test_validate_code_task_executor_accepts_completed_slugify_task(tmp_path):
         "Changed files: test-code-task-project/src/text_utils.py, test-code-task-project/benchmark_report.md.\n",
         encoding="utf-8",
     )
+    benchmark._git_baseline_fixture(tmp_path)
 
     failures = benchmark._validate_code_task_executor(
         {
@@ -518,6 +521,46 @@ def test_score_code_task_delivery_quality_combines_plan_and_report_rubrics():
     assert quality["score"] == 100
     assert quality["pass"] is True
     assert quality["weights"] == {"plan_task": 0.4, "report_execution": 0.6}
+
+
+def test_score_code_task_report_quality_fails_scope_control_gate():
+    benchmark = load_module()
+    session_id = "260607_1300_code-task-benchmark"
+    report_text = (
+        "# Benchmark Report\n\n"
+        f"Session: {session_id}\n"
+        "Task: T-01 done.\n"
+        "Summary: slugify implemented in test-code-task-project/src/text_utils.py.\n"
+        "Verification: python3 scripts/check_slugify.py passed.\n"
+        "Evidence: recorded in AFOL ledger.\n"
+        "Changed files: test-code-task-project/src/text_utils.py, test-code-task-project/benchmark_report.md.\n"
+    )
+    evidence_text = (
+        '{"task_id":"T-01","command":"python3 scripts/check_slugify.py",'
+        '"result":"passed","artifact":"test-code-task-project/benchmark_report.md"}\n'
+    )
+    task_text = (
+        "| T-01 | done | worker | Implement slugify(text) in "
+        "test-code-task-project/src/text_utils.py and verify with python3 scripts/check_slugify.py. |\n"
+    )
+
+    quality = benchmark._score_code_task_report_quality(
+        session_id,
+        report_text,
+        evidence_text,
+        task_text,
+        ["README.md"],
+    )
+
+    assert quality["score"] == benchmark.CODE_TASK_REPORT_QUALITY_THRESHOLD
+    assert quality["pass"] is False
+    assert quality["required_failures"] == ["scope_control"]
+
+
+def test_code_task_changed_paths_fails_closed_outside_git_repo(tmp_path):
+    benchmark = load_module()
+
+    assert benchmark._code_task_changed_paths(tmp_path) == ["<git-status-unavailable>"]
 
 
 def test_validate_code_task_executor_rejects_incoherent_delivery_report(tmp_path):
