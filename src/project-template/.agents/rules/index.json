@@ -33,6 +33,6 @@
       "surfaces": ["structure", "scaffold"],
       "work_types": ["delivery", "implementation", "refactor"],
       "priority": 50
-    },
+    }
   ]
 }

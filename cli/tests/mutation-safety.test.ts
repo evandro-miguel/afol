@@ -183,6 +183,34 @@ describe("mutation safety command family", () => {
     }
   });
 
+  test("mv missing source fails instead of reporting success", () => {
+    const root = mkProjectRoot();
+    try {
+      const proc = runKernel(root, [
+        "f",
+        "mv",
+        "--session",
+        "S-07",
+        "--task-id",
+        "T-07",
+        "--reason",
+        "missing move",
+        "--path",
+        "mut/missing.txt",
+        "--to",
+        "mut/destination.txt",
+        "--json",
+      ]);
+
+      expect(proc.status).toBe(2);
+      expect(proc.stdout as string).toBe("");
+      expect(proc.stderr as string).toContain("Source file not found: mut/missing.txt");
+      expect(readMutationJournal(root)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("ar dry-run reports deterministic destination and does not mutate", () => {
     const root = mkProjectRoot();
     try {

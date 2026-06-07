@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import type { BootstrapManifestEntry, ManagedOwnership } from "../services/bootstrap/planner";
@@ -25,6 +25,11 @@ type MutableBaselineOperation = {
   sourcePath: string;
 };
 
+type ProviderCompatibleCleanupOperation = {
+  path: string;
+  reason: string;
+};
+
 const MUTABLE_BASELINE_SOURCES = [
   { suffix: "skills/README.md", sourcePath: ".agents/skills/README.md" },
   { suffix: "wb/README.md", sourcePath: ".agents/wb/README.md" },
@@ -32,6 +37,13 @@ const MUTABLE_BASELINE_SOURCES = [
   { suffix: "data/README.md", sourcePath: ".agents/data/README.md" },
   { suffix: "data/events/README.md", sourcePath: ".agents/data/events/README.md" },
   { suffix: "data/index/README.md", sourcePath: ".agents/data/index/README.md" },
+] as const;
+
+const PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS = [
+  ".agents/data",
+  ".agents/skills",
+  ".agents/tmp",
+  ".agents/wb",
 ] as const;
 
 function sha256Hex(content: Buffer): string {
@@ -143,6 +155,12 @@ function buildBootstrapTemplateFiles(mutableDir: string): TemplateFileMap {
     return templateFiles;
   }
 
+  for (const path of Object.keys(templateFiles)) {
+    if (PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS.some((root) => path === root || path.startsWith(`${root}/`))) {
+      delete templateFiles[path];
+    }
+  }
+
   const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
   if (!configEntry) {
     return templateFiles;
@@ -177,6 +195,34 @@ function planMutableBaselines(targetRoot: string, mutableDir: string): MutableBa
     });
   }
   return operations;
+}
+
+function planProviderCompatibleAgentsMutableCleanup(
+  targetRoot: string,
+  mutableDir: string,
+): ProviderCompatibleCleanupOperation[] {
+  if (mutableDir === ".agents") {
+    return [];
+  }
+
+  return PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS
+    .filter((path) => existsSync(join(targetRoot, path)))
+    .map((path) => ({
+      path,
+      reason: "provider-compatible-mutable-state-moved-to-afol",
+    }));
+}
+
+function cleanupProviderCompatibleAgentsMutable(
+  targetRoot: string,
+  operations: readonly ProviderCompatibleCleanupOperation[],
+): void {
+  for (const operation of operations) {
+    const absolutePath = join(targetRoot, operation.path);
+    if (existsSync(absolutePath)) {
+      rmSync(absolutePath, { recursive: true, force: true });
+    }
+  }
 }
 
 async function writeMutableBaselines(targetRoot: string, operations: MutableBaselineOperation[]): Promise<void> {
@@ -323,6 +369,7 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
   });
   const cleanupPlan = planBootstrapCleanup(parsed.targetRoot);
   const mutableBaselinePlan = planMutableBaselines(parsed.targetRoot, parsed.mutableDir);
+  const providerCompatibleCleanupPlan = planProviderCompatibleAgentsMutableCleanup(parsed.targetRoot, parsed.mutableDir);
 
   const conflicts = plan.operations.filter((operation) => operation.kind === "conflict");
   const writable = plan.operations.filter((operation) =>
@@ -338,6 +385,7 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
       `operations=${plan.operations.length}`,
       `conflicts=${conflicts.length}`,
       `cleanup=${cleanupPlan.candidates.length}`,
+      `provider_cleanup=${providerCompatibleCleanupPlan.length}`,
     ].join(" "),
   );
 
@@ -349,6 +397,9 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
   }
   for (const operation of mutableBaselinePlan) {
     console.log(`mutable-baseline-${operation.kind} ${operation.path} source=${operation.sourcePath} ${operation.reason}`);
+  }
+  for (const operation of providerCompatibleCleanupPlan) {
+    console.log(`provider-compatible-cleanup-pending ${operation.path} ${operation.reason}`);
   }
 
   if (parsed.dryRun) {
@@ -375,6 +426,10 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
     }
   }
   await writeMutableBaselines(parsed.targetRoot, mutableBaselinePlan);
+  cleanupProviderCompatibleAgentsMutable(parsed.targetRoot, providerCompatibleCleanupPlan);
+  for (const operation of providerCompatibleCleanupPlan) {
+    console.log(`provider-compatible-cleanup-removed ${operation.path} ${operation.reason}`);
+  }
 
   return 0;
 }

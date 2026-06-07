@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 
 import {
   scanProjectTemplateForbiddenTextReferences,
@@ -9,6 +10,31 @@ import {
   scanProjectTemplateUnknownAllowedPaths,
   scanTemplateForbiddenPaths,
 } from "../schemas/template-policy";
+
+function toPosixPath(path: string): string {
+  return path.split(sep).join("/");
+}
+
+async function collectJsonFiles(root: string): Promise<string[]> {
+  const paths: string[] = [];
+
+  async function walk(currentDir: string): Promise<void> {
+    const entries = await readdir(currentDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const absolutePath = join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(absolutePath);
+        continue;
+      }
+      if (entry.isFile() && entry.name.endsWith(".json")) {
+        paths.push(toPosixPath(relative(root, absolutePath)));
+      }
+    }
+  }
+
+  await walk(root);
+  return paths.sort();
+}
 
 describe("template forbidden-content policy", () => {
   test("matches expected forbidden patterns in a small fixture", async () => {
@@ -78,5 +104,27 @@ describe("template forbidden-content policy", () => {
     }
 
     expect(matches).toEqual([]);
+  });
+
+  test("live src/project-template JSON files parse", async () => {
+    const templateRoot = join(process.cwd(), "src/project-template");
+    const jsonFiles = await collectJsonFiles(templateRoot);
+    const failures: string[] = [];
+
+    for (const relativePath of jsonFiles) {
+      const absolutePath = join(templateRoot, relativePath);
+      try {
+        JSON.parse(await readFile(absolutePath, "utf8"));
+      } catch (error) {
+        failures.push(`${relativePath}: ${(error as Error).message}`);
+      }
+    }
+
+    if (failures.length > 0) {
+      throw new Error([`Invalid JSON in src/project-template (${failures.length}):`, ...failures].join("\n"));
+    }
+
+    expect(jsonFiles.length).toBeGreaterThan(0);
+    expect(failures).toEqual([]);
   });
 });

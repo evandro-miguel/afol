@@ -495,17 +495,7 @@ function runMoveMutation(args: MoveArgs, projectRoot: string): CommandResult {
   }
 
   if (!existsSync(source.path)) {
-    return {
-      command: "mv",
-      status: "noop",
-      dry_run: false,
-      session: args.session,
-      task_id: args.taskId,
-      reason: args.reason,
-      path: source.relativePath,
-      destination: destination.relativePath,
-      mutation_id: mutationId,
-    };
+    throw new Error(`Source file not found: ${source.relativePath}`);
   }
 
   requireWriteContext(args);

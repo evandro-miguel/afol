@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { TemplateFileMap } from "../services/template/payload";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
 import { runBootstrapCommand } from "../commands/bootstrap";
@@ -71,6 +71,10 @@ describe("bootstrap provider-compatible mutable state", () => {
       expect(exitCode).toBe(0);
       expect(existsSync(join(target, ".agents", "config.json"))).toBe(true);
       expect(existsSync(join(target, ".agents", "rules", "index.json"))).toBe(true);
+      expect(existsSync(join(target, ".agents", "skills"))).toBe(false);
+      expect(existsSync(join(target, ".agents", "wb"))).toBe(false);
+      expect(existsSync(join(target, ".agents", "tmp"))).toBe(false);
+      expect(existsSync(join(target, ".agents", "data"))).toBe(false);
       expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(true);
       expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
       expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
@@ -117,6 +121,35 @@ describe("bootstrap provider-compatible mutable state", () => {
 
       expect(await runBootstrapCommand([target, "--provider-compatible", "--force-managed"])).toBe(0);
       expect(readFileSync(wbReadme, "utf8")).toBe(edited);
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+
+  test("provider-compatible removes legacy mutable roots from .agents target", async () => {
+    const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-cleanup-"));
+    try {
+      for (const relativePath of [
+        ".agents/skills/custom.md",
+        ".agents/wb/session/task.md",
+        ".agents/tmp/scratch.txt",
+        ".agents/data/events/events.jsonl",
+      ]) {
+        const absolutePath = join(target, relativePath);
+        mkdirSync(dirname(absolutePath), { recursive: true });
+        writeFileSync(absolutePath, "legacy mutable\n", "utf8");
+      }
+
+      expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(0);
+
+      expect(existsSync(join(target, ".agents", "skills"))).toBe(false);
+      expect(existsSync(join(target, ".agents", "wb"))).toBe(false);
+      expect(existsSync(join(target, ".agents", "tmp"))).toBe(false);
+      expect(existsSync(join(target, ".agents", "data"))).toBe(false);
+      expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(true);
+      expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
+      expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
+      expect(existsSync(join(target, ".afol", "data", "README.md"))).toBe(true);
     } finally {
       rmSync(target, { recursive: true, force: true });
     }

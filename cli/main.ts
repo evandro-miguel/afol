@@ -68,6 +68,8 @@ const NEW_COMMAND_HELP = [
   "  --task <text>            Initial task summary",
 ].join("\n");
 
+const DELEGATE_UNAVAILABLE_MESSAGE = "delegate commands are not available in TypeScript template";
+
 const exit = (code: number): never => {
   process.exit(code);
 };
@@ -80,7 +82,8 @@ function signalExitCode(signal: string): number {
 function runLegacyAdapter(projectRoot: string, args: string[]): number {
   const agents = join(projectRoot, ".agents", "agents");
   if (!existsSync(agents)) {
-    console.error(`❌ Missing executable wrapper: ${agents}`);
+    const command = args[0] ?? "delegate";
+    console.error(`err delegate-unavailable command=${command} message="${DELEGATE_UNAVAILABLE_MESSAGE}"`);
     return 127;
   }
 

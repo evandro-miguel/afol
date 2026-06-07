@@ -57,3 +57,72 @@ describe("log command", () => {
     }
   });
 });
+
+describe("workbench command parity", () => {
+  test("start auto-selects the only pending task and evidence/done persist metadata", () => {
+    const root = mkProjectRoot("command-parity");
+    try {
+      const created = newWorkstream(root, "command-parity");
+
+      const startProc = runKernel(root, ["start", "--session", created.session]);
+      expect(startProc.status).toBe(0);
+
+      const evidenceProc = runKernel(root, [
+        "evidence",
+        "--session",
+        created.session,
+        "--task-id",
+        "T-01",
+        "--command",
+        "bun test",
+        "--result",
+        "passed",
+        "--artifact",
+        "reports/unit.md",
+        "--note",
+        "unit gate",
+      ]);
+      expect(evidenceProc.status).toBe(0);
+
+      const doneProc = runKernel(root, [
+        "done",
+        "--session",
+        created.session,
+        "--task-id",
+        "T-01",
+        "--command",
+        "bun run validate",
+        "--result",
+        "passed",
+        "--artifact",
+        "reports/validate.md",
+        "--note",
+        "closure gate",
+      ]);
+      expect(doneProc.status).toBe(0);
+
+      const evidence = readFileSync(created.evidencePath, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(evidence).toHaveLength(2);
+      expect(evidence[0]).toMatchObject({
+        task_id: "T-01",
+        command: "bun test",
+        result: "passed",
+        artifact: "reports/unit.md",
+        note: "unit gate",
+      });
+      expect(evidence[1]).toMatchObject({
+        task_id: "T-01",
+        command: "bun run validate",
+        result: "passed",
+        artifact: "reports/validate.md",
+        note: "closure gate",
+      });
+      expect(readFileSync(created.taskPath, "utf8")).toContain("| T-01 | done | worker |");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

@@ -152,4 +152,106 @@ describe("status command", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test("rejects unknown arguments before reading project state", () => {
+    const root = createFixture();
+    try {
+      const captured = captureIo();
+      const code = runStatusCommand(root, ["--bad"], captured.io);
+
+      expect(code).toBe(2);
+      expect(captured.stdout).toEqual([]);
+      expect(captured.stderr).toEqual(["Unknown status argument: --bad"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("reports no active task when active session points to missing task files", () => {
+    const root = createFixture();
+    try {
+      const agentsDir = join(root, ".agents");
+      const wbDir = join(agentsDir, "wb");
+      writeFileSync(join(wbDir, ".active_session"), "260530_9999_missing-tasks\n", "utf8");
+
+      const captured = captureIo();
+      const code = runStatusCommand(root, ["--json"], captured.io);
+
+      expect(code).toBe(0);
+      const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<string, unknown>;
+      expect(payload.status).toBe("none");
+      expect(payload.task).toBe("none");
+      expect((payload.paths as Record<string, unknown>).task_file).toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("extracts task fields from state board, inline values, and plain lines", () => {
+    const root = createFixture();
+    try {
+      const sessionId = "260530_2256_cli-native-command-parity";
+      const sessionDir = join(root, ".agents", "wb", sessionId);
+      writeFileSync(
+        join(sessionDir, `${sessionId}_task_01.md`),
+        [
+          "---",
+          "task_id: T-01",
+          "status: done",
+          "---",
+          "",
+          "# Task",
+          "",
+          "## State Board",
+          "",
+          "| Task | State | Owner | Notes |",
+          "|------|-------|-------|-------|",
+          "| T-01 | done | worker | covered |",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      writeFileSync(
+        join(sessionDir, `${sessionId}_task_02.md`),
+        [
+          "---",
+          "task_id: T-02",
+          "status: tested_needs_spec_validation",
+          "---",
+          "",
+          "# Task",
+          "",
+          "## State Board",
+          "",
+          "| Task | State | Owner | Notes |",
+          "|------|-------|-------|-------|",
+          "| T-02 | tested_needs_spec_validation | worker | verify status extraction |",
+          "",
+          "FILES_WRITTEN: cli/commands/status.ts",
+          "VALIDATION_OR_CHECKS:",
+          "",
+          "- bun test cli/tests/status.test.ts",
+          "BLOCKERS:",
+          "- none",
+          "NEXT:",
+          "review coverage output",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+
+      const captured = captureIo();
+      const code = runStatusCommand(root, [], captured.io);
+      const text = captured.stdout[0] ?? "";
+
+      expect(code).toBe(0);
+      expect(text).toContain("STATUS: tested_needs_spec_validation");
+      expect(text).toContain("TASK: T-02");
+      expect(text).toContain("- cli/commands/status.ts");
+      expect(text).toContain("- bun test cli/tests/status.test.ts");
+      expect(text).toContain("- review coverage output");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

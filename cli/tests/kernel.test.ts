@@ -47,6 +47,17 @@ function mkProjectRoot(name: string, fakeAgentsBody: string): string {
   return root;
 }
 
+function mkTemplateProjectRoot(name: string): string {
+  const root = mkdtempSync(join(tmpdir(), `kernel-${name}-`));
+  const agentsDir = join(root, ".agents");
+  mkdirSync(agentsDir, { recursive: true });
+
+  writeFileSync(join(agentsDir, "config.json"), templateConfig, "utf8");
+  writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
+
+  return root;
+}
+
 describe("kernel front-door", () => {
   test("-h prints compact help without requiring project files", () => {
     const root = mkdtempSync(join(tmpdir(), "kernel-help-no-project-"));
@@ -328,6 +339,21 @@ describe("kernel front-door", () => {
     try {
       const proc = runKernel(root, ["task"]);
       expect(proc.status).toBe(11);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("delegate command in TypeScript template fails without missing wrapper lookup", () => {
+    const root = mkTemplateProjectRoot("delegate-no-wrapper");
+    try {
+      const proc = runKernel(root, ["task", "list"]);
+
+      expect(proc.status).toBe(127);
+      expect(proc.stdout as string).toBe("");
+      expect(proc.stderr as string).toContain("err delegate-unavailable command=task");
+      expect(proc.stderr as string).toContain("not available in TypeScript template");
+      expect(proc.stderr as string).not.toContain("Missing executable wrapper");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

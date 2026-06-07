@@ -18,6 +18,8 @@ export type RecordEvidenceInput = WorkbenchTaskRef & {
   command: string;
   result: string;
   exitCode?: number;
+  artifact?: string;
+  note?: string;
 };
 
 export type EvidenceEntry = {
@@ -27,6 +29,8 @@ export type EvidenceEntry = {
   command: string;
   result: string;
   exit_code?: number;
+  artifact?: string;
+  note?: string;
 };
 
 export type NewWorkstreamMetadata = {
@@ -224,11 +228,30 @@ function loadEvidenceEntries(evidencePath: string): EvidenceEntry[] {
         if (typeof parsed.exit_code === "number") {
           entry.exit_code = parsed.exit_code;
         }
+        if (typeof parsed.artifact === "string") {
+          entry.artifact = parsed.artifact;
+        }
+        if (typeof parsed.note === "string") {
+          entry.note = parsed.note;
+        }
         entries.push(entry);
       }
     } catch {}
   }
   return entries;
+}
+
+export function selectSingleOpenTask(root: string, session: string): string {
+  const paths = sessionPaths(root, session);
+  const openRows = readTaskRows(paths.taskPath).filter((row) => row.state === "pending");
+  if (openRows.length === 1) {
+    return openRows[0]?.taskId ?? "";
+  }
+  if (openRows.length === 0) {
+    throw new Error(`Missing --task-id for start; no pending tasks found in ${session}.`);
+  }
+  const labels = openRows.map((row) => row.taskId).join(", ");
+  throw new Error(`Missing --task-id for start; multiple pending tasks found in ${session}: ${labels}.`);
 }
 
 function currentTimelineStamp(now = new Date()): string {
@@ -360,6 +383,12 @@ export function recordEvidence(root: string, input: RecordEvidenceInput): Eviden
   };
   if (input.exitCode !== undefined) {
     entry.exit_code = input.exitCode;
+  }
+  if (input.artifact) {
+    entry.artifact = input.artifact;
+  }
+  if (input.note) {
+    entry.note = input.note;
   }
   writeFileSync(paths.evidencePath, `${JSON.stringify(entry)}\n`, { encoding: "utf8", flag: "a" });
   appendWorkbenchEvent(root, {

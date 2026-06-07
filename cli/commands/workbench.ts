@@ -5,6 +5,7 @@ import {
   newWorkstream,
   readActiveSession,
   recordEvidence,
+  selectSingleOpenTask,
   startTask,
   type NewWorkstreamMetadata,
 } from "../services/workbench/lifecycle";
@@ -21,10 +22,16 @@ type SessionTaskArgs = {
 type EvidenceArgs = SessionTaskArgs & {
   command: string;
   result: string;
+  artifact?: string;
+  note?: string;
 };
 
 type DoneArgs = SessionTaskArgs & {
   testCommand: string | null;
+  evidenceCommand: string | null;
+  evidenceResult: string | null;
+  artifact?: string;
+  note?: string;
 };
 
 type NewCommandArgs = {
@@ -125,7 +132,12 @@ function parseSessionOnlyArgs(args: string[], commandName: string, root: string)
   return { session: resolveSession(root, session, commandName) };
 }
 
-function parseSessionTaskArgs(args: string[], commandName: string, root: string): SessionTaskArgs {
+function parseSessionTaskArgs(
+  args: string[],
+  commandName: string,
+  root: string,
+  options: { allowAutoTask?: boolean } = {},
+): SessionTaskArgs {
   let session = "";
   let taskId = "";
   for (let i = 0; i < args.length; i += 1) {
@@ -154,10 +166,14 @@ function parseSessionTaskArgs(args: string[], commandName: string, root: string)
     }
     throw new Error(`Unknown ${commandName} argument: ${arg}`);
   }
+  const resolvedSession = resolveSession(root, session, commandName);
+  if (!taskId && options.allowAutoTask) {
+    taskId = selectSingleOpenTask(root, resolvedSession);
+  }
   if (!taskId) {
     throw new Error(`Missing --task-id for ${commandName}.`);
   }
-  return { session: resolveSession(root, session, commandName), taskId };
+  return { session: resolvedSession, taskId };
 }
 
 function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
@@ -165,6 +181,8 @@ function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
   let taskId = "";
   let command = "";
   let result = "";
+  let artifact = "";
+  let note = "";
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     const value = args[i + 1];
@@ -200,6 +218,22 @@ function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
       i += 1;
       continue;
     }
+    if (arg === "--artifact") {
+      if (!value) {
+        throw new Error("Missing value for --artifact in evidence.");
+      }
+      artifact = value;
+      i += 1;
+      continue;
+    }
+    if (arg === "--note") {
+      if (!value) {
+        throw new Error("Missing value for --note in evidence.");
+      }
+      note = value;
+      i += 1;
+      continue;
+    }
     if (arg && !arg.startsWith("-") && !taskId) {
       taskId = arg;
       continue;
@@ -217,13 +251,24 @@ function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
     throw new Error("Missing --result for evidence.");
   }
 
-  return { session: resolveSession(root, session, "evidence"), taskId, command, result };
+  return {
+    session: resolveSession(root, session, "evidence"),
+    taskId,
+    command,
+    result,
+    ...(artifact ? { artifact } : {}),
+    ...(note ? { note } : {}),
+  };
 }
 
 function parseDoneArgs(args: string[], root: string): DoneArgs {
   let session = "";
   let taskId = "";
   let testCommand: string | null = null;
+  let evidenceCommand: string | null = null;
+  let evidenceResult: string | null = null;
+  let artifact = "";
+  let note = "";
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     const value = args[i + 1];
@@ -251,6 +296,38 @@ function parseDoneArgs(args: string[], root: string): DoneArgs {
       i += 1;
       continue;
     }
+    if (arg === "--command") {
+      if (!value) {
+        throw new Error("Missing value for --command in done.");
+      }
+      evidenceCommand = value;
+      i += 1;
+      continue;
+    }
+    if (arg === "--result") {
+      if (!value) {
+        throw new Error("Missing value for --result in done.");
+      }
+      evidenceResult = value;
+      i += 1;
+      continue;
+    }
+    if (arg === "--artifact") {
+      if (!value) {
+        throw new Error("Missing value for --artifact in done.");
+      }
+      artifact = value;
+      i += 1;
+      continue;
+    }
+    if (arg === "--note") {
+      if (!value) {
+        throw new Error("Missing value for --note in done.");
+      }
+      note = value;
+      i += 1;
+      continue;
+    }
     if (arg && !arg.startsWith("-") && !taskId) {
       taskId = arg;
       continue;
@@ -260,7 +337,18 @@ function parseDoneArgs(args: string[], root: string): DoneArgs {
   if (!taskId) {
     throw new Error("Missing --task-id for done.");
   }
-  return { session: resolveSession(root, session, "done"), taskId, testCommand };
+  if ((evidenceCommand && !evidenceResult) || (!evidenceCommand && evidenceResult)) {
+    throw new Error("done requires both --command and --result when recording evidence.");
+  }
+  return {
+    session: resolveSession(root, session, "done"),
+    taskId,
+    testCommand,
+    evidenceCommand,
+    evidenceResult,
+    ...(artifact ? { artifact } : {}),
+    ...(note ? { note } : {}),
+  };
 }
 
 function parseLogArgs(args: string[], root: string): LogArgs {
@@ -418,7 +506,7 @@ export async function runNewCommand(args: string[], root: string = process.cwd()
 
 export async function runStartCommand(args: string[], root: string = process.cwd()): Promise<number> {
   try {
-    const parsed = parseSessionTaskArgs(args, "start", root);
+    const parsed = parseSessionTaskArgs(args, "start", root, { allowAutoTask: true });
     startTask(root, parsed);
     console.log(`task started: ${parsed.taskId}`);
     return 0;
@@ -450,11 +538,23 @@ export async function runDoneCommand(args: string[], root: string = process.cwd(
         command: parsed.testCommand,
         result: verification.exitCode === 0 ? "passed" : "failed",
         exitCode: verification.exitCode,
+        ...(parsed.artifact ? { artifact: parsed.artifact } : {}),
+        ...(parsed.note ? { note: parsed.note } : {}),
       });
       if (verification.exitCode !== 0) {
         console.error(`--test failed with exit code ${verification.exitCode}`);
         return 1;
       }
+    }
+    if (parsed.evidenceCommand && parsed.evidenceResult) {
+      recordEvidence(root, {
+        session: parsed.session,
+        taskId: parsed.taskId,
+        command: parsed.evidenceCommand,
+        result: parsed.evidenceResult,
+        ...(parsed.artifact ? { artifact: parsed.artifact } : {}),
+        ...(parsed.note ? { note: parsed.note } : {}),
+      });
     }
     doneTask(root, parsed);
     console.log(`task done: ${parsed.taskId}`);
