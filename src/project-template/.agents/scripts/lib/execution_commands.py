@@ -69,7 +69,7 @@ ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 WORKFLOW_CFG = CONFIG.get("workflow", {})
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
-CANONICAL_WB_DIR = AGENTS_DIR / "wb"
+CANONICAL_WB_DIR = WB_DIR
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
 SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
 RULES_DIR = AGENTS_DIR / "rules"
@@ -290,7 +290,7 @@ def _resolve_session_path(session: str, *, source: str) -> Path:
         if candidate.name in protected:
             raise ExecutionError(
                 f"Session is protected/read-only for this run ({source}): {candidate.name}. "
-                "Create or target a different .agents/wb session."
+                f"Create or target a different {canonical_wb_label()} session."
             )
         return candidate
     raise ExecutionError(f"Session not found ({source}): {session}")

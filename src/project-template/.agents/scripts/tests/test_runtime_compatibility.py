@@ -10,6 +10,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import yaml
+
 
 def load_module(module_name: str, file_path: Path):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
@@ -236,13 +238,17 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
     def test_lint_config_excludes_synced_skills_docs(self):
         config_text = Path(".agents/agents.config").read_text(encoding="utf-8")
+        config = yaml.safe_load(config_text)
+
         self.assertIn("- .agents/tmp/", config_text)
         self.assertIn("- tmp/", config_text)
         self.assertIn("- .agents/tools/uv/", config_text)
         self.assertIn("- skills/", config_text)
         self.assertIn("- source/", config_text)
-        self.assertIn('source_dir: ".agents/source/universal-skills"', config_text)
-        self.assertNotIn('source_dir: "../universal-skills"', config_text)
+        self.assertEqual(
+            config["skills_sync"]["source_dir"],
+            ".agents/source/universal-skills",
+        )
         self.assertIn('"agentic-folder-sys"', config_text)
 
     def test_wrapper_keeps_legacy_commands_on_local_script_runtime(self):

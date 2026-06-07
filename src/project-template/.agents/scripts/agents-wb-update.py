@@ -44,7 +44,7 @@ from lib.postmortem_governance import postmortem_governance_review_issues
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
-CANONICAL_WB_DIR = AGENTS_DIR / "wb"
+CANONICAL_WB_DIR = WB_DIR
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 TELEMETRY_SCRIPT = Path(__file__).resolve().parent / "agents-telemetry.py"
 WB_OFFSET = CONFIG.get("time", {}).get("wb_offset", "-03:00")
@@ -154,7 +154,7 @@ def _resolve_session_path(session: str, *, source: str) -> Path:
         if p.name in protected:
             raise FileNotFoundError(
                 f"Session is protected/read-only for this run ({source}): {p.name}. "
-                "Create or target a different .agents/wb session."
+                f"Create or target a different {canonical_wb_label()} session."
             )
         return p
     raise FileNotFoundError(f"Session folder not found ({source}): {session}")
@@ -176,7 +176,7 @@ def resolve_session(session: str | None) -> Path:
 
     active = get_active_session_id()
     if not active:
-        raise FileNotFoundError("No active session found in .agents/wb/.active_session")
+        raise FileNotFoundError(f"No active session found in {ACTIVE_SESSION_FILE}")
     return _resolve_session_path(active, source=".active_session")
 
 
@@ -411,7 +411,8 @@ def replace_section(content: str, section_title: str, lines_to_insert: List[str]
 def update_files_changed(report_file: Path, include_wb: bool):
     changed = git_changed_files()
     if not include_wb:
-        changed = [p for p in changed if not p.startswith(".agents/wb/")]
+        wb_prefix = f"{canonical_wb_label().rstrip('/')}/"
+        changed = [p for p in changed if not p.startswith(wb_prefix)]
     changed = sorted(changed)
 
     content = report_file.read_text()
@@ -623,7 +624,7 @@ def cmd_touch(args: argparse.Namespace):
     if args.all_wb:
         files = sorted(WB_DIR.rglob("*.md"))
         count = touch_targets(files)
-        print(f"✓ updated_at touched in {count} file(s) under .agents/wb")
+        print(f"✓ updated_at touched in {count} file(s) under {canonical_wb_label()}")
         return
 
     session_dir = resolve_session(args.session)
@@ -651,7 +652,7 @@ def cmd_normalize_time(args: argparse.Namespace):
     if args.file:
         scope = "single file"
     elif args.all_wb:
-        scope = ".agents/wb"
+        scope = canonical_wb_label()
     else:
         scope = display_path(resolve_session(args.session))
     print(f"✓ normalized timestamps in {changed} file(s) under {scope}")
@@ -752,7 +753,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_touch.add_argument("--session", help="session id/path (required for session-scoped writes)")
     p_touch.add_argument("--file", help="single file to touch")
     p_touch.add_argument(
-        "--all-wb", action="store_true", help="touch all markdown files under .agents/wb"
+        "--all-wb", action="store_true", help=f"touch all markdown files under {canonical_wb_label()}"
     )
     p_touch.set_defaults(func=cmd_touch)
 
@@ -762,7 +763,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_norm.add_argument("--session", help="session id/path (required for session-scoped writes)")
     p_norm.add_argument("--file", help="single file to normalize")
     p_norm.add_argument(
-        "--all-wb", action="store_true", help="normalize all markdown files under .agents/wb"
+        "--all-wb",
+        action="store_true",
+        help=f"normalize all markdown files under {canonical_wb_label()}",
     )
     p_norm.set_defaults(func=cmd_normalize_time)
 
@@ -772,7 +775,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_changed.add_argument("--session", help="session id/path (required for session-scoped writes)")
     p_changed.add_argument("--report", help="explicit report file")
     p_changed.add_argument(
-        "--include-wb", action="store_true", help="include .agents/wb paths in output"
+        "--include-wb", action="store_true", help=f"include {canonical_wb_label()} paths in output"
     )
     p_changed.set_defaults(func=cmd_files_changed)
 

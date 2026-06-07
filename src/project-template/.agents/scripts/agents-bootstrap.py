@@ -15,6 +15,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, NamedTuple, Sequence, Set, Tuple
 
+import yaml
+
 from lib.agents_config import now_iso_with_offset
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -77,7 +79,7 @@ JUSTFILE_IMPORT_MARKER = f"import '{JUSTFILE_STANDARDS_PATH}'"
 JUSTFILE_IMPORT_MARKER_DOUBLE = f'import "{JUSTFILE_STANDARDS_PATH}"'
 JUSTFILE_MODULE_MARKER = f"mod agents_scaffold '{JUSTFILE_STANDARDS_PATH}'"
 JUSTFILE_MODULE_MARKER_DOUBLE = f'mod agents_scaffold "{JUSTFILE_STANDARDS_PATH}"'
-JUSTFILE_WRAPPER = """set unstable := true
+JUSTFILE_WRAPPER = """set unstable
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 set working-directory := "."
 
@@ -181,8 +183,8 @@ BOOTSTRAP_RECONCILE_SCOPE: Sequence[Path] = (
 )
 
 
-def bootstrap_lock_file(target: Path) -> Path:
-    return target / BOOTSTRAP_MANIFEST_PATH
+def bootstrap_lock_file(target: Path, mutable_dir: Path = Path(".agents")) -> Path:
+    return target / mutable_dir / "bootstrap-manifest.json"
 
 
 def bootstrap_manifest_payload_from_data(data: object) -> Dict[str, object]:
@@ -242,8 +244,10 @@ def _managed_files_from_template() -> Dict[Path, Path]:
     return managed
 
 
-def _load_bootstrap_manifest(target: Path) -> BootstrapManifest:
-    manifest_path = bootstrap_lock_file(target)
+def _load_bootstrap_manifest(
+    target: Path, mutable_dir: Path = Path(".agents")
+) -> BootstrapManifest:
+    manifest_path = bootstrap_lock_file(target, mutable_dir)
     if not manifest_path.exists():
         return BootstrapManifest(
             version=BOOTSTRAP_MANIFEST_VERSION, generated_at=current_timestamp(), managed_files={}
@@ -269,7 +273,8 @@ def _load_bootstrap_manifest(target: Path) -> BootstrapManifest:
     )
 
 
-def bootstrap_manifest(target: Path) -> BootstrapManifest:
+def bootstrap_manifest(target: Path, mutable_dir: Path = Path(".agents")) -> BootstrapManifest:
+    _ = (target, mutable_dir)
     managed = _managed_files_from_template()
     return BootstrapManifest(
         version=BOOTSTRAP_MANIFEST_VERSION,
@@ -281,8 +286,10 @@ def bootstrap_manifest(target: Path) -> BootstrapManifest:
     )
 
 
-def write_bootstrap_manifest(target: Path, manifest: BootstrapManifest):
-    manifest_path = bootstrap_lock_file(target)
+def write_bootstrap_manifest(
+    target: Path, manifest: BootstrapManifest, mutable_dir: Path = Path(".agents")
+):
+    manifest_path = bootstrap_lock_file(target, mutable_dir)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(
         json.dumps(
@@ -298,12 +305,14 @@ def write_bootstrap_manifest(target: Path, manifest: BootstrapManifest):
     )
 
 
-def finalize_bootstrap_manifest(target: Path, dry_run: bool):
-    manifest_path = bootstrap_lock_file(target)
+def finalize_bootstrap_manifest(
+    target: Path, dry_run: bool, mutable_dir: Path = Path(".agents")
+):
+    manifest_path = bootstrap_lock_file(target, mutable_dir)
     print_action("write bootstrap manifest", manifest_path)
     if dry_run:
         return
-    write_bootstrap_manifest(target, bootstrap_manifest(target))
+    write_bootstrap_manifest(target, bootstrap_manifest(target, mutable_dir), mutable_dir)
 
 
 def _iter_preserve_scope_files(target: Path) -> Iterable[Path]:
@@ -381,12 +390,18 @@ def _classify_reconcile_item(
 
 
 def bootstrap_reconcile_plan(
-    target: Path, manifest: BootstrapManifest | None = None
+    target: Path,
+    manifest: BootstrapManifest | None = None,
+    mutable_dir: Path = Path(".agents"),
 ) -> List[BootstrapPlanItem]:
     planned_source = _managed_files_from_template()
     managed_paths = {_managed_entry_key(path) for path in planned_source}
-    manifest = manifest or _load_bootstrap_manifest(target)
+    manifest = manifest or _load_bootstrap_manifest(target, mutable_dir)
     actions: List[BootstrapPlanItem] = []
+    manifest_paths = {
+        _managed_entry_key(BOOTSTRAP_MANIFEST_PATH),
+        _managed_entry_key(bootstrap_lock_file(target, mutable_dir).relative_to(target)),
+    }
 
     for rel, source_path in sorted(
         planned_source.items(), key=lambda item: _managed_entry_key(item[0])
@@ -415,7 +430,7 @@ def bootstrap_reconcile_plan(
             continue
         if rel_str in manifest.managed_files:
             continue
-        if rel_str == _managed_entry_key(BOOTSTRAP_MANIFEST_PATH):
+        if rel_str in manifest_paths:
             continue
         if absolute_path.is_file():
             actions.append(
@@ -519,6 +534,16 @@ def parse_args() -> argparse.Namespace:
         help="Skip post-bootstrap doctor/tools-check verification",
     )
     parser.add_argument("--verbose", action="store_true", help="Show per-file action output")
+    parser.add_argument(
+        "--mutable-dir",
+        default=".agents",
+        help="Operational mutable folder for workbench, skills, telemetry, archives, and local state",
+    )
+    parser.add_argument(
+        "--provider-compatible",
+        action="store_true",
+        help="Use .afol for mutable scaffold state while keeping .agents as the tool/runtime surface",
+    )
     return parser.parse_args()
 
 
@@ -631,8 +656,75 @@ def safe_copy_dir(src: Path, dst: Path, force: bool, dry_run: bool, ignore: Igno
     shutil.copytree(src, dst, ignore=ignore)
 
 
-def ensure_dirs(target: Path, dry_run: bool):
-    for rel in ENSURE_DIRS:
+def _directory_has_files(path: Path) -> bool:
+    return path.exists() and any(path.iterdir())
+
+
+def seed_provider_mutable_skills(target: Path, mutable_dir: Path, force: bool, dry_run: bool) -> None:
+    if mutable_dir == Path(".agents"):
+        return
+
+    source_skills = TEMPLATE_ROOT / ".agents" / "skills"
+    target_skills = target / mutable_dir / "skills"
+    if source_skills.is_dir():
+        if _directory_has_files(target_skills) and not force:
+            print_action("preserve provider skills", target_skills)
+        else:
+            print_action("copy provider skills", target_skills)
+            if not dry_run:
+                if target_skills.exists() and force:
+                    shutil.rmtree(target_skills)
+                target_skills.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(source_skills, target_skills, ignore=_ignore_default, dirs_exist_ok=True)
+
+    source_manifest = TEMPLATE_ROOT / ".agents" / "skills-sync.manifest.json"
+    target_manifest = target / mutable_dir / "skills-sync.manifest.json"
+    if source_manifest.is_file():
+        safe_copy_file(source_manifest, target_manifest, force, dry_run)
+
+
+def normalize_mutable_dir(raw: str) -> Path:
+    value = raw.strip()
+    if not value:
+        raise ValueError("--mutable-dir must not be empty")
+    candidate = Path(value)
+    if candidate.is_absolute() or "." in candidate.parts or ".." in candidate.parts:
+        raise ValueError("--mutable-dir must be a simple relative repository path")
+    return candidate
+
+
+def effective_mutable_dir(args: argparse.Namespace) -> Path:
+    if args.provider_compatible and args.mutable_dir == ".agents":
+        return Path(".afol")
+    return normalize_mutable_dir(args.mutable_dir)
+
+
+def ensure_dirs_for_mutable_dir(mutable_dir: Path) -> List[Path]:
+    if mutable_dir == Path(".agents"):
+        return list(ENSURE_DIRS)
+    return [
+        Path("docs"),
+        Path("docs/arc"),
+        Path("docs/arc/SPECS"),
+        Path("docs/arc/DECISIONS"),
+        Path("docs/map/structure"),
+        Path("docs/map"),
+        Path(".agents/rules"),
+        Path(".agents/scripts"),
+        Path(".agents/runtime"),
+        mutable_dir / "tmp",
+        mutable_dir / "wb",
+        mutable_dir / "skills",
+        mutable_dir / "z-arq",
+        mutable_dir / "data" / "telemetry",
+        mutable_dir / "journal" / "agentic-runtime",
+        Path(".claude"),
+        Path(".claude/rules"),
+    ]
+
+
+def ensure_dirs(target: Path, dry_run: bool, mutable_dir: Path = Path(".agents")):
+    for rel in ensure_dirs_for_mutable_dir(mutable_dir):
         p = target / rel
         if p.exists():
             continue
@@ -832,7 +924,7 @@ def build_project_brief(timestamp: str) -> str:
             "- Current-state evidence: `docs/map/` when the repo adopts repository maps or analysis surfaces",
             "- Primary workflow standard: `docs/standards/workflow.md`",
             "- Runtime governance source: `AGENTS.md`",
-            "- Skills baseline: `.agents/skills-sync.manifest.json` and `docs/standards/skills-sync.md`",
+            "- Skills baseline: configured skills-sync manifest and `docs/standards/skills-sync.md`",
             "",
             "---",
             "*Generated by `.agents/scripts/agents-bootstrap.py`*",
@@ -894,7 +986,7 @@ def build_current_state_map_readme(timestamp: str) -> str:
             "",
             "- `docs/map/` is the current-state, descriptive evidence surface.",
             "- Run `./.agents/agents repo-map .` to refresh repository-wide map artifacts.",
-            "- Keep goal-state canon in `docs/arc/` and execution history in `.agents/wb/`.",
+            "- Keep goal-state canon in `docs/arc/` and execution history in the configured workbench path.",
             "- Bootstrap ships only this generic entrypoint, not source-repo-specific current-state artifacts.",
             "",
             "## Expected Surface",
@@ -1195,8 +1287,81 @@ def write_generated_baseline(target: Path, force: bool, dry_run: bool, install_m
         safe_write_file(target / rel, content, force, dry_run)
 
 
+def provider_config_payload(mutable_dir: Path) -> Dict[str, object]:
+    mutable = mutable_dir.as_posix()
+    return {
+        "paths": {
+            "mutable_dir": mutable,
+            "wb_dir": f"{mutable}/wb",
+            "active_session_file": f"{mutable}/wb/.active_session",
+            "tmp_dir": f"{mutable}/tmp",
+            "archive_dir": f"{mutable}/z-arq",
+            "journal_dir": f"{mutable}/journal/agentic-runtime",
+            "bootstrap_manifest_file": f"{mutable}/bootstrap-manifest.json",
+        },
+        "doctor": {
+            "required_folders": [
+                "docs/templates",
+                "docs/standards",
+                "docs/knowledge",
+                "docs/lessons",
+                "docs/patterns",
+                "docs/agentic",
+                "docs/telemetry",
+                "docs/arc",
+                "docs/arc/SPECS",
+                "docs/arc/DECISIONS",
+                "docs/map/structure",
+                "docs/map",
+                f"{mutable}/tmp",
+                f"{mutable}/wb",
+                ".agents/rules",
+                ".agents/scripts",
+                f"{mutable}/skills",
+                f"{mutable}/z-arq",
+            ]
+        },
+        "skills_sync": {
+            "project_dir": f"{mutable}/skills",
+            "manifest_file": f"{mutable}/skills-sync.manifest.json",
+        },
+        "telemetry": {
+            "data_dir": f"{mutable}/data/telemetry",
+            "schema_dir": ".agents/data/telemetry/schemas",
+        },
+    }
+
+
+def deep_update_mapping(target: Dict[str, object], update: Dict[str, object]) -> None:
+    for key, value in update.items():
+        current = target.get(key)
+        if isinstance(value, dict) and isinstance(current, dict):
+            deep_update_mapping(current, value)  # type: ignore[arg-type]
+            continue
+        target[key] = value
+
+
+def write_provider_config(target: Path, mutable_dir: Path, dry_run: bool) -> None:
+    if mutable_dir == Path(".agents"):
+        return
+    config_path = target / ".agents" / "agents.config"
+    print_action("write provider-compatible config", config_path)
+    if dry_run:
+        return
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+    if not isinstance(data, dict):
+        data = {}
+    deep_update_mapping(data, provider_config_payload(mutable_dir))
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+
 def write_adaptation_doc(
-    target: Path, stack: Dict[str, List[str]], dry_run: bool, install_mode: str
+    target: Path,
+    stack: Dict[str, List[str]],
+    dry_run: bool,
+    install_mode: str,
+    mutable_dir: Path = Path(".agents"),
 ):
     out = target / "docs" / "standards" / "bootstrap-adaptation.md"
     install_label = (
@@ -1217,6 +1382,7 @@ def write_adaptation_doc(
         "",
         "## Install Mode",
         f"- {install_label}",
+        f"- Mutable scaffold state: `{mutable_dir.as_posix()}/`",
         "",
         "## Current State vs Goal State",
         "- Goal-state canon lives outside `docs/map/` in docs such as `PROJECT-BRIEF.md`, `ARCHITECTURE.md`, `TECH-STACK.md`, `GENERAL-ROADMAP.md`, and `SPECS/`.",
@@ -1245,7 +1411,7 @@ def write_adaptation_doc(
             "- The bootstrap output is generic and history-free; it should not import scaffold-local workbench, lessons, or telemetry history into the target repo.",
             "- The current skills manifest is a compatibility layer. It should remain safe for existing repos while the richer universal-skills contract lands.",
             "- Existing projects should install skills without clobbering project-owned files; use the partial path when the target repo already has live content.",
-            "- Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and avoid using them as the primary project skill surface.",
+            f"- Prefer repo-local skills under `{(mutable_dir / 'skills').as_posix()}/`; keep Codex global skills lean and avoid using them as the primary project skill surface.",
             "- When the upstream contract becomes repo/ref/profile-based, bootstrap should still only prepare the baseline and leave project-specific selection to the target repo owners.",
             f"- Preferred repo-local universal-skills checkout: `{(target / LOCAL_UNIVERSAL_SKILLS_DIR).resolve()}`.",
             "",
@@ -1257,6 +1423,7 @@ def write_adaptation_doc(
             "4. Confirm exported docs are generic baselines only; do not treat scaffold-local workbench, lessons, or knowledge history as project history.",
             "5. Treat skills sync as a baseline install step, not a source of project history.",
             "6. Update `.agents/agents.config` timezone/path settings if needed.",
+            f"   Provider-compatible installs keep editable operational state under `{mutable_dir.as_posix()}/`.",
             "7. Define real verification commands in repo docs (`install/dev/lint/typecheck/test/build`).",
             "8. Confirm `AGENTS.md`, `CLAUDE.md`, and the `.claude/` runtime folder are present.",
             "9. Run `just --fmt --check`, `just --list`, and the scaffold validation recipes exposed by the root `Justfile` (fresh baselines use `just --justfile Justfile agents_scaffold::doctor`, `agents_scaffold::lint`, `agents_scaffold::test-scripts`, and `agents_scaffold::all`).",
@@ -1753,6 +1920,7 @@ def validate_target(target: Path, dry_run: bool, install_mode: str):
 def main() -> int:
     args = parse_args()
     target = Path(args.target).resolve()
+    mutable_dir = effective_mutable_dir(args)
     global _VERBOSE_OUTPUT
     _VERBOSE_OUTPUT = args.verbose
     _ACTION_COUNTS.clear()
@@ -1761,7 +1929,7 @@ def main() -> int:
     print(
         "bootstrap: "
         f"source={TEMPLATE_ROOT} target={target} mode={'dry-run' if args.dry_run else 'apply'} "
-        f"install_mode={install_mode}"
+        f"install_mode={install_mode} mutable_dir={mutable_dir.as_posix()}"
     )
 
     try:
@@ -1781,11 +1949,13 @@ def main() -> int:
         if install_mode == INSTALL_MODE_PARTIAL:
             ensure_partial_runtime_surfaces(target, args.dry_run)
 
-        ensure_dirs(target, args.dry_run)
+        ensure_dirs(target, args.dry_run, mutable_dir)
+        seed_provider_mutable_skills(target, mutable_dir, args.force, args.dry_run)
+        write_provider_config(target, mutable_dir, args.dry_run)
         write_generated_baseline(target, args.force, args.dry_run, install_mode)
         ensure_justfile(target, args.dry_run)
-        write_adaptation_doc(target, stack, args.dry_run, install_mode)
-        finalize_bootstrap_manifest(target, args.dry_run)
+        write_adaptation_doc(target, stack, args.dry_run, install_mode, mutable_dir)
+        finalize_bootstrap_manifest(target, args.dry_run, mutable_dir)
 
         if not args.dry_run and not args.skip_checks:
             run_post_checks(target, install_mode)

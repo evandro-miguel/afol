@@ -72,7 +72,7 @@ class AdoptionPlanner:
         actions.append(
             AdoptionAction(
                 kind="rollback-record",
-                path=".agents/journal/agentic-runtime",
+                path=self.config.journal_root.relative_to(root).as_posix(),
                 reason="capture undo metadata for every mutating batch",
                 managed=True,
                 notes=["journal latest applied changes so undo remains available"],

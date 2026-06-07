@@ -50,7 +50,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
-CANONICAL_WB_DIR = AGENTS_DIR / "wb"
+CANONICAL_WB_DIR = WB_DIR
 ROADMAP_FILE = get_cfg_path(ROOT_DIR, CONFIG, "roadmap_file")
 SPECS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "specs_dir")
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
@@ -808,7 +808,7 @@ def _print_usage():
     )
     print()
     print("Governed delivery lifecycle:")
-    print("  1. new: create/target the .agents/wb session before product edits")
+    print(f"  1. new: create/target the {canonical_wb_label()} session before product edits")
     print("  2. implement start: move the execution task to in_progress")
     print("  3. edit and verify the product change")
     print("  4. implement complete: record verification evidence and mark done")
@@ -862,7 +862,7 @@ def _handle_quick_mode(args: Dict, active_session: str) -> bool:
     print("=" * 60)
     print()
     print(f"Active session: {active_session}")
-    print(f"Session path: .agents/wb/{active_session}/")
+    print(f"Session path: {canonical_wb_label()}/{active_session}/")
     print()
 
     try:
@@ -957,7 +957,7 @@ def _create_workstream(session_id: str, theme: str, timestamp: str, args: Dict) 
             )
     print()
     print("Session folder:")
-    print(f"  .agents/wb/{session_id}/")
+    print(f"  {session_path.relative_to(ROOT_DIR)}/")
     if target_dir != session_path:
         print("Pack folder:")
         print(f"  {target_dir.relative_to(ROOT_DIR)}/")

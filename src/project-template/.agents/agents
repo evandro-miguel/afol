@@ -4,7 +4,7 @@
 # Run .agents scripts with UV isolation
 #
 # Governed delivery lifecycle:
-#   1. Use this wrapper to create/target a .agents/wb session before product edits.
+#   1. Use this wrapper to create/target the configured workbench session before product edits.
 #   2. Move the execution task to in_progress before product edits.
 #   3. Run the product verification named by the request.
 #   4. Complete the task through this wrapper so evidence and done state are recorded together.
@@ -19,6 +19,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 if [ -d "${SCRIPT_DIR}/current/scripts" ]; then
     SCRIPTS_DIR="${SCRIPT_DIR}/current/scripts"
 else
@@ -366,8 +367,52 @@ resolve_uv_cache_dir() {
 export UV_CACHE_DIR="$(resolve_uv_cache_dir)"
 export PYTHONHASHSEED="${PYTHONHASHSEED:-0}"
 
+config_path_value() {
+    local section="$1"
+    local key="$2"
+    local fallback="$3"
+    local config_file="${SCRIPT_DIR}/agents.config"
+
+    if [ ! -f "${config_file}" ]; then
+        echo "${fallback}"
+        return 0
+    fi
+
+    awk -v section="${section}" -v key="${key}" -v fallback="${fallback}" '
+        BEGIN { in_section=0; found="" }
+        /^[^[:space:]#][^:]*:[[:space:]]*$/ {
+            current=$0
+            sub(/:.*/, "", current)
+            in_section=(current == section)
+            next
+        }
+        in_section && $0 ~ "^[[:space:]]+" key ":[[:space:]]*" {
+            line=$0
+            sub(/^[[:space:]]*/, "", line)
+            sub(/^[^:]+:[[:space:]]*/, "", line)
+            sub(/[[:space:]]+#.*/, "", line)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+            gsub(/^"|"$/, "", line)
+            found=line
+            print found
+            exit
+        }
+        END { if (found == "") print fallback }
+    ' "${config_file}"
+}
+
+repo_path() {
+    case "$1" in
+        /*) echo "$1" ;;
+        *) echo "${REPO_ROOT}/$1" ;;
+    esac
+}
+
 TELEMETRY_SCRIPT="${SCRIPTS_DIR}/agents-telemetry.py"
-ACTIVE_SESSION_FILE="${AGENTS_ACTIVE_SESSION_FILE:-${SCRIPT_DIR}/wb/.active_session}"
+ACTIVE_SESSION_REL="$(config_path_value paths active_session_file ".agents/wb/.active_session")"
+AGENTS_TMP_REL="$(config_path_value paths tmp_dir ".agents/tmp")"
+ACTIVE_SESSION_FILE="${AGENTS_ACTIVE_SESSION_FILE:-$(repo_path "${ACTIVE_SESSION_REL}")}"
+AGENTS_TELEMETRY_LOG_DIR="$(repo_path "${AGENTS_TMP_REL}")"
 
 # Auto-record telemetry for tool execution
 record_tool_telemetry() {
@@ -385,11 +430,11 @@ record_tool_telemetry() {
     fi
 
     if [ -n "${session_id}" ] && [ -f "${TELEMETRY_SCRIPT}" ]; then
-        mkdir -p "${SCRIPT_DIR}/tmp"
+        mkdir -p "${AGENTS_TELEMETRY_LOG_DIR}"
         "${PYTHON_BIN}" "${TELEMETRY_SCRIPT}" record tool_exec \
             --session-id="${session_id}" \
             --metadata="{\"tool_name\":\"${tool_name}\",\"outcome\":\"${outcome}\",\"exit_code\":${exit_code}}" \
-            >>"${SCRIPT_DIR}/tmp/telemetry-record.log" 2>&1 || true
+            >>"${AGENTS_TELEMETRY_LOG_DIR}/telemetry-record.log" 2>&1 || true
     fi
 }
 
@@ -655,10 +700,10 @@ show_help() {
     echo "  # Governed delivery: session -> start -> edit/verify -> complete-with-evidence"
     echo "  .agents/agents new auth-refactor --feature-id F-01 --parent-spec my-parent-spec --spec"
     echo "  .agents/agents implement start --session 260223_1200_auth-refactor --task-id T-01"
-    echo "  .agents/agents implement complete --session 260223_1200_auth-refactor --task-id T-01 --command \"just verify\" --result passed --artifact .agents/wb/260223_1200_auth-refactor/report.md"
+    echo "  .agents/agents implement complete --session 260223_1200_auth-refactor --task-id T-01 --command \"just verify\" --result passed --artifact <workbench>/260223_1200_auth-refactor/report.md"
     echo "  .agents/agents structure-map . --output docs/map/structure/"
     echo "  .agents/agents repo-map ."
-    echo "  .agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/"
+    echo "  .agents/agents verify-tasks <workbench>/260223_1200_auth-refactor/"
     echo "  .agents/agents status --session 260223_1200_auth-refactor"
     echo "  .agents/agents implement next --session 260306_2128_context-driven-execution-commands"
     echo "  .agents/agents review --session 260306_2128_context-driven-execution-commands"

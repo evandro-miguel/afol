@@ -43,6 +43,39 @@ def test_fixture_roadmap_matches_agents_new_feature_heading_contract():
     assert f"### {benchmark.FIXTURE_FEATURE_ID} " in roadmap
 
 
+def test_tool_info_validator_checks_tool_id_contract():
+    benchmark = load_module()
+
+    failures = benchmark._validate_tool_info(
+        {
+            "scenario_id": "live-tools-benchmark-discovery",
+            "tool_id": "benchmark",
+            "default_model": benchmark.DEFAULT_PROFILE.model,
+            "default_reasoning_effort": benchmark.DEFAULT_PROFILE.reasoning_effort,
+        },
+        Path("."),
+    )
+
+    assert failures == []
+    assert "tool_id" in benchmark._tool_info_schema()["required"]
+
+
+def test_live_scenario_command_uses_current_sandbox_flag(tmp_path):
+    benchmark = load_module()
+    scenario = benchmark.SCENARIOS["live-tools-benchmark-discovery"]
+
+    command = benchmark._live_scenario_command(
+        scenario,
+        benchmark.DEFAULT_PROFILE,
+        tmp_path,
+        tmp_path / "schema.json",
+        tmp_path / "output.json",
+    )
+
+    assert "--full-auto" not in command
+    assert command[command.index("-s") + 1] == "workspace-write"
+
+
 def test_parse_observed_tool_data_counts_errors_and_retries():
     benchmark = load_module()
     stdout = "\n".join(

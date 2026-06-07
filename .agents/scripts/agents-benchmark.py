@@ -731,13 +731,13 @@ def _tool_info_schema() -> dict[str, Any]:
         "additionalProperties": False,
         "properties": {
             "scenario_id": {"type": "string", "const": "live-tools-benchmark-discovery"},
-            "tool_surface": {"type": "string"},
+            "tool_id": {"type": "string"},
             "default_model": {"type": "string"},
             "default_reasoning_effort": {"type": "string"},
         },
         "required": [
             "scenario_id",
-            "tool_surface",
+            "tool_id",
             "default_model",
             "default_reasoning_effort",
         ],
@@ -903,8 +903,8 @@ def _wb_update_link_schema() -> dict[str, Any]:
 
 def _validate_tool_info(output: dict[str, Any], _repo_root: Path) -> list[str]:
     failures: list[str] = []
-    if output.get("tool_surface") != "benchmark":
-        failures.append("tool_surface != benchmark")
+    if output.get("tool_id") != "benchmark":
+        failures.append("tool_id != benchmark")
     if output.get("default_model") != DEFAULT_PROFILE.model:
         failures.append(f"default_model != {DEFAULT_PROFILE.model}")
     if output.get("default_reasoning_effort") != DEFAULT_PROFILE.reasoning_effort:
@@ -1750,7 +1750,6 @@ def _live_scenario_command(
         "apps._default.enabled=false",
         "-c",
         "apps._default.default_tools_enabled=false",
-        "--full-auto",
         "-C",
         str(fixture_root),
         "--add-dir",
@@ -1761,9 +1760,8 @@ def _live_scenario_command(
         str(output_path),
         scenario.prompt,
     ]
-    sandbox_insert_at = command.index("--full-auto")
+    sandbox_insert_at = command.index("-C")
     if scenario.id == "live-autonomous-agentic-folder-delivery":
-        command.remove("--full-auto")
         command.insert(sandbox_insert_at, "--dangerously-bypass-approvals-and-sandbox")
     else:
         command[sandbox_insert_at:sandbox_insert_at] = ["-s", "workspace-write"]

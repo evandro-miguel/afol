@@ -1481,6 +1481,29 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
         target, stack, dry_run=False, install_mode=bootstrap.INSTALL_MODE_PARTIAL
     )
     assert (target / "docs" / "standards" / "bootstrap-adaptation.md").exists()
+    provider_args = type("Args", (), {"provider_compatible": True, "mutable_dir": ".agents"})()
+    assert bootstrap.effective_mutable_dir(provider_args) == Path(".afol")
+    afol_dirs = bootstrap.ensure_dirs_for_mutable_dir(Path(".afol"))
+    assert Path(".afol/wb") in afol_dirs
+    assert Path(".afol/skills") in afol_dirs
+    provider_payload = bootstrap.provider_config_payload(Path(".afol"))
+    assert provider_payload["paths"]["wb_dir"] == ".afol/wb"
+    assert provider_payload["skills_sync"]["project_dir"] == ".afol/skills"
+    config_path = target / ".agents" / "agents.config"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("paths:\n  wb_dir: .agents/wb\n", encoding="utf-8")
+    bootstrap.write_provider_config(target, Path(".afol"), dry_run=False)
+    config_text = config_path.read_text(encoding="utf-8")
+    assert "wb_dir: .afol/wb" in config_text
+    assert "project_dir: .afol/skills" in config_text
+    bootstrap.ensure_dirs(target, dry_run=False, mutable_dir=Path(".afol"))
+    bootstrap.seed_provider_mutable_skills(target, Path(".afol"), force=False, dry_run=False)
+    assert (target / ".afol" / "skills" / "local-skill" / "SKILL.md").exists()
+    assert (target / ".afol" / "skills-sync.manifest.json").exists()
+    provider_manifest = bootstrap.bootstrap_manifest(target, Path(".afol"))
+    bootstrap.write_bootstrap_manifest(target, provider_manifest, Path(".afol"))
+    loaded_provider_manifest = bootstrap._load_bootstrap_manifest(target, Path(".afol"))
+    assert loaded_provider_manifest.managed_files == provider_manifest.managed_files
     assert bootstrap.load_local_skills_manifest()["installs"]
     assert bootstrap.local_project_skill_names() == ["local-skill"]
     assert bootstrap.profile_names_for_local_seed() == ["core", "dev"]
@@ -1494,4 +1517,8 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
     assert bootstrap.main() == 0
     monkeypatch.setattr(sys, "argv", ["agents-bootstrap.py", str(source), "--dry-run"])
     assert bootstrap.main() == 1
-    assert "AGENTS BOOTSTRAP" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "bootstrap:" in output
+    assert "mutable_dir=.agents" in output
+    assert "Bootstrap completed" in output
+    assert "Target must be a different repository path" in output

@@ -47,7 +47,14 @@ class AgenticRuntime:
             if (repo_root / ".agents" / "scripts" / "tests").exists()
             else 0
         )
-        skills_dir = repo_root / ".agents" / "skills"
+        skills_dir = next(
+            (
+                root
+                for root in self.config.search_roots
+                if root.name == "skills" and root.exists()
+            ),
+            repo_root / ".agents" / "skills",
+        )
         skills = []
         if skills_dir.exists():
             for skill_dir in sorted(path for path in skills_dir.iterdir() if path.is_dir()):
@@ -80,7 +87,7 @@ class AgenticRuntime:
             tool_catalog_count=tool_catalog_count,
             governed_execution_contract={
                 "applies_when": "governed implementation, validation, or delivery work",
-                "session_root": ".agents/wb",
+                "session_root": self.config.session_root_label,
                 "required_order": [
                     "create_or_target_session_before_product_edits",
                     "move_task_to_in_progress_before_product_edits",
@@ -99,7 +106,7 @@ class AgenticRuntime:
                     "manual_task_done_edit",
                     "manual_evidence_jsonl_edit",
                     "task_created_as_done",
-                    "session_outside_.agents/wb",
+                    f"session_outside_{self.config.session_root_label}",
                 ],
             },
             major_surfaces=list(self.config.manifest_major_surfaces),

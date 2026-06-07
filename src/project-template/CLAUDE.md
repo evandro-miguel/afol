@@ -10,7 +10,9 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 ## Governed Execution
 
-- Use `.agents/wb/` when work includes implementation, validation, or delivery.
+- Use the configured workbench path when work includes implementation,
+  validation, or delivery. Default is `.agents/wb/`; provider-compatible
+  installs may use `.afol/wb/`.
 - Before product edits: create/target a session and move task to `in_progress`.
 - Canonical path:
   1. `./.agents/agents new {theme} --feature-id {F-id} --parent-spec {spec-id}`
@@ -35,6 +37,9 @@ Replace this section after bootstrap with real product purpose and constraints.
 - `.agents/rules/`: local operational contracts only.
 - `.agents/skills/`: project-local skills only when needed.
 - `.agents/source/universal-skills/`: local seed, not nested git.
+- `.afol/`: optional provider-compatible mutable state root for workbench,
+  skills, telemetry, archives, and local manifests when `.agents/` must stay
+  read-only in a sandbox.
 - `docs/`: project docs.
 - `docs/map/`: current-state evidence only.
 
@@ -105,7 +110,8 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Keep runtime state/caches/generated ops artifacts outside `docs/`.
 - `docs/map/` is descriptive evidence only.
 - `docs/arc/` is goal-state governance.
-- Use `.agents/tmp/` only for disposable files.
+- Use the configured temp path only for disposable files. Default is
+  `.agents/tmp/`; provider-compatible installs may use `.afol/tmp/`.
 - Do not manually edit managed `updated_at`; use `just wb-touch` or
   `./.agents/agents wb-update touch`.
 - Keep project-local rules/docs minimal: only required operational contracts.
@@ -119,6 +125,8 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Keep committed adapters thin and traceable.
 - Prefer project-local skills only for project-specific behavior.
 - `skills-sync sync` / `skills-sync update` refresh `.agents/skills/`.
+- If `.agents/agents.config` points `skills_sync.project_dir` at
+  `.afol/skills`, refresh that configured path instead.
 - `skills-sync pull` refreshes configured external source only.
 - `skills-sync push` is branch/PR flow; never direct to universal `main`.
 - When local skill behavior changes, record pending propagation to

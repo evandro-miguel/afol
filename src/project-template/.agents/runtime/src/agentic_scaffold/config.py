@@ -14,6 +14,8 @@ DEFAULT_BLOCKLIST = (
     "__pycache__",
     ".agents/cache",
     ".agents/data/telemetry/events.jsonl",
+    ".afol/cache",
+    ".afol/data/telemetry/events.jsonl",
 )
 
 RUNTIME_DOC_FILENAMES = (
@@ -52,6 +54,7 @@ class RuntimeConfig:
     required_templates: tuple[str, ...]
     runtime_docs: tuple[str, ...]
     manifest_major_surfaces: tuple[str, ...]
+    session_root_label: str = ".agents/wb"
 
 
 def _walk_up(start: Path) -> list[Path]:
@@ -98,6 +101,27 @@ def _path_from_cfg(repo_root: Path, cfg: dict[str, Any], key: str, fallback: str
     return (repo_root / rel).resolve()
 
 
+def _nested_path_from_cfg(
+    repo_root: Path,
+    cfg: dict[str, Any],
+    section: str,
+    key: str,
+    fallback: str,
+) -> Path:
+    section_cfg = cfg.get(section, {}) if isinstance(cfg, dict) else {}
+    if not isinstance(section_cfg, dict):
+        section_cfg = {}
+    rel = str(section_cfg.get(key, fallback)).strip() or fallback
+    return (repo_root / rel).resolve()
+
+
+def _label_from_path(repo_root: Path, path: Path) -> str:
+    try:
+        return path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def _paths_from_cfg(
     repo_root: Path, cfg: dict[str, Any], entries: tuple[tuple[str, str], ...]
 ) -> tuple[Path, ...]:
@@ -112,13 +136,14 @@ def build_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
     root = find_repo_root(repo_root)
     raw = load_agents_config(root)
 
-    skills_dir = root / ".agents" / "skills"
+    skills_dir = _nested_path_from_cfg(root, raw, "skills_sync", "project_dir", ".agents/skills")
     search_root_candidates = list(_paths_from_cfg(root, raw, SEARCH_ROOT_PATHS))
     if skills_dir.exists():
         search_root_candidates.append(skills_dir)
     search_roots = tuple(search_root_candidates)
-    archive_root = (root / ".agents" / "z-arq").resolve()
-    journal_root = (root / ".agents" / "journal" / "agentic-runtime").resolve()
+    archive_root = _path_from_cfg(root, raw, "archive_dir", ".agents/z-arq")
+    journal_root = _path_from_cfg(root, raw, "journal_dir", ".agents/journal/agentic-runtime")
+    wb_root = _path_from_cfg(root, raw, "wb_dir", ".agents/wb")
     doctor_cfg = raw.get("doctor", {}) if isinstance(raw, dict) else {}
     required_folders = tuple(
         str(item) for item in doctor_cfg.get("required_folders", []) if str(item).strip()
@@ -136,5 +161,15 @@ def build_runtime_config(repo_root: Path | None = None) -> RuntimeConfig:
         required_folders=required_folders,
         required_templates=required_templates,
         runtime_docs=RUNTIME_DOC_FILENAMES,
-        manifest_major_surfaces=MANIFEST_MAJOR_SURFACES,
+        manifest_major_surfaces=tuple(
+            dict.fromkeys(
+                [
+                    *MANIFEST_MAJOR_SURFACES,
+                    f"{_label_from_path(root, skills_dir).rstrip('/')}/",
+                    f"{_label_from_path(root, wb_root).rstrip('/')}/",
+                    f"{_label_from_path(root, archive_root).rstrip('/')}/",
+                ]
+            )
+        ),
+        session_root_label=_label_from_path(root, wb_root),
     )

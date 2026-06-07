@@ -41,6 +41,13 @@ WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
 VERIFY_TASKS_SCRIPT = Path(__file__).resolve().parent / "verify-tasks.py"
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return path.relative_to(ROOT_DIR).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def _read_active_session() -> str:
     if not ACTIVE_SESSION_FILE.exists():
         return ""
@@ -203,7 +210,7 @@ def _build_session_overview(session_dir: Path, active_session: str) -> Dict[str,
 
 
 def _print_session_list(payload: Dict[str, Any]) -> None:
-    print("Project Session List (.agents/wb)")
+    print(f"Project Session List ({_display_path(WB_DIR)})")
     print(f"active_session: {payload['active_session'] or 'unset'}")
     if not payload["sessions"]:
         print("sessions: none")
@@ -361,7 +368,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_list = sub.add_parser(
         "list",
-        help="List project-local workbench sessions under .agents/wb with lightweight lifecycle signals",
+        help="List project-local workbench sessions with lightweight lifecycle signals",
     )
     p_list.add_argument("--json", action="store_true", help="Emit JSON payload")
     p_list.set_defaults(func=cmd_list)

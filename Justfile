@@ -1,4 +1,4 @@
-set unstable := true
+set unstable
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 set working-directory := "."
 
