@@ -22,6 +22,7 @@ docs/
 ├── map/                    # Current-state repository mapping
 ├── standards/              # Human-readable standards
 ├── templates/              # Document templates
+├── plans/                  # Durable ExecPlans and governed plan sessions
 ├── lessons/                # Lessons learned
 └── agentic/                # Tool documentation
 
@@ -30,9 +31,8 @@ docs/
 ├── tools.json              # Tool catalog (JSON)
 ├── agents                  # CLI wrapper (bash)
 ├── runtime/                # Runtime package mirror and adapters
-├── wb/                     # Workstreams (sessions)
-│   ├── .active_session     # Pointer to current session
-│   └── YYMMDD_HHMM_<theme>/
+├── data/
+│   └── session/            # Local active-session pointer
 ├── scripts/
 │   ├── agents-*.py         # Tool scripts
 │   └── lib/
@@ -50,6 +50,7 @@ src/
 | Folder | Purpose |
 |--------|---------|
 | `docs/templates/` | Document templates |
+| `docs/plans/` | Durable ExecPlans and governed plan sessions |
 | `docs/standards/` | Human standards |
 | `docs/lessons/` | Lessons learned |
 | `docs/agentic/` | Tool documentation |
@@ -58,7 +59,6 @@ src/
 | `docs/arc/DECISIONS/` | Architecture decisions |
 | `docs/map/` | Current-state repository mapping |
 | `src/project-template/` | Exportable scaffold baseline source |
-| `.agents/wb/` | Workstreams |
 | `.agents/rules/` | Agent rules |
 | `.agents/scripts/` | Tool scripts |
 | `.agents/skills/` | Agent skills |
@@ -82,7 +82,8 @@ version: 1
 paths:
   agents_dir: .agents
   docs_dir: docs
-  wb_dir: .agents/wb
+  wb_dir: docs/plans
+  active_session_file: .agents/data/session/.active_session
   templates_dir: docs/templates
   arc_dir: docs/arc
 
@@ -145,7 +146,7 @@ python -m json.tool .agents/tools.json
 
 **Purpose:** Points to current workstream
 
-**Location:** `.agents/wb/.active_session`
+**Location:** `.agents/data/session/.active_session`
 
 **Update automatically:**
 
@@ -174,7 +175,7 @@ python -m json.tool .agents/tools.json
 ## Workstream Structure
 
 ```text
-.agents/wb/
+docs/plans/
 └── 260223_1800_auth-refactor/
     ├── 260223_1800_auth-refactor_plan_01.md
     ├── 260223_1800_auth-refactor_task_01.md
@@ -194,7 +195,8 @@ python -m json.tool .agents/tools.json
 
 **DO:**
 
-- ✅ Use `.agents/` as root for all agent files
+- ✅ Use `docs/plans/` for durable plan/session files
+- ✅ Use `.agents/` for runtime state and agent-owned local files
 - ✅ Keep configuration in `.agents/agents.config`
 - ✅ Store tool docs in `docs/agentic/`
 - ✅ Store human docs in `docs/standards/`
@@ -206,7 +208,7 @@ python -m json.tool .agents/tools.json
 
 **DON'T:**
 
-- ❌ Create folders outside `.agents/` for agent work
+- ❌ Put durable plans or active sessions under legacy `.agents/wb/`
 - ❌ Edit `agents.config` without validating YAML
 - ❌ Edit `tools.json` without validating JSON
 - ❌ Delete required folders
@@ -227,11 +229,11 @@ python -c "import yaml; yaml.safe_load(open('.agents/agents.config'))"
 # Check tools.json
 python -m json.tool .agents/tools.json
 
-# List workstreams
-ls -la .agents/wb/
+# List governed plan sessions
+ls -la docs/plans/
 
 # Check active session
-cat .agents/wb/.active_session
+cat .agents/data/session/.active_session
 ```
 
 ---

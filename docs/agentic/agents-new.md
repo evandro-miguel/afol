@@ -32,7 +32,7 @@ Creates or extends a workstream with:
 1. **Session folder** - Standardized name
 2. **Intent-selected artifacts** - only the docs required by the chosen intent or explicit `--with` flags
 3. **Spec file** (optional) - Full or child specification (current CLI compatibility flag: `--spec-lite`)
-4. **Updates .active_session** - Points to new session
+4. **Updates .active_session** - Points to new session under local runtime state
 
 Artifact creation now has two layers:
 
@@ -63,7 +63,7 @@ distinguishes missing artifacts from invalid placeholder-only artifacts.
 Delivery default:
 
 ```text
-.agents/wb/
+docs/plans/
 └── YYMMDD_HHMM_<theme>/
     ├── YYMMDD_HHMM_<theme>_task_01.md
     └── YYMMDD_HHMM_<theme>_spec_01.md (optional)
@@ -72,14 +72,14 @@ Delivery default:
 Research example:
 
 ```text
-.agents/wb/YYMMDD_HHMM_<theme>/
+docs/plans/YYMMDD_HHMM_<theme>/
 └── YYMMDD_HHMM_<theme>_research_01.md
 ```
 
 Closure example:
 
 ```text
-.agents/wb/YYMMDD_HHMM_<theme>/
+docs/plans/YYMMDD_HHMM_<theme>/
 └── YYMMDD_HHMM_<theme>_report_01.md
 ```
 
@@ -93,7 +93,7 @@ typically added later with `--with postmortem` once real closure work exists.
 
 | File | Change |
 |------|--------|
-| `.agents/wb/.active_session` | Points to new session |
+| `.agents/data/session/.active_session` | Points to new session |
 
 ## How to Configure
 
@@ -144,7 +144,7 @@ typically added later with `--with postmortem` once real closure work exists.
 - When `--intent` is omitted, obvious themes such as `auth-investigation` or `api-postmortem` are mapped to a safer non-delivery intent automatically.
 - `--with <doc-type>` adds only the specific extra artifacts that are justified.
 - `--into-session` may reuse the root session without `--pack` when you are materializing missing artifacts later.
-- `--into-session` must target an existing session under `.agents/wb/`; do not use `/tmp` or a copied workbench path.
+- `--into-session` must target an existing session under `docs/plans/`; do not use `/tmp` or a copied workbench path.
 
 ### Multi-Session Support
 
@@ -164,7 +164,7 @@ typically added later with `--with postmortem` once real closure work exists.
 
 # Target specific session for operations.
 # Done requires a prior passing closure evidence record and its evidence id.
-./.agents/agents wb-update evidence T-01 --session 260224_1200_feature-a --command "just lint" --result passed --artifact .agents/wb/260224_1200_feature-a/260224_1200_feature-a_report_01.md
+./.agents/agents wb-update evidence T-01 --session 260224_1200_feature-a --command "just lint" --result passed --artifact docs/plans/260224_1200_feature-a/260224_1200_feature-a_report_01.md
 ./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done --evidence-id E-...
 ./.agents/agents wb-update touch --session 260224_1200_feature-b
 # Or set AGENTS_SESSION_ID in the process environment before running status
@@ -192,7 +192,7 @@ def fill_template(template: str, session_id: str, theme: str) -> str:
     """Replace placeholders in template."""
 
 def create_session_folder(session_id: str) -> Path:
-    """Create session folder in .agents/wb/."""
+    """Create session folder in docs/plans/."""
 
 def set_active_session(session_id: str) -> None:
     """Update .active_session file."""
@@ -257,10 +257,10 @@ workflow:
 ./.agents/agents new test-workstream
 
 # Verify structure
-ls -la .agents/wb/26*test-workstream/
+ls -la docs/plans/26*test-workstream/
 
 # Check .active_session
-cat .agents/wb/.active_session
+cat .agents/data/session/.active_session
 ```
 
 ## Output
@@ -285,8 +285,8 @@ Creating files:
 ============================================================
 Next steps:
 0. Confirm roadmap feature and parent spec stay current
-1. Edit: .agents/wb/260223_1800_auth-refactor/260223_1800_auth-refactor_plan_01.md
-2. Edit: .agents/wb/260223_1800_auth-refactor/260223_1800_auth-refactor_task_01.md
+1. Edit: docs/plans/260223_1800_auth-refactor/260223_1800_auth-refactor_plan_01.md
+2. Edit: docs/plans/260223_1800_auth-refactor/260223_1800_auth-refactor_task_01.md
 ```
 
 ## Related

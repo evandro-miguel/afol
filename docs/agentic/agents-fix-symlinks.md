@@ -114,7 +114,7 @@ def report_status(repairs):
 Found 3 broken symlinks:
   - .agents/scripts/lib/utils -> ../../utils (broken)
   - .agents/cache/data -> /mnt/data (broken)
-  - .agents/wb/link -> ../sessions (broken)
+  - docs/plans/link -> ../sessions (broken)
 
 Run without --dry-run to fix.
 ```
@@ -126,7 +126,7 @@ Run without --dry-run to fix.
 
 ✓ Fixed: .agents/scripts/lib/utils
 ✓ Fixed: .agents/cache/data
-✓ Fixed: .agents/wb/link (copy fallback)
+✓ Fixed: docs/plans/link (copy fallback)
 
 3 symlinks repaired.
 ```

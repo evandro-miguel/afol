@@ -77,7 +77,7 @@ Before closure:
 
 - `./.agents/agents wb-update status --session <session-id> --file postmortem --value final`
   must succeed without unresolved placeholders.
-- `./.agents/agents verify-tasks --strict .agents/wb/<session-id>` must not
+- `./.agents/agents verify-tasks --strict docs/plans/<session-id>` must not
   report incomplete postmortem governance review.
 
 ---

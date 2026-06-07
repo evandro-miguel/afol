@@ -155,7 +155,7 @@ project-local layer
 - .agents/config.json
 - .agents/lock.json
 - .agents/manifest.json
-- .agents/wb, rules, skills, specs, data, tmp
+- docs/plans, rules, skills, specs, data, tmp
 
 project wrapper
 - afol (local compatibility alias during migration)

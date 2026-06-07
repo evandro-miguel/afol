@@ -25,7 +25,7 @@ When managing multiple tasks or workstreams in the .agents system.
 
 **Maintain only one active workstream at a time (recommended for focus):**
 
-1. Use `.agents/wb/.active_session` to track current local-operator focus
+1. Use `.agents/data/session/.active_session` to track current local-operator focus
 2. For small changes, use quick mode: `.agents/agents new <theme> --quick`
 3. Create new sessions as needed - system allows multiple coexisting sessions
 4. Complete or pause current session before starting another (disciplined workflow)
@@ -46,7 +46,7 @@ When managing multiple tasks or workstreams in the .agents system.
 
 ```bash
 # Working on auth-refactor
-cat .agents/wb/.active_session
+cat .agents/data/session/.active_session
 # -> 260223_1800_auth-refactor
 
 # Small related task - use quick mode
@@ -67,7 +67,7 @@ cat .agents/wb/.active_session
 ./.agents/agents new feature-b          # Session B created (warns about A)
 
 # Target specific session for operations
-./.agents/agents wb-update evidence T-01 --session 260224_1200_feature-a --command "just lint" --result passed --artifact .agents/wb/260224_1200_feature-a/260224_1200_feature-a_report_01.md
+./.agents/agents wb-update evidence T-01 --session 260224_1200_feature-a --command "just lint" --result passed --artifact docs/plans/260224_1200_feature-a/260224_1200_feature-a_report_01.md
 ./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done --evidence-id E-...
 ./.agents/agents wb-update touch --session 260224_1200_feature-b
 # Or set AGENTS_SESSION_ID in the process environment before running status
@@ -117,7 +117,7 @@ cat .agents/wb/.active_session
 - Multiple sessions are **allowed** but use discipline to avoid sprawl
 - Use `--session <id>` to target specific sessions in commands
 - Archive completed sessions monthly to reduce clutter
-- Review `.agents/wb/` folder weekly for orphaned sessions
+- Review `docs/plans/` folder weekly for orphaned sessions
 
 ---
 

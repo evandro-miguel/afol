@@ -68,13 +68,13 @@ just doctor
 
 ```bash
 # Lint specific folder
-./.agents/agents lint-docs .agents/wb/
+./.agents/agents lint-docs docs/plans/
 
 # Lint all docs
 ./.agents/agents lint-docs .agents/
 
 # Auto-fix issues
-./.agents/agents lint-docs .agents/wb --fix
+./.agents/agents lint-docs docs/plans --fix
 
 # Via Justfile
 just lint
@@ -95,7 +95,7 @@ just lint
 
 ```bash
 # Verify specific session
-./.agents/agents verify-tasks .agents/wb/260223_1200_auth-refactor/
+./.agents/agents verify-tasks docs/plans/260223_1200_auth-refactor/
 
 # Verify current directory
 ./.agents/agents verify-tasks .
@@ -116,7 +116,7 @@ just verify
 ### Auto-fix (when possible)
 
 ```bash
-./.agents/agents lint-docs .agents/wb --fix
+./.agents/agents lint-docs docs/plans --fix
 ```
 
 ### Manual fixes
@@ -188,7 +188,7 @@ Before marking task complete:
 ./.agents/agents doctor
 
 # Fix lint issues
-./.agents/agents lint-docs .agents/wb --fix
+./.agents/agents lint-docs docs/plans --fix
 
 # Validate tools.json
 python -m json.tool .agents/tools.json

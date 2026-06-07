@@ -58,7 +58,7 @@ When starting work with the .agents system or when unsure which tool to use for 
 
 ```bash
 # Agent guesses command based on memory
-mkdir -p .agents/wb/260223_1800_auth-refactor
+mkdir -p docs/plans/260223_1800_auth-refactor
 # Creates non-standard structure, misses templates
 # Later has to redo with proper tool
 ```

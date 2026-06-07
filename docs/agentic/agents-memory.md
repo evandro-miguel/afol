@@ -32,7 +32,7 @@ links:
 2. **Emits search contracts** - exact MCP server/tool/args for discovery
 3. **Emits context contracts** - exact MCP flow for expanding a topic
 4. **Emits recent/show contracts** - exact MCP calls for recent activity and one note
-5. **Protects governance** - explicitly keeps `.agents/wb/` and repo-local `knowledge` canonical
+5. **Protects governance** - explicitly keeps `docs/plans/` and repo-local `knowledge` canonical
 
 Important constraint:
 
@@ -121,7 +121,7 @@ Meaning of the key fields:
 
 This preserves:
 
-- `.agents/wb/` as canonical execution state
+- `docs/plans/` as canonical execution state
 - repo-local `knowledge` as canonical reusable project history
 - external memory as auxiliary retrieval
 

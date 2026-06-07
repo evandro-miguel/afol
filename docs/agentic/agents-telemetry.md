@@ -42,7 +42,7 @@ Collects and analyzes usage data:
 |------|---------|
 | `.agents/data/telemetry/events.jsonl` | Event log |
 | `.agents/data/telemetry/schemas/event.json` | Event schema |
-| `.agents/wb/.active_session` | Current session |
+| `.agents/data/session/.active_session` | Current session |
 
 ### Files Written
 

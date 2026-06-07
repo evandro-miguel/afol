@@ -524,7 +524,7 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
       reasons.push(`cli-change:${changedPath}`);
       continue;
     }
-    if (hasPrefix(normalizedPath, [".agents/wb/", ".afol/wb/"])) {
+    if (hasPrefix(normalizedPath, ["docs/plans/", ".agents/wb/"])) {
       selected.add("workbench-parity");
       reasons.push(`workbench-change:${changedPath}`);
       continue;

@@ -20,6 +20,7 @@ docs/
 ├── map/
 ├── standards/
 ├── templates/
+├── plans/
 ├── lessons/
 └── agentic/
 
@@ -29,13 +30,11 @@ docs/
 ├── manifest.json
 ├── rules/
 ├── skills/
-├── wb/
 ├── tmp/
 └── data/
 
 .afol/
 ├── skills/
-├── wb/
 ├── tmp/
 └── data/
 ```
@@ -45,6 +44,7 @@ docs/
 | Folder | Purpose |
 | --- | --- |
 | `docs/templates/` | Reusable templates |
+| `docs/plans/` | Durable governed plan sessions |
 | `docs/standards/` | Human standards |
 | `docs/lessons/` | Lessons learned |
 | `docs/agentic/` | Tool docs |
@@ -55,9 +55,7 @@ docs/
 | `.agents/manifest.json` | Template ownership metadata |
 | `.agents/lock.json` | Scaffold lock metadata |
 | `.agents/skills/` | Baseline skills when `paths.mutable_dir` is `.agents` |
-| `.agents/wb/` | Baseline workbench when `paths.mutable_dir` is `.agents` |
 | `.afol/skills/` | Provider-compatible project skills |
-| `.afol/wb/` | Provider-compatible workbench sessions |
 | `.afol/tmp/` | Provider-compatible temporary files |
 | `.afol/data/` | Provider-compatible local data |
 

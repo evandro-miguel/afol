@@ -161,7 +161,7 @@ For a new non-trivial feature:
 ### File naming
 
 ```text
-.agents/wb/YYMMDD_HHMM_<theme>/
+docs/plans/YYMMDD_HHMM_<theme>/
   ├── YYMMDD_HHMM_<theme>_plan_01.md
   ├── YYMMDD_HHMM_<theme>_task_01.md
   ├── YYMMDD_HHMM_<theme>_task_02.md

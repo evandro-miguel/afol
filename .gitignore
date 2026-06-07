@@ -32,6 +32,7 @@ src/project-template/.agents/tmp/
 src/project-template/.agents/scripts/.agents/
 .agents/data/events/
 .agents/data/index/
+.agents/data/session/
 src/project-template/.agents/data/events/
 src/project-template/.agents/data/index/
 
@@ -56,13 +57,13 @@ docs/map/extra/
 # Legacy implementation report generated during migration work.
 docs/telemetry/reports/implementation_report.md
 
-# Workbench sessions (operational state; should not be cloned)
+# Legacy workbench sessions (local-only; plans now live in docs/plans/)
 .agents/wb/
-.afol/wb/
 .afol/tmp/*
 !.afol/tmp/README.md
 .afol/data/events/
 .afol/data/index/
+.afol/data/session/
 .afol/data/mutations/
 
 # Local merge worktrees

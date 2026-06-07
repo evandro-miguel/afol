@@ -18,7 +18,7 @@ updated_at: '2026-04-18T22:35:01-03:00'
 
 Project-authored managed Markdown files must have YAML frontmatter.
 
-This applies to docs, rules, workbench artifacts, lessons, specs, reports, and
+This applies to docs, rules, governed plan artifacts, lessons, specs, reports, and
 templates maintained by this scaffold.
 
 This does not apply to vendored packages, dependency caches, third-party
@@ -167,10 +167,10 @@ links:
 
 ```bash
 # Validate frontmatter
-./.agents/agents lint-docs .agents/wb/
+./.agents/agents lint-docs docs/plans/
 
 # Fix issues automatically
-./.agents/agents lint-docs .agents/wb --fix
+./.agents/agents lint-docs docs/plans --fix
 ```
 
 ---

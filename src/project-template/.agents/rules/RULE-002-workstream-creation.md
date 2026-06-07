@@ -14,7 +14,7 @@ updated_at: '2026-05-14T20:05:00-03:00'
 
 ## Artifact Economy Gate
 
-- Create workbench artifacts only for active execution/evidence.
+- Create governed plan artifacts only for active execution/evidence.
 - Default tracked pair: `plan + task`.
 - Do not create artifacts as thinking dumps.
 - Do not add tasks whose only purpose is to make a plan.

@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { resolveProjectPath } from "../project/root";
 import { appendWorkbenchEvent } from "../local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
@@ -369,6 +369,7 @@ export function newWorkstream(
     "utf8",
   );
   writeFileSync(paths.evidencePath, "", "utf8");
+  mkdirSync(dirname(paths.activeSessionPath), { recursive: true });
   writeFileSync(paths.activeSessionPath, `${session}\n`, "utf8");
   appendWorkbenchEvent(root, {
     type: "workbench.new",

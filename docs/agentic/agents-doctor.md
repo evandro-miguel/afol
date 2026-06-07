@@ -38,7 +38,7 @@ Validates `.agents` directory structure:
 |------|---------|
 | `.agents/agents.config` | Config (required_folders, required_templates) |
 | `docs/templates/*.md` | Templates |
-| `.agents/wb/**/*.md` | Workstreams to validate |
+| `docs/plans/**/*.md` | Workstreams to validate |
 | `docs/arc/SPECS/**/*.md` | Specs to validate |
 | `docs/arc/DECISIONS/**/*.md` | ADRs to validate |
 
@@ -130,7 +130,7 @@ AFOL-native command pending; do not use legacy just command runners.
 ### Errors
 
 ```text
-❌ Missing folder: .agents/wb
+❌ Missing folder: docs/plans
 ❌ Missing template: plan.md
 ❌ Invalid frontmatter in file.md: missing 'id' field
 ```

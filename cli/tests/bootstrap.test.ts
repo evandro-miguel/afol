@@ -76,7 +76,7 @@ describe("bootstrap provider-compatible mutable state", () => {
       expect(existsSync(join(target, ".agents", "tmp"))).toBe(false);
       expect(existsSync(join(target, ".agents", "data"))).toBe(false);
       expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(true);
-      expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
+      expect(existsSync(join(target, "docs", "plans", "README.md"))).toBe(true);
       expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
       expect(existsSync(join(target, ".afol", "data", "README.md"))).toBe(true);
       expect(existsSync(join(target, ".afol", "data", "events", "README.md"))).toBe(true);
@@ -88,7 +88,8 @@ describe("bootstrap provider-compatible mutable state", () => {
       };
       expect(config.paths.agents_dir).toBe(".agents");
       expect(config.paths.mutable_dir).toBe(".afol");
-      expect(config.paths.wb_dir).toBe(".afol/wb");
+      expect(config.paths.wb_dir).toBe("docs/plans");
+      expect(config.paths.active_session_file).toBe(".afol/data/session/.active_session");
       expect(config.paths.skills_dir).toBe(".afol/skills");
       expect(config.paths.tmp_dir).toBe(".afol/tmp");
       expect(config.paths.data_dir).toBe(".afol/data");
@@ -115,12 +116,12 @@ describe("bootstrap provider-compatible mutable state", () => {
     const target = mkdtempSync(join(tmpdir(), "bootstrap-afol-baseline-"));
     try {
       expect(await runBootstrapCommand([target, "--provider-compatible"])).toBe(0);
-      const wbReadme = join(target, ".afol", "wb", "README.md");
-      const edited = "custom downstream workbench notes\n";
-      writeFileSync(wbReadme, edited, "utf8");
+      const tmpReadme = join(target, ".afol", "tmp", "README.md");
+      const edited = "custom downstream tmp notes\n";
+      writeFileSync(tmpReadme, edited, "utf8");
 
       expect(await runBootstrapCommand([target, "--provider-compatible", "--force-managed"])).toBe(0);
-      expect(readFileSync(wbReadme, "utf8")).toBe(edited);
+      expect(readFileSync(tmpReadme, "utf8")).toBe(edited);
     } finally {
       rmSync(target, { recursive: true, force: true });
     }
@@ -147,7 +148,7 @@ describe("bootstrap provider-compatible mutable state", () => {
       expect(existsSync(join(target, ".agents", "tmp"))).toBe(false);
       expect(existsSync(join(target, ".agents", "data"))).toBe(false);
       expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(true);
-      expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
+      expect(existsSync(join(target, "docs", "plans", "README.md"))).toBe(true);
       expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
       expect(existsSync(join(target, ".afol", "data", "README.md"))).toBe(true);
     } finally {
@@ -167,7 +168,6 @@ describe("bootstrap provider-compatible mutable state", () => {
 
       const output = logs.join("\n");
       expect(output).toContain("mutable-baseline-create .afol/skills/README.md source=.agents/skills/README.md missing-target-file");
-      expect(output).toContain("mutable-baseline-create .afol/wb/README.md source=.agents/wb/README.md missing-target-file");
       expect(output).toContain("mutable-baseline-create .afol/tmp/README.md source=.agents/tmp/README.md missing-target-file");
       expect(output).toContain("mutable-baseline-create .afol/data/README.md source=.agents/data/README.md missing-target-file");
     } finally {

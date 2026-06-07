@@ -15,14 +15,14 @@ Replace this section after bootstrap with real product context.
 
 ## Governed Execution
 
-- Use `.agents/wb/` for implementation, validation, and delivery work.
+- Use `docs/plans/` for implementation, validation, and delivery work.
 - Start task before product edits.
 - Close task with evidence.
 - Canonical path:
-  1. `./.agents/agents new {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `./.agents/agents implement start --session {session-id} --task-id T-01`
+  1. `afol n {theme} --feature-id {F-id} --parent-spec {spec-id}`
+  2. `afol st -S {session-id} -T T-01`
   3. Edit and run named verification.
-  4. `./.agents/agents implement complete ... --result passed`
+  4. `afol d -S {session-id} -T T-01 -x "<verification command>"`
 
 ## Stack
 
@@ -33,7 +33,7 @@ Replace this section after bootstrap with real product context.
 
 ## Repository Map
 
-- `.agents/scripts/`, `.agents/runtime/`, `.agents/wb/`
+- `docs/plans/`
 - `.agents/rules/` local contracts only
 - `.agents/skills/` only required project-local behavior
 - `docs/` project docs, `docs/map/` evidence only

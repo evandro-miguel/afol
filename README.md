@@ -27,7 +27,8 @@ docs/
 ├── arc/                     # Roadmap, specs, decisions, structure canon
 ├── map/                     # Current-state repository map and analysis evidence
 ├── standards/               # Canonical process and command standards
-├── templates/               # Reusable doc and workbench templates
+├── templates/               # Reusable docs and governed plan templates
+├── plans/                   # Durable ExecPlans and governed plan sessions
 ├── telemetry/               # Telemetry docs and reports
 ├── patterns/                # Pattern catalog and anti-patterns
 ├── knowledge/               # Indexed knowledge summaries
@@ -47,10 +48,9 @@ docs/
 │       └── schemas/
 │           └── event.json   # Event schema
 │
-├── wb/                      # Active workstreams
-│   ├── .active_session      # Project-local convenience pointer for one operator
-│   └── YYMMDD_HHMM_theme/   # Session folders
-│
+├── data/                    # Operational data
+│   ├── session/             # Local active-session pointer
+│   └── telemetry/
 ├── tmp/                     # Temporary non-canonical artifacts
 │
 ├── rules/                   # Operational rules
@@ -151,8 +151,8 @@ afol bootstrap /path/to/existing-project --partial
 - `CLAUDE.md` is the only committed runtime-facing mirror generated from it.
 - OpenCode, Qwen, Gemini, and Codex do not need committed root mirrors in this scaffold; they use `AGENTS.md` directly or global runtime configuration.
 - `.claude/` should only contain project-safe adapter notes and links.
-- Project-owned documentation belongs under `docs/`; `.agents/` is reserved for agent-system surfaces such as workbench, skills, telemetry, and runtime automation.
-- `.agents/wb/.active_session` is a project-local convenience pointer for a
+- Project-owned documentation belongs under `docs/`; durable plans live in `docs/plans/`. `.agents/` is reserved for skills, telemetry, local state, and runtime automation.
+- `.agents/data/session/.active_session` is a project-local convenience pointer for a
   single operator; parallel agents should not use it as a shared
   synchronization primitive.
 - The scaffold should be optimized for interactive CLI agent execution paths first; embedded SDK/server use cases are secondary and should not drive the default structure.
@@ -190,7 +190,7 @@ afol bootstrap /path/to/existing-project --partial
 - `skills-sync pull` refreshes only an external git checkout; it does not clone into `.agents/cache/` and does not overwrite `.agents/skills/` by itself.
 - `skills-sync sync` and `skills-sync update` are the simple one-step paths to refresh `.agents/skills/` from the configured source.
 - `skills-sync push` is a branch/PR proposal flow. It requires an external universal-skills checkout and refuses direct pushes to `main`.
-- Keep `agentic-folder-sys` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, git-backed skills flow, and governed workbench sessions.
+- Keep `agentic-folder-sys` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, git-backed skills flow, and governed plan sessions.
 - The scaffold should not depend on global Codex skills for universal-skills content.
 - Feature additions and meaningful behavior changes must update affected
   project-local skills and docs, then leave a pending item to propose the skill
@@ -212,7 +212,7 @@ afol bootstrap /path/to/existing-project --partial
 
 - `memory` is a governed adapter for interactive runtimes, not a shell-side MCP executor.
 - Use repo-local `knowledge` first, then `memory`, then targeted repo rereads when needed.
-- External memory remains auxiliary; `.agents/wb/` and repo-local `knowledge` stay canonical.
+- External memory remains auxiliary; `docs/plans/` and repo-local `knowledge` stay canonical.
 
 ### 3. Work
 
@@ -374,9 +374,9 @@ afol validate
 
 ### ExecPlans
 
-- Non-trivial work should use the workbench plan as a living ExecPlan.
+- Non-trivial work should use the durable plan as a living ExecPlan.
 - The canonical contract lives in `PLANS.md`.
-- The canonical file path is `.agents/wb/<session_id>/<session_id>_plan_01.md`.
+- The canonical file path is `docs/plans/<session_id>/<session_id>_plan_01.md`.
 - Finalized plans are strictly verified for required ExecPlan sections and maintained `Progress`.
 
 ### Required Frontmatter

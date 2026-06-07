@@ -17,19 +17,18 @@ This folder stores reusable project knowledge after the project starts.
 
 ## Source Artifacts
 
-Read the workbench root from `.agents/config.json` `paths.wb_dir` before
-collecting source artifacts. Defaults use `.agents/wb`; provider-compatible
-projects usually use `.afol/wb`.
+Read the governed plan root from `.agents/config.json` `paths.wb_dir` before
+collecting source artifacts. The default is `docs/plans`.
 
-- `<configured-wb-dir>/**/_research_*.md`
-- `<configured-wb-dir>/**/_brainstorm_*.md`
-- `<configured-wb-dir>/**/_explorer-check_*.md`
-- `<configured-wb-dir>/**/_report_*.md`
-- `<configured-wb-dir>/**/_postmortem_*.md`
+- `<configured-plan-dir>/**/_research_*.md`
+- `<configured-plan-dir>/**/_brainstorm_*.md`
+- `<configured-plan-dir>/**/_explorer-check_*.md`
+- `<configured-plan-dir>/**/_report_*.md`
+- `<configured-plan-dir>/**/_postmortem_*.md`
 
 ## Files
 
-- `INDEX.md` is generated from knowledge-bearing workbench artifacts.
+- `INDEX.md` is generated from knowledge-bearing governed plan artifacts.
 
 ---
 

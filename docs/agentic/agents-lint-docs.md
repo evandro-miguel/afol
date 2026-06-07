@@ -41,7 +41,7 @@ Validates markdown documents:
 
 | File | Purpose |
 |------|---------|
-| `.agents/wb/**/*.md` | Workstreams |
+| `docs/plans/**/*.md` | Workstreams |
 | `docs/arc/**/*.md` | Architecture |
 | `.agents/agents.config` | Lint exclusions |
 
@@ -90,10 +90,10 @@ def validate_new_thing(filepath: Path) -> List[str]:
 
 ```bash
 # Run lint
-./.agents/agents lint-docs .agents/wb/
+./.agents/agents lint-docs docs/plans/
 
 # Fix issues
-./.agents/agents lint-docs .agents/wb/ --fix
+./.agents/agents lint-docs docs/plans/ --fix
 
 # Via legacy just command runner
 AFOL-native command pending; do not use legacy just command runners.

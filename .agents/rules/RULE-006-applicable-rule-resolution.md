@@ -75,7 +75,7 @@ When creating a new function, command, workflow, or artifact type:
 
 ## File-First Contract Check
 
-When work touches workbench artifacts, ensure:
+When work touches governed plan artifacts, ensure:
 
 - Output artifacts include required fields for primary and optional sidecar artifacts.
 - `sidecar_justification` exists for each optional artifact, including `not_required`

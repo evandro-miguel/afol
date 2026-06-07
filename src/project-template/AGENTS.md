@@ -10,25 +10,26 @@ Replace this section after bootstrap with real product purpose and constraints.
 - This repository was created from the minimal scaffold template.
 - The template owns local protocol files only: `AGENTS.md`,
   `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
-  `.agents/rules/`, optional `.agents/skills/` baseline, optional
-  `.agents/wb/` baseline, and minimal docs.
+  `.agents/rules/`, optional `.agents/skills/` baseline, `docs/plans/`
+  baseline, and minimal docs.
 - Some sandbox providers make `.agents/` read-only. When this project was
   initialized with `afol init --provider-compatible` or
   `afol init --mutable-dir .afol`, mutable agent state lives under `.afol/`.
   Always read `.agents/config.json` `paths.*` before hardcoding state paths.
-- The configured workbench directory in a downstream project is that project's
-  workbench state. It defaults to `.agents/wb/`; provider-compatible projects
-  use `.afol/wb/`. It
-  must start from the template baseline and must not include factory repo
-  history, root workbench sessions, active-session pointers, caches, telemetry
-  events, benchmark results, or development-only evidence.
+- The configured plan directory in a downstream project is that project's
+  durable governed plan state. It defaults to `docs/plans/`. Active-session
+  pointers and local runtime state live under `.agents/data/` or the configured
+  mutable directory. The plan directory must start from the template baseline
+  and must not include factory repo history, root workbench sessions,
+  active-session pointers, caches, telemetry events, benchmark results, or
+  development-only evidence.
 - If a future update proposes broad docs, source seeds, factory tests, caches,
   or root `.agents/wb/` history, treat that as export drift and reject it until
   the scaffold manifest and docs explicitly justify the payload.
 
 ## Governed Execution
 
-- Use the configured workbench directory when work includes implementation,
+- Use the configured plan directory when work includes implementation,
   validation, or delivery.
 - Before product edits: create/target a session and move task to `in_progress`.
 - Canonical path:
@@ -56,8 +57,8 @@ Replace this section after bootstrap with real product purpose and constraints.
 - `.agents/rules/`: local operational contracts only.
 - `.agents/skills/` or configured `paths.skills_dir`: project-local skills only
   when needed.
-- `.agents/wb/` or configured `paths.wb_dir`: local governed sessions for this
-  downstream project only.
+- `docs/plans/` or configured `paths.wb_dir`: durable governed plan sessions
+  for this downstream project only.
 - `.afol/`: provider-compatible mutable state when configured.
 - `.agents/source/universal-skills/`: local seed, not nested git.
 - `docs/`: project docs.
@@ -81,7 +82,7 @@ Replace this section after bootstrap with real product purpose and constraints.
   Keep full precise prose when compression could hide risk, order, or evidence.
 - Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
   CLI, and existing `docs/map/` before broad scans.
-- Prefer repo-local configured workbench state and `docs/knowledge/` records
+- Prefer repo-local configured plan state and `docs/knowledge/` records
   before broad historical reads.
 - Use RTK only for noisy shell output:
   `rtk git status`, `rtk find`, `rtk summary`, bounded `rtk grep`.
@@ -107,7 +108,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Use roadmap-first delivery for non-trivial features.
 - Run the smallest decision-intake lane for ambiguous/product-shaped work.
 - Plans must describe direct execution, not pre-plan research.
-- Keep workbench artifact count minimal: default is `plan + task`.
+- Keep governed artifact count minimal: default is `plan + task`.
 - Start tasks as `pending`/`in_progress`; mark `[x]` only with valid
   evidence id.
 - Finalize optional artifacts before closure.
@@ -150,6 +151,6 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 ## Optional Memory
 
-- Repo-local workbench docs and `docs/knowledge/` are canonical.
+- Repo-local `docs/plans/` and `docs/knowledge/` are canonical.
 - External memory is auxiliary retrieval only.
 - Use host runtime memory only when it is explicitly configured.

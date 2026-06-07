@@ -7,8 +7,8 @@
 
 This repo is the canonical `.agents` scaffold factory for terminal-first
 LLM-assisted development. The public/downstream CLI is `afol`, and the current
-TypeScript implementation lives under `cli/**`. It provides workbench sessions,
-task/evidence tracking, runtime adapters, docs standards, telemetry, and
+TypeScript implementation lives under `cli/**`. It provides governed plan
+sessions, task/evidence tracking, runtime adapters, docs standards, telemetry, and
 bootstrap assets for downstream repos. Legacy local aliases and just
 command-runner surfaces are compatibility debt; `afol` is the current public
 entrypoint and must be the only documented downstream path.
@@ -25,12 +25,12 @@ entrypoint and must be the only documented downstream path.
 - Public runtime usage for this repo is `afol` only (TS-native path); the
   compatibility surfaces above are internal factory fallback and must not be
   documented as public entrypoints.
-- Root `.agents/wb/` is development workbench history for this factory repo.
-  It may be versioned on development branches such as `main_dev`, but it must
-  not be treated as part of the downstream template payload.
+- Root `.agents/wb/` is discontinued legacy local workbench history for this
+  factory repo. It is ignored/local-only and must not be treated as part of the
+  downstream template payload.
 - Downstream installs receive only the exportable scaffold from
-  `src/project-template/`, including the workbench baseline in
-  `src/project-template/.agents/wb/`, not root workbench sessions, active
+  `src/project-template/`, including the durable plan baseline in
+  `src/project-template/docs/plans/`, not root workbench sessions, active
   session pointers, caches, telemetry events, or factory evidence.
 - Downstream installs must not receive legacy aliases or just command runners
   after the AFOL-only cutover; any remaining payload, test, or documentation
@@ -46,8 +46,9 @@ entrypoint and must be the only documented downstream path.
 ## Governed Execution
 
 - If work requires implementation, validation, or delivery and references
-  governed work, evidence, task state, or closure, `.agents/wb/` is part of the
-  work.
+  governed work, evidence, task state, or closure, use the configured plan
+  directory. The default is `docs/plans/`; active-session pointers and local
+  runtime state live under `.agents/data/` or the configured mutable directory.
 - Before product edits: create or target a session, then move the executable
   task to `in_progress`.
 - Canonical path:
@@ -86,8 +87,9 @@ entrypoint and must be the only documented downstream path.
   migration.
 - `.agents/runtime/`: factory-only legacy compatibility runtime support during
   migration.
-- `.agents/wb/`: factory development workstreams and local active-session
-  state; versionable on development branches, not exportable template payload.
+- `.agents/wb/`: discontinued legacy local workbench history; ignored and not
+  exportable template payload.
+- `docs/plans/`: versioned durable ExecPlans and governed plan sessions.
 - `.agents/rules/`: operational guardrails.
 - `.agents/skills/`: project-local skills and workflows.
 - `.agents/source/universal-skills/`: repo-local seed, not a nested git checkout.
@@ -150,7 +152,7 @@ entrypoint and must be the only documented downstream path.
 - Browser/UI checks: `npx playwright` or `bunx playwright` for E2E,
   screenshots, and automation; `lightpanda` for lightweight page checks.
 - Runtime/tasks: `afol` for scaffold lifecycle, status, validation, and
-  workbench commands; `bun`/`node`/`npm` for the CLI and JS tooling;
+  governed plan commands; `bun`/`node`/`npm` for the CLI and JS tooling;
   `python3`/`uv` only for legacy compatibility surfaces when they are
   explicitly touched. Do not use `just` as the canonical project entrypoint.
 - Docs/ops: `markdownlint`/`lint-md`/`fix-md`/`validate-md` for Markdown,
@@ -160,7 +162,7 @@ entrypoint and must be the only documented downstream path.
 ## Planning And Evidence
 
 - Roadmap-first delivery is mandatory for meaningful feature work:
-  roadmap feature -> parent spec -> optional child spec -> workbench.
+  roadmap feature -> parent spec -> optional child spec -> `docs/plans/`.
 - For ambiguous, product-shaped, benchmark-heavy, or prioritization-heavy work,
   run the smallest useful `docs/standards/decision-intake.md` lane before
   planning, delegation, benchmarking, or implementation.
@@ -168,7 +170,7 @@ entrypoint and must be the only documented downstream path.
   generic research, broad discovery, or "make the real plan" tasks.
 - Do needed discovery before authoring a plan and fold findings into facts,
   risks, sequencing, and validation.
-- Workbench artifact economy is mandatory. Create only artifacts with a concrete
+- Governed artifact economy is mandatory. Create only artifacts with a concrete
   operational reason; the normal governed minimum is `plan + task`.
 - New tasks start pending or in_progress. Mark `[x]` only through task-scoped
   closure evidence and a valid evidence id.
@@ -202,13 +204,13 @@ entrypoint and must be the only documented downstream path.
 
 - `docs/` is project-owned documentation, not runtime state.
 - Keep runtime state, caches, mirrors, generated operational artifacts, and
-  workbench evidence outside `docs/`.
+  local evidence outside `docs/`. Durable plans live in `docs/plans/`.
 - `docs/map/` describes current state; it must not contain roadmap items,
   feature specs, ADRs, briefs, desired architecture, or product philosophy.
 - `docs/arc/` is goal-state governance: roadmap, specs, decisions,
   architecture, project brief, tech stack, and engineering guidelines.
-- Root `.agents/wb/` evidence may document factory work, but it must not be
-  copied into `src/project-template/` or release/export payloads.
+- Root `.agents/wb/` legacy evidence must not be copied into
+  `src/project-template/` or release/export payloads.
 - Use `.agents/tmp/` only for disposable temporary files.
 - Never edit managed `updated_at` manually; use AFOL-native workbench update
   commands when available. If a capability exists only in `.agents/agents` or a
@@ -233,7 +235,7 @@ entrypoint and must be the only documented downstream path.
 
 ## Optional Memory
 
-- Repo-local workbench docs and `knowledge` are canonical.
+- Repo-local `docs/plans/` and `knowledge` are canonical.
 - External memory is auxiliary retrieval only.
 - `knowledge search|context|recent|show` commands emit MCP contracts for
   host runtimes; it does not execute MCP calls from shell.
@@ -241,7 +243,7 @@ entrypoint and must be the only documented downstream path.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **agentic-standard-folder** (5189 symbols, 7551 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **agentic-standard-folder** (5194 symbols, 7559 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

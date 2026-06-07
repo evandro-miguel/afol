@@ -119,15 +119,15 @@ describe("validation command family", () => {
     const updateCommandPayload = parseJsonOutput(updateCommandProc.stdout as string);
     expect(updateCommandPayload.selected_pack_ids).toEqual(["update-safety"]);
 
-    const wbProc = runKernel(["v", "select", "--changed-path", ".agents/wb/session/task.md", "--json"]);
+    const wbProc = runKernel(["v", "select", "--changed-path", "docs/plans/session/task.md", "--json"]);
     expect(wbProc.status).toBe(0);
     const wbPayload = parseJsonOutput(wbProc.stdout as string);
     expect(wbPayload.selected_pack_ids).toEqual(["workbench-parity"]);
 
-    const afolWbProc = runKernel(["v", "select", "--changed-path", ".afol/wb/session/task.md", "--json"]);
-    expect(afolWbProc.status).toBe(0);
-    const afolWbPayload = parseJsonOutput(afolWbProc.stdout as string);
-    expect(afolWbPayload.selected_pack_ids).toEqual(["workbench-parity"]);
+    const legacyWbProc = runKernel(["v", "select", "--changed-path", ".agents/wb/session/task.md", "--json"]);
+    expect(legacyWbProc.status).toBe(0);
+    const legacyWbPayload = parseJsonOutput(legacyWbProc.stdout as string);
+    expect(legacyWbPayload.selected_pack_ids).toEqual(["workbench-parity"]);
 
     const mcpProc = runKernel(["v", "select", "--changed-path", "cli/mcp/adapter.ts", "--json"]);
     expect(mcpProc.status).toBe(0);

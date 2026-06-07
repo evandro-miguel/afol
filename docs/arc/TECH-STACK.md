@@ -99,7 +99,7 @@ package dependencies in `package.json`:
   - no `.agents/runtime` in template payload
   - no `.agents/agents` in template payload
   - no Python/uv payload in template payload
-- Root `.agents/wb/` remains factory workbench history, not downstream payload
+- Root `docs/plans/` remains factory workbench history, not downstream payload
 - Template tests live in CLI layer; template is not a runtime test host
 
 ## Runtime / Tooling Surface

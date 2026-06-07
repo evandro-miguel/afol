@@ -95,9 +95,9 @@ python3 .agents/scripts/agents-benchmark.py run live-afol-python-code-task-orche
 - Fails targeted scenarios when forbidden manual workbench edits are observed.
 - Includes script-writing flows for session creation, task state, evidence, timeline entries, frontmatter status/touch, and frontmatter links.
 - Includes an autonomous hypothetical delivery scenario where the prompt does not name the exact scaffold commands; the agent must read `.agents/skills/agentic-folder-sys/SKILL.md`, discover operations from AGENTS.md and the public tool catalog, prefer `.agents/agents` wrapper commands, create a governed session/plan, implement a tiny fixture fix, record evidence, complete the task, and run bounded acceptance verification.
-- Includes AFOL provider-compatible scenarios where mutable operational state stays under `.afol/` instead of `.agents/wb/`.
+- Includes AFOL provider-compatible scenarios where mutable operational state stays under `.afol/` instead of `.agents/`.
 - AFOL provider-compatible scenarios must use `./afold`; `./afol`, `./a`, bare
-  `afol` discovery, global skills, and manual `.afol/wb` edits are failure
+  `afol` discovery, global skills, and manual `.afol/data` session edits are failure
   signals.
 - Autonomous benchmark scenarios should not rely on reading `.agents/scripts/*.py` internals to infer command routing.
 

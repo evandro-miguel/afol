@@ -123,7 +123,7 @@ Compatibility mirrors kept for broader reuse:
 | `<target>/.agents/tmp/` | Temporary non-canonical workspace |
 | `<target>/.claude/` | Runtime folder ensured |
 | `<target>/docs/arc/` | Folders created |
-| `<target>/.agents/wb/` | Folders created |
+| `<target>/docs/plans/` | Folders created |
 | `<target>/docs/arc/*.md` | Generic baseline generated for the target repo |
 | `<target>/docs/arc/SPECS/INDEX.md` | Empty starter index generated |
 | `<target>/docs/arc/DECISIONS/INDEX.md` | Empty starter index generated |
@@ -148,7 +148,7 @@ Installer resilience rule:
 
 Generic-export rule:
 
-- `.agents/wb/` is created as an empty working area; active sessions and historical plans/reports are not copied.
+- `docs/plans/` is created as an empty working area; active sessions and historical plans/reports are not copied.
 - `docs/knowledge/INDEX.md` is regenerated empty.
 - `docs/lessons/entries/` keeps only reusable scaffolding such as `README.md`; historical lesson entries are not copied.
 - `docs/telemetry/reports/` is omitted from bootstrap output.

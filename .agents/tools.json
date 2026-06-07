@@ -205,7 +205,7 @@
         "Investigate a bug inside an existing roadmap/spec context",
         "Before product edits for governed work"
       ],
-      "critical_rule": "A governed product change is not valid unless the session exists under .agents/wb before product edits. Do not reuse unrelated fixture sessions, do not create sessions outside .agents/wb, and do not create tasks already marked done.",
+      "critical_rule": "A governed product change is not valid unless the session exists under docs/plans before product edits. Do not reuse unrelated fixture sessions, do not create sessions outside docs/plans, and do not create tasks already marked done.",
       "options": [
         "--feature-id: Mandatory roadmap feature identifier (for example F-01)",
         "--parent-spec: Mandatory parent spec id or file under docs/arc/SPECS/",
@@ -214,7 +214,7 @@
         "--spec-child/--spec-lite: Creates a new local child-spec artifact; do not combine with --child-spec",
         "--plan-only: Creates only arquivo plan.md",
         "--quick: Registers quick task rapida na sessao ativa",
-        "--into-session: Reuse an existing session under .agents/wb/ only"
+        "--into-session: Reuse an existing session under docs/plans/ only"
       ],
       "files_created": [
         "YYMMDD_HHMM_<theme>_plan_01.md",
@@ -222,8 +222,8 @@
         "YYMMDD_HHMM_<theme>_spec_01.md (optional)",
         "YYMMDD_HHMM_<theme>_spec-lite_01.md (optional)"
       ],
-      "output": "Session folder em .agents/wb/ with files inicializados",
-      "side_effect": "Updates .agents/wb/.active_session pointing to nova sessao",
+      "output": "Session folder em docs/plans/ with files inicializados",
+      "side_effect": "Updates .agents/data/session/.active_session pointing to nova sessao",
       "just_command": "just new THEME=<theme> FEATURE_ID=F-01 PARENT_SPEC=<spec-id> [SPEC=1|lite] [CHILD_SPEC=<spec-id>]"
     },
     {
@@ -582,7 +582,7 @@
         "Updatesr lista de arquivos modificados no report",
         "Setar status ou links no frontmatter"
       ],
-      "critical_rule": "For done transitions, first record evidence with wb-update evidence, then pass the returned id to wb-update task ... --mark-done --evidence-id <E-id>. The session must be under .agents/wb.",
+      "critical_rule": "For done transitions, first record evidence with wb-update evidence, then pass the returned id to wb-update task ... --mark-done --evidence-id <E-id>. The session must be under docs/plans.",
       "commands": [
         {
           "name": "touch",
@@ -620,7 +620,7 @@
           "description": "Seta frontmatter links.<key> = <value>"
         }
       ],
-      "active_session": "Le .agents/wb/.active_session para determinar sessao alvo",
+      "active_session": "Le .agents/data/session/.active_session para determinar sessao alvo",
       "offset": "Usa WB_OFFSET do config para timestamps",
       "just_command": "just wb-<command> [ARGS...]"
     },

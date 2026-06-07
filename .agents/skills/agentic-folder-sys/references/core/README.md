@@ -16,7 +16,7 @@ validation, or fix in the current repository, do not bootstrap or inspect
 scaffold internals first. Use the already-installed scaffold wrapper and keep
 the order of state changes clear:
 
-1. create or target the `.agents/wb/` session,
+1. create or target the `docs/plans/` session,
 2. move the execution task to in progress,
 3. edit the product,
 4. run the named acceptance check,

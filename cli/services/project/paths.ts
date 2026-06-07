@@ -109,7 +109,7 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
   const mutableDir = fromConfig(config, ["paths", "mutable_dir"], agentsDir);
   const dataDir = fromConfig(config, ["paths", "data_dir"], `${mutableDir}/data`);
   const mutationsDir = fromConfig(config, ["paths", "mutations_dir"], `${dataDir}/mutations`);
-  const wbDir = fromConfig(config, ["paths", "wb_dir"], `${mutableDir}/wb`);
+  const wbDir = fromConfig(config, ["paths", "wb_dir"], "docs/plans");
 
   const paths: ProjectPathConfig = {
     agentsDir,
@@ -120,7 +120,7 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
       `${agentsDir}/skills`,
     ),
     wbDir,
-    activeSessionFile: fromConfig(config, ["paths", "active_session_file"], `${wbDir}/.active_session`),
+    activeSessionFile: fromConfig(config, ["paths", "active_session_file"], `${dataDir}/session/.active_session`),
     tmpDir: fromConfig(config, ["paths", "tmp_dir"], `${mutableDir}/tmp`),
     dataIndexDir: fromConfig(config, ["paths", "data_index_dir"], `${dataDir}/index`),
     eventsFile: fromConfig(config, ["paths", "events_file"], `${dataDir}/events/events.jsonl`),

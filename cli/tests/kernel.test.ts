@@ -241,8 +241,8 @@ describe("kernel front-door", () => {
       expect(match).not.toBeNull();
       const session = (match?.[1] ?? "").trim();
 
-      const planPath = join(root, ".agents", "wb", session, `${session}_plan_01.md`);
-      const taskPath = join(root, ".agents", "wb", session, `${session}_task_01.md`);
+      const planPath = join(root, "docs", "plans", session, `${session}_plan_01.md`);
+      const taskPath = join(root, "docs", "plans", session, `${session}_task_01.md`);
       const plan = readFileSync(planPath, "utf8");
       const task = readFileSync(taskPath, "utf8");
 

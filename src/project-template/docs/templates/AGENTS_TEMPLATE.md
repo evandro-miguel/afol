@@ -15,9 +15,8 @@ Replace this section after bootstrap with real product context.
 
 ## Governed Execution
 
-- Use the configured workbench path for implementation, validation, and
-  delivery work. It defaults to `.agents/wb/`; provider-compatible projects use
-  `.afol/wb/`.
+- Use the configured plan path for implementation, validation, and delivery
+  work. It defaults to `docs/plans/`.
 - Start task before product edits.
 - Close task with evidence.
 - Canonical path:
@@ -35,9 +34,9 @@ Replace this section after bootstrap with real product context.
 
 ## Repository Map
 
-- `.agents/config.json` path contract for mutable state, workbench, skills,
+- `.agents/config.json` path contract for mutable state, plan storage, skills,
   tmp, and data locations
-- `.agents/wb/` or `.afol/wb/` governed workbench state
+- `docs/plans/` or configured `paths.wb_dir` governed plan state
 - `.agents/data/telemetry/` or configured data path for telemetry data and indexes when the downstream CLI exposes them
 - `.agents/rules/` local contracts only
 - `.agents/skills/` or `.afol/skills/` only required project-local behavior
@@ -100,5 +99,5 @@ work and keep this template focused on the stored data and docs contract.
 
 ## Optional Memory
 
-- Repo-local workbench docs and `knowledge` are canonical.
+- Repo-local `docs/plans/` and `knowledge` are canonical.
 - External memory is auxiliary only.

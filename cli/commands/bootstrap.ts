@@ -32,7 +32,6 @@ type ProviderCompatibleCleanupOperation = {
 
 const MUTABLE_BASELINE_SOURCES = [
   { suffix: "skills/README.md", sourcePath: ".agents/skills/README.md" },
-  { suffix: "wb/README.md", sourcePath: ".agents/wb/README.md" },
   { suffix: "tmp/README.md", sourcePath: ".agents/tmp/README.md" },
   { suffix: "data/README.md", sourcePath: ".agents/data/README.md" },
   { suffix: "data/events/README.md", sourcePath: ".agents/data/events/README.md" },
@@ -126,8 +125,8 @@ function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
     mutable_dir: mutableDir,
     rules_dir: ".agents/rules",
     skills_dir: `${mutableDir}/skills`,
-    wb_dir: `${mutableDir}/wb`,
-    active_session_file: `${mutableDir}/wb/.active_session`,
+    wb_dir: "docs/plans",
+    active_session_file: `${dataDir}/session/.active_session`,
     tmp_dir: `${mutableDir}/tmp`,
     data_dir: dataDir,
     data_index_dir: `${dataDir}/index`,

@@ -41,7 +41,8 @@ Reads from `.agents/agents.config`:
 ```yaml
 paths:
   agents_dir: .agents
-  wb_dir: .agents/wb
+  wb_dir: docs/plans
+  active_session_file: .agents/data/session/.active_session
   templates_dir: docs/templates
 
 time:
