@@ -64,6 +64,14 @@ Use this file to adapt paths, timezone offsets, lint exclusions, doctor requirem
 `agents-knowledge.py` provides low-token list/search/pull/show/index over research, brainstorm, explorer-check, report, and postmortem docs.
 `agents-repo-map.py` wraps the external `docker-analisys-tools` runner so `docs/map/` can be refreshed through a project-local command instead of ad-hoc shell usage.
 `agents-benchmark.py` runs the standard controlled live-agent runtime-flow benchmark family through `codex exec --json` and can persist JSON outputs under `.agents/data/benchmarks/results/`.
+The `live-afol-python-code-task-orchestrated` scenario is a compact end-to-end
+AFOL code-task benchmark: it bootstraps a temp downstream project with a tiny
+Python `slugify` task, sends a planner phase to create the AFOL plan/task, sends
+an executor phase to implement and close the task, records prompts/schemas/agent
+outputs/delivery artifacts, and captures Codex token usage when present in the
+JSON stream. Explicit single-scenario or non-default-profile `--save` runs write
+raw result files only; stable `current-results.json` snapshots are reserved for
+the default full benchmark profile.
 For per-process isolation, set `AGENTS_SESSION_ID` to target a session directly.
 Set `AGENTS_SESSION_STRICT=1` to reject repository-global active-session fallback.
 `AGENTS_ACTIVE_SESSION_FILE` remains available for custom local convenience pointers.

@@ -30,6 +30,7 @@ def test_catalog_contains_live_scenarios():
         "live-wb-update-status-touch",
         "live-wb-update-link",
         "live-afol-provider-compatible-delivery",
+        "live-afol-python-code-task-orchestrated",
     } <= set(benchmark.SCENARIOS)
     assert benchmark.DEFAULT_PROFILE.model == "gpt-5.4-mini"
     assert benchmark.DEFAULT_PROFILE.reasoning_effort == "medium"
@@ -95,6 +96,35 @@ def test_parse_observed_tool_data_counts_errors_and_retries():
     assert error_count == 1
     assert retry_count == 1
     assert tool_calls[0]["command_excerpt"] == "./.agents/agents tools info benchmark"
+
+
+def test_parse_token_usage_collects_response_usage():
+    benchmark = load_module()
+    stdout = "\n".join(
+        [
+            '{"type":"event","usage":{"input_tokens":10,"output_tokens":5,"total_tokens":15}}',
+            '{"type":"event","payload":{"usage":{"input_tokens":12,"output_tokens":7,"total_tokens":19,"cached_input_tokens":3,"reasoning_output_tokens":2}}}',
+        ]
+    )
+
+    usage = benchmark._parse_token_usage(stdout)
+
+    assert usage["available"] is True
+    assert usage["input_tokens"] == 12
+    assert usage["output_tokens"] == 7
+    assert usage["total_tokens"] == 19
+    assert usage["cached_input_tokens"] == 3
+    assert usage["reasoning_output_tokens"] == 2
+
+
+def test_parse_token_usage_derives_total_when_codex_omits_it():
+    benchmark = load_module()
+    stdout = '{"type":"event","usage":{"input_tokens":21,"output_tokens":8,"cached_input_tokens":13}}'
+
+    usage = benchmark._parse_token_usage(stdout)
+
+    assert usage["available"] is True
+    assert usage["total_tokens"] == 29
 
 
 def test_forbidden_commands_absent_reports_manual_wb_edits():
@@ -274,6 +304,109 @@ def test_collect_afol_delivery_artifacts_preserves_generated_files(tmp_path):
     assert '"mutable_state":".afol"' in artifacts["runtime_policy"]["content"]
 
 
+def test_validate_code_task_planner_accepts_meaningful_afol_plan_and_task(tmp_path):
+    benchmark = load_module()
+    session_id = "260607_1300_code-task-benchmark"
+    session_dir = tmp_path / ".afol" / "wb" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_plan_01.md").write_text(
+        "# Plan\n\nImplement slugify in test-code-task-project.\n",
+        encoding="utf-8",
+    )
+    (session_dir / f"{session_id}_task_01.md").write_text(
+        "| T-01 | pending | worker | Implement slugify(text) in test-code-task-project/src/text_utils.py. |\n",
+        encoding="utf-8",
+    )
+
+    failures = benchmark._validate_code_task_planner(
+        {
+            "session_id": session_id,
+            "used_afol_new": True,
+            "plan_created": True,
+            "task_created": True,
+            "plan_mentions_slugify": True,
+            "task_mentions_slugify": True,
+            "manual_afol_wb_edit": False,
+        },
+        tmp_path,
+    )
+
+    assert failures == []
+
+
+def test_validate_code_task_executor_accepts_completed_slugify_task(tmp_path):
+    benchmark = load_module()
+    session_id = "260607_1300_code-task-benchmark"
+    session_dir = tmp_path / ".afol" / "wb" / session_id
+    project_src = tmp_path / benchmark.CODE_TASK_PROJECT_DIR / "src"
+    scripts_dir = tmp_path / "scripts"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    project_src.mkdir(parents=True, exist_ok=True)
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_task_01.md").write_text(
+        "| T-01 | done | worker | Implement slugify(text) in test-code-task-project/src/text_utils.py. |\n",
+        encoding="utf-8",
+    )
+    (session_dir / ".evidence.jsonl").write_text(
+        '{"task_id":"T-01","command":"python3 scripts/check_slugify.py","result":"passed"}\n',
+        encoding="utf-8",
+    )
+    (project_src / "text_utils.py").write_text(
+        "from __future__ import annotations\n\n"
+        "import re\n\n\n"
+        "def slugify(text: str) -> str:\n"
+        "    lowered = text.strip().lower()\n"
+        "    slug = re.sub(r'[^a-z0-9]+', '-', lowered)\n"
+        "    return slug.strip('-')\n",
+        encoding="utf-8",
+    )
+    check_file = scripts_dir / "check_slugify.py"
+    check_file.write_text(benchmark._code_task_check_text(), encoding="utf-8")
+    check_file.chmod(0o755)
+
+    failures = benchmark._validate_code_task_executor(
+        {
+            "session_id": session_id,
+            "problem_fixed": True,
+            "verification_passed": True,
+            "used_afol_start": True,
+            "used_afol_evidence": True,
+            "used_afol_done": True,
+            "task_completed": True,
+            "evidence_recorded": True,
+            "manual_afol_wb_edit": False,
+            "edited_only_allowed_paths": True,
+        },
+        tmp_path,
+    )
+
+    assert failures == []
+
+
+def test_collect_code_task_delivery_artifacts_preserves_prompt_fixture(tmp_path):
+    benchmark = load_module()
+    session_id = "260607_1300_code-task-benchmark"
+    session_dir = tmp_path / ".afol" / "wb" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_plan_01.md").write_text("# Plan\n", encoding="utf-8")
+    (session_dir / f"{session_id}_task_01.md").write_text("| T-01 | done | worker | slugify |\n", encoding="utf-8")
+    (session_dir / ".evidence.jsonl").write_text('{"command":"python3 scripts/check_slugify.py"}\n', encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "benchmark_problem.md").write_text("# Problem\n", encoding="utf-8")
+    (tmp_path / benchmark.CODE_TASK_PROJECT_DIR / "src").mkdir(parents=True)
+    (tmp_path / benchmark.CODE_TASK_PROJECT_DIR / "src" / "text_utils.py").write_text("def slugify(text): ...\n", encoding="utf-8")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "check_slugify.py").write_text("print('ok')\n", encoding="utf-8")
+
+    artifacts = benchmark._collect_code_task_delivery_artifacts({"session_id": session_id}, tmp_path)
+
+    assert artifacts["session_id"] == session_id
+    assert artifacts["plan"]["content"].startswith("# Plan")
+    assert artifacts["problem"]["path"] == "docs/benchmark_problem.md"
+    assert artifacts["text_utils"]["path"].endswith("src/text_utils.py")
+    assert artifacts["acceptance_check"]["path"] == "scripts/check_slugify.py"
+
+
 def test_run_suite_aggregates_results_and_writes_output(tmp_path):
     benchmark = load_module()
 
@@ -300,6 +433,14 @@ def test_run_suite_aggregates_results_and_writes_output(tmp_path):
             "stdout_excerpt": "",
             "stderr_excerpt": "",
             "command": ["codex", "exec"],
+            "token_usage": {
+                "available": True,
+                "input_tokens": 6,
+                "output_tokens": 3,
+                "total_tokens": 9,
+                "cached_input_tokens": 1,
+                "reasoning_output_tokens": 2,
+            },
         }
 
     output_path = tmp_path / "runtime-flow-live-agent.json"
@@ -321,6 +462,8 @@ def test_run_suite_aggregates_results_and_writes_output(tmp_path):
     assert payload["accuracy"] == 1.0
     assert payload["context_bytes_total"] == 200
     assert payload["prompt_bytes_total"] == 100
+    assert payload["token_usage"]["available"] is True
+    assert payload["token_usage"]["total_tokens"] == 18
     assert output_path.exists()
 
 
@@ -398,6 +541,41 @@ def test_save_payload_updates_stable_snapshot_files(tmp_path):
     assert comparison["delta"] == {}
     assert comparison["delta_pct"] == {}
     assert comparison["trend"] == {}
+
+
+def test_save_payload_can_skip_stable_snapshot_files(tmp_path):
+    benchmark = load_module()
+    benchmark.ROOT_DIR = tmp_path
+    benchmark.RESULTS_DIR = tmp_path / ".agents" / "data" / "benchmarks" / "results"
+    benchmark.BENCHMARK_SNAPSHOT_DIR = tmp_path / ".agents" / "benchmarks"
+    benchmark.CURRENT_RESULTS_FILE = benchmark.BENCHMARK_SNAPSHOT_DIR / "current-results.json"
+    benchmark._timestamp_slug = lambda: "20260424_120001"
+
+    payload = {
+        "pack_id": benchmark.BENCHMARK_PACK_ID,
+        "generated_at": "2026-04-24T15:00:00Z",
+        "benchmark_profile": {"runtime": "codex", "model": "gpt-5.4-mini", "reasoning_effort": "low"},
+        "scenario_count": 1,
+        "pass": True,
+        "duration_ms": 100,
+        "tool_call_count": 1,
+        "tool_success_count": 1,
+        "error_count": 0,
+        "retry_count": 0,
+        "checks_total": 1,
+        "checks_passed": 1,
+        "context_bytes_total": 10,
+        "prompt_bytes_total": 10,
+        "accuracy": 1.0,
+        "tool_success_rate": 1.0,
+        "scenarios": [],
+    }
+
+    saved_path = benchmark._save_payload(payload, write_stable_snapshots=False)
+
+    assert saved_path.exists()
+    assert not benchmark.CURRENT_RESULTS_FILE.exists()
+    assert not (benchmark.BENCHMARK_SNAPSHOT_DIR / "runtime-flow-live-agent-v4-latest.json").exists()
 
 
 def test_save_payload_adds_comparison_against_previous_snapshot(tmp_path):

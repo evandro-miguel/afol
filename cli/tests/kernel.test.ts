@@ -242,13 +242,16 @@ describe("kernel front-door", () => {
       const session = (match?.[1] ?? "").trim();
 
       const planPath = join(root, ".agents", "wb", session, `${session}_plan_01.md`);
+      const taskPath = join(root, ".agents", "wb", session, `${session}_task_01.md`);
       const plan = readFileSync(planPath, "utf8");
+      const task = readFileSync(taskPath, "utf8");
 
       expect(plan).toContain("## Native command metadata");
       expect(plan).toContain("feature_id: F-00");
       expect(plan).toContain("parent_spec: 260531_parent_spec_01");
       expect(plan).toContain("intent: delivery");
       expect(plan).toContain("task: Implement retirement bootstrap parity");
+      expect(task).toContain("| T-01 | pending | worker | Implement retirement bootstrap parity |");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

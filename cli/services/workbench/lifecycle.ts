@@ -111,6 +111,12 @@ function uniqueSessionId(wbRoot: string, base: string): string {
   }
 }
 
+function taskNoteFromMetadata(metadata?: NewWorkstreamMetadata): string {
+  const task = metadata?.task?.trim();
+  const note = task && task.length > 0 ? task : "Execute requested lifecycle work.";
+  return note.replace(/\|/g, "/");
+}
+
 function sessionPaths(root: string, session: string): {
   wbRoot: string;
   sessionDir: string;
@@ -325,7 +331,7 @@ export function newWorkstream(
       "",
       "| Task | State | Owner | Notes |",
       "|------|-------|-------|-------|",
-      "| T-01 | pending | worker | Execute requested lifecycle work. |",
+      `| T-01 | pending | worker | ${taskNoteFromMetadata(metadata)} |`,
       "",
     ].join("\n"),
     "utf8",
