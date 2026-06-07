@@ -38,6 +38,7 @@ FIXTURE_CHILD_SPEC_FILE = (
 )
 BENCHMARK_PACK_ID = "runtime-flow-live-agent-v4"
 LIVE_COMPLETE_COMMAND = "live benchmark fixture command"
+AFOL_POLICY_CHECK_COMMAND = "python3 scripts/check_afol_policy.py"
 EXIT_CODE_RE = re.compile(r"Process exited with code\s+(-?\d+)")
 COMPARISON_METRICS: tuple[tuple[str, str, bool], ...] = (
     ("duration_ms", "lower", False),
@@ -708,6 +709,158 @@ def _prepare_fixture_repo(temp_root: Path) -> Path:
     return temp_root
 
 
+def _afol_agents_text() -> str:
+    return (
+        "# AGENTS.md\n\n"
+        "## Governed Execution\n\n"
+        "Use `./afol` or `./a` for all workbench operations. This repository is provider-compatible: "
+        "mutable state belongs under `.afol/`, and `.agents/` contains only provider-safe static config.\n\n"
+        "Required order for implementation work:\n\n"
+        "1. Create a short session with `./afol new <theme> --feature-id <id> --parent-spec <id> --task <text>`.\n"
+        "2. Start `T-01` with `./afol start --session <session-id> --task-id T-01` before product edits.\n"
+        "3. Run the acceptance check.\n"
+        "4. Record evidence with `./afol evidence --session <session-id> --task-id T-01 --command \"<command>\" --result passed --artifact <path>`.\n"
+        "5. Close the task with `./afol done --session <session-id> --task-id T-01`.\n\n"
+        "Do not manually create, edit, or append `.afol/wb` files. Do not use `.agents/agents` in this project.\n"
+    )
+
+
+def _afol_problem_text() -> str:
+    return (
+        "# AFOL Provider-Compatible Benchmark Request\n\n"
+        "The repository has a tiny runtime policy fixture. Change the product policy so it describes the "
+        "provider-compatible AFOL workflow.\n\n"
+        "## Acceptance\n\n"
+        f"- `{AFOL_POLICY_CHECK_COMMAND}` must pass.\n"
+        "- Keep the product change minimal.\n"
+        "- Use `./afol` or `./a` for session, task, and evidence state.\n"
+        "- Do not manually edit `.afol/wb`.\n"
+    )
+
+
+def _afol_runtime_policy_text() -> str:
+    return (
+        "{\n"
+        '  "workflow_mode": "manual",\n'
+        '  "mutable_state": ".agents",\n'
+        '  "evidence_required": false\n'
+        "}\n"
+    )
+
+
+def _afol_runtime_policy_check_text() -> str:
+    return (
+        "#!/usr/bin/env python3\n"
+        '"""Validate the controlled AFOL provider-compatible benchmark fixture."""\n\n'
+        "from __future__ import annotations\n\n"
+        "import json\n"
+        "import re\n"
+        "from pathlib import Path\n\n"
+        'POLICY_PATH = Path("app/runtime_policy.json")\n'
+        'WB_DIR = Path(".afol/wb")\n'
+        'TASK_TABLE_RE = re.compile(r"^\\|\\s*(T-\\d{2,3})\\s*\\|\\s*([^|]+?)\\s*\\|")\n'
+        'TASK_CHECK_RE = re.compile(r"^-\\s*\\[([ /%!>&x])\\]\\s+(T-\\d{2,3})\\b")\n'
+        "MARKER_TO_STATE = {\n"
+        '    " ": "pending", "/": "in_progress", "%": "implemented_untested",\n'
+        '    "&": "tested_needs_spec_validation", "!": "problem", ">": "moved", "x": "done",\n'
+        "}\n"
+        'STARTED_STATES = {"in_progress", "implemented_untested", "tested_needs_spec_validation", "done"}\n\n'
+        "def _task_state(task_file: Path, task_id: str = \"T-01\") -> str | None:\n"
+        "    for raw_line in task_file.read_text(encoding=\"utf-8\").splitlines():\n"
+        "        line = raw_line.strip()\n"
+        "        table = TASK_TABLE_RE.match(line)\n"
+        "        if table and table.group(1) == task_id:\n"
+        "            return table.group(2).strip().lower()\n"
+        "        check = TASK_CHECK_RE.match(line)\n"
+        "        if check and check.group(2) == task_id:\n"
+        "            return MARKER_TO_STATE.get(check.group(1))\n"
+        "    return None\n\n"
+        "def _governed_session_started() -> bool:\n"
+        "    if not WB_DIR.exists():\n"
+        "        return False\n"
+        "    for session_dir in WB_DIR.iterdir():\n"
+        "        if not session_dir.is_dir():\n"
+        "            continue\n"
+        "        has_plan = any(session_dir.glob(\"*_plan_*.md\"))\n"
+        "        for task_file in session_dir.glob(\"*_task_*.md\"):\n"
+        "            if has_plan and _task_state(task_file) in STARTED_STATES:\n"
+        "                return True\n"
+        "    return False\n\n"
+        "def main() -> int:\n"
+        "    data = json.loads(POLICY_PATH.read_text(encoding=\"utf-8\"))\n"
+        "    expected = {\n"
+        '        "workflow_mode": "afol",\n'
+        '        "mutable_state": ".afol",\n'
+        '        "evidence_required": True,\n'
+        "    }\n"
+        "    failures = [\n"
+        "        f\"{key}: expected {value!r}, got {data.get(key)!r}\"\n"
+        "        for key, value in expected.items()\n"
+        "        if data.get(key) != value\n"
+        "    ]\n"
+        "    if Path('.agents/wb').exists():\n"
+        "        failures.append('provider-compatible project must not create .agents/wb')\n"
+        "    if not _governed_session_started():\n"
+        "        failures.append('expected an AFOL .afol/wb session with T-01 started before validation')\n"
+        "    if failures:\n"
+        "        print('afol policy check failed')\n"
+        "        for failure in failures:\n"
+        "            print(f'- {failure}')\n"
+        "        return 1\n"
+        "    print('afol policy check passed')\n"
+        "    return 0\n\n"
+        "if __name__ == \"__main__\":\n"
+        "    raise SystemExit(main())\n"
+    )
+
+
+def _build_afol_dist() -> Path:
+    dist_binary = ROOT_DIR / "dist" / "afol"
+    subprocess.run(["bun", "run", "build"], cwd=ROOT_DIR, check=True, capture_output=True, text=True)
+    if not dist_binary.exists():
+        raise FileNotFoundError(f"AFOL dist binary missing after build: {dist_binary}")
+    return dist_binary
+
+
+def _write_afol_fixture_launcher(target: Path, dist_binary: Path) -> None:
+    bin_dir = target / ".afol" / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    runtime = bin_dir / "afol-runtime"
+    shutil.copy2(dist_binary, runtime)
+    runtime.chmod(0o755)
+    launcher = (
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+        'exec "${SCRIPT_DIR}/.afol/bin/afol-runtime" "$@"\n'
+    )
+    for name in ("afol", "a"):
+        path = target / name
+        _write_text(path, launcher)
+        path.chmod(0o755)
+
+
+def _prepare_afol_fixture_repo(temp_root: Path) -> Path:
+    dist_binary = _build_afol_dist()
+    target = temp_root / "afol-downstream"
+    subprocess.run(
+        ["bun", str(ROOT_DIR / "cli" / "main.ts"), "bootstrap", str(target), "--provider-compatible"],
+        cwd=ROOT_DIR,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _write_afol_fixture_launcher(target, dist_binary)
+    _write_text(target / "AGENTS.md", _afol_agents_text())
+    _write_text(target / "docs" / "benchmark_problem.md", _afol_problem_text())
+    _write_text(target / "app" / "runtime_policy.json", _afol_runtime_policy_text())
+    check_file = target / "scripts" / "check_afol_policy.py"
+    _write_text(check_file, _afol_runtime_policy_check_text())
+    check_file.chmod(0o444)
+    subprocess.run(["git", "init", "-q"], cwd=target, check=False)
+    return target
+
+
 def _context_bytes(repo_root: Path, artifacts: tuple[str, ...]) -> int:
     total = 0
     for rel_path in artifacts:
@@ -865,6 +1018,41 @@ def _autonomous_delivery_schema() -> dict[str, Any]:
             "used_governed_session",
             "used_scripted_task_flow",
             "manual_wb_task_edit",
+        ],
+    }
+
+
+def _afol_provider_delivery_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "scenario_id": {"type": "string", "const": "live-afol-provider-compatible-delivery"},
+            "session_id": {"type": "string"},
+            "problem_fixed": {"type": "boolean"},
+            "verification_passed": {"type": "boolean"},
+            "used_afol_new": {"type": "boolean"},
+            "used_afol_start": {"type": "boolean"},
+            "used_afol_evidence": {"type": "boolean"},
+            "used_afol_done": {"type": "boolean"},
+            "task_completed": {"type": "boolean"},
+            "evidence_recorded": {"type": "boolean"},
+            "manual_afol_wb_edit": {"type": "boolean"},
+            "created_agents_wb": {"type": "boolean"},
+        },
+        "required": [
+            "scenario_id",
+            "session_id",
+            "problem_fixed",
+            "verification_passed",
+            "used_afol_new",
+            "used_afol_start",
+            "used_afol_evidence",
+            "used_afol_done",
+            "task_completed",
+            "evidence_recorded",
+            "manual_afol_wb_edit",
+            "created_agents_wb",
         ],
     }
 
@@ -1093,6 +1281,106 @@ def _validate_autonomous_delivery(output: dict[str, Any], repo_root: Path) -> li
 
     failures.extend(_validate_runtime_policy_file(repo_root))
     failures.extend(_validate_governed_session_delivery(session_id, repo_root))
+    return failures
+
+
+def _validate_afol_policy_file(repo_root: Path) -> list[str]:
+    failures: list[str] = []
+    policy_file = repo_root / "app" / "runtime_policy.json"
+    check_file = repo_root / "scripts" / "check_afol_policy.py"
+    try:
+        check_text = check_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        failures.append(f"afol policy check script could not be read: {exc}")
+        check_text = ""
+    if check_text != _afol_runtime_policy_check_text():
+        failures.append("afol policy check script was modified")
+
+    try:
+        policy = json.loads(policy_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        failures.append(f"afol policy could not be read: {exc}")
+        policy = {}
+    expected_policy = {
+        "workflow_mode": "afol",
+        "mutable_state": ".afol",
+        "evidence_required": True,
+    }
+    for key, value in expected_policy.items():
+        if policy.get(key) != value:
+            failures.append(f"afol policy {key} != {value!r}")
+    return failures
+
+
+def _validate_afol_session_delivery(session_id: str, repo_root: Path) -> list[str]:
+    failures: list[str] = []
+    session_dir = repo_root / ".afol" / "wb" / session_id
+    plan_files = sorted(session_dir.glob("*_plan_*.md")) if session_dir.exists() else []
+    task_files = sorted(session_dir.glob("*_task_*.md")) if session_dir.exists() else []
+    evidence_file = session_dir / ".evidence.jsonl"
+    if not session_dir.exists():
+        failures.append("created AFOL session directory missing")
+    if not plan_files:
+        failures.append("created AFOL plan file missing")
+    if not task_files:
+        failures.append("created AFOL task file missing")
+
+    task_text = task_files[0].read_text(encoding="utf-8") if task_files else ""
+    evidence_records: list[dict[str, Any]] = []
+    if evidence_file.exists():
+        for line in evidence_file.read_text(encoding="utf-8").splitlines():
+            try:
+                parsed = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                evidence_records.append(parsed)
+    if "| T-01 | done |" not in task_text and "- [x] T-01" not in task_text:
+        failures.append("created AFOL task T-01 not marked done")
+    has_expected_evidence = any(
+        record.get("task_id") == "T-01" and "check_afol_policy.py" in str(record.get("command", ""))
+        for record in evidence_records
+    )
+    if not has_expected_evidence:
+        failures.append("AFOL evidence ledger missing expected verification record")
+    return failures
+
+
+def _validate_afol_provider_delivery(output: dict[str, Any], repo_root: Path) -> list[str]:
+    failures: list[str] = []
+    session_id = str(output.get("session_id", "")).strip()
+    if not session_id or "/" in session_id or ".." in session_id:
+        failures.append("session_id is missing or invalid")
+    for key in (
+        "problem_fixed",
+        "verification_passed",
+        "used_afol_new",
+        "used_afol_start",
+        "used_afol_evidence",
+        "used_afol_done",
+        "task_completed",
+        "evidence_recorded",
+    ):
+        if output.get(key) is not True:
+            failures.append(f"{key} != true")
+    if output.get("manual_afol_wb_edit") is not False:
+        failures.append("manual_afol_wb_edit != false")
+    if output.get("created_agents_wb") is not False:
+        failures.append("created_agents_wb != false")
+    if (repo_root / ".agents" / "wb").exists():
+        failures.append("provider-compatible run created .agents/wb")
+    final_check = subprocess.run(
+        AFOL_POLICY_CHECK_COMMAND.split(),
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if final_check.returncode != 0:
+        failures.append("afol acceptance check failed during benchmark validation")
+
+    failures.extend(_validate_afol_policy_file(repo_root))
+    failures.extend(_validate_afol_session_delivery(session_id, repo_root))
     return failures
 
 
@@ -1403,6 +1691,77 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             min_tool_calls=5,
             timeout_seconds=240,
         ),
+        "live-afol-provider-compatible-delivery": LiveBenchmarkScenario(
+            id="live-afol-provider-compatible-delivery",
+            description="Use a mini live agent to deliver a tiny downstream task through provider-compatible AFOL state.",
+            purpose=(
+                "Measure whether a mini-tier agent can use `afol` directly for fast plan/task/evidence operations "
+                "in a downstream project where mutable state belongs under `.afol/` instead of `.agents/`."
+            ),
+            tool_families=("exec_command", "afol", "new", "start", "done", "python"),
+            scope="Controlled end-to-end mutation of a tiny downstream project plus one `.afol/wb` session.",
+            context_artifacts=(
+                "AGENTS.md",
+                "afol",
+                "a",
+                ".agents/agents.config",
+                "docs/benchmark_problem.md",
+                "app/runtime_policy.json",
+                "scripts/check_afol_policy.py",
+            ),
+            required_command_substrings=(
+                AFOL_POLICY_CHECK_COMMAND,
+            ),
+            any_required_command_groups=(
+                ("./afol new", "./afol n", "./a new", "./a n"),
+                ("./afol start", "./afol st", "./a start", "./a st"),
+                ("./afol evidence", "./afol e", "./a evidence", "./a e"),
+                ("./afol done", "./afol d", "./a done", "./a d"),
+            ),
+            forbidden_command_substrings=(
+                ".agents/agents",
+                "cat > .afol/wb",
+                "tee .afol/wb",
+                "tee -a .afol/wb",
+                "> .afol/wb",
+                ">> .afol/wb",
+                "sed -i .afol/wb",
+                "perl -pi .afol/wb",
+                "rm -rf .afol/wb",
+                "mkdir -p .afol/wb",
+                "/home/ozy/.codex",
+                "/home/ozy/.agents",
+                "SKILL.md",
+            ),
+            response_schema=_afol_provider_delivery_schema(),
+            prompt=(
+                "You are running inside a controlled downstream AFOL benchmark project.\n"
+                "Rules:\n"
+                "- Use tools and inspect local files as needed. Do not answer from memory.\n"
+                "- Do not inspect global skills, `/home/ozy/.codex`, `/home/ozy/.agents`, or files outside this downstream project.\n"
+                "- Use `./afol` or `./a` for all workbench/session/task/evidence operations.\n"
+                "- Do not use `.agents/agents`.\n"
+                "- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n"
+                "- Keep this bounded: at most 10 shell commands unless a command fails and needs one focused recovery.\n"
+                "- Implement the smallest product change only.\n"
+                "- Return JSON only that matches the provided schema.\n\n"
+                "Task:\n"
+                "Deliver `docs/benchmark_problem.md` end-to-end in this downstream project.\n"
+                "Expected fast path:\n"
+                "1. Run `./afol new afol-provider-benchmark --feature-id F-AFOL --parent-spec BENCH-AFOL --task \"Update runtime policy for AFOL provider-compatible state\"` and capture the session id.\n"
+                "2. Run `./afol start --session <session-id> --task-id T-01` before product edits.\n"
+                "3. Edit only `app/runtime_policy.json` so the acceptance check can pass.\n"
+                f"4. Run `{AFOL_POLICY_CHECK_COMMAND}`.\n"
+                f"5. Run `./afol evidence --session <session-id> --task-id T-01 --command \"{AFOL_POLICY_CHECK_COMMAND}\" --result passed --artifact app/runtime_policy.json`.\n"
+                "6. Run `./afol done --session <session-id> --task-id T-01`.\n"
+                "7. Inspect `.afol/wb/<session-id>/.evidence.jsonl`, the task file, and `./afol status --json`.\n"
+                "Report the created session id, whether the problem was fixed, whether verification passed, whether `afol new/start/evidence/done` were used, whether T-01 is done, whether evidence exists, whether you manually edited `.afol/wb`, and whether `.agents/wb` was created."
+            ),
+            validator=_validate_afol_provider_delivery,
+            validation_check_count=12,
+            min_tool_calls=6,
+            timeout_seconds=240,
+        ),
         "live-wb-update-status-touch": LiveBenchmarkScenario(
             id="live-wb-update-status-touch",
             description="Use wb-update scripts to set report status and refresh updated_at.",
@@ -1684,6 +2043,103 @@ def _forbidden_commands_absent(tool_calls: list[dict[str, Any]], forbidden: tupl
     return failures
 
 
+def _artifact_text(path: Path, repo_root: Path, *, max_chars: int = 8000) -> dict[str, Any]:
+    try:
+        relative_path = str(path.relative_to(repo_root))
+    except ValueError:
+        relative_path = str(path)
+    payload: dict[str, Any] = {"path": relative_path, "exists": path.exists()}
+    if not path.exists():
+        payload["content"] = ""
+        payload["truncated"] = False
+        return payload
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        payload["content"] = ""
+        payload["truncated"] = False
+        payload["error"] = str(exc)
+        return payload
+    payload["content"] = content[:max_chars]
+    payload["truncated"] = len(content) > max_chars
+    return payload
+
+
+def _afol_status_json(repo_root: Path) -> dict[str, Any]:
+    try:
+        completed = subprocess.run(
+            ["./afol", "status", "--json"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"error": str(exc)}
+    if completed.returncode != 0:
+        return {
+            "returncode": completed.returncode,
+            "stdout_excerpt": _excerpt(completed.stdout or ""),
+            "stderr_excerpt": _excerpt(completed.stderr or ""),
+        }
+    try:
+        parsed = json.loads(completed.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        return {
+            "error": str(exc),
+            "stdout_excerpt": _excerpt(completed.stdout or ""),
+        }
+    return parsed if isinstance(parsed, dict) else {"value": parsed}
+
+
+def _collect_afol_delivery_artifacts(
+    output_json: dict[str, Any] | None, repo_root: Path
+) -> dict[str, Any]:
+    session_id = ""
+    if isinstance(output_json, dict):
+        session_id = str(output_json.get("session_id", "")).strip()
+    if not session_id or "/" in session_id or ".." in session_id:
+        return {
+            "session_id": session_id,
+            "session_dir": "",
+            "status_json": _afol_status_json(repo_root),
+            "plan": {"path": "", "exists": False, "content": "", "truncated": False},
+            "task": {"path": "", "exists": False, "content": "", "truncated": False},
+            "evidence_jsonl": {"path": "", "exists": False, "content": "", "truncated": False},
+            "runtime_policy": _artifact_text(repo_root / "app" / "runtime_policy.json", repo_root),
+        }
+
+    session_dir = repo_root / ".afol" / "wb" / session_id
+    plan_files = sorted(session_dir.glob("*_plan_*.md")) if session_dir.exists() else []
+    task_files = sorted(session_dir.glob("*_task_*.md")) if session_dir.exists() else []
+    log_files = sorted(session_dir.glob("*_log_*.md")) if session_dir.exists() else []
+    return {
+        "session_id": session_id,
+        "session_dir": str(session_dir.relative_to(repo_root)),
+        "status_json": _afol_status_json(repo_root),
+        "plan": _artifact_text(plan_files[0], repo_root) if plan_files else {
+            "path": "",
+            "exists": False,
+            "content": "",
+            "truncated": False,
+        },
+        "task": _artifact_text(task_files[0], repo_root) if task_files else {
+            "path": "",
+            "exists": False,
+            "content": "",
+            "truncated": False,
+        },
+        "log": _artifact_text(log_files[0], repo_root) if log_files else {
+            "path": "",
+            "exists": False,
+            "content": "",
+            "truncated": False,
+        },
+        "evidence_jsonl": _artifact_text(session_dir / ".evidence.jsonl", repo_root),
+        "runtime_policy": _artifact_text(repo_root / "app" / "runtime_policy.json", repo_root),
+    }
+
+
 def _live_scenario_command(
     scenario: LiveBenchmarkScenario,
     profile: BenchmarkProfile,
@@ -1691,6 +2147,7 @@ def _live_scenario_command(
     schema_path: Path,
     output_path: Path,
 ) -> list[str]:
+    mutable_state_dir = ".afol" if scenario.id == "live-afol-provider-compatible-delivery" else ".agents"
     command = [
         "codex",
         "exec",
@@ -1720,7 +2177,7 @@ def _live_scenario_command(
             "-C",
             str(fixture_root),
             "--add-dir",
-            str(fixture_root / ".agents"),
+            str(fixture_root / mutable_state_dir),
             "--output-schema",
             str(schema_path),
             "-o",
@@ -1754,9 +2211,13 @@ def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfil
     temp_parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="agents-benchmark-live-", dir=temp_parent) as temp_dir:
-        fixture_root = _prepare_fixture_repo(Path(temp_dir))
+        if scenario.id == "live-afol-provider-compatible-delivery":
+            fixture_root = _prepare_afol_fixture_repo(Path(temp_dir))
+            tmp_dir = fixture_root / ".afol" / "tmp" / "benchmarks"
+        else:
+            fixture_root = _prepare_fixture_repo(Path(temp_dir))
+            tmp_dir = fixture_root / ".agents" / "tmp" / "benchmarks"
         context_bytes = _context_bytes(fixture_root, scenario.context_artifacts)
-        tmp_dir = fixture_root / ".agents" / "tmp" / "benchmarks"
         tmp_dir.mkdir(parents=True, exist_ok=True)
         schema_path = tmp_dir / f"{scenario.id}-schema.json"
         output_path = tmp_dir / f"{scenario.id}-output.json"
@@ -1809,6 +2270,9 @@ def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfil
         failures.extend(_forbidden_commands_absent(tool_calls, scenario.forbidden_command_substrings))
         if output_json is not None:
             failures.extend(scenario.validator(output_json, fixture_root))
+        delivery_artifacts: dict[str, Any] = {}
+        if scenario.id == "live-afol-provider-compatible-delivery":
+            delivery_artifacts = _collect_afol_delivery_artifacts(output_json, fixture_root)
 
         checks_total = (
             4
@@ -1822,7 +2286,7 @@ def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfil
         tool_success_count = max(len(tool_calls) - error_count, 0)
         tool_success_rate = round(tool_success_count / len(tool_calls), 4) if tool_calls else 0.0
 
-        return {
+        result = {
             "id": scenario.id,
             "backend": "live_agent",
             "pass": not failures,
@@ -1847,6 +2311,9 @@ def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfil
             "stderr_excerpt": _excerpt(stderr, 400),
             "command": command,
         }
+        if delivery_artifacts:
+            result["delivery_artifacts"] = delivery_artifacts
+        return result
 
 
 def _validate_scenario_ids(scenario_ids: list[str]) -> list[str]:

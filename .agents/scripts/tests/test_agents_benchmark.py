@@ -29,6 +29,7 @@ def test_catalog_contains_live_scenarios():
         "live-autonomous-agentic-folder-delivery",
         "live-wb-update-status-touch",
         "live-wb-update-link",
+        "live-afol-provider-compatible-delivery",
     } <= set(benchmark.SCENARIOS)
     assert benchmark.DEFAULT_PROFILE.model == "gpt-5.4-mini"
     assert benchmark.DEFAULT_PROFILE.reasoning_effort == "medium"
@@ -133,6 +134,25 @@ def test_live_scenario_command_keeps_agents_dir_writable_mount(tmp_path):
     assert command[command.index("-C") + 1] == str(fixture_root)
 
 
+def test_live_scenario_command_keeps_afol_dir_writable_mount(tmp_path):
+    benchmark = load_module()
+    scenario = benchmark.SCENARIOS["live-afol-provider-compatible-delivery"]
+    fixture_root = tmp_path / "fixture"
+    fixture_root.mkdir(parents=True, exist_ok=True)
+
+    command = benchmark._live_scenario_command(
+        scenario,
+        benchmark.DEFAULT_PROFILE,
+        fixture_root,
+        tmp_path / "schema.json",
+        tmp_path / "output.json",
+    )
+
+    assert "--add-dir" in command
+    assert command[command.index("--add-dir") + 1] == str(fixture_root / ".afol")
+    assert str(fixture_root / ".agents") not in command
+
+
 def test_validate_completion_accepts_done_row_with_evidence_suffix(tmp_path):
     benchmark = load_module()
     session_dir = tmp_path / ".agents" / "wb" / benchmark.FIXTURE_WORKSTREAM_ID
@@ -160,6 +180,98 @@ def test_validate_completion_accepts_done_row_with_evidence_suffix(tmp_path):
     )
 
     assert failures == []
+
+
+def test_validate_afol_provider_delivery_accepts_afol_session(tmp_path):
+    benchmark = load_module()
+    session_id = "260607_1200_afol-provider-benchmark"
+    session_dir = tmp_path / ".afol" / "wb" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_plan_01.md").write_text("# Plan\n", encoding="utf-8")
+    (session_dir / f"{session_id}_task_01.md").write_text(
+        "| T-01 | done | worker | Update runtime policy for AFOL provider-compatible state. |\n",
+        encoding="utf-8",
+    )
+    (session_dir / ".evidence.jsonl").write_text(
+        '{"task_id": "T-01", "command": "python3 scripts/check_afol_policy.py", "result": "passed"}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "app").mkdir()
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "app" / "runtime_policy.json").write_text(
+        json.dumps(
+            {
+                "workflow_mode": "afol",
+                "mutable_state": ".afol",
+                "evidence_required": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    check_file = tmp_path / "scripts" / "check_afol_policy.py"
+    check_file.write_text(benchmark._afol_runtime_policy_check_text(), encoding="utf-8")
+
+    failures = benchmark._validate_afol_provider_delivery(
+        {
+            "scenario_id": "live-afol-provider-compatible-delivery",
+            "session_id": session_id,
+            "problem_fixed": True,
+            "verification_passed": True,
+            "used_afol_new": True,
+            "used_afol_start": True,
+            "used_afol_evidence": True,
+            "used_afol_done": True,
+            "task_completed": True,
+            "evidence_recorded": True,
+            "manual_afol_wb_edit": False,
+            "created_agents_wb": False,
+        },
+        tmp_path,
+    )
+
+    assert failures == []
+
+
+def test_collect_afol_delivery_artifacts_preserves_generated_files(tmp_path):
+    benchmark = load_module()
+    session_id = "260607_1200_afol-provider-benchmark"
+    session_dir = tmp_path / ".afol" / "wb" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / f"{session_id}_plan_01.md").write_text("# Plan\n\n- Do work.\n", encoding="utf-8")
+    (session_dir / f"{session_id}_task_01.md").write_text(
+        "| T-01 | done | worker | Update runtime policy. |\n",
+        encoding="utf-8",
+    )
+    (session_dir / f"{session_id}_log_01.md").write_text("# Log\n", encoding="utf-8")
+    (session_dir / ".evidence.jsonl").write_text(
+        '{"task_id":"T-01","command":"python3 scripts/check_afol_policy.py","result":"passed"}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "runtime_policy.json").write_text(
+        '{"workflow_mode":"afol","mutable_state":".afol","evidence_required":true}\n',
+        encoding="utf-8",
+    )
+    launcher = tmp_path / "afol"
+    launcher.write_text(
+        "#!/usr/bin/env bash\nprintf '%s\\n' '{\"status\":\"done\",\"session_count\":1}'\n",
+        encoding="utf-8",
+    )
+    launcher.chmod(0o755)
+
+    artifacts = benchmark._collect_afol_delivery_artifacts(
+        {"session_id": session_id},
+        tmp_path,
+    )
+
+    assert artifacts["session_id"] == session_id
+    assert artifacts["session_dir"] == f".afol/wb/{session_id}"
+    assert artifacts["status_json"]["status"] == "done"
+    assert artifacts["plan"]["path"].endswith("_plan_01.md")
+    assert artifacts["plan"]["content"].startswith("# Plan")
+    assert artifacts["task"]["content"].startswith("| T-01 | done |")
+    assert "check_afol_policy.py" in artifacts["evidence_jsonl"]["content"]
+    assert '"mutable_state":".afol"' in artifacts["runtime_policy"]["content"]
 
 
 def test_run_suite_aggregates_results_and_writes_output(tmp_path):

@@ -1,0 +1,211 @@
+{
+  "pack_id": "runtime-flow-live-agent-v4",
+  "generated_at": "2026-06-07T10:12:47.301708Z",
+  "benchmark_profile": {
+    "runtime": "codex",
+    "model": "gpt-5.4-mini",
+    "reasoning_effort": "medium"
+  },
+  "scenario_count": 1,
+  "pass": true,
+  "duration_ms": 39954,
+  "tool_call_count": 8,
+  "tool_success_count": 8,
+  "error_count": 0,
+  "retry_count": 0,
+  "checks_total": 34,
+  "checks_passed": 34,
+  "context_bytes_total": 4008,
+  "prompt_bytes_total": 1720,
+  "scenarios": [
+    {
+      "id": "live-afol-provider-compatible-delivery",
+      "backend": "live_agent",
+      "pass": true,
+      "duration_ms": 38832,
+      "context_bytes": 4008,
+      "prompt_bytes": 1720,
+      "tool_call_count": 8,
+      "tool_success_count": 8,
+      "tool_success_rate": 1.0,
+      "error_count": 0,
+      "retry_count": 0,
+      "checks_total": 34,
+      "checks_passed": 34,
+      "accuracy": 1.0,
+      "observed_tool_calls": [
+        {
+          "call_id": "item_0",
+          "name": "command_execution",
+          "arguments_excerpt": "/usr/bin/zsh -lc \"pwd && rg --files app scripts .afol | sed -n '1,120p'\"",
+          "command_excerpt": "/usr/bin/zsh -lc \"pwd && rg --files app scripts .afol | sed -n '1,120p'\"",
+          "exit_code": 0,
+          "aggregated_output_excerpt": "/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream scripts/check_afol_policy.py app/runtime_policy.json .afol/skills/README.md .afol/wb/README.md .afol/data/README.md .afol/data/events/README.md .afol/bin/afol-runtime .afol/data/index/README.md"
+        },
+        {
+          "call_id": "item_1",
+          "name": "command_execution",
+          "arguments_excerpt": "/usr/bin/zsh -lc \"sed -n '1,220p' app/runtime_policy.json && printf '\\\\n---SCRIPT---\\\\n' && sed -n '1,240p' scripts/check_afol_policy.py\"",
+          "command_excerpt": "/usr/bin/zsh -lc \"sed -n '1,220p' app/runtime_policy.json && printf '\\\\n---SCRIPT---\\\\n' && sed -n '1,240p' scripts/check_afol_policy.py\"",
+          "exit_code": 0,
+          "aggregated_output_excerpt": "{ \"workflow_mode\": \"manual\", \"mutable_state\": \".agents\", \"evidence_required\": false } ---SCRIPT--- #!/usr/bin/env python3 \"\"\"Validate the controlled AFOL provider-compatible benchmark fixture.\"\"\" from __future__ import annotations import json import re from pathlib import Path POLICY_PATH = Path(\"app/runtime_policy.json\") WB_DIR = Path(\".afol/wb\") TASK_TABLE_RE = re.compile(r\"^\\|\\s*(T-\\d{2,3})\\s*\\|\\s*([^|]+?)\\s*\\|\") TASK_CHECK_RE = re.compile(r\"^-\\s*\\[([ /%!>&x])\\]\\s+(T-\\d{2,3})\\b\") MARKER_TO_STATE = { \" \": \"pending\", \"/\": \"in_progress\", \"%\": \"implemented_untested\", \"&\": \"tested_needs_spec_validation\", \"!\": \"problem\", \">\": \"moved\", \"x\": \"done\", } STARTED_STATES = {\"in_progress\", \"implemented_untested\", \"tested_needs_spec_validation\", \"done\"} def _task_state(task_file: Path, task_id: str = \"T-01\") -> str | None: for raw_line in task_file.read_text(encoding=\"utf-8\").splitlines(): line = raw_line.strip() table = TASK_TABLE_RE.match(line) if table and table.group(1) == task_id: return t..."
+        },
+        {
+          "call_id": "item_2",
+          "name": "command_execution",
+          "arguments_excerpt": "/usr/bin/zsh -lc './afol new afol-provider-benchmark --feature-id F-AFOL --parent-spec BENCH-AFOL --task \"Update runtime policy for AFOL provider-compatible state\"'",
+          "command_excerpt": "/usr/bin/zsh -lc './afol new afol-provider-benchmark --feature-id F-AFOL --parent-spec BENCH-AFOL --task \"Update runtime policy for AFOL provider-compatible state\"'",
+          "exit_code": 0,
+          "aggregated_output_excerpt": "session created: 260607_0612_afol-provider-benchmark"
+        },
+        {
+          "call_id": "item_3",
+          "name": "command_execution",
+          "arguments_excerpt": "/usr/bin/zsh -lc './afol start --session 260607_0612_afol-provider-benchmark --task-id T-01'",
+          "command_excerpt": "/usr/bin/zsh -lc './afol start --session 260607_0612_afol-provider-benchmark --task-id T-01'",
+          "exit_code": 0,
+          "aggregated_output_excerpt": "task started: T-01"
+        },
+        {
+          "call_id": "item_5",
+          "name": "command_execution",
+          "arguments_excerpt": "/usr/bin/zsh -lc 'python3 scripts/check_afol_policy.py'",
+          "command_excerpt": "/usr/bin/zsh -lc 'python3 scripts/check_afol_policy.py'",
+          "exit_code": 0,
+          "aggregated_output_excerpt": "afol policy check passed"
+        },
+        {
+          "call_id": "item_6",
+          "name": "command_execution",
+          "arguments_excerpt": "/usr/bin/zsh -lc './afol evidence --session 260607_0612_afol-provider-benchmark --task-id T-01 --command \"python3 scripts/check_afol_policy.py\" --result passed --artifact app/runtime_policy.json'",
+          "command_excerpt": "/usr/bin/zsh -lc './afol evidence --session 260607_0612_afol-provider-benchmark --task-id T-01 --command \"python3 scripts/check_afol_policy.py\" --result passed --artifact app/runtime_policy.json'",
+          "exit_code": 0,
+          "aggregated_output_excerpt": "evidence recorded: E-20260607061233143"
+        },
+        {
+          "call_id": "item_7",
+          "name": "command_execution",
+          "arguments_excerpt": "/usr/bin/zsh -lc './afol done --session 260607_0612_afol-provider-benchmark --task-id T-01'",
+          "command_excerpt": "/usr/bin/zsh -lc './afol done --session 260607_0612_afol-provider-benchmark --task-id T-01'",
+          "exit_code": 0,
+          "aggregated_output_excerpt": "task done: T-01"
+        },
+        {
+          "call_id": "item_8",
+          "name": "command_execution",
+          "arguments_excerpt": "/usr/bin/zsh -lc \"python3 - <<'PY' from pathlib import Path import json session = Path('.afol/wb/260607_0612_afol-provider-benchmark') print('SESSION_DIR', session) for p in sorted(session.glob('*')): print('FILE', p.name) if p.name.endswith('.evidence.jsonl') or '_task_' in p.name or p.name == 'status.json': print(p.read_text(encoding='utf-8')) print('AGENTS_WB_EXISTS', Path('.agents/wb').exists()) PY ./afol status --json\"",
+          "command_excerpt": "/usr/bin/zsh -lc \"python3 - <<'PY' from pathlib import Path import json session = Path('.afol/wb/260607_0612_afol-provider-benchmark') print('SESSION_DIR', session) for p in sorted(session.glob('*')): print('FILE', p.name) if p.name.endswith('.evidence.jsonl') or '_task_' in p.name or p.name == 'status.json': print(p.read_text(encoding='utf-8')) print('AGENTS_WB_EXISTS', Path('.agents/wb').exists()) PY ./afol status --json\"",
+          "exit_code": 0,
+          "aggregated_output_excerpt": "SESSION_DIR .afol/wb/260607_0612_afol-provider-benchmark FILE .evidence.jsonl {\"id\":\"E-20260607061233143\",\"task_id\":\"T-01\",\"created_at\":\"2026-06-07T10:12:33.143Z\",\"command\":\"python3 scripts/check_afol_policy.py\",\"result\":\"passed\",\"artifact\":\"app/runtime_policy.json\"} FILE 260607_0612_afol-provider-benchmark_log_01.md FILE 260607_0612_afol-provider-benchmark_plan_01.md FILE 260607_0612_afol-provider-benchmark_task_01.md # Tasks: afol-provider-benchmark ## State Board | Task | State | Owner | Notes | |------|-------|-------|-------| | T-01 | done | worker | Execute requested lifecycle work. | AGENTS_WB_EXISTS False {\"status\":\"done\",\"task\":\"T-01\",\"files_written\":[\"none\"],\"validation_or_checks\":[\"none\"],\"blockers\":[\"none\"],\"next\":[\"none\"],\"paths\":{\"config\":\"/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream/.agents/config.json\",\"lock\":\"/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream/.agents/lock.json\",\"active_session\":\"/tmp/agents-benchma..."
+        }
+      ],
+      "failure_reasons": [],
+      "output_json": {
+        "scenario_id": "live-afol-provider-compatible-delivery",
+        "session_id": "260607_0612_afol-provider-benchmark",
+        "problem_fixed": true,
+        "verification_passed": true,
+        "used_afol_new": true,
+        "used_afol_start": true,
+        "used_afol_evidence": true,
+        "used_afol_done": true,
+        "task_completed": true,
+        "evidence_recorded": true,
+        "manual_afol_wb_edit": false,
+        "created_agents_wb": false
+      },
+      "output_excerpt": "{\"scenario_id\": \"live-afol-provider-compatible-delivery\", \"session_id\": \"260607_0612_afol-provider-benchmark\", \"problem_fixed\": true, \"verification_passed\": true, \"used_afol_new\": true, \"used_afol_start\": true, \"used_...",
+      "stdout_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"019ea191-8bfb-7721-b2ad-b4c8ddf5f169\"} {\"type\":\"turn.started\"} {\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution\",\"command\":\"/usr/bin/zsh -lc \\\"pwd && rg --files app scripts .afol | sed -n '1,120p'\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}} {\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"command_execution...",
+      "stderr_excerpt": "Reading additional input from stdin...",
+      "command": [
+        "codex",
+        "exec",
+        "--json",
+        "--ephemeral",
+        "--ignore-user-config",
+        "--skip-git-repo-check",
+        "--color",
+        "never",
+        "-m",
+        "gpt-5.4-mini",
+        "-c",
+        "model_reasoning_effort=\"medium\"",
+        "-c",
+        "features.apps=false",
+        "-c",
+        "apps._default.enabled=false",
+        "-c",
+        "apps._default.default_tools_enabled=false",
+        "-s",
+        "workspace-write",
+        "-C",
+        "/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream",
+        "--add-dir",
+        "/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream/.afol",
+        "--output-schema",
+        "/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream/.afol/tmp/benchmarks/live-afol-provider-compatible-delivery-schema.json",
+        "-o",
+        "/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream/.afol/tmp/benchmarks/live-afol-provider-compatible-delivery-output.json",
+        "You are running inside a controlled downstream AFOL benchmark project.\nRules:\n- Use tools and inspect local files as needed. Do not answer from memory.\n- Do not inspect global skills, `/home/ozy/.codex`, `/home/ozy/.agents`, or files outside this downstream project.\n- Use `./afol` or `./a` for all workbench/session/task/evidence operations.\n- Do not use `.agents/agents`.\n- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n- Keep this bounded: at most 10 shell commands unless a command fails and needs one focused recovery.\n- Implement the smallest product change only.\n- Return JSON only that matches the provided schema.\n\nTask:\nDeliver `docs/benchmark_problem.md` end-to-end in this downstream project.\nExpected fast path:\n1. Run `./afol new afol-provider-benchmark --feature-id F-AFOL --parent-spec BENCH-AFOL --task \"Update runtime policy for AFOL provider-compatible state\"` and capture the session id.\n2. Run `./afol start --session <session-id> --task-id T-01` before product edits.\n3. Edit only `app/runtime_policy.json` so the acceptance check can pass.\n4. Run `python3 scripts/check_afol_policy.py`.\n5. Run `./afol evidence --session <session-id> --task-id T-01 --command \"python3 scripts/check_afol_policy.py\" --result passed --artifact app/runtime_policy.json`.\n6. Run `./afol done --session <session-id> --task-id T-01`.\n7. Inspect `.afol/wb/<session-id>/.evidence.jsonl`, the task file, and `./afol status --json`.\nReport the created session id, whether the problem was fixed, whether verification passed, whether `afol new/start/evidence/done` were used, whether T-01 is done, whether evidence exists, whether you manually edited `.afol/wb`, and whether `.agents/wb` was created."
+      ],
+      "delivery_artifacts": {
+        "session_id": "260607_0612_afol-provider-benchmark",
+        "session_dir": ".afol/wb/260607_0612_afol-provider-benchmark",
+        "status_json": {
+          "status": "done",
+          "task": "T-01",
+          "files_written": [
+            "none"
+          ],
+          "validation_or_checks": [
+            "none"
+          ],
+          "blockers": [
+            "none"
+          ],
+          "next": [
+            "none"
+          ],
+          "paths": {
+            "config": "/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream/.agents/config.json",
+            "lock": "/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream/.agents/lock.json",
+            "active_session": "/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream/.afol/wb/.active_session",
+            "task_file": "/tmp/agents-benchmark-live/agents-benchmark-live-klnzjm_7/afol-downstream/.afol/wb/260607_0612_afol-provider-benchmark/260607_0612_afol-provider-benchmark_task_01.md"
+          }
+        },
+        "plan": {
+          "path": ".afol/wb/260607_0612_afol-provider-benchmark/260607_0612_afol-provider-benchmark_plan_01.md",
+          "exists": true,
+          "content": "# Plan: afol-provider-benchmark\n\n- Created by native CLI workbench lifecycle.\n\n## Native command metadata\n- feature_id: F-AFOL\n- parent_spec: BENCH-AFOL\n- task: Update runtime policy for AFOL provider-compatible state\n",
+          "truncated": false
+        },
+        "task": {
+          "path": ".afol/wb/260607_0612_afol-provider-benchmark/260607_0612_afol-provider-benchmark_task_01.md",
+          "exists": true,
+          "content": "# Tasks: afol-provider-benchmark\n\n## State Board\n\n| Task | State | Owner | Notes |\n|------|-------|-------|-------|\n| T-01 | done | worker | Execute requested lifecycle work. |\n",
+          "truncated": false
+        },
+        "log": {
+          "path": ".afol/wb/260607_0612_afol-provider-benchmark/260607_0612_afol-provider-benchmark_log_01.md",
+          "exists": true,
+          "content": "# Log\n\n## Timeline\n\n- 2026-06-07T10:12:23.906Z - session created 260607_0612_afol-provider-benchmark\n",
+          "truncated": false
+        },
+        "evidence_jsonl": {
+          "path": ".afol/wb/260607_0612_afol-provider-benchmark/.evidence.jsonl",
+          "exists": true,
+          "content": "{\"id\":\"E-20260607061233143\",\"task_id\":\"T-01\",\"created_at\":\"2026-06-07T10:12:33.143Z\",\"command\":\"python3 scripts/check_afol_policy.py\",\"result\":\"passed\",\"artifact\":\"app/runtime_policy.json\"}\n",
+          "truncated": false
+        },
+        "runtime_policy": {
+          "path": "app/runtime_policy.json",
+          "exists": true,
+          "content": "{\n  \"workflow_mode\": \"afol\",\n  \"mutable_state\": \".afol\",\n  \"evidence_required\": true\n}\n",
+          "truncated": false
+        }
+      }
+    }
+  ],
+  "accuracy": 1.0,
+  "tool_success_rate": 1.0
+}
