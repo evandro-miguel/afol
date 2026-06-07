@@ -251,6 +251,10 @@ describe("kernel front-door", () => {
       expect(plan).toContain("parent_spec: 260531_parent_spec_01");
       expect(plan).toContain("intent: delivery");
       expect(plan).toContain("task: Implement retirement bootstrap parity");
+      expect(plan).toContain("## Execution Plan");
+      expect(plan).toContain("- T-01: Implement retirement bootstrap parity");
+      expect(plan).toContain("## Validation");
+      expect(plan).toContain("## Closure Criteria");
       expect(task).toContain("| T-01 | pending | worker | Implement retirement bootstrap parity |");
     } finally {
       rmSync(root, { recursive: true, force: true });

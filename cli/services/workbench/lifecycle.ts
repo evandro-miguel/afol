@@ -117,6 +117,10 @@ function taskNoteFromMetadata(metadata?: NewWorkstreamMetadata): string {
   return note.replace(/\|/g, "/");
 }
 
+function planTaskFromMetadata(metadata?: NewWorkstreamMetadata): string {
+  return metadata?.task?.trim() || "Execute requested lifecycle work.";
+}
+
 function sessionPaths(root: string, session: string): {
   wbRoot: string;
   sessionDir: string;
@@ -315,11 +319,34 @@ export function newWorkstream(
   if (metadata?.task) {
     metadataLines.push(`- task: ${metadata.task}`);
   }
-  const metadataSection = metadataLines.length > 0 ? `\n\n## Native command metadata\n${metadataLines.join("\n")}` : "";
+  const metadataSection = metadataLines.length > 0 ? ["", "## Native command metadata", ...metadataLines] : [];
+  const planTask = planTaskFromMetadata(metadata);
 
   writeFileSync(
     paths.planPath,
-    `# Plan: ${theme.trim()}\n\n- Created by native CLI workbench lifecycle.${metadataSection}\n`,
+    [
+      `# Plan: ${theme.trim()}`,
+      "",
+      "- Created by native CLI workbench lifecycle.",
+      ...metadataSection,
+      "",
+      "## Execution Plan",
+      "",
+      `- T-01: ${planTask}`,
+      "- Keep edits scoped to the task and repository rules.",
+      "- Record evidence before marking the task done.",
+      "",
+      "## Validation",
+      "",
+      "- Run the command named in the task or governing brief.",
+      "- Capture the validation result in the evidence ledger.",
+      "",
+      "## Closure Criteria",
+      "",
+      "- T-01 is marked done only after passed evidence exists.",
+      "- Delivery notes identify the changed files and verification result.",
+      "",
+    ].join("\n"),
     "utf8",
   );
   writeFileSync(

@@ -1198,6 +1198,8 @@ def _code_task_planner_schema() -> dict[str, Any]:
             "task_created": {"type": "boolean"},
             "plan_mentions_slugify": {"type": "boolean"},
             "task_mentions_slugify": {"type": "boolean"},
+            "plan_quality_passed": {"type": "boolean"},
+            "task_quality_passed": {"type": "boolean"},
             "manual_afol_wb_edit": {"type": "boolean"},
         },
         "required": [
@@ -1209,6 +1211,8 @@ def _code_task_planner_schema() -> dict[str, Any]:
             "task_created",
             "plan_mentions_slugify",
             "task_mentions_slugify",
+            "plan_quality_passed",
+            "task_quality_passed",
             "manual_afol_wb_edit",
         ],
     }
@@ -1229,6 +1233,9 @@ def _code_task_executor_schema() -> dict[str, Any]:
             "used_afol_done": {"type": "boolean"},
             "task_completed": {"type": "boolean"},
             "evidence_recorded": {"type": "boolean"},
+            "report_written": {"type": "boolean"},
+            "report_coherent": {"type": "boolean"},
+            "task_marked_correct": {"type": "boolean"},
             "manual_afol_wb_edit": {"type": "boolean"},
             "edited_only_allowed_paths": {"type": "boolean"},
         },
@@ -1243,6 +1250,9 @@ def _code_task_executor_schema() -> dict[str, Any]:
             "used_afol_done",
             "task_completed",
             "evidence_recorded",
+            "report_written",
+            "report_coherent",
+            "task_marked_correct",
             "manual_afol_wb_edit",
             "edited_only_allowed_paths",
         ],
@@ -1596,9 +1606,63 @@ def _validate_code_task_session_id(output: dict[str, Any]) -> tuple[str, list[st
     return session_id, failures
 
 
+def _validate_code_task_plan_quality(plan_text: str, task_text: str) -> list[str]:
+    failures: list[str] = []
+    if "## Execution Plan" not in plan_text and "## Steps" not in plan_text:
+        failures.append("planner plan missing execution steps section")
+    if "## Validation" not in plan_text and "Verify" not in plan_text:
+        failures.append("planner plan missing validation section")
+    if CODE_TASK_CHECK_COMMAND not in plan_text:
+        failures.append("planner plan missing acceptance command")
+    if f"{CODE_TASK_PROJECT_DIR}/src/text_utils.py" not in plan_text:
+        failures.append("planner plan missing target source path")
+    if "T-01" not in plan_text:
+        failures.append("planner plan missing task id")
+    if f"{CODE_TASK_PROJECT_DIR}/src/text_utils.py" not in task_text:
+        failures.append("planner task missing target source path")
+    if CODE_TASK_CHECK_COMMAND not in task_text:
+        failures.append("planner task missing acceptance command")
+    if "T-01" not in task_text:
+        failures.append("planner task missing task id")
+    task_state_re = re.compile(r"\|\s*T-01\s*\|\s*(pending|in_progress|done)\s*\|", re.IGNORECASE)
+    if not task_state_re.search(task_text):
+        failures.append("planner task missing valid T-01 state row")
+    return failures
+
+
+def _validate_code_task_report_quality(session_id: str, report_text: str, evidence_text: str) -> list[str]:
+    failures: list[str] = []
+    normalized_report_text = report_text.lower()
+    required_report_tokens = (
+        session_id,
+        "T-01",
+        "slugify",
+        CODE_TASK_CHECK_COMMAND,
+        "passed",
+        "evidence",
+    )
+    for token in required_report_tokens:
+        if token.lower() not in normalized_report_text:
+            failures.append(f"code task report missing {token}")
+    compact_evidence_text = evidence_text.replace(" ", "")
+    evidence_tokens = ("benchmark_report.md", CODE_TASK_CHECK_COMMAND.replace(" ", ""), '"result":"passed"')
+    for token in evidence_tokens:
+        if token not in compact_evidence_text:
+            failures.append(f"code task evidence ledger missing {token}")
+    return failures
+
+
 def _validate_code_task_planner(output: dict[str, Any], repo_root: Path) -> list[str]:
     session_id, failures = _validate_code_task_session_id(output)
-    for key in ("used_afol_new", "plan_created", "task_created", "plan_mentions_slugify", "task_mentions_slugify"):
+    for key in (
+        "used_afol_new",
+        "plan_created",
+        "task_created",
+        "plan_mentions_slugify",
+        "task_mentions_slugify",
+        "plan_quality_passed",
+        "task_quality_passed",
+    ):
         if output.get(key) is not True:
             failures.append(f"{key} != true")
     if output.get("manual_afol_wb_edit") is not False:
@@ -1620,6 +1684,7 @@ def _validate_code_task_planner(output: dict[str, Any], repo_root: Path) -> list
             failures.append(f"planner plan missing {token}")
         if token not in task_text:
             failures.append(f"planner task missing {token}")
+    failures.extend(_validate_code_task_plan_quality(plan_text, task_text))
     return failures
 
 
@@ -1633,6 +1698,9 @@ def _validate_code_task_executor(output: dict[str, Any], repo_root: Path) -> lis
         "used_afol_done",
         "task_completed",
         "evidence_recorded",
+        "report_written",
+        "report_coherent",
+        "task_marked_correct",
         "edited_only_allowed_paths",
     ):
         if output.get(key) is not True:
@@ -1655,12 +1723,17 @@ def _validate_code_task_executor(output: dict[str, Any], repo_root: Path) -> lis
     artifacts = _code_task_session_artifacts(session_id, repo_root)
     task_path = artifacts["task"]
     evidence_path = artifacts["evidence"]
+    report_path = repo_root / CODE_TASK_PROJECT_DIR / "benchmark_report.md"
     task_text = task_path.read_text(encoding="utf-8") if isinstance(task_path, Path) else ""
     evidence_text = evidence_path.read_text(encoding="utf-8") if isinstance(evidence_path, Path) and evidence_path.exists() else ""
+    report_text = report_path.read_text(encoding="utf-8") if report_path.exists() else ""
     if "| T-01 | done |" not in task_text and "- [x] T-01" not in task_text:
         failures.append("code task T-01 not marked done")
+    if not report_path.exists():
+        failures.append("code task report missing")
     if "check_slugify.py" not in evidence_text:
         failures.append("code task evidence ledger missing slugify check")
+    failures.extend(_validate_code_task_report_quality(session_id, report_text, evidence_text))
 
     status = subprocess.run(["git", "status", "--short"], cwd=repo_root, capture_output=True, text=True, timeout=10)
     changed_paths = [line[3:] for line in status.stdout.splitlines() if len(line) > 3]
@@ -2054,7 +2127,8 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             description="Run a planner/executor live-agent benchmark against a tiny Python code task through AFOL.",
             purpose=(
                 "Measure whether lightweight agents can create meaningful AFOL plan/task artifacts, execute a bounded "
-                "code task, record evidence, and stay fast with low tool and token cost."
+                "code task, write a coherent delivery report, mark task state correctly, record evidence, and stay fast "
+                "with low tool and token cost."
             ),
             tool_families=("exec_command", "afol", "planner", "executor", "python"),
             scope=f"Controlled mutation of `{CODE_TASK_PROJECT_DIR}` plus one `.afol/wb` session.",
@@ -2092,7 +2166,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             response_schema=_code_task_executor_schema(),
             prompt="Two-phase orchestrated planner/executor scenario. The runner supplies phase prompts.",
             validator=_validate_code_task_executor,
-            validation_check_count=16,
+            validation_check_count=25,
             min_tool_calls=4,
             timeout_seconds=360,
         ),
@@ -2626,15 +2700,18 @@ def _code_task_planner_prompt() -> str:
         "- Use shell tools. Do not answer from memory.\n"
         f"- Work only with `docs/benchmark_problem.md`, `{CODE_TASK_PROJECT_DIR}/`, and `.afol/`.\n"
         "- Use `./afol` or `./a` for plan/task operations.\n"
+        f"- The acceptance script is `{CODE_TASK_CHECK_COMMAND}` at repository root; there is no `{CODE_TASK_PROJECT_DIR}/scripts/` directory.\n"
         "- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n"
         "- Do not edit product code; planner only creates the AFOL session.\n"
         "- Keep this ultra fast: at most 4 shell commands.\n"
         "- Return JSON only that matches the provided schema.\n\n"
         "Task:\n"
         "1. Inspect `docs/benchmark_problem.md` and the tiny Python project enough to understand the task.\n"
-        "2. Run `./afol new code-task-benchmark --feature-id F-CODE --parent-spec BENCH-CODE --task \"Implement slugify(text) in test-code-task-project/src/text_utils.py\"` and capture the session id.\n"
-        "3. Inspect the generated plan/task files only to confirm they mention `slugify` and `test-code-task-project`.\n"
-        "4. Return the session id and planner checks."
+        "2. Run `./afol new code-task-benchmark --feature-id F-CODE --parent-spec BENCH-CODE --task \"Implement slugify(text) in test-code-task-project/src/text_utils.py and verify with python3 scripts/check_slugify.py\"` and capture the session id.\n"
+        "3. Inspect the generated `.afol/wb/<session>/<session>_plan_01.md` and `.afol/wb/<session>/<session>_task_01.md` files only; do not inspect or assume a nested project `.afol` directory.\n"
+        f"4. Confirm the plan/task mention `slugify`, `{CODE_TASK_PROJECT_DIR}`, `{CODE_TASK_PROJECT_DIR}/src/text_utils.py`, `T-01`, and `{CODE_TASK_CHECK_COMMAND}`.\n"
+        "5. Judge whether the generated plan is coherent/actionable and the generated task is specific/actionable.\n"
+        "6. Return the session id and planner checks."
     )
 
 
@@ -2652,7 +2729,7 @@ def _code_task_executor_prompt(session_id: str, *, recovery: bool = False) -> st
         "- Use shell tools. Do not answer from memory.\n"
         f"- Work only in `{CODE_TASK_PROJECT_DIR}/`, `.afol/`, and the read-only check script `scripts/check_slugify.py`.\n"
         f"- The acceptance script is `scripts/check_slugify.py`; do not look for a `{CODE_TASK_PROJECT_DIR}/scripts/` directory.\n"
-        f"- You may edit only `{CODE_TASK_PROJECT_DIR}/src/text_utils.py`.\n"
+        f"- You may edit only `{CODE_TASK_PROJECT_DIR}/src/text_utils.py` and `{CODE_TASK_PROJECT_DIR}/benchmark_report.md`.\n"
         "- Use `./afol` or `./a` for task state, evidence, and closure.\n"
         "- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n"
         "- Keep this ultra fast: at most 8 shell commands unless one command fails and needs one focused recovery.\n"
@@ -2663,10 +2740,11 @@ def _code_task_executor_prompt(session_id: str, *, recovery: bool = False) -> st
         f"2. Run `./afol start --session {session_id} --task-id T-01` if T-01 is not already started.\n"
         f"3. Implement `slugify(text)` in `{CODE_TASK_PROJECT_DIR}/src/text_utils.py`.\n"
         f"4. Run `{CODE_TASK_CHECK_COMMAND}`.\n"
-        f"5. Run `./afol evidence --session {session_id} --task-id T-01 --command \"{CODE_TASK_CHECK_COMMAND}\" --result passed --artifact {CODE_TASK_PROJECT_DIR}/src/text_utils.py`.\n"
-        f"6. Run `./afol done --session {session_id} --task-id T-01`.\n"
-        f"7. Inspect `.afol/wb/{session_id}/.evidence.jsonl`, `.afol/wb/{session_id}/{session_id}_task_01.md`, and `git status --short`.\n"
-        f"8. Return phase `{phase}`, session id, whether the problem was fixed, verification passed, AFOL commands were used, T-01 is done, evidence exists, no manual `.afol/wb` edit happened, and only allowed paths changed."
+        f"5. Write `{CODE_TASK_PROJECT_DIR}/benchmark_report.md` with a concise coherent report containing the session id, T-01 status, slugify fix summary, `{CODE_TASK_CHECK_COMMAND}` result, evidence status, and changed files.\n"
+        f"6. Run `./afol evidence --session {session_id} --task-id T-01 --command \"{CODE_TASK_CHECK_COMMAND}\" --result passed --artifact {CODE_TASK_PROJECT_DIR}/benchmark_report.md`.\n"
+        f"7. Run `./afol done --session {session_id} --task-id T-01`.\n"
+        f"8. Inspect `.afol/wb/{session_id}/.evidence.jsonl`, `.afol/wb/{session_id}/{session_id}_task_01.md`, `{CODE_TASK_PROJECT_DIR}/benchmark_report.md`, and `git status --short`.\n"
+        f"9. Return phase `{phase}`, session id, whether the problem was fixed, verification passed, AFOL commands were used, T-01 is done, evidence exists, report is written/coherent, task is marked correct, no manual `.afol/wb` edit happened, and only allowed paths changed."
     )
 
 
@@ -2776,6 +2854,7 @@ def _collect_code_task_delivery_artifacts(output_json: dict[str, Any] | None, re
     artifacts = _collect_afol_delivery_artifacts({"session_id": session_id}, repo_root)
     artifacts["problem"] = _artifact_text(repo_root / "docs" / "benchmark_problem.md", repo_root)
     artifacts["text_utils"] = _artifact_text(repo_root / CODE_TASK_PROJECT_DIR / "src" / "text_utils.py", repo_root)
+    artifacts["report"] = _artifact_text(repo_root / CODE_TASK_PROJECT_DIR / "benchmark_report.md", repo_root)
     artifacts["acceptance_check"] = _artifact_text(repo_root / "scripts" / "check_slugify.py", repo_root)
     return artifacts
 
