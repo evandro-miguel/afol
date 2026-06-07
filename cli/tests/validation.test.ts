@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -460,6 +460,105 @@ describe("validation command family", () => {
     expect(summary.failed).toBe(0);
     expect(summary.skipped).toBe(0);
     expect(summary.baseline_missing).toBe(0);
+  });
+
+  test("v bench runtime-live-agent passes from tracked snapshot when ignored result artifact is absent", () => {
+    const fixtureRoot = createValidationFixtureRoot((root) => {
+      mkdirSync(join(root, ".agents", "benchmarks"), { recursive: true });
+      cpSync(
+        join(process.cwd(), ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json"),
+        join(root, ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json"),
+      );
+      const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
+      if (existsSync(savedResultPath)) {
+        unlinkSync(savedResultPath);
+      }
+    });
+
+    const proc = runKernel(["v", "bench", "--pack", "runtime-live-agent", "--json"], fixtureRoot);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.status).toBe("passed");
+    expect(payload.pass).toBe(true);
+    expect(payload.notes).toContain("runtime-live-agent-evidence-source:snapshot");
+    const results = payload.results as Array<Record<string, unknown>>;
+    expect(results.length).toBe(3);
+    expect(results.every((result) => result.status === "passed")).toBe(true);
+    expect(
+      results.every((result) => (result.notes as string[]).includes("live-runner-evidence-source:snapshot")),
+    ).toBe(true);
+  });
+
+  test("v bench runtime-live-agent fails when direct live evidence violates thresholds", () => {
+    const fixtureRoot = createValidationFixtureRoot((root) => {
+      mkdirSync(join(root, ".agents", "benchmarks"), { recursive: true });
+      cpSync(
+        join(process.cwd(), ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json"),
+        join(root, ".agents", "benchmarks", "runtime-flow-live-agent-v4-latest.json"),
+      );
+      const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
+      const savedResult = readJson(savedResultPath);
+      savedResult.scenarios = [
+        {
+          id: "live-implement-start-complete-evidence",
+          pass: true,
+          duration_ms: 120,
+          tool_call_count: 1,
+          tool_success_rate: 1,
+          error_count: 0,
+          retry_count: 0,
+          context_bytes: 1024,
+          prompt_bytes: 240,
+        },
+        {
+          id: "live-tools-benchmark-discovery",
+          pass: true,
+          duration_ms: 140,
+          tool_call_count: 1,
+          tool_success_rate: 1,
+          error_count: 0,
+          retry_count: 0,
+          context_bytes: 1024,
+          prompt_bytes: 240,
+        },
+        {
+          id: "live-implement-next-governance-preflight",
+          pass: true,
+          duration_ms: 160,
+          tool_call_count: 4,
+          tool_success_rate: 0.75,
+          error_count: 1,
+          retry_count: 0,
+          context_bytes: 1024,
+          prompt_bytes: 240,
+        },
+      ];
+      savedResult.pass = true;
+      savedResult.duration_ms = 420;
+      savedResult.tool_call_count = 6;
+      savedResult.error_count = 1;
+      savedResult.retry_count = 0;
+      savedResult.context_bytes_total = 3072;
+      savedResult.prompt_bytes_total = 720;
+      writeFileSync(savedResultPath, `${JSON.stringify(savedResult, null, 2)}\n`);
+    });
+
+    const proc = runKernel(["v", "bench", "--pack", "runtime-live-agent", "--json"], fixtureRoot);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.status).toBe("failed");
+    expect(payload.pass).toBe(false);
+    const results = payload.results as Array<Record<string, unknown>>;
+    const target = results.find((entry) => entry.scenario_id === "live-status");
+    expect(target?.status).toBe("failed");
+    expect(target?.pass).toBe(false);
+    expect(target?.tool_success_rate).toBe(0.75);
+    const notes = target?.notes as string[];
+    expect(notes).toContain("threshold-below-min:min_tool_success_rate:0.75<0.98");
+    const summary = payload.summary as Record<string, unknown>;
+    expect(summary.passed).toBe(2);
+    expect(summary.failed).toBe(1);
+    expect(summary.skipped).toBe(0);
   });
 
   test("v bench runtime-live-agent fails with actionable note when live artifact is missing", () => {

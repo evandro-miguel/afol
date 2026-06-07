@@ -200,6 +200,7 @@ interface LiveRunnerResultPayload {
 interface RuntimeLiveEvidence {
   snapshotPathRelative: string;
   savedResultPathRelative: string;
+  payloadSource: "result" | "snapshot";
   payload: LiveRunnerResultPayload;
 }
 
@@ -234,6 +235,16 @@ function asOptionalNumber(value: unknown, key: string): number | undefined {
   }
   if (typeof value !== "number" || Number.isNaN(value)) {
     throw new Error(`Invalid numeric field: ${key}`);
+  }
+  return value;
+}
+
+function asOptionalObject(value: unknown, key: string): Record<string, unknown> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!isObject(value)) {
+    throw new Error(`Invalid object field: ${key}`);
   }
   return value;
 }
@@ -572,17 +583,37 @@ function parseLiveRunnerScenarioResult(
   if (!isObject(data)) {
     throw new Error(`Invalid live scenario object: ${sourcePath}`);
   }
+  const toolCallCount = asOptionalNumber(data.tool_call_count, `${sourcePath}.tool_call_count`) ?? 0;
+  const errorCount = asOptionalNumber(data.error_count, `${sourcePath}.error_count`) ?? 0;
   return {
     id: asString(data.id, `${sourcePath}.id`),
     pass: asBoolean(data.pass, `${sourcePath}.pass`),
     duration_ms: asOptionalNumber(data.duration_ms, `${sourcePath}.duration_ms`) ?? 0,
-    tool_call_count: asOptionalNumber(data.tool_call_count, `${sourcePath}.tool_call_count`) ?? 0,
-    tool_success_rate: asOptionalNumber(data.tool_success_rate, `${sourcePath}.tool_success_rate`) ?? 0,
-    error_count: asOptionalNumber(data.error_count, `${sourcePath}.error_count`) ?? 0,
+    tool_call_count: toolCallCount,
+    tool_success_rate:
+      asOptionalNumber(data.tool_success_rate, `${sourcePath}.tool_success_rate`)
+      ?? deriveToolSuccessRate(toolCallCount, errorCount),
+    error_count: errorCount,
     retry_count: asOptionalNumber(data.retry_count, `${sourcePath}.retry_count`) ?? 0,
     context_bytes: asOptionalNumber(data.context_bytes, `${sourcePath}.context_bytes`) ?? 0,
     prompt_bytes: asOptionalNumber(data.prompt_bytes, `${sourcePath}.prompt_bytes`) ?? 0,
   };
+}
+
+function deriveToolSuccessRate(toolCallCount: number, errorCount: number): number {
+  if (toolCallCount <= 0) {
+    return errorCount === 0 ? 1 : 0;
+  }
+  const successCount = Math.max(0, toolCallCount - errorCount);
+  return Number((successCount / toolCallCount).toFixed(4));
+}
+
+function payloadMetricValue(
+  data: Record<string, unknown>,
+  summary: Record<string, unknown> | undefined,
+  key: string,
+): unknown {
+  return data[key] ?? summary?.[key];
 }
 
 function parseLiveRunnerPayload(
@@ -598,16 +629,22 @@ function parseLiveRunnerPayload(
   if (scenarios.length === 0) {
     throw new Error(`Live runner artifact has no scenarios: ${sourcePath}`);
   }
+  const summary = asOptionalObject(data.summary, `${sourcePath}.summary`);
   return {
     pack_id: asString(data.pack_id, `${sourcePath}.pack_id`),
     generated_at: asString(data.generated_at, `${sourcePath}.generated_at`),
-    pass: asBoolean(data.pass, `${sourcePath}.pass`),
-    duration_ms: asOptionalNumber(data.duration_ms, `${sourcePath}.duration_ms`) ?? 0,
-    tool_call_count: asOptionalNumber(data.tool_call_count, `${sourcePath}.tool_call_count`) ?? 0,
-    error_count: asOptionalNumber(data.error_count, `${sourcePath}.error_count`) ?? 0,
-    retry_count: asOptionalNumber(data.retry_count, `${sourcePath}.retry_count`) ?? 0,
-    context_bytes_total: asOptionalNumber(data.context_bytes_total, `${sourcePath}.context_bytes_total`) ?? 0,
-    prompt_bytes_total: asOptionalNumber(data.prompt_bytes_total, `${sourcePath}.prompt_bytes_total`) ?? 0,
+    pass: asBoolean(payloadMetricValue(data, summary, "pass"), `${sourcePath}.pass`),
+    duration_ms: asOptionalNumber(payloadMetricValue(data, summary, "duration_ms"), `${sourcePath}.duration_ms`) ?? 0,
+    tool_call_count:
+      asOptionalNumber(payloadMetricValue(data, summary, "tool_call_count"), `${sourcePath}.tool_call_count`) ?? 0,
+    error_count: asOptionalNumber(payloadMetricValue(data, summary, "error_count"), `${sourcePath}.error_count`) ?? 0,
+    retry_count: asOptionalNumber(payloadMetricValue(data, summary, "retry_count"), `${sourcePath}.retry_count`) ?? 0,
+    context_bytes_total:
+      asOptionalNumber(payloadMetricValue(data, summary, "context_bytes_total"), `${sourcePath}.context_bytes_total`)
+      ?? 0,
+    prompt_bytes_total:
+      asOptionalNumber(payloadMetricValue(data, summary, "prompt_bytes_total"), `${sourcePath}.prompt_bytes_total`)
+      ?? 0,
     benchmark_profile: parseLiveRunnerProfile(data.benchmark_profile, `${sourcePath}.benchmark_profile`),
     scenarios,
   };
@@ -639,13 +676,10 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
   }
   const savedResultPathRaw = asString(snapshot.saved_result_path, `${snapshotPath}.saved_result_path`);
   const savedResultPath = resolve(projectRoot, savedResultPathRaw);
-  if (!existsSync(savedResultPath)) {
-    throw new Error(
-      `runtime-live-artifact-result-missing:${savedResultPathRaw};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
-    );
-  }
-  const savedResult = loadJsonObject(savedResultPath);
-  const payload = parseLiveRunnerPayload(savedResult, savedResultPath);
+  const payloadSource = existsSync(savedResultPath) ? "result" : "snapshot";
+  const payloadPath = payloadSource === "result" ? savedResultPath : snapshotPath;
+  const payloadRaw = payloadSource === "result" ? loadJsonObject(savedResultPath) : snapshot;
+  const payload = parseLiveRunnerPayload(payloadRaw, payloadPath);
   if (payload.pack_id !== LIVE_BENCHMARK_EXPECTED_PACK_ID) {
     throw new Error(
       `runtime-live-artifact-pack-mismatch:${payload.pack_id};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
@@ -659,6 +693,7 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
   return {
     snapshotPathRelative: resolveRelativePath(projectRoot, LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH),
     savedResultPathRelative: resolveRelativePath(projectRoot, savedResultPathRaw),
+    payloadSource,
     payload,
   };
 }
@@ -695,6 +730,38 @@ function failedRuntimeLiveResult(
     git_commit: getGitCommit(projectRoot),
     notes: [note],
   };
+}
+
+function collectThresholdNotes(
+  thresholds: Record<string, number>,
+  metrics: Record<string, number | undefined>,
+): string[] {
+  const notes: string[] = [];
+  for (const [thresholdKey, thresholdValue] of Object.entries(thresholds)) {
+    const metricKey =
+      thresholdKey === "max_p95_ms" || thresholdKey === "min_p95_ms"
+        ? "timing_p95_ms"
+        : thresholdKey === "max_p50_ms" || thresholdKey === "min_p50_ms"
+          ? "timing_p50_ms"
+          : thresholdKey.startsWith("max_") || thresholdKey.startsWith("min_")
+            ? thresholdKey.slice(4)
+            : null;
+    if (!metricKey) {
+      notes.push(`unsupported-threshold:${thresholdKey}`);
+      continue;
+    }
+    const metricValue = metrics[metricKey];
+    if (typeof metricValue !== "number" || Number.isNaN(metricValue)) {
+      notes.push(`threshold-metric-missing:${thresholdKey}`);
+      continue;
+    }
+    if (thresholdKey.startsWith("max_") && metricValue > thresholdValue) {
+      notes.push(`threshold-exceeded:${thresholdKey}:${metricValue}>${thresholdValue}`);
+    } else if (thresholdKey.startsWith("min_") && metricValue < thresholdValue) {
+      notes.push(`threshold-below-min:${thresholdKey}:${metricValue}<${thresholdValue}`);
+    }
+  }
+  return notes;
 }
 
 function runtimeLiveDirectEvidenceNote(
@@ -763,28 +830,7 @@ function buildRuntimeLiveAgentResults(
     usedLiveScenarioIds.add(mappedScenario.id);
     matchedDirectEvidenceCount += 1;
     const mappedId = mappedScenario.id;
-    const status: BenchmarkResult["status"] = mappedScenario.pass ? "passed" : "failed";
-    const notes = [
-      `live-runner-artifact:${evidence.savedResultPathRelative}`,
-      `live-runner-snapshot:${evidence.snapshotPathRelative}`,
-      `live-runner-scenario:${mappedId}`,
-      `live-runner-generated-at:${evidence.payload.generated_at}`,
-      `live-runner-profile:${evidence.payload.benchmark_profile.model}/${evidence.payload.benchmark_profile.reasoning_effort}`,
-    ];
-    if (!mappedScenario.pass) {
-      notes.push("live-runner-scenario-failed");
-    }
-    return {
-      schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
-      run_id: `live-runtime-live-agent-${scenario.scenario_id}-${scenario.scenario_version}`,
-      scenario_id: scenario.scenario_id,
-      scenario_version: scenario.scenario_version,
-      pack_id: scenario.pack_id,
-      status,
-      baseline_id: scenario.baseline_id,
-      baseline_reference: relative(projectRoot, baselinePath).replaceAll("\\", "/"),
-      threshold_reference: scenario.thresholds,
-      pass: status === "passed",
+    const metrics: Record<string, number> = {
       duration_ms: mappedScenario.duration_ms,
       timing_p50_ms: mappedScenario.duration_ms,
       timing_p95_ms: mappedScenario.duration_ms,
@@ -797,6 +843,45 @@ function buildRuntimeLiveAgentResults(
       output_bytes: mappedScenario.prompt_bytes,
       tool_call_count: mappedScenario.tool_call_count,
       tool_success_rate: mappedScenario.tool_success_rate,
+    };
+    const thresholdNotes = collectThresholdNotes(scenario.thresholds, metrics);
+    const status: BenchmarkResult["status"] =
+      mappedScenario.pass && thresholdNotes.length === 0 ? "passed" : "failed";
+    const notes = [
+      `live-runner-artifact:${evidence.savedResultPathRelative}`,
+      `live-runner-snapshot:${evidence.snapshotPathRelative}`,
+      `live-runner-evidence-source:${evidence.payloadSource}`,
+      `live-runner-scenario:${mappedId}`,
+      `live-runner-generated-at:${evidence.payload.generated_at}`,
+      `live-runner-profile:${evidence.payload.benchmark_profile.model}/${evidence.payload.benchmark_profile.reasoning_effort}`,
+    ];
+    if (!mappedScenario.pass) {
+      notes.push("live-runner-scenario-failed");
+    }
+    notes.push(...thresholdNotes);
+    return {
+      schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
+      run_id: `live-runtime-live-agent-${scenario.scenario_id}-${scenario.scenario_version}`,
+      scenario_id: scenario.scenario_id,
+      scenario_version: scenario.scenario_version,
+      pack_id: scenario.pack_id,
+      status,
+      baseline_id: scenario.baseline_id,
+      baseline_reference: relative(projectRoot, baselinePath).replaceAll("\\", "/"),
+      threshold_reference: scenario.thresholds,
+      pass: status === "passed",
+      duration_ms: metrics.duration_ms ?? 0,
+      timing_p50_ms: metrics.timing_p50_ms ?? 0,
+      timing_p95_ms: metrics.timing_p95_ms ?? 0,
+      error_count: metrics.error_count ?? 0,
+      retry_count: metrics.retry_count ?? 0,
+      context_tokens: metrics.context_tokens ?? 0,
+      prompt_tokens: metrics.prompt_tokens ?? 0,
+      output_tokens: metrics.output_tokens ?? 0,
+      context_bytes: metrics.context_bytes ?? 0,
+      output_bytes: metrics.output_bytes ?? 0,
+      tool_call_count: metrics.tool_call_count ?? 0,
+      tool_success_rate: metrics.tool_success_rate ?? 0,
       git_commit: getGitCommit(projectRoot),
       notes,
     };
@@ -810,6 +895,7 @@ function buildRuntimeLiveAgentResults(
     results,
     notes: [
       `runtime-live-agent-artifact:${evidence.savedResultPathRelative}`,
+      `runtime-live-agent-evidence-source:${evidence.payloadSource}`,
       ...(incompleteArtifact
         ? [
             `runtime-live-artifact-incomplete:${evidence.savedResultPathRelative};matched-direct-evidence:${matchedDirectEvidenceCount}/${scenarios.length};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
@@ -827,31 +913,7 @@ function buildResult(
   baseline: Baseline | undefined,
 ): BenchmarkResult {
   const metrics = scenario.deterministic_metrics;
-  const notes: string[] = [];
-  for (const [thresholdKey, thresholdValue] of Object.entries(scenario.thresholds)) {
-    const metricKey =
-      thresholdKey === "max_p95_ms" || thresholdKey === "min_p95_ms"
-        ? "timing_p95_ms"
-        : thresholdKey === "max_p50_ms" || thresholdKey === "min_p50_ms"
-          ? "timing_p50_ms"
-          : thresholdKey.startsWith("max_") || thresholdKey.startsWith("min_")
-            ? thresholdKey.slice(4)
-            : null;
-    if (!metricKey) {
-      notes.push(`unsupported-threshold:${thresholdKey}`);
-      continue;
-    }
-    const metricValue = metrics[metricKey];
-    if (typeof metricValue !== "number" || Number.isNaN(metricValue)) {
-      notes.push(`threshold-metric-missing:${thresholdKey}`);
-      continue;
-    }
-    if (thresholdKey.startsWith("max_") && metricValue > thresholdValue) {
-      notes.push(`threshold-exceeded:${thresholdKey}:${metricValue}>${thresholdValue}`);
-    } else if (thresholdKey.startsWith("min_") && metricValue < thresholdValue) {
-      notes.push(`threshold-below-min:${thresholdKey}:${metricValue}<${thresholdValue}`);
-    }
-  }
+  const notes = collectThresholdNotes(scenario.thresholds, metrics);
   if (baseline) {
     if (
       typeof baseline.timing_p50_ms === "number"

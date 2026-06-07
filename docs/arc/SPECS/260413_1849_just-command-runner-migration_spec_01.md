@@ -31,6 +31,10 @@ risk_level: high
 
 # SPEC: just-command-runner-migration
 
+> Superseded: this spec is historical. The current command direction is
+> AFOL-only through `afol`; root/template Justfiles must not be generated or
+> documented as public downstream entrypoints.
+
 ## 1) Feature Intent
 
 - Outcome: `just` becomes the canonical command runner for scaffold operations
