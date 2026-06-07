@@ -15,6 +15,8 @@ describe("generated template cleanliness", () => {
     expect(paths.some((path) => path.startsWith(".agents/runtime/"))).toBe(false);
     expect(paths).not.toContain(".agents/agents");
     expect(paths).not.toContain(".agents/agents-mcp");
+    expect(paths).not.toContain("a");
+    expect(paths).not.toContain("Justfile");
     expect(paths.some((path) => path.endsWith(".py"))).toBe(false);
     expect(paths.some((path) => path.startsWith("docs/standards/"))).toBe(false);
     expect(paths.some((path) => path.startsWith("docs/agentic/"))).toBe(false);
@@ -32,5 +34,7 @@ describe("generated template cleanliness", () => {
     );
     expect(forbiddenOps).toEqual([]);
     expect(plan.filteredForbiddenCount).toBe(0);
+    expect(plan.operations.some((operation) => operation.path === "a")).toBe(false);
+    expect(plan.operations.some((operation) => operation.path === "Justfile")).toBe(false);
   });
 });

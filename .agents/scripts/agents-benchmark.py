@@ -731,7 +731,7 @@ def _afol_agents_text() -> str:
     return (
         "# AGENTS.md\n\n"
         "## Governed Execution\n\n"
-        "Use `./afol` or `./a` for all workbench operations. This repository is provider-compatible: "
+        "Use `./afol` for all workbench operations. This repository is provider-compatible: "
         "mutable state belongs under `.afol/`, and `.agents/` contains only provider-safe static config.\n\n"
         "Required order for implementation work:\n\n"
         "1. Create a short session with `./afol new <theme> --feature-id <id> --parent-spec <id> --task <text>`.\n"
@@ -751,7 +751,7 @@ def _afol_problem_text() -> str:
         "## Acceptance\n\n"
         f"- `{AFOL_POLICY_CHECK_COMMAND}` must pass.\n"
         "- Keep the product change minimal.\n"
-        "- Use `./afol` or `./a` for session, task, and evidence state.\n"
+        "- Use `./afol` for session, task, and evidence state.\n"
         "- Do not manually edit `.afol/wb`.\n"
     )
 
@@ -838,7 +838,7 @@ def _code_task_agents_text() -> str:
         "## Benchmark Scope\n\n"
         f"Work only in `{CODE_TASK_PROJECT_DIR}/` and `.afol/` for this benchmark. "
         "Do not edit repository files outside those paths.\n\n"
-        "Use `./afol` or `./a` for all plan, task, evidence, and closure operations. "
+        "Use `./afol` for all plan, task, evidence, and closure operations. "
         "Do not manually create, edit, or append `.afol/wb` files.\n"
     )
 
@@ -2368,7 +2368,6 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             context_artifacts=(
                 "AGENTS.md",
                 "afol",
-                "a",
                 ".agents/agents.config",
                 "docs/benchmark_problem.md",
                 "app/runtime_policy.json",
@@ -2378,13 +2377,14 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 AFOL_POLICY_CHECK_COMMAND,
             ),
             any_required_command_groups=(
-                ("./afol new", "./afol n", "./a new", "./a n"),
-                ("./afol start", "./afol st", "./a start", "./a st"),
-                ("./afol evidence", "./afol e", "./a evidence", "./a e"),
-                ("./afol done", "./afol d", "./a done", "./a d"),
+                ("./afol new", "./afol n"),
+                ("./afol start", "./afol st"),
+                ("./afol evidence", "./afol e"),
+                ("./afol done", "./afol d", "['./afol', 'done'"),
             ),
             forbidden_command_substrings=(
                 ".agents/agents",
+                "./a ",
                 "cat > .afol/wb",
                 "tee .afol/wb",
                 "tee -a .afol/wb",
@@ -2404,7 +2404,7 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 "Rules:\n"
                 "- Use tools and inspect local files as needed. Do not answer from memory.\n"
                 "- Do not inspect global skills, `/home/ozy/.codex`, `/home/ozy/.agents`, or files outside this downstream project.\n"
-                "- Use `./afol` or `./a` for all workbench/session/task/evidence operations.\n"
+                "- Use `./afol` for all workbench/session/task/evidence operations.\n"
                 "- Do not use `.agents/agents`.\n"
                 "- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n"
                 "- Keep this bounded: at most 10 shell commands unless a command fails and needs one focused recovery.\n"
@@ -2440,7 +2440,6 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             context_artifacts=(
                 "AGENTS.md",
                 "afol",
-                "a",
                 "docs/benchmark_problem.md",
                 f"{CODE_TASK_PROJECT_DIR}/README.md",
                 f"{CODE_TASK_PROJECT_DIR}/src/text_utils.py",
@@ -2448,13 +2447,14 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
             ),
             required_command_substrings=(CODE_TASK_CHECK_COMMAND,),
             any_required_command_groups=(
-                ("./afol new", "./afol n", "./a new", "./a n"),
-                ("./afol start", "./afol st", "./a start", "./a st"),
-                ("./afol evidence", "./afol e", "./a evidence", "./a e"),
-                ("./afol done", "./afol d", "./a done", "./a d"),
+                ("./afol new", "./afol n"),
+                ("./afol start", "./afol st"),
+                ("./afol evidence", "./afol e"),
+                ("./afol done", "./afol d", "['./afol', 'done'"),
             ),
             forbidden_command_substrings=(
                 ".agents/agents",
+                "./a ",
                 "cat > .afol/wb",
                 "tee .afol/wb",
                 "tee -a .afol/wb",
@@ -3004,7 +3004,7 @@ def _code_task_planner_prompt() -> str:
         "Rules:\n"
         "- Use shell tools. Do not answer from memory.\n"
         f"- Work only with `docs/benchmark_problem.md`, `{CODE_TASK_PROJECT_DIR}/`, and `.afol/`.\n"
-        "- Use `./afol` or `./a` for plan/task operations.\n"
+        "- Use `./afol` for plan/task operations.\n"
         f"- The acceptance script is `{CODE_TASK_CHECK_COMMAND}` at repository root; there is no `{CODE_TASK_PROJECT_DIR}/scripts/` directory.\n"
         "- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n"
         "- Do not edit product code; planner only creates the AFOL session.\n"
@@ -3035,7 +3035,7 @@ def _code_task_executor_prompt(session_id: str, *, recovery: bool = False) -> st
         f"- Work only in `{CODE_TASK_PROJECT_DIR}/`, `.afol/`, and the read-only check script `scripts/check_slugify.py`.\n"
         f"- The acceptance script is `scripts/check_slugify.py`; do not look for a `{CODE_TASK_PROJECT_DIR}/scripts/` directory.\n"
         f"- You may edit only `{CODE_TASK_PROJECT_DIR}/src/text_utils.py` and `{CODE_TASK_PROJECT_DIR}/benchmark_report.md`.\n"
-        "- Use `./afol` or `./a` for task state, evidence, and closure.\n"
+        "- Use `./afol` for task state, evidence, and closure.\n"
         "- Do not manually create, edit, append, remove, or move `.afol/wb` files.\n"
         "- Keep this ultra fast: at most 8 shell commands unless one command fails and needs one focused recovery.\n"
         "- Return JSON only that matches the provided schema.\n\n"

@@ -173,7 +173,7 @@ all gate evidence (`validate:template`, `validate:bootstrap`) passes.
   complete.
 - Provider hook support, when added, does not expand the template beyond
   state-only policy, manifest, lock, and local governance files.
-- `afol` is the canonical front door; `./a` remains compatibility/local wrapper
+- `afol` is the canonical front door; `afol` remains compatibility/local wrapper
   during migration.
 
 ## 10) Hermes Benchmark Decisions

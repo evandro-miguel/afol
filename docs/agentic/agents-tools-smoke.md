@@ -57,17 +57,17 @@ Validates tools system:
 python3 .agents/scripts/agents-tools-smoke.py
 ```
 
-### Via Justfile
+### Via legacy just command runner
 
 ```bash
-just tools-check
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### In CI/CD
 
 ```bash
 # Add to CI pipeline
-just tools-check
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## How to Modify

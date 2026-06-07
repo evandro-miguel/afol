@@ -54,9 +54,9 @@ project template = local state, rules, skills, workbench, specs, evidence
 
 The template must remain usable while legacy Python/Bash compatibility exists,
 but it should converge toward invoking the universal Bun/TypeScript CLI through
-`./a`.
+`afol`.
 
-`afol` remains the canonical command in runtime-facing workflows; `./a` stays as
+`afol` remains the canonical command in runtime-facing workflows; `afol` stays as
 the compatibility/local entrypoint where native parity is incomplete.
 
 ## 4) Required Template Shape
@@ -90,7 +90,7 @@ Required local files:
 
 | File | Owner | Purpose |
 | --- | --- | --- |
-| `./a` | managed | local wrapper into CLI/fallback |
+| `afol` | managed | local wrapper into CLI/fallback |
 | `.agents/config.json` | project | local feature flags and paths |
 | `.agents/lock.json` | managed | CLI/template version lock |
 | `.agents/manifest.json` | managed | managed file hashes and ownership |
@@ -169,7 +169,7 @@ DR-specific exclusions:
 - Template contains every required local protocol file.
 - Template excludes factory noise.
 - Export checks fail on forbidden content.
-- Downstream bootstrap can run `./a -h` and `./a s`.
+- Downstream bootstrap can run `afol -h` and `afol s`.
 - Update preview can classify managed vs project-owned files.
 - Agents can start governed work without reading root factory docs.
 

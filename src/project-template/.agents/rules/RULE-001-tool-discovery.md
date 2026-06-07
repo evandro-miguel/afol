@@ -50,17 +50,6 @@ updated_at: '2026-05-14T20:05:00-03:00'
 ./afol verify-tasks <configured-wb-dir>/<session>/
 ```
 
-## Justfile Quick Reference
-
-```bash
-just help
-just doctor
-just new THEME=<theme>
-just lint
-just verify
-just all
-```
-
 ## Rule
 
 - No blind tool use.

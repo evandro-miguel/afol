@@ -6,6 +6,8 @@ import { join, relative, sep } from "node:path";
 export const TEMPLATE_ROOT = "src/project-template";
 
 export const TEMPLATE_FORBIDDEN_PATTERNS = [
+  "a",
+  "Justfile",
   "**/*.py",
   "**/pyproject.toml",
   "**/uv.lock",
@@ -22,11 +24,9 @@ export const TEMPLATE_FORBIDDEN_PATTERNS = [
 ] as const;
 
 export const TEMPLATE_ALLOWED_PATTERNS = [
-  "a",
   "afol",
   "AGENTS.md",
   "CLAUDE.md",
-  "Justfile",
   "RTK.md",
   ".claude/**",
   ".agents/config.json",
@@ -54,6 +54,13 @@ const TEMPLATE_INSTRUCTION_FILES = [
 ] as const;
 
 const TEMPLATE_FORBIDDEN_TEXT_REFERENCES = [
+  "./a",
+  "`./a`",
+  " or `./a`",
+  "`afol` or `./a`",
+  "just ",
+  "`just",
+  "Justfile",
   "./.agents/agents",
   ".agents/agents ",
   ".agents/agents`",

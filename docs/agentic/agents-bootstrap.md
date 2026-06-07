@@ -19,7 +19,7 @@ links:
 
 - Copying multiple files and folders
 - Creating required directory structure
-- Configuring Justfile
+- Writing the native `afol` front door
 - Detecting target project stack
 - Validating installation
 
@@ -35,7 +35,7 @@ Installs `.agents` system in another repository:
 2. **Copies reusable system assets** - Core configs, docs, rules, templates, mirror docs, and native CLI wrappers
 3. **Generates clean governance baseline** - Starter roadmap, architecture, project brief, tech stack, guidelines, and empty indexes
 4. **Creates folders** - Required structure, local state, workbench, rules, and skill folders
-5. **Configures command runner surface** - Justfile canonical
+5. **Configures command runner surface** - `afol` canonical
 6. **Runs system setup** - Writes the native front door and exported baseline
 7. **Validates** - Runs native front-door checks
 
@@ -45,7 +45,7 @@ When the target repository already exists, bootstrap must behave as an overlay:
 - `skip` for existing project-owned files
 - `patch-managed` for scaffold-owned files that can be safely updated
 - `adapt-config` for legacy layout or path translation
-- `add-wrapper` for missing compatibility adapters such as `afol` or `./a`
+- `add-wrapper` for missing native adapters such as `afol`
 - `reconcile-skills` for manifest/source drift that needs explicit
   classification
 - `conflict` when overwrite would touch project-owned content
@@ -68,11 +68,9 @@ Front-door checks available in all adopted repos:
 - `afol` is the public native front door for status and workflow commands.
 - `afol s` (or `afol status`) reports status.
 - `afol ck` (or `afol check`) reports validation/runtime metadata when supported by the wrapper in that repo.
-- `afol st`, `afol d -x "just lint"`, and `afol c` are the token-optimized
+- `afol st`, `afol d -x "afol validate"`, and `afol c` are the token-optimized
   workbench lifecycle aliases.
-- `./a` remains available as a compatibility alias during migration.
-- Validate the onboarding result with `just --list`, `./a status`, and
-  `./a validate`.
+- Validate the onboarding result with `afol status` and `afol validate`.
 
 Sanitization rule:
 
@@ -124,7 +122,6 @@ Compatibility mirrors kept for broader reuse:
 | `<target>/.agents/` | Complete structure |
 | `<target>/.agents/tmp/` | Temporary non-canonical workspace |
 | `<target>/.claude/` | Runtime folder ensured |
-| `<target>/Justfile` | Canonical command runner configured |
 | `<target>/docs/arc/` | Folders created |
 | `<target>/.agents/wb/` | Folders created |
 | `<target>/docs/arc/*.md` | Generic baseline generated for the target repo |
@@ -251,7 +248,7 @@ For a live project, the partial-install expectation is that pre-existing files r
 → Detected stack: Python
 → Copying files...
 → Creating directories...
-→ Configuring Justfile...
+→ Configuring legacy just command runner...
 → Running validation...
 ✓ Bootstrap complete
 ```

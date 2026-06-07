@@ -87,21 +87,21 @@ Initial shared types:
 
 | MCP tool | CLI equivalent | Shared core contract |
 | --- | --- | --- |
-| `status` | `./a s` | project/session summary |
-| `task_start` | `./a t s` | task state transition |
-| `task_done` | `./a t d` | task closure with evidence |
-| `evidence_add` | `./a e a` | evidence ledger append |
-| `log_add` | `./a l a` | timeline/log append |
-| `rule_get` | `./a r g` | rule routing result |
-| `skill_get` | `./a sk g` | skill routing result |
-| `research_save` | `./a q s` | sidecar save and handoff |
-| `verify` | `./a v` | validation result |
-| `close` | `./a c` | closure gate |
-| `update_check` | `./a up ck` | update metadata read |
-| `file_write` | `./a f w` | safe write mutation |
-| `file_move` | `./a f mv` | safe move mutation |
-| `file_patch` | `./a f pt` | safe patch mutation |
-| `undo` | `./a u` | mutation rollback |
+| `status` | `afol s` | project/session summary |
+| `task_start` | `afol t s` | task state transition |
+| `task_done` | `afol t d` | task closure with evidence |
+| `evidence_add` | `afol e a` | evidence ledger append |
+| `log_add` | `afol l a` | timeline/log append |
+| `rule_get` | `afol r g` | rule routing result |
+| `skill_get` | `afol sk g` | skill routing result |
+| `research_save` | `afol q s` | sidecar save and handoff |
+| `verify` | `afol v` | validation result |
+| `close` | `afol c` | closure gate |
+| `update_check` | `afol up ck` | update metadata read |
+| `file_write` | `afol f w` | safe write mutation |
+| `file_move` | `afol f mv` | safe move mutation |
+| `file_patch` | `afol f pt` | safe patch mutation |
+| `undo` | `afol u` | mutation rollback |
 
 Parity means the same request yields the same semantic result envelope, even if
 transport formatting differs.

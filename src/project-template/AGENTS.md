@@ -37,8 +37,7 @@ Replace this section after bootstrap with real product purpose and constraints.
   3. Edit and run named verification.
   4. `afol d -S {session-id} -T T-01 -x "<verification command>"`
   5. `afol c -S {session-id}`
-- Use `./a` with the same subcommands when the compatibility alias is the
-  active front door.
+- Use `afol` as the only downstream front door.
 - Planning-only or read-only questions stay in chat unless durable artifacts
   are required.
 
@@ -98,7 +97,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Repo history/context: `git`/`gh`; indexed graph/callers: GitNexus CLI.
 - Browser/UI: `npx playwright` or `bunx playwright`; lightweight checks:
   `lightpanda`.
-- Runtime/tasks: `bun`/`node`/`npm`, `just`, and project-specific toolchains
+- Runtime/tasks: `bun`/`node`/`npm`, `afol`, and project-specific toolchains
   when present.
 - Docs/ops: `markdownlint`/`lint-md`/`fix-md`/`validate-md`, `markitdown`,
   `yt-dlp`, `docker compose`, `tmux`.
@@ -117,9 +116,9 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 - Never close work without proof.
 - Gate selection:
-  - docs/prompt/process -> `just lint`
+  - docs/prompt/process -> `afol validate`
   - front door/workbench -> `afol ck`
-  - scaffold/release -> `just agents-all`
+  - scaffold/release -> `afol validate --json`
 - Run focused checks first; broaden only when risk requires.
 - If runtime guidance changes, report docs/mirror sync status.
 

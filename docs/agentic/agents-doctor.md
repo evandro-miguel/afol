@@ -74,8 +74,8 @@ doctor:
 # Validate structure
 .agents/agents doctor
 
-# Via Justfile
-just doctor
+# Via legacy just command runner
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## How to Modify
@@ -109,7 +109,7 @@ def validate_timestamps(filepath: Path) -> List[str]:
 
 ```bash
 # Run validation
-just doctor
+AFOL-native command pending; do not use legacy just command runners.
 
 # Expected: Exit code 0 if valid, 1 if errors
 ```

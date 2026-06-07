@@ -37,16 +37,15 @@ fixture tasks.
 ## Commands
 
 ```bash
-.agents/agents benchmark list
-.agents/agents benchmark show live-implement-next-governance-preflight
-.agents/agents benchmark run
-.agents/agents benchmark run live-implement-start-complete-evidence --save
-.agents/agents benchmark run live-wb-update-task-evidence-timeline --save
-.agents/agents benchmark run live-wb-session-create-scripted-progress --save
-.agents/agents benchmark run live-autonomous-agentic-folder-delivery --save
-.agents/agents benchmark run live-afol-provider-compatible-delivery --save
-.agents/agents benchmark run live-afol-python-code-task-orchestrated --save
-just benchmark-runtime-flow
+./afol benchmark list
+./afol benchmark show live-implement-next-governance-preflight
+./afol benchmark run
+./afol benchmark run live-implement-start-complete-evidence --save
+./afol benchmark run live-wb-update-task-evidence-timeline --save
+./afol benchmark run live-wb-session-create-scripted-progress --save
+./afol benchmark run live-autonomous-agentic-folder-delivery --save
+./afol benchmark run live-afol-provider-compatible-delivery --save
+./afol benchmark run live-afol-python-code-task-orchestrated --save
 ```
 
 ## Validation Bridge
@@ -59,7 +58,7 @@ just benchmark-runtime-flow
   its explicit `live_runner_scenario_id`; index fallback and row reuse are
   rejected.
 - Refresh live evidence with:
-  - `./.agents/agents benchmark run --save`
+  - `./afol benchmark run --save`
 - If the saved live artifact is missing or only covers a partial scenario set,
   the validation pack returns `status=failed` with an actionable note that
   points to the refresh command.

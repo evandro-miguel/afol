@@ -3,22 +3,25 @@
 ## Project Overview
 
 This repo is the canonical `.agents` scaffold factory for terminal-first
-LLM-assisted development. The public/downstream CLI is `afol`/`./a`, and the
-current TypeScript implementation lives under `cli/**`. It provides workbench
-sessions, task/evidence tracking, runtime adapters, docs standards, telemetry,
-and bootstrap assets for downstream repos.
+LLM-assisted development. The public/downstream CLI is `afol`, and the current
+TypeScript implementation lives under `cli/**`. It provides workbench sessions,
+task/evidence tracking, runtime adapters, docs standards, telemetry, and
+bootstrap assets for downstream repos. Legacy local aliases and just
+command-runner surfaces are compatibility debt; `afol` is the current public
+entrypoint and must be the only documented downstream path.
 
 ## Factory And Template Boundary
 
 - The exportable scaffold is `src/project-template/`.
 - The root `.agents/` tree is the factory/dev environment used to refine the
   scaffold, the Bun/TypeScript CLI, docs, validation, and export behavior.
-- Root `.agents/agents`, `.agents/scripts`, and `.agents/runtime` are
-  factory-only legacy compatibility surfaces during migration; they are not
-  part of the downstream template payload.
-- Public runtime usage for this repo remains `afol`/`./a` (TS-native path); the
+- Root `.agents/agents`, `.agents/scripts`, `.agents/runtime`, legacy local
+  aliases, and legacy just command-runner surfaces are factory-only
+  compatibility debt during migration; they are not part of the downstream
+  template payload.
+- Public runtime usage for this repo is `afol` only (TS-native path); the
   compatibility surfaces above are internal factory fallback and must not be
-  documented as a public entrypoint.
+  documented as public entrypoints.
 - Root `.agents/wb/` is development workbench history for this factory repo.
   It may be versioned on development branches such as `main_dev`, but it must
   not be treated as part of the downstream template payload.
@@ -26,12 +29,16 @@ and bootstrap assets for downstream repos.
   `src/project-template/`, including the workbench baseline in
   `src/project-template/.agents/wb/`, not root workbench sessions, active
   session pointers, caches, telemetry events, or factory evidence.
+- Downstream installs must not receive legacy aliases or just command runners
+  after the AFOL-only cutover; any remaining payload, test, or documentation
+  reference to them is migration debt.
 - Cleanup work must preserve this boundary: organize factory state in the root
   repo and harden export checks so factory-only material cannot leak into
   `src/project-template/` or downstream bootstrap output.
-- Safe retirement rule: remove or rework factory Python/legacy compatibility
-  surfaces only after all delegated command families have a proven native TS
-  replacement and gates confirm no downstream visibility.
+- Safe retirement rule: remove or rework legacy aliases, legacy just
+  command-runner surfaces, and factory Python compatibility surfaces after all
+  delegated command families have a proven AFOL-native TS replacement and gates
+  confirm no downstream visibility.
 
 ## Governed Execution
 
@@ -41,10 +48,14 @@ and bootstrap assets for downstream repos.
 - Before product edits: create or target a session, then move the executable
   task to `in_progress`.
 - Canonical path:
-  1. `./.agents/agents new {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `./.agents/agents implement start --session {session-id} --task-id T-01`
+  1. `afol n {theme} --feature-id {F-id} --parent-spec {spec-id}`
+  2. `afol st -S {session-id} -T T-01`
   3. Edit and run the named verification.
-  4. Close with `./.agents/agents implement complete ... --result passed`.
+  4. `afol d -S {session-id} -T T-01 -x "<verification command>"`
+  5. `afol c -S {session-id}`
+- Use `afol` for factory and downstream lifecycle commands. Use
+  `.agents/agents` only when explicitly testing or retiring legacy
+  compatibility.
 - Planning-only, read-only checks, and broad context questions stay in the
   conversation unless a durable governed artifact is explicitly needed.
 
@@ -52,20 +63,22 @@ and bootstrap assets for downstream repos.
 
 - Language/runtime: Bun and TypeScript for the current CLI/kernel under
   `cli/**`.
-- Tooling: Bash wrappers, Just, Markdown, YAML, JSON, and TOML.
-- Legacy compatibility: `.agents/agents`, `.agents/scripts`, and
-  `.agents/runtime` remain in the factory tree during migration only; legacy
-  Python/uv-backed flows should be retired under the safe condition above, not
-  as a best-effort cleanup.
+- Tooling: Bun/TypeScript, Bash wrappers for packaging or compatibility only,
+  Markdown, YAML, JSON, and TOML.
+- Legacy compatibility: `.agents/agents`, `.agents/scripts`, `.agents/runtime`,
+  legacy local aliases, and legacy just command-runner surfaces remain in the
+  factory tree during migration only; legacy Python/uv-backed flows should be
+  retired under the safe condition above, not as a best-effort cleanup.
 - Runtime model: interactive CLI agents. Do not redesign this scaffold around
   long-lived backend agent services unless the roadmap introduces that use case.
 
 ## Repository Map
 
+- `afol`: public TS CLI front door.
 - `cli/`: current Bun/TypeScript CLI implementation, commands, router,
   validation, and tests.
 - `.agents/agents`: factory-only legacy compatibility wrapper during
-  migration.
+  migration; not a public entrypoint.
 - `.agents/scripts/`: factory-only legacy compatibility helpers during
   migration.
 - `.agents/runtime/`: factory-only legacy compatibility runtime support during
@@ -96,8 +109,9 @@ and bootstrap assets for downstream repos.
 
 ## Context And Tokens
 
-- Use Caveman-style updates by default: concise, no filler, no repeated setup.
-  Keep full precise prose when compression could hide risk, order, or evidence.
+- Default communication mode is `$caveman` full: concise, technical, no filler,
+  no repeated setup. Keep full precise prose when compression could hide risk,
+  order, or evidence.
 - Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
   CLI, and existing `docs/map/` before broad scans.
 - Prefer the native `knowledge pull "<topic>"` command before opening historical
@@ -132,9 +146,10 @@ and bootstrap assets for downstream repos.
   repo export materially helps.
 - Browser/UI checks: `npx playwright` or `bunx playwright` for E2E,
   screenshots, and automation; `lightpanda` for lightweight page checks.
-- Runtime/tasks: `bun`/`node`/`npm` for the CLI and JS tooling; `python3`/
-  `uv` only for legacy compatibility surfaces when they are explicitly touched;
-  `just` for project command entrypoints.
+- Runtime/tasks: `afol` for scaffold lifecycle, status, validation, and
+  workbench commands; `bun`/`node`/`npm` for the CLI and JS tooling;
+  `python3`/`uv` only for legacy compatibility surfaces when they are
+  explicitly touched. Do not use `just` as the canonical project entrypoint.
 - Docs/ops: `markdownlint`/`lint-md`/`fix-md`/`validate-md` for Markdown,
   `markitdown` for document conversion, `yt-dlp` for media, `docker compose`
   for containers, and `tmux` for long-running terminals.
@@ -159,9 +174,17 @@ and bootstrap assets for downstream repos.
 ## Verification
 
 - Never mark work complete without proof.
-- Gate selection: docs/prompt/process -> `just lint`; `cli/**` ->
-  `bun run typecheck` plus `bun test` or focused `bun test cli/tests/...`
-  runs; cross-cutting scaffold/release -> `just agents-all`.
+- Gate selection starts with `afol validate [--changed-path <path>]` to select
+  validation packs and report contract issues. Until `afol validate` executes
+  selected packs directly, run the required Bun/package commands explicitly and
+  treat legacy just-command-runner-only gates as migration debt.
+- Docs/prompt/process -> `afol validate --changed-path <path>` plus the
+  relevant Markdown/documentation check.
+- `cli/**` -> `bun run typecheck` plus `bun test` or focused
+  `bun test cli/tests/...` runs.
+- Cross-cutting scaffold/release -> `bun run validate:release`,
+  `bun run smoke:clean`, and `afol validate --json`; do not use
+  `just agents-all` as the canonical gate.
 - Prefer focused checks first, then broader checks when risk justifies them.
 - Runtime/tool-routing/prompt/rule-loading changes should run the controlled
   runtime-flow benchmark family when regression risk is material.
@@ -184,8 +207,10 @@ and bootstrap assets for downstream repos.
 - Root `.agents/wb/` evidence may document factory work, but it must not be
   copied into `src/project-template/` or release/export payloads.
 - Use `.agents/tmp/` only for disposable temporary files.
-- Never edit managed `updated_at` manually; use `just wb-touch` or
-  `./.agents/agents wb-update touch`.
+- Never edit managed `updated_at` manually; use AFOL-native workbench update
+  commands when available. If a capability exists only in `.agents/agents` or a
+  legacy just command-runner target, record it as migration debt unless the task
+  explicitly targets legacy retirement.
 
 ## Runtime And Skill Sync
 

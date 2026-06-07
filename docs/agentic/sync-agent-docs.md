@@ -83,8 +83,8 @@ HEADER_TEMPLATE = """<!-- Agent-specific instructions for {agent_name}. -->
 # Sync all agents
 ./.agents/agents sync --force
 
-# Via Justfile
-just sync
+# Via legacy just command runner
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## Output

@@ -35,11 +35,11 @@ internal context, or machine-specific workflows.
 
 ## 3) Expected Behavior
 
-Future users can install the CLI, initialize a project, run ./a s, create
+Future users can install the CLI, initialize a project, run afol s, create
 governed tasks, add evidence, close sessions, and update the local template
 without reading long internal docs.
 
-The public command name is `afol`; `./a` remains a local compatibility wrapper
+The public command name is `afol`; `afol` remains a local compatibility wrapper
 while migration parity is incomplete.
 
 ## 4) Product Boundary

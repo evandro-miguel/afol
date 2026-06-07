@@ -30,7 +30,6 @@ updated_at: '2026-05-14T20:05:00-03:00'
   --parent-spec <parent-spec-id> --spec-lite
 ./afol n <theme-name> --feature-id F-01 \
   --parent-spec <parent-spec-id> --child-spec <child-spec-id>
-just new THEME=<theme-name> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 ```
 
 ## Quick Task (active session only)
@@ -68,9 +67,9 @@ just new THEME=<theme-name> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 
 ```bash
 ./afol st -S <session-id> -T T-01
-./afol d -S <session-id> -T T-01 -x "just verify"
+./afol d -S <session-id> -T T-01 -x "<verification command>"
 ./afol evidence T-01 -S <session-id> \
-  --command "just verify" --result passed \
+  --command "<verification command>" --result passed \
   --artifact <configured-wb-dir>/<session-id>/<report-or-log>
 ./afol done -S <session-id> -T T-01
 ```

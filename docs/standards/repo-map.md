@@ -38,7 +38,7 @@ Primary wrapper:
 Just target:
 
 ```bash
-just repo-map
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 Useful variants:
@@ -129,8 +129,8 @@ Prefer `structure-map` when you only need a quick physical file inventory.
 After a `repo-map` refresh:
 
 ```bash
-just doctor
-just lint
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 `just lint` validates the canonical `.agents` governance docs. The map surface under `docs/map/` is validated primarily by the `repo-map` command itself, while raw evidence under `docs/map/extra/` remains pipeline-owned output and should not be treated like hand-maintained governance docs.
@@ -140,7 +140,7 @@ The wrapper also rejects semantically degenerate output, not only missing files.
 If the work also changes the scripts or command surface:
 
 ```bash
-just test-scripts
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## Rules

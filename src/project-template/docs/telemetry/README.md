@@ -18,7 +18,7 @@ owned by the downstream CLI.
 
 **Telemetry is fully automated!** No manual recording needed.
 
-Every time you use the front door (`afol` or `./a`), telemetry is captured
+Every time you use the `afol` front door, telemetry is captured
 automatically by the runtime:
 
 - Tool usage
@@ -28,8 +28,8 @@ automatically by the runtime:
 
 ### CLI-Owned / Future Surfaces
 
-If the downstream CLI exposes telemetry commands, invoke them through `afol`
-or `./a`. Otherwise, treat report, export, validation, and index generation as
+If the downstream CLI exposes telemetry commands, invoke them through `afol`.
+Otherwise, treat report, export, validation, and index generation as
 future CLI-owned work and inspect the raw event files directly.
 
 ```bash

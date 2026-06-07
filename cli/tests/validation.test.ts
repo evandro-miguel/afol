@@ -46,8 +46,8 @@ function getRuntimeLiveArtifactPaths(root: string): { snapshotPath: string; save
 }
 
 describe("validation command family", () => {
-  test("v emits deterministic selector JSON", () => {
-    const proc = runKernel(["v", "--json"]);
+  test("v select emits deterministic selector JSON", () => {
+    const proc = runKernel(["v", "select", "--json"]);
     expect(proc.status).toBe(0);
     expect((proc.stdout as string).trim().split("\n").length).toBe(1);
     const payload = parseJsonOutput(proc.stdout as string);
@@ -59,16 +59,16 @@ describe("validation command family", () => {
     expect(selected.includes("cli-kernel-local")).toBe(true);
   });
 
-  test("v wb selects workbench pack only", () => {
-    const proc = runKernel(["v", "wb", "--json"]);
+  test("v select wb selects workbench pack only", () => {
+    const proc = runKernel(["v", "select", "wb", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
     expect(payload.scope).toBe("wb");
     expect(payload.selected_pack_ids).toEqual(["workbench-parity"]);
   });
 
-  test("v selects runtime packs when runtime paths change", () => {
-    const proc = runKernel(["v", "--changed-path", ".agents/runtime/core.py", "--json"]);
+  test("v select selects runtime packs when runtime paths change", () => {
+    const proc = runKernel(["v", "select", "--changed-path", ".agents/runtime/core.py", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
     const selected = payload.selected_pack_ids as string[];
@@ -76,54 +76,55 @@ describe("validation command family", () => {
     expect(selected.includes("runtime-live-agent")).toBe(true);
   });
 
-  test("v changed-path selector routes current services/commands paths to benchmark packs", () => {
-    const cliProc = runKernel(["v", "--changed-path", "cli/main.ts", "--json"]);
+  test("v select changed-path routes current services/commands paths to benchmark packs", () => {
+    const cliProc = runKernel(["v", "select", "--changed-path", "cli/main.ts", "--json"]);
     expect(cliProc.status).toBe(0);
     const cliPayload = parseJsonOutput(cliProc.stdout as string);
     expect(cliPayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
 
-    const catalogRulesProc = runKernel(["v", "--changed-path", "cli/services/catalog/rules.ts", "--json"]);
+    const catalogRulesProc = runKernel(["v", "select", "--changed-path", "cli/services/catalog/rules.ts", "--json"]);
     expect(catalogRulesProc.status).toBe(0);
     const catalogRulesPayload = parseJsonOutput(catalogRulesProc.stdout as string);
     expect(catalogRulesPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
 
-    const catalogCommandProc = runKernel(["v", "--changed-path", "cli/commands/catalog.ts", "--json"]);
+    const catalogCommandProc = runKernel(["v", "select", "--changed-path", "cli/commands/catalog.ts", "--json"]);
     expect(catalogCommandProc.status).toBe(0);
     const catalogCommandPayload = parseJsonOutput(catalogCommandProc.stdout as string);
     expect(catalogCommandPayload.selected_pack_ids).toEqual(["routing-accuracy"]);
 
-    const mutationProc = runKernel(["v", "--changed-path", "cli/files/example.ts", "--json"]);
+    const mutationProc = runKernel(["v", "select", "--changed-path", "cli/files/example.ts", "--json"]);
     expect(mutationProc.status).toBe(0);
     const mutationPayload = parseJsonOutput(mutationProc.stdout as string);
     expect(mutationPayload.selected_pack_ids).toEqual(["mutation-safety"]);
 
-    const updateServiceProc = runKernel(["v", "--changed-path", "cli/services/update/check.ts", "--json"]);
+    const updateServiceProc = runKernel(["v", "select", "--changed-path", "cli/services/update/check.ts", "--json"]);
     expect(updateServiceProc.status).toBe(0);
     const updateServicePayload = parseJsonOutput(updateServiceProc.stdout as string);
     expect(updateServicePayload.selected_pack_ids).toEqual(["update-safety"]);
 
-    const updateCommandProc = runKernel(["v", "--changed-path", "cli/commands/update.ts", "--json"]);
+    const updateCommandProc = runKernel(["v", "select", "--changed-path", "cli/commands/update.ts", "--json"]);
     expect(updateCommandProc.status).toBe(0);
     const updateCommandPayload = parseJsonOutput(updateCommandProc.stdout as string);
     expect(updateCommandPayload.selected_pack_ids).toEqual(["update-safety"]);
 
-    const wbProc = runKernel(["v", "--changed-path", ".agents/wb/session/task.md", "--json"]);
+    const wbProc = runKernel(["v", "select", "--changed-path", ".agents/wb/session/task.md", "--json"]);
     expect(wbProc.status).toBe(0);
     const wbPayload = parseJsonOutput(wbProc.stdout as string);
     expect(wbPayload.selected_pack_ids).toEqual(["workbench-parity"]);
 
-    const afolWbProc = runKernel(["v", "--changed-path", ".afol/wb/session/task.md", "--json"]);
+    const afolWbProc = runKernel(["v", "select", "--changed-path", ".afol/wb/session/task.md", "--json"]);
     expect(afolWbProc.status).toBe(0);
     const afolWbPayload = parseJsonOutput(afolWbProc.stdout as string);
     expect(afolWbPayload.selected_pack_ids).toEqual(["workbench-parity"]);
 
-    const mcpProc = runKernel(["v", "--changed-path", "cli/mcp/adapter.ts", "--json"]);
+    const mcpProc = runKernel(["v", "select", "--changed-path", "cli/mcp/adapter.ts", "--json"]);
     expect(mcpProc.status).toBe(0);
     const mcpPayload = parseJsonOutput(mcpProc.stdout as string);
     expect(mcpPayload.selected_pack_ids).toEqual(["mcp-parity"]);
 
     const tokenProc = runKernel([
       "v",
+      "select",
       "--changed-path",
       "docs/standards/prompt-context-guidelines.md",
       "--json",
@@ -133,16 +134,34 @@ describe("validation command family", () => {
     expect(tokenPayload.selected_pack_ids).toEqual(["token-economy"]);
   });
 
-  test("v changed-path keeps generic cli fallback on cli-kernel-local", () => {
-    const proc = runKernel(["v", "--changed-path", "cli/commands/validate.ts", "--json"]);
+  test("v select changed-path keeps generic cli fallback on cli-kernel-local", () => {
+    const proc = runKernel(["v", "select", "--changed-path", "cli/commands/validate.ts", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
     expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
   });
 
-  test("v changed-path does not route docs/spec-tests by runtime or mcp substrings", () => {
+  test("validate changed-path executes selected AFOL-native validation commands", () => {
+    const proc = runKernel(["validate", "--changed-path", "cli/commands/validate.ts", "--json"]);
+    expect(proc.status).toBe(0);
+    const payload = parseJsonOutput(proc.stdout as string);
+    expect(payload.mode).toBe("run");
+    expect(payload.status).toBe("passed");
+    expect(payload.pass).toBe(true);
+    expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
+    const results = payload.command_results as Array<Record<string, unknown>>;
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.every((entry) => entry.pack_id === "cli-kernel-local")).toBe(true);
+    expect(results.every((entry) => entry.status === "passed")).toBe(true);
+    expect(results.every((entry) => Array.isArray(entry.command))).toBe(true);
+    expect(JSON.stringify(results)).not.toContain("just");
+    expect(payload.contract_issues).toEqual([]);
+  }, 10000);
+
+  test("v select changed-path does not route docs/spec-tests by runtime or mcp substrings", () => {
     const proc = runKernel([
       "v",
+      "select",
       "--changed-path",
       "docs/arc/SPECS/F-10/spec-tests/260521_0140_runtime-adapters-and-mcp-parity_spec-test_01.md",
       "--json",
@@ -335,7 +354,7 @@ describe("validation command family", () => {
     expect(
       notes.some((entry) => entry.startsWith("runtime-live-agent-artifact:.agents/data/benchmarks/results/")),
     ).toBe(true);
-    expect(notes).toContain("runtime-live-agent-refresh:./.agents/agents benchmark run --save");
+    expect(notes).toContain("runtime-live-agent-refresh:./afol benchmark run --save");
     expect(notes.some((entry) => entry.startsWith("runtime-live-artifact-incomplete:"))).toBe(true);
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
@@ -421,7 +440,7 @@ describe("validation command family", () => {
     expect(
       notes.some((entry) => entry.startsWith("runtime-live-agent-artifact:.agents/data/benchmarks/results/")),
     ).toBe(true);
-    expect(notes).toContain("runtime-live-agent-refresh:./.agents/agents benchmark run --save");
+    expect(notes).toContain("runtime-live-agent-refresh:./afol benchmark run --save");
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
     expect(results.every((result) => result.status === "passed")).toBe(true);
@@ -452,7 +471,7 @@ describe("validation command family", () => {
     expect(payload.pass).toBe(false);
     const notes = payload.notes as string[];
     expect(notes).toContain(
-      "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:./.agents/agents benchmark run --save",
+      "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:./afol benchmark run --save",
     );
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
@@ -460,7 +479,7 @@ describe("validation command family", () => {
     expect(
       results.every((entry) =>
         (entry.notes as string[]).includes(
-          "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:./.agents/agents benchmark run --save",
+          "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:./afol benchmark run --save",
         )),
     ).toBe(true);
     expect(payload.summary).toEqual({
@@ -500,7 +519,7 @@ describe("validation command family", () => {
       writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
     });
 
-    const selectProc = runKernel(["v", "--json"], fixtureRoot);
+    const selectProc = runKernel(["v", "select", "--json"], fixtureRoot);
     expect(selectProc.status).toBe(0);
     const selectPayload = parseJsonOutput(selectProc.stdout as string);
     const selectIssues = selectPayload.contract_issues as string[];
@@ -519,26 +538,26 @@ describe("validation command family", () => {
   });
 
   test("validate alias and tpl/update scopes keep working", () => {
-    const validateProc = runKernel(["validate", "--json"]);
+    const validateProc = runKernel(["validate", "select", "--json"]);
     expect(validateProc.status).toBe(0);
     const validatePayload = parseJsonOutput(validateProc.stdout as string);
     expect(validatePayload.mode).toBe("select");
 
-    const tplProc = runKernel(["v", "tpl", "--json"]);
+    const tplProc = runKernel(["v", "select", "tpl", "--json"]);
     expect(tplProc.status).toBe(0);
     const tplPayload = parseJsonOutput(tplProc.stdout as string);
     expect(tplPayload.scope).toBe("tpl");
     expect(tplPayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
 
-    const updateProc = runKernel(["v", "update", "--json"]);
+    const updateProc = runKernel(["v", "select", "update", "--json"]);
     expect(updateProc.status).toBe(0);
     const updatePayload = parseJsonOutput(updateProc.stdout as string);
     expect(updatePayload.scope).toBe("update");
     expect(updatePayload.selected_pack_ids).toEqual(["cli-kernel-local"]);
-  });
+  }, 10000);
 
   test("registry contract remains complete for the eight-pack matrix", () => {
-    const proc = runKernel(["v", "--json"]);
+    const proc = runKernel(["v", "select", "--json"]);
     expect(proc.status).toBe(0);
     const payload = parseJsonOutput(proc.stdout as string);
     const registry = payload.registry as Array<Record<string, unknown>>;

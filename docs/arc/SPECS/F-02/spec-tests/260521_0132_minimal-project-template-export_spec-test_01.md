@@ -28,7 +28,7 @@ protocol and rejects factory noise.
 ## 2) Covered Journey
 
 1. Export or bootstrap prepares a downstream project fixture.
-2. The fixture includes `./a`, `AGENTS.md`, config, lock, manifest, rules,
+2. The fixture includes `afol`, `AGENTS.md`, config, lock, manifest, rules,
    skills, workbench, data, tmp, and minimal `docs/arc` files.
 3. Forbidden root-only artifacts are absent.
 4. Managed and project-owned files are classified before updates.
@@ -41,8 +41,8 @@ protocol and rejects factory noise.
 | `TC-02` | forbidden root workbench path | export fails |
 | `TC-03` | forbidden cache/test/source seed | export fails |
 | `TC-04` | downstream project-owned edit | update plan preserves or flags |
-| `TC-05` | `./a -h` in fixture | wrapper smoke succeeds |
-| `TC-06` | `./a s` in fixture | status smoke succeeds or delegates |
+| `TC-05` | `afol -h` in fixture | wrapper smoke succeeds |
+| `TC-06` | `afol s` in fixture | status smoke succeeds or delegates |
 
 ## 4) Metrics
 

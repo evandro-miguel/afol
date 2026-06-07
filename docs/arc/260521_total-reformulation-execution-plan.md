@@ -36,7 +36,7 @@ The main conflicts are:
 - The current stack is Python 3.11, Bash, uv, Just, and Markdown, while the new
   target is Bun/TypeScript-first.
 - The public low-level dispatcher is `.agents/agents` plus Just aliases; the
-  canonical product command should be `afol`, with `./a` kept as a
+  canonical product command should be `afol`, with `afol` kept as a
   compatibility alias during migration.
 - `src/project-template` still carries runtime implementation, scripts, broad
   docs, skills source seed, and generated or operational baggage.
@@ -50,7 +50,7 @@ Do not perform a Big Bang rewrite.
 The correct path is staged parity:
 
 1. Add `afol` as the new command front door.
-2. Keep `./a` as a compatibility alias and make both entrypoints delegate to
+2. Keep `afol` as a compatibility alias and make both entrypoints delegate to
    existing `.agents/agents` behavior where TypeScript parity does not exist
    yet.
 3. Build the Bun/TypeScript CLI kernel behind that wrapper.
@@ -66,7 +66,7 @@ Critical path alignment:
 
 1. Harden template hygiene with forbidden-content and export clean-room checks before template shrink.
 2. Finalize CLI kernel ownership for registry/router/result/project-loader/schemas.
-3. Keep `afol` as canonical, with `./a` as compatibility/local wrapper.
+3. Keep `afol` as canonical, with `afol` as compatibility/local wrapper.
 4. Keep embedded template minimal; avoid factory/runtime payload in `src/project-template`.
 5. Complete workbench/evidence and manifest ownership wiring before update-only changes.
 6. Deliver local-state JSONL and index contracts for state/query.
@@ -129,12 +129,12 @@ Coverage and benchmark lock (applies to the program):
   incluindo outputs JSON de resultado em diretório de artefatos, e aderência à
   matriz do F-11 antes do `T-27`.
 
-### Slice 2: `afol` Canonical Front Door, `./a` Compatibility Alias
+### Slice 2: `afol` Canonical Front Door, `afol` Compatibility Alias
 
 Files likely involved:
 
 - `afol`
-- `./a`
+- `afol`
 - `src/project-template/a`
 - `.agents/agents`
 - wrapper dispatch tests
@@ -146,7 +146,7 @@ Behavior:
 - `afol status` maps to compact status.
 - `afol s` is the short status alias.
 - Unsupported commands delegate or produce actionable errors.
-- `./a` remains a compatibility alias during migration.
+- `afol` remains a compatibility alias during migration.
 
 Validation:
 

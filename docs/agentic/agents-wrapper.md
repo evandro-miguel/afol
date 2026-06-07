@@ -8,7 +8,7 @@ created_at: 2026-02-20 00:00:00-03:00
 updated_at: '2026-05-04T16:22:15-03:00'
 links:
   tools_json: ./tools-json.md
-  justfile: ./justfile.md
+  justfile: ./agents-wrapper.md
 ---
 
 # agents (Bash Wrapper) - CLI Entry Point
@@ -62,7 +62,7 @@ Bash wrapper that:
 | `AGENTS_ALLOW_SYSTEM_UV` | Opt in to using host `uv` as a fallback when the project-local binary is missing. |
 | `AGENTS_ALLOW_SYSTEM_PYTHON` | Opt in to host Python fallback when `.agents/scripts/.venv` is missing. |
 | `AGENTS_RUNTIME_ALLOW_UV_RUN` | Opt in to `uv run` fallback when runtime console scripts are missing. |
-| `PYTHONHASHSEED` | Defaults to `0` inside wrapper/Justfile execution so Python can start in sandboxes that block kernel randomness. |
+| `PYTHONHASHSEED` | Defaults to `0` inside wrapper/legacy just command runner execution so Python can start in sandboxes that block kernel randomness. |
 
 ### Files Executed
 
@@ -163,7 +163,7 @@ Commands:
 
 ## Related
 
-- [justfile.md](./justfile.md) - Justfile targets
+- [agents-wrapper.md](./agents-wrapper.md) - legacy just command-runner targets
 - [agents-runtime.md](./agents-runtime.md) - Central runtime package
 - [agents-mcp.md](./agents-mcp.md) - FastMCP adapter
 - [tools-json.md](./tools-json.md) - Tool catalog

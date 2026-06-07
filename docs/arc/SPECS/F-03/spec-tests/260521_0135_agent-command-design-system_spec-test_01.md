@@ -33,7 +33,7 @@ human-auditable.
 3. CLI returns compact output by default.
 4. CLI returns JSON with `-j`.
 5. Errors suggest a next command.
-6. `./a` remains available as a compatibility alias during migration.
+6. `afol` remains available as a compatibility alias during migration.
 
 ## 3) Required Test Cases
 

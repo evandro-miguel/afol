@@ -71,7 +71,6 @@ docs/
 ## Validation
 
 ```bash
-just doctor
 ./afol validate
 ```
 

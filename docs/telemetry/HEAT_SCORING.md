@@ -50,46 +50,46 @@ heat_score = (frequency_score × 0.5) + (recency_score × 0.3) + (success_score 
 
 ```bash
 # Current week (default)
-just telemetry-heat
+AFOL-native command pending; do not use legacy just command runners.
 
 # Different periods
-just telemetry-heat PERIOD=daily
-just telemetry-heat PERIOD=weekly
-just telemetry-heat PERIOD=monthly
-just telemetry-heat PERIOD=all
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 
 # Filter by type
-just telemetry-heat TYPE=tools
-just telemetry-heat TYPE=patterns
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 
 # Minimum score filter
-just telemetry-heat MIN_SCORE=50
+AFOL-native command pending; do not use legacy just command runners.
 
 # JSON output
-just telemetry-heat FORMAT=json PERIOD=weekly
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Show Hottest Elements
 
 ```bash
 # Top 10 hot elements this week (default)
-just telemetry-hot
+AFOL-native command pending; do not use legacy just command runners.
 
 # Top 5 hot elements today
-just telemetry-hot LIMIT=5 PERIOD=daily
+AFOL-native command pending; do not use legacy just command runners.
 
 # Hot patterns this month
-just telemetry-hot TYPE=patterns PERIOD=monthly LIMIT=5
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Show Coldest Elements
 
 ```bash
 # Top 10 cold elements this week (default)
-just telemetry-cold
+AFOL-native command pending; do not use legacy just command runners.
 
 # Top 5 cold patterns this month
-just telemetry-cold TYPE=patterns PERIOD=monthly LIMIT=5
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Direct Python Commands
@@ -148,13 +148,13 @@ Element                      Score    Level   Access     Last    Success
 
 ```bash
 # Compare this week vs last week
-just telemetry-heat PERIOD=weekly FORMAT=json > this_week.json
+AFOL-native command pending; do not use legacy just command runners.
 # ... wait a week ...
-just telemetry-heat PERIOD=weekly FORMAT=json > last_week.json
+AFOL-native command pending; do not use legacy just command runners.
 
 # Compare daily vs weekly
-just telemetry-heat PERIOD=daily
-just telemetry-heat PERIOD=weekly
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## Use Cases
@@ -165,13 +165,13 @@ just telemetry-heat PERIOD=weekly
 
 ```bash
 # What was hot during last sprint?
-just telemetry-heat PERIOD=weekly
+AFOL-native command pending; do not use legacy just command runners.
 
 # What's hot in current session (today)?
-just telemetry-heat PERIOD=daily
+AFOL-native command pending; do not use legacy just command runners.
 
 # Elements that were hot but now cold (abandoned between sprints)
-just telemetry-heat PERIOD=monthly FORMAT=json | jq '.all[] | select(.heat_level=="cold")'
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 **Insight:** Elements that are hot weekly but cold daily may indicate:
@@ -184,10 +184,10 @@ just telemetry-heat PERIOD=monthly FORMAT=json | jq '.all[] | select(.heat_level
 
 ```bash
 # Daily heat (active today)
-just telemetry-heat PERIOD=daily
+AFOL-native command pending; do not use legacy just command runners.
 
 # Weekly heat (active this week)
-just telemetry-heat PERIOD=weekly
+AFOL-native command pending; do not use legacy just command runners.
 
 # If daily << weekly, session gap detected
 ```
@@ -202,7 +202,7 @@ just telemetry-heat PERIOD=weekly
 
 ```bash
 # End of sprint: export weekly heat
-just telemetry-heat PERIOD=weekly FORMAT=json > sprint_heat.json
+AFOL-native command pending; do not use legacy just command runners.
 
 # Analyze: what tools/patterns were most used?
 jq '.tools | sort_by(.heat_score) | reverse' sprint_heat.json
@@ -216,7 +216,7 @@ jq '.patterns[] | select(.heat_level=="cold")' sprint_heat.json
 ```bash
 # Daily trend: is engagement increasing?
 for i in 1 2 3 4 5; do
-  just telemetry-heat PERIOD=daily FORMAT=json | \
+AFOL-native command pending; do not use legacy just command runners.
     jq '.summary.total_accesses'
   sleep 86400  # wait 1 day
 done
@@ -233,7 +233,7 @@ done
 
 ```bash
 # Find cold elements this month
-just telemetry-cold PERIOD=monthly TYPE=tools
+AFOL-native command pending; do not use legacy just command runners.
 
 # Investigate each:
 # - Check if tool still works
@@ -330,7 +330,7 @@ Embed heat map in dashboard:
 ## Element Heat Summary
 
 ```bash
-just telemetry-heat MIN_SCORE=50
+AFOL-native command pending; do not use legacy just command runners.
 ```
 ```
 

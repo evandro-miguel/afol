@@ -27,8 +27,9 @@ Read this first. This document is the orientation layer for agents entering the 
 
 ## Public Boundaries
 
-- `docs/standards/Justfile`
-- `src/project-template/docs/standards/Justfile`
+- `afol`
+- `cli/main.ts`
+- `src/project-template/`
 
 ## Boundary Families
 
@@ -36,17 +37,15 @@ Read this first. This document is the orientation layer for agents entering the 
 - No backend route boundaries were detected.
 
 - CLI boundary files: `2`
-- `docs/standards/Justfile`
-- `src/project-template/docs/standards/Justfile`
+- `afol`
+- `cli/main.ts`
 
 - MCP entrypoints: none detected
 - No MCP entrypoints were detected.
 
-- Config boundary files: `4`
-- `Justfile`
-- `docs/standards/Justfile`
-- `src/project-template/Justfile`
-- `src/project-template/docs/standards/Justfile`
+- Config boundary files: `2`
+- `AGENTS.md`
+- `src/project-template/AGENTS.md`
 
 - Frontend route files: none detected
 - No frontend route-like boundaries were detected.

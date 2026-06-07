@@ -82,10 +82,10 @@ python3 .agents/scripts/check-links.py --fix
 python3 .agents/scripts/check-links.py --output report.txt
 ```
 
-### Via Justfile (add target)
+### Via legacy just command runner (add target)
 
 ```just
-# Add to Justfile:
+# Add to legacy just command runner:
 check-links:
   python3 .agents/scripts/check-links.py
 

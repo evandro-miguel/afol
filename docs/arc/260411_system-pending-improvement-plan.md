@@ -98,7 +98,7 @@ cannot accept new workbench artifacts.
 
 6. Add a guardrail for direct verification ergonomics.
    Consider teaching `./.agents/agents verify-tasks <session-id>` to resolve
-   `.agents/wb/<session-id>` automatically, matching the Justfile wrapper behavior and
+   `.agents/wb/<session-id>` automatically, matching the legacy just command-runner wrapper behavior and
    avoiding false "session folder not found" failures.
 
 ## Acceptance Criteria

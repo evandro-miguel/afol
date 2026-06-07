@@ -37,17 +37,17 @@ core as the CLI.
 
 | MCP tool | CLI command | Expected result |
 | --- | --- | --- |
-| `status` | `./a s` | same semantic status fields |
-| `task_start` | `./a t s` | same task transition result |
-| `task_done` | `./a t d` | evidence-required closure |
-| `evidence_add` | `./a e a` | same evidence id/result |
-| `log_add` | `./a l a` | same log append result |
-| `rule_get` | `./a r g` | same routed rule ids |
-| `skill_get` | `./a sk g` | same routed skill ids |
-| `verify` | `./a v` | same validation result |
-| `update_check` | `./a up ck` | read-only update summary |
-| `file_patch` | `./a f pt` | same mutation journal record |
-| `undo` | `./a u` | same undo result |
+| `status` | `afol s` | same semantic status fields |
+| `task_start` | `afol t s` | same task transition result |
+| `task_done` | `afol t d` | evidence-required closure |
+| `evidence_add` | `afol e a` | same evidence id/result |
+| `log_add` | `afol l a` | same log append result |
+| `rule_get` | `afol r g` | same routed rule ids |
+| `skill_get` | `afol sk g` | same routed skill ids |
+| `verify` | `afol v` | same validation result |
+| `update_check` | `afol up ck` | read-only update summary |
+| `file_patch` | `afol f pt` | same mutation journal record |
+| `undo` | `afol u` | same undo result |
 
 ## 4) Parity Diff Contract
 

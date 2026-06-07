@@ -54,8 +54,7 @@ This directory contains detailed technical documentation for each operational to
 
 | Component | Type | Document |
 |-----------|------|----------|
-| `agents` (wrapper) | infrastructure | [agents-wrapper.md](./agents-wrapper.md) |
-| `Justfile` | infrastructure | [justfile.md](./justfile.md) |
+| `afol` (wrapper) | infrastructure | [agents-wrapper.md](./agents-wrapper.md) |
 | `tools.json` | configuration | [tools-json.md](./tools-json.md) |
 | `agents_config.py` | library | [agents-config.md](./agents-config.md) |
 

@@ -122,13 +122,13 @@ After updates, verify:
 
 ```bash
 # Check for real issues
-just lint-fix-check
+AFOL-native command pending; do not use legacy just command runners.
 
 # Run full lint
-just lint
+AFOL-native command pending; do not use legacy just command runners.
 
 # Verify no new errors
-just verify
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## Related

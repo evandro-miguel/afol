@@ -142,7 +142,7 @@ creation:
 Tool: doctor
 Description: Validates .agents structure and integrity
 Usage: .agents/agents doctor
-Just: just doctor
+AFOL: afol validate
 
 Commands:
   doctor [args]  - Run validation

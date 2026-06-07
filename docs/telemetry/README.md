@@ -26,10 +26,10 @@ Every time you use `.agents/agents <command>`, telemetry is captured automatical
 
 ```bash
 # Generate weekly report
-just telemetry-report PERIOD=weekly
+AFOL-native command pending; do not use legacy just command runners.
 
 # Export all data
-just telemetry-export FORMAT=json OUTPUT=telemetry_backup.json
+AFOL-native command pending; do not use legacy just command runners.
 
 # Query events
 python3 .agents/scripts/agents-telemetry.py query --limit=20
@@ -72,36 +72,36 @@ python3 .agents/scripts/agents-telemetry.py query --format=json --limit=50
 
 ```bash
 # Weekly report (default)
-just telemetry-report
+AFOL-native command pending; do not use legacy just command runners.
 
 # Monthly report
-just telemetry-report PERIOD=monthly
+AFOL-native command pending; do not use legacy just command runners.
 
 # JSON format
-just telemetry-report FORMAT=json
+AFOL-native command pending; do not use legacy just command runners.
 
 # All time
-just telemetry-report PERIOD=all
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Export Data
 
 ```bash
 # JSON export
-just telemetry-export FORMAT=json
+AFOL-native command pending; do not use legacy just command runners.
 
 # CSV export
-just telemetry-export FORMAT=csv
+AFOL-native command pending; do not use legacy just command runners.
 
 # Custom output path
-just telemetry-export OUTPUT=/path/to/backup.json
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Validate
 
 ```bash
 # Validate all events against schema
-just telemetry-validate
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## Data Storage
@@ -177,7 +177,7 @@ python3 .agents/scripts/agents-telemetry.py query --event-type=tool_exec --forma
 ### Success Rate
 
 ```bash
-just telemetry-report PERIOD=weekly FORMAT=json | \
+AFOL-native command pending; do not use legacy just command runners.
   jq '.summary.success_rate'
 ```
 

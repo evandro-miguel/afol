@@ -85,5 +85,4 @@ updated_at: 2026-02-23T14:30:00-03:00
 ```bash
 ./afol validate
 ./afol status
-just lint
 ```

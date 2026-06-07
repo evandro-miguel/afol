@@ -24,11 +24,11 @@ updated_at: "2026-05-28T09:48:25Z"
 
 - CLI entrypoints: `2`
 - Runtime instruction entrypoints: `2`
-- Command script boundaries: `23`
+- Factory compatibility boundaries: `1`
 ## Public Boundary Files
 
-- `.agents/agents`
-- `Justfile`
+- `afol`
+- `cli/main.ts`
 - `AGENTS.md`
 - `CLAUDE.md`
 ## Supporting Integration And Contract Surfaces

@@ -18,8 +18,8 @@ Define how to install the `.agents` scaffold into another repository, including:
 - the skills baseline that should be prepared for future universal-skills contract evolution
 - the preferred project-local skill model, where each repo carries its own `.agents/skills` subset instead of depending on many global Codex skills
 - the export source boundary, where the reusable baseline lives under `src/project-template/` in this repo instead of the live development root
-- the canonical operator front door `afol`, with `./a` kept as a
-  compatibility alias during migration
+- the canonical operator front door `afol`; downstream installs must not depend
+  on legacy aliases or legacy just command runners
 
 ## Public onboarding requirements
 
@@ -33,11 +33,9 @@ Define how to install the `.agents` scaffold into another repository, including:
 - Validation minimum:
   - `afol` confirms the front-door wrapper is present.
   - `afol s` (or `afol status`) confirms onboarding command visibility.
-  - `afol ck` (or `afol check`) confirms wrapper/runtime toolchain version surface.
   - `afol b /path/to/existing-project --partial` confirms the partial install path.
-  - `just --list`
-  - `./a status`
-  - `./a validate`
+  - `afol status`
+  - `afol validate`
 
 ## Modes
 
@@ -138,7 +136,7 @@ silently replace additional project content.
 - Bootstrap does not generate current-state repository maps; it only provisions the place and rules for them.
 - Bootstrap does not copy source-repo workbench sessions, active-session pointers, or source-repo current-state map artifacts into the target repo.
 - Existing project governance should be reviewed after install before non-trivial work begins.
-- If the target repo already has its own `AGENTS.md`, `Justfile`, or runtime adapter files, review the merge outcome before accepting the install.
+- If the target repo already has its own `AGENTS.md` or runtime adapter files, review the merge outcome before accepting the install.
 - Optional upstream skills sync may emit warnings; those warnings are non-blocking.
 - Bootstrap does not copy scaffold-local skill history; it only prepares the baseline needed for the target repo to own its selection and upgrade path.
 - Bootstrap should reinforce project-local skills, not turn global Codex skills into a second project contract.
@@ -153,16 +151,15 @@ silently replace additional project content.
 After install, validate the target repo with:
 
 ```bash
-just --list
-./a status
-./a validate
+afol status
+afol validate
 ```
 
 For isolated environments, point `AGENTIC_CLI_PATH` at the source checkout's
 native CLI and confirm the exported front door works:
 
 ```bash
-AGENTIC_CLI_PATH=/path/to/source/cli/main.ts ./a validate
+AGENTIC_CLI_PATH=/path/to/source/cli/main.ts afol validate
 ```
 
 ---

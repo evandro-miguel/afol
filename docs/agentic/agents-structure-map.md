@@ -91,8 +91,8 @@ DEFAULT_SECTIONS = {
 # Generate structure docs
 ./.agents/agents structure-map . --output docs/map/structure/
 
-# Via Justfile
-just structure
+# Via legacy just command runner
+AFOL-native command pending; do not use legacy just command runners.
 
 # Verify output
 cat docs/map/structure/README.md

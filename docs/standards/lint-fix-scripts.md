@@ -23,13 +23,13 @@ The lint fix scripts automatically resolve the most common markdown validation w
 
 ```bash
 # Check for issues (no modifications)
-just lint-fix-check
+AFOL-native command pending; do not use legacy just command runners.
 
 # Preview fixes (dry run)
-just lint-fix-dry
+AFOL-native command pending; do not use legacy just command runners.
 
 # Apply all fixes
-just lint-fix
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## Available Commands
@@ -156,13 +156,13 @@ Content here...
 1. **Before fixing:**
 
    ```bash
-   just lint-fix-check
+AFOL-native command pending; do not use legacy just command runners.
    ```
 
 2. **Preview changes:**
 
    ```bash
-   just lint-fix-dry
+AFOL-native command pending; do not use legacy just command runners.
    ```
 
 3. **Review the files that will change**
@@ -170,13 +170,13 @@ Content here...
 4. **Apply fixes:**
 
    ```bash
-   just lint-fix
+AFOL-native command pending; do not use legacy just command runners.
    ```
 
 5. **Verify:**
 
    ```bash
-   just lint
+AFOL-native command pending; do not use legacy just command runners.
    ```
 
 ### CI/CD Integration
@@ -185,7 +185,7 @@ Use `--check` mode in CI to fail if lint issues exist:
 
 ```yaml
 - name: Check lint issues
-  run: just lint-fix-check
+  run: afol validate
   continue-on-error: false
 ```
 
@@ -237,7 +237,7 @@ git diff
 
 - [`lint.md`](./lint.md) - Lint validation standards
 - [`checkbox-protocol.md`](./checkbox-protocol.md) - Checkbox state markers
-- [Justfile](./Justfile) - Canonical command reference
+- [AFOL command reference](./scripts-reference.md) - Canonical command reference
 
 ---
 

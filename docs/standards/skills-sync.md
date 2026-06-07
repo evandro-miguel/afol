@@ -85,13 +85,13 @@ skills_sync:
 1. Initialize sync state:
 
 ```bash
-just skills-init
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 2. Refresh the external git-backed universal-skills source when configured:
 
 ```bash
-just skills-pull
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 `skills-pull` is the explicit network refresh command.
@@ -106,8 +106,8 @@ If only the repo-local bootstrap seed exists, `just skills-pull` is a no-op. It 
 3. Discover what is available:
 
 ```bash
-just skills-list RUNTIME=codex
-just skills-search QUERY=markdown RUNTIME=codex
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 When an external universal-skills checkout is configured, discovery commands prefer that full catalog. The repo-local source seed remains the default offline install/apply baseline.
@@ -115,26 +115,26 @@ When an external universal-skills checkout is configured, discovery commands pre
 4. Plan selected subset impact:
 
 ```bash
-just skills-plan SKILLS=agentic-folder-sys
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 5. Apply selected skills to project:
 
 ```bash
-just skills-apply SKILLS=agentic-folder-sys
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 6. Ensure one skill on demand:
 
 ```bash
-just skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 7. Run the one-step update flow into `.agents/skills/`:
 
 ```bash
-just skills-sync SKILLS=agentic-folder-sys
-just skills-update SKILLS=agentic-folder-sys
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 ```
 Without `--pull`, these commands use the current local source only.
 Use `--pull` when you want to refresh the external source before syncing.
@@ -152,7 +152,7 @@ Observed fields are:
 9. Propose one locally edited skill back to universal-skills only through a branch:
 
 ```bash
-just skills-push SKILL=agentic-folder-sys BRANCH=skills-sync/agentic-folder-sys COMMIT=1 PUSH=1 PR=1
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 This command must never push to `main` directly. It requires an external universal-skills checkout and pushes only a proposal branch; use `PR=1` when the change should be opened as a GitHub pull request.
@@ -160,7 +160,7 @@ This command must never push to `main` directly. It requires an external univers
 10. Verify sync and structure:
 
 ```bash
-just skills-check SKILLS=agentic-folder-sys
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## Default Template Skills

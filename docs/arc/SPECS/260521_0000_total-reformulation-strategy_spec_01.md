@@ -37,7 +37,7 @@ project state.
 ## 3) Expected Behavior
 
 The project will be redesigned as universal CLI plus minimal local template. CLI
-owns logic. Local project owns state. ./a is the default command entrypoint for
+owns logic. Local project owns state. afol is the default command entrypoint for
 agents.
 
 ## 4) Product Boundary
@@ -66,7 +66,7 @@ established as the future core.
 
 Accepted: the strategy package exists in `docs/arc/PROJECT-MANIFESTO.md`,
 `docs/arc/GENERAL-ROADMAP.md`, and the F-01 through F-17 feature specs. The
-implementation phase proceeded as staged compatibility-first slices with `./a`
+implementation phase proceeded as staged compatibility-first slices with `afol`
 as the Bun/TypeScript front door and the Python/Bash runtime retained as the
 compatibility contract where native parity is not yet justified.
 

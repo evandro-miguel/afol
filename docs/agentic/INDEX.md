@@ -51,9 +51,8 @@ Central index for all `.agents` system documentation.
 
 | Component | Document | Description |
 |-----------|----------|-------------|
-| CLI Wrapper | [agents-wrapper.md](./agents-wrapper.md) | Bash wrapper |
-| Central Runtime | [agents-runtime.md](./agents-runtime.md) | Python runtime package and FastMCP adapter |
-| Justfile | [justfile.md](./justfile.md) | Just targets |
+| AFOL Wrapper | [agents-wrapper.md](./agents-wrapper.md) | Native `afol` wrapper |
+| Central Runtime | [agents-runtime.md](./agents-runtime.md) | Runtime package and FastMCP adapter |
 | Config | [agents-config.md](./agents-config.md) | Config loader |
 | Library | [lib-modules.md](./lib-modules.md) | Internal modules |
 | Catalog | [tools-json.md](./tools-json.md) | Tool catalog |

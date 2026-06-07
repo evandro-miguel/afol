@@ -105,12 +105,12 @@ def cmd_new_command(args):
 # Update files changed
 ./.agents/agents wb-update files-changed
 
-# Via Justfile
-just wb-touch
-just wb-evidence SESSION_ID=<session-id> TASK_ID=T-01 CMD="just lint" RESULT=passed ARTIFACT=.agents/wb/<session-id>/<session-id>_report_01.md
-just wb-task SESSION_ID=<session-id> TASK_ID=T-01 ACTION=done EVIDENCE_ID=E-...
-just wb-status STATUS=active
-just wb-timeline MSG="Implemented login"
+# Via legacy just command runner
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## Related

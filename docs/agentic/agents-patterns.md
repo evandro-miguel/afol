@@ -90,14 +90,14 @@ patterns:
 ./.agents/agents patterns rate PAT-001 --effectiveness=high
 ```
 
-### Via Justfile
+### Via legacy just command runner
 
 ```bash
-just patterns-suggest THEME=auth-refactor
-just patterns-list TYPE=success
-just patterns-show PATTERN_ID=PAT-001
-just patterns-apply PATTERN_ID=PAT-001
-just patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## How to Modify

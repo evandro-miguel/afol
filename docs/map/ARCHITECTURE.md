@@ -13,8 +13,10 @@ updated_at: "2026-05-28T09:48:25Z"
 
 - Python utilities or service-side scripts are present only as migration-only factory compatibility
   surfaces, not as the public runtime entrypoint.
-- Dominant feature clusters: `.agents/scripts, docs, .agents/skills`.
-- Public boundaries currently concentrate in `afol`/`./a`, `Justfile`, and runtime instruction entrypoints.
+- Dominant feature clusters: `cli`, `src/project-template`, `.agents/scripts`,
+  `docs`, and `.agents/skills`.
+- Public boundaries currently concentrate in `afol`, `cli/main.ts`, and runtime
+  instruction entrypoints.
 ## Runtime Topology
 
 - Cross-domain flows must be inferred from the available route, symbol, and dependency artifacts.

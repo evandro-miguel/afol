@@ -10,8 +10,7 @@ status: draft
 
 ## Project Overview
 
-`{project_name}` uses the local `afol` front door, with `./a` kept as a
-compatibility alias, for LLM-assisted delivery.
+`{project_name}` uses the local `afol` front door for LLM-assisted delivery.
 Replace this section after bootstrap with real product context.
 
 ## Governed Execution
@@ -66,12 +65,12 @@ Replace this section after bootstrap with real product context.
 - Indexed/structured: MCPs.
 - Exact search: `rg`, `fd`, `jq`.
 - Syntax: `sg`/`ast-grep`.
-- Validation/docs/tasks: `just`, `afol`, `./a`.
+- Validation/docs/tasks: `afol` and project-local package commands.
 
 ## Telemetry And Indexes
 
 Telemetry is a state surface in the template export. If the downstream repo
-ships a native telemetry command, call it through `afol` or `./a`.
+ships a native telemetry command, call it through `afol`.
 Otherwise, treat telemetry reports, exports, and indexes as CLI-owned future
 work and keep this template focused on the stored data and docs contract.
 
@@ -83,7 +82,7 @@ work and keep this template focused on the stored data and docs contract.
 
 ## Verification
 
-- Required template gate: `just validate` or `afol ck`.
+- Required template gate: `afol ck`.
 - Choose focused checks first.
 
 ## Docs And Boundaries

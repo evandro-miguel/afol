@@ -8,7 +8,7 @@ const BASELINES_RELATIVE_PATH = ".agents/data/benchmarks/baselines";
 const RESULTS_RELATIVE_PATH = ".agents/data/benchmarks/results";
 const LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH = ".agents/benchmarks/runtime-flow-live-agent-v4-latest.json";
 const LIVE_BENCHMARK_EXPECTED_PACK_ID = "runtime-flow-live-agent-v4";
-const LIVE_BENCHMARK_REFRESH_COMMAND = "./.agents/agents benchmark run --save";
+const LIVE_BENCHMARK_REFRESH_COMMAND = "./afol benchmark run --save";
 
 export const VALIDATION_SCHEMA_VERSION = "1.0.0";
 export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
@@ -27,6 +27,70 @@ export const REQUIRED_PACKS = [
 export type PackId = (typeof REQUIRED_PACKS)[number];
 
 export type ValidationScope = "default" | "wb" | "tpl" | "update";
+
+const OUTPUT_TAIL_LIMIT = 4000;
+
+interface ValidationCommandSpec {
+  command: string[];
+}
+
+const VALIDATION_COMMANDS_BY_PACK: Record<PackId, ValidationCommandSpec[]> = {
+  "cli-kernel-local": [
+    { command: ["bun", "run", "typecheck"] },
+    { command: ["bun", "test", "cli/tests/kernel.test.ts", "cli/tests/validate-command.test.ts"] },
+  ],
+  "routing-accuracy": [
+    {
+      command: [
+        "bun",
+        "test",
+        "cli/tests/kernel.test.ts",
+        "cli/tests/rule-command.test.ts",
+        "cli/tests/skill-command.test.ts",
+      ],
+    },
+  ],
+  "mutation-safety": [
+    { command: ["bun", "test", "cli/tests/mutation-safety.test.ts"] },
+  ],
+  "update-safety": [
+    { command: ["bun", "test", "cli/tests/update-command.test.ts"] },
+  ],
+  "workbench-parity": [
+    {
+      command: [
+        "bun",
+        "test",
+        "cli/tests/workbench-lifecycle.test.ts",
+        "cli/tests/workbench-verify.test.ts",
+        "cli/tests/log-command.test.ts",
+        "cli/tests/verify-command.test.ts",
+      ],
+    },
+  ],
+  "mcp-parity": [
+    { command: ["bun", "run", "cli/main.ts", "v", "bench", "--pack", "mcp-parity", "--json"] },
+  ],
+  "runtime-live-agent": [
+    { command: ["bun", "run", "cli/main.ts", "v", "bench", "--pack", "runtime-live-agent", "--json"] },
+  ],
+  "token-economy": [
+    { command: ["bun", "run", "cli/main.ts", "v", "bench", "--pack", "token-economy", "--json"] },
+  ],
+};
+
+interface ValidationCommandResult {
+  pack_id: PackId;
+  command: string[];
+  status: "passed" | "failed";
+  exit_code: number | null;
+  signal: string | null;
+  duration_ms: number;
+  stdout_tail: string;
+  stderr_tail: string;
+  reported_status?: string;
+  reported_pass?: boolean;
+}
 
 export interface Scenario {
   schema_version: string;
@@ -850,6 +914,78 @@ function outputJson(payload: Record<string, unknown>): number {
   return 0;
 }
 
+function outputJsonWithStatus(payload: Record<string, unknown>, status: number): number {
+  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  return status;
+}
+
+function outputTail(value: string): string {
+  if (value.length <= OUTPUT_TAIL_LIMIT) {
+    return value;
+  }
+  return value.slice(value.length - OUTPUT_TAIL_LIMIT);
+}
+
+function registrySummary(snapshot: RegistrySnapshot): Array<Record<string, unknown>> {
+  return snapshot.packs.map((entry) => ({
+    pack_id: entry.pack_id,
+    min_scenarios: entry.min_scenarios,
+    scenario_count: (snapshot.scenariosByPack[entry.pack_id] ?? []).length,
+    baseline_present: Boolean(snapshot.baselinesByPack[entry.pack_id]),
+  }));
+}
+
+function runPackCommand(
+  projectRoot: string,
+  packId: PackId,
+  spec: ValidationCommandSpec,
+): ValidationCommandResult {
+  const startedAt = performance.now();
+  const [command, ...args] = spec.command;
+  if (!command) {
+    throw new Error(`Empty validation command for pack: ${packId}`);
+  }
+  const result = spawnSync(command, args, {
+    cwd: projectRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const durationMs = Math.round(performance.now() - startedAt);
+  const exitCode = result.status;
+  let reportedStatus: string | undefined;
+  let reportedPass: boolean | undefined;
+  try {
+    const payload = JSON.parse(result.stdout ?? "") as Record<string, unknown>;
+    if (typeof payload.status === "string") {
+      reportedStatus = payload.status;
+    }
+    if (typeof payload.pass === "boolean") {
+      reportedPass = payload.pass;
+    }
+  } catch {
+    // Non-JSON command output is valid for package scripts and tests.
+  }
+  const reportedFailure = reportedPass === false || reportedStatus === "failed";
+  const passed = exitCode === 0 && !result.signal && !result.error && !reportedFailure;
+  const commandResult: ValidationCommandResult = {
+    pack_id: packId,
+    command: spec.command,
+    status: passed ? "passed" : "failed",
+    exit_code: exitCode,
+    signal: result.signal,
+    duration_ms: durationMs,
+    stdout_tail: outputTail(result.stdout ?? ""),
+    stderr_tail: outputTail(result.error ? result.error.message : result.stderr ?? ""),
+  };
+  if (reportedStatus !== undefined) {
+    commandResult.reported_status = reportedStatus;
+  }
+  if (reportedPass !== undefined) {
+    commandResult.reported_pass = reportedPass;
+  }
+  return commandResult;
+}
+
 function timestampSlug(now: Date = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, "0");
   return [
@@ -888,14 +1024,14 @@ function saveBenchmarkPayload(
 }
 
 function parseArgs(args: string[]): {
-  mode: "select" | "bench";
+  mode: "run" | "select" | "bench";
   scope: ValidationScope;
   changedPaths: string[];
   explicitPacks: PackId[];
   save: boolean;
   outputPath?: string;
 } {
-  let mode: "select" | "bench" = "select";
+  let mode: "run" | "select" | "bench" = "run";
   let scope: ValidationScope = "default";
   const changedPaths: string[] = [];
   const explicitPacks: PackId[] = [];
@@ -903,10 +1039,12 @@ function parseArgs(args: string[]): {
   let outputPath: string | undefined;
 
   let index = 0;
-  if (args[index] === "bench") {
-    mode = "bench";
+  const modeArg = args[index];
+  if (modeArg === "bench" || modeArg === "select" || modeArg === "run") {
+    mode = modeArg;
     index += 1;
-  } else {
+  }
+  if (mode !== "bench") {
     const scopeArg = args[index];
     if (scopeArg === "wb" || scopeArg === "tpl" || scopeArg === "update") {
       scope = scopeArg;
@@ -971,14 +1109,48 @@ function handleSelect(snapshot: RegistrySnapshot, scope: ValidationScope, change
     scope,
     selected_pack_ids: selection.selected_pack_ids,
     reasons: selection.reasons,
-    registry: snapshot.packs.map((entry) => ({
-      pack_id: entry.pack_id,
-      min_scenarios: entry.min_scenarios,
-      scenario_count: (snapshot.scenariosByPack[entry.pack_id] ?? []).length,
-      baseline_present: Boolean(snapshot.baselinesByPack[entry.pack_id]),
-    })),
+    registry: registrySummary(snapshot),
     contract_issues: validateRegistryContract(snapshot),
   });
+}
+
+function handleRun(
+  projectRoot: string,
+  snapshot: RegistrySnapshot,
+  scope: ValidationScope,
+  changedPaths: string[],
+  explicitPacks: PackId[],
+): number {
+  const selection = selectPacks({ scope, changedPaths });
+  const selectedPacks = explicitPacks.length > 0 ? explicitPacks : selection.selected_pack_ids;
+  const commandResults: ValidationCommandResult[] = [];
+  for (const packId of selectedPacks) {
+    for (const spec of VALIDATION_COMMANDS_BY_PACK[packId] ?? []) {
+      commandResults.push(runPackCommand(projectRoot, packId, spec));
+    }
+  }
+  const passed = commandResults.filter((entry) => entry.status === "passed").length;
+  const failed = commandResults.filter((entry) => entry.status === "failed").length;
+  const contractIssues = validateRegistryContract(snapshot);
+  const pass = failed === 0 && contractIssues.length === 0;
+  return outputJsonWithStatus({
+    schema_version: VALIDATION_SCHEMA_VERSION,
+    command_family: "validation",
+    mode: "run",
+    scope,
+    status: pass ? "passed" : "failed",
+    pass,
+    selected_pack_ids: selectedPacks,
+    selection_reasons: selection.reasons,
+    summary: {
+      total: commandResults.length,
+      passed,
+      failed,
+    },
+    command_results: commandResults,
+    registry: registrySummary(snapshot),
+    contract_issues: contractIssues,
+  }, pass ? 0 : 2);
 }
 
 function handleBenchmark(
@@ -1081,5 +1253,8 @@ export function runValidationCommand(projectRoot: string, args: string[]): numbe
       parsed.outputPath,
     );
   }
-  return handleSelect(snapshot, parsed.scope, parsed.changedPaths);
+  if (parsed.mode === "select") {
+    return handleSelect(snapshot, parsed.scope, parsed.changedPaths);
+  }
+  return handleRun(projectRoot, snapshot, parsed.scope, parsed.changedPaths, parsed.explicitPacks);
 }

@@ -94,15 +94,15 @@ python3 .agents/scripts/agents-telemetry.py export --format=json
 python3 .agents/scripts/agents-telemetry.py validate
 ```
 
-### Via Justfile
+### Via legacy just command runner
 
 ```bash
-just telemetry-heat
-just telemetry-hot LIMIT=5
-just telemetry-cold PERIOD=monthly
-just telemetry-report PERIOD=weekly
-just telemetry-export FORMAT=json
-just telemetry-validate
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## How to Modify

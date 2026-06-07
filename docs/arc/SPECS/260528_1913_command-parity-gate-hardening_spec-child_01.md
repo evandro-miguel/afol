@@ -51,8 +51,8 @@ risk_level: low
 ## Boundaries
 
 - In scope:
-  - `Justfile` root strict alias parity.
-  - `docs/standards/Justfile` strict/diff gate recipes.
+  - `legacy just command runner` root strict alias parity.
+  - `docs/standards/legacy just command runner` strict/diff gate recipes.
   - `docs/standards/scripts-reference.md` and `docs/standards/agents-usage.md` mirror updates.
 - Out of scope:
   - Runtime/package code changes.

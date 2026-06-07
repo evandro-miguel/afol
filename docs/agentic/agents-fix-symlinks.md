@@ -74,10 +74,10 @@ fix_symlinks:
 ./.agents/agents fix-symlinks --verbose
 ```
 
-### Via Justfile
+### Via legacy just command runner
 
 ```bash
-just fix-symlinks DRY=1
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## How to Modify

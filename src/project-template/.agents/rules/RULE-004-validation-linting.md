@@ -15,15 +15,16 @@ updated_at: '2026-05-14T20:05:00-03:00'
 ## Pre-Commit Validation (MANDATORY)
 
 ```bash
-just doctor
-just lint
-just verify
+./afol validate
+./afol status
+<project-local lint/test command>
 ```
 
 Full pass:
 
 ```bash
-just all
+./afol validate
+<project-local full validation command>
 ```
 
 ## Validation Commands
@@ -32,9 +33,6 @@ just all
 ./afol validate
 ./afol status
 ./afol verify-tasks <configured-wb-dir>/<session>/
-just doctor
-just lint
-just verify
 ```
 
 ## Exit Codes
@@ -44,10 +42,8 @@ just verify
 
 ## Validation Checklist
 
-- [ ] `just doctor` passes
-- [ ] `just lint` passes
-- [ ] `just verify` passes
 - [ ] `./afol validate` passes
+- [ ] Project-local lint/test gates pass
 - [ ] Frontmatter valid
 - [ ] Task markers valid
 - [ ] Timestamps include timezone

@@ -30,7 +30,7 @@ Every time you run `.agents/agents <command>`, the system captures:
 .agents/agents structure
 
 # Generate report (view collected data)
-just telemetry-report
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Query Events
@@ -56,29 +56,29 @@ python3 .agents/scripts/agents-telemetry.py query --format=json --limit=100
 
 ```bash
 # Weekly report
-just telemetry-report
+AFOL-native command pending; do not use legacy just command runners.
 
 # Monthly report
-just telemetry-report PERIOD=monthly
+AFOL-native command pending; do not use legacy just command runners.
 
 # JSON format
-just telemetry-report FORMAT=json
+AFOL-native command pending; do not use legacy just command runners.
 
 # All time
-just telemetry-report PERIOD=all
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Export & Validate
 
 ```bash
 # Export to JSON
-just telemetry-export FORMAT=json OUTPUT=backup.json
+AFOL-native command pending; do not use legacy just command runners.
 
 # Export to CSV
-just telemetry-export FORMAT=csv
+AFOL-native command pending; do not use legacy just command runners.
 
 # Validate schema
-just telemetry-validate
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ---
@@ -89,29 +89,29 @@ just telemetry-validate
 
 ```bash
 # Suggest by theme
-just patterns-suggest THEME=auth-refactor
+AFOL-native command pending; do not use legacy just command runners.
 
 # Suggest by tags
-just patterns-suggest TAGS=process,tools
+AFOL-native command pending; do not use legacy just command runners.
 
 # List all
-just patterns-list
+AFOL-native command pending; do not use legacy just command runners.
 
 # Filter by type
-just patterns-list TYPE=success
+AFOL-native command pending; do not use legacy just command runners.
 
 # Show details
-just patterns-show PATTERN_ID=PAT-001
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Apply & Rate
 
 ```bash
 # Apply pattern (records in telemetry)
-just patterns-apply PATTERN_ID=PAT-001
+AFOL-native command pending; do not use legacy just command runners.
 
 # Rate effectiveness
-just patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ---
@@ -147,46 +147,46 @@ just patterns-rate PATTERN_ID=PAT-001 EFFECTIVENESS=high
 
 ```bash
 # 1. Get pattern suggestions
-just patterns-suggest THEME=my-feature
+AFOL-native command pending; do not use legacy just command runners.
 
 # 2. Apply relevant pattern
-just patterns-apply PATTERN_ID=PAT-001
+AFOL-native command pending; do not use legacy just command runners.
 
 # 3. Record session start
-just telemetry-record EVENT_TYPE=session_start METADATA='{"theme":"my-feature"}'
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### During Work
 
 ```bash
 # Record tool usage
-just telemetry-record EVENT_TYPE=tool_exec METADATA='{"tool_name":"agents-new","outcome":"success"}'
+AFOL-native command pending; do not use legacy just command runners.
 
 # Record blocker
-just telemetry-record EVENT_TYPE=blocker METADATA='{"blocker_reason":"need clarification"}'
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Complete Session
 
 ```bash
 # Record session end
-just telemetry-record EVENT_TYPE=session_end OUTCOME=success METADATA='{"duration_seconds":3600}'
+AFOL-native command pending; do not use legacy just command runners.
 
 # Generate report
-just telemetry-report
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ### Weekly Review
 
 ```bash
 # Generate weekly report
-just telemetry-report PERIOD=weekly
+AFOL-native command pending; do not use legacy just command runners.
 
 # Review patterns applied
 python3 .agents/scripts/agents-telemetry.py query --event-type=pattern_applied --since=2026-02-17
 
 # Export for analysis
-just telemetry-export FORMAT=json OUTPUT=weekly_backup.json
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ---
@@ -253,7 +253,7 @@ record_event("tool_exec", session_id, {
 | No events recorded | Check `events.jsonl` exists and is writable |
 | Invalid JSON | Run `just telemetry-validate` |
 | Pattern not found | Check ID format: `PAT-001` |
-| Just recipe fails | Verify syntax: `just telemetry-report PERIOD=weekly` |
+| Just recipe fails | Verify syntax: `afol telemetry command pending PERIOD=weekly` |
 
 ---
 

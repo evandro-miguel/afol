@@ -28,7 +28,7 @@ updated_at: '2026-03-06T22:29:30-03:00'
 - Bun test runner (`bun test`) for CLI and focused template-policy checks
 - CLI command surface in progress:
   - `afol` (public/publicized entrypoint)
-  - `./a` (factory migration wrapper)
+  - `afol` (factory migration wrapper)
 - Template-policy-based runtime hygiene:
   - `template:check` and `template:check`-adjacent tests in `package.json`
   - forbidden/allowed path patterns and forbidden-text scan in

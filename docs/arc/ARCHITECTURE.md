@@ -66,7 +66,7 @@ Modules:
 
 Data flow:
 
-1. Operator or agent calls `afol` or compatibility `./a`.
+1. Operator or agent calls `afol` or compatibility `afol`.
 2. CLI loads project config, lock, manifest, and targeted local state.
 3. Registry resolves the command to an action contract.
 4. Guards validate root, path, env, secrets, mode, and side-effect class.
@@ -115,7 +115,7 @@ Forbidden dependencies:
 
 - CLI:
   - `afol`: stable project-local front door.
-  - `./a`: compatibility alias during migration.
+  - `afol`: compatibility alias during migration.
   - Compact text output by default.
   - JSON output through explicit JSON mode.
 

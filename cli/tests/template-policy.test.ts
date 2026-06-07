@@ -46,6 +46,8 @@ describe("template forbidden-content policy", () => {
       mkdirSync(join(fixtureRoot, "tests"), { recursive: true });
 
       writeFileSync(join(fixtureRoot, ".agents", "runtime", "main.py"), "print('x')\n", "utf8");
+      writeFileSync(join(fixtureRoot, "a"), "#!/usr/bin/env bash\n", "utf8");
+      writeFileSync(join(fixtureRoot, "Justfile"), "validate:\n", "utf8");
       writeFileSync(join(fixtureRoot, "docs", "standards", "policy.md"), "x\n", "utf8");
       writeFileSync(join(fixtureRoot, "tests", "sample.txt"), "x\n", "utf8");
       writeFileSync(join(fixtureRoot, "docs", "templates", "ok.md"), "x\n", "utf8");
@@ -53,6 +55,8 @@ describe("template forbidden-content policy", () => {
       const matches = await scanTemplateForbiddenPaths(fixtureRoot);
 
       expect(matches).toContain(".agents/runtime/main.py");
+      expect(matches).toContain("a");
+      expect(matches).toContain("Justfile");
       expect(matches).toContain("docs/standards/policy.md");
       expect(matches).toContain("tests/sample.txt");
       expect(matches).not.toContain("docs/templates/ok.md");

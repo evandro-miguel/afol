@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -61,21 +61,21 @@ describe("downstream bootstrap smoke", () => {
       };
 
       const commands: Array<{ args: string[]; label: string }> = [
-        { args: ["-h"], label: "./a -h" },
-        { args: ["status"], label: "./a status" },
-        { args: ["validate"], label: "./a validate" },
-        { args: ["new", "smoke"], label: "./a new smoke" },
-        { args: ["start", "--task-id", "T-01"], label: "./a start --task-id T-01" },
+        { args: ["-h"], label: "./afol -h" },
+        { args: ["status"], label: "./afol status" },
+        { args: ["validate"], label: "./afol validate" },
+        { args: ["new", "smoke"], label: "./afol new smoke" },
+        { args: ["start", "--task-id", "T-01"], label: "./afol start --task-id T-01" },
         {
           args: ["evidence", "T-01", "--command", "smoke", "--result", "passed"],
-          label: "./a evidence T-01 --command smoke --result passed",
+          label: "./afol evidence T-01 --command smoke --result passed",
         },
-        { args: ["done", "--task-id", "T-01"], label: "./a done --task-id T-01" },
-        { args: ["close"], label: "./a close" },
+        { args: ["done", "--task-id", "T-01"], label: "./afol done --task-id T-01" },
+        { args: ["close"], label: "./afol close" },
       ];
 
       for (const command of commands) {
-        const proc = spawnSync("./a", command.args, {
+        const proc = spawnSync("./afol", command.args, {
           cwd: target,
           env: targetEnv,
           encoding: "utf8",
@@ -85,6 +85,10 @@ describe("downstream bootstrap smoke", () => {
       }
 
       const allPaths = listFilesRecursive(target);
+      expect(existsSync(join(target, "afol"))).toBe(true);
+      expect(existsSync(join(target, "a"))).toBe(false);
+      expect(existsSync(join(target, "Justfile"))).toBe(false);
+
       const pyPaths = allPaths.filter((path) => path.endsWith(".py"));
       expect(pyPaths).toEqual([]);
 

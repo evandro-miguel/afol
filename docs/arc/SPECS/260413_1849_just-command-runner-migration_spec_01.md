@@ -17,7 +17,7 @@ links:
   report: .agents/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_report_01.md
 scope:
   repo_areas:
-  - Justfile
+  - legacy just command runner
   - docs/standards
   - src/project-template
   - .agents/scripts
@@ -43,8 +43,8 @@ risk_level: high
 
 ## 2) Problem
 
-- The current command surface is centered on `Justfile` and
-  `docs/standards/Justfile`, even though most targets delegate directly to
+- The current command surface is centered on `legacy just command runner` and
+  `docs/standards/legacy just command runner`, even though most targets delegate directly to
   `.agents/agents`, `uv`, or simple shell wrappers.
 - Bootstrap, templates, CI, tool metadata, runtime mirrors, and docs all assume
   Make, so a direct replacement risks breaking downstream adoption and local
@@ -92,9 +92,9 @@ Failure or friction points:
 
 In scope:
 
-- Add root and standards Justfiles for the scaffold command surface.
-- Update bootstrap and project-template output to generate Justfiles.
-- Update tests that assert Justfile behavior to assert Just parity and the new
+- Add root and standards legacy just command runners for the scaffold command surface.
+- Update bootstrap and project-template output to generate legacy just command runners.
+- Update tests that assert legacy just command runner behavior to assert Just parity and the new
   compatibility contract.
 - Update canonical docs, tool metadata, runtime mirrors, and CI to use Just.
 - Clean Make-specific references from canonical command docs after Just parity
@@ -113,8 +113,8 @@ Out of scope:
   - Use child specs or workbench slices for command parity, bootstrap/template
     wiring, docs/catalog cleanup, and final Make compatibility removal.
 - Planned child specs:
-  - Command parity Justfile slice.
-  - Bootstrap and project-template Justfile wiring.
+  - Command parity legacy just command runner slice.
+  - Bootstrap and project-template legacy just command-runner wiring.
   - Documentation, tools catalog, CI, and runtime mirror cleanup.
 
 ## 7) Constraints and Assumptions

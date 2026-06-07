@@ -67,14 +67,14 @@ src/
 ### 1. Initial Validation
 
 ```bash
-# Validate .agents structure
-just doctor
+# Run selected validation gates
+afol validate
 
-# List available tools
-.agents/agents tools list
+# Show project/session status
+afol status
 
-# Inspect the controlled live-agent runtime-flow benchmark family
-.agents/agents benchmark list
+# Inspect validation selection without running gates
+afol validate select --json
 ```
 
 ### 2. Create Workstream
@@ -90,25 +90,25 @@ just doctor
 #    the user asks.
 
 # 4. Create the workstream with mandatory governance linkage
-.agents/agents new auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --child-spec 260306_auth_refactor_spec-child_01
+afol n auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --child-spec 260306_auth_refactor_spec-child_01
 # Use --child-spec <id> to link an existing child spec.
 # Use --spec-lite only when you need to create a local lightweight spec artifact.
 
 # Research-only workstream, when research itself is the requested deliverable
-.agents/agents new auth-investigation --feature-id F-02 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --intent research
+afol n auth-investigation --feature-id F-02 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --intent research
 
 # The same theme would also infer `research` safely if --intent is omitted
 
 # Governed planning workstream. The plan tracks direct execution work; optional
 # brainstorm/research/explorer-check artifacts are sidecars only when requested
 # or needed as a small blocking proof.
-.agents/agents new planning-track --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --intent planning
+afol n planning-track --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --intent planning
 
 # Optional: add a pack for another major track inside an existing session
-.agents/agents new api-follow-up --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec
+afol n api-follow-up --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec
 
 # Quick task in active session
-.agents/agents new update-docs --quick
+afol n update-docs --quick
 ```
 
 ### Public onboarding (full + partial bootstrap)
@@ -141,10 +141,9 @@ afol bootstrap /path/to/existing-project --partial
   - `afol s` (status alias)
   - `afol ck` (validation alias)
   - `afol st -T T-01` (task start alias)
-  - `afol d -T T-01 -x "just lint"` (task completion alias)
-  - `just --list`
-  - `./a status`
-  - `./a validate`
+  - `afol d -T T-01 -x "afol validate"` (task completion alias)
+  - `afol validate --changed-path AGENTS.md`
+  - `afol validate select --json`
 
 ### Runtime Entry Points
 
@@ -231,8 +230,7 @@ afol bootstrap /path/to/existing-project --partial
 .agents/agents verify
 .agents/agents structure
 
-# View heat map of what's being used
-just telemetry-heat PERIOD=daily
+# Telemetry heat reports are pending native AFOL port.
 ```
 
 ### 4. Complete
@@ -253,11 +251,9 @@ just telemetry-heat PERIOD=daily
 .agents/agents session close --session <session-id>
 .agents/agents session close --session <session-id> --next-session <next-session-id>
 
-# Generate report
-just wb-files-changed
-
-# View session telemetry
-just telemetry-report PERIOD=weekly
+# Generate reports with AFOL-native validation/status first.
+afol validate
+afol status
 ```
 
 ### Project-Local Session Workflow
@@ -301,17 +297,8 @@ Before ending work, close the documentation loop first:
 Heat score identifies most/least used elements:
 
 ```bash
-# Heat map this week
-just telemetry-heat PERIOD=weekly
-
-# Hottest elements (top 10)
-just telemetry-hot
-
-# Coldest elements (top 10)
-just telemetry-cold
-
-# By type
-just telemetry-heat TYPE=patterns PERIOD=monthly
+# Telemetry heat/report commands are pending native AFOL port.
+afol validate
 ```
 
 Score formula: (frequency × 0.5) + (recency × 0.3) + (success × 0.2)
@@ -359,17 +346,8 @@ Catalog of patterns and anti-patterns with automatic suggestions.
 ### Commands
 
 ```bash
-# Suggest patterns for theme
-just patterns-suggest THEME=auth-refactor
-
-# List patterns
-just patterns-list
-
-# Show pattern details
-just patterns-show PATTERN_ID=PAT-001
-
-# Apply pattern (records in telemetry)
-just patterns-apply PATTERN_ID=PAT-001
+# Pattern catalog commands are pending native AFOL port.
+afol validate
 ```
 
 ### Included Patterns
@@ -427,89 +405,23 @@ updated_at: "2026-02-23T00:00:00-03:00"
 - [x] T-06 Completed
 ```
 
-## 🛠️ Justfile Targets
-
-### Setup & Validation
+## AFOL Commands
 
 ```bash
-just setup          # Setup project-local uv, managed Python, and virtualenvs
-just doctor         # Validate .agents structure
-just clean          # Clean caches
-just test-scripts-all # Run script unit + integration tests with 80% coverage gate
-just lint-runtime   # Lint central runtime package
-just benchmark-runtime-flow # Run controlled live-agent runtime-flow benchmarks selectively after risky execution changes
-just runtime-mcp-smoke # Smoke runtime and MCP CLIs
-just agents-all     # Full scaffold validation, including docs, scripts, runtime, tools, telemetry, and MCP smoke
-just all            # Alias for just agents-all
+afol status                                      # Show project/session status
+afol validate                                    # Run selected validation gates
+afol validate select --json                      # Show selected packs without running gates
+afol validate bench --pack cli-kernel-local      # Run benchmark contract pack
+afol n <theme> --feature-id F-01 --parent-spec <spec-id>
+afol st -S <session-id> -T T-01
+afol d -S <session-id> -T T-01 -x "afol validate"
+afol c -S <session-id>
+afol bootstrap /path/to/target-repo --dry-run
+afol bootstrap /path/to/existing-project --partial
 ```
 
-### Workflows
-
-```bash
-just new THEME=x FEATURE_ID=F-01 PARENT_SPEC=<spec-id>  # Create governed workstream
-just quick THEME=x  # Quick task
-just verify         # Verify tasks
-just lint           # Lint markdown, excluding tmp workspaces
-just structure      # Generate structure
-just index          # Update indexes
-just sync           # Sync AGENTS.md
-```
-
-### Telemetry
-
-```bash
-just telemetry-heat     # Heat map
-just telemetry-hot      # Hot elements
-just telemetry-cold     # Cold elements
-just telemetry-report   # Weekly report
-just telemetry-export   # Export data
-just telemetry-validate # Validate schema
-```
-
-### Patterns
-
-```bash
-just patterns-suggest   # Suggest patterns
-just patterns-list      # List patterns
-just patterns-show      # Pattern details
-just patterns-apply     # Apply pattern
-just patterns-rate      # Rate pattern
-```
-
-## 📊 .agents Commands
-
-```bash
-# Main tools
-.agents/agents doctor           # Validate structure
-.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id>  # Create minimal delivery workstream (task by default)
-.agents/agents new <theme> --feature-id F-01 --parent-spec <spec-id> --intent planning  # Create governed planning workstream for direct execution; optional sidecars only when requested/blocking
-.agents/agents verify-tasks     # Verify tasks
-.agents/agents status           # Show session status + workflow artifact readiness
-.agents/agents benchmark list   # List controlled live-agent runtime-flow benchmark scenarios
-.agents/agents benchmark run live-implement-next-governance-preflight --save  # Run one live benchmark and persist JSON output
-.agents/agents benchmark run live-wb-update-task-evidence-timeline --save  # Measure script-based task/evidence/timeline flow
-.agents/agents wb-update touch  # Update session
-afol bootstrap /path/to/target-repo --dry-run  # Preview generic export to another repo
-afol bootstrap /path/to/existing-project --partial  # Partial install for a live repo
-just agents-all  # Aggregate scaffold validations when the target Justfile already owns `all`
-.agents/agents tools list       # List tools
-.agents/agents structure-map .  # Map structure
-.agents/agents repo-map .       # Refresh full repository codemap
-.agents/agents runtime manifest # Generate central runtime manifest
-.agents/agents runtime validate # Validate scaffold through central runtime
-.agents/agents mcp serve        # Run FastMCP server over stdio
-.agents/agents-mcp manifest     # Compatibility launcher for MCP-oriented commands
-
-# Telemetry
-.agents/agents telemetry heat   # Heat map
-.agents/agents telemetry hot    # Hot elements
-.agents/agents telemetry cold   # Cold elements
-.agents/agents telemetry report # Report
-
-# Patterns
-.agents/agents patterns suggest # Suggest patterns
-.agents/agents patterns apply   # Apply pattern
-```
+Legacy factory-only command surfaces may still exist during migration, but they
+are not public entrypoints and must not be exported to downstream templates.
 
 ## 🔧 Configuration
 
@@ -537,10 +449,10 @@ patterns:
 
 ```bash
 # What was hot during sprint?
-just telemetry-heat PERIOD=weekly
+afol status
 
 # What's hot today?
-just telemetry-heat PERIOD=daily
+afol status
 
 # Detect gap: daily << weekly
 ```
@@ -549,7 +461,7 @@ just telemetry-heat PERIOD=daily
 
 ```bash
 # Export sprint heat
-just telemetry-heat PERIOD=weekly FORMAT=json > sprint.json
+afol status --json > sprint.json
 
 # Analyze patterns used
 jq '.patterns | sort_by(.heat_score) | reverse' sprint.json
@@ -559,7 +471,7 @@ jq '.patterns | sort_by(.heat_score) | reverse' sprint.json
 
 ```bash
 # Cold tools this month
-just telemetry-cold PERIOD=monthly TYPE=tools
+afol status
 ```
 
 ## 🎓 Core Principles
@@ -579,11 +491,11 @@ just telemetry-cold PERIOD=monthly TYPE=tools
 
 ## 🤝 Contributing
 
-1. Create only the workstream artifacts you need: `.agents/agents new feature-x --feature-id F-01 --parent-spec <spec-id> --child-spec <child-spec-id>` when linking an existing child spec; use `--spec-lite` only when creating a local lightweight spec artifact.
+1. Create only the workstream artifacts you need: `afol n feature-x --feature-id F-01 --parent-spec <spec-id> --child-spec <child-spec-id>` when linking an existing child spec; use `--spec-lite` only when creating a local lightweight spec artifact.
 2. Follow templates from `docs/templates/`
 3. Apply relevant patterns
-4. Validate: `just all`
-5. Report: `just wb-files-changed`
+4. Validate: `afol validate`
+5. Report: `afol status`
 
 ## 📄 License
 

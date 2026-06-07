@@ -95,8 +95,8 @@ def validate_new_thing(filepath: Path) -> List[str]:
 # Fix issues
 ./.agents/agents lint-docs .agents/wb/ --fix
 
-# Via Justfile
-just lint
+# Via legacy just command runner
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## Output

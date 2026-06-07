@@ -30,7 +30,7 @@ const HELP_LINES = [
   "",
   "Commands",
   "  s/status               Show status",
-  "  v/validate             Run structural checks",
+  "  v/validate             Run selected validation gates",
   "  init                   Install scaffold into current repo",
   "  n/new                  Create workbench session",
   "  st/start               Start workbench task",

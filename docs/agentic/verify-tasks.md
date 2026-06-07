@@ -90,8 +90,8 @@ Edit regex `TASK_LINE_RE`.
 # Verify all
 ./.agents/agents verify-tasks .agents/wb/
 
-# Via Justfile
-just verify
+# Via legacy just command runner
+AFOL-native command pending; do not use legacy just command runners.
 
 # Strict verification for session closure
 ./.agents/scripts/.venv/bin/python .agents/scripts/verify-tasks.py --strict .agents/wb/<session>/

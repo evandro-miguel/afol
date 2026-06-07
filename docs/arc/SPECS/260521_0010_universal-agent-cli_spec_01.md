@@ -29,7 +29,7 @@ risk_level: high
 ## 1) Feature Intent
 
 Build a universal Bun/TypeScript CLI that agents call from any governed project
-through the local command `afol`, with `./a` retained as a compatibility alias
+through the local command `afol`, with `afol` retained as a compatibility alias
 during migration.
 
 The intended simple operator surface includes `afol s`, `afol ck`, and
@@ -62,7 +62,7 @@ The first CLI kernel must be small and typed.
 
 Required kernel boundaries:
 
-- `afol` is the stable local entrypoint; `./a` remains a compatibility alias
+- `afol` is the stable local entrypoint; `afol` remains a compatibility alias
   during migration.
 - Bun/TypeScript owns the command router, schemas, output envelope, and project
   loader.

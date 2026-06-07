@@ -145,22 +145,22 @@ choose commands, tools, rules, skills, or mutation paths.
 
 | Surface | Scenario | Metrics | Required threshold |
 | --- | --- | --- | --- |
-| `./a -h` | compact help | quality, tokens | <= 25 lines |
-| `./a s` | status success | accuracy, speed | 100% pass, p50 <= 2s |
-| `./a status` | long alias parity | parity | semantic equality with `s` |
-| `./a -j s` | JSON output | contract | valid JSON, required keys |
+| `afol -h` | compact help | quality, tokens | <= 25 lines |
+| `afol s` | status success | accuracy, speed | 100% pass, p50 <= 2s |
+| `afol status` | long alias parity | parity | semantic equality with `s` |
+| `afol -j s` | JSON output | contract | valid JSON, required keys |
 | invalid root | safety error | safety, quality | non-zero, actionable hint |
 | missing config | loader failure | safety | non-zero before mutation |
 | unsupported command | router failure | quality | next command hint |
 | delegated command | legacy fallback | parity | exit/stdout/stderr contract |
-| `./a t d` | task closure | correctness | evidence required |
-| `./a e a` | evidence add | correctness | ledger append validated |
-| `./a r g` | rule route | accuracy | expected rules returned |
-| `./a sk g` | skill route | accuracy | expected skills returned |
-| `./a f pt` | patch mutation | safety | journal + protected path gate |
-| `./a u` | undo | safety | supported rollback succeeds |
-| `./a up ck` | update check | safety | read-only, no writes |
-| `./a up ap` | update apply | safety | local edits preserved/flagged |
+| `afol t d` | task closure | correctness | evidence required |
+| `afol e a` | evidence add | correctness | ledger append validated |
+| `afol r g` | rule route | accuracy | expected rules returned |
+| `afol sk g` | skill route | accuracy | expected skills returned |
+| `afol f pt` | patch mutation | safety | journal + protected path gate |
+| `afol u` | undo | safety | supported rollback succeeds |
+| `afol up ck` | update check | safety | read-only, no writes |
+| `afol up ap` | update apply | safety | local edits preserved/flagged |
 | `bun run build` | standalone build | release safety | deterministic artifact produced |
 | `bun run smoke:dist` | standalone smoke | safety + tokens | `./dist/afol --help` succeeds |
 | MCP `status` | tool parity | parity | same semantic envelope as CLI |
@@ -351,7 +351,7 @@ Implementation order:
 1. Write spec-test artifacts for the behavior contract.
 2. Write type/schema tests.
 3. Write parser, alias, and result-envelope unit tests.
-4. Write fixture integration tests for `./a`.
+4. Write fixture integration tests for `afol`.
 5. Write delegation parity tests against legacy commands.
 6. Write template export negative tests before shrinking the template.
 7. Write MCP parity tests before exposing new MCP tools.

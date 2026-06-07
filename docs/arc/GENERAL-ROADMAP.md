@@ -59,7 +59,7 @@ disposable history.
 The Bun/TypeScript reformulation must be staged:
 
 1. Add `afol` as the new project-local front door.
-2. Keep `./a` as a compatibility alias and delegate from both entrypoints to
+2. Keep `afol` as a compatibility alias and delegate from both entrypoints to
    existing `.agents/agents` commands where parity does not exist yet.
 3. Implement one typed Bun/TypeScript command family at a time.
 4. Keep Python/Bash paths until parity tests prove the replacement.
@@ -81,7 +81,7 @@ Critical path (in dependency order):
 7. Complete mutation safety (path-jail, symlink checks, atomic write, journal, backups, rollback, task/session context).
 8. Add release/security gates and deterministic standalone build checks.
 
-`afol` remains the primary command. `./a` remains compatibility alias/local wrapper while parity is incomplete.
+`afol` remains the primary command. `afol` remains compatibility alias/local wrapper while parity is incomplete.
 
 Boundary guardrails:
 
@@ -172,7 +172,7 @@ Minimum acceptance:
   every project.
 - Exit criteria: Bun/TypeScript CLI architecture is defined; CLI runs from
   `afol`; CLI reads local project state; CLI supports version lock and update
-  checks; `./a` remains a compatibility alias until parity.
+  checks; `afol` remains a compatibility alias until parity.
 - Closure note: accepted implementation evidence is `E-20260528215311949499`
   and `E-20260528220141194181`; closeout session
   `.agents/wb/260528_0722_slice2-cli-kernel-front-door/`; strict verification

@@ -158,15 +158,15 @@ project-local layer
 - .agents/wb, rules, skills, specs, data, tmp
 
 project wrapper
-- ./a (local compatibility alias during migration)
+- afol (local compatibility alias during migration)
 ```
 
 The public command entrypoint is `afol`.
-`./a` is the local migration wrapper/compatibility alias.
+`afol` is the local migration wrapper/compatibility alias.
 
 ## 8) Command Philosophy
 
-The local wrapper is `./a` while migration is active.
+The local wrapper is `afol` while migration is active.
 
 High-frequency commands should use short names through `afol`:
 
@@ -184,7 +184,7 @@ High-frequency commands should use short names through `afol`:
 - `afol up ck`
 
 Long aliases may exist for humans. Agents should prefer short commands.
-`./a` remains a local compatibility alias where migration requires it.
+`afol` remains a local compatibility alias where migration requires it.
 
 ## 9) Quality Bar
 

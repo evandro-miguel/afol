@@ -129,21 +129,21 @@ Partial-install note:
 ./.agents/agents skills-sync push agentic-folder-sys --branch skills-sync/agentic-folder-sys --commit --push --pr
 ```
 
-### Via Justfile
+### Via legacy just command runner
 
 ```bash
-just skills-init
-just skills-pull
-just skills-update SKILLS=agentic-folder-sys
-just skills-list RUNTIME=codex
-just skills-search QUERY=markdown RUNTIME=codex
-just skills-plan SKILLS=agentic-folder-sys
-just skills-apply SKILLS=agentic-folder-sys
-just skills-ensure SKILL=agentic-folder-sys RUNTIME=codex
-just skills-check SKILLS=agentic-folder-sys
-just skills-sync SKILLS=agentic-folder-sys
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 # Disabled by default in this scaffold:
-# just skills-push SKILL=agentic-folder-sys COMMIT=1 PUSH=1
+# AFOL-native command pending; do not use legacy just command runners.
 ```
 
 ## How to Modify

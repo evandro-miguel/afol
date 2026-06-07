@@ -156,7 +156,7 @@ docs/                           # ← Project-owned documentation
 ### Weekly Report
 
 ```bash
-just telemetry-report PERIOD=weekly
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 Output includes:
@@ -216,7 +216,7 @@ Auto-populated from reports:
 
 ```bash
 # Export to external BI tool
-just telemetry-export FORMAT=json OUTPUT=/tmp/telemetry.json
+AFOL-native command pending; do not use legacy just command runners.
 
 # Query specific patterns
 python3 .agents/scripts/agents-telemetry.py query \

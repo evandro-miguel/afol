@@ -41,10 +41,10 @@ The wrapper keeps the existing `.agents/agents <legacy-command>` surface intact 
 ## Commands
 
 ```bash
-just setup-runtime
-just lint-runtime
-just test-runtime
-just runtime-mcp-smoke
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
+AFOL-native command pending; do not use legacy just command runners.
 ```
 
 `just all` includes the runtime lint, runtime test, and runtime MCP smoke gates.

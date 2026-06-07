@@ -68,7 +68,7 @@ afol update check
 ```
 
 Short aliases are canonical for agents. Long aliases are canonical for humans
-and docs. `afol` is the canonical front door; `./a` remains a compatibility
+and docs. `afol` is the canonical front door; `afol` remains a compatibility
 alias during migration.
 
 ## 4) Locked Domain Aliases

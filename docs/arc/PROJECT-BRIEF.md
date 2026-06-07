@@ -18,7 +18,7 @@ updated_at: '2026-03-06T22:29:30-03:00'
 
 - This repository is a Bun/TypeScript-first factory for an AGENTS-governed
   development workflow.
-- The public downstream CLI is `afol`/`./a`, implemented under `cli/**`.
+- The public downstream CLI is `afol`/`afol`, implemented under `cli/**`.
 - The exportable template source is `src/project-template/`.
 - Root `.agents/` compatibility surfaces remain in the factory tree during
   migration and are not part of the downstream payload.

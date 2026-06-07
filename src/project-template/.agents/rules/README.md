@@ -46,9 +46,8 @@ Mandatory local rules for downstream bootstrap.
 ./afol --help
 ./afol rule list
 ./afol skill list
-just doctor
-just lint
-just verify
+./afol validate
+./afol status
 ```
 
 ## References

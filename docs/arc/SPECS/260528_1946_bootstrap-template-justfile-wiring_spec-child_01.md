@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 workstream_intent: delivery
-artifact_purpose: Capture the child scope that wires strict Justfile parity into the exported template baseline.
+artifact_purpose: Capture the child scope that wires strict legacy just command-runner parity into the exported template baseline.
 created_at: '2026-05-28T22:46:34Z'
 updated_at: '2026-05-28T20:10:13-03:00'
 roadmap_feature: F-17
@@ -24,7 +24,7 @@ risk_level: low
 
 ## Intent
 
-- Outcome: exported template Justfile surfaces expose the strict aggregate validation commands already available at repo root.
+- Outcome: exported template legacy just command runner surfaces expose the strict aggregate validation commands already available at repo root.
 - Roadmap feature: `F-17`
 - Parent spec: `260413_1849_just-command-runner-migration_spec_01`
 
@@ -47,8 +47,8 @@ risk_level: low
 ## Boundaries
 
 - In scope:
-  - `src/project-template/Justfile` strict alias wiring.
-  - `src/project-template/docs/standards/Justfile` strict aggregate and diff gate recipes.
+  - `src/project-template/legacy just command runner` strict alias wiring.
+  - `src/project-template/docs/standards/legacy just command runner` strict aggregate and diff gate recipes.
   - Template docs mirrors that describe these commands.
 - Out of scope:
   - Runtime package or MCP registration changes.
