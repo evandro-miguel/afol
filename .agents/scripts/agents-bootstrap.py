@@ -52,7 +52,6 @@ MANDATORY_DIRS_TO_COPY = [
     Path(".agents/data/telemetry/schemas"),
     Path("docs/knowledge"),
     Path("docs/lessons"),
-    Path("docs/patterns"),
     Path("docs/telemetry"),
     Path("docs/templates"),
 ]

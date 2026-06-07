@@ -88,6 +88,7 @@ IGNORED_DIRS = {
     "venv",
     "__pycache__",
     "node_modules",
+    "coverage",
     "dist",
     "build",
     "target",
@@ -458,7 +459,11 @@ This documentation uses **incremental updates**:
 
         # Add top-level directories
         top_dirs = sorted(
-            [d for d in self.project_path.iterdir() if d.is_dir() and not d.name.startswith(".")]
+            [
+                d
+                for d in self.project_path.iterdir()
+                if d.is_dir() and not d.name.startswith(".") and d.name not in IGNORED_DIRS
+            ]
         )[:10]
         for d in top_dirs:
             content += f"├── 📁 {d.name}/\n"

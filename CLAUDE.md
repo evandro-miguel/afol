@@ -169,7 +169,8 @@ and bootstrap assets for downstream repos.
 - Runtime/tool-routing/prompt/rule-loading changes should run the controlled
   runtime-flow benchmark family when regression risk is material.
 - Use `gpt-5.4-mini` with medium reasoning as the default benchmark baseline
-  unless a benchmark spec says otherwise.
+  for selective development-time regression checks unless a benchmark spec
+  says otherwise.
 - Final reports must state changes, verification, remaining risk/skipped gates,
   documentation-drift status, and mirror sync status when runtime guidance
   changed.
@@ -211,13 +212,6 @@ and bootstrap assets for downstream repos.
 - External memory is auxiliary retrieval only.
 - `knowledge search|context|recent|show` commands emit MCP contracts for
   host runtimes; it does not execute MCP calls from shell.
-
----
-
-> **⚠️ IMPORTANT:** THIS FILE IS A REPLICA OF THE `AGENTS.md`.
->
-> - **DO NOT READ** the `AGENTS.md` AGAIN if you read this one.
-> - This file is auto-synced. Run `.agents/scripts/sync-agent-docs.py` to update.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
@@ -262,3 +256,10 @@ This project is indexed by GitNexus as **agentic-standard-folder** (5335 symbols
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+---
+
+> **⚠️ IMPORTANT:** THIS FILE IS A REPLICA OF THE `AGENTS.md`.
+>
+> - **DO NOT READ** the `AGENTS.md` AGAIN if you read this one.
+> - This file is auto-synced. Run `.agents/scripts/sync-agent-docs.py` to update.

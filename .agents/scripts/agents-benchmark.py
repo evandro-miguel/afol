@@ -1709,24 +1709,25 @@ def _live_scenario_command(
         "apps._default.enabled=false",
         "-c",
         "apps._default.default_tools_enabled=false",
-        "--full-auto",
-        "-C",
-        str(fixture_root),
-        "--add-dir",
-        str(fixture_root / ".agents"),
-        "--output-schema",
-        str(schema_path),
-        "-o",
-        str(output_path),
-        scenario.prompt,
     ]
-    sandbox_insert_at = command.index("--full-auto")
     if scenario.id == "live-autonomous-agentic-folder-delivery":
-        command.remove("--full-auto")
-        command.insert(sandbox_insert_at, "--dangerously-bypass-approvals-and-sandbox")
+        command.append("--dangerously-bypass-approvals-and-sandbox")
     else:
-        command[sandbox_insert_at:sandbox_insert_at] = ["-s", "workspace-write"]
         command.insert(4, "--ignore-user-config")
+        command.extend(["-s", "workspace-write"])
+    command.extend(
+        [
+            "-C",
+            str(fixture_root),
+            "--add-dir",
+            str(fixture_root / ".agents"),
+            "--output-schema",
+            str(schema_path),
+            "-o",
+            str(output_path),
+            scenario.prompt,
+        ]
+    )
     return command
 
 
@@ -1952,6 +1953,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     run_parser = subparsers.add_parser("run", help="Run one or more benchmark scenarios")
     run_parser.add_argument("scenario_ids", nargs="*", help="Optional benchmark scenario ids")
+    run_parser.add_argument("--model", default=DEFAULT_PROFILE.model, help="Codex model for live-agent scenarios")
+    run_parser.add_argument(
+        "--reasoning-effort",
+        default=DEFAULT_PROFILE.reasoning_effort,
+        help="Codex reasoning effort for live-agent scenarios",
+    )
     run_parser.add_argument("--save", action="store_true", help="Save results under .agents/data/benchmarks/results/")
     run_parser.add_argument("--output", type=Path, help="Write the JSON payload to an explicit path")
     run_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
@@ -1972,7 +1979,12 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "run":
-            payload = run_suite(args.scenario_ids, DEFAULT_PROFILE, args.output)
+            profile = BenchmarkProfile(
+                runtime=DEFAULT_PROFILE.runtime,
+                model=args.model,
+                reasoning_effort=args.reasoning_effort,
+            )
+            payload = run_suite(args.scenario_ids, profile, args.output)
             saved_path = _save_payload(payload) if args.save else None
             if saved_path is not None:
                 payload = dict(payload)

@@ -40,20 +40,20 @@ class BootstrapTests(unittest.TestCase):
         """Bootstrap must declare a non-empty list of mandatory files."""
         self.assertGreater(len(self.bootstrap.MANDATORY_FILES_TO_COPY), 0)
 
-    def test_mandatory_files_include_agents_wrapper(self):
-        """The agents CLI wrapper must be in the mandatory files list."""
+    def test_mandatory_files_exclude_legacy_agents_wrapper(self):
+        """The TS template must not ship the retired Python agents wrapper."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
-        self.assertIn(".agents/agents", mandatory)
+        self.assertNotIn(".agents/agents", mandatory)
 
-    def test_mandatory_files_include_agents_mcp_wrapper(self):
-        """The MCP wrapper must be in the mandatory files list."""
+    def test_mandatory_files_exclude_legacy_agents_mcp_wrapper(self):
+        """The TS template must not ship the retired Python MCP wrapper."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
-        self.assertIn(".agents/agents-mcp", mandatory)
+        self.assertNotIn(".agents/agents-mcp", mandatory)
 
-    def test_mandatory_files_include_agents_config(self):
-        """The agents config must be in the mandatory files list."""
+    def test_mandatory_files_exclude_legacy_agents_config(self):
+        """The TS template must not ship the retired YAML agents config."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
-        self.assertIn(".agents/agents.config", mandatory)
+        self.assertNotIn(".agents/agents.config", mandatory)
 
     def test_mandatory_files_include_canonical_config_json(self):
         """The canonical JSON config must be in the mandatory files list."""
@@ -90,10 +90,10 @@ class BootstrapTests(unittest.TestCase):
         """Bootstrap must declare mandatory directories."""
         self.assertGreater(len(self.bootstrap.MANDATORY_DIRS_TO_COPY), 0)
 
-    def test_mandatory_dirs_include_runtime_package(self):
-        """The runtime package must be part of the bootstrap surface."""
+    def test_mandatory_dirs_exclude_runtime_package(self):
+        """The TS template must not ship the retired Python runtime package."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_DIRS_TO_COPY}
-        self.assertIn(".agents/runtime", mandatory)
+        self.assertNotIn(".agents/runtime", mandatory)
 
     def test_ensure_dirs_list_is_non_empty(self):
         """Bootstrap must declare directories to ensure exist."""
@@ -114,7 +114,10 @@ class BootstrapTests(unittest.TestCase):
             justfile = target / "Justfile"
             self.assertTrue(justfile.exists())
             content = justfile.read_text(encoding="utf-8")
-            self.assertIn(self.bootstrap.JUSTFILE_MODULE_MARKER, content)
+            self.assertIn("validate:", content)
+            self.assertIn("./a validate", content)
+            self.assertIn("status:", content)
+            self.assertIn("./a status", content)
 
     def test_ensure_justfile_skips_when_scaffold_reference_present(self):
         """ensure_justfile must not modify Justfile when scaffold import/module exists."""
@@ -139,7 +142,9 @@ class BootstrapTests(unittest.TestCase):
             self.bootstrap.ensure_justfile(target, dry_run=False)
             content = justfile.read_text(encoding="utf-8")
             self.assertIn("default:", content)
-            self.assertIn(self.bootstrap.JUSTFILE_MODULE_MARKER, content)
+            self.assertIn(self.bootstrap.JUSTFILE_NATIVE_MARKER, content)
+            self.assertIn("agents-status:", content)
+            self.assertIn("./a status", content)
 
     def test_ensure_justfile_ignores_comment_only_marker_mentions(self):
         """Comment-only marker mentions must not suppress scaffold module append."""
@@ -153,7 +158,9 @@ class BootstrapTests(unittest.TestCase):
             self.bootstrap.ensure_justfile(target, dry_run=False)
             content = justfile.read_text(encoding="utf-8")
             self.assertIn("default:", content)
-            self.assertIn(self.bootstrap.JUSTFILE_MODULE_MARKER, content)
+            self.assertIn(self.bootstrap.JUSTFILE_NATIVE_MARKER, content)
+            self.assertIn("agents-validate:", content)
+            self.assertIn("./a validate", content)
 
     def test_generated_baseline_content_includes_roadmap(self):
         """Generated baseline must include the roadmap file."""

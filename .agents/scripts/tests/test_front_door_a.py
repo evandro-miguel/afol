@@ -4,7 +4,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
-from shutil import copy2
+from shutil import copytree
 from pathlib import Path
 
 
@@ -67,6 +67,33 @@ class FrontDoorATests(unittest.TestCase):
             )
         return proc
 
+    def _run_template_with_fake_afol(
+        self,
+        args: list[str],
+        fake_body: str,
+        source_wrapper: Path,
+    ):
+        source_wrapper = source_wrapper.resolve()
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+            root = Path(td)
+            wrapper = self._copy_wrapper(root, source_wrapper)
+
+            fake_afol = root / "bin" / "afol"
+            self._write_exec(fake_afol, fake_body)
+
+            env = os.environ.copy()
+            env.pop("AGENTIC_CLI_PATH", None)
+            env["PATH"] = f"{fake_afol.parent}{os.pathsep}{env.get('PATH', '')}"
+            proc = subprocess.run(
+                [str(wrapper), *args],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                env=env,
+                check=False,
+            )
+        return proc
+
     def _run_kernel_with_fake_project(
         self,
         args: list[str],
@@ -79,16 +106,13 @@ class FrontDoorATests(unittest.TestCase):
         nested_cwd: bool = False,
     ):
         source_wrapper = Path("a").resolve() if source_wrapper is None else source_wrapper.resolve()
-        kernel_source = Path("cli/main.ts").resolve()
-        validate_contract_source = Path("cli/validate/contract.ts").resolve()
+        kernel_source_dir = Path("cli").resolve()
 
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
             root = Path(td)
             wrapper = self._copy_wrapper(root, source_wrapper)
 
-            (root / "cli" / "validate").mkdir(parents=True, exist_ok=True)
-            copy2(kernel_source, root / "cli" / "main.ts")
-            copy2(validate_contract_source, root / "cli" / "validate" / "contract.ts")
+            copytree(kernel_source_dir, root / "cli")
 
             agents_dir = root / ".agents"
             agents_dir.mkdir(parents=True, exist_ok=True)
@@ -165,44 +189,48 @@ class FrontDoorATests(unittest.TestCase):
                 self.assertIn("ARGS:status --json", proc.stdout)
 
     def test_template_wrapper_json_shortcut_uses_template_source(self):
-        proc = self._run_with_fake_agents(
+        proc = self._run_template_with_fake_afol(
             ["--json", "status"],
             "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n",
             source_wrapper=Path("src/project-template/a"),
         )
         self.assertEqual(proc.returncode, 0)
-        self.assertIn("ARGS:status --json", proc.stdout)
+        self.assertIn("ARGS:--json status", proc.stdout)
 
     def test_template_afol_wrapper_json_shortcut_uses_template_source(self):
-        proc = self._run_with_fake_agents(
+        proc = self._run_template_with_fake_afol(
             ["--json", "status"],
             "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n",
             source_wrapper=Path("src/project-template/afol"),
         )
         self.assertEqual(proc.returncode, 0)
-        self.assertIn("ARGS:status --json", proc.stdout)
+        self.assertIn("ARGS:--json status", proc.stdout)
 
     def test_template_afol_wrapper_simple_commands_route_to_existing_runtime(self):
         fake_body = "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n"
         cases = (
-            (["check"], "ARGS:doctor"),
-            (["ck"], "ARGS:doctor"),
-            (["start", "--session", "S", "--task-id", "T-01"], "ARGS:implement start --session S --task-id T-01"),
-            (["st", "-S", "S", "-T", "T-01"], "ARGS:implement start --session S --task-id T-01"),
+            (["check"], "ARGS:check"),
+            (["ck"], "ARGS:ck"),
+            (["start", "--session", "S", "--task-id", "T-01"], "ARGS:start --session S --task-id T-01"),
+            (["st", "-S", "S", "-T", "T-01"], "ARGS:st -S S -T T-01"),
             (
                 ["done", "--session", "S", "--task-id", "T-01", "--test", "just lint"],
-                "ARGS:implement complete --session S --task-id T-01 --command just lint --result passed",
+                "ARGS:done --session S --task-id T-01 --test just lint",
             ),
             (
                 ["d", "-S", "S", "-T", "T-01", "-x", "just lint"],
-                "ARGS:implement complete --session S --task-id T-01 --command just lint --result passed",
+                "ARGS:d -S S -T T-01 -x just lint",
             ),
-            (["close", "--session", "S"], "ARGS:session close --session S"),
-            (["c", "-S", "S"], "ARGS:session close --session S"),
+            (["close", "--session", "S"], "ARGS:close --session S"),
+            (["c", "-S", "S"], "ARGS:c -S S"),
         )
         for args, expected in cases:
             with self.subTest(args=args):
-                proc = self._run_with_fake_agents(args, fake_body, source_wrapper=Path("src/project-template/afol"))
+                proc = self._run_template_with_fake_afol(
+                    args,
+                    fake_body,
+                    source_wrapper=Path("src/project-template/afol"),
+                )
                 self.assertEqual(proc.returncode, 0)
                 self.assertIn(expected, proc.stdout)
 
@@ -217,14 +245,15 @@ class FrontDoorATests(unittest.TestCase):
 
     def test_kernel_accepts_agents_config_and_delegates_from_nested_cwd(self):
         proc = self._run_kernel_with_fake_project(
-            ["s"],
+            ["s", "--json"],
             "#!/usr/bin/env bash\nprintf 'PWD:%s\\n' \"$PWD\"\nprintf 'ARGS:%s\\n' \"$*\"\n",
             config_name="agents.config",
             nested_cwd=True,
         )
         self.assertEqual(proc.returncode, 0)
-        self.assertIn("ARGS:status", proc.stdout)
-        self.assertIn("PWD:", proc.stdout)
+        payload = json.loads(proc.stdout)
+        self.assertEqual(payload["status"], "none")
+        self.assertTrue(payload["paths"]["config"].endswith(".agents/agents.config"))
 
     def test_kernel_prefers_config_json_when_both_configs_exist(self):
         proc = self._run_kernel_with_fake_project(

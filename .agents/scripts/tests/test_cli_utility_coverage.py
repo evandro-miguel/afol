@@ -316,6 +316,7 @@ def test_structure_mapper_scans_cache_generates_and_cli(tmp_path, monkeypatch):
     (project / "tests").mkdir()
     (project / "data").mkdir()
     (project / "node_modules").mkdir()
+    (project / "coverage").mkdir()
     (project / ".agents" / "tools" / "uv").mkdir(parents=True)
     (project / "components" / "HomePage.tsx").write_text(
         "export function HomePage() {}\n", encoding="utf-8"
@@ -329,6 +330,7 @@ def test_structure_mapper_scans_cache_generates_and_cli(tmp_path, monkeypatch):
     )
     (project / "data" / "config.json").write_text("{}\n", encoding="utf-8")
     (project / "node_modules" / "skip.py").write_text("skip\n", encoding="utf-8")
+    (project / "coverage" / "skip.py").write_text("skip\n", encoding="utf-8")
     (project / ".agents" / "tools" / "uv" / "skip.py").write_text("skip\n", encoding="utf-8")
 
     mapper = struct.StructureMapper(project, output)
@@ -342,9 +344,14 @@ def test_structure_mapper_scans_cache_generates_and_cli(tmp_path, monkeypatch):
     sections = mapper.scan_files()
     assert set(sections) >= {"frontend", "backend", "types", "tests", "data"}
     assert ".agents/tools/uv/skip.py" not in mapper.cache["files"]
+    assert "node_modules/skip.py" not in mapper.cache["files"]
+    assert "coverage/skip.py" not in mapper.cache["files"]
     mapper.run()
     assert (output / "README.md").exists()
     assert (output / struct.CACHE_FILE).exists()
+    readme = (output / "README.md").read_text(encoding="utf-8")
+    assert "node_modules/" not in readme
+    assert "coverage/" not in readme
 
     second = struct.StructureMapper(project, output)
     second.load_cache()

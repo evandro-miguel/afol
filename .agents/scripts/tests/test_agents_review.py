@@ -1,4 +1,5 @@
 import argparse
+import json
 import importlib.util
 import sys
 import tempfile
@@ -271,11 +272,41 @@ class ReviewScopeTests(unittest.TestCase):
 
     def test_run_verify_tasks_real_session_uses_strict_gate(self):
         """A real governed session still passes through strict verification."""
-        session_dir = Path(".agents/wb/260528_0811_workbench-core-f04-t07-t10")
-        code, out, err = self.review.run_verify_tasks(session_dir)
-        self.assertEqual(code, 0)
-        self.assertIn("✅ All tasks completed!", out)
-        self.assertEqual(err, "")
+        with tempfile.TemporaryDirectory() as td:
+            session_dir = Path(td) / "260401_review_strict"
+            session_dir.mkdir()
+            (session_dir / "260401_task_01.md").write_text(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Covered by evidence |\n\n"
+                "## Execution\n\n"
+                "```bash\n"
+                "python3 -m unittest\n"
+                "```\n\n"
+                "Result: All tests passed successfully.\n",
+                encoding="utf-8",
+            )
+            (session_dir / ".evidence.jsonl").write_text(
+                json.dumps(
+                    {
+                        "id": "E-1",
+                        "task_id": "T-01",
+                        "command": "python3 -m unittest",
+                        "result": "passed",
+                        "artifacts": ["test_report_01.md"],
+                        "note": "",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            code, out, err = self.review.run_verify_tasks(session_dir)
+            self.assertEqual(code, 0)
+            self.assertIn("✅ All tasks completed!", out)
+            self.assertEqual(err, "")
 
 
 class ReviewMainTests(unittest.TestCase):

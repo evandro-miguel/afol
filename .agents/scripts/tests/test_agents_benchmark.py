@@ -49,6 +49,7 @@ def test_tool_info_validator_checks_tool_id_contract():
     failures = benchmark._validate_tool_info(
         {
             "scenario_id": "live-tools-benchmark-discovery",
+            "tool_surface": "benchmark",
             "tool_id": "benchmark",
             "default_model": benchmark.DEFAULT_PROFILE.model,
             "default_reasoning_effort": benchmark.DEFAULT_PROFILE.reasoning_effort,
@@ -57,7 +58,7 @@ def test_tool_info_validator_checks_tool_id_contract():
     )
 
     assert failures == []
-    assert "tool_id" in benchmark._tool_info_schema()["required"]
+    assert "tool_surface" in benchmark._tool_info_schema()["required"]
 
 
 def test_live_scenario_command_uses_current_sandbox_flag(tmp_path):
@@ -427,3 +428,53 @@ def test_main_run_emits_compact_json(monkeypatch, capsys):
     assert code == 0
     assert output.startswith("{")
     assert "\n" not in output
+
+
+def test_main_run_accepts_profile_overrides(monkeypatch, capsys):
+    benchmark = load_module()
+    captured = {}
+
+    def fake_run_suite(ids, profile, output, executor=None):
+        _ = executor
+        captured["ids"] = ids
+        captured["profile"] = profile
+        captured["output"] = output
+        return {
+            "pack_id": benchmark.BENCHMARK_PACK_ID,
+            "generated_at": "2026-05-14T00:00:00Z",
+            "benchmark_profile": profile.to_dict(),
+            "scenario_count": 0,
+            "pass": True,
+            "duration_ms": 0,
+            "tool_call_count": 0,
+            "tool_success_count": 0,
+            "error_count": 0,
+            "retry_count": 0,
+            "checks_total": 0,
+            "checks_passed": 0,
+            "context_bytes_total": 0,
+            "prompt_bytes_total": 0,
+            "accuracy": 1.0,
+            "tool_success_rate": 0.0,
+            "scenarios": [],
+        }
+
+    monkeypatch.setattr(benchmark, "run_suite", fake_run_suite)
+    code = benchmark.main(
+        [
+            "run",
+            "--model",
+            "test-mini",
+            "--reasoning-effort",
+            "low",
+            "live-tools-benchmark-discovery",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    assert captured["ids"] == ["live-tools-benchmark-discovery"]
+    assert captured["profile"].model == "test-mini"
+    assert captured["profile"].reasoning_effort == "low"
+    assert payload["benchmark_profile"]["model"] == "test-mini"
+    assert payload["benchmark_profile"]["reasoning_effort"] == "low"

@@ -1,23 +1,41 @@
-# Structure Map
+# 📁 Project Structure - Complete Index
 
-This section is a compact physical-layout snapshot, not a full file inventory.
+**Generated:** 2026-06-07T09:09:44+00:00
+**Last Update:** First run
 
-## Top-Level Surfaces
+## 📊 Overview
 
-- `cli/`: live Bun/TypeScript CLI, routing, commands, schema checks, and tests.
-- `src/project-template/`: exportable downstream template source.
-- `.agents/`: factory repo state, including legacy Python compatibility surfaces kept as safe migration fallbacks, workbench data, skills, rules, and generated evidence.
-- `docs/`: project documentation, with `docs/map/` for current-state evidence and `docs/arc/` for goal-state canon.
+| Metric | Value |
+|--------|-------|
+| **Total Files** | 292 |
+| **Total Lines** | 62,039 |
 
-## Boundary Notes
+## 📂 Documentation Sections
 
-- Template payload generation starts from `src/project-template/`.
-- The clean template excludes root `.agents/scripts/**`, `.agents/runtime/**`, `.agents/agents`, `.agents/agents-mcp`, and Python env artifacts.
-- Legacy compatibility paths remain in the factory root until native delegation parity is complete.
-- `cli/tests/` is the live policy and bootstrap verification surface for that boundary.
+| Section | Description | Files |
+|---------|-------------|-------|
+| [Backend](./backend.md) | Services, utilities, and business logic | 94 |
+| [Types](./types.md) | Type definitions and interfaces | 2 |
+| [Tests](./tests.md) | Unit tests, integration tests, and E2E tests | 136 |
+| [Data](./data.md) | Data files, constants, and configuration | 60 |
 
-## Use This Section For
+## 🔄 Change Detection
 
-- Fast orientation on where the live app and template live.
-- Checking which tree is active versus migration-only.
-- Finding the right follow-up file before opening source.
+This documentation uses **incremental updates**:
+- ✅ Descriptions cached to avoid regenerating everything
+- ✅ Only new/changed files get new descriptions
+- ✅ Detects when file purpose changes
+
+## 🌳 Quick Directory Tree
+
+```
+merge-dev-refactor-ts-afol/
+├── 📁 cli/
+├── 📁 docs/
+├── 📁 src/
+```
+
+---
+
+*Generated automatically by `agents-structure-map.py`*
+*For detailed structure, see individual section files*

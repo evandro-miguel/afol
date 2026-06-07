@@ -636,11 +636,11 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
         self.assertIsInstance(ownership, dict)
         self.assertTrue(ownership.get("project-owned"))
         self.assertTrue(ownership.get("generated"))
-        self.assertTrue(ownership.get("ignored"))
+        self.assertIsInstance(ownership.get("ignored"), list)
         self.assertTrue(ownership.get("conflict"))
         managed_hashes = payload.get("managed_hashes")
         self.assertIsInstance(managed_hashes, dict)
-        self.assertRegex(str(managed_hashes.get("agents", "")), r"^[a-f0-9]{64}$")
+        self.assertRegex(str(managed_hashes.get("config.json", "")), r"^[a-f0-9]{64}$")
 
     def test_template_managed_hashes_match_template_files_and_lock(self):
         template_agents_dir = Path("src/project-template/.agents").resolve()
@@ -667,13 +667,9 @@ class AgentsScaffoldUpdateTests(unittest.TestCase):
                 f"Managed hash mismatch for {rel_path}",
             )
 
-        root_script = Path(".agents/scripts/agents-scaffold-update.py").resolve()
-        template_script = template_agents_dir / "scripts/agents-scaffold-update.py"
-        self.assertTrue(root_script.is_file())
-        self.assertTrue(template_script.is_file())
-        self.assertEqual(
-            hashlib.sha256(root_script.read_bytes()).hexdigest(),
-            hashlib.sha256(template_script.read_bytes()).hexdigest(),
+        self.assertFalse(
+            (template_agents_dir / "scripts").exists(),
+            "TS project template must not ship Python scaffold update scripts",
         )
 
 
