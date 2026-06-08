@@ -445,6 +445,109 @@ def test_gemini_runtime_records_api_metrics_with_mocked_http(tmp_path, monkeypat
     assert len(calls) == 2
 
 
+def test_gemini_runtime_respects_remaining_suite_request_budget(tmp_path, monkeypatch):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark, max_requests=5)
+    profile = benchmark.BenchmarkProfile(
+        runtime="gemini-api",
+        model="gemma-4-31b-it",
+        provider_config_path=str(config_path),
+        api_request_budget_remaining=1,
+    )
+    monkeypatch.setenv("GEMINI_API_KEY", "secret-test-key")
+    calls = []
+
+    def fake_generate_content(config, contents, api_key, *, schema=None, tools=None):
+        calls.append({"schema": schema, "tools": tools})
+        assert tools is None
+        assert schema is not None
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "scenario_id": "live-tools-benchmark-discovery",
+                                        "tool_surface": "benchmark",
+                                        "default_model": benchmark.DEFAULT_PROFILE.model,
+                                        "default_reasoning_effort": benchmark.DEFAULT_PROFILE.reasoning_effort,
+                                    }
+                                )
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1, "totalTokenCount": 2},
+        }
+
+    monkeypatch.setattr(benchmark, "_gemini_http_generate_content", fake_generate_content)
+
+    payload = benchmark.run_suite(["live-tools-benchmark-discovery"], profile)
+    result = payload["scenarios"][0]
+
+    assert result["api_request_count"] == 1
+    assert result["tool_call_count"] == 0
+    assert result["pass"] is False
+    assert len(calls) == 1
+
+
+def test_run_suite_passes_gemini_suite_request_budget_remaining(tmp_path):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark, max_requests=5)
+    profile = benchmark.BenchmarkProfile(
+        runtime="gemini-api",
+        model="gemma-4-31b-it",
+        provider_config_path=str(config_path),
+    )
+    seen_remaining = []
+
+    def fake_executor(scenario, scenario_profile):
+        remaining = int(scenario_profile.api_request_budget_remaining)
+        request_count = min(4, remaining)
+        seen_remaining.append(remaining)
+        return {
+            "id": scenario.id,
+            "backend": "gemini_api",
+            "pass": True,
+            "duration_ms": 12,
+            "context_bytes": 100,
+            "prompt_bytes": 50,
+            "tool_call_count": 1,
+            "tool_success_count": 1,
+            "tool_success_rate": 1.0,
+            "error_count": 0,
+            "retry_count": 0,
+            "checks_total": 8,
+            "checks_passed": 8,
+            "accuracy": 1.0,
+            "observed_tool_calls": [{"name": "run_shell", "command_excerpt": "dummy"}],
+            "failure_reasons": [],
+            "output_json": {"scenario_id": scenario.id},
+            "output_excerpt": '{"scenario_id":"x"}',
+            "stdout_excerpt": "",
+            "stderr_excerpt": "",
+            "command": ["gemini-api"],
+            "token_usage": {},
+            "api_request_count": request_count,
+        }
+
+    payload = benchmark.run_suite(
+        [
+            "live-tools-benchmark-discovery",
+            "live-implement-next-governance-preflight",
+            "live-implement-start-complete-evidence",
+        ],
+        profile,
+        executor=fake_executor,
+    )
+
+    assert seen_remaining == [10, 6, 2]
+    assert payload["api_request_count"] == 10
+
+
 def test_gemini_runtime_runs_multi_tool_completion_flow(tmp_path, monkeypatch):
     benchmark = load_module()
     config_path = write_gemini_config(tmp_path, benchmark, max_requests=5)

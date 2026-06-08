@@ -21,7 +21,17 @@ fixture tasks.
 - model: `gpt-5.4-mini`
 - reasoning_effort: `medium`
 
-## Gemini Gemma Profile
+## Source Of Truth
+
+- Scenario catalog: `.agents/scripts/agents-benchmark.py` (`SCENARIOS`)
+- Clean-clone validation snapshot:
+  `.agents/benchmarks/runtime-flow-live-agent-v4-latest.json`
+- Raw full-result history:
+  `.agents/data/benchmarks/results/*_runtime-flow-live-agent-v4.json`
+- Provider profiles: `.agents/data/benchmarks/providers/*.json`
+- Manual API runs: `.afol/tmp/benchmarks/*.json`
+
+## Gemini/Gemma Profile
 
 Config:
 
@@ -51,46 +61,96 @@ Initial limits:
 - default request budget: 5 requests per scenario, 10 requests per suite
 - recovery request: disabled by default
 
-Gemma API benchmark implementation plan:
+Implemented behavior:
 
-1. Add provider config loading to `agents-benchmark.py` while preserving the
-   Codex defaults and `--model` / `--reasoning-effort` compatibility.
-2. Add a `gemini-api` provider that calls Gemini `generateContent` with
-   `GEMINI_API_KEY`, redacts secrets in errors, and refuses to run when the key
-   is missing.
-3. Add request accounting fields to every result: `api_request_count`,
-   `api_rpm_limit`, `api_rpd_limit`, `api_rpm_peak`, `api_rpd_count`,
-   `api_rate_limited`, and `api_throttle_delay_ms`.
-4. Enforce request budgets before and during runs. Use the local ledger to count
-   the last 60 seconds for RPM and the current day for RPD. Sleep when the RPM
-   window is full; fail fast when RPD is exhausted.
-5. Keep Gemma scenarios text-only. Use Gemini function calling with an
-   allowlisted local `run_shell` harness so the model must request fixture
-   commands before final structured output.
-6. Minimize API calls: discovery scenarios should use two requests, tool
-   request plus final structured response. Task/evidence scenarios may use up
-   to five requests so the agent can run start, complete, final task-file
-   inspection, final evidence-ledger inspection, then structured output. No
-   automatic recovery request unless explicitly enabled.
-7. Update validation so `runtime-live-agent` can either keep the Codex baseline
-   or consume an explicit Gemma profile snapshot without hard-coded
-   `gpt-5.4-mini` assumptions.
-8. Add unit tests with mocked Gemini HTTP responses for config parsing, missing
-   key handling, request ledger math, throttle behavior, and profile result
-   serialization. Real API runs stay manual/dev-only.
+- Provider config loading preserves Codex defaults and `--model` /
+  `--reasoning-effort` compatibility.
+- `gemini-api` calls Gemini `generateContent` with `GEMINI_API_KEY`, redacts
+  secrets from payload output, and fails when the key is missing.
+- API accounting is recorded in suite and scenario payloads:
+  `api_request_count`, `api_rpm_limit`, `api_rpd_limit`, `api_rpm_peak`,
+  `api_rpd_count`, `api_rate_limited`, and `api_throttle_delay_ms`.
+- Local ledger enforces RPD, RPM, and minimum request spacing.
+- Suite and scenario request budgets are enforced. A multi-scenario Gemini run
+  receives only the remaining suite request budget for each next scenario.
+- Gemini runs use text-only function calling with an allowlisted local
+  `run_shell` harness.
+- Unit tests mock Gemini HTTP responses. Real API runs are manual/dev-only.
+
+Current verified real-API coverage:
+
+| Scenario | Result | Requests | Tokens | Notes |
+| --- | --- | ---: | ---: | --- |
+| `live-implement-start-complete-evidence` | pass, 30/30 checks | 5 | 2076 | Verified with Gemma API and local tools. |
+
+Current unverified real-API coverage:
+
+- `live-afol-python-code-task-orchestrated`
+- `live-autonomous-agentic-folder-delivery`
+- Full multi-scenario Gemini suite
+
+Risk: the hard code-task and autonomous scenarios may need more than the
+default 5 requests/scenario. Raise budget only for intentional manual runs, and
+keep the suite cap low to protect RPM/RPD.
 
 ## Scenarios
 
-- `live-tools-benchmark-discovery`
-- `live-implement-next-governance-preflight`
-- `live-implement-start-complete-evidence`
-- `live-wb-update-task-evidence-timeline`
-- `live-wb-session-create-scripted-progress`
-- `live-autonomous-agentic-folder-delivery`
-- `live-wb-update-status-touch`
-- `live-wb-update-link`
-- `live-afol-provider-compatible-delivery`
-- `live-afol-python-code-task-orchestrated`
+| Tier | Scenario | Purpose | Expected use |
+| --- | --- | --- | --- |
+| T0 read-only | `live-tools-benchmark-discovery` | Tool contract discovery. | Cheapest smoke check. |
+| T0 read-only | `live-implement-next-governance-preflight` | Governance preflight/report for next task. | Quick rule-loading check. |
+| T1 lifecycle | `live-implement-start-complete-evidence` | Start task, complete task, inspect final task and evidence. | Minimum closeout proof. |
+| T1 lifecycle | `live-wb-update-task-evidence-timeline` | Evidence, done state, timeline updates. | Legacy workbench mutation check. |
+| T1 lifecycle | `live-wb-session-create-scripted-progress` | Create session and advance T-01 through scripts. | Scripted lifecycle check. |
+| T1 metadata | `live-wb-update-status-touch` | Frontmatter status/touch update. | Metadata mutation check. |
+| T1 metadata | `live-wb-update-link` | Frontmatter link entry. | Metadata link check. |
+| T2 AFOL delivery | `live-afol-provider-compatible-delivery` | Downstream `.afol/wb` delivery with provider-compatible paths. | AFOL-only lifecycle check. |
+| T3 autonomous delivery | `live-autonomous-agentic-folder-delivery` | Discover workflow from local instructions, plan, execute, verify tiny fix. | Hard no-recipe workflow check. |
+| T4 code task | `live-afol-python-code-task-orchestrated` | Planner/executor code task through AFOL with plan/task/report scoring. | Hardest code-delivery check. |
+
+Selection rules:
+
+- Need quick smoke: run `live-tools-benchmark-discovery`.
+- Need final plan/task/evidence proof: run
+  `live-implement-start-complete-evidence`.
+- Need downstream `.afol/` compatibility: run
+  `live-afol-provider-compatible-delivery`.
+- Need real code-delivery ability: run
+  `live-afol-python-code-task-orchestrated`.
+- Need no-recipe autonomous discovery: run
+  `live-autonomous-agentic-folder-delivery`.
+- Need release regression: run the full Codex suite and refresh the tracked
+  snapshot.
+
+Do not confuse:
+
+- `live-implement-start-complete-evidence` proves lifecycle closeout only. It
+  does not prove code-task ability.
+- `live-afol-python-code-task-orchestrated` is the harder code-task scenario.
+- `live-autonomous-agentic-folder-delivery` tests workflow discovery without a
+  command recipe in the prompt.
+- `.agents/benchmarks/runtime-flow-live-agent-v4-latest.json` is the tracked
+  clean-clone snapshot. Raw result files carry fuller diagnostics and token
+  detail.
+- `.afol/tmp/benchmarks/` is for ignored manual API outputs.
+
+## Latest Codex Baseline
+
+Latest full result inspected:
+`.agents/data/benchmarks/results/20260607_132956_runtime-flow-live-agent-v4.json`.
+
+| Scenario | Pass | Checks | Tools | Duration ms | Total tokens | Cached tokens |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `live-tools-benchmark-discovery` | yes | 8/8 | 1 | 8580 | 32208 | 12544 |
+| `live-implement-next-governance-preflight` | yes | 10/10 | 2 | 12421 | 52982 | 35968 |
+| `live-implement-start-complete-evidence` | yes | 10/10 | 4 | 13968 | 67505 | 36864 |
+| `live-wb-update-task-evidence-timeline` | yes | 12/12 | 6 | 18767 | 82257 | 65408 |
+| `live-wb-session-create-scripted-progress` | yes | 31/31 | 6 | 24280 | 123050 | 104064 |
+| `live-autonomous-agentic-folder-delivery` | yes | 34/34 | 19 | 63245 | 456853 | 418304 |
+| `live-afol-provider-compatible-delivery` | yes | 35/35 | 7 | 32016 | 147414 | 129408 |
+| `live-afol-python-code-task-orchestrated` | yes | 51/51 | 12 | 72124 | 255575 | 225792 |
+| `live-wb-update-status-touch` | yes | 10/10 | 5 | 21527 | 102147 | 85248 |
+| `live-wb-update-link` | yes | 9/9 | 2 | 11109 | 47886 | 33408 |
 
 ## Commands
 
@@ -104,6 +164,14 @@ python3 .agents/scripts/agents-benchmark.py run live-wb-session-create-scripted-
 python3 .agents/scripts/agents-benchmark.py run live-autonomous-agentic-folder-delivery --save --model gpt-5.4-mini --reasoning-effort low
 python3 .agents/scripts/agents-benchmark.py run live-afol-provider-compatible-delivery --save --model gpt-5.4-mini --reasoning-effort low
 python3 .agents/scripts/agents-benchmark.py run live-afol-python-code-task-orchestrated --save --model gpt-5.4-mini --reasoning-effort low
+```
+
+Gemini/Gemma manual runs:
+
+```bash
+python3 .agents/scripts/agents-benchmark.py run live-implement-start-complete-evidence --provider-config .agents/data/benchmarks/providers/gemini-gemma4-31b.json --output .afol/tmp/benchmarks/gemini-implement-complete.json --pretty
+python3 .agents/scripts/agents-benchmark.py run live-afol-python-code-task-orchestrated --provider-config .agents/data/benchmarks/providers/gemini-gemma4-31b.json --output .afol/tmp/benchmarks/gemini-code-task-orchestrated.json --pretty
+python3 .agents/scripts/agents-benchmark.py run live-autonomous-agentic-folder-delivery --provider-config .agents/data/benchmarks/providers/gemini-gemma4-31b.json --output .afol/tmp/benchmarks/gemini-autonomous-delivery.json --pretty
 ```
 
 ## Validation Bridge

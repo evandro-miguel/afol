@@ -14,7 +14,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -113,6 +113,7 @@ class BenchmarkProfile:
     model: str = "gpt-5.4-mini"
     reasoning_effort: str = "medium"
     provider_config_path: str = ""
+    api_request_budget_remaining: int | None = None
 
     def to_dict(self) -> dict[str, str]:
         payload = {
@@ -154,6 +155,10 @@ class GeminiProviderConfig:
     @property
     def max_requests_per_scenario(self) -> int:
         return int(self.request_budget.get("max_requests_per_scenario", 1))
+
+    @property
+    def max_requests_per_suite(self) -> int:
+        return int(self.request_budget.get("max_requests_per_suite", 0))
 
 
 @dataclass(frozen=True)
@@ -4183,7 +4188,10 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
             "api_rate_limited": False,
             "api_throttle_delay_ms": 0,
         }
-        if config.max_requests_per_scenario < 1:
+        request_limit = config.max_requests_per_scenario
+        if profile.api_request_budget_remaining is not None:
+            request_limit = min(request_limit, max(profile.api_request_budget_remaining, 0))
+        if request_limit < 1:
             failures.append("Gemini request budget exhausted before first request")
         else:
             contents: list[dict[str, Any]] = [
@@ -4202,7 +4210,7 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
             ]
             try:
                 while (
-                    api_request_count < config.max_requests_per_scenario - 1
+                    api_request_count < request_limit - 1
                     and not _gemini_tool_requirements_satisfied(tool_calls, scenario)
                 ):
                     api_stats = _reserve_gemini_request(config, scenario.id)
@@ -4250,7 +4258,7 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
                                 ],
                             }
                         )
-                if api_request_count >= config.max_requests_per_scenario:
+                if api_request_count >= request_limit:
                     failures.append("Gemini request budget exhausted before final structured response")
                 else:
                     api_stats = _reserve_gemini_request(config, scenario.id)
@@ -4357,11 +4365,32 @@ def run_suite(
     selected_ids = _validate_scenario_ids(scenario_ids)
     run_scenario = executor or _run_default_scenario
 
+    suite_request_budget: int | None = None
+    if profile.runtime == "gemini-api" and profile.provider_config_path:
+        config = _load_gemini_provider_config(profile.provider_config_path)
+        if config.max_requests_per_suite > 0:
+            suite_request_budget = config.max_requests_per_suite
+        if profile.api_request_budget_remaining is not None:
+            profile_budget = max(profile.api_request_budget_remaining, 0)
+            suite_request_budget = (
+                min(suite_request_budget, profile_budget)
+                if suite_request_budget is not None
+                else profile_budget
+            )
+
     started_at = time.perf_counter()
-    scenario_results = [
-        _enforce_token_budget(run_scenario(SCENARIOS[scenario_id], profile))
-        for scenario_id in selected_ids
-    ]
+    scenario_results = []
+    for scenario_id in selected_ids:
+        scenario_profile = profile
+        if suite_request_budget is not None:
+            scenario_profile = replace(
+                profile,
+                api_request_budget_remaining=max(suite_request_budget, 0),
+            )
+        result = _enforce_token_budget(run_scenario(SCENARIOS[scenario_id], scenario_profile))
+        scenario_results.append(result)
+        if suite_request_budget is not None:
+            suite_request_budget = max(suite_request_budget - int(result.get("api_request_count", 0)), 0)
     total_duration_ms = round((time.perf_counter() - started_at) * 1000)
 
     payload = {

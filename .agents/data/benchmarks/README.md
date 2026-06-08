@@ -7,3 +7,5 @@ when `--save` or `--output` targets a path under `.agents/data/benchmarks/`.
 - Results are operational artifacts, not project-owned docs
 - Benchmark runs are selective regression checks for risky execution-flow
   changes, not a universal gate
+- Scenario catalog, tiering, provider profiles, and run commands are documented
+  in `docs/agentic/agents-benchmark.md`
