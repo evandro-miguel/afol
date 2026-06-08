@@ -60,6 +60,7 @@ docs/telemetry/reports/implementation_report.md
 
 # Legacy workbench sessions (local-only; plans live in .afol/wb/)
 .agents/wb/
+.afol/wb/.active_session
 .afol/tmp/*
 !.afol/tmp/
 !.afol/tmp/README.md

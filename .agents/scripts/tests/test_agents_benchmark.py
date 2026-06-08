@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from dataclasses import replace
 import json
 import subprocess
 import sys
@@ -33,7 +34,11 @@ def write_gemini_config(tmp_path, benchmark, *, rpm=15, rpd=1500, interval_ms=0,
                 "generation": {"temperature": 0.1, "top_p": 0.95, "max_output_tokens": 8192},
                 "rate_limits": {"rpm": rpm, "rpd": rpd, "min_request_interval_ms": interval_ms},
                 "request_budget": {"max_requests_per_scenario": max_requests, "max_requests_per_suite": 10},
-                "capabilities": {"text_only": True, "structured_json": True},
+                "capabilities": {
+                    "text_only": True,
+                    "structured_json": True,
+                    "tools": ["list_dir", "read_file", "write_file", "run_shell"],
+                },
                 "ledger": {"path": str(tmp_path / "gemini-rate-ledger.jsonl")},
             }
         )
@@ -375,7 +380,14 @@ def test_gemini_runtime_records_api_metrics_with_mocked_http(tmp_path, monkeypat
         assert "secret-test-key" == api_key
         if tools:
             assert schema is None
-            assert "controlled runtime benchmark fixture" in contents[0]["parts"][0]["text"]
+            initial_prompt = contents[0]["parts"][0]["text"]
+            tool_names = {
+                declaration["name"]
+                for declaration in tools[0]["functionDeclarations"]
+            }
+            assert tool_names == {"list_dir", "read_file", "write_file", "run_shell"}
+            assert "controlled runtime benchmark fixture" in initial_prompt
+            assert "Use the provided `run_shell` tool" not in initial_prompt
             return {
                 "candidates": [
                     {
@@ -440,6 +452,16 @@ def test_gemini_runtime_records_api_metrics_with_mocked_http(tmp_path, monkeypat
     assert scenario["tool_call_count"] == 1
     assert scenario["tool_success_count"] == 1
     assert scenario["observed_tool_calls"][0]["command_excerpt"] == "./.agents/agents tools info benchmark"
+    assert scenario["available_tools"] == ["list_dir", "read_file", "write_file", "run_shell"]
+    assert scenario["agent_progress_event_count"] >= 6
+    assert {"fixture_prepared", "tool_call", "tool_result", "structured_output_parsed"} <= {
+        event["event"] for event in scenario["agent_progress"]
+    }
+    assert scenario["agent_progress"][0]["available_tools"] == ["list_dir", "read_file", "write_file", "run_shell"]
+    assert isinstance(
+        next(event["token_usage"] for event in scenario["agent_progress"] if event["event"] == "api_response_received"),
+        dict,
+    )
     assert scenario["token_usage"]["total_tokens"] == 18
     assert "secret-test-key" not in json.dumps(payload)
     assert len(calls) == 2
@@ -658,19 +680,95 @@ def test_gemini_function_call_parser_and_allowlist(tmp_path):
         {
             "name": "run_shell",
             "args": {"command": "./.agents/agents tools info benchmark"},
+            "id": "",
         }
     ]
     assert benchmark._gemini_command_allowed("./.agents/agents tools info benchmark", scenario) is True
     assert benchmark._gemini_command_allowed("rm -rf .", scenario) is False
 
 
+def test_gemini_code_task_shell_allowlist_permits_afold_help_discovery():
+    benchmark = load_module()
+    scenario = benchmark.SCENARIOS["live-afol-python-code-task-orchestrated"]
+
+    assert benchmark._gemini_command_allowed("./afold --help", scenario) is True
+    assert benchmark._gemini_command_allowed("./afold new --help", scenario) is True
+    assert benchmark._gemini_command_allowed("command -v afol", scenario) is False
+    assert benchmark._gemini_command_allowed("rm -rf .afol/wb", scenario) is False
+
+
 def test_gemini_tool_declaration_uses_supported_schema_fields():
     benchmark = load_module()
 
-    parameters = benchmark._gemini_tool_declarations()[0]["functionDeclarations"][0]["parameters"]
+    declarations = benchmark._gemini_tool_declarations()[0]["functionDeclarations"]
+    by_name = {declaration["name"]: declaration for declaration in declarations}
 
-    assert "additionalProperties" not in parameters
-    assert parameters["required"] == ["command"]
+    assert set(by_name) == {"list_dir", "read_file", "write_file", "run_shell"}
+    for declaration in declarations:
+        assert "additionalProperties" not in declaration["parameters"]
+    assert by_name["run_shell"]["parameters"]["required"] == ["command"]
+    assert by_name["read_file"]["parameters"]["required"] == ["path"]
+    assert by_name["write_file"]["parameters"]["required"] == ["path", "content"]
+
+
+def test_gemini_code_task_prompt_is_high_level_without_tool_recipe():
+    benchmark = load_module()
+
+    prompt = benchmark._gemini_initial_prompt(benchmark.SCENARIOS["live-afol-python-code-task-orchestrated"])
+
+    assert "AGENTS.md" in prompt
+    assert "docs" in prompt
+    assert "run_shell" not in prompt
+    assert "list_dir" not in prompt
+    assert "./afold" not in prompt
+    assert "python3 scripts/check_slugify.py" not in prompt
+    assert "runner supplies phase prompts" not in prompt
+
+
+def test_gemini_file_tools_are_bounded_to_fixture(tmp_path):
+    benchmark = load_module()
+    scenario = benchmark.SCENARIOS["live-tools-benchmark-discovery"]
+    fixture_root = tmp_path / "fixture"
+    fixture_root.mkdir()
+    (fixture_root / "docs").mkdir()
+    (fixture_root / "docs" / "note.md").write_text("hello", encoding="utf-8")
+
+    list_result, list_observation = benchmark._run_gemini_agent_tool(
+        {"name": "list_dir", "args": {"path": "docs"}},
+        fixture_root,
+        scenario,
+        1,
+    )
+    read_result, read_observation = benchmark._run_gemini_agent_tool(
+        {"name": "read_file", "args": {"path": "docs/note.md"}},
+        fixture_root,
+        scenario,
+        2,
+    )
+    write_result, write_observation = benchmark._run_gemini_agent_tool(
+        {"name": "write_file", "args": {"path": "out/result.txt", "content": "done"}},
+        fixture_root,
+        scenario,
+        3,
+    )
+    escape_result, _escape_observation = benchmark._run_gemini_agent_tool(
+        {"name": "read_file", "args": {"path": "../outside.txt"}},
+        fixture_root,
+        scenario,
+        4,
+    )
+
+    assert list_result["ok"] is True
+    assert list_result["entries"] == [{"name": "note.md", "kind": "file"}]
+    assert list_observation["name"] == "list_dir"
+    assert read_result["ok"] is True
+    assert read_result["content"] == "hello"
+    assert read_observation["command_excerpt"] == "read_file docs/note.md"
+    assert write_result["ok"] is True
+    assert (fixture_root / "out" / "result.txt").read_text(encoding="utf-8") == "done"
+    assert write_observation["exit_code"] == 0
+    assert escape_result["ok"] is False
+    assert escape_result["error"] == "path escapes benchmark fixture"
 
 
 def test_gemini_rate_ledger_enforces_rpd(tmp_path):
@@ -756,6 +854,371 @@ def test_parse_observed_tool_data_counts_errors_and_retries():
     assert error_count == 1
     assert retry_count == 1
     assert tool_calls[0]["command_excerpt"] == "./.agents/agents tools info benchmark"
+
+
+def test_gemini_tool_loop_appends_function_responses(tmp_path, monkeypatch):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark, max_requests=5)
+    profile = benchmark.BenchmarkProfile(
+        runtime="gemini-api",
+        model="gemma-4-31b-it",
+        provider_config_path=str(config_path),
+    )
+    scenario = replace(
+        benchmark.SCENARIOS["live-tools-benchmark-discovery"],
+        required_command_substrings=(".agents/agents tools info benchmark",),
+        any_required_command_groups=(),
+        forbidden_command_substrings=(),
+        validation_check_count=0,
+        min_tool_calls=0,
+        validator=lambda _output_json, _repo_root: [],
+    )
+
+    fixture_root = tmp_path / "fixture"
+    fixture_root.mkdir()
+    (fixture_root / "README.md").write_text("fixture", encoding="utf-8")
+    monkeypatch.setenv("GEMINI_API_KEY", "secret-test-key")
+    monkeypatch.setattr(benchmark, "_prepare_fixture_repo", lambda _tmp_dir: fixture_root)
+
+    call_history = []
+    calls = {"shell": 0}
+    tool_sequence = [
+        {"name": "list_dir", "args": {"path": "."}},
+        {"name": "read_file", "args": {"path": "README.md"}},
+        {"name": "write_file", "args": {"path": "notes/progress.md", "content": "ready"}},
+        {"name": "run_shell", "args": {"command": "./.agents/agents tools info benchmark"}},
+    ]
+
+    def fake_generate_content(config, contents, api_key, *, schema=None, tools=None):
+        call_history.append(
+            {
+                "has_tools": bool(tools),
+                "has_schema": bool(schema),
+                "contents": json.loads(json.dumps(contents)),
+            }
+        )
+        assert config.model == "gemma-4-31b-it"
+        if tools:
+            tool_turn = sum(1 for call in call_history if call["has_tools"])
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "name": tool_sequence[tool_turn - 1]["name"],
+                                        "args": tool_sequence[tool_turn - 1]["args"],
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 3, "totalTokenCount": 8},
+            }
+        assert schema is not None
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "scenario_id": scenario.id,
+                                        "tool_surface": "benchmark",
+                                        "default_model": benchmark.DEFAULT_PROFILE.model,
+                                        "default_reasoning_effort": benchmark.DEFAULT_PROFILE.reasoning_effort,
+                                    }
+                                )
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {"promptTokenCount": 6, "candidatesTokenCount": 4, "totalTokenCount": 10},
+        }
+
+    def fake_run_shell(command, _fixture_root, _scenario):
+        calls["shell"] += 1
+        assert command == "./.agents/agents tools info benchmark"
+        return {
+            "ok": True,
+            "exit_code": 0,
+            "stdout": "tool ok",
+            "stderr": "",
+        }
+
+    monkeypatch.setattr(benchmark, "_gemini_http_generate_content", fake_generate_content)
+    monkeypatch.setattr(benchmark, "_run_gemini_shell_tool", fake_run_shell)
+
+    result = benchmark._run_gemini_scenario(scenario, profile)
+
+    assert result["backend"] == "gemini_api"
+    assert result["api_request_count"] == 5
+    assert result["tool_call_count"] == 4
+    assert result["tool_success_count"] == 4
+    assert [call["name"] for call in result["observed_tool_calls"]] == [
+        "list_dir",
+        "read_file",
+        "write_file",
+        "run_shell",
+    ]
+    assert result["observed_tool_calls"][-1]["command_excerpt"] == "./.agents/agents tools info benchmark"
+    assert calls["shell"] == 1
+    assert len(call_history) == 5
+    tool_messages = call_history[1]["contents"]
+    assert any(part.get("functionResponse") is not None for message in tool_messages for part in message.get("parts", []))
+    assert (fixture_root / "notes" / "progress.md").read_text(encoding="utf-8") == "ready"
+    assert result["available_tools"] == ["list_dir", "read_file", "write_file", "run_shell"]
+    assert {"tool_call", "tool_result", "structured_output_parsed"} <= {
+        event["event"] for event in result["agent_progress"]
+    }
+
+
+def test_gemini_scenario_respects_max_requests_per_scenario_limit(tmp_path, monkeypatch):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark, max_requests=0)
+    profile = benchmark.BenchmarkProfile(
+        runtime="gemini-api",
+        model="gemma-4-31b-it",
+        provider_config_path=str(config_path),
+    )
+    scenario = replace(
+        benchmark.SCENARIOS["live-tools-benchmark-discovery"],
+        required_command_substrings=(),
+        any_required_command_groups=(),
+        forbidden_command_substrings=(),
+        validation_check_count=0,
+        min_tool_calls=1,
+        validator=lambda _output_json, _repo_root: [],
+    )
+    monkeypatch.setenv("GEMINI_API_KEY", "secret-test-key")
+
+    fixture_root = tmp_path / "fixture"
+    fixture_root.mkdir()
+    monkeypatch.setattr(benchmark, "_prepare_fixture_repo", lambda _tmp_dir: fixture_root)
+
+    called = []
+
+    def fake_generate_content(config, contents, api_key, *, schema=None, tools=None):
+        called.append((bool(tools), bool(schema)))
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "scenario_id": scenario.id,
+                                        "tool_surface": "benchmark",
+                                        "default_model": benchmark.DEFAULT_PROFILE.model,
+                                        "default_reasoning_effort": benchmark.DEFAULT_PROFILE.reasoning_effort,
+                                    }
+                                )
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {"promptTokenCount": 6, "candidatesTokenCount": 4, "totalTokenCount": 10},
+        }
+
+    monkeypatch.setattr(benchmark, "_gemini_http_generate_content", fake_generate_content)
+
+    result = benchmark._run_gemini_scenario(scenario, profile)
+
+    assert result["api_request_count"] == 0
+    assert result["tool_call_count"] == 0
+    assert result["pass"] is False
+    assert "Gemini request budget exhausted before first request" in result["failure_reasons"]
+    assert called == []
+
+
+def test_gemini_runtime_records_rate_limit_and_rpd_metrics_from_reserve(tmp_path, monkeypatch):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark, max_requests=4)
+    profile = benchmark.BenchmarkProfile(
+        runtime="gemini-api",
+        model="gemma-4-31b-it",
+        provider_config_path=str(config_path),
+    )
+    scenario = replace(
+        benchmark.SCENARIOS["live-tools-benchmark-discovery"],
+        required_command_substrings=(),
+        any_required_command_groups=(),
+        forbidden_command_substrings=(),
+        validation_check_count=0,
+        min_tool_calls=1,
+        validator=lambda _output_json, _repo_root: [],
+    )
+    monkeypatch.setenv("GEMINI_API_KEY", "secret-test-key")
+    fixture_root = tmp_path / "fixture"
+    fixture_root.mkdir()
+    monkeypatch.setattr(benchmark, "_prepare_fixture_repo", lambda _tmp_dir: fixture_root)
+
+    reserve_calls = []
+
+    def fake_reserve(config, scenario_id, now=None):
+        reserve_calls.append(scenario_id)
+        return {
+            "api_rpm_limit": 15,
+            "api_rpd_limit": 1500,
+            "api_rpm_peak": len(reserve_calls),
+            "api_rpd_count": 20 + len(reserve_calls),
+            "api_rate_limited": len(reserve_calls) > 1,
+            "api_throttle_delay_ms": 60000 if len(reserve_calls) == 2 else 0,
+        }
+
+    def fake_generate_content(config, contents, api_key, *, schema=None, tools=None):
+        if tools:
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "name": "run_shell",
+                                        "args": {"command": "echo metric-check"},
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 3, "totalTokenCount": 8},
+            }
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "scenario_id": scenario.id,
+                                        "tool_surface": "benchmark",
+                                        "default_model": benchmark.DEFAULT_PROFILE.model,
+                                        "default_reasoning_effort": benchmark.DEFAULT_PROFILE.reasoning_effort,
+                                    }
+                                )
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {"promptTokenCount": 6, "candidatesTokenCount": 4, "totalTokenCount": 10},
+        }
+
+    def fake_run_shell(command, _fixture_root, _scenario):
+        return {"ok": True, "exit_code": 0, "stdout": "ok", "stderr": ""}
+
+    monkeypatch.setattr(benchmark, "_reserve_gemini_request", fake_reserve)
+    monkeypatch.setattr(benchmark, "_gemini_http_generate_content", fake_generate_content)
+    monkeypatch.setattr(benchmark, "_run_gemini_shell_tool", fake_run_shell)
+
+    result = benchmark._run_gemini_scenario(scenario, profile)
+
+    assert result["api_request_count"] == 2
+    assert reserve_calls == [scenario.id, scenario.id]
+    assert result["api_rpm_limit"] == 15
+    assert result["api_rpd_limit"] == 1500
+    assert result["api_rpm_peak"] == 2
+    assert result["api_rpd_count"] == 22
+    assert result["api_rate_limited"] is True
+    assert result["api_throttle_delay_ms"] == 60000
+
+
+def test_run_orchestrated_code_task_scenario_exposes_delivery_artifacts_and_quality(tmp_path, monkeypatch):
+    benchmark = load_module()
+    scenario = replace(
+        benchmark.SCENARIOS["live-afol-python-code-task-orchestrated"],
+        required_command_substrings=(),
+        any_required_command_groups=(),
+        forbidden_command_substrings=(),
+        validation_check_count=0,
+        min_tool_calls=0,
+        validator=lambda _output_json, _repo_root: [],
+    )
+
+    fixture_root = tmp_path / "code-task"
+    fixture_root.mkdir()
+    session_id = benchmark.FIXTURE_WORKSTREAM_ID
+    session_dir = fixture_root / ".afol" / "wb" / session_id
+    session_dir.mkdir(parents=True)
+    (session_dir / f"{session_id}_plan_01.md").write_text("# Plan\n", encoding="utf-8")
+    (session_dir / f"{session_id}_task_01.md").write_text("| T-01 | done | worker | Implement slugify |\n", encoding="utf-8")
+    (session_dir / ".evidence.jsonl").write_text('{"task_id":"T-01","command":"python3 scripts/check_slugify.py","result":"passed","artifact":"test-code-task-project/benchmark_report.md"}\n', encoding="utf-8")
+    (fixture_root / "docs").mkdir()
+    (fixture_root / "docs" / "benchmark_problem.md").write_text("# Benchmark Problem\n", encoding="utf-8")
+    project_dir = fixture_root / benchmark.CODE_TASK_PROJECT_DIR
+    (project_dir / "src").mkdir(parents=True)
+    (project_dir / "src" / "text_utils.py").write_text("def slugify(text): return text\n", encoding="utf-8")
+    (project_dir / "benchmark_report.md").write_text("# Report\n", encoding="utf-8")
+    scripts_dir = fixture_root / "scripts"
+    scripts_dir.mkdir()
+    (scripts_dir / "check_slugify.py").write_text("print('ok')\n", encoding="utf-8")
+
+    monkeypatch.setattr(benchmark, "_prepare_code_task_fixture_repo", lambda _tmp_dir: fixture_root)
+
+    phase_runs = []
+
+    def fake_codex_phase(phase, **_kwargs):
+        phase_runs.append(phase)
+        return {
+            "phase": phase,
+            "returncode": 0,
+            "timed_out": False,
+            "error_count": 0,
+            "retry_count": 0,
+            "prompt_bytes": 42,
+            "stdout_excerpt": "phase ok",
+            "stderr_excerpt": "",
+            "command": ["codex", "--phase", phase],
+            "token_usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2, "cached_input_tokens": 0, "reasoning_output_tokens": 0},
+            "tool_calls": [],
+            "output_error": None,
+            "stdout": "phase ok",
+            "stderr": "",
+            "output_json": {"session_id": session_id},
+        }
+
+    def fake_score(
+        _session_id,
+        _plan_text,
+        _task_text,
+        _report_text,
+        _evidence_text,
+        _changed_paths,
+    ):
+        return {"score": 92, "pass": True}
+
+    monkeypatch.setattr(benchmark, "_run_codex_phase", fake_codex_phase)
+    monkeypatch.setattr(benchmark, "_score_code_task_delivery_quality", fake_score)
+    monkeypatch.setattr(benchmark, "_code_task_changed_paths", lambda _repo_root: [f"{benchmark.CODE_TASK_PROJECT_DIR}/src/text_utils.py"])
+    monkeypatch.setattr(benchmark, "_validate_code_task_planner", lambda _output_json, _fixture_root: [])
+    monkeypatch.setattr(benchmark, "_validate_code_task_executor", lambda _output_json, _fixture_root: [])
+
+    result = benchmark._run_orchestrated_code_task_scenario(scenario, benchmark.BenchmarkProfile(runtime="gemini-api"))
+
+    assert phase_runs == ["planner", "executor"]
+    assert result["backend"] == "live_agent_orchestrated"
+    assert result["pass"] is True
+    assert result["quality_score"]["score"] == 92
+    assert result["delivery_artifacts"]["session_id"] == session_id
+    assert result["delivery_artifacts"]["problem"]["exists"] is True
+    assert "Benchmark Problem" in result["delivery_artifacts"]["problem"]["content"]
+    assert result["delivery_artifacts"]["text_utils"]["exists"] is True
+    assert "def slugify" in result["delivery_artifacts"]["text_utils"]["content"]
+    assert result["delivery_artifacts"]["plan"]["path"] == f".afol/wb/{session_id}/{session_id}_plan_01.md"
+    assert result["delivery_artifacts"]["task"]["path"] == f".afol/wb/{session_id}/{session_id}_task_01.md"
+    assert result["delivery_artifacts"]["evidence_jsonl"]["path"] == f".afol/wb/{session_id}/.evidence.jsonl"
+    assert result["delivery_artifacts"]["report"]["path"] == f"{benchmark.CODE_TASK_PROJECT_DIR}/benchmark_report.md"
+    assert result["delivery_artifacts"]["problem"]["path"] == "docs/benchmark_problem.md"
+    assert result["output_json"]["session_id"] == session_id
 
 
 def test_parse_token_usage_collects_response_usage():

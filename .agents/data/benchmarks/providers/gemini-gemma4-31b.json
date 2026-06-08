@@ -17,14 +17,21 @@
     "min_request_interval_ms": 4100
   },
   "request_budget": {
-    "max_requests_per_scenario": 5,
-    "max_requests_per_suite": 10,
+    "max_requests_per_scenario": 12,
+    "max_requests_per_suite": 12,
     "allow_recovery_request": false
   },
   "capabilities": {
     "text_only": true,
-    "tool_loop": "gemini_function_calling_local_harness",
-    "structured_json": true
+    "tool_loop": "provider_agent_sdk_local_tools",
+    "structured_json": true,
+    "tools": [
+      "list_dir",
+      "read_file",
+      "write_file",
+      "run_shell"
+    ],
+    "progress_log": "agent_progress"
   },
   "ledger": {
     "path": ".afol/tmp/benchmarks/gemini-rate-ledger.jsonl"

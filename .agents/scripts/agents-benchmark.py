@@ -175,9 +175,25 @@ class LiveBenchmarkScenario:
     validator: Callable[[dict[str, Any], Path], list[str]]
     validation_check_count: int
     any_required_command_groups: tuple[tuple[str, ...], ...] = ()
+    allowed_command_substrings: tuple[str, ...] = ()
     min_tool_calls: int = 1
     timeout_seconds: int = 240
     forbidden_command_substrings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class GeminiAgentTool:
+    name: str
+    description: str
+    parameters: dict[str, Any]
+    handler: Callable[[dict[str, Any], Path, LiveBenchmarkScenario], dict[str, Any]]
+
+    def declaration(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": self.parameters,
+        }
 
 
 DEFAULT_PROFILE = BenchmarkProfile()
@@ -488,25 +504,160 @@ def _parse_gemini_json_response(response: dict[str, Any]) -> dict[str, Any]:
     return parsed
 
 
+def _gemini_safe_fixture_path(fixture_root: Path, raw_path: Any) -> tuple[Path | None, str, str | None]:
+    relative_path = str(raw_path or ".").strip() or "."
+    if "\x00" in relative_path:
+        return None, relative_path, "path contains null byte"
+    root = fixture_root.resolve()
+    candidate = (fixture_root / relative_path).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None, relative_path, "path escapes benchmark fixture"
+    return candidate, relative_path, None
+
+
+def _gemini_list_dir_tool(
+    args: dict[str, Any],
+    fixture_root: Path,
+    _scenario: LiveBenchmarkScenario,
+) -> dict[str, Any]:
+    path, relative_path, error = _gemini_safe_fixture_path(fixture_root, args.get("path", "."))
+    if error or path is None:
+        return {"ok": False, "error": error, "path": relative_path}
+    if not path.exists():
+        return {"ok": False, "error": "path does not exist", "path": relative_path}
+    if not path.is_dir():
+        return {"ok": False, "error": "path is not a directory", "path": relative_path}
+    limit = min(max(_non_negative_int(args.get("limit")) or 80, 1), 200)
+    children = sorted(path.iterdir(), key=lambda item: item.name)
+    entries = []
+    for child in children[:limit]:
+        entries.append(
+            {
+                "name": child.name,
+                "kind": "dir" if child.is_dir() else "file",
+            }
+        )
+    return {
+        "ok": True,
+        "path": relative_path,
+        "entries": entries,
+        "truncated": len(children) > limit,
+    }
+
+
+def _gemini_read_file_tool(
+    args: dict[str, Any],
+    fixture_root: Path,
+    _scenario: LiveBenchmarkScenario,
+) -> dict[str, Any]:
+    path, relative_path, error = _gemini_safe_fixture_path(fixture_root, args.get("path", ""))
+    if error or path is None:
+        return {"ok": False, "error": error, "path": relative_path}
+    if not path.exists():
+        return {"ok": False, "error": "path does not exist", "path": relative_path}
+    if not path.is_file():
+        return {"ok": False, "error": "path is not a file", "path": relative_path}
+    max_chars = min(max(_non_negative_int(args.get("max_chars")) or 8000, 1), 20000)
+    content = path.read_text(encoding="utf-8", errors="replace")
+    truncated = len(content) > max_chars
+    return {
+        "ok": True,
+        "path": relative_path,
+        "content": content[:max_chars],
+        "truncated": truncated,
+        "chars": min(len(content), max_chars),
+    }
+
+
+def _gemini_write_file_tool(
+    args: dict[str, Any],
+    fixture_root: Path,
+    _scenario: LiveBenchmarkScenario,
+) -> dict[str, Any]:
+    path, relative_path, error = _gemini_safe_fixture_path(fixture_root, args.get("path", ""))
+    if error or path is None:
+        return {"ok": False, "error": error, "path": relative_path}
+    content = str(args.get("content", ""))
+    if len(content) > 20000:
+        return {"ok": False, "error": "content exceeds 20000 character limit", "path": relative_path}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return {
+        "ok": True,
+        "path": relative_path,
+        "bytes": len(content.encode("utf-8")),
+    }
+
+
+def _gemini_shell_tool(args: dict[str, Any], fixture_root: Path, scenario: LiveBenchmarkScenario) -> dict[str, Any]:
+    command = str(args.get("command", "")).strip()
+    return _run_gemini_shell_tool(command, fixture_root, scenario)
+
+
+def _gemini_agent_tools() -> tuple[GeminiAgentTool, ...]:
+    return (
+        GeminiAgentTool(
+            name="list_dir",
+            description="List files and directories inside the benchmark fixture.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Relative directory path. Defaults to repository root."},
+                    "limit": {"type": "integer", "description": "Maximum entries to return."},
+                },
+            },
+            handler=_gemini_list_dir_tool,
+        ),
+        GeminiAgentTool(
+            name="read_file",
+            description="Read a UTF-8 text file from inside the benchmark fixture.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Relative file path to read."},
+                    "max_chars": {"type": "integer", "description": "Maximum characters to return."},
+                },
+                "required": ["path"],
+            },
+            handler=_gemini_read_file_tool,
+        ),
+        GeminiAgentTool(
+            name="write_file",
+            description="Write a UTF-8 text file inside the benchmark fixture.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Relative file path to write."},
+                    "content": {"type": "string", "description": "File contents."},
+                },
+                "required": ["path", "content"],
+            },
+            handler=_gemini_write_file_tool,
+        ),
+        GeminiAgentTool(
+            name="run_shell",
+            description="Run one allowlisted shell command in the benchmark fixture repository.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "Shell command to run from the fixture repository root.",
+                    }
+                },
+                "required": ["command"],
+            },
+            handler=_gemini_shell_tool,
+        ),
+    )
+
+
 def _gemini_tool_declarations() -> list[dict[str, Any]]:
     return [
         {
-            "functionDeclarations": [
-                {
-                    "name": "run_shell",
-                    "description": "Run one allowlisted shell command in the benchmark fixture repository.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "command": {
-                                "type": "string",
-                                "description": "Shell command to run from the fixture repository root.",
-                            }
-                        },
-                        "required": ["command"],
-                    },
-                }
-            ]
+            "functionDeclarations": [tool.declaration() for tool in _gemini_agent_tools()]
         }
     ]
 
@@ -528,6 +679,7 @@ def _gemini_function_calls(response: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "name": str(function_call.get("name", "")),
                 "args": function_call.get("args") if isinstance(function_call.get("args"), dict) else {},
+                "id": str(function_call.get("id", "")),
             }
         )
     return calls
@@ -541,6 +693,7 @@ def _gemini_command_allowed(command: str, scenario: LiveBenchmarkScenario) -> bo
     allowed_needles = list(scenario.required_command_substrings)
     for group in scenario.any_required_command_groups:
         allowed_needles.extend(group)
+    allowed_needles.extend(scenario.allowed_command_substrings)
     return any(needle and needle in command for needle in allowed_needles)
 
 
@@ -567,6 +720,90 @@ def _run_gemini_shell_tool(command: str, fixture_root: Path, scenario: LiveBench
         "stdout": _excerpt(completed.stdout or "", 4000),
         "stderr": _excerpt(completed.stderr or "", 4000),
     }
+
+
+def _gemini_progress_value(value: Any, *, depth: int = 0) -> Any:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if depth >= 3:
+        return _excerpt(str(value), 500)
+    if isinstance(value, list):
+        return [_gemini_progress_value(item, depth=depth + 1) for item in value[:50]]
+    if isinstance(value, dict):
+        limited_items = list(value.items())[:50]
+        return {str(key): _gemini_progress_value(item, depth=depth + 1) for key, item in limited_items}
+    return _excerpt(str(value), 500)
+
+
+def _record_gemini_agent_progress(progress: list[dict[str, Any]], event: str, **fields: Any) -> None:
+    entry: dict[str, Any] = {
+        "index": len(progress) + 1,
+        "at": _utc_now(),
+        "event": event,
+    }
+    for key, value in fields.items():
+        entry[key] = _gemini_progress_value(value)
+    progress.append(entry)
+
+
+def _gemini_tool_observation(
+    tool_name: str,
+    args: dict[str, Any],
+    result: dict[str, Any],
+    call_index: int,
+) -> dict[str, Any]:
+    if tool_name == "run_shell":
+        command_excerpt = _excerpt(str(args.get("command", "")), 1000)
+    else:
+        command_excerpt = _excerpt(f"{tool_name} {str(args.get('path', '.'))}", 1000)
+    output_excerpt = _excerpt(
+        str(result.get("stdout", ""))
+        + "\n"
+        + str(result.get("stderr", ""))
+        + "\n"
+        + json.dumps(result, ensure_ascii=True, sort_keys=True),
+        1000,
+    )
+    return {
+        "call_id": f"gemini-tool-{call_index}",
+        "name": tool_name,
+        "arguments_excerpt": _excerpt(json.dumps(args, ensure_ascii=True, sort_keys=True), 1000),
+        "command_excerpt": command_excerpt,
+        "exit_code": int(result.get("exit_code", 0 if result.get("ok") else 1)),
+        "aggregated_output_excerpt": output_excerpt,
+    }
+
+
+def _run_gemini_agent_tool(
+    function_call: dict[str, Any],
+    fixture_root: Path,
+    scenario: LiveBenchmarkScenario,
+    call_index: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    tool_name = str(function_call.get("name", ""))
+    args = function_call.get("args") if isinstance(function_call.get("args"), dict) else {}
+    tool_by_name = {tool.name: tool for tool in _gemini_agent_tools()}
+    tool = tool_by_name.get(tool_name)
+    if tool is None:
+        result = {"ok": False, "exit_code": 127, "error": f"unknown tool: {tool_name}"}
+    else:
+        result = tool.handler(args, fixture_root, scenario)
+    observation = _gemini_tool_observation(tool_name, args, result, call_index)
+    return result, observation
+
+
+def _gemini_initial_prompt(scenario: LiveBenchmarkScenario) -> str:
+    if scenario.id == "live-afol-python-code-task-orchestrated":
+        return (
+            "You are running inside an isolated AFOL benchmark fixture.\n"
+            "Complete the local code task as a provider agent.\n"
+            "Use AGENTS.md and docs/benchmark_problem.md as the source of truth before acting.\n"
+            "Follow the local governed workflow and edit only the fixture paths allowed by those instructions.\n"
+            "Keep API requests minimal by batching independent work when possible.\n"
+            "Do not claim completion until local acceptance, evidence, task closure, and report artifacts are actually done.\n"
+            "When finished, return JSON only that matches the provided schema."
+        )
+    return scenario.prompt
 
 
 def _gemini_tool_requirements_satisfied(tool_calls: list[dict[str, Any]], scenario: LiveBenchmarkScenario) -> bool:
@@ -3148,6 +3385,21 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 (f"{AFOLD_COMMAND} evidence", f"{AFOLD_COMMAND} e"),
                 (f"{AFOLD_COMMAND} done", f"{AFOLD_COMMAND} d", f"['{AFOLD_COMMAND}', 'done'"),
             ),
+            allowed_command_substrings=(
+                f"{AFOLD_COMMAND} --help",
+                f"{AFOLD_COMMAND} -h",
+                f"{AFOLD_COMMAND} help",
+                f"{AFOLD_COMMAND} new --help",
+                f"{AFOLD_COMMAND} n --help",
+                f"{AFOLD_COMMAND} start --help",
+                f"{AFOLD_COMMAND} st --help",
+                f"{AFOLD_COMMAND} evidence --help",
+                f"{AFOLD_COMMAND} e --help",
+                f"{AFOLD_COMMAND} done --help",
+                f"{AFOLD_COMMAND} d --help",
+                f"{AFOLD_COMMAND} status",
+                f"{AFOLD_COMMAND} s",
+            ),
             forbidden_command_substrings=(
                 *BARE_AFOL_DISCOVERY_COMMANDS,
                 ".agents/agents",
@@ -3208,6 +3460,21 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
                 (f"{AFOLD_COMMAND} start", f"{AFOLD_COMMAND} st"),
                 (f"{AFOLD_COMMAND} evidence", f"{AFOLD_COMMAND} e"),
                 (f"{AFOLD_COMMAND} done", f"{AFOLD_COMMAND} d", f"['{AFOLD_COMMAND}', 'done'"),
+            ),
+            allowed_command_substrings=(
+                f"{AFOLD_COMMAND} --help",
+                f"{AFOLD_COMMAND} -h",
+                f"{AFOLD_COMMAND} help",
+                f"{AFOLD_COMMAND} new --help",
+                f"{AFOLD_COMMAND} n --help",
+                f"{AFOLD_COMMAND} start --help",
+                f"{AFOLD_COMMAND} st --help",
+                f"{AFOLD_COMMAND} evidence --help",
+                f"{AFOLD_COMMAND} e --help",
+                f"{AFOLD_COMMAND} done --help",
+                f"{AFOLD_COMMAND} d --help",
+                f"{AFOLD_COMMAND} status",
+                f"{AFOLD_COMMAND} s",
             ),
             forbidden_command_substrings=(
                 *BARE_AFOL_DISCOVERY_COMMANDS,
@@ -3900,6 +4167,22 @@ def _collect_code_task_delivery_artifacts(output_json: dict[str, Any] | None, re
     return artifacts
 
 
+def _collect_gemini_code_task_delivery_result(
+    scenario: LiveBenchmarkScenario,
+    output_json: dict[str, Any],
+    fixture_root: Path,
+) -> tuple[dict[str, Any], list[str]]:
+    if scenario.id != "live-afol-python-code-task-orchestrated":
+        return {}, []
+    artifacts = _collect_code_task_delivery_artifacts(output_json, fixture_root)
+    failures = []
+    for artifact_name in ("plan", "task", "report", "evidence_jsonl"):
+        artifact = artifacts.get(artifact_name)
+        if not isinstance(artifact, dict) or not artifact.get("exists", False):
+            failures.append(f"required artifact missing in final output: {artifact_name}")
+    return artifacts, failures
+
+
 def _run_orchestrated_code_task_scenario(
     scenario: LiveBenchmarkScenario,
     profile: BenchmarkProfile,
@@ -4161,7 +4444,8 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
         raise ValueError(
             f"Missing {config.api_key_env}; export it or add it to ignored .env.local before running Gemini API benchmarks."
         )
-    prompt_bytes = _json_size(scenario.prompt)
+    initial_prompt = _gemini_initial_prompt(scenario)
+    prompt_bytes = _json_size(initial_prompt)
     temp_parent = Path(os.environ.get("AGENTS_BENCHMARK_TEMP_PARENT", "/tmp/agents-benchmark-live"))
     temp_parent.mkdir(parents=True, exist_ok=True)
 
@@ -4180,6 +4464,9 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
         api_request_count = 0
         tool_calls: list[dict[str, Any]] = []
         tool_error_count = 0
+        agent_progress: list[dict[str, Any]] = []
+        available_tools = [tool.name for tool in _gemini_agent_tools()]
+        delivery_artifacts: dict[str, Any] = {}
         api_stats: dict[str, Any] = {
             "api_rpm_limit": config.rpm_limit,
             "api_rpd_limit": config.rpd_limit,
@@ -4191,21 +4478,22 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
         request_limit = config.max_requests_per_scenario
         if profile.api_request_budget_remaining is not None:
             request_limit = min(request_limit, max(profile.api_request_budget_remaining, 0))
+        _record_gemini_agent_progress(
+            agent_progress,
+            "fixture_prepared",
+            scenario_id=scenario.id,
+            context_bytes=context_bytes,
+            available_tools=available_tools,
+            request_limit=request_limit,
+        )
         if request_limit < 1:
             failures.append("Gemini request budget exhausted before first request")
+            _record_gemini_agent_progress(agent_progress, "request_budget_exhausted", request_limit=request_limit)
         else:
             contents: list[dict[str, Any]] = [
                 {
                     "role": "user",
-                    "parts": [
-                        {
-                            "text": (
-                                scenario.prompt
-                                + "\n\nUse the provided `run_shell` tool for required shell commands. "
-                                + "After the tool result, return JSON only matching the requested schema."
-                            )
-                        }
-                    ],
+                    "parts": [{"text": initial_prompt}],
                 }
             ]
             try:
@@ -4215,6 +4503,13 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
                 ):
                     api_stats = _reserve_gemini_request(config, scenario.id)
                     api_request_count += 1
+                    _record_gemini_agent_progress(
+                        agent_progress,
+                        "api_request_start",
+                        request_index=api_request_count,
+                        with_tools=True,
+                        with_schema=False,
+                    )
                     response = _gemini_http_generate_content(
                         config,
                         contents,
@@ -4222,28 +4517,41 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
                         tools=_gemini_tool_declarations(),
                     )
                     function_calls = _gemini_function_calls(response)
+                    _record_gemini_agent_progress(
+                        agent_progress,
+                        "api_response_received",
+                        request_index=api_request_count,
+                        function_call_count=len(function_calls),
+                        token_usage=_gemini_token_usage(response),
+                    )
                     if not function_calls:
                         break
                     candidate_content = response.get("candidates", [{}])[0].get("content")
                     if isinstance(candidate_content, dict):
                         contents.append(candidate_content)
                     for function_call in function_calls:
-                        command = str(function_call.get("args", {}).get("command", "")).strip()
-                        call_result = _run_gemini_shell_tool(command, fixture_root, scenario)
+                        _record_gemini_agent_progress(
+                            agent_progress,
+                            "tool_call",
+                            tool_name=str(function_call.get("name", "")),
+                            args=function_call.get("args", {}),
+                        )
+                        call_result, observation = _run_gemini_agent_tool(
+                            function_call,
+                            fixture_root,
+                            scenario,
+                            len(tool_calls) + 1,
+                        )
                         if not call_result["ok"]:
                             tool_error_count += 1
-                        tool_calls.append(
-                            {
-                                "call_id": f"gemini-tool-{len(tool_calls) + 1}",
-                                "name": "run_shell",
-                                "arguments_excerpt": _excerpt(json.dumps({"command": command}, ensure_ascii=True)),
-                                "command_excerpt": _excerpt(command, 1000),
-                                "exit_code": call_result["exit_code"],
-                                "aggregated_output_excerpt": _excerpt(
-                                    str(call_result.get("stdout", "")) + "\n" + str(call_result.get("stderr", "")),
-                                    1000,
-                                ),
-                            }
+                        tool_calls.append(observation)
+                        _record_gemini_agent_progress(
+                            agent_progress,
+                            "tool_result",
+                            tool_name=observation["name"],
+                            ok=bool(call_result.get("ok")),
+                            exit_code=observation["exit_code"],
+                            output_excerpt=observation["aggregated_output_excerpt"],
                         )
                         contents.append(
                             {
@@ -4251,7 +4559,7 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
                                 "parts": [
                                     {
                                         "functionResponse": {
-                                            "name": "run_shell",
+                                            "name": str(function_call.get("name", "")),
                                             "response": call_result,
                                         }
                                     }
@@ -4260,24 +4568,57 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
                         )
                 if api_request_count >= request_limit:
                     failures.append("Gemini request budget exhausted before final structured response")
+                    _record_gemini_agent_progress(
+                        agent_progress,
+                        "request_budget_exhausted",
+                        request_limit=request_limit,
+                    )
                 else:
                     api_stats = _reserve_gemini_request(config, scenario.id)
                     api_request_count += 1
+                    _record_gemini_agent_progress(
+                        agent_progress,
+                        "api_request_start",
+                        request_index=api_request_count,
+                        with_tools=False,
+                        with_schema=True,
+                    )
                     response = _gemini_http_generate_content(
                         config,
                         contents,
                         api_key,
                         schema=scenario.response_schema,
                     )
+                    _record_gemini_agent_progress(
+                        agent_progress,
+                        "api_response_received",
+                        request_index=api_request_count,
+                        function_call_count=0,
+                        token_usage=_gemini_token_usage(response),
+                    )
                 output_json = _parse_gemini_json_response(response)
+                _record_gemini_agent_progress(
+                    agent_progress,
+                    "structured_output_parsed",
+                    ok=True,
+                    keys=sorted(output_json),
+                )
             except json.JSONDecodeError as exc:
                 failures.append(f"Gemini structured output parse failed: {exc}")
+                _record_gemini_agent_progress(agent_progress, "failure", error=f"structured output parse failed: {exc}")
             except ValueError as exc:
                 failures.append(str(exc))
+                _record_gemini_agent_progress(agent_progress, "failure", error=str(exc))
 
         if output_json is None:
             failures.append("structured output file was not produced")
         else:
+            delivery_artifacts, artifact_failures = _collect_gemini_code_task_delivery_result(
+                scenario,
+                output_json,
+                fixture_root,
+            )
+            failures.extend(artifact_failures)
             failures.extend(scenario.validator(output_json, fixture_root))
         if len(tool_calls) < scenario.min_tool_calls:
             failures.append(f"observed tool_call_count {len(tool_calls)} < {scenario.min_tool_calls}")
@@ -4313,6 +4654,9 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
             "checks_passed": checks_passed,
             "accuracy": round(checks_passed / checks_total, 4) if checks_total else 1.0,
             "observed_tool_calls": tool_calls,
+            "available_tools": available_tools,
+            "agent_progress": agent_progress,
+            "agent_progress_event_count": len(agent_progress),
             "failure_reasons": failures,
             "output_json": output_json,
             "output_excerpt": _excerpt(json.dumps(output_json, ensure_ascii=True))
@@ -4329,6 +4673,7 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
                 config.api_key_env,
             ],
             "token_usage": token_usage,
+            "delivery_artifacts": delivery_artifacts,
             "api_request_count": api_request_count,
             "api_rpm_limit": int(api_stats["api_rpm_limit"]),
             "api_rpd_limit": int(api_stats["api_rpd_limit"]),

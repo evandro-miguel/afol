@@ -58,7 +58,7 @@ Initial limits:
 - RPM: 15
 - RPD: 1500
 - minimum request interval: 4100 ms
-- default request budget: 5 requests per scenario, 10 requests per suite
+- default request budget: 12 requests per scenario, 12 requests per suite
 - recovery request: disabled by default
 
 Implemented behavior:
@@ -73,8 +73,32 @@ Implemented behavior:
 - Local ledger enforces RPD, RPM, and minimum request spacing.
 - Suite and scenario request budgets are enforced. A multi-scenario Gemini run
   receives only the remaining suite request budget for each next scenario.
-- Gemini runs use text-only function calling with an allowlisted local
-  `run_shell` harness.
+- Gemini runs use a local provider-agent SDK wrapper with four bounded tools:
+  `list_dir`, `read_file`, `write_file`, and allowlisted `run_shell`.
+- Gemini prompts stay high-level. The runner sends tool declarations to the API,
+  but does not tell the model to call a specific tool or command. Fixture
+  `AGENTS.md`, rules, skills, docs, and validators own the workflow contract.
+- Gemini scenario payloads include `available_tools`, `agent_progress`, and
+  `agent_progress_event_count` so benchmark review can inspect request/tool/final
+  parse progress.
+
+Contract note:
+
+- Gemini/Gemma custom tools are local SDK responsibilities only.
+- Google tool/function declarations (`tools`) are sent with model calls. When
+  the API returns `functionCall`, the benchmark runner must execute the
+  requested local function and send `functionResponse` back in the next model
+  turn.
+- The active path in this repo is the direct provider-agent SDK wrapper in
+  `.agents/scripts/agents-benchmark.py`; ADK/Gemma agent/tool integration is
+  optional and not the default dependency.
+- Hard scenario acceptance (`live-afol-python-code-task-orchestrated`) is not
+  complete unless the final `.afol/wb` plan, task state, evidence, and report
+  files are inspected and the output includes API/token metrics
+  (`api_request_count`, `api_rpm_limit`, `api_rpd_limit`, `api_rpm_peak`,
+  `api_rpd_count`, `token_usage`) plus progress fields (`available_tools`,
+  `agent_progress`, `agent_progress_event_count`)
+  alongside tool-loop fields.
 - Unit tests mock Gemini HTTP responses. Real API runs are manual/dev-only.
 
 Current verified real-API coverage:
@@ -82,10 +106,10 @@ Current verified real-API coverage:
 | Scenario | Result | Requests | Tokens | Notes |
 | --- | --- | ---: | ---: | --- |
 | `live-implement-start-complete-evidence` | pass, 30/30 checks | 5 | 2076 | Verified with Gemma API and local tools. |
+| `live-afol-python-code-task-orchestrated` | fail, 21/53 checks | 12 | 3520 | SDK/tool loop worked, but Gemma did not write files or close final AFOL artifacts under the 12-request budget. |
 
 Current unverified real-API coverage:
 
-- `live-afol-python-code-task-orchestrated`
 - `live-autonomous-agentic-folder-delivery`
 - Full multi-scenario Gemini suite
 
@@ -174,6 +198,29 @@ python3 .agents/scripts/agents-benchmark.py run live-afol-python-code-task-orche
 python3 .agents/scripts/agents-benchmark.py run live-autonomous-agentic-folder-delivery --provider-config .agents/data/benchmarks/providers/gemini-gemma4-31b.json --output .afol/tmp/benchmarks/gemini-autonomous-delivery.json --pretty
 ```
 
+For hard API runs, only mark success after manual inspection of:
+
+- `.afol/tmp/benchmarks/<scenario>.json` payload
+- final plan file
+- final task file
+- evidence ledger
+- final report
+- API/token accounting fields in payload
+
+Latest hard-code-task Gemma run:
+
+- Output:
+  `.afol/tmp/benchmarks/gemini-code-task-orchestrated-sdk-r3.json`
+- Result: failed correctly.
+- Requests: 12 of 12.
+- Tokens: 3520 total, 3378 input, 142 output, 0 cached.
+- Rate fields: RPM limit 15, RPD limit 1500, RPM peak 12, RPD count 49.
+- Progress: 48 `agent_progress` events.
+- Tools available: `list_dir`, `read_file`, `write_file`, `run_shell`.
+- Tools observed: `list_dir`, `read_file`, `run_shell`.
+- Missing: `write_file`, final plan/task/evidence/report artifacts, passed
+  slugify acceptance.
+
 ## Validation Bridge
 
 - `bun run cli/main.ts v bench --pack runtime-live-agent --json` consumes the
@@ -208,6 +255,7 @@ python3 .agents/scripts/agents-benchmark.py run live-autonomous-agentic-folder-d
   - `tool_success_count`
   - `tool_success_rate`
   - observed tool names and command excerpts when available
+  - available provider-agent tools and progress events when available
   - `error_count`
   - `retry_count` when inferable
   - `context_bytes`
