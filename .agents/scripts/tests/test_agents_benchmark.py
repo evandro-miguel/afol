@@ -18,6 +18,31 @@ def load_module():
     return module
 
 
+def write_gemini_config(tmp_path, benchmark, *, rpm=15, rpd=1500, interval_ms=0):
+    config_path = tmp_path / "gemini-gemma4-31b.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0.0",
+                "id": "gemini-gemma4-31b",
+                "runtime": "gemini-api",
+                "provider": "google-gemini",
+                "model": "gemma-4-31b-it",
+                "api_key_env": "GEMINI_API_KEY",
+                "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                "generation": {"temperature": 0.1, "top_p": 0.95, "max_output_tokens": 8192},
+                "rate_limits": {"rpm": rpm, "rpd": rpd, "min_request_interval_ms": interval_ms},
+                "request_budget": {"max_requests_per_scenario": 2, "max_requests_per_suite": 10},
+                "capabilities": {"text_only": True, "structured_json": True},
+                "ledger": {"path": str(tmp_path / "gemini-rate-ledger.jsonl")},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return config_path
+
+
 def test_catalog_contains_live_scenarios():
     benchmark = load_module()
 
@@ -34,7 +59,7 @@ def test_catalog_contains_live_scenarios():
         "live-afol-python-code-task-orchestrated",
     } <= set(benchmark.SCENARIOS)
     assert benchmark.DEFAULT_PROFILE.model == "gpt-5.4-mini"
-    assert benchmark.DEFAULT_PROFILE.reasoning_effort == "low"
+    assert benchmark.DEFAULT_PROFILE.reasoning_effort == "medium"
     assert benchmark.BENCHMARK_PACK_ID == "runtime-flow-live-agent-v4"
 
 
@@ -199,6 +224,296 @@ def test_benchmark_env_isolates_zsh_login_shell(tmp_path, monkeypatch):
     assert (zdotdir / ".zshenv").exists()
     assert str(keep_bin) in completed.stdout
     assert str(afol_bin) not in completed.stdout
+
+
+def test_load_gemini_provider_config_reads_limits(tmp_path):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark, rpm=15, rpd=1500, interval_ms=4100)
+
+    config = benchmark._load_gemini_provider_config(str(config_path))
+
+    assert config.runtime == "gemini-api"
+    assert config.model == "gemma-4-31b-it"
+    assert config.api_key_env == "GEMINI_API_KEY"
+    assert config.rpm_limit == 15
+    assert config.rpd_limit == 1500
+    assert config.min_request_interval_ms == 4100
+    assert config.ledger_path == tmp_path / "gemini-rate-ledger.jsonl"
+
+
+def test_gemini_generation_config_uses_google_structured_output_fields(tmp_path):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark)
+    config = benchmark._load_gemini_provider_config(str(config_path))
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"scenario_id": {"type": "string", "const": "live-tools-benchmark-discovery"}},
+    }
+
+    generation = benchmark._gemini_generation_config(config, schema)
+
+    assert generation["responseMimeType"] == "application/json"
+    assert generation["responseSchema"] == {
+        "type": "object",
+        "properties": {"scenario_id": {"type": "string", "enum": ["live-tools-benchmark-discovery"]}},
+    }
+    assert "responseFormat" not in generation
+
+
+def test_gemini_runtime_refuses_missing_api_key(tmp_path, monkeypatch):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark)
+    profile = benchmark.BenchmarkProfile(
+        runtime="gemini-api",
+        model="gemma-4-31b-it",
+        provider_config_path=str(config_path),
+    )
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr(benchmark, "ROOT_DIR", tmp_path)
+
+    try:
+        benchmark.run_suite(["live-tools-benchmark-discovery"], profile)
+    except ValueError as exc:
+        assert "Missing GEMINI_API_KEY" in str(exc)
+    else:
+        raise AssertionError("expected missing API key failure")
+
+
+def test_gemini_runtime_reads_api_key_from_env_local(tmp_path, monkeypatch):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark)
+    profile = benchmark.BenchmarkProfile(
+        runtime="gemini-api",
+        model="gemma-4-31b-it",
+        provider_config_path=str(config_path),
+    )
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr(benchmark, "ROOT_DIR", tmp_path)
+    env_key = "GEMINI_API_" + "KEY"
+    (tmp_path / ".env.local").write_text(f'{env_key}="local-secret-key"\n', encoding="utf-8")
+
+    calls = []
+
+    def fake_generate_content(config, contents, api_key, *, schema=None, tools=None):
+        calls.append({"contents": contents, "schema": schema, "tools": tools})
+        assert api_key == "local-secret-key"
+        if tools:
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "name": "run_shell",
+                                        "args": {"command": "./.agents/agents tools info benchmark"},
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1, "totalTokenCount": 2},
+            }
+        assert schema is not None
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "scenario_id": "live-tools-benchmark-discovery",
+                                        "tool_surface": "benchmark",
+                                        "default_model": benchmark.DEFAULT_PROFILE.model,
+                                        "default_reasoning_effort": benchmark.DEFAULT_PROFILE.reasoning_effort,
+                                    }
+                                )
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1, "totalTokenCount": 2},
+        }
+
+    monkeypatch.setattr(benchmark, "_gemini_http_generate_content", fake_generate_content)
+
+    result = benchmark.run_suite(["live-tools-benchmark-discovery"], profile)
+
+    assert result["pass"] is True
+    assert result["api_request_count"] == 2
+    assert result["scenarios"][0]["tool_call_count"] == 1
+    assert len(calls) == 2
+
+
+def test_gemini_local_env_reader_accepts_colon_format(tmp_path):
+    benchmark = load_module()
+    env_file = tmp_path / ".env.local"
+    env_file.write_text("GEMINI_API_KEY: local-secret-key\n", encoding="utf-8")
+
+    assert benchmark._read_local_env_value("GEMINI_API_KEY", env_file) == "local-secret-key"
+
+
+def test_gemini_runtime_records_api_metrics_with_mocked_http(tmp_path, monkeypatch):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark)
+    profile = benchmark.BenchmarkProfile(
+        runtime="gemini-api",
+        model="gemma-4-31b-it",
+        provider_config_path=str(config_path),
+    )
+    monkeypatch.setenv("GEMINI_API_KEY", "secret-test-key")
+
+    calls = []
+
+    def fake_generate_content(config, contents, api_key, *, schema=None, tools=None):
+        calls.append({"contents": contents, "schema": schema, "tools": tools})
+        assert config.model == "gemma-4-31b-it"
+        assert "secret-test-key" == api_key
+        if tools:
+            assert schema is None
+            assert "controlled runtime benchmark fixture" in contents[0]["parts"][0]["text"]
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "name": "run_shell",
+                                        "args": {"command": "./.agents/agents tools info benchmark"},
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "usageMetadata": {
+                    "promptTokenCount": 5,
+                    "candidatesTokenCount": 3,
+                    "totalTokenCount": 8,
+                },
+            }
+        assert "scenario_id" in schema["properties"]
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "scenario_id": "live-tools-benchmark-discovery",
+                                        "tool_surface": "benchmark",
+                                        "default_model": benchmark.DEFAULT_PROFILE.model,
+                                        "default_reasoning_effort": benchmark.DEFAULT_PROFILE.reasoning_effort,
+                                    }
+                                )
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 11,
+                "candidatesTokenCount": 7,
+                "totalTokenCount": 18,
+            },
+        }
+
+    monkeypatch.setattr(benchmark, "_gemini_http_generate_content", fake_generate_content)
+
+    payload = benchmark.run_suite(["live-tools-benchmark-discovery"], profile)
+    scenario = payload["scenarios"][0]
+
+    assert payload["pass"] is True
+    assert payload["benchmark_profile"]["runtime"] == "gemini-api"
+    assert payload["api_request_count"] == 2
+    assert payload["api_rpm_limit"] == 15
+    assert payload["api_rpd_limit"] == 1500
+    assert payload["api_rpd_count"] == 2
+    assert scenario["backend"] == "gemini_api"
+    assert scenario["api_request_count"] == 2
+    assert scenario["tool_call_count"] == 1
+    assert scenario["tool_success_count"] == 1
+    assert scenario["observed_tool_calls"][0]["command_excerpt"] == "./.agents/agents tools info benchmark"
+    assert scenario["token_usage"]["total_tokens"] == 18
+    assert "secret-test-key" not in json.dumps(payload)
+    assert len(calls) == 2
+
+
+def test_gemini_function_call_parser_and_allowlist(tmp_path):
+    benchmark = load_module()
+    scenario = benchmark.SCENARIOS["live-tools-benchmark-discovery"]
+    response = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "functionCall": {
+                                "name": "run_shell",
+                                "args": {"command": "./.agents/agents tools info benchmark"},
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+    calls = benchmark._gemini_function_calls(response)
+
+    assert calls == [
+        {
+            "name": "run_shell",
+            "args": {"command": "./.agents/agents tools info benchmark"},
+        }
+    ]
+    assert benchmark._gemini_command_allowed("./.agents/agents tools info benchmark", scenario) is True
+    assert benchmark._gemini_command_allowed("rm -rf .", scenario) is False
+
+
+def test_gemini_tool_declaration_uses_supported_schema_fields():
+    benchmark = load_module()
+
+    parameters = benchmark._gemini_tool_declarations()[0]["functionDeclarations"][0]["parameters"]
+
+    assert "additionalProperties" not in parameters
+    assert parameters["required"] == ["command"]
+
+
+def test_gemini_rate_ledger_enforces_rpd(tmp_path):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark, rpd=1)
+    config = benchmark._load_gemini_provider_config(str(config_path))
+
+    benchmark._reserve_gemini_request(config, "first")
+
+    try:
+        benchmark._reserve_gemini_request(config, "second")
+    except ValueError as exc:
+        assert "RPD limit exhausted" in str(exc)
+    else:
+        raise AssertionError("expected RPD exhaustion")
+
+
+def test_gemini_rate_ledger_throttles_rpm(tmp_path, monkeypatch):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark, rpm=1)
+    config = benchmark._load_gemini_provider_config(str(config_path))
+    sleeps = []
+    monkeypatch.setattr(benchmark.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    benchmark._reserve_gemini_request(config, "first")
+    stats = benchmark._reserve_gemini_request(config, "second")
+
+    assert sleeps == [60.0]
+    assert stats["api_rate_limited"] is True
+    assert stats["api_throttle_delay_ms"] == 60000
 
 
 def test_afold_fixture_launcher_writes_local_env(tmp_path):
@@ -1621,3 +1936,53 @@ def test_main_run_accepts_profile_overrides(monkeypatch, capsys):
     assert captured["profile"].reasoning_effort == "low"
     assert payload["benchmark_profile"]["model"] == "test-mini"
     assert payload["benchmark_profile"]["reasoning_effort"] == "low"
+
+
+def test_main_run_accepts_gemini_provider_config(tmp_path, monkeypatch, capsys):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark)
+    captured = {}
+
+    def fake_run_suite(ids, profile, output, executor=None):
+        _ = executor
+        captured["ids"] = ids
+        captured["profile"] = profile
+        captured["output"] = output
+        return {
+            "pack_id": benchmark.BENCHMARK_PACK_ID,
+            "generated_at": "2026-05-14T00:00:00Z",
+            "benchmark_profile": profile.to_dict(),
+            "scenario_count": 0,
+            "pass": True,
+            "duration_ms": 0,
+            "tool_call_count": 0,
+            "tool_success_count": 0,
+            "error_count": 0,
+            "retry_count": 0,
+            "checks_total": 0,
+            "checks_passed": 0,
+            "context_bytes_total": 0,
+            "prompt_bytes_total": 0,
+            "api_request_count": 0,
+            "api_rpm_limit": 0,
+            "api_rpd_limit": 0,
+            "api_rpm_peak": 0,
+            "api_rpd_count": 0,
+            "api_rate_limited": False,
+            "api_throttle_delay_ms": 0,
+            "accuracy": 1.0,
+            "tool_success_rate": 0.0,
+            "scenarios": [],
+        }
+
+    monkeypatch.setattr(benchmark, "run_suite", fake_run_suite)
+    code = benchmark.main(["run", "--provider-config", str(config_path), "live-tools-benchmark-discovery"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    assert captured["ids"] == ["live-tools-benchmark-discovery"]
+    assert captured["profile"].runtime == "gemini-api"
+    assert captured["profile"].model == "gemma-4-31b-it"
+    assert payload["benchmark_profile"]["runtime"] == "gemini-api"
+    assert payload["benchmark_profile"]["model"] == "gemma-4-31b-it"
+    assert payload["benchmark_profile"]["provider_config_path"].endswith("gemini-gemma4-31b.json")

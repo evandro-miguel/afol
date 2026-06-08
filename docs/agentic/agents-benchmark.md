@@ -19,7 +19,63 @@ fixture tasks.
 
 - runtime: `codex`
 - model: `gpt-5.4-mini`
-- reasoning_effort: `low`
+- reasoning_effort: `medium`
+
+## Gemini Gemma Profile
+
+Config:
+
+- `.agents/data/benchmarks/providers/gemini-gemma4-31b.json`
+- runtime: `gemini-api`
+- provider: `google-gemini`
+- model: `gemma-4-31b-it`
+- API key source: `GEMINI_API_KEY`
+- request ledger: `.afol/tmp/benchmarks/gemini-rate-ledger.jsonl`
+
+Do not commit API keys. Put the key in the shell environment or ignored
+`.env.local` file:
+
+```bash
+export GEMINI_API_KEY="..."
+```
+
+The benchmark runner reads `GEMINI_API_KEY` from the process environment first,
+then falls back to root `.env.local`. The file stays local-only and must not be
+committed.
+
+Initial limits:
+
+- RPM: 15
+- RPD: 1500
+- minimum request interval: 4100 ms
+- default request budget: 2 requests per scenario, 10 requests per suite
+- recovery request: disabled by default
+
+Gemma API benchmark implementation plan:
+
+1. Add provider config loading to `agents-benchmark.py` while preserving the
+   Codex defaults and `--model` / `--reasoning-effort` compatibility.
+2. Add a `gemini-api` provider that calls Gemini `generateContent` with
+   `GEMINI_API_KEY`, redacts secrets in errors, and refuses to run when the key
+   is missing.
+3. Add request accounting fields to every result: `api_request_count`,
+   `api_rpm_limit`, `api_rpd_limit`, `api_rpm_peak`, `api_rpd_count`,
+   `api_rate_limited`, and `api_throttle_delay_ms`.
+4. Enforce request budgets before and during runs. Use the local ledger to count
+   the last 60 seconds for RPM and the current day for RPD. Sleep when the RPM
+   window is full; fail fast when RPD is exhausted.
+5. Keep Gemma scenarios text-only. Use Gemini function calling with an
+   allowlisted local `run_shell` harness so the model must request fixture
+   commands before final structured output.
+6. Minimize API calls: one request when no tool is needed; two requests for
+   tool-capable scenarios, tool request plus final structured response; no
+   automatic recovery request unless explicitly enabled.
+7. Update validation so `runtime-live-agent` can either keep the Codex baseline
+   or consume an explicit Gemma profile snapshot without hard-coded
+   `gpt-5.4-mini` assumptions.
+8. Add unit tests with mocked Gemini HTTP responses for config parsing, missing
+   key handling, request ledger math, throttle behavior, and profile result
+   serialization. Real API runs stay manual/dev-only.
 
 ## Scenarios
 

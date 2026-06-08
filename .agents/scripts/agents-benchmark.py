@@ -12,6 +12,8 @@ import shutil
 import subprocess
 import tempfile
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +28,7 @@ DOCS_DIR = ROOT_DIR / "docs"
 RESULTS_DIR = AGENTS_DIR / "data" / "benchmarks" / "results"
 BENCHMARK_SNAPSHOT_DIR = AGENTS_DIR / "benchmarks"
 CURRENT_RESULTS_FILE = BENCHMARK_SNAPSHOT_DIR / "current-results.json"
+PROVIDER_CONFIG_DIR = AGENTS_DIR / "data" / "benchmarks" / "providers"
 
 FIXTURE_WORKSTREAM_ID = "260423_0001_runtime-flow-live-agent-fixture"
 FIXTURE_FEATURE_ID = "F-19"
@@ -108,14 +111,49 @@ AGENTIC_FOLDER_SKILL_PATH = ".agents/skills/agentic-folder-sys/SKILL.md"
 class BenchmarkProfile:
     runtime: str = "codex"
     model: str = "gpt-5.4-mini"
-    reasoning_effort: str = "low"
+    reasoning_effort: str = "medium"
+    provider_config_path: str = ""
 
     def to_dict(self) -> dict[str, str]:
-        return {
+        payload = {
             "runtime": self.runtime,
             "model": self.model,
             "reasoning_effort": self.reasoning_effort,
         }
+        if self.provider_config_path:
+            payload["provider_config_path"] = self.provider_config_path
+        return payload
+
+
+@dataclass(frozen=True)
+class GeminiProviderConfig:
+    id: str
+    runtime: str
+    provider: str
+    model: str
+    api_key_env: str
+    endpoint: str
+    generation: dict[str, Any]
+    rate_limits: dict[str, int]
+    request_budget: dict[str, Any]
+    capabilities: dict[str, Any]
+    ledger_path: Path
+
+    @property
+    def rpm_limit(self) -> int:
+        return int(self.rate_limits.get("rpm", 0))
+
+    @property
+    def rpd_limit(self) -> int:
+        return int(self.rate_limits.get("rpd", 0))
+
+    @property
+    def min_request_interval_ms(self) -> int:
+        return int(self.rate_limits.get("min_request_interval_ms", 0))
+
+    @property
+    def max_requests_per_scenario(self) -> int:
+        return int(self.request_budget.get("max_requests_per_scenario", 1))
 
 
 @dataclass(frozen=True)
@@ -195,6 +233,349 @@ def _safe_division(numerator: int, denominator: int, *, digits: int = 4) -> floa
     if denominator <= 0:
         return 0.0
     return round(numerator / denominator, digits)
+
+
+def _resolve_provider_config_path(path_or_id: str) -> Path:
+    candidate = Path(path_or_id)
+    if candidate.suffix == ".json" or candidate.is_absolute() or "/" in path_or_id:
+        return candidate if candidate.is_absolute() else ROOT_DIR / candidate
+    return PROVIDER_CONFIG_DIR / f"{path_or_id}.json"
+
+
+def _resolve_root_path(path_value: str) -> Path:
+    path = Path(path_value)
+    return path if path.is_absolute() else ROOT_DIR / path
+
+
+def _load_gemini_provider_config(path_or_id: str) -> GeminiProviderConfig:
+    path = _resolve_provider_config_path(path_or_id)
+    if not path.exists():
+        raise ValueError(f"Provider config not found: {_relative_from_root(path)}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Provider config must be a JSON object: {_relative_from_root(path)}")
+    runtime = str(payload.get("runtime", "")).strip()
+    if runtime != "gemini-api":
+        raise ValueError(f"Unsupported provider runtime: {runtime or '<missing>'}")
+    ledger_payload = payload.get("ledger", {})
+    ledger_path = ""
+    if isinstance(ledger_payload, dict):
+        ledger_path = str(ledger_payload.get("path", "")).strip()
+    required = ("id", "provider", "model", "api_key_env", "endpoint")
+    missing = [key for key in required if not str(payload.get(key, "")).strip()]
+    if missing:
+        raise ValueError("Provider config missing required field(s): " + ", ".join(missing))
+    return GeminiProviderConfig(
+        id=str(payload["id"]),
+        runtime=runtime,
+        provider=str(payload["provider"]),
+        model=str(payload["model"]),
+        api_key_env=str(payload["api_key_env"]),
+        endpoint=str(payload["endpoint"]),
+        generation=payload.get("generation", {}) if isinstance(payload.get("generation", {}), dict) else {},
+        rate_limits=payload.get("rate_limits", {}) if isinstance(payload.get("rate_limits", {}), dict) else {},
+        request_budget=payload.get("request_budget", {}) if isinstance(payload.get("request_budget", {}), dict) else {},
+        capabilities=payload.get("capabilities", {}) if isinstance(payload.get("capabilities", {}), dict) else {},
+        ledger_path=_resolve_root_path(ledger_path or ".afol/tmp/benchmarks/gemini-rate-ledger.jsonl"),
+    )
+
+
+def _unquote_env_value(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _read_local_env_value(env_name: str, env_file: Path | None = None) -> str:
+    env_path = env_file or ROOT_DIR / ".env.local"
+    if not env_path.exists():
+        return ""
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].strip()
+        separator = "=" if "=" in line else ":" if ":" in line else ""
+        if not separator:
+            continue
+        key, value = line.split(separator, 1)
+        if key.strip() == env_name:
+            return _unquote_env_value(value)
+    return ""
+
+
+def _gemini_api_key(config: GeminiProviderConfig) -> str:
+    return os.environ.get(config.api_key_env, "").strip() or _read_local_env_value(config.api_key_env).strip()
+
+
+def _gemini_response_schema(schema: Any) -> Any:
+    if isinstance(schema, list):
+        return [_gemini_response_schema(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+    sanitized: dict[str, Any] = {}
+    for key, value in schema.items():
+        if key == "additionalProperties":
+            continue
+        if key == "const":
+            sanitized["enum"] = [_gemini_response_schema(value)]
+            continue
+        sanitized[key] = _gemini_response_schema(value)
+    return sanitized
+
+
+def _read_gemini_rate_ledger(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict):
+            records.append(record)
+    return records
+
+
+def _gemini_rate_stats(config: GeminiProviderConfig, now: datetime | None = None) -> dict[str, Any]:
+    now = now or datetime.now(timezone.utc)
+    records = _read_gemini_rate_ledger(config.ledger_path)
+    day_prefix = now.strftime("%Y-%m-%d")
+    minute_window_start = now.timestamp() - 60
+    current_day = 0
+    current_minute = 0
+    last_request_ts = 0.0
+    for record in records:
+        created_at = str(record.get("created_at", ""))
+        if created_at.startswith(day_prefix):
+            current_day += 1
+        try:
+            created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        request_ts = created_dt.timestamp()
+        last_request_ts = max(last_request_ts, request_ts)
+        if request_ts >= minute_window_start:
+            current_minute += 1
+    return {
+        "api_rpm_limit": config.rpm_limit,
+        "api_rpd_limit": config.rpd_limit,
+        "api_rpm_peak": current_minute,
+        "api_rpd_count": current_day,
+        "last_request_ts": last_request_ts,
+    }
+
+
+def _reserve_gemini_request(
+    config: GeminiProviderConfig,
+    scenario_id: str,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    now = now or datetime.now(timezone.utc)
+    stats = _gemini_rate_stats(config, now)
+    if config.rpd_limit and int(stats["api_rpd_count"]) >= config.rpd_limit:
+        raise ValueError(f"Gemini RPD limit exhausted: {stats['api_rpd_count']} >= {config.rpd_limit}")
+    throttle_delay_ms = 0
+    rate_limited = False
+    if config.rpm_limit and int(stats["api_rpm_peak"]) >= config.rpm_limit:
+        throttle_delay_ms = 60_000
+        rate_limited = True
+    elapsed_since_last_ms = round((now.timestamp() - float(stats["last_request_ts"])) * 1000)
+    if config.min_request_interval_ms and stats["last_request_ts"] and elapsed_since_last_ms < config.min_request_interval_ms:
+        throttle_delay_ms = max(throttle_delay_ms, config.min_request_interval_ms - elapsed_since_last_ms)
+        rate_limited = True
+    if throttle_delay_ms > 0:
+        time.sleep(throttle_delay_ms / 1000)
+        now = datetime.now(timezone.utc)
+        stats = _gemini_rate_stats(config, now)
+    config.ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with config.ledger_path.open("a", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "created_at": now.isoformat().replace("+00:00", "Z"),
+                    "provider": config.provider,
+                    "model": config.model,
+                    "scenario_id": scenario_id,
+                },
+                sort_keys=True,
+            )
+            + "\n"
+        )
+    updated_stats = _gemini_rate_stats(config, now)
+    updated_stats["api_rate_limited"] = rate_limited
+    updated_stats["api_throttle_delay_ms"] = throttle_delay_ms
+    return updated_stats
+
+
+def _gemini_generation_config(config: GeminiProviderConfig, schema: dict[str, Any] | None = None) -> dict[str, Any]:
+    generation = dict(config.generation)
+    if "max_output_tokens" in generation:
+        generation["maxOutputTokens"] = generation.pop("max_output_tokens")
+    if "top_p" in generation:
+        generation["topP"] = generation.pop("top_p")
+    if schema is not None:
+        generation["responseMimeType"] = "application/json"
+        generation["responseSchema"] = _gemini_response_schema(schema)
+    return generation
+
+
+def _gemini_http_generate_content(
+    config: GeminiProviderConfig,
+    contents: list[dict[str, Any]],
+    api_key: str,
+    *,
+    schema: dict[str, Any] | None = None,
+    tools: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    endpoint = config.endpoint.replace("{model}", config.model)
+    request_body = {
+        "contents": contents,
+        "generationConfig": _gemini_generation_config(config, schema),
+    }
+    if tools:
+        request_body["tools"] = tools
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(request_body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise ValueError(f"Gemini API request failed with HTTP {exc.code}: {_excerpt(body, 500)}") from exc
+    except urllib.error.URLError as exc:
+        raise ValueError(f"Gemini API request failed: {exc.reason}") from exc
+
+
+def _gemini_response_text(response: dict[str, Any]) -> str:
+    candidates = response.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return ""
+    content = candidates[0].get("content") if isinstance(candidates[0], dict) else None
+    parts = content.get("parts") if isinstance(content, dict) else None
+    if not isinstance(parts, list):
+        return ""
+    texts = [str(part.get("text", "")) for part in parts if isinstance(part, dict)]
+    return "\n".join(text for text in texts if text).strip()
+
+
+def _parse_gemini_json_response(response: dict[str, Any]) -> dict[str, Any]:
+    text = _gemini_response_text(response)
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text.strip())
+        text = re.sub(r"\s*```$", "", text.strip())
+    parsed = json.loads(text)
+    if not isinstance(parsed, dict):
+        raise ValueError("Gemini response JSON must be an object")
+    return parsed
+
+
+def _gemini_tool_declarations() -> list[dict[str, Any]]:
+    return [
+        {
+            "functionDeclarations": [
+                {
+                    "name": "run_shell",
+                    "description": "Run one allowlisted shell command in the benchmark fixture repository.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "command": {
+                                "type": "string",
+                                "description": "Shell command to run from the fixture repository root.",
+                            }
+                        },
+                        "required": ["command"],
+                    },
+                }
+            ]
+        }
+    ]
+
+
+def _gemini_function_calls(response: dict[str, Any]) -> list[dict[str, Any]]:
+    candidates = response.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return []
+    content = candidates[0].get("content") if isinstance(candidates[0], dict) else None
+    parts = content.get("parts") if isinstance(content, dict) else None
+    if not isinstance(parts, list):
+        return []
+    calls: list[dict[str, Any]] = []
+    for part in parts:
+        if not isinstance(part, dict) or not isinstance(part.get("functionCall"), dict):
+            continue
+        function_call = part["functionCall"]
+        calls.append(
+            {
+                "name": str(function_call.get("name", "")),
+                "args": function_call.get("args") if isinstance(function_call.get("args"), dict) else {},
+            }
+        )
+    return calls
+
+
+def _gemini_command_allowed(command: str, scenario: LiveBenchmarkScenario) -> bool:
+    if "\n" in command or "\r" in command:
+        return False
+    if any(forbidden in command for forbidden in scenario.forbidden_command_substrings):
+        return False
+    allowed_needles = list(scenario.required_command_substrings)
+    for group in scenario.any_required_command_groups:
+        allowed_needles.extend(group)
+    return any(needle and needle in command for needle in allowed_needles)
+
+
+def _run_gemini_shell_tool(command: str, fixture_root: Path, scenario: LiveBenchmarkScenario) -> dict[str, Any]:
+    if not _gemini_command_allowed(command, scenario):
+        return {
+            "ok": False,
+            "exit_code": 126,
+            "stdout": "",
+            "stderr": "command is not allowlisted for this benchmark scenario",
+        }
+    completed = subprocess.run(
+        command,
+        cwd=fixture_root,
+        shell=True,
+        capture_output=True,
+        text=True,
+        timeout=min(scenario.timeout_seconds, 60),
+        env=_live_scenario_env(scenario, fixture_root),
+    )
+    return {
+        "ok": completed.returncode == 0,
+        "exit_code": completed.returncode,
+        "stdout": _excerpt(completed.stdout or "", 4000),
+        "stderr": _excerpt(completed.stderr or "", 4000),
+    }
+
+
+def _gemini_token_usage(response: dict[str, Any]) -> dict[str, Any]:
+    usage = response.get("usageMetadata")
+    if not isinstance(usage, dict):
+        return {"available": False, **_normalized_token_usage({})}
+    raw_usage = {
+        "input_tokens": _non_negative_int(usage.get("promptTokenCount")),
+        "output_tokens": _non_negative_int(usage.get("candidatesTokenCount")),
+        "total_tokens": _non_negative_int(usage.get("totalTokenCount")),
+        "cached_input_tokens": _non_negative_int(usage.get("cachedContentTokenCount")),
+        "reasoning_output_tokens": _non_negative_int(usage.get("thoughtsTokenCount")),
+    }
+    return {"available": True, **_normalized_token_usage(raw_usage)}
 
 
 def _efficiency_metrics(payload: dict[str, Any]) -> dict[str, float]:
@@ -3714,7 +4095,181 @@ def _run_live_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfil
         return result
 
 
+def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfile) -> dict[str, Any]:
+    if not profile.provider_config_path:
+        raise ValueError("Gemini runtime requires --provider-config.")
+    config = _load_gemini_provider_config(profile.provider_config_path)
+    api_key = _gemini_api_key(config)
+    if not api_key:
+        raise ValueError(
+            f"Missing {config.api_key_env}; export it or add it to ignored .env.local before running Gemini API benchmarks."
+        )
+    prompt_bytes = _json_size(scenario.prompt)
+    temp_parent = Path(os.environ.get("AGENTS_BENCHMARK_TEMP_PARENT", "/tmp/agents-benchmark-live"))
+    temp_parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="agents-benchmark-gemini-", dir=temp_parent) as temp_dir:
+        fixture_root = _prepare_code_task_fixture_repo(Path(temp_dir)) if scenario.id == "live-afol-python-code-task-orchestrated" else _prepare_fixture_repo(Path(temp_dir))
+        context_bytes = _context_bytes(fixture_root, scenario.context_artifacts)
+        started_at = time.perf_counter()
+        failures: list[str] = []
+        output_json: dict[str, Any] | None = None
+        response: dict[str, Any] = {}
+        api_request_count = 0
+        tool_calls: list[dict[str, Any]] = []
+        tool_error_count = 0
+        api_stats: dict[str, Any] = {
+            "api_rpm_limit": config.rpm_limit,
+            "api_rpd_limit": config.rpd_limit,
+            "api_rpm_peak": 0,
+            "api_rpd_count": 0,
+            "api_rate_limited": False,
+            "api_throttle_delay_ms": 0,
+        }
+        if config.max_requests_per_scenario < 1:
+            failures.append("Gemini request budget exhausted before first request")
+        else:
+            contents: list[dict[str, Any]] = [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": (
+                                scenario.prompt
+                                + "\n\nUse the provided `run_shell` tool for required shell commands. "
+                                + "After the tool result, return JSON only matching the requested schema."
+                            )
+                        }
+                    ],
+                }
+            ]
+            api_stats = _reserve_gemini_request(config, scenario.id)
+            api_request_count = 1
+            try:
+                response = _gemini_http_generate_content(
+                    config,
+                    contents,
+                    api_key,
+                    tools=_gemini_tool_declarations(),
+                )
+                function_calls = _gemini_function_calls(response)
+                if function_calls:
+                    contents.append(response["candidates"][0]["content"])
+                    for function_call in function_calls[:1]:
+                        command = str(function_call.get("args", {}).get("command", "")).strip()
+                        call_result = _run_gemini_shell_tool(command, fixture_root, scenario)
+                        if not call_result["ok"]:
+                            tool_error_count += 1
+                        tool_calls.append(
+                            {
+                                "call_id": f"gemini-tool-{len(tool_calls) + 1}",
+                                "name": "run_shell",
+                                "arguments_excerpt": _excerpt(json.dumps({"command": command}, ensure_ascii=True)),
+                                "command_excerpt": _excerpt(command, 1000),
+                                "exit_code": call_result["exit_code"],
+                                "aggregated_output_excerpt": _excerpt(
+                                    str(call_result.get("stdout", "")) + "\n" + str(call_result.get("stderr", "")),
+                                    1000,
+                                ),
+                            }
+                        )
+                        contents.append(
+                            {
+                                "role": "user",
+                                "parts": [
+                                    {
+                                        "functionResponse": {
+                                            "name": "run_shell",
+                                            "response": call_result,
+                                        }
+                                    }
+                                ],
+                            }
+                        )
+                    if api_request_count >= config.max_requests_per_scenario:
+                        failures.append("Gemini request budget exhausted before final structured response")
+                    else:
+                        api_stats = _reserve_gemini_request(config, scenario.id)
+                        api_request_count += 1
+                        response = _gemini_http_generate_content(
+                            config,
+                            contents,
+                            api_key,
+                            schema=scenario.response_schema,
+                        )
+                output_json = _parse_gemini_json_response(response)
+            except json.JSONDecodeError as exc:
+                failures.append(f"Gemini structured output parse failed: {exc}")
+            except ValueError as exc:
+                failures.append(str(exc))
+
+        if output_json is None:
+            failures.append("structured output file was not produced")
+        else:
+            failures.extend(scenario.validator(output_json, fixture_root))
+        if len(tool_calls) < scenario.min_tool_calls:
+            failures.append(f"observed tool_call_count {len(tool_calls)} < {scenario.min_tool_calls}")
+        failures.extend(_required_commands_present(tool_calls, scenario.required_command_substrings))
+        failures.extend(_any_required_commands_present(tool_calls, scenario.any_required_command_groups))
+        failures.extend(_forbidden_commands_absent(tool_calls, scenario.forbidden_command_substrings))
+
+        checks_total = (
+            4
+            + len(scenario.required_command_substrings)
+            + len(scenario.any_required_command_groups)
+            + len(scenario.forbidden_command_substrings)
+            + scenario.validation_check_count
+        )
+        checks_passed = max(checks_total - len(failures), 0)
+        duration_ms = round((time.perf_counter() - started_at) * 1000)
+        token_usage = _gemini_token_usage(response)
+        tool_success_count = max(len(tool_calls) - tool_error_count, 0)
+
+        return {
+            "id": scenario.id,
+            "backend": "gemini_api",
+            "pass": not failures,
+            "duration_ms": duration_ms,
+            "context_bytes": context_bytes,
+            "prompt_bytes": prompt_bytes,
+            "tool_call_count": len(tool_calls),
+            "tool_success_count": tool_success_count,
+            "tool_success_rate": round(tool_success_count / len(tool_calls), 4) if tool_calls else 0.0,
+            "error_count": (1 if failures else 0) + tool_error_count,
+            "retry_count": 0,
+            "checks_total": checks_total,
+            "checks_passed": checks_passed,
+            "accuracy": round(checks_passed / checks_total, 4) if checks_total else 1.0,
+            "observed_tool_calls": tool_calls,
+            "failure_reasons": failures,
+            "output_json": output_json,
+            "output_excerpt": _excerpt(json.dumps(output_json, ensure_ascii=True))
+            if output_json is not None
+            else _excerpt(_gemini_response_text(response)),
+            "stdout_excerpt": "",
+            "stderr_excerpt": "",
+            "command": [
+                "gemini-api",
+                "generateContent",
+                "--model",
+                config.model,
+                "--api-key-env",
+                config.api_key_env,
+            ],
+            "token_usage": token_usage,
+            "api_request_count": api_request_count,
+            "api_rpm_limit": int(api_stats["api_rpm_limit"]),
+            "api_rpd_limit": int(api_stats["api_rpd_limit"]),
+            "api_rpm_peak": int(api_stats["api_rpm_peak"]),
+            "api_rpd_count": int(api_stats["api_rpd_count"]),
+            "api_rate_limited": bool(api_stats["api_rate_limited"]),
+            "api_throttle_delay_ms": int(api_stats["api_throttle_delay_ms"]),
+        }
+
+
 def _run_default_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProfile) -> dict[str, Any]:
+    if profile.runtime == "gemini-api":
+        return _run_gemini_scenario(scenario, profile)
     if scenario.id == "live-afol-python-code-task-orchestrated":
         return _run_orchestrated_code_task_scenario(scenario, profile)
     return _run_live_scenario(scenario, profile)
@@ -3767,6 +4322,13 @@ def run_suite(
                 if isinstance(result.get("token_usage", {}), dict)
             ]
         ),
+        "api_request_count": sum(int(result.get("api_request_count", 0)) for result in scenario_results),
+        "api_rpm_limit": max((int(result.get("api_rpm_limit", 0)) for result in scenario_results), default=0),
+        "api_rpd_limit": max((int(result.get("api_rpd_limit", 0)) for result in scenario_results), default=0),
+        "api_rpm_peak": max((int(result.get("api_rpm_peak", 0)) for result in scenario_results), default=0),
+        "api_rpd_count": max((int(result.get("api_rpd_count", 0)) for result in scenario_results), default=0),
+        "api_rate_limited": any(bool(result.get("api_rate_limited", False)) for result in scenario_results),
+        "api_throttle_delay_ms": sum(int(result.get("api_throttle_delay_ms", 0)) for result in scenario_results),
         "scenarios": scenario_results,
     }
     payload["accuracy"] = (
@@ -3837,6 +4399,11 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("scenario_ids", nargs="*", help="Optional benchmark scenario ids")
     run_parser.add_argument("--model", default=DEFAULT_PROFILE.model, help="Codex model for live-agent scenarios")
     run_parser.add_argument(
+        "--provider-config",
+        default="",
+        help="Benchmark provider config path or id, for example gemini-gemma4-31b",
+    )
+    run_parser.add_argument(
         "--reasoning-effort",
         default=DEFAULT_PROFILE.reasoning_effort,
         help="Codex reasoning effort for live-agent scenarios",
@@ -3861,10 +4428,19 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "run":
+            provider_config_path = ""
+            runtime = DEFAULT_PROFILE.runtime
+            model = args.model
+            if args.provider_config:
+                provider_config = _load_gemini_provider_config(args.provider_config)
+                provider_config_path = _relative_from_root(_resolve_provider_config_path(args.provider_config))
+                runtime = provider_config.runtime
+                model = provider_config.model
             profile = BenchmarkProfile(
-                runtime=DEFAULT_PROFILE.runtime,
-                model=args.model,
+                runtime=runtime,
+                model=model,
                 reasoning_effort=args.reasoning_effort,
+                provider_config_path=provider_config_path,
             )
             payload = run_suite(args.scenario_ids, profile, args.output)
             writes_stable_snapshots = not args.scenario_ids and profile == DEFAULT_PROFILE

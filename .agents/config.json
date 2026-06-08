@@ -5,8 +5,12 @@
   },
   "paths": {
     "agents_dir": ".agents",
+    "mutable_dir": ".afol",
     "wb_dir": ".afol/wb",
     "active_session_file": ".afol/wb/.active_session",
+    "data_dir": ".afol/data",
+    "data_index_dir": ".afol/data/index",
+    "events_file": ".afol/data/events/events.jsonl",
     "docs_dir": "docs"
   }
 }

@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "id": "gemini-gemma4-31b",
+  "runtime": "gemini-api",
+  "provider": "google-gemini",
+  "model": "gemma-4-31b-it",
+  "api_key_env": "GEMINI_API_KEY",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+  "generation": {
+    "temperature": 0.1,
+    "top_p": 0.95,
+    "max_output_tokens": 8192
+  },
+  "rate_limits": {
+    "rpm": 15,
+    "rpd": 1500,
+    "min_request_interval_ms": 4100
+  },
+  "request_budget": {
+    "max_requests_per_scenario": 2,
+    "max_requests_per_suite": 10,
+    "allow_recovery_request": false
+  },
+  "capabilities": {
+    "text_only": true,
+    "tool_loop": "gemini_function_calling_local_harness",
+    "structured_json": true
+  },
+  "ledger": {
+    "path": ".afol/tmp/benchmarks/gemini-rate-ledger.jsonl"
+  }
+}

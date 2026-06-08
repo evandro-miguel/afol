@@ -74,6 +74,11 @@ docs/telemetry/reports/implementation_report.md
 # Local coverage artifact
 .coverage
 
+# Local secrets
+.env
+.env.local
+.env.*.local
+
 # Makefile in a-docs (keep root Makefile)
 # .agents/a-docs/standards/Makefile
 .gitnexus
