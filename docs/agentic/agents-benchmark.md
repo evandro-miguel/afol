@@ -48,7 +48,7 @@ Initial limits:
 - RPM: 15
 - RPD: 1500
 - minimum request interval: 4100 ms
-- default request budget: 2 requests per scenario, 10 requests per suite
+- default request budget: 5 requests per scenario, 10 requests per suite
 - recovery request: disabled by default
 
 Gemma API benchmark implementation plan:
@@ -67,8 +67,10 @@ Gemma API benchmark implementation plan:
 5. Keep Gemma scenarios text-only. Use Gemini function calling with an
    allowlisted local `run_shell` harness so the model must request fixture
    commands before final structured output.
-6. Minimize API calls: one request when no tool is needed; two requests for
-   tool-capable scenarios, tool request plus final structured response; no
+6. Minimize API calls: discovery scenarios should use two requests, tool
+   request plus final structured response. Task/evidence scenarios may use up
+   to five requests so the agent can run start, complete, final task-file
+   inspection, final evidence-ledger inspection, then structured output. No
    automatic recovery request unless explicitly enabled.
 7. Update validation so `runtime-live-agent` can either keep the Codex baseline
    or consume an explicit Gemma profile snapshot without hard-coded

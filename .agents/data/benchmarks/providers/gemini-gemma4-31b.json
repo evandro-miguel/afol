@@ -17,7 +17,7 @@
     "min_request_interval_ms": 4100
   },
   "request_budget": {
-    "max_requests_per_scenario": 2,
+    "max_requests_per_scenario": 5,
     "max_requests_per_suite": 10,
     "allow_recovery_request": false
   },

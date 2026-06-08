@@ -18,7 +18,7 @@ def load_module():
     return module
 
 
-def write_gemini_config(tmp_path, benchmark, *, rpm=15, rpd=1500, interval_ms=0):
+def write_gemini_config(tmp_path, benchmark, *, rpm=15, rpd=1500, interval_ms=0, max_requests=2):
     config_path = tmp_path / "gemini-gemma4-31b.json"
     config_path.write_text(
         json.dumps(
@@ -32,7 +32,7 @@ def write_gemini_config(tmp_path, benchmark, *, rpm=15, rpd=1500, interval_ms=0)
                 "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                 "generation": {"temperature": 0.1, "top_p": 0.95, "max_output_tokens": 8192},
                 "rate_limits": {"rpm": rpm, "rpd": rpd, "min_request_interval_ms": interval_ms},
-                "request_budget": {"max_requests_per_scenario": 2, "max_requests_per_suite": 10},
+                "request_budget": {"max_requests_per_scenario": max_requests, "max_requests_per_suite": 10},
                 "capabilities": {"text_only": True, "structured_json": True},
                 "ledger": {"path": str(tmp_path / "gemini-rate-ledger.jsonl")},
             }
@@ -445,6 +445,90 @@ def test_gemini_runtime_records_api_metrics_with_mocked_http(tmp_path, monkeypat
     assert len(calls) == 2
 
 
+def test_gemini_runtime_runs_multi_tool_completion_flow(tmp_path, monkeypatch):
+    benchmark = load_module()
+    config_path = write_gemini_config(tmp_path, benchmark, max_requests=5)
+    profile = benchmark.BenchmarkProfile(
+        runtime="gemini-api",
+        model="gemma-4-31b-it",
+        provider_config_path=str(config_path),
+    )
+    monkeypatch.setenv("GEMINI_API_KEY", "secret-test-key")
+
+    scenario = benchmark.SCENARIOS["live-implement-start-complete-evidence"]
+    commands = [
+        f"{benchmark.AFOLD_COMMAND} start --session {benchmark.FIXTURE_WORKSTREAM_ID} --task-id T-01",
+        (
+            f"{benchmark.AFOLD_COMMAND} done --session {benchmark.FIXTURE_WORKSTREAM_ID} --task-id T-01 "
+            f'--command "{benchmark.LIVE_COMPLETE_COMMAND}" --result passed '
+            f"--artifact .afol/wb/{benchmark.FIXTURE_WORKSTREAM_ID}/{benchmark.FIXTURE_WORKSTREAM_ID}_task_01.md"
+        ),
+        f"cat .afol/wb/{benchmark.FIXTURE_WORKSTREAM_ID}/{benchmark.FIXTURE_WORKSTREAM_ID}_task_01.md",
+        f"cat .afol/wb/{benchmark.FIXTURE_WORKSTREAM_ID}/.evidence.jsonl",
+    ]
+    calls = []
+
+    def fake_generate_content(config, contents, api_key, *, schema=None, tools=None):
+        calls.append({"contents": contents, "schema": schema, "tools": tools})
+        assert api_key == "secret-test-key"
+        tool_turn = sum(1 for call in calls if call["tools"])
+        if tools:
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "name": "run_shell",
+                                        "args": {"command": commands[tool_turn - 1]},
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "usageMetadata": {"promptTokenCount": 4, "candidatesTokenCount": 2, "totalTokenCount": 6},
+            }
+        assert schema is not None
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "scenario_id": scenario.id,
+                                        "task_id": "T-01",
+                                        "completed": True,
+                                        "evidence_recorded": True,
+                                    }
+                                )
+                            }
+                        ]
+                    }
+                }
+            ],
+            "usageMetadata": {"promptTokenCount": 8, "candidatesTokenCount": 4, "totalTokenCount": 12},
+        }
+
+    monkeypatch.setattr(benchmark, "_gemini_http_generate_content", fake_generate_content)
+
+    payload = benchmark.run_suite([scenario.id], profile)
+    result = payload["scenarios"][0]
+
+    assert payload["pass"] is True
+    assert result["pass"] is True
+    assert result["api_request_count"] == 5
+    assert result["tool_call_count"] == 4
+    assert result["tool_success_count"] == 4
+    assert result["output_json"]["completed"] is True
+    assert result["output_json"]["evidence_recorded"] is True
+    assert [call["command_excerpt"] for call in result["observed_tool_calls"]] == commands
+    assert len(calls) == 5
+
+
 def test_gemini_function_call_parser_and_allowlist(tmp_path):
     benchmark = load_module()
     scenario = benchmark.SCENARIOS["live-tools-benchmark-discovery"]
@@ -661,7 +745,7 @@ def test_live_scenario_command_keeps_afol_dir_writable_mount(tmp_path):
 
 def test_validate_completion_accepts_done_row_with_evidence_suffix(tmp_path):
     benchmark = load_module()
-    session_dir = tmp_path / ".agents" / "wb" / benchmark.FIXTURE_WORKSTREAM_ID
+    session_dir = tmp_path / ".afol" / "wb" / benchmark.FIXTURE_WORKSTREAM_ID
     session_dir.mkdir(parents=True, exist_ok=True)
     task_file = session_dir / f"{benchmark.FIXTURE_WORKSTREAM_ID}_task_01.md"
     evidence_file = session_dir / ".evidence.jsonl"
@@ -672,7 +756,7 @@ def test_validate_completion_accepts_done_row_with_evidence_suffix(tmp_path):
         encoding="utf-8",
     )
     evidence_file.write_text(
-        '{"command": "live benchmark fixture command", "result": "passed"}\n',
+        '{"task_id": "T-01", "command": "live benchmark fixture command", "result": "passed"}\n',
         encoding="utf-8",
     )
 

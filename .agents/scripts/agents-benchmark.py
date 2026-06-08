@@ -564,6 +564,16 @@ def _run_gemini_shell_tool(command: str, fixture_root: Path, scenario: LiveBench
     }
 
 
+def _gemini_tool_requirements_satisfied(tool_calls: list[dict[str, Any]], scenario: LiveBenchmarkScenario) -> bool:
+    if len(tool_calls) < scenario.min_tool_calls:
+        return False
+    if _required_commands_present(tool_calls, scenario.required_command_substrings):
+        return False
+    if _any_required_commands_present(tool_calls, scenario.any_required_command_groups):
+        return False
+    return True
+
+
 def _gemini_token_usage(response: dict[str, Any]) -> dict[str, Any]:
     usage = response.get("usageMetadata")
     if not isinstance(usage, dict):
@@ -1248,6 +1258,11 @@ def _prepare_fixture_repo(temp_root: Path) -> Path:
     _write_text(session_dir / f"{FIXTURE_WORKSTREAM_ID}_task_01.md", _fixture_task_text())
     _write_text(session_dir / f"{FIXTURE_WORKSTREAM_ID}_log_01.md", _fixture_log_text())
     _write_text(session_dir / f"{FIXTURE_WORKSTREAM_ID}_report_01.md", _fixture_report_text())
+    afol_session_dir = temp_root / ".afol" / "wb" / FIXTURE_WORKSTREAM_ID
+    _write_text(afol_session_dir / f"{FIXTURE_WORKSTREAM_ID}_plan_01.md", _fixture_plan_text())
+    _write_text(afol_session_dir / f"{FIXTURE_WORKSTREAM_ID}_task_01.md", _fixture_task_text())
+    _write_text(afol_session_dir / f"{FIXTURE_WORKSTREAM_ID}_log_01.md", _fixture_log_text())
+    _write_text(afol_session_dir / f"{FIXTURE_WORKSTREAM_ID}_report_01.md", _fixture_report_text())
     _write_text(temp_root / "docs" / "benchmark_problem.md", _hypothetical_problem_text())
     _write_text(temp_root / "app" / "runtime_policy.json", _runtime_policy_text())
     runtime_check = temp_root / "scripts" / "check_runtime_policy.py"
@@ -1511,6 +1526,12 @@ def _prepare_afol_fixture_repo(temp_root: Path) -> Path:
     check_file = target / "scripts" / "check_afol_policy.py"
     _write_text(check_file, _afol_runtime_policy_check_text())
     check_file.chmod(0o444)
+    if (temp_root.name.startswith("agents-benchmark-gemini-")):
+        session_dir = target / ".afol" / "wb" / FIXTURE_WORKSTREAM_ID
+        _write_text(session_dir / f"{FIXTURE_WORKSTREAM_ID}_plan_01.md", _fixture_plan_text())
+        _write_text(session_dir / f"{FIXTURE_WORKSTREAM_ID}_task_01.md", _fixture_task_text())
+        _write_text(session_dir / f"{FIXTURE_WORKSTREAM_ID}_log_01.md", _fixture_log_text())
+        _write_text(session_dir / f"{FIXTURE_WORKSTREAM_ID}_report_01.md", _fixture_report_text())
     subprocess.run(["git", "init", "-q"], cwd=target, check=False)
     return target
 
@@ -1913,8 +1934,8 @@ def _validate_completion(output: dict[str, Any], repo_root: Path) -> list[str]:
     if output.get("evidence_recorded") is not True:
         failures.append("evidence_recorded != true")
 
-    task_file = repo_root / ".agents" / "wb" / FIXTURE_WORKSTREAM_ID / f"{FIXTURE_WORKSTREAM_ID}_task_01.md"
-    evidence_file = repo_root / ".agents" / "wb" / FIXTURE_WORKSTREAM_ID / ".evidence.jsonl"
+    task_file = repo_root / ".afol" / "wb" / FIXTURE_WORKSTREAM_ID / f"{FIXTURE_WORKSTREAM_ID}_task_01.md"
+    evidence_file = repo_root / ".afol" / "wb" / FIXTURE_WORKSTREAM_ID / ".evidence.jsonl"
     task_text = task_file.read_text(encoding="utf-8") if task_file.exists() else ""
     evidence_text = evidence_file.read_text(encoding="utf-8") if evidence_file.exists() else ""
     done_row_re = re.compile(
@@ -1923,7 +1944,16 @@ def _validate_completion(output: dict[str, Any], repo_root: Path) -> list[str]:
     )
     if not done_row_re.search(task_text):
         failures.append("fixture task not marked done")
-    if LIVE_COMPLETE_COMMAND not in evidence_text or '"result": "passed"' not in evidence_text:
+    evidence_records, invalid_evidence_count = _parse_evidence_records(evidence_text)
+    if invalid_evidence_count:
+        failures.append("fixture evidence ledger contains invalid JSON")
+    has_expected_evidence = any(
+        record.get("task_id") == "T-01"
+        and record.get("command") == LIVE_COMPLETE_COMMAND
+        and record.get("result") == "passed"
+        for record in evidence_records
+    )
+    if not has_expected_evidence:
         failures.append("fixture evidence missing expected completion record")
     return failures
 
@@ -2854,40 +2884,62 @@ def _scenario_catalog() -> dict[str, LiveBenchmarkScenario]:
         ),
         "live-implement-start-complete-evidence": LiveBenchmarkScenario(
             id="live-implement-start-complete-evidence",
-            description="Use a real agent to start and complete the fixture task, then confirm evidence exists.",
-            purpose="Catch regressions in task transitions and evidence recording under a real tool-driven agent loop.",
-            tool_families=("exec_command", "implement", "evidence"),
-            scope="Controlled mutation of the isolated fixture workbench session only.",
+            description="Use a real agent to start and complete the AFOL fixture task, then inspect final task and evidence state.",
+            purpose="Catch regressions where an API-backed agent uses tools but does not verify final plan/task/evidence state.",
+            tool_families=("exec_command", "afold", "start", "done", "evidence"),
+            scope="Controlled mutation of the isolated `.afol/wb` fixture session only.",
             context_artifacts=(
                 "AGENTS.md",
-                f"{session_path}/{FIXTURE_WORKSTREAM_ID}_plan_01.md",
-                f"{session_path}/{FIXTURE_WORKSTREAM_ID}_task_01.md",
-                f"{session_path}/{FIXTURE_WORKSTREAM_ID}_log_01.md",
-                f"docs/arc/SPECS/{FIXTURE_PARENT_SPEC_FILE.name}",
-                f"docs/arc/SPECS/{FIXTURE_CHILD_SPEC_FILE.name}",
+                ".env",
+                "afold",
+                f".afol/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_plan_01.md",
+                f".afol/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md",
+                f".afol/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_log_01.md",
             ),
             required_command_substrings=(
-                f"implement start --session {FIXTURE_WORKSTREAM_ID} --task-id T-01",
-                f"implement complete --session {FIXTURE_WORKSTREAM_ID} --task-id T-01",
+                f"{AFOLD_COMMAND} start --session {FIXTURE_WORKSTREAM_ID} --task-id T-01",
+                f"{AFOLD_COMMAND} done --session {FIXTURE_WORKSTREAM_ID} --task-id T-01",
+                f"cat .afol/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md",
+                f"cat .afol/wb/{FIXTURE_WORKSTREAM_ID}/.evidence.jsonl",
+            ),
+            forbidden_command_substrings=(
+                *BARE_AFOL_DISCOVERY_COMMANDS,
+                ".agents/agents",
+                "./afol ",
+                "['./afol'",
+                "./a ",
+                "cat > .afol/wb",
+                "tee .afol/wb",
+                "tee -a .afol/wb",
+                "> .afol/wb",
+                ">> .afol/wb",
+                "sed -i .afol/wb",
+                "perl -pi .afol/wb",
+                "rm -rf .afol/wb",
+                "mkdir -p .afol/wb",
+                "/home/ozy/.codex",
+                "/home/ozy/.agents",
             ),
             response_schema=_complete_schema(),
             prompt=(
-                "You are running inside a controlled runtime benchmark fixture.\n"
+                "You are running inside a controlled provider-compatible AFOL benchmark fixture.\n"
                 "Rules:\n"
                 "- Use tools. Do not answer from memory.\n"
-                "- You may only mutate the isolated fixture session through the scaffold commands below.\n"
+                "- You may only mutate the isolated fixture session through the AFOL commands below.\n"
                 "- Do not run help commands, create virtualenvs, install packages, copy the fixture repo, or set AGENTS_SCRIPT_PYTHON/PYTHONPATH.\n"
-                "- Run only the two implement commands, then inspect the task file and `.evidence.jsonl` ledger.\n"
+                "- Run exactly one shell command per tool call.\n"
+                "- Run only the two lifecycle commands and the two inspection commands below.\n"
                 "- Return JSON only that matches the provided schema.\n\n"
                 "Task:\n"
-                f"1. Run `./.agents/agents implement start --session {FIXTURE_WORKSTREAM_ID} --task-id T-01`.\n"
-                f"2. Run `./.agents/agents implement complete --session {FIXTURE_WORKSTREAM_ID} --task-id T-01 --command \"{LIVE_COMPLETE_COMMAND}\" --result passed --artifact .agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md`.\n"
-                f"3. Inspect `.agents/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md` and `.agents/wb/{FIXTURE_WORKSTREAM_ID}/.evidence.jsonl`.\n"
-                "4. Return whether completion and evidence recording both succeeded."
+                f"1. Run `{AFOLD_COMMAND} start --session {FIXTURE_WORKSTREAM_ID} --task-id T-01`.\n"
+                f"2. Run `{AFOLD_COMMAND} done --session {FIXTURE_WORKSTREAM_ID} --task-id T-01 --command \"{LIVE_COMPLETE_COMMAND}\" --result passed --artifact .afol/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md`.\n"
+                f"3. Run `cat .afol/wb/{FIXTURE_WORKSTREAM_ID}/{FIXTURE_WORKSTREAM_ID}_task_01.md`.\n"
+                f"4. Run `cat .afol/wb/{FIXTURE_WORKSTREAM_ID}/.evidence.jsonl`.\n"
+                "5. Return whether the inspected final task state is done and the inspected evidence ledger contains the passed record."
             ),
             validator=_validate_completion,
             validation_check_count=4,
-            min_tool_calls=2,
+            min_tool_calls=4,
         ),
         "live-wb-update-task-evidence-timeline": LiveBenchmarkScenario(
             id="live-wb-update-task-evidence-timeline",
@@ -4109,7 +4161,12 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
     temp_parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="agents-benchmark-gemini-", dir=temp_parent) as temp_dir:
-        fixture_root = _prepare_code_task_fixture_repo(Path(temp_dir)) if scenario.id == "live-afol-python-code-task-orchestrated" else _prepare_fixture_repo(Path(temp_dir))
+        if scenario.id in {"live-afol-provider-compatible-delivery", "live-implement-start-complete-evidence"}:
+            fixture_root = _prepare_afol_fixture_repo(Path(temp_dir))
+        elif scenario.id == "live-afol-python-code-task-orchestrated":
+            fixture_root = _prepare_code_task_fixture_repo(Path(temp_dir))
+        else:
+            fixture_root = _prepare_fixture_repo(Path(temp_dir))
         context_bytes = _context_bytes(fixture_root, scenario.context_artifacts)
         started_at = time.perf_counter()
         failures: list[str] = []
@@ -4143,19 +4200,26 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
                     ],
                 }
             ]
-            api_stats = _reserve_gemini_request(config, scenario.id)
-            api_request_count = 1
             try:
-                response = _gemini_http_generate_content(
-                    config,
-                    contents,
-                    api_key,
-                    tools=_gemini_tool_declarations(),
-                )
-                function_calls = _gemini_function_calls(response)
-                if function_calls:
-                    contents.append(response["candidates"][0]["content"])
-                    for function_call in function_calls[:1]:
+                while (
+                    api_request_count < config.max_requests_per_scenario - 1
+                    and not _gemini_tool_requirements_satisfied(tool_calls, scenario)
+                ):
+                    api_stats = _reserve_gemini_request(config, scenario.id)
+                    api_request_count += 1
+                    response = _gemini_http_generate_content(
+                        config,
+                        contents,
+                        api_key,
+                        tools=_gemini_tool_declarations(),
+                    )
+                    function_calls = _gemini_function_calls(response)
+                    if not function_calls:
+                        break
+                    candidate_content = response.get("candidates", [{}])[0].get("content")
+                    if isinstance(candidate_content, dict):
+                        contents.append(candidate_content)
+                    for function_call in function_calls:
                         command = str(function_call.get("args", {}).get("command", "")).strip()
                         call_result = _run_gemini_shell_tool(command, fixture_root, scenario)
                         if not call_result["ok"]:
@@ -4186,17 +4250,17 @@ def _run_gemini_scenario(scenario: LiveBenchmarkScenario, profile: BenchmarkProf
                                 ],
                             }
                         )
-                    if api_request_count >= config.max_requests_per_scenario:
-                        failures.append("Gemini request budget exhausted before final structured response")
-                    else:
-                        api_stats = _reserve_gemini_request(config, scenario.id)
-                        api_request_count += 1
-                        response = _gemini_http_generate_content(
-                            config,
-                            contents,
-                            api_key,
-                            schema=scenario.response_schema,
-                        )
+                if api_request_count >= config.max_requests_per_scenario:
+                    failures.append("Gemini request budget exhausted before final structured response")
+                else:
+                    api_stats = _reserve_gemini_request(config, scenario.id)
+                    api_request_count += 1
+                    response = _gemini_http_generate_content(
+                        config,
+                        contents,
+                        api_key,
+                        schema=scenario.response_schema,
+                    )
                 output_json = _parse_gemini_json_response(response)
             except json.JSONDecodeError as exc:
                 failures.append(f"Gemini structured output parse failed: {exc}")
