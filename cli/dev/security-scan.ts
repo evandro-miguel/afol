@@ -3,68 +3,125 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
-type ScanMode = "deps" | "secrets";
+export type ScanMode = "deps" | "secrets";
+type ScanRequirement = "informative" | "required";
 
-const mode = process.argv[2] as ScanMode | undefined;
-
-if (mode === "deps") {
-  const lockfile = supportedDependencyLockfile();
-  if (!lockfile) {
-    console.log("No OSV-supported dependency lockfile found; skipping dependency scan (informative).");
-    process.exit(0);
-  }
-
-  runOptionalScan({
-    binaries: ["osv-scanner", "osv"],
-    args: ["scan", "--lockfile", lockfile],
-    missingMessage: "osv-scanner not installed; skipping dependency scan (informative).",
-  });
-  process.exit(0);
+export function supportedDependencyLockfile(
+	cwd = process.cwd(),
+): string | null {
+	const lockfiles = [
+		"bun.lock",
+		"package-lock.json",
+		"npm-shrinkwrap.json",
+		"yarn.lock",
+		"pnpm-lock.yaml",
+	];
+	return lockfiles.find((path) => existsSync(`${cwd}/${path}`)) ?? null;
 }
 
-if (mode === "secrets") {
-  runOptionalScan({
-    binaries: ["gitleaks"],
-    args: ["detect", "--no-git", "-v", "--redact", "--exit-code", "1", "--source", "."],
-    missingMessage: "gitleaks not installed; skipping secret scan (informative).",
-  });
-  process.exit(0);
+function parseRequirement(args: string[]): ScanRequirement {
+	return args.includes("--required") ? "required" : "informative";
 }
 
-console.error("Usage: bun run cli/dev/security-scan.ts <deps|secrets>");
-process.exit(1);
+function main(args: string[]): void {
+	const mode = args[0] as ScanMode | undefined;
+	const requirement = parseRequirement(args.slice(1));
+
+	if (mode === "deps") {
+		const lockfile = supportedDependencyLockfile();
+		if (!lockfile) {
+			if (requirement === "required") {
+				console.error(
+					"No OSV-supported dependency lockfile found; required dependency scan cannot run.",
+				);
+				process.exit(1);
+			}
+
+			console.log(
+				"No OSV-supported dependency lockfile found; skipping dependency scan (informative).",
+			);
+			process.exit(0);
+		}
+
+		runOptionalScan({
+			binaries: ["osv-scanner", "osv"],
+			args: ["scan", "--lockfile", lockfile],
+			missingMessage:
+				"osv-scanner not installed; skipping dependency scan (informative).",
+			missingRequiredMessage:
+				"osv-scanner not installed; required dependency scan cannot run.",
+			requirement,
+		});
+		process.exit(0);
+	}
+
+	if (mode === "secrets") {
+		runOptionalScan({
+			binaries: ["gitleaks"],
+			args: [
+				"detect",
+				"--no-git",
+				"-v",
+				"--redact",
+				"--exit-code",
+				"1",
+				"--source",
+				".",
+			],
+			missingMessage:
+				"gitleaks not installed; skipping secret scan (informative).",
+			missingRequiredMessage:
+				"gitleaks not installed; required secret scan cannot run.",
+			requirement,
+		});
+		process.exit(0);
+	}
+
+	console.error(
+		"Usage: bun run cli/dev/security-scan.ts <deps|secrets> [--required]",
+	);
+	process.exit(1);
+}
 
 function runOptionalScan(opts: {
-  binaries: string[];
-  args: string[];
-  missingMessage: string;
+	binaries: string[];
+	args: string[];
+	missingMessage: string;
+	missingRequiredMessage: string;
+	requirement: ScanRequirement;
 }): void {
-  for (const binary of opts.binaries) {
-    const result = spawnSync(binary, opts.args, {
-      stdio: "inherit",
-      shell: false,
-    });
+	for (const binary of opts.binaries) {
+		const result = spawnSync(binary, opts.args, {
+			stdio: "inherit",
+			shell: false,
+		});
 
-    if (result.error) {
-      if (String((result.error as Error & { code?: string }).code) === "ENOENT") {
-        continue;
-      }
+		if (result.error) {
+			if (
+				String((result.error as Error & { code?: string }).code) === "ENOENT"
+			) {
+				continue;
+			}
 
-      console.error(`${binary} failed to start: ${result.error.message}`);
-      process.exit(1);
-    }
+			console.error(`${binary} failed to start: ${result.error.message}`);
+			process.exit(1);
+		}
 
-    if (result.status !== 0) {
-      process.exit(result.status ?? 1);
-    }
+		if (result.status !== 0) {
+			process.exit(result.status ?? 1);
+		}
 
-    return;
-  }
+		return;
+	}
 
-  console.log(opts.missingMessage);
+	if (opts.requirement === "required") {
+		console.error(opts.missingRequiredMessage);
+		process.exit(1);
+	}
+
+	console.log(opts.missingMessage);
 }
 
-function supportedDependencyLockfile(): string | null {
-  const lockfiles = ["bun.lock", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml"];
-  return lockfiles.find((path) => existsSync(path)) ?? null;
+if (import.meta.main) {
+	main(process.argv.slice(2));
 }

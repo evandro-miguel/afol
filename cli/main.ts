@@ -1,236 +1,255 @@
 #!/usr/bin/env bun
 
-import { constants as osConstants } from "node:os";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { constants as osConstants } from "node:os";
+import { join } from "node:path";
 import { runBootstrapCommand } from "./commands/bootstrap";
 import { runRuleCommand, runSkillCommand } from "./commands/catalog";
+import { runFileCommand } from "./commands/file";
 import { runInitCommand } from "./commands/init";
+import { runLocalStateCommand } from "./commands/local-state";
 import { runStatusCommand } from "./commands/status";
 import { runUpdateCommand } from "./commands/update";
 import { runValidateCommand } from "./commands/validate";
-import { runLocalStateCommand } from "./commands/local-state";
 import {
-  runCloseCommand,
-  runDoneCommand,
-  runEvidenceCommand,
-  runLogCommand,
-  runNewCommand,
-  runStartCommand,
-  runVerifyTasksCommand,
+	runCloseCommand,
+	runDoneCommand,
+	runEvidenceCommand,
+	runLogCommand,
+	runNewCommand,
+	runStartCommand,
+	runVerifyTasksCommand,
 } from "./commands/workbench";
-import { runFileCommand } from "./commands/file";
 import { CLI_VERSION } from "./generated/version";
 import { resolveCommand } from "./router";
-import { runValidationCommand } from "./validate/contract";
 import { loadProjectRoot } from "./services/project/root";
+import { runValidationCommand } from "./validate/contract";
 
 const HELP_LINES = [
-  "Usage: afol [command] [options]",
-  "",
-  "Commands",
-  "  s/status               Show status",
-  "  v/validate             Run selected validation gates",
-  "  init                   Install scaffold into current repo",
-  "  n/new                  Create workbench session",
-  "  st/start               Start workbench task",
-  "  e/evidence             Record task evidence",
-  "  d/done                 Complete task with evidence",
-  "  l/log                  Append session log timeline entry",
-  "  vf/verify, verify-tasks Verify workbench tasks",
-  "  r/rule sk/skill up/update ls/local-state Inspect routing, updates, indexes",
-  "  c/close                Close active session",
-  "  b/bootstrap            Install scaffold into another repo",
-  "",
-  "Flags",
-  "  -j, --json             JSON output for status",
-  "  -h, --help  -V, --version Show help or version",
-  "",
-  "Aliases",
-  "  -S --session  -T --task-id  -x --test",
-  "  t/task a=afol",
-  "",
-  "Examples",
-  "  afol s",
-  "  afol validate",
-  "  afol init --dry-run",
-  "  afol new <theme> [--intent ...] [--feature-id ...] [--parent-spec ...] [--task ...]",
-  "  afol done -T T-01",
+	"Usage: afol [command] [options]",
+	"",
+	"Commands",
+	"  s/status               Show status",
+	"  v/validate             Run selected validation gates",
+	"  init                   Install scaffold into current repo",
+	"  n/new                  Create workbench session",
+	"  st/start               Start workbench task",
+	"  e/evidence             Record task evidence",
+	"  d/done                 Complete task with evidence",
+	"  l/log                  Append session log timeline entry",
+	"  vf/verify, verify-tasks Verify workbench tasks",
+	"  r/rule sk/skill up/update ls/local-state Inspect routing, updates, indexes",
+	"  c/close                Close active session",
+	"  b/bootstrap            Install scaffold into another repo",
+	"",
+	"Flags",
+	"  -j, --json             JSON output for status",
+	"  -h, --help  -V, --version Show help or version",
+	"",
+	"Aliases",
+	"  -S --session  -T --task-id  -x --test",
+	"  a=afol",
+	"",
+	"Examples",
+	"  afol s",
+	"  afol validate",
+	"  afol init --dry-run",
+	"  afol new <theme> [--intent ...] [--feature-id ...] [--parent-spec ...] [--task ...]",
+	"  afol done -T T-01",
 ].join("\n");
 
 const NEW_COMMAND_HELP = [
-  "Usage: afol new <theme> [options]",
-  "",
-  "Options",
-  "  --intent <intent>        Delivery or planning intent",
-  "  --feature-id <id>        Governing roadmap feature ID",
-  "  --parent-spec <spec-id>  Parent spec identifier",
-  "  --task <text>            Initial task summary",
+	"Usage: afol new <theme> [options]",
+	"",
+	"Options",
+	"  --intent <intent>        Delivery or planning intent",
+	"  --feature-id <id>        Governing roadmap feature ID",
+	"  --parent-spec <spec-id>  Parent spec identifier",
+	"  --task <text>            Initial task summary",
 ].join("\n");
 
-const DELEGATE_UNAVAILABLE_MESSAGE = "delegate commands are not available in TypeScript template";
+const DELEGATE_UNAVAILABLE_MESSAGE =
+	"delegate commands are not available in TypeScript template";
 
 const exit = (code: number): never => {
-  process.exit(code);
+	process.exit(code);
 };
 
 function signalExitCode(signal: string): number {
-  const signalNumber = osConstants.signals[signal as keyof typeof osConstants.signals];
-  return typeof signalNumber === "number" ? 128 + signalNumber : 1;
+	const signalNumber =
+		osConstants.signals[signal as keyof typeof osConstants.signals];
+	return typeof signalNumber === "number" ? 128 + signalNumber : 1;
 }
 
 function runLegacyAdapter(projectRoot: string, args: string[]): number {
-  const agents = join(projectRoot, ".agents", "agents");
-  if (!existsSync(agents)) {
-    const command = args[0] ?? "delegate";
-    console.error(`err delegate-unavailable command=${command} message="${DELEGATE_UNAVAILABLE_MESSAGE}"`);
-    return 127;
-  }
+	const agents = join(projectRoot, ".agents", "agents");
+	if (!existsSync(agents)) {
+		const command = args[0] ?? "delegate";
+		console.error(
+			`err delegate-unavailable command=${command} message="${DELEGATE_UNAVAILABLE_MESSAGE}"`,
+		);
+		return 127;
+	}
 
-  const result = spawnSync(agents, args, {
-    cwd: projectRoot,
-    stdio: "inherit",
-  });
+	const result = spawnSync(agents, args, {
+		cwd: projectRoot,
+		stdio: "inherit",
+	});
 
-  if (result.error) {
-    console.error(`Failed to run ${agents}: ${result.error.message}`);
-    return 127;
-  }
+	if (result.error) {
+		console.error(`Failed to run ${agents}: ${result.error.message}`);
+		return 127;
+	}
 
-  if (result.signal) {
-    console.error(`Command terminated by signal: ${result.signal}`);
-    return signalExitCode(result.signal);
-  }
+	if (result.signal) {
+		console.error(`Command terminated by signal: ${result.signal}`);
+		return signalExitCode(result.signal);
+	}
 
-  return result.status ?? 0;
+	return result.status ?? 0;
 }
 
-function resolveValidateMode(projectRoot: string, args: string[]): {
-  mode: "project" | "benchmark";
-  args: string[];
+function resolveValidateMode(
+	projectRoot: string,
+	args: string[],
+): {
+	mode: "project" | "benchmark";
+	args: string[];
 } {
-  const explicitProject = args[0] === "project" || args.includes("--project");
-  if (explicitProject) {
-    return {
-      mode: "project",
-      args: args.filter((arg) => arg !== "project" && arg !== "--project"),
-    };
-  }
+	const explicitProject = args[0] === "project" || args.includes("--project");
+	if (explicitProject) {
+		return {
+			mode: "project",
+			args: args.filter((arg) => arg !== "project" && arg !== "--project"),
+		};
+	}
 
-  const benchmarkRegistry = join(projectRoot, ".agents", "data", "benchmarks", "registry.json");
-  if (existsSync(benchmarkRegistry)) {
-    return { mode: "benchmark", args };
-  }
+	const benchmarkRegistry = join(
+		projectRoot,
+		".agents",
+		"data",
+		"benchmarks",
+		"registry.json",
+	);
+	if (existsSync(benchmarkRegistry)) {
+		return { mode: "benchmark", args };
+	}
 
-  return { mode: "project", args };
+	return { mode: "project", args };
 }
 
 export async function main(argv: string[]): Promise<number> {
-  const args = argv.slice(2);
-  if (args.length === 1 && (args[0] === "--version" || args[0] === "-V" || args[0] === "version")) {
-    console.log(`afol ${CLI_VERSION}`);
-    return 0;
-  }
+	const args = argv.slice(2);
+	if (
+		args.length === 1 &&
+		(args[0] === "--version" || args[0] === "-V" || args[0] === "version")
+	) {
+		console.log(`afol ${CLI_VERSION}`);
+		return 0;
+	}
 
-  const resolution = resolveCommand(args);
+	const resolution = resolveCommand(args);
 
-  if (resolution.kind === "help") {
-    console.log(HELP_LINES);
-    return 0;
-  }
+	if (resolution.kind === "help") {
+		console.log(HELP_LINES);
+		return 0;
+	}
 
-  if (resolution.kind === "unknown") {
-    console.error(resolution.message);
-    return resolution.exitCode;
-  }
+	if (resolution.kind === "unknown") {
+		console.error(resolution.message);
+		return resolution.exitCode;
+	}
 
-  if (
-    resolution.kind === "new" &&
-    resolution.args.length === 1 &&
-    (resolution.args[0] === "-h" || resolution.args[0] === "--help")
-  ) {
-    console.log(NEW_COMMAND_HELP);
-    return 0;
-  }
+	if (
+		resolution.kind === "new" &&
+		resolution.args.length === 1 &&
+		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
+	) {
+		console.log(NEW_COMMAND_HELP);
+		return 0;
+	}
 
-  if (resolution.kind === "bootstrap") {
-    return runBootstrapCommand(resolution.args);
-  }
+	if (resolution.kind === "bootstrap") {
+		return runBootstrapCommand(resolution.args);
+	}
 
-  if (resolution.kind === "init") {
-    return runInitCommand(resolution.args);
-  }
+	if (resolution.kind === "init") {
+		return runInitCommand(resolution.args);
+	}
 
-  const project = loadProjectRoot(process.cwd());
-  if (!project.ok) {
-    console.error(project.error.message);
-    return project.error.code;
-  }
+	const project = loadProjectRoot(process.cwd());
+	if (!project.ok) {
+		console.error(project.error.message);
+		return project.error.code;
+	}
 
-  if (resolution.kind === "validate") {
-    const validateMode = resolveValidateMode(project.value.root, resolution.args);
-    if (validateMode.mode === "benchmark") {
-      return runValidationCommand(project.value.root, validateMode.args);
-    }
-    return runValidateCommand(project.value.root, validateMode.args);
-  }
+	if (resolution.kind === "validate") {
+		const validateMode = resolveValidateMode(
+			project.value.root,
+			resolution.args,
+		);
+		if (validateMode.mode === "benchmark") {
+			return runValidationCommand(project.value.root, validateMode.args);
+		}
+		return runValidateCommand(project.value.root, validateMode.args);
+	}
 
-  if (resolution.kind === "status") {
-    return runStatusCommand(project.value.root, resolution.args);
-  }
+	if (resolution.kind === "status") {
+		return runStatusCommand(project.value.root, resolution.args);
+	}
 
-  if (resolution.kind === "new") {
-    return runNewCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "new") {
+		return runNewCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "start") {
-    return runStartCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "start") {
+		return runStartCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "evidence") {
-    return runEvidenceCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "evidence") {
+		return runEvidenceCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "done") {
-    return runDoneCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "done") {
+		return runDoneCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "log") {
-    return runLogCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "log") {
+		return runLogCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "verifyTasks") {
-    return runVerifyTasksCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "verifyTasks") {
+		return runVerifyTasksCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "rule") {
-    return runRuleCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "rule") {
+		return runRuleCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "skill") {
-    return runSkillCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "skill") {
+		return runSkillCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "update") {
-    return runUpdateCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "update") {
+		return runUpdateCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "close") {
-    return runCloseCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "close") {
+		return runCloseCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "file") {
-    return runFileCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "file") {
+		return runFileCommand(resolution.args, project.value.root);
+	}
 
-  if (resolution.kind === "localState") {
-    return runLocalStateCommand(resolution.args, project.value.root);
-  }
+	if (resolution.kind === "localState") {
+		return runLocalStateCommand(resolution.args, project.value.root);
+	}
 
-  return runLegacyAdapter(project.value.root, resolution.args);
+	return runLegacyAdapter(project.value.root, resolution.args);
 }
 
 if (import.meta.main) {
-  exit(await main(process.argv));
+	exit(await main(process.argv));
 }
