@@ -88,6 +88,8 @@ def validate_new_thing(filepath: Path) -> List[str]:
 
 ## How to Test
 
+No public `afol lint-docs` verb exists yet. The command below is factory-only compatibility.
+
 ```bash
 # Run lint
 ./.agents/agents lint-docs .afol/wb/
@@ -95,8 +97,8 @@ def validate_new_thing(filepath: Path) -> List[str]:
 # Fix issues
 ./.agents/agents lint-docs .afol/wb/ --fix
 
-# Via legacy just command runner
-AFOL-native command pending; do not use legacy just command runners.
+# Legacy just targets are retired migration debt.
+# Keep lint-docs wrapper usage factory-only until a public AFOL verb lands.
 ```
 
 ## Output

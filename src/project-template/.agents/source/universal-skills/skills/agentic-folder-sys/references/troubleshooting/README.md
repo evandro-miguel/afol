@@ -22,7 +22,7 @@ Cause:
 Fix:
 
 ```bash
-./.agents/agents bootstrap /path/to/new-project
+afol bootstrap /path/to/new-project
 ```
 
 Full bootstrap creates the target directory when it is missing.

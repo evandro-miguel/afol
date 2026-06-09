@@ -29,16 +29,12 @@ Do not treat `repo-map` output as roadmap, spec, or approval authority.
 
 ## Command
 
-Primary wrapper:
+AFOL-native repo-map command is pending.
+
+Factory compatibility only:
 
 ```bash
 ./.agents/agents repo-map .
-```
-
-Just target:
-
-```bash
-AFOL-native command pending; do not use legacy just command runners.
 ```
 
 Useful variants:
@@ -128,20 +124,17 @@ Prefer `structure-map` when you only need a quick physical file inventory.
 
 After a `repo-map` refresh:
 
-```bash
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-```
+AFOL-native repo-map validation is pending. Keep the refresh path factory-only
+until a public verb lands.
 
-`just lint` validates the canonical `.agents` governance docs. The map surface under `docs/map/` is validated primarily by the `repo-map` command itself, while raw evidence under `docs/map/extra/` remains pipeline-owned output and should not be treated like hand-maintained governance docs.
+`just lint` is legacy migration debt, not the public path. The map surface under `docs/map/` is validated primarily by the `repo-map` command itself, while raw evidence under `docs/map/extra/` remains pipeline-owned output and should not be treated like hand-maintained governance docs.
 
 The wrapper also rejects semantically degenerate output, not only missing files. At minimum, `README.md` must contain `Major Runtime Surfaces`, and the dependency graph must not collapse to markers like `Processed 0 files`.
 
 If the work also changes the scripts or command surface:
 
-```bash
-AFOL-native command pending; do not use legacy just command runners.
-```
+Keep wrapper references in migration notes only until an AFOL-native public
+repo-map verb exists.
 
 ## Rules
 

@@ -19,7 +19,9 @@ const runtimeLiveBenchmarkProfile = {
 	reasoning_effort: "medium",
 };
 const runtimeLiveBenchmarkRefreshCommand =
-	"python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort medium";
+	"afol validate bench --pack runtime-live-agent --json";
+const runtimeLiveBenchmarkRefreshNote =
+	"snapshot validation; live refresh runner pending AFOL-native migration";
 
 function runKernel(
 	args: string[],
@@ -611,6 +613,9 @@ describe("validation command family", () => {
 		expect(notes).toContain(
 			`runtime-live-agent-refresh:${runtimeLiveBenchmarkRefreshCommand}`,
 		);
+		expect(notes).toContain(
+			`runtime-live-agent-refresh-note:${runtimeLiveBenchmarkRefreshNote}`,
+		);
 		expect(
 			notes.some((entry) =>
 				entry.startsWith("runtime-live-artifact-incomplete:"),
@@ -730,6 +735,9 @@ describe("validation command family", () => {
 		).toBe(true);
 		expect(notes).toContain(
 			`runtime-live-agent-refresh:${runtimeLiveBenchmarkRefreshCommand}`,
+		);
+		expect(notes).toContain(
+			`runtime-live-agent-refresh-note:${runtimeLiveBenchmarkRefreshNote}`,
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
 		expect(results.length).toBe(3);

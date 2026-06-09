@@ -141,13 +141,15 @@ Describes when each tool runs:
 
 ## How to Modify
 
+No public `afol tools` verb exists yet. The commands below are factory-only compatibility surfaces.
+
 ### Add New Tool
 
 1. Add entry to `tools` array
 2. Include all required fields
 3. Add to appropriate category in `tool_categories`
 4. Add to `execution_modes.on-demand.tools`
-5. Run `./.agents/agents tools validate`
+5. Run `./.agents/agents tools validate` only as a factory compatibility check
 
 ### Runtime Tool Entry
 
@@ -159,7 +161,8 @@ The central runtime is cataloged as `agentic-runtime`:
 .agents/agents mcp validate
 ```
 
-Its catalog entry points to `.agents/runtime/`, the `.agents/agents runtime` wrapper route, and the `just lint-runtime`, `just test-runtime`, and `just runtime-mcp-smoke` validation gates.
+Its catalog entry points to legacy factory-only runtime surfaces. Do not copy
+runtime wrapper routes or just targets into public downstream guidance.
 
 ### Update Existing Tool
 
@@ -169,6 +172,8 @@ Its catalog entry points to `.agents/runtime/`, the `.agents/agents runtime` wra
 4. Validate: `./.agents/agents tools validate`
 
 ## How to Test
+
+No public `afol tools` verb exists yet. The commands below are factory-only compatibility surfaces.
 
 ```bash
 # Validate catalog

@@ -42,7 +42,7 @@
 		"security:scan:informative": "bun run security:deps:informative && bun run security:secrets:informative",
 		"security:scan:required": "bun run security:deps:required && bun run security:secrets:required",
 		"validate:security:required": "bun run security:scan:required",
-		"validate:release": "bun run validate:toolchain && bun run validate:template && bun run validate:bootstrap && bun run build:deterministic && bun run smoke:dist && bun run validate:security:required && bun run release:provenance:release",
+		"validate:release": "bun run validate:toolchain && bun run validate:template && bun run validate:bootstrap && bun run coverage:check && bun run build:deterministic && bun run smoke:dist && bun run validate:security:required && bun run release:provenance:release",
 		"release:provenance": "bun run cli/dev/release-provenance.ts",
 		"release:provenance:release": "bun run cli/dev/release-provenance.ts --release",
 		"smoke:dist": "bun run build && bun run cli/dev/dist-smoke.ts",

@@ -85,16 +85,16 @@ Edit regex `TASK_LINE_RE`.
 
 ```bash
 # Verify specific session
-./.agents/agents verify-tasks .afol/wb/260223_1800_auth-refactor/
+afol verify-tasks .afol/wb/260223_1800_auth-refactor/
 
 # Verify all
+afol verify-tasks .afol/wb/
+
+# Compatibility fallback only
 ./.agents/agents verify-tasks .afol/wb/
 
-# Via legacy just command runner
-AFOL-native command pending; do not use legacy just command runners.
-
 # Strict verification for session closure
-./.agents/scripts/.venv/bin/python .agents/scripts/verify-tasks.py --strict .afol/wb/<session>/
+afol verify-tasks --strict .afol/wb/<session>/
 ```
 
 ## Output

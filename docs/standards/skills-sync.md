@@ -85,13 +85,15 @@ skills_sync:
 1. Initialize sync state:
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL skills-sync init verb exists yet.
+# Keep compatibility usage factory-only.
 ```
 
 2. Refresh the external git-backed universal-skills source when configured:
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL skills-sync pull verb exists yet.
+# Keep compatibility usage factory-only.
 ```
 
 `skills-pull` is the explicit network refresh command.
@@ -101,13 +103,14 @@ If a selected skill name comes from CLI input, a local manifest, or an
 upstream profile, validation must complete for the full selection before any
 destination is removed or copied.
 
-If only the repo-local bootstrap seed exists, `just skills-pull` is a no-op. It never creates a git checkout under `.agents/cache/`.
+If only the repo-local bootstrap seed exists, compatibility pull is a no-op. It
+never creates a git checkout under `.agents/cache/`.
 
 3. Discover what is available:
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL skills-sync discovery verbs exist yet.
+# Keep compatibility usage factory-only.
 ```
 
 When an external universal-skills checkout is configured, discovery commands prefer that full catalog. The repo-local source seed remains the default offline install/apply baseline.
@@ -115,26 +118,29 @@ When an external universal-skills checkout is configured, discovery commands pre
 4. Plan selected subset impact:
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL skills-sync plan verb exists yet.
+# Keep compatibility usage factory-only.
 ```
 
 5. Apply selected skills to project:
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL skills-sync apply verb exists yet.
+# Keep compatibility usage factory-only.
 ```
 
 6. Ensure one skill on demand:
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL skills-sync ensure verb exists yet.
+# Keep compatibility usage factory-only.
 ```
 
 7. Run the one-step update flow into `.agents/skills/`:
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL skills-sync update verb exists yet.
+# Keep compatibility usage factory-only.
 ```
 Without `--pull`, these commands use the current local source only.
 Use `--pull` when you want to refresh the external source before syncing.
@@ -152,7 +158,8 @@ Observed fields are:
 9. Propose one locally edited skill back to universal-skills only through a branch:
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL skills-sync push verb exists yet.
+# Keep compatibility usage factory-only and branch/PR-only.
 ```
 
 This command must never push to `main` directly. It requires an external universal-skills checkout and pushes only a proposal branch; use `PR=1` when the change should be opened as a GitHub pull request.
@@ -160,7 +167,8 @@ This command must never push to `main` directly. It requires an external univers
 10. Verify sync and structure:
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL skills-sync check verb exists yet.
+# Keep compatibility usage factory-only.
 ```
 
 ## Default Template Skills
@@ -179,7 +187,8 @@ After initial setup in each repository:
 3. Choose `mode` (`copy` recommended for template repos)
 4. Define selected skills via `SKILLS=...` and persist in manifest when needed
 5. Enable gate with `skills_sync.required=true`
-6. Ensure `just all` passes with `skills-check`
+6. Ensure the current AFOL validation path and any factory-only compatibility
+   check both pass before publishing.
 7. For live repos, use bootstrap `--partial` so skills and scaffold files are added without clobbering project-owned content
 8. Ensure bootstrap provisions `.agents/source/universal-skills` before expecting `skills-sync sync` to use a local-first source
 9. Treat repo/ref/profile fields as the canonical upgrade path for F-10 rather than inventing another local skills contract

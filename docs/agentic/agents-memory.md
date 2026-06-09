@@ -94,6 +94,8 @@ Meaning of the key fields:
 
 ## How to Use
 
+No public `afol memory` verb exists yet. The commands below are factory-only compatibility surfaces.
+
 ### Wrapper Commands
 
 ```bash

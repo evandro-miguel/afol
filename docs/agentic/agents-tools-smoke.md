@@ -50,24 +50,27 @@ Validates tools system:
 
 ## How to Use
 
+No public `afol tools-smoke` verb exists yet. The commands below are factory-only compatibility surfaces.
+
 ### Direct Execution
 
 ```bash
 # Run smoke tests
-python3 .agents/scripts/agents-tools-smoke.py
+# factory-only script-backed command pending AFOL-native migration
 ```
 
-### Via legacy just command runner
+### Legacy just runner
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
+# Legacy just targets are retired migration debt.
+# Keep tools-smoke script usage factory-only until a public AFOL verb lands.
 ```
 
 ### In CI/CD
 
 ```bash
-# Add to CI pipeline
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL CI command exists yet.
+# Keep tools-smoke script-backed and factory-only until a public verb lands.
 ```
 
 ## How to Modify

@@ -23,7 +23,8 @@ This document defines how the agent system standards evolve over time.
 #### Update Steps
 
 1. Update the source of truth (templates/standards)
-2. Run sync script: `python .agents/scripts/sync-agent-docs.py`
+2. Run the AFOL-native or documented factory-only sync path for the changed
+   surface; do not add new public Python script usage.
 3. Verify all agent files are updated
 4. Add lesson if change was triggered by user correction
 

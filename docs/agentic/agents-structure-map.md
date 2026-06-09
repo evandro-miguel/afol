@@ -87,12 +87,14 @@ DEFAULT_SECTIONS = {
 
 ## How to Test
 
+No public `afol structure-map` verb exists yet. The command below is factory-only compatibility.
+
 ```bash
 # Generate structure docs
 ./.agents/agents structure-map . --output docs/map/structure/
 
-# Via legacy just command runner
-AFOL-native command pending; do not use legacy just command runners.
+# Legacy just targets are retired migration debt.
+# Keep structure-map wrapper usage factory-only until a public AFOL verb lands.
 
 # Verify output
 cat docs/map/structure/README.md

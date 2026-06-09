@@ -54,6 +54,7 @@ To add new allowed doc_types:
 Find the validator script and add to the allowed list:
 
 ```python
+# Factory-only compatibility validator in the scaffold repo:
 # .agents/scripts/agents-lint-docs.py
 VALID_DOC_TYPES = [
     'plan', 'task', 'report', 'log', 'research', 'brainstorm',
@@ -69,12 +70,9 @@ VALID_DOC_TYPES = [
 
 ### Option 2: Auto-Discovery Script
 
-Use the discovery script to scan and update:
-
-```bash
-python .agents/scripts/fix-lint-doctypes.py --dry-run
-python .agents/scripts/fix-lint-doctypes.py
-```
+Use `afol validate --changed-path docs` after manual edits. If an old factory
+compatibility script is still needed in this scaffold repo, document that as
+migration debt instead of publishing it as a downstream workflow.
 
 ## Excluding Files from Lint
 
@@ -122,13 +120,13 @@ After updates, verify:
 
 ```bash
 # Check for real issues
-AFOL-native command pending; do not use legacy just command runners.
+afol validate --changed-path docs/standards/lint-false-positives.md
 
 # Run full lint
-AFOL-native command pending; do not use legacy just command runners.
+afol validate --json
 
 # Verify no new errors
-AFOL-native command pending; do not use legacy just command runners.
+afol validate --changed-path docs/standards/lint-false-positives.md --json
 ```
 
 ## Related

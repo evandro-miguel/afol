@@ -91,6 +91,8 @@ Partial-install note:
 
 ## How to Use
 
+No public `afol skills-sync` verb exists yet. The commands below are factory-only compatibility surfaces.
+
 ### Commands
 
 ```bash
@@ -129,21 +131,12 @@ Partial-install note:
 ./.agents/agents skills-sync push agentic-folder-sys --branch skills-sync/agentic-folder-sys --commit --push --pr
 ```
 
-### Via legacy just command runner
+### Legacy just runner
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-# Disabled by default in this scaffold:
-# AFOL-native command pending; do not use legacy just command runners.
+# Legacy just targets are retired migration debt.
+# Use the compatibility commands above until an AFOL skills-sync verb lands.
+# Disabled-by-default scaffold lanes remain non-public.
 ```
 
 ## How to Modify
@@ -170,7 +163,7 @@ def check_structure(skills):
 ### Add New Skill
 
 1. Add to `default_skills` in config
-2. Run `just skills-sync SKILLS=new-skill`
+2. Run `./.agents/agents skills-sync check --skills new-skill` only as compatibility; no public AFOL equivalent exists yet
 3. Verify structure in `.agents/skills/new-skill/`
 
 For the scaffold itself, keep `agentic-folder-sys` available so agents can

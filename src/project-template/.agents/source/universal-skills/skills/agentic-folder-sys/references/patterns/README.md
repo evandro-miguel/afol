@@ -12,9 +12,9 @@ to operate it safely.
 ## 1. Git-Backed Skills Refresh
 
 ```bash
-./.agents/agents skills-sync status
-./.agents/agents skills-sync pull
-./.agents/agents skills-sync update --runtime codex
+afol validate --changed-path .agents/skills
+skills-sync pull
+skills-sync update --runtime codex
 ```
 
 Use this when the project already has the scaffold and you want the installed

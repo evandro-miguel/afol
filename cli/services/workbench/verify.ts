@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { collectSessionIds } from "../local-state/workbench-index";
 import { resolveProjectPaths } from "../project/paths";
+import { loadProjectRoot } from "../project/root";
 
 const LEGACY_TASK_RE = /^\s*-\s\[( |\/|%|&|!|>|x)\]\s+(T-\d{2,3})\s+(.+?)\s*$/;
 const STATE_BOARD_TASK_RE =
@@ -111,6 +112,9 @@ function walkFiles(root: string): string[] {
 	for (const entry of readdirSync(root, { withFileTypes: true })) {
 		const absolute = join(root, entry.name);
 		if (entry.isDirectory()) {
+			if (entry.name === "_archive") {
+				continue;
+			}
 			files.push(...walkFiles(absolute));
 			continue;
 		}
@@ -146,6 +150,16 @@ function findTaskFiles(sessionPath: string): string[] {
 			return /_task_\d+\.md$/.test(name) || /^task.*\.md$/i.test(name);
 		})
 		.sort();
+}
+
+function resolveVerifyScopeRoot(sessionPath: string): string {
+	const absoluteSessionPath = resolve(sessionPath);
+	const project = loadProjectRoot(absoluteSessionPath);
+	if (!project.ok || project.value.root !== absoluteSessionPath) {
+		return absoluteSessionPath;
+	}
+	const wbRoot = resolveProjectPaths(absoluteSessionPath).abs.wbDir;
+	return existsSync(wbRoot) ? wbRoot : absoluteSessionPath;
 }
 
 function parseTasks(content: string, file: string): VerifyTask[] {
@@ -346,18 +360,18 @@ export function verifyWorkbenchTasks(
 	sessionPath: string,
 	strict = false,
 ): VerifyResult {
-	const absoluteSessionPath = resolve(sessionPath);
-	const result = emptyResult(absoluteSessionPath, strict);
+	const scanRoot = resolveVerifyScopeRoot(sessionPath);
+	const result = emptyResult(scanRoot, strict);
 
-	if (!existsSync(absoluteSessionPath)) {
+	if (!existsSync(scanRoot)) {
 		result.issues.push({
 			type: "missing_session",
-			message: `Session folder not found: ${absoluteSessionPath}`,
+			message: `Session folder not found: ${scanRoot}`,
 		});
 		return result;
 	}
 
-	const taskFiles = findTaskFiles(absoluteSessionPath);
+	const taskFiles = findTaskFiles(scanRoot);
 	result.taskFiles = taskFiles;
 	if (taskFiles.length === 0) {
 		result.allCompleted = !strict;
@@ -373,7 +387,7 @@ export function verifyWorkbenchTasks(
 	for (const taskFile of taskFiles) {
 		const content = readFileSync(taskFile, "utf8");
 		const tasks = parseTasks(content, taskFile);
-		const evidenceScope = evidenceScopeFor(taskFile, absoluteSessionPath);
+		const evidenceScope = evidenceScopeFor(taskFile, scanRoot);
 		if (strict && !evidenceByScope.has(evidenceScope)) {
 			evidenceByScope.set(evidenceScope, loadEvidence(evidenceScope));
 		}

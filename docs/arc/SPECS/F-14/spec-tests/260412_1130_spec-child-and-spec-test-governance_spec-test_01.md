@@ -64,15 +64,17 @@ risk_level: medium
 
 ## 5) Recommended Technology
 
-- Python unit tests for artifact manifest, CLI parsing, and artifact resolution.
-- Existing scaffold commands for end-to-end workbench creation when safe.
+- Bun/TypeScript tests for artifact manifest, CLI parsing, and artifact
+  resolution.
+- AFOL-native scaffold commands for end-to-end workbench creation when safe.
 - Markdown lint and strict task verification for documentation correctness.
 
 ## 6) Evidence Format
 
-- Workbench evidence IDs from `./.agents/agents wb-update evidence`.
+- Workbench evidence IDs from `afol d`.
 - Test command names and pass/fail summaries in the F-14 report.
-- Final `just lint` and strict F-14 workbench verification output summaries.
+- Final `afol validate --changed-path docs` and strict F-14 workbench
+  verification output summaries.
 
 ## 7) Open Risks
 

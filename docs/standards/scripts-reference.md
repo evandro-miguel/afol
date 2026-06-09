@@ -53,14 +53,15 @@ afol validate --changed-path cli/validate/contract.ts --json
 afol validate --json
 ```
 
-Runtime-flow benchmark refresh:
+Runtime-flow benchmark validation:
 
 ```bash
-python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort medium
+afol validate bench --pack runtime-live-agent --json
 ```
 
 The runtime-flow benchmark is a development test tool, not a public downstream
-AFOL command surface.
+AFOL command surface. Live benchmark refresh remains script-backed and
+factory-only until an AFOL-native refresh verb lands.
 
 ## Legacy Boundary
 

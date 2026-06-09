@@ -54,7 +54,8 @@ This directory contains detailed technical documentation for each operational to
 
 | Component | Type | Document |
 |-----------|------|----------|
-| `afol` (wrapper) | infrastructure | [agents-wrapper.md](./agents-wrapper.md) |
+| `afol` | public CLI | repo help/status/validate |
+| `.agents/agents` | factory-only compatibility wrapper | [agents-wrapper.md](./agents-wrapper.md) |
 | `tools.json` | configuration | [tools-json.md](./tools-json.md) |
 | `agents_config.py` | library | [agents-config.md](./agents-config.md) |
 
@@ -98,15 +99,15 @@ updated_at: <date>
 
 ### For Agents
 
-1. **Discover tools:** Use `.agents/agents tools list`
-2. **Understand tool:** Read corresponding document in this directory
-3. **Use tool:** Follow usage examples in the document
-4. **Troubleshoot:** Consult "How to Test" section
+1. **Check live state:** Use `afol status` or `afol validate`
+2. **Understand tool:** Read the corresponding document in this directory
+3. **Use tool:** Follow `afol` examples when they exist; treat legacy commands as compatibility-only when the doc says so
+4. **Troubleshoot:** Consult "How to Test" or the compatibility note
 
 ### For Humans
 
 1. **Understand system:** Start with [tools-json.md](./tools-json.md)
-2. **Modify tool:** Read "How to Modify" in specific document
+2. **Modify tool:** Read "How to Modify" in the specific document
 3. **Add tool:** Follow documentation standard
 
 ---
@@ -145,17 +146,17 @@ updated_at: <date>
 1. Agent receives task
    ↓
 2. Unsure which tool to use?
-   → .agents/agents tools list
-   → .agents/agents tools search <keyword>
+   → afol status
+   → afol validate
    ↓
 3. Identifies tool
    → Reads documentation in docs/agentic/
    ↓
 4. Gets tool details
-   → .agents/agents tools info <tool-id>
+   → AFOL-native command pending; use the compatibility note in the tool doc
    ↓
 5. Executes tool
-   → .agents/agents <command> [args]
+   → afol <command> [args] when the verb exists
    ↓
 6. Verifies result
    → Checks output and exit code
@@ -167,10 +168,10 @@ updated_at: <date>
 
 | Metric | How to Measure | Ideal |
 |--------|----------------|-------|
-| Functional tools | `.agents/agents tools list` | 15+ tools |
+| Functional tools | `afol status --json` | Live repo state |
 | Complete documentation | Count files in `agentic/` | 1 doc per tool/infra surface |
-| Valid configuration | `python -m json.tool .agents/tools.json` | Valid JSON |
-| Functional wrapper | `.agents/agents help` | Lists all commands |
+| Valid configuration | `jq empty .agents/tools.json` | Valid JSON |
+| Functional wrapper | `afol --help` | Lists public commands |
 
 ---
 

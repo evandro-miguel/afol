@@ -391,4 +391,33 @@ describe("local-state project indexer", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("validateWorkBenchIndex fails malformed generated_at", () => {
+		const root = buildFixture();
+		try {
+			mkdirSync(join(root, ".agents", "data", "index"), { recursive: true });
+			writeFileSync(
+				join(root, ".agents", "data", "index", "workbench.json"),
+				JSON.stringify({
+					kind: "workbench_index_v1",
+					version: 1,
+					generated_at: "not-a-date",
+					source: {
+						wb_dir: ".afol/wb",
+						event_log: ".agents/data/events/events.jsonl",
+					},
+					sessions: [],
+					tasks: [],
+				}),
+				"utf8",
+			);
+
+			expect(validateWorkBenchIndex(root)).toEqual({
+				ok: false,
+				message: expect.stringContaining("invalid workbench index snapshot"),
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });

@@ -53,45 +53,41 @@ Scans and validates links:
 
 ## How to Use
 
+No public `afol check-links` verb exists yet. The commands below are factory-only compatibility surfaces.
+
 ### Basic Usage
 
 ```bash
 # Check default directory (docs/)
-python3 .agents/scripts/check-links.py
+# factory-only script-backed command pending AFOL-native migration
 
 # Check specific directory
-python3 .agents/scripts/check-links.py docs/agentic/
+# factory-only script-backed command pending AFOL-native migration
 
 # Check multiple directories
-python3 .agents/scripts/check-links.py docs/ docs/arc/
+# factory-only script-backed command pending AFOL-native migration
 ```
 
 ### Options
 
 ```bash
 # Verbose mode - show all links
-python3 .agents/scripts/check-links.py --verbose
+# factory-only script-backed command pending AFOL-native migration
 
 # Quiet mode - only broken links
-python3 .agents/scripts/check-links.py --quiet
+# factory-only script-backed command pending AFOL-native migration
 
 # Generate fix script
-python3 .agents/scripts/check-links.py --fix
+# factory-only script-backed command pending AFOL-native migration
 
 # Save report to file
-python3 .agents/scripts/check-links.py --output report.txt
+# factory-only script-backed command pending AFOL-native migration
 ```
 
-### Via legacy just command runner (add target)
+### Legacy just runner
 
-```just
-# Add to legacy just command runner:
-check-links:
-  python3 .agents/scripts/check-links.py
-
-check-links-verbose:
-  python3 .agents/scripts/check-links.py --verbose
-```
+Legacy just targets are retired migration debt. Keep `check-links` script usage
+factory-only until a public AFOL verb lands.
 
 ## Output Examples
 
@@ -218,7 +214,7 @@ for match in new_pattern.finditer(line):
 #!/bin/bash
 # .git/hooks/pre-commit
 
-python3 .agents/scripts/check-links.py --quiet
+afol validate --changed-path docs
 if [ $? -ne 0 ]; then
     echo "❌ Broken links found. Fix before commit."
     exit 1
@@ -230,7 +226,7 @@ fi
 ```yaml
 # GitHub Actions example
 - name: Check links
-  run: python3 .agents/scripts/check-links.py --quiet
+  run: afol validate --changed-path docs
 ```
 
 ### With lint-md
@@ -238,7 +234,7 @@ fi
 ```bash
 # Run both checks
 lint-md "**/*.md" --strict && \
-python3 .agents/scripts/check-links.py --quiet
+afol validate --changed-path docs
 ```
 
 ## Related

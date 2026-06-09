@@ -29,7 +29,9 @@ Define how archived workbench sessions in `.agents/z-arq/` are retained, cleaned
 mv .afol/wb/<session-id> .agents/z-arq/<session-id>
 
 # Rebuild knowledge index after archiving
-.agents/scripts/.venv/bin/python .agents/scripts/agents-knowledge.py index
+afol validate --changed-path docs/knowledge/INDEX.md
+# If this validation lacks parity, record factory-only migration debt instead of
+# documenting Python script fallbacks as downstream usage.
 ```
 
 ## What to Preserve

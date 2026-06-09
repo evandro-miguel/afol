@@ -11,7 +11,7 @@ links:
   new: ./agents-new.md
 ---
 
-# agents-wb-update.py - Workbench Automation
+# Workbench Automation
 
 ## Why It Exists
 
@@ -23,19 +23,18 @@ links:
 - Mark tasks as complete
 - Add timeline entries
 
-**Solution:** Automation that executes these tasks with one command.
+**Solution:** Use AFOL-native lifecycle commands for supported transitions and
+keep remaining wrapper-only operations as factory migration debt.
 
 ## Function
 
 Automates workbench updates:
 
-1. **touch** - Updates `updated_at`
-2. **normalize-time** - Normalizes timestamps to WB timezone
-3. **files-changed** - Updates "Files Changed" section in report
-4. **task** - Marks task by ID (done, in_progress, etc.)
-5. **status** - Set status in frontmatter
-6. **timeline** - Adds timeline entry to log
-7. **link** - Set `links.<key>` in frontmatter
+1. **new** - Creates governed sessions under `.afol/wb/`
+2. **st** - Starts a task
+3. **d** - Records task evidence and marks done when evidence passes
+4. **c** - Closes the session after strict evidence exists
+5. **validate / verify-tasks** - Checks project and task contracts
 
 ## What It Touches
 
@@ -45,18 +44,17 @@ Automates workbench updates:
 |------|---------|
 | `.afol/wb/.active_session` | Project-local convenience pointer |
 | `.afol/wb/*/*.md` | Plan/session documents |
-| `.agents/agents.config` | Config (WB_OFFSET, etc.) |
+| `.agents/data/` | Local mutable pointers and indexes |
 
 ### Files Written
 
 | Command | File | Change |
 |---------|------|--------|
-| `touch` | Session files | `updated_at` in frontmatter |
-| `task` | `*_task_*.md` | Task marker |
-| `status` | Session files | `status` in frontmatter |
-| `timeline` | `*_log_*.md` | Timeline entry |
-| `files-changed` | `*_report_*.md` | File list |
-| `link` | Session files | `links.<key>` in frontmatter |
+| `afol n` | Session files | Plan/task/log/report baseline |
+| `afol st` | `*_task_*.md` | Task marker to in_progress |
+| `afol d` | `.evidence.jsonl`, task file | Evidence row and done marker |
+| `afol c` | Session files | Closure status after verification |
+| `afol local-state rebuild` | `.agents/data/` | Local mutable indexes |
 
 ## How to Configure
 
@@ -69,48 +67,29 @@ time:
 
 ## How to Modify
 
-### Add New Subcommand
+### Add New AFOL Subcommand
 
-```python
-def cmd_new_command(args):
-    """New subcommand."""
-    session = get_active_session()
-    # Implement logic
-    save_session(session)
-```
+Implement new workbench behavior under `cli/**`, add focused Bun tests, and run
+`afol validate --changed-path <path>` plus the relevant package gate.
 
 ## How to Use
 
+No public `afol wb-update` verb exists. Use native `afol` lifecycle verbs where
+they exist; do not document wrapper-only operations as downstream workflows.
+
 ```bash
-# Update updated_at
-./.agents/agents wb-update touch
+# Create a session
+afol n <theme> --feature-id <F-id> --parent-spec <spec-id>
 
-# Mark task as done only after recording passing closure evidence
-./.agents/agents wb-update evidence T-01 --session <session-id> --command "just lint" --result passed --artifact .afol/wb/<session-id>/<session-id>_report_01.md
-./.agents/agents wb-update task T-01 --session <session-id> --mark-done --evidence-id E-...
+# Start a task
+afol st -S <session-id> -T T-01
 
-# Target a session through the process environment when the wrapper supports it.
-# Set AGENTS_SESSION_ID before this command.
-./.agents/agents wb-update task T-01 --mark-in-progress
+# Record passing evidence and close
+afol d -S <session-id> -T T-01 -x "afol validate"
+afol c -S <session-id>
 
-# Use strict mode by also setting AGENTS_SESSION_STRICT before the command.
-./.agents/agents wb-update task T-01 --mark-in-progress
-
-# Set status
-./.agents/agents wb-update status --value active --file plan
-
-# Add timeline entry
-./.agents/agents wb-update timeline --message "Implemented login"
-
-# Update files changed
-./.agents/agents wb-update files-changed
-
-# Via legacy just command runner
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
+# Rebuild local mutable indexes when validation reports stale local state
+afol local-state rebuild
 ```
 
 ## Related

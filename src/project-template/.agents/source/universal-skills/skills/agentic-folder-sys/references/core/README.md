@@ -33,7 +33,7 @@ Full bootstrap can create the target directory when it does not exist yet.
 ```bash
 mkdir -p /path/to/new-project
 git -C /path/to/new-project init  # optional but recommended
-./.agents/agents bootstrap /path/to/new-project
+afol bootstrap /path/to/new-project
 ```
 
 What this does:

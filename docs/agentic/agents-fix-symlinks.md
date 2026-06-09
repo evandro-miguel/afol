@@ -61,6 +61,9 @@ fix_symlinks:
 
 ## How to Use
 
+No public `afol fix-symlinks` verb exists yet. The commands below are
+factory-only compatibility surfaces.
+
 ### Commands
 
 ```bash
@@ -74,10 +77,11 @@ fix_symlinks:
 ./.agents/agents fix-symlinks --verbose
 ```
 
-### Via legacy just command runner
+### Legacy just runner
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
+# Legacy just targets are retired migration debt.
+# Keep fix-symlinks wrapper usage factory-only until a public AFOL verb lands.
 ```
 
 ## How to Modify

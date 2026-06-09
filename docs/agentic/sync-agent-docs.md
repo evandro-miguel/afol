@@ -79,12 +79,14 @@ HEADER_TEMPLATE = """<!-- Agent-specific instructions for {agent_name}. -->
 
 ## How to Use
 
+No public `afol sync` verb exists yet. The command below is factory-only compatibility.
+
 ```bash
 # Sync all agents
 ./.agents/agents sync --force
 
-# Via legacy just command runner
-AFOL-native command pending; do not use legacy just command runners.
+# Legacy just targets are retired migration debt.
+# Keep sync wrapper usage factory-only until a public AFOL verb lands.
 ```
 
 ## Output

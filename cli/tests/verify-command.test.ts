@@ -32,12 +32,97 @@ function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 }
 
 describe("verify-tasks command", () => {
+	test("repo-root strict verification scans .afol/wb and ignores legacy .agents/wb", () => {
+		const root = mkProjectRoot("root-scan");
+		try {
+			const currentSession = "260609_1707_current";
+			const legacySession = "260101_0900_legacy";
+			const archivedSession = "260101_0800_archived";
+			mkdirSync(join(root, ".afol", "wb", currentSession), { recursive: true });
+			mkdirSync(join(root, ".afol", "wb", "_archive", archivedSession), {
+				recursive: true,
+			});
+			mkdirSync(join(root, ".agents", "wb", legacySession), {
+				recursive: true,
+			});
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					currentSession,
+					`${currentSession}_task_01.md`,
+				),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | current work |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					"_archive",
+					archivedSession,
+					`${archivedSession}_task_01.md`,
+				),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | archived old work |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(
+					root,
+					".agents",
+					"wb",
+					legacySession,
+					`${legacySession}_task_01.md`,
+				),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | legacy history |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const proc = runKernel(root, ["verify-tasks", "--strict"]);
+
+			expect(proc.status).toBe(1);
+			expect(proc.stderr as string).toBe("");
+			expect(proc.stdout as string).toContain("/.afol/wb");
+			expect(proc.stdout as string).toContain("Pending:");
+			expect(proc.stdout as string).not.toContain("/.afol/wb/_archive/");
+			expect(proc.stdout as string).not.toContain("/.agents/wb/");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("fails with open state-board tasks and prints the open task", () => {
 		const root = mkProjectRoot("open");
 		try {
 			const created = newWorkstream(root, "verify-open");
 
-			const proc = runKernel(root, ["verify-tasks", created.sessionDir]);
+			const proc = runKernel(root, [
+				"verify-tasks",
+				`.afol/wb/${created.session}`,
+			]);
 
 			expect(proc.status).toBe(1);
 			expect(proc.stderr as string).toBe("");
@@ -108,7 +193,11 @@ describe("verify-tasks command", () => {
 				"utf8",
 			);
 
-			const proc = runKernel(root, ["vf", created.sessionDir, "--strict"]);
+			const proc = runKernel(root, [
+				"vf",
+				`.afol/wb/${created.session}`,
+				"--strict",
+			]);
 
 			expect(proc.status).toBe(1);
 			expect(proc.stdout as string).toContain("missing_evidence");
@@ -116,6 +205,77 @@ describe("verify-tasks command", () => {
 				"T-01 marked done but lacks passed evidence",
 			);
 			expect(proc.stdout as string).toContain("Verification failed.");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("accepts explicit .afol/wb session paths", () => {
+		const root = mkProjectRoot("explicit-wb-path");
+		try {
+			const created = newWorkstream(root, "explicit-wb-path");
+			writeFileSync(
+				created.taskPath,
+				[
+					"# Tasks: explicit-wb-path",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | explicit path |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+
+			const proc = runKernel(root, [
+				"verify-tasks",
+				`.afol/wb/${created.session}`,
+				"--strict",
+			]);
+
+			expect(proc.status).toBe(0);
+			expect(proc.stderr as string).toBe("");
+			expect(proc.stdout as string).toContain("All tasks completed.");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects session arguments that escape the configured workbench root", () => {
+		const root = mkProjectRoot("session-escape");
+		try {
+			const proc = runKernel(root, [
+				"verify-tasks",
+				"--session",
+				"../../outside",
+			]);
+
+			expect(proc.status).toBe(2);
+			expect(proc.stdout as string).toBe("");
+			expect(proc.stderr as string).toContain(
+				"Path escapes workbench directory: ../../outside",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects positional verify paths that escape the project root", () => {
+		const root = mkProjectRoot("positional-escape");
+		try {
+			const proc = runKernel(root, ["verify-tasks", "../outside"]);
+
+			expect(proc.status).toBe(2);
+			expect(proc.stdout as string).toBe("");
+			expect(proc.stderr as string).toContain(
+				"Path escapes project root: ../outside",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

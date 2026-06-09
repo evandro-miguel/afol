@@ -350,6 +350,10 @@ function latestSourceMtime(root: string): number {
 	return latest;
 }
 
+function isIsoDate(value: unknown): boolean {
+	return Number.isFinite(Date.parse(value as string));
+}
+
 export function rebuildWorkBenchIndex(
 	root: string,
 	sessionScope?: string,
@@ -428,10 +432,16 @@ export function validateWorkBenchIndex(root: string): {
 			message: `invalid workbench index snapshot: ${indexPath}`,
 		};
 	}
+	if (!isIsoDate(snapshot.generated_at)) {
+		return {
+			ok: false,
+			message: `invalid workbench index snapshot: ${indexPath}`,
+		};
+	}
 
 	const generatedAt = Date.parse(snapshot.generated_at);
 	const sourceLatest = latestSourceMtime(root);
-	if (!Number.isFinite(generatedAt) || !Number.isFinite(sourceLatest)) {
+	if (!Number.isFinite(sourceLatest)) {
 		return { ok: true, message: `ok workbench index: ${indexPath}` };
 	}
 	if (generatedAt < sourceLatest) {

@@ -10,47 +10,35 @@ updated_at: '2026-05-04T16:08:30-03:00'
 
 ## Purpose
 
-`.agents/runtime/` is the central Python runtime for the scaffold. It provides a package boundary for agent-native inspection, search, validation, journaling, reversible writes, and the FastMCP adapter.
+The legacy runtime package is discontinued factory-only compatibility state. It
+is not part of the public downstream CLI path.
 
-The wrapper keeps the existing `.agents/agents <legacy-command>` surface intact while adding runtime-native entrypoints:
+`afol` is the public entrypoint. Runtime and wrapper commands below are factory-only migration references, not downstream usage:
 
 ```bash
-.agents/agents runtime manifest
-.agents/agents runtime validate
-.agents/runtime/.venv/bin/agentic adoption-plan
-.agents/runtime/.venv/bin/agentic inspect-target
-.agents/agents adoption-plan
-.agents/agents inspect-target
-.agents/agents runtime search "roadmap"
-.agents/agents runtime inspect --depth 2
-.agents/agents mcp serve
-.agents/agents-mcp manifest
+afol status
+afol validate
+afol verify-tasks
 ```
 
 ## Package Layout
 
 | Path | Purpose |
 |------|---------|
-| `.agents/runtime/pyproject.toml` | Runtime package metadata, dependencies, console scripts, test config |
-| `.agents/runtime/uv.lock` | Reproducible runtime dependency lockfile |
-| `.agents/runtime/src/agentic_scaffold/` | Runtime code and MCP adapter |
-| `.agents/runtime/tests/` | Runtime unit and FastMCP tests |
-| `.agents/agents` | Primary compatibility wrapper with `runtime` and `mcp` routes |
-| `.agents/agents-mcp` | Thin compatibility launcher for MCP-oriented runtime commands |
+| Legacy runtime package | Factory-only runtime metadata, lockfile, code, MCP adapter, and tests |
+| Legacy wrapper launchers | Factory-only compatibility routing for retired runtime and MCP commands |
 
 ## Commands
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
+afol status
+afol validate
+afol verify-tasks
 ```
 
-`just all` includes the runtime lint, runtime test, and runtime MCP smoke gates.
-Runtime setup uses the project-local `.agents/tools/uv/bin/uv` with the checked-in
-`uv.lock`. Normal validation, CI, and runtime launchers execute from
-`.agents/runtime/.venv/` directly so sandboxed runs do not need global `uv`.
+Runtime-specific subcommands remain factory-only and must not be documented as
+public downstream usage. Legacy runtime gates are migration debt, not the
+current public validation path.
 
 ## Safety Model
 
@@ -63,19 +51,18 @@ Runtime setup uses the project-local `.agents/tools/uv/bin/uv` with the checked-
 
 ## Migration Rule
 
-New agent-native behavior should enter through `.agents/runtime/` first.
-Existing `.agents/scripts/` commands remain callable through `.agents/agents`
-as compatibility delegates until the runtime has equivalent native behavior and
-the workbench records validation evidence for the replacement.
+New public behavior should enter through the Bun/TypeScript `afol` CLI first.
+Existing legacy script/runtime commands remain factory-only compatibility
+delegates until retired or replaced with AFOL-native behavior and workbench
+validation evidence.
 
 Adoption planning now lives in the runtime layer through:
 
 - `adoption-plan`
 - `inspect-target`
 
-Those commands are routed directly through `.agents/agents` as runtime-native
-surfaces, while registry-backed compatibility commands continue to use the
-script fallback.
+Those commands are factory-only migration references while registry-backed
+compatibility commands continue to use the legacy fallback.
 
 The source-kit priority wrappers were migrated first:
 
@@ -83,28 +70,15 @@ The source-kit priority wrappers were migrated first:
 - `knowledge list/search/show/pull`
 - `session catchup`
 
-After that wrapper path was proven with focused runtime tests, every public
-`.agents/agents <command>` alias was routed through the runtime command
-registry. `status` now executes in-process through the runtime while preserving
-the legacy output contract, and `knowledge list/search/show/pull/index` now dispatch
-through native runtime search/format logic with parity tests against
-`agents-knowledge.py`. Remaining registry entries stay delegated to existing
-scripts until their native ports land with parity evidence.
+After that compatibility path was proven with focused runtime tests, the legacy
+aliases were routed through the runtime command registry. `status` now executes
+in-process through the runtime while preserving the legacy output contract, and
+knowledge list/search/show/pull/index dispatch through native runtime
+search/format logic with parity tests. Remaining registry entries stay
+factory-only until their native ports land with parity evidence.
 
 ## Runtime Command Registry
 
-Public wrapper commands now route through the runtime command registry while
-preserving legacy script behavior:
-
-```bash
-.agents/agents runtime command-registry
-.agents/agents status --json
-.agents/agents knowledge pull runtime
-.agents/agents session catchup --json
-.agents/agents doctor
-```
-
-The registry owns public routing for the wrapper aliases listed by
-`.agents/agents runtime command-registry`. `status` is a native command family
-(`phase=native`). `knowledge` remains marked `phase=compatibility`, but
-`knowledge list/search/show/pull/index` execute through native runtime dispatch.
+The legacy runtime command registry is factory-only. Public routing belongs in
+the Bun/TypeScript `afol` CLI. `status` is native; remaining compatibility
+entries must become AFOL-native or stay undocumented downstream.

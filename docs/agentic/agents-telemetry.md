@@ -65,44 +65,41 @@ telemetry:
 
 ## How to Use
 
-### Commands
+No public `afol telemetry` verb exists yet. The commands below are factory-only compatibility surfaces.
+
+### Compatibility Commands
 
 ```bash
 # Record event (manual)
-python3 .agents/scripts/agents-telemetry.py record session_start \
-  --metadata='{"theme":"my-feature"}'
+# factory-only script-backed command pending AFOL-native migration
 
 # Query events
-python3 .agents/scripts/agents-telemetry.py query --limit=20
+# factory-only script-backed command pending AFOL-native migration
 
 # Generate report
-python3 .agents/scripts/agents-telemetry.py report --period=weekly
+# factory-only script-backed command pending AFOL-native migration
 
 # Heat map
-python3 .agents/scripts/agents-telemetry.py heat --period=weekly
+# factory-only script-backed command pending AFOL-native migration
 
 # Hot elements
-python3 .agents/scripts/agents-telemetry.py hot --limit=10
+# factory-only script-backed command pending AFOL-native migration
 
 # Cold elements
-python3 .agents/scripts/agents-telemetry.py cold --limit=10
+# factory-only script-backed command pending AFOL-native migration
 
 # Export data
-python3 .agents/scripts/agents-telemetry.py export --format=json
+# factory-only script-backed command pending AFOL-native migration
 
 # Validate
-python3 .agents/scripts/agents-telemetry.py validate
+# factory-only script-backed command pending AFOL-native migration
 ```
 
-### Via legacy just command runner
+### Legacy just runner (migration debt only)
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
+# Legacy just targets are retired migration debt.
+# Use the compatibility commands above until an AFOL telemetry verb lands.
 ```
 
 ## How to Modify

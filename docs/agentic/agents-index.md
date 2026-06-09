@@ -77,6 +77,8 @@ def generate_index_md(entries: List[DocEntry], output_path: Path):
 
 ## How to Test
 
+No public `afol index` verb exists yet. The command below is factory-only compatibility.
+
 ```bash
 # Run index
 ./.agents/agents index

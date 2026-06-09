@@ -15,6 +15,10 @@ Provide a selective, development-only benchmark family for risky scaffold
 execution changes using a real mini-tier agent, real tool calls, and bounded
 fixture tasks.
 
+No public AFOL live benchmark refresh verb exists yet; the live refresh harness
+remains script-backed and internal. `afol validate bench` consumes the saved
+benchmark contract evidence.
+
 ## Default Profile
 
 - runtime: `codex`
@@ -179,23 +183,15 @@ Latest full result inspected:
 ## Commands
 
 ```bash
-python3 .agents/scripts/agents-benchmark.py list
-python3 .agents/scripts/agents-benchmark.py show live-implement-next-governance-preflight
-python3 .agents/scripts/agents-benchmark.py run --model gpt-5.4-mini --reasoning-effort medium
-python3 .agents/scripts/agents-benchmark.py run live-implement-start-complete-evidence --save --model gpt-5.4-mini --reasoning-effort medium
-python3 .agents/scripts/agents-benchmark.py run live-wb-update-task-evidence-timeline --save --model gpt-5.4-mini --reasoning-effort medium
-python3 .agents/scripts/agents-benchmark.py run live-wb-session-create-scripted-progress --save --model gpt-5.4-mini --reasoning-effort medium
-python3 .agents/scripts/agents-benchmark.py run live-autonomous-agentic-folder-delivery --save --model gpt-5.4-mini --reasoning-effort medium
-python3 .agents/scripts/agents-benchmark.py run live-afol-provider-compatible-delivery --save --model gpt-5.4-mini --reasoning-effort medium
-python3 .agents/scripts/agents-benchmark.py run live-afol-python-code-task-orchestrated --save --model gpt-5.4-mini --reasoning-effort medium
+afol validate bench --pack runtime-live-agent --json
 ```
 
-Gemini/Gemma manual runs:
+Legacy live-refresh runs remain script-backed and factory-only until an
+AFOL-native refresh verb lands. Gemini/Gemma manual runs are local diagnostic
+work, not public downstream CLI usage.
 
 ```bash
-python3 .agents/scripts/agents-benchmark.py run live-implement-start-complete-evidence --provider-config .agents/data/benchmarks/providers/gemini-gemma4-31b.json --output .afol/tmp/benchmarks/gemini-implement-complete.json --pretty
-python3 .agents/scripts/agents-benchmark.py run live-afol-python-code-task-orchestrated --provider-config .agents/data/benchmarks/providers/gemini-gemma4-31b.json --output .afol/tmp/benchmarks/gemini-code-task-orchestrated.json --pretty
-python3 .agents/scripts/agents-benchmark.py run live-autonomous-agentic-folder-delivery --provider-config .agents/data/benchmarks/providers/gemini-gemma4-31b.json --output .afol/tmp/benchmarks/gemini-autonomous-delivery.json --pretty
+# factory-only script-backed refresh: pending AFOL-native migration
 ```
 
 For hard API runs, only mark success after manual inspection of:
@@ -235,8 +231,9 @@ Latest hard-code-task Gemma run:
 - Scenario thresholds are applied to the mapped live metrics. A saved live
   artifact with `pass=true` still fails validation when duration, tool success,
   or other scenario thresholds are violated.
-- Refresh live evidence with:
-  - `python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort medium`
+- Validate saved live evidence with:
+  - `afol validate bench --pack runtime-live-agent --json`
+- Refreshing live evidence is still factory-only script-backed migration debt.
 - If the tracked live snapshot is missing or only covers a partial scenario set,
   the validation pack returns `status=failed` with an actionable note that
   points to the refresh command.
@@ -268,7 +265,12 @@ Latest hard-code-task Gemma run:
 - Validates that live agents call the expected scripts instead of only returning a plausible answer.
 - Fails targeted scenarios when forbidden manual workbench edits are observed.
 - Includes script-writing flows for session creation, task state, evidence, timeline entries, frontmatter status/touch, and frontmatter links.
-- Includes an autonomous hypothetical delivery scenario where the prompt does not name the exact scaffold commands; the agent must read `.agents/skills/agentic-folder-sys/SKILL.md`, discover operations from AGENTS.md and the public tool catalog, prefer `.agents/agents` wrapper commands, create a governed session/plan, implement a tiny fixture fix, record evidence, complete the task, and run bounded acceptance verification.
+- Includes an autonomous hypothetical delivery scenario where the prompt does not
+  name the exact scaffold commands; the agent must read
+  `.agents/skills/agentic-folder-sys/SKILL.md`, discover operations from
+  AGENTS.md and the public tool catalog, prefer AFOL-native commands, create a
+  governed session/plan, implement a tiny fixture fix, record evidence, complete
+  the task, and run bounded acceptance verification.
 - Includes AFOL provider-compatible scenarios where mutable operational state stays under `.afol/` instead of `.agents/`.
 - AFOL provider-compatible scenarios must use `./afold`; `./afol`, `./a`, bare
   `afol` discovery, global skills, and manual `.afol/data` session edits are failure

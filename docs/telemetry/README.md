@@ -9,13 +9,14 @@ updated_at: '2026-04-13T19:37:05-03:00'
 
 ## Purpose
 
-Track and analyze .agents system usage, session metrics, and work patterns.
+Track and analyze AFOL scaffold usage, session metrics, and work patterns.
 
 ## Quick Start
 
-**Telemetry is fully automated!** No manual recording needed.
+Telemetry is automated where AFOL-native commands emit events. No manual
+recording is required for the current public path.
 
-Every time you use `.agents/agents <command>`, telemetry is captured automatically:
+AFOL lifecycle and validation commands may capture:
 
 - Tool usage
 - Session start/end
@@ -24,84 +25,40 @@ Every time you use `.agents/agents <command>`, telemetry is captured automatical
 
 ### Manual Commands (Optional)
 
-```bash
-# Generate weekly report
-AFOL-native command pending; do not use legacy just command runners.
-
-# Export all data
-AFOL-native command pending; do not use legacy just command runners.
-
-# Query events
-python3 .agents/scripts/agents-telemetry.py query --limit=20
-```
+Manual telemetry query/report/export commands are pending AFOL-native parity. Do
+not use retired compatibility command runners as public workflows.
 
 ## Event Types (Auto-Captured)
 
 | Event Type | When Captured | Source |
 |------------|---------------|--------|
-| `session_start` | Creating new workstream | `agents-new.py` |
-| `tool_exec` | Using any `.agents/agents <tool>` | `.agents/agents` wrapper |
-| `session_end` | Completing workstream | `agents-wb-update.py touch` |
-| `task_complete` | Marking task done | `verify-tasks.py` |
+| `session_start` | Creating new workstream | `afol n` |
+| `tool_exec` | Using AFOL commands | `afol` |
+| `session_end` | Closing workstream | `afol c` |
+| `task_complete` | Marking task done | `afol d` |
 | `blocker` | Manual (optional) | User |
 | `error` | Tool failure | Wrapper |
-| `pattern_applied` | Using pattern suggestion | `agents-patterns.py` |
+| `pattern_applied` | Using pattern suggestion | AFOL-native command pending |
 
 ## Commands
 
 ### Query Events
 
-```bash
-# All events
-python3 .agents/scripts/agents-telemetry.py query
-
-# Filter by type
-python3 .agents/scripts/agents-telemetry.py query --event-type=tool_exec
-
-# Filter by session
-python3 .agents/scripts/agents-telemetry.py query --session-id=260223_1800_my-theme
-
-# Date range
-python3 .agents/scripts/agents-telemetry.py query --since=2026-02-20T00:00:00Z --until=2026-02-23T23:59:59Z
-
-# Export as JSON
-python3 .agents/scripts/agents-telemetry.py query --format=json --limit=50
-```
+AFOL-native telemetry query is pending. Until it lands, inspect telemetry data as
+JSONL only for factory debugging and do not document legacy command fallbacks.
 
 ### Generate Report
 
-```bash
-# Weekly report (default)
-AFOL-native command pending; do not use legacy just command runners.
-
-# Monthly report
-AFOL-native command pending; do not use legacy just command runners.
-
-# JSON format
-AFOL-native command pending; do not use legacy just command runners.
-
-# All time
-AFOL-native command pending; do not use legacy just command runners.
-```
+AFOL-native report generation is pending.
 
 ### Export Data
 
-```bash
-# JSON export
-AFOL-native command pending; do not use legacy just command runners.
-
-# CSV export
-AFOL-native command pending; do not use legacy just command runners.
-
-# Custom output path
-AFOL-native command pending; do not use legacy just command runners.
-```
+AFOL-native export is pending.
 
 ### Validate
 
 ```bash
-# Validate all events against schema
-AFOL-native command pending; do not use legacy just command runners.
+afol validate --json
 ```
 
 ## Data Storage
@@ -122,24 +79,15 @@ The following events are captured **automatically** - no manual action needed:
 
 | Event | Trigger |
 |-------|---------|
-| `tool_exec` | Every `.agents/agents <command>` |
-| `session_start` | Running `.agents/agents new <theme>` |
-| `session_end` | Running `.agents/agents wb-update touch` |
-| `task_complete` | Running `.agents/agents verify-tasks` |
+| `tool_exec` | AFOL command execution |
+| `session_start` | Running `afol n <theme>` |
+| `session_end` | Running `afol c -S <session-id>` |
+| `task_complete` | Running `afol d -S <session-id> -T <task-id> -x <command>` |
 
 ## Manual Events (Optional)
 
-For blockers, errors, or custom events, you can manually record:
-
-```bash
-# Blocker (optional)
-python3 .agents/scripts/agents-telemetry.py record blocker \
-  --metadata='{"blocker_reason":"waiting for review"}'
-
-# Error (optional)
-python3 .agents/scripts/agents-telemetry.py record error \
-  --metadata='{"error_message":"something failed"}'
-```
+Manual blocker/error telemetry is pending AFOL-native parity. Record blockers in
+the governed task/report until the public command exists.
 
 ## Privacy & Security
 
@@ -162,24 +110,15 @@ python3 .agents/scripts/agents-telemetry.py record error \
 
 ### Session Duration Trend
 
-```bash
-python3 .agents/scripts/agents-telemetry.py query --event-type=session_end --format=json | \
-  jq '.[] | {session: .session_id, duration: .metadata.duration_seconds}'
-```
+Use JSONL inspection with `jq` only for local factory diagnostics.
 
 ### Tool Usage Frequency
 
-```bash
-python3 .agents/scripts/agents-telemetry.py query --event-type=tool_exec --format=json | \
-  jq -r '.[].metadata.tool_name' | sort | uniq -c | sort -rn
-```
+Use JSONL inspection with `jq` only for local factory diagnostics.
 
 ### Success Rate
 
-```bash
-AFOL-native command pending; do not use legacy just command runners.
-  jq '.summary.success_rate'
-```
+AFOL-native success-rate reporting is pending.
 
 ## Troubleshooting
 
@@ -187,11 +126,11 @@ AFOL-native command pending; do not use legacy just command runners.
 
 - Check if `events.jsonl` exists: `ls -la .agents/data/telemetry/`
 - Verify write permissions
-- Check event schema: `python3 .agents/scripts/agents-telemetry.py validate`
+- Validate project state with `afol validate --json`
 
 ### Invalid JSON
 
-- Run validation: `just telemetry-validate`
+- Run validation with `afol validate --json`
 - Check for manual edits to `events.jsonl`
 - Restore from backup if needed
 
@@ -199,7 +138,7 @@ AFOL-native command pending; do not use legacy just command runners.
 
 - Review event type requirements in schema
 - Ensure all required fields are provided
-- Check script integration points
+- Check AFOL integration points
 
 ## Related
 

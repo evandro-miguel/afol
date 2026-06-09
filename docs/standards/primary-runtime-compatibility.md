@@ -77,10 +77,11 @@ Committed runtime config must stay safe to review publicly inside the repository
 
 ## Verification
 
-- `just sync`
-- `just lint`
-- `just doctor`
-- `just all`
+- `afol validate --changed-path <adapter-path>`
+- `afol validate --changed-path AGENTS.md`
+- `afol validate --changed-path CLAUDE.md`
+- `afol validate --json`
+- `bun run validate:release`
 
 ## Acceptance
 

@@ -58,9 +58,9 @@ disposable history.
 
 The Bun/TypeScript reformulation must be staged:
 
-1. Add `afol` as the new project-local front door.
-2. Keep `afol` as a compatibility alias and delegate from both entrypoints to
-   existing `.agents/agents` commands where parity does not exist yet.
+1. Keep `afol` as the project-local and downstream front door.
+2. Keep legacy `.agents/agents`, Python, Bash, uv, and just surfaces
+   factory-only until parity tests prove safe retirement.
 3. Implement one typed Bun/TypeScript command family at a time.
 4. Keep Python/Bash paths until parity tests prove the replacement.
 5. Shrink src/project-template only after bootstrap/export validation proves
@@ -81,7 +81,9 @@ Critical path (in dependency order):
 7. Complete mutation safety (path-jail, symlink checks, atomic write, journal, backups, rollback, task/session context).
 8. Add release/security gates and deterministic standalone build checks.
 
-`afol` remains the primary command. `afol` remains compatibility alias/local wrapper while parity is incomplete.
+`afol` remains the primary command and the only documented downstream entrypoint.
+Legacy local wrappers remain factory-only compatibility surfaces while parity is
+incomplete.
 
 Boundary guardrails:
 
@@ -90,7 +92,7 @@ Boundary guardrails:
 - F-08: mutation writes are session/task constrained with journaling and rollback support.
 - F-09: no blind overwrite of project-owned files; update flow must classify managed/project-owned generated/ignored/conflict with conflicts preserved.
 - F-11: release/security gate set includes deterministic build checks and token-aware validation, without claiming unverified dependency installation.
-- F-11 (MVP): release is hard-gated by `bun run validate:release`; security checks are informative by default and require an explicit release waiver record only when OSV/Gitleaks are absent in environment.
+- F-11 (MVP): release is hard-gated by `bun run validate:release`, including `bun run coverage:check` at `>=80%` lines/functions before release provenance; security checks are informative by default and require an explicit release waiver record only when OSV/Gitleaks are absent in environment.
 - F-12: public distribution remains gated on reproducible `bun install
   --frozen-lockfile`, standalone binary smoke, platform-target evidence,
   checksum/provenance, and explicit macOS notarization disclosure.
@@ -390,8 +392,9 @@ Minimum acceptance:
 - Status: final
 - Governing spec:
   docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md
-- Why: keep `just` as the canonical command runner while preserving command
-  parity and predictable validation behavior.
+- Why: retire `just` from the documented downstream path while preserving
+  factory-only compatibility long enough to prove command parity and predictable
+  validation behavior.
 - Closure note: the parent spec is final and the accepted child slices are
   final.
 - Exit criteria: aggregate validation entrypoints and standards mirrors stay in

@@ -1,0 +1,2 @@
+{"id":"E-20260609172324582-687707","task_id":"T-01","created_at":"2026-06-09T21:23:24.582Z","command":"bun run validate:release","result":"passed","exit_code":0}
+{"id":"E-20260609172756967-d7c844","task_id":"T-01","created_at":"2026-06-09T21:27:56.967Z","command":"bun run validate:release","result":"passed","exit_code":0}

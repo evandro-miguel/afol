@@ -31,17 +31,15 @@ For any governed request that includes implementation, validation, or delivery,
 the workbench workflow is part of the work, not documentation after the fact.
 Run this sequence before product completion can be claimed:
 
-1. Create or target a session under `.afol/wb/` with `./.agents/agents new
-   <theme> --feature-id <F-id> --parent-spec <spec-id>`.
-2. Move the execution task to in_progress with `./.agents/agents implement start
-   --session <session-id> --task-id T-01` or the equivalent `wb-update task ...
-   --mark-in-progress`.
+1. Create or target a session under `.afol/wb/` with
+   `afol n <theme> --feature-id <F-id> --parent-spec <spec-id>`.
+2. Move the execution task to in_progress with
+   `afol st -S <session-id> -T T-01`.
 3. Only then edit product files.
 4. Run the requested verification command.
-5. Close the task with `./.agents/agents implement complete --session
-   <session-id> --task-id T-01 --command "<verification command>" --result
-   passed --artifact <path-or-report>` or record evidence with `wb-update
-   evidence` and then use `wb-update task ... --mark-done --evidence-id <E-id>`.
+5. Record evidence with
+   `afol d -S <session-id> -T T-01 -x "<verification command>"`, then close
+   the session with `afol c -S <session-id>`.
 
 If step 1 or step 2 fails, stop and fix the workflow blocker before editing the
 product. Do not create tasks already marked `[x]`, do not manually edit
@@ -110,9 +108,9 @@ over speed; for trivial tasks, use judgment.
 
 ## Operating Rules
 
-- Treat `./.agents/agents bootstrap` as the installer for this scaffold. Full
-  bootstrap can create the target directory for a brand new repo. Use `bootstrap
-  --partial` for existing projects so project-owned files stay intact. Keep
+- Treat `afol bootstrap` as the installer for this scaffold. Full bootstrap can
+  create the target directory for a brand new repo. Use `bootstrap --partial`
+  for existing projects so project-owned files stay intact. Keep
   project-owned repository docs outside `.agents/`; use `docs/map/` for
   current-state repository mapping and analysis evidence. Treat git as the
   upstream source of truth for universal-skills, but keep that checkout outside
@@ -133,14 +131,11 @@ over speed; for trivial tasks, use judgment.
   one session folder per workstream. Treat `.afol/wb/.active_session` as local
   operator state. It is a project-local convenience pointer, not shared
   synchronization for parallel agents. Use `AGENTS_SESSION_ID=<session-id>` when
-  the shell or wrapper honors the session context contract. Use
+  the shell honors the session context contract. Use
   `AGENTS_SESSION_STRICT=1` when you need to reject repository-global
   active-session fallback in strict or parallel contexts. Keep session
-  management per project: list sessions with `./.agents/agents session list`,
-  sweep stale or overlapping sessions with `./.agents/agents session sweep` as a
-  read-only pass, resume with `./.agents/agents session catchup --session
-  <session-id>`, and close with `./.agents/agents session close --session
-  <session-id>`. Do not treat this as a global multi-project dashboard or index.
+  management per project with AFOL-native commands and workbench validation; do
+  not treat this as a global multi-project dashboard or index.
   Use standardized workbench artifacts: `plan`, `task`, `log`, and `report`. For
   major work, `brainstorm`, `research`, `explorer-check`, and `postmortem` are
   optional companion artifacts when they materially help the workstream, but
@@ -158,17 +153,17 @@ over speed; for trivial tasks, use judgment.
   not planning theater: each task should describe a concrete action an agent can
   take now, and deferred work must be marked `moved` with destination plus
   reason instead of a generic skip. For governed feature execution, prefer
-  `./.agents/agents implement ...` because it should surface the active
-  feature/spec/rule bundle before task transitions run. For ambiguous,
+  AFOL-native lifecycle commands so active feature/spec/rule context stays tied
+  to task transitions. For ambiguous,
   product-shaped, benchmark-heavy, or prioritization-heavy work, run the
   smallest useful decision-intake lane before creating plans, delegating agents,
   benchmarking, or implementing. Treat it as a ladder, not a mandatory pipeline.
   For every feature addition or meaningful feature behavior change, update the
   affected project-local skill under `.agents/skills/` and the affected project
   docs. Pending: mirror behavior-changing edits in this skill back to
-  universal-skills through the approved branch/PR flow. Prefer `./.agents/agents
-  wb-update ...` over manual timestamp, task-state, evidence, and file-list
-  edits. Never create new tasks already marked `[x]` or `done`; seed them as
+  universal-skills through the approved branch/PR flow. Prefer AFOL-native
+  workbench update commands over manual timestamp, task-state, evidence, and
+  file-list edits. Never create new tasks already marked `[x]` or `done`; seed them as
   `pending` unless execution has started. Mark tasks `[x]` only through
   task-scoped `.evidence.jsonl` closure evidence, a valid `evidence_id`, passing
   required gates, no unresolved blocking failed evidence, and strict
@@ -211,10 +206,9 @@ Verification rule:
   explicitly moved to another plan. Do not close a task by treating a failed
   gate as a successful readiness check.
 
-1. Create or target a session through `./.agents/agents new ...` so
-   `.active_session` stays aligned for the local operator fast path. Session
-   state must live under the repo's `.afol/wb/`; do not create, reuse, or
-   point `--into-session` at `/tmp` or any path outside `.afol/wb/`.
+1. Create or target a session through `afol n ...`. Session state must live
+   under the repo's `.afol/wb/`; do not create, reuse, or point
+   `--into-session` at `/tmp` or any path outside `.afol/wb/`.
 2. Keep `roadmap_feature` and `parent_spec` context on major workstreams.
 3. Run the smallest useful decision-intake lane when the request needs problem
    framing, challenge, benchmark order, qualitative prioritization, optional
@@ -226,7 +220,7 @@ Verification rule:
    `explorer-check` only when they are the requested deliverable or the smallest
    blocking proof needed before safe execution.
 7. Execute the change and record progress in `log`.
-8. Record validation with `./.agents/agents wb-update evidence ...`.
+8. Record validation with `afol d`.
 9. Run repo checks and strict session verification before closure.
 10. Close with `report`; if `brainstorm`, `research`, `explorer-check`, or
     `postmortem` exist, finalize them before closure.
@@ -235,15 +229,16 @@ Verification rule:
 
 ## Runtime MCP Lane
 
-Use this lane for fast, bounded repository maintenance inside the scaffold. It
-is part of `agentic-folder-sys`; do not create a separate skill for it.
+Use this lane for fast, bounded repository maintenance inside the scaffold
+through configured MCP tools or AFOL-native commands. It is part of
+`agentic-folder-sys`; do not create a separate skill for it.
 
 Start sequence:
 
-1. Run `generate_manifest` or `./.agents/agents runtime manifest`.
-2. Run `search_docs` or `./.agents/agents runtime search "<query>"` for roadmap,
-   spec, rule, docs/map, workbench, or skill context.
-3. Run `validate_structure` or `./.agents/agents runtime validate`.
+1. Run `generate_manifest` when the MCP lane is configured.
+2. Run `search_docs` for roadmap, spec, rule, docs/map, workbench, or skill
+   context when the MCP lane is configured.
+3. Run `validate_structure` or `afol validate project`.
 4. Only then mutate files.
 5. Prefer `archive_paths` over delete.
 6. Use `undo_last_change` if validation regresses.
@@ -263,15 +258,8 @@ Runtime tool surface:
   patch application. `undo_last_change`: revert the latest archive, write, or
   patch operation.
 
-CLI fallback:
-
-```bash
-./.agents/agents runtime manifest
-./.agents/agents runtime validate
-./.agents/agents runtime search "roadmap"
-./.agents/agents mcp inspect --depth 2
-./.agents/agents-mcp manifest
-```
+CLI fallback is AFOL validation plus exact repository search. Do not publish
+legacy runtime or MCP wrapper commands as downstream usage.
 
 Resources exposed by the runtime include `repo://manifest`, `repo://validation`,
 `repo://tool-catalog`, and `skill://...` entries from `.agents/skills/`.
@@ -311,7 +299,7 @@ workbench files.
 ## Validation
 
 ```bash
-./.agents/agents skills-sync check --skills agentic-folder-sys
-./.agents/agents verify-tasks --strict .afol/wb/$(cat .afol/wb/.active_session)
-make lint
+afol validate --changed-path .agents/skills/agentic-folder-sys
+afol verify-tasks --strict
+bun run validate:release
 ```

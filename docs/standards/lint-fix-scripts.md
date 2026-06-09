@@ -23,43 +23,41 @@ The lint fix scripts automatically resolve the most common markdown validation w
 
 ```bash
 # Check for issues (no modifications)
-AFOL-native command pending; do not use legacy just command runners.
+afol validate --changed-path docs
 
 # Preview fixes (dry run)
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL lint-fix dry-run verb exists yet.
+# Factory-only compatibility scripts remain in the scaffold repo.
 
 # Apply all fixes
-AFOL-native command pending; do not use legacy just command runners.
+# No public AFOL lint-fix apply verb exists yet.
+# Factory-only compatibility scripts remain in the scaffold repo.
 ```
 
 ## Available Commands
 
-| Command | Description |
-|---------|-------------|
-| `just lint-fix` | Apply all lint fixes |
-| `just lint-fix-dry` | Preview fixes without modifying |
-| `just lint-fix-check` | Check if fixes needed (exit 1 if yes) |
-| `just lint-fix-checkboxes` | Fix checkbox separators only |
-| `just lint-fix-frontmatter` | Add frontmatter to specific files |
+No public AFOL lint-fix command exists yet. Legacy just targets and Python
+scripts are factory-only migration debt and must not be copied into downstream
+usage docs.
 
 ## Scripts
 
-### fix-lint-all.py
+### Factory-only `fix-lint-all.py`
 
 Unified script that runs all fix operations.
 
 ```bash
 # Check for issues
-python .agents/scripts/fix-lint-all.py --check
+# Factory-only script-backed command pending AFOL-native migration.
 
 # Preview fixes
-python .agents/scripts/fix-lint-all.py --dry-run
+# Factory-only script-backed command pending AFOL-native migration.
 
 # Apply fixes
-python .agents/scripts/fix-lint-all.py .agents
+# Factory-only script-backed command pending AFOL-native migration.
 ```
 
-### fix-lint-checkboxes.py
+### Factory-only `fix-lint-checkboxes.py`
 
 Fixes missing separators after checkbox markers.
 
@@ -67,41 +65,37 @@ Fixes missing separators after checkbox markers.
 
 ```bash
 # Dry run
-python .agents/scripts/fix-lint-checkboxes.py --dry-run .agents/
+# Factory-only script-backed command pending AFOL-native migration.
 
 # Fix specific directory
-python .agents/scripts/fix-lint-checkboxes.py docs/standards/
+# Factory-only script-backed command pending AFOL-native migration.
 
 # Fix specific file
-python .agents/scripts/fix-lint-checkboxes.py .agents/rules/RULE-002.md
+# Factory-only script-backed command pending AFOL-native migration.
 ```
 
-### fix-lint-frontmatter.py
+### Factory-only `fix-lint-frontmatter.py`
 
 Adds YAML frontmatter to files missing it.
 
 ```bash
 # Add frontmatter to specific files
-python .agents/scripts/fix-lint-frontmatter.py \
-  docs/standards/scripts-usage.md \
-  docs/standards/scripts-reference.md
+# Factory-only script-backed command pending AFOL-native migration.
 
 # With custom doc_type
-python .agents/scripts/fix-lint-frontmatter.py \
-  --doc-type tool-doc \
-  docs/agentic/my-tool.md
+# Factory-only script-backed command pending AFOL-native migration.
 ```
 
-### fix-lint-doctypes.py
+### Factory-only `fix-lint-doctypes.py`
 
 Updates the lint validator to recognize new doc_type values found in markdown files.
 
 ```bash
 # Scan and preview updates
-python .agents/scripts/fix-lint-doctypes.py --dry-run
+# Factory-only script-backed command pending AFOL-native migration.
 
 # Apply updates
-python .agents/scripts/fix-lint-doctypes.py
+# Factory-only script-backed command pending AFOL-native migration.
 ```
 
 ## Common Issues Fixed
@@ -156,13 +150,13 @@ Content here...
 1. **Before fixing:**
 
    ```bash
-AFOL-native command pending; do not use legacy just command runners.
+   afol validate --changed-path docs/standards/lint-fix-scripts.md
    ```
 
 2. **Preview changes:**
 
    ```bash
-AFOL-native command pending; do not use legacy just command runners.
+   # Factory-only compatibility scripts remain in the scaffold repo.
    ```
 
 3. **Review the files that will change**
@@ -170,13 +164,13 @@ AFOL-native command pending; do not use legacy just command runners.
 4. **Apply fixes:**
 
    ```bash
-AFOL-native command pending; do not use legacy just command runners.
+   # Factory-only compatibility scripts remain in the scaffold repo.
    ```
 
 5. **Verify:**
 
    ```bash
-AFOL-native command pending; do not use legacy just command runners.
+   afol validate --changed-path docs
    ```
 
 ### CI/CD Integration
@@ -208,13 +202,13 @@ The scripts automatically exclude:
 
 ## Troubleshooting
 
-### Script not found
+### Legacy Script not found
 
 Ensure you're in the project root:
 
 ```bash
 cd /path/to/project
-python .agents/scripts/fix-lint-all.py --check
+# Factory-only script-backed command pending AFOL-native migration.
 ```
 
 ### Permission denied
@@ -222,7 +216,7 @@ python .agents/scripts/fix-lint-all.py --check
 Make scripts executable:
 
 ```bash
-chmod +x .agents/scripts/fix-lint-*.py
+# factory-only script-backed command pending AFOL-native migration
 ```
 
 ### False positives in code examples

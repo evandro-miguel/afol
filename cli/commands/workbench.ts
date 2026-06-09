@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { isAbsolute, relative } from "node:path";
 import { resolveProjectPaths } from "../services/project/paths";
+import { resolveProjectPath } from "../services/project/root";
 import {
 	appendTimelineEntry,
 	closeSession,
@@ -51,6 +52,40 @@ type VerifyArgs = {
 	sessionPath: string;
 	strict: boolean;
 };
+
+function pathIsInside(root: string, candidate: string): boolean {
+	const relativePath = relative(root, candidate);
+	return (
+		relativePath === "" ||
+		(!relativePath.startsWith("..") && !isAbsolute(relativePath))
+	);
+}
+
+function resolveVerifyTargetPath(root: string, target: string): string {
+	const result = resolveProjectPath(root, target);
+	if (!result.ok) {
+		throw new Error(result.error);
+	}
+	return result.value.path;
+}
+
+function resolveVerifySessionPath(root: string, session: string): string {
+	const projectPaths = resolveProjectPaths(root);
+	const normalized = session.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+	const sessionTarget =
+		normalized === projectPaths.wbDir ||
+		normalized.startsWith(`${projectPaths.wbDir}/`)
+			? normalized
+			: `${projectPaths.wbDir}/${normalized}`;
+	const result = resolveProjectPath(root, sessionTarget);
+	if (!result.ok) {
+		throw new Error(result.error);
+	}
+	if (!pathIsInside(projectPaths.abs.wbDir, result.value.path)) {
+		throw new Error(`Path escapes workbench directory: ${session}`);
+	}
+	return result.value.path;
+}
 
 function parseNewArgs(args: string[]): NewCommandArgs {
 	const [theme, ...rest] = args;
@@ -419,7 +454,7 @@ function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 			if (!value) {
 				throw new Error("Missing value for --session in verify.");
 			}
-			sessionPath = resolve(resolveProjectPaths(root).abs.wbDir, value);
+			sessionPath = resolveVerifySessionPath(root, value);
 			i += 1;
 			continue;
 		}
@@ -430,17 +465,14 @@ function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 			throw new Error(`Unknown verify argument: ${arg}`);
 		}
 		if (!sessionPath && arg) {
-			sessionPath = resolve(root, arg);
+			sessionPath = resolveVerifyTargetPath(root, arg);
 			continue;
 		}
 		throw new Error(`Unexpected verify argument: ${arg}`);
 	}
 
 	if (!sessionPath) {
-		const active = readActiveSession(root);
-		sessionPath = active
-			? resolve(resolveProjectPaths(root).abs.wbDir, active)
-			: root;
+		sessionPath = resolveProjectPaths(root).abs.wbDir;
 	}
 
 	return { sessionPath, strict };

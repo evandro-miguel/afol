@@ -39,7 +39,7 @@ links:
 | File | Purpose |
 |------|---------|
 | `.agents/tools.json` | Tool catalog |
-| `.agents/agents.config` | Path configurations |
+| `.agents/config.json` | Path configurations |
 
 ### Files Written
 
@@ -56,68 +56,33 @@ links:
 
 ## How to Configure
 
+No public `afol tools` verb exists yet. Do not document the retired wrapper as a
+downstream workflow.
+
 ### Available Commands
 
+Current public validation path:
+
 ```bash
-# List all tools
-./.agents/agents tools list
-
-# Filter by type
-./.agents/agents tools list --type validation
-./.agents/agents tools list --type creation
-./.agents/agents tools list --type automation
-
-# Show tool details
-./.agents/agents tools info doctor
-./.agents/agents tools info wb-update
-
-# Search by keyword
-./.agents/agents tools search Validates
-./.agents/agents tools search automate
-./.agents/agents tools search create
-
-# Help
-./.agents/agents tools help
+afol validate --json
 ```
 
 ## How to Modify
 
 ### Main Functions
 
-```python
-def list_tools(tool_type: Optional[str] = None) -> None:
-    """List all tools, optionally filtered by type."""
-
-def show_tool_info(tool_id: str) -> None:
-    """Show detailed information about a specific tool."""
-
-def search_tools(query: str) -> None:
-    """Search tools by keyword in description and usage."""
-
-def load_tools_catalog() -> Dict:
-    """Load and parse tools.json."""
-```
+Implement new tool catalog behavior in `cli/**` with Bun tests.
 
 ### Adding New Tool to Catalog
 
 1. Add entry to `.agents/tools.json`
 2. Include: id, name, description, commands, when_to_use
-3. Run `./.agents/agents tools validate`
+3. Run `afol validate --changed-path .agents/tools.json`
 
 ## How to Test
 
 ```bash
-# List tools
-./.agents/agents tools list
-
-# Get info
-./.agents/agents tools info doctor
-
-# Search
-./.agents/agents tools search validation
-
-# Validate catalog
-./.agents/agents tools validate
+afol validate --changed-path .agents/tools.json
 ```
 
 ## Output Examples
@@ -141,11 +106,10 @@ creation:
 ```text
 Tool: doctor
 Description: Validates .agents structure and integrity
-Usage: .agents/agents doctor
-AFOL: afol validate
+Usage: afol validate
 
 Commands:
-  doctor [args]  - Run validation
+  validate [args]  - Run validation
 
 When to Use:
   - Before starting work

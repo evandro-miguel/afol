@@ -32,7 +32,7 @@ This standard establishes a **hybrid approach**:
   repository as current-state evidence.
 - `docs/map/` may hold a broader **current-state** surface, such as module
   maps, API maps, dependency views, and codemap-style artifacts.
-- Use `.agents/agents repo-map` for the full codemap workflow described in [repo-map.md](repo-map.md).
+- Use the factory-only `.agents/agents repo-map` compatibility path inside the scaffold repo; downstream validation should use `afol validate --changed-path docs/map/structure/`.
 - Neither `structure/` nor `map/` replaces roadmap/spec governance.
 - Desired architecture, product intent, roadmap, and specs remain outside `docs/map/`.
 
@@ -52,13 +52,13 @@ This standard establishes a **hybrid approach**:
 
 ```bash
 # First run (full scan)
-python .agents/scripts/agents-structure-map.py <project-path> --output <output-dir>
+# factory-only script-backed command pending AFOL-native migration
 
 # Example: Current project
-python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
+# factory-only script-backed command pending AFOL-native migration
 
 # Example: External project
-python .agents/scripts/agents-structure-map.py /path/to/example-project --output docs/map/structure/
+# factory-only script-backed command pending AFOL-native migration
 ```
 
 ### Output Files
@@ -138,26 +138,26 @@ The script uses a cache system:
 
 ```bash
 # 1. Create workstream
-python .agents/scripts/agents-new.py my-feature --spec
+afol new my-feature --feature-id F-01 --parent-spec <spec-id>
 
 # 2. Implement feature...
 
 # 3. After major changes, update structure
-python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
+# Factory-only script-backed command pending AFOL-native migration.
 
 # 4. Validate
-python .agents/scripts/agents-doctor.py
+afol validate --changed-path docs/map/structure/
 
 # 5. Update indexes
-python .agents/scripts/agents-index.py
+afol validate --json
 ```
 
 ## Examples
 
 ### Example 1: Small Project (< 50 files)
 
-```bash
-$ python .agents/scripts/agents-structure-map.py ./my-app --output docs/
+```text
+$ factory-only structure-map command in the scaffold repo
 
 ============================================================
 SUMMARY
@@ -174,8 +174,8 @@ Sections:
 
 ### Example 2: Large Project
 
-```bash
-$ python .agents/scripts/agents-structure-map.py /path/to/example-project --output .agent/docs/structure-auto/
+```text
+$ factory-only structure-map command in the scaffold repo
 
 ============================================================
 SUMMARY
@@ -193,8 +193,8 @@ Sections:
 
 ### Example 3: Incremental Update
 
-```bash
-$ python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
+```text
+$ factory-only structure-map command in the scaffold repo
 
 ✓ Loaded cache: 719 entries
 Scanning: /path/to/example-project
@@ -246,7 +246,7 @@ Modify `classify_file()` method in the script.
 ```bash
 # Run from project root
 cd /path/to/project
-python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
+# factory-only script-backed command pending AFOL-native migration
 ```
 
 ### Cache Not Working
@@ -258,7 +258,7 @@ python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
 ```bash
 # Delete cache and regenerate
 rm docs/map/structure/.structure-cache.json
-python .agents/scripts/agents-structure-map.py . --output docs/map/structure/
+# factory-only script-backed command pending AFOL-native migration
 ```
 
 ### Wrong Classification

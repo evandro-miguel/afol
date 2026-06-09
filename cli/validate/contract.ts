@@ -23,7 +23,9 @@ const LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH =
 	".agents/benchmarks/runtime-flow-live-agent-v4-latest.json";
 const LIVE_BENCHMARK_EXPECTED_PACK_ID = "runtime-flow-live-agent-v4";
 const LIVE_BENCHMARK_REFRESH_COMMAND =
-	"python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort medium";
+	"afol validate bench --pack runtime-live-agent --json";
+const LIVE_BENCHMARK_REFRESH_NOTE =
+	"snapshot validation; live refresh runner pending AFOL-native migration";
 
 export const VALIDATION_SCHEMA_VERSION = "1.0.0";
 export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
@@ -1132,10 +1134,11 @@ function buildRuntimeLiveAgentResults(
 			`runtime-live-agent-evidence-source:${evidence.payloadSource}`,
 			...(incompleteArtifact
 				? [
-						`runtime-live-artifact-incomplete:${evidence.savedResultPathRelative};matched-direct-evidence:${matchedDirectEvidenceCount}/${scenarios.length};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+						`runtime-live-artifact-incomplete:${evidence.savedResultPathRelative};matched-direct-evidence:${matchedDirectEvidenceCount}/${scenarios.length};run:${LIVE_BENCHMARK_REFRESH_COMMAND};note:${LIVE_BENCHMARK_REFRESH_NOTE}`,
 					]
 				: []),
 			`runtime-live-agent-refresh:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+			`runtime-live-agent-refresh-note:${LIVE_BENCHMARK_REFRESH_NOTE}`,
 		],
 	};
 }

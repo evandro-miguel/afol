@@ -67,6 +67,9 @@ patterns:
 
 ## How to Use
 
+No public `afol patterns` verb exists yet. The commands below are factory-only
+compatibility surfaces.
+
 ### Commands
 
 ```bash
@@ -90,14 +93,11 @@ patterns:
 ./.agents/agents patterns rate PAT-001 --effectiveness=high
 ```
 
-### Via legacy just command runner
+### Legacy compatibility only
 
 ```bash
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
-AFOL-native command pending; do not use legacy just command runners.
+# AFOL-native pattern verbs are pending.
+# Keep wrapper usage factory-only until public verbs land.
 ```
 
 ## How to Modify

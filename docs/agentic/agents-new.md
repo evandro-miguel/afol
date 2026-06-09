@@ -101,37 +101,37 @@ typically added later with `--with postmortem` once real closure work exists.
 
 ```bash
 # Standard governed workstream
-./.agents/agents new auth-refactor --feature-id F-01 --parent-spec my-parent-spec
+afol new auth-refactor --feature-id F-01 --parent-spec my-parent-spec
 
 # Research-only session
-./.agents/agents new auth-investigation --feature-id F-02 --parent-spec my-parent-spec --intent research
+afol new auth-investigation --feature-id F-02 --parent-spec my-parent-spec --intent research
 
 # With full spec
-./.agents/agents new api-endpoint --feature-id F-02 --parent-spec my-parent-spec --spec
+afol new api-endpoint --feature-id F-02 --parent-spec my-parent-spec --spec
 
 # With spec-lite (legacy compatibility alias for spec-child)
-./.agents/agents new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --spec-lite
+afol new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --spec-lite
 
 # Link an existing child spec without creating another spec artifact
-./.agents/agents new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --child-spec existing-child-spec
+afol new bugfix-login --feature-id F-03 --parent-spec my-parent-spec --child-spec existing-child-spec
 
 # Plan only
-./.agents/agents new quick-task --feature-id F-04 --parent-spec my-parent-spec --plan-only
+afol new quick-task --feature-id F-04 --parent-spec my-parent-spec --plan-only
 
 # Add closure artifacts later in the same session
-./.agents/agents new auth-refactor --feature-id F-01 --parent-spec my-parent-spec --into-session 260223_1800_auth-refactor --intent closure
+afol new auth-refactor --feature-id F-01 --parent-spec my-parent-spec --into-session 260223_1800_auth-refactor --intent closure
 
 # Add the postmortem only when closure analysis actually started
-./.agents/agents new auth-refactor --feature-id F-01 --parent-spec my-parent-spec --into-session 260223_1800_auth-refactor --intent closure --with postmortem
+afol new auth-refactor --feature-id F-01 --parent-spec my-parent-spec --into-session 260223_1800_auth-refactor --intent closure --with postmortem
 
 # Quick task in active session
-./.agents/agents new update-docs --quick
+afol new update-docs --quick
 
 # Reuse an existing session with a pack
-./.agents/agents new api-follow-up --feature-id F-07 --parent-spec my-parent-spec --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec
+afol new api-follow-up --feature-id F-07 --parent-spec my-parent-spec --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec
 
 # Force flag still exists for backward compatibility
-./.agents/agents new epic-feature --feature-id F-05 --parent-spec my-parent-spec --force-new
+afol new epic-feature --feature-id F-05 --parent-spec my-parent-spec --force-new
 ```
 
 ### Governance Rules
@@ -159,16 +159,16 @@ typically added later with `--with postmortem` once real closure work exists.
 
 ```bash
 # Example: Working with multiple sessions
-./.agents/agents new feature-a          # Creates session A (active)
-./.agents/agents new feature-b          # Creates session B (now active, warns about A)
+afol new feature-a          # Creates session A (active)
+afol new feature-b          # Creates session B (now active, warns about A)
 
 # Target specific session for operations.
-# Done requires a prior passing closure evidence record and its evidence id.
-./.agents/agents wb-update evidence T-01 --session 260224_1200_feature-a --command "just lint" --result passed --artifact .afol/wb/260224_1200_feature-a/260224_1200_feature-a_report_01.md
-./.agents/agents wb-update task T-01 --session 260224_1200_feature-a --mark-done --evidence-id E-...
-./.agents/agents wb-update touch --session 260224_1200_feature-b
+# Done records or verifies passing closure evidence before marking the task done.
+afol e T-01 --session 260224_1200_feature-a --command "afol validate" --result passed --artifact .afol/wb/260224_1200_feature-a/260224_1200_feature-a_report_01.md
+afol d T-01 --session 260224_1200_feature-a --test "afol validate"
+afol l --session 260224_1200_feature-b --message "Opened follow-up task"
 # Or set AGENTS_SESSION_ID in the process environment before running status
-./.agents/agents status
+afol status
 ```
 
 ## ExecPlan Convention
@@ -254,7 +254,7 @@ workflow:
 
 ```bash
 # Create test workstream
-./.agents/agents new test-workstream
+afol new test-workstream
 
 # Verify structure
 ls -la .afol/wb/26*test-workstream/

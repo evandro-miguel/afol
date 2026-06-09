@@ -34,9 +34,9 @@ touch .agents/data/telemetry/events.jsonl
 ## Automated Rotation (Future)
 
 When scaffolding supports it, rotation should be triggered by:
-- `just doctor` checking file size/age
-- `agents-telemetry.py` checking before each write batch
-- A cron-like hook in the wrapper script
+- `afol validate --json` checking file size/age
+- AFOL-native telemetry write batches checking before append
+- A scheduled project-local AFOL maintenance hook
 
 ## Impact on Heat Scoring
 

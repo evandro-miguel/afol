@@ -72,10 +72,10 @@ doctor:
 
 ```bash
 # Validate structure
-.agents/agents doctor
+afol validate
 
-# Via legacy just command runner
-AFOL-native command pending; do not use legacy just command runners.
+# Compatibility fallback only
+./.agents/agents doctor
 ```
 
 ## How to Modify
@@ -109,7 +109,7 @@ def validate_timestamps(filepath: Path) -> List[str]:
 
 ```bash
 # Run validation
-AFOL-native command pending; do not use legacy just command runners.
+afol validate
 
 # Expected: Exit code 0 if valid, 1 if errors
 ```

@@ -24,6 +24,17 @@ function write(path: string, content: string): void {
 	writeFileSync(path, content, "utf8");
 }
 
+function writeProjectConfig(root: string): void {
+	write(
+		join(root, ".agents", "config.json"),
+		JSON.stringify({ schema_version: 1 }, null, 2),
+	);
+	write(
+		join(root, ".agents", "lock.json"),
+		JSON.stringify({ schema_version: 1, locked: true }, null, 2),
+	);
+}
+
 function seedDoneWorkbenchTask(
 	root: string,
 	session = "260531_1200_verify",
@@ -119,6 +130,83 @@ describe("verifyWorkbenchTasks", () => {
 			expect(result.openTasks).toHaveLength(1);
 			expect(result.openTasks[0]?.file).toContain("/.afol/wb/");
 			expect(result.openTasks[0]?.id).toBe("T-01");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project-root verification ignores legacy .agents/wb history when .afol/wb exists", () => {
+		const root = mkRoot("legacy-root-ignore");
+		try {
+			writeProjectConfig(root);
+			const currentSession = "260609_1205_verify";
+			const legacySession = "260101_0900_legacy";
+			const archivedSession = "260101_0800_archived";
+			write(
+				join(
+					root,
+					".afol",
+					"wb",
+					currentSession,
+					`${currentSession}_task_01.md`,
+				),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | current task |",
+					"",
+				].join("\n"),
+			);
+			write(
+				join(
+					root,
+					".afol",
+					"wb",
+					"_archive",
+					archivedSession,
+					`${archivedSession}_task_01.md`,
+				),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | archived task |",
+					"",
+				].join("\n"),
+			);
+			write(
+				join(
+					root,
+					".agents",
+					"wb",
+					legacySession,
+					`${legacySession}_task_01.md`,
+				),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | legacy task |",
+					"",
+				].join("\n"),
+			);
+
+			const result = verifyWorkbenchTasks(root, true);
+
+			expect(result.totalTasks).toBe(1);
+			expect(result.pending).toBe(1);
+			expect(result.completed).toBe(0);
+			expect(result.sessionPath).toContain("/.afol/wb");
+			expect(
+				result.taskFiles.every((file) => file.includes("/.afol/wb/")),
+			).toBe(true);
+			expect(
+				result.taskFiles.every((file) => !file.includes("/.afol/wb/_archive/")),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
