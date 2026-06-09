@@ -70,16 +70,16 @@ class BootstrapTests(unittest.TestCase):
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn(".agents/manifest.json", mandatory)
 
-    def test_mandatory_files_include_just_wrapper(self):
-        """The Justfile wrapper must be in the mandatory files list."""
+    def test_mandatory_files_exclude_just_wrapper(self):
+        """The downstream template must not require a Justfile wrapper."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
-        self.assertIn("Justfile", mandatory)
+        self.assertNotIn("Justfile", mandatory)
 
     def test_mandatory_files_include_front_door_wrappers(self):
         """Root front door wrappers must be part of bootstrap mandatory files."""
         mandatory = {str(p) for p in self.bootstrap.MANDATORY_FILES_TO_COPY}
         self.assertIn("afol", mandatory)
-        self.assertIn("a", mandatory)
+        self.assertNotIn("a", mandatory)
 
     def test_mandatory_files_exclude_opencode_json(self):
         """opencode.json should not be in the minimal root bootstrap surface."""
@@ -115,9 +115,9 @@ class BootstrapTests(unittest.TestCase):
             self.assertTrue(justfile.exists())
             content = justfile.read_text(encoding="utf-8")
             self.assertIn("validate:", content)
-            self.assertIn("./a validate", content)
+            self.assertIn("./afol validate", content)
             self.assertIn("status:", content)
-            self.assertIn("./a status", content)
+            self.assertIn("./afol status", content)
 
     def test_ensure_justfile_skips_when_scaffold_reference_present(self):
         """ensure_justfile must not modify Justfile when scaffold import/module exists."""
@@ -144,7 +144,7 @@ class BootstrapTests(unittest.TestCase):
             self.assertIn("default:", content)
             self.assertIn(self.bootstrap.JUSTFILE_NATIVE_MARKER, content)
             self.assertIn("agents-status:", content)
-            self.assertIn("./a status", content)
+            self.assertIn("./afol status", content)
 
     def test_ensure_justfile_ignores_comment_only_marker_mentions(self):
         """Comment-only marker mentions must not suppress scaffold module append."""
@@ -160,7 +160,7 @@ class BootstrapTests(unittest.TestCase):
             self.assertIn("default:", content)
             self.assertIn(self.bootstrap.JUSTFILE_NATIVE_MARKER, content)
             self.assertIn("agents-validate:", content)
-            self.assertIn("./a validate", content)
+            self.assertIn("./afol validate", content)
 
     def test_generated_baseline_content_includes_roadmap(self):
         """Generated baseline must include the roadmap file."""

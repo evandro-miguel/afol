@@ -53,9 +53,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         self.assertIn("AGENTS.md", mandatory_files)
         self.assertIn("CLAUDE.md", mandatory_files)
-        self.assertIn("Justfile", mandatory_files)
         self.assertIn("afol", mandatory_files)
-        self.assertIn("a", mandatory_files)
+        self.assertNotIn("Justfile", mandatory_files)
+        self.assertNotIn("a", mandatory_files)
         self.assertIn(".agents/config.json", mandatory_files)
         self.assertNotIn(".agents/agents", mandatory_files)
         self.assertNotIn(".agents/agents-mcp", mandatory_files)
@@ -97,7 +97,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("- `afol`", docs["README"])
         self.assertIn("afol s", docs["README"])
         self.assertIn("afol ck", docs["README"])
-        self.assertIn("./a validate", docs["README"])
+        self.assertNotIn("./a validate", docs["README"])
 
         for doc in docs.values():
             self.assertIn("public onboarding", doc.lower())
@@ -135,7 +135,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             target = Path(td)
-            (target / "Justfile").write_text("validate:\n    ./a validate\n", encoding="utf-8")
+            (target / "Justfile").write_text("validate:\n    ./afol validate\n", encoding="utf-8")
             calls = []
             cwds = []
 
@@ -152,9 +152,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
             self.assertIn(["just", "--justfile", "Justfile", "--fmt", "--check"], calls)
             self.assertIn(["just", "--justfile", "Justfile", "--list"], calls)
-            self.assertIn(["./a", "-h"], calls)
-            self.assertIn(["./a", "status"], calls)
-            self.assertIn(["./a", "validate"], calls)
+            self.assertIn(["./afol", "-h"], calls)
+            self.assertIn(["./afol", "status"], calls)
+            self.assertIn(["./afol", "validate"], calls)
             self.assertEqual(cwds, [target] * len(cwds))
 
     def test_build_post_check_commands_cover_full_validation_contract(self):
@@ -164,7 +164,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             target = Path(td)
-            (target / "Justfile").write_text("validate:\n    ./a validate\n", encoding="utf-8")
+            (target / "Justfile").write_text("validate:\n    ./afol validate\n", encoding="utf-8")
 
             with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
                 commands = agents_bootstrap.build_post_check_commands(target)
@@ -182,24 +182,16 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         )
         self.assertTrue(all(cmd[0] != "make" for _, cmd, _ in commands))
         self.assertIn(
-            ["./a", "validate"],
+            ["./afol", "validate"],
             [cmd for _, cmd, _ in commands],
         )
 
-    def test_project_template_justfile_exports_strict_targets(self):
+    def test_project_template_does_not_export_legacy_justfile(self):
         template_root = Path("src/project-template")
         if not template_root.exists():
             self.skipTest("source project template is only present in the source repo")
 
-        root_list = subprocess.run(
-            ["just", "--justfile", str(template_root / "Justfile"), "--list"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-        self.assertRegex(root_list, r"(?m)^\s*validate-strict\b")
-        self.assertRegex(root_list, r"(?m)^\s*validate\b")
-        self.assertRegex(root_list, r"(?m)^\s*status\b")
+        self.assertFalse((template_root / "Justfile").exists())
 
     def test_bootstrap_post_checks_use_namespaced_recipe_when_justfile_is_module(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -208,7 +200,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             target = Path(td)
-            (target / "Justfile").write_text("validate:\n    ./a validate\n", encoding="utf-8")
+            (target / "Justfile").write_text("validate:\n    ./afol validate\n", encoding="utf-8")
             calls = []
             cwds = []
 
@@ -223,9 +215,9 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
                     agents_bootstrap.run_post_checks(target)
 
-            self.assertIn(["./a", "-h"], calls)
-            self.assertIn(["./a", "status"], calls)
-            self.assertIn(["./a", "validate"], calls)
+            self.assertIn(["./afol", "-h"], calls)
+            self.assertIn(["./afol", "status"], calls)
+            self.assertIn(["./afol", "validate"], calls)
             self.assertEqual(cwds, [target] * len(cwds))
 
     def test_partial_bootstrap_post_checks_downgrade_repo_validation_failures(self):
@@ -235,20 +227,20 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             target = Path(td)
-            (target / "Justfile").write_text("validate:\n    ./a validate\n", encoding="utf-8")
+            (target / "Justfile").write_text("validate:\n    ./afol validate\n", encoding="utf-8")
             calls = []
 
             def fake_run(cmd, cwd=None, **kwargs):
                 calls.append(cmd)
                 result = mock.Mock()
-                result.returncode = 1 if cmd == ["./a", "validate"] else 0
+                result.returncode = 1 if cmd == ["./afol", "validate"] else 0
                 return result
 
             with mock.patch.object(agents_bootstrap.shutil, "which", return_value="/usr/bin/just"):
                 with mock.patch.object(agents_bootstrap.subprocess, "run", side_effect=fake_run):
                     agents_bootstrap.run_post_checks(target, agents_bootstrap.INSTALL_MODE_PARTIAL)
 
-        self.assertIn(["./a", "validate"], calls)
+        self.assertIn(["./afol", "validate"], calls)
 
     def test_bootstrap_post_checks_require_just(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -684,7 +676,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
 
         self.assertIn("AGENTIC_CLI_PATH", afol)
         self.assertIn("bunx agentic-cli", afol)
-        self.assertIn("AGENTIC_CLI_PATH", a_wrapper)
+        self.assertEqual("#!/usr/bin/env bash\necho legacy\n", a_wrapper)
 
     def test_bootstrap_exports_generic_baseline_without_scaffold_history(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()
@@ -710,7 +702,6 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             specs_index = (target / "docs/arc/SPECS/INDEX.md").read_text(encoding="utf-8")
             knowledge_index = (target / "docs/knowledge/INDEX.md").read_text(encoding="utf-8")
             map_readme = (target / "docs/map/README.md").read_text(encoding="utf-8")
-            root_justfile = (target / "Justfile").read_text(encoding="utf-8")
             canonical_config = json.loads((target / ".agents/config.json").read_text(encoding="utf-8"))
 
             self.assertFalse((target / ".agents/wb/.active_session").exists())
@@ -744,7 +735,7 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("| Total | 2 |", specs_index)
             self.assertIn("- Total indexed docs: 0", knowledge_index)
             self.assertIn("current-state, descriptive", map_readme)
-            self.assertIn("./a validate", root_justfile)
+            self.assertFalse((target / "Justfile").exists())
             self.assertFalse((target / "docs/standards/Justfile").exists())
             self.assertFalse((target / ".agents/arc/map").exists())
             self.assertFalse((target / "docs/map/ARCHITECTURE.md").exists())
@@ -844,12 +835,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
         self.assertIn("## Repository Map", agents_md)
         self.assertIn("## Working Rules", agents_md)
         self.assertIn(".agents/rules/", agents_md)
-        self.assertTrue((template_root / "Justfile").exists())
+        self.assertFalse((template_root / "Justfile").exists())
         self.assertFalse((template_root / "docs/standards/Justfile").exists())
-        self.assertIn(
-            "./a validate",
-            (template_root / "Justfile").read_text(encoding="utf-8"),
-        )
         self.assertFalse((template_root / "PLANS.md").exists())
         for path in ["OPENCODE.md", "QWEN.md", "GEMINI.md", "opencode.json", ".opencode", ".qwen", ".gemini", ".codex"]:
             self.assertFalse((template_root / path).exists())
@@ -932,7 +919,8 @@ class RuntimeCompatibilityTests(unittest.TestCase):
             self.assertIn("partial install", adaptation_doc)
             self.assertIn("repo/ref/profile", adaptation_doc)
             self.assertIn("Prefer repo-local skills under `.agents/skills/`", adaptation_doc)
-            self.assertIn("just --fmt --check", adaptation_doc)
+            self.assertIn("./afol status", adaptation_doc)
+            self.assertIn("./afol validate", adaptation_doc)
 
     def test_bootstrap_seeds_repo_local_universal_skills_checkout_without_network(self):
         script_path = Path(".agents/scripts/agents-bootstrap.py").resolve()

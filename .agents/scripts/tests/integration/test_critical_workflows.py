@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -40,6 +41,8 @@ def _copytree_ignore_runtime_state(src: str, names: list[str]) -> set[str]:
 
     if rel_src == Path(".agents"):
         ignored.update({"cache", "wb", "z-arq", "tmp"})
+    elif rel_src == Path(".afol"):
+        ignored.update({"cache", "data", "tmp"})
     elif rel_src == Path("docs"):
         ignored.add("map")
 
@@ -48,13 +51,12 @@ def _copytree_ignore_runtime_state(src: str, names: list[str]) -> set[str]:
 
 def isolated_env(repo_root: Path) -> dict[str, str]:
     env = os.environ.copy()
-    env["AGENTS_ACTIVE_SESSION_FILE"] = str(repo_root / ".agents" / "wb" / ".active_session")
-    env["AGENTS_SCRIPT_PYTHON"] = str(
-        ROOT_DIR / ".agents" / "scripts" / ".venv" / "bin" / "python3"
-    )
+    env["AGENTS_ACTIVE_SESSION_FILE"] = str(repo_root / ".afol" / "wb" / ".active_session")
+    env["AGENTS_SCRIPT_PYTHON"] = sys.executable
+    env["AGENTS_ALLOW_SYSTEM_PYTHON"] = "1"
     env["AGENTS_UV_CACHE_DIR"] = str(repo_root / ".agents" / "cache" / "uv")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    env["PATH"] = f"{ROOT_DIR / '.agents' / 'scripts' / '.venv' / 'bin'}:{env.get('PATH', '')}"
+    env["PATH"] = f"{Path(sys.executable).parent}:{env.get('PATH', '')}"
     return env
 
 
@@ -81,9 +83,9 @@ def build_isolated_repo(tmp_root: Path) -> Path:
     (repo_root / ".agents" / "z-arq").mkdir(parents=True, exist_ok=True)
     (repo_root / ".agents" / "tmp").mkdir(parents=True, exist_ok=True)
 
-    session_dir = repo_root / ".agents" / "wb" / SESSION_ID
+    session_dir = repo_root / ".afol" / "wb" / SESSION_ID
     session_dir.mkdir(parents=True, exist_ok=True)
-    (repo_root / ".agents" / "wb" / ".active_session").write_text(
+    (repo_root / ".afol" / "wb" / ".active_session").write_text(
         f"{SESSION_ID}\n", encoding="utf-8"
     )
     (session_dir / f"{SESSION_ID}_plan_01.md").write_text(
@@ -193,7 +195,7 @@ def test_new_planning_workflow_creates_minimum_plan_and_task(isolated_repo: Path
 
     assert result.returncode == 0, result.stderr
 
-    session_dirs = sorted((isolated_repo / ".agents" / "wb").glob("*_integration-planning-track"))
+    session_dirs = sorted((isolated_repo / ".afol" / "wb").glob("*_integration-planning-track"))
     assert session_dirs, "Expected a new planning session directory."
     session_dir = session_dirs[-1]
     session_id = session_dir.name
@@ -400,7 +402,7 @@ def test_session_catchup_temp_repo_scenarios():
         def run_catchup(session: Path):
             proc = subprocess.run(
                 [
-                    str(ROOT_DIR / ".agents/scripts/.venv/bin/python"),
+                    sys.executable,
                     str(script),
                     "catchup",
                     "--session",

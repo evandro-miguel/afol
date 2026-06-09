@@ -111,6 +111,7 @@ class AgentsTelemetryTests(unittest.TestCase):
             env = os.environ.copy()
             env["AGENTS_ACTIVE_SESSION_FILE"] = str(active_session_file)
             env["AGENTS_TELEMETRY_EVENTS_FILE"] = str(events_file)
+            env["AGENTS_ALLOW_SYSTEM_PYTHON"] = "1"
 
             result = subprocess.run(
                 [str(wrapper_path), "doctor", "--definitely-invalid-flag"],

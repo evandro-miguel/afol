@@ -57,7 +57,7 @@ ledger evidence and an explicit evidence id.
 
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
-| T-01 | done | worker | Implementar F-08 T-17/T-18/T-19 (mutation policy/journal, write/move/patch/archive, dry-run/undo) com validação e strict de sessão (evidence: E-20260528122615973830) |
+| T-01 | moved | worker | Follow-up evidence repair; no recoverable passed evidence or replay command |
 
 **State values:** `pending` | `in_progress` | `problem` | `moved` | `implemented_untested` | `tested_needs_spec_validation` | `done`
 

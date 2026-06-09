@@ -46,7 +46,7 @@ from lib.postmortem_governance import postmortem_governance_review_issues
 ROOT_DIR, CONFIG = load_agents_config(Path(__file__).resolve().parent)
 AGENTS_DIR = get_cfg_path(ROOT_DIR, CONFIG, "agents_dir")
 WB_DIR = get_cfg_path(ROOT_DIR, CONFIG, "wb_dir")
-CANONICAL_WB_DIR = AGENTS_DIR / "wb"
+CANONICAL_WB_DIR = WB_DIR
 ACTIVE_SESSION_FILE = get_active_session_file_path(ROOT_DIR, CONFIG)
 TELEMETRY_SCRIPT = Path(__file__).resolve().parent / "agents-telemetry.py"
 TEMPLATES_DIR = get_cfg_path(ROOT_DIR, CONFIG, "templates_dir")

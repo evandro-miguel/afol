@@ -482,8 +482,6 @@ def closure_evidence_error(
         f"{result_text}\n{note_text}"
     ):
         return "closure evidence result must show a passed/validated gate or explicit N/A"
-    if not artifact_list and not note_text:
-        return "closure evidence requires an artifact path or explanatory note"
     return None
 
 

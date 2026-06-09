@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { resolveProjectPaths } from "../services/project/paths";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 
@@ -36,7 +37,7 @@ function mkProjectRoot(): string {
 }
 
 function readMutationJournal(root: string): Array<Record<string, unknown>> {
-  const path = join(root, ".agents", "data", "mutations", "mutations.jsonl");
+  const path = join(resolveProjectPaths(root).abs.mutationsDir, "mutations.jsonl");
   if (!existsSync(path)) {
     return [];
   }
@@ -232,7 +233,7 @@ describe("mutation safety command family", () => {
       expect(result.status).toBe("dry-run");
       expect(result.path).toBe("notes/to-archive.txt");
       expect(typeof result.destination).toBe("string");
-      expect((result.destination as string)).toContain(".agents/data/mutations/archives/");
+      expect((result.destination as string)).toContain(`${resolveProjectPaths(root).mutationArchivesDir}/`);
       expect(readFileSync(target, "utf8")).toBe("transient");
       expect(readMutationJournal(root).length).toBe(0);
     } finally {
@@ -267,7 +268,7 @@ describe("mutation safety command family", () => {
 
       const destination = archiveResult.destination as string;
       expect(typeof destination).toBe("string");
-      expect(destination).toContain(".agents/data/mutations/archives/");
+      expect(destination).toContain(`${resolveProjectPaths(root).mutationArchivesDir}/`);
       const archivedPath = join(root, destination);
       expect(existsSync(archivedPath)).toBe(true);
       expect(readFileSync(archivedPath, "utf8")).toBe("for-archive");

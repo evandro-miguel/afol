@@ -8,8 +8,10 @@ const kernelPath = `${process.cwd()}/cli/main.ts`;
 const runtimeLiveBenchmarkProfile = {
   runtime: "codex",
   model: "gpt-5.4-mini",
-  reasoning_effort: "low",
+  reasoning_effort: "medium",
 };
+const runtimeLiveBenchmarkRefreshCommand =
+  "python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort medium";
 
 function runKernel(args: string[], cwd = process.cwd()): ReturnType<typeof spawnSync> {
   return spawnSync("bun", [kernelPath, ...args], {
@@ -49,11 +51,10 @@ function getRuntimeLiveArtifactPaths(root: string): { snapshotPath: string; save
   snapshot.benchmark_profile = runtimeLiveBenchmarkProfile;
   writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
   const savedResultPath = join(root, snapshot.saved_result_path as string);
-  if (existsSync(savedResultPath)) {
-    const savedResult = readJson(savedResultPath);
-    savedResult.benchmark_profile = runtimeLiveBenchmarkProfile;
-    writeFileSync(savedResultPath, `${JSON.stringify(savedResult, null, 2)}\n`);
-  }
+  const savedResult = existsSync(savedResultPath) ? readJson(savedResultPath) : { ...snapshot };
+  savedResult.benchmark_profile = runtimeLiveBenchmarkProfile;
+  mkdirSync(join(savedResultPath, ".."), { recursive: true });
+  writeFileSync(savedResultPath, `${JSON.stringify(savedResult, null, 2)}\n`);
   return { snapshotPath, savedResultPath };
 }
 
@@ -366,9 +367,7 @@ describe("validation command family", () => {
     expect(
       notes.some((entry) => entry.startsWith("runtime-live-agent-artifact:.agents/data/benchmarks/results/")),
     ).toBe(true);
-    expect(notes).toContain(
-      "runtime-live-agent-refresh:python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low",
-    );
+    expect(notes).toContain(`runtime-live-agent-refresh:${runtimeLiveBenchmarkRefreshCommand}`);
     expect(notes.some((entry) => entry.startsWith("runtime-live-artifact-incomplete:"))).toBe(true);
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
@@ -454,9 +453,7 @@ describe("validation command family", () => {
     expect(
       notes.some((entry) => entry.startsWith("runtime-live-agent-artifact:.agents/data/benchmarks/results/")),
     ).toBe(true);
-    expect(notes).toContain(
-      "runtime-live-agent-refresh:python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low",
-    );
+    expect(notes).toContain(`runtime-live-agent-refresh:${runtimeLiveBenchmarkRefreshCommand}`);
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
     expect(results.every((result) => result.status === "passed")).toBe(true);
@@ -595,7 +592,7 @@ describe("validation command family", () => {
     expect(payload.pass).toBe(false);
     const notes = payload.notes as string[];
     expect(notes).toContain(
-      "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low",
+      `runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
     );
     const results = payload.results as Array<Record<string, unknown>>;
     expect(results.length).toBe(3);
@@ -603,7 +600,7 @@ describe("validation command family", () => {
     expect(
       results.every((entry) =>
         (entry.notes as string[]).includes(
-          "runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low",
+          `runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
         )),
     ).toBe(true);
     expect(payload.summary).toEqual({

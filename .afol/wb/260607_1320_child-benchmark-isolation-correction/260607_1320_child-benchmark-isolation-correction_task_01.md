@@ -4,4 +4,4 @@
 
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
-| T-01 | in_progress | worker | Rerun child AFOL benchmark with fixture-local ./afol only and reject global afol evidence |
+| T-01 | moved | worker | Follow-up benchmark rerun; no recoverable passed evidence or replay command |

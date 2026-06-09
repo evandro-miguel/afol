@@ -181,13 +181,13 @@ Latest full result inspected:
 ```bash
 python3 .agents/scripts/agents-benchmark.py list
 python3 .agents/scripts/agents-benchmark.py show live-implement-next-governance-preflight
-python3 .agents/scripts/agents-benchmark.py run --model gpt-5.4-mini --reasoning-effort low
-python3 .agents/scripts/agents-benchmark.py run live-implement-start-complete-evidence --save --model gpt-5.4-mini --reasoning-effort low
-python3 .agents/scripts/agents-benchmark.py run live-wb-update-task-evidence-timeline --save --model gpt-5.4-mini --reasoning-effort low
-python3 .agents/scripts/agents-benchmark.py run live-wb-session-create-scripted-progress --save --model gpt-5.4-mini --reasoning-effort low
-python3 .agents/scripts/agents-benchmark.py run live-autonomous-agentic-folder-delivery --save --model gpt-5.4-mini --reasoning-effort low
-python3 .agents/scripts/agents-benchmark.py run live-afol-provider-compatible-delivery --save --model gpt-5.4-mini --reasoning-effort low
-python3 .agents/scripts/agents-benchmark.py run live-afol-python-code-task-orchestrated --save --model gpt-5.4-mini --reasoning-effort low
+python3 .agents/scripts/agents-benchmark.py run --model gpt-5.4-mini --reasoning-effort medium
+python3 .agents/scripts/agents-benchmark.py run live-implement-start-complete-evidence --save --model gpt-5.4-mini --reasoning-effort medium
+python3 .agents/scripts/agents-benchmark.py run live-wb-update-task-evidence-timeline --save --model gpt-5.4-mini --reasoning-effort medium
+python3 .agents/scripts/agents-benchmark.py run live-wb-session-create-scripted-progress --save --model gpt-5.4-mini --reasoning-effort medium
+python3 .agents/scripts/agents-benchmark.py run live-autonomous-agentic-folder-delivery --save --model gpt-5.4-mini --reasoning-effort medium
+python3 .agents/scripts/agents-benchmark.py run live-afol-provider-compatible-delivery --save --model gpt-5.4-mini --reasoning-effort medium
+python3 .agents/scripts/agents-benchmark.py run live-afol-python-code-task-orchestrated --save --model gpt-5.4-mini --reasoning-effort medium
 ```
 
 Gemini/Gemma manual runs:
@@ -213,7 +213,7 @@ Latest hard-code-task Gemma run:
   `.afol/tmp/benchmarks/gemini-code-task-orchestrated-sdk-r3.json`
 - Result: failed correctly.
 - Requests: 12 of 12.
-- Tokens: 3520 total, 3378 input, 142 output, 0 cached.
+- Token accounting: 3520 total, 3378 input, 142 output, 0 cached.
 - Rate fields: RPM limit 15, RPD limit 1500, RPM peak 12, RPD count 49.
 - Progress: 48 `agent_progress` events.
 - Tools available: `list_dir`, `read_file`, `write_file`, `run_shell`.
@@ -236,7 +236,7 @@ Latest hard-code-task Gemma run:
   artifact with `pass=true` still fails validation when duration, tool success,
   or other scenario thresholds are violated.
 - Refresh live evidence with:
-  - `python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low`
+  - `python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort medium`
 - If the tracked live snapshot is missing or only covers a partial scenario set,
   the validation pack returns `status=failed` with an actionable note that
   points to the refresh command.

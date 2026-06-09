@@ -551,6 +551,30 @@ class TestStrictVerification(unittest.TestCase):
         self.assertEqual(len(results['contradictions']), 0)
         self.assertEqual(len(results['governance_issues']), 0)
 
+    def test_strict_mode_accepts_ledger_command_and_pass_without_artifact(self):
+        """Strict mode accepts ledger evidence with a real command and passing result."""
+        self._write_standard_docs(
+            task_body=(
+                "# Tasks\n\n"
+                "## State Board\n\n"
+                "| Task | State | Owner | Notes |\n"
+                "|------|-------|-------|-------|\n"
+                "| T-01 | done | worker | Implement feature with ledger evidence |\n"
+            ),
+            evidence_entries=[
+                {
+                    "id": "E-1",
+                    "task_id": "T-01",
+                    "command": "bun test",
+                    "result": "passed",
+                }
+            ],
+        )
+
+        all_completed, results = verify_tasks.verify_session(self.session_dir, strict=True)
+        self.assertTrue(all_completed)
+        self.assertEqual(len(results["evidence_issues"]), 0)
+
     def test_strict_mode_fails_without_evidence(self):
         """Strict mode fails when completed tasks lack evidence."""
         self._write_standard_docs(

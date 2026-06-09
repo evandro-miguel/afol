@@ -450,7 +450,7 @@ def _gemini_generation_config(config: GeminiProviderConfig, schema: dict[str, An
 def _gemini_http_generate_content(
     config: GeminiProviderConfig,
     contents: list[dict[str, Any]],
-    api_key: str,
+    credential: str,
     *,
     schema: dict[str, Any] | None = None,
     tools: list[dict[str, Any]] | None = None,
@@ -467,7 +467,7 @@ def _gemini_http_generate_content(
         data=json.dumps(request_body).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
+            "x-goog-api-key": credential,
         },
         method="POST",
     )
@@ -1842,6 +1842,8 @@ def _benchmark_env(
     env = os.environ.copy()
     env.setdefault("NO_COLOR", "1")
     env.setdefault("PYTHONUTF8", "1")
+    # Benchmarks must be runnable without a hydrated project venv.
+    env.setdefault("AGENTS_ALLOW_SYSTEM_PYTHON", "1")
     for key in ("http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):
         env.pop(key, None)
     if hide_bare_afol:

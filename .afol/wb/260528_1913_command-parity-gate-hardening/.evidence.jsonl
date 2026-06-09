@@ -1,0 +1,1 @@
+{"id":"E-20260528192937709986","task_id":"T-01","created_at":"2026-05-28T22:29:37.709Z","command":"just lint && just lint-scripts && just test-scripts-all && bun run typecheck && bun test && git diff --check","result":"passed","artifact":"260528_1913_command-parity-gate-hardening_task_01.md"}

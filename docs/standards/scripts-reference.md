@@ -56,7 +56,7 @@ afol validate --json
 Runtime-flow benchmark refresh:
 
 ```bash
-python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low
+python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort medium
 ```
 
 The runtime-flow benchmark is a development test tool, not a public downstream

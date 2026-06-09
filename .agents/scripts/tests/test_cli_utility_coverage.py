@@ -1,6 +1,8 @@
 import importlib.util
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -1677,10 +1679,16 @@ def test_agents_bootstrap_dry_run_and_baseline_helpers(tmp_path, monkeypatch, ca
 def test_wrapper_command_map_matches_runtime_registry_payload():
     repo_root = Path(__file__).resolve().parents[3]
     wrapper = repo_root / ".agents" / "agents"
+    env = os.environ.copy()
+    env["AGENTS_RUNTIME_ALLOW_UV_RUN"] = "1"
+    uv_bin = shutil.which("uv")
+    if uv_bin:
+        env["AGENTS_UV_BIN"] = uv_bin
     payload = json.loads(
         subprocess.run(
             ["./.agents/agents", "runtime", "command-registry", "--repo-root", str(repo_root)],
             cwd=repo_root,
+            env=env,
             capture_output=True,
             text=True,
             check=True,

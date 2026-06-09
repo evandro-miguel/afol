@@ -31,9 +31,7 @@ MANDATORY_FILES_TO_COPY = [
     Path("AGENTS.md"),
     Path("CLAUDE.md"),
     Path("RTK.md"),
-    Path("Justfile"),
     Path("afol"),
-    Path("a"),
     Path(".agents/config.json"),
     Path(".agents/lock.json"),
     Path(".agents/manifest.json"),
@@ -83,20 +81,20 @@ set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 set working-directory := "."
 
 validate:
-    ./a validate
+    ./afol validate
 
 validate-strict:
-    ./a validate
+    ./afol validate
 
 status:
-    ./a status
+    ./afol status
 """
 JUSTFILE_MODULE_APPEND = f"""{JUSTFILE_NATIVE_MARKER}
 agents-status:
-    ./a status
+    ./afol status
 
 agents-validate:
-    ./a validate
+    ./afol validate
 """
 JUSTFILE_IMPORT_RE = re.compile(r'^\s*import\s+["\']docs/standards/Justfile["\']\s*$')
 JUSTFILE_MODULE_RE = re.compile(r'^\s*mod\s+agents_scaffold\s+["\']docs/standards/Justfile["\']\s*$')
@@ -465,14 +463,6 @@ def ensure_partial_runtime_surfaces(target: Path, dry_run: bool):
                 "bunx agentic-cli",
             ),
             "patch native front door",
-        ),
-        (
-            Path("a"),
-            (
-                "AGENTIC_CLI_PATH",
-                "bunx agentic-cli",
-            ),
-            "patch compatibility front door",
         ),
     ]
 
@@ -1224,7 +1214,7 @@ def write_adaptation_doc(target: Path, stack: Dict[str, List[str]], dry_run: boo
             "6. Update `.agents/config.json` path settings if needed.",
             "7. Define real verification commands in repo docs (`install/dev/lint/typecheck/test/build`).",
             "8. Confirm `AGENTS.md`, `CLAUDE.md`, and the `.claude/` runtime folder are present.",
-            "9. Run `just --fmt --check`, `just --list`, `./a status`, and `./a validate`.",
+            "9. Run `./afol status` and `./afol validate`.",
             "10. Create the first workstream with `afol new <theme> --feature-id F-01 --parent-spec <spec-id>`.",
             "",
             "## Verification Evidence",
@@ -1621,9 +1611,9 @@ def build_post_check_commands(target: Path, install_mode: str = INSTALL_MODE_FUL
     commands: List[Tuple[str, List[str], bool]] = [
         ("fmt-check", _just_post_check_command("--fmt", "--check"), True),
         ("list", _just_post_check_command("--list"), True),
-        ("frontdoor-help", ["./a", "-h"], True),
-        ("status", ["./a", "status"], True),
-        ("validate", ["./a", "validate"], repo_validation_required),
+        ("frontdoor-help", ["./afol", "-h"], True),
+        ("status", ["./afol", "status"], True),
+        ("validate", ["./afol", "validate"], repo_validation_required),
     ]
     return commands
 

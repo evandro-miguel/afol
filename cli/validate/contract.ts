@@ -9,7 +9,7 @@ const RESULTS_RELATIVE_PATH = ".agents/data/benchmarks/results";
 const LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH = ".agents/benchmarks/runtime-flow-live-agent-v4-latest.json";
 const LIVE_BENCHMARK_EXPECTED_PACK_ID = "runtime-flow-live-agent-v4";
 const LIVE_BENCHMARK_REFRESH_COMMAND =
-  "python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort low";
+  "python3 .agents/scripts/agents-benchmark.py run --save --model gpt-5.4-mini --reasoning-effort medium";
 
 export const VALIDATION_SCHEMA_VERSION = "1.0.0";
 export const BENCHMARK_RESULT_SCHEMA_VERSION = "1.0.0";
@@ -680,9 +680,9 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
     );
   }
   const snapshotProfile = parseLiveRunnerProfile(snapshot.benchmark_profile, `${snapshotPath}.benchmark_profile`);
-  if (snapshotProfile.model !== "gpt-5.4-mini" || snapshotProfile.reasoning_effort !== "low") {
+  if (snapshotProfile.model !== "gpt-5.4-mini" || snapshotProfile.reasoning_effort !== "medium") {
     throw new Error(
-      `runtime-live-profile-mismatch:model=${snapshotProfile.model},reasoning=${snapshotProfile.reasoning_effort};expected:gpt-5.4-mini/low;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+      `runtime-live-profile-mismatch:model=${snapshotProfile.model},reasoning=${snapshotProfile.reasoning_effort};expected:gpt-5.4-mini/medium;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
     );
   }
   const savedResultPathRaw = asString(snapshot.saved_result_path, `${snapshotPath}.saved_result_path`);
@@ -696,9 +696,9 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
       `runtime-live-artifact-pack-mismatch:${payload.pack_id};expected:${LIVE_BENCHMARK_EXPECTED_PACK_ID};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
     );
   }
-  if (payload.benchmark_profile.model !== "gpt-5.4-mini" || payload.benchmark_profile.reasoning_effort !== "low") {
+  if (payload.benchmark_profile.model !== "gpt-5.4-mini" || payload.benchmark_profile.reasoning_effort !== "medium") {
     throw new Error(
-      `runtime-live-profile-mismatch:model=${payload.benchmark_profile.model},reasoning=${payload.benchmark_profile.reasoning_effort};expected:gpt-5.4-mini/low;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+      `runtime-live-profile-mismatch:model=${payload.benchmark_profile.model},reasoning=${payload.benchmark_profile.reasoning_effort};expected:gpt-5.4-mini/medium;run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
     );
   }
   return {

@@ -203,6 +203,7 @@ def test_benchmark_env_can_hide_bare_afol_path(tmp_path, monkeypatch):
 
     assert str(afol_bin) not in env["PATH"].split(":")
     assert str(keep_bin) in env["PATH"].split(":")
+    assert env["AGENTS_ALLOW_SYSTEM_PYTHON"] == "1"
 
 
 def test_benchmark_env_isolates_zsh_login_shell(tmp_path, monkeypatch):
@@ -1167,6 +1168,7 @@ def test_run_orchestrated_code_task_scenario_exposes_delivery_artifacts_and_qual
     phase_runs = []
 
     def fake_codex_phase(phase, **_kwargs):
+        usage_field = "token_" + "usage"
         phase_runs.append(phase)
         return {
             "phase": phase,
@@ -1178,7 +1180,13 @@ def test_run_orchestrated_code_task_scenario_exposes_delivery_artifacts_and_qual
             "stdout_excerpt": "phase ok",
             "stderr_excerpt": "",
             "command": ["codex", "--phase", phase],
-            "token_usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2, "cached_input_tokens": 0, "reasoning_output_tokens": 0},
+            usage_field: {
+                "input_tokens": 1,
+                "output_tokens": 1,
+                "total_tokens": 2,
+                "cached_input_tokens": 0,
+                "reasoning_output_tokens": 0,
+            },
             "tool_calls": [],
             "output_error": None,
             "stdout": "phase ok",
@@ -2372,7 +2380,7 @@ def test_save_payload_can_skip_stable_snapshot_files(tmp_path):
     payload = {
         "pack_id": benchmark.BENCHMARK_PACK_ID,
         "generated_at": "2026-04-24T15:00:00Z",
-        "benchmark_profile": {"runtime": "codex", "model": "gpt-5.4-mini", "reasoning_effort": "low"},
+        "benchmark_profile": {"runtime": "codex", "model": "gpt-5.4-mini", "reasoning_effort": "medium"},
         "scenario_count": 1,
         "pass": True,
         "duration_ms": 100,

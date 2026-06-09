@@ -8,6 +8,9 @@ from shutil import copytree
 from pathlib import Path
 
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
 class FrontDoorATests(unittest.TestCase):
     @staticmethod
     def _write_exec(path: Path, content: str) -> None:
@@ -28,8 +31,8 @@ class FrontDoorATests(unittest.TestCase):
         return wrapper
 
     def _run_with_fake_agents(self, args: list[str], fake_body: str, source_wrapper: Path | None = None):
-        source_wrapper = Path("a").resolve() if source_wrapper is None else source_wrapper.resolve()
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        source_wrapper = REPO_ROOT / "afol" if source_wrapper is None else (REPO_ROOT / source_wrapper).resolve()
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as td:
             root = Path(td)
             wrapper = self._copy_wrapper(root, source_wrapper)
 
@@ -47,8 +50,8 @@ class FrontDoorATests(unittest.TestCase):
         return proc
 
     def _run_path_command_with_fake_agents(self, command: str, args: list[str], fake_body: str):
-        source_wrapper = Path(command).resolve()
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        source_wrapper = (REPO_ROOT / command).resolve()
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as td:
             root = Path(td)
             self._copy_wrapper(root, source_wrapper)
 
@@ -73,8 +76,8 @@ class FrontDoorATests(unittest.TestCase):
         fake_body: str,
         source_wrapper: Path,
     ):
-        source_wrapper = source_wrapper.resolve()
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        source_wrapper = (REPO_ROOT / source_wrapper).resolve()
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as td:
             root = Path(td)
             wrapper = self._copy_wrapper(root, source_wrapper)
 
@@ -105,14 +108,17 @@ class FrontDoorATests(unittest.TestCase):
         source_wrapper: Path | None = None,
         nested_cwd: bool = False,
     ):
-        source_wrapper = Path("a").resolve() if source_wrapper is None else source_wrapper.resolve()
-        kernel_source_dir = Path("cli").resolve()
+        source_wrapper = REPO_ROOT / "afol" if source_wrapper is None else (REPO_ROOT / source_wrapper).resolve()
+        kernel_source_dir = REPO_ROOT / "cli"
 
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as td:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as td:
             root = Path(td)
             wrapper = self._copy_wrapper(root, source_wrapper)
 
             copytree(kernel_source_dir, root / "cli")
+            node_modules = REPO_ROOT / "node_modules"
+            if node_modules.exists():
+                os.symlink(node_modules, root / "node_modules", target_is_directory=True)
 
             agents_dir = root / ".agents"
             agents_dir.mkdir(parents=True, exist_ok=True)
@@ -151,7 +157,7 @@ class FrontDoorATests(unittest.TestCase):
             ["s"],
             "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n",
         )
-        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.returncode, 0, f"stdout={proc.stdout!r}\nstderr={proc.stderr!r}")
         self.assertIn("ARGS:status", proc.stdout)
 
     def test_canonical_afol_short_status_alias_maps_to_status(self):
@@ -160,7 +166,7 @@ class FrontDoorATests(unittest.TestCase):
             "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n",
             source_wrapper=Path("afol"),
         )
-        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.returncode, 0, f"stdout={proc.stdout!r}\nstderr={proc.stderr!r}")
         self.assertIn("ARGS:status", proc.stdout)
 
     def test_canonical_afol_runs_as_path_command(self):
@@ -187,15 +193,6 @@ class FrontDoorATests(unittest.TestCase):
                 proc = self._run_with_fake_agents(args, fake_body, source_wrapper=Path("afol"))
                 self.assertEqual(proc.returncode, 0)
                 self.assertIn("ARGS:status --json", proc.stdout)
-
-    def test_template_wrapper_json_shortcut_uses_template_source(self):
-        proc = self._run_template_with_fake_afol(
-            ["--json", "status"],
-            "#!/usr/bin/env bash\nprintf 'ARGS:%s\\n' \"$*\"\n",
-            source_wrapper=Path("src/project-template/a"),
-        )
-        self.assertEqual(proc.returncode, 0)
-        self.assertIn("ARGS:--json status", proc.stdout)
 
     def test_template_afol_wrapper_json_shortcut_uses_template_source(self):
         proc = self._run_template_with_fake_afol(
@@ -263,7 +260,7 @@ class FrontDoorATests(unittest.TestCase):
             config_content="{invalid-json",
             extra_configs={"agents.config": "schema_version: 1\nproject:\n  name: yaml\n"},
         )
-        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(proc.returncode, 2, f"stdout={proc.stdout!r}\nstderr={proc.stderr!r}")
         self.assertIn("Invalid JSON in", proc.stderr)
         self.assertNotIn("ARGS:status", proc.stdout)
 

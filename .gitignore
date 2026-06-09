@@ -26,15 +26,21 @@ uv.lock
 # Runtime/cache snapshots
 .agents/.cache/
 .agents/tools/uv/
-src/project-template/.agents/tmp/
+src/project-template/.agents/tmp/*
+!src/project-template/.agents/tmp/
+!src/project-template/.agents/tmp/README.md
 .agents/journal/
 .agents/scripts/.agents/
 src/project-template/.agents/scripts/.agents/
 .agents/data/events/
 .agents/data/index/
 .agents/data/session/
-src/project-template/.agents/data/events/
-src/project-template/.agents/data/index/
+src/project-template/.agents/data/events/*
+src/project-template/.agents/data/index/*
+!src/project-template/.agents/data/events/
+!src/project-template/.agents/data/events/README.md
+!src/project-template/.agents/data/index/
+!src/project-template/.agents/data/index/README.md
 
 # Universal-skills must not be a repo-local git cache or nested checkout.
 .agents/cache/universal-skills/
