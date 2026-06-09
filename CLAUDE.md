@@ -243,7 +243,7 @@ entrypoint and must be the only documented downstream path.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **agentic-standard-folder** (5203 symbols, 7568 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **agentic-start-folder** (5317 symbols, 7692 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -266,10 +266,10 @@ This project is indexed by GitNexus as **agentic-standard-folder** (5203 symbols
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/agentic-standard-folder/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/agentic-standard-folder/clusters` | All functional areas |
-| `gitnexus://repo/agentic-standard-folder/processes` | All execution flows |
-| `gitnexus://repo/agentic-standard-folder/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/agentic-start-folder/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/agentic-start-folder/clusters` | All functional areas |
+| `gitnexus://repo/agentic-start-folder/processes` | All execution flows |
+| `gitnexus://repo/agentic-start-folder/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
