@@ -3,7 +3,7 @@ doc_type: index
 id: 260223_0000_decisions_index_01
 title: Architecture Decision Records Index
 created_at: '2026-02-23T00:00:00-03:00'
-updated_at: '2026-04-13T13:36:56-03:00'
+updated_at: '2026-06-09T08:00:00-03:00'
 ---
 
 ## Architecture Decision Records (ADRs)
@@ -23,8 +23,8 @@ ADRs document:
 ```text
 docs/arc/DECISIONS/
 ├── INDEX.md           # This file - ADR index
-├── ADR-001-<title>.md
-├── ADR-002-<title>.md
+├── ADR-001-bun-typescript-canonical-runtime.md
+├── ADR-002-afol-sole-public-entrypoint.md
 └── ...
 ```
 
@@ -32,9 +32,8 @@ docs/arc/DECISIONS/
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
-| - | - | - | - |
-
-*No ADRs created yet.*
+| ADR-001 | Bun/TypeScript as Canonical Runtime | Accepted | 2026-06-09 |
+| ADR-002 | AFOL as Sole Public Entrypoint | Accepted | 2026-06-09 |
 
 ### Creating an ADR
 
