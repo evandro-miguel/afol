@@ -2,7 +2,7 @@ import { Glob } from "bun";
 import { existsSync, readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 export const TEMPLATE_ROOT = "src/project-template";
 
@@ -181,11 +181,10 @@ export type ToolchainClaim = {
 export function scanTemplateToolchainClaims(): ToolchainClaim[] {
   return CLAIMED_TOOLS.map((tool): ToolchainClaim => {
     const critical = tool === "bun";
-    try {
-      execSync(`${tool} --version`, { stdio: "ignore", timeout: 5000 });
+    const result = spawnSync(tool, ["--version"], { stdio: "ignore", timeout: 5000 });
+    if (!result.error && result.status === 0) {
       return { tool, available: true, critical };
-    } catch {
-      return { tool, available: false, critical, error: `"${tool}" not found in PATH or not responding` };
     }
+    return { tool, available: false, critical, error: `"${tool}" not found in PATH or not responding` };
   });
 }

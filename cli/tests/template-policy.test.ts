@@ -8,6 +8,7 @@ import {
   scanProjectTemplateForbiddenTextReferences,
   scanProjectTemplateForbiddenPaths,
   scanProjectTemplateUnknownAllowedPaths,
+  scanTemplateToolchainClaims,
   scanTemplateForbiddenPaths,
 } from "../schemas/template-policy";
 
@@ -135,15 +136,14 @@ describe("template forbidden-content policy", () => {
 
 describe("scanTemplateToolchainClaims", () => {
   test("returns claims for bun and afol", () => {
-    // Import is at top level; we test the function directly
-    const { scanTemplateToolchainClaims } = require("../schemas/template-policy");
     const claims = scanTemplateToolchainClaims();
     expect(claims.length).toBeGreaterThanOrEqual(2);
-    const bun = claims.find((c: any) => c.tool === "bun");
-    const afol = claims.find((c: any) => c.tool === "afol");
-    expect(bun).toBeDefined();
+    const bun = claims.find((claim) => claim.tool === "bun");
+    const afol = claims.find((claim) => claim.tool === "afol");
+    if (!bun || !afol) {
+      throw new Error("expected bun and afol toolchain claims");
+    }
     expect(bun.critical).toBe(true);
-    expect(afol).toBeDefined();
     expect(afol.critical).toBe(false);
     // bun should be available in this test environment
     expect(bun.available).toBe(true);

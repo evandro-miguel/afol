@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { resolveProjectPath } from "../project/root";
 import { appendWorkbenchEvent } from "../local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
+import { rebuildFilesIndex } from "../local-state/project-indexes";
 import { resolveProjectPaths } from "../project/paths";
 
 const TASK_ROW_RE = /^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
@@ -142,6 +143,14 @@ function sessionPaths(root: string, session: string): {
     evidencePath: join(sessionDir, ".evidence.jsonl"),
     activeSessionPath: projectPaths.abs.activeSessionFile,
   };
+}
+
+function refreshWorkbenchLocalState(root: string, session?: string): void {
+  rebuildWorkBenchIndex(root, session);
+  const filesIndexPath = join(resolveProjectPaths(root).abs.dataIndexDir, "files.json");
+  if (existsSync(filesIndexPath)) {
+    rebuildFilesIndex(root);
+  }
 }
 
 export function readActiveSession(root: string): string | null {
@@ -378,7 +387,7 @@ export function newWorkstream(
       theme: theme.trim(),
     },
   });
-  rebuildWorkBenchIndex(root, session);
+  refreshWorkbenchLocalState(root, session);
 
   return {
     session,
@@ -399,7 +408,7 @@ export function startTask(root: string, input: WorkbenchTaskRef): void {
     session: input.session,
     taskId: input.taskId,
   });
-  rebuildWorkBenchIndex(root, input.session);
+  refreshWorkbenchLocalState(root, input.session);
 }
 
 export function recordEvidence(root: string, input: RecordEvidenceInput): EvidenceEntry {
@@ -432,6 +441,7 @@ export function recordEvidence(root: string, input: RecordEvidenceInput): Eviden
     command: input.command,
     result: input.result,
   });
+  refreshWorkbenchLocalState(root, input.session);
   return entry;
 }
 
@@ -454,6 +464,7 @@ export function appendTimelineEntry(root: string, session: string, message: stri
     session,
     command: trimmed,
   });
+  refreshWorkbenchLocalState(root, session);
   return { logPath: paths.logPath, message: trimmed };
 }
 
@@ -471,7 +482,7 @@ export function doneTask(root: string, input: WorkbenchTaskRef): void {
     session: input.session,
     taskId: input.taskId,
   });
-  rebuildWorkBenchIndex(root, input.session);
+  refreshWorkbenchLocalState(root, input.session);
 }
 
 export function closeSession(root: string, session: string): void {
@@ -495,4 +506,5 @@ export function closeSession(root: string, session: string): void {
     type: "workbench.close",
     session,
   });
+  refreshWorkbenchLocalState(root, session);
 }

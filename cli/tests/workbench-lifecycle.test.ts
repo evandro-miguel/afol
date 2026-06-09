@@ -11,6 +11,8 @@ import {
   recordEvidence,
   startTask,
 } from "../services/workbench/lifecycle";
+import { rebuildFilesIndex, validateFilesIndex } from "../services/local-state/project-indexes";
+import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
 
 function mkRoot(name: string): string {
   return mkdtempSync(join(tmpdir(), `wb-lifecycle-${name}-`));
@@ -158,6 +160,23 @@ describe("workbench lifecycle service", () => {
       expect(indexPayload.tasks.find((task) => task.session === created.session && task.task_id === "T-01")).toMatchObject({
         state: "done",
       });
+      expect(validateWorkBenchIndex(root).ok).toBe(true);
+      expect(validateFilesIndex(root).ok).toBe(true);
+
+      rebuildFilesIndex(root);
+      const second = newWorkstream(root, "local-state-second");
+      startTask(root, { session: second.session, taskId: "T-01" });
+      recordEvidence(root, {
+        session: second.session,
+        taskId: "T-01",
+        command: "bun test",
+        result: "passed",
+      });
+      doneTask(root, { session: second.session, taskId: "T-01" });
+      closeSession(root, second.session);
+
+      expect(validateWorkBenchIndex(root).ok).toBe(true);
+      expect(validateFilesIndex(root).ok).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

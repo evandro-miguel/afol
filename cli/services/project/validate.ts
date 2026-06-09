@@ -1,17 +1,12 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { loadJsonObject, loadYamlObject } from "../../core/schema";
 import { scanTemplateForbiddenPaths, scanTemplateToolchainClaims, TEMPLATE_ROOT } from "../../schemas/template-policy";
 import {
-  collectSessionIds,
   detectSessionHealth,
   validateWorkBenchIndex,
 } from "../local-state/workbench-index";
 import {
-  rebuildRulesIndex,
-  rebuildSkillsIndex,
-  rebuildSpecsIndex,
-  rebuildFilesIndex,
   validateFilesIndex,
   validateRulesIndex,
   validateSkillsIndex,
@@ -131,27 +126,20 @@ async function validateTemplateForbidden(projectRoot: string): Promise<ProjectVa
 }
 
 function detectIndexDrift(projectRoot: string): string[] {
-  const dataIndexDir = resolveProjectPaths(projectRoot).abs.dataIndexDir;
   const drifts: string[] = [];
 
   type IndexRebuilder = {
     id: string;
-    file: string;
   };
   const indexFiles: IndexRebuilder[] = [
-    { id: "rules", file: "rules.json" },
-    { id: "skills", file: "skills.json" },
-    { id: "specs", file: "specs.json" },
-    { id: "files", file: "files.json" },
-    { id: "workbench", file: "workbench.json" },
+    { id: "rules" },
+    { id: "skills" },
+    { id: "specs" },
+    { id: "files" },
+    { id: "workbench" },
   ];
 
-  for (const { id, file } of indexFiles) {
-    const indexPath = resolve(dataIndexDir, file);
-    let oldContent = "";
-    if (existsSync(indexPath)) {
-      oldContent = readFileSync(indexPath, "utf8");
-    }
+  for (const { id } of indexFiles) {
     // We compare using the validate functions which check freshness
     // against source file mtimes — if generated_at < source_mtime, it's stale
     switch (id) {

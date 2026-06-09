@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { formatVerifyReport, verifyAllSessions, verifyWorkbenchTasks } from "../services/workbench/verify";
-import { collectSessionIds, detectSessionHealth } from "../services/local-state/workbench-index";
+import { detectSessionHealth } from "../services/local-state/workbench-index";
 
 function mkRoot(name: string): string {
   return mkdtempSync(join(tmpdir(), `wb-verify-${name}-`));
@@ -317,7 +317,7 @@ describe("verifyWorkbenchTasks", () => {
       const warnings = detectSessionHealth(root);
       const duplicates = warnings.filter((w) => w.type === "duplicate_theme");
       expect(duplicates.length).toBeGreaterThanOrEqual(1);
-      expect(duplicates[0]!.message).toContain("same-feature");
+      expect(duplicates[0]?.message).toContain("same-feature");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -353,7 +353,7 @@ describe("verifyWorkbenchTasks", () => {
       const warnings = detectSessionHealth(root);
       const stale = warnings.filter((w) => w.type === "stale_open_tasks");
       expect(stale.length).toBeGreaterThanOrEqual(1);
-      expect(stale[0]!.session).toBe(session);
+      expect(stale[0]?.session).toBe(session);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
