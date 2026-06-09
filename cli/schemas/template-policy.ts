@@ -2,6 +2,7 @@ import { Glob } from "bun";
 import { existsSync, readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
+import { execSync } from "node:child_process";
 
 export const TEMPLATE_ROOT = "src/project-template";
 
@@ -160,4 +161,31 @@ export function scanProjectTemplateForbiddenTextReferences(projectRoot = process
   }
 
   return matches.sort();
+}
+
+/** Claimed tools that documentation says must be available in the environment. */
+export const CLAIMED_TOOLS = ["bun", "afol"] as const;
+
+export type ToolchainClaim = {
+  tool: string;
+  available: boolean;
+  critical: boolean;
+  error?: string;
+};
+
+/**
+ * Verify that each claimed tool is actually available in the environment.
+ * - `bun` is CRITICAL — must be available for any operation
+ * - `afol` is ADVISORY — expected after bootstrap but may not exist in CI/fresh env
+ */
+export function scanTemplateToolchainClaims(): ToolchainClaim[] {
+  return CLAIMED_TOOLS.map((tool): ToolchainClaim => {
+    const critical = tool === "bun";
+    try {
+      execSync(`${tool} --version`, { stdio: "ignore", timeout: 5000 });
+      return { tool, available: true, critical };
+    } catch {
+      return { tool, available: false, critical, error: `"${tool}" not found in PATH or not responding` };
+    }
+  });
 }

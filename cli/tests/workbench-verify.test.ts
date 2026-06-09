@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { formatVerifyReport, verifyWorkbenchTasks } from "../services/workbench/verify";
+import { formatVerifyReport, verifyAllSessions, verifyWorkbenchTasks } from "../services/workbench/verify";
+import { collectSessionIds, detectSessionHealth } from "../services/local-state/workbench-index";
 
 function mkRoot(name: string): string {
   return mkdtempSync(join(tmpdir(), `wb-verify-${name}-`));
@@ -246,6 +247,113 @@ describe("verifyWorkbenchTasks", () => {
       expect(result.issues[0]?.type).toBe("failed_evidence");
       expect(report).toContain("Mode: STRICT");
       expect(report).toContain("failed_evidence");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("verifyAllSessions isolates evidence per session (cross-session task ID reuse)", () => {
+    const root = mkRoot("cross-session");
+    try {
+      // Session A: T-01 done with evidence
+      const sessionA = "260609_1001_session_a";
+      const sessionADir = join(root, ".afol", "wb", sessionA);
+      write(
+        join(sessionADir, `${sessionA}_task_01.md`),
+        [
+          "# Tasks",
+          "",
+          "| Task | State | Owner | Notes |",
+          "|------|-------|-------|-------|",
+          "| T-01 | done | worker | task in session A |",
+          "",
+        ].join("\n"),
+      );
+      write(
+        join(sessionADir, ".evidence.jsonl"),
+        `${JSON.stringify({ task_id: "T-01", command: "bun test", result: "passed" })}\n`,
+      );
+
+      // Session B: T-01 done WITHOUT evidence
+      const sessionB = "260609_1001_session_b";
+      const sessionBDir = join(root, ".afol", "wb", sessionB);
+      write(
+        join(sessionBDir, `${sessionB}_task_01.md`),
+        [
+          "# Tasks",
+          "",
+          "| Task | State | Owner | Notes |",
+          "|------|-------|-------|-------|",
+          "| T-01 | done | worker | task in session B (no evidence) |",
+          "",
+        ].join("\n"),
+      );
+
+      const results = verifyAllSessions(root, true);
+      expect(results).toHaveLength(2);
+
+      const resultA = results.find((r) => r.sessionPath.endsWith(sessionA));
+      const resultB = results.find((r) => r.sessionPath.endsWith(sessionB));
+
+      expect(resultA?.allCompleted).toBe(true);
+      expect(resultA?.issues).toHaveLength(0);
+
+      expect(resultB?.allCompleted).toBe(false);
+      expect(resultB?.issues.some((i) => i.type === "missing_evidence")).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("detectSessionHealth catches duplicate themes", () => {
+    const root = mkRoot("dup-theme");
+    try {
+      // Two sessions sharing the same theme "same-feature"
+      const sessionA = "260609_1001_same-feature";
+      const sessionB = "260610_1002_same-feature";
+      mkdirSync(join(root, ".afol", "wb", sessionA), { recursive: true });
+      mkdirSync(join(root, ".afol", "wb", sessionB), { recursive: true });
+
+      const warnings = detectSessionHealth(root);
+      const duplicates = warnings.filter((w) => w.type === "duplicate_theme");
+      expect(duplicates.length).toBeGreaterThanOrEqual(1);
+      expect(duplicates[0]!.message).toContain("same-feature");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("detectSessionHealth detects stale open tasks", () => {
+    const root = mkRoot("stale-tasks");
+    try {
+      const session = "260601_1000_stale-session";
+      const sessionDir = join(root, ".afol", "wb", session);
+      write(
+        join(sessionDir, `${session}_task_01.md`),
+        [
+          "# Tasks",
+          "",
+          "| Task | State | Owner | Notes |",
+          "|------|-------|-------|-------|",
+          "| T-01 | wip | worker | never finished |",
+          "",
+        ].join("\n"),
+      );
+
+      // Force old mtime (>7 days)
+      const oldTime = new Date("2025-01-01T00:00:00Z").getTime() / 1000;
+      for (const file of [join(sessionDir, `${session}_task_01.md`), sessionDir]) {
+        try {
+          utimesSync(file, oldTime, oldTime);
+        } catch {
+          // some filesystems don't support utimes on dirs
+        }
+      }
+
+      const warnings = detectSessionHealth(root);
+      const stale = warnings.filter((w) => w.type === "stale_open_tasks");
+      expect(stale.length).toBeGreaterThanOrEqual(1);
+      expect(stale[0]!.session).toBe(session);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

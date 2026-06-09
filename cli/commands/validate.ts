@@ -14,8 +14,9 @@ const DEFAULT_IO: CommandIo = {
   },
 };
 
-function parseValidateArgs(args: string[]): { json: boolean } {
+function parseValidateArgs(args: string[]): { json: boolean; checkDrift: boolean } {
   let json = false;
+  let checkDrift = false;
   const values = [...args];
   if (values[0] === "validate") {
     values.shift();
@@ -26,13 +27,17 @@ function parseValidateArgs(args: string[]): { json: boolean } {
       json = true;
       continue;
     }
+    if (value === "--check-drift") {
+      checkDrift = true;
+      continue;
+    }
     if (value.startsWith("-")) {
       throw new Error(`Unknown validate argument: ${value}`);
     }
     throw new Error(`Unexpected validate argument: ${value}`);
   }
 
-  return { json };
+  return { json, checkDrift };
 }
 
 function formatReport(report: Awaited<ReturnType<typeof validateProjectStructure>>): string {
@@ -50,7 +55,7 @@ export async function runValidateCommand(
   args: string[],
   io: CommandIo = DEFAULT_IO,
 ): Promise<number> {
-  let parsed: { json: boolean };
+  let parsed: { json: boolean; checkDrift: boolean };
   try {
     parsed = parseValidateArgs(args);
   } catch (error) {
@@ -58,7 +63,7 @@ export async function runValidateCommand(
     return 2;
   }
 
-  const report = await validateProjectStructure(projectRoot);
+  const report = await validateProjectStructure(projectRoot, { checkDrift: parsed.checkDrift });
 
   if (parsed.json) {
     io.stdout(JSON.stringify(report));

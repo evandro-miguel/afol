@@ -132,3 +132,20 @@ describe("template forbidden-content policy", () => {
     expect(failures).toEqual([]);
   });
 });
+
+describe("scanTemplateToolchainClaims", () => {
+  test("returns claims for bun and afol", () => {
+    // Import is at top level; we test the function directly
+    const { scanTemplateToolchainClaims } = require("../schemas/template-policy");
+    const claims = scanTemplateToolchainClaims();
+    expect(claims.length).toBeGreaterThanOrEqual(2);
+    const bun = claims.find((c: any) => c.tool === "bun");
+    const afol = claims.find((c: any) => c.tool === "afol");
+    expect(bun).toBeDefined();
+    expect(bun.critical).toBe(true);
+    expect(afol).toBeDefined();
+    expect(afol.critical).toBe(false);
+    // bun should be available in this test environment
+    expect(bun.available).toBe(true);
+  });
+});

@@ -1,14 +1,23 @@
-import { existsSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { loadJsonObject, loadYamlObject } from "../../core/schema";
-import { scanTemplateForbiddenPaths, TEMPLATE_ROOT } from "../../schemas/template-policy";
-import { validateWorkBenchIndex } from "../local-state/workbench-index";
+import { scanTemplateForbiddenPaths, scanTemplateToolchainClaims, TEMPLATE_ROOT } from "../../schemas/template-policy";
 import {
+  collectSessionIds,
+  detectSessionHealth,
+  validateWorkBenchIndex,
+} from "../local-state/workbench-index";
+import {
+  rebuildRulesIndex,
+  rebuildSkillsIndex,
+  rebuildSpecsIndex,
+  rebuildFilesIndex,
   validateFilesIndex,
   validateRulesIndex,
   validateSkillsIndex,
   validateSpecsIndex,
 } from "../local-state/project-indexes";
+import { verifyAllSessions } from "../workbench/verify";
 import { resolveProjectPaths } from "./paths";
 
 export type ProjectValidationCheck = {
@@ -25,9 +34,17 @@ export type ProjectValidationCheck = {
   | "skills_local_state_index"
   | "specs_local_state_index"
   | "files_local_state_index"
-  | "wb_local_state_index";
+  | "wb_local_state_index"
+  | "session_evidence"
+  | "session_health"
+  | "index_drift"
+  | "toolchain_claims";
   ok: boolean;
   message: string;
+};
+
+export type ProjectValidationOptions = {
+  checkDrift?: boolean;
 };
 
 export type ProjectValidationReport = {
@@ -113,7 +130,66 @@ async function validateTemplateForbidden(projectRoot: string): Promise<ProjectVa
   };
 }
 
-export async function validateProjectStructure(projectRoot: string): Promise<ProjectValidationReport> {
+function detectIndexDrift(projectRoot: string): string[] {
+  const dataIndexDir = resolveProjectPaths(projectRoot).abs.dataIndexDir;
+  const drifts: string[] = [];
+
+  type IndexRebuilder = {
+    id: string;
+    file: string;
+  };
+  const indexFiles: IndexRebuilder[] = [
+    { id: "rules", file: "rules.json" },
+    { id: "skills", file: "skills.json" },
+    { id: "specs", file: "specs.json" },
+    { id: "files", file: "files.json" },
+    { id: "workbench", file: "workbench.json" },
+  ];
+
+  for (const { id, file } of indexFiles) {
+    const indexPath = resolve(dataIndexDir, file);
+    let oldContent = "";
+    if (existsSync(indexPath)) {
+      oldContent = readFileSync(indexPath, "utf8");
+    }
+    // We compare using the validate functions which check freshness
+    // against source file mtimes — if generated_at < source_mtime, it's stale
+    switch (id) {
+      case "rules": {
+        const result = validateRulesIndex(projectRoot);
+        if (!result.ok) drifts.push(`${id}: ${result.message}`);
+        break;
+      }
+      case "skills": {
+        const result = validateSkillsIndex(projectRoot);
+        if (!result.ok) drifts.push(`${id}: ${result.message}`);
+        break;
+      }
+      case "specs": {
+        const result = validateSpecsIndex(projectRoot);
+        if (!result.ok) drifts.push(`${id}: ${result.message}`);
+        break;
+      }
+      case "files": {
+        const result = validateFilesIndex(projectRoot);
+        if (!result.ok) drifts.push(`${id}: ${result.message}`);
+        break;
+      }
+      case "workbench": {
+        const result = validateWorkBenchIndex(projectRoot);
+        if (!result.ok) drifts.push(`${id}: ${result.message}`);
+        break;
+      }
+    }
+  }
+
+  return drifts;
+}
+
+export async function validateProjectStructure(
+  projectRoot: string,
+  options?: ProjectValidationOptions,
+): Promise<ProjectValidationReport> {
   const projectPaths = resolveProjectPaths(projectRoot);
   const checks: ProjectValidationCheck[] = [
     validateConfig(projectRoot),
@@ -164,7 +240,71 @@ export async function validateProjectStructure(projectRoot: string): Promise<Pro
       };
     })(),
     await validateTemplateForbidden(projectRoot),
+    (() => {
+      // Session evidence check: run strict verify per session
+      const results = verifyAllSessions(projectRoot, true);
+      const totalIssues = results.reduce((sum, r) => sum + r.issues.length, 0);
+      const openTaskSessions = results.filter((r) => r.openTasks.length > 0);
+      if (results.length === 0) {
+        return { id: "session_evidence" as const, ok: true, message: "no sessions to verify" };
+      }
+      if (totalIssues > 0) {
+        return {
+          id: "session_evidence" as const,
+          ok: false,
+          message: `${totalIssues} evidence issues across ${results.length} sessions`,
+        };
+      }
+      if (openTaskSessions.length > 0) {
+        return { id: "session_evidence" as const, ok: true, message: `ok, ${openTaskSessions.length} session(s) have open tasks (no evidence issues)` };
+      }
+      return { id: "session_evidence" as const, ok: true, message: `ok ${results.length} sessions verified` };
+    })(),
+    (() => {
+      // Session health check
+      const warnings = detectSessionHealth(projectRoot);
+      if (warnings.length === 0) {
+        return { id: "session_health" as const, ok: true, message: "no session health warnings" };
+      }
+      const hasDuplicates = warnings.some((w) => w.type === "duplicate_theme");
+      return {
+        id: "session_health" as const,
+        ok: !hasDuplicates,
+        message: warnings.map((w) => w.message).join("; "),
+      };
+    })(),
+    (() => {
+      // Toolchain claims check — only CRITICAL failures cause validate to fail
+      const claims = scanTemplateToolchainClaims();
+      const missing = claims.filter((c) => !c.available);
+      const criticalMissing = missing.filter((c) => c.critical);
+      if (missing.length === 0) {
+        return { id: "toolchain_claims" as const, ok: true, message: `all claimed tools available: ${claims.map((c) => c.tool).join(", ")}` };
+      }
+      if (criticalMissing.length > 0) {
+        return {
+          id: "toolchain_claims" as const,
+          ok: false,
+          message: criticalMissing.map((c) => c.error).join("; "),
+        };
+      }
+      return {
+        id: "toolchain_claims" as const,
+        ok: true,
+        message: `advisory tools missing: ${missing.map((c) => c.tool).join(", ")}`,
+      };
+    })(),
   ];
+
+  // Index drift check (opt-in via --check-drift)
+  if (options?.checkDrift) {
+    const drifts = detectIndexDrift(projectRoot);
+    checks.push({
+      id: "index_drift",
+      ok: drifts.length === 0,
+      message: drifts.length === 0 ? "no index drift" : `stale indexes: ${drifts.join("; ")}`,
+    });
+  }
 
   return {
     ok: checks.every((check) => check.ok),

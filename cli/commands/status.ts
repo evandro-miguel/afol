@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { collectSessionIds, detectSessionHealth } from "../services/local-state/workbench-index";
 import { loadProjectRoot } from "../services/project/root";
 import { resolveProjectPaths } from "../services/project/paths";
 
@@ -19,6 +20,8 @@ type StatusSnapshot = {
   lockPath: string;
   activeSessionPath: string;
   taskFilePath?: string;
+  sessionCount?: number;
+  sessionHealth?: string[];
 };
 
 const DEFAULT_IO: CommandIo = {
@@ -192,6 +195,19 @@ function pickTaskFile(projectRoot: string, activeSession: string): string | null
   return first ? join(sessionDir, first) : null;
 }
 
+function computeSessionHealth(projectRoot: string): { sessionCount: number; sessionHealth: string[] } {
+  try {
+    const sessions = collectSessionIds(projectRoot);
+    const warnings = detectSessionHealth(projectRoot);
+    return {
+      sessionCount: sessions.length,
+      sessionHealth: warnings.map((w) => w.message),
+    };
+  } catch {
+    return { sessionCount: 0, sessionHealth: [] };
+  }
+}
+
 function readStatusSnapshot(projectRoot: string): StatusSnapshot {
   const loaded = loadProjectRoot(projectRoot);
   if (!loaded.ok) {
@@ -204,6 +220,8 @@ function readStatusSnapshot(projectRoot: string): StatusSnapshot {
   const lockPath = projectPaths.abs.lockFile;
   const activeSessionPath = projectPaths.abs.activeSessionFile;
 
+  const healthInfo = computeSessionHealth(loaded.value.root);
+
   if (!existsSync(activeSessionPath)) {
     return {
       status: "none",
@@ -215,6 +233,7 @@ function readStatusSnapshot(projectRoot: string): StatusSnapshot {
       configPath: loaded.value.configPath,
       lockPath,
       activeSessionPath,
+      ...healthInfo,
     };
   }
 
@@ -230,6 +249,7 @@ function readStatusSnapshot(projectRoot: string): StatusSnapshot {
       configPath: loaded.value.configPath,
       lockPath,
       activeSessionPath,
+      ...healthInfo,
     };
   }
 
@@ -245,6 +265,7 @@ function readStatusSnapshot(projectRoot: string): StatusSnapshot {
       configPath: loaded.value.configPath,
       lockPath,
       activeSessionPath,
+      ...healthInfo,
     };
   }
 
@@ -265,11 +286,12 @@ function readStatusSnapshot(projectRoot: string): StatusSnapshot {
     lockPath,
     activeSessionPath,
     taskFilePath,
+    ...computeSessionHealth(projectRoot),
   };
 }
 
 function formatCompact(snapshot: StatusSnapshot): string {
-  return [
+  const lines = [
     `STATUS: ${snapshot.status}`,
     `TASK: ${snapshot.task}`,
     "FILES_WRITTEN:",
@@ -280,7 +302,19 @@ function formatCompact(snapshot: StatusSnapshot): string {
     ...snapshot.blockers.map((entry) => `- ${entry}`),
     "NEXT:",
     ...snapshot.next.map((entry) => `- ${entry}`),
-  ].join("\n");
+  ];
+
+  if (snapshot.sessionCount !== undefined) {
+    lines.push(`SESSIONS: ${snapshot.sessionCount}`);
+    if (snapshot.sessionHealth && snapshot.sessionHealth.length > 0) {
+      lines.push("SESSION_HEALTH_WARNINGS:");
+      for (const warning of snapshot.sessionHealth) {
+        lines.push(`  - ${warning}`);
+      }
+    }
+  }
+
+  return lines.join("\n");
 }
 
 export function runStatusCommand(projectRoot: string, args: string[], io: CommandIo = DEFAULT_IO): number {

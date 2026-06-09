@@ -70,13 +70,13 @@ function parseTouchedAt(path: string): string {
   }
 }
 
-function collectSessionIds(root: string): string[] {
+export function collectSessionIds(root: string): string[] {
   const wbRoot = resolveWorkbenchRoot(root);
   if (!existsSync(wbRoot)) {
     return [];
   }
   return readdirSync(wbRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "_archive")
     .map((entry) => entry.name)
     .sort();
 }
@@ -399,4 +399,74 @@ export function validateWorkBenchIndex(root: string): { ok: boolean; message: st
   }
 
   return { ok: true, message: `ok workbench index snapshot: ${indexPath}` };
+}
+
+export type SessionHealthWarning = {
+  type: "duplicate_theme" | "stale_open_tasks";
+  session: string;
+  message: string;
+};
+
+export function detectSessionHealth(root: string): SessionHealthWarning[] {
+  const warnings: SessionHealthWarning[] = [];
+  const allSessionIds = collectSessionIds(root);
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  // Detect duplicate themes (same suffix after timestamp prefix)
+  const themeToSessions = new Map<string, string[]>();
+  for (const session of allSessionIds) {
+    const theme = session.replace(/^\d{6}_\d{4}_/, "");
+    const existing = themeToSessions.get(theme) ?? [];
+    existing.push(session);
+    themeToSessions.set(theme, existing);
+  }
+  for (const [theme, sessions] of themeToSessions) {
+    if (sessions.length > 1) {
+      warnings.push({
+        type: "duplicate_theme",
+        session: sessions.join(", "),
+        message: `Duplicate session theme: "${theme}" appears in ${sessions.length} sessions: ${sessions.join(", ")}`,
+      });
+    }
+  }
+
+  // Detect stale open tasks (>7 days since last touched)
+  const wbRoot = resolveWorkbenchRoot(root);
+  for (const session of allSessionIds) {
+    const sessionDir = resolve(wbRoot, session);
+    if (!existsSync(sessionDir)) {
+      continue;
+    }
+    const taskFiles = sessionTaskFiles(sessionDir);
+    if (taskFiles.length === 0) {
+      continue;
+    }
+
+    let hasOpen = false;
+    let touchedAt = 0;
+    for (const file of taskFiles) {
+      const tasks = parseTaskRows(session, file);
+      for (const task of tasks) {
+        if (task.state !== "done" && task.state !== "moved") {
+          hasOpen = true;
+        }
+      }
+      try {
+        touchedAt = Math.max(touchedAt, statSync(file).mtimeMs);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (hasOpen && now - touchedAt > SEVEN_DAYS_MS) {
+      warnings.push({
+        type: "stale_open_tasks",
+        session,
+        message: `Session "${session}" has open tasks untouched for >7 days`,
+      });
+    }
+  }
+
+  return warnings;
 }

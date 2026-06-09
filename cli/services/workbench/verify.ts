@@ -1,5 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { collectSessionIds } from "../local-state/workbench-index";
+import { resolveProjectPaths } from "../project/paths";
 
 const LEGACY_TASK_RE = /^\s*-\s\[( |\/|%|&|!|>|x)\]\s+(T-\d{2,3})\s+(.+?)\s*$/;
 const STATE_BOARD_TASK_RE = /^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|?\s*$/;
@@ -417,4 +419,30 @@ export function formatVerifyReport(result: VerifyResult): string {
 
   lines.push("", result.allCompleted ? "All tasks completed." : "Verification failed.");
   return `${lines.join("\n")}\n`;
+}
+
+export function verifyAllSessions(
+  root: string,
+  strict = false,
+  sessionFilter?: string[],
+): VerifyResult[] {
+  const wbRoot = resolveProjectPaths(root).abs.wbDir;
+  const allSessionIds = sessionFilter ?? collectSessionIds(root);
+  const results: VerifyResult[] = [];
+
+  for (const sessionId of allSessionIds) {
+    const sessionPath = resolve(wbRoot, sessionId);
+    if (!existsSync(sessionPath)) {
+      continue;
+    }
+    const result = verifyWorkbenchTasks(sessionPath, strict);
+    result.sessionPath = sessionPath;
+    results.push(result);
+  }
+
+  if (results.length === 0) {
+    results.push(emptyResult(root, strict));
+  }
+
+  return results;
 }
