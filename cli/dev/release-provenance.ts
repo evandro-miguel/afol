@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 
 const artifact = "dist/afol";
 const checksumPath = "dist/afol.sha256";
@@ -20,6 +21,8 @@ writeFileSync(
   `${JSON.stringify(
     {
       artifact,
+      package_name: CLI_PACKAGE_NAME,
+      version: CLI_VERSION,
       sha256,
       size_bytes: stats.size,
       bun: process.versions.bun ?? "unknown",

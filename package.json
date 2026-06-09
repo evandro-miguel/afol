@@ -11,6 +11,8 @@
   },
   "scripts": {
     "dev": "bun run cli/main.ts",
+    "version:generate": "bun run cli/dev/generate-version.ts",
+    "version:check": "bun run cli/dev/generate-version.ts --check",
     "template:generate": "bun run cli/dev/generate-template.ts",
     "template:check": "bun test cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -18,7 +20,7 @@
     "lint:oxlint": "oxlint cli",
     "lint:knip": "knip --dependencies --use-tsconfig-files --max-issues 20",
     "toolchain:diff": "bun run cli/dev/toolchain-smoke.ts",
-    "validate:toolchain": "bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
+    "validate:toolchain": "bun run version:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
     "test": "bun test",
     "test:unit": "bun test cli/tests",
     "test:ci": "AGENT=1 bun test --concurrent --max-concurrency 4 --bail=1",
@@ -29,7 +31,7 @@
     "validate:template": "bun run template:generate && bun test cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts",
     "validate:bootstrap": "bun test cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts",
     "kernel": "bun run cli/main.ts",
-    "build": "bun build --compile ./cli/main.ts --outfile dist/afol",
+    "build": "bun run version:generate && bun build --compile ./cli/main.ts --outfile dist/afol",
     "build:deterministic": "bun install --frozen-lockfile && bun run build",
     "validate:security": "bun run security:scan:informative",
     "security:deps:informative": "bun run cli/dev/security-scan.ts deps",
@@ -37,7 +39,7 @@
     "security:scan:informative": "bun run security:deps:informative && bun run security:secrets:informative",
     "validate:release": "bun run validate:toolchain && bun run validate:template && bun run validate:bootstrap && bun run build:deterministic && bun run smoke:dist && bun run validate:security && bun run release:provenance",
     "release:provenance": "bun run cli/dev/release-provenance.ts",
-    "smoke:dist": "bun run build && ./dist/afol --help > /dev/null",
+    "smoke:dist": "bun run build && ./dist/afol --help > /dev/null && ./dist/afol --version > /dev/null",
     "smoke:clean": "bash -lc 'set -euo pipefail; tmpdir=$(mktemp -d); trap \"rm -rf \\\"$tmpdir\\\"\" EXIT; checkout=\"$tmpdir/checkout\"; mkdir -p \"$checkout\"; tar -C \"$PWD\" --exclude .git --exclude node_modules --exclude dist --exclude .bun-build\\* -cf - . | tar -C \"$checkout\" -xf -; cd \"$checkout\"; bun install --frozen-lockfile; bun run build; ./dist/afol --help > /dev/null'"
   },
   "devDependencies": {

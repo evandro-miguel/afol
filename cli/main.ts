@@ -21,6 +21,7 @@ import {
   runVerifyTasksCommand,
 } from "./commands/workbench";
 import { runFileCommand } from "./commands/file";
+import { CLI_VERSION } from "./generated/version";
 import { resolveCommand } from "./router";
 import { runValidationCommand } from "./validate/contract";
 import { loadProjectRoot } from "./services/project/root";
@@ -44,7 +45,7 @@ const HELP_LINES = [
   "",
   "Flags",
   "  -j, --json             JSON output for status",
-  "  -h, --help             Show this compact help",
+  "  -h, --help  -V, --version Show help or version",
   "",
   "Aliases",
   "  -S --session  -T --task-id  -x --test",
@@ -127,6 +128,11 @@ function resolveValidateMode(projectRoot: string, args: string[]): {
 
 export async function main(argv: string[]): Promise<number> {
   const args = argv.slice(2);
+  if (args.length === 1 && (args[0] === "--version" || args[0] === "-V" || args[0] === "version")) {
+    console.log(`afol ${CLI_VERSION}`);
+    return 0;
+  }
+
   const resolution = resolveCommand(args);
 
   if (resolution.kind === "help") {

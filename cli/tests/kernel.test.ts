@@ -11,6 +11,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { CLI_VERSION } from "../generated/version";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 const templateConfig = JSON.stringify({
@@ -72,6 +73,19 @@ describe("kernel front-door", () => {
       expect((proc.stdout as string)).toContain("v/validate");
       expect((proc.stdout as string)).toContain("n/new");
       expect((proc.stdout as string)).toContain("a=afol");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("--version prints version without requiring project files", () => {
+    const root = mkdtempSync(join(tmpdir(), "kernel-version-no-project-"));
+    try {
+      for (const args of [["--version"], ["-V"], ["version"]]) {
+        const proc = runKernel(root, args);
+        expect(proc.status).toBe(0);
+        expect((proc.stdout as string).trim()).toBe(`afol ${CLI_VERSION}`);
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
