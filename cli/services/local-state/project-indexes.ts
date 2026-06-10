@@ -353,7 +353,7 @@ function latestSpecsSource(root: string): number {
 
 function latestFilesSource(root: string): number {
 	const files = collectFileIndexFiles(root);
-	return sourceLatestFromPaths(collectSourceFiles([...files, root]));
+	return sourceLatestFromPaths(collectSourceFiles([...files]));
 }
 
 function isIsoDate(value: unknown): boolean {

@@ -281,6 +281,21 @@ describe("local-state project indexer", () => {
 		}
 	});
 
+	test("files index staleness: root dir mtime change does not invalidate snapshot", () => {
+		const root = buildFixture();
+		try {
+			rebuildFilesIndex(root);
+			// Simulate the scenario that caused the bug: writing index files
+			// updates the root directory mtime, which would make the snapshot
+			// appear stale if root itself were included in latestFilesSource.
+			const future = new Date(Date.now() + 60_000);
+			utimesSync(root, future, future);
+			expect(validateFilesIndex(root).ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("skills index has deterministic names and freshness check", () => {
 		const root = buildFixture();
 		try {

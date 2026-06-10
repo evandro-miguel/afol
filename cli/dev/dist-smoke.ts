@@ -260,7 +260,7 @@ try {
 	const sourceRuleReadme = templateText(".agents/rules/README.md");
 	applyLock.revision = "old";
 	applyLock.managed_hashes = {
-		...(applyLock.managed_hashes ?? {}),
+		...applyLock.managed_hashes,
 		"rules/README.md": sha256Hex(downstreamRuleReadme),
 	};
 	writeJson(applyLockPath, applyLock);
