@@ -48,9 +48,9 @@ Central catalog of patterns, anti-patterns, and best practices for .agents syste
 
 | ID | Tool | Rating | Notes |
 |----|------|--------|-------|
-| PAT-201 | `agents doctor` | high | Run before all work |
-| PAT-202 | `agents new` | high | Use for all new workstreams |
-| PAT-203 | `agents verify-tasks` | high | Run before marking done |
+| PAT-201 | `afol validate project` | high | Run before all work |
+| PAT-202 | `afol new` | high | Use for all new workstreams |
+| PAT-203 | `afol validate project` | high | Run before marking done |
 
 ### Template Patterns
 
