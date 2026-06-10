@@ -10,21 +10,21 @@ Replace this section after bootstrap with real product purpose and constraints.
 - This repository was created from the minimal scaffold template.
 - The template owns local protocol files only: `AGENTS.md`,
   `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
-  `.agents/rules/`, optional `.agents/skills/` baseline, `.afol/wb/`
-  baseline, and minimal docs.
+  `.agents/rules/`, `.afol/skills/` baseline, `.afol/wb/` baseline, and
+  minimal docs.
 - Some sandbox providers make `.agents/` read-only. When this project was
   initialized with `afol init --provider-compatible` or
   `afol init --mutable-dir .afol`, mutable agent state lives under `.afol/`.
   Always read `.agents/config.json` `paths.*` before hardcoding state paths.
 - The configured plan directory in a downstream project is that project's
   durable governed plan state. It defaults to `.afol/wb/`. Active-session
-  pointers and local runtime state live under `.agents/data/` or the configured
-  mutable directory. The plan directory must start from the template baseline
+  pointers and local runtime state live under the configured mutable directory,
+  which defaults to `.afol/`. The plan directory must start from the template baseline
   and must not include factory repo history, root workbench sessions,
   active-session pointers, caches, telemetry events, benchmark results, or
   development-only evidence.
 - If a future update proposes broad docs, source seeds, factory tests, caches,
-  or root `.agents/wb/` history, treat that as export drift and reject it until
+  or root `.agents/wb/` legacy history, treat that as export drift and reject it until
   the scaffold manifest and docs explicitly justify the payload.
 
 ## Governed Execution
@@ -55,7 +55,7 @@ Replace this section after bootstrap with real product purpose and constraints.
   `paths.skills_dir`, `paths.tmp_dir`, and `paths.data_dir` before writing
   agent-owned state.
 - `.agents/rules/`: local operational contracts only.
-- `.agents/skills/` or configured `paths.skills_dir`: project-local skills only
+- `.afol/skills/` or configured `paths.skills_dir`: project-local skills only
   when needed.
 - `.afol/wb/` or configured `paths.wb_dir`: durable governed plan sessions
   for this downstream project only.

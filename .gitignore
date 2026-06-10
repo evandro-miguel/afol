@@ -1,62 +1,46 @@
-# Agents scripts virtualenv (isolated per project)
-.agents/scripts/.venv/
-.agents/runtime/.venv/
-.agents/scripts/*.egg-info/
+# Legacy Python/runtime surfaces are retired. Do not recreate
+# .agents/scripts, .agents/runtime, .agents/wb, or .agents/z-arq.
 
-# UV lock files (optional: commit for reproducible builds)
-.agents/scripts/uv.lock
+# UV lock files
 uv.lock
-!.agents/runtime/uv.lock
-!src/project-template/.agents/runtime/uv.lock
 
 # Python cache
-.agents/scripts/__pycache__/
-.agents/scripts/*.pyc
 **/__pycache__/
 **/*.pyc
 
 # Structure map cache
-.agents/arc/structure/.structure-cache.json
 **/.structure-cache.json
 
-# Runtime telemetry events (operational data)
-.agents/data/telemetry/events.jsonl
-.agents/data/benchmarks/results/*
+# AFOL mutable data
+.afol/data/events/
+.afol/data/index/
+.afol/data/session/
+.afol/data/mutations/
+.afol/data/migrations/*
+.afol/data/benchmarks/catalog/results/*
+!.afol/data/migrations/
+!.afol/data/migrations/legacy-system-retirement-260609/
+!.afol/data/migrations/legacy-system-retirement-260609/z-arq-README.md
+.afol/data/migrations/legacy-system-retirement-260609/legacy-*/
 
-# Runtime/cache snapshots
-.agents/.cache/
-.agents/tools/uv/
-src/project-template/.agents/tmp/*
-!src/project-template/.agents/tmp/
-!src/project-template/.agents/tmp/README.md
-.agents/journal/
-.agents/scripts/.agents/
-src/project-template/.agents/scripts/.agents/
-.agents/data/events/
-.agents/data/index/
-.agents/data/session/
-src/project-template/.agents/data/events/*
-src/project-template/.agents/data/index/*
-!src/project-template/.agents/data/events/
-!src/project-template/.agents/data/events/README.md
-!src/project-template/.agents/data/index/
-!src/project-template/.agents/data/index/README.md
+src/project-template/.afol/tmp/*
+!src/project-template/.afol/tmp/
+!src/project-template/.afol/tmp/README.md
+
+src/project-template/.afol/data/events/*
+src/project-template/.afol/data/index/*
+!src/project-template/.afol/data/events/
+!src/project-template/.afol/data/events/README.md
+!src/project-template/.afol/data/index/
+!src/project-template/.afol/data/index/README.md
 
 # Universal-skills must not be a repo-local git cache or nested checkout.
 .agents/cache/universal-skills/
 
 # Local temporary/reference workspace
-.agents/.tmp/
-.agents/tmp/*
-!.agents/tmp/
-!.agents/tmp/README.md
-
-# Archived workstream payloads; keep the placeholder only.
-.agents/z-arq/*
-!.agents/z-arq/README.md
-
-# Legacy/generated local map output; current-state repo maps live in docs/map/
-.agents/arc/map/
+.afol/tmp/*
+!.afol/tmp/
+!.afol/tmp/README.md
 
 # Generated repo-map evidence; regenerate on demand instead of committing.
 docs/map/extra/
@@ -64,16 +48,7 @@ docs/map/extra/
 # Legacy implementation report generated during migration work.
 docs/telemetry/reports/implementation_report.md
 
-# Legacy workbench sessions (local-only; plans live in .afol/wb/)
-.agents/wb/
 .afol/wb/.active_session
-.afol/tmp/*
-!.afol/tmp/
-!.afol/tmp/README.md
-.afol/data/events/
-.afol/data/index/
-.afol/data/session/
-.afol/data/mutations/
 
 # Local merge worktrees
 .worktree/

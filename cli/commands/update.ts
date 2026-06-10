@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { atomicWriteText } from "../services/io/atomic";
+import { withSessionLock } from "../services/io/session-lock";
 import {
-	appendMutationRecord,
+	appendMutationRecords,
 	createMutationId,
+	type MutationRecord,
 } from "../services/mutations/journal";
 import { resolveProjectPaths } from "../services/project/paths";
 import {
@@ -150,62 +152,156 @@ function writeAtomically(
 	atomicWriteText(absolutePath, content);
 }
 
-function applyUpdateOperations(
+type UpdateApplyRuntime = {
+	failAfterWriteCount?: number | undefined;
+	failBeforeJournalAppend?: boolean | undefined;
+};
+
+type StagedUpdateOperation = {
+	operation: UpdateOperation;
+	absolutePath: string;
+	beforeExisted: boolean;
+	beforeContent: string;
+	backupPath: string | null;
+	mutationId: string;
+	record: MutationRecord;
+};
+
+function stageUpdateOperations(
 	projectRoot: string,
 	operations: UpdateOperation[],
 	context: Pick<ParsedUpdateArgs, "session" | "taskId" | "reason">,
-): void {
-	for (const operation of operations.filter(isWritableOperation)) {
+): StagedUpdateOperation[] {
+	const batchId = createMutationId();
+	return operations.filter(isWritableOperation).flatMap((operation) => {
 		if (!operation.nextContent) {
-			continue;
+			return [];
 		}
 		const absolutePath = join(projectRoot, operation.path);
-		const dir = dirname(absolutePath);
-		if (!existsSync(dir)) {
-			mkdirSync(dir, { recursive: true });
-		}
 		const beforeExisted = existsSync(absolutePath);
 		const beforeContent = beforeExisted
 			? readFileSync(absolutePath, "utf8")
 			: "";
 		const mutationId = createMutationId();
-		let backupPath: string | null = null;
+		const backupPath = beforeExisted
+			? mutationBackupPath(projectRoot, mutationId, operation.path)
+			: null;
 
-		if (beforeExisted) {
-			backupPath = mutationBackupPath(projectRoot, mutationId, operation.path);
-			cpSync(absolutePath, backupPath);
+		return [
+			{
+				operation,
+				absolutePath,
+				beforeExisted,
+				beforeContent,
+				backupPath,
+				mutationId,
+				record: {
+					id: mutationId,
+					ts: new Date().toISOString(),
+					kind: "patch",
+					status: "applied",
+					dryRun: false,
+					session: context.session,
+					taskId: context.taskId,
+					reason: context.reason,
+					sourcePath: operation.path,
+					beforeHash: beforeExisted ? sha256Hex(beforeContent) : null,
+					afterHash: sha256Hex(operation.nextContent),
+					backupPath,
+					beforeExisted,
+					source: "afol-update",
+					batchId,
+					...(operation.diff ? { diffPreview: operation.diff } : {}),
+				},
+			},
+		];
+	});
+}
+
+function restoreAppliedOperations(staged: StagedUpdateOperation[]): void {
+	for (let index = staged.length - 1; index >= 0; index -= 1) {
+		const entry = staged[index];
+		if (!entry) {
+			continue;
+		}
+		if (entry.beforeExisted) {
+			writeAtomically(
+				entry.absolutePath,
+				entry.operation.path,
+				entry.mutationId,
+				entry.beforeContent,
+			);
+			continue;
+		}
+		rmSync(entry.absolutePath, { force: true });
+	}
+}
+
+function applyUpdateOperations(
+	projectRoot: string,
+	operations: UpdateOperation[],
+	context: Pick<ParsedUpdateArgs, "session" | "taskId" | "reason">,
+	runtime: UpdateApplyRuntime = {},
+): void {
+	withSessionLock(projectRoot, context.session, () => {
+		const staged = stageUpdateOperations(projectRoot, operations, context);
+		if (staged.length === 0) {
+			return;
 		}
 
-		writeAtomically(
-			absolutePath,
-			operation.path,
-			mutationId,
-			operation.nextContent,
-		);
+		for (const entry of staged) {
+			if (!entry.backupPath) {
+				continue;
+			}
+			cpSync(entry.absolutePath, entry.backupPath);
+		}
 
-		appendMutationRecord(projectRoot, {
-			id: mutationId,
-			ts: new Date().toISOString(),
-			kind: "patch",
-			status: "applied",
-			dryRun: false,
-			session: context.session,
-			taskId: context.taskId,
-			reason: context.reason,
-			sourcePath: operation.path,
-			beforeHash: beforeExisted ? sha256Hex(beforeContent) : null,
-			afterHash: sha256Hex(operation.nextContent),
-			backupPath,
-			beforeExisted,
-			...(operation.diff ? { diffPreview: operation.diff } : {}),
-		});
-	}
+		const applied: StagedUpdateOperation[] = [];
+		try {
+			for (const entry of staged) {
+				const nextContent = entry.operation.nextContent;
+				if (!nextContent) {
+					continue;
+				}
+				const dir = dirname(entry.absolutePath);
+				if (!existsSync(dir)) {
+					mkdirSync(dir, { recursive: true });
+				}
+				writeAtomically(
+					entry.absolutePath,
+					entry.operation.path,
+					entry.mutationId,
+					nextContent,
+				);
+				applied.push(entry);
+				if (
+					typeof runtime.failAfterWriteCount === "number" &&
+					applied.length >= runtime.failAfterWriteCount
+				) {
+					throw new Error("Injected update apply failure after write");
+				}
+			}
+
+			if (runtime.failBeforeJournalAppend) {
+				throw new Error("Injected update apply failure before journal append");
+			}
+
+			appendMutationRecords(
+				projectRoot,
+				staged.map((entry) => entry.record),
+			);
+		} catch (error) {
+			restoreAppliedOperations(applied);
+			throw error;
+		}
+	});
 }
 
 export async function runUpdateCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	runtime: UpdateApplyRuntime = {},
 ): Promise<number> {
 	try {
 		const [rawCommand, ...rest] = args;
@@ -249,7 +345,12 @@ export async function runUpdateCommand(
 			if (writableOperations.length > 0) {
 				requireApplyContext(parsedArgs);
 			}
-			applyUpdateOperations(projectRoot, writableOperations, parsedArgs);
+			applyUpdateOperations(
+				projectRoot,
+				writableOperations,
+				parsedArgs,
+				runtime,
+			);
 			io.stdout(
 				parsedArgs.json
 					? JSON.stringify(result)

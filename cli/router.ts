@@ -1,7 +1,5 @@
 import { kernelRegistry } from "./registry";
 
-const LEGACY_PREFIX = "legacy:";
-
 export type CommandResolution =
 	| { kind: "help" }
 	| { kind: "status"; args: string[] }
@@ -20,7 +18,6 @@ export type CommandResolution =
 	| { kind: "update"; args: string[] }
 	| { kind: "file"; args: string[] }
 	| { kind: "localState"; args: string[] }
-	| { kind: "delegate"; args: string[] }
 	| { kind: "unknown"; message: string; exitCode: number };
 
 function removeJsonAliases(values: string[]): string[] {
@@ -87,56 +84,6 @@ function normalizeTokenOptimizedFlags(values: string[]): string[] {
 	return normalized;
 }
 
-function normalizeLegacyDoneInvocation(rest: string[]): string[] {
-	const normalized = ["implement", "complete"];
-	let hasResult = false;
-	const expanded = normalizeTokenOptimizedFlags(rest);
-
-	for (let index = 0; index < expanded.length; index += 1) {
-		const value = expanded[index];
-		if (!value) {
-			continue;
-		}
-		if (value === "--test") {
-			normalized.push("--command");
-			if (index + 1 < expanded.length) {
-				index += 1;
-				const command = expanded[index];
-				if (command) {
-					normalized.push(command);
-				}
-			}
-			continue;
-		}
-		if (value === "--result") {
-			hasResult = true;
-		}
-		normalized.push(value);
-	}
-
-	if (!hasResult) {
-		normalized.push("--result", "passed");
-	}
-
-	return normalized;
-}
-
-function normalizeDelegatedInvocation(values: string[]): string[] {
-	const topLevel = values[0] ?? "";
-	const rest = values.slice(1);
-	const expandedRest = normalizeTokenOptimizedFlags(rest);
-	if (topLevel === "start") {
-		return ["implement", "start", ...expandedRest];
-	}
-	if (topLevel === "done") {
-		return normalizeLegacyDoneInvocation(rest);
-	}
-	if (topLevel === "close") {
-		return ["session", "close", ...expandedRest];
-	}
-	return [topLevel, ...expandedRest];
-}
-
 function suggestionFor(command: string): string | null {
 	const normalizedInput = command.toLowerCase();
 	for (const candidate of kernelRegistry.knownCanonicalCommands()) {
@@ -183,22 +130,6 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevel === "--help") {
 		return { kind: "help" };
-	}
-
-	if (topLevel.startsWith(LEGACY_PREFIX)) {
-		const legacyToken = topLevel.slice(LEGACY_PREFIX.length);
-		const command = kernelRegistry.resolveLegacyCommand(legacyToken);
-		if (!command) {
-			return {
-				kind: "unknown",
-				message: formatUnknownCommandHint(topLevel),
-				exitCode: 2,
-			};
-		}
-		return {
-			kind: "delegate",
-			args: normalizeDelegatedInvocation([command, ...rest]),
-		};
 	}
 
 	const topLevelKind = kernelRegistry.resolveKind(topLevel);

@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { atomicWriteText } from "../io/atomic";
+import { withSessionLock } from "../io/session-lock";
 import { rebuildFilesIndex } from "../local-state/project-indexes";
 import { appendWorkbenchEvent } from "../local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
@@ -443,54 +444,58 @@ export function newWorkstream(
 }
 
 export function startTask(root: string, input: WorkbenchTaskRef): void {
-	const paths = sessionPaths(root, input.session);
-	updateTaskState(paths.taskPath, input.taskId, "in_progress");
-	appendWorkbenchEvent(root, {
-		type: "workbench.start_task",
-		session: input.session,
-		taskId: input.taskId,
+	withSessionLock(root, input.session, () => {
+		const paths = sessionPaths(root, input.session);
+		updateTaskState(paths.taskPath, input.taskId, "in_progress");
+		appendWorkbenchEvent(root, {
+			type: "workbench.start_task",
+			session: input.session,
+			taskId: input.taskId,
+		});
+		refreshWorkbenchLocalState(root, input.session);
 	});
-	refreshWorkbenchLocalState(root, input.session);
 }
 
 export function recordEvidence(
 	root: string,
 	input: RecordEvidenceInput,
 ): EvidenceEntry {
-	const paths = sessionPaths(root, input.session);
-	if (!existsSync(paths.sessionDir)) {
-		throw new Error(`Session folder not found: ${paths.sessionDir}`);
-	}
-	const now = new Date();
-	const entry: EvidenceEntry = {
-		id: evidenceId(now),
-		task_id: input.taskId,
-		created_at: now.toISOString(),
-		command: input.command,
-		result: input.result,
-	};
-	if (input.exitCode !== undefined) {
-		entry.exit_code = input.exitCode;
-	}
-	if (input.artifact) {
-		entry.artifact = input.artifact;
-	}
-	if (input.note) {
-		entry.note = input.note;
-	}
-	writeFileSync(paths.evidencePath, `${JSON.stringify(entry)}\n`, {
-		encoding: "utf8",
-		flag: "a",
+	return withSessionLock(root, input.session, () => {
+		const paths = sessionPaths(root, input.session);
+		if (!existsSync(paths.sessionDir)) {
+			throw new Error(`Session folder not found: ${paths.sessionDir}`);
+		}
+		const now = new Date();
+		const entry: EvidenceEntry = {
+			id: evidenceId(now),
+			task_id: input.taskId,
+			created_at: now.toISOString(),
+			command: input.command,
+			result: input.result,
+		};
+		if (input.exitCode !== undefined) {
+			entry.exit_code = input.exitCode;
+		}
+		if (input.artifact) {
+			entry.artifact = input.artifact;
+		}
+		if (input.note) {
+			entry.note = input.note;
+		}
+		writeFileSync(paths.evidencePath, `${JSON.stringify(entry)}\n`, {
+			encoding: "utf8",
+			flag: "a",
+		});
+		appendWorkbenchEvent(root, {
+			type: "workbench.record_evidence",
+			session: input.session,
+			taskId: input.taskId,
+			command: input.command,
+			result: input.result,
+		});
+		refreshWorkbenchLocalState(root, input.session);
+		return entry;
 	});
-	appendWorkbenchEvent(root, {
-		type: "workbench.record_evidence",
-		session: input.session,
-		taskId: input.taskId,
-		command: input.command,
-		result: input.result,
-	});
-	refreshWorkbenchLocalState(root, input.session);
-	return entry;
 }
 
 export function appendTimelineEntry(
@@ -498,81 +503,87 @@ export function appendTimelineEntry(
 	session: string,
 	message: string,
 ): TimelineEntryResult {
-	const paths = sessionPaths(root, session);
-	if (!existsSync(paths.sessionDir)) {
-		throw new Error(`Session folder not found: ${paths.sessionDir}`);
-	}
-	if (!existsSync(paths.logPath)) {
-		throw new Error(`Log file not found: ${paths.logPath}`);
-	}
-	const trimmed = message.trim();
-	if (!trimmed) {
-		throw new Error("Timeline message cannot be empty.");
-	}
-	const current = readFileSync(paths.logPath, "utf8");
-	atomicWriteText(paths.logPath, insertTimelineEntry(current, trimmed));
-	appendWorkbenchEvent(root, {
-		type: "workbench.append_log",
-		session,
-		command: trimmed,
+	return withSessionLock(root, session, () => {
+		const paths = sessionPaths(root, session);
+		if (!existsSync(paths.sessionDir)) {
+			throw new Error(`Session folder not found: ${paths.sessionDir}`);
+		}
+		if (!existsSync(paths.logPath)) {
+			throw new Error(`Log file not found: ${paths.logPath}`);
+		}
+		const trimmed = message.trim();
+		if (!trimmed) {
+			throw new Error("Timeline message cannot be empty.");
+		}
+		const current = readFileSync(paths.logPath, "utf8");
+		atomicWriteText(paths.logPath, insertTimelineEntry(current, trimmed));
+		appendWorkbenchEvent(root, {
+			type: "workbench.append_log",
+			session,
+			command: trimmed,
+		});
+		refreshWorkbenchLocalState(root, session);
+		return { logPath: paths.logPath, message: trimmed };
 	});
-	refreshWorkbenchLocalState(root, session);
-	return { logPath: paths.logPath, message: trimmed };
 }
 
 export function doneTask(root: string, input: WorkbenchTaskRef): void {
-	const paths = sessionPaths(root, input.session);
-	const hasSuccessEvidence = loadEvidenceEntries(paths.evidencePath).some(
-		(entry) =>
-			entry.task_id === input.taskId && evidenceResultIsSuccess(entry.result),
-	);
-	if (!hasSuccessEvidence) {
-		throw new Error(
-			`Task ${input.taskId} requires passed evidence before done.`,
+	withSessionLock(root, input.session, () => {
+		const paths = sessionPaths(root, input.session);
+		const hasSuccessEvidence = loadEvidenceEntries(paths.evidencePath).some(
+			(entry) =>
+				entry.task_id === input.taskId && evidenceResultIsSuccess(entry.result),
 		);
-	}
-	updateTaskState(paths.taskPath, input.taskId, "done");
-	appendWorkbenchEvent(root, {
-		type: "workbench.mark_done",
-		session: input.session,
-		taskId: input.taskId,
+		if (!hasSuccessEvidence) {
+			throw new Error(
+				`Task ${input.taskId} requires passed evidence before done.`,
+			);
+		}
+		updateTaskState(paths.taskPath, input.taskId, "done");
+		appendWorkbenchEvent(root, {
+			type: "workbench.mark_done",
+			session: input.session,
+			taskId: input.taskId,
+		});
+		refreshWorkbenchLocalState(root, input.session);
 	});
-	refreshWorkbenchLocalState(root, input.session);
 }
 
 export function closeSession(root: string, session: string): void {
-	const paths = sessionPaths(root, session);
-	if (!existsSync(paths.sessionDir)) {
-		throw new Error(`Session folder not found: ${session}`);
-	}
-	const blockingRows = readTaskRows(paths.taskPath).filter((row) =>
-		BLOCKING_STATES.has(row.state),
-	);
-	if (blockingRows.length > 0) {
-		const labels = blockingRows
-			.map((row) => `${row.taskId}:${row.state}`)
-			.join(", ");
-		throw new Error(`Session ${session} has blocking tasks: ${labels}`);
-	}
-	const verification = verifyWorkbenchTasks(paths.sessionDir, true);
-	if (!verification.allCompleted) {
-		const message =
-			verification.issues.map((issue) => issue.message).join("; ") ||
-			"strict verification failed";
-		throw new Error(
-			`Session ${session} failed strict verification: ${message}`,
-		);
-	}
-
-	if (existsSync(paths.activeSessionPath)) {
-		const active = readFileSync(paths.activeSessionPath, "utf8").trim();
-		if (active === session) {
-			unlinkSync(paths.activeSessionPath);
+	withSessionLock(root, session, () => {
+		const paths = sessionPaths(root, session);
+		if (!existsSync(paths.sessionDir)) {
+			throw new Error(`Session folder not found: ${session}`);
 		}
-	}
-	appendWorkbenchEvent(root, {
-		type: "workbench.close",
-		session,
+		const blockingRows = readTaskRows(paths.taskPath).filter((row) =>
+			BLOCKING_STATES.has(row.state),
+		);
+		if (blockingRows.length > 0) {
+			const labels = blockingRows
+				.map((row) => `${row.taskId}:${row.state}`)
+				.join(", ");
+			throw new Error(`Session ${session} has blocking tasks: ${labels}`);
+		}
+		const verification = verifyWorkbenchTasks(paths.sessionDir, true);
+		if (!verification.allCompleted) {
+			const message =
+				verification.issues.map((issue) => issue.message).join("; ") ||
+				"strict verification failed";
+			throw new Error(
+				`Session ${session} failed strict verification: ${message}`,
+			);
+		}
+
+		if (existsSync(paths.activeSessionPath)) {
+			const active = readFileSync(paths.activeSessionPath, "utf8").trim();
+			if (active === session) {
+				unlinkSync(paths.activeSessionPath);
+			}
+		}
+		appendWorkbenchEvent(root, {
+			type: "workbench.close",
+			session,
+		});
+		refreshWorkbenchLocalState(root, session);
 	});
-	refreshWorkbenchLocalState(root, session);
 }

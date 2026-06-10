@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -10,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { validateFilesIndex } from "../services/local-state/project-indexes";
+import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
 import {
 	appendTimelineEntry,
@@ -20,12 +22,35 @@ import {
 	startTask,
 } from "../services/workbench/lifecycle";
 
+const kernelPath = `${process.cwd()}/cli/main.ts`;
+
 function mkRoot(name: string): string {
 	return mkdtempSync(join(tmpdir(), `wb-lifecycle-${name}-`));
 }
 
+function waitForExit(
+	proc: ReturnType<typeof spawn>,
+): Promise<{ code: number | null; stderr: string; stdout: string }> {
+	return new Promise((resolve, reject) => {
+		let stdout = "";
+		let stderr = "";
+		proc.stdout?.setEncoding("utf8");
+		proc.stderr?.setEncoding("utf8");
+		proc.stdout?.on("data", (chunk: string) => {
+			stdout += chunk;
+		});
+		proc.stderr?.on("data", (chunk: string) => {
+			stderr += chunk;
+		});
+		proc.on("error", reject);
+		proc.on("close", (code) => {
+			resolve({ code, stderr, stdout });
+		});
+	});
+}
+
 function readLocalStateEvents(root: string): Array<Record<string, unknown>> {
-	const path = join(root, ".agents", "data", "events", "events.jsonl");
+	const path = resolveWorkbenchEventLogPath(root);
 	if (!existsSync(path)) {
 		return [];
 	}
@@ -56,6 +81,15 @@ function writeProviderCompatibleConfig(root: string): void {
 			null,
 			2,
 		),
+		"utf8",
+	);
+}
+
+function writeCliProjectContract(root: string): void {
+	writeProviderCompatibleConfig(root);
+	writeFileSync(
+		join(root, ".agents", "lock.json"),
+		JSON.stringify({ schema_version: 1, locked: true }),
 		"utf8",
 	);
 }
@@ -126,6 +160,67 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("recordEvidence serializes concurrent evidence and event JSONL appends", async () => {
+		const root = mkRoot("evidence-concurrency");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "evidence-concurrency");
+			const processes = Array.from({ length: 8 }, (_, index) =>
+				spawn(
+					"bun",
+					[
+						kernelPath,
+						"evidence",
+						"--session",
+						created.session,
+						"--task-id",
+						"T-01",
+						"--command",
+						`bun test shard-${index}`,
+						"--result",
+						"passed",
+					],
+					{
+						cwd: root,
+						stdio: ["ignore", "pipe", "pipe"],
+					},
+				),
+			);
+
+			const results = await Promise.all(processes.map(waitForExit));
+			for (const result of results) {
+				expect(result.code).toBe(0);
+				expect(result.stderr).toBe("");
+			}
+
+			const evidenceRows = readFileSync(created.evidencePath, "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(evidenceRows).toHaveLength(8);
+			expect(
+				new Set(
+					evidenceRows.map(
+						(row) => `${row.command}:${row.result}:${row.task_id}`,
+					),
+				).size,
+			).toBe(8);
+
+			const eventRows = readLocalStateEvents(root);
+			expect(eventRows).toHaveLength(9);
+			expect(
+				eventRows.filter((row) => row.type === "workbench.record_evidence"),
+			).toHaveLength(8);
+			expect(
+				existsSync(
+					join(root, ".afol", "wb", ".locks", `${created.session}.lock`),
+				),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("appendTimelineEntry writes to the session log", () => {
 		const root = mkRoot("timeline");
 		try {
@@ -171,13 +266,7 @@ describe("workbench lifecycle service", () => {
 				]),
 			);
 
-			const indexPath = join(
-				root,
-				".agents",
-				"data",
-				"index",
-				"workbench.json",
-			);
+			const indexPath = join(root, ".afol", "data", "index", "workbench.json");
 			const indexPayload = JSON.parse(readFileSync(indexPath, "utf8")) as {
 				sessions: Array<{
 					session: string;
@@ -202,7 +291,7 @@ describe("workbench lifecycle service", () => {
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
 			expect(validateFilesIndex(root).ok).toBe(true);
 			expect(
-				existsSync(join(root, ".agents", "data", "index", "files.json")),
+				existsSync(join(root, ".afol", "data", "index", "files.json")),
 			).toBe(true);
 
 			const second = newWorkstream(root, "local-state-second");

@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { loadJsonObject, loadYamlObject } from "../../core/schema";
+import { loadJsonObject } from "../../core/schema";
 import {
 	scanTemplateForbiddenPaths,
 	scanTemplateToolchainClaims,
@@ -51,33 +51,18 @@ export type ProjectValidationReport = {
 	checks: ProjectValidationCheck[];
 };
 
-function configCandidates(
-	projectRoot: string,
-): { path: string; kind: "json" | "yaml" }[] {
-	return [
-		{ path: join(projectRoot, ".agents", "config.json"), kind: "json" },
-		{ path: join(projectRoot, ".agents", "agents.config"), kind: "yaml" },
-	];
-}
-
 function validateConfig(projectRoot: string): ProjectValidationCheck {
-	for (const candidate of configCandidates(projectRoot)) {
-		if (!existsSync(candidate.path)) {
-			continue;
-		}
-		const loaded =
-			candidate.kind === "json"
-				? loadJsonObject(candidate.path)
-				: loadYamlObject(candidate.path);
-		if (!loaded.ok) {
-			return { id: "config", ok: false, message: loaded.error };
-		}
-		return { id: "config", ok: true, message: `ok ${candidate.path}` };
+	const configPath = join(projectRoot, ".agents", "config.json");
+	if (existsSync(configPath)) {
+		const loaded = loadJsonObject(configPath);
+		return loaded.ok
+			? { id: "config", ok: true, message: `ok ${configPath}` }
+			: { id: "config", ok: false, message: loaded.error };
 	}
 	return {
 		id: "config",
 		ok: false,
-		message: `missing .agents/config.json or .agents/agents.config under ${projectRoot}`,
+		message: `missing .agents/config.json under ${projectRoot}`,
 	};
 }
 

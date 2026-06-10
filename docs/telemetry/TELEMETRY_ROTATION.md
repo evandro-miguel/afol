@@ -26,9 +26,9 @@ Prevent `events.jsonl` from growing indefinitely while preserving enough history
 
 ```bash
 # Rotate manually (compress and start fresh)
-mv .agents/data/telemetry/events.jsonl .agents/data/telemetry/events.jsonl.$(date +%Y%m%d)
-gzip .agents/data/telemetry/events.jsonl.$(date +%Y%m%d)
-touch .agents/data/telemetry/events.jsonl
+mv .afol/data/events/events.jsonl .afol/data/events/events.jsonl.$(date +%Y%m%d)
+gzip .afol/data/events/events.jsonl.$(date +%Y%m%d)
+touch .afol/data/events/events.jsonl
 ```
 
 ## Automated Rotation (Future)

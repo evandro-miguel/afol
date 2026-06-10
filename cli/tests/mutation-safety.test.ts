@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+	appendFileSync,
 	cpSync,
 	existsSync,
 	mkdirSync,
@@ -324,7 +325,7 @@ describe("mutation safety command family", () => {
 				"--reason",
 				"blocked target",
 				"--path",
-				".agents/runtime/core.py",
+				".agents/config.json",
 				"--append",
 				"danger",
 				"--dry-run",
@@ -515,6 +516,56 @@ describe("mutation safety command family", () => {
 
 			const afterUndoJournal = readMutationJournal(root);
 			expect(afterUndoJournal.length).toBe(beforeUndoJournal.length);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("journal loader ignores truncated trailing rows and preserves applied mutations", () => {
+		const root = mkProjectRoot();
+		try {
+			const target = join(root, "notes", "loader.txt");
+			mkdirSync(join(root, "notes"), { recursive: true });
+			writeFileSync(target, "base", "utf8");
+
+			const proc = runKernel(root, [
+				"f",
+				"pt",
+				"--session",
+				"S-10",
+				"--task-id",
+				"T-10",
+				"--reason",
+				"stable row before truncation",
+				"--path",
+				"notes/loader.txt",
+				"--append",
+				"-next",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+
+			const journalPath = join(
+				resolveProjectPaths(root).abs.mutationsDir,
+				"mutations.jsonl",
+			);
+			appendFileSync(journalPath, '{"id":"partial"', "utf8");
+
+			const undoProc = runKernel(root, [
+				"f",
+				"ud",
+				"--session",
+				"S-10",
+				"--task-id",
+				"T-10",
+				"--reason",
+				"undo after truncated row",
+				"--json",
+			]);
+			expect(undoProc.status).toBe(0);
+			const undoResult = parseJsonOutput(undoProc.stdout as string);
+			expect(undoResult.status).toBe("write");
+			expect(readFileSync(target, "utf8")).toBe("base");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

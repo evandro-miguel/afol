@@ -1,10 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import {
-	loadJsonObject,
-	loadYamlObject,
-	type SchemaObject,
-} from "../../core/schema";
+import { loadJsonObject, type SchemaObject } from "../../core/schema";
 
 type ProjectPathConfig = {
 	agentsDir: string;
@@ -31,12 +27,6 @@ function readProjectConfig(root: string): SchemaObject {
 	const jsonPath = join(root, ".agents", "config.json");
 	if (existsSync(jsonPath)) {
 		const loaded = loadJsonObject(jsonPath);
-		return loaded.ok ? loaded.value : {};
-	}
-
-	const yamlPath = join(root, ".agents", "agents.config");
-	if (existsSync(yamlPath)) {
-		const loaded = loadYamlObject(yamlPath);
 		return loaded.ok ? loaded.value : {};
 	}
 
@@ -130,7 +120,7 @@ function absolute(root: string, paths: ProjectPathConfig): ProjectPathConfig {
 export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 	const config = readProjectConfig(root);
 	const agentsDir = fromConfig(config, ["paths", "agents_dir"], ".agents");
-	const mutableDir = fromConfig(config, ["paths", "mutable_dir"], agentsDir);
+	const mutableDir = fromConfig(config, ["paths", "mutable_dir"], ".afol");
 	const dataDir = fromConfig(
 		config,
 		["paths", "data_dir"],
@@ -150,8 +140,8 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 		skillsDir: normalizeProjectRelativePath(
 			stringAt(config, ["paths", "skills_dir"]) ??
 				stringAt(config, ["skills_sync", "project_dir"]) ??
-				`${agentsDir}/skills`,
-			`${agentsDir}/skills`,
+				`${mutableDir}/skills`,
+			`${mutableDir}/skills`,
 		),
 		wbDir,
 		activeSessionFile: fromConfig(

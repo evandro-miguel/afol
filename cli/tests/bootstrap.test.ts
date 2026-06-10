@@ -313,9 +313,15 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(existsSync(join(target, ".agents", "tmp"))).toBe(false);
 			expect(existsSync(join(target, ".agents", "data"))).toBe(false);
 
-			const archives = readdirSync(join(target, ".agents", "z-arq"));
+			const archives = readdirSync(join(target, ".afol", "data", "migrations"));
 			expect(archives).toHaveLength(1);
-			const archiveRoot = join(target, ".agents", "z-arq", archives[0] ?? "");
+			const archiveRoot = join(
+				target,
+				".afol",
+				"data",
+				"migrations",
+				archives[0] ?? "",
+			);
 			expect(existsSync(join(archiveRoot, "skills", "custom.md"))).toBe(true);
 			expect(existsSync(join(archiveRoot, "wb", "session", "task.md"))).toBe(
 				true,
@@ -347,13 +353,13 @@ describe("bootstrap provider-compatible mutable state", () => {
 
 			const output = logs.join("\n");
 			expect(output).toContain(
-				"mutable-baseline-create .afol/skills/README.md source=.agents/skills/README.md missing-target-file",
+				"mutable-baseline-create .afol/skills/README.md source=.afol/skills/README.md missing-target-file",
 			);
 			expect(output).toContain(
-				"mutable-baseline-create .afol/tmp/README.md source=.agents/tmp/README.md missing-target-file",
+				"mutable-baseline-create .afol/tmp/README.md source=.afol/tmp/README.md missing-target-file",
 			);
 			expect(output).toContain(
-				"mutable-baseline-create .afol/data/README.md source=.agents/data/README.md missing-target-file",
+				"mutable-baseline-create .afol/data/README.md source=.afol/data/README.md missing-target-file",
 			);
 			expect(output).not.toContain("provider-compatible-cleanup-removed");
 		} finally {

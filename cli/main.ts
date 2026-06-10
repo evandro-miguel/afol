@@ -1,9 +1,5 @@
 #!/usr/bin/env bun
 
-import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { constants as osConstants } from "node:os";
-import { join } from "node:path";
 import { runBootstrapCommand } from "./commands/bootstrap";
 import { runRuleCommand, runSkillCommand } from "./commands/catalog";
 import { runFileCommand } from "./commands/file";
@@ -69,46 +65,9 @@ const NEW_COMMAND_HELP = [
 	"  --task <text>            Initial task summary",
 ].join("\n");
 
-const DELEGATE_UNAVAILABLE_MESSAGE =
-	"delegate commands are not available in TypeScript template";
-
 const exit = (code: number): never => {
 	process.exit(code);
 };
-
-function signalExitCode(signal: string): number {
-	const signalNumber =
-		osConstants.signals[signal as keyof typeof osConstants.signals];
-	return typeof signalNumber === "number" ? 128 + signalNumber : 1;
-}
-
-function runLegacyAdapter(projectRoot: string, args: string[]): number {
-	const agents = join(projectRoot, ".agents", "agents");
-	if (!existsSync(agents)) {
-		const command = args[0] ?? "delegate";
-		console.error(
-			`err delegate-unavailable command=${command} message="${DELEGATE_UNAVAILABLE_MESSAGE}"`,
-		);
-		return 127;
-	}
-
-	const result = spawnSync(agents, args, {
-		cwd: projectRoot,
-		stdio: "inherit",
-	});
-
-	if (result.error) {
-		console.error(`Failed to run ${agents}: ${result.error.message}`);
-		return 127;
-	}
-
-	if (result.signal) {
-		console.error(`Command terminated by signal: ${result.signal}`);
-		return signalExitCode(result.signal);
-	}
-
-	return result.status ?? 0;
-}
 
 function resolveValidateMode(
 	projectRoot: string,
@@ -117,6 +76,7 @@ function resolveValidateMode(
 	mode: "project" | "benchmark";
 	args: string[];
 } {
+	void projectRoot;
 	const explicitProject = args[0] === "project" || args.includes("--project");
 	if (explicitProject) {
 		return {
@@ -125,14 +85,12 @@ function resolveValidateMode(
 		};
 	}
 
-	const benchmarkRegistry = join(
-		projectRoot,
-		".agents",
-		"data",
-		"benchmarks",
-		"registry.json",
-	);
-	if (existsSync(benchmarkRegistry)) {
+	const explicitBenchmarkMode = args[0];
+	if (
+		explicitBenchmarkMode === "bench" ||
+		explicitBenchmarkMode === "select" ||
+		explicitBenchmarkMode === "run"
+	) {
 		return { mode: "benchmark", args };
 	}
 
@@ -247,7 +205,8 @@ export async function main(argv: string[]): Promise<number> {
 		return runLocalStateCommand(resolution.args, project.value.root);
 	}
 
-	return runLegacyAdapter(project.value.root, resolution.args);
+	console.error("err unsupported-command");
+	return 2;
 }
 
 if (import.meta.main) {

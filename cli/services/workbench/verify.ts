@@ -137,7 +137,7 @@ function findTaskFiles(sessionPath: string): string[] {
 				"/",
 			);
 			if (
-				relativePath.startsWith(".agents/tmp/") ||
+				relativePath.startsWith(".afol/tmp/") ||
 				relativePath.startsWith("docs/templates/") ||
 				relativePath.startsWith("src/project-template/docs/templates/") ||
 				relativePath.startsWith("docs/lessons/entries/") ||

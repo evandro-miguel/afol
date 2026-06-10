@@ -15,12 +15,12 @@ import {
 	resolve,
 } from "node:path";
 
-const REGISTRY_RELATIVE_PATH = ".agents/data/benchmarks/registry.json";
-const SCENARIOS_RELATIVE_PATH = ".agents/data/benchmarks/scenarios";
-const BASELINES_RELATIVE_PATH = ".agents/data/benchmarks/baselines";
-const RESULTS_RELATIVE_PATH = ".agents/data/benchmarks/results";
+const REGISTRY_RELATIVE_PATH = ".afol/data/benchmarks/catalog/registry.json";
+const SCENARIOS_RELATIVE_PATH = ".afol/data/benchmarks/catalog/scenarios";
+const BASELINES_RELATIVE_PATH = ".afol/data/benchmarks/catalog/baselines";
+const RESULTS_RELATIVE_PATH = ".afol/data/benchmarks/catalog/results";
 const LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH =
-	".agents/benchmarks/runtime-flow-live-agent-v4-latest.json";
+	".afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json";
 const LIVE_BENCHMARK_EXPECTED_PACK_ID = "runtime-flow-live-agent-v4";
 const LIVE_BENCHMARK_REFRESH_COMMAND =
 	"afol validate bench --pack runtime-live-agent --json";
@@ -589,12 +589,6 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 	const reasons: string[] = [];
 	for (const changedPath of changedPaths) {
 		const normalizedPath = normalizePath(changedPath);
-		if (hasPrefix(normalizedPath, [".agents/runtime/"])) {
-			selected.add("mcp-parity");
-			selected.add("runtime-live-agent");
-			reasons.push(`runtime-change:${changedPath}`);
-			continue;
-		}
 		if (hasPrefix(normalizedPath, ["cli/mcp/"])) {
 			selected.add("mcp-parity");
 			reasons.push(`mcp-change:${changedPath}`);
@@ -641,7 +635,7 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 			reasons.push(`cli-change:${changedPath}`);
 			continue;
 		}
-		if (hasPrefix(normalizedPath, [".afol/wb/", ".agents/wb/"])) {
+		if (hasPrefix(normalizedPath, [".afol/wb/"])) {
 			selected.add("workbench-parity");
 			reasons.push(`workbench-change:${changedPath}`);
 			continue;

@@ -35,7 +35,7 @@ function buildFixture() {
 	const root = mkdtempSync(join(tmpdir(), "proj-indexes-"));
 
 	const rulesDir = join(root, ".agents", "rules");
-	const skillsDir = join(root, ".agents", "skills");
+	const skillsDir = join(root, ".afol", "skills");
 	const specsDir = join(root, "docs", "arc", "SPECS");
 
 	mkdirSync(rulesDir, { recursive: true });
@@ -95,7 +95,7 @@ function buildFixture() {
 }
 
 describe("local-state project indexer", () => {
-	test("rebuildProjectIndexes builds ordered snapshots and omits .agents/data/index", () => {
+	test("rebuildProjectIndexes builds ordered snapshots and omits .afol/data/index", () => {
 		const root = buildFixture();
 		try {
 			const snapshot = rebuildProjectIndexes(root);
@@ -134,7 +134,7 @@ describe("local-state project indexer", () => {
 			expect(snapshot.specs.kind).toBe("specs_index_v1");
 			expect(snapshot.specs.version).toBe(1);
 
-			const rulesPath = join(root, ".agents", "data", "index", "rules.json");
+			const rulesPath = join(root, ".afol", "data", "index", "rules.json");
 			const parsedRulesSnapshot = JSON.parse(
 				readFileSync(rulesPath, "utf8"),
 			) as { rules: { id: string }[] };
@@ -143,7 +143,7 @@ describe("local-state project indexer", () => {
 				"RULE-200",
 			]);
 
-			const filesPath = join(root, ".agents", "data", "index", "files.json");
+			const filesPath = join(root, ".afol", "data", "index", "files.json");
 			const filesSnapshot = JSON.parse(
 				readFileSync(filesPath, "utf8"),
 			) as FilesIndexSnapshot;
@@ -152,8 +152,8 @@ describe("local-state project indexer", () => {
 				.sort((a, b) => a.localeCompare(b));
 			expect(filesSnapshot.files.map((file) => file.path)).toEqual(sorted);
 
-			const skillsPath = join(root, ".agents", "data", "index", "skills.json");
-			const specsPath = join(root, ".agents", "data", "index", "specs.json");
+			const skillsPath = join(root, ".afol", "data", "index", "skills.json");
+			const specsPath = join(root, ".afol", "data", "index", "specs.json");
 			const skillsSnapshot = JSON.parse(
 				readFileSync(skillsPath, "utf8"),
 			) as SkillsIndexSnapshot;
@@ -168,32 +168,32 @@ describe("local-state project indexer", () => {
 				orderedSkills,
 			);
 			expect(skillsSnapshot.skills.map((skill) => skill.path)).toEqual([
-				".agents/skills/skill-a/SKILL.md",
-				".agents/skills/skill-b/SKILL.md",
+				".afol/skills/skill-a/SKILL.md",
+				".afol/skills/skill-b/SKILL.md",
 			]);
 			expect(specsSnapshot.specs.map((spec) => spec.path)).toEqual([
 				"docs/arc/SPECS/001-spec.md",
 				"docs/arc/SPECS/002-spec.md",
 			]);
 
-			const blocked = join(root, ".agents", "data", "index", "ignore.txt");
-			mkdirSync(join(root, ".agents", "data", "index"), { recursive: true });
+			const blocked = join(root, ".afol", "data", "index", "ignore.txt");
+			mkdirSync(join(root, ".afol", "data", "index"), { recursive: true });
 			writeFileSync(blocked, "ignore", "utf8");
-			mkdirSync(join(root, ".agents", "tmp"), { recursive: true });
+			mkdirSync(join(root, ".afol", "tmp"), { recursive: true });
 			writeFileSync(
-				join(root, ".agents", "tmp", "scratch.txt"),
+				join(root, ".afol", "tmp", "scratch.txt"),
 				"ignore",
 				"utf8",
 			);
 			const blockedSnapshot = rebuildFilesIndex(root);
 			expect(
 				blockedSnapshot.files.some(
-					(entry) => entry.path === ".agents/data/index/ignore.txt",
+					(entry) => entry.path === ".afol/data/index/ignore.txt",
 				),
 			).toBe(false);
 			expect(
 				blockedSnapshot.files.some(
-					(entry) => entry.path === ".agents/tmp/scratch.txt",
+					(entry) => entry.path === ".afol/tmp/scratch.txt",
 				),
 			).toBe(false);
 		} finally {
@@ -287,12 +287,12 @@ describe("local-state project indexer", () => {
 			const snapshot = rebuildSkillsIndex(root) as SkillsIndexSnapshot;
 			expect(snapshot.skills[0]).toMatchObject({
 				name: "alpha skill",
-				path: ".agents/skills/skill-a/SKILL.md",
+				path: ".afol/skills/skill-a/SKILL.md",
 				description: "alpha",
 				touched_at: expect.any(String),
 			} satisfies Partial<SkillIndexEntry>);
 
-			const skillPath = join(root, ".agents", "skills", "skill-a", "SKILL.md");
+			const skillPath = join(root, ".afol", "skills", "skill-a", "SKILL.md");
 			const future = new Date(Date.now() + 60_000);
 			utimesSync(skillPath, future, future);
 
@@ -308,18 +308,18 @@ describe("local-state project indexer", () => {
 		const root = buildFixture();
 		try {
 			writeFileSync(
-				join(root, ".agents", "skills", "skill-a", "SKILL.md"),
+				join(root, ".afol", "skills", "skill-a", "SKILL.md"),
 				"---\nname: [broken\ndescription: no\n---\n\npayload\n",
 				"utf8",
 			);
 
 			const snapshot = rebuildSkillsIndex(root) as SkillsIndexSnapshot;
 			const fallbackSkill = snapshot.skills.find(
-				(skill) => skill.path === ".agents/skills/skill-a/SKILL.md",
+				(skill) => skill.path === ".afol/skills/skill-a/SKILL.md",
 			);
 			expect(fallbackSkill).toMatchObject({
 				name: "skill-a",
-				path: ".agents/skills/skill-a/SKILL.md",
+				path: ".afol/skills/skill-a/SKILL.md",
 				description: "",
 			} satisfies Partial<SkillIndexEntry>);
 			expect(validateSkillsIndex(root).ok).toBe(true);
@@ -395,16 +395,16 @@ describe("local-state project indexer", () => {
 	test("validateWorkBenchIndex fails malformed generated_at", () => {
 		const root = buildFixture();
 		try {
-			mkdirSync(join(root, ".agents", "data", "index"), { recursive: true });
+			mkdirSync(join(root, ".afol", "data", "index"), { recursive: true });
 			writeFileSync(
-				join(root, ".agents", "data", "index", "workbench.json"),
+				join(root, ".afol", "data", "index", "workbench.json"),
 				JSON.stringify({
 					kind: "workbench_index_v1",
 					version: 1,
 					generated_at: "not-a-date",
 					source: {
 						wb_dir: ".afol/wb",
-						event_log: ".agents/data/events/events.jsonl",
+						event_log: ".afol/data/events/events.jsonl",
 					},
 					sessions: [],
 					tasks: [],

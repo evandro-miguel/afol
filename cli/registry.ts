@@ -14,8 +14,7 @@ export type CommandKind =
 	| "skill"
 	| "update"
 	| "file"
-	| "localState"
-	| "delegate";
+	| "localState";
 export type CommandSideEffect = "read" | "write" | "append" | "generated";
 
 export type CommandSpec = {
@@ -75,82 +74,12 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 ]);
 
-const LEGACY_COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
-	{ command: "task", aliases: ["t"], kind: "delegate", sideEffect: "write" },
-	{ command: "query", aliases: ["q"], kind: "delegate", sideEffect: "read" },
-	{ command: "undo", aliases: ["u"], kind: "delegate", sideEffect: "write" },
-	{
-		command: "index",
-		aliases: ["ix"],
-		kind: "delegate",
-		sideEffect: "generated",
-	},
-	{ command: "event", aliases: ["ev"], kind: "delegate", sideEffect: "append" },
-	{ command: "session", aliases: [], kind: "delegate", sideEffect: "write" },
-	{ command: "runtime", aliases: [], kind: "delegate", sideEffect: "read" },
-	{ command: "tools", aliases: [], kind: "delegate", sideEffect: "read" },
-	{
-		command: "inspect-target",
-		aliases: [],
-		kind: "delegate",
-		sideEffect: "read",
-	},
-	{
-		command: "adoption-plan",
-		aliases: [],
-		kind: "delegate",
-		sideEffect: "write",
-	},
-	{ command: "implement", aliases: [], kind: "delegate", sideEffect: "write" },
-	{ command: "wb-update", aliases: [], kind: "delegate", sideEffect: "write" },
-	{ command: "knowledge", aliases: [], kind: "delegate", sideEffect: "read" },
-	{ command: "memory", aliases: [], kind: "delegate", sideEffect: "read" },
-	{
-		command: "skills-sync",
-		aliases: [],
-		kind: "delegate",
-		sideEffect: "write",
-	},
-	{
-		command: "scaffold-update",
-		aliases: [],
-		kind: "delegate",
-		sideEffect: "write",
-	},
-	{ command: "doctor", aliases: [], kind: "delegate", sideEffect: "read" },
-	{ command: "mcp", aliases: [], kind: "delegate", sideEffect: "read" },
-	{
-		command: "benchmark",
-		aliases: [],
-		kind: "delegate",
-		sideEffect: "generated",
-	},
-	{ command: "patterns", aliases: [], kind: "delegate", sideEffect: "read" },
-	{ command: "review", aliases: [], kind: "delegate", sideEffect: "read" },
-	{ command: "revert", aliases: [], kind: "delegate", sideEffect: "write" },
-	{
-		command: "repo-map",
-		aliases: [],
-		kind: "delegate",
-		sideEffect: "generated",
-	},
-	{ command: "lint-docs", aliases: [], kind: "delegate", sideEffect: "read" },
-	{ command: "tools-smoke", aliases: [], kind: "delegate", sideEffect: "read" },
-	{
-		command: "fix-symlinks",
-		aliases: [],
-		kind: "delegate",
-		sideEffect: "write",
-	},
-]);
-
 const HELP_ALIASES = Object.freeze(["-h", "--help"] as const);
 const JSON_ALIASES = Object.freeze(["-j", "--json"] as const);
 
 const aliasToCommand = new Map<string, string>();
 const commandToSpec = new Map<string, CommandSpec>();
 const knownTokens = new Set<string>();
-const legacyAliasToCommand = new Map<string, string>();
 
 for (const spec of COMMAND_SPECS) {
 	commandToSpec.set(spec.command, spec);
@@ -159,13 +88,6 @@ for (const spec of COMMAND_SPECS) {
 	for (const alias of spec.aliases) {
 		aliasToCommand.set(alias, spec.command);
 		knownTokens.add(alias);
-	}
-}
-
-for (const spec of LEGACY_COMMAND_SPECS) {
-	legacyAliasToCommand.set(spec.command, spec.command);
-	for (const alias of spec.aliases) {
-		legacyAliasToCommand.set(alias, spec.command);
 	}
 }
 
@@ -190,9 +112,6 @@ export const kernelRegistry = {
 		const canonical = canonicalize(value);
 		const spec = commandToSpec.get(canonical);
 		return spec?.kind ?? null;
-	},
-	resolveLegacyCommand(value: string): string | null {
-		return legacyAliasToCommand.get(value) ?? null;
 	},
 	knownCanonicalCommands(): readonly string[] {
 		return [...commandToSpec.keys()];

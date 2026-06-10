@@ -37,8 +37,6 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("c")).toBe("close");
 		expect(kernelRegistry.resolveKind("task")).toBeNull();
 		expect(kernelRegistry.resolveKind("query")).toBeNull();
-		expect(kernelRegistry.resolveLegacyCommand("task")).toBe("task");
-		expect(kernelRegistry.resolveLegacyCommand("ix")).toBe("index");
 	});
 
 	test("keeps helper flags and public aliases only", () => {

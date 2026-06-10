@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -34,6 +35,27 @@ function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 		cwd,
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
+	});
+}
+
+function waitForExit(
+	proc: ReturnType<typeof spawn>,
+): Promise<{ code: number | null; stderr: string; stdout: string }> {
+	return new Promise((resolve, reject) => {
+		let stdout = "";
+		let stderr = "";
+		proc.stdout?.setEncoding("utf8");
+		proc.stderr?.setEncoding("utf8");
+		proc.stdout?.on("data", (chunk: string) => {
+			stdout += chunk;
+		});
+		proc.stderr?.on("data", (chunk: string) => {
+			stderr += chunk;
+		});
+		proc.on("error", reject);
+		proc.on("close", (code) => {
+			resolve({ code, stderr, stdout });
+		});
 	});
 }
 
@@ -76,6 +98,57 @@ describe("log command", () => {
 			expect(proc.status).toBe(0);
 			const log = readFileSync(created.logPath, "utf8");
 			expect(log).toContain("from alias");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("concurrent log commands preserve all timeline entries and clean up the session lock", async () => {
+		const root = mkProjectRoot("log-concurrency");
+		try {
+			const created = newWorkstream(root, "log-concurrency");
+			const messages = Array.from(
+				{ length: 8 },
+				(_, index) => `entry-${index}`,
+			);
+			const processes = messages.map((message) =>
+				spawn(
+					"bun",
+					[kernelPath, "log", "--session", created.session, message],
+					{
+						cwd: root,
+						stdio: ["ignore", "pipe", "pipe"],
+					},
+				),
+			);
+
+			const results = await Promise.all(processes.map(waitForExit));
+			for (const result of results) {
+				expect(result.code).toBe(0);
+				expect(result.stderr).toBe("");
+			}
+
+			const log = readFileSync(created.logPath, "utf8");
+			for (const message of messages) {
+				expect(log).toContain(message);
+			}
+
+			const eventRows = readFileSync(
+				join(root, ".afol", "data", "events", "events.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			expect(eventRows).toHaveLength(9);
+			expect(
+				eventRows.filter((row) => row.type === "workbench.append_log"),
+			).toHaveLength(8);
+			expect(
+				existsSync(
+					join(root, ".afol", "wb", ".locks", `${created.session}.lock`),
+				),
+			).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

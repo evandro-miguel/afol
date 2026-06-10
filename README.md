@@ -1,508 +1,78 @@
-# .agents - Agentic Workflow System
+# Agentic Start Folder
 
-<!-- markdownlint-disable MD013 -->
+Canonical AFOL scaffold factory for terminal-first LLM-assisted development.
 
-Operating system for interactive agentic CLI workflows with automated telemetry and element heat scoring.
+`afol` is the only supported public CLI. The old `.agents` command/runtime
+system has been retired and must not be restored.
 
-Primary supported runtimes: OpenCode, Codex, Qwen, Gemini CLI, and Claude Code style interactive agents.
+## Current Architecture
 
-## 🎯 Overview
+- `afol`: public CLI entrypoint.
+- `cli/**`: Bun/TypeScript implementation.
+- `src/project-template/**`: exportable downstream scaffold payload.
+- `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`: static
+  scaffold metadata.
+- `.agents/rules/**`, `.agents/source/**`: static protocol/source seed
+- `.afol/skills/**`: project-local skills
+  scaffold guidance and skill seed content.
+- `.afol/**`: mutable AFOL-owned state, including workbench sessions, indexes,
+  events, mutations, temporary files, benchmark catalog/results, and migration
+  archives.
 
-`.agents` is a standardized system for managing LLM-assisted development workflows, focused on:
+Removed legacy surfaces:
 
-- **Consistent documentation** - Standardized templates for plans, tasks, reports
-- **Planning rigor** - Plan/task first, with optional brainstorm or explorer-check when useful
-- **Knowledge reuse** - Low-token search over prior research, reports, and finalized postmortems when they exist
-- **Automated telemetry** - Tracks tool, pattern, and document usage without manual intervention
-- **Heat scoring** - Identifies hot/cold elements by period (daily, weekly, monthly)
-- **Pattern catalog** - Catalog of patterns and anti-patterns with automatic suggestions
-- **Self-improvement** - Lessons learned system after each correction
+- `.agents/agents`
+- `.agents/agents-mcp`
+- `.agents/scripts/**`
+- `.agents/runtime/**`
+- `.agents/wb/**`
+- `.agents/z-arq/**`
+- `.agents/agents.config`
+- `legacy:` delegate routing
 
-This scaffold is built for interactive, terminal-first agent sessions. It is not positioned as an application SDK for embedding long-lived agent runtimes into backend services.
-
-## 📁 Repository Structure
-
-```text
-docs/
-├── arc/                     # Roadmap, specs, decisions, structure canon
-├── map/                     # Current-state repository map and analysis evidence
-├── standards/               # Canonical process and command standards
-├── templates/               # Reusable docs and governed plan templates
-├── plans/                   # Durable ExecPlans and governed plan sessions
-├── telemetry/               # Telemetry docs and reports
-├── patterns/                # Pattern catalog and anti-patterns
-├── knowledge/               # Indexed knowledge summaries
-└── lessons/                 # Lessons learned
-
-.agents/
-├── scripts/                 # Operational scripts
-│   ├── agents-telemetry.py  # Telemetry and heat scoring
-│   ├── agents-patterns.py   # Pattern catalog
-│   ├── agents-new.py        # Creates workstreams
-│   ├── agents-doctor.py     # Validates structure
-│   └── ...
-│
-├── data/                    # Operational data
-│   └── telemetry/
-│       ├── events.jsonl     # Telemetry events
-│       └── schemas/
-│           └── event.json   # Event schema
-│
-├── data/                    # Operational data
-│   ├── session/             # Local active-session pointer
-│   └── telemetry/
-├── tmp/                     # Temporary non-canonical artifacts
-│
-├── rules/                   # Operational rules
-├── runtime/                 # Legacy compatibility runtime support during migration
-├── skills/                  # Project skills
-└── tools.json               # Tool catalog
-
-src/
-└── project-template/        # Exportable default project baseline source
-```
-
-## 🚀 Quick Start
-
-### 1. Initial Validation
+## Commands
 
 ```bash
-# Run selected validation gates
-afol validate
-
-# Show project/session status
 afol status
-
-# Inspect validation selection without running gates
-afol validate select --json
+afol validate project
+afol validate bench --pack <pack-id> --json
+afol new <theme> --feature-id <F-id> --parent-spec <spec-id>
+afol start --session <session-id> --task-id <task-id>
+afol evidence --session <session-id> --task-id <task-id> --command "<cmd>" --result passed
+afol done --session <session-id> --task-id <task-id>
+afol close --session <session-id>
+afol update check
+afol update preview
+afol update apply --dry-run
 ```
 
-### 2. Create Workstream
+## Development
 
 ```bash
-# 1. Define or update the roadmap feature in docs/arc/GENERAL-ROADMAP.md
-
-# 2. Define or update the governing parent spec in docs/arc/SPECS/
-
-# 3. For ambiguous/product-shaped work, run the smallest useful
-#    docs/standards/decision-intake.md lane before benchmark, planning,
-#    delegation, or implementation. Use formal scoring only when it helps or
-#    the user asks.
-
-# 4. Create the workstream with mandatory governance linkage
-afol n auth-refactor --feature-id F-01 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --child-spec 260306_auth_refactor_spec-child_01
-# Use --child-spec <id> to link an existing child spec.
-# Use --spec-lite only when you need to create a local lightweight spec artifact.
-
-# Research-only workstream, when research itself is the requested deliverable
-afol n auth-investigation --feature-id F-02 --parent-spec 260306_roadmap-first-delivery-system_spec_01 --intent research
-
-# The same theme would also infer `research` safely if --intent is omitted
-
-# Governed planning workstream. The plan tracks direct execution work; optional
-# brainstorm/research/explorer-check artifacts are sidecars only when requested
-# or needed as a small blocking proof.
-afol n planning-track --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --intent planning
-
-# Optional: add a pack for another major track inside an existing session
-afol n api-follow-up --feature-id F-07 --parent-spec 260306_execution-intelligence-and-knowledge-system_spec_01 --pack api-cleanup --into-session 260306_2002_execution-intelligence-system --spec
-
-# Quick task in active session
-afol n update-docs --quick
+bun install --frozen-lockfile
+bun run typecheck
+bun test
+afol local-state rebuild --json
+afol validate project --json
+bun run validate:release
 ```
 
-### Public onboarding (full + partial bootstrap)
+## Bootstrap
 
-Public onboarding has two entrypoints:
-
-- `full`: install this scaffold into a new or mostly empty repository.
-- `partial`: adopt the scaffold into an existing repository while preserving project-owned files by default.
+Use AFOL only:
 
 ```bash
-# Full bootstrap for a new or mostly empty repo.
-# The target directory is created automatically if it does not exist yet.
-afol bootstrap /path/to/target-repo
-
-# Partial install for an existing project with live content
-afol bootstrap /path/to/existing-project --partial
-
-# Bootstrap prepares a repo-local upstream source checkout at
-# .agents/source/universal-skills inside the target repository.
-# The default bootstrap path seeds that source from committed repo assets,
-# so downstream installs do not need a network clone.
-# The exportable project baseline is sourced from `src/project-template/`
-# inside this repo, not from the live development root.
+afol init --dry-run
+afol init
+afol bootstrap /path/to/repo --dry-run
+afol bootstrap /path/to/repo --provider-compatible
 ```
 
-### Onboarding validation (minimum)
+Provider-compatible installs keep static scaffold metadata in `.agents/` and
+write mutable state under `.afol/`.
 
-- Validate installation from public examples:
-  - `afol` (front-door entrypoint)
-  - `afol s` (status alias)
-  - `afol ck` (validation alias)
-  - `afol st -T T-01` (task start alias)
-  - `afol d -T T-01 -x "afol validate"` (task completion alias)
-  - `afol validate --changed-path AGENTS.md`
-  - `afol validate select --json`
+## Legacy Policy
 
-### Runtime Entry Points
-
-- `AGENTS.md` is the canonical instruction source.
-- `CLAUDE.md` is the only committed runtime-facing mirror generated from it.
-- OpenCode, Qwen, Gemini, and Codex do not need committed root mirrors in this scaffold; they use `AGENTS.md` directly or global runtime configuration.
-- `.claude/` should only contain project-safe adapter notes and links.
-- Project-owned documentation belongs under `docs/`; durable plans live in `.afol/wb/`. `.agents/` is reserved for skills, telemetry, local state, and runtime automation.
-- `.afol/wb/.active_session` is a project-local convenience pointer for a
-  single operator; parallel agents should not use it as a shared
-  synchronization primitive.
-- The scaffold should be optimized for interactive CLI agent execution paths first; embedded SDK/server use cases are secondary and should not drive the default structure.
-- Bootstrap exports a generic, history-free baseline for downstream repos and supports a partial install mode that preserves existing project-owned files.
-- The exported baseline keeps current-state repository mapping in `docs/map/` and avoids publishing repo-map artifacts inside `.agents/`.
-- The skills baseline is treated as an adoption artifact, not as scaffold-local history; downstream repos should pin their own selection and evolve it from there.
-
-### Skills Source and Discovery
-
-```bash
-# Show the active upstream source checkout and manifest state
-./.agents/agents skills-sync status
-
-# List available upstream skills from the configured external catalog when available,
-# otherwise from the repo-local source seed.
-./.agents/agents skills-sync list --runtime codex
-
-# Search by keyword across skill names and SKILL.md content
-./.agents/agents skills-sync search markdown --runtime codex
-
-# One-step update from the configured source into .agents/skills/
-./.agents/agents skills-sync sync --runtime codex
-
-# Ensure the scaffold-operating skill is installed locally
-./.agents/agents skills-sync ensure agentic-folder-sys --runtime codex --pull
-
-# Propose upstream skill changes through a branch/PR; never push to main.
-./.agents/agents skills-sync push agentic-folder-sys --branch skills-sync/agentic-folder-sys --commit --push --pr
-```
-
-- Preferred repo-local source seed: `.agents/source/universal-skills` inside the repo root. It must not be a nested git checkout.
-- Optional external catalog: set `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir` to a separate universal-skills checkout when the full upstream catalog or Git refresh is needed.
-- Bootstrap seeds `.agents/source/universal-skills` from committed repo skills by default.
-- `skills-sync list` and `skills-sync search` prefer the configured external catalog when present; otherwise they use the repo-local source seed.
-- `skills-sync pull` refreshes only an external git checkout; it does not clone into `.agents/cache/` and does not overwrite `.agents/skills/` by itself.
-- `skills-sync sync` and `skills-sync update` are the simple one-step paths to refresh `.agents/skills/` from the configured source.
-- `skills-sync push` is a branch/PR proposal flow. It requires an external universal-skills checkout and refuses direct pushes to `main`.
-- Keep `agentic-folder-sys` installed locally so agents have a canonical operational skill for scaffold bootstrap, upgrade, validation, git-backed skills flow, and governed plan sessions.
-- The scaffold should not depend on global Codex skills for universal-skills content.
-- Feature additions and meaningful behavior changes must update affected
-  project-local skills and docs, then leave a pending item to propose the skill
-  change back to universal-skills through the branch/PR flow.
-- Prefer repo-local skills under `.agents/skills/`; keep Codex global skills lean and project-agnostic.
-
-### Optional External Memory
-
-```bash
-# Show the configured external-memory provider and boundary rules
-./.agents/agents memory status
-
-# Emit the exact MCP contract for a cross-project memory search
-./.agents/agents memory search "agent memory mcp integration" --runtime codex
-
-# Emit the exact MCP contract for contextual expansion around a topic
-./.agents/agents memory context "persistent planning memory" --runtime codex
-```
-
-- `memory` is a governed adapter for interactive runtimes, not a shell-side MCP executor.
-- Use repo-local `knowledge` first, then `memory`, then targeted repo rereads when needed.
-- External memory remains auxiliary; `.afol/wb/` and repo-local `knowledge` stay canonical.
-
-### 3. Work
-
-```bash
-# Reuse prior findings before deep exploration when relevant
-.agents/agents knowledge search runtime
-.agents/agents knowledge pull runtime
-
-# If configured, emit exact MCP contracts for cross-project memory lookup
-.agents/agents memory search "agent memory"
-.agents/agents memory context "session catchup"
-
-# Use tools (automatic telemetry)
-.agents/agents doctor
-.agents/agents verify
-.agents/agents structure
-
-# Telemetry heat reports are pending native AFOL port.
-```
-
-### 4. Complete
-
-```bash
-# Verify complete tasks
-.agents/agents verify
-
-# Catch up the active session before resuming after a gap
-.agents/agents session catchup --session <session-id>
-
-# Finalize postmortem, if one exists, before closing the session report
-# The final postmortem now requires a completed Governance Promotion Review.
-.agents/agents wb-update status --session <session-id> --file postmortem --value final
-.agents/agents wb-update status --session <session-id> --file report --value final
-
-# Close the verified session and optionally move the convenience pointer
-.agents/agents session close --session <session-id>
-.agents/agents session close --session <session-id> --next-session <next-session-id>
-
-# Generate reports with AFOL-native validation/status first.
-afol validate
-afol status
-```
-
-### Project-Local Session Workflow
-
-1. List local sessions with `./.agents/agents session list`.
-2. Sweep stale or overlapping sessions with `./.agents/agents session sweep`.
-3. Use `AGENTS_SESSION_ID=<session-id>` when a shell or wrapper honors the
-   session-context contract and needs an explicit target.
-4. Set `AGENTS_SESSION_STRICT=1` when you want strict session handling for
-   sweep, catchup, or close flows.
-5. Catch up a target session before resuming with
-   `./.agents/agents session catchup --session <session-id>`.
-6. Close only after strict verification passes with
-   `./.agents/agents session close --session <session-id>`.
-7. Use `--next-session <next-session-id>` only for an intentional handoff to a
-   different session.
-
-### Documentation Currency (Required)
-
-Before ending work, close the documentation loop first:
-
-- update all affected management artifacts in the active session (`plan`, `task`, `log`, `report`)
-- align impacted specs/roadmap entries and standards/standards templates
-- refresh runtime mirrors if canonical behavior changed
-- keep required metadata updates (`updated_at`) automation-driven
-- if a defect is found and fixed, add a lesson entry in `docs/lessons/entries/`
-
-## 🔥 Automated Telemetry
-
-### What's Tracked (Automatically)
-
-| Event | When | Source |
-|-------|------|--------|
-| `tool_exec` | Every `.agents/agents <tool>` attempt | `.agents/agents` wrapper and runtime registry delegate |
-| `session_start` | Creating workstream | `agents-new.py` |
-| `pattern_applied` | Applying pattern | `agents-patterns.py` |
-| `session_end` | Finalizing a session report, or touching a session whose report is already final | `agents-wb-update.py` |
-
-### Heat Scoring by Period
-
-Heat score identifies most/least used elements:
-
-```bash
-# Telemetry heat/report commands are pending native AFOL port.
-afol validate
-```
-
-Score formula: (frequency × 0.5) + (recency × 0.3) + (success × 0.2)
-
-- 🔴 **Hot** (70-100): Heavily used in period
-- 🟡 **Warm** (40-69): Moderate usage
-- 🔵 **Cold** (0-39): Rarely used in period
-
-### Heat Map Example
-
-```text
-======================================================================
-🔥 HEAT MAP - Element Usage & Engagement (weekly)
-======================================================================
-Period: 2026-02-16 → 2026-02-23
-
-Total Elements: 6
-Total Accesses: 37
-🔴 Hot (score >= 70): 1
-🟡 Warm (score 40-69): 5
-🔵 Cold (score < 40): 0
-Avg Heat Score: 60.6
-
-TOOLS
-----------------------------------------------------------------------
-Element                      Score    Level   Access     Last    Success
-----------------------------------------------------------------------
-🔴 tools                      100.0      hot       29   0d ago 29/29 (100%)
-🟡 doctor                      53.4     warm        2   0d ago 2/2 (100%)
-```
-
-## 📚 Pattern Catalog
-
-Catalog of patterns and anti-patterns with automatic suggestions.
-
-### Pattern Types
-
-| Type | Location | Purpose |
-|------|----------|---------|
-| **Success** | `patterns/success/` | Proven approaches |
-| **Anti** | `patterns/anti/` | What to avoid |
-| **Tool** | `patterns/tools/` | Tool effectiveness |
-| **Template** | `patterns/templates/` | Template patterns |
-
-### Commands
-
-```bash
-# Pattern catalog commands are pending native AFOL port.
-afol validate
-```
-
-### Included Patterns
-
-- **PAT-001**: Discovery-First Tool Usage (success)
-- **PAT-002**: Single Active Session (success)
-- **PAT-101**: Workbench Sprawl (anti-pattern)
-
-## 📝 Documentation
-
-### Available Templates
-
-- `plan.md` - Workstream ExecPlan (living execution document)
-- `task.md` - Task list with IDs
-- `log.md` - Decision timeline
-- `report.md` - Outcome report
-- `spec.md` / `spec-child.md` - Local workstream refinements chosen as needed
-- `spec-lite.md` - Legacy compatibility alias for `spec-child`
-- `spec-test.md` - Journey-first testing strategy artifact before test implementation
-- `brainstorm.md` - Optional ideation artifact when real option analysis happened
-- `explorer-check.md` - Optional current-project exploration proof when repo inspection is needed
-- `research.md` - Research when durable findings are needed
-- `postmortem.md` - Optional final session closure artifact that records optional artifact state and whether the session should promote a lesson, rule, ADR/decision, or skill/doc follow-up
-
-### ExecPlans
-
-- Non-trivial work should use the durable plan as a living ExecPlan.
-- The canonical contract lives in `PLANS.md`.
-- The canonical file path is `.afol/wb/<session_id>/<session_id>_plan_01.md`.
-- Finalized plans are strictly verified for required ExecPlan sections and maintained `Progress`.
-
-### Required Frontmatter
-
-Every `.md` must have:
-
-```yaml
----
-doc_type: task
-id: "YYMMDD_HHMM_theme_task_01"
-theme: "auth-refactor"
-status: active
-created_at: "2026-02-23T00:00:00-03:00"
-updated_at: "2026-02-23T00:00:00-03:00"
----
-```
-
-### Task Markers
-
-```markdown
-- [ ] T-01 Pending
-- [/] T-02 In progress
-- [%] T-03 Ready for test
-- [!] T-04 Blocked
-- [>] T-05 Skipped
-- [x] T-06 Completed
-```
-
-## AFOL Commands
-
-```bash
-afol status                                      # Show project/session status
-afol validate                                    # Run selected validation gates
-afol validate select --json                      # Show selected packs without running gates
-afol validate bench --pack cli-kernel-local      # Run benchmark contract pack
-afol n <theme> --feature-id F-01 --parent-spec <spec-id>
-afol st -S <session-id> -T T-01
-afol d -S <session-id> -T T-01 -x "afol validate"
-afol c -S <session-id>
-afol bootstrap /path/to/target-repo --dry-run
-afol bootstrap /path/to/existing-project --partial
-```
-
-Legacy factory-only command surfaces may still exist during migration, but they
-are not public entrypoints and must not be exported to downstream templates.
-
-## 🔧 Configuration
-
-File: `.agents/agents.config`
-
-```yaml
-time:
-  default_offset: "+00:00"
-  wb_offset: "-03:00"
-
-telemetry:
-  enabled: true
-  data_dir: ".agents/data/telemetry"
-  auto_record_sessions: true
-  retention_days: 90
-
-patterns:
-  enabled: true
-  auto_suggest: true
-```
-
-## 📈 Use Cases
-
-### Sprint with Gaps
-
-```bash
-# What was hot during sprint?
-afol status
-
-# What's hot today?
-afol status
-
-# Detect gap: daily << weekly
-```
-
-### Retrospective
-
-```bash
-# Export sprint heat
-afol status --json > sprint.json
-
-# Analyze patterns used
-jq '.patterns | sort_by(.heat_score) | reverse' sprint.json
-```
-
-### Investigate Cold Elements
-
-```bash
-# Cold tools this month
-afol status
-```
-
-## 🎓 Core Principles
-
-1. **Simplicity first** - Minimal necessary change
-2. **Root cause first** - No temporary fixes
-3. **Minimal blast radius** - Touch only what's needed
-4. **Deterministic verification** - Evidence over assumptions
-5. **Documentation consistency** - Templates and patterns aligned
-
-## 📖 Documentation
-
-- `docs/telemetry/README.md` - Telemetry guide
-- `docs/telemetry/HEAT_SCORING.md` - Heat scoring details
-- `docs/patterns/INDEX.md` - Pattern catalog
-- `docs/lessons/` - Lessons learned
-
-## 🤝 Contributing
-
-1. Create only the workstream artifacts you need: `afol n feature-x --feature-id F-01 --parent-spec <spec-id> --child-spec <child-spec-id>` when linking an existing child spec; use `--spec-lite` only when creating a local lightweight spec artifact.
-2. Follow templates from `docs/templates/`
-3. Apply relevant patterns
-4. Validate: `afol validate`
-5. Report: `afol status`
-
-## 📄 License
-
-MIT
-
----
-
-**Status:** ✅ Production  
-**Last updated:** 2026-02-23  
-**Version:** 1.0.0
+The legacy `.agents` executable/runtime system is discontinued. Do not add docs,
+tests, or code paths that depend on it. Useful historical material should be
+moved under `.afol/data/migrations/` or converted into the TypeScript AFOL CLI.

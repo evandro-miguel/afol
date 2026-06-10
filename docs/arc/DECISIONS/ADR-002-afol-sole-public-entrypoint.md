@@ -4,7 +4,7 @@ id: ADR-002
 title: AFOL as Sole Public Entrypoint
 status: accepted
 created_at: '2026-06-09T08:05:00-03:00'
-updated_at: '2026-06-09T08:05:00-03:00'
+updated_at: '2026-06-09T21:10:00-03:00'
 ---
 
 # ADR-002: AFOL as Sole Public Entrypoint
@@ -16,8 +16,8 @@ wrapper, `just` command runner, `./a` local alias, and various Python scripts.
 This created confusion about which path was canonical and made documentation
 inconsistent.
 
-Sessions afol-cli-ux-simplification and mvp-finalization-gap-implementation
-converged on making `afol` the single documented public entrypoint.
+Follow-up retirement work removed the legacy executable/runtime surfaces from
+the active repo.
 
 ## Decision
 
@@ -26,9 +26,10 @@ converged on making `afol` the single documented public entrypoint.
 - `afol` is installed as a bin in `package.json`.
 - All documented workflows use `afol` commands: `afol s`, `afol n`, `afol validate`,
   `afol init`, etc.
-- `./a` remains as a local compatibility alias but is not documented as a public
-  entrypoint.
-- `.agents/agents` is a factory-only legacy wrapper during migration.
+- `./a` is not part of the public contract.
+- `.agents/agents`, `.agents/scripts`, `.agents/runtime`, `.agents/wb`,
+  `.agents/z-arq`, `agents.config`, and `legacy:` delegate routing are retired
+  and must not be restored.
 - Downstream installs receive only the exportable scaffold from
   `src/project-template/`.
 
@@ -43,12 +44,10 @@ converged on making `afol` the single documented public entrypoint.
 
 **Negative:**
 
-- Existing documentation referencing `.agents/agents` or `just` targets must be
-  updated.
-- Compatibility aliases must be maintained until safe retirement (RULE-009).
+- Historical docs/specs may still mention the old system as history, but active
+  guidance must not teach it as a current workflow.
 
 ## Compliance
 
-- RULE-009 governs safe retirement of legacy entrypoints.
 - AGENTS.md documents the entrypoint hierarchy.
 - `afol --help` is the canonical reference.

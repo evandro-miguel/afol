@@ -74,16 +74,13 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-const DEFAULT_PATCH_PATH = ".agents/data/mutations/.file-probe.txt";
-const DEFAULT_MOVE_SOURCE = ".agents/data/mutations/move-source.txt";
-const DEFAULT_MOVE_DESTINATION = ".agents/data/mutations/move-destination.txt";
+const DEFAULT_PATCH_PATH = ".afol/data/mutations/.file-probe.txt";
+const DEFAULT_MOVE_SOURCE = ".afol/data/mutations/move-source.txt";
+const DEFAULT_MOVE_DESTINATION = ".afol/data/mutations/move-destination.txt";
 
 const PROTECTED_PREFIXES = Object.freeze([
-	".agents/runtime/",
-	".agents/runtime",
 	".agents/lock.json",
 	".agents/config.json",
-	".agents/agents.config",
 	".agents/manifest.json",
 ]);
 

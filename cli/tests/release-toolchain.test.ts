@@ -61,6 +61,28 @@ describe("release and toolchain contracts", () => {
 		expect(pkg.version).not.toBe("0.0.0");
 	});
 
+	test("CI provisions pinned security scanners before release validation", () => {
+		const workflow = readFileSync(
+			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
+			"utf8",
+		);
+
+		expect(workflow).toContain('OSV_SCANNER_VERSION: "2.3.8"');
+		expect(workflow).toContain('GITLEAKS_VERSION: "8.24.2"');
+		expect(workflow).toContain("Install pinned security scanners");
+		expect(workflow).toContain(
+			"https://github.com/google/osv-scanner/releases/download/v",
+		);
+		expect(workflow).toContain("osv-scanner_linux_amd64");
+		expect(workflow).toContain(
+			"https://github.com/gitleaks/gitleaks/releases/download/v",
+		);
+		expect(workflow).toContain("_linux_x64.tar.gz");
+		expect(workflow.indexOf("Install pinned security scanners")).toBeLessThan(
+			workflow.indexOf("Release validation"),
+		);
+	});
+
 	test("generate-version creates cli/generated recursively", () => {
 		const root = mkdtempSync(join(tmpdir(), "generate-version-"));
 		const cliRoot = join(root, "cli");

@@ -210,7 +210,7 @@ describe("update command", () => {
 
 			const journalPath = join(
 				root,
-				".agents",
+				".afol",
 				"data",
 				"mutations",
 				"mutations.jsonl",
@@ -226,6 +226,8 @@ describe("update command", () => {
 							beforeHash: string | null;
 							afterHash: string | null;
 							backupPath: string | null;
+							source?: string;
+							batchId?: string;
 						},
 				);
 			const ruleEntry = journalRows.find(
@@ -238,6 +240,10 @@ describe("update command", () => {
 			expect(ruleEntry?.beforeHash).toBe(sha256Hex(downstreamRuleReadme));
 			expect(ruleEntry?.afterHash).toBe(sha256Hex(sourceRuleReadme));
 			expect(ruleEntry?.backupPath).toBeTruthy();
+			expect(ruleEntry?.source).toBe("afol-update");
+			expect(lockEntry?.source).toBe("afol-update");
+			expect(ruleEntry?.batchId).toBeTruthy();
+			expect(lockEntry?.batchId).toBe(ruleEntry?.batchId);
 			expect(lockEntry?.backupPath).toBeTruthy();
 			expect(readFileSync(ruleEntry?.backupPath ?? "", "utf8")).toBe(
 				downstreamRuleReadme,
@@ -296,6 +302,59 @@ describe("update command", () => {
 			expect(blocked.stdout.join("\n")).toContain(
 				"conflict .agents/manifest.json local-user-edit-or-unsafe",
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply rolls back all target files when journal append fails", async () => {
+		const root = mkRoot();
+		const originalLock = readFileSync(
+			join(root, ".agents", "lock.json"),
+			"utf8",
+		);
+		const originalManifest = readFileSync(
+			join(root, ".agents", "manifest.json"),
+			"utf8",
+		);
+		try {
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"apply",
+						"--session",
+						"S-02",
+						"--task-id",
+						"T-03",
+						"--reason",
+						"rollback on journal failure",
+					],
+					root,
+					output.io,
+					{ failBeforeJournalAppend: true },
+				),
+			).toBe(2);
+			expect(output.stderr.join("\n")).toContain(
+				"Injected update apply failure before journal append",
+			);
+			expect(readFileSync(join(root, ".agents", "lock.json"), "utf8")).toBe(
+				originalLock,
+			);
+			expect(readFileSync(join(root, ".agents", "manifest.json"), "utf8")).toBe(
+				originalManifest,
+			);
+			expect(existsSync(join(root, ".agents", "rules", "README.md"))).toBe(
+				false,
+			);
+			const journalPath = join(
+				root,
+				".agents",
+				"data",
+				"mutations",
+				"mutations.jsonl",
+			);
+			expect(existsSync(journalPath)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

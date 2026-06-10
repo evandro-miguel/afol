@@ -155,8 +155,8 @@ For a new non-trivial feature:
 
 ### Temporary files
 
-- Use `.agents/tmp/` for temporary files that do not yet belong in the durable scaffold structure
-- Move durable artifacts out of `.agents/tmp/` once they become real project assets
+- Use `.afol/tmp/` for temporary files that do not yet belong in the durable scaffold structure
+- Move durable artifacts out of `.afol/tmp/` once they become real project assets
 
 ### File naming
 

@@ -30,7 +30,7 @@ function captureIo(): CapturedIo {
 	};
 }
 
-function createFixture(options?: { yamlConfig?: boolean }): string {
+function createFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "status-command-"));
 	const agentsDir = join(root, ".agents");
 	const wbDir = join(root, ".afol", "wb");
@@ -41,22 +41,14 @@ function createFixture(options?: { yamlConfig?: boolean }): string {
 	mkdirSync(agentsDir, { recursive: true });
 	mkdirSync(sessionDir, { recursive: true });
 
-	if (options?.yamlConfig) {
-		writeFileSync(
-			join(agentsDir, "agents.config"),
-			["schema_version: 1", "project:", "  name: status-fixture"].join("\n"),
-			"utf8",
-		);
-	} else {
-		writeFileSync(
-			join(agentsDir, "config.json"),
-			JSON.stringify({
-				schema_version: 1,
-				project: { name: "status-fixture" },
-			}),
-			"utf8",
-		);
-	}
+	writeFileSync(
+		join(agentsDir, "config.json"),
+		JSON.stringify({
+			schema_version: 1,
+			project: { name: "status-fixture" },
+		}),
+		"utf8",
+	);
 
 	writeFileSync(
 		join(agentsDir, "lock.json"),
@@ -140,27 +132,6 @@ describe("status command", () => {
 			expect(typeof paths.lock).toBe("string");
 			expect(typeof paths.active_session).toBe("string");
 			expect(typeof paths.task_file).toBe("string");
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
-
-	test("reads .agents/agents.config when config.json is absent", () => {
-		const root = createFixture({ yamlConfig: true });
-		try {
-			const captured = captureIo();
-			const code = runStatusCommand(root, ["--json"], captured.io);
-			expect(code).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<
-				string,
-				unknown
-			>;
-			const paths = payload.paths as Record<string, unknown>;
-			const configPath = paths.config;
-			expect(typeof configPath).toBe("string");
-			expect((configPath as string).endsWith(".agents/agents.config")).toBe(
-				true,
-			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

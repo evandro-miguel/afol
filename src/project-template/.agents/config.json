@@ -5,23 +5,23 @@
   },
   "paths": {
     "agents_dir": ".agents",
-    "mutable_dir": ".agents",
+    "mutable_dir": ".afol",
     "rules_dir": ".agents/rules",
-    "skills_dir": ".agents/skills",
+    "skills_dir": ".afol/skills",
     "wb_dir": ".afol/wb",
     "active_session_file": ".afol/wb/.active_session",
-    "tmp_dir": ".agents/tmp",
-    "data_dir": ".agents/data",
-    "data_index_dir": ".agents/data/index",
-    "events_file": ".agents/data/events/events.jsonl",
-    "mutations_dir": ".agents/data/mutations",
-    "mutation_backups_dir": ".agents/data/mutations/backups",
-    "mutation_archives_dir": ".agents/data/mutations/archives",
+    "tmp_dir": ".afol/tmp",
+    "data_dir": ".afol/data",
+    "data_index_dir": ".afol/data/index",
+    "events_file": ".afol/data/events/events.jsonl",
+    "mutations_dir": ".afol/data/mutations",
+    "mutation_backups_dir": ".afol/data/mutations/backups",
+    "mutation_archives_dir": ".afol/data/mutations/archives",
     "lock_file": ".agents/lock.json",
     "manifest_file": ".agents/manifest.json",
     "docs_dir": "docs"
   },
   "skills_sync": {
-    "project_dir": ".agents/skills"
+    "project_dir": ".afol/skills"
   }
 }

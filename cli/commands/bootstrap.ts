@@ -50,16 +50,20 @@ type ProviderCompatibleCleanupArchiveResult =
 	};
 
 const MUTABLE_BASELINE_SOURCES = [
-	{ suffix: "skills/README.md", sourcePath: ".agents/skills/README.md" },
-	{ suffix: "tmp/README.md", sourcePath: ".agents/tmp/README.md" },
-	{ suffix: "data/README.md", sourcePath: ".agents/data/README.md" },
+	{ suffix: "skills/README.md", sourcePath: ".afol/skills/README.md" },
+	{ suffix: "tmp/README.md", sourcePath: ".afol/tmp/README.md" },
+	{ suffix: "data/README.md", sourcePath: ".afol/data/README.md" },
 	{
 		suffix: "data/events/README.md",
-		sourcePath: ".agents/data/events/README.md",
+		sourcePath: ".afol/data/events/README.md",
 	},
 	{
 		suffix: "data/index/README.md",
-		sourcePath: ".agents/data/index/README.md",
+		sourcePath: ".afol/data/index/README.md",
+	},
+	{
+		suffix: "data/telemetry/schemas/event.json",
+		sourcePath: ".afol/data/telemetry/schemas/event.json",
 	},
 ] as const;
 
@@ -68,7 +72,10 @@ const PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS = [
 	".agents/skills",
 	".agents/tmp",
 	".agents/wb",
+	".agents/z-arq",
 ] as const;
+
+const MUTABLE_TEMPLATE_SUFFIX_ROOTS = ["data", "skills", "tmp"] as const;
 
 function sha256Hex(content: Buffer): string {
 	return createHash("sha256").update(content).digest("hex");
@@ -81,7 +88,7 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 	let cleanupObsolete = false;
 	let cleanupProviderCompatibleMutable = false;
 	let confirmProviderMigration = false;
-	let mutableDir = ".agents";
+	let mutableDir = ".afol";
 
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -208,6 +215,16 @@ function buildBootstrapTemplateFiles(mutableDir: string): TemplateFileMap {
 			delete templateFiles[path];
 		}
 	}
+	for (const path of Object.keys(templateFiles)) {
+		if (
+			MUTABLE_TEMPLATE_SUFFIX_ROOTS.some((suffix) => {
+				const root = `${mutableDir}/${suffix}`;
+				return path === root || path.startsWith(`${root}/`);
+			})
+		) {
+			delete templateFiles[path];
+		}
+	}
 
 	const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
 	if (!configEntry) {
@@ -312,7 +329,7 @@ function nextProviderCompatibleArchiveRoot(targetRoot: string): string {
 		String(now.getMinutes()).padStart(2, "0"),
 		String(now.getSeconds()).padStart(2, "0"),
 	].join("");
-	const base = `.agents/z-arq/${stamp}_${time}_provider-compatible-mutable-migration`;
+	const base = `.afol/data/migrations/${stamp}_${time}_provider-compatible-mutable-migration`;
 	let candidate = base;
 	let suffix = 1;
 	while (existsSync(join(targetRoot, candidate))) {

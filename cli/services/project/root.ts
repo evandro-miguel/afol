@@ -2,14 +2,8 @@ import { existsSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Result } from "../../core/result";
 import { err, ok } from "../../core/result";
-import {
-	loadJsonObject,
-	loadYamlObject,
-	type SchemaObject,
-} from "../../core/schema";
+import { loadJsonObject, type SchemaObject } from "../../core/schema";
 import { resolveProjectPaths } from "./paths";
-
-const PROJECT_CONFIG_CANDIDATES = ["config.json", "agents.config"] as const;
 
 export type LoadedProjectRoot = {
 	root: string;
@@ -37,11 +31,9 @@ function findProjectRoot(
 ): { root: string; configPath: string } | null {
 	let current = resolve(startPath);
 	while (true) {
-		for (const configName of PROJECT_CONFIG_CANDIDATES) {
-			const configPath = join(current, ".agents", configName);
-			if (existsSync(configPath)) {
-				return { root: current, configPath };
-			}
+		const configPath = join(current, ".agents", "config.json");
+		if (existsSync(configPath)) {
+			return { root: current, configPath };
 		}
 		const parent = dirname(current);
 		if (parent === current) {
@@ -49,13 +41,6 @@ function findProjectRoot(
 		}
 		current = parent;
 	}
-}
-
-function loadProjectConfig(path: string): Result<SchemaObject, string> {
-	if (path.endsWith("agents.config")) {
-		return loadYamlObject(path);
-	}
-	return loadJsonObject(path);
 }
 
 export function loadProjectRoot(
@@ -66,11 +51,11 @@ export function loadProjectRoot(
 		return err({
 			code: 3,
 			message:
-				"❌ Could not detect project root: .agents/config.json or .agents/agents.config not found.",
+				"❌ Could not detect project root: .agents/config.json not found.",
 		});
 	}
 
-	const configResult = loadProjectConfig(found.configPath);
+	const configResult = loadJsonObject(found.configPath);
 	if (!configResult.ok) {
 		return err({ code: 2, message: configResult.error });
 	}

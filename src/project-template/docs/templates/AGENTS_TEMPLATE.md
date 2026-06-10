@@ -37,9 +37,9 @@ Replace this section after bootstrap with real product context.
 - `.agents/config.json` path contract for mutable state, plan storage, skills,
   tmp, and data locations
 - `.afol/wb/` or configured `paths.wb_dir` governed plan state
-- `.agents/data/telemetry/` or configured data path for telemetry data and indexes when the downstream CLI exposes them
+- `.afol/data/` or configured data path for telemetry data and indexes when the downstream CLI exposes them
 - `.agents/rules/` local contracts only
-- `.agents/skills/` or `.afol/skills/` only required project-local behavior
+- `.afol/skills/` only required project-local behavior
 - `docs/` project docs, `docs/map/` evidence only
 
 ## Working Rules

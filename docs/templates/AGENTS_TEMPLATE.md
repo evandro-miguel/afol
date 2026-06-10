@@ -35,7 +35,7 @@ Replace this section after bootstrap with real product context.
 
 - `.afol/wb/`
 - `.agents/rules/` local contracts only
-- `.agents/skills/` only required project-local behavior
+- `.afol/skills/` only required project-local behavior
 - `docs/` project docs, `docs/map/` evidence only
 
 ## Working Rules
@@ -60,7 +60,7 @@ Replace this section after bootstrap with real product context.
 - Indexed/structured: MCPs.
 - Exact search: `rg`, `fd`, `jq`.
 - Syntax: `sg`/`ast-grep`.
-- Validation/docs/tasks: `just`, `.agents/agents`.
+- Validation/docs/tasks: `afol` and project-local package commands.
 
 ## Planning And Evidence
 

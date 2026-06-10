@@ -66,7 +66,7 @@ This document defines how the agent system standards evolve over time.
 1. Mark as `deprecated` in frontmatter status
 2. Add deprecation notice to document
 3. Keep document for 30 days
-4. Move to `.agents/z-arq/` archive folder
+4. Move retained legacy material and AFOL provider-compatible migration artifacts to `.afol/data/migrations/`
 5. Update any references
 
 ### Versioning
@@ -75,13 +75,13 @@ Standards do not use explicit version numbers. Instead:
 
 - **ID timestamp** - Each document has creation date in ID
 - **Frontmatter dates** - `created_at` and `updated_at` track history
-- **Archive folder** - Old versions preserved in `.agents/z-arq/`
+- **AFOL migration archive folder** - Provider-compatible mutable-state migrations preserved in `.afol/data/migrations/`
 
 ### Archive Process
 
 Before deleting any file:
 
-1. Move to `.agents/z-arq/YYYYMMDD_<description>/`
+1. Move retained legacy material to `.afol/data/migrations/YYYYMMDD_<description>/`
 2. Include README explaining why it was archived
 3. Update any references in remaining documents
 

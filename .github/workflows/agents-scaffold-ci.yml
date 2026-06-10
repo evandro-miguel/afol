@@ -8,6 +8,9 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      OSV_SCANNER_VERSION: "2.3.8"
+      GITLEAKS_VERSION: "8.24.2"
 
     steps:
       - name: Checkout
@@ -20,6 +23,24 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Install pinned security scanners
+        run: |
+          set -euo pipefail
+          tool_dir="$RUNNER_TEMP/security-tools"
+          mkdir -p "$tool_dir"
+          echo "$tool_dir" >> "$GITHUB_PATH"
+          curl -fsSL \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64" \
+            -o "$tool_dir/osv-scanner"
+          chmod +x "$tool_dir/osv-scanner"
+          curl -fsSL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o "$RUNNER_TEMP/gitleaks.tar.gz"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$tool_dir" gitleaks
+          chmod +x "$tool_dir/gitleaks"
+          osv-scanner --version
+          gitleaks version
 
       - name: Release validation
         run: bun run validate:release

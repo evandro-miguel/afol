@@ -1,9 +1,13 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
 
 export type MutationKind = "patch" | "move" | "archive";
 export type MutationStatus = "applied" | "noop";
+export type MutationSource = "afol-update";
+
+const MUTATION_JOURNAL_LOCK_SESSION = "__mutation-journal__";
 
 type MutationBase = {
 	id: string;
@@ -23,6 +27,8 @@ type MutationBase = {
 	beforeExisted?: boolean | undefined;
 	destinationExisted?: boolean | undefined;
 	diffPreview?: string | undefined;
+	source?: MutationSource | undefined;
+	batchId?: string | undefined;
 };
 
 type MutationUndoRecord = {
@@ -37,6 +43,8 @@ type MutationUndoRecord = {
 	targetMutationId: string;
 	sourcePath: string;
 	destinationPath: string;
+	source?: MutationSource | undefined;
+	batchId?: string | undefined;
 };
 
 export type MutationRecord = MutationBase | MutationUndoRecord;
@@ -81,6 +89,9 @@ function parseRecord(raw: string): MutationRecord | null {
 			typeof record.destinationPath === "string"
 				? record.destinationPath
 				: undefined;
+		const source = record.source === "afol-update" ? record.source : undefined;
+		const batchId =
+			typeof record.batchId === "string" ? record.batchId : undefined;
 
 		if (
 			id.length === 0 ||
@@ -116,6 +127,8 @@ function parseRecord(raw: string): MutationRecord | null {
 				targetMutationId: record.targetMutationId,
 				sourcePath,
 				destinationPath,
+				source,
+				batchId,
 			};
 		}
 
@@ -157,6 +170,8 @@ function parseRecord(raw: string): MutationRecord | null {
 					typeof record.diffPreview === "string"
 						? record.diffPreview
 						: undefined,
+				source,
+				batchId,
 			};
 		}
 	} catch {
@@ -173,14 +188,33 @@ export function mutationJournalPath(projectRoot: string): string {
 	return resolveJournalPath(projectRoot);
 }
 
+export function appendMutationRecords(
+	projectRoot: string,
+	records: MutationRecord[],
+): void {
+	if (records.length === 0) {
+		return;
+	}
+	const path = resolveJournalPath(projectRoot);
+	withSessionLock(projectRoot, MUTATION_JOURNAL_LOCK_SESSION, () => {
+		mkdirSync(resolve(path, ".."), { recursive: true });
+		const payload = records
+			.map((record) =>
+				JSON.stringify({
+					...record,
+					ts: record.ts || new Date().toISOString(),
+				}),
+			)
+			.join("\n");
+		appendFileSync(path, `${payload}\n`, { encoding: "utf8" });
+	});
+}
+
 export function appendMutationRecord(
 	projectRoot: string,
 	record: MutationRecord,
 ): void {
-	const path = resolveJournalPath(projectRoot);
-	mkdirSync(resolve(path, ".."), { recursive: true });
-	const stamped = { ...record, ts: record.ts || new Date().toISOString() };
-	appendFileSync(path, `${JSON.stringify(stamped)}\n`, { encoding: "utf8" });
+	appendMutationRecords(projectRoot, [record]);
 }
 
 export function loadMutationJournal(projectRoot: string): MutationRecord[] {

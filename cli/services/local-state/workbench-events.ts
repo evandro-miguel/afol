@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
 
 export type WorkbenchEventKind =
@@ -40,20 +41,22 @@ export function appendWorkbenchEvent(
 		detail?: Record<string, unknown>;
 	},
 ): WorkbenchEvent {
-	const now = new Date();
-	const eventPath = resolveWorkbenchEventLogPath(root);
-	const fullEvent: WorkbenchEvent = {
-		id: nextEventId(now),
-		ts: now.toISOString(),
-		source: "cli-workbench",
-		...event,
-	};
-	mkdirSync(resolve(eventPath, ".."), { recursive: true });
-	writeFileSync(eventPath, `${JSON.stringify(fullEvent)}\n`, {
-		encoding: "utf8",
-		flag: "a",
+	return withSessionLock(root, event.session, () => {
+		const now = new Date();
+		const eventPath = resolveWorkbenchEventLogPath(root);
+		const fullEvent: WorkbenchEvent = {
+			id: nextEventId(now),
+			ts: now.toISOString(),
+			source: "cli-workbench",
+			...event,
+		};
+		mkdirSync(resolve(eventPath, ".."), { recursive: true });
+		writeFileSync(eventPath, `${JSON.stringify(fullEvent)}\n`, {
+			encoding: "utf8",
+			flag: "a",
+		});
+		return fullEvent;
 	});
-	return fullEvent;
 }
 
 export function hasEventLog(root: string): boolean {

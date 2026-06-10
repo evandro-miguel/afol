@@ -58,7 +58,7 @@ Events are stored under the configured data path from `.agents/config.json`.
 Default projects use:
 
 ```text
-.agents/data/telemetry/events.jsonl
+.afol/data/events/events.jsonl
 ```
 
 Provider-compatible projects initialized with `.afol` use:

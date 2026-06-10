@@ -35,7 +35,7 @@ function createValidationFixture(): string {
 	const agentsDir = join(root, ".agents");
 
 	mkdirSync(join(agentsDir, "rules"), { recursive: true });
-	mkdirSync(join(agentsDir, "skills"), { recursive: true });
+	mkdirSync(join(root, ".afol", "skills"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc"), { recursive: true });
 
@@ -165,7 +165,7 @@ describe("validate command", () => {
 	test("fails when workbench index snapshot is malformed", async () => {
 		const root = createValidationFixture();
 		try {
-			const indexPath = join(root, ".agents", "data", "index");
+			const indexPath = join(root, ".afol", "data", "index");
 			mkdirSync(indexPath, { recursive: true });
 			writeFileSync(
 				join(indexPath, "workbench.json"),
@@ -192,7 +192,7 @@ describe("validate command", () => {
 	test("fails when rules index snapshot is malformed", async () => {
 		const root = createValidationFixture();
 		try {
-			const indexPath = join(root, ".agents", "data", "index");
+			const indexPath = join(root, ".afol", "data", "index");
 			mkdirSync(indexPath, { recursive: true });
 			writeFileSync(
 				join(indexPath, "rules.json"),

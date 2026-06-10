@@ -66,12 +66,12 @@ afol validate --json
 Events are stored in:
 
 ```text
-.agents/data/telemetry/events.jsonl
+.afol/data/events/events.jsonl
 ```
 
 Format: JSONL (one JSON object per line)
 
-Schema: `.agents/data/telemetry/schemas/event.json`
+Schema: `.afol/data/telemetry/schemas/event.json`
 
 ## What's Automatic
 
@@ -124,7 +124,7 @@ AFOL-native success-rate reporting is pending.
 
 ### No events recorded
 
-- Check if `events.jsonl` exists: `ls -la .agents/data/telemetry/`
+- Check if `events.jsonl` exists: `ls -la .afol/data/events/`
 - Verify write permissions
 - Validate project state with `afol validate --json`
 

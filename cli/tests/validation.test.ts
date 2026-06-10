@@ -40,7 +40,8 @@ function parseJsonOutput(stdout: string): Record<string, unknown> {
 
 function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 	const root = mkdtempSync(join(tmpdir(), "validation-fixture-"));
-	mkdirSync(join(root, ".agents", "data"), { recursive: true });
+	mkdirSync(join(root, ".agents"), { recursive: true });
+	mkdirSync(join(root, ".afol", "data", "benchmarks"), { recursive: true });
 	cpSync(
 		join(process.cwd(), ".agents", "config.json"),
 		join(root, ".agents", "config.json"),
@@ -50,8 +51,13 @@ function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 		join(root, ".agents", "lock.json"),
 	);
 	cpSync(
-		join(process.cwd(), ".agents", "data", "benchmarks"),
-		join(root, ".agents", "data", "benchmarks"),
+		join(process.cwd(), ".afol", "data", "benchmarks", "catalog"),
+		join(root, ".afol", "data", "benchmarks", "catalog"),
+		{ recursive: true },
+	);
+	cpSync(
+		join(process.cwd(), ".afol", "data", "benchmarks", "snapshots"),
+		join(root, ".afol", "data", "benchmarks", "snapshots"),
 		{ recursive: true },
 	);
 	mutate?.(root);
@@ -68,8 +74,10 @@ function getRuntimeLiveArtifactPaths(root: string): {
 } {
 	const snapshotPath = join(
 		root,
-		".agents",
+		".afol",
+		"data",
 		"benchmarks",
+		"snapshots",
 		"runtime-flow-live-agent-v4-latest.json",
 	);
 	const snapshot = readJson(snapshotPath);
@@ -107,7 +115,7 @@ describe("validation command family", () => {
 		expect(payload.selected_pack_ids).toEqual(["workbench-parity"]);
 	});
 
-	test("v select selects runtime packs when runtime paths change", () => {
+	test("v select treats retired runtime paths as default fallback", () => {
 		const proc = runKernel([
 			"v",
 			"select",
@@ -118,8 +126,7 @@ describe("validation command family", () => {
 		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
 		const selected = payload.selected_pack_ids as string[];
-		expect(selected.includes("mcp-parity")).toBe(true);
-		expect(selected.includes("runtime-live-agent")).toBe(true);
+		expect(selected).toEqual(["cli-kernel-local"]);
 	});
 
 	test("v select changed-path routes current services/commands paths to benchmark packs", () => {
@@ -266,17 +273,6 @@ describe("validation command family", () => {
 		const wbPayload = parseJsonOutput(wbProc.stdout as string);
 		expect(wbPayload.selected_pack_ids).toEqual(["workbench-parity"]);
 
-		const legacyWbProc = runKernel([
-			"v",
-			"select",
-			"--changed-path",
-			".agents/wb/session/task.md",
-			"--json",
-		]);
-		expect(legacyWbProc.status).toBe(0);
-		const legacyWbPayload = parseJsonOutput(legacyWbProc.stdout as string);
-		expect(legacyWbPayload.selected_pack_ids).toEqual(["workbench-parity"]);
-
 		const mcpProc = runKernel([
 			"v",
 			"select",
@@ -313,9 +309,20 @@ describe("validation command family", () => {
 		expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
 	});
 
-	test("validate changed-path executes selected AFOL-native validation commands", () => {
+	test("plain validate stays on structural validation even when benchmark registry exists", () => {
+		const fixtureRoot = createValidationFixtureRoot();
+		const proc = runKernel(["validate", "--json"], fixtureRoot);
+		expect(proc.status).toBe(2);
+		const payload = parseJsonOutput(proc.stdout as string);
+		expect(payload.mode).toBeUndefined();
+		expect(typeof payload.ok).toBe("boolean");
+		expect(Array.isArray(payload.checks)).toBe(true);
+	});
+
+	test("validate run changed-path executes selected AFOL-native validation commands", () => {
 		const proc = runKernel([
 			"validate",
+			"run",
 			"--changed-path",
 			"cli/commands/validate.ts",
 			"--json",
@@ -386,7 +393,7 @@ describe("validation command family", () => {
 		expect(typeof first.baseline_reference).toBe("string");
 		expect(
 			(first.baseline_reference as string).startsWith(
-				".agents/data/benchmarks/baselines/",
+				".afol/data/benchmarks/catalog/baselines/",
 			),
 		).toBe(true);
 		expect((first.baseline_reference as string).startsWith("/")).toBe(false);
@@ -456,7 +463,9 @@ describe("validation command family", () => {
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(typeof payload.saved_result_path).toBe("string");
 		const savedPath = payload.saved_result_path as string;
-		expect(savedPath.startsWith(".agents/data/benchmarks/results/")).toBe(true);
+		expect(savedPath.startsWith(".afol/data/benchmarks/catalog/results/")).toBe(
+			true,
+		);
 		const absoluteSavedPath = join(fixtureRoot, savedPath);
 		expect(existsSync(absoluteSavedPath)).toBe(true);
 		const savedPayload = readJson(absoluteSavedPath);
@@ -477,7 +486,7 @@ describe("validation command family", () => {
 		const fixtureRoot = createValidationFixtureRoot();
 		const outputPath = join(
 			fixtureRoot,
-			".agents",
+			".afol",
 			"tmp",
 			"f11",
 			"cli-kernel-local-result.json",
@@ -498,7 +507,7 @@ describe("validation command family", () => {
 		expect(existsSync(outputPath)).toBe(true);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.saved_result_path).toBe(
-			".agents/tmp/f11/cli-kernel-local-result.json",
+			".afol/tmp/f11/cli-kernel-local-result.json",
 		);
 		const savedPayload = readJson(outputPath);
 		expect(savedPayload.mode).toBe("benchmark");
@@ -508,9 +517,10 @@ describe("validation command family", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
 			const scenarioPath = join(
 				root,
-				".agents",
+				".afol",
 				"data",
 				"benchmarks",
+				"catalog",
 				"scenarios",
 				"cli-kernel-local",
 				"cli-help-compact.json",
@@ -558,21 +568,6 @@ describe("validation command family", () => {
 
 	test("v bench runtime-live-agent fails on a partial live snapshot without fallback mapping", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
-			mkdirSync(join(root, ".agents", "benchmarks"), { recursive: true });
-			cpSync(
-				join(
-					process.cwd(),
-					".agents",
-					"benchmarks",
-					"runtime-flow-live-agent-v4-latest.json",
-				),
-				join(
-					root,
-					".agents",
-					"benchmarks",
-					"runtime-flow-live-agent-v4-latest.json",
-				),
-			);
 			const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
 			const savedResult = readJson(savedResultPath);
 			savedResult.scenarios = [
@@ -606,7 +601,7 @@ describe("validation command family", () => {
 		expect(
 			notes.some((entry) =>
 				entry.startsWith(
-					"runtime-live-agent-artifact:.agents/data/benchmarks/results/",
+					"runtime-live-agent-artifact:.afol/data/benchmarks/catalog/results/",
 				),
 			),
 		).toBe(true);
@@ -647,21 +642,6 @@ describe("validation command family", () => {
 
 	test("v bench runtime-live-agent passes when every scenario has direct live evidence", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
-			mkdirSync(join(root, ".agents", "benchmarks"), { recursive: true });
-			cpSync(
-				join(
-					process.cwd(),
-					".agents",
-					"benchmarks",
-					"runtime-flow-live-agent-v4-latest.json",
-				),
-				join(
-					root,
-					".agents",
-					"benchmarks",
-					"runtime-flow-live-agent-v4-latest.json",
-				),
-			);
 			const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
 			const savedResult = readJson(savedResultPath);
 			savedResult.scenarios = [
@@ -729,7 +709,7 @@ describe("validation command family", () => {
 		expect(
 			notes.some((entry) =>
 				entry.startsWith(
-					"runtime-live-agent-artifact:.agents/data/benchmarks/results/",
+					"runtime-live-agent-artifact:.afol/data/benchmarks/catalog/results/",
 				),
 			),
 		).toBe(true);
@@ -752,7 +732,7 @@ describe("validation command family", () => {
 				const resultNotes = result.notes as string[];
 				return resultNotes.some((entry) =>
 					entry.startsWith(
-						"live-runner-artifact:.agents/data/benchmarks/results/",
+						"live-runner-artifact:.afol/data/benchmarks/catalog/results/",
 					),
 				);
 			}),
@@ -767,21 +747,6 @@ describe("validation command family", () => {
 
 	test("v bench runtime-live-agent passes from tracked snapshot when ignored result artifact is absent", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
-			mkdirSync(join(root, ".agents", "benchmarks"), { recursive: true });
-			cpSync(
-				join(
-					process.cwd(),
-					".agents",
-					"benchmarks",
-					"runtime-flow-live-agent-v4-latest.json",
-				),
-				join(
-					root,
-					".agents",
-					"benchmarks",
-					"runtime-flow-live-agent-v4-latest.json",
-				),
-			);
 			const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
 			if (existsSync(savedResultPath)) {
 				unlinkSync(savedResultPath);
@@ -813,21 +778,6 @@ describe("validation command family", () => {
 
 	test("v bench runtime-live-agent fails when direct live evidence violates thresholds", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
-			mkdirSync(join(root, ".agents", "benchmarks"), { recursive: true });
-			cpSync(
-				join(
-					process.cwd(),
-					".agents",
-					"benchmarks",
-					"runtime-flow-live-agent-v4-latest.json",
-				),
-				join(
-					root,
-					".agents",
-					"benchmarks",
-					"runtime-flow-live-agent-v4-latest.json",
-				),
-			);
 			const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
 			const savedResult = readJson(savedResultPath);
 			savedResult.scenarios = [
@@ -911,7 +861,18 @@ describe("validation command family", () => {
 	});
 
 	test("v bench runtime-live-agent fails with actionable note when live artifact is missing", () => {
-		const fixtureRoot = createValidationFixtureRoot();
+		const fixtureRoot = createValidationFixtureRoot((root) => {
+			unlinkSync(
+				join(
+					root,
+					".afol",
+					"data",
+					"benchmarks",
+					"snapshots",
+					"runtime-flow-live-agent-v4-latest.json",
+				),
+			);
+		});
 		const proc = runKernel(
 			["v", "bench", "--pack", "runtime-live-agent", "--json"],
 			fixtureRoot,
@@ -922,7 +883,7 @@ describe("validation command family", () => {
 		expect(payload.pass).toBe(false);
 		const notes = payload.notes as string[];
 		expect(notes).toContain(
-			`runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
+			`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
 		expect(results.length).toBe(3);
@@ -930,7 +891,7 @@ describe("validation command family", () => {
 		expect(
 			results.every((entry) =>
 				(entry.notes as string[]).includes(
-					`runtime-live-artifact-missing:.agents/benchmarks/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
+					`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
 				),
 			),
 		).toBe(true);
@@ -947,18 +908,20 @@ describe("validation command family", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
 			const scenarioPath = join(
 				root,
-				".agents",
+				".afol",
 				"data",
 				"benchmarks",
+				"catalog",
 				"scenarios",
 				"cli-kernel-local",
 				"cli-help-compact.json",
 			);
 			const baselinePath = join(
 				root,
-				".agents",
+				".afol",
 				"data",
 				"benchmarks",
+				"catalog",
 				"baselines",
 				"cli-kernel-local",
 				"baseline-v1.json",
