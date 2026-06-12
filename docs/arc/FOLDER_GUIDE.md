@@ -121,7 +121,7 @@ Plans should reference architecture docs:
 ```markdown
 ## Approach
 
-- Follow ADR-003: Event-driven architecture
+- Follow ADR-004: AFOL administration and project structure surfaces
 - Component: auth-service (see arc/components/auth.md)
 ```
 

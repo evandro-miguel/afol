@@ -400,6 +400,46 @@ Minimum acceptance:
 - Exit criteria: aggregate validation entrypoints and standards mirrors stay in
   command parity; governed slices close with strict evidence.
 
+### F-18 AFOL Administration, Project Structure, and Onion Architecture
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md
+- Why: AFOL needs a stable onion architecture and source-boundary model before
+  adding SQLite hydration, memory, library, context bundles, and spec gates.
+  Project direction should migrate from `docs/arc/**` into `.afol/adm/**`, and
+  current-state structure maps should live under `.afol/pstr/**`.
+- Relationship to prior features: F-18 extends the final F-04 workbench, F-05
+  routing, F-06 file-first handoff, F-07 local-state contracts, and the draft
+  F-18 operational-state specs. It supersedes the narrow JSON-source direction
+  with Markdown/YAML canonical administration plus SQLite materialization.
+- Exit criteria:
+  - Project manifesto names AFOL as a layered local execution OS for agents.
+  - `.afol/adm/**` is specified as target project administration for roadmap,
+    specs, ADRs, changelog, archive, and doctrine.
+  - `.afol/pstr/**` is specified as target project structure for maps,
+    inventories, and current-state evidence.
+  - `docs/arc/**` remains the current transitional authority until migration
+    commands, drift validation, and indexes are implemented.
+  - Onion layers define doctrine, authority, contracts, hydration/projection,
+    domain services, providers, CLI commands, and runtime adapters.
+  - Memory and library boundaries are explicit and separate.
+  - SQLite is specified as rebuildable materialized execution state, not the
+    only human-readable source.
+  - Legacy `.agents/agents`, `.agents/scripts`, `.agents/runtime`,
+    `.agents/wb`, `.agents/z-arq`, `agents.config`, and legacy delegate routing
+    remain prohibited.
+
+Follow-on slices under this direction:
+
+- SQLite hydration and execution state.
+- Markdown projection and drift validation.
+- Project memory system.
+- Library Markdown knowledge graph with optional IWE provider.
+- Context bundle and tool routing.
+- Spec compatibility and closure gates.
+- ADR, changelog, archive, and cleanup commands.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command

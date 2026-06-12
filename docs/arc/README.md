@@ -3,12 +3,14 @@ doc_type: architecture
 id: 260223_0000_arc_architecture_01
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-13T13:36:55-03:00'
+updated_at: '2026-06-12T13:37:19-03:00'
 ---
 
 # Architecture
 
-This folder contains all architecture documentation for the project.
+This folder contains the current transitional architecture documentation for
+the project. Target project administration moves to `.afol/adm/**` after AFOL
+ships command-managed migration, hydration, drift validation, and index checks.
 
 ## Purpose
 
@@ -27,8 +29,9 @@ arc/
 └── README.md            # This file
 ```
 
-Current-state map evidence lives outside `docs/arc/` under `docs/map/`.
-The physical-layout evidence view lives in `docs/map/structure/`.
+Current-state map evidence should move to `.afol/pstr/**` after migration.
+Historical `docs/map/**` references are transitional/legacy and must not become
+a second desired-state authority.
 Reusable templates live only under `docs/templates/`.
 
 ## Document types
@@ -48,19 +51,18 @@ Reusable templates live only under `docs/templates/`.
 - Milestones
 - Prioritization rules
 
-### map/
+### .afol/pstr/
 
 - Current-state descriptive repository maps
 - Analysis evidence and codemap-style surfaces
 - Refreshable operator references
 - Never the approval source for roadmap/spec intent
-- Includes the canonical structure index in `docs/map/structure/`
+- Includes structure indexes, inventories, maps, and generated snapshots
 
 ### docs/map/structure/
 
-- Physical directory layout evidence for the current repository
-- Current-state structure index and folder conventions
-- Entry points and import conventions for the map surface
+- Legacy/transitional physical directory layout evidence.
+- Do not recreate this surface when `.afol/pstr/**` becomes available.
 
 ### Specifications (SPECS/)
 
@@ -87,7 +89,7 @@ Plans and tasks should reference architecture docs:
 ```markdown
 ## Approach
 
-- Follow ADR-003: Event-driven architecture
+- Follow ADR-004: AFOL administration and project structure surfaces
 - Implement SPEC-AUTH-001: OAuth2 authentication
 ```
 
@@ -97,9 +99,9 @@ Plans and tasks should reference architecture docs:
 - Deprecate (don't delete) old ADRs
 - Link ADRs to implementation tasks
 - Update SPECS INDEX for every new spec
-- Keep `map/` descriptive and refreshable; keep desired-state decisions in roadmap/spec/ADR docs outside that folder
-- Keep the structure evidence in `docs/map/structure/`; do not recreate
-  `docs/arc/structure/` as a second current-state surface
+- Keep current-state maps descriptive and refreshable. Target project-structure
+  evidence belongs under `.afol/pstr/**` after migration; do not recreate
+  `docs/arc/structure/` as a second current-state surface.
 
 ---
 

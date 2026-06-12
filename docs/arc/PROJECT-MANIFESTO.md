@@ -5,12 +5,18 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-05-21T00:00:00+08:00'
+updated_at: '2026-06-12T13:37:19-03:00'
 ---
 
 # PROJECT MANIFESTO
 
 ## 1) Thesis
+
+AFOL is a layered local execution OS for agents: Markdown/YAML keeps human and
+agent interaction readable; SQLite materializes execution state for speed; IWE
+can power curated library retrieval; memory preserves compact project
+continuity; specs/ADRs govern decisions; evidence proves completion; context
+bundles give each agent only what it needs.
 
 This project is a universal governance and execution template for AI agents.
 
@@ -35,6 +41,12 @@ CLI = code, commands, validation, bootstrap/update, tests, safety,
 Template = Markdown + JSON config, rules, skills, workbench,
            evidence/logs/specs, editable local state
 ```
+
+Direction update: project administration should move from `docs/arc/**` to
+`.afol/adm/**` through an AFOL-managed migration. Current project structure
+evidence and maps should move from ad hoc map docs into `.afol/pstr/**`.
+`docs/arc/**` remains the current canonical administration surface until AFOL
+ships migration, hydration, drift validation, and index checks for `.afol/adm`.
 
 The final system should allow agents to enter any project that uses this template
 and immediately know how to plan, create specs, execute tasks, update logs, mark
@@ -133,6 +145,28 @@ use: clear boundaries, simple onboarding, predictable commands, no
 machine-specific assumptions, no hidden private dependencies, and no unnecessary
 complexity.
 
+### 5.12 Administrative onion
+
+The system should behave like an onion:
+
+- inner doctrine and authority change rarely and require ADR,
+- contracts and schemas change through specs and tests,
+- hydration/projection engines connect canonical Markdown/YAML with materialized
+  execution state,
+- domain services own workbench, memory, library, context, spec, ADR, and audit
+  behavior,
+- providers such as IWE remain replaceable outer layers.
+
+Target project-local administration surfaces:
+
+- `.afol/adm/` owns desired-state administration: manifesto, roadmap, specs,
+  ADRs, changelog, archive, and policy.
+- `.afol/pstr/` owns present-state project structure: maps, inventories,
+  generated structure evidence, and rebuildable current-state snapshots.
+- `.afol/state/afol.db` owns SQLite materialization and query cache.
+- `docs/arc/**` is the current transitional administration surface until the
+  AFOL migration is implemented and validated.
+
 ## 6) Non-Goals
 
 This project should not become a generic coding agent, a project management
@@ -155,7 +189,7 @@ project-local layer
 - .agents/config.json
 - .agents/lock.json
 - .agents/manifest.json
-- .afol/wb, rules, skills, specs, data, tmp
+- .afol/adm, .afol/pstr, .afol/wb, .afol/state, rules, skills, data, tmp
 
 project wrapper
 - afol (local compatibility alias during migration)

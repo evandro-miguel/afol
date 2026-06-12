@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T01:10:00+08:00'
-updated_at: '2026-05-29T13:20:21-03:00'
+updated_at: '2026-06-12T12:12:33-03:00'
 roadmap_feature: F-07
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -15,7 +15,7 @@ links:
   manifesto: docs/arc/PROJECT-MANIFESTO.md
 scope:
   repo_areas:
-  - .agents/data cli/index cli/events
+  - .afol/data cli/index cli/events
   packages:
   - agentic-cli
 risk_level: medium
@@ -34,7 +34,7 @@ Repeated file scans waste tokens and time.
 
 ## 3) Expected Behavior
 
-The CLI maintains local state under .agents/data/events and .agents/data/index
+The CLI maintains local state under `.afol/data/events` and `.afol/data/index`
 for workbench, rules, skills, specs, and files.
 
 2026-05-31 DR addendum:
@@ -91,9 +91,9 @@ must not collect raw private prompts by default.
 
 Lifecycle-derived artifacts should stay local and rebuildable:
 
-- durable event records under `.agents/data/events/`
-- derived indexes under `.agents/data/index/`
-- draft skill candidates under `.agents/tmp/skill-suggestions/`
+- durable event records under `.afol/data/events/`
+- derived indexes under `.afol/data/index/`
+- draft skill candidates under `.afol/tmp/skill-suggestions/`
 
 This keeps memory, knowledge, and skill suggestion features queryable without
 turning the scaffold into an always-on daemon, cloud sync service, or hidden
