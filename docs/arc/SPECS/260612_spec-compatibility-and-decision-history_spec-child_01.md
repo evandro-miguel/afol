@@ -6,7 +6,7 @@ status: draft
 owners:
 - orchestrator
 created_at: '2026-06-12T12:12:33-03:00'
-updated_at: '2026-06-12T13:37:19-03:00'
+updated_at: '2026-06-12T14:48:23-03:00'
 roadmap_feature: F-18
 spec_role: child
 parent_spec: 260612_afol-administration-project-structure-onion-architecture_spec_01
@@ -18,9 +18,8 @@ links:
 scope:
   repo_areas:
   - .afol/wb
+  - .afol/adm
   - docs/arc/DECISIONS
-  - docs/arc/CHANGELOG.md
-  - docs/arc/archive
   - cli/commands
   packages:
   - agentic-cli
@@ -60,7 +59,7 @@ User journey:
 
 1. A task reaches implementation or tested state.
 2. `afol spec check -S <session> -T <task> --json` records compatibility state
-   in `.afol/wb/<session>/json/spec-checks.json`.
+   in materialized AFOL state and can export JSON for agents/scripts.
 3. `afol done -S <session> -T <task> --require-spec-check` requires passed
    evidence and compatible spec status.
 4. If conflict remains, `afol done` fails and reports the conflict.
@@ -83,7 +82,8 @@ Failure or friction points:
 
 Expected behavior:
 
-- Spec check path: `.afol/wb/<session>/json/spec-checks.json`.
+- Spec check state is materialized under `.afol/state/afol.db`; JSON output is
+  a command/export format, not a required session source file.
 - Required done gates when spec check is enabled:
   - passed evidence exists,
   - no unresolved failed evidence,
@@ -94,10 +94,12 @@ Expected behavior:
   operation, and a bounded diagnostic excerpt.
 - Waiver requires a reason and should reference an ADR or spec update for major
   conflicts.
-- Decision history paths:
+- Current transitional decision history paths:
   - `docs/arc/DECISIONS/`
-  - `docs/arc/CHANGELOG.md`
-  - `docs/arc/archive/`
+- Target decision history paths after adm migration:
+  - `.afol/adm/decisions/`
+  - `.afol/adm/changelog.md`
+  - `.afol/adm/archive/`
 
 Boundaries:
 
@@ -187,7 +189,7 @@ Constraints:
 - Add done/close tests for missing, compatible, conflict, waived, and
   not-applicable spec-check states.
 - Add ADR/changelog command tests.
-- Add JSON schema tests for `spec-checks.json`.
+- Add schema tests for materialized spec-check state and JSON command output.
 - Add failure-path tests proving rejected gates and failed `done -x` executions
   produce command-error records.
 - Run `bun run typecheck`, `bun test`, and `afol validate project --json`.

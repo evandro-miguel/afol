@@ -18,6 +18,10 @@ system has been retired and must not be restored.
 - `.afol/**`: mutable AFOL-owned state, including workbench sessions, indexes,
   events, mutations, temporary files, benchmark catalog/results, and migration
   archives.
+- Target `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy,
+  and desired-state administration.
+- Target `.afol/pstr/**`: current project-structure maps only; commands live in
+  `cli/**`, and pstr contains map outputs.
 
 Removed legacy surfaces:
 

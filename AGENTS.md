@@ -23,12 +23,23 @@ Retained `.agents` content is static scaffold metadata only:
 - `.agents/lock.json`
 - `.agents/manifest.json`
 - `.agents/rules/**`
-- `.afol/skills/**`
 - `.agents/source/**`
 
 Mutable AFOL state belongs under `.afol/`, including workbench sessions,
 events, indexes, mutations, temporary files, benchmark catalog/results, and
 migration archives.
+
+AFOL-owned project-local skills live under `.afol/skills/**`.
+
+Target governance layout:
+
+- `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and
+  desired-state administration.
+- `.afol/pstr/**`: current project-structure maps only. No scripts, task
+  execution, automations, roadmap, specs, or future-state governance.
+- `.afol/wb/**`: execution sessions. Do not create a workbench session for
+  small docs/spec direction edits unless the user explicitly asks for governed
+  execution evidence.
 
 Canonical commands:
 

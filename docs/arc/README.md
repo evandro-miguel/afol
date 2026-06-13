@@ -29,7 +29,7 @@ arc/
 └── README.md            # This file
 ```
 
-Current-state map evidence should move to `.afol/pstr/**` after migration.
+Current project-structure maps should move to `.afol/pstr/**` after migration.
 Historical `docs/map/**` references are transitional/legacy and must not become
 a second desired-state authority.
 Reusable templates live only under `docs/templates/`.
@@ -53,11 +53,13 @@ Reusable templates live only under `docs/templates/`.
 
 ### .afol/pstr/
 
-- Current-state descriptive repository maps
-- Analysis evidence and codemap-style surfaces
-- Refreshable operator references
+- Current project-structure maps
+- Area maps for frontend, backend, API, data, devops, CLI, integrations, flows,
+  tests, and critical paths when those areas exist
+- Refreshable agent navigation references
 - Never the approval source for roadmap/spec intent
-- Includes structure indexes, inventories, maps, and generated snapshots
+- Contains maps only; no scripts, task execution, automations, roadmap,
+  acceptance criteria, or future-state governance
 
 ### docs/map/structure/
 
@@ -100,7 +102,7 @@ Plans and tasks should reference architecture docs:
 - Link ADRs to implementation tasks
 - Update SPECS INDEX for every new spec
 - Keep current-state maps descriptive and refreshable. Target project-structure
-  evidence belongs under `.afol/pstr/**` after migration; do not recreate
+  maps belong under `.afol/pstr/**` after migration; do not recreate
   `docs/arc/structure/` as a second current-state surface.
 
 ---

@@ -6,7 +6,7 @@ status: draft
 owners:
 - orchestrator
 created_at: '2026-06-12T12:12:33-03:00'
-updated_at: '2026-06-12T13:37:19-03:00'
+updated_at: '2026-06-12T17:47:40-03:00'
 roadmap_feature: F-18
 spec_role: child
 parent_spec: 260612_afol-administration-project-structure-onion-architecture_spec_01
@@ -30,8 +30,8 @@ risk_level: medium
 ## 1) Feature Intent
 
 - Outcome: AFOL can promote validated, sourced research from session drafts into
-  a global project library that agents can search without reading raw session
-  history.
+  a Markdown/YAML project library that agents can search without reading raw
+  session history.
 - Why now: File-first handoffs save research locally, but useful findings still
   remain tied to individual sessions unless promoted into a durable structured
   store.
@@ -58,11 +58,11 @@ Primary users:
 
 User journey:
 
-1. A session creates `.afol/wb/<session>/json/research-draft.json`.
+1. A session creates a bounded research draft under the workbench session.
 2. `afol library propose -S <session>` validates schema, purpose, sources,
    duplicates, and conflicts.
-3. `afol library promote -S <session> --topic <topic>` appends validated
-   records to `.afol/library/topics/<topic>/`.
+3. `afol library promote -S <session> --topic <topic>` writes or updates
+   curated Markdown library documents under `.afol/library/topics/<topic>/`.
 4. `afol library search "<query>" --json` returns current claims and sources.
 5. `afol library invalidate --claim <id> --reason "<reason>" --source <id>`
    marks stale or contradicted claims.
@@ -74,6 +74,8 @@ Failure or friction points:
 - Source without `accessed_at` -> proposal fails.
 - Duplicate or conflicting claim -> proposal reports conflict for review.
 - Raw copied page content -> validation rejects or flags as out of scope.
+- Stale or invalidated research -> normal search and context bundles exclude it
+  unless the caller explicitly asks for stale/invalidated records.
 
 ## 4) Experience and Behavior
 
@@ -81,23 +83,29 @@ Expected behavior:
 
 - Global library root: `.afol/library/`.
 - Topic root: `.afol/library/topics/<topic-slug>/`.
-- Topic files:
-  - `topic.json`
-  - `claims.jsonl`
-  - `sources.jsonl`
-  - `research-runs.jsonl`
-  - `invalidations.jsonl`
-  - `useful-sources.jsonl`
+- Library files:
+  - `INDEX.md`
+  - `TAGS.md`
+  - `GRAPH.md`
+  - `topics/<topic>/INDEX.md`
+  - `topics/<topic>/<research-doc>.md`
 - Session draft path:
-  - `.afol/wb/<session>/json/research-draft.json`.
+  - `.afol/wb/<session>/research-draft.md` or an equivalent AFOL-owned draft
+    export.
 
 Boundaries:
 
-- The library stores claims, sources, invalidations, runs, and useful source
-  candidates. It does not store full pages or chat transcripts.
+- The library stores curated summaries, claims, sources, invalidations,
+  freshness metadata, tags, and wikilinks. It does not store full pages or chat
+  transcripts.
 - Session drafts may be messy; promoted library entries must be structured and
   sourced.
-- Library search is local and structured in MVP.
+- Library search is local and structured in MVP. IWE may provide Markdown graph
+  search/retrieve/backlinks behind an AFOL library engine interface.
+- Library health checks validate YAML, tags, wikilinks, source dates, claim
+  support, stale status, aliases, document size, and required summaries.
+- Wikilinks, backlinks, topic links, source refs, claim refs, and related adm
+  or pstr refs should materialize as graph edges without LLM calls.
 
 ## 5) Scope
 
@@ -114,6 +122,8 @@ In scope:
   <source-id>`.
 - `afol library suggest-source --topic <topic> --url <url> --why "<why>"`.
 - `afol library rebuild-index`.
+- `afol library health --json`.
+- `afol library doctor --json`.
 
 Out of scope:
 
@@ -139,14 +149,14 @@ Constraints:
 
 - Compatibility: library commands must not alter workbench task state unless
   called through explicit lifecycle commands.
-- Operational: topic files use JSON/JSONL and are append-friendly where
-  appropriate.
+- Operational: topic files use Markdown/YAML with structured sections for
+  claims, sources, freshness, invalidations, tags, and wikilinks.
 - Security/privacy: no private prompts, secrets, credentials, or full copied
   external pages.
 
 ## 8) Acceptance
 
-- A session can generate `research-draft.json`.
+- A session can generate a bounded research draft for proposal.
 - `afol library propose` validates schema, source requirements, duplicate
   candidates, and conflicts.
 - `afol library promote` writes validated research to
@@ -157,6 +167,8 @@ Constraints:
 - `afol library search` returns current claims and useful sources without
   reading all raw files into agent context.
 - `afol ctx bundle --include-library` can include relevant current claims.
+- Stale docs, invalidated claims, broken wikilinks, duplicate aliases, missing
+  `accessed_at`, and unsupported claims are reported by library health.
 
 ## 9) Risks and Tradeoffs
 
@@ -170,7 +182,7 @@ Constraints:
 
 ## 10) Rollout and Lifecycle
 
-- Start with local JSON/JSONL topic storage.
+- Start with local Markdown/YAML topic storage.
 - Add search over topic titles, tags, claim text, source titles, and status.
 - Add bundle integration after routing bundles support library refs.
 - Backout by leaving session drafts intact and disabling promotion/search.

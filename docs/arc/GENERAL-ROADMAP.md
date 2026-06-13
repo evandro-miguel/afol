@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-05-29T14:59:24Z'
+updated_at: '2026-06-12T17:47:40-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -400,7 +400,7 @@ Minimum acceptance:
 - Exit criteria: aggregate validation entrypoints and standards mirrors stay in
   command parity; governed slices close with strict evidence.
 
-### F-18 AFOL Administration, Project Structure, and Onion Architecture
+### F-18 Rehome Administration and Project Structure
 
 - Status: planned
 - Governing spec:
@@ -408,7 +408,7 @@ Minimum acceptance:
 - Why: AFOL needs a stable onion architecture and source-boundary model before
   adding SQLite hydration, memory, library, context bundles, and spec gates.
   Project direction should migrate from `docs/arc/**` into `.afol/adm/**`, and
-  current-state structure maps should live under `.afol/pstr/**`.
+  current project-structure maps should live under `.afol/pstr/**`.
 - Relationship to prior features: F-18 extends the final F-04 workbench, F-05
   routing, F-06 file-first handoff, F-07 local-state contracts, and the draft
   F-18 operational-state specs. It supersedes the narrow JSON-source direction
@@ -417,8 +417,8 @@ Minimum acceptance:
   - Project manifesto names AFOL as a layered local execution OS for agents.
   - `.afol/adm/**` is specified as target project administration for roadmap,
     specs, ADRs, changelog, archive, and doctrine.
-  - `.afol/pstr/**` is specified as target project structure for maps,
-    inventories, and current-state evidence.
+  - `.afol/pstr/**` is specified as target project structure for current-state
+    maps only.
   - `docs/arc/**` remains the current transitional authority until migration
     commands, drift validation, and indexes are implemented.
   - Onion layers define doctrine, authority, contracts, hydration/projection,
@@ -430,22 +430,174 @@ Minimum acceptance:
     `.agents/wb`, `.agents/z-arq`, `agents.config`, and legacy delegate routing
     remain prohibited.
 
+#### F-18.S1 PSTR Map System
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md
+- Why: Agents need a compact structural map of the current project before they
+  scan broadly or edit code.
+- Exit criteria:
+  - PSTR map schema exists with `doc_type`, `scope`, `authority: observed`,
+    source paths, source hash, updated timestamp, tags, and freshness status.
+  - Area maps are defined for the areas that exist in a project: frontend,
+    backend, API, data, devops, CLI, integrations, flows, tests, and critical
+    paths.
+  - `.afol/pstr/**` contains maps only, not scripts, task state, automations,
+    roadmap/spec governance, or future-state planning.
+  - `afol pstr rebuild`, `afol pstr show`, `afol pstr section`,
+    `afol pstr validate`, and `afol pstr stale` are specified as CLI commands
+    whose outputs live in `.afol/pstr/**`.
+  - Context bundles include compact `pstr_refs` instead of loading the whole
+    pstr tree.
+
+#### F-18.S2 ADM/PSTR Drift Validation
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md
+- Why: AFOL must compare desired state in adm/specs with observed structure in
+  pstr maps without confusing maps for authority.
+- Exit criteria:
+  - Drift checks detect stale pstr maps, missing implementation, contradiction
+    between desired-state docs and observed maps, and unimplemented spec
+    expectations.
+  - Drift reports are compact, JSON-capable, and include next-step hints for
+    agents.
+  - Source code remains the final authority for current implementation state.
+  - PSTR drift findings do not automatically become roadmap or task decisions.
+
+#### F-18.S3 SQLite Hydration Layer
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md
+- Why: AFOL needs fast local execution state, FTS, source hashes, and bundle
+  generation without making JSON files or SQLite the human authoring surface.
+- Exit criteria:
+  - `.afol/state/afol.db` materializes adm, pstr, wb, memory, library,
+    evidence, events, sections, tools, and context bundle state.
+  - Source hashes and stale checks fail closed before trusted bundle generation.
+  - SQLite is rebuildable from canonical Markdown/YAML/evidence sources.
+  - JSON output remains command/export/debug format, not a live competing
+    source of truth.
+
+#### F-18.S4 Project Memory System
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md
+- Why: AFOL needs compact long-lived project continuity without turning memory
+  into raw research, chat transcript, or hidden prompt state.
+- Exit criteria:
+  - `.afol/memory/memory.md` is the concise memory master.
+  - Memory proposal, promotion, rejection, invalidation, archive, render, and
+    recall flows are defined.
+  - Memory can feed context bundles selectively.
+  - Memory links to library when needed but does not store external research.
+
+#### F-18.S5 Library Markdown Graph
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_global-project-research-library_spec-child_01.md
+- Why: AFOL needs curated external knowledge with sources, claims, freshness,
+  invalidation, tags, wikilinks, and optional IWE-powered retrieval.
+- Exit criteria:
+  - `.afol/library/**` uses Markdown/YAML library documents.
+  - Sources include provenance and `accessed_at`.
+  - Claims are supported by sources and can be invalidated without deletion.
+  - IWE is a provider behind AFOL library policy, not a core authority.
+
+#### F-18.S6 Context Bundle and Tool Routing
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_context-routing-bundles-and-section-index_spec-child_01.md
+- Why: Agents need the smallest correct task/role context: adm refs, pstr refs,
+  tools, rules, skills, memory, library, validation, and `do_not_load`.
+- Exit criteria:
+  - `afol ctx bundle` returns compact JSON for one task/role/surface.
+  - Bundles include refs by default and expand sections only on demand.
+  - Bundle budgets prevent adm, pstr, memory, or library from becoming repo
+    dumps.
+  - `ctx explain` makes routing decisions auditable.
+
+#### F-18.S7 Spec Gate, Cleanup, and Governance
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_spec-compatibility-and-decision-history_spec-child_01.md
+- Why: AFOL needs closure gates, explicit waivers, cleanup/audit flows, ADRs,
+  changelog, and archive behavior that preserve history without polluting active
+  surfaces.
+- Exit criteria:
+  - `afol spec check` can block `done`/`close` when required checks are missing
+    or conflicted.
+  - Waivers require explicit reason and decision/spec reference when relevant.
+  - ADR/changelog/archive commands preserve superseded, abandoned, and archived
+    decisions.
+
+#### F-18.S8 Temporal Health, Freshness, and Token Budgets
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_temporal-health-freshness-token-budget_spec-child_01.md
+- Why: AFOL must age well over months of use; stale pstr maps, stale memory,
+  stale library claims, stale SQLite state, oversized bundles, and unrotated
+  logs must be visible before agents trust them.
+- Exit criteria:
+  - Durable artifacts carry timestamps, status, authority, source hash, and
+    branch/commit metadata where relevant.
+  - `afol health` is fast by default and reports `fail`, `warn`, and `info`.
+  - Domain health commands exist for adm, pstr, wb, memory, library, db, and
+    token budgets.
+  - `afol pstr stale` blocks stale maps from trusted context bundles.
+  - `afol db health` checks schema, migrations, source hashes, FTS freshness,
+    orphan records, and size/WAL signals.
+  - Maintenance commands produce dry-run cleanup reports for weekly and monthly
+    routines.
+  - Context bundles enforce explicit token budgets and prefer refs before full
+    documents.
+
+#### F-18.S9 AFOL Brain Shape, Think-Lite, and Trust Boundary
+
+- Status: planned
+- Governing spec:
+  docs/arc/SPECS/260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01.md
+- Why: AFOL should gain a small internal brain layer without copying a heavy
+  always-on brain product: typed source classes, shape packs, graph-aware
+  retrieval, gap analysis, resolver routing, sweep/doctor cycles, and operation
+  trust boundaries.
+- Exit criteria:
+  - `.afol/adm/schema/afol-shape.yaml` defines source classes, page types,
+    authority, inclusion rules, freshness policy, and cache-key versioning.
+  - `afol schema detect/suggest/review/apply` is specified for pstr and library
+    shape evolution with human review.
+  - `afol ctx bundle --explain` returns context, why, gaps, freshness,
+    evidence tags, create-safety hints, and do-not-load.
+  - Retrieval combines exact/path/id match, SQLite FTS, section index,
+    wikilinks/backlinks, pstr structural refs, freshness, authority, and
+    lightweight reranking.
+  - `afol sweep daily|weekly|monthly` is specified as command-run maintenance,
+    not a mandatory daemon.
+  - `afol doctor --remediation-plan` produces ordered repair steps with domain
+    scores.
+  - OperationContext distinguishes local, agent, and remote callers and applies
+    stricter mutation rules for lower-trust contexts.
+
 Follow-on slices under this direction:
 
-- SQLite hydration and execution state.
-- Markdown projection and drift validation.
-- Project memory system.
-- Library Markdown knowledge graph with optional IWE provider.
-- Context bundle and tool routing.
-- Spec compatibility and closure gates.
-- ADR, changelog, archive, and cleanup commands.
+- Implement each feature above as narrow slices.
+- Do not combine SQLite, memory, library, context bundle, spec gate, temporal
+  health, brain-shape retrieval, and cleanup implementation in one PR.
 
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command
    system, product/factory boundary, compatibility constraints.
 1. CLI kernel: Bun/TypeScript skeleton, `afol`, project detection, config/lock
-   reading, short router, compact output, compatibility delegation.
+   reading, short router, compact output, and AFOL-native command execution.
 1. Workbench core: session, task state, evidence, log append, plan status,
    verify, close.
 1. Rules and skills: routers, surface detection, delegation context, update

@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-06-12T13:37:19-03:00'
+updated_at: '2026-06-12T17:47:40-03:00'
 ---
 
 # PROJECT MANIFESTO
@@ -44,9 +44,16 @@ Template = Markdown + JSON config, rules, skills, workbench,
 
 Direction update: project administration should move from `docs/arc/**` to
 `.afol/adm/**` through an AFOL-managed migration. Current project structure
-evidence and maps should move from ad hoc map docs into `.afol/pstr/**`.
+maps should move from ad hoc map docs into `.afol/pstr/**`.
 `docs/arc/**` remains the current canonical administration surface until AFOL
 ships migration, hydration, drift validation, and index checks for `.afol/adm`.
+
+AFOL separates project direction from project structure.
+
+`.afol/adm` defines what the project should become. `.afol/pstr` maps what the
+project currently is. Agents use `adm` to understand intent, `pstr` to
+understand where to work, `wb` to execute, memory to preserve continuity, and
+library to access curated external knowledge.
 
 The final system should allow agents to enter any project that uses this template
 and immediately know how to plan, create specs, execute tasks, update logs, mark
@@ -161,11 +168,68 @@ Target project-local administration surfaces:
 
 - `.afol/adm/` owns desired-state administration: manifesto, roadmap, specs,
   ADRs, changelog, archive, and policy.
-- `.afol/pstr/` owns present-state project structure: maps, inventories,
-  generated structure evidence, and rebuildable current-state snapshots.
+- `.afol/pstr/` owns current project-structure maps: frontend, backend, API,
+  data, devops, CLI, integrations, flows, tests, critical paths, entrypoints,
+  dependencies, and structural ownership.
 - `.afol/state/afol.db` owns SQLite materialization and query cache.
 - `docs/arc/**` is the current transitional administration surface until the
   AFOL migration is implemented and validated.
+
+Rule of gold:
+
+```text
+pstr describes what exists.
+adm defines what should exist.
+wb executes change.
+```
+
+`.afol/pstr/**` must not contain scripts, task execution, automations, roadmap,
+spec acceptance, future planning, or governance decisions. Commands that build
+or validate maps live in `cli/**`; only their map outputs live in `.afol/pstr`.
+
+### 5.13 Time-aware durability
+
+AFOL must treat time as first-class state. Every durable artifact that can guide
+an agent must declare when it was created, updated, reviewed, and when it should
+be considered stale.
+
+Default policies:
+
+- Time policy: canonical files use ISO UTC timestamps; branch and commit are
+  recorded when an artifact depends on repository state.
+- Freshness policy: stale pstr maps, stale SQLite materialization, stale memory,
+  and stale library research do not enter context bundles as trusted inputs.
+- Health policy: `afol health` is fast by default, JSON-capable, and reports
+  `fail`, `warn`, and `info` severities.
+- Cleanup policy: archive by metadata before moving files; preserve stable refs.
+- Token budget policy: context bundles start with refs and summaries, then
+  expand exact sections only on demand.
+
+### 5.14 Brain layer, not brain product
+
+AFOL should borrow brain-system patterns without becoming a heavy personal or
+company brain product.
+
+Copy the patterns:
+
+- Markdown/YAML source of record.
+- SQLite materialization.
+- AFOL shape/schema pack.
+- Hybrid retrieval over exact paths, FTS, section refs, graph refs, freshness,
+  and authority.
+- Context bundles with citations, why, gaps, stale warnings, and do-not-load.
+- Sweep/doctor cycles for cleanup and remediation.
+- Resolver-based routing for rules, skills, tools, pstr, memory, and library.
+- Trust boundary for local, agent, and remote callers.
+
+Do not copy now:
+
+- always-on daemon,
+- multi-user company brain,
+- mandatory OAuth,
+- mandatory Postgres/pgvector,
+- aggressive auto-ingest,
+- remote schema mutation or admin surfaces.
 
 ## 6) Non-Goals
 

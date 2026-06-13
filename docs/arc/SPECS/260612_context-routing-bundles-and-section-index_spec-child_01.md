@@ -6,7 +6,7 @@ status: draft
 owners:
 - orchestrator
 created_at: '2026-06-12T12:12:33-03:00'
-updated_at: '2026-06-12T13:37:19-03:00'
+updated_at: '2026-06-12T17:47:40-03:00'
 roadmap_feature: F-18
 spec_role: child
 parent_spec: 260612_afol-administration-project-structure-onion-architecture_spec_01
@@ -31,7 +31,8 @@ risk_level: high
 ## 1) Feature Intent
 
 - Outcome: AFOL can produce compact, task-scoped context bundles and retrieve
-  exact document sections by stable references.
+  exact adm, pstr, workbench, memory, library, and spec sections by stable
+  references.
 - Why now: Rule/skill routing and local-state indexes already exist, but agents
   still need a single package that combines task, role, surface, tools, rules,
   skills, validation, and relevant spec sections.
@@ -60,14 +61,16 @@ Primary users:
 User journey:
 
 1. AFOL builds or refreshes routing state for a session.
-2. `afol ctx tools -S <session>` materializes toolsets into
-   `.afol/wb/<session>/json/tools.json`.
-3. Optional `.afol/wb/<session>/json/tools.override.json` changes the derived
-   toolset without editing generated state.
+2. `afol ctx tools -S <session>` materializes toolsets into SQLite and can
+   export compact JSON when requested.
+3. Optional operator overrides change the derived toolset without editing
+   generated state directly.
 4. `afol ctx bundle -S <session> -T T-01 --role coder --surface typescript
    --json` returns one compact bundle.
 5. `afol ctx section --ref <ref> --json` returns an exact indexed section.
 6. `afol ctx explain` reports why the bundle includes or omits inputs.
+7. `afol ctx bundle --explain --json` reports selected refs, why, gaps,
+   freshness, evidence tags, create-safety hints, and do-not-load.
 
 Failure or friction points:
 
@@ -80,21 +83,28 @@ Failure or friction points:
 
 Expected behavior:
 
-- Generated routing state lives at
-  `.afol/wb/<session>/json/tools.json`.
-- Operator overrides live at
-  `.afol/wb/<session>/json/tools.override.json`.
-- Bundle files live under
-  `.afol/wb/<session>/json/bundles/`.
+- Generated routing state is materialized in `.afol/state/afol.db` and can be
+  exported as JSON for agents/scripts.
+- Operator overrides live in an AFOL-owned override file or table and must be
+  auditable.
+- Bundle files are optional debug/interchange exports, not required live state.
 - Section index lives at `.afol/data/index/sections.json`.
-- Section refs can target specs, tasks, plans, ADRs, and library entries.
+- Section refs can target adm docs, pstr maps, specs, tasks, plans, ADRs,
+  memory entries, and library entries.
+- Context retrieval starts at compact levels and expands only when requested:
+  `L0` status, `L1` refs/summaries, `L2` exact sections, `L3` full document,
+  `L4` repo scan.
+- Retrieval combines exact/path/id match, SQLite FTS, section index,
+  wikilink/backlink graph, pstr structural refs, freshness/status filters, and
+  lightweight authority/task reranking.
 
 Boundaries:
 
-- `tools.json` is generated; humans should use `tools.override.json` for manual
-  adds/removals.
+- Generated routing state is derived; humans should use explicit overrides for
+  manual adds/removals.
 - Bundles include references and compact extracts, not whole documents by
   default.
+- PSTR appears as `pstr_refs`, not as full map trees.
 - No vector database or embeddings are required for MVP.
 
 ## 5) Scope
@@ -105,10 +115,13 @@ In scope:
 - `afol ctx tools -S <session>`.
 - `afol ctx bundle -S <session> -T <task> --role <role> --surface <surface>
   --json`.
+- `afol ctx bundle -S <session> -T <task> --role <role> --explain --json`.
 - `afol ctx explain -S <session> -T <task> --role <role>`.
 - `afol index sections rebuild`.
 - `afol ctx section --ref <ref> --json`.
-- Updating `plan.md ## Tools` as a short projection from `tools.json`.
+- Updating `plan.md ## Tools` as a short projection from materialized routing
+  state.
+- `afol ctx bundle --include-pstr` returning compact project-structure refs.
 
 Out of scope:
 
@@ -143,12 +156,19 @@ Constraints:
 
 - `afol ctx bundle` returns a compact JSON package for one task/role/surface.
 - The bundle includes task, relevant rules, skills, tools, validation commands,
-  and spec section references.
+  adm/spec section references, pstr refs, memory refs when requested, and
+  library refs when requested.
 - The bundle does not include whole unrelated documents by default.
-- `tools.override.json` can add or remove tools without editing `tools.json`.
-- `plan.md ## Tools` mirrors a concise view of `tools.json`.
+- Tool overrides can add or remove tools without editing generated routing
+  state.
+- `plan.md ## Tools` mirrors a concise view of materialized routing state.
 - `afol ctx section --ref ...` returns an exact section or JSON pointer.
 - `afol ctx bundle` uses `sections.json` when possible.
+- Bundle budgets prevent pstr, adm, memory, or library from becoming repo dumps.
+- Default budget targets are about 2k tokens total, 500 memory tokens, 5 pstr
+  refs, 3 library claims, 3 adm/spec sections, and 10 tools unless overridden.
+- Bundles expose gap analysis instead of silently omitting missing, stale, or
+  contradictory inputs.
 
 ## 9) Risks and Tradeoffs
 

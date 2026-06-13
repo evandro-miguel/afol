@@ -6,7 +6,7 @@ status: draft
 owners:
 - orchestrator
 created_at: '2026-06-12T12:12:33-03:00'
-updated_at: '2026-06-12T13:37:19-03:00'
+updated_at: '2026-06-12T17:47:40-03:00'
 roadmap_feature: F-18
 spec_role: child
 parent_spec: 260612_afol-administration-project-structure-onion-architecture_spec_01
@@ -75,9 +75,9 @@ Primary users:
 User journey:
 
 1. An orchestrator creates or targets an AFOL session.
-2. AFOL writes session JSON under `.afol/wb/<session>/json/`.
-3. AFOL renders human Markdown from JSON state and preserves allowed human
-   notes outside managed blocks.
+2. AFOL hydrates session Markdown and evidence into `.afol/state/afol.db`.
+3. AFOL renders human Markdown managed blocks from materialized state and
+   preserves allowed human notes outside managed blocks.
 4. A worker requests `afol ctx bundle` for one task, role, and surface.
 5. The bundle returns only the relevant task, spec sections, rules, skills,
    tools, validations, and optional current library claims.
@@ -88,8 +88,8 @@ User journey:
 
 Failure or friction points:
 
-- Markdown and JSON drift -> `afol state validate` detects it and `afol state
-  sync` re-renders managed Markdown.
+- Markdown and materialized-state drift -> `afol state validate` detects it and
+  `afol state sync` re-renders managed Markdown.
 - Missing context for a task -> `afol ctx explain` shows why a bundle includes
   or omits rules, skills, tools, specs, and library claims.
 - Research without sources -> library proposal fails.
@@ -98,6 +98,10 @@ Failure or friction points:
 - AFOL command failure -> AFOL writes a structured command-error record with the
   failed command, exit code, session/task when known, summarized stderr/stdout,
   cause classification, and suggested recovery path.
+- Stale pstr, library, memory, or SQLite state -> AFOL excludes it from trusted
+  context bundles or fails with a rebuild/review hint.
+- Ambiguous retrieval -> AFOL reports why sources were selected, what is stale,
+  what is missing, and what should not be loaded.
 
 ## 4) Experience and Behavior
 
@@ -114,6 +118,10 @@ Expected behavior:
 - Command-error logs remain the diagnostic trail for failed AFOL operations.
 - Indexes remain rebuildable caches.
 - Library topics preserve sourced project research outside individual sessions.
+- Freshness and token-budget checks decide whether adm, pstr, memory, library,
+  and SQLite-derived content can enter trusted context.
+- Shape-pack and resolver rules decide which source classes, maps, rules,
+  skills, tools, memory, and library refs can enter the bundle.
 
 Boundaries:
 
@@ -123,7 +131,7 @@ Boundaries:
 - Exportable downstream template state belongs in `src/project-template/**`
   only when the payload is meant for downstream projects.
 - Target project administration belongs under `.afol/adm/**`.
-- Target present-state project structure belongs under `.afol/pstr/**`.
+- Target current project-structure maps belong under `.afol/pstr/**`.
 - Mutable runtime/session state belongs under `.afol/**`.
 - `.agents/**` remains static scaffold metadata, rules, skills, lock, manifest,
   config, and source seed content only.
@@ -133,14 +141,17 @@ Boundaries:
 In scope:
 
 - `.afol/adm/**` administration references and migration compatibility.
-- `.afol/pstr/**` project structure references and map/index compatibility.
+- `.afol/pstr/**` project-structure map references and map/index
+  compatibility.
 - `.afol/state/afol.db` materialized execution state references.
-- `.afol/wb/<session>/json/` session interchange/debug state where useful.
+- `.afol/wb/<session>/json/` optional session interchange/debug snapshots where
+  useful, not active source state.
 - `.afol/data/events/command-errors.jsonl` or an equivalent AFOL-owned error
   event stream for failed lifecycle and validation commands.
 - Controlled rendering and drift detection for managed Markdown blocks.
 - Task/role/surface context bundles.
-- Tool/rule/skill/spec routing materialized as structured JSON.
+- Tool/rule/skill/spec routing materialized in SQLite and exportable as
+  structured JSON when requested.
 - `.afol/data/index/sections.json` section and reference index.
 - `.afol/library/` topic, source, claim, invalidation, and useful-source
   records.
@@ -171,7 +182,7 @@ Out of scope:
   - `260612_afol-administration-project-structure-onion-architecture_spec_01`
     -> parent authority, onion, `.afol/adm`, `.afol/pstr`, and migration
     direction.
-  - `260612_session-json-state-and-markdown-projection_spec-child_01` ->
+  - `260612_workbench-hydration-and-markdown-projection_spec-child_01` ->
     session state, render/sync, and Markdown drift handling; this must align
     with SQLite hydration and must not make JSON the sole source of truth.
   - `260612_context-routing-bundles-and-section-index_spec-child_01` ->
@@ -180,6 +191,12 @@ Out of scope:
     project research library and session drafts.
   - `260612_spec-compatibility-and-decision-history_spec-child_01` -> spec
     compatibility gates, waiver behavior, ADR/changelog/archive contracts.
+  - `260612_temporal-health-freshness-token-budget_spec-child_01` -> time,
+    freshness, health, cleanup, archive, branch/commit, and token-budget
+    policies.
+  - `260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01` -> AFOL
+    shape pack, source axes, hybrid retrieval, think-lite, sweep/doctor,
+    resolver, and trust boundary.
 
 ## 7) Constraints and Assumptions
 
@@ -206,8 +223,8 @@ Success looks like:
 
 - AFOL defines the migration path from `docs/arc/**` to `.afol/adm/**` and from
   legacy map docs to `.afol/pstr/**`.
-- AFOL hydrates canonical Markdown/YAML into materialized state and detects
-  source drift.
+- AFOL hydrates canonical Markdown/YAML and evidence into materialized state and
+  detects source drift.
 - AFOL renders managed Markdown blocks from materialized state and detects
   projection drift.
 - AFOL routes tools, rules, skills, specs, and validations into compact bundles.
@@ -221,6 +238,12 @@ Success looks like:
 - AFOL records structured command-error logs when AFOL commands fail, including
   failures from `done -x`, `close`, `state validate`, `ctx bundle`, `library
   propose`, and `spec check`.
+- AFOL prevents stale pstr maps, stale library claims, stale memory focus, and
+  stale SQLite materialization from entering trusted context bundles by default.
+- AFOL enforces context bundle token budgets and provides section-level expansion
+  commands when compact refs are insufficient.
+- AFOL can return think-lite bundle explanations with context refs, why, gaps,
+  freshness, evidence tags, create-safety hints, and do-not-load.
 - Strategic decisions and abandoned or superseded directions remain traceable
   through ADR/changelog/archive surfaces.
 

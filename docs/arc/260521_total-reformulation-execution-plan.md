@@ -14,6 +14,15 @@ links:
 
 # Total Reformulation Execution Plan
 
+## Supersession Note
+
+This plan records the May 2026 migration strategy. Its compatibility-delegation
+language is historical only. The current AFOL direction is AFOL-only:
+`afol` is the front door, live command logic belongs in `cli/**`, mutable state
+belongs under `.afol/**`, and legacy `.agents/agents`, `.agents/scripts`,
+`.agents/runtime`, `.agents/wb`, and legacy delegate routing must not be
+restored or extended.
+
 ## 1) Current Evidence
 
 Repository inspection and delegated read-only exploration found that the current

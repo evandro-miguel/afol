@@ -6,7 +6,7 @@ status: draft
 owners:
 - orchestrator
 created_at: '2026-06-12T13:37:19-03:00'
-updated_at: '2026-06-12T13:37:19-03:00'
+updated_at: '2026-06-12T17:47:40-03:00'
 roadmap_feature: F-18
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -34,7 +34,7 @@ risk_level: high
 
 - Outcome: define AFOL as a layered local execution OS for agents, with
   `.afol/adm/**` as target project administration and `.afol/pstr/**` as target
-  present-state project structure.
+  current project-structure maps.
 - Why now: The project has enough workbench, routing, local-state, and template
   hardening to need a stable inner architecture before adding SQLite hydration,
   memory, library, IWE, context bundles, and spec gates.
@@ -69,10 +69,12 @@ User journey:
 2. AFOL treats `docs/arc/**` as canonical until migration commands exist.
 3. The migration creates `.afol/adm/**` with manifesto, architecture, roadmap,
    specs, ADRs, changelog, archive, and policy.
-4. AFOL creates `.afol/pstr/**` for current-state maps, structure inventories,
-   and generated project snapshots.
+4. AFOL creates `.afol/pstr/**` for current project-structure maps.
 5. AFOL hydrates canonical Markdown/YAML into `.afol/state/afol.db`.
 6. AFOL validates source hashes, managed projections, indexes, and drift.
+7. AFOL refuses stale maps, stale materialization, stale memory, or stale
+   library claims as trusted context unless the command explicitly allows a
+   warning-only mode.
 
 Failure or friction points:
 
@@ -93,7 +95,7 @@ Layer 0: Doctrine and invariants.
 Layer 1: Authority and source boundaries.
 
 - `.afol/adm/**` is target desired-state administration.
-- `.afol/pstr/**` is target present-state structure.
+- `.afol/pstr/**` is target current project-structure maps.
 - `.afol/wb/**` is session execution.
 - `.afol/state/afol.db` is materialized execution state.
 - `.afol/data/events/**` is append-only audit.
@@ -124,6 +126,19 @@ Layer 6: CLI commands.
 Layer 7: Runtime adapters and future integrations.
 
 - Adapters are thin and call AFOL. They do not own state or duplicate logic.
+
+Cross-layer policy: Time, freshness, health, cleanup, and token budgets.
+
+- Every durable artifact that can guide an agent has timestamps, status,
+  authority, and source metadata.
+- Stale state fails closed when it affects done, close, release, or trusted
+  context bundle generation.
+- Health checks classify findings as `fail`, `warn`, or `info`.
+- Cleanup archives logically before moving files.
+- Bundles start with refs and summaries, not whole documents.
+- AFOL uses a small brain layer internally: shape pack, source axes, hybrid
+  retrieval, graph refs, think-lite gap analysis, sweep/doctor, resolver
+  routing, and caller trust boundaries.
 
 ## 5) Authority Model
 
@@ -166,17 +181,104 @@ Project structure:
 ```text
 .afol/pstr/
 ├── README.md
-├── structure/
-├── inventories/
-├── maps/
+├── INDEX.md
+├── overview.md
+├── critical-paths.md
+├── frontend/
+├── backend/
+├── api/
+├── data/
+├── devops/
+├── cli/
+├── integrations/
+├── flows/
+├── tests/
 └── snapshots/
 ```
+
+PSTR is adaptive. Projects do not create empty area maps for surfaces they do
+not have.
+
+PSTR map files must be observed and source-backed:
+
+```yaml
+---
+doc_type: pstr_map
+id: pstr_api_endpoints
+status: current
+authority: observed
+scope: api.endpoints
+source:
+  generated_by: afol pstr rebuild
+  command: afol pstr map api endpoints
+  source_paths:
+    - src/api/
+  source_hash: "<hash>"
+updated_at: 2026-06-12T00:00:00Z
+reviewed_at: 2026-06-12T00:00:00Z
+stale_after: 2026-07-12T00:00:00Z
+git:
+  branch: main_dev
+  commit: abc123
+tags:
+  - pstr
+  - api
+---
+```
+
+PSTR forbidden content:
+
+- scripts, task execution, or automations,
+- roadmap, spec acceptance criteria, ADR decisions, or future-state planning,
+- aspirational language such as "should", "future", "roadmap", "proposal", or
+  "we should".
+
+PSTR allowed content:
+
+- current entrypoints, modules, routes, services, schemas, data flows,
+  integrations, tests, dependencies, critical files, ownership, and observed
+  structural gaps.
 
 Materialized execution:
 
 ```text
 .afol/state/
 └── afol.db
+```
+
+Ownership classes:
+
+```text
+Canônico/versionado:
+- .afol/adm/
+- .afol/memory/memory.md
+- .afol/library/
+
+Mapa observado/versionável:
+- .afol/pstr/
+
+Execução:
+- .afol/wb/
+
+Derivado/reconstruível:
+- .afol/state/
+- .afol/data/index/
+
+Append-only/auditoria:
+- .afol/data/events/
+
+Temporário:
+- .afol/tmp/
+```
+
+Stable reference forms:
+
+```text
+adm:spec:F-18.S6
+pstr:api/auth#Routes
+memory:where-we-stopped
+library:agent-memory-systems/hermes-memory-system#C-001
+wb:260612_1400/T-01
 ```
 
 ## 7) Scope
@@ -190,6 +292,16 @@ In scope:
 - Separate memory from library.
 - Keep IWE as a library provider, never core authority.
 - Define migration, drift, and validation requirements.
+- Define time, freshness, health, cleanup, archive, branch/commit, and token
+  budget requirements.
+- Define brain-layer requirements: AFOL shape pack, source axes, think-lite
+  bundles, hybrid retrieval, sweep/doctor, resolver routing, and operation trust
+  context.
+- Define strategy for small specs and large specs:
+  - small feature: one `spec.md`;
+  - large feature: `spec.md`, `requirements.md`, `design.md`, and `tasks.md`.
+- Define adm steering metadata such as `inclusion: always | fileMatch | manual
+  | auto` so AFOL can route context without loading all administration docs.
 
 Out of scope:
 
@@ -214,6 +326,18 @@ Constraints:
 - Mutable project-local AFOL state belongs under `.afol/**`.
 - SQLite must not become an opaque source that overwrites human-authored
   Markdown/YAML outside managed blocks.
+- Markdown/YAML owns authorship. SQLite owns speed. IWE owns library graph
+  retrieval only. AFOL owns validation and policy.
+- JSON snapshots are debug/interchange artifacts, not live competing sources of
+  truth.
+- `.afol/wb/.active_session` is local convenience only. Multi-agent and
+  governed commands must pass explicit session id.
+- OperationContext must distinguish local, agent, and remote callers before
+  sensitive mutation.
+- `adm` owns canonical project intent; memory may summarize intent only when it
+  links back to canonical adm docs.
+- `adm check-pstr` compares only current pstr maps. If pstr is stale, the
+  result is inconclusive and points to rebuild first.
 
 ## 9) Acceptance
 
@@ -221,9 +345,23 @@ Constraints:
 - Roadmap points F-18 at this parent spec.
 - `.afol/adm/**` is documented as the target administration surface.
 - `.afol/pstr/**` is documented as the target project-structure surface.
+- `.afol/pstr/**` is documented as maps only, with code as final authority for
+  current implementation structure.
 - `docs/arc/**` is explicitly transitional, not silently deprecated.
 - Memory, library, SQLite, workbench, evidence, and provider authority are
   separated.
+- Adm steering docs can declare inclusion mode for context routing.
+- Specs can remain one file when small and split into requirements/design/tasks
+  only when feature size justifies it.
+- Time, freshness, health, cleanup, archive, branch/commit, and token budget
+  policies are documented as cross-layer requirements.
+- Stale pstr, stale library docs, stale memory, and stale SQLite materialization
+  are excluded from trusted context bundles by default.
+- `afol health` and domain health commands are specified as fast-by-default,
+  severity-classified checks.
+- AFOL shape pack and resolver are documented as target routing contracts.
+- Context bundles support think-lite explain output with why, gaps, freshness,
+  evidence tags, create-safety hints, and do-not-load.
 - ADR records the supersession of the narrow JSON-source direction.
 - Follow-on slices are named without implementing across layers at once.
 
@@ -237,6 +375,10 @@ Rollout approach:
 4. Add hydration/projection/drift checks.
 5. Add memory, library, context bundles, spec gates, and cleanup commands in
    separate slices.
+6. Add temporal health, freshness, maintenance, archive, and token-budget checks
+   as a separate slice.
+7. Add brain-shape, retrieval, doctor, resolver, and trust-boundary behavior as
+   a separate slice.
 
 Backout or deferral:
 
