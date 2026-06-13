@@ -41,7 +41,7 @@ risk_level: medium
 - This spec does not introduce cloud memory, vector databases, or cross-repo state.
 - This spec does not require heavyweight hooks that are unavailable across runtimes.
 - This spec does not let provider hooks create a second source of truth outside
-  `.afol/wb/`, `.agents/data/`, and explicit draft artifacts.
+  `.afol/wb/`, `.afol/data/`, and explicit draft artifacts.
 
 ## 4) Scope
 

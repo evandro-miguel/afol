@@ -97,7 +97,7 @@ Required local files:
 | `.afol/wb/` | project | sessions, tasks, logs, evidence |
 | `.agents/rules/` | project | local rules and routing metadata |
 | `.agents/skills/` | project | local skills and metadata |
-| `.agents/data/` | generated | indexes, events, benchmark results |
+| `.afol/data/` | generated | indexes, events, benchmark results |
 | `AGENTS.md` | project | runtime instruction front door |
 | `docs/arc/` | project | minimal goal-state governance |
 

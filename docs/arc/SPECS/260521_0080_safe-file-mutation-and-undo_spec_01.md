@@ -16,7 +16,7 @@ links:
 scope:
   repo_areas:
   - cli/files cli/mutations
-  - .agents/data
+  - .afol/data
   packages:
   - agentic-cli
 risk_level: high

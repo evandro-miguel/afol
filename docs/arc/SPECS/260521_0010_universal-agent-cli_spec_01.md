@@ -100,7 +100,7 @@ Authoritative local files:
 .afol/wb/
 .agents/rules/
 .agents/skills/
-.agents/data/
+.afol/data/
 ```
 
 Loader precedence:
