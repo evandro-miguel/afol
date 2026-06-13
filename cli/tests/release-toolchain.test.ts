@@ -39,7 +39,13 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:security:required"]).toBe(
 			"bun run security:scan:required",
 		);
+		expect(scripts["validate:security:release"]).toBe(
+			"bun run security:scan:release",
+		);
 		expect(scripts["validate:release"]).toContain(
+			"bun run validate:security:release",
+		);
+		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:security:required",
 		);
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");

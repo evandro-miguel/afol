@@ -132,9 +132,11 @@ function buildReleaseScannerOutcome(opts: {
 	tool: string;
 	kind: ScanMode;
 	mode: ScanRequirement;
+	env?: NodeJS.ProcessEnv;
 }): SecurityScanOutcome {
 	const probe = spawnSync(opts.tool, ["--version"], {
 		encoding: "utf8",
+		env: opts.env,
 		shell: false,
 		stdio: "ignore",
 	});
@@ -151,6 +153,15 @@ function buildReleaseScannerOutcome(opts: {
 		});
 	}
 
+	if ((probe.status ?? 0) !== 0) {
+		return buildCommandOutcome({
+			tool: opts.tool,
+			kind: opts.kind,
+			mode: opts.mode,
+			status: probe.status ?? 1,
+		});
+	}
+
 	return {
 		tool: opts.tool,
 		kind: opts.kind,
@@ -160,11 +171,12 @@ function buildReleaseScannerOutcome(opts: {
 	};
 }
 
-export function buildReleaseSecurityScanOutcomes(): SecurityScanOutcome[] {
+export function buildReleaseSecurityScanOutcomes(env?: NodeJS.ProcessEnv): SecurityScanOutcome[] {
 	return RELEASE_SECURITY_SCANNERS.map((scanner) =>
 		buildReleaseScannerOutcome({
 			...scanner,
 			mode: "release",
+			...(env ? { env } : {}),
 		}),
 	);
 }
