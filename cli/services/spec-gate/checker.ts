@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { atomicWriteText } from "../io/atomic";
+import { resolveAdmPaths } from "../adm";
 import { resolveProjectPaths } from "../project/paths";
 import type { SpecCheckResult } from "./types";
 
@@ -162,21 +163,22 @@ function collectMarkdownFiles(rootDir: string): string[] {
 }
 
 function findSpecFile(root: string, specId: string): string | null {
-	const specsRoot = join(root, "docs", "arc", "SPECS");
-	for (const specPath of collectMarkdownFiles(specsRoot)) {
-		const parsed = parseFrontmatter(readFileSync(specPath, "utf8"));
-		if (!parsed) {
-			continue;
-		}
-		const frontmatter = parsed as SpecFrontmatter;
-		if (readString(frontmatter.doc_type) !== "spec") {
-			continue;
-		}
-		if (readString(frontmatter.id) === specId) {
-			return specPath;
-		}
-		if (basename(specPath) === `${specId}.md`) {
-			return specPath;
+	for (const specsRoot of [resolveAdmPaths(root).specsDir, join(root, "docs", "arc", "SPECS")]) {
+		for (const specPath of collectMarkdownFiles(specsRoot)) {
+			const parsed = parseFrontmatter(readFileSync(specPath, "utf8"));
+			if (!parsed) {
+				continue;
+			}
+			const frontmatter = parsed as SpecFrontmatter;
+			if (readString(frontmatter.doc_type) !== "spec") {
+				continue;
+			}
+			if (readString(frontmatter.id) === specId) {
+				return specPath;
+			}
+			if (basename(specPath) === `${specId}.md`) {
+				return specPath;
+			}
 		}
 	}
 	return null;

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { atomicWriteText } from "../io/atomic";
+import { resolveAdmPaths } from "../adm";
 
 type Frontmatter = Record<string, unknown>;
 
@@ -122,7 +123,7 @@ function collectMarkdownFiles(rootDir: string): string[] {
 }
 
 function adrDir(root: string): string {
-	return join(root, "docs", "arc", "DECISIONS");
+	return resolveAdmPaths(root).decisionsDir;
 }
 
 function adrPath(root: string, id: string): string | null {

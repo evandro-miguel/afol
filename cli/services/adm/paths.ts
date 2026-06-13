@@ -38,7 +38,7 @@ export function resolveAdmPaths(root: string): AdmPaths {
 		roadmapDir: join(admDir, "roadmap"),
 		specsDir: join(admDir, "specs"),
 		decisionsDir: join(admDir, "decisions"),
-		changelogFile: join(admDir, "changelog.md"),
+		changelogFile: join(admDir, "changelog", "CHANGELOG.md"),
 		doctrineDir: join(admDir, "doctrine"),
 		archiveDir: join(admDir, "archive"),
 		migrationsDir: join(admDir, "migrations"),

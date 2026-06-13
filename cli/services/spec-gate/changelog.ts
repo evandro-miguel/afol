@@ -1,8 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { atomicWriteText } from "../io/atomic";
-
-const CHANGELOG_FILE = "CHANGELOG.md";
+import { resolveAdmPaths } from "../adm";
 
 export type ChangelogEntryType = "decision" | "behavior" | "breaking" | "fix";
 
@@ -11,7 +10,7 @@ function now(): string {
 }
 
 function changelogPath(root: string): string {
-	return join(root, "docs", "arc", CHANGELOG_FILE);
+	return resolveAdmPaths(root).changelogFile;
 }
 
 export function addChangelogEntry(
@@ -22,6 +21,7 @@ export function addChangelogEntry(
 	const path = changelogPath(root);
 	const heading = `## ${now()}`;
 	const entry = `- ${type}: ${message.trim().replace(/\s+/g, " ")}`;
+	mkdirSync(dirname(path), { recursive: true });
 	const existing = existsSync(path)
 		? readFileSync(path, "utf8").replace(/\n*$/g, "")
 		: "# Changelog";

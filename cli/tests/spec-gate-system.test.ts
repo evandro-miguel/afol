@@ -55,8 +55,10 @@ function createFixture(): string {
 	mkdirSync(join(root, ".afol", "state"), { recursive: true });
 	mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
 	mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "decisions"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "changelog"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });
-	mkdirSync(join(root, "docs", "arc", "DECISIONS"), { recursive: true });
 	writeFileSync(
 		join(root, ".agents", "config.json"),
 		'{"version":"0.1.0"}',
@@ -105,6 +107,24 @@ function writeTask(
 }
 
 function writeSpec(root: string, id: string, status: string): string {
+	const path = join(root, ".afol", "adm", "specs", `${id}.md`);
+	writeFileSync(
+		path,
+		[
+			"---",
+			"doc_type: spec",
+			`id: "${id}"`,
+			`status: ${status}`,
+			"---",
+			"",
+			`# ${id}`,
+		].join("\n"),
+		"utf8",
+	);
+	return path;
+}
+
+function writeLegacySpec(root: string, id: string, status: string): string {
 	const path = join(root, "docs", "arc", "SPECS", `${id}.md`);
 	writeFileSync(
 		path,
@@ -145,6 +165,19 @@ describe("spec-gate system", () => {
 			expect(result.status).toBe("compatible");
 			expect(result.spec_id).toBe("spec-001");
 			expect(getSpecCheck(root, "session-a", "T-01")).toEqual(result);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkSpecCompatibility falls back to docs arc spec", () => {
+		const root = createFixture();
+		try {
+			writeTask(root, "session-a", "T-01", "spec-legacy");
+			writeLegacySpec(root, "spec-legacy", "active");
+			const result = checkSpecCompatibility(root, "session-a", "T-01");
+			expect(result.status).toBe("compatible");
+			expect(result.spec_id).toBe("spec-legacy");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -199,9 +232,9 @@ describe("spec-gate system", () => {
 		try {
 			const existing = join(
 				root,
-				"docs",
-				"arc",
-				"DECISIONS",
+				".afol",
+				"adm",
+				"decisions",
 				"ADR-001-existing.md",
 			);
 			writeFileSync(
@@ -266,7 +299,7 @@ describe("spec-gate system", () => {
 			createAdr(root, "New decision");
 			supersedeAdr(root, "ADR-001", "ADR-002");
 			const content = readFileSync(
-				join(root, "docs", "arc", "DECISIONS", "ADR-001-old-decision.md"),
+				join(root, ".afol", "adm", "decisions", "ADR-001-old-decision.md"),
 				"utf8",
 			);
 			expect(content).toContain("status: superseded");
@@ -304,7 +337,7 @@ describe("spec-gate system", () => {
 	test("addChangelogEntry appends to existing", () => {
 		const root = createFixture();
 		try {
-			const path = join(root, "docs", "arc", "CHANGELOG.md");
+			const path = join(root, ".afol", "adm", "changelog", "CHANGELOG.md");
 			writeFileSync(
 				path,
 				["# Changelog", "", "## old", "- fix: prior", ""].join("\n"),
