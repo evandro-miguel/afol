@@ -109,11 +109,23 @@ describe("update command", () => {
 			const json = capture();
 			expect(await runUpdateCommand(["ck", "--json"], root, json.io)).toBe(0);
 			const parsed = JSON.parse(json.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
 				hasSource: boolean;
 				currentRevision: string;
 				ownershipSource: Record<string, number>;
+				data?: {
+					hasSource?: boolean;
+					currentRevision?: string;
+					ownershipSource?: Record<string, number>;
+				};
 			};
+			expect(parsed.schema).toBe("afol.result/v1");
+			expect(parsed.ok).toBe(true);
+			expect(parsed.exit_code).toBe(0);
 			expect(parsed).toMatchObject({ hasSource: true, currentRevision: "old" });
+			expect(parsed.data).toMatchObject({ hasSource: true, currentRevision: "old" });
 			expect(parsed.ownershipSource.managed).toBe(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

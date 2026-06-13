@@ -12,8 +12,15 @@ import { resolveProjectPaths } from "../services/project/paths";
 import {
 	checkTemplateUpdate,
 	formatUpdateCheck,
+	type UpdateCheckResult,
 	type UpdateOperation,
 } from "../services/update/check";
+import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -167,6 +174,48 @@ type StagedUpdateOperation = {
 	record: MutationRecord;
 };
 
+function resultEnvelope<T extends Record<string, unknown>>(
+	data: T,
+	action: string,
+	exitCode: number,
+): ResultEnvelope<T> {
+	return exitCode === 0
+		? envelopeOk(data, { action, exitCode })
+		: {
+			schema: "afol.result/v1",
+			ok: false,
+			action,
+			exit_code: exitCode,
+			data,
+		};
+}
+
+function writeJsonResult(
+	io: CommandIo,
+	action: string,
+	result: UpdateCheckResult,
+	exitCode: number,
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(
+				resultEnvelope(result, action, exitCode),
+				[
+					"hasSource",
+					"currentRevision",
+					"sourceRevision",
+					"upToDate",
+					"changes",
+					"ownershipSource",
+					"ownershipCurrent",
+					"filePreviews",
+					"operations",
+				],
+			),
+		),
+	);
+}
+
 function stageUpdateOperations(
 	projectRoot: string,
 	operations: UpdateOperation[],
@@ -319,27 +368,21 @@ export async function runUpdateCommand(
 
 		if (command === "apply") {
 			if (!result.hasSource) {
-				io.stdout(
-					parsedArgs.json
-						? JSON.stringify(result)
-						: formatUpdateCheck(result, command).trimEnd(),
-				);
+				parsedArgs.json
+					? writeJsonResult(io, `update.${command}`, result, 1)
+					: io.stdout(formatUpdateCheck(result, command).trimEnd());
 				return 1;
 			}
 			if (blockedCount > 0) {
-				io.stdout(
-					parsedArgs.json
-						? JSON.stringify(result)
-						: formatUpdateCheck(result, "apply").trimEnd(),
-				);
+				parsedArgs.json
+					? writeJsonResult(io, "update.apply", result, 4)
+					: io.stdout(formatUpdateCheck(result, "apply").trimEnd());
 				return 4;
 			}
 			if (parsedArgs.dryRun) {
-				io.stdout(
-					parsedArgs.json
-						? JSON.stringify(result)
-						: formatUpdateCheck(result, "apply").trimEnd(),
-				);
+				parsedArgs.json
+					? writeJsonResult(io, "update.apply", result, 0)
+					: io.stdout(formatUpdateCheck(result, "apply").trimEnd());
 				return 0;
 			}
 			if (writableOperations.length > 0) {
@@ -351,19 +394,15 @@ export async function runUpdateCommand(
 				parsedArgs,
 				runtime,
 			);
-			io.stdout(
-				parsedArgs.json
-					? JSON.stringify(result)
-					: formatUpdateCheck(result, command).trimEnd(),
-			);
+			parsedArgs.json
+				? writeJsonResult(io, "update.apply", result, 0)
+				: io.stdout(formatUpdateCheck(result, command).trimEnd());
 			return 0;
 		}
 
-		io.stdout(
-			parsedArgs.json
-				? JSON.stringify(result)
-				: formatUpdateCheck(result, command).trimEnd(),
-		);
+		parsedArgs.json
+			? writeJsonResult(io, `update.${command}`, result, result.hasSource ? 0 : 1)
+			: io.stdout(formatUpdateCheck(result, command).trimEnd());
 		return result.hasSource ? 0 : 1;
 	} catch (error) {
 		io.stderr((error as Error).message);
