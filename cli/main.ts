@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { runAdrCommand } from "./commands/adr";
+import { runAdmCommand } from "./commands/adm";
 import { runBootstrapCommand } from "./commands/bootstrap";
 import { runRuleCommand, runSkillCommand } from "./commands/catalog";
 import { runChangelogCommand } from "./commands/changelog";
@@ -51,6 +52,7 @@ const HELP_LINES = [
 	"  l/log                  Append session log timeline entry",
 	"  vf/verify, verify-tasks Verify workbench tasks",
 	"  r/rule sk/skill up/update ls/local-state Inspect routing, updates, indexes",
+	"  adm                    Inspect adm paths and files",
 	"  ps/pstr cx/ctx lb/library mm/memory ht/health db/health do/doctor ma/maintenance schema/sweep spec/adr/changelog",
 	"  c/close b/bootstrap     Close active session / install scaffold into another repo",
 	"",
@@ -217,6 +219,14 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "localState") {
 		return runLocalStateCommand(resolution.args, project.value.root);
+	}
+
+	if (resolution.kind === "subcommand" && resolution.group === "adm") {
+		return runAdmCommand(
+			resolution.action,
+			resolution.args,
+			project.value.root,
+		);
 	}
 
 	if (resolution.kind === "subcommand") {

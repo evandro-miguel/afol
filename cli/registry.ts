@@ -22,6 +22,7 @@ export type CommandKind =
 	| "render"
 	| "library"
 	| "memory"
+	| "adm"
 	| "spec"
 	| "adr"
 	| "changelog"
@@ -235,6 +236,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "memory",
 		sideEffect: "read",
 		description: "Inspect memory entries",
+		category: "inspect",
+	},
+	{
+		command: "adm",
+		aliases: [],
+		kind: "adm",
+		sideEffect: "read",
+		description: "Inspect adm paths and files",
 		category: "inspect",
 	},
 	{

@@ -39,6 +39,7 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("cx")).toBe("ctx");
 		expect(kernelRegistry.resolveKind("library")).toBe("library");
 		expect(kernelRegistry.resolveKind("lb")).toBe("library");
+		expect(kernelRegistry.resolveKind("adm")).toBe("adm");
 		expect(kernelRegistry.resolveKind("health")).toBe("health");
 		expect(kernelRegistry.resolveKind("ht")).toBe("health");
 		expect(kernelRegistry.resolveKind("db")).toBe("db");
@@ -81,6 +82,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("render")?.sideEffect).toBe("generated");
 		expect(byCommand.get("library")?.sideEffect).toBe("read");
 		expect(byCommand.get("memory")?.sideEffect).toBe("read");
+		expect(byCommand.get("adm")?.sideEffect).toBe("read");
 		expect(byCommand.get("spec")?.sideEffect).toBe("read");
 		expect(byCommand.get("adr")?.sideEffect).toBe("read");
 		expect(byCommand.get("changelog")?.sideEffect).toBe("read");

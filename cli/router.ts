@@ -36,6 +36,7 @@ const SUBCOMMAND_GROUPS = new Set([
 	"render",
 	"library",
 	"memory",
+	"adm",
 	"spec",
 	"adr",
 	"changelog",
@@ -222,6 +223,19 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind === "localState") {
 		return { kind: "localState", args: rest };
+	}
+
+	if (topLevelKind === "adm") {
+		const first = rest[0];
+		if (first && kernelRegistry.isJsonAlias(first)) {
+			return { kind: "subcommand", group: "adm", action: "", args: rest };
+		}
+		return {
+			kind: "subcommand",
+			group: "adm",
+			action: first ?? "",
+			args: rest.slice(1),
+		};
 	}
 
 	if (topLevelKind && SUBCOMMAND_GROUPS.has(topLevelKind)) {
