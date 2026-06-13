@@ -96,6 +96,8 @@ describe("kernel registry", () => {
 				entry.sideEffect,
 			);
 			expect(entry.command.length).toBeGreaterThan(0);
+			expect(entry.description.length).toBeGreaterThan(0);
+			expect(entry.description.length).toBeLessThanOrEqual(80);
 		}
 	});
 });

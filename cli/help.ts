@@ -1,0 +1,51 @@
+import { kernelRegistry, type CommandCategory, type CommandSpec } from "./registry";
+
+const CATEGORY_ORDER: readonly CommandCategory[] = ["core", "workflow", "inspect", "ops"];
+
+const CATEGORY_LABELS: Record<CommandCategory, string> = {
+	core: "Core",
+	workflow: "Workflow",
+	inspect: "Inspect",
+	ops: "Ops",
+};
+
+function formatEntry(spec: CommandSpec): string {
+	const alias = spec.aliases[0];
+	const name = alias ? `${alias}/${spec.command}` : spec.command;
+	return `${name} - ${spec.description}`;
+}
+
+export function formatHelpText(registry = kernelRegistry): string {
+	const grouped = new Map<CommandCategory | "uncategorized", string[]>();
+	for (const category of CATEGORY_ORDER) {
+		grouped.set(category, []);
+	}
+	grouped.set("uncategorized", []);
+
+	for (const spec of registry.commands) {
+		const bucket = spec.category ?? "uncategorized";
+		const entries = grouped.get(bucket) ?? [];
+		entries.push(formatEntry(spec));
+		grouped.set(bucket, entries);
+	}
+
+	const lines = ["Usage: afol [command] [options]", "", "Commands"];
+	for (const category of CATEGORY_ORDER) {
+		const entries = grouped.get(category);
+		if (!entries?.length) {
+			continue;
+		}
+
+		lines.push(CATEGORY_LABELS[category]);
+		lines.push(`  ${entries.join(" | ")}`);
+	}
+
+	const uncategorized = grouped.get("uncategorized");
+	if (uncategorized?.length) {
+		lines.push("Other");
+		lines.push(`  ${uncategorized.join(" | ")}`);
+	}
+
+	lines.push("", "Flags", "  -j, --json  JSON output for status", "Aliases", "  a=afol");
+	return lines.join("\n");
+}
