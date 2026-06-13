@@ -92,26 +92,36 @@ function createHealthyFixture(): string {
 }
 
 describe("sweep command", () => {
-	test("daily sweep returns maintenance actions", async () => {
-		const root = mkdtempSync(join(tmpdir(), "sweep-daily-"));
-		try {
-			const out: string[] = [];
+		test("daily sweep returns maintenance actions", async () => {
+			const root = mkdtempSync(join(tmpdir(), "sweep-daily-"));
+			try {
+				const out: string[] = [];
 			const io = {
 				stdout: (value: string) => out.push(value),
 				stderr: (_: string) => undefined,
-			};
-			expect(await runSweepCommand("daily", ["--json"], root, io)).toBe(1);
-			const payload = JSON.parse(out[0] ?? "{}") as {
-				checked: number;
-				issues: number;
-				actions: string[];
-			};
-			expect(payload.checked).toBeGreaterThan(0);
-			expect(payload.issues).toBeGreaterThan(0);
-			expect(payload.actions).toContain("rebuild pstr");
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+				};
+				expect(await runSweepCommand("daily", ["--json"], root, io)).toBe(1);
+				const payload = JSON.parse(out[0] ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					exit_code: number;
+					action: string;
+					checked: number;
+					issues: number;
+					actions: string[];
+					data?: { action?: string; checked?: number; issues?: number; actions?: string[] };
+				};
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(false);
+				expect(payload.exit_code).toBe(1);
+				expect(payload.action).toBe("daily");
+				expect(payload.checked).toBeGreaterThan(0);
+				expect(payload.issues).toBeGreaterThan(0);
+				expect(payload.actions).toContain("rebuild pstr");
+				expect(payload.data?.action).toBe("daily");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 	});
 
 	test("daily sweep returns ok on healthy fixture", async () => {
@@ -147,18 +157,29 @@ describe("sweep command", () => {
 	test("monthly sweep returns JSON on healthy fixture", async () => {
 		const root = createHealthyFixture();
 		try {
-			const out: string[] = [];
-			const io = {
-				stdout: (value: string) => out.push(value),
-				stderr: (_: string) => undefined,
-			};
-			expect(await runSweepCommand("monthly", ["--json"], root, io)).toBe(0);
-			const payload = JSON.parse(out[0] ?? "{}");
-			expect(payload.action).toBe("monthly");
-			expect(payload.ok).toBe(true);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+				const out: string[] = [];
+				const io = {
+					stdout: (value: string) => out.push(value),
+					stderr: (_: string) => undefined,
+				};
+				expect(await runSweepCommand("monthly", ["--json"], root, io)).toBe(0);
+				const payload = JSON.parse(out[0] ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					exit_code: number;
+					action: string;
+					checked: number;
+					issues: number;
+					data?: { action?: string; checked?: number; issues?: number };
+				};
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(true);
+				expect(payload.exit_code).toBe(0);
+				expect(payload.action).toBe("monthly");
+				expect(payload.data?.action).toBe("monthly");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 	});
 
 	test("sweep rejects invalid args", async () => {

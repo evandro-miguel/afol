@@ -1,4 +1,10 @@
 import { maintenanceMonthly, maintenanceWeekly } from "../services/health";
+import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -11,6 +17,22 @@ const DEFAULT_IO: CommandIo = {
 };
 
 type MaintenanceMode = "weekly" | "monthly";
+
+function resultEnvelope<T extends Record<string, unknown>>(
+	data: T,
+	action: string,
+	exitCode: number,
+): ResultEnvelope<T> {
+	return exitCode === 0
+		? envelopeOk(data, { action, exitCode })
+		: {
+			schema: "afol.result/v1",
+			ok: false,
+			action,
+			exit_code: exitCode,
+			data,
+		};
+}
 
 function parseArgs(args: string[]): {
 	dryRun: boolean;
@@ -51,12 +73,21 @@ export async function runMaintenanceCommand(
 				: maintenanceMonthly(projectRoot, parsed.dryRun);
 		if (parsed.json) {
 			io.stdout(
-				JSON.stringify({
-					ok: true,
-					mode: parsed.mode,
-					dry_run: parsed.dryRun,
-					...result,
-				}),
+				stringifyEnvelope(
+					envelopeWithLegacyKeys(
+						resultEnvelope(
+							{
+								ok: true,
+								mode: parsed.mode,
+								dry_run: parsed.dryRun,
+								...result,
+							},
+							`maintenance.${parsed.mode}`,
+							0,
+						),
+						["ok", "mode", "dry_run", "actions", "applied"],
+					),
+				),
 			);
 		} else {
 			io.stdout(

@@ -1,4 +1,10 @@
 import { sweepDaily, sweepMonthly, sweepWeekly } from "../services/sweep";
+import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -11,6 +17,22 @@ const DEFAULT_IO: CommandIo = {
 };
 
 type SweepAction = "daily" | "weekly" | "monthly";
+
+function resultEnvelope<T extends Record<string, unknown>>(
+	data: T,
+	action: string,
+	exitCode: number,
+): ResultEnvelope<T> {
+	return exitCode === 0
+		? envelopeOk(data, { action, exitCode })
+		: {
+			schema: "afol.result/v1",
+			ok: false,
+			action,
+			exit_code: exitCode,
+			data,
+		};
+}
 
 function normalizeAction(value: string | undefined): SweepAction {
 	if (!value || value === "daily") return "daily";
@@ -46,15 +68,20 @@ export async function runSweepCommand(
 				: sweepAction === "weekly"
 					? sweepWeekly(projectRoot)
 					: sweepMonthly(projectRoot);
-		if (json)
+		if (json) {
 			io.stdout(
-				JSON.stringify({
-					ok: report.issues === 0,
-					action: sweepAction,
-					...report,
-				}),
+				stringifyEnvelope(
+					envelopeWithLegacyKeys(
+						resultEnvelope(
+							{ ok: report.issues === 0, action: sweepAction, ...report },
+							`sweep.${sweepAction}`,
+							report.issues === 0 ? 0 : 1,
+						),
+						["ok", "action", "checked", "issues", "actions"],
+					),
+				),
 			);
-		else
+		} else
 			io.stdout(
 				[
 					`sweep ${sweepAction}: ${report.issues === 0 ? "ok" : "issues"}`,
