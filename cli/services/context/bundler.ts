@@ -1,7 +1,9 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { resolveRules } from "../catalog/rules";
 import { listSkills, searchSkills } from "../catalog/skills";
+import { recallEntries } from "../memory";
+import { searchLibrary } from "../library";
 import { getPstrIndex, validatePstrIndex } from "../pstr";
 import { loadSessionState, validateState } from "../state";
 import { resolveProjectPaths } from "../project/paths";
@@ -184,20 +186,27 @@ function selectPstrRefs(root: string): string[] {
 	return index.maps.slice(0, 5).map((map) => `pstr:${map.id}`);
 }
 
-function selectMemoryRefs(root: string): string[] {
-	const memoryFile = resolveProjectPaths(root).abs.memoryFile;
-	return existsSync(memoryFile) ? [`memory:${basename(memoryFile)}`] : [];
+function bundleSearchQuery(taskId: string, surface: string, role: string): string {
+	const queryParts = taskId ? [taskId, surface, role] : [surface, role];
+	return queryParts.filter(Boolean).join(" ").trim();
 }
 
-function selectLibraryRefs(root: string): string[] {
-	const libraryDir = resolveProjectPaths(root).abs.libraryDir;
-	if (!existsSync(libraryDir)) {
+function selectMemoryRefs(root: string, taskId: string, surface: string, role: string): string[] {
+	const query = bundleSearchQuery(taskId, surface, role);
+	if (!query) {
 		return [];
 	}
-	return readdirSync(libraryDir)
-		.filter((name) => name.endsWith(".md") && statSync(join(libraryDir, name)).isFile())
-		.slice(0, 3)
-		.map((name) => `library:${name}`);
+	return recallEntries(root, query, { limit: 3 }).map((entry) => `memory:${entry.id}`);
+}
+
+function selectLibraryRefs(root: string, taskId: string, surface: string, role: string): string[] {
+	const query = bundleSearchQuery(taskId, surface, role);
+	if (!query) {
+		return [];
+	}
+	return searchLibrary(root, query)
+		.flatMap((result) => result.matching_claims.map((claim) => `library:${result.topic.slug}#${claim.id}`))
+		.slice(0, 3);
 }
 
 function doNotLoadList(): string[] {
@@ -281,8 +290,8 @@ export function buildContextBundle(root: string, opts: BuildOptions): ContextBun
 		tools: selectTools(session || undefined, taskId || undefined, surface),
 		validation_commands: selectValidationCommands(session || undefined, taskId || undefined),
 		pstr_refs: selectPstrRefs(root),
-		memory_refs: selectMemoryRefs(root),
-		library_refs: selectLibraryRefs(root),
+		memory_refs: selectMemoryRefs(root, taskId, surface, role),
+		library_refs: selectLibraryRefs(root, taskId, surface, role),
 		budget: { total_tokens: TOTAL_TOKENS, used_tokens: 0 },
 		gaps: [
 			!session ? "missing session" : "",

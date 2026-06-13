@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runContextCommand } from "../commands/context";
 import { buildContextBundle } from "../services/context/bundler";
+import { addClaim, invalidateClaim, proposeTopic } from "../services/library/crud";
+import { writeMemory } from "../services/memory/crud";
 import {
 	rebuildSectionIndex,
 	getSectionIndex,
@@ -98,7 +100,7 @@ function createSectionFixture(): string {
 	return root;
 }
 
-function createBundleFixture(options?: { inflate?: boolean; pstr?: "valid" | "missing" | "stale" }): string {
+function createBundleFixture(options?: { inflate?: boolean; pstr?: "valid" | "missing" | "stale"; memoryRefs?: boolean; libraryRefs?: boolean }): string {
 	const root = createSectionFixture();
 	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
 	mkdirSync(join(root, ".afol", "skills", "alpha-helper"), { recursive: true });
@@ -140,6 +142,74 @@ function createBundleFixture(options?: { inflate?: boolean; pstr?: "valid" | "mi
 
 	writeFileSync(join(root, ".afol", "library", "alpha-guide.md"), "# Guide\n", "utf8");
 	writeFileSync(join(root, ".afol", "memory", "memory.md"), "# Memory\n", "utf8");
+	if (options?.memoryRefs) {
+		writeMemory(root, {
+			updated_at: "2026-06-13T00:00:00.000Z",
+			entries: [
+				{
+					id: "MEM-ACTIVE",
+					title: "Alpha memory",
+					body: "T-01 alpha designer active memory",
+					status: "active",
+					created_at: "2026-06-13T00:00:00.000Z",
+					updated_at: "2026-06-13T00:00:00.000Z",
+					tags: ["alpha"],
+				},
+				{
+					id: "MEM-ARCHIVED",
+					title: "Alpha memory archived",
+					body: "T-01 alpha designer archived memory",
+					status: "archived",
+					created_at: "2026-06-13T00:00:00.000Z",
+					updated_at: "2026-06-13T00:00:00.000Z",
+					tags: ["alpha"],
+				},
+				{
+					id: "MEM-REJECTED",
+					title: "Alpha memory rejected",
+					body: "T-01 alpha designer rejected memory",
+					status: "rejected",
+					created_at: "2026-06-13T00:00:00.000Z",
+					updated_at: "2026-06-13T00:00:00.000Z",
+					tags: ["alpha"],
+				},
+				{
+					id: "MEM-INVALIDATED",
+					title: "Alpha memory invalidated",
+					body: "T-01 alpha designer invalidated memory",
+					status: "invalidated",
+					created_at: "2026-06-13T00:00:00.000Z",
+					updated_at: "2026-06-13T00:00:00.000Z",
+					tags: ["alpha"],
+				},
+			],
+		});
+	}
+	if (options?.libraryRefs) {
+		proposeTopic(root, "alpha", "Alpha library", [
+			{
+				id: "SRC-1",
+				url: "https://example.com/alpha",
+				title: "Alpha source",
+				accessed_at: "2026-06-13T00:00:00.000Z",
+			},
+		]);
+		addClaim(root, "alpha", {
+			id: "CLAIM-CURRENT",
+			text: "T-01 alpha designer current claim",
+			source_ids: ["SRC-1"],
+			status: "current",
+			created_at: "2026-06-13T00:00:00.000Z",
+		});
+		addClaim(root, "alpha", {
+			id: "CLAIM-INVALID",
+			text: "T-01 alpha designer invalidated claim",
+			source_ids: ["SRC-1"],
+			status: "current",
+			created_at: "2026-06-13T00:00:00.000Z",
+		});
+		invalidateClaim(root, "alpha", "CLAIM-INVALID", "wrong");
+	}
 	if (options?.pstr !== "missing") {
 		writeFileSync(
 			join(root, ".afol", "pstr", "index.json"),
@@ -475,6 +545,40 @@ describe("context system", () => {
 		}
 	});
 
+	test("buildContextBundle includes active memory refs and excludes inactive statuses", () => {
+		const root = createBundleFixture({ memoryRefs: true });
+		try {
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+			});
+			expect(bundle.memory_refs).toEqual(["memory:MEM-ACTIVE"]);
+			expect(bundle.memory_refs.join(" ")).not.toContain("MEM-ARCHIVED");
+			expect(bundle.memory_refs.join(" ")).not.toContain("MEM-REJECTED");
+			expect(bundle.memory_refs.join(" ")).not.toContain("MEM-INVALIDATED");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle includes current library claim refs and excludes invalidated claims", () => {
+		const root = createBundleFixture({ libraryRefs: true });
+		try {
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+			});
+			expect(bundle.library_refs).toEqual(["library:alpha#CLAIM-CURRENT"]);
+			expect(bundle.library_refs.join(" ")).not.toContain("CLAIM-INVALID");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol ctx build returns 0 and rebuilds sections", async () => {
 		const root = createSectionFixture();
 		try {
@@ -618,10 +722,22 @@ describe("context system", () => {
 		try {
 			const captured = captureIo();
 			expect(await runContextCommand("explain", ["-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { ok: boolean; reason: { included: string[]; excluded: string[] } };
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				why: unknown;
+				gaps: string[];
+				freshness: unknown;
+				evidence_tags: string[];
+				create_safety_hints: string[];
+				do_not_load: string[];
+			};
 			expect(payload.ok).toBe(true);
-			expect(payload.reason.included.length).toBeGreaterThan(0);
-			expect(payload.reason.excluded).toContain("raw .afol/state/afol.db");
+			expect(payload.why).toBeDefined();
+			expect(payload.gaps).toEqual(expect.any(Array));
+			expect(payload.freshness).toBeDefined();
+			expect(payload.evidence_tags).toEqual(expect.any(Array));
+			expect(payload.create_safety_hints).toEqual(expect.any(Array));
+			expect(payload.do_not_load).toContain("raw .afol/state/afol.db");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

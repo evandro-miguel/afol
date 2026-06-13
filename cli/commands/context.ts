@@ -128,15 +128,39 @@ function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
 }
 
 function formatExplanation(bundle: ReturnType<typeof buildContextBundle>) {
+	const evidenceTags = Array.from(
+		new Set([
+			...bundle.refs.map((ref) => ref.domain),
+			...(bundle.pstr_refs.length > 0 ? ["pstr"] : []),
+			...(bundle.memory_refs.length > 0 ? ["memory"] : []),
+			...(bundle.library_refs.length > 0 ? ["library"] : []),
+		]),
+	);
 	return {
 		ok: true,
-		bundle,
-		reason: {
-			included: bundle.refs.map((ref) => `${ref.domain}:${ref.path}${ref.section ? `#${ref.section}` : ""}`),
+		why: {
+			included: [
+				...bundle.refs.map((ref) => `${ref.domain}:${ref.path}${ref.section ? `#${ref.section}` : ""}`),
+				...bundle.memory_refs,
+				...bundle.library_refs,
+			],
 			excluded: bundle.do_not_load,
-			gaps: bundle.gaps,
-			budget: bundle.budget,
 		},
+		gaps: bundle.gaps,
+		freshness: {
+			pstr: bundle.pstr_refs.length > 0 ? "fresh" : "missing",
+			memory: bundle.memory_refs.length > 0 ? "fresh" : "missing",
+			library: bundle.library_refs.length > 0 ? "fresh" : "missing",
+			state: bundle.gaps.includes("no hydrated session state") ? "missing" : "fresh",
+		},
+		evidence_tags: evidenceTags,
+		create_safety_hints: [
+			"load only cited refs",
+			"avoid whole-tree loads",
+			"prefer current memory and library refs",
+		],
+		do_not_load: bundle.do_not_load,
+		bundle,
 	};
 }
 
