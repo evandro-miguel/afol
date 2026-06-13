@@ -11,6 +11,12 @@ import {
 import { dirname, join } from "node:path";
 import { createPatch } from "diff";
 import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
+import {
 	appendMutationRecord,
 	createMutationId,
 	findLatestSupportedMutation,
@@ -46,6 +52,39 @@ type CommandResult = {
 	diff_preview?: string | undefined;
 	message?: string;
 };
+
+function fileResultEnvelope(result: CommandResult): ResultEnvelope<CommandResult> {
+	if (result.status !== "blocked") {
+		return envelopeOk(result, { action: "file", exitCode: 0 });
+	}
+
+	return {
+		schema: "afol.result/v1",
+		ok: false,
+		action: "file",
+		exit_code: 4,
+		data: result,
+	};
+}
+
+const FILE_RESULT_LEGACY_KEYS = [
+	"command",
+	"status",
+	"dry_run",
+	"session",
+	"task_id",
+	"reason",
+	"path",
+	"destination",
+	"before_hash",
+	"after_hash",
+	"mutation_id",
+	"target_mutation_id",
+	"backup_path",
+	"overwritten_backup_path",
+	"diff_preview",
+	"message",
+] as const satisfies readonly (keyof CommandResult)[];
 
 type CommandArgs = {
 	command: FileCommand;
@@ -1163,7 +1202,14 @@ function outputResult(
 	asJson: boolean,
 ): void {
 	if (asJson) {
-		io.stdout(`${JSON.stringify(result)}\n`);
+		io.stdout(
+			`${stringifyEnvelope(
+				envelopeWithLegacyKeys(
+					fileResultEnvelope(result),
+					FILE_RESULT_LEGACY_KEYS,
+				),
+			)}\n`,
+		);
 		return;
 	}
 	io.stdout(formatHumanResult(result));
