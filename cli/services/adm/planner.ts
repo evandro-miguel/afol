@@ -77,7 +77,7 @@ function targetPathFor(sourcePath: string): string | null {
 	return null;
 }
 
-export function planAdmMigration(root: string): AdmPlanResult {
+export function buildAdmMigrationPlan(root: string): AdmPlanResult {
 	const manifest = listArcDocs(root)
 		.sort((left, right) => left.localeCompare(right))
 		.map((sourcePath) => {
@@ -99,3 +99,5 @@ export function planAdmMigration(root: string): AdmPlanResult {
 
 	return { manifest };
 }
+
+export const planAdmMigration = buildAdmMigrationPlan;

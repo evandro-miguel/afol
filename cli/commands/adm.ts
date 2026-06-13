@@ -1,5 +1,10 @@
 import { relative } from "node:path";
-import { listAdmFiles, planAdmMigration, resolveAdmPaths } from "../services/adm";
+import {
+	buildAdmMigrationPlan,
+	listAdmFiles,
+	migrateAdm,
+	resolveAdmPaths,
+} from "../services/adm";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -81,25 +86,52 @@ export async function runAdmCommand(
 			if (admAction === "plan" && parsed.dryRun) {
 				throw new Error("Unknown adm argument: --dry-run");
 			}
-			if (admAction === "migrate" && !parsed.dryRun) {
-				throw new Error("adm migrate requires --dry-run");
+			if (admAction === "plan") {
+				const result = buildAdmMigrationPlan(projectRoot);
+				if (parsed.json) {
+					io.stdout(JSON.stringify({ action: admAction, ...result }));
+				} else {
+					io.stdout(
+						[
+							`${admAction}: ${result.manifest.length} files`,
+							...result.manifest.map(
+								(entry) => `${entry.source_path} -> ${entry.target_path}`,
+							),
+						].join("\n"),
+					);
+				}
+				return 0;
 			}
-			const result = planAdmMigration(projectRoot);
-			if (parsed.json) {
-				io.stdout(
-					JSON.stringify(
-						admAction === "migrate"
-							? { action: admAction, dry_run: true, ...result }
-							: { action: admAction, ...result },
-					),
-				);
-			} else {
-				io.stdout(
-					[
+
+			if (parsed.dryRun) {
+				const result = buildAdmMigrationPlan(projectRoot);
+				if (parsed.json) {
+					io.stdout(
+						JSON.stringify({
+							action: admAction,
+							dry_run: true,
+							archive_path: null,
+							count: result.manifest.length,
+							manifest: result.manifest,
+						}),
+					);
+				} else {
+					io.stdout([
 						`${admAction}: ${result.manifest.length} files`,
-						...result.manifest.map((entry) => `${entry.source_path} -> ${entry.target_path}`),
-					].join("\n"),
-				);
+						"archive: (dry-run)",
+					].join("\n"));
+				}
+				return 0;
+			}
+
+			const result = migrateAdm(projectRoot);
+			if (parsed.json) {
+				io.stdout(JSON.stringify({ action: admAction, ...result }));
+			} else {
+				io.stdout([
+					`${admAction}: ${result.manifest.length} files`,
+					`archive: ${result.archive_path}`,
+				].join("\n"));
 			}
 			return 0;
 		}
