@@ -43,6 +43,7 @@ function createFixture(): string {
 	mkdirSync(join(root, "cli"), { recursive: true });
 	mkdirSync(join(root, "src", "project-template"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb", "test-session"), { recursive: true });
 
 	writeFileSync(
@@ -88,6 +89,36 @@ function createFixture(): string {
 	);
 	writeFileSync(
 		join(root, "docs", "arc", "SPECS", "spec-a.md"),
+		[
+			"---",
+			"doc_type: spec",
+			"id: spec-a",
+			"status: active",
+			"---",
+			"",
+			"# Spec A",
+			"",
+		].join("\n"),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "adm", "specs", "INDEX.md"),
+		[
+			"---",
+			"doc_type: specs_index",
+			"id: specs_index",
+			"status: active",
+			"---",
+			"",
+			"| SPEC ID | Theme | Status | Owner | Links |",
+			"|--------:|-------|--------|-------|------|",
+			"| spec-a | spec-a | active | owner | |",
+			"",
+		].join("\n"),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "adm", "specs", "spec-a.md"),
 		[
 			"---",
 			"doc_type: spec",
@@ -189,6 +220,18 @@ describe("drift validation", () => {
 						finding.domain === "state" && finding.severity === "warn",
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("runDriftCheck reports adm drift", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(join(root, ".afol", "adm", "specs", "spec-a.md"), "changed", "utf8");
+			const report = runDriftCheck(root);
+			expect(report.ok).toBe(false);
+			expect(report.findings.some((finding) => finding.domain === "adm")).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

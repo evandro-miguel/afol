@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import { computeSourceHash } from "../../core/source-hash";
+import { validateAdmMigration } from "../adm";
 import { buildPstrIndexSnapshot, getPstrIndex } from "../pstr/builder";
 import { openDb } from "../state/db";
 import type { DriftFinding, DriftReport } from "./types";
@@ -364,11 +365,16 @@ export function checkSpecDrift(root: string): DriftFinding[] {
 	return findings;
 }
 
+export function checkAdmDrift(root: string): DriftFinding[] {
+	return validateAdmMigration(root).findings;
+}
+
 export function runDriftCheck(
 	root: string,
-	opts?: { pstr?: boolean; state?: boolean; specs?: boolean },
+	opts?: { adm?: boolean; pstr?: boolean; state?: boolean; specs?: boolean },
 ): DriftReport {
 	const findings = [
+		...((opts?.adm ?? true) ? checkAdmDrift(root) : []),
 		...((opts?.pstr ?? true) ? checkPstrDrift(root) : []),
 		...((opts?.state ?? true) ? checkStateDrift(root) : []),
 		...((opts?.specs ?? true) ? checkSpecDrift(root) : []),

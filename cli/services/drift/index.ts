@@ -1,4 +1,5 @@
 export {
+	checkAdmDrift,
 	checkPstrDrift,
 	checkSpecDrift,
 	checkStateDrift,

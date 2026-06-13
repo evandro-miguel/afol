@@ -4,6 +4,7 @@ import {
 	listAdmFiles,
 	migrateAdm,
 	resolveAdmPaths,
+	validateAdmMigration,
 } from "../services/adm";
 
 type CommandIo = {
@@ -16,7 +17,7 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-type AdmAction = "paths" | "show" | "plan" | "migrate";
+type AdmAction = "paths" | "show" | "plan" | "migrate" | "validate";
 
 function normalizeAction(value: string | undefined): AdmAction {
 	if (!value || value === "paths") {
@@ -30,6 +31,9 @@ function normalizeAction(value: string | undefined): AdmAction {
 	}
 	if (value === "migrate") {
 		return "migrate";
+	}
+	if (value === "validate") {
+		return "validate";
 	}
 	throw new Error(`Unknown adm action: ${value}`);
 }
@@ -134,6 +138,29 @@ export async function runAdmCommand(
 				].join("\n"));
 			}
 			return 0;
+		}
+
+		if (admAction === "validate") {
+			if (parsed.dryRun) {
+				throw new Error("Unknown adm argument: --dry-run");
+			}
+			const report = validateAdmMigration(projectRoot);
+			if (parsed.json) {
+				io.stdout(JSON.stringify({ action: admAction, ...report }));
+			} else {
+				io.stdout(
+					[
+						`${admAction}: ${report.ok ? "passed" : "failed"}`,
+						`checked_at: ${report.checked_at}`,
+						`findings: ${report.findings.length}`,
+						...report.findings.map((finding) => {
+							const hint = finding.hint ? ` hint=${finding.hint}` : "";
+							return `${finding.severity} ${finding.domain} ${finding.id} ${finding.message}${hint}`;
+						}),
+					].join("\n"),
+				);
+			}
+			return report.ok ? 0 : 1;
 		}
 
 		const files = listAdmFiles(projectRoot);

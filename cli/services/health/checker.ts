@@ -313,6 +313,7 @@ function checkStateHealth(root: string, deep: boolean): HealthFinding[] {
 	}
 
 	const findings = runDriftCheck(root, {
+		adm: false,
 		state: true,
 		pstr: false,
 		specs: false,
