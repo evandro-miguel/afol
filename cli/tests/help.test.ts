@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { formatCommandHelp, formatHelpText } from "../help";
+import {
+	buildCommandCatalog,
+	buildCommandHelpJson,
+	formatCatalogJson,
+	formatCommandHelp,
+	formatHelpText,
+} from "../help";
 import { kernelRegistry } from "../registry";
 
 describe("help formatter", () => {
@@ -36,5 +42,43 @@ describe("help formatter", () => {
 		expect(help).toContain("Side effect: read");
 		expect(help).toContain("Description: Show current project status");
 		expect(unknown).toBeNull();
+	});
+
+	test("builds catalog json without fake aliases", () => {
+		const catalog = buildCommandCatalog(kernelRegistry);
+		const parsed = JSON.parse(formatCatalogJson(kernelRegistry)) as Array<{
+			command: string;
+			aliases: string[];
+			kind: string;
+			sideEffect: string;
+			description: string;
+			category?: string;
+		}>;
+
+		expect(parsed).toEqual(catalog);
+		expect(parsed.map((entry) => entry.command)).toEqual(
+			expect.arrayContaining(["status", "pstr", "adm"]),
+		);
+		expect(parsed.find((entry) => entry.command === "status")?.aliases).toEqual([
+			"s",
+		]);
+		expect(parsed.find((entry) => entry.command === "adm")?.aliases).toEqual([]);
+		expect(parsed.every((entry) => !entry.aliases.includes(entry.command))).toBe(
+			true,
+		);
+	});
+
+	test("builds single command json from registry metadata", () => {
+		const help = buildCommandHelpJson("status", kernelRegistry);
+		expect(help).not.toBeNull();
+		expect(help).toEqual({
+			command: "status",
+			aliases: ["s"],
+			kind: "status",
+			sideEffect: "read",
+			description: "Show current project status",
+			category: "core",
+		});
+		expect(buildCommandHelpJson("nope", kernelRegistry)).toBeNull();
 	});
 });

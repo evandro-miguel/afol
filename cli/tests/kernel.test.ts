@@ -149,6 +149,52 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("help json surfaces catalog and single command metadata", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-help-json-no-project-"));
+		try {
+			const catalog = runKernel(root, ["help", "--json"]);
+			expect(catalog.status).toBe(0);
+			const catalogPayload = JSON.parse(catalog.stdout as string) as Array<{
+				command: string;
+				aliases: string[];
+				kind: string;
+				sideEffect: string;
+				description: string;
+				category?: string;
+			}>;
+			expect(catalogPayload.map((entry) => entry.command)).toEqual(
+				expect.arrayContaining(["status", "pstr", "adm"]),
+			);
+			expect(catalogPayload.find((entry) => entry.command === "status")?.aliases).toEqual([
+				"s",
+			]);
+			expect(catalogPayload.every((entry) => !entry.aliases.includes(entry.command))).toBe(
+				true,
+			);
+
+			const single = runKernel(root, ["help", "status", "--json"]);
+			expect(single.status).toBe(0);
+			const singlePayload = JSON.parse(single.stdout as string) as {
+				command: string;
+				aliases: string[];
+				kind: string;
+				sideEffect: string;
+				description: string;
+				category?: string;
+			};
+			expect(singlePayload).toEqual({
+				command: "status",
+				aliases: ["s"],
+				kind: "status",
+				sideEffect: "read",
+				description: "Show current project status",
+				category: "core",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("status alias and json shorthands are normalized", () => {
 		const script = "#!/usr/bin/env bash\necho ARGS:$*";
 		const root = mkProjectRoot("aliases", script);

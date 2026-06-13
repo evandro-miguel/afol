@@ -15,13 +15,57 @@ function formatEntry(spec: CommandSpec): string {
 	return `${name} - ${spec.description}`;
 }
 
+export type CommandCatalogEntry = {
+	command: string;
+	aliases: string[];
+	kind: CommandSpec["kind"];
+	sideEffect: CommandSpec["sideEffect"];
+	description: string;
+	category: CommandCategory | "uncategorized";
+};
+
+export function buildCommandCatalog(
+	registry = kernelRegistry,
+): CommandCatalogEntry[] {
+	return registry.commands.map((spec) => ({
+		command: spec.command,
+		aliases: [...spec.aliases],
+		kind: spec.kind,
+		sideEffect: spec.sideEffect,
+		description: spec.description,
+		category: spec.category ?? "uncategorized",
+	}));
+}
+
+export function formatCatalogJson(registry = kernelRegistry): string {
+	return `${JSON.stringify(buildCommandCatalog(registry), null, 2)}\n`;
+}
+
+export function buildCommandHelpJson(
+	commandOrAlias: string,
+	registry = kernelRegistry,
+): CommandCatalogEntry | null {
+	const canonical = registry.canonicalize(commandOrAlias);
+	const spec = registry.commands.find((entry) => entry.command === canonical) ?? null;
+	if (!spec) {
+		return null;
+	}
+
+	return {
+		command: spec.command,
+		aliases: [...spec.aliases],
+		kind: spec.kind,
+		sideEffect: spec.sideEffect,
+		description: spec.description,
+		category: spec.category ?? "uncategorized",
+	};
+}
+
 export function formatCommandHelp(
 	commandOrAlias: string,
 	registry = kernelRegistry,
 ): string | null {
-	const canonical = registry.canonicalize(commandOrAlias);
-	const spec =
-		registry.commands.find((entry) => entry.command === canonical) ?? null;
+	const spec = buildCommandHelpJson(commandOrAlias, registry);
 	if (!spec) {
 		return null;
 	}

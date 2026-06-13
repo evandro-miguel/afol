@@ -34,7 +34,12 @@ import {
 	runVerifyTasksCommand,
 } from "./commands/workbench";
 import { CLI_VERSION } from "./generated/version";
-import { formatCommandHelp, formatHelpText } from "./help";
+import {
+	buildCommandHelpJson,
+	formatCatalogJson,
+	formatCommandHelp,
+	formatHelpText,
+} from "./help";
 import { resolveCommand } from "./router";
 import { kernelRegistry } from "./registry";
 import { loadProjectRoot } from "./services/project/root";
@@ -93,11 +98,28 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (args[0] === "help") {
+		const jsonRequested = args.some((arg) => kernelRegistry.isJsonAlias(arg));
+		const helpTarget = args[1] ?? "";
+		if (jsonRequested) {
+			if (helpTarget && !kernelRegistry.isJsonAlias(helpTarget)) {
+				const help = buildCommandHelpJson(helpTarget, kernelRegistry);
+				if (help) {
+					console.log(`${JSON.stringify(help, null, 2)}\n`);
+					return 0;
+				}
+				console.error(
+					`err unknown-command command=${helpTarget} hint="run afol -h"`,
+				);
+				return 2;
+			}
+			console.log(formatCatalogJson(kernelRegistry));
+			return 0;
+		}
 		if (args.length === 1) {
 			console.log(formatHelpText(kernelRegistry));
 			return 0;
 		}
-		const help = formatCommandHelp(args[1] ?? "", kernelRegistry);
+		const help = formatCommandHelp(helpTarget, kernelRegistry);
 		if (help) {
 			console.log(help);
 			return 0;
