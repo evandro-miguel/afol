@@ -54,19 +54,23 @@ function createFixture(): string {
 }
 
 describe("adm plan", () => {
-	test("plan json includes manifest entries", async () => {
-		const root = createFixture();
-		try {
-			const captured = captureIo();
-			const code = await runAdmCommand("plan", ["--json"], root, captured.io);
-			expect(code).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}");
-			expect(payload.action).toBe("plan");
-			expect(Array.isArray(payload.manifest)).toBe(true);
-			const bySource = new Map(
-				(payload.manifest as Array<{ source_path: string }>).map((entry) => [
-					entry.source_path,
-					entry,
+		test("plan json includes manifest entries", async () => {
+			const root = createFixture();
+			try {
+				const captured = captureIo();
+				const code = await runAdmCommand("plan", ["--json"], root, captured.io);
+				expect(code).toBe(0);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}");
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(true);
+				expect(payload.exit_code).toBe(0);
+				expect(payload.action).toBe("plan");
+				expect(Array.isArray(payload.manifest)).toBe(true);
+				expect(payload.data).toMatchObject({ action: "plan", manifest: payload.manifest });
+				const bySource = new Map(
+					(payload.manifest as Array<{ source_path: string }>).map((entry) => [
+						entry.source_path,
+						entry,
 				]),
 			);
 			expect(bySource.get("docs/arc/GENERAL-ROADMAP.md")).toMatchObject({

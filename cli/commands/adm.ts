@@ -6,6 +6,13 @@ import {
 	resolveAdmPaths,
 	validateAdmMigration,
 } from "../services/adm";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -63,6 +70,21 @@ function toRelative(root: string, paths: Record<string, string>): Record<string,
 	return result;
 }
 
+function writeJsonEnvelope(io: CommandIo, data: Record<string, unknown>, ok: boolean): void {
+	const envelope = ok
+		? envelopeOk(data, { action: String(data.action ?? "adm"), exitCode: 0 })
+		: (envelopeErr("ADM_FAILED", "adm command failed", {
+			action: String(data.action ?? "adm"),
+			exitCode: 1,
+		}) as ResultEnvelope<Record<string, unknown>>);
+	envelope.data = data;
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(envelope, Object.keys(data) as (keyof typeof data)[]),
+		),
+	);
+}
+
 export async function runAdmCommand(
 	action: string,
 	args: string[],
@@ -75,7 +97,7 @@ export async function runAdmCommand(
 		if (admAction === "paths") {
 			const paths = resolveAdmPaths(projectRoot);
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ action: admAction, paths }));
+				writeJsonEnvelope(io, { action: admAction, paths }, true);
 			} else {
 				io.stdout(
 					Object.entries(toRelative(projectRoot, paths))
@@ -93,7 +115,7 @@ export async function runAdmCommand(
 			if (admAction === "plan") {
 				const result = buildAdmMigrationPlan(projectRoot);
 				if (parsed.json) {
-					io.stdout(JSON.stringify({ action: admAction, ...result }));
+					writeJsonEnvelope(io, { action: admAction, ...result }, true);
 				} else {
 					io.stdout(
 						[
@@ -110,14 +132,16 @@ export async function runAdmCommand(
 			if (parsed.dryRun) {
 				const result = buildAdmMigrationPlan(projectRoot);
 				if (parsed.json) {
-					io.stdout(
-						JSON.stringify({
+					writeJsonEnvelope(
+						io,
+						{
 							action: admAction,
 							dry_run: true,
 							archive_path: null,
 							count: result.manifest.length,
 							manifest: result.manifest,
-						}),
+						},
+						true,
 					);
 				} else {
 					io.stdout([
@@ -130,7 +154,7 @@ export async function runAdmCommand(
 
 			const result = migrateAdm(projectRoot);
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ action: admAction, ...result }));
+				writeJsonEnvelope(io, { action: admAction, ...result }, true);
 			} else {
 				io.stdout([
 					`${admAction}: ${result.manifest.length} files`,
@@ -146,7 +170,7 @@ export async function runAdmCommand(
 			}
 			const report = validateAdmMigration(projectRoot);
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ action: admAction, ...report }));
+				writeJsonEnvelope(io, { action: admAction, ...report }, report.ok);
 			} else {
 				io.stdout(
 					[
@@ -165,7 +189,7 @@ export async function runAdmCommand(
 
 		const files = listAdmFiles(projectRoot);
 		if (parsed.json) {
-			io.stdout(JSON.stringify({ action: admAction, files }));
+			writeJsonEnvelope(io, { action: admAction, files }, true);
 		} else {
 			io.stdout(files.join("\n"));
 		}

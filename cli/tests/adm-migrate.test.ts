@@ -65,22 +65,38 @@ describe("adm migrate", () => {
 		}
 	});
 
-	test("applies docs and archives manifest", async () => {
-		const root = createFixture();
-		try {
-			const captured = captureIo();
-			const code = await runAdmCommand("migrate", ["--json"], root, captured.io);
-			expect(code).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-				archive_path: string;
-				manifest: Array<{ source_path: string; target_path: string }>;
-				count: number;
-			};
-			expect(payload.count).toBe(7);
-			expect(payload.archive_path).toMatch(/\.afol\/adm\/migrations\//);
+		test("applies docs and archives manifest", async () => {
+			const root = createFixture();
+			try {
+				const captured = captureIo();
+				const code = await runAdmCommand("migrate", ["--json"], root, captured.io);
+				expect(code).toBe(0);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					exit_code: number;
+					data: {
+						action: string;
+						archive_path: string;
+						count: number;
+						manifest: Array<{ source_path: string; target_path: string }>;
+					};
+					archive_path: string;
+					manifest: Array<{ source_path: string; target_path: string }>;
+					count: number;
+				};
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(true);
+				expect(payload.exit_code).toBe(0);
+				expect(payload.data.action).toBe("migrate");
+				expect(payload.count).toBe(7);
+				expect(payload.archive_path).toMatch(/\.afol\/adm\/migrations\//);
+				expect(payload.data.archive_path).toBe(payload.archive_path);
+				expect(payload.data.count).toBe(payload.count);
+				expect(payload.data.manifest).toEqual(payload.manifest);
 
-			for (const entry of payload.manifest) {
-				const source = join(root, entry.source_path);
+				for (const entry of payload.manifest) {
+					const source = join(root, entry.source_path);
 				const target = join(root, entry.target_path);
 				expect(existsSync(source)).toBe(true);
 				expect(existsSync(target)).toBe(true);
@@ -154,11 +170,23 @@ describe("adm migrate", () => {
 			const beforeCode = await runAdmCommand("validate", ["--json"], root, before.io);
 			expect(beforeCode).toBe(1);
 			const beforePayload = JSON.parse(before.stdout[0] ?? "{}") as {
+				schema: string;
 				ok: boolean;
+				exit_code: number;
 				findings: Array<{ id: string }>;
+				data: {
+					action: string;
+					ok: boolean;
+					findings: Array<{ id: string }>;
+				};
 			};
+			expect(beforePayload.schema).toBe("afol.result/v1");
 			expect(beforePayload.ok).toBe(false);
+			expect(beforePayload.exit_code).toBe(1);
+			expect(beforePayload.data.action).toBe("validate");
+			expect(beforePayload.data.ok).toBe(false);
 			expect(beforePayload.findings.length).toBeGreaterThan(0);
+			expect(beforePayload.data.findings.length).toBe(beforePayload.findings.length);
 
 			const migrate = captureIo();
 			expect(await runAdmCommand("migrate", ["--json"], root, migrate.io)).toBe(0);
@@ -167,11 +195,23 @@ describe("adm migrate", () => {
 			const afterCode = await runAdmCommand("validate", ["--json"], root, after.io);
 			expect(afterCode).toBe(0);
 			const afterPayload = JSON.parse(after.stdout[0] ?? "{}") as {
+				schema: string;
 				ok: boolean;
+				exit_code: number;
 				findings: Array<{ id: string }>;
+				data: {
+					action: string;
+					ok: boolean;
+					findings: Array<{ id: string }>;
+				};
 			};
+			expect(afterPayload.schema).toBe("afol.result/v1");
 			expect(afterPayload.ok).toBe(true);
+			expect(afterPayload.exit_code).toBe(0);
+			expect(afterPayload.data.action).toBe("validate");
+			expect(afterPayload.data.ok).toBe(true);
 			expect(afterPayload.findings).toEqual([]);
+			expect(afterPayload.data.findings).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

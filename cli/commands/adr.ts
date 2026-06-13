@@ -5,6 +5,11 @@ import {
 	createAdr,
 	supersedeAdr,
 } from "../services/spec-gate";
+import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -58,6 +63,16 @@ function parseReason(args: string[], commandName: string): string {
 	throw new Error(`Missing --reason for ${commandName}.`);
 }
 
+function writeJsonEnvelope(io: CommandIo, data: Record<string, unknown>): void {
+	const envelope = envelopeOk(data, { action: String(data.action ?? "adr"), exitCode: 0 });
+	envelope.data = data;
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(envelope, Object.keys(data) as (keyof typeof data)[]),
+		),
+	);
+}
+
 export async function runAdrCommand(
 	action: string,
 	args: string[],
@@ -74,9 +89,11 @@ export async function runAdrCommand(
 				throw new Error("Missing topic for adr new.");
 			}
 			const path = createAdr(projectRoot, topic);
-			io.stdout(
-				json ? JSON.stringify({ action: adrAction, path }) : `adr new: ${path}`,
-			);
+			if (json) {
+				writeJsonEnvelope(io, { action: adrAction, path });
+			} else {
+				io.stdout(`adr new: ${path}`);
+			}
 			return 0;
 		}
 		if (adrAction === "accept") {
@@ -85,11 +102,11 @@ export async function runAdrCommand(
 				throw new Error("Missing id for adr accept.");
 			}
 			const path = acceptAdr(projectRoot, id);
-			io.stdout(
-				json
-					? JSON.stringify({ action: adrAction, path })
-					: `adr accept: ${path}`,
-			);
+			if (json) {
+				writeJsonEnvelope(io, { action: adrAction, path });
+			} else {
+				io.stdout(`adr accept: ${path}`);
+			}
 			return 0;
 		}
 		if (adrAction === "supersede") {
@@ -99,11 +116,11 @@ export async function runAdrCommand(
 				throw new Error("Missing ids for adr supersede.");
 			}
 			const path = supersedeAdr(projectRoot, oldId, newId);
-			io.stdout(
-				json
-					? JSON.stringify({ action: adrAction, path })
-					: `adr supersede: ${path}`,
-			);
+			if (json) {
+				writeJsonEnvelope(io, { action: adrAction, path });
+			} else {
+				io.stdout(`adr supersede: ${path}`);
+			}
 			return 0;
 		}
 		const id = cleanArgs[0];
@@ -115,11 +132,11 @@ export async function runAdrCommand(
 			adrAction === "abandon"
 				? abandonAdr(projectRoot, id, reason)
 				: archiveAdr(projectRoot, id, reason);
-		io.stdout(
-			json
-				? JSON.stringify({ action: adrAction, path })
-				: `adr ${adrAction}: ${path}`,
-		);
+		if (json) {
+			writeJsonEnvelope(io, { action: adrAction, path });
+		} else {
+			io.stdout(`adr ${adrAction}: ${path}`);
+		}
 		return 0;
 	} catch (error) {
 		io.stderr((error as Error).message);

@@ -353,7 +353,7 @@ describe("spec-gate system", () => {
 		}
 	});
 
-	test("afol spec check --json returns check result", async () => {
+		test("afol spec check --json returns check result", async () => {
 		const root = createFixture();
 		try {
 			writeTask(root, "session-a", "T-01", "spec-001");
@@ -366,14 +366,30 @@ describe("spec-gate system", () => {
 					root,
 					captured.io,
 				),
-			).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}");
-			expect(payload.action).toBe("check");
-			expect(payload.status).toBe("compatible");
-			expect(payload.spec_id).toBe("spec-001");
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+				).toBe(0);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					exit_code: number;
+					action: string;
+					status: string;
+					spec_id: string;
+					data: { action: string; status: string; spec_id: string };
+				};
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(true);
+				expect(payload.exit_code).toBe(0);
+				expect(payload.action).toBe("check");
+				expect(payload.status).toBe("compatible");
+				expect(payload.spec_id).toBe("spec-001");
+				expect(payload.data).toMatchObject({
+					action: "check",
+					status: "compatible",
+					spec_id: "spec-001",
+				});
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 	});
 
 	test("afol spec check prints human output", async () => {
@@ -396,7 +412,7 @@ describe("spec-gate system", () => {
 		}
 	});
 
-	test("afol adr new --json creates ADR", async () => {
+		test("afol adr new --json creates ADR", async () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
@@ -407,16 +423,27 @@ describe("spec-gate system", () => {
 					root,
 					captured.io,
 				),
-			).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}");
-			expect(payload.action).toBe("new");
-			expect(readFileSync(payload.path, "utf8")).toContain("Json Output Test");
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+				).toBe(0);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					exit_code: number;
+					action: string;
+					path: string;
+					data: { action: string; path: string };
+				};
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(true);
+				expect(payload.exit_code).toBe(0);
+				expect(payload.action).toBe("new");
+				expect(readFileSync(payload.path, "utf8")).toContain("Json Output Test");
+				expect(payload.data).toMatchObject({ action: "new", path: payload.path });
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 	});
 
-	test("afol changelog add --json adds entry", async () => {
+		test("afol changelog add --json adds entry", async () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
@@ -427,13 +454,24 @@ describe("spec-gate system", () => {
 					root,
 					captured.io,
 				),
-			).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}");
-			expect(payload.action).toBe("add");
-			expect(readFileSync(payload.path, "utf8")).toContain("- fix: test");
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+				).toBe(0);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					exit_code: number;
+					action: string;
+					path: string;
+					data: { action: string; path: string };
+				};
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(true);
+				expect(payload.exit_code).toBe(0);
+				expect(payload.action).toBe("add");
+				expect(readFileSync(payload.path, "utf8")).toContain("- fix: test");
+				expect(payload.data).toMatchObject({ action: "add", path: payload.path });
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 	});
 
 	test("afol spec conflict reports conflict", async () => {

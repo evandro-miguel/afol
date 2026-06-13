@@ -4,6 +4,13 @@ import {
 	getSpecCheck,
 	waiveSpecCheck,
 } from "../services/spec-gate";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -118,6 +125,28 @@ function formatResult(action: SpecAction, result: SpecCheckResult): string {
 	return base.join("\n");
 }
 
+function writeJsonResult(
+	io: CommandIo,
+	action: SpecAction,
+	result: SpecCheckResult,
+	exitCode: number,
+): void {
+	const data = { action, ...result };
+	const envelope =
+		exitCode === 0
+			? envelopeOk(data, { action: `spec.${action}`, exitCode })
+			: (envelopeErr("SPEC_CONFLICT", "spec compatibility check failed", {
+				action: `spec.${action}`,
+				exitCode,
+			}) as ResultEnvelope<typeof data>);
+	envelope.data = data;
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(envelope, Object.keys(data) as (keyof typeof data)[]),
+		),
+	);
+}
+
 export async function runSpecCommand(
 	action: string,
 	args: string[],
@@ -142,14 +171,20 @@ export async function runSpecCommand(
 				: checkSpecCompatibility(projectRoot, parsed.session, parsed.task);
 		const stored =
 			getSpecCheck(projectRoot, parsed.session, parsed.task) ?? result;
-		const output = parsed.json
-			? JSON.stringify({ action: specAction, ...stored })
-			: formatResult(specAction, stored);
-		io.stdout(output);
-		if (specAction === "conflict") {
-			return stored.status === "conflict" ? 0 : 1;
+		const exitCode =
+			specAction === "conflict"
+				? stored.status === "conflict"
+					? 0
+					: 1
+				: stored.status === "conflict"
+					? 1
+					: 0;
+		if (parsed.json) {
+			writeJsonResult(io, specAction, stored, exitCode);
+		} else {
+			io.stdout(formatResult(specAction, stored));
 		}
-		return stored.status === "conflict" ? 1 : 0;
+		return exitCode;
 	} catch (error) {
 		io.stderr((error as Error).message);
 		return 2;
