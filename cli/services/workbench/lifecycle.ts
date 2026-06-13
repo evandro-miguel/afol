@@ -19,7 +19,7 @@ import { evidenceResultIsSuccess, verifyWorkbenchTasks } from "./verify";
 const TASK_ROW_RE =
 	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
 const BLOCKING_STATES = new Set(["pending", "in_progress", "problem"]);
-const SESSION_NAME_RE = /^[A-Za-z0-9._-]+$/;
+const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
 export type WorkbenchTaskRef = {
 	session: string;
@@ -86,7 +86,7 @@ function sanitizeTheme(theme: string): string {
 
 function resolveSafeSessionPath(root: string, session: string): string {
 	const normalized = session.trim();
-	if (!SESSION_NAME_RE.test(normalized) || normalized.length === 0) {
+	if (!SESSION_NAME_RE.test(normalized) || normalized.includes("..") || normalized.length === 0) {
 		throw new Error(`Invalid session identifier: ${session}`);
 	}
 

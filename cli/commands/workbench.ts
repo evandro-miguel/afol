@@ -14,6 +14,11 @@ import {
 	startTask,
 } from "../services/workbench/lifecycle";
 import {
+	checkSpecCompatibility,
+	getSpecCheck,
+	type SpecCheckResult,
+} from "../services/spec-gate";
+import {
 	formatVerifyReport,
 	verifyWorkbenchTasks,
 } from "../services/workbench/verify";
@@ -34,6 +39,7 @@ type DoneArgs = SessionTaskArgs & {
 	testCommand: string | null;
 	evidenceCommand: string | null;
 	evidenceResult: string | null;
+	requireSpecCheck: boolean;
 	artifact?: string;
 	note?: string;
 };
@@ -315,6 +321,7 @@ function parseDoneArgs(args: string[], root: string): DoneArgs {
 	let testCommand: string | null = null;
 	let evidenceCommand: string | null = null;
 	let evidenceResult: string | null = null;
+	let requireSpecCheck = false;
 	let artifact = "";
 	let note = "";
 	for (let i = 0; i < args.length; i += 1) {
@@ -360,6 +367,10 @@ function parseDoneArgs(args: string[], root: string): DoneArgs {
 			i += 1;
 			continue;
 		}
+		if (arg === "--require-spec-check") {
+			requireSpecCheck = true;
+			continue;
+		}
 		if (arg === "--artifact") {
 			if (!value) {
 				throw new Error("Missing value for --artifact in done.");
@@ -401,7 +412,20 @@ function parseDoneArgs(args: string[], root: string): DoneArgs {
 		evidenceResult,
 		...(artifact ? { artifact } : {}),
 		...(note ? { note } : {}),
+		requireSpecCheck,
 	};
+}
+
+function resolveRequiredSpecCheck(
+	root: string,
+	session: string,
+	taskId: string,
+): SpecCheckResult {
+	const current = getSpecCheck(root, session, taskId);
+	if (current?.status === "waived") {
+		return current;
+	}
+	return checkSpecCompatibility(root, session, taskId);
 }
 
 function parseLogArgs(args: string[], root: string): LogArgs {
@@ -596,6 +620,17 @@ export async function runDoneCommand(
 ): Promise<number> {
 	try {
 		const parsed = parseDoneArgs(args, root);
+		if (parsed.requireSpecCheck) {
+			const specCheck = resolveRequiredSpecCheck(
+				root,
+				parsed.session,
+				parsed.taskId,
+			);
+			if (specCheck.status === "conflict") {
+				console.error(`spec check failed: ${specCheck.spec_id || parsed.taskId}`);
+				return 1;
+			}
+		}
 		if (parsed.testCommand) {
 			const verification = runVerification(root, parsed.testCommand);
 			recordEvidence(root, {

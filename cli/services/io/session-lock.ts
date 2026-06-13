@@ -11,7 +11,7 @@ import {
 import { dirname, join } from "node:path";
 import { resolveProjectPaths } from "../project/paths";
 
-const SESSION_LOCK_RE = /^[A-Za-z0-9._-]+$/;
+const SESSION_LOCK_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const LOCK_RETRY_MS = 25;
 const LOCK_TIMEOUT_MS = 30_000;
 const LOCK_WAIT_BUFFER = new Int32Array(new SharedArrayBuffer(4));
@@ -40,7 +40,7 @@ function isAlreadyExistsError(error: unknown): boolean {
 
 function assertSessionLockName(session: string): string {
 	const normalized = session.trim();
-	if (!SESSION_LOCK_RE.test(normalized) || normalized.length === 0) {
+	if (!SESSION_LOCK_RE.test(normalized) || normalized.includes("..") || normalized.length === 0) {
 		throw new Error(`Invalid session identifier for lock: ${session}`);
 	}
 	return normalized;

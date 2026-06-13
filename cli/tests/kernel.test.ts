@@ -12,6 +12,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CLI_VERSION } from "../generated/version";
+import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
+import { waiveSpecCheck } from "../services/spec-gate";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 const templateConfig = JSON.stringify({
@@ -45,6 +47,49 @@ function mkProjectRoot(name: string, fakeAgentsBody: string): string {
 	writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
 
 	return root;
+}
+
+function writeSpec(root: string, id: string, status: string): void {
+	const specDir = join(root, "docs", "arc", "SPECS");
+	mkdirSync(specDir, { recursive: true });
+	writeFileSync(
+		join(specDir, `${id}.md`),
+		[
+			"---",
+			"doc_type: spec",
+			`id: "${id}"`,
+			`status: ${status}`,
+			"---",
+			"",
+			`# ${id}`,
+		].join("\n"),
+		"utf8",
+	);
+}
+
+function writeTaskWithSpecMetadata(
+	taskPath: string,
+	parentSpec: string | null,
+): void {
+	writeFileSync(
+		taskPath,
+		[
+			"---",
+			"feature_id: feature-done",
+			...(parentSpec ? [`parent_spec: "${parentSpec}"`] : []),
+			"---",
+			"",
+			"# Tasks",
+			"",
+			"## State Board",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			"| T-01 | pending | worker | test |",
+			"",
+		].join("\n"),
+		"utf8",
+	);
 }
 
 describe("kernel front-door", () => {
@@ -316,6 +361,21 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("planned F-18 groups route to pstr handler", () => {
+		const script = "#!/usr/bin/env bash\necho LEGACY:$*";
+		const root = mkProjectRoot("subcommand-stub", script);
+		try {
+			const proc = runKernel(root, ["pstr", "rebuild"]);
+
+			expect(proc.status).toBe(0);
+			expect(proc.stdout as string).toContain("pstr rebuild: ok");
+			expect(proc.stderr as string).toBe("");
+			expect(proc.stderr as string).not.toContain("LEGACY:");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("new --help is native help only and does not create session", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-new-help-"));
 		try {
@@ -409,6 +469,138 @@ describe("kernel front-door", () => {
 			expect(proc.stdout as string).toBe("");
 			expect(proc.stderr as string).not.toContain("LEGACY:");
 			expect(existsSync(join(root, ".agents", "wb"))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done without spec flag stays unchanged", () => {
+		const root = mkProjectRoot("done-plain", "#!/usr/bin/env bash\necho LEGACY:$*");
+		try {
+			const created = newWorkstream(root, "plain done");
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+
+			const proc = runKernel(root, ["done", "--session", created.session, "--task-id", "T-01"]);
+			expect(proc.status).toBe(0);
+			expect(proc.stdout as string).toContain("task done: T-01");
+			expect(proc.stderr as string).toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done with compatible spec check passes", () => {
+		const root = mkProjectRoot("done-compatible", "#!/usr/bin/env bash\necho LEGACY:$*");
+		try {
+			const created = newWorkstream(root, "compatible done", { parentSpec: "spec-001" });
+			writeTaskWithSpecMetadata(created.taskPath, "spec-001");
+			writeSpec(root, "spec-001", "active");
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--require-spec-check",
+			]);
+
+			expect(proc.status).toBe(0);
+			expect(proc.stdout as string).toContain("task done: T-01");
+			expect(proc.stderr as string).toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done with not_applicable spec check passes", () => {
+		const root = mkProjectRoot("done-not-applicable", "#!/usr/bin/env bash\necho LEGACY:$*");
+		try {
+			const created = newWorkstream(root, "no spec done");
+			writeTaskWithSpecMetadata(created.taskPath, null);
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--require-spec-check",
+			]);
+
+			expect(proc.status).toBe(0);
+			expect(proc.stdout as string).toContain("task done: T-01");
+			expect(proc.stderr as string).toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done with missing spec blocks spec check", () => {
+		const root = mkProjectRoot("done-missing-spec", "#!/usr/bin/env bash\necho LEGACY:$*");
+		try {
+			const created = newWorkstream(root, "missing spec done", { parentSpec: "spec-missing" });
+			writeTaskWithSpecMetadata(created.taskPath, "spec-missing");
+
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--require-spec-check",
+			]);
+
+			expect(proc.status).toBe(1);
+			expect(proc.stdout as string).toBe("");
+			expect(proc.stderr as string).toContain("spec check failed:");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done with waived spec passes", () => {
+		const root = mkProjectRoot("done-waived", "#!/usr/bin/env bash\necho LEGACY:$*");
+		try {
+			const created = newWorkstream(root, "waived done", { parentSpec: "spec-missing" });
+			writeTaskWithSpecMetadata(created.taskPath, "spec-missing");
+			waiveSpecCheck(root, created.session, "T-01", "needs override");
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--require-spec-check",
+			]);
+
+			expect(proc.status).toBe(0);
+			expect(proc.stdout as string).toContain("task done: T-01");
+			expect(proc.stderr as string).toBe("");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

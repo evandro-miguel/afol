@@ -5,6 +5,11 @@ import { loadJsonObject, type SchemaObject } from "../../core/schema";
 type ProjectPathConfig = {
 	agentsDir: string;
 	mutableDir: string;
+	admDir: string;
+	pstrDir: string;
+	stateDb: string;
+	libraryDir: string;
+	memoryFile: string;
 	rulesDir: string;
 	skillsDir: string;
 	wbDir: string;
@@ -102,6 +107,11 @@ function absolute(root: string, paths: ProjectPathConfig): ProjectPathConfig {
 	return {
 		agentsDir: resolve(root, paths.agentsDir),
 		mutableDir: resolve(root, paths.mutableDir),
+		admDir: resolve(root, paths.admDir),
+		pstrDir: resolve(root, paths.pstrDir),
+		stateDb: resolve(root, paths.stateDb),
+		libraryDir: resolve(root, paths.libraryDir),
+		memoryFile: resolve(root, paths.memoryFile),
 		rulesDir: resolve(root, paths.rulesDir),
 		skillsDir: resolve(root, paths.skillsDir),
 		wbDir: resolve(root, paths.wbDir),
@@ -136,6 +146,23 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 	const paths: ProjectPathConfig = {
 		agentsDir,
 		mutableDir,
+		admDir: fromConfig(config, ["paths", "adm_dir"], `${mutableDir}/adm`),
+		pstrDir: fromConfig(config, ["paths", "pstr_dir"], `${mutableDir}/pstr`),
+		stateDb: fromConfig(
+			config,
+			["paths", "state_db"],
+			`${mutableDir}/state/afol.db`,
+		),
+		libraryDir: fromConfig(
+			config,
+			["paths", "library_dir"],
+			`${mutableDir}/library`,
+		),
+		memoryFile: fromConfig(
+			config,
+			["paths", "memory_file"],
+			`${mutableDir}/memory/memory.md`,
+		),
 		rulesDir: fromConfig(config, ["paths", "rules_dir"], `${agentsDir}/rules`),
 		skillsDir: normalizeProjectRelativePath(
 			stringAt(config, ["paths", "skills_dir"]) ??

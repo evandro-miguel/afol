@@ -18,7 +18,34 @@ export type CommandResolution =
 	| { kind: "update"; args: string[] }
 	| { kind: "file"; args: string[] }
 	| { kind: "localState"; args: string[] }
+	| SubCommandResolution
 	| { kind: "unknown"; message: string; exitCode: number };
+
+export type SubCommandResolution = {
+	kind: "subcommand";
+	group: string;
+	action: string;
+	args: string[];
+};
+
+const SUBCOMMAND_GROUPS = new Set([
+	"pstr",
+	"ctx",
+	"state",
+	"hydrate",
+	"render",
+	"library",
+	"memory",
+	"spec",
+	"adr",
+	"changelog",
+	"health",
+	"db",
+	"doctor",
+	"maintenance",
+	"sweep",
+	"schema",
+]);
 
 function removeJsonAliases(values: string[]): string[] {
 	return values.filter((value) => !kernelRegistry.isJsonAlias(value));
@@ -195,6 +222,11 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind === "localState") {
 		return { kind: "localState", args: rest };
+	}
+
+	if (topLevelKind && SUBCOMMAND_GROUPS.has(topLevelKind)) {
+		const action = rest[0] ?? "";
+		return { kind: "subcommand", group: topLevelKind, action, args: rest.slice(1) };
 	}
 
 	if (topLevel.startsWith("-")) {

@@ -14,7 +14,23 @@ export type CommandKind =
 	| "skill"
 	| "update"
 	| "file"
-	| "localState";
+	| "localState"
+	| "pstr"
+	| "ctx"
+	| "state"
+	| "hydrate"
+	| "render"
+	| "library"
+	| "memory"
+	| "spec"
+	| "adr"
+	| "changelog"
+	| "health"
+	| "db"
+	| "doctor"
+	| "maintenance"
+	| "sweep"
+	| "schema";
 export type CommandSideEffect = "read" | "write" | "append" | "generated";
 
 export type CommandSpec = {
@@ -72,6 +88,27 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "localState",
 		sideEffect: "generated",
 	},
+	{ command: "pstr", aliases: ["ps"], kind: "pstr", sideEffect: "read" },
+	{ command: "ctx", aliases: ["cx"], kind: "ctx", sideEffect: "read" },
+	{ command: "state", aliases: [], kind: "state", sideEffect: "read" },
+	{ command: "hydrate", aliases: [], kind: "hydrate", sideEffect: "generated" },
+	{ command: "render", aliases: [], kind: "render", sideEffect: "generated" },
+	{ command: "library", aliases: ["lb"], kind: "library", sideEffect: "read" },
+	{ command: "memory", aliases: ["mm"], kind: "memory", sideEffect: "read" },
+	{ command: "spec", aliases: [], kind: "spec", sideEffect: "read" },
+	{ command: "adr", aliases: [], kind: "adr", sideEffect: "read" },
+	{ command: "changelog", aliases: [], kind: "changelog", sideEffect: "read" },
+	{ command: "health", aliases: ["ht"], kind: "health", sideEffect: "read" },
+	{ command: "db", aliases: [], kind: "db", sideEffect: "read" },
+	{ command: "doctor", aliases: [], kind: "doctor", sideEffect: "read" },
+	{
+		command: "maintenance",
+		aliases: [],
+		kind: "maintenance",
+		sideEffect: "read",
+	},
+	{ command: "sweep", aliases: [], kind: "sweep", sideEffect: "read" },
+	{ command: "schema", aliases: [], kind: "schema", sideEffect: "read" },
 ]);
 
 const HELP_ALIASES = Object.freeze(["-h", "--help"] as const);

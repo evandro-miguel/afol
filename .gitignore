@@ -12,6 +12,10 @@ uv.lock
 **/.structure-cache.json
 
 # AFOL mutable data
+.afol/pstr/*
+!.afol/pstr/
+.afol/state/*
+!.afol/state/
 .afol/data/events/
 .afol/data/index/
 .afol/data/session/
