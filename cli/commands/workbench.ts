@@ -7,6 +7,7 @@ import {
 	getSpecCheck,
 	type SpecCheckResult,
 } from "../services/spec-gate";
+import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
 	appendTimelineEntry,
 	closeSession,
@@ -28,6 +29,10 @@ type SessionTaskArgs = {
 	taskId: string;
 };
 
+type SessionTaskJsonArgs = SessionTaskArgs & {
+	json: boolean;
+};
+
 type EvidenceArgs = SessionTaskArgs & {
 	command: string;
 	result: string;
@@ -42,21 +47,30 @@ type DoneArgs = SessionTaskArgs & {
 	requireSpecCheck: boolean;
 	artifact?: string;
 	note?: string;
+	json: boolean;
 };
 
 type NewCommandArgs = {
 	theme: string;
 	metadata: NewWorkstreamMetadata;
+	json: boolean;
 };
 
 type LogArgs = {
 	session: string;
 	message: string;
+	json: boolean;
 };
 
 type VerifyArgs = {
 	sessionPath: string;
 	strict: boolean;
+	json: boolean;
+};
+
+type SessionArgs = {
+	session: string;
+	json: boolean;
 };
 
 function pathIsInside(root: string, candidate: string): boolean {
@@ -93,58 +107,70 @@ function resolveVerifySessionPath(root: string, session: string): string {
 	return result.value.path;
 }
 
+function hasJsonFlag(args: readonly string[]): boolean {
+	return args.includes("--json") || args.includes("-j");
+}
+
 function parseNewArgs(args: string[]): NewCommandArgs {
-	const [theme, ...rest] = args;
-	if (!theme) {
-		throw new Error("Missing theme for new workstream.");
-	}
-	if (theme === "--help" || theme === "-h") {
-		throw new Error("Missing theme for new workstream.");
-	}
+	let theme = "";
+	const rest: string[] = [];
 	const metadata: NewWorkstreamMetadata = {};
-	if (rest.length > 0) {
-		for (let index = 0; index < rest.length; index += 1) {
-			const arg = rest[index];
-			if (arg === "--intent") {
-				const value = rest[index + 1];
-				if (!value) {
-					throw new Error("Missing value for --intent in new.");
-				}
-				metadata.intent = value;
-				index += 1;
-				continue;
-			}
-			if (arg === "--feature-id") {
-				const value = rest[index + 1];
-				if (!value) {
-					throw new Error("Missing value for --feature-id in new.");
-				}
-				metadata.featureId = value;
-				index += 1;
-				continue;
-			}
-			if (arg === "--parent-spec") {
-				const value = rest[index + 1];
-				if (!value) {
-					throw new Error("Missing value for --parent-spec in new.");
-				}
-				metadata.parentSpec = value;
-				index += 1;
-				continue;
-			}
-			if (arg === "--task") {
-				const value = rest[index + 1];
-				if (!value) {
-					throw new Error("Missing value for --task in new.");
-				}
-				metadata.task = value;
-				index += 1;
-				continue;
-			}
-			throw new Error(`Unknown new argument: ${arg}`);
+	let json = false;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		const value = args[index + 1];
+		if (!arg) {
+			continue;
 		}
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
+		if (!theme && arg && !arg.startsWith("-")) {
+			theme = arg;
+			continue;
+		}
+		if (arg === "--intent") {
+			if (!value) {
+				throw new Error("Missing value for --intent in new.");
+			}
+			metadata.intent = value;
+			index += 1;
+			continue;
+		}
+		if (arg === "--feature-id") {
+			if (!value) {
+				throw new Error("Missing value for --feature-id in new.");
+			}
+			metadata.featureId = value;
+			index += 1;
+			continue;
+		}
+		if (arg === "--parent-spec") {
+			if (!value) {
+				throw new Error("Missing value for --parent-spec in new.");
+			}
+			metadata.parentSpec = value;
+			index += 1;
+			continue;
+		}
+		if (arg === "--task") {
+			if (!value) {
+				throw new Error("Missing value for --task in new.");
+			}
+			metadata.task = value;
+			index += 1;
+			continue;
+		}
+		rest.push(arg);
 	}
-	return { theme, metadata };
+	if (!theme || theme === "--help" || theme === "-h") {
+		throw new Error("Missing theme for new workstream.");
+	}
+	if (rest.length > 0) {
+		throw new Error(`Unknown new argument: ${rest[0]}`);
+	}
+	return { theme, metadata, json };
 }
 
 function resolveSession(
@@ -168,10 +194,15 @@ function parseSessionOnlyArgs(
 	args: string[],
 	commandName: string,
 	root: string,
-): { session: string } {
+): SessionArgs {
 	let session = "";
+	let json = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
 		if (arg === "--session") {
 			const value = args[i + 1];
 			if (!value) {
@@ -183,7 +214,7 @@ function parseSessionOnlyArgs(
 		}
 		throw new Error(`Unknown ${commandName} argument: ${arg}`);
 	}
-	return { session: resolveSession(root, session, commandName) };
+	return { session: resolveSession(root, session, commandName), json };
 }
 
 function parseSessionTaskArgs(
@@ -191,11 +222,16 @@ function parseSessionTaskArgs(
 	commandName: string,
 	root: string,
 	options: { allowAutoTask?: boolean } = {},
-): SessionTaskArgs {
+): SessionTaskJsonArgs {
 	let session = "";
 	let taskId = "";
+	let json = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
 		if (arg === "--session") {
 			const value = args[i + 1];
 			if (!value) {
@@ -227,7 +263,7 @@ function parseSessionTaskArgs(
 	if (!taskId) {
 		throw new Error(`Missing --task-id for ${commandName}.`);
 	}
-	return { session: resolvedSession, taskId };
+	return { session: resolvedSession, taskId, json };
 }
 
 function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
@@ -240,6 +276,9 @@ function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		const value = args[i + 1];
+		if (arg === "--json" || arg === "-j") {
+			throw new Error("JSON output is not supported for evidence.");
+		}
 		if (arg === "--session") {
 			if (!value) {
 				throw new Error("Missing value for --session in evidence.");
@@ -324,9 +363,14 @@ function parseDoneArgs(args: string[], root: string): DoneArgs {
 	let requireSpecCheck = false;
 	let artifact = "";
 	let note = "";
+	let json = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		const value = args[i + 1];
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
 		if (arg === "--session") {
 			if (!value) {
 				throw new Error("Missing value for --session in done.");
@@ -413,6 +457,7 @@ function parseDoneArgs(args: string[], root: string): DoneArgs {
 		...(artifact ? { artifact } : {}),
 		...(note ? { note } : {}),
 		requireSpecCheck,
+		json,
 	};
 }
 
@@ -431,9 +476,14 @@ function resolveRequiredSpecCheck(
 function parseLogArgs(args: string[], root: string): LogArgs {
 	let session = "";
 	const messageParts: string[] = [];
+	let json = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		const value = args[i + 1];
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
 		if (arg === "--session") {
 			if (!value) {
 				throw new Error("Missing value for --session in log.");
@@ -461,14 +511,19 @@ function parseLogArgs(args: string[], root: string): LogArgs {
 	if (!message) {
 		throw new Error("Missing timeline message for log.");
 	}
-	return { session: resolveSession(root, session, "log"), message };
+	return { session: resolveSession(root, session, "log"), message, json };
 }
 
 function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 	let strict = false;
 	let sessionPath = "";
+	let json = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
+		if (arg === "--json" || arg === "-j") {
+			json = true;
+			continue;
+		}
 		if (arg === "--strict") {
 			strict = true;
 			continue;
@@ -499,7 +554,7 @@ function parseVerifyArgs(args: string[], root: string): VerifyArgs {
 		sessionPath = resolveProjectPaths(root).abs.wbDir;
 	}
 
-	return { sessionPath, strict };
+	return { sessionPath, strict, json };
 }
 
 function splitCommandLine(command: string): string[] {
@@ -568,6 +623,19 @@ function runVerification(root: string, command: string): { exitCode: number } {
 	return { exitCode: result.status ?? 1 };
 }
 
+function writeJsonError(
+	action: string,
+	error: unknown,
+	exitCode = 2,
+): void {
+	const message = error instanceof Error ? error.message : String(error);
+	console.log(
+		stringifyEnvelope(
+			envelopeErr("workbench.error", message, { action, exitCode }),
+		),
+	);
+}
+
 export async function runNewCommand(
 	args: string[],
 	root: string = process.cwd(),
@@ -575,10 +643,22 @@ export async function runNewCommand(
 	try {
 		const parsed = parseNewArgs(args);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
-		console.log(`session created: ${created.session}`);
+		if (parsed.json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeOk({ ...created, status: "created" }, { action: "workbench.new" }),
+				),
+			);
+		} else {
+			console.log(`session created: ${created.session}`);
+		}
 		return 0;
 	} catch (error) {
-		console.error((error as Error).message);
+		if (hasJsonFlag(args)) {
+			writeJsonError("workbench.new", error);
+		} else {
+			console.error((error as Error).message);
+		}
 		return 2;
 	}
 }
@@ -592,10 +672,29 @@ export async function runStartCommand(
 			allowAutoTask: true,
 		});
 		startTask(root, parsed);
-		console.log(`task started: ${parsed.taskId}`);
+		if (parsed.json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							session: parsed.session,
+							task: parsed.taskId,
+							status: "in_progress",
+						},
+						{ action: "workbench.start" },
+					),
+				),
+			);
+		} else {
+			console.log(`task started: ${parsed.taskId}`);
+		}
 		return 0;
 	} catch (error) {
-		console.error((error as Error).message);
+		if (hasJsonFlag(args)) {
+			writeJsonError("workbench.start", error);
+		} else {
+			console.error((error as Error).message);
+		}
 		return 2;
 	}
 }
@@ -627,9 +726,17 @@ export async function runDoneCommand(
 				parsed.taskId,
 			);
 			if (specCheck.status === "conflict") {
-				console.error(
-					`spec check failed: ${specCheck.spec_id || parsed.taskId}`,
-				);
+				if (parsed.json) {
+					writeJsonError(
+						"workbench.done",
+						new Error(`spec check failed: ${specCheck.spec_id || parsed.taskId}`),
+						1,
+					);
+				} else {
+					console.error(
+						`spec check failed: ${specCheck.spec_id || parsed.taskId}`,
+					);
+				}
 				return 1;
 			}
 		}
@@ -645,7 +752,15 @@ export async function runDoneCommand(
 				...(parsed.note ? { note: parsed.note } : {}),
 			});
 			if (verification.exitCode !== 0) {
-				console.error(`--test failed with exit code ${verification.exitCode}`);
+				if (parsed.json) {
+					writeJsonError(
+						"workbench.done",
+						new Error(`--test failed with exit code ${verification.exitCode}`),
+						1,
+					);
+				} else {
+					console.error(`--test failed with exit code ${verification.exitCode}`);
+				}
 				return 1;
 			}
 		}
@@ -660,10 +775,29 @@ export async function runDoneCommand(
 			});
 		}
 		doneTask(root, parsed);
-		console.log(`task done: ${parsed.taskId}`);
+		if (parsed.json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							session: parsed.session,
+							task: parsed.taskId,
+							status: "done",
+						},
+						{ action: "workbench.done" },
+					),
+				),
+			);
+		} else {
+			console.log(`task done: ${parsed.taskId}`);
+		}
 		return 0;
 	} catch (error) {
-		console.error((error as Error).message);
+		if (hasJsonFlag(args)) {
+			writeJsonError("workbench.done", error);
+		} else {
+			console.error((error as Error).message);
+		}
 		return 2;
 	}
 }
@@ -675,10 +809,30 @@ export async function runLogCommand(
 	try {
 		const parsed = parseLogArgs(args, root);
 		const result = appendTimelineEntry(root, parsed.session, parsed.message);
-		console.log(`log appended: ${result.logPath}`);
+		if (parsed.json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							session: parsed.session,
+							status: "logged",
+							logPath: result.logPath,
+							message: result.message,
+						},
+						{ action: "workbench.log" },
+					),
+				),
+			);
+		} else {
+			console.log(`log appended: ${result.logPath}`);
+		}
 		return 0;
 	} catch (error) {
-		console.error((error as Error).message);
+		if (hasJsonFlag(args)) {
+			writeJsonError("workbench.log", error);
+		} else {
+			console.error((error as Error).message);
+		}
 		return 2;
 	}
 }
@@ -694,10 +848,44 @@ export async function runVerifyTasksCommand(
 		}
 		const parsed = parseVerifyArgs(args, root);
 		const result = verifyWorkbenchTasks(parsed.sessionPath, parsed.strict);
-		console.log(formatVerifyReport(result).trimEnd());
+		if (parsed.json) {
+			if (result.allCompleted) {
+				console.log(
+					stringifyEnvelope(
+						envelopeOk(
+							{
+								...result,
+								status: "passed",
+							},
+							{ action: "workbench.verify" },
+						),
+					),
+				);
+			} else {
+				console.log(
+					stringifyEnvelope(
+						envelopeErr(
+							"workbench.error",
+							"Verification failed.",
+							{
+								action: "workbench.verify",
+								exitCode: 1,
+								hint: `open_tasks=${result.openTasks.length}; issues=${result.issues.length}`,
+							},
+						),
+					),
+				);
+			}
+		} else {
+			console.log(formatVerifyReport(result).trimEnd());
+		}
 		return result.allCompleted ? 0 : 1;
 	} catch (error) {
-		console.error((error as Error).message);
+		if (hasJsonFlag(args)) {
+			writeJsonError("workbench.verify", error);
+		} else {
+			console.error((error as Error).message);
+		}
 		return 2;
 	}
 }
@@ -709,10 +897,25 @@ export async function runCloseCommand(
 	try {
 		const parsed = parseSessionOnlyArgs(args, "close", root);
 		closeSession(root, parsed.session);
-		console.log(`session closed: ${parsed.session}`);
+		if (parsed.json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(
+						{ session: parsed.session, status: "closed" },
+						{ action: "workbench.close" },
+					),
+				),
+			);
+		} else {
+			console.log(`session closed: ${parsed.session}`);
+		}
 		return 0;
 	} catch (error) {
-		console.error((error as Error).message);
+		if (hasJsonFlag(args)) {
+			writeJsonError("workbench.close", error);
+		} else {
+			console.error((error as Error).message);
+		}
 		return 2;
 	}
 }

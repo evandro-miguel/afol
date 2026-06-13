@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -49,6 +49,14 @@ function waitForExit(
 	});
 }
 
+function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
+	return spawnSync("bun", [kernelPath, ...args], {
+		cwd,
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+}
+
 function readLocalStateEvents(root: string): Array<Record<string, unknown>> {
 	const path = resolveWorkbenchEventLogPath(root);
 	if (!existsSync(path)) {
@@ -94,6 +102,10 @@ function writeCliProjectContract(root: string): void {
 	);
 }
 
+function parseEnvelope(stdout: string): Record<string, unknown> {
+	return JSON.parse(stdout) as Record<string, unknown>;
+}
+
 describe("workbench lifecycle service", () => {
 	test("newWorkstream creates plan/task/log/evidence and active session pointer", () => {
 		const root = mkRoot("new");
@@ -110,6 +122,256 @@ describe("workbench lifecycle service", () => {
 			expect(existsSync(created.evidencePath)).toBe(true);
 			expect(readFileSync(created.activeSessionPath, "utf8")).toBe(
 				`${created.session}\n`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("cli workbench lifecycle json envelopes", () => {
+		const root = mkRoot("cli-json");
+		try {
+			writeCliProjectContract(root);
+
+			const newProc = runKernel(root, ["new", "cli json", "--json"]);
+			expect(newProc.status).toBe(0);
+			const newEnvelope = parseEnvelope(newProc.stdout as string);
+			expect(newEnvelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.new",
+			});
+			expect((newEnvelope.data as Record<string, unknown>).session).toMatch(
+				/^\d{6}_\d{4}_cli-json(?:_\d{2})?$/,
+			);
+			expect((newEnvelope.data as Record<string, unknown>).status).toBe(
+				"created",
+			);
+
+			const created = newWorkstream(root, "cli done json");
+			const startProc = runKernel(root, [
+				"start",
+				"--session",
+				created.session,
+				"--json",
+			]);
+			expect(startProc.status).toBe(0);
+			const startEnvelope = parseEnvelope(startProc.stdout as string);
+			expect(startEnvelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.start",
+			});
+			expect(startEnvelope.data).toMatchObject({
+				session: created.session,
+				task: "T-01",
+				status: "in_progress",
+			});
+
+			const logProc = runKernel(root, [
+				"log",
+				"--session",
+				created.session,
+				"--message",
+				"json timeline",
+				"--json",
+			]);
+			expect(logProc.status).toBe(0);
+			const logEnvelope = parseEnvelope(logProc.stdout as string);
+			expect(logEnvelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.log",
+			});
+			expect(logEnvelope.data).toMatchObject({
+				session: created.session,
+				status: "logged",
+				message: "json timeline",
+			});
+
+			const verifyProc = runKernel(root, [
+				"verify-tasks",
+				`.afol/wb/${created.session}`,
+				"--json",
+			]);
+			expect(verifyProc.status).toBe(1);
+			const verifyEnvelope = parseEnvelope(verifyProc.stdout as string);
+			expect(verifyEnvelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "workbench.verify",
+				exit_code: 1,
+			});
+			expect((verifyEnvelope.error as Record<string, unknown>).message).toBe(
+				"Verification failed.",
+			);
+
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+
+			const doneProc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--command",
+				"bun test",
+				"--result",
+				"passed",
+				"--json",
+			]);
+			expect(doneProc.status).toBe(0);
+			const doneEnvelope = parseEnvelope(doneProc.stdout as string);
+			expect(doneEnvelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.done",
+			});
+			expect(doneEnvelope.data).toMatchObject({
+				session: created.session,
+				task: "T-01",
+				status: "done",
+			});
+
+			const closeProc = runKernel(root, ["close", "--session", created.session, "--json"]);
+			expect(closeProc.status).toBe(0);
+			const closeEnvelope = parseEnvelope(closeProc.stdout as string);
+			expect(closeEnvelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.close",
+			});
+			expect(closeEnvelope.data).toMatchObject({
+				session: created.session,
+				status: "closed",
+			});
+
+			const missingProc = runKernel(root, ["new", "--json"]);
+			expect(missingProc.status).toBe(2);
+			const missingEnvelope = parseEnvelope(missingProc.stdout as string);
+			expect(missingEnvelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "workbench.new",
+			});
+			expect((missingEnvelope.error as Record<string, unknown>).message).toBe(
+				"Missing theme for new workstream.",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects json for evidence command", () => {
+		const root = mkRoot("evidence-json");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "evidence-json");
+			const proc = runKernel(root, [
+				"evidence",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--command",
+				"bun test",
+				"--result",
+				"passed",
+				"--json",
+			]);
+
+			expect(proc.status).toBe(2);
+			expect(proc.stdout as string).toBe("");
+			expect(proc.stderr as string).toContain(
+				"JSON output is not supported for evidence.",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+	test("done json emits failure envelope for spec conflict", () => {
+		const root = mkRoot("done-spec-conflict");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done-spec-conflict", {
+				parentSpec: "missing-spec",
+			});
+			writeFileSync(
+				created.taskPath,
+				[
+					"---",
+					'parent_spec: "missing-spec"',
+					"---",
+					"",
+					"# Tasks",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | conflict |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--require-spec-check",
+				"--json",
+			]);
+
+			expect(proc.status).toBe(1);
+			const payload = parseEnvelope(proc.stdout as string);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "workbench.done",
+				exit_code: 1,
+			});
+			expect((payload.error as Record<string, unknown>).message).toContain(
+				"spec check failed",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done json emits failure envelope for test failure", () => {
+		const root = mkRoot("done-test-failure");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done-test-failure");
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test",
+				"bun -e \"process.exit(3)\"",
+				"--json",
+			]);
+
+			expect(proc.status).toBe(1);
+			const payload = parseEnvelope(proc.stdout as string);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "workbench.done",
+				exit_code: 1,
+			});
+			expect((payload.error as Record<string, unknown>).message).toContain(
+				"--test failed",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
