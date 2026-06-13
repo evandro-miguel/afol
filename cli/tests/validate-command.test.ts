@@ -80,7 +80,12 @@ describe("validate command", () => {
 				string,
 				unknown
 			>;
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(0);
 			expect(payload.ok).toBe(true);
+			expect(payload.report).toBeDefined();
+			const data = payload.data as { report?: { ok?: boolean } };
+			expect(data.report?.ok).toBe(true);
 			const checks = payload.checks as Array<Record<string, unknown>>;
 			expect(Array.isArray(checks)).toBe(true);
 			expect(
@@ -150,13 +155,20 @@ describe("validate command", () => {
 			);
 
 			const captured = captureIo();
-			const code = await runValidateCommand(root, [], captured.io);
-			expect(code).toBe(2);
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(1);
 			expect(captured.stderr).toEqual([]);
 			expect(captured.stdout.length).toBe(1);
-			const output = captured.stdout[0] ?? "";
-			expect(output).toContain("validate: failed");
-			expect(output).toContain("fail manifest");
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(1);
+			expect(payload.ok).toBe(false);
+			expect(payload.report).toBeDefined();
+			const checks = payload.checks as Array<Record<string, unknown>>;
+			expect(checks.some((entry) => entry.id === "manifest" && entry.ok === false)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -175,10 +187,14 @@ describe("validate command", () => {
 
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(2);
+			expect(code).toBe(1);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				exit_code: number;
 				checks: Array<{ id: string; ok: boolean }>;
 			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(1);
 			const indexCheck = payload.checks.find(
 				(entry) => entry.id === "wb_local_state_index",
 			);
@@ -202,11 +218,15 @@ describe("validate command", () => {
 
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(2);
+			expect(code).toBe(1);
 
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				exit_code: number;
 				checks: Array<{ id: string; ok: boolean }>;
 			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(1);
 			const indexCheck = payload.checks.find(
 				(entry) => entry.id === "rules_local_state_index",
 			);
@@ -235,7 +255,13 @@ describe("validate command", () => {
 			const code = await runValidateCommand(root, ["--json"], captured.io);
 			expect(code).toBe(0);
 
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { ok: boolean };
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				exit_code: number;
+				ok: boolean;
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(0);
 			expect(payload.ok).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -255,12 +281,16 @@ describe("validate command", () => {
 				},
 			);
 
-			expect(code).toBe(2);
+			expect(code).toBe(1);
 			expect(captured.stderr).toEqual([]);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				exit_code: number;
 				ok: boolean;
 				checks: Array<{ id: string; ok: boolean; message: string }>;
 			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(1);
 			expect(payload.ok).toBe(false);
 			expect(payload.checks).toEqual([
 				{
@@ -279,7 +309,7 @@ describe("validate command", () => {
 					throw new Error("validation exploded");
 				},
 			);
-			expect(humanCode).toBe(2);
+			expect(humanCode).toBe(1);
 			expect(human.stderr).toEqual([]);
 			expect(human.stdout[0]).toContain("validate: failed");
 			expect(human.stdout[0]).toContain("fail runtime validation exploded");
@@ -302,12 +332,14 @@ describe("validate command", () => {
 
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
-			expect(code).toBe(2);
+			expect(code).toBe(1);
 
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<
 				string,
 				unknown
 			>;
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(1);
 			const checks = payload.checks as Array<Record<string, unknown>>;
 			const templateCheck = checks.find(
 				(entry) => entry.id === "template_forbidden",

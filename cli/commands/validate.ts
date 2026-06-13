@@ -1,6 +1,13 @@
 import type { DriftReport } from "../services/drift";
 import { runDriftCheck } from "../services/drift";
 import { validateProjectStructure } from "../services/project/validate";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -25,6 +32,19 @@ type ValidationCheck = {
 type ValidationReport = {
 	ok: boolean;
 	checks: ValidationCheck[];
+};
+
+type ValidationJsonData = {
+	report: ValidationReport;
+	ok: boolean;
+	checks: ValidationCheck[];
+};
+
+type DriftJsonData = {
+	report: DriftReport;
+	ok: boolean;
+	findings: DriftReport["findings"];
+	checked_at: string;
 };
 
 type ValidateRunner = (
@@ -91,6 +111,47 @@ function formatDriftReport(report: DriftReport): string {
 	].join("\n");
 }
 
+function writeValidationJson(io: CommandIo, report: ValidationReport): void {
+	const data: ValidationJsonData = {
+		report,
+		ok: report.ok,
+		checks: report.checks,
+	};
+	const envelope = report.ok
+		? envelopeOk(data, { action: "validate", exitCode: 0 })
+		: (envelopeErr("VALIDATION_FAILED", "validation failed", {
+			action: "validate",
+			exitCode: 1,
+		}) as ResultEnvelope<ValidationJsonData>);
+	envelope.data = data;
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(envelope, ["report", "ok", "checks"]),
+		),
+	);
+}
+
+function writeDriftJson(io: CommandIo, report: DriftReport): void {
+	const data: DriftJsonData = {
+		report,
+		ok: report.ok,
+		findings: report.findings,
+		checked_at: report.checked_at,
+	};
+	const envelope = report.ok
+		? envelopeOk(data, { action: "validate.drift", exitCode: 0 })
+		: (envelopeErr("DRIFT_FOUND", "drift validation failed", {
+			action: "validate.drift",
+			exitCode: 1,
+		}) as ResultEnvelope<DriftJsonData>);
+	envelope.data = data;
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(envelope, ["report", "ok", "findings", "checked_at"]),
+		),
+	);
+}
+
 function failureReport(error: unknown): ValidationReport {
 	const message = error instanceof Error ? error.message : String(error);
 	return {
@@ -122,11 +183,11 @@ export async function runValidateCommand(
 	if (parsed.mode === "drift") {
 		const report = runDriftCheck(projectRoot);
 		if (parsed.json) {
-			io.stdout(JSON.stringify(report));
+			writeDriftJson(io, report);
 		} else {
 			io.stdout(formatDriftReport(report));
 		}
-		return report.ok ? 0 : 2;
+		return report.ok ? 0 : 1;
 	}
 
 	let report: ValidationReport;
@@ -137,10 +198,10 @@ export async function runValidateCommand(
 	}
 
 	if (parsed.json) {
-		io.stdout(JSON.stringify(report));
+		writeValidationJson(io, report);
 	} else {
 		io.stdout(formatReport(report));
 	}
 
-	return report.ok ? 0 : 2;
+	return report.ok ? 0 : 1;
 }

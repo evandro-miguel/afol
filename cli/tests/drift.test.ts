@@ -202,11 +202,19 @@ describe("drift validation", () => {
 				await runValidateCommand(root, ["drift", "--json"], captured.io),
 			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				exit_code: number;
 				ok: boolean;
+				report?: { ok: boolean; findings: Array<{ id: string }> };
 				findings: Array<{ id: string }>;
+				data?: { report?: { ok: boolean; findings: Array<{ id: string }> } };
 			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(0);
 			expect(payload.ok).toBe(true);
+			expect(payload.report).toBeDefined();
 			expect(payload.findings).toEqual([]);
+			expect(payload.data?.report?.ok).toBe(true);
 			expect(captured.stderr).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
