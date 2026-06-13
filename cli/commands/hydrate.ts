@@ -1,8 +1,20 @@
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 import { hydrateSession } from "../services/state/session-state";
 
 type CommandIo = {
 	stdout: (message: string) => void;
 	stderr: (message: string) => void;
+};
+
+type HydrateJsonData = {
+	session?: string;
+	snapshot?: ReturnType<typeof hydrateSession>;
 };
 
 const DEFAULT_IO: CommandIo = {
@@ -50,6 +62,29 @@ function formatResult(snapshot: ReturnType<typeof hydrateSession>): string {
 	].join("\n");
 }
 
+function writeHydrateJson(
+	io: CommandIo,
+	snapshot: ReturnType<typeof hydrateSession>,
+): void {
+	const envelope = envelopeWithLegacyKeys(
+		envelopeOk<HydrateJsonData>(
+			{ session: snapshot.sessionId, snapshot },
+			{ action: "hydrate" },
+		),
+		["snapshot", "session"],
+	);
+	io.stdout(stringifyEnvelope(envelope));
+}
+
+function writeHydrateError(io: CommandIo, sessionId: string, message: string): void {
+	const envelope = envelopeErr("HYDRATE_FAILED", message, {
+		action: "hydrate",
+		exitCode: 1,
+	}) as ResultEnvelope<HydrateJsonData>;
+	envelope.data = { session: sessionId };
+	io.stdout(stringifyEnvelope(envelopeWithLegacyKeys(envelope, ["session"])));
+}
+
 export async function runHydrateCommand(
 	action: string,
 	args: string[],
@@ -67,11 +102,24 @@ export async function runHydrateCommand(
 			throw new Error(`Unknown hydrate action: ${action}`);
 		}
 		const parsed = parseHydrateArgs(hydrateArgs);
-		const snapshot = hydrateSession(projectRoot, parsed.sessionId);
-		if (parsed.json) {
-			io.stdout(JSON.stringify({ ok: true, action: "hydrate", snapshot }));
-		} else {
-			io.stdout(formatResult(snapshot));
+		try {
+			const snapshot = hydrateSession(projectRoot, parsed.sessionId);
+			if (parsed.json) {
+				writeHydrateJson(io, snapshot);
+			} else {
+				io.stdout(formatResult(snapshot));
+			}
+		} catch (error) {
+			if (parsed.json) {
+				writeHydrateError(
+					io,
+					parsed.sessionId,
+					(error as Error).message,
+				);
+			} else {
+				throw error;
+			}
+			return 1;
 		}
 		return 0;
 	} catch (error) {

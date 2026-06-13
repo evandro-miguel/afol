@@ -66,6 +66,10 @@ function captureIo() {
 	};
 }
 
+function parseEnvelope(output: string[]): Record<string, unknown> {
+	return JSON.parse(output[0] ?? "{}") as Record<string, unknown>;
+}
+
 describe("state commands", () => {
 	test("afol hydrate -S test-session returns 0 and prints ok", async () => {
 		const root = createFixture();
@@ -82,6 +86,40 @@ describe("state commands", () => {
 			expect(captured.stdout.join("\n")).toContain("hydrate: ok");
 			expect(captured.stdout.join("\n")).toContain("test-session");
 			expect(captured.stderr).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol hydrate -S test-session --json returns envelope with legacy keys", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = parseEnvelope(captured.stdout);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				exit_code: 0,
+				action: "hydrate",
+			});
+			expect((payload.snapshot as { sessionId: string }).sessionId).toBe(
+				"test-session",
+			);
+			expect((payload.session as string)).toBe("test-session");
+			expect((payload.data as { snapshot: { sessionId: string }; session: string }).snapshot.sessionId).toBe(
+				"test-session",
+			);
+			expect((payload.data as { snapshot: { sessionId: string }; session: string }).session).toBe(
+				"test-session",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -114,6 +152,49 @@ describe("state commands", () => {
 		}
 	});
 
+	test("afol state validate -S test-session --json returns envelope with legacy keys", async () => {
+		const root = createFixture();
+		try {
+			const hydrated = captureIo();
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					hydrated.io,
+				),
+			).toBe(0);
+			const captured = captureIo();
+			expect(
+				await runStateCommand(
+					"validate",
+					["-S", "test-session", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = parseEnvelope(captured.stdout);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				exit_code: 0,
+				action: "state.validate",
+			});
+			expect((payload.result as { sessionId: string }).sessionId).toBe(
+				"test-session",
+			);
+			expect((payload.session as string)).toBe("test-session");
+			expect((payload.data as { result: { sessionId: string }; session: string }).result.sessionId).toBe(
+				"test-session",
+			);
+			expect((payload.data as { result: { sessionId: string }; session: string }).session).toBe(
+				"test-session",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol state show -S test-session --json returns JSON with session data", async () => {
 		const root = createFixture();
 		try {
@@ -135,17 +216,19 @@ describe("state commands", () => {
 					captured.io,
 				),
 			).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-				ok: boolean;
-				snapshot: {
-					sessionId: string;
-					summary: { taskRows: number; evidenceEntries: number };
-				};
-			};
-			expect(payload.ok).toBe(true);
-			expect(payload.snapshot.sessionId).toBe("test-session");
-			expect(payload.snapshot.summary.taskRows).toBe(1);
-			expect(payload.snapshot.summary.evidenceEntries).toBe(1);
+			const payload = parseEnvelope(captured.stdout);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				exit_code: 0,
+				action: "state.show",
+			});
+			expect((payload.snapshot as { sessionId: string; summary: { taskRows: number; evidenceEntries: number } }).sessionId).toBe(
+				"test-session",
+			);
+			expect((payload.session as string)).toBe("test-session");
+			expect((payload.data as { snapshot: { sessionId: string; summary: { taskRows: number; evidenceEntries: number } }; session: string }).snapshot.summary.taskRows).toBe(1);
+			expect((payload.data as { snapshot: { sessionId: string; summary: { taskRows: number; evidenceEntries: number } }; session: string }).snapshot.summary.evidenceEntries).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -172,18 +255,19 @@ describe("state commands", () => {
 					captured.io,
 				),
 			).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-				ok: boolean;
-				snapshot: {
-					sessionId: string;
-					sourceFiles: unknown[];
-					summary: { taskRows: number };
-				};
-			};
-			expect(payload.ok).toBe(true);
-			expect(payload.snapshot.sessionId).toBe("test-session");
-			expect(payload.snapshot.sourceFiles).toHaveLength(3);
-			expect(payload.snapshot.summary.taskRows).toBe(1);
+			const payload = parseEnvelope(captured.stdout);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				exit_code: 0,
+				action: "state.export",
+			});
+			expect((payload.snapshot as { sessionId: string; sourceFiles: unknown[] }).sessionId).toBe(
+				"test-session",
+			);
+			expect((payload.session as string)).toBe("test-session");
+			expect((payload.data as { snapshot: { sessionId: string; sourceFiles: unknown[]; summary: { taskRows: number } }; session: string }).snapshot.sourceFiles).toHaveLength(3);
+			expect((payload.data as { snapshot: { sessionId: string; sourceFiles: unknown[]; summary: { taskRows: number } }; session: string }).snapshot.summary.taskRows).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -197,6 +281,33 @@ describe("state commands", () => {
 			expect(captured.stderr.join("\n")).toContain(
 				"Missing --session for hydrate.",
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol state export --json without hydration returns failure envelope", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runStateCommand(
+					"export",
+					["-S", "test-session", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			const payload = parseEnvelope(captured.stdout);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				exit_code: 1,
+				action: "state.export",
+			});
+			expect((payload.session as string)).toBe("test-session");
+			expect((payload.data as { session: string }).session).toBe("test-session");
+			expect(payload.snapshot).toBeUndefined();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -232,6 +343,15 @@ describe("state commands", () => {
 	test("afol state sync --json returns hydrated snapshot", async () => {
 		const root = createFixture();
 		try {
+			const hydrated = captureIo();
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					hydrated.io,
+				),
+			).toBe(0);
 			const captured = captureIo();
 			expect(
 				await runStateCommand(
@@ -241,9 +361,17 @@ describe("state commands", () => {
 					captured.io,
 				),
 			).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}");
-			expect(payload.action).toBe("sync");
-			expect(payload.snapshot.sessionId).toBe("test-session");
+			const payload = parseEnvelope(captured.stdout);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				exit_code: 0,
+				action: "state.sync",
+			});
+			expect((payload.snapshot as { sessionId: string }).sessionId).toBe(
+				"test-session",
+			);
+			expect((payload.session as string)).toBe("test-session");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

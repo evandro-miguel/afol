@@ -1,4 +1,11 @@
 import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
+import {
 	exportSessionState,
 	hydrateSession,
 	loadSessionState,
@@ -16,6 +23,16 @@ const DEFAULT_IO: CommandIo = {
 };
 
 type StateAction = "show" | "validate" | "sync" | "export";
+
+type StateSnapshotJson = {
+	session?: string;
+	snapshot?: NonNullable<ReturnType<typeof loadSessionState>>;
+};
+
+type StateValidationJson = {
+	session?: string;
+	result?: ReturnType<typeof validateSessionState>;
+};
 
 function normalizeAction(value: string | undefined): StateAction {
 	if (!value || value === "show" || value === "sh") {
@@ -96,6 +113,56 @@ function formatValidation(
 		.join("\n");
 }
 
+function writeSnapshotJson(
+	io: CommandIo,
+	action: Exclude<StateAction, "validate">,
+	snapshot: NonNullable<ReturnType<typeof loadSessionState>>,
+): void {
+	const envelope = envelopeWithLegacyKeys(
+		envelopeOk<StateSnapshotJson>(
+			{ session: snapshot.sessionId, snapshot },
+			{ action: `state.${action}` },
+		),
+		["snapshot", "session"],
+	);
+	io.stdout(stringifyEnvelope(envelope));
+}
+
+function writeSnapshotError(
+	io: CommandIo,
+	action: Exclude<StateAction, "validate">,
+	sessionId: string,
+	message: string,
+): void {
+	const envelope = envelopeErr("STATE_MISSING", message, {
+		action: `state.${action}`,
+		exitCode: 1,
+	}) as ResultEnvelope<StateSnapshotJson>;
+	envelope.data = { session: sessionId };
+	io.stdout(stringifyEnvelope(envelopeWithLegacyKeys(envelope, ["session"])));
+}
+
+function writeValidationJson(
+	io: CommandIo,
+	result: ReturnType<typeof validateSessionState>,
+): void {
+	const envelope = result.ok
+		? envelopeOk<StateValidationJson>(
+			{ session: result.sessionId, result },
+			{ action: "state.validate" },
+		)
+		: (envelopeErr("STATE_VALIDATE_FAILED", result.message, {
+			action: "state.validate",
+			exitCode: 1,
+		}) as ResultEnvelope<StateValidationJson>);
+	envelope.data = { session: result.sessionId, result };
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(envelope, ["result", "session"]),
+		),
+	);
+}
+
 export async function runStateCommand(
 	action: string,
 	args: string[],
@@ -109,26 +176,39 @@ export async function runStateCommand(
 		const parsed = parseStateArgs(stateArgs);
 
 		if (stateAction === "sync") {
-			const snapshot = hydrateSession(projectRoot, parsed.sessionId);
-			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, action: stateAction, snapshot }));
-			} else {
-				io.stdout(
-					[
-						`state sync: ok`,
-						`session: ${snapshot.sessionId}`,
-						`hydrated_at: ${snapshot.hydratedAt}`,
-						`source_files: ${snapshot.sourceFiles.length}`,
-					].join("\n"),
-				);
+			try {
+				const snapshot = hydrateSession(projectRoot, parsed.sessionId);
+				if (parsed.json) {
+					writeSnapshotJson(io, stateAction, snapshot);
+				} else {
+					io.stdout(
+						[
+							`state sync: ok`,
+							`session: ${snapshot.sessionId}`,
+							`hydrated_at: ${snapshot.hydratedAt}`,
+							`source_files: ${snapshot.sourceFiles.length}`,
+						].join("\n"),
+					);
+				}
+				return 0;
+			} catch (error) {
+				if (parsed.json) {
+					writeSnapshotError(
+						io,
+						stateAction,
+						parsed.sessionId,
+						(error as Error).message,
+					);
+					return 1;
+				}
+				throw error;
 			}
-			return 0;
 		}
 
 		if (stateAction === "validate") {
 			const result = validateSessionState(projectRoot, parsed.sessionId);
 			if (parsed.json) {
-				io.stdout(JSON.stringify(result));
+				writeValidationJson(io, result);
 			} else {
 				io.stdout(formatValidation(result));
 			}
@@ -138,6 +218,16 @@ export async function runStateCommand(
 		if (stateAction === "export") {
 			const snapshot = exportSessionState(projectRoot, parsed.sessionId);
 			if (!snapshot) {
+				if (parsed.json) {
+					writeSnapshotError(
+						io,
+						stateAction,
+						parsed.sessionId,
+						`state export: no hydrated state for ${parsed.sessionId}. Run ` +
+							"`afol hydrate -S <session>` first.",
+					);
+					return 1;
+				}
 				io.stderr(
 					`state export: no hydrated state for ${parsed.sessionId}. Run ` +
 						"`afol hydrate -S <session>` first.",
@@ -145,7 +235,7 @@ export async function runStateCommand(
 				return 1;
 			}
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, action: stateAction, snapshot }));
+				writeSnapshotJson(io, stateAction, snapshot);
 			} else {
 				io.stdout(JSON.stringify(snapshot));
 			}
@@ -154,6 +244,16 @@ export async function runStateCommand(
 
 		const snapshot = loadSessionState(projectRoot, parsed.sessionId);
 		if (!snapshot) {
+			if (parsed.json) {
+				writeSnapshotError(
+					io,
+					stateAction,
+					parsed.sessionId,
+					`state show: no hydrated state for ${parsed.sessionId}. Run ` +
+						"`afol hydrate -S <session>` first.",
+				);
+				return 1;
+			}
 			io.stderr(
 				`state show: no hydrated state for ${parsed.sessionId}. Run ` +
 					"`afol hydrate -S <session>` first.",
@@ -161,7 +261,7 @@ export async function runStateCommand(
 			return 1;
 		}
 		if (parsed.json) {
-			io.stdout(JSON.stringify({ ok: true, action: stateAction, snapshot }));
+			writeSnapshotJson(io, stateAction, snapshot);
 		} else {
 			io.stdout(formatSnapshot(snapshot));
 		}
