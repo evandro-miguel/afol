@@ -1,5 +1,5 @@
 import { relative } from "node:path";
-import { listAdmFiles, resolveAdmPaths } from "../services/adm";
+import { listAdmFiles, planAdmMigration, resolveAdmPaths } from "../services/adm";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -11,7 +11,7 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-type AdmAction = "paths" | "show";
+type AdmAction = "paths" | "show" | "plan" | "migrate";
 
 function normalizeAction(value: string | undefined): AdmAction {
 	if (!value || value === "paths") {
@@ -20,19 +20,30 @@ function normalizeAction(value: string | undefined): AdmAction {
 	if (value === "show") {
 		return "show";
 	}
+	if (value === "plan") {
+		return "plan";
+	}
+	if (value === "migrate") {
+		return "migrate";
+	}
 	throw new Error(`Unknown adm action: ${value}`);
 }
 
-function parseArgs(args: string[]): { json: boolean } {
+function parseArgs(args: string[]): { dryRun: boolean; json: boolean } {
+	let dryRun = false;
 	let json = false;
 	for (const value of args) {
+		if (value === "--dry-run") {
+			dryRun = true;
+			continue;
+		}
 		if (value === "--json" || value === "-j") {
 			json = true;
 			continue;
 		}
 		throw new Error(`Unknown adm argument: ${value}`);
 	}
-	return { json };
+	return { dryRun, json };
 }
 
 function toRelative(root: string, paths: Record<string, string>): Record<string, string> {
@@ -61,6 +72,33 @@ export async function runAdmCommand(
 					Object.entries(toRelative(projectRoot, paths))
 						.map(([key, value]) => `${key}: ${value}`)
 						.join("\n"),
+				);
+			}
+			return 0;
+		}
+
+		if (admAction === "plan" || admAction === "migrate") {
+			if (admAction === "plan" && parsed.dryRun) {
+				throw new Error("Unknown adm argument: --dry-run");
+			}
+			if (admAction === "migrate" && !parsed.dryRun) {
+				throw new Error("adm migrate requires --dry-run");
+			}
+			const result = planAdmMigration(projectRoot);
+			if (parsed.json) {
+				io.stdout(
+					JSON.stringify(
+						admAction === "migrate"
+							? { action: admAction, dry_run: true, ...result }
+							: { action: admAction, ...result },
+					),
+				);
+			} else {
+				io.stdout(
+					[
+						`${admAction}: ${result.manifest.length} files`,
+						...result.manifest.map((entry) => `${entry.source_path} -> ${entry.target_path}`),
+					].join("\n"),
 				);
 			}
 			return 0;
