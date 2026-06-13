@@ -1,7 +1,5 @@
 import { type ParsedArgs, parseArgs } from "citty";
 import { createPatch, diffWords } from "diff";
-// @ts-expect-error: jsdiff ships JavaScript-only runtime package without bundled types
-import jsdiff from "jsdiff";
 import * as v from "valibot";
 
 const commandName = "toolchain-smoke";
@@ -29,7 +27,6 @@ const payload = v.parse(
 
 const textPatch = createPatch("toolchain", "left", "right");
 const wordDiff = diffWords("left side", "right side");
-const objectDiff = jsdiff({ step: "toolchain" }, { step: "smoke" });
 
 if (!parsedArgs.json) {
 	throw new Error("toolchain smoke failed: citty parseArgs output");
@@ -47,15 +44,6 @@ if (!Array.isArray(wordDiff)) {
 	throw new Error("toolchain smoke failed: diffWords output");
 }
 
-if (objectDiff === null || typeof objectDiff !== "object") {
-	throw new Error("toolchain smoke failed: jsdiff output");
-}
-
-if (
-	payload.tool === "toolchain" &&
-	textPatch &&
-	wordDiff &&
-	typeof objectDiff === "object"
-) {
+if (payload.tool === "toolchain" && textPatch && wordDiff) {
 	process.stdout.write("toolchain smoke: ok\n");
 }

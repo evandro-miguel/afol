@@ -20,7 +20,6 @@ updated_at: '2026-03-06T22:29:30-03:00'
   - `oxlint` `^1.67.0`
   - `knip` `^6.15.0`
   - `diff` `^9.0.0`
-  - `jsdiff` `^1.1.1`
 - `osv-scanner` `2.3.8` installed in the user-local Go bin; release-security
   lane scans `bun.lock`
 - `gitleaks` installed in the user-local Go bin; release-security lane scans
@@ -53,7 +52,7 @@ package dependencies in `package.json`:
 - Biome
 - Oxlint
 - Knip
-- diff / jsdiff
+- diff
 - OSV
 - Gitleaks or modern equivalent
 - Standalone deterministic build path
