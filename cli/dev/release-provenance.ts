@@ -6,7 +6,10 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_TEMPLATE_HASH } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
-import { supportedDependencyLockfile } from "./security-scan";
+import {
+	buildReleaseSecurityScanOutcomes,
+	supportedDependencyLockfile,
+} from "./security-scan";
 
 const DEFAULT_ARTIFACT = "dist/afol";
 const DEFAULT_BUILD_COMMAND = "bun run build:deterministic";
@@ -28,6 +31,13 @@ type ReleaseProvenance = {
 	build_command: string;
 	platform: string;
 	arch: string;
+	security_scanners: Array<{
+		tool: string;
+		kind: string;
+		status: string;
+		reason?: string;
+		waiver_required?: boolean;
+	}>;
 };
 
 type WriteReleaseProvenanceOptions = {
@@ -80,6 +90,7 @@ function assertKnownReleaseFields(provenance: ReleaseProvenance): void {
 		"build_command",
 		"platform",
 		"arch",
+		"security_scanners",
 	];
 	const unknownFields = requiredFields.filter(
 		(field) => provenance[field] === "unknown",
@@ -125,6 +136,13 @@ export function buildReleaseProvenance(
 		build_command: options.buildCommand ?? DEFAULT_BUILD_COMMAND,
 		platform: process.platform || "unknown",
 		arch: process.arch || "unknown",
+		security_scanners: buildReleaseSecurityScanOutcomes().map((scanner) => ({
+			tool: scanner.tool,
+			kind: scanner.kind,
+			status: scanner.status,
+			...(scanner.reason ? { reason: scanner.reason } : {}),
+			...(scanner.waiver_required ? { waiver_required: scanner.waiver_required } : {}),
+		})),
 	};
 
 	if (options.releaseMode) {

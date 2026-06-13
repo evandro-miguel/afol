@@ -6,7 +6,12 @@ import { existsSync } from "node:fs";
 export type ScanMode = "deps" | "secrets";
 type ScanRequirement = "informative" | "required" | "release";
 
-export type SecurityScanStatus = "passed" | "failed" | "skipped" | "waived";
+export type SecurityScanStatus =
+	| "passed"
+	| "failed"
+	| "errored"
+	| "skipped"
+	| "waived";
 
 export type SecurityScanOutcome = {
 	tool: string;
@@ -33,6 +38,14 @@ const SCAN_TOOLS: Record<ScanMode, string[]> = {
 	deps: ["osv-scanner", "osv"],
 	secrets: ["gitleaks"],
 };
+
+export const RELEASE_SECURITY_SCANNERS: Array<{
+	tool: string;
+	kind: ScanMode;
+}> = [
+	{ tool: "osv-scanner", kind: "deps" },
+	{ tool: "gitleaks", kind: "secrets" },
+];
 
 export function supportedDependencyLockfile(
 	cwd = process.cwd(),
@@ -97,6 +110,65 @@ function buildCommandOutcome(opts: {
 	};
 }
 
+function buildProbeErrorOutcome(opts: {
+	tool: string;
+	kind: ScanMode;
+	mode: ScanRequirement;
+	error: Error & { code?: string };
+}): SecurityScanOutcome {
+	const waiver_required = opts.mode !== "informative";
+	const code = opts.error.code ?? "unknown";
+	return {
+		tool: opts.tool,
+		kind: opts.kind,
+		mode: opts.mode,
+		status: "errored",
+		reason: `${opts.tool} probe failed with ${code}: ${opts.error.message}`,
+		...(waiver_required ? { waiver_required } : {}),
+	};
+}
+
+function buildReleaseScannerOutcome(opts: {
+	tool: string;
+	kind: ScanMode;
+	mode: ScanRequirement;
+}): SecurityScanOutcome {
+	const probe = spawnSync(opts.tool, ["--version"], {
+		encoding: "utf8",
+		shell: false,
+		stdio: "ignore",
+	});
+
+	if (probe.error) {
+		const code = String((probe.error as Error & { code?: string }).code);
+		if (code === "ENOENT") {
+			return buildMissingToolOutcome(opts);
+		}
+
+		return buildProbeErrorOutcome({
+			...opts,
+			error: probe.error as Error & { code?: string },
+		});
+	}
+
+	return {
+		tool: opts.tool,
+		kind: opts.kind,
+		mode: opts.mode,
+		status: "skipped",
+		reason: `${opts.tool} available; scan not executed during provenance generation.`,
+	};
+}
+
+export function buildReleaseSecurityScanOutcomes(): SecurityScanOutcome[] {
+	return RELEASE_SECURITY_SCANNERS.map((scanner) =>
+		buildReleaseScannerOutcome({
+			...scanner,
+			mode: "release",
+		}),
+	);
+}
+
 function runOptionalScan(opts: {
 	binaries: string[];
 	args: string[];
@@ -120,18 +192,20 @@ function runOptionalScan(opts: {
 		});
 
 		if (result.error) {
+			const error = result.error as Error & { code?: string };
 			if (
-				String((result.error as Error & { code?: string }).code) === "ENOENT"
+				String(error.code) === "ENOENT"
 			) {
 				continue;
 			}
 
-			const stderr = `${binary} failed to start: ${result.error.message}`;
+			const stderr = `${binary} failed to start: ${error.message}`;
 			return {
-				outcome: buildMissingToolOutcome({
+				outcome: buildProbeErrorOutcome({
 					tool: binary,
 					kind: opts.kind,
 					mode: opts.mode,
+					error,
 				}),
 				exitCode: 1,
 				stderr,

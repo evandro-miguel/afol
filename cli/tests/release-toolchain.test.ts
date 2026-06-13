@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -116,6 +117,88 @@ describe("release and toolchain contracts", () => {
 				'export const CLI_PACKAGE_NAME = "fixture-cli";',
 			);
 			expect(output).toContain('export const CLI_VERSION = "1.2.3-beta.1";');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release provenance records scanner statuses", () => {
+		const root = mkdtempSync(join(tmpdir(), "release-provenance-scanners-"));
+		const distDir = join(root, "dist");
+		const binDir = join(root, "bin");
+		mkdirSync(distDir, { recursive: true });
+		mkdirSync(binDir, { recursive: true });
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
+		const gitEnv = {
+			...process.env,
+			PATH: binDir,
+			GIT_AUTHOR_NAME: "Test User",
+			GIT_AUTHOR_EMAIL: "test@example.com",
+			GIT_COMMITTER_NAME: "Test User",
+			GIT_COMMITTER_EMAIL: "test@example.com",
+		};
+
+		try {
+			const result = spawnSync("git", ["init"], {
+				cwd: root,
+				encoding: "utf8",
+				env: gitEnv,
+				shell: false,
+			});
+			if (result.error) {
+				throw result.error;
+			}
+			expect(result.status).toBe(0);
+
+			const addResult = spawnSync("git", ["add", "dist/afol"], {
+				cwd: root,
+				encoding: "utf8",
+				env: gitEnv,
+				shell: false,
+			});
+			if (addResult.error) {
+				throw addResult.error;
+			}
+			expect(addResult.status).toBe(0);
+
+			const commitResult = spawnSync(
+				"git",
+				["commit", "--no-verify", "-m", "test release provenance"],
+				{
+					cwd: root,
+					encoding: "utf8",
+					env: gitEnv,
+					shell: false,
+				},
+			);
+			if (commitResult.error) {
+				throw commitResult.error;
+			}
+			expect(commitResult.status).toBe(0);
+
+			const provenance = buildReleaseProvenance({ cwd: root, releaseMode: true });
+			expect(provenance.security_scanners).toHaveLength(2);
+			expect(provenance.security_scanners).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						tool: "osv-scanner",
+						kind: "deps",
+						status: "waived",
+						reason: expect.stringContaining("missing binary"),
+						waiver_required: true,
+					}),
+					expect.objectContaining({
+						tool: "gitleaks",
+						kind: "secrets",
+						status: "waived",
+						reason: expect.stringContaining("missing binary"),
+						waiver_required: true,
+					}),
+				]),
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
