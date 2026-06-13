@@ -375,33 +375,57 @@ describe("local-state project indexer", () => {
 		}
 	});
 
-	test("local-state command rebuilds indexes and reports freshness", async () => {
-		const root = buildFixture();
-		try {
-			const stdout: string[] = [];
-			const stderr: string[] = [];
+		test("local-state command rebuilds indexes and reports freshness", async () => {
+			const root = buildFixture();
+			try {
+				const stdout: string[] = [];
+				const stderr: string[] = [];
 			const io = {
 				stdout: (message: string) => stdout.push(message),
 				stderr: (message: string) => stderr.push(message),
 			};
 
-			expect(await runLocalStateCommand(["rebuild", "--json"], root, io)).toBe(
-				0,
-			);
-			const rebuildPayload = JSON.parse(stdout.at(-1) ?? "{}") as {
-				ok: boolean;
-				snapshot?: { workbench?: { kind?: string } };
-			};
-			expect(rebuildPayload.ok).toBe(true);
-			expect(rebuildPayload.snapshot?.workbench?.kind).toBe(
-				"workbench_index_v1",
-			);
-			expect(validateWorkBenchIndex(root).ok).toBe(true);
+				expect(await runLocalStateCommand(["rebuild", "--json"], root, io)).toBe(
+					0,
+				);
+				const rebuildPayload = JSON.parse(stdout.at(-1) ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					exit_code: number;
+					command: string;
+					snapshot?: { workbench?: { kind?: string } };
+					data?: { command?: string; snapshot?: { workbench?: { kind?: string } } };
+				};
+				expect(rebuildPayload.schema).toBe("afol.result/v1");
+				expect(rebuildPayload.ok).toBe(true);
+				expect(rebuildPayload.exit_code).toBe(0);
+				expect(rebuildPayload.command).toBe("rebuild");
+				expect(rebuildPayload.snapshot?.workbench?.kind).toBe(
+					"workbench_index_v1",
+				);
+				expect(rebuildPayload.data?.command).toBe("rebuild");
+				expect(validateWorkBenchIndex(root).ok).toBe(true);
 
-			expect(await runLocalStateCommand(["freshness"], root, io)).toBe(0);
-			expect(stdout.at(-1)).toContain("local-state freshness: ok");
-			expect(stdout.at(-1)).toContain("ok workbench");
-			expect(stderr).toEqual([]);
+				expect(await runLocalStateCommand(["freshness", "--json"], root, io)).toBe(
+					0,
+				);
+				const freshnessPayload = JSON.parse(stdout.at(-1) ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					exit_code: number;
+					checks: unknown[];
+					data?: { checks?: unknown[] };
+				};
+				expect(freshnessPayload.schema).toBe("afol.result/v1");
+				expect(freshnessPayload.ok).toBe(true);
+				expect(freshnessPayload.exit_code).toBe(0);
+				expect(Array.isArray(freshnessPayload.checks)).toBe(true);
+				expect(freshnessPayload.data?.checks).toBeDefined();
+
+				expect(await runLocalStateCommand(["freshness"], root, io)).toBe(0);
+				expect(stdout.at(-1)).toContain("local-state freshness: ok");
+				expect(stdout.at(-1)).toContain("ok workbench");
+				expect(stderr).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

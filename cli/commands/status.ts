@@ -6,6 +6,12 @@ import {
 } from "../services/local-state/workbench-index";
 import { resolveProjectPaths } from "../services/project/paths";
 import { loadProjectRoot } from "../services/project/root";
+import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -25,6 +31,21 @@ type StatusSnapshot = {
 	taskFilePath?: string;
 	sessionCount?: number;
 	sessionHealth?: string[];
+};
+
+type StatusJsonData = {
+	status: string;
+	task: string;
+	files_written: string[];
+	validation_or_checks: string[];
+	blockers: string[];
+	next: string[];
+	paths: {
+		config: string;
+		lock: string;
+		active_session: string;
+		task_file: string | null;
+	};
 };
 
 const DEFAULT_IO: CommandIo = {
@@ -66,6 +87,22 @@ function parseStatusArgs(args: string[]): { json: boolean } {
 	}
 
 	return { json };
+}
+
+function resultEnvelope<T extends Record<string, unknown>>(
+	data: T,
+	action: string,
+	exitCode: number,
+): ResultEnvelope<T> {
+	return exitCode === 0
+		? envelopeOk(data, { action, exitCode })
+		: {
+			schema: "afol.result/v1",
+			ok: false,
+			action,
+			exit_code: exitCode,
+			data,
+		};
 }
 
 function parseFrontmatter(text: string): Record<string, string> {
@@ -368,21 +405,35 @@ export function runStatusCommand(
 	}
 
 	if (parsed.json) {
+		const data: StatusJsonData = {
+			status: snapshot.status,
+			task: snapshot.task,
+			files_written: snapshot.filesWritten,
+			validation_or_checks: snapshot.validationOrChecks,
+			blockers: snapshot.blockers,
+			next: snapshot.next,
+			paths: {
+				config: snapshot.configPath,
+				lock: snapshot.lockPath,
+				active_session: snapshot.activeSessionPath,
+				task_file: snapshot.taskFilePath ?? null,
+			},
+		};
 		io.stdout(
-			JSON.stringify({
-				status: snapshot.status,
-				task: snapshot.task,
-				files_written: snapshot.filesWritten,
-				validation_or_checks: snapshot.validationOrChecks,
-				blockers: snapshot.blockers,
-				next: snapshot.next,
-				paths: {
-					config: snapshot.configPath,
-					lock: snapshot.lockPath,
-					active_session: snapshot.activeSessionPath,
-					task_file: snapshot.taskFilePath ?? null,
-				},
-			}),
+			stringifyEnvelope(
+				envelopeWithLegacyKeys(
+					resultEnvelope(data, "status", 0),
+					[
+						"status",
+						"task",
+						"files_written",
+						"validation_or_checks",
+						"blockers",
+						"next",
+						"paths",
+					],
+				),
+			),
 		);
 		return 0;
 	}
