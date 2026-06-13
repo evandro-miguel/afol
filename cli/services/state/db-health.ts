@@ -1,9 +1,14 @@
-import { existsSync, statSync } from "node:fs";
 import { Database } from "bun:sqlite";
+import { existsSync, statSync } from "node:fs";
 import { resolveProjectPaths } from "../project/paths";
 import { validateState } from "./validate";
 
-const EXPECTED_TABLES = ["sessions", "source_files", "tasks", "evidence"] as const;
+const EXPECTED_TABLES = [
+	"sessions",
+	"source_files",
+	"tasks",
+	"evidence",
+] as const;
 
 export type DbHealthSeverity = "fail" | "warn" | "info";
 
@@ -121,26 +126,40 @@ export function checkDbHealth(root: string): DbHealthReport {
 		).toLowerCase();
 		wal_enabled = journalMode === "wal";
 		if (!wal_enabled) {
-			findings.push({ severity: "warn", message: `WAL not enabled (mode=${journalMode})` });
+			findings.push({
+				severity: "warn",
+				message: `WAL not enabled (mode=${journalMode})`,
+			});
 		}
 
 		const integrity = scalarString(
-			db.query(`PRAGMA integrity_check;`).get() as Record<string, unknown> | null,
+			db.query(`PRAGMA integrity_check;`).get() as Record<
+				string,
+				unknown
+			> | null,
 		);
 		if (integrity !== "ok") {
 			schema_ok = false;
-			findings.push({ severity: "fail", message: `integrity_check failed: ${integrity}` });
+			findings.push({
+				severity: "fail",
+				message: `integrity_check failed: ${integrity}`,
+			});
 		}
 
 		const tables = new Set(
-			(db.query(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as Array<{ name: string }>).map(
-				(row) => row.name,
-			),
+			(
+				db
+					.query(`SELECT name FROM sqlite_master WHERE type = 'table'`)
+					.all() as Array<{ name: string }>
+			).map((row) => row.name),
 		);
 		const missingTables = EXPECTED_TABLES.filter((name) => !tables.has(name));
 		if (missingTables.length > 0) {
 			schema_ok = false;
-			findings.push({ severity: "fail", message: `missing tables: ${missingTables.join(", ")}` });
+			findings.push({
+				severity: "fail",
+				message: `missing tables: ${missingTables.join(", ")}`,
+			});
 		}
 
 		fts_ok = tables.has("state_fts");
@@ -155,12 +174,18 @@ export function checkDbHealth(root: string): DbHealthReport {
 
 		orphan_records = countOrphans(db);
 		if (orphan_records > 0) {
-			findings.push({ severity: "warn", message: `orphan records: ${orphan_records}` });
+			findings.push({
+				severity: "warn",
+				message: `orphan records: ${orphan_records}`,
+			});
 		}
 
 		stale_sources = countStaleSources(root, db);
 		if (stale_sources > 0) {
-			findings.push({ severity: "warn", message: `stale sources: ${stale_sources}` });
+			findings.push({
+				severity: "warn",
+				message: `stale sources: ${stale_sources}`,
+			});
 		}
 	} catch (error) {
 		schema_ok = false;

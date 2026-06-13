@@ -2,19 +2,19 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveRules } from "../catalog/rules";
 import { listSkills, searchSkills } from "../catalog/skills";
-import { recallEntries } from "../memory";
 import { searchLibrary } from "../library";
+import { recallEntries } from "../memory";
+import { resolveProjectPaths } from "../project/paths";
 import { getPstrIndex, validatePstrIndex } from "../pstr";
 import { loadSessionState, validateState } from "../state";
-import { resolveProjectPaths } from "../project/paths";
 import { getSectionIndex, rebuildSectionIndex } from "./section-index";
 import type {
 	ContextBundle,
+	ContextExpandedSection,
 	ContextRef,
 	ContextRetrievalMode,
-	ContextExpandedSection,
+	SectionEntry,
 } from "./types";
-import type { SectionEntry } from "./types";
 
 type BuildOptions = {
 	session?: string;
@@ -41,7 +41,8 @@ type TaskRecord = {
 	featureId: string;
 };
 
-const TASK_ROW_RE = /^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
+const TASK_ROW_RE =
+	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
 const MODE_BUDGETS: Record<ContextRetrievalMode, number> = {
 	compact: 1000,
 	balanced: 2000,
@@ -56,7 +57,9 @@ function frontmatter(content: string): Record<string, unknown> {
 	}
 	try {
 		const parsed = Bun.YAML.parse(match[1]);
-		return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+		return parsed !== null &&
+			typeof parsed === "object" &&
+			!Array.isArray(parsed)
 			? (parsed as Record<string, unknown>)
 			: {};
 	} catch {
@@ -75,7 +78,11 @@ function taskFiles(root: string, session: string): string[] {
 		.sort((a, b) => a.localeCompare(b));
 }
 
-function findTaskRecord(root: string, session: string, taskId: string): TaskRecord | null {
+function findTaskRecord(
+	root: string,
+	session: string,
+	taskId: string,
+): TaskRecord | null {
 	for (const filePath of taskFiles(root, session)) {
 		const content = readFileSync(filePath, "utf8");
 		const meta = frontmatter(content);
@@ -111,7 +118,10 @@ function refFromSection(section: SectionEntry): ContextRef {
 }
 
 function estimateTokens(values: string[]): number {
-	return values.reduce((total, value) => total + Math.max(1, Math.ceil(value.length / 4)), 0);
+	return values.reduce(
+		(total, value) => total + Math.max(1, Math.ceil(value.length / 4)),
+		0,
+	);
 }
 
 function estimateBundleTokens(bundle: ContextBundle): number {
@@ -120,7 +130,9 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 		bundle.role,
 		bundle.surface,
 		bundle.mode,
-		...bundle.refs.map((ref) => `${ref.domain}:${ref.path}:${ref.section ?? ""}`),
+		...bundle.refs.map(
+			(ref) => `${ref.domain}:${ref.path}:${ref.section ?? ""}`,
+		),
 		...bundle.rules,
 		...bundle.skills,
 		...bundle.tools,
@@ -139,19 +151,29 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 	]);
 }
 
-function selectSections(root: string, task: TaskRecord | null, surface: string): SectionEntry[] {
+function selectSections(
+	root: string,
+	task: TaskRecord | null,
+	surface: string,
+): SectionEntry[] {
 	const index = getSectionIndex(root) ?? rebuildSectionIndex(root);
 	if (task?.featureId) {
 		const needle = `spec:${task.featureId.trim().toLowerCase()}`;
-		const matches = index.sections.filter((section) => section.ref.toLowerCase().startsWith(needle));
+		const matches = index.sections.filter((section) =>
+			section.ref.toLowerCase().startsWith(needle),
+		);
 		if (matches.length > 0) {
 			return matches.slice(0, 3);
 		}
 	}
 	const surfaceMatches = index.sections
-		.filter((section) => section.ref.toLowerCase().includes(surface.toLowerCase()))
+		.filter((section) =>
+			section.ref.toLowerCase().includes(surface.toLowerCase()),
+		)
 		.slice(0, 3);
-	return surfaceMatches.length > 0 ? surfaceMatches : index.sections.slice(0, 3);
+	return surfaceMatches.length > 0
+		? surfaceMatches
+		: index.sections.slice(0, 3);
 }
 
 function selectExpandedSections(
@@ -167,11 +189,15 @@ function selectExpandedSections(
 		}
 		const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
 		const snippetLines = lines.slice(section.line_start - 1, section.line_end);
-		const snippet = full ? snippetLines.join("\n") : snippetLines.slice(0, 24).join("\n");
-		return [{
-			...section,
-			snippet,
-		}];
+		const snippet = full
+			? snippetLines.join("\n")
+			: snippetLines.slice(0, 24).join("\n");
+		return [
+			{
+				...section,
+				snippet,
+			},
+		];
 	});
 }
 
@@ -188,7 +214,11 @@ function selectSkills(root: string, surface: string, role: string): string[] {
 	return selected.slice(0, 5).map((skill) => skill.name);
 }
 
-function selectTools(session: string | undefined, task: string | undefined, surface: string): string[] {
+function selectTools(
+	session: string | undefined,
+	task: string | undefined,
+	surface: string,
+): string[] {
 	const tools = [
 		"afol ctx section",
 		"afol ctx explain",
@@ -209,8 +239,15 @@ function selectTools(session: string | undefined, task: string | undefined, surf
 	return tools.slice(0, 10);
 }
 
-function selectValidationCommands(session: string | undefined, task: string | undefined): string[] {
-	const commands = ["bun run typecheck", "bun test", "afol validate project --json"];
+function selectValidationCommands(
+	session: string | undefined,
+	task: string | undefined,
+): string[] {
+	const commands = [
+		"bun run typecheck",
+		"bun test",
+		"afol validate project --json",
+	];
 	if (session && task) {
 		commands.unshift(`afol state validate -S ${session}`);
 	}
@@ -225,26 +262,46 @@ function selectPstrRefs(root: string): string[] {
 	return index.maps.slice(0, 5).map((map) => `pstr:${map.id}`);
 }
 
-function bundleSearchQuery(taskId: string, surface: string, role: string): string {
+function bundleSearchQuery(
+	taskId: string,
+	surface: string,
+	role: string,
+): string {
 	const queryParts = taskId ? [taskId, surface, role] : [surface, role];
 	return queryParts.filter(Boolean).join(" ").trim();
 }
 
-function selectMemoryRefs(root: string, taskId: string, surface: string, role: string): string[] {
+function selectMemoryRefs(
+	root: string,
+	taskId: string,
+	surface: string,
+	role: string,
+): string[] {
 	const query = bundleSearchQuery(taskId, surface, role);
 	if (!query) {
 		return [];
 	}
-	return recallEntries(root, query, { limit: 3 }).map((entry) => `memory:${entry.id}`);
+	return recallEntries(root, query, { limit: 3 }).map(
+		(entry) => `memory:${entry.id}`,
+	);
 }
 
-function selectLibraryRefs(root: string, taskId: string, surface: string, role: string): string[] {
+function selectLibraryRefs(
+	root: string,
+	taskId: string,
+	surface: string,
+	role: string,
+): string[] {
 	const query = bundleSearchQuery(taskId, surface, role);
 	if (!query) {
 		return [];
 	}
 	return searchLibrary(root, query)
-		.flatMap((result) => result.matching_claims.map((claim) => `library:${result.topic.slug}#${claim.id}`))
+		.flatMap((result) =>
+			result.matching_claims.map(
+				(claim) => `library:${result.topic.slug}#${claim.id}`,
+			),
+		)
 		.slice(0, 3);
 }
 
@@ -314,7 +371,10 @@ function trimToBudget(bundle: ContextBundle): ContextBundle {
 	return next;
 }
 
-export function buildContextBundle(root: string, opts: BuildOptions): ContextBundle {
+export function buildContextBundle(
+	root: string,
+	opts: BuildOptions,
+): ContextBundle {
 	const role = (opts.role ?? "worker").trim() || "worker";
 	const surface = (opts.surface ?? "general").trim() || "general";
 	const mode = opts.mode ?? "balanced";
@@ -328,20 +388,29 @@ export function buildContextBundle(root: string, opts: BuildOptions): ContextBun
 	const state = session ? loadSessionState(root, session) : null;
 	const sections = selectSections(root, task, surface);
 	const compact = mode === "compact";
-	const expandedSections = mode === "deep" || mode === "tokenmax" ? selectExpandedSections(root, sections, mode) : undefined;
+	const expandedSections =
+		mode === "deep" || mode === "tokenmax"
+			? selectExpandedSections(root, sections, mode)
+			: undefined;
 	const bundle: ContextBundle = {
 		task_id: taskId,
 		role,
 		surface,
 		mode,
 		refs: [
-			...(task ? [{ domain: "task", path: task.path, section: task.taskId }] : []),
+			...(task
+				? [{ domain: "task", path: task.path, section: task.taskId }]
+				: []),
 			...sections.map(refFromSection),
 		],
 		rules: compact ? [] : selectRules(root, surface),
 		skills: compact ? [] : selectSkills(root, surface, role),
-		tools: compact ? [] : selectTools(session || undefined, taskId || undefined, surface),
-		validation_commands: compact ? [] : selectValidationCommands(session || undefined, taskId || undefined),
+		tools: compact
+			? []
+			: selectTools(session || undefined, taskId || undefined, surface),
+		validation_commands: compact
+			? []
+			: selectValidationCommands(session || undefined, taskId || undefined),
 		pstr_refs: compact ? [] : selectPstrRefs(root),
 		memory_refs: compact ? [] : selectMemoryRefs(root, taskId, surface, role),
 		library_refs: compact ? [] : selectLibraryRefs(root, taskId, surface, role),
@@ -349,11 +418,11 @@ export function buildContextBundle(root: string, opts: BuildOptions): ContextBun
 		gaps: compact
 			? []
 			: [
-				!session ? "missing session" : "",
-				!task ? "missing task record" : "",
-				sections.length === 0 ? "no matching spec sections" : "",
-				state ? "" : "no hydrated session state",
-			].filter(Boolean),
+					!session ? "missing session" : "",
+					!task ? "missing task record" : "",
+					sections.length === 0 ? "no matching spec sections" : "",
+					state ? "" : "no hydrated session state",
+				].filter(Boolean),
 		do_not_load: doNotLoadList(),
 		...(expandedSections ? { expanded_sections: expandedSections } : {}),
 	};

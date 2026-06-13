@@ -226,7 +226,12 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind && SUBCOMMAND_GROUPS.has(topLevelKind)) {
 		const action = rest[0] ?? "";
-		return { kind: "subcommand", group: topLevelKind, action, args: rest.slice(1) };
+		return {
+			kind: "subcommand",
+			group: topLevelKind,
+			action,
+			args: rest.slice(1),
+		};
 	}
 
 	if (topLevel.startsWith("-")) {

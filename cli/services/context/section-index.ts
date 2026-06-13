@@ -42,7 +42,9 @@ function frontmatter(content: string): Frontmatter {
 	}
 	try {
 		const parsed = Bun.YAML.parse(match[1]);
-		return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+		return parsed !== null &&
+			typeof parsed === "object" &&
+			!Array.isArray(parsed)
 			? (parsed as Frontmatter)
 			: {};
 	} catch {
@@ -63,7 +65,10 @@ function docMetaForPath(root: string, filePath: string): DocMeta {
 	const meta = frontmatter(content);
 	const relPath = relative(root, filePath).replace(/\\/g, "/");
 	if (relPath.includes("/SPECS/")) {
-		const feature = typeof meta.roadmap_feature === "string" ? meta.roadmap_feature.trim() : "";
+		const feature =
+			typeof meta.roadmap_feature === "string"
+				? meta.roadmap_feature.trim()
+				: "";
 		const id = typeof meta.id === "string" ? meta.id.trim() : filePath;
 		return { ref: `spec:${normalizeRefPart(feature || id)}`, path: relPath };
 	}
@@ -92,7 +97,9 @@ function collectDocs(root: string): string[] {
 			}
 		}
 	}
-	return docs.sort((a, b) => relative(root, a).localeCompare(relative(root, b)));
+	return docs.sort((a, b) =>
+		relative(root, a).localeCompare(relative(root, b)),
+	);
 }
 
 function parseHeadings(content: string): Heading[] {
@@ -166,7 +173,7 @@ function isValidIndex(value: unknown): value is SectionIndex {
 				typeof entry.title === "string" &&
 				typeof entry.level === "number" &&
 				typeof entry.line_start === "number" &&
-			typeof entry.line_end === "number" &&
+				typeof entry.line_end === "number" &&
 				typeof entry.source_path === "string",
 		)
 	);
@@ -181,7 +188,11 @@ function writeIndex(root: string, snapshot: SectionIndex): SectionIndex {
 export function rebuildSectionIndex(root: string): SectionIndex {
 	const sections = collectDocs(root)
 		.flatMap((filePath) => sectionsForDoc(root, filePath))
-		.sort((a, b) => a.source_path.localeCompare(b.source_path) || a.line_start - b.line_start);
+		.sort(
+			(a, b) =>
+				a.source_path.localeCompare(b.source_path) ||
+				a.line_start - b.line_start,
+		);
 	return writeIndex(root, {
 		kind: "sections_index_v1",
 		version: 1,
@@ -207,8 +218,12 @@ export function resolveSection(root: string, ref: string): SectionEntry | null {
 	const index = getSectionIndex(root) ?? rebuildSectionIndex(root);
 	return (
 		index.sections.find((entry) => entry.ref.toLowerCase() === needle) ??
-		index.sections.find((entry) => entry.ref.toLowerCase().startsWith(`${needle}#`)) ??
-		index.sections.find((entry) => entry.ref.toLowerCase().startsWith(needle)) ??
+		index.sections.find((entry) =>
+			entry.ref.toLowerCase().startsWith(`${needle}#`),
+		) ??
+		index.sections.find((entry) =>
+			entry.ref.toLowerCase().startsWith(needle),
+		) ??
 		null
 	);
 }

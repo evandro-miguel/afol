@@ -40,7 +40,11 @@ function isAlreadyExistsError(error: unknown): boolean {
 
 function assertSessionLockName(session: string): string {
 	const normalized = session.trim();
-	if (!SESSION_LOCK_RE.test(normalized) || normalized.includes("..") || normalized.length === 0) {
+	if (
+		!SESSION_LOCK_RE.test(normalized) ||
+		normalized.includes("..") ||
+		normalized.length === 0
+	) {
 		throw new Error(`Invalid session identifier for lock: ${session}`);
 	}
 	return normalized;

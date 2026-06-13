@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runAdrCommand } from "../commands/adr";
+import { runChangelogCommand } from "../commands/changelog";
+import { runSpecCommand } from "../commands/spec";
 import {
 	abandonAdr,
 	acceptAdr,
@@ -12,9 +21,6 @@ import {
 	supersedeAdr,
 	waiveSpecCheck,
 } from "../services/spec-gate";
-import { runAdrCommand } from "../commands/adr";
-import { runChangelogCommand } from "../commands/changelog";
-import { runSpecCommand } from "../commands/spec";
 
 type CapturedIo = {
 	stdout: string[];
@@ -51,13 +57,30 @@ function createFixture(): string {
 	mkdirSync(join(root, ".afol", "memory"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "DECISIONS"), { recursive: true });
-	writeFileSync(join(root, ".agents", "config.json"), '{"version":"0.1.0"}', "utf8");
-	writeFileSync(join(root, ".agents", "lock.json"), '{"version":"0.1.0"}', "utf8");
-	writeFileSync(join(root, ".agents", "manifest.json"), '{"commands":[]}', "utf8");
+	writeFileSync(
+		join(root, ".agents", "config.json"),
+		'{"version":"0.1.0"}',
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "lock.json"),
+		'{"version":"0.1.0"}',
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "manifest.json"),
+		'{"commands":[]}',
+		"utf8",
+	);
 	return root;
 }
 
-function writeTask(root: string, sessionId: string, taskId: string, parentSpec = ""): string {
+function writeTask(
+	root: string,
+	sessionId: string,
+	taskId: string,
+	parentSpec = "",
+): string {
 	const sessionDir = join(root, ".afol", "wb", sessionId);
 	mkdirSync(sessionDir, { recursive: true });
 	const path = join(sessionDir, "plan_task_001.md");
@@ -143,7 +166,13 @@ describe("spec-gate system", () => {
 		const root = createFixture();
 		try {
 			writeTask(root, "session-a", "T-01", "spec-missing");
-			const result = waiveSpecCheck(root, "session-a", "T-01", " needs waiver ", " ADR-9 ");
+			const result = waiveSpecCheck(
+				root,
+				"session-a",
+				"T-01",
+				" needs waiver ",
+				" ADR-9 ",
+			);
 			expect(result.status).toBe("waived");
 			expect(result.waiver_reason).toBe("needs waiver");
 			expect(result.adr_ref).toBe("ADR-9");
@@ -168,26 +197,56 @@ describe("spec-gate system", () => {
 	test("createAdr creates file with next sequential number", () => {
 		const root = createFixture();
 		try {
-			const existing = join(root, "docs", "arc", "DECISIONS", "ADR-001-existing.md");
-			writeFileSync(existing, ["---", "doc_type: adr", "id: ADR-001", "title: Existing", "status: accepted", "created_at: \"2026-01-01T00:00:00.000Z\"", "updated_at: \"2026-01-01T00:00:00.000Z\"", "decision_type: \"architecture\"", "supersedes: \"\"", "superseded_by: \"\"", "affected_specs: []", "affected_rules: []", "affected_skills: []", "affected_commands: []", "archive_reason: \"\"", "---", ""].join("\n"), "utf8");
+			const existing = join(
+				root,
+				"docs",
+				"arc",
+				"DECISIONS",
+				"ADR-001-existing.md",
+			);
+			writeFileSync(
+				existing,
+				[
+					"---",
+					"doc_type: adr",
+					"id: ADR-001",
+					"title: Existing",
+					"status: accepted",
+					'created_at: "2026-01-01T00:00:00.000Z"',
+					'updated_at: "2026-01-01T00:00:00.000Z"',
+					'decision_type: "architecture"',
+					'supersedes: ""',
+					'superseded_by: ""',
+					"affected_specs: []",
+					"affected_rules: []",
+					"affected_skills: []",
+					"affected_commands: []",
+					'archive_reason: ""',
+					"---",
+					"",
+				].join("\n"),
+				"utf8",
+			);
 			const path = createAdr(root, "Next decision");
 			expect(path).toContain("ADR-002-next-decision.md");
-			expect(readFileSync(path, "utf8")).toContain("id: \"ADR-002\"");
+			expect(readFileSync(path, "utf8")).toContain('id: "ADR-002"');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-		test("createAdr handles slugification", () => {
-			const root = createFixture();
-			try {
-				const path = createAdr(root, "  Hello, World! / Test  ");
-				expect(path).toContain("ADR-001-hello-world-test.md");
-				expect(readFileSync(path, "utf8")).toContain("title: \"Hello, World! / Test\"");
-			} finally {
-				rmSync(root, { recursive: true, force: true });
-			}
-		});
+	test("createAdr handles slugification", () => {
+		const root = createFixture();
+		try {
+			const path = createAdr(root, "  Hello, World! / Test  ");
+			expect(path).toContain("ADR-001-hello-world-test.md");
+			expect(readFileSync(path, "utf8")).toContain(
+				'title: "Hello, World! / Test"',
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
 	test("acceptAdr updates status", () => {
 		const root = createFixture();
@@ -206,9 +265,12 @@ describe("spec-gate system", () => {
 			createAdr(root, "Old decision");
 			createAdr(root, "New decision");
 			supersedeAdr(root, "ADR-001", "ADR-002");
-			const content = readFileSync(join(root, "docs", "arc", "DECISIONS", "ADR-001-old-decision.md"), "utf8");
+			const content = readFileSync(
+				join(root, "docs", "arc", "DECISIONS", "ADR-001-old-decision.md"),
+				"utf8",
+			);
 			expect(content).toContain("status: superseded");
-			expect(content).toContain("superseded_by: \"ADR-002\"");
+			expect(content).toContain('superseded_by: "ADR-002"');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -220,7 +282,9 @@ describe("spec-gate system", () => {
 			const path = createAdr(root, "Abandon me");
 			abandonAdr(root, "ADR-001", " no longer needed ");
 			expect(readFileSync(path, "utf8")).toContain("status: abandoned");
-			expect(readFileSync(path, "utf8")).toContain("archive_reason: \"no longer needed\"");
+			expect(readFileSync(path, "utf8")).toContain(
+				'archive_reason: "no longer needed"',
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -241,7 +305,11 @@ describe("spec-gate system", () => {
 		const root = createFixture();
 		try {
 			const path = join(root, "docs", "arc", "CHANGELOG.md");
-			writeFileSync(path, ["# Changelog", "", "## old", "- fix: prior", ""].join("\n"), "utf8");
+			writeFileSync(
+				path,
+				["# Changelog", "", "## old", "- fix: prior", ""].join("\n"),
+				"utf8",
+			);
 			addChangelogEntry(root, "behavior", " appended test ");
 			const content = readFileSync(path, "utf8");
 			expect(content).toContain("## old");
@@ -258,7 +326,14 @@ describe("spec-gate system", () => {
 			writeTask(root, "session-a", "T-01", "spec-001");
 			writeSpec(root, "spec-001", "active");
 			const captured = captureIo();
-			expect(await runSpecCommand("check", ["-S", "session-a", "-T", "T-01", "--json"], root, captured.io)).toBe(0);
+			expect(
+				await runSpecCommand(
+					"check",
+					["-S", "session-a", "-T", "T-01", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.action).toBe("check");
 			expect(payload.status).toBe("compatible");
@@ -274,31 +349,52 @@ describe("spec-gate system", () => {
 			writeTask(root, "session-a", "T-01", "spec-001");
 			writeSpec(root, "spec-001", "active");
 			const captured = captureIo();
-			expect(await runSpecCommand("check", ["-S", "session-a", "-T", "T-01"], root, captured.io)).toBe(0);
+			expect(
+				await runSpecCommand(
+					"check",
+					["-S", "session-a", "-T", "T-01"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("spec check: compatible");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-		test("afol adr new --json creates ADR", async () => {
-			const root = createFixture();
-			try {
-				const captured = captureIo();
-				expect(await runAdrCommand("new", ["JSON output test", "--json"], root, captured.io)).toBe(0);
-				const payload = JSON.parse(captured.stdout[0] ?? "{}");
-				expect(payload.action).toBe("new");
-				expect(readFileSync(payload.path, "utf8")).toContain("Json Output Test");
-			} finally {
-				rmSync(root, { recursive: true, force: true });
-			}
-		});
+	test("afol adr new --json creates ADR", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runAdrCommand(
+					"new",
+					["JSON output test", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.action).toBe("new");
+			expect(readFileSync(payload.path, "utf8")).toContain("Json Output Test");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
 	test("afol changelog add --json adds entry", async () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runChangelogCommand("add", ["--type", "fix", "--message", "test", "--json"], root, captured.io)).toBe(0);
+			expect(
+				await runChangelogCommand(
+					"add",
+					["--type", "fix", "--message", "test", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.action).toBe("add");
 			expect(readFileSync(payload.path, "utf8")).toContain("- fix: test");
@@ -312,7 +408,14 @@ describe("spec-gate system", () => {
 		try {
 			writeTask(root, "session-a", "T-01", "spec-missing");
 			const captured = captureIo();
-			expect(await runSpecCommand("conflict", ["-S", "session-a", "-T", "T-01"], root, captured.io)).toBe(0);
+			expect(
+				await runSpecCommand(
+					"conflict",
+					["-S", "session-a", "-T", "T-01"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("spec conflict: conflict");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -324,8 +427,17 @@ describe("spec-gate system", () => {
 		try {
 			writeTask(root, "session-a", "T-01", "spec-missing");
 			const captured = captureIo();
-			expect(await runSpecCommand("waive", ["-S", "session-a", "-T", "T-01"], root, captured.io)).toBe(2);
-			expect(captured.stderr.join("\n")).toContain("Missing --reason for spec waive.");
+			expect(
+				await runSpecCommand(
+					"waive",
+					["-S", "session-a", "-T", "T-01"],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			expect(captured.stderr.join("\n")).toContain(
+				"Missing --reason for spec waive.",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -337,7 +449,22 @@ describe("spec-gate system", () => {
 			writeTask(root, "session-a", "T-01", "spec-missing");
 			const captured = captureIo();
 			expect(
-				await runSpecCommand("waive", ["-S", "session-a", "-T", "T-01", "--reason", "needs override", "--adr", "ADR-9", "--json"], root, captured.io),
+				await runSpecCommand(
+					"waive",
+					[
+						"-S",
+						"session-a",
+						"-T",
+						"T-01",
+						"--reason",
+						"needs override",
+						"--adr",
+						"ADR-9",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
 			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.action).toBe("waive");
@@ -353,29 +480,61 @@ describe("spec-gate system", () => {
 		const root = createFixture();
 		try {
 			const created = captureIo();
-			expect(await runAdrCommand("new", ["First decision"], root, created.io)).toBe(0);
+			expect(
+				await runAdrCommand("new", ["First decision"], root, created.io),
+			).toBe(0);
 			const firstPath = created.stdout[0] ?? "";
 			expect(firstPath).toContain("ADR-001-first-decision.md");
 
 			const accepted = captureIo();
-			expect(await runAdrCommand("accept", ["ADR-001"], root, accepted.io)).toBe(0);
+			expect(
+				await runAdrCommand("accept", ["ADR-001"], root, accepted.io),
+			).toBe(0);
 			expect(accepted.stdout[0] ?? "").toContain("adr accept:");
 
 			const second = captureIo();
-			expect(await runAdrCommand("new", ["Second decision", "--json"], root, second.io)).toBe(0);
+			expect(
+				await runAdrCommand(
+					"new",
+					["Second decision", "--json"],
+					root,
+					second.io,
+				),
+			).toBe(0);
 			const secondPayload = JSON.parse(second.stdout[0] ?? "{}");
 			expect(secondPayload.path).toContain("ADR-002-second-decision.md");
 
 			const superseded = captureIo();
-			expect(await runAdrCommand("supersede", ["ADR-001", "ADR-002"], root, superseded.io)).toBe(0);
+			expect(
+				await runAdrCommand(
+					"supersede",
+					["ADR-001", "ADR-002"],
+					root,
+					superseded.io,
+				),
+			).toBe(0);
 			expect(superseded.stdout[0] ?? "").toContain("adr supersede:");
 
 			const abandoned = captureIo();
-			expect(await runAdrCommand("abandon", ["ADR-002", "--reason", "unused"], root, abandoned.io)).toBe(0);
+			expect(
+				await runAdrCommand(
+					"abandon",
+					["ADR-002", "--reason", "unused"],
+					root,
+					abandoned.io,
+				),
+			).toBe(0);
 			expect(abandoned.stdout[0] ?? "").toContain("adr abandon:");
 
 			const archived = captureIo();
-			expect(await runAdrCommand("archive", ["ADR-002", "--reason", "old"], root, archived.io)).toBe(0);
+			expect(
+				await runAdrCommand(
+					"archive",
+					["ADR-002", "--reason", "old"],
+					root,
+					archived.io,
+				),
+			).toBe(0);
 			expect(archived.stdout[0] ?? "").toContain("adr archive:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -386,7 +545,14 @@ describe("spec-gate system", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runChangelogCommand("a", ["--type", "behavior", "--message", "plain output"], root, captured.io)).toBe(0);
+			expect(
+				await runChangelogCommand(
+					"a",
+					["--type", "behavior", "--message", "plain output"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			expect(captured.stdout[0] ?? "").toContain("changelog add:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });

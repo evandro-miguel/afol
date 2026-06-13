@@ -1,6 +1,6 @@
+import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { Database } from "bun:sqlite";
 import { resolveProjectPaths } from "../project/paths";
 
 export type StoredSourceFile = {

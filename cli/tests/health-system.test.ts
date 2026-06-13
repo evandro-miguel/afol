@@ -5,9 +5,14 @@ import { join } from "node:path";
 import { runDoctorCommand } from "../commands/doctor";
 import { runHealthCommand } from "../commands/health";
 import { runMaintenanceCommand } from "../commands/maintenance";
+import {
+	checkHealth,
+	maintenanceMonthly,
+	maintenanceWeekly,
+	runDoctor,
+} from "../services/health";
 import { writeMemory as writeProjectMemory } from "../services/memory";
 import { openDb } from "../services/state";
-import { checkHealth, runDoctor, maintenanceMonthly, maintenanceWeekly } from "../services/health";
 
 type CapturedIo = {
 	stdout: string[];
@@ -46,9 +51,21 @@ function createFixture(): string {
 	mkdirSync(join(root, ".afol", "data", "index"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "DECISIONS"), { recursive: true });
-	writeFileSync(join(root, ".agents", "config.json"), '{"version":"0.1.0"}', "utf8");
-	writeFileSync(join(root, ".agents", "lock.json"), '{"version":"0.1.0"}', "utf8");
-	writeFileSync(join(root, ".agents", "manifest.json"), '{"commands":[]}', "utf8");
+	writeFileSync(
+		join(root, ".agents", "config.json"),
+		'{"version":"0.1.0"}',
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "lock.json"),
+		'{"version":"0.1.0"}',
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "manifest.json"),
+		'{"commands":[]}',
+		"utf8",
+	);
 	return root;
 }
 
@@ -80,14 +97,21 @@ function writeMemory(root: string, updatedAt: string): void {
 function writeSectionIndex(root: string, generatedAt: string): void {
 	writeFileSync(
 		join(root, ".afol", "data", "index", "sections.json"),
-		JSON.stringify({
+		`${JSON.stringify({
 			kind: "sections_index_v1",
 			version: 1,
 			generated_at: generatedAt,
 			sections: [
-				{ ref: "spec:test#overview", title: "Overview", level: 2, line_start: 1, line_end: 2, source_path: "docs/arc/SPECS/test.md" },
+				{
+					ref: "spec:test#overview",
+					title: "Overview",
+					level: 2,
+					line_start: 1,
+					line_end: 2,
+					source_path: "docs/arc/SPECS/test.md",
+				},
 			],
-		}) + "\n",
+		})}\n`,
 		"utf8",
 	);
 }
@@ -95,18 +119,62 @@ function writeSectionIndex(root: string, generatedAt: string): void {
 function writePstrIndex(root: string, staleAfter: string): void {
 	writeFileSync(
 		join(root, ".afol", "pstr", "index.json"),
-		JSON.stringify({
+		`${JSON.stringify({
 			kind: "pstr_index_v1",
 			version: 1,
 			generated_at: staleAfter,
 			source: { project_root: root, pstr_dir: join(root, ".afol", "pstr") },
 			maps: [
-				{ id: "cli", scope: "cli", status: "current", authority: "observed", source_paths: ["cli/main.ts"], source_hash: "hash-cli", file_count: 1, updated_at: staleAfter, stale_after: staleAfter, tags: ["pstr"] },
-				{ id: "template", scope: "template", status: "current", authority: "observed", source_paths: ["src/project-template/index.ts"], source_hash: "hash-template", file_count: 1, updated_at: staleAfter, stale_after: staleAfter, tags: ["pstr"] },
-				{ id: "docs", scope: "docs", status: "current", authority: "observed", source_paths: ["docs/arc/SPECS/test.md"], source_hash: "hash-docs", file_count: 1, updated_at: staleAfter, stale_after: staleAfter, tags: ["pstr"] },
-				{ id: "config", scope: "config", status: "current", authority: "observed", source_paths: [".agents/config.json"], source_hash: "hash-config", file_count: 1, updated_at: staleAfter, stale_after: staleAfter, tags: ["pstr"] },
+				{
+					id: "cli",
+					scope: "cli",
+					status: "current",
+					authority: "observed",
+					source_paths: ["cli/main.ts"],
+					source_hash: "hash-cli",
+					file_count: 1,
+					updated_at: staleAfter,
+					stale_after: staleAfter,
+					tags: ["pstr"],
+				},
+				{
+					id: "template",
+					scope: "template",
+					status: "current",
+					authority: "observed",
+					source_paths: ["src/project-template/index.ts"],
+					source_hash: "hash-template",
+					file_count: 1,
+					updated_at: staleAfter,
+					stale_after: staleAfter,
+					tags: ["pstr"],
+				},
+				{
+					id: "docs",
+					scope: "docs",
+					status: "current",
+					authority: "observed",
+					source_paths: ["docs/arc/SPECS/test.md"],
+					source_hash: "hash-docs",
+					file_count: 1,
+					updated_at: staleAfter,
+					stale_after: staleAfter,
+					tags: ["pstr"],
+				},
+				{
+					id: "config",
+					scope: "config",
+					status: "current",
+					authority: "observed",
+					source_paths: [".agents/config.json"],
+					source_hash: "hash-config",
+					file_count: 1,
+					updated_at: staleAfter,
+					stale_after: staleAfter,
+					tags: ["pstr"],
+				},
 			],
-		}) + "\n",
+		})}\n`,
 		"utf8",
 	);
 }
@@ -149,7 +217,9 @@ describe("health system", () => {
 			const report = checkHealth(root, { deep: true });
 			expect(report.ok).toBe(false);
 			expect(report.findings.length).toBeGreaterThan(0);
-			expect(report.summary.fail + report.summary.warn + report.summary.info).toBe(report.findings.length);
+			expect(
+				report.summary.fail + report.summary.warn + report.summary.info,
+			).toBe(report.findings.length);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -160,8 +230,14 @@ describe("health system", () => {
 		try {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			const report = checkHealth(root, { area: "pstr" });
-			expect(report.findings.some((finding) => finding.message.includes("stale pstr map"))).toBe(true);
-			expect(report.findings.every((finding) => finding.area === "pstr")).toBe(true);
+			expect(
+				report.findings.some((finding) =>
+					finding.message.includes("stale pstr map"),
+				),
+			).toBe(true);
+			expect(report.findings.every((finding) => finding.area === "pstr")).toBe(
+				true,
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -172,7 +248,9 @@ describe("health system", () => {
 		try {
 			const report = checkHealth(root, { area: "memory" });
 			expect(report.findings[0]?.severity).toBe("fail");
-			expect(report.findings[0]?.message).toContain("missing or invalid project memory");
+			expect(report.findings[0]?.message).toContain(
+				"missing or invalid project memory",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -196,7 +274,9 @@ describe("health system", () => {
 			writeMemory(root, hoursAgo(24 * 45));
 			const report = checkHealth(root, { area: "pstr" });
 			expect(report.findings.length).toBeGreaterThan(0);
-			expect(report.findings.every((finding) => finding.area === "pstr")).toBe(true);
+			expect(report.findings.every((finding) => finding.area === "pstr")).toBe(
+				true,
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -209,9 +289,15 @@ describe("health system", () => {
 			writeMemory(root, hoursAgo(24 * 45));
 			writeSectionIndex(root, hoursAgo(1));
 			const report = checkHealth(root, { deep: true });
-			const fail = report.findings.filter((finding) => finding.severity === "fail").length;
-			const warn = report.findings.filter((finding) => finding.severity === "warn").length;
-			const info = report.findings.filter((finding) => finding.severity === "info").length;
+			const fail = report.findings.filter(
+				(finding) => finding.severity === "fail",
+			).length;
+			const warn = report.findings.filter(
+				(finding) => finding.severity === "warn",
+			).length;
+			const info = report.findings.filter(
+				(finding) => finding.severity === "info",
+			).length;
 			expect(report.summary).toEqual({ fail, warn, info });
 			expect(fail).toBeGreaterThan(0);
 			expect(warn).toBeGreaterThan(0);
@@ -228,8 +314,16 @@ describe("health system", () => {
 			writeMemory(root, hoursAgo(24 * 45));
 			const report = runDoctor(root);
 			expect(report.scores).toHaveLength(8);
-			expect(report.scores.some((score) => score.area === "pstr" && score.score < 100)).toBe(true);
-			expect(report.scores.some((score) => score.area === "memory" && score.score < 100)).toBe(true);
+			expect(
+				report.scores.some(
+					(score) => score.area === "pstr" && score.score < 100,
+				),
+			).toBe(true);
+			expect(
+				report.scores.some(
+					(score) => score.area === "memory" && score.score < 100,
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -242,7 +336,9 @@ describe("health system", () => {
 			writeMemory(root, hoursAgo(24 * 45));
 			const report = runDoctor(root);
 			expect(report.remediation.length).toBeGreaterThan(0);
-			expect(report.remediation.every((step, index) => step.step === index + 1)).toBe(true);
+			expect(
+				report.remediation.every((step, index) => step.step === index + 1),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -319,7 +415,13 @@ describe("health system", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runMaintenanceCommand(["weekly", "--dry-run", "--json"], root, captured.io)).toBe(0);
+			expect(
+				await runMaintenanceCommand(
+					["weekly", "--dry-run", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.mode).toBe("weekly");
 			expect(payload.dry_run).toBe(true);
@@ -333,7 +435,13 @@ describe("health system", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runMaintenanceCommand(["monthly", "--dry-run", "--json"], root, captured.io)).toBe(0);
+			expect(
+				await runMaintenanceCommand(
+					["monthly", "--dry-run", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.mode).toBe("monthly");
 			expect(payload.dry_run).toBe(true);
@@ -385,7 +493,9 @@ describe("health system", () => {
 		try {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			const captured = captureIo();
-			expect(await runHealthCommand(["--area", "pstr"], root, captured.io)).toBe(1);
+			expect(
+				await runHealthCommand(["--area", "pstr"], root, captured.io),
+			).toBe(1);
 			expect(captured.stdout.join("\n")).toContain("pstr");
 			expect(captured.stdout.join("\n")).not.toContain("memory");
 		} finally {
@@ -397,8 +507,12 @@ describe("health system", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runHealthCommand(["--area", "bogus"], root, captured.io)).toBe(2);
-			expect(captured.stderr.join("\n")).toContain("Missing or invalid value for --area.");
+			expect(
+				await runHealthCommand(["--area", "bogus"], root, captured.io),
+			).toBe(2);
+			expect(captured.stderr.join("\n")).toContain(
+				"Missing or invalid value for --area.",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -422,7 +536,9 @@ describe("health system", () => {
 		try {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			const captured = captureIo();
-			expect(await runDoctorCommand(["--remediation-plan"], root, captured.io)).toBe(0);
+			expect(
+				await runDoctorCommand(["--remediation-plan"], root, captured.io),
+			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("doctor remediation plan:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -434,7 +550,9 @@ describe("health system", () => {
 		try {
 			const captured = captureIo();
 			expect(await runDoctorCommand(["--bogus"], root, captured.io)).toBe(2);
-			expect(captured.stderr.join("\n")).toContain("Unknown doctor argument: --bogus");
+			expect(captured.stderr.join("\n")).toContain(
+				"Unknown doctor argument: --bogus",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -445,7 +563,9 @@ describe("health system", () => {
 		try {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			const captured = captureIo();
-			expect(await runMaintenanceCommand(["weekly"], root, captured.io)).toBe(0);
+			expect(await runMaintenanceCommand(["weekly"], root, captured.io)).toBe(
+				0,
+			);
 			expect(captured.stdout.join("\n")).toContain("maintenance weekly:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -457,7 +577,13 @@ describe("health system", () => {
 		try {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			const captured = captureIo();
-			expect(await runMaintenanceCommand(["monthly", "--dry-run", "--json"], root, captured.io)).toBe(0);
+			expect(
+				await runMaintenanceCommand(
+					["monthly", "--dry-run", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.mode).toBe("monthly");
 			expect(payload.dry_run).toBe(true);
@@ -470,8 +596,12 @@ describe("health system", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runMaintenanceCommand(["yearly"], root, captured.io)).toBe(2);
-			expect(captured.stderr.join("\n")).toContain("Unknown maintenance argument: yearly");
+			expect(await runMaintenanceCommand(["yearly"], root, captured.io)).toBe(
+				2,
+			);
+			expect(captured.stderr.join("\n")).toContain(
+				"Unknown maintenance argument: yearly",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

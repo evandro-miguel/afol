@@ -3,7 +3,13 @@ import { atomicWriteText } from "../io/atomic";
 import { resolveProjectPaths } from "../project/paths";
 import type { MemoryEntry, MemoryFile } from "./types";
 
-const STATUS_ORDER: MemoryEntry["status"][] = ["active", "proposed", "rejected", "archived", "invalidated"];
+const STATUS_ORDER: MemoryEntry["status"][] = [
+	"active",
+	"proposed",
+	"rejected",
+	"archived",
+	"invalidated",
+];
 const MEMORY_ENTRY_ID_RE = /^[A-Za-z0-9._-]+$/;
 
 type MemoryFrontmatter = {
@@ -26,7 +32,9 @@ function isStatus(value: string): value is MemoryEntry["status"] {
 	return STATUS_ORDER.includes(value as MemoryEntry["status"]);
 }
 
-function parseFrontmatter(content: string): { frontmatter: MemoryFrontmatter; body: string } | null {
+function parseFrontmatter(
+	content: string,
+): { frontmatter: MemoryFrontmatter; body: string } | null {
 	const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/m.exec(content);
 	if (!match?.[1]) {
 		return null;
@@ -57,7 +65,9 @@ function parseEntryMetadata(lines: string[]): {
 	if (endIndex === -1) {
 		return { metadata: {}, bodyLines: lines };
 	}
-	const metadata: Partial<Pick<MemoryEntry, "created_at" | "updated_at" | "tags">> = {};
+	const metadata: Partial<
+		Pick<MemoryEntry, "created_at" | "updated_at" | "tags">
+	> = {};
 	for (const line of lines.slice(1, endIndex)) {
 		const match = /^([a-z_]+):\s*(.*)$/.exec(line.trim());
 		if (!match?.[1]) {
@@ -88,7 +98,9 @@ function parseSectionHeading(value: string): MemoryEntry["status"] | null {
 	return isStatus(heading) ? heading : null;
 }
 
-function parseEntryHeading(value: string): { id: string; title: string } | null {
+function parseEntryHeading(
+	value: string,
+): { id: string; title: string } | null {
 	const match = /^###\s+([^:]+):\s*(.+)$/.exec(value.trim());
 	if (!match?.[1] || !match[2]) {
 		return null;
@@ -185,7 +197,10 @@ function parseMemoryContent(content: string): MemoryFile | null {
 	if (parsed.frontmatter.doc_type !== "project_memory") {
 		return null;
 	}
-	if (typeof parsed.frontmatter.updated_at !== "string" || !parsed.frontmatter.updated_at.trim()) {
+	if (
+		typeof parsed.frontmatter.updated_at !== "string" ||
+		!parsed.frontmatter.updated_at.trim()
+	) {
 		return null;
 	}
 	const updatedAt = parsed.frontmatter.updated_at.trim();
@@ -206,7 +221,9 @@ function formatTags(tags: readonly string[]): string {
 function sanitizeReason(reason: string): string {
 	return reason
 		.split(/\r?\n/)
-		.map((line) => (line.startsWith("#") || line === "---" ? `> ${line}` : line))
+		.map((line) =>
+			line.startsWith("#") || line === "---" ? `> ${line}` : line,
+		)
 		.join("\n")
 		.trim();
 }
@@ -220,11 +237,15 @@ function formatMemoryEntry(entry: MemoryEntry): string {
 		`tags: ${formatTags(entry.tags)}`,
 		"-->",
 		entry.body,
-	].filter((line, index) => index < 5 || line.length > 0).join("\n");
+	]
+		.filter((line, index) => index < 5 || line.length > 0)
+		.join("\n");
 }
 
 function groupEntries(entries: readonly MemoryEntry[]): MemoryEntry[][] {
-	return STATUS_ORDER.map((status) => entries.filter((entry) => entry.status === status));
+	return STATUS_ORDER.map((status) =>
+		entries.filter((entry) => entry.status === status),
+	);
 }
 
 function memoryText(memory: MemoryFile): string {
@@ -255,7 +276,9 @@ function memoryText(memory: MemoryFile): string {
 
 export function renderMemory(root: string): string {
 	const memory = readMemory(root);
-	return memory ? memoryText(memory) : memoryText({ entries: [], updated_at: new Date().toISOString() });
+	return memory
+		? memoryText(memory)
+		: memoryText({ entries: [], updated_at: new Date().toISOString() });
 }
 
 export function readMemory(root: string): MemoryFile | null {
@@ -278,21 +301,32 @@ export function getEntry(root: string, id: string): MemoryEntry | null {
 		return null;
 	}
 	const needle = id.trim().toLowerCase();
-	return memory.entries.find((entry) => entry.id.toLowerCase() === needle) ?? null;
+	return (
+		memory.entries.find((entry) => entry.id.toLowerCase() === needle) ?? null
+	);
 }
 
 export function addEntry(root: string, entry: MemoryEntry): void {
 	assertValidId(entry.id);
-	const memory = readMemory(root) ?? { entries: [], updated_at: entry.updated_at };
+	const memory = readMemory(root) ?? {
+		entries: [],
+		updated_at: entry.updated_at,
+	};
 	writeMemory(root, {
 		updated_at: entry.updated_at,
 		entries: [...memory.entries, entry],
 	});
 }
 
-export type MemoryPatch = Partial<Pick<MemoryEntry, "title" | "body" | "status" | "tags">>;
+export type MemoryPatch = Partial<
+	Pick<MemoryEntry, "title" | "body" | "status" | "tags">
+>;
 
-export function updateEntry(root: string, id: string, patch: MemoryPatch): void {
+export function updateEntry(
+	root: string,
+	id: string,
+	patch: MemoryPatch,
+): void {
 	assertValidId(id);
 	const memory = readMemory(root);
 	if (!memory) {
@@ -327,7 +361,10 @@ export function archiveEntry(root: string, id: string): void {
 
 export function proposeEntry(
 	root: string,
-	entry: Pick<MemoryEntry, "id" | "title" | "body" | "tags" | "created_at" | "updated_at">,
+	entry: Pick<
+		MemoryEntry,
+		"id" | "title" | "body" | "tags" | "created_at" | "updated_at"
+	>,
 ): void {
 	addEntry(root, { ...entry, status: "proposed" });
 }
@@ -353,11 +390,17 @@ export function rejectEntry(root: string, id: string, reason: string): void {
 	const safeReason = sanitizeReason(reason);
 	updateEntry(root, id, {
 		status: "rejected",
-		body: current.body ? `${current.body}\n\nReason: ${safeReason}` : `Reason: ${safeReason}`,
+		body: current.body
+			? `${current.body}\n\nReason: ${safeReason}`
+			: `Reason: ${safeReason}`,
 	});
 }
 
-export function invalidateEntry(root: string, id: string, reason: string): void {
+export function invalidateEntry(
+	root: string,
+	id: string,
+	reason: string,
+): void {
 	const current = getEntry(root, id);
 	if (!current) {
 		return;
@@ -365,7 +408,9 @@ export function invalidateEntry(root: string, id: string, reason: string): void 
 	const safeReason = sanitizeReason(reason);
 	updateEntry(root, id, {
 		status: "invalidated",
-		body: current.body ? `${current.body}\n\nReason: ${safeReason}` : `Reason: ${safeReason}`,
+		body: current.body
+			? `${current.body}\n\nReason: ${safeReason}`
+			: `Reason: ${safeReason}`,
 	});
 }
 
@@ -379,19 +424,34 @@ export function searchEntries(root: string, query: string): MemoryEntry[] {
 		return [];
 	}
 	return memory.entries.filter((entry) => {
-		const haystack = [entry.id, entry.title, entry.body, entry.status, ...entry.tags].join(" ").toLowerCase();
+		const haystack = [
+			entry.id,
+			entry.title,
+			entry.body,
+			entry.status,
+			...entry.tags,
+		]
+			.join(" ")
+			.toLowerCase();
 		return haystack.includes(needle);
 	});
 }
 
-export type MemoryRecallEntry = Pick<MemoryEntry, "id" | "title" | "status" | "tags">;
+export type MemoryRecallEntry = Pick<
+	MemoryEntry,
+	"id" | "title" | "status" | "tags"
+>;
 
 export type RecallOptions = {
 	limit?: number;
 	statuses?: readonly MemoryEntry["status"][];
 };
 
-export function recallEntries(root: string, query: string, opts: RecallOptions = {}): MemoryRecallEntry[] {
+export function recallEntries(
+	root: string,
+	query: string,
+	opts: RecallOptions = {},
+): MemoryRecallEntry[] {
 	const memory = readMemory(root);
 	if (!memory) {
 		return [];
@@ -405,9 +465,22 @@ export function recallEntries(root: string, query: string, opts: RecallOptions =
 	return memory.entries
 		.filter((entry) => statuses.includes(entry.status))
 		.filter((entry) => {
-			const haystack = [entry.id, entry.title, entry.body, entry.status, ...entry.tags].join(" ").toLowerCase();
+			const haystack = [
+				entry.id,
+				entry.title,
+				entry.body,
+				entry.status,
+				...entry.tags,
+			]
+				.join(" ")
+				.toLowerCase();
 			return haystack.includes(needle);
 		})
 		.slice(0, limit)
-		.map((entry) => ({ id: entry.id, title: entry.title, status: entry.status, tags: [...entry.tags] }));
+		.map((entry) => ({
+			id: entry.id,
+			title: entry.title,
+			status: entry.status,
+			tags: [...entry.tags],
+		}));
 }

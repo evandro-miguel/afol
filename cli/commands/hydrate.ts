@@ -10,7 +10,10 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-function parseHydrateArgs(args: string[]): { json: boolean; sessionId: string } {
+function parseHydrateArgs(args: string[]): {
+	json: boolean;
+	sessionId: string;
+} {
 	let json = false;
 	let sessionId = "";
 	for (let index = 0; index < args.length; index += 1) {
@@ -54,8 +57,13 @@ export async function runHydrateCommand(
 	io: CommandIo = DEFAULT_IO,
 ): Promise<number> {
 	try {
-		const hydrateArgs = action && action.startsWith("-") ? [action, ...args] : args;
-		if (action && !action.startsWith("-") && action !== "hydrate" && action !== "session") {
+		const hydrateArgs = action?.startsWith("-") ? [action, ...args] : args;
+		if (
+			action &&
+			!action.startsWith("-") &&
+			action !== "hydrate" &&
+			action !== "session"
+		) {
 			throw new Error(`Unknown hydrate action: ${action}`);
 		}
 		const parsed = parseHydrateArgs(hydrateArgs);

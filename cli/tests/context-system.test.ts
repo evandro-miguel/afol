@@ -4,13 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runContextCommand } from "../commands/context";
 import { buildContextBundle } from "../services/context/bundler";
-import { addClaim, invalidateClaim, proposeTopic } from "../services/library/crud";
-import { writeMemory } from "../services/memory/crud";
 import {
-	rebuildSectionIndex,
 	getSectionIndex,
+	rebuildSectionIndex,
 	resolveSection,
 } from "../services/context/section-index";
+import {
+	addClaim,
+	invalidateClaim,
+	proposeTopic,
+} from "../services/library/crud";
+import { writeMemory } from "../services/memory/crud";
 import { rebuildPstrIndex, validatePstrIndex } from "../services/pstr";
 import { hydrateSession, validateState } from "../services/state";
 
@@ -47,9 +51,21 @@ function createBaseFixture(): string {
 	mkdirSync(join(root, ".afol", "data", "index"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "DECISIONS"), { recursive: true });
-	writeFileSync(join(root, ".agents", "config.json"), '{"version":"0.1.0"}', "utf8");
-	writeFileSync(join(root, ".agents", "lock.json"), '{"version":"0.1.0"}', "utf8");
-	writeFileSync(join(root, ".agents", "manifest.json"), '{"commands":[]}', "utf8");
+	writeFileSync(
+		join(root, ".agents", "config.json"),
+		'{"version":"0.1.0"}',
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "lock.json"),
+		'{"version":"0.1.0"}',
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "manifest.json"),
+		'{"commands":[]}',
+		"utf8",
+	);
 	return root;
 }
 
@@ -100,7 +116,12 @@ function createSectionFixture(): string {
 	return root;
 }
 
-function createBundleFixture(options?: { inflate?: boolean; pstr?: "valid" | "missing" | "stale"; memoryRefs?: boolean; libraryRefs?: boolean }): string {
+function createBundleFixture(options?: {
+	inflate?: boolean;
+	pstr?: "valid" | "missing" | "stale";
+	memoryRefs?: boolean;
+	libraryRefs?: boolean;
+}): string {
 	const root = createSectionFixture();
 	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
 	mkdirSync(join(root, ".afol", "skills", "alpha-helper"), { recursive: true });
@@ -125,7 +146,11 @@ function createBundleFixture(options?: { inflate?: boolean; pstr?: "valid" | "mi
 		}),
 		"utf8",
 	);
-	writeFileSync(join(root, ".agents", "rules", "alpha.md"), "# Alpha rule\n", "utf8");
+	writeFileSync(
+		join(root, ".agents", "rules", "alpha.md"),
+		"# Alpha rule\n",
+		"utf8",
+	);
 
 	writeFileSync(
 		join(root, ".afol", "skills", "alpha-helper", "SKILL.md"),
@@ -140,8 +165,16 @@ function createBundleFixture(options?: { inflate?: boolean; pstr?: "valid" | "mi
 		"utf8",
 	);
 
-	writeFileSync(join(root, ".afol", "library", "alpha-guide.md"), "# Guide\n", "utf8");
-	writeFileSync(join(root, ".afol", "memory", "memory.md"), "# Memory\n", "utf8");
+	writeFileSync(
+		join(root, ".afol", "library", "alpha-guide.md"),
+		"# Guide\n",
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "memory", "memory.md"),
+		"# Memory\n",
+		"utf8",
+	);
 	if (options?.memoryRefs) {
 		writeMemory(root, {
 			updated_at: "2026-06-13T00:00:00.000Z",
@@ -273,15 +306,15 @@ function createBundleFixture(options?: { inflate?: boolean; pstr?: "valid" | "mi
 				"",
 				"# Alpha Spec",
 				"",
-				"## " + "Overview ".repeat(240),
+				`## ${"Overview ".repeat(240)}`,
 				"",
 				"Text.",
 				"",
-				"### " + "Details ".repeat(240),
+				`### ${"Details ".repeat(240)}`,
 				"",
 				"More text.",
 				"",
-				"## " + "Notes ".repeat(240),
+				`## ${"Notes ".repeat(240)}`,
 				"",
 				"End.",
 			].join("\n"),
@@ -354,9 +387,15 @@ describe("context system", () => {
 			expect(snapshot.version).toBe(1);
 			expect(snapshot.sections.length).toBe(4);
 			expect(snapshot.sections[0]?.title).toBe("Decision");
-			expect(snapshot.sections.some((entry) => entry.ref === "spec:alpha#overview")).toBe(true);
-			expect(snapshot.sections.some((entry) => entry.ref === "spec:alpha#details")).toBe(true);
-			expect(snapshot.sections.some((entry) => entry.ref === "spec:alpha#notes")).toBe(true);
+			expect(
+				snapshot.sections.some((entry) => entry.ref === "spec:alpha#overview"),
+			).toBe(true);
+			expect(
+				snapshot.sections.some((entry) => entry.ref === "spec:alpha#details"),
+			).toBe(true);
+			expect(
+				snapshot.sections.some((entry) => entry.ref === "spec:alpha#notes"),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -422,7 +461,9 @@ describe("context system", () => {
 		const root = createSectionFixture();
 		try {
 			const snapshot = rebuildSectionIndex(root);
-			const details = snapshot.sections.find((entry) => entry.ref === "spec:alpha#details");
+			const details = snapshot.sections.find(
+				(entry) => entry.ref === "spec:alpha#details",
+			);
 			expect(details).toEqual({
 				ref: "spec:alpha#details",
 				title: "Details",
@@ -440,7 +481,9 @@ describe("context system", () => {
 		const root = createSectionFixture();
 		try {
 			const snapshot = rebuildSectionIndex(root);
-			const specEntries = snapshot.sections.filter((entry) => entry.source_path === "docs/arc/SPECS/alpha-spec.md");
+			const specEntries = snapshot.sections.filter(
+				(entry) => entry.source_path === "docs/arc/SPECS/alpha-spec.md",
+			);
 			expect(specEntries.map((entry) => entry.ref)).toEqual([
 				"spec:alpha#overview",
 				"spec:alpha#details",
@@ -488,7 +531,9 @@ describe("context system", () => {
 			expect(bundle.pstr_refs).toEqual(["pstr:alpha-map"]);
 			expect(bundle.rules).toContain("RULE-ALPHA");
 			expect(bundle.skills).toContain("alpha helper");
-			expect(bundle.validation_commands).toContain("afol state validate -S session-1");
+			expect(bundle.validation_commands).toContain(
+				"afol state validate -S session-1",
+			);
 			expect(bundle.validation_commands).toContain("bun test");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -504,7 +549,9 @@ describe("context system", () => {
 				role: "designer",
 				surface: "alpha",
 			});
-			expect(bundle.budget.used_tokens).toBeLessThanOrEqual(bundle.budget.total_tokens);
+			expect(bundle.budget.used_tokens).toBeLessThanOrEqual(
+				bundle.budget.total_tokens,
+			);
 			expect(bundle.refs.length).toBeGreaterThan(0);
 			expect(bundle.rules.length).toBeGreaterThan(0);
 			expect(bundle.skills.length).toBeGreaterThan(0);
@@ -570,7 +617,10 @@ describe("context system", () => {
 	test("buildContextBundle populates gaps when session and task are missing", () => {
 		const root = createBundleFixture();
 		try {
-			const bundle = buildContextBundle(root, { surface: "alpha", role: "designer" });
+			const bundle = buildContextBundle(root, {
+				surface: "alpha",
+				role: "designer",
+			});
 			expect(bundle.gaps).toContain("missing session");
 			expect(bundle.gaps).toContain("missing task record");
 			expect(bundle.gaps).toContain("no hydrated session state");
@@ -650,8 +700,14 @@ describe("context system", () => {
 		const root = createSectionFixture();
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("build", ["--json"], root, captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { ok: boolean; action: string; snapshot: { sections: unknown[] } };
+			expect(
+				await runContextCommand("build", ["--json"], root, captured.io),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				action: string;
+				snapshot: { sections: unknown[] };
+			};
 			expect(payload.ok).toBe(true);
 			expect(payload.action).toBe("build");
 			expect(payload.snapshot.sections).toHaveLength(4);
@@ -664,7 +720,23 @@ describe("context system", () => {
 		const root = createBundleFixture();
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("bundle", ["-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(0);
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			expect(captured.stdout[0]).toContain("task: T-01");
 			expect(captured.stdout[0]).toContain("mode: balanced");
 			expect(captured.stdout[0]).toContain("refs:");
@@ -678,8 +750,27 @@ describe("context system", () => {
 		const root = createBundleFixture({ pstr: "missing" });
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("bundle", ["-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha", "--json"], root, captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { pstr_refs: string[] };
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				pstr_refs: string[];
+			};
 			expect(payload.pstr_refs).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -690,7 +781,24 @@ describe("context system", () => {
 		const root = createBundleFixture({ pstr: "missing" });
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("bundle", ["--trusted", "-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(1);
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"--trusted",
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
 			expect(captured.stderr[0]).toContain("missing pstr index snapshot");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -701,9 +809,30 @@ describe("context system", () => {
 		const root = createBundleFixture({ pstr: "stale" });
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("bundle", ["--trusted", "--json", "-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(1);
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"--trusted",
+						"--json",
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
 			expect(captured.stderr).toHaveLength(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { ok: boolean; error: string };
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: string;
+			};
 			expect(payload.ok).toBe(false);
 			expect(payload.error).toContain("stale pstr index snapshot");
 		} finally {
@@ -715,8 +844,29 @@ describe("context system", () => {
 		const root = createBundleFixture({ pstr: "stale" });
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("explain", ["--trusted", "--json", "-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(1);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { ok: boolean; error: string };
+			expect(
+				await runContextCommand(
+					"explain",
+					[
+						"--trusted",
+						"--json",
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: string;
+			};
 			expect(payload.ok).toBe(false);
 			expect(payload.error).toContain("stale pstr index snapshot");
 		} finally {
@@ -729,16 +879,44 @@ describe("context system", () => {
 		try {
 			mkdirSync(join(root, "cli"), { recursive: true });
 			mkdirSync(join(root, "src", "project-template"), { recursive: true });
-			writeFileSync(join(root, "cli", "trusted.ts"), "export const trusted = true;\n", "utf8");
-			writeFileSync(join(root, "src", "project-template", "index.ts"), "export const template = true;\n", "utf8");
+			writeFileSync(
+				join(root, "cli", "trusted.ts"),
+				"export const trusted = true;\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, "src", "project-template", "index.ts"),
+				"export const template = true;\n",
+				"utf8",
+			);
 			rebuildSectionIndex(root);
 			rebuildPstrIndex(root);
 			expect(validatePstrIndex(root).ok).toBe(true);
 			hydrateSession(root, "session-1");
 			expect(validateState(root, "session-1").ok).toBe(true);
 			const captured = captureIo();
-			expect(await runContextCommand("bundle", ["--trusted", "--json", "-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { pstr_refs: string[] };
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"--trusted",
+						"--json",
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				pstr_refs: string[];
+			};
 			expect(payload.pstr_refs.length).toBeGreaterThan(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -749,8 +927,30 @@ describe("context system", () => {
 		const root = createBundleFixture();
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("bundle", ["-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha", "--json"], root, captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { task_id: string; mode: string; refs: Array<{ section?: string }>; pstr_refs: string[] };
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				task_id: string;
+				mode: string;
+				refs: Array<{ section?: string }>;
+				pstr_refs: string[];
+			};
 			expect(payload.task_id).toBe("T-01");
 			expect(payload.mode).toBe("balanced");
 			expect(payload.refs.length).toBeGreaterThan(0);
@@ -764,7 +964,25 @@ describe("context system", () => {
 		const root = createBundleFixture();
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("bundle", ["--mode", "nope", "-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(2);
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"--mode",
+						"nope",
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(2);
 			expect(captured.stderr[0]).toContain("Invalid ctx mode");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -776,8 +994,18 @@ describe("context system", () => {
 		try {
 			rebuildSectionIndex(root);
 			const captured = captureIo();
-			expect(await runContextCommand("section", ["--ref", "spec:alpha#overview"], root, captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { title: string; line_start: number };
+			expect(
+				await runContextCommand(
+					"section",
+					["--ref", "spec:alpha#overview"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				title: string;
+				line_start: number;
+			};
 			expect(payload.title).toBe("Overview");
 			expect(payload.line_start).toBe(9);
 		} finally {
@@ -789,7 +1017,23 @@ describe("context system", () => {
 		const root = createBundleFixture();
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("explain", ["-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(0);
+			expect(
+				await runContextCommand(
+					"explain",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				ok: boolean;
 				why: unknown;
@@ -815,7 +1059,23 @@ describe("context system", () => {
 		const root = createBundleFixture();
 		try {
 			const captured = captureIo();
-			expect(await runContextCommand("tools", ["-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(0);
+			expect(
+				await runContextCommand(
+					"tools",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			expect(captured.stdout[0]).toContain("afol ctx section");
 			expect(captured.stdout[0]).toContain("bun test");
 		} finally {

@@ -10,7 +10,10 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-function parseArgs(args: string[]): { json: boolean; remediationPlan: boolean } {
+function parseArgs(args: string[]): {
+	json: boolean;
+	remediationPlan: boolean;
+} {
 	const parsed = { json: false, remediationPlan: false };
 	for (const value of args) {
 		if (value === "--json" || value === "-j") {
@@ -26,25 +29,44 @@ function parseArgs(args: string[]): { json: boolean; remediationPlan: boolean } 
 	return parsed;
 }
 
-export async function runDoctorCommand(args: string[], projectRoot: string = process.cwd(), io: CommandIo = DEFAULT_IO): Promise<number> {
+export async function runDoctorCommand(
+	args: string[],
+	projectRoot: string = process.cwd(),
+	io: CommandIo = DEFAULT_IO,
+): Promise<number> {
 	try {
 		const parsed = parseArgs(args);
 		const report = runDoctor(projectRoot);
 		if (parsed.json) {
-			io.stdout(JSON.stringify({ ok: true, remediation_plan: parsed.remediationPlan, ...report }));
+			io.stdout(
+				JSON.stringify({
+					ok: true,
+					remediation_plan: parsed.remediationPlan,
+					...report,
+				}),
+			);
 			return 0;
 		}
 		if (parsed.remediationPlan) {
-			io.stdout([
-				"doctor remediation plan:",
-				...report.remediation.map((step) => `${step.step}. ${step.area} [${step.severity}] ${step.action}`),
-			].join("\n"));
+			io.stdout(
+				[
+					"doctor remediation plan:",
+					...report.remediation.map(
+						(step) =>
+							`${step.step}. ${step.area} [${step.severity}] ${step.action}`,
+					),
+				].join("\n"),
+			);
 			return 0;
 		}
-		io.stdout([
-			"doctor scores:",
-			...report.scores.map((score) => `  ${score.area}: ${score.score}/${score.max}`),
-		].join("\n"));
+		io.stdout(
+			[
+				"doctor scores:",
+				...report.scores.map(
+					(score) => `  ${score.area}: ${score.score}/${score.max}`,
+				),
+			].join("\n"),
+		);
 		return 0;
 	} catch (error) {
 		io.stderr((error as Error).message);

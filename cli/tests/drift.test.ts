@@ -1,11 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
+import {
+	checkPstrDrift,
+	checkStateDrift,
+	runDriftCheck,
+} from "../services/drift";
 import { rebuildPstrIndex } from "../services/pstr";
 import { hydrateSession } from "../services/state/session-state";
-import { checkPstrDrift, checkStateDrift, runDriftCheck } from "../services/drift";
 
 type CapturedIo = {
 	stdout: string[];
@@ -41,11 +45,31 @@ function createFixture(): string {
 	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb", "test-session"), { recursive: true });
 
-	writeFileSync(join(root, ".agents", "config.json"), JSON.stringify({ schema_version: 1 }), "utf8");
-	writeFileSync(join(root, ".agents", "lock.json"), JSON.stringify({ schema_version: 1, locked: true }), "utf8");
-	writeFileSync(join(root, ".agents", "manifest.json"), JSON.stringify({ schema_version: 1 }), "utf8");
-	writeFileSync(join(root, "cli", "main.ts"), "export const cli = true;\n", "utf8");
-	writeFileSync(join(root, "src", "project-template", "index.md"), "# Template\n", "utf8");
+	writeFileSync(
+		join(root, ".agents", "config.json"),
+		JSON.stringify({ schema_version: 1 }),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "lock.json"),
+		JSON.stringify({ schema_version: 1, locked: true }),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "manifest.json"),
+		JSON.stringify({ schema_version: 1 }),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, "cli", "main.ts"),
+		"export const cli = true;\n",
+		"utf8",
+	);
+	writeFileSync(
+		join(root, "src", "project-template", "index.md"),
+		"# Template\n",
+		"utf8",
+	);
 	writeFileSync(
 		join(root, "docs", "arc", "SPECS", "INDEX.md"),
 		[
@@ -76,9 +100,37 @@ function createFixture(): string {
 		].join("\n"),
 		"utf8",
 	);
-	writeFileSync(join(root, ".afol", "wb", "test-session", "plan.md"), ["# Plan", "", "plan body"].join("\n"), "utf8");
-	writeFileSync(join(root, ".afol", "wb", "test-session", "task.md"), ["# Tasks", "", "| Task | State | Owner | Notes |", "|------|-------|-------|-------|", "| T-01 | pending | worker | first task |", ""].join("\n"), "utf8");
-	writeFileSync(join(root, ".afol", "wb", "test-session", ".evidence.jsonl"), [JSON.stringify({ id: "E-1", task_id: "T-01", created_at: "2026-06-12T00:00:00.000Z", command: "bun test", result: "passed" }), ""].join("\n"), "utf8");
+	writeFileSync(
+		join(root, ".afol", "wb", "test-session", "plan.md"),
+		["# Plan", "", "plan body"].join("\n"),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "wb", "test-session", "task.md"),
+		[
+			"# Tasks",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			"| T-01 | pending | worker | first task |",
+			"",
+		].join("\n"),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "wb", "test-session", ".evidence.jsonl"),
+		[
+			JSON.stringify({
+				id: "E-1",
+				task_id: "T-01",
+				created_at: "2026-06-12T00:00:00.000Z",
+				command: "bun test",
+				result: "passed",
+			}),
+			"",
+		].join("\n"),
+		"utf8",
+	);
 	rebuildPstrIndex(root);
 	hydrateSession(root, "test-session");
 	return root;
@@ -99,9 +151,17 @@ describe("drift validation", () => {
 	test("checkPstrDrift reports stale maps", () => {
 		const root = createFixture();
 		try {
-			writeFileSync(join(root, "cli", "main.ts"), "export const cli = false;\n", "utf8");
+			writeFileSync(
+				join(root, "cli", "main.ts"),
+				"export const cli = false;\n",
+				"utf8",
+			);
 			const findings = checkPstrDrift(root);
-			expect(findings.some((finding) => finding.domain === "pstr" && finding.severity === "warn")).toBe(true);
+			expect(
+				findings.some(
+					(finding) => finding.domain === "pstr" && finding.severity === "warn",
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -110,9 +170,25 @@ describe("drift validation", () => {
 	test("checkStateDrift reports stale hydration", () => {
 		const root = createFixture();
 		try {
-			writeFileSync(join(root, ".afol", "wb", "test-session", "task.md"), ["# Tasks", "", "| Task | State | Owner | Notes |", "|------|-------|-------|-------|", "| T-01 | done | worker | changed |", ""].join("\n"), "utf8");
+			writeFileSync(
+				join(root, ".afol", "wb", "test-session", "task.md"),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | changed |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
 			const findings = checkStateDrift(root);
-			expect(findings.some((finding) => finding.domain === "state" && finding.severity === "warn")).toBe(true);
+			expect(
+				findings.some(
+					(finding) =>
+						finding.domain === "state" && finding.severity === "warn",
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -122,8 +198,13 @@ describe("drift validation", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runValidateCommand(root, ["drift", "--json"], captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { ok: boolean; findings: Array<{ id: string }> };
+			expect(
+				await runValidateCommand(root, ["drift", "--json"], captured.io),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				findings: Array<{ id: string }>;
+			};
 			expect(payload.ok).toBe(true);
 			expect(payload.findings).toEqual([]);
 			expect(captured.stderr).toEqual([]);

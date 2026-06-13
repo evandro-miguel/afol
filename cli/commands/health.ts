@@ -10,10 +10,29 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-const AREAS = new Set<HealthArea>(["adm", "pstr", "wb", "memory", "library", "state", "ctx", "token_budget"]);
+const AREAS = new Set<HealthArea>([
+	"adm",
+	"pstr",
+	"wb",
+	"memory",
+	"library",
+	"state",
+	"ctx",
+	"token_budget",
+]);
 
-function parseArgs(args: string[]): { area?: HealthArea; deep: boolean; json: boolean; release: boolean } {
-	const parsed = { deep: false, json: false, release: false } as { area?: HealthArea; deep: boolean; json: boolean; release: boolean };
+function parseArgs(args: string[]): {
+	area?: HealthArea;
+	deep: boolean;
+	json: boolean;
+	release: boolean;
+} {
+	const parsed = { deep: false, json: false, release: false } as {
+		area?: HealthArea;
+		deep: boolean;
+		json: boolean;
+		release: boolean;
+	};
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
 		if (value === "--json" || value === "-j") {
@@ -42,28 +61,43 @@ function parseArgs(args: string[]): { area?: HealthArea; deep: boolean; json: bo
 	return parsed;
 }
 
-function formatFinding(finding: { area: string; severity: string; message: string; hint?: string }): string {
+function formatFinding(finding: {
+	area: string;
+	severity: string;
+	message: string;
+	hint?: string;
+}): string {
 	return [
 		`${finding.severity.toUpperCase()} ${finding.area}: ${finding.message}`,
 		finding.hint ? `  hint: ${finding.hint}` : "",
-	].filter(Boolean).join("\n");
+	]
+		.filter(Boolean)
+		.join("\n");
 }
 
-export async function runHealthCommand(args: string[], projectRoot: string = process.cwd(), io: CommandIo = DEFAULT_IO): Promise<number> {
+export async function runHealthCommand(
+	args: string[],
+	projectRoot: string = process.cwd(),
+	io: CommandIo = DEFAULT_IO,
+): Promise<number> {
 	try {
 		const parsed = parseArgs(args);
 		const report = checkHealth(
 			projectRoot,
-			parsed.area ? { area: parsed.area, deep: parsed.deep || parsed.release } : { deep: parsed.deep || parsed.release },
+			parsed.area
+				? { area: parsed.area, deep: parsed.deep || parsed.release }
+				: { deep: parsed.deep || parsed.release },
 		);
 		if (parsed.json) {
 			io.stdout(JSON.stringify({ ...report, release: parsed.release }));
 		} else {
-			io.stdout([
-				`health: ${report.ok ? "ok" : "issues found"}`,
-				`summary: fail=${report.summary.fail} warn=${report.summary.warn} info=${report.summary.info}`,
-				...report.findings.map(formatFinding),
-			].join("\n"));
+			io.stdout(
+				[
+					`health: ${report.ok ? "ok" : "issues found"}`,
+					`summary: fail=${report.summary.fail} warn=${report.summary.warn} info=${report.summary.info}`,
+					...report.findings.map(formatFinding),
+				].join("\n"),
+			);
 		}
 		return report.ok ? 0 : 1;
 	} catch (error) {

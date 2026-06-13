@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
-	defaultOperationContext,
 	agentOperationContext,
+	defaultOperationContext,
 	remoteOperationContext,
 	requiresApproval,
 } from "../core/operation-context";

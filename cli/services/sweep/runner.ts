@@ -1,11 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { openDb } from "../state";
-import { readMemory } from "../memory";
-import { checkPstrStale } from "../pstr";
 import { detectSessionHealth } from "../local-state/workbench-index";
+import { readMemory } from "../memory";
 import { resolveProjectPaths } from "../project/paths";
-import { validateState } from "../state";
+import { checkPstrStale } from "../pstr";
+import { openDb, validateState } from "../state";
 
 type SweepReport = { checked: number; issues: number; actions: string[] };
 
@@ -15,7 +14,12 @@ function unique(values: string[]): string[] {
 	return [...new Set(values)];
 }
 
-function addCheck(report: SweepReport, checked: number, issues: number, actions: string[]): void {
+function addCheck(
+	report: SweepReport,
+	checked: number,
+	issues: number,
+	actions: string[],
+): void {
 	report.checked += checked;
 	report.issues += issues;
 	report.actions.push(...actions);
@@ -53,7 +57,8 @@ function memoryCheck(root: string, report: SweepReport): void {
 		return;
 	}
 	const updatedAt = Date.parse(memory.updated_at);
-	const stale = !Number.isFinite(updatedAt) || Date.now() - updatedAt > 30 * DAY_MS;
+	const stale =
+		!Number.isFinite(updatedAt) || Date.now() - updatedAt > 30 * DAY_MS;
 	addCheck(report, 1, stale ? 1 : 0, stale ? ["refresh project memory"] : []);
 }
 
@@ -80,7 +85,12 @@ function activeSessionCheck(root: string, report: SweepReport): void {
 
 function sessionHealthCheck(root: string, report: SweepReport): void {
 	const warnings = detectSessionHealth(root);
-	addCheck(report, 1, warnings.length, warnings.length > 0 ? ["review session health warnings"] : []);
+	addCheck(
+		report,
+		1,
+		warnings.length,
+		warnings.length > 0 ? ["review session health warnings"] : [],
+	);
 }
 
 function stateValidationCheck(root: string, report: SweepReport): void {
@@ -95,7 +105,12 @@ function stateValidationCheck(root: string, report: SweepReport): void {
 		return;
 	}
 	const validation = validateState(root, sessionId);
-	addCheck(report, 1, validation.ok ? 0 : 1, validation.ok ? [] : ["hydrate active session state"]);
+	addCheck(
+		report,
+		1,
+		validation.ok ? 0 : 1,
+		validation.ok ? [] : ["hydrate active session state"],
+	);
 }
 
 function archiveCheck(root: string, report: SweepReport): void {
@@ -115,7 +130,12 @@ function archiveCheck(root: string, report: SweepReport): void {
 			staleSessions.push(entry.name);
 		}
 	}
-	addCheck(report, 1, staleSessions.length > 0 ? 1 : 0, staleSessions.length > 0 ? ["archive closed workbench sessions"] : []);
+	addCheck(
+		report,
+		1,
+		staleSessions.length > 0 ? 1 : 0,
+		staleSessions.length > 0 ? ["archive closed workbench sessions"] : [],
+	);
 }
 
 function finalize(report: SweepReport): SweepReport {

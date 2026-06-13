@@ -1,3 +1,4 @@
+export type { LibrarySearchResult } from "./crud";
 export {
 	addClaim,
 	addSource,
@@ -8,6 +9,4 @@ export {
 	rebuildLibraryIndex,
 	searchLibrary,
 } from "./crud";
-
-export type { LibrarySearchResult } from "./crud";
 export type { LibraryClaim, LibrarySource, LibraryTopic } from "./types";

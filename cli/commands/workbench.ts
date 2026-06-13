@@ -3,6 +3,11 @@ import { isAbsolute, relative } from "node:path";
 import { resolveProjectPaths } from "../services/project/paths";
 import { resolveProjectPath } from "../services/project/root";
 import {
+	checkSpecCompatibility,
+	getSpecCheck,
+	type SpecCheckResult,
+} from "../services/spec-gate";
+import {
 	appendTimelineEntry,
 	closeSession,
 	doneTask,
@@ -13,11 +18,6 @@ import {
 	selectSingleOpenTask,
 	startTask,
 } from "../services/workbench/lifecycle";
-import {
-	checkSpecCompatibility,
-	getSpecCheck,
-	type SpecCheckResult,
-} from "../services/spec-gate";
 import {
 	formatVerifyReport,
 	verifyWorkbenchTasks,
@@ -627,7 +627,9 @@ export async function runDoneCommand(
 				parsed.taskId,
 			);
 			if (specCheck.status === "conflict") {
-				console.error(`spec check failed: ${specCheck.spec_id || parsed.taskId}`);
+				console.error(
+					`spec check failed: ${specCheck.spec_id || parsed.taskId}`,
+				);
 				return 1;
 			}
 		}

@@ -108,7 +108,9 @@ export async function runPstrCommand(
 				return 1;
 			}
 			if (json) {
-				io.stdout(JSON.stringify({ ok: true, action: pstrAction, snapshot: index }));
+				io.stdout(
+					JSON.stringify({ ok: true, action: pstrAction, snapshot: index }),
+				);
 			} else {
 				io.stdout(
 					[
@@ -116,7 +118,8 @@ export async function runPstrCommand(
 						`maps: ${index.maps.length}`,
 						`generated: ${index.generated_at}`,
 						...index.maps.map(
-							(map) => `  ${map.id} [${map.status}]: ${map.scope}, ${map.file_count} files`,
+							(map) =>
+								`  ${map.id} [${map.status}]: ${map.scope}, ${map.file_count} files`,
 						),
 					].join("\n"),
 				);
@@ -130,7 +133,9 @@ export async function runPstrCommand(
 			if (json) {
 				io.stdout(JSON.stringify({ action: pstrAction, ...result }));
 			} else {
-				io.stdout(`pstr validate: ${result.ok ? "ok" : "fail"} ${result.message}`);
+				io.stdout(
+					`pstr validate: ${result.ok ? "ok" : "fail"} ${result.message}`,
+				);
 			}
 			return result.ok ? 0 : 1;
 		}
@@ -140,13 +145,20 @@ export async function runPstrCommand(
 			const staleResults = checkPstrStale(projectRoot);
 			const anyStale = staleResults.some((result) => result.stale);
 			if (json) {
-				io.stdout(JSON.stringify({ ok: !anyStale, action: pstrAction, areas: staleResults }));
+				io.stdout(
+					JSON.stringify({
+						ok: !anyStale,
+						action: pstrAction,
+						areas: staleResults,
+					}),
+				);
 			} else {
 				io.stdout(
 					[
 						`pstr stale: ${anyStale ? "stale areas found" : "all current"}`,
 						...staleResults.map(
-							(result) => `  ${result.stale ? "STALE" : "ok"} ${result.id}: ${result.message}`,
+							(result) =>
+								`  ${result.stale ? "STALE" : "ok"} ${result.id}: ${result.message}`,
 						),
 					].join("\n"),
 				);
@@ -166,7 +178,14 @@ export async function runPstrCommand(
 				return 2;
 			}
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, action: pstrAction, entry: section.entry, content: section.content }));
+				io.stdout(
+					JSON.stringify({
+						ok: true,
+						action: pstrAction,
+						entry: section.entry,
+						content: section.content,
+					}),
+				);
 			} else {
 				io.stdout(section.content);
 			}

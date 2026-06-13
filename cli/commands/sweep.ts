@@ -46,8 +46,23 @@ export async function runSweepCommand(
 				: sweepAction === "weekly"
 					? sweepWeekly(projectRoot)
 					: sweepMonthly(projectRoot);
-		if (json) io.stdout(JSON.stringify({ ok: report.issues === 0, action: sweepAction, ...report }));
-		else io.stdout([`sweep ${sweepAction}: ${report.issues === 0 ? "ok" : "issues"}`, `checked: ${report.checked}`, `issues: ${report.issues}`, ...report.actions.map((actionLine) => `- ${actionLine}`)].join("\n"));
+		if (json)
+			io.stdout(
+				JSON.stringify({
+					ok: report.issues === 0,
+					action: sweepAction,
+					...report,
+				}),
+			);
+		else
+			io.stdout(
+				[
+					`sweep ${sweepAction}: ${report.issues === 0 ? "ok" : "issues"}`,
+					`checked: ${report.checked}`,
+					`issues: ${report.issues}`,
+					...report.actions.map((actionLine) => `- ${actionLine}`),
+				].join("\n"),
+			);
 		return report.issues === 0 ? 0 : 1;
 	} catch (error) {
 		io.stderr((error as Error).message);

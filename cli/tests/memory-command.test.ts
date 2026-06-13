@@ -76,11 +76,15 @@ describe("memory command", () => {
 			expect(list.stdout.join("\n")).toContain("memory entries: 4");
 
 			const show = capture();
-			expect(await runMemoryCommand("show", ["--id", "MEM-001"], root, show.io)).toBe(0);
+			expect(
+				await runMemoryCommand("show", ["--id", "MEM-001"], root, show.io),
+			).toBe(0);
 			expect(show.stdout.join("\n")).toContain("MEM-001 active Alpha");
 
 			const search = capture();
-			expect(await runMemoryCommand("search", ["--query", "beta"], root, search.io)).toBe(0);
+			expect(
+				await runMemoryCommand("search", ["--query", "beta"], root, search.io),
+			).toBe(0);
 			expect(search.stdout.join("\n")).toContain("memory matches: 1");
 
 			const update = capture();
@@ -105,7 +109,16 @@ describe("memory command", () => {
 			expect(
 				await runMemoryCommand(
 					"add",
-					["--id", "MEM-006", "--title", "Gamma", "--body", "Gamma body.", "--tags", "one,two"],
+					[
+						"--id",
+						"MEM-006",
+						"--title",
+						"Gamma",
+						"--body",
+						"Gamma body.",
+						"--tags",
+						"one,two",
+					],
 					root,
 					add.io,
 				),
@@ -113,14 +126,30 @@ describe("memory command", () => {
 			expect(add.stdout.join("\n")).toContain("memory add: MEM-006");
 
 			const archive = capture();
-			expect(await runMemoryCommand("archive", ["--id", "MEM-001"], root, archive.io)).toBe(0);
+			expect(
+				await runMemoryCommand(
+					"archive",
+					["--id", "MEM-001"],
+					root,
+					archive.io,
+				),
+			).toBe(0);
 			expect(archive.stdout.join("\n")).toContain("memory archive: MEM-001");
 
 			const propose = capture();
 			expect(
 				await runMemoryCommand(
 					"propose",
-					["--id", "MEM-005", "--title", "Epsilon", "--body", "Epsilon body.", "--tags", "x,y"],
+					[
+						"--id",
+						"MEM-005",
+						"--title",
+						"Epsilon",
+						"--body",
+						"Epsilon body.",
+						"--tags",
+						"x,y",
+					],
 					root,
 					propose.io,
 				),
@@ -128,7 +157,14 @@ describe("memory command", () => {
 			expect(propose.stdout.join("\n")).toContain("memory propose: MEM-005");
 
 			const promote = capture();
-			expect(await runMemoryCommand("promote", ["--id", "MEM-003"], root, promote.io)).toBe(0);
+			expect(
+				await runMemoryCommand(
+					"promote",
+					["--id", "MEM-003"],
+					root,
+					promote.io,
+				),
+			).toBe(0);
 			expect(promote.stdout.join("\n")).toContain("memory promote: MEM-003");
 
 			const reject = capture();
@@ -147,22 +183,34 @@ describe("memory command", () => {
 			expect(render.stdout.join("\n")).toContain("## rejected");
 
 			const recall = capture();
-			expect(await runMemoryCommand("recall", ["--query", "body"], root, recall.io)).toBe(0);
+			expect(
+				await runMemoryCommand("recall", ["--query", "body"], root, recall.io),
+			).toBe(0);
 			expect(recall.stdout.join("\n")).toContain("memory recall: 2");
 			expect(recall.stdout.join("\n")).not.toContain("archived");
 			expect(recall.stdout.join("\n")).not.toContain("rejected");
 
 			const json = capture();
-			expect(await runMemoryCommand("render", ["--json"], root, json.io)).toBe(0);
+			expect(await runMemoryCommand("render", ["--json"], root, json.io)).toBe(
+				0,
+			);
 			expect(json.stdout[0]).toContain('"markdown"');
 
 			const invalid = capture();
-			expect(await runMemoryCommand("promote", ["--id", "../bad"], root, invalid.io)).toBe(2);
-			expect(invalid.stderr.join("\n")).toContain("Invalid memory entry identifier");
+			expect(
+				await runMemoryCommand("promote", ["--id", "../bad"], root, invalid.io),
+			).toBe(2);
+			expect(invalid.stderr.join("\n")).toContain(
+				"Invalid memory entry identifier",
+			);
 
 			const missing = capture();
-			expect(await runMemoryCommand("reject", ["--id", "MEM-001"], root, missing.io)).toBe(2);
-			expect(missing.stderr.join("\n")).toContain("Missing --id or --reason for memory reject.");
+			expect(
+				await runMemoryCommand("reject", ["--id", "MEM-001"], root, missing.io),
+			).toBe(2);
+			expect(missing.stderr.join("\n")).toContain(
+				"Missing --id or --reason for memory reject.",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

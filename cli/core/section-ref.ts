@@ -10,7 +10,15 @@ export function parseSectionRef(ref: string): SectionRef | null {
 	if (colonIndex < 1) return null;
 
 	const domain = ref.slice(0, colonIndex);
-	const validDomains = ["adm", "pstr", "wb", "memory", "library", "spec", "adr"];
+	const validDomains = [
+		"adm",
+		"pstr",
+		"wb",
+		"memory",
+		"library",
+		"spec",
+		"adr",
+	];
 	if (!validDomains.includes(domain)) return null;
 
 	let rest = ref.slice(colonIndex + 1);

@@ -74,7 +74,9 @@ export async function runAdrCommand(
 				throw new Error("Missing topic for adr new.");
 			}
 			const path = createAdr(projectRoot, topic);
-			io.stdout(json ? JSON.stringify({ action: adrAction, path }) : `adr new: ${path}`);
+			io.stdout(
+				json ? JSON.stringify({ action: adrAction, path }) : `adr new: ${path}`,
+			);
 			return 0;
 		}
 		if (adrAction === "accept") {
@@ -83,7 +85,11 @@ export async function runAdrCommand(
 				throw new Error("Missing id for adr accept.");
 			}
 			const path = acceptAdr(projectRoot, id);
-			io.stdout(json ? JSON.stringify({ action: adrAction, path }) : `adr accept: ${path}`);
+			io.stdout(
+				json
+					? JSON.stringify({ action: adrAction, path })
+					: `adr accept: ${path}`,
+			);
 			return 0;
 		}
 		if (adrAction === "supersede") {
@@ -93,7 +99,11 @@ export async function runAdrCommand(
 				throw new Error("Missing ids for adr supersede.");
 			}
 			const path = supersedeAdr(projectRoot, oldId, newId);
-			io.stdout(json ? JSON.stringify({ action: adrAction, path }) : `adr supersede: ${path}`);
+			io.stdout(
+				json
+					? JSON.stringify({ action: adrAction, path })
+					: `adr supersede: ${path}`,
+			);
 			return 0;
 		}
 		const id = cleanArgs[0];
@@ -101,8 +111,15 @@ export async function runAdrCommand(
 			throw new Error(`Missing id for adr ${adrAction}.`);
 		}
 		const reason = parseReason(cleanArgs, `adr ${adrAction}`);
-		const path = adrAction === "abandon" ? abandonAdr(projectRoot, id, reason) : archiveAdr(projectRoot, id, reason);
-		io.stdout(json ? JSON.stringify({ action: adrAction, path }) : `adr ${adrAction}: ${path}`);
+		const path =
+			adrAction === "abandon"
+				? abandonAdr(projectRoot, id, reason)
+				: archiveAdr(projectRoot, id, reason);
+		io.stdout(
+			json
+				? JSON.stringify({ action: adrAction, path })
+				: `adr ${adrAction}: ${path}`,
+		);
 		return 0;
 	} catch (error) {
 		io.stderr((error as Error).message);

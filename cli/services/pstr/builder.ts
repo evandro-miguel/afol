@@ -1,14 +1,14 @@
 import {
 	existsSync,
 	mkdirSync,
-	readFileSync,
 	readdirSync,
+	readFileSync,
 	statSync,
 } from "node:fs";
-import { join, relative, resolve, extname } from "node:path";
+import { extname, join, relative, resolve } from "node:path";
 import { computeSourceHash } from "../../core/source-hash";
-import { resolveProjectPaths } from "../project/paths";
 import { atomicWriteText } from "../io/atomic";
+import { resolveProjectPaths } from "../project/paths";
 import type {
 	PstrIndexSnapshot,
 	PstrMapEntry,
@@ -23,10 +23,29 @@ type PstrArea = {
 };
 
 const PSTR_AREAS: PstrArea[] = [
-	{ id: "cli", scope: "cli", sourcePaths: ["cli/"], tags: ["pstr", "cli", "typescript"] },
-	{ id: "template", scope: "template", sourcePaths: ["src/project-template/"], tags: ["pstr", "template"] },
+	{
+		id: "cli",
+		scope: "cli",
+		sourcePaths: ["cli/"],
+		tags: ["pstr", "cli", "typescript"],
+	},
+	{
+		id: "template",
+		scope: "template",
+		sourcePaths: ["src/project-template/"],
+		tags: ["pstr", "template"],
+	},
 	{ id: "docs", scope: "docs", sourcePaths: ["docs/"], tags: ["pstr", "docs"] },
-	{ id: "config", scope: "config", sourcePaths: [".agents/config.json", ".agents/lock.json", ".agents/manifest.json"], tags: ["pstr", "config"] },
+	{
+		id: "config",
+		scope: "config",
+		sourcePaths: [
+			".agents/config.json",
+			".agents/lock.json",
+			".agents/manifest.json",
+		],
+		tags: ["pstr", "config"],
+	},
 ];
 
 const STALE_AFTER_DAYS = 30;
@@ -58,7 +77,10 @@ function uniqueSorted(items: string[]): string[] {
 	return [...new Set(items)].sort((a, b) => a.localeCompare(b));
 }
 
-function isExcludedDirectory(projectRoot: string, directoryPath: string): boolean {
+function isExcludedDirectory(
+	projectRoot: string,
+	directoryPath: string,
+): boolean {
 	const normalizedPath = toRelativeProjectPath(projectRoot, directoryPath);
 	if (normalizedPath === ".") {
 		return false;
@@ -142,12 +164,16 @@ function computeAggregateHash(projectRoot: string, files: string[]): string {
 
 function staleAfter(updatedAt: string): string {
 	const updatedTime = Date.parse(updatedAt);
-	return new Date(updatedTime + STALE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
+	return new Date(
+		updatedTime + STALE_AFTER_DAYS * 24 * 60 * 60 * 1000,
+	).toISOString();
 }
 
 function buildMapEntry(projectRoot: string, area: PstrArea): PstrMapEntry {
 	const files = uniqueSorted(
-		area.sourcePaths.flatMap((sourcePath) => collectSourceFiles(projectRoot, sourcePath)),
+		area.sourcePaths.flatMap((sourcePath) =>
+			collectSourceFiles(projectRoot, sourcePath),
+		),
 	);
 	const updatedAt = formatNow();
 
@@ -167,9 +193,9 @@ function buildMapEntry(projectRoot: string, area: PstrArea): PstrMapEntry {
 
 export function buildPstrIndexSnapshot(projectRoot: string): PstrIndexSnapshot {
 	const pstrPaths = resolveProjectPaths(projectRoot);
-	const maps = PSTR_AREAS
-		.map((area) => buildMapEntry(projectRoot, area))
-		.filter((entry) => entry.file_count > 0);
+	const maps = PSTR_AREAS.map((area) =>
+		buildMapEntry(projectRoot, area),
+	).filter((entry) => entry.file_count > 0);
 
 	return {
 		kind: "pstr_index_v1",
@@ -216,8 +242,10 @@ function writeAreaMarkdown(root: string, entry: PstrMapEntry): void {
 		"source:",
 		"  generated_by: afol pstr rebuild",
 		"  source_paths:",
-		...(entry.source_paths.length > 0 ? entry.source_paths.map((path) => `  - ${path}`) : ["  - " ]),
-		`  source_hash: \"${entry.source_hash}\"`,
+		...(entry.source_paths.length > 0
+			? entry.source_paths.map((path) => `  - ${path}`)
+			: ["  - "]),
+		`  source_hash: "${entry.source_hash}"`,
 		`  file_count: ${entry.file_count}`,
 		`updated_at: ${entry.updated_at}`,
 		`stale_after: ${entry.stale_after}`,
@@ -229,7 +257,9 @@ function writeAreaMarkdown(root: string, entry: PstrMapEntry): void {
 		"",
 		"## Files",
 		"",
-		...(entry.source_paths.length > 0 ? entry.source_paths.map((path) => `- ${path}`) : ["- (none)"]),
+		...(entry.source_paths.length > 0
+			? entry.source_paths.map((path) => `- ${path}`)
+			: ["- (none)"]),
 		"",
 		"> This map is generated. Do not edit by hand. Run `afol pstr rebuild` to refresh.",
 		"",
@@ -238,32 +268,38 @@ function writeAreaMarkdown(root: string, entry: PstrMapEntry): void {
 	atomicWriteText(pstrAreaPath(root, entry.id), `${frontmatter}`);
 }
 
-function snapshotShapeIsValid(snapshot: PstrIndexSnapshot | null): snapshot is PstrIndexSnapshot {
+function snapshotShapeIsValid(
+	snapshot: PstrIndexSnapshot | null,
+): snapshot is PstrIndexSnapshot {
 	return Boolean(
 		snapshot &&
-		snapshot.kind === "pstr_index_v1" &&
-		snapshot.version === 1 &&
-		typeof snapshot.generated_at === "string" &&
-		snapshot.source !== null &&
-		typeof snapshot.source === "object" &&
-		!Array.isArray(snapshot.source) &&
-		typeof snapshot.source.project_root === "string" &&
-		typeof snapshot.source.pstr_dir === "string" &&
-		Array.isArray(snapshot.maps) &&
-		snapshot.maps.every((entry) =>
-			typeof entry.id === "string" &&
-			typeof entry.scope === "string" &&
-			(entry.status === "current" || entry.status === "stale" || entry.status === "partial" || entry.status === "missing") &&
-			entry.authority === "observed" &&
-			Array.isArray(entry.source_paths) &&
-			entry.source_paths.every((path) => typeof path === "string") &&
-			typeof entry.source_hash === "string" &&
-			typeof entry.file_count === "number" &&
-			typeof entry.updated_at === "string" &&
-			typeof entry.stale_after === "string" &&
-			Array.isArray(entry.tags) &&
-			entry.tags.every((tag) => typeof tag === "string"),
-		),
+			snapshot.kind === "pstr_index_v1" &&
+			snapshot.version === 1 &&
+			typeof snapshot.generated_at === "string" &&
+			snapshot.source !== null &&
+			typeof snapshot.source === "object" &&
+			!Array.isArray(snapshot.source) &&
+			typeof snapshot.source.project_root === "string" &&
+			typeof snapshot.source.pstr_dir === "string" &&
+			Array.isArray(snapshot.maps) &&
+			snapshot.maps.every(
+				(entry) =>
+					typeof entry.id === "string" &&
+					typeof entry.scope === "string" &&
+					(entry.status === "current" ||
+						entry.status === "stale" ||
+						entry.status === "partial" ||
+						entry.status === "missing") &&
+					entry.authority === "observed" &&
+					Array.isArray(entry.source_paths) &&
+					entry.source_paths.every((path) => typeof path === "string") &&
+					typeof entry.source_hash === "string" &&
+					typeof entry.file_count === "number" &&
+					typeof entry.updated_at === "string" &&
+					typeof entry.stale_after === "string" &&
+					Array.isArray(entry.tags) &&
+					entry.tags.every((tag) => typeof tag === "string"),
+			),
 	);
 }
 
@@ -296,7 +332,9 @@ export function validatePstrIndex(root: string): PstrValidationResult {
 		return { ok: false, message: `stale pstr index snapshot: ${indexPath}` };
 	}
 
-	const current = new Map(PSTR_AREAS.map((area) => [area.id, buildMapEntry(root, area)] as const));
+	const current = new Map(
+		PSTR_AREAS.map((area) => [area.id, buildMapEntry(root, area)] as const),
+	);
 	if (snapshot.maps.length !== PSTR_AREAS.length) {
 		return { ok: false, message: `stale pstr index snapshot: ${indexPath}` };
 	}
@@ -312,7 +350,9 @@ export function validatePstrIndex(root: string): PstrValidationResult {
 			entry.file_count !== live.file_count ||
 			entry.source_hash !== live.source_hash ||
 			entry.source_paths.length !== live.source_paths.length ||
-			entry.source_paths.some((path, index) => path !== live.source_paths[index])
+			entry.source_paths.some(
+				(path, index) => path !== live.source_paths[index],
+			)
 		) {
 			return { ok: false, message: `stale pstr index snapshot: ${indexPath}` };
 		}
@@ -321,23 +361,37 @@ export function validatePstrIndex(root: string): PstrValidationResult {
 	return { ok: true, message: `ok pstr index snapshot: ${indexPath}` };
 }
 
-export function checkPstrStale(root: string): { id: string; stale: boolean; message: string }[] {
+export function checkPstrStale(
+	root: string,
+): { id: string; stale: boolean; message: string }[] {
 	const snapshot = getPstrIndex(root);
 	if (!snapshot) {
-		return PSTR_AREAS.map((area) => ({ id: area.id, stale: true, message: `missing pstr index snapshot: ${pstrIndexPath(root)}` }));
+		return PSTR_AREAS.map((area) => ({
+			id: area.id,
+			stale: true,
+			message: `missing pstr index snapshot: ${pstrIndexPath(root)}`,
+		}));
 	}
 
 	const now = Date.now();
 	return PSTR_AREAS.map((area) => {
 		const entry = snapshot.maps.find((map) => map.id === area.id);
 		if (!entry) {
-			return { id: area.id, stale: true, message: `missing pstr map entry: ${area.id}` };
+			return {
+				id: area.id,
+				stale: true,
+				message: `missing pstr map entry: ${area.id}`,
+			};
 		}
-		const stale = Number.isFinite(Date.parse(entry.stale_after)) ? Date.parse(entry.stale_after) <= now : true;
+		const stale = Number.isFinite(Date.parse(entry.stale_after))
+			? Date.parse(entry.stale_after) <= now
+			: true;
 		return {
 			id: area.id,
 			stale,
-			message: stale ? `stale pstr map: ${area.id}` : `current pstr map: ${area.id}`,
+			message: stale
+				? `stale pstr map: ${area.id}`
+				: `current pstr map: ${area.id}`,
 		};
 	});
 }
@@ -353,10 +407,16 @@ export function getPstrIndex(root: string): PstrIndexSnapshot | null {
 export function getPstrSection(
 	root: string,
 	idOrScope: string,
-): { ok: true; entry: PstrMapEntry; content: string } | { ok: false; message: string } | null {
+):
+	| { ok: true; entry: PstrMapEntry; content: string }
+	| { ok: false; message: string }
+	| null {
 	const index = getPstrIndex(root);
 	if (!index) {
-		return { ok: false, message: `missing pstr index snapshot: ${pstrIndexPath(root)}` };
+		return {
+			ok: false,
+			message: `missing pstr index snapshot: ${pstrIndexPath(root)}`,
+		};
 	}
 
 	const needle = idOrScope.trim().toLowerCase();
@@ -365,12 +425,17 @@ export function getPstrSection(
 	}
 
 	const entry = index.maps.find(
-		(map) => map.id.toLowerCase() === needle || map.scope.toLowerCase() === needle,
+		(map) =>
+			map.id.toLowerCase() === needle || map.scope.toLowerCase() === needle,
 	);
 	if (!entry) {
 		return null;
 	}
-	if (entry.id.includes("/") || entry.id.includes("\\") || entry.id.includes("..")) {
+	if (
+		entry.id.includes("/") ||
+		entry.id.includes("\\") ||
+		entry.id.includes("..")
+	) {
 		return { ok: false, message: `invalid pstr section id: ${entry.id}` };
 	}
 

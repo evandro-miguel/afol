@@ -1,6 +1,6 @@
-import { validateProjectStructure } from "../services/project/validate";
-import { runDriftCheck } from "../services/drift";
 import type { DriftReport } from "../services/drift";
+import { runDriftCheck } from "../services/drift";
+import { validateProjectStructure } from "../services/project/validate";
 
 type CommandIo = {
 	stdout: (message: string) => void;

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { atomicWriteText } from "../io/atomic";
 import { resolveProjectPaths } from "../project/paths";
-import type { SpecCheckResult, SpecCheckStatus } from "./types";
+import type { SpecCheckResult } from "./types";
 
 type Frontmatter = Record<string, unknown>;
 
@@ -52,7 +52,9 @@ function parseFrontmatter(content: string): Frontmatter | null {
 	}
 	try {
 		const parsed = Bun.YAML.parse(match[1]);
-		return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+		return parsed !== null &&
+			typeof parsed === "object" &&
+			!Array.isArray(parsed)
 			? (parsed as Frontmatter)
 			: null;
 	} catch {
@@ -70,7 +72,11 @@ function escapeRegExp(value: string): string {
 
 function taskPathForSession(root: string, sessionId: string): string {
 	const normalized = sessionId.trim();
-	if (!normalized || !SESSION_NAME_RE.test(normalized) || normalized.includes("..")) {
+	if (
+		!normalized ||
+		!SESSION_NAME_RE.test(normalized) ||
+		normalized.includes("..")
+	) {
 		throw new Error(`Invalid session identifier: ${sessionId}`);
 	}
 	return join(resolveProjectPaths(root).abs.wbDir, normalized);
@@ -81,12 +87,18 @@ function findTaskFile(sessionDir: string, taskId: string): string | null {
 		return null;
 	}
 	for (const entry of readdirSync(sessionDir, { withFileTypes: true })) {
-		if (!entry.isFile() || !entry.name.endsWith(".md") || !/_task_\d+\.md$/.test(entry.name)) {
+		if (
+			!entry.isFile() ||
+			!entry.name.endsWith(".md") ||
+			!/_task_\d+\.md$/.test(entry.name)
+		) {
 			continue;
 		}
 		const taskPath = join(sessionDir, entry.name);
 		const content = readFileSync(taskPath, "utf8");
-		if (new RegExp(`^\\|\\s*${escapeRegExp(taskId)}\\s*\\|`, "m").test(content)) {
+		if (
+			new RegExp(`^\\|\\s*${escapeRegExp(taskId)}\\s*\\|`, "m").test(content)
+		) {
 			return taskPath;
 		}
 	}
@@ -101,10 +113,14 @@ function findTaskMetadata(
 	const sessionDir = taskPathForSession(root, sessionId);
 	const taskPath = findTaskFile(sessionDir, taskId);
 	if (!taskPath) {
-		throw new Error(`Task ${taskId} not found in any task file under ${sessionDir}`);
+		throw new Error(
+			`Task ${taskId} not found in any task file under ${sessionDir}`,
+		);
 	}
 	const content = readFileSync(taskPath, "utf8");
-	if (!new RegExp(`^\\|\\s*${escapeRegExp(taskId)}\\s*\\|`, "m").test(content)) {
+	if (
+		!new RegExp(`^\\|\\s*${escapeRegExp(taskId)}\\s*\\|`, "m").test(content)
+	) {
 		throw new Error(`Task ${taskId} not found in ${taskPath}`);
 	}
 	const parsed = parseFrontmatter(content);
@@ -113,7 +129,9 @@ function findTaskMetadata(
 	}
 	const frontmatter = parsed as TaskFrontmatter;
 	return {
-		featureId: readString(frontmatter.feature_id) || readString(frontmatter.roadmap_feature),
+		featureId:
+			readString(frontmatter.feature_id) ||
+			readString(frontmatter.roadmap_feature),
 		parentSpec: readString(frontmatter.parent_spec),
 	};
 }
@@ -203,7 +221,10 @@ function saveResult(root: string, result: SpecCheckResult): SpecCheckResult {
 }
 
 function buildResult(
-	input: Pick<SpecCheckResult, "session_id" | "task_id" | "spec_id" | "checked_at" | "status">,
+	input: Pick<
+		SpecCheckResult,
+		"session_id" | "task_id" | "spec_id" | "checked_at" | "status"
+	>,
 	patch: Partial<Pick<SpecCheckResult, "waiver_reason" | "adr_ref">> = {},
 ): SpecCheckResult {
 	return {
@@ -235,21 +256,36 @@ export function checkSpecCompatibility(
 	if (!metadata.parentSpec) {
 		return saveResult(
 			root,
-			buildResult({ session_id: sessionId, task_id: taskId, spec_id: "", checked_at: checkedAt, status: "not_applicable" }),
+			buildResult({
+				session_id: sessionId,
+				task_id: taskId,
+				spec_id: "",
+				checked_at: checkedAt,
+				status: "not_applicable",
+			}),
 		);
 	}
 	const specPath = findSpecFile(root, metadata.parentSpec);
 	if (!specPath) {
 		return saveResult(
 			root,
-			buildResult({ session_id: sessionId, task_id: taskId, spec_id: metadata.parentSpec, checked_at: checkedAt, status: "conflict" }),
+			buildResult({
+				session_id: sessionId,
+				task_id: taskId,
+				spec_id: metadata.parentSpec,
+				checked_at: checkedAt,
+				status: "conflict",
+			}),
 		);
 	}
 	const parsed = parseFrontmatter(readFileSync(specPath, "utf8"));
-	const frontmatter = parsed && typeof parsed === "object" && !Array.isArray(parsed)
-		? (parsed as SpecFrontmatter)
-		: null;
-	const status = frontmatter ? readString(frontmatter.status).toLowerCase() : "";
+	const frontmatter =
+		parsed && typeof parsed === "object" && !Array.isArray(parsed)
+			? (parsed as SpecFrontmatter)
+			: null;
+	const status = frontmatter
+		? readString(frontmatter.status).toLowerCase()
+		: "";
 	return saveResult(
 		root,
 		buildResult({
@@ -269,7 +305,9 @@ export function waiveSpecCheck(
 	reason: string,
 	adrRef?: string,
 ): SpecCheckResult {
-	const current = getSpecCheck(root, sessionId, taskId) ?? checkSpecCompatibility(root, sessionId, taskId);
+	const current =
+		getSpecCheck(root, sessionId, taskId) ??
+		checkSpecCompatibility(root, sessionId, taskId);
 	if (current.status !== "conflict") {
 		return current;
 	}

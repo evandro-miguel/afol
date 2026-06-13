@@ -86,7 +86,11 @@ function sanitizeTheme(theme: string): string {
 
 function resolveSafeSessionPath(root: string, session: string): string {
 	const normalized = session.trim();
-	if (!SESSION_NAME_RE.test(normalized) || normalized.includes("..") || normalized.length === 0) {
+	if (
+		!SESSION_NAME_RE.test(normalized) ||
+		normalized.includes("..") ||
+		normalized.length === 0
+	) {
 		throw new Error(`Invalid session identifier: ${session}`);
 	}
 

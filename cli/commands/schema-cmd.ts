@@ -1,6 +1,18 @@
-import { defaultOperationContext, type OperationContext } from "../core/operation-context";
-import { detectResolver, detectShape, readShapePack, resolverPathForRoot, shapePackPathForRoot, suggestShape, writeResolver, writeShapePack } from "../services/schema";
+import {
+	defaultOperationContext,
+	type OperationContext,
+} from "../core/operation-context";
 import type { ShapePack } from "../services/schema";
+import {
+	detectResolver,
+	detectShape,
+	readShapePack,
+	resolverPathForRoot,
+	shapePackPathForRoot,
+	suggestShape,
+	writeResolver,
+	writeShapePack,
+} from "../services/schema";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -23,7 +35,11 @@ function normalizeAction(value: string | undefined): SchemaAction {
 	throw new Error(`Unknown schema action: ${value}`);
 }
 
-function parseArgs(args: string[]): { json: boolean; dryRun: boolean; write: boolean } {
+function parseArgs(args: string[]): {
+	json: boolean;
+	dryRun: boolean;
+	write: boolean;
+} {
 	let json = false;
 	let dryRun = false;
 	let write = false;
@@ -51,18 +67,25 @@ function formatPack(pack: ShapePack): string {
 		`api_version: ${pack.api_version}`,
 		`version: ${pack.version}`,
 		...pack.page_types.map(
-			(pageType) => `- ${pageType.name} ${pageType.prefix} ${pageType.authority} ${pageType.inclusion}${pageType.stale_policy ? ` stale_policy=${pageType.stale_policy}` : ""}`,
+			(pageType) =>
+				`- ${pageType.name} ${pageType.prefix} ${pageType.authority} ${pageType.inclusion}${pageType.stale_policy ? ` stale_policy=${pageType.stale_policy}` : ""}`,
 		),
 	].join("\n");
 }
 
-function canApply(ctx: OperationContext, dryRun: boolean): { ok: boolean; message?: string } {
+function canApply(
+	ctx: OperationContext,
+	dryRun: boolean,
+): { ok: boolean; message?: string } {
 	if (dryRun) return { ok: true };
 	if (ctx.callerType === "remote") {
 		return { ok: false, message: "schema apply denied for remote callers" };
 	}
 	if (ctx.callerType === "agent") {
-		return { ok: false, message: "schema apply requires --dry-run for agent callers" };
+		return {
+			ok: false,
+			message: "schema apply requires --dry-run for agent callers",
+		};
 	}
 	return { ok: true };
 }
@@ -84,31 +107,75 @@ export async function runSchemaCommand(
 		const detected = detectShape(projectRoot);
 
 		if (schemaAction === "detect") {
-			if (parsed.json) io.stdout(JSON.stringify({ ok: true, action: schemaAction, pack: detected }));
+			if (parsed.json)
+				io.stdout(
+					JSON.stringify({ ok: true, action: schemaAction, pack: detected }),
+				);
 			else io.stdout(formatPack(detected));
 			return 0;
 		}
 
 		if (schemaAction === "suggest") {
 			const suggestions = suggestShape(projectRoot);
-			if (parsed.json) io.stdout(JSON.stringify({ ok: true, action: schemaAction, suggestions }));
-			else io.stdout(suggestions.length > 0 ? suggestions.join("\n") : "shape pack is current");
+			if (parsed.json)
+				io.stdout(
+					JSON.stringify({ ok: true, action: schemaAction, suggestions }),
+				);
+			else
+				io.stdout(
+					suggestions.length > 0
+						? suggestions.join("\n")
+						: "shape pack is current",
+				);
 			return 0;
 		}
 
 		if (schemaAction === "review") {
 			const current = readShapePack(projectRoot);
 			const suggestions = suggestShape(projectRoot);
-			if (parsed.json) io.stdout(JSON.stringify({ ok: true, action: schemaAction, current, detected, suggestions }));
-			else io.stdout([current ? formatPack(current) : "schema: missing", "", ...suggestions].join("\n"));
+			if (parsed.json)
+				io.stdout(
+					JSON.stringify({
+						ok: true,
+						action: schemaAction,
+						current,
+						detected,
+						suggestions,
+					}),
+				);
+			else
+				io.stdout(
+					[
+						current ? formatPack(current) : "schema: missing",
+						"",
+						...suggestions,
+					].join("\n"),
+				);
 			return 0;
 		}
 
 		if (schemaAction === "resolver") {
 			const path = resolverPathForRoot(projectRoot);
-			const content = parsed.write ? (writeResolver(projectRoot), detectResolver(projectRoot)) : detectResolver(projectRoot);
-			if (parsed.json) io.stdout(JSON.stringify({ ok: true, action: schemaAction, write: parsed.write, path, content }));
-			else io.stdout(parsed.write ? `resolver written: ${path}` : formatResolver(content, path));
+			if (parsed.write) {
+				writeResolver(projectRoot);
+			}
+			const content = detectResolver(projectRoot);
+			if (parsed.json)
+				io.stdout(
+					JSON.stringify({
+						ok: true,
+						action: schemaAction,
+						write: parsed.write,
+						path,
+						content,
+					}),
+				);
+			else
+				io.stdout(
+					parsed.write
+						? `resolver written: ${path}`
+						: formatResolver(content, path),
+				);
 			return 0;
 		}
 
@@ -121,9 +188,19 @@ export async function runSchemaCommand(
 			writeShapePack(projectRoot, detected);
 		}
 		if (parsed.json) {
-			io.stdout(JSON.stringify({ ok: true, action: schemaAction, dry_run: parsed.dryRun, path: shapePackPathForRoot(projectRoot), pack: detected }));
+			io.stdout(
+				JSON.stringify({
+					ok: true,
+					action: schemaAction,
+					dry_run: parsed.dryRun,
+					path: shapePackPathForRoot(projectRoot),
+					pack: detected,
+				}),
+			);
 		} else {
-			io.stdout(`schema apply: ${parsed.dryRun ? "dry-run" : "written"} ${shapePackPathForRoot(projectRoot)}`);
+			io.stdout(
+				`schema apply: ${parsed.dryRun ? "dry-run" : "written"} ${shapePackPathForRoot(projectRoot)}`,
+			);
 		}
 		return 0;
 	} catch (error) {

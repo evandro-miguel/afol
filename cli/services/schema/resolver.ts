@@ -8,7 +8,10 @@ function resolverPath(root: string): string {
 }
 
 function resolverDisplayPath(root: string): string {
-	return relative(root, resolverPath(root)).replace(/\\/g, "/") || ".afol/adm/routing/resolver.md";
+	return (
+		relative(root, resolverPath(root)).replace(/\\/g, "/") ||
+		".afol/adm/routing/resolver.md"
+	);
 }
 
 function section(title: string, lines: string[]): string[] {

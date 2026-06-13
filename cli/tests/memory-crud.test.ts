@@ -42,7 +42,10 @@ describe("memory crud", () => {
 			);
 
 			invalidateEntry(root, "MEM-001", "### heading\nkept");
-			const memory = readFileSync(join(root, ".afol", "memory", "memory.md"), "utf8");
+			const memory = readFileSync(
+				join(root, ".afol", "memory", "memory.md"),
+				"utf8",
+			);
 			expect(memory).toContain("> ### heading");
 			expect(memory).not.toContain("\n### heading");
 		} finally {
@@ -62,7 +65,10 @@ describe("memory crud", () => {
 				updated_at: "2026-06-13T00:00:00.000Z",
 				tags: ["draft"],
 			};
-			writeMemory(root, { updated_at: proposed.updated_at, entries: [proposed] });
+			writeMemory(root, {
+				updated_at: proposed.updated_at,
+				entries: [proposed],
+			});
 
 			proposeEntry(root, {
 				id: "MEM-004",

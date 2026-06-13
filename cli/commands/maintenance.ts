@@ -12,7 +12,11 @@ const DEFAULT_IO: CommandIo = {
 
 type MaintenanceMode = "weekly" | "monthly";
 
-function parseArgs(args: string[]): { dryRun: boolean; json: boolean; mode: MaintenanceMode } {
+function parseArgs(args: string[]): {
+	dryRun: boolean;
+	json: boolean;
+	mode: MaintenanceMode;
+} {
 	let mode: MaintenanceMode = "weekly";
 	let dryRun = false;
 	let json = false;
@@ -34,20 +38,34 @@ function parseArgs(args: string[]): { dryRun: boolean; json: boolean; mode: Main
 	return { dryRun, json, mode };
 }
 
-export async function runMaintenanceCommand(args: string[], projectRoot: string = process.cwd(), io: CommandIo = DEFAULT_IO): Promise<number> {
+export async function runMaintenanceCommand(
+	args: string[],
+	projectRoot: string = process.cwd(),
+	io: CommandIo = DEFAULT_IO,
+): Promise<number> {
 	try {
 		const parsed = parseArgs(args);
-		const result = parsed.mode === "weekly"
-			? maintenanceWeekly(projectRoot, parsed.dryRun)
-			: maintenanceMonthly(projectRoot, parsed.dryRun);
+		const result =
+			parsed.mode === "weekly"
+				? maintenanceWeekly(projectRoot, parsed.dryRun)
+				: maintenanceMonthly(projectRoot, parsed.dryRun);
 		if (parsed.json) {
-			io.stdout(JSON.stringify({ ok: true, mode: parsed.mode, dry_run: parsed.dryRun, ...result }));
+			io.stdout(
+				JSON.stringify({
+					ok: true,
+					mode: parsed.mode,
+					dry_run: parsed.dryRun,
+					...result,
+				}),
+			);
 		} else {
-			io.stdout([
-				`maintenance ${parsed.mode}: ${parsed.dryRun ? "dry-run" : "suggestions"}`,
-				`applied: ${result.applied}`,
-				...result.actions.map((action) => `  - ${action}`),
-			].join("\n"));
+			io.stdout(
+				[
+					`maintenance ${parsed.mode}: ${parsed.dryRun ? "dry-run" : "suggestions"}`,
+					`applied: ${result.applied}`,
+					...result.actions.map((action) => `  - ${action}`),
+				].join("\n"),
+			);
 		}
 		return 0;
 	} catch (error) {

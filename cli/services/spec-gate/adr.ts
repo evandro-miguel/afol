@@ -50,7 +50,9 @@ function parseFrontmatter(content: string): Frontmatter | null {
 	}
 	try {
 		const parsed = Bun.YAML.parse(match[1]);
-		return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+		return parsed !== null &&
+			typeof parsed === "object" &&
+			!Array.isArray(parsed)
 			? (parsed as Frontmatter)
 			: null;
 	} catch {
@@ -144,7 +146,8 @@ function nextAdrId(root: string): string {
 	for (const filePath of collectMarkdownFiles(adrDir(root))) {
 		const parsed = parseFrontmatter(readFileSync(filePath, "utf8"));
 		const id = parsed ? readString(parsed.id) : "";
-		const match = /^ADR-(\d{3})$/.exec(id) ?? /^ADR-(\d{3})-/.exec(basename(filePath));
+		const match =
+			/^ADR-(\d{3})$/.exec(id) ?? /^ADR-(\d{3})-/.exec(basename(filePath));
 		const number = match?.[1] ? Number(match[1]) : 0;
 		if (number > max) {
 			max = number;
@@ -181,10 +184,20 @@ function updateAdrFile(
 		decision_type: readString(parsed.decision_type) || "architecture",
 		supersedes: readString(parsed.supersedes),
 		superseded_by: readString(parsed.superseded_by),
-		affected_specs: Array.isArray(parsed.affected_specs) ? parsed.affected_specs.map((value) => readString(value)).filter(Boolean) : [],
-		affected_rules: Array.isArray(parsed.affected_rules) ? parsed.affected_rules.map((value) => readString(value)).filter(Boolean) : [],
-		affected_skills: Array.isArray(parsed.affected_skills) ? parsed.affected_skills.map((value) => readString(value)).filter(Boolean) : [],
-		affected_commands: Array.isArray(parsed.affected_commands) ? parsed.affected_commands.map((value) => readString(value)).filter(Boolean) : [],
+		affected_specs: Array.isArray(parsed.affected_specs)
+			? parsed.affected_specs.map((value) => readString(value)).filter(Boolean)
+			: [],
+		affected_rules: Array.isArray(parsed.affected_rules)
+			? parsed.affected_rules.map((value) => readString(value)).filter(Boolean)
+			: [],
+		affected_skills: Array.isArray(parsed.affected_skills)
+			? parsed.affected_skills.map((value) => readString(value)).filter(Boolean)
+			: [],
+		affected_commands: Array.isArray(parsed.affected_commands)
+			? parsed.affected_commands
+					.map((value) => readString(value))
+					.filter(Boolean)
+			: [],
 		archive_reason: readString(parsed.archive_reason),
 	};
 	const next = updater(current);
@@ -252,10 +265,18 @@ export function createAdr(root: string, topic: string): string {
 }
 
 export function acceptAdr(root: string, id: string): string {
-	return updateAdrFile(root, id, (frontmatter) => ({ ...frontmatter, status: "accepted", updated_at: now() }));
+	return updateAdrFile(root, id, (frontmatter) => ({
+		...frontmatter,
+		status: "accepted",
+		updated_at: now(),
+	}));
 }
 
-export function supersedeAdr(root: string, oldId: string, newId: string): string {
+export function supersedeAdr(
+	root: string,
+	oldId: string,
+	newId: string,
+): string {
 	return updateAdrFile(root, oldId, (frontmatter) => ({
 		...frontmatter,
 		status: "superseded",

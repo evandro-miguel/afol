@@ -1,26 +1,26 @@
 #!/usr/bin/env bun
 
-import { runBootstrapCommand } from "./commands/bootstrap";
 import { runAdrCommand } from "./commands/adr";
-import { runDbCommand } from "./commands/db";
+import { runBootstrapCommand } from "./commands/bootstrap";
+import { runRuleCommand, runSkillCommand } from "./commands/catalog";
 import { runChangelogCommand } from "./commands/changelog";
 import { runContextCommand } from "./commands/context";
-import { runHydrateCommand } from "./commands/hydrate";
-import { runRuleCommand, runSkillCommand } from "./commands/catalog";
+import { runDbCommand } from "./commands/db";
+import { runDoctorCommand } from "./commands/doctor";
 import { runFileCommand } from "./commands/file";
+import { runHealthCommand } from "./commands/health";
+import { runHydrateCommand } from "./commands/hydrate";
 import { runInitCommand } from "./commands/init";
 import { runLibraryCommand } from "./commands/library";
-import { runMemoryCommand } from "./commands/memory";
-import { runHealthCommand } from "./commands/health";
-import { runDoctorCommand } from "./commands/doctor";
-import { runMaintenanceCommand } from "./commands/maintenance";
 import { runLocalStateCommand } from "./commands/local-state";
-import { runSchemaCommand } from "./commands/schema-cmd";
+import { runMaintenanceCommand } from "./commands/maintenance";
+import { runMemoryCommand } from "./commands/memory";
 import { runPstrCommand } from "./commands/pstr";
+import { runSchemaCommand } from "./commands/schema-cmd";
 import { runSpecCommand } from "./commands/spec";
-import { runSweepCommand } from "./commands/sweep";
 import { runStateCommand } from "./commands/state";
 import { runStatusCommand } from "./commands/status";
+import { runSweepCommand } from "./commands/sweep";
 import { runUpdateCommand } from "./commands/update";
 import { runValidateCommand } from "./commands/validate";
 import {
@@ -221,51 +221,110 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "subcommand") {
 		if (resolution.group === "health") {
-			return runHealthCommand([resolution.action, ...resolution.args].filter(Boolean), project.value.root);
+			return runHealthCommand(
+				[resolution.action, ...resolution.args].filter(Boolean),
+				project.value.root,
+			);
 		}
 		if (resolution.group === "db") {
-			return runDbCommand(resolution.action, resolution.args, project.value.root);
+			return runDbCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "doctor") {
-			return runDoctorCommand([resolution.action, ...resolution.args].filter(Boolean), project.value.root);
+			return runDoctorCommand(
+				[resolution.action, ...resolution.args].filter(Boolean),
+				project.value.root,
+			);
 		}
 		if (resolution.group === "maintenance") {
-			return runMaintenanceCommand([resolution.action, ...resolution.args].filter(Boolean), project.value.root);
+			return runMaintenanceCommand(
+				[resolution.action, ...resolution.args].filter(Boolean),
+				project.value.root,
+			);
 		}
 		if (resolution.group === "pstr") {
-			return runPstrCommand(resolution.action, resolution.args, project.value.root);
+			return runPstrCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "schema") {
-			return runSchemaCommand(resolution.action, resolution.args, project.value.root);
+			return runSchemaCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "sweep") {
-			return runSweepCommand(resolution.action, resolution.args, project.value.root);
+			return runSweepCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "spec") {
-			return runSpecCommand(resolution.action, resolution.args, project.value.root);
+			return runSpecCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "adr") {
-			return runAdrCommand(resolution.action, resolution.args, project.value.root);
+			return runAdrCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "changelog") {
-			return runChangelogCommand(resolution.action, resolution.args, project.value.root);
+			return runChangelogCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "ctx") {
-			return runContextCommand(resolution.action, resolution.args, project.value.root);
+			return runContextCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "library") {
-			return runLibraryCommand(resolution.action, resolution.args, project.value.root);
+			return runLibraryCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "memory") {
-			return runMemoryCommand(resolution.action, resolution.args, project.value.root);
+			return runMemoryCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "state") {
-			return runStateCommand(resolution.action, resolution.args, project.value.root);
+			return runStateCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
 		}
 		if (resolution.group === "hydrate") {
-			return runHydrateCommand("hydrate", [resolution.action, ...resolution.args], project.value.root);
+			return runHydrateCommand(
+				"hydrate",
+				[resolution.action, ...resolution.args],
+				project.value.root,
+			);
 		}
-		console.error(`afol ${resolution.group} ${resolution.action}: not yet implemented`);
+		console.error(
+			`afol ${resolution.group} ${resolution.action}: not yet implemented`,
+		);
 		return 1;
 	}
 

@@ -1,18 +1,18 @@
-export type { MemoryEntry, MemoryFile } from "./types";
 export {
 	addEntry,
 	archiveEntry,
 	getEntry,
 	invalidateEntry,
 	type MemoryRecallEntry,
-	type RecallOptions,
-	recallEntries,
-	renderMemory,
-	proposeEntry,
 	promoteEntry,
-	rejectEntry,
+	proposeEntry,
+	type RecallOptions,
 	readMemory,
+	recallEntries,
+	rejectEntry,
+	renderMemory,
 	searchEntries,
 	updateEntry,
 	writeMemory,
 } from "./crud";
+export type { MemoryEntry, MemoryFile } from "./types";

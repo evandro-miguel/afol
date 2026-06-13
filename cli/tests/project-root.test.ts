@@ -9,11 +9,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-	loadProjectRoot,
-	resolveProjectPath,
-} from "../services/project/root";
 import { resolveProjectPaths } from "../services/project/paths";
+import { loadProjectRoot, resolveProjectPath } from "../services/project/root";
 
 const templateConfig = JSON.stringify({
 	schema_version: 1,

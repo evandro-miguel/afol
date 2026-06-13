@@ -1,3 +1,4 @@
+import type { LibraryClaim, LibrarySource } from "../services/library";
 import {
 	addClaim,
 	addSource,
@@ -8,7 +9,6 @@ import {
 	rebuildLibraryIndex,
 	searchLibrary,
 } from "../services/library";
-import type { LibraryClaim, LibrarySource } from "../services/library";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -20,7 +20,15 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-type LibraryAction = "list" | "topic" | "propose" | "add-source" | "add-claim" | "invalidate" | "search" | "rebuild-index";
+type LibraryAction =
+	| "list"
+	| "topic"
+	| "propose"
+	| "add-source"
+	| "add-claim"
+	| "invalidate"
+	| "search"
+	| "rebuild-index";
 
 type ParsedArgs = {
 	json: boolean;
@@ -63,7 +71,10 @@ function normalizeAction(value: string | undefined): LibraryAction {
 }
 
 function splitCsv(value: string): string[] {
-	return value.split(",").map((item) => item.trim()).filter(Boolean);
+	return value
+		.split(",")
+		.map((item) => item.trim())
+		.filter(Boolean);
 }
 
 function parseArgs(args: string[]): ParsedArgs {
@@ -163,7 +174,11 @@ function currentTime(): string {
 }
 
 function slugify(value: string): string {
-	return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+	return value
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
 }
 
 function sourceIdFrom(url: string, title: string): string {
@@ -197,7 +212,11 @@ export async function runLibraryCommand(
 
 		if (libraryAction === "list") {
 			const topics = listTopics(projectRoot);
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, topics }) : [`library topics: ${topics.length}`, ...topics].join("\n"));
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, topics })
+					: [`library topics: ${topics.length}`, ...topics].join("\n"),
+			);
 			return 0;
 		}
 
@@ -211,15 +230,19 @@ export async function runLibraryCommand(
 				io.stderr(`Library topic not found: ${slug}`);
 				return 1;
 			}
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, topic }) : [
-				`topic: ${topic.slug}`,
-				`title: ${topic.title}`,
-				`sources: ${topic.sources.length}`,
-				`claims: ${topic.claims.length}`,
-				`tags: ${topic.tags.join(", ") || "none"}`,
-				...topic.sources.map(formatSource),
-				...topic.claims.map(formatClaim),
-			].join("\n"));
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, topic })
+					: [
+							`topic: ${topic.slug}`,
+							`title: ${topic.title}`,
+							`sources: ${topic.sources.length}`,
+							`claims: ${topic.claims.length}`,
+							`tags: ${topic.tags.join(", ") || "none"}`,
+							...topic.sources.map(formatSource),
+							...topic.claims.map(formatClaim),
+						].join("\n"),
+			);
 			return 0;
 		}
 
@@ -229,13 +252,26 @@ export async function runLibraryCommand(
 				throw new Error("Missing --query for library search.");
 			}
 			const matches = searchLibrary(projectRoot, query);
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, matches }) : [`library matches: ${matches.length}`, ...matches.map((match) => `${match.topic.slug} ${match.topic.title}`),].join("\n"));
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, matches })
+					: [
+							`library matches: ${matches.length}`,
+							...matches.map(
+								(match) => `${match.topic.slug} ${match.topic.title}`,
+							),
+						].join("\n"),
+			);
 			return 0;
 		}
 
 		if (libraryAction === "rebuild-index") {
 			const snapshot = rebuildLibraryIndex(projectRoot);
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, snapshot }) : `library rebuild-index: ok topics=${snapshot.topics.length}`);
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, snapshot })
+					: `library rebuild-index: ok topics=${snapshot.topics.length}`,
+			);
 			return 0;
 		}
 
@@ -248,10 +284,21 @@ export async function runLibraryCommand(
 				throw new Error("Missing --title for library propose.");
 			}
 			const sources: LibrarySource[] = parsed.url.trim()
-				? [{ id: parsed.source[0] || sourceIdFrom(parsed.url, parsed.title), url: parsed.url, title: parsed.title, accessed_at: currentTime() }]
+				? [
+						{
+							id: parsed.source[0] || sourceIdFrom(parsed.url, parsed.title),
+							url: parsed.url,
+							title: parsed.title,
+							accessed_at: currentTime(),
+						},
+					]
 				: [];
 			const topic = proposeTopic(projectRoot, slug, parsed.title, sources);
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, topic }) : `library propose: ${topic.slug}`);
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, topic })
+					: `library propose: ${topic.slug}`,
+			);
 			return 0;
 		}
 
@@ -271,7 +318,11 @@ export async function runLibraryCommand(
 				accessed_at: currentTime(),
 			};
 			const topic = addSource(projectRoot, slug, source);
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, topic, source }) : `library add-source: ${source.id}`);
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, topic, source })
+					: `library add-source: ${source.id}`,
+			);
 			return 0;
 		}
 
@@ -294,13 +345,18 @@ export async function runLibraryCommand(
 				created_at: currentTime(),
 			};
 			const topic = addClaim(projectRoot, slug, claim);
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, topic, claim }) : `library add-claim: ${claim.id}`);
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, topic, claim })
+					: `library add-claim: ${claim.id}`,
+			);
 			return 0;
 		}
 
 		if (libraryAction === "invalidate") {
 			const slug = topicSlug.trim();
-			const claimId = parsed.claim || parsed.positional[1] || parsed.positional[0] || "";
+			const claimId =
+				parsed.claim || parsed.positional[1] || parsed.positional[0] || "";
 			if (!slug) {
 				throw new Error("Missing --topic for library invalidate.");
 			}
@@ -311,7 +367,11 @@ export async function runLibraryCommand(
 				throw new Error("Missing --reason for library invalidate.");
 			}
 			const topic = invalidateClaim(projectRoot, slug, claimId, parsed.reason);
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, topic }) : `library invalidate: ${claimId}`);
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, topic })
+					: `library invalidate: ${claimId}`,
+			);
 			return 0;
 		}
 

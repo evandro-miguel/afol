@@ -30,7 +30,12 @@ type ParsedArgs = {
 	explain: boolean;
 };
 
-const MODES: readonly ContextRetrievalMode[] = ["compact", "balanced", "deep", "tokenmax"];
+const MODES: readonly ContextRetrievalMode[] = [
+	"compact",
+	"balanced",
+	"deep",
+	"tokenmax",
+];
 
 function normalizeAction(value: string | undefined): ContextAction {
 	if (!value || value === "build" || value === "b") {
@@ -157,7 +162,10 @@ function formatExplanation(bundle: ReturnType<typeof buildContextBundle>) {
 		ok: true,
 		why: {
 			included: [
-				...bundle.refs.map((ref) => `${ref.domain}:${ref.path}${ref.section ? `#${ref.section}` : ""}`),
+				...bundle.refs.map(
+					(ref) =>
+						`${ref.domain}:${ref.path}${ref.section ? `#${ref.section}` : ""}`,
+				),
 				...bundle.memory_refs,
 				...bundle.library_refs,
 			],
@@ -168,7 +176,9 @@ function formatExplanation(bundle: ReturnType<typeof buildContextBundle>) {
 			pstr: bundle.pstr_refs.length > 0 ? "fresh" : "missing",
 			memory: bundle.memory_refs.length > 0 ? "fresh" : "missing",
 			library: bundle.library_refs.length > 0 ? "fresh" : "missing",
-			state: bundle.gaps.includes("no hydrated session state") ? "missing" : "fresh",
+			state: bundle.gaps.includes("no hydrated session state")
+				? "missing"
+				: "fresh",
 		},
 		evidence_tags: evidenceTags,
 		create_safety_hints: [
@@ -181,7 +191,11 @@ function formatExplanation(bundle: ReturnType<typeof buildContextBundle>) {
 	};
 }
 
-function emitTrustError(io: CommandIo, json: boolean, error: ContextTrustError): void {
+function emitTrustError(
+	io: CommandIo,
+	json: boolean,
+	error: ContextTrustError,
+): void {
 	if (json) {
 		io.stdout(JSON.stringify({ ok: false, error: error.message }));
 		return;
@@ -218,7 +232,11 @@ export async function runContextCommand(
 				io.stderr(`Section not found: ${parsed.ref}`);
 				return 1;
 			}
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, section }) : JSON.stringify(section));
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, section })
+					: JSON.stringify(section),
+			);
 			return 0;
 		}
 
@@ -241,14 +259,22 @@ export async function runContextCommand(
 		}
 
 		if (ctxAction === "tools") {
-			io.stdout(parsed.json ? JSON.stringify({ ok: true, tools: bundle.tools }) : bundle.tools.join("\n"));
+			io.stdout(
+				parsed.json
+					? JSON.stringify({ ok: true, tools: bundle.tools })
+					: bundle.tools.join("\n"),
+			);
 			return 0;
 		}
 
 		if (ctxAction === "bundle") {
 			if (parsed.explain) {
 				const explanation = formatExplanation(bundle);
-				io.stdout(parsed.json ? JSON.stringify(explanation) : JSON.stringify(explanation, null, 2));
+				io.stdout(
+					parsed.json
+						? JSON.stringify(explanation)
+						: JSON.stringify(explanation, null, 2),
+				);
 				return 0;
 			}
 			io.stdout(parsed.json ? JSON.stringify(bundle) : formatBundle(bundle));
@@ -257,7 +283,11 @@ export async function runContextCommand(
 
 		if (ctxAction === "explain") {
 			const explanation = formatExplanation(bundle);
-			io.stdout(parsed.json ? JSON.stringify(explanation) : JSON.stringify(explanation, null, 2));
+			io.stdout(
+				parsed.json
+					? JSON.stringify(explanation)
+					: JSON.stringify(explanation, null, 2),
+			);
 			return 0;
 		}
 

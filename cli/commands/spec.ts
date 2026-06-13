@@ -1,9 +1,9 @@
+import type { SpecCheckResult } from "../services/spec-gate";
 import {
 	checkSpecCompatibility,
 	getSpecCheck,
 	waiveSpecCheck,
 } from "../services/spec-gate";
-import type { SpecCheckResult } from "../services/spec-gate";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -39,7 +39,13 @@ function normalizeAction(value: string | undefined): SpecAction {
 }
 
 function parseArgs(args: string[]): ParsedArgs {
-	const parsed: ParsedArgs = { json: false, session: "", task: "", reason: "", adr: "" };
+	const parsed: ParsedArgs = {
+		json: false,
+		session: "",
+		task: "",
+		reason: "",
+		adr: "",
+	};
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
 		if (value === "--json" || value === "-j") {
@@ -94,7 +100,11 @@ function parseArgs(args: string[]): ParsedArgs {
 }
 
 function formatResult(action: SpecAction, result: SpecCheckResult): string {
-	const base = [`spec ${action}: ${result.status}`, `session: ${result.session_id}`, `task: ${result.task_id}`];
+	const base = [
+		`spec ${action}: ${result.status}`,
+		`session: ${result.session_id}`,
+		`task: ${result.task_id}`,
+	];
 	if (result.spec_id) {
 		base.push(`spec: ${result.spec_id}`);
 	}
@@ -122,9 +132,16 @@ export async function runSpecCommand(
 		}
 		const result =
 			specAction === "waive"
-				? waiveSpecCheck(projectRoot, parsed.session, parsed.task, parsed.reason, parsed.adr || undefined)
+				? waiveSpecCheck(
+						projectRoot,
+						parsed.session,
+						parsed.task,
+						parsed.reason,
+						parsed.adr || undefined,
+					)
 				: checkSpecCompatibility(projectRoot, parsed.session, parsed.task);
-		const stored = getSpecCheck(projectRoot, parsed.session, parsed.task) ?? result;
+		const stored =
+			getSpecCheck(projectRoot, parsed.session, parsed.task) ?? result;
 		const output = parsed.json
 			? JSON.stringify({ action: specAction, ...stored })
 			: formatResult(specAction, stored);

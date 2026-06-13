@@ -9,11 +9,47 @@ function createFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "state-command-"));
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb", "test-session"), { recursive: true });
-	writeFileSync(join(root, ".agents", "config.json"), JSON.stringify({ schema_version: 1 }), "utf8");
-	writeFileSync(join(root, ".agents", "lock.json"), JSON.stringify({ schema_version: 1, locked: true }), "utf8");
-	writeFileSync(join(root, ".afol", "wb", "test-session", "plan.md"), ["# Plan", "", "test plan"].join("\n"), "utf8");
-	writeFileSync(join(root, ".afol", "wb", "test-session", "task.md"), ["# Tasks", "", "| Task | State | Owner | Notes |", "|------|-------|-------|-------|", "| T-01 | pending | worker | first task |", ""].join("\n"), "utf8");
-	writeFileSync(join(root, ".afol", "wb", "test-session", ".evidence.jsonl"), [JSON.stringify({ id: "E-1", task_id: "T-01", created_at: "2026-06-12T00:00:00.000Z", command: "bun test", result: "passed" }), ""].join("\n"), "utf8");
+	writeFileSync(
+		join(root, ".agents", "config.json"),
+		JSON.stringify({ schema_version: 1 }),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "lock.json"),
+		JSON.stringify({ schema_version: 1, locked: true }),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "wb", "test-session", "plan.md"),
+		["# Plan", "", "test plan"].join("\n"),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "wb", "test-session", "task.md"),
+		[
+			"# Tasks",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			"| T-01 | pending | worker | first task |",
+			"",
+		].join("\n"),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "wb", "test-session", ".evidence.jsonl"),
+		[
+			JSON.stringify({
+				id: "E-1",
+				task_id: "T-01",
+				created_at: "2026-06-12T00:00:00.000Z",
+				command: "bun test",
+				result: "passed",
+			}),
+			"",
+		].join("\n"),
+		"utf8",
+	);
 	return root;
 }
 
@@ -35,7 +71,14 @@ describe("state commands", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runHydrateCommand("hydrate", ["-S", "test-session"], root, captured.io)).toBe(0);
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("hydrate: ok");
 			expect(captured.stdout.join("\n")).toContain("test-session");
 			expect(captured.stderr).toEqual([]);
@@ -48,9 +91,23 @@ describe("state commands", () => {
 		const root = createFixture();
 		try {
 			const hydrated = captureIo();
-			expect(await runHydrateCommand("hydrate", ["-S", "test-session"], root, hydrated.io)).toBe(0);
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					hydrated.io,
+				),
+			).toBe(0);
 			const captured = captureIo();
-			expect(await runStateCommand("validate", ["-S", "test-session"], root, captured.io)).toBe(0);
+			expect(
+				await runStateCommand(
+					"validate",
+					["-S", "test-session"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("state validate: ok");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -61,10 +118,30 @@ describe("state commands", () => {
 		const root = createFixture();
 		try {
 			const hydrated = captureIo();
-			expect(await runHydrateCommand("hydrate", ["-S", "test-session"], root, hydrated.io)).toBe(0);
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					hydrated.io,
+				),
+			).toBe(0);
 			const captured = captureIo();
-			expect(await runStateCommand("show", ["-S", "test-session", "--json"], root, captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { ok: boolean; snapshot: { sessionId: string; summary: { taskRows: number; evidenceEntries: number } } };
+			expect(
+				await runStateCommand(
+					"show",
+					["-S", "test-session", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				snapshot: {
+					sessionId: string;
+					summary: { taskRows: number; evidenceEntries: number };
+				};
+			};
 			expect(payload.ok).toBe(true);
 			expect(payload.snapshot.sessionId).toBe("test-session");
 			expect(payload.snapshot.summary.taskRows).toBe(1);
@@ -78,10 +155,31 @@ describe("state commands", () => {
 		const root = createFixture();
 		try {
 			const hydrated = captureIo();
-			expect(await runHydrateCommand("hydrate", ["-S", "test-session"], root, hydrated.io)).toBe(0);
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					hydrated.io,
+				),
+			).toBe(0);
 			const captured = captureIo();
-			expect(await runStateCommand("export", ["-S", "test-session", "--json"], root, captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { ok: boolean; snapshot: { sessionId: string; sourceFiles: unknown[]; summary: { taskRows: number } } };
+			expect(
+				await runStateCommand(
+					"export",
+					["-S", "test-session", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				snapshot: {
+					sessionId: string;
+					sourceFiles: unknown[];
+					summary: { taskRows: number };
+				};
+			};
 			expect(payload.ok).toBe(true);
 			expect(payload.snapshot.sessionId).toBe("test-session");
 			expect(payload.snapshot.sourceFiles).toHaveLength(3);
@@ -96,7 +194,9 @@ describe("state commands", () => {
 		try {
 			const captured = captureIo();
 			expect(await runHydrateCommand("hydrate", [], root, captured.io)).toBe(2);
-			expect(captured.stderr.join("\n")).toContain("Missing --session for hydrate.");
+			expect(captured.stderr.join("\n")).toContain(
+				"Missing --session for hydrate.",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -106,9 +206,23 @@ describe("state commands", () => {
 		const root = createFixture();
 		try {
 			const hydrated = captureIo();
-			expect(await runHydrateCommand("hydrate", ["-S", "test-session"], root, hydrated.io)).toBe(0);
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					hydrated.io,
+				),
+			).toBe(0);
 			const captured = captureIo();
-			expect(await runStateCommand("show", ["-S", "test-session"], root, captured.io)).toBe(0);
+			expect(
+				await runStateCommand(
+					"show",
+					["-S", "test-session"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("state: test-session");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -119,7 +233,14 @@ describe("state commands", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runStateCommand("sync", ["-S", "test-session", "--json"], root, captured.io)).toBe(0);
+			expect(
+				await runStateCommand(
+					"sync",
+					["-S", "test-session", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.action).toBe("sync");
 			expect(payload.snapshot.sessionId).toBe("test-session");
@@ -132,10 +253,35 @@ describe("state commands", () => {
 		const root = createFixture();
 		try {
 			const hydrated = captureIo();
-			expect(await runHydrateCommand("hydrate", ["-S", "test-session"], root, hydrated.io)).toBe(0);
-			writeFileSync(join(root, ".afol", "wb", "test-session", "task.md"), ["# Tasks", "", "| Task | State | Owner | Notes |", "|------|-------|-------|-------|", "| T-01 | done | worker | changed |", ""].join("\n"), "utf8");
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					hydrated.io,
+				),
+			).toBe(0);
+			writeFileSync(
+				join(root, ".afol", "wb", "test-session", "task.md"),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | changed |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
 			const captured = captureIo();
-			expect(await runStateCommand("validate", ["-S", "test-session"], root, captured.io)).toBe(1);
+			expect(
+				await runStateCommand(
+					"validate",
+					["-S", "test-session"],
+					root,
+					captured.io,
+				),
+			).toBe(1);
 			expect(captured.stdout.join("\n")).toContain("state validate: fail");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -146,8 +292,17 @@ describe("state commands", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runStateCommand("export", ["-S", "test-session"], root, captured.io)).toBe(1);
-			expect(captured.stderr.join("\n")).toContain("no hydrated state for test-session");
+			expect(
+				await runStateCommand(
+					"export",
+					["-S", "test-session"],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			expect(captured.stderr.join("\n")).toContain(
+				"no hydrated state for test-session",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

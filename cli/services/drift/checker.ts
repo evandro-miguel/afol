@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import { computeSourceHash } from "../../core/source-hash";
 import { buildPstrIndexSnapshot, getPstrIndex } from "../pstr/builder";
@@ -56,7 +56,9 @@ function walkFiles(root: string): string[] {
 		if (!current) {
 			continue;
 		}
-		for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+		for (const entry of readdirSync(current, { withFileTypes: true }).sort(
+			(a, b) => a.name.localeCompare(b.name),
+		)) {
 			const entryPath = join(current, entry.name);
 			if (entry.isDirectory()) {
 				stack.push(entryPath);
@@ -86,7 +88,10 @@ function parseFrontmatter(content: string): Record<string, string> {
 			continue;
 		}
 		const key = line.slice(0, index).trim();
-		const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
+		const value = line
+			.slice(index + 1)
+			.trim()
+			.replace(/^['"]|['"]$/g, "");
 		if (key && value) {
 			result[key] = value;
 		}
@@ -117,24 +122,39 @@ function parseSpecIndex(root: string): SpecIndexRow[] {
 
 function findSpecFile(root: string, specId: string): string | null {
 	const specsRoot = join(root, "docs", "arc", "SPECS");
-	const match = walkFiles(specsRoot).find((path) => basename(path) === `${specId}.md`);
+	const match = walkFiles(specsRoot).find(
+		(path) => basename(path) === `${specId}.md`,
+	);
 	return match ? relative(root, match).replace(/\\/g, "/") : null;
 }
 
 function hasDocTypeFrontmatter(path: string): boolean {
-	return existsSync(path) && Object.prototype.hasOwnProperty.call(parseFrontmatter(readText(path)), "doc_type");
+	return (
+		existsSync(path) &&
+		Object.hasOwn(parseFrontmatter(readText(path)), "doc_type")
+	);
 }
 
-	export function checkPstrDrift(root: string): DriftFinding[] {
+export function checkPstrDrift(root: string): DriftFinding[] {
 	const live = buildPstrIndexSnapshot(root);
 	const stored = getPstrIndex(root);
 	const findings: DriftFinding[] = [];
 	const storedMaps = stored && Array.isArray(stored.maps) ? stored.maps : [];
-	const storedById = new Map(storedMaps.map((entry) => [entry.id, entry] as const));
+	const storedById = new Map(
+		storedMaps.map((entry) => [entry.id, entry] as const),
+	);
 
 	if (!stored) {
 		if (live.maps.length === 0) {
-			return [makeFinding("pstr:index:missing", "warn", "pstr", "missing stored PSTR index", "run afol pstr rebuild")];
+			return [
+				makeFinding(
+					"pstr:index:missing",
+					"warn",
+					"pstr",
+					"missing stored PSTR index",
+					"run afol pstr rebuild",
+				),
+			];
 		}
 		return live.maps.map((entry) =>
 			makeFinding(
@@ -200,19 +220,36 @@ function hasDocTypeFrontmatter(path: string): boolean {
 	return findings;
 }
 
-export function checkStateDrift(root: string, sessionId?: string): DriftFinding[] {
+export function checkStateDrift(
+	root: string,
+	sessionId?: string,
+): DriftFinding[] {
 	const db = openDb(root);
 	try {
 		const sessions = sessionId
 			? (db
-				.query("SELECT session_id, session_path FROM sessions WHERE session_id = ?")
-				.all(sessionId) as StoredSessionRow[])
+					.query(
+						"SELECT session_id, session_path FROM sessions WHERE session_id = ?",
+					)
+					.all(sessionId) as StoredSessionRow[])
 			: (db
-				.query("SELECT session_id, session_path FROM sessions ORDER BY session_id ASC")
-				.all() as StoredSessionRow[]);
+					.query(
+						"SELECT session_id, session_path FROM sessions ORDER BY session_id ASC",
+					)
+					.all() as StoredSessionRow[]);
 		const findings: DriftFinding[] = [];
 		if (sessionId && sessions.length === 0) {
-			return [makeFinding(`state:session:${sessionId}:missing`, "warn", "state", `missing hydrated session ${sessionId}`, `run afol hydrate -S ${sessionId}`, "missing", "missing")];
+			return [
+				makeFinding(
+					`state:session:${sessionId}:missing`,
+					"warn",
+					"state",
+					`missing hydrated session ${sessionId}`,
+					`run afol hydrate -S ${sessionId}`,
+					"missing",
+					"missing",
+				),
+			];
 		}
 
 		for (const session of sessions) {
@@ -232,7 +269,9 @@ export function checkStateDrift(root: string, sessionId?: string): DriftFinding[
 			}
 
 			const sourceRows = db
-				.query("SELECT session_id, path, source_hash FROM source_files WHERE session_id = ? ORDER BY path ASC")
+				.query(
+					"SELECT session_id, path, source_hash FROM source_files WHERE session_id = ? ORDER BY path ASC",
+				)
 				.all(session.session_id) as StoredSourceFileRow[];
 
 			for (const row of sourceRows) {
@@ -251,7 +290,9 @@ export function checkStateDrift(root: string, sessionId?: string): DriftFinding[
 					);
 					continue;
 				}
-				const actualHash = computeSourceHash(readFileSync(actualPath, "utf8")).hash;
+				const actualHash = computeSourceHash(
+					readFileSync(actualPath, "utf8"),
+				).hash;
 				if (actualHash !== row.source_hash) {
 					findings.push(
 						makeFinding(
@@ -276,9 +317,19 @@ export function checkStateDrift(root: string, sessionId?: string): DriftFinding[
 
 export function checkSpecDrift(root: string): DriftFinding[] {
 	const findings: DriftFinding[] = [];
-	const activeRows = parseSpecIndex(root).filter((row) => row.status === "active");
+	const activeRows = parseSpecIndex(root).filter(
+		(row) => row.status === "active",
+	);
 	if (activeRows.length === 0) {
-		return [makeFinding("adm:spec-index:missing", "fail", "adm", "missing active specs index", "restore docs/arc/SPECS/INDEX.md")];
+		return [
+			makeFinding(
+				"adm:spec-index:missing",
+				"fail",
+				"adm",
+				"missing active specs index",
+				"restore docs/arc/SPECS/INDEX.md",
+			),
+		];
 	}
 
 	for (const row of activeRows) {
@@ -318,9 +369,9 @@ export function runDriftCheck(
 	opts?: { pstr?: boolean; state?: boolean; specs?: boolean },
 ): DriftReport {
 	const findings = [
-		...(opts?.pstr ?? true ? checkPstrDrift(root) : []),
-		...(opts?.state ?? true ? checkStateDrift(root) : []),
-		...(opts?.specs ?? true ? checkSpecDrift(root) : []),
+		...((opts?.pstr ?? true) ? checkPstrDrift(root) : []),
+		...((opts?.state ?? true) ? checkStateDrift(root) : []),
+		...((opts?.specs ?? true) ? checkSpecDrift(root) : []),
 	];
 	return { ok: findings.length === 0, checked_at: nowIso(), findings };
 }

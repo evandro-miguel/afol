@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { atomicWriteText } from "../io/atomic";
 import { loadYamlObject } from "../../core/schema";
+import { atomicWriteText } from "../io/atomic";
 import { resolveProjectPaths } from "../project/paths";
 import type { ShapePack, ShapePageType } from "./types";
 
@@ -15,15 +15,54 @@ type ShapeSource = {
 };
 
 const SHAPE_SOURCES: readonly ShapeSource[] = [
-	{ path: "admDir", name: "adm", prefix: "adm", authority: "canonical", inclusion: "task-matched", stalePolicy: "manual" },
-	{ path: "pstrDir", name: "pstr", prefix: "pstr", authority: "observed", inclusion: "surface-matched", stalePolicy: "rebuild-on-drift" },
-	{ path: "wbDir", name: "wb", prefix: "wb", authority: "execution", inclusion: "session-matched", stalePolicy: "session-age" },
-	{ path: "memoryFile", name: "memory", prefix: "memory", authority: "continuity", inclusion: "cited-only", stalePolicy: "memory-freshness" },
-	{ path: "libraryDir", name: "library", prefix: "library", authority: "external-knowledge", inclusion: "cited-only", stalePolicy: "reference-freshness" },
+	{
+		path: "admDir",
+		name: "adm",
+		prefix: "adm",
+		authority: "canonical",
+		inclusion: "task-matched",
+		stalePolicy: "manual",
+	},
+	{
+		path: "pstrDir",
+		name: "pstr",
+		prefix: "pstr",
+		authority: "observed",
+		inclusion: "surface-matched",
+		stalePolicy: "rebuild-on-drift",
+	},
+	{
+		path: "wbDir",
+		name: "wb",
+		prefix: "wb",
+		authority: "execution",
+		inclusion: "session-matched",
+		stalePolicy: "session-age",
+	},
+	{
+		path: "memoryFile",
+		name: "memory",
+		prefix: "memory",
+		authority: "continuity",
+		inclusion: "cited-only",
+		stalePolicy: "memory-freshness",
+	},
+	{
+		path: "libraryDir",
+		name: "library",
+		prefix: "library",
+		authority: "external-knowledge",
+		inclusion: "cited-only",
+		stalePolicy: "reference-freshness",
+	},
 ] as const;
 
 function shapePackPath(root: string): string {
-	return join(resolveProjectPaths(root).abs.admDir, "schema", "afol-shape.yaml");
+	return join(
+		resolveProjectPaths(root).abs.admDir,
+		"schema",
+		"afol-shape.yaml",
+	);
 }
 
 function toPageType(source: ShapeSource): ShapePageType {
@@ -44,8 +83,16 @@ function isShapePageType(value: unknown): value is ShapePageType {
 	return (
 		typeof record.name === "string" &&
 		typeof record.prefix === "string" &&
-		(record.authority === "canonical" || record.authority === "observed" || record.authority === "execution" || record.authority === "continuity" || record.authority === "external-knowledge") &&
-		(record.inclusion === "task-matched" || record.inclusion === "surface-matched" || record.inclusion === "session-matched" || record.inclusion === "compact" || record.inclusion === "cited-only") &&
+		(record.authority === "canonical" ||
+			record.authority === "observed" ||
+			record.authority === "execution" ||
+			record.authority === "continuity" ||
+			record.authority === "external-knowledge") &&
+		(record.inclusion === "task-matched" ||
+			record.inclusion === "surface-matched" ||
+			record.inclusion === "session-matched" ||
+			record.inclusion === "compact" ||
+			record.inclusion === "cited-only") &&
 		(!("stale_policy" in record) || typeof record.stale_policy === "string")
 	);
 }
@@ -70,13 +117,13 @@ function renderScalar(value: string): string {
 
 function renderPageType(pageType: ShapePageType): string[] {
 	const lines = [
-		"  - name: " + renderScalar(pageType.name),
-		"    prefix: " + renderScalar(pageType.prefix),
-		"    authority: " + renderScalar(pageType.authority),
-		"    inclusion: " + renderScalar(pageType.inclusion),
+		`  - name: ${renderScalar(pageType.name)}`,
+		`    prefix: ${renderScalar(pageType.prefix)}`,
+		`    authority: ${renderScalar(pageType.authority)}`,
+		`    inclusion: ${renderScalar(pageType.inclusion)}`,
 	];
 	if (pageType.stale_policy) {
-		lines.push("    stale_policy: " + renderScalar(pageType.stale_policy));
+		lines.push(`    stale_policy: ${renderScalar(pageType.stale_policy)}`);
 	}
 	return lines;
 }
@@ -99,7 +146,9 @@ function sourceExists(root: string, source: ShapeSource): boolean {
 }
 
 function packByName(pack: ShapePack): Map<string, ShapePageType> {
-	return new Map(pack.page_types.map((pageType) => [pageType.name, pageType] as const));
+	return new Map(
+		pack.page_types.map((pageType) => [pageType.name, pageType] as const),
+	);
 }
 
 export function detectShape(root: string): ShapePack {
@@ -107,7 +156,9 @@ export function detectShape(root: string): ShapePack {
 		api_version: "1.0.0",
 		name: "afol-shape",
 		version: "1",
-		page_types: SHAPE_SOURCES.filter((source) => sourceExists(root, source)).map(toPageType),
+		page_types: SHAPE_SOURCES.filter((source) =>
+			sourceExists(root, source),
+		).map(toPageType),
 	};
 }
 
@@ -119,7 +170,11 @@ export function suggestShape(root: string): string[] {
 	}
 
 	const suggestions: string[] = [];
-	if (current.api_version !== detected.api_version || current.name !== detected.name || current.version !== detected.version) {
+	if (
+		current.api_version !== detected.api_version ||
+		current.name !== detected.name ||
+		current.version !== detected.version
+	) {
 		suggestions.push("update shape pack metadata");
 	}
 

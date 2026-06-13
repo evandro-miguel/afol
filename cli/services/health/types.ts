@@ -1,6 +1,6 @@
 export type HealthSeverity = "fail" | "warn" | "info";
 export type HealthFinding = {
-	area: string;	// "adm", "pstr", "wb", "memory", "library", "state", "ctx", "token_budget"
+	area: string; // "adm", "pstr", "wb", "memory", "library", "state", "ctx", "token_budget"
 	severity: HealthSeverity;
 	message: string;
 	hint?: string;
@@ -13,7 +13,20 @@ export type HealthReport = {
 };
 export type DoctorReport = {
 	scores: { area: string; score: number; max: number }[];
-	remediation: { step: number; area: string; action: string; severity: HealthSeverity }[];
+	remediation: {
+		step: number;
+		area: string;
+		action: string;
+		severity: HealthSeverity;
+	}[];
 };
 
-export type HealthArea = "adm" | "pstr" | "wb" | "memory" | "library" | "state" | "ctx" | "token_budget";
+export type HealthArea =
+	| "adm"
+	| "pstr"
+	| "wb"
+	| "memory"
+	| "library"
+	| "state"
+	| "ctx"
+	| "token_budget";

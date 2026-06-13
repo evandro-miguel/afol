@@ -1,17 +1,17 @@
+import type { MemoryEntry, MemoryRecallEntry } from "../services/memory";
 import {
 	addEntry,
 	archiveEntry,
 	getEntry,
 	promoteEntry,
 	proposeEntry,
+	readMemory,
 	recallEntries,
 	rejectEntry,
 	renderMemory,
-	readMemory,
 	searchEntries,
 	updateEntry,
 } from "../services/memory";
-import type { MemoryEntry, MemoryRecallEntry } from "../services/memory";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -85,7 +85,10 @@ function normalizeAction(value: string | undefined): MemoryAction {
 }
 
 function splitCsv(value: string): string[] {
-	return value.split(",").map((item) => item.trim()).filter(Boolean);
+	return value
+		.split(",")
+		.map((item) => item.trim())
+		.filter(Boolean);
 }
 
 function parseMemoryArgs(action: string, args: string[]): ParsedArgs {
@@ -169,7 +172,9 @@ function formatEntry(entry: MemoryEntry): string {
 		`${entry.id} ${entry.status} ${entry.title}`,
 		entry.tags.length > 0 ? `tags: ${entry.tags.join(", ")}` : "tags: none",
 		entry.body,
-	].filter((line) => line.length > 0).join("\n");
+	]
+		.filter((line) => line.length > 0)
+		.join("\n");
 }
 
 function formatRecallEntry(entry: MemoryRecallEntry): string {
@@ -198,7 +203,12 @@ export async function runMemoryCommand(
 			if (parsed.json) {
 				io.stdout(JSON.stringify({ ok: true, entries }));
 			} else {
-				io.stdout([`memory entries: ${entries.length}`, ...entries.map(formatEntry)].join("\n"));
+				io.stdout(
+					[
+						`memory entries: ${entries.length}`,
+						...entries.map(formatEntry),
+					].join("\n"),
+				);
 			}
 			return 0;
 		}
@@ -229,7 +239,12 @@ export async function runMemoryCommand(
 			if (parsed.json) {
 				io.stdout(JSON.stringify({ ok: true, entries }));
 			} else {
-				io.stdout([`memory matches: ${entries.length}`, ...entries.map(formatEntry)].join("\n"));
+				io.stdout(
+					[
+						`memory matches: ${entries.length}`,
+						...entries.map(formatEntry),
+					].join("\n"),
+				);
 			}
 			return 0;
 		}
@@ -375,7 +390,12 @@ export async function runMemoryCommand(
 			if (parsed.json) {
 				io.stdout(JSON.stringify({ ok: true, entries }));
 			} else {
-				io.stdout([`memory recall: ${entries.length}`, ...entries.map(formatRecallEntry)].join("\n"));
+				io.stdout(
+					[
+						`memory recall: ${entries.length}`,
+						...entries.map(formatRecallEntry),
+					].join("\n"),
+				);
 			}
 			return 0;
 		}

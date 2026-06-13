@@ -1,7 +1,21 @@
 import { checkHealth } from "./checker";
-import type { DoctorReport, HealthFinding, HealthSeverity, HealthArea } from "./types";
+import type {
+	DoctorReport,
+	HealthArea,
+	HealthFinding,
+	HealthSeverity,
+} from "./types";
 
-const AREAS: readonly HealthArea[] = ["adm", "pstr", "wb", "memory", "library", "state", "ctx", "token_budget"];
+const AREAS: readonly HealthArea[] = [
+	"adm",
+	"pstr",
+	"wb",
+	"memory",
+	"library",
+	"state",
+	"ctx",
+	"token_budget",
+];
 
 function scoreFor(findings: readonly HealthFinding[]): number {
 	let score = 100;
@@ -60,9 +74,21 @@ export function runDoctor(root: string): DoctorReport {
 		return { area, score: scoreFor(findings), max: 100 };
 	});
 	const remediation = report.findings
-		.filter((finding) => finding.severity === "fail" || finding.severity === "warn")
-		.sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || a.area.localeCompare(b.area) || a.message.localeCompare(b.message))
-		.map((finding, index) => ({ step: index + 1, area: finding.area, action: remediationAction(finding), severity: finding.severity }));
+		.filter(
+			(finding) => finding.severity === "fail" || finding.severity === "warn",
+		)
+		.sort(
+			(a, b) =>
+				severityRank(a.severity) - severityRank(b.severity) ||
+				a.area.localeCompare(b.area) ||
+				a.message.localeCompare(b.message),
+		)
+		.map((finding, index) => ({
+			step: index + 1,
+			area: finding.area,
+			action: remediationAction(finding),
+			severity: finding.severity,
+		}));
 
 	return { scores, remediation };
 }

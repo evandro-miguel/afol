@@ -1,12 +1,31 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	utimesSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runPstrCommand } from "../commands/pstr";
-import { detectShape, readShapePack, shapePackPathForRoot, suggestShape, writeShapePack } from "../services/schema/detector";
 import { rebuildPstrIndex } from "../services/pstr/builder";
+import {
+	detectShape,
+	readShapePack,
+	shapePackPathForRoot,
+	suggestShape,
+	writeShapePack,
+} from "../services/schema/detector";
 import { openDb } from "../services/state/db";
-import { sweepDaily, sweepMonthly, sweepWeekly } from "../services/sweep/runner";
+import {
+	sweepDaily,
+	sweepMonthly,
+	sweepWeekly,
+} from "../services/sweep/runner";
 
 function createFixture(includeSource = true): string {
 	const root = mkdtempSync(join(tmpdir(), "pss-test-"));
@@ -18,11 +37,14 @@ function createFixture(includeSource = true): string {
 	mkdirSync(join(root, "cli"), { recursive: true });
 	mkdirSync(join(root, "docs"), { recursive: true });
 	mkdirSync(join(root, "src", "project-template"), { recursive: true });
-	writeFileSync(join(root, ".agents", "config.json"), "{\"version\":\"0.1.0\"}");
-	writeFileSync(join(root, ".agents", "lock.json"), "{\"version\":\"0.1.0\"}");
-	writeFileSync(join(root, ".agents", "manifest.json"), "{\"commands\":[]}");
+	writeFileSync(join(root, ".agents", "config.json"), '{"version":"0.1.0"}');
+	writeFileSync(join(root, ".agents", "lock.json"), '{"version":"0.1.0"}');
+	writeFileSync(join(root, ".agents", "manifest.json"), '{"commands":[]}');
 	writeFileSync(join(root, "docs", "readme.md"), "# Docs\n");
-	writeFileSync(join(root, "src", "project-template", "index.ts"), "export const template = true;\n");
+	writeFileSync(
+		join(root, "src", "project-template", "index.ts"),
+		"export const template = true;\n",
+	);
 	if (includeSource) {
 		writeFileSync(join(root, "cli", "test.ts"), "export const x = 1;\n");
 	}
@@ -33,7 +55,11 @@ function cleanup(root: string): void {
 	rmSync(root, { recursive: true, force: true });
 }
 
-function captureIo(): { stdout: string[]; stderr: string[]; io: { stdout: (message: string) => void; stderr: (message: string) => void } } {
+function captureIo(): {
+	stdout: string[];
+	stderr: string[];
+	io: { stdout: (message: string) => void; stderr: (message: string) => void };
+} {
 	const stdout: string[] = [];
 	const stderr: string[] = [];
 	return {
@@ -56,25 +82,28 @@ function isoDaysAgo(days: number): string {
 
 function writeMemoryFile(root: string, updatedAt: string): void {
 	const path = join(root, ".afol", "memory", "memory.md");
-	writeFileSync(path, [
-		"---",
-		"doc_type: project_memory",
-		`updated_at: ${updatedAt}`,
-		"entries: 1",
-		"---",
-		"",
-		"# Project Memory",
-		"",
-		"## active",
-		"### M-1: Memory",
-		"<!--",
-		`created_at: ${updatedAt}`,
-		`updated_at: ${updatedAt}`,
-		"tags: ",
-		"-->",
-		"Body",
-		"",
-	].join("\n"));
+	writeFileSync(
+		path,
+		[
+			"---",
+			"doc_type: project_memory",
+			`updated_at: ${updatedAt}`,
+			"entries: 1",
+			"---",
+			"",
+			"# Project Memory",
+			"",
+			"## active",
+			"### M-1: Memory",
+			"<!--",
+			`created_at: ${updatedAt}`,
+			`updated_at: ${updatedAt}`,
+			"tags: ",
+			"-->",
+			"Body",
+			"",
+		].join("\n"),
+	);
 }
 
 function prepareCurrentSweepRoot(): string {
@@ -86,25 +115,38 @@ function prepareCurrentSweepRoot(): string {
 	return root;
 }
 
-function writeActiveSession(root: string, sessionId: string, staleDays = 0): void {
+function writeActiveSession(
+	root: string,
+	sessionId: string,
+	staleDays = 0,
+): void {
 	const sessionDir = join(root, ".afol", "wb", sessionId);
 	mkdirSync(sessionDir, { recursive: true });
 	const taskPath = join(sessionDir, "task.md");
-	writeFileSync(taskPath, [
-		"| Task | State | Owner | Notes |",
-		"| ---- | ---- | ---- | ---- |",
-		"| T-01 | open | bot | keep moving |",
-		"",
-	].join("\n"));
+	writeFileSync(
+		taskPath,
+		[
+			"| Task | State | Owner | Notes |",
+			"| ---- | ---- | ---- | ---- |",
+			"| T-01 | open | bot | keep moving |",
+			"",
+		].join("\n"),
+	);
 	const mtime = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000);
 	utimesSync(taskPath, mtime, mtime);
 	utimesSync(sessionDir, mtime, mtime);
 	writeFileSync(join(root, ".afol", "wb", ".active_session"), sessionId);
 }
 
-function mutatePstrIndex(root: string, mutate: (snapshot: Record<string, unknown>) => void): void {
+function mutatePstrIndex(
+	root: string,
+	mutate: (snapshot: Record<string, unknown>) => void,
+): void {
 	const path = join(root, ".afol", "pstr", "index.json");
-	const snapshot = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+	const snapshot = JSON.parse(readFileSync(path, "utf8")) as Record<
+		string,
+		unknown
+	>;
 	mutate(snapshot);
 	writeFileSync(path, `${JSON.stringify(snapshot)}\n`);
 }
@@ -126,7 +168,10 @@ describe("pstr command", () => {
 		try {
 			const io = captureIo();
 			expect(await runPstrCommand("rebuild", ["--json"], root, io.io)).toBe(0);
-			const payload = JSON.parse(io.stdout[0] ?? "{}") as { ok: boolean; snapshot: { kind: string; maps: unknown[] } };
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
+				ok: boolean;
+				snapshot: { kind: string; maps: unknown[] };
+			};
 			expect(payload.ok).toBe(true);
 			expect(payload.snapshot.kind).toBe("pstr_index_v1");
 			expect(payload.snapshot.maps.length).toBeGreaterThan(0);
@@ -164,7 +209,10 @@ describe("pstr command", () => {
 			rebuildPstrIndex(root);
 			const io = captureIo();
 			expect(await runPstrCommand("show", ["--json"], root, io.io)).toBe(0);
-			const payload = JSON.parse(io.stdout[0] ?? "{}") as { ok: boolean; snapshot: { kind: string } };
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
+				ok: boolean;
+				snapshot: { kind: string };
+			};
 			expect(payload.ok).toBe(true);
 			expect(payload.snapshot.kind).toBe("pstr_index_v1");
 		} finally {
@@ -178,7 +226,9 @@ describe("pstr command", () => {
 			rebuildPstrIndex(root);
 			const io = captureIo();
 			expect(await runPstrCommand("section", ["cli"], root, io.io)).toBe(0);
-			expect(io.stdout[0] ?? "").toBe(readFileSync(join(root, ".afol", "pstr", "cli.md"), "utf8"));
+			expect(io.stdout[0] ?? "").toBe(
+				readFileSync(join(root, ".afol", "pstr", "cli.md"), "utf8"),
+			);
 		} finally {
 			cleanup(root);
 		}
@@ -189,8 +239,15 @@ describe("pstr command", () => {
 		try {
 			rebuildPstrIndex(root);
 			const io = captureIo();
-			expect(await runPstrCommand("sec", ["cli", "--json"], root, io.io)).toBe(0);
-			const payload = JSON.parse(io.stdout[0] ?? "{}") as { ok: boolean; action: string; entry: { id: string }; content: string };
+			expect(await runPstrCommand("sec", ["cli", "--json"], root, io.io)).toBe(
+				0,
+			);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
+				ok: boolean;
+				action: string;
+				entry: { id: string };
+				content: string;
+			};
 			expect(payload.ok).toBe(true);
 			expect(payload.action).toBe("section");
 			expect(payload.entry.id).toBe("cli");
@@ -218,7 +275,9 @@ describe("pstr command", () => {
 			rebuildPstrIndex(root);
 			const io = captureIo();
 			expect(await runPstrCommand("section", [], root, io.io)).toBe(2);
-			expect(io.stderr[0] ?? "").toContain("Usage: afol pstr section <id> [--json]");
+			expect(io.stderr[0] ?? "").toContain(
+				"Usage: afol pstr section <id> [--json]",
+			);
 		} finally {
 			cleanup(root);
 		}
@@ -267,13 +326,13 @@ describe("pstr command", () => {
 	test("stale returns 1 when stale", async () => {
 		const root = createFixture();
 		try {
-		rebuildPstrIndex(root);
-		mutatePstrIndex(root, (snapshot) => {
-			const maps = snapshot.maps as Array<{ stale_after: string }>;
-			if (maps[0]) {
-				maps[0].stale_after = "1970-01-01T00:00:00.000Z";
-			}
-		});
+			rebuildPstrIndex(root);
+			mutatePstrIndex(root, (snapshot) => {
+				const maps = snapshot.maps as Array<{ stale_after: string }>;
+				if (maps[0]) {
+					maps[0].stale_after = "1970-01-01T00:00:00.000Z";
+				}
+			});
 			const io = captureIo();
 			expect(await runPstrCommand("stale", [], root, io.io)).toBe(1);
 			expect(io.stdout[0] ?? "").toContain("stale areas found");
@@ -365,7 +424,9 @@ describe("schema detector", () => {
 		const root = createFixture();
 		try {
 			const shape = detectShape(root);
-			expect(shape.page_types.some((pageType) => pageType.name === "pstr")).toBe(true);
+			expect(
+				shape.page_types.some((pageType) => pageType.name === "pstr"),
+			).toBe(true);
 		} finally {
 			cleanup(root);
 		}
@@ -375,7 +436,9 @@ describe("schema detector", () => {
 		const root = createFixture();
 		try {
 			const shape = detectShape(root);
-			expect(shape.page_types.some((pageType) => pageType.name === "wb")).toBe(true);
+			expect(shape.page_types.some((pageType) => pageType.name === "wb")).toBe(
+				true,
+			);
 		} finally {
 			cleanup(root);
 		}

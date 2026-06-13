@@ -1,4 +1,8 @@
-export type SpecCheckStatus = "compatible" | "conflict" | "waived" | "not_applicable";
+export type SpecCheckStatus =
+	| "compatible"
+	| "conflict"
+	| "waived"
+	| "not_applicable";
 
 export type SpecCheckResult = {
 	task_id: string;

@@ -1,8 +1,8 @@
+import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Database } from "bun:sqlite";
 import { runDbCommand } from "../commands/db";
 import { openDb } from "../services/state";
 import { checkDbHealth } from "../services/state/db-health";
@@ -38,9 +38,21 @@ function createFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "db-health-"));
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb", "session-a"), { recursive: true });
-	writeFileSync(join(root, ".agents", "config.json"), JSON.stringify({ schema_version: 1 }), "utf8");
-	writeFileSync(join(root, ".agents", "lock.json"), JSON.stringify({ schema_version: 1, locked: true }), "utf8");
-	writeFileSync(join(root, ".afol", "wb", "session-a", "plan.md"), ["# Plan", "", "body"].join("\n"), "utf8");
+	writeFileSync(
+		join(root, ".agents", "config.json"),
+		JSON.stringify({ schema_version: 1 }),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".agents", "lock.json"),
+		JSON.stringify({ schema_version: 1, locked: true }),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "wb", "session-a", "plan.md"),
+		["# Plan", "", "body"].join("\n"),
+		"utf8",
+	);
 	return root;
 }
 
@@ -79,7 +91,9 @@ describe("db health", () => {
 		try {
 			hydrateSession(root, "session-a");
 			const captured = captureIo();
-			expect(await runDbCommand("health", ["--json"], root, captured.io)).toBe(0);
+			expect(await runDbCommand("health", ["--json"], root, captured.io)).toBe(
+				0,
+			);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(typeof payload.ok).toBe("boolean");
 			expect(typeof payload.schema_ok).toBe("boolean");
@@ -89,7 +103,7 @@ describe("db health", () => {
 			expect(typeof payload.orphan_records).toBe("number");
 			expect(typeof payload.stale_sources).toBe("number");
 			expect(typeof payload.size_bytes).toBe("number");
-				expect(Array.isArray(payload.findings)).toBe(true);
+			expect(Array.isArray(payload.findings)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -116,7 +130,11 @@ describe("db health", () => {
 			db.close();
 			const report = checkDbHealth(root);
 			expect(report.schema_ok).toBe(false);
-			expect(report.findings.some((finding) => finding.message.includes("missing tables"))).toBe(true);
+			expect(
+				report.findings.some((finding) =>
+					finding.message.includes("missing tables"),
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

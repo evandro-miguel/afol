@@ -1,4 +1,7 @@
-import { checkDbHealth, type DbHealthReport } from "../services/state/db-health";
+import {
+	checkDbHealth,
+	type DbHealthReport,
+} from "../services/state/db-health";
 
 type CommandIo = {
 	stdout: (message: string) => void;

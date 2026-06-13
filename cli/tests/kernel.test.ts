@@ -12,8 +12,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CLI_VERSION } from "../generated/version";
-import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
 import { waiveSpecCheck } from "../services/spec-gate";
+import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 const templateConfig = JSON.stringify({
@@ -475,7 +475,10 @@ describe("kernel front-door", () => {
 	});
 
 	test("done without spec flag stays unchanged", () => {
-		const root = mkProjectRoot("done-plain", "#!/usr/bin/env bash\necho LEGACY:$*");
+		const root = mkProjectRoot(
+			"done-plain",
+			"#!/usr/bin/env bash\necho LEGACY:$*",
+		);
 		try {
 			const created = newWorkstream(root, "plain done");
 			recordEvidence(root, {
@@ -485,7 +488,13 @@ describe("kernel front-door", () => {
 				result: "passed",
 			});
 
-			const proc = runKernel(root, ["done", "--session", created.session, "--task-id", "T-01"]);
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+			]);
 			expect(proc.status).toBe(0);
 			expect(proc.stdout as string).toContain("task done: T-01");
 			expect(proc.stderr as string).toBe("");
@@ -495,9 +504,14 @@ describe("kernel front-door", () => {
 	});
 
 	test("done with compatible spec check passes", () => {
-		const root = mkProjectRoot("done-compatible", "#!/usr/bin/env bash\necho LEGACY:$*");
+		const root = mkProjectRoot(
+			"done-compatible",
+			"#!/usr/bin/env bash\necho LEGACY:$*",
+		);
 		try {
-			const created = newWorkstream(root, "compatible done", { parentSpec: "spec-001" });
+			const created = newWorkstream(root, "compatible done", {
+				parentSpec: "spec-001",
+			});
 			writeTaskWithSpecMetadata(created.taskPath, "spec-001");
 			writeSpec(root, "spec-001", "active");
 			recordEvidence(root, {
@@ -525,7 +539,10 @@ describe("kernel front-door", () => {
 	});
 
 	test("done with not_applicable spec check passes", () => {
-		const root = mkProjectRoot("done-not-applicable", "#!/usr/bin/env bash\necho LEGACY:$*");
+		const root = mkProjectRoot(
+			"done-not-applicable",
+			"#!/usr/bin/env bash\necho LEGACY:$*",
+		);
 		try {
 			const created = newWorkstream(root, "no spec done");
 			writeTaskWithSpecMetadata(created.taskPath, null);
@@ -554,9 +571,14 @@ describe("kernel front-door", () => {
 	});
 
 	test("done with missing spec blocks spec check", () => {
-		const root = mkProjectRoot("done-missing-spec", "#!/usr/bin/env bash\necho LEGACY:$*");
+		const root = mkProjectRoot(
+			"done-missing-spec",
+			"#!/usr/bin/env bash\necho LEGACY:$*",
+		);
 		try {
-			const created = newWorkstream(root, "missing spec done", { parentSpec: "spec-missing" });
+			const created = newWorkstream(root, "missing spec done", {
+				parentSpec: "spec-missing",
+			});
 			writeTaskWithSpecMetadata(created.taskPath, "spec-missing");
 
 			const proc = runKernel(root, [
@@ -577,9 +599,14 @@ describe("kernel front-door", () => {
 	});
 
 	test("done with waived spec passes", () => {
-		const root = mkProjectRoot("done-waived", "#!/usr/bin/env bash\necho LEGACY:$*");
+		const root = mkProjectRoot(
+			"done-waived",
+			"#!/usr/bin/env bash\necho LEGACY:$*",
+		);
 		try {
-			const created = newWorkstream(root, "waived done", { parentSpec: "spec-missing" });
+			const created = newWorkstream(root, "waived done", {
+				parentSpec: "spec-missing",
+			});
 			writeTaskWithSpecMetadata(created.taskPath, "spec-missing");
 			waiveSpecCheck(root, created.session, "T-01", "needs override");
 			recordEvidence(root, {

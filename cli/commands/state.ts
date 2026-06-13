@@ -59,7 +59,9 @@ function parseStateArgs(args: string[]): { json: boolean; sessionId: string } {
 	return { json, sessionId };
 }
 
-function formatSnapshot(snapshot: NonNullable<ReturnType<typeof loadSessionState>>): string {
+function formatSnapshot(
+	snapshot: NonNullable<ReturnType<typeof loadSessionState>>,
+): string {
 	return [
 		`state: ${snapshot.sessionId}`,
 		`hydrated_at: ${snapshot.hydratedAt}`,
@@ -75,7 +77,9 @@ function formatSnapshot(snapshot: NonNullable<ReturnType<typeof loadSessionState
 	].join("\n");
 }
 
-function formatValidation(result: ReturnType<typeof validateSessionState>): string {
+function formatValidation(
+	result: ReturnType<typeof validateSessionState>,
+): string {
 	return [
 		`state validate: ${result.ok ? "ok" : "fail"}`,
 		`session: ${result.sessionId}`,
@@ -83,10 +87,13 @@ function formatValidation(result: ReturnType<typeof validateSessionState>): stri
 		`stored_sources: ${result.storedSourceCount}`,
 		`current_sources: ${result.currentSourceCount}`,
 		...result.mismatches.map(
-			(mismatch) => `mismatch ${mismatch.path} stored=${mismatch.stored} current=${mismatch.current}`,
+			(mismatch) =>
+				`mismatch ${mismatch.path} stored=${mismatch.stored} current=${mismatch.current}`,
 		),
 		result.mismatches.length === 0 ? result.message : "",
-	].filter((line) => line.length > 0).join("\n");
+	]
+		.filter((line) => line.length > 0)
+		.join("\n");
 }
 
 export async function runStateCommand(
@@ -96,8 +103,9 @@ export async function runStateCommand(
 	io: CommandIo = DEFAULT_IO,
 ): Promise<number> {
 	try {
-		const stateArgs = action && action.startsWith("-") ? [action, ...args] : args;
-		const stateAction = action && !action.startsWith("-") ? normalizeAction(action) : "show";
+		const stateArgs = action?.startsWith("-") ? [action, ...args] : args;
+		const stateAction =
+			action && !action.startsWith("-") ? normalizeAction(action) : "show";
 		const parsed = parseStateArgs(stateArgs);
 
 		if (stateAction === "sync") {
@@ -105,12 +113,14 @@ export async function runStateCommand(
 			if (parsed.json) {
 				io.stdout(JSON.stringify({ ok: true, action: stateAction, snapshot }));
 			} else {
-				io.stdout([
-					`state sync: ok`,
-					`session: ${snapshot.sessionId}`,
-					`hydrated_at: ${snapshot.hydratedAt}`,
-					`source_files: ${snapshot.sourceFiles.length}`,
-				].join("\n"));
+				io.stdout(
+					[
+						`state sync: ok`,
+						`session: ${snapshot.sessionId}`,
+						`hydrated_at: ${snapshot.hydratedAt}`,
+						`source_files: ${snapshot.sourceFiles.length}`,
+					].join("\n"),
+				);
 			}
 			return 0;
 		}
@@ -128,8 +138,10 @@ export async function runStateCommand(
 		if (stateAction === "export") {
 			const snapshot = exportSessionState(projectRoot, parsed.sessionId);
 			if (!snapshot) {
-				io.stderr(`state export: no hydrated state for ${parsed.sessionId}. Run ` +
-					"`afol hydrate -S <session>` first.");
+				io.stderr(
+					`state export: no hydrated state for ${parsed.sessionId}. Run ` +
+						"`afol hydrate -S <session>` first.",
+				);
 				return 1;
 			}
 			if (parsed.json) {
@@ -142,8 +154,10 @@ export async function runStateCommand(
 
 		const snapshot = loadSessionState(projectRoot, parsed.sessionId);
 		if (!snapshot) {
-			io.stderr(`state show: no hydrated state for ${parsed.sessionId}. Run ` +
-				"`afol hydrate -S <session>` first.");
+			io.stderr(
+				`state show: no hydrated state for ${parsed.sessionId}. Run ` +
+					"`afol hydrate -S <session>` first.",
+			);
 			return 1;
 		}
 		if (parsed.json) {

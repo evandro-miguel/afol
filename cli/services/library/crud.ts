@@ -88,7 +88,11 @@ function isSlug(value: string): boolean {
 }
 
 function normalizeSlug(value: string): string {
-	const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+	const slug = value
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
 	if (!slug || !isSlug(slug)) {
 		throw new Error(`Invalid library topic slug: ${value}`);
 	}
@@ -96,7 +100,12 @@ function normalizeSlug(value: string): string {
 }
 
 function assertSource(source: LibrarySource): LibrarySource {
-	if (!trimOrNull(source.id) || !trimOrNull(source.url) || !trimOrNull(source.title) || !trimOrNull(source.accessed_at)) {
+	if (
+		!trimOrNull(source.id) ||
+		!trimOrNull(source.url) ||
+		!trimOrNull(source.title) ||
+		!trimOrNull(source.accessed_at)
+	) {
 		throw new Error("Every source requires id, url, title, and accessed_at.");
 	}
 	return {
@@ -108,10 +117,16 @@ function assertSource(source: LibrarySource): LibrarySource {
 }
 
 function assertClaim(claim: LibraryClaim): LibraryClaim {
-	if (!trimOrNull(claim.id) || !trimOrNull(claim.text) || !trimOrNull(claim.created_at)) {
+	if (
+		!trimOrNull(claim.id) ||
+		!trimOrNull(claim.text) ||
+		!trimOrNull(claim.created_at)
+	) {
 		throw new Error("Every claim requires id, text, and created_at.");
 	}
-	const sourceIds = claim.source_ids.map((sourceId) => sourceId.trim()).filter(Boolean);
+	const sourceIds = claim.source_ids
+		.map((sourceId) => sourceId.trim())
+		.filter(Boolean);
 	if (sourceIds.length === 0) {
 		throw new Error("Every claim requires at least one source.");
 	}
@@ -120,7 +135,9 @@ function assertClaim(claim: LibraryClaim): LibraryClaim {
 		text: claim.text.trim(),
 		source_ids: sourceIds,
 		status: claim.status,
-		...(claim.invalidated_reason ? { invalidated_reason: claim.invalidated_reason.trim() } : {}),
+		...(claim.invalidated_reason
+			? { invalidated_reason: claim.invalidated_reason.trim() }
+			: {}),
 		created_at: claim.created_at.trim(),
 	};
 }
@@ -141,14 +158,16 @@ function parseFrontmatter(content: string): LibraryFrontmatter | null {
 
 function parseTopicContent(content: string): LibraryTopic | null {
 	const frontmatter = parseFrontmatter(content);
-	if (!frontmatter || frontmatter.doc_type !== "library_topic") {
+	if (frontmatter?.doc_type !== "library_topic") {
 		return null;
 	}
 	const slug = trimOrNull(frontmatter.slug);
 	const title = trimOrNull(frontmatter.title);
 	const updatedAt = trimOrNull(frontmatter.updated_at);
 	const tags = asStringArray(frontmatter.tags) ?? [];
-	const sourcesRaw = Array.isArray(frontmatter.sources) ? frontmatter.sources : [];
+	const sourcesRaw = Array.isArray(frontmatter.sources)
+		? frontmatter.sources
+		: [];
 	const claimsRaw = Array.isArray(frontmatter.claims) ? frontmatter.claims : [];
 	if (!slug || !title || !updatedAt || !isSlug(slug)) {
 		return null;
@@ -174,13 +193,19 @@ function parseTopicContent(content: string): LibraryTopic | null {
 			return null;
 		}
 		const sourceIds = asStringArray(record.source_ids);
-		const status = record.status === "invalidated" ? "invalidated" : record.status === "current" ? "current" : null;
+		const status =
+			record.status === "invalidated"
+				? "invalidated"
+				: record.status === "current"
+					? "current"
+					: null;
 		const claim = assertClaim({
 			id: String(record.id ?? ""),
 			text: String(record.text ?? ""),
 			source_ids: sourceIds ?? [],
 			status: status ?? "current",
-			...(typeof record.invalidated_reason === "string" && record.invalidated_reason.trim()
+			...(typeof record.invalidated_reason === "string" &&
+			record.invalidated_reason.trim()
 				? { invalidated_reason: record.invalidated_reason.trim() }
 				: {}),
 			created_at: String(record.created_at ?? ""),
@@ -229,7 +254,9 @@ function renderClaims(claims: readonly LibraryClaim[]): string[] {
 		}
 		lines.push(`    status: ${claim.status}`);
 		if (claim.invalidated_reason) {
-			lines.push(`    invalidated_reason: ${renderString(claim.invalidated_reason)}`);
+			lines.push(
+				`    invalidated_reason: ${renderString(claim.invalidated_reason)}`,
+			);
 		}
 		lines.push(`    created_at: ${renderString(claim.created_at)}`);
 	}
@@ -256,18 +283,24 @@ function topicBody(topic: LibraryTopic): string {
 		"",
 		"## Sources",
 		...(topic.sources.length > 0
-			? topic.sources.map((source) => `- ${source.id}: ${source.title} (${source.url}) [${source.accessed_at}]`)
+			? topic.sources.map(
+					(source) =>
+						`- ${source.id}: ${source.title} (${source.url}) [${source.accessed_at}]`,
+				)
 			: ["- none"]),
 		"",
 		"## Claims",
 		...(topic.claims.length > 0
-			? topic.claims.map((claim) =>
-				`- ${claim.id}: ${claim.text} [${claim.status}]${claim.invalidated_reason ? ` (${claim.invalidated_reason})` : ""}`,
-			)
+			? topic.claims.map(
+					(claim) =>
+						`- ${claim.id}: ${claim.text} [${claim.status}]${claim.invalidated_reason ? ` (${claim.invalidated_reason})` : ""}`,
+				)
 			: ["- none"]),
 		"",
 		"## Tags",
-		...(topic.tags.length > 0 ? topic.tags.map((tag) => `- ${tag}`) : ["- none"]),
+		...(topic.tags.length > 0
+			? topic.tags.map((tag) => `- ${tag}`)
+			: ["- none"]),
 		"",
 		"> Read-only curated research. Do not use this to replace specs.",
 	].join("\n");
@@ -283,7 +316,10 @@ function cloneTopic(topic: LibraryTopic): LibraryTopic {
 		slug: topic.slug,
 		title: topic.title,
 		sources: topic.sources.map((source) => ({ ...source })),
-		claims: topic.claims.map((claim) => ({ ...claim, source_ids: [...claim.source_ids] })),
+		claims: topic.claims.map((claim) => ({
+			...claim,
+			source_ids: [...claim.source_ids],
+		})),
 		tags: [...topic.tags],
 		updated_at: topic.updated_at,
 	};
@@ -297,7 +333,10 @@ function requireTopic(root: string, slug: string): LibraryTopic {
 	return topic;
 }
 
-function ensureSourceIdsExist(topic: LibraryTopic, sourceIds: readonly string[]): void {
+function ensureSourceIdsExist(
+	topic: LibraryTopic,
+	sourceIds: readonly string[],
+): void {
 	const available = new Set(topic.sources.map((source) => source.id));
 	for (const sourceId of sourceIds) {
 		if (!available.has(sourceId)) {
@@ -306,7 +345,10 @@ function ensureSourceIdsExist(topic: LibraryTopic, sourceIds: readonly string[])
 	}
 }
 
-function upsertById<T extends { id: string }>(items: readonly T[], item: T): T[] {
+function upsertById<T extends { id: string }>(
+	items: readonly T[],
+	item: T,
+): T[] {
 	const next = items.map((entry) => (entry.id === item.id ? item : entry));
 	return next.some((entry) => entry.id === item.id) ? next : [...next, item];
 }
@@ -357,7 +399,11 @@ export function proposeTopic(
 	return topic;
 }
 
-export function addSource(root: string, slug: string, source: LibrarySource): LibraryTopic {
+export function addSource(
+	root: string,
+	slug: string,
+	source: LibrarySource,
+): LibraryTopic {
 	const topic = cloneTopic(requireTopic(root, slug));
 	const validated = assertSource(source);
 	topic.sources = upsertById(topic.sources, validated);
@@ -366,7 +412,11 @@ export function addSource(root: string, slug: string, source: LibrarySource): Li
 	return topic;
 }
 
-export function addClaim(root: string, slug: string, claim: LibraryClaim): LibraryTopic {
+export function addClaim(
+	root: string,
+	slug: string,
+	claim: LibraryClaim,
+): LibraryTopic {
 	const topic = cloneTopic(requireTopic(root, slug));
 	const validated = assertClaim(claim);
 	ensureSourceIdsExist(topic, validated.source_ids);
@@ -376,7 +426,12 @@ export function addClaim(root: string, slug: string, claim: LibraryClaim): Libra
 	return topic;
 }
 
-export function invalidateClaim(root: string, slug: string, claimId: string, reason: string): LibraryTopic {
+export function invalidateClaim(
+	root: string,
+	slug: string,
+	claimId: string,
+	reason: string,
+): LibraryTopic {
 	const topic = cloneTopic(requireTopic(root, slug));
 	const needle = claimId.trim();
 	const invalidatedReason = reason.trim();
@@ -406,7 +461,10 @@ export function invalidateClaim(root: string, slug: string, claimId: string, rea
 	return topic;
 }
 
-export function searchLibrary(root: string, query: string): LibrarySearchResult[] {
+export function searchLibrary(
+	root: string,
+	query: string,
+): LibrarySearchResult[] {
 	const needle = query.trim().toLowerCase();
 	if (!needle) {
 		return [];
@@ -423,14 +481,23 @@ export function searchLibrary(root: string, query: string): LibrarySearchResult[
 					topic.slug,
 					topic.title,
 					...topic.tags,
-					...topic.sources.flatMap((source) => [source.id, source.url, source.title, source.accessed_at]),
+					...topic.sources.flatMap((source) => [
+						source.id,
+						source.url,
+						source.title,
+						source.accessed_at,
+					]),
 					claim.id,
 					claim.text,
 					...claim.source_ids,
-				].join(" ").toLowerCase();
+				]
+					.join(" ")
+					.toLowerCase();
 				return haystack.includes(needle);
 			});
-			return matchingClaims.length > 0 ? { topic, matching_claims: matchingClaims } : null;
+			return matchingClaims.length > 0
+				? { topic, matching_claims: matchingClaims }
+				: null;
 		})
 		.filter((entry): entry is LibrarySearchResult => entry !== null);
 }
@@ -455,6 +522,9 @@ export function rebuildLibraryIndex(root: string): LibraryIndexSnapshot {
 		topics,
 	};
 	mkdirSync(libraryDir(root), { recursive: true });
-	atomicWriteText(libraryIndexPath(root), `${JSON.stringify(snapshot, null, 2)}\n`);
+	atomicWriteText(
+		libraryIndexPath(root),
+		`${JSON.stringify(snapshot, null, 2)}\n`,
+	);
 	return snapshot;
 }

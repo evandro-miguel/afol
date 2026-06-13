@@ -1,4 +1,7 @@
-import { addChangelogEntry, type ChangelogEntryType } from "../services/spec-gate";
+import {
+	addChangelogEntry,
+	type ChangelogEntryType,
+} from "../services/spec-gate";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -10,7 +13,10 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-function parseArgs(args: string[]): { type: ChangelogEntryType; message: string } {
+function parseArgs(args: string[]): {
+	type: ChangelogEntryType;
+	message: string;
+} {
 	let type = "";
 	let message = "";
 	for (let index = 0; index < args.length; index += 1) {
@@ -38,7 +44,12 @@ function parseArgs(args: string[]): { type: ChangelogEntryType; message: string 
 		}
 		throw new Error(`Unknown changelog argument: ${value}`);
 	}
-	if (type !== "decision" && type !== "behavior" && type !== "breaking" && type !== "fix") {
+	if (
+		type !== "decision" &&
+		type !== "behavior" &&
+		type !== "breaking" &&
+		type !== "fix"
+	) {
 		throw new Error("Missing or invalid --type for changelog add.");
 	}
 	if (!message.trim()) {
@@ -60,7 +71,9 @@ export async function runChangelogCommand(
 		const json = args.some((value) => value === "--json" || value === "-j");
 		const parsed = parseArgs(args);
 		const path = addChangelogEntry(projectRoot, parsed.type, parsed.message);
-		io.stdout(json ? JSON.stringify({ action: "add", path }) : `changelog add: ${path}`);
+		io.stdout(
+			json ? JSON.stringify({ action: "add", path }) : `changelog add: ${path}`,
+		);
 		return 0;
 	} catch (error) {
 		io.stderr((error as Error).message);
