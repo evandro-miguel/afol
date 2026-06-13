@@ -15,6 +15,26 @@ function formatEntry(spec: CommandSpec): string {
 	return `${name} - ${spec.description}`;
 }
 
+export function formatCommandHelp(
+	commandOrAlias: string,
+	registry = kernelRegistry,
+): string | null {
+	const canonical = registry.canonicalize(commandOrAlias);
+	const spec =
+		registry.commands.find((entry) => entry.command === canonical) ?? null;
+	if (!spec) {
+		return null;
+	}
+
+	return [
+		`Command: ${spec.command}`,
+		`Aliases: ${spec.aliases.length > 0 ? spec.aliases.join(", ") : "none"}`,
+		`Category: ${spec.category ?? "uncategorized"}`,
+		`Side effect: ${spec.sideEffect}`,
+		`Description: ${spec.description}`,
+	].join("\n");
+}
+
 export function formatHelpText(registry = kernelRegistry): string {
 	const grouped = new Map<CommandCategory | "uncategorized", string[]>();
 	for (const category of CATEGORY_ORDER) {

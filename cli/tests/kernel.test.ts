@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CLI_VERSION } from "../generated/version";
+import { kernelRegistry } from "../registry";
 import { waiveSpecCheck } from "../services/spec-gate";
 import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
 
@@ -119,6 +120,30 @@ describe("kernel front-door", () => {
 				expect(proc.status).toBe(0);
 				expect((proc.stdout as string).trim()).toBe(`afol ${CLI_VERSION}`);
 			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("help command prints registry-backed command help", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-command-help-no-project-"));
+		try {
+			for (const args of [["help", "status"], ["help", "s"]]) {
+				const proc = runKernel(root, args);
+				expect(proc.status).toBe(0);
+				expect(proc.stdout as string).toContain("Command: status");
+				expect(proc.stdout as string).toContain("Aliases: s");
+				expect(proc.stdout as string).toContain("Category: core");
+				expect(proc.stdout as string).toContain("Side effect: read");
+				expect(proc.stdout as string).toContain(
+					kernelRegistry.commands.find((entry) => entry.command === "status")
+						?.description ?? "",
+				);
+			}
+
+			const unknown = runKernel(root, ["help", "nope"]);
+			expect(unknown.status).toBe(2);
+			expect(unknown.stderr as string).toContain("err unknown-command");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -34,7 +34,7 @@ import {
 	runVerifyTasksCommand,
 } from "./commands/workbench";
 import { CLI_VERSION } from "./generated/version";
-import { formatHelpText } from "./help";
+import { formatCommandHelp, formatHelpText } from "./help";
 import { resolveCommand } from "./router";
 import { kernelRegistry } from "./registry";
 import { loadProjectRoot } from "./services/project/root";
@@ -90,6 +90,22 @@ export async function main(argv: string[]): Promise<number> {
 	) {
 		console.log(`afol ${CLI_VERSION}`);
 		return 0;
+	}
+
+	if (args[0] === "help") {
+		if (args.length === 1) {
+			console.log(formatHelpText(kernelRegistry));
+			return 0;
+		}
+		const help = formatCommandHelp(args[1] ?? "", kernelRegistry);
+		if (help) {
+			console.log(help);
+			return 0;
+		}
+		console.error(
+			`err unknown-command command=${args[1] ?? ""} hint="run afol -h"`,
+		);
+		return 2;
 	}
 
 	const resolution = resolveCommand(args);

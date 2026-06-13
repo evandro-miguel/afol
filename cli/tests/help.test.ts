@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatHelpText } from "../help";
+import { formatCommandHelp, formatHelpText } from "../help";
 import { kernelRegistry } from "../registry";
 
 describe("help formatter", () => {
@@ -20,5 +20,21 @@ describe("help formatter", () => {
 		expect(help).toContain("a=afol");
 		expect(help).not.toContain("do/doctor");
 		expect(help).not.toContain("ma/maintenance");
+	});
+
+	test("formats per-command help from registry metadata", () => {
+		const help = formatCommandHelp("s", kernelRegistry);
+		const unknown = formatCommandHelp("nope", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected command help");
+		}
+		expect(help).toContain("Command: status");
+		expect(help).toContain("Aliases: s");
+		expect(help).toContain("Category: core");
+		expect(help).toContain("Side effect: read");
+		expect(help).toContain("Description: Show current project status");
+		expect(unknown).toBeNull();
 	});
 });
