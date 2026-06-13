@@ -13,6 +13,12 @@ import {
 	writeResolver,
 	writeShapePack,
 } from "../services/schema";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -23,6 +29,36 @@ const DEFAULT_IO: CommandIo = {
 	stdout: (message) => console.log(message),
 	stderr: (message) => console.error(message),
 };
+
+function writeJsonOk<T extends Record<string, unknown>>(
+	io: CommandIo,
+	action: string,
+	data: T,
+	legacyKeys: readonly (keyof T)[],
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(
+				envelopeOk(data, { action: `schema.${action}` }),
+				legacyKeys,
+			),
+		),
+	);
+}
+
+function writeJsonErr(
+	io: CommandIo,
+	action: string,
+	code: string,
+	message: string,
+	exitCode: 1 | 2,
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			envelopeErr(code, message, { action: `schema.${action}`, exitCode }),
+		),
+	);
+}
 
 type SchemaAction = "detect" | "suggest" | "review" | "apply" | "resolver";
 
@@ -101,26 +137,30 @@ export async function runSchemaCommand(
 	io: CommandIo = DEFAULT_IO,
 	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
+	const wantsJson = args.some((value) => value === "--json" || value === "-j");
 	try {
 		const schemaAction = normalizeAction(action);
 		const parsed = parseArgs(args);
 		const detected = detectShape(projectRoot);
 
 		if (schemaAction === "detect") {
-			if (parsed.json)
-				io.stdout(
-					JSON.stringify({ ok: true, action: schemaAction, pack: detected }),
+			if (parsed.json) {
+				writeJsonOk(
+					io,
+					schemaAction,
+					{ pack: detected, shape: detected },
+					["pack", "shape"],
 				);
+			}
 			else io.stdout(formatPack(detected));
 			return 0;
 		}
 
 		if (schemaAction === "suggest") {
 			const suggestions = suggestShape(projectRoot);
-			if (parsed.json)
-				io.stdout(
-					JSON.stringify({ ok: true, action: schemaAction, suggestions }),
-				);
+			if (parsed.json) {
+				writeJsonOk(io, schemaAction, { suggestions }, ["suggestions"]);
+			}
 			else
 				io.stdout(
 					suggestions.length > 0
@@ -133,16 +173,14 @@ export async function runSchemaCommand(
 		if (schemaAction === "review") {
 			const current = readShapePack(projectRoot);
 			const suggestions = suggestShape(projectRoot);
-			if (parsed.json)
-				io.stdout(
-					JSON.stringify({
-						ok: true,
-						action: schemaAction,
-						current,
-						detected,
-						suggestions,
-					}),
+			if (parsed.json) {
+				writeJsonOk(
+					io,
+					schemaAction,
+					{ current, detected, suggestions, shape: detected },
+					["current", "detected", "suggestions", "shape"],
 				);
+			}
 			else
 				io.stdout(
 					[
@@ -160,16 +198,14 @@ export async function runSchemaCommand(
 				writeResolver(projectRoot);
 			}
 			const content = detectResolver(projectRoot);
-			if (parsed.json)
-				io.stdout(
-					JSON.stringify({
-						ok: true,
-						action: schemaAction,
-						write: parsed.write,
-						path,
-						content,
-					}),
+			if (parsed.json) {
+				writeJsonOk(
+					io,
+					schemaAction,
+					{ write: parsed.write, path, content },
+					["write", "path", "content"],
 				);
+			}
 			else
 				io.stdout(
 					parsed.write
@@ -181,21 +217,33 @@ export async function runSchemaCommand(
 
 		const apply = canApply(ctx, parsed.dryRun);
 		if (!apply.ok) {
-			io.stderr(apply.message ?? "schema apply denied");
+			if (parsed.json) {
+				writeJsonErr(
+					io,
+					schemaAction,
+					"schema.apply.denied",
+					apply.message ?? "schema apply denied",
+					2,
+				);
+			} else {
+				io.stderr(apply.message ?? "schema apply denied");
+			}
 			return 2;
 		}
 		if (!parsed.dryRun) {
 			writeShapePack(projectRoot, detected);
 		}
 		if (parsed.json) {
-			io.stdout(
-				JSON.stringify({
-					ok: true,
-					action: schemaAction,
+			writeJsonOk(
+				io,
+				schemaAction,
+				{
 					dry_run: parsed.dryRun,
 					path: shapePackPathForRoot(projectRoot),
 					pack: detected,
-				}),
+					shape: detected,
+				},
+				["dry_run", "path", "pack", "shape"],
 			);
 		} else {
 			io.stdout(
@@ -204,6 +252,10 @@ export async function runSchemaCommand(
 		}
 		return 0;
 	} catch (error) {
+		if (wantsJson && error instanceof Error && error.message) {
+			writeJsonErr(io, action, "schema.command.error", error.message, 2);
+			return 2;
+		}
 		io.stderr((error as Error).message);
 		return 2;
 	}

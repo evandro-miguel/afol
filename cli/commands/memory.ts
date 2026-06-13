@@ -12,6 +12,12 @@ import {
 	searchEntries,
 	updateEntry,
 } from "../services/memory";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -22,6 +28,36 @@ const DEFAULT_IO: CommandIo = {
 	stdout: (message) => console.log(message),
 	stderr: (message) => console.error(message),
 };
+
+function writeJsonOk<T extends Record<string, unknown>>(
+	io: CommandIo,
+	action: string,
+	data: T,
+	legacyKeys: readonly (keyof T)[],
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(
+				envelopeOk(data, { action: `memory.${action}` }),
+				legacyKeys,
+			),
+		),
+	);
+}
+
+function writeJsonErr(
+	io: CommandIo,
+	action: string,
+	code: string,
+	message: string,
+	exitCode: 1 | 2,
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			envelopeErr(code, message, { action: `memory.${action}`, exitCode }),
+		),
+	);
+}
 
 type MemoryAction =
 	| "list"
@@ -194,6 +230,7 @@ export async function runMemoryCommand(
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
 ): Promise<number> {
+	const wantsJson = args.some((value) => value === "--json" || value === "-j");
 	try {
 		const parsed = parseMemoryArgs(action, args);
 
@@ -201,7 +238,7 @@ export async function runMemoryCommand(
 			const memory = readMemory(projectRoot);
 			const entries = memory?.entries ?? [];
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entries }));
+				writeJsonOk(io, parsed.action, { entries }, ["entries"]);
 			} else {
 				io.stdout(
 					[
@@ -219,11 +256,21 @@ export async function runMemoryCommand(
 			}
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
-				io.stderr(`Memory entry not found: ${parsed.id}`);
+				if (parsed.json) {
+					writeJsonErr(
+						io,
+						parsed.action,
+						"memory.entry.not_found",
+						`Memory entry not found: ${parsed.id}`,
+						1,
+					);
+				} else {
+					io.stderr(`Memory entry not found: ${parsed.id}`);
+				}
 				return 1;
 			}
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entry }));
+				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(formatEntry(entry));
 			}
@@ -237,7 +284,7 @@ export async function runMemoryCommand(
 			}
 			const entries = searchEntries(projectRoot, query);
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entries }));
+				writeJsonOk(io, parsed.action, { entries }, ["entries"]);
 			} else {
 				io.stdout(
 					[
@@ -265,7 +312,7 @@ export async function runMemoryCommand(
 			};
 			addEntry(projectRoot, entry);
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entry }));
+				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory add: ${entry.id}`);
 			}
@@ -283,11 +330,21 @@ export async function runMemoryCommand(
 			});
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
-				io.stderr(`Memory entry not found: ${parsed.id}`);
+				if (parsed.json) {
+					writeJsonErr(
+						io,
+						parsed.action,
+						"memory.entry.not_found",
+						`Memory entry not found: ${parsed.id}`,
+						1,
+					);
+				} else {
+					io.stderr(`Memory entry not found: ${parsed.id}`);
+				}
 				return 1;
 			}
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entry }));
+				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory update: ${entry.id}`);
 			}
@@ -301,11 +358,21 @@ export async function runMemoryCommand(
 			archiveEntry(projectRoot, parsed.id);
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
-				io.stderr(`Memory entry not found: ${parsed.id}`);
+				if (parsed.json) {
+					writeJsonErr(
+						io,
+						parsed.action,
+						"memory.entry.not_found",
+						`Memory entry not found: ${parsed.id}`,
+						1,
+					);
+				} else {
+					io.stderr(`Memory entry not found: ${parsed.id}`);
+				}
 				return 1;
 			}
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entry }));
+				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory archive: ${entry.id}`);
 			}
@@ -328,7 +395,7 @@ export async function runMemoryCommand(
 			};
 			proposeEntry(projectRoot, entry);
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entry }));
+				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory propose: ${entry.id}`);
 			}
@@ -342,11 +409,21 @@ export async function runMemoryCommand(
 			promoteEntry(projectRoot, parsed.id);
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
-				io.stderr(`Memory entry not found: ${parsed.id}`);
+				if (parsed.json) {
+					writeJsonErr(
+						io,
+						parsed.action,
+						"memory.entry.not_found",
+						`Memory entry not found: ${parsed.id}`,
+						1,
+					);
+				} else {
+					io.stderr(`Memory entry not found: ${parsed.id}`);
+				}
 				return 1;
 			}
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entry }));
+				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory promote: ${entry.id}`);
 			}
@@ -360,11 +437,21 @@ export async function runMemoryCommand(
 			rejectEntry(projectRoot, parsed.id, parsed.reason);
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
-				io.stderr(`Memory entry not found: ${parsed.id}`);
+				if (parsed.json) {
+					writeJsonErr(
+						io,
+						parsed.action,
+						"memory.entry.not_found",
+						`Memory entry not found: ${parsed.id}`,
+						1,
+					);
+				} else {
+					io.stderr(`Memory entry not found: ${parsed.id}`);
+				}
 				return 1;
 			}
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entry }));
+				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory reject: ${entry.id}`);
 			}
@@ -374,7 +461,7 @@ export async function runMemoryCommand(
 		if (parsed.action === "render") {
 			const markdown = renderMemory(projectRoot);
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, markdown }));
+				writeJsonOk(io, parsed.action, { markdown }, ["markdown"]);
 			} else {
 				io.stdout(markdown);
 			}
@@ -388,7 +475,7 @@ export async function runMemoryCommand(
 			}
 			const entries = recallEntries(projectRoot, query);
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, entries }));
+				writeJsonOk(io, parsed.action, { entries }, ["entries"]);
 			} else {
 				io.stdout(
 					[
@@ -402,6 +489,10 @@ export async function runMemoryCommand(
 
 		throw new Error(`Unknown memory action: ${parsed.action}`);
 	} catch (error) {
+		if (wantsJson && error instanceof Error && error.message) {
+			writeJsonErr(io, action, "memory.command.error", error.message, 2);
+			return 2;
+		}
 		io.stderr((error as Error).message);
 		return 2;
 	}

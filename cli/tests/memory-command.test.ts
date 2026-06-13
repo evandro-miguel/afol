@@ -68,12 +68,26 @@ function createRoot(): string {
 }
 
 describe("memory command", () => {
-	test("lists, shows, searches, and updates entries", async () => {
-		const root = createRoot();
-		try {
-			const list = capture();
-			expect(await runMemoryCommand("list", [], root, list.io)).toBe(0);
-			expect(list.stdout.join("\n")).toContain("memory entries: 4");
+		test("lists, shows, searches, and updates entries", async () => {
+			const root = createRoot();
+			try {
+				const listJson = capture();
+				expect(
+					await runMemoryCommand("list", ["--json"], root, listJson.io),
+				).toBe(0);
+			const listPayload = JSON.parse(listJson.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			const listData = listPayload.data as { entries: unknown[] };
+			expect(listPayload.schema).toBe("afol.result/v1");
+			expect(listPayload.ok).toBe(true);
+			expect(listPayload.exit_code).toBe(0);
+			expect(listPayload.entries).toEqual(listData.entries);
+
+				const list = capture();
+				expect(await runMemoryCommand("list", [], root, list.io)).toBe(0);
+				expect(list.stdout.join("\n")).toContain("memory entries: 4");
 
 			const show = capture();
 			expect(
@@ -86,6 +100,34 @@ describe("memory command", () => {
 				await runMemoryCommand("search", ["--query", "beta"], root, search.io),
 			).toBe(0);
 			expect(search.stdout.join("\n")).toContain("memory matches: 1");
+
+			const renderJson = capture();
+			expect(
+				await runMemoryCommand("render", ["--json"], root, renderJson.io),
+			).toBe(0);
+			const renderPayload = JSON.parse(renderJson.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			const renderData = renderPayload.data as { markdown: string };
+			expect(renderPayload.schema).toBe("afol.result/v1");
+			expect(renderPayload.exit_code).toBe(0);
+			expect(renderPayload.markdown).toBe(renderData.markdown);
+
+			const invalid = capture();
+			expect(
+				await runMemoryCommand("show", ["--json"], root, invalid.io),
+			).toBe(2);
+			const invalidPayload = JSON.parse(invalid.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expect(invalidPayload.schema).toBe("afol.result/v1");
+			expect(invalidPayload.ok).toBe(false);
+			expect(invalidPayload.exit_code).toBe(2);
+			expect((invalidPayload.error as { code: string }).code).toBe(
+				"memory.command.error",
+			);
 
 			const update = capture();
 			expect(

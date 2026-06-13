@@ -292,19 +292,25 @@ describe("library command", () => {
 		}
 	});
 
-	test("afol library list --json returns JSON", async () => {
-		const root = createFixture();
-		try {
-			const out = capture();
-			expect(await runLibraryCommand("list", ["--json"], root, out.io)).toBe(0);
-			expect(JSON.parse(out.stdout[0] ?? "{}")).toMatchObject({
-				ok: true,
-				topics: [],
-			});
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+		test("afol library list --json returns JSON", async () => {
+			const root = createFixture();
+			try {
+				const out = capture();
+				expect(await runLibraryCommand("list", ["--json"], root, out.io)).toBe(0);
+				const payload = JSON.parse(out.stdout[0] ?? "{}") as Record<
+					string,
+					unknown
+				>;
+				const data = payload.data as { topics: unknown[] };
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(true);
+				expect(payload.exit_code).toBe(0);
+				expect(payload.topics).toEqual(data.topics);
+				expect(data.topics).toEqual([]);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
 
 	test('afol library propose --topic x --title "X" --url http://... --json creates topic', async () => {
 		const root = createFixture();
@@ -327,18 +333,25 @@ describe("library command", () => {
 				),
 			).toBe(0);
 			const payload = JSON.parse(out.stdout[0] ?? "{}") as {
+				schema: string;
 				ok: boolean;
+				exit_code: number;
 				topic: {
 					slug: string;
 					title: string;
 					sources: Array<{ accessed_at: string }>;
 				};
+				data: { topic: { slug: string; title: string } };
 			};
+			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
 			expect(payload.topic.slug).toBe("x");
 			expect(payload.topic.title).toBe("X");
 			expect(payload.topic.sources).toHaveLength(1);
 			expect(payload.topic.sources[0]?.accessed_at).toMatch(/T/);
+			expect(payload.data.topic.slug).toBe(payload.topic.slug);
+			expect(payload.data.topic.title).toBe(payload.topic.title);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -363,13 +376,19 @@ describe("library command", () => {
 				),
 			).toBe(0);
 			const payload = JSON.parse(out.stdout[0] ?? "{}") as {
+				schema: string;
+				exit_code: number;
 				ok: boolean;
 				topic: { slug: string; claims: Array<{ id: string }> };
+				data: { topic: { slug: string; claims: Array<{ id: string }> } };
 			};
+			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
 			expect(payload.topic.slug).toBe("x");
 			expect(payload.topic.claims).toHaveLength(1);
 			expect(payload.topic.claims[0]?.id).toBe("claimId");
+			expect(payload.topic).toEqual(payload.data.topic);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -513,12 +532,35 @@ describe("library command", () => {
 				),
 			).toBe(0);
 			const payload = JSON.parse(out.stdout[0] ?? "{}") as {
+				schema: string;
 				ok: boolean;
+				exit_code: number;
 				matches: Array<{ topic: { slug: string } }>;
+				data: { matches: Array<{ topic: { slug: string } }> };
 			};
+			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
 			expect(payload.matches).toHaveLength(1);
 			expect(payload.matches[0]?.topic.slug).toBe("x");
+			expect(payload.matches).toEqual(payload.data.matches);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol library topic --json without topic returns envelope error", async () => {
+		const root = createFixture();
+		try {
+			const out = capture();
+			expect(await runLibraryCommand("topic", ["--json"], root, out.io)).toBe(2);
+			const payload = JSON.parse(out.stdout[0] ?? "{}") as Record<string, unknown>;
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(2);
+			expect((payload.error as { code: string }).code).toBe(
+				"library.command.error",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

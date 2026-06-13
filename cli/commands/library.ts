@@ -9,6 +9,12 @@ import {
 	rebuildLibraryIndex,
 	searchLibrary,
 } from "../services/library";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -19,6 +25,36 @@ const DEFAULT_IO: CommandIo = {
 	stdout: (message) => console.log(message),
 	stderr: (message) => console.error(message),
 };
+
+function writeJsonOk<T extends Record<string, unknown>>(
+	io: CommandIo,
+	action: string,
+	data: T,
+	legacyKeys: readonly (keyof T)[],
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(
+				envelopeOk(data, { action: `library.${action}` }),
+				legacyKeys,
+			),
+		),
+	);
+}
+
+function writeJsonErr(
+	io: CommandIo,
+	action: string,
+	code: string,
+	message: string,
+	exitCode: 1 | 2,
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			envelopeErr(code, message, { action: `library.${action}`, exitCode }),
+		),
+	);
+}
 
 type LibraryAction =
 	| "list"
@@ -205,6 +241,7 @@ export async function runLibraryCommand(
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
 ): Promise<number> {
+	const wantsJson = args.some((value) => value === "--json" || value === "-j");
 	try {
 		const libraryAction = normalizeAction(action);
 		const parsed = parseArgs(args);
@@ -212,11 +249,11 @@ export async function runLibraryCommand(
 
 		if (libraryAction === "list") {
 			const topics = listTopics(projectRoot);
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, topics })
-					: [`library topics: ${topics.length}`, ...topics].join("\n"),
-			);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { topics }, ["topics"]);
+			} else {
+				io.stdout([`library topics: ${topics.length}`, ...topics].join("\n"));
+			}
 			return 0;
 		}
 
@@ -227,22 +264,32 @@ export async function runLibraryCommand(
 			}
 			const topic = getTopic(projectRoot, slug);
 			if (!topic) {
-				io.stderr(`Library topic not found: ${slug}`);
+				if (parsed.json) {
+					writeJsonErr(
+						io,
+						libraryAction,
+						"library.topic.not_found",
+						`Library topic not found: ${slug}`,
+						1,
+					);
+				} else {
+					io.stderr(`Library topic not found: ${slug}`);
+				}
 				return 1;
 			}
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, topic })
-					: [
-							`topic: ${topic.slug}`,
-							`title: ${topic.title}`,
-							`sources: ${topic.sources.length}`,
-							`claims: ${topic.claims.length}`,
-							`tags: ${topic.tags.join(", ") || "none"}`,
-							...topic.sources.map(formatSource),
-							...topic.claims.map(formatClaim),
-						].join("\n"),
-			);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { topic }, ["topic"]);
+			} else {
+				io.stdout([
+						`topic: ${topic.slug}`,
+						`title: ${topic.title}`,
+						`sources: ${topic.sources.length}`,
+						`claims: ${topic.claims.length}`,
+						`tags: ${topic.tags.join(", ") || "none"}`,
+						...topic.sources.map(formatSource),
+						...topic.claims.map(formatClaim),
+					].join("\n"));
+			}
 			return 0;
 		}
 
@@ -252,26 +299,26 @@ export async function runLibraryCommand(
 				throw new Error("Missing --query for library search.");
 			}
 			const matches = searchLibrary(projectRoot, query);
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, matches })
-					: [
-							`library matches: ${matches.length}`,
-							...matches.map(
-								(match) => `${match.topic.slug} ${match.topic.title}`,
-							),
-						].join("\n"),
-			);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { matches }, ["matches"]);
+			} else {
+				io.stdout([
+						`library matches: ${matches.length}`,
+						...matches.map(
+							(match) => `${match.topic.slug} ${match.topic.title}`,
+						),
+					].join("\n"));
+			}
 			return 0;
 		}
 
 		if (libraryAction === "rebuild-index") {
 			const snapshot = rebuildLibraryIndex(projectRoot);
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, snapshot })
-					: `library rebuild-index: ok topics=${snapshot.topics.length}`,
-			);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { snapshot }, ["snapshot"]);
+			} else {
+				io.stdout(`library rebuild-index: ok topics=${snapshot.topics.length}`);
+			}
 			return 0;
 		}
 
@@ -294,11 +341,11 @@ export async function runLibraryCommand(
 					]
 				: [];
 			const topic = proposeTopic(projectRoot, slug, parsed.title, sources);
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, topic })
-					: `library propose: ${topic.slug}`,
-			);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { topic }, ["topic"]);
+			} else {
+				io.stdout(`library propose: ${topic.slug}`);
+			}
 			return 0;
 		}
 
@@ -318,11 +365,11 @@ export async function runLibraryCommand(
 				accessed_at: currentTime(),
 			};
 			const topic = addSource(projectRoot, slug, source);
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, topic, source })
-					: `library add-source: ${source.id}`,
-			);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { topic, source }, ["topic", "source"]);
+			} else {
+				io.stdout(`library add-source: ${source.id}`);
+			}
 			return 0;
 		}
 
@@ -345,11 +392,11 @@ export async function runLibraryCommand(
 				created_at: currentTime(),
 			};
 			const topic = addClaim(projectRoot, slug, claim);
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, topic, claim })
-					: `library add-claim: ${claim.id}`,
-			);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { topic, claim }, ["topic", "claim"]);
+			} else {
+				io.stdout(`library add-claim: ${claim.id}`);
+			}
 			return 0;
 		}
 
@@ -367,16 +414,20 @@ export async function runLibraryCommand(
 				throw new Error("Missing --reason for library invalidate.");
 			}
 			const topic = invalidateClaim(projectRoot, slug, claimId, parsed.reason);
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, topic })
-					: `library invalidate: ${claimId}`,
-			);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { topic }, ["topic"]);
+			} else {
+				io.stdout(`library invalidate: ${claimId}`);
+			}
 			return 0;
 		}
 
 		throw new Error(`Unknown library action: ${libraryAction}`);
 	} catch (error) {
+		if (wantsJson && error instanceof Error && error.message) {
+			writeJsonErr(io, action, "library.command.error", error.message, 2);
+			return 2;
+		}
 		io.stderr((error as Error).message);
 		return 2;
 	}
