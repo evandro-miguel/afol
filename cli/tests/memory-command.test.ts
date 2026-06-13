@@ -26,7 +26,7 @@ function createRoot(): string {
 			"---",
 			"doc_type: project_memory",
 			"updated_at: 2026-06-13T00:00:00Z",
-			"entries: 2",
+			"entries: 4",
 			"---",
 			"",
 			"# Project Memory",
@@ -41,6 +41,26 @@ function createRoot(): string {
 			"### MEM-002: Beta",
 			"Beta body.",
 			"",
+			"## proposed",
+			"",
+			"### MEM-003: Gamma",
+			"<!--",
+			"created_at: 2026-06-13T00:00:00Z",
+			"updated_at: 2026-06-13T00:00:00Z",
+			"tags: draft",
+			"-->",
+			"Gamma body.",
+			"",
+			"## rejected",
+			"",
+			"### MEM-004: Delta",
+			"<!--",
+			"created_at: 2026-06-13T00:00:00Z",
+			"updated_at: 2026-06-13T00:00:00Z",
+			"tags: nope",
+			"-->",
+			"Delta body.",
+			"",
 		].join("\n"),
 		"utf8",
 	);
@@ -53,7 +73,7 @@ describe("memory command", () => {
 		try {
 			const list = capture();
 			expect(await runMemoryCommand("list", [], root, list.io)).toBe(0);
-			expect(list.stdout.join("\n")).toContain("memory entries: 2");
+			expect(list.stdout.join("\n")).toContain("memory entries: 4");
 
 			const show = capture();
 			expect(await runMemoryCommand("show", ["--id", "MEM-001"], root, show.io)).toBe(0);
@@ -78,23 +98,71 @@ describe("memory command", () => {
 		}
 	});
 
-	test("adds and archives entries", async () => {
+	test("adds, archives, proposes, promotes, rejects, renders, and recalls entries", async () => {
 		const root = createRoot();
 		try {
 			const add = capture();
 			expect(
 				await runMemoryCommand(
 					"add",
-					["--id", "MEM-003", "--title", "Gamma", "--body", "Gamma body.", "--tags", "one,two"],
+					["--id", "MEM-006", "--title", "Gamma", "--body", "Gamma body.", "--tags", "one,two"],
 					root,
 					add.io,
 				),
 			).toBe(0);
-			expect(add.stdout.join("\n")).toContain("memory add: MEM-003");
+			expect(add.stdout.join("\n")).toContain("memory add: MEM-006");
 
 			const archive = capture();
 			expect(await runMemoryCommand("archive", ["--id", "MEM-001"], root, archive.io)).toBe(0);
 			expect(archive.stdout.join("\n")).toContain("memory archive: MEM-001");
+
+			const propose = capture();
+			expect(
+				await runMemoryCommand(
+					"propose",
+					["--id", "MEM-005", "--title", "Epsilon", "--body", "Epsilon body.", "--tags", "x,y"],
+					root,
+					propose.io,
+				),
+			).toBe(0);
+			expect(propose.stdout.join("\n")).toContain("memory propose: MEM-005");
+
+			const promote = capture();
+			expect(await runMemoryCommand("promote", ["--id", "MEM-003"], root, promote.io)).toBe(0);
+			expect(promote.stdout.join("\n")).toContain("memory promote: MEM-003");
+
+			const reject = capture();
+			expect(
+				await runMemoryCommand(
+					"reject",
+					["--id", "MEM-005", "--reason", "### bad\nnope"],
+					root,
+					reject.io,
+				),
+			).toBe(0);
+			expect(reject.stdout.join("\n")).toContain("memory reject: MEM-005");
+
+			const render = capture();
+			expect(await runMemoryCommand("render", [], root, render.io)).toBe(0);
+			expect(render.stdout.join("\n")).toContain("## rejected");
+
+			const recall = capture();
+			expect(await runMemoryCommand("recall", ["--query", "body"], root, recall.io)).toBe(0);
+			expect(recall.stdout.join("\n")).toContain("memory recall: 2");
+			expect(recall.stdout.join("\n")).not.toContain("archived");
+			expect(recall.stdout.join("\n")).not.toContain("rejected");
+
+			const json = capture();
+			expect(await runMemoryCommand("render", ["--json"], root, json.io)).toBe(0);
+			expect(json.stdout[0]).toContain('"markdown"');
+
+			const invalid = capture();
+			expect(await runMemoryCommand("promote", ["--id", "../bad"], root, invalid.io)).toBe(2);
+			expect(invalid.stderr.join("\n")).toContain("Invalid memory entry identifier");
+
+			const missing = capture();
+			expect(await runMemoryCommand("reject", ["--id", "MEM-001"], root, missing.io)).toBe(2);
+			expect(missing.stderr.join("\n")).toContain("Missing --id or --reason for memory reject.");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

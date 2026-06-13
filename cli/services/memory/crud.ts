@@ -3,7 +3,7 @@ import { atomicWriteText } from "../io/atomic";
 import { resolveProjectPaths } from "../project/paths";
 import type { MemoryEntry, MemoryFile } from "./types";
 
-const STATUS_ORDER: MemoryEntry["status"][] = ["active", "archived", "invalidated"];
+const STATUS_ORDER: MemoryEntry["status"][] = ["active", "proposed", "rejected", "archived", "invalidated"];
 const MEMORY_ENTRY_ID_RE = /^[A-Za-z0-9._-]+$/;
 
 type MemoryFrontmatter = {
@@ -14,6 +14,12 @@ type MemoryFrontmatter = {
 
 function memoryPath(root: string): string {
 	return resolveProjectPaths(root).abs.memoryFile;
+}
+
+function assertValidId(id: string): void {
+	if (!MEMORY_ENTRY_ID_RE.test(id)) {
+		throw new Error(`Invalid memory entry identifier: ${id}`);
+	}
 }
 
 function isStatus(value: string): value is MemoryEntry["status"] {
@@ -197,6 +203,14 @@ function formatTags(tags: readonly string[]): string {
 	return tags.length > 0 ? tags.join(", ") : "";
 }
 
+function sanitizeReason(reason: string): string {
+	return reason
+		.split(/\r?\n/)
+		.map((line) => (line.startsWith("#") || line === "---" ? `> ${line}` : line))
+		.join("\n")
+		.trim();
+}
+
 function formatMemoryEntry(entry: MemoryEntry): string {
 	return [
 		`### ${entry.id}: ${entry.title}`,
@@ -239,6 +253,11 @@ function memoryText(memory: MemoryFile): string {
 	].join("\n");
 }
 
+export function renderMemory(root: string): string {
+	const memory = readMemory(root);
+	return memory ? memoryText(memory) : memoryText({ entries: [], updated_at: new Date().toISOString() });
+}
+
 export function readMemory(root: string): MemoryFile | null {
 	const path = memoryPath(root);
 	if (!existsSync(path)) {
@@ -263,9 +282,7 @@ export function getEntry(root: string, id: string): MemoryEntry | null {
 }
 
 export function addEntry(root: string, entry: MemoryEntry): void {
-	if (!MEMORY_ENTRY_ID_RE.test(entry.id)) {
-		throw new Error(`Invalid memory entry identifier: ${entry.id}`);
-	}
+	assertValidId(entry.id);
 	const memory = readMemory(root) ?? { entries: [], updated_at: entry.updated_at };
 	writeMemory(root, {
 		updated_at: entry.updated_at,
@@ -276,9 +293,7 @@ export function addEntry(root: string, entry: MemoryEntry): void {
 export type MemoryPatch = Partial<Pick<MemoryEntry, "title" | "body" | "status" | "tags">>;
 
 export function updateEntry(root: string, id: string, patch: MemoryPatch): void {
-	if (!MEMORY_ENTRY_ID_RE.test(id)) {
-		throw new Error(`Invalid memory entry identifier: ${id}`);
-	}
+	assertValidId(id);
 	const memory = readMemory(root);
 	if (!memory) {
 		return;
@@ -310,16 +325,47 @@ export function archiveEntry(root: string, id: string): void {
 	updateEntry(root, id, { status: "archived" });
 }
 
+export function proposeEntry(
+	root: string,
+	entry: Pick<MemoryEntry, "id" | "title" | "body" | "tags" | "created_at" | "updated_at">,
+): void {
+	addEntry(root, { ...entry, status: "proposed" });
+}
+
+export function promoteEntry(root: string, id: string): void {
+	assertValidId(id);
+	const current = getEntry(root, id);
+	if (!current) {
+		return;
+	}
+	if (current.status !== "proposed" && current.status !== "rejected") {
+		return;
+	}
+	updateEntry(root, id, { status: "active" });
+}
+
+export function rejectEntry(root: string, id: string, reason: string): void {
+	assertValidId(id);
+	const current = getEntry(root, id);
+	if (!current) {
+		return;
+	}
+	const safeReason = sanitizeReason(reason);
+	updateEntry(root, id, {
+		status: "rejected",
+		body: current.body ? `${current.body}\n\nReason: ${safeReason}` : `Reason: ${safeReason}`,
+	});
+}
+
 export function invalidateEntry(root: string, id: string, reason: string): void {
 	const current = getEntry(root, id);
 	if (!current) {
 		return;
 	}
+	const safeReason = sanitizeReason(reason);
 	updateEntry(root, id, {
 		status: "invalidated",
-		body: current.body
-			? `${current.body}\n\nReason: ${reason.replace(/^###\s/gm, "> ### ")}`
-			: `Reason: ${reason.replace(/^###\s/gm, "> ### ")}`,
+		body: current.body ? `${current.body}\n\nReason: ${safeReason}` : `Reason: ${safeReason}`,
 	});
 }
 
@@ -336,4 +382,32 @@ export function searchEntries(root: string, query: string): MemoryEntry[] {
 		const haystack = [entry.id, entry.title, entry.body, entry.status, ...entry.tags].join(" ").toLowerCase();
 		return haystack.includes(needle);
 	});
+}
+
+export type MemoryRecallEntry = Pick<MemoryEntry, "id" | "title" | "status" | "tags">;
+
+export type RecallOptions = {
+	limit?: number;
+	statuses?: readonly MemoryEntry["status"][];
+};
+
+export function recallEntries(root: string, query: string, opts: RecallOptions = {}): MemoryRecallEntry[] {
+	const memory = readMemory(root);
+	if (!memory) {
+		return [];
+	}
+	const needle = query.trim().toLowerCase();
+	if (!needle) {
+		return [];
+	}
+	const statuses = opts.statuses ?? ["active"];
+	const limit = Math.max(0, Math.min(opts.limit ?? 5, 5));
+	return memory.entries
+		.filter((entry) => statuses.includes(entry.status))
+		.filter((entry) => {
+			const haystack = [entry.id, entry.title, entry.body, entry.status, ...entry.tags].join(" ").toLowerCase();
+			return haystack.includes(needle);
+		})
+		.slice(0, limit)
+		.map((entry) => ({ id: entry.id, title: entry.title, status: entry.status, tags: [...entry.tags] }));
 }

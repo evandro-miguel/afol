@@ -2,11 +2,16 @@ import {
 	addEntry,
 	archiveEntry,
 	getEntry,
+	promoteEntry,
+	proposeEntry,
+	recallEntries,
+	rejectEntry,
+	renderMemory,
 	readMemory,
 	searchEntries,
 	updateEntry,
 } from "../services/memory";
-import type { MemoryEntry } from "../services/memory";
+import type { MemoryEntry, MemoryRecallEntry } from "../services/memory";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -18,7 +23,18 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-type MemoryAction = "list" | "show" | "add" | "update" | "archive" | "search";
+type MemoryAction =
+	| "list"
+	| "show"
+	| "add"
+	| "update"
+	| "archive"
+	| "search"
+	| "propose"
+	| "promote"
+	| "reject"
+	| "render"
+	| "recall";
 
 type ParsedArgs = {
 	action: MemoryAction;
@@ -28,6 +44,7 @@ type ParsedArgs = {
 	body: string;
 	tags: string[];
 	query: string;
+	reason: string;
 };
 
 function normalizeAction(value: string | undefined): MemoryAction {
@@ -49,6 +66,21 @@ function normalizeAction(value: string | undefined): MemoryAction {
 	if (value === "search" || value === "find") {
 		return "search";
 	}
+	if (value === "propose") {
+		return "propose";
+	}
+	if (value === "promote") {
+		return "promote";
+	}
+	if (value === "reject") {
+		return "reject";
+	}
+	if (value === "render") {
+		return "render";
+	}
+	if (value === "recall") {
+		return "recall";
+	}
 	throw new Error(`Unknown memory action: ${value}`);
 }
 
@@ -65,6 +97,7 @@ function parseMemoryArgs(action: string, args: string[]): ParsedArgs {
 		body: "",
 		tags: [],
 		query: "",
+		reason: "",
 	};
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
@@ -117,6 +150,15 @@ function parseMemoryArgs(action: string, args: string[]): ParsedArgs {
 			index += 1;
 			continue;
 		}
+		if (value === "--reason") {
+			const next = args[index + 1];
+			if (!next) {
+				throw new Error("Missing value for --reason.");
+			}
+			parsed.reason = next;
+			index += 1;
+			continue;
+		}
 		throw new Error(`Unknown memory argument: ${value}`);
 	}
 	return parsed;
@@ -128,6 +170,13 @@ function formatEntry(entry: MemoryEntry): string {
 		entry.tags.length > 0 ? `tags: ${entry.tags.join(", ")}` : "tags: none",
 		entry.body,
 	].filter((line) => line.length > 0).join("\n");
+}
+
+function formatRecallEntry(entry: MemoryRecallEntry): string {
+	return [
+		`${entry.id} ${entry.status} ${entry.title}`,
+		entry.tags.length > 0 ? `tags: ${entry.tags.join(", ")}` : "tags: none",
+	].join("\n");
 }
 
 function currentTime(): string {
@@ -244,6 +293,89 @@ export async function runMemoryCommand(
 				io.stdout(JSON.stringify({ ok: true, entry }));
 			} else {
 				io.stdout(`memory archive: ${entry.id}`);
+			}
+			return 0;
+		}
+
+		if (parsed.action === "propose") {
+			if (!parsed.id || !parsed.title || !parsed.body) {
+				throw new Error("Missing --id, --title, or --body for memory propose.");
+			}
+			const now = currentTime();
+			const entry: MemoryEntry = {
+				id: parsed.id,
+				title: parsed.title,
+				body: parsed.body,
+				status: "proposed",
+				created_at: now,
+				updated_at: now,
+				tags: parsed.tags,
+			};
+			proposeEntry(projectRoot, entry);
+			if (parsed.json) {
+				io.stdout(JSON.stringify({ ok: true, entry }));
+			} else {
+				io.stdout(`memory propose: ${entry.id}`);
+			}
+			return 0;
+		}
+
+		if (parsed.action === "promote") {
+			if (!parsed.id) {
+				throw new Error("Missing --id for memory promote.");
+			}
+			promoteEntry(projectRoot, parsed.id);
+			const entry = getEntry(projectRoot, parsed.id);
+			if (!entry) {
+				io.stderr(`Memory entry not found: ${parsed.id}`);
+				return 1;
+			}
+			if (parsed.json) {
+				io.stdout(JSON.stringify({ ok: true, entry }));
+			} else {
+				io.stdout(`memory promote: ${entry.id}`);
+			}
+			return 0;
+		}
+
+		if (parsed.action === "reject") {
+			if (!parsed.id || !parsed.reason) {
+				throw new Error("Missing --id or --reason for memory reject.");
+			}
+			rejectEntry(projectRoot, parsed.id, parsed.reason);
+			const entry = getEntry(projectRoot, parsed.id);
+			if (!entry) {
+				io.stderr(`Memory entry not found: ${parsed.id}`);
+				return 1;
+			}
+			if (parsed.json) {
+				io.stdout(JSON.stringify({ ok: true, entry }));
+			} else {
+				io.stdout(`memory reject: ${entry.id}`);
+			}
+			return 0;
+		}
+
+		if (parsed.action === "render") {
+			const markdown = renderMemory(projectRoot);
+			if (parsed.json) {
+				io.stdout(JSON.stringify({ ok: true, markdown }));
+			} else {
+				io.stdout(markdown);
+			}
+			return 0;
+		}
+
+		if (parsed.action === "recall") {
+			const query = parsed.query.trim();
+			if (!query) {
+				throw new Error("Missing --query for memory recall.");
+			}
+			const entries = recallEntries(projectRoot, query);
+			if (parsed.json) {
+				io.stdout(JSON.stringify({ ok: true, entries }));
+			} else {
+				io.stdout([`memory recall: ${entries.length}`, ...entries.map(formatRecallEntry)].join("\n"));
 			}
 			return 0;
 		}
