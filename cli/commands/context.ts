@@ -5,6 +5,12 @@ import {
 } from "../services/context";
 import { ContextTrustError } from "../services/context/bundler";
 import type { ContextRetrievalMode } from "../services/context/types";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -191,13 +197,40 @@ function formatExplanation(bundle: ReturnType<typeof buildContextBundle>) {
 	};
 }
 
+function writeJsonOk<T extends Record<string, unknown>>(
+	io: CommandIo,
+	action: string,
+	data: T,
+): void {
+	const envelope = envelopeWithLegacyKeys(
+		envelopeOk(data, { action: `ctx.${action}` }),
+		Object.keys(data) as (keyof T)[],
+	);
+	io.stdout(stringifyEnvelope(envelope));
+}
+
+function writeJsonErr(
+	io: CommandIo,
+	action: string,
+	code: string,
+	message: string,
+	exitCode: 1 | 2,
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			envelopeErr(code, message, { action: `ctx.${action}`, exitCode }),
+		),
+	);
+}
+
 function emitTrustError(
 	io: CommandIo,
+	action: ContextAction,
 	json: boolean,
 	error: ContextTrustError,
 ): void {
 	if (json) {
-		io.stdout(JSON.stringify({ ok: false, error: error.message }));
+		writeJsonErr(io, action, "CTX_TRUST_ERROR", error.message, 1);
 		return;
 	}
 	io.stderr(error.message);
@@ -209,6 +242,7 @@ export async function runContextCommand(
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
 ): Promise<number> {
+	const wantsJson = args.some((value) => value === "--json" || value === "-j");
 	try {
 		const ctxAction = normalizeAction(action);
 		const parsed = parseArgs(args);
@@ -216,7 +250,7 @@ export async function runContextCommand(
 		if (ctxAction === "build") {
 			const snapshot = rebuildSectionIndex(projectRoot);
 			if (parsed.json) {
-				io.stdout(JSON.stringify({ ok: true, action: ctxAction, snapshot }));
+				writeJsonOk(io, ctxAction, { snapshot });
 			} else {
 				io.stdout(`ctx build: ok sections=${snapshot.sections.length}`);
 			}
@@ -229,14 +263,24 @@ export async function runContextCommand(
 			}
 			const section = resolveSection(projectRoot, parsed.ref);
 			if (!section) {
-				io.stderr(`Section not found: ${parsed.ref}`);
+				if (parsed.json) {
+					writeJsonErr(
+						io,
+						ctxAction,
+						"CTX_SECTION_NOT_FOUND",
+						`Section not found: ${parsed.ref}`,
+						1,
+					);
+				} else {
+					io.stderr(`Section not found: ${parsed.ref}`);
+				}
 				return 1;
 			}
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, section })
-					: JSON.stringify(section),
-			);
+			if (parsed.json) {
+				writeJsonOk(io, ctxAction, { section });
+			} else {
+				io.stdout(JSON.stringify(section));
+			}
 			return 0;
 		}
 
@@ -252,49 +296,61 @@ export async function runContextCommand(
 			});
 		} catch (error) {
 			if (error instanceof ContextTrustError) {
-				emitTrustError(io, parsed.json, error);
+				emitTrustError(io, ctxAction, parsed.json, error);
 				return 1;
 			}
 			throw error;
 		}
 
 		if (ctxAction === "tools") {
-			io.stdout(
-				parsed.json
-					? JSON.stringify({ ok: true, tools: bundle.tools })
-					: bundle.tools.join("\n"),
-			);
+			if (parsed.json) {
+				writeJsonOk(io, ctxAction, { tools: bundle.tools });
+			} else {
+				io.stdout(bundle.tools.join("\n"));
+			}
 			return 0;
 		}
 
 		if (ctxAction === "bundle") {
 			if (parsed.explain) {
 				const explanation = formatExplanation(bundle);
-				io.stdout(
-					parsed.json
-						? JSON.stringify(explanation)
-						: JSON.stringify(explanation, null, 2),
-				);
+				if (parsed.json) {
+					writeJsonOk(io, ctxAction, explanation);
+				} else {
+					io.stdout(JSON.stringify(explanation, null, 2));
+				}
 				return 0;
 			}
-			io.stdout(parsed.json ? JSON.stringify(bundle) : formatBundle(bundle));
+			if (parsed.json) {
+				writeJsonOk(io, ctxAction, bundle);
+			} else {
+				io.stdout(formatBundle(bundle));
+			}
 			return 0;
 		}
 
 		if (ctxAction === "explain") {
 			const explanation = formatExplanation(bundle);
-			io.stdout(
-				parsed.json
-					? JSON.stringify(explanation)
-					: JSON.stringify(explanation, null, 2),
-			);
+			if (parsed.json) {
+				writeJsonOk(io, ctxAction, explanation);
+			} else {
+				io.stdout(JSON.stringify(explanation, null, 2));
+			}
 			return 0;
 		}
 
 		io.stderr(`ctx ${ctxAction}: not yet implemented`);
 		return 1;
 	} catch (error) {
-		io.stderr((error as Error).message);
+		if (wantsJson && error instanceof Error && error.message) {
+			writeJsonErr(io, action, "CTX_USAGE_ERROR", error.message, 2);
+			return 2;
+		}
+		if (error instanceof Error && error.message) {
+			io.stderr(error.message);
+			return 2;
+		}
+		io.stderr("Unknown ctx error");
 		return 2;
 	}
 }

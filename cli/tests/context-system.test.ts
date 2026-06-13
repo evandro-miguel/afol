@@ -696,31 +696,37 @@ describe("context system", () => {
 		}
 	});
 
-	test("afol ctx build --json returns JSON", async () => {
-		const root = createSectionFixture();
-		try {
-			const captured = captureIo();
-			expect(
-				await runContextCommand("build", ["--json"], root, captured.io),
-			).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-				ok: boolean;
-				action: string;
-				snapshot: { sections: unknown[] };
-			};
-			expect(payload.ok).toBe(true);
-			expect(payload.action).toBe("build");
-			expect(payload.snapshot.sections).toHaveLength(4);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+		test("afol ctx build --json returns JSON", async () => {
+			const root = createSectionFixture();
+			try {
+				const captured = captureIo();
+				expect(
+					await runContextCommand("build", ["--json"], root, captured.io),
+				).toBe(0);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					action: string;
+					exit_code: number;
+					data: { snapshot: { sections: unknown[] } };
+					snapshot: { sections: unknown[] };
+				};
+				expect(payload.schema).toBe("afol.result/v1");
+				expect(payload.ok).toBe(true);
+				expect(payload.action).toBe("ctx.build");
+				expect(payload.exit_code).toBe(0);
+				expect(payload.data.snapshot.sections).toHaveLength(4);
+				expect(payload.snapshot.sections).toHaveLength(4);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
 
-	test("afol ctx bundle returns bundle", async () => {
-		const root = createBundleFixture();
-		try {
-			const captured = captureIo();
-			expect(
+		test("afol ctx bundle returns bundle", async () => {
+			const root = createBundleFixture();
+			try {
+				const captured = captureIo();
+				expect(
 				await runContextCommand(
 					"bundle",
 					[
@@ -736,15 +742,15 @@ describe("context system", () => {
 					root,
 					captured.io,
 				),
-			).toBe(0);
-			expect(captured.stdout[0]).toContain("task: T-01");
-			expect(captured.stdout[0]).toContain("mode: balanced");
-			expect(captured.stdout[0]).toContain("refs:");
-			expect(captured.stdout[0]).toContain("pstr_refs:");
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+				).toBe(0);
+				expect(captured.stdout[0]).toContain("task: T-01");
+				expect(captured.stdout[0]).toContain("mode: balanced");
+				expect(captured.stdout[0]).toContain("refs:");
+				expect(captured.stdout[0]).toContain("pstr_refs:");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
 
 	test("afol ctx bundle works without trusted when pstr is missing", async () => {
 		const root = createBundleFixture({ pstr: "missing" });
@@ -769,8 +775,18 @@ describe("context system", () => {
 				),
 			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				data: { pstr_refs: string[] };
 				pstr_refs: string[];
 			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("ctx.bundle");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data.pstr_refs).toEqual([]);
 			expect(payload.pstr_refs).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -830,17 +846,21 @@ describe("context system", () => {
 			).toBe(1);
 			expect(captured.stderr).toHaveLength(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
 				ok: boolean;
-				error: string;
+				exit_code: number;
+				error: { message: string };
 			};
+			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(false);
-			expect(payload.error).toContain("stale pstr index snapshot");
+			expect(payload.exit_code).toBe(1);
+			expect(payload.error.message).toContain("stale pstr index snapshot");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("afol ctx explain --trusted fails on stale pstr", async () => {
+		test("afol ctx explain --trusted fails on stale pstr", async () => {
 		const root = createBundleFixture({ pstr: "stale" });
 		try {
 			const captured = captureIo();
@@ -864,11 +884,62 @@ describe("context system", () => {
 				),
 			).toBe(1);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
 				ok: boolean;
-				error: string;
+				exit_code: number;
+				error: { message: string };
 			};
+			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(false);
-			expect(payload.error).toContain("stale pstr index snapshot");
+			expect(payload.exit_code).toBe(1);
+			expect(payload.error.message).toContain("stale pstr index snapshot");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle --json returns JSON", async () => {
+		const root = createBundleFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				data: { task_id: string; mode: string; refs: Array<{ section?: string }>; pstr_refs: string[] };
+				task_id: string;
+				mode: string;
+				refs: Array<{ section?: string }>;
+				pstr_refs: string[];
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("ctx.bundle");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data.task_id).toBe("T-01");
+			expect(payload.task_id).toBe("T-01");
+			expect(payload.mode).toBe("balanced");
+			expect(payload.refs.length).toBeGreaterThan(0);
+			expect(payload.pstr_refs).toEqual(["pstr:alpha-map"]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -915,8 +986,18 @@ describe("context system", () => {
 				),
 			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				data: { pstr_refs: string[] };
 				pstr_refs: string[];
 			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("ctx.bundle");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data.pstr_refs.length).toBeGreaterThan(0);
 			expect(payload.pstr_refs.length).toBeGreaterThan(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -946,11 +1027,21 @@ describe("context system", () => {
 				),
 			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				data: { task_id: string; mode: string; refs: Array<{ section?: string }>; pstr_refs: string[] };
 				task_id: string;
 				mode: string;
 				refs: Array<{ section?: string }>;
 				pstr_refs: string[];
 			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("ctx.bundle");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data.task_id).toBe("T-01");
 			expect(payload.task_id).toBe("T-01");
 			expect(payload.mode).toBe("balanced");
 			expect(payload.refs.length).toBeGreaterThan(0);
@@ -989,11 +1080,50 @@ describe("context system", () => {
 		}
 	});
 
-	test("afol ctx section <ref> returns section content", async () => {
-		const root = createSectionFixture();
+	test("afol ctx bundle --json invalid mode returns envelope exit 2", async () => {
+		const root = createBundleFixture();
 		try {
-			rebuildSectionIndex(root);
 			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"--mode",
+						"nope",
+						"--json",
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
+				error: { message: string };
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(2);
+			expect(payload.error.message).toContain("Invalid ctx mode");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+		test("afol ctx section <ref> returns section content", async () => {
+			const root = createSectionFixture();
+			try {
+				rebuildSectionIndex(root);
+				const captured = captureIo();
 			expect(
 				await runContextCommand(
 					"section",
@@ -1001,22 +1131,54 @@ describe("context system", () => {
 					root,
 					captured.io,
 				),
-			).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				).toBe(0);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				title: string;
 				line_start: number;
 			};
-			expect(payload.title).toBe("Overview");
-			expect(payload.line_start).toBe(9);
+				expect(payload.title).toBe("Overview");
+				expect(payload.line_start).toBe(9);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+	test("afol ctx section --json returns envelope", async () => {
+		const root = createSectionFixture();
+		try {
+			rebuildSectionIndex(root);
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"section",
+					["--ref", "spec:alpha#overview", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				data: { section: { title: string; line_start: number } };
+				section: { title: string; line_start: number };
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("ctx.section");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data.section.title).toBe("Overview");
+			expect(payload.section.line_start).toBe(9);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("afol ctx explain returns explanation", async () => {
-		const root = createBundleFixture();
-		try {
-			const captured = captureIo();
+		test("afol ctx explain returns explanation", async () => {
+			const root = createBundleFixture();
+			try {
+				const captured = captureIo();
 			expect(
 				await runContextCommand(
 					"explain",
@@ -1033,32 +1195,95 @@ describe("context system", () => {
 					root,
 					captured.io,
 				),
+				).toBe(0);
+				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+					ok: boolean;
+					why: unknown;
+					gaps: string[];
+					freshness: unknown;
+					evidence_tags: string[];
+					create_safety_hints: string[];
+					do_not_load: string[];
+					bundle: unknown;
+				};
+				expect(payload.ok).toBe(true);
+				expect(payload.why).toBeDefined();
+				expect(payload.gaps).toEqual(expect.any(Array));
+				expect(payload.freshness).toBeDefined();
+				expect(payload.evidence_tags).toEqual(expect.any(Array));
+				expect(payload.create_safety_hints).toEqual(expect.any(Array));
+				expect(payload.do_not_load).toContain("raw .afol/state/afol.db");
+				expect(payload.bundle).toBeDefined();
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+	test("afol ctx explain --json returns envelope", async () => {
+		const root = createBundleFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"explain",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
 			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
 				ok: boolean;
+				action: string;
+				exit_code: number;
+				data: {
+					why: unknown;
+					gaps: string[];
+					freshness: unknown;
+					evidence_tags: string[];
+					create_safety_hints: string[];
+					do_not_load: string[];
+					bundle: unknown;
+				};
 				why: unknown;
 				gaps: string[];
 				freshness: unknown;
 				evidence_tags: string[];
 				create_safety_hints: string[];
 				do_not_load: string[];
+				bundle: unknown;
 			};
+			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("ctx.explain");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data.why).toBeDefined();
 			expect(payload.why).toBeDefined();
 			expect(payload.gaps).toEqual(expect.any(Array));
 			expect(payload.freshness).toBeDefined();
 			expect(payload.evidence_tags).toEqual(expect.any(Array));
 			expect(payload.create_safety_hints).toEqual(expect.any(Array));
 			expect(payload.do_not_load).toContain("raw .afol/state/afol.db");
+			expect(payload.bundle).toBeDefined();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("afol ctx tools returns tool list", async () => {
-		const root = createBundleFixture();
-		try {
-			const captured = captureIo();
+		test("afol ctx tools returns tool list", async () => {
+			const root = createBundleFixture();
+			try {
+				const captured = captureIo();
 			expect(
 				await runContextCommand(
 					"tools",
@@ -1075,9 +1300,50 @@ describe("context system", () => {
 					root,
 					captured.io,
 				),
+				).toBe(0);
+				expect(captured.stdout[0]).toContain("afol ctx section");
+				expect(captured.stdout[0]).toContain("bun test");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+	test("afol ctx tools --json returns envelope", async () => {
+		const root = createBundleFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"tools",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
 			).toBe(0);
-			expect(captured.stdout[0]).toContain("afol ctx section");
-			expect(captured.stdout[0]).toContain("bun test");
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				data: { tools: string[] };
+				tools: string[];
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("ctx.tools");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data.tools.join("\n")).toContain("afol ctx section");
+			expect(payload.tools.join("\n")).toContain("bun test");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
