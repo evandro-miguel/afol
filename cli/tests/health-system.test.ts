@@ -389,8 +389,12 @@ describe("health system", () => {
 			const captured = captureIo();
 			expect(await runHealthCommand(["--json"], root, captured.io)).toBe(1);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
-			expect(typeof payload.ok).toBe("boolean");
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(1);
+			expect(payload.ok).toBe(false);
 			expect(Array.isArray(payload.findings)).toBe(true);
+			expect(payload.summary).toEqual({ fail: expect.any(Number), warn: expect.any(Number), info: expect.any(Number) });
+			expect(payload.data.checked_at).toBe(payload.checked_at);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -403,9 +407,13 @@ describe("health system", () => {
 			const captured = captureIo();
 			expect(await runDoctorCommand(["--json"], root, captured.io)).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(0);
 			expect(payload.ok).toBe(true);
 			expect(Array.isArray(payload.scores)).toBe(true);
 			expect(Array.isArray(payload.remediation)).toBe(true);
+			expect(payload.remediation_plan).toBe(false);
+			expect(payload.data.scores).toHaveLength(payload.scores.length);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -469,8 +477,12 @@ describe("health system", () => {
 			const captured = captureIo();
 			expect(await runHealthCommand(["--json"], root, captured.io)).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(0);
 			expect(payload.ok).toBe(true);
 			expect(payload.summary).toEqual({ fail: 0, warn: 0, info: 0 });
+			expect(payload.release).toBe(false);
+			expect(payload.data.summary).toEqual({ fail: 0, warn: 0, info: 0 });
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

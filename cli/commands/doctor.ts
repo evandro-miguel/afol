@@ -1,4 +1,9 @@
 import { runDoctor } from "../services/health";
+import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -8,6 +13,11 @@ type CommandIo = {
 const DEFAULT_IO: CommandIo = {
 	stdout: (message) => console.log(message),
 	stderr: (message) => console.error(message),
+};
+
+type DoctorJsonData = ReturnType<typeof runDoctor> & {
+	ok: boolean;
+	remediation_plan: boolean;
 };
 
 function parseArgs(args: string[]): {
@@ -38,12 +48,18 @@ export async function runDoctorCommand(
 		const parsed = parseArgs(args);
 		const report = runDoctor(projectRoot);
 		if (parsed.json) {
+			const data: DoctorJsonData = {
+				...report,
+				ok: true,
+				remediation_plan: parsed.remediationPlan,
+			};
 			io.stdout(
-				JSON.stringify({
-					ok: true,
-					remediation_plan: parsed.remediationPlan,
-					...report,
-				}),
+				stringifyEnvelope(
+					envelopeWithLegacyKeys(
+						envelopeOk(data, { action: "doctor", exitCode: 0 }),
+						["ok", "scores", "remediation", "remediation_plan"],
+					),
+				),
 			);
 			return 0;
 		}

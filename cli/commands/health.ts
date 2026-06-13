@@ -1,4 +1,11 @@
 import { checkHealth, type HealthArea } from "../services/health";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -9,6 +16,8 @@ const DEFAULT_IO: CommandIo = {
 	stdout: (message) => console.log(message),
 	stderr: (message) => console.error(message),
 };
+
+type HealthJsonData = ReturnType<typeof checkHealth> & { release: boolean };
 
 const AREAS = new Set<HealthArea>([
 	"adm",
@@ -75,6 +84,32 @@ function formatFinding(finding: {
 		.join("\n");
 }
 
+function writeJsonReport(
+	io: CommandIo,
+	report: ReturnType<typeof checkHealth>,
+	release: boolean,
+): void {
+	const data: HealthJsonData = { ...report, release };
+	const envelope = report.ok
+		? envelopeOk(data, { action: "health", exitCode: 0 })
+		: (envelopeErr("HEALTH_FAILED", "health check failed", {
+			action: "health",
+			exitCode: 1,
+		}) as ResultEnvelope<HealthJsonData>);
+	envelope.data = data;
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(envelope, [
+				"ok",
+				"checked_at",
+				"findings",
+				"summary",
+				"release",
+			]),
+		),
+	);
+}
+
 export async function runHealthCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
@@ -89,7 +124,7 @@ export async function runHealthCommand(
 				: { deep: parsed.deep || parsed.release },
 		);
 		if (parsed.json) {
-			io.stdout(JSON.stringify({ ...report, release: parsed.release }));
+			writeJsonReport(io, report, parsed.release);
 		} else {
 			io.stdout(
 				[

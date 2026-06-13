@@ -2,6 +2,13 @@ import {
 	checkDbHealth,
 	type DbHealthReport,
 } from "../services/state/db-health";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+	type ResultEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -12,6 +19,31 @@ const DEFAULT_IO: CommandIo = {
 	stdout: (message) => console.log(message),
 	stderr: (message) => console.error(message),
 };
+
+function writeJsonReport(io: CommandIo, report: DbHealthReport): void {
+	const envelope = report.ok
+		? envelopeOk(report, { action: "db.health", exitCode: 0 })
+		: (envelopeErr("DB_HEALTH_FAILED", "db health check failed", {
+			action: "db.health",
+			exitCode: 1,
+		}) as ResultEnvelope<DbHealthReport>);
+	envelope.data = report;
+	io.stdout(
+		stringifyEnvelope(
+			envelopeWithLegacyKeys(envelope, [
+				"ok",
+				"schema_ok",
+				"db_exists",
+				"wal_enabled",
+				"fts_ok",
+				"orphan_records",
+				"stale_sources",
+				"size_bytes",
+				"findings",
+			]),
+		),
+	);
+}
 
 function parseArgs(args: string[]): { json: boolean } {
 	let json = false;
@@ -52,7 +84,7 @@ export async function runDbCommand(
 		const parsed = parseArgs(args);
 		const report = checkDbHealth(projectRoot);
 		if (parsed.json) {
-			io.stdout(JSON.stringify(report));
+			writeJsonReport(io, report);
 		} else {
 			io.stdout(formatReport(report));
 		}

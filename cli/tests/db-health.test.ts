@@ -57,7 +57,7 @@ function createFixture(): string {
 }
 
 describe("db health", () => {
-	test("missing db fails", () => {
+	test("missing db fails", async () => {
 		const root = createFixture();
 		try {
 			const report = checkDbHealth(root);
@@ -65,6 +65,17 @@ describe("db health", () => {
 			expect(report.ok).toBe(false);
 			expect(report.findings[0]?.severity).toBe("fail");
 			expect(report.findings[0]?.message).toContain("missing state db");
+			const captured = captureIo();
+			expect(await runDbCommand("health", ["--json"], root, captured.io)).toBe(
+				1,
+			);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(1);
+			expect(payload.db_exists).toBe(false);
+			expect(Array.isArray(payload.findings)).toBe(true);
+			expect(payload.data.db_exists).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -95,6 +106,8 @@ describe("db health", () => {
 				0,
 			);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.exit_code).toBe(0);
 			expect(typeof payload.ok).toBe("boolean");
 			expect(typeof payload.schema_ok).toBe("boolean");
 			expect(typeof payload.db_exists).toBe("boolean");
@@ -104,6 +117,8 @@ describe("db health", () => {
 			expect(typeof payload.stale_sources).toBe("number");
 			expect(typeof payload.size_bytes).toBe("number");
 			expect(Array.isArray(payload.findings)).toBe(true);
+			expect(payload.data.schema_ok).toBe(true);
+			expect(payload.data.db_exists).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
