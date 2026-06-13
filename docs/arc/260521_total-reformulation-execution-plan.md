@@ -263,7 +263,7 @@ Files:
 
 - `docs/arc/SPECS/260521_0110_validation-ci-and-benchmarks_spec_01.md`
 - `docs/arc/SPECS/F-*/spec-tests/`
-- future benchmark scenario definitions under `.agents/data/benchmarks/`
+- future benchmark scenario definitions under `.afol/data/benchmarks/`
 
 Behavior:
 

@@ -19,7 +19,7 @@ scope:
   - tests
   - .github/workflows
   - src/project-template
-  - .agents/data/benchmarks
+  - .afol/data/benchmarks
   packages:
   - agentic-cli
 risk_level: high
@@ -224,7 +224,7 @@ cost metric and must identify tokenizer, counting method, source, and status.
 Every pack must have scenario definitions under:
 
 ```text
-.agents/data/benchmarks/scenarios/<pack-id>/<scenario-id>.json
+.afol/data/benchmarks/scenarios/<pack-id>/<scenario-id>.json
 ```
 
 Each scenario definition must include:
@@ -264,7 +264,7 @@ oracle, threshold, or result-schema mapping.
 Baseline artifacts live under:
 
 ```text
-.agents/data/benchmarks/baselines/<pack-id>/<baseline-id>.json
+.afol/data/benchmarks/baselines/<pack-id>/<baseline-id>.json
 ```
 
 Protocol:
@@ -371,7 +371,7 @@ Default CI runs:
 - workbench validation where applicable.
 - Smoke benchmark runs are acceptable for early continuity checks, but they are
   not a daily production gate. Global closure requires full artifacts persisted
-  for selected packs (`.agents/data/benchmarks/results/...`) and evidence that
+  for selected packs (`.afol/data/benchmarks/results/...`) and evidence that
   all F-11 required pack scenarios were executed or explicitly waived with
   artifact-backed reasoning.
 
@@ -422,19 +422,19 @@ Selective CI maps paths to packs:
   - `681c6d0`
   - `8dd5e20`
 - Persisted selected-pack benchmark results:
-  - `.agents/data/benchmarks/results/20260529_142632_cli-kernel-local.json`
-  - `.agents/data/benchmarks/results/20260529_142632_workbench-parity.json`
-  - `.agents/data/benchmarks/results/20260529_142633_routing-accuracy.json`
-  - `.agents/data/benchmarks/results/20260529_142633_mutation-safety.json`
-  - `.agents/data/benchmarks/results/20260529_142633_update-safety.json`
-  - `.agents/data/benchmarks/results/20260529_142633_mcp-parity.json`
-  - `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
-  - `.agents/data/benchmarks/results/20260529_142633_token-economy.json`
+  - `.afol/data/benchmarks/results/20260529_142632_cli-kernel-local.json`
+  - `.afol/data/benchmarks/results/20260529_142632_workbench-parity.json`
+  - `.afol/data/benchmarks/results/20260529_142633_routing-accuracy.json`
+  - `.afol/data/benchmarks/results/20260529_142633_mutation-safety.json`
+  - `.afol/data/benchmarks/results/20260529_142633_update-safety.json`
+  - `.afol/data/benchmarks/results/20260529_142633_mcp-parity.json`
+  - `.afol/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
+  - `.afol/data/benchmarks/results/20260529_142633_token-economy.json`
 - Waiver (artifact-backed):
   - `runtime-live-agent` is explicitly recorded as
     `status=skipped` with note
     `all-scenarios-skipped:not-implemented-live-runner`
-    in `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`.
+    in `.afol/data/benchmarks/results/20260529_142633_runtime-live-agent.json`.
 - Current benchmark matrix:
   - `cli-kernel-local`
   - `workbench-parity`

@@ -83,7 +83,7 @@ risk_level: medium
   - declared benchmark profile metadata
 - Result persistence:
   - stdout JSON is mandatory
-  - saving a JSON file under `.agents/data/benchmarks/results/` is supported
+  - saving a JSON file under `.afol/data/benchmarks/results/` is supported
     when requested
 
 ## Controlled Fixture Strategy

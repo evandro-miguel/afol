@@ -309,10 +309,10 @@ Minimum acceptance:
   routing-accuracy `7760358`, update-safety `681c6d0`, and mutation-safety
   `8dd5e20`.
   Artifact-backed benchmark result persistence for the selected pack set is
-  captured under `.agents/data/benchmarks/results/20260529_14263*_*.json`
+  captured under `.afol/data/benchmarks/results/20260529_14263*_*.json`
   (one JSON per pack), with explicit waiver evidence for
   `runtime-live-agent` in
-  `.agents/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
+  `.afol/data/benchmarks/results/20260529_142633_runtime-live-agent.json`
   (`status=skipped`, `all-scenarios-skipped:not-implemented-live-runner`).
 - Exit criteria: type checks; unit tests; schema tests; command parity tests;
   template export tests; workbench validation; MCP parity tests; benchmark

@@ -15,7 +15,7 @@ scope:
   repo_areas:
   - cli/validate
   - tests
-  - .agents/data/benchmarks
+  - .afol/data/benchmarks
   - docs/map/benchmarks
 risk_level: high
 ---
@@ -45,7 +45,7 @@ matter: accuracy, speed, quality, safety, parity, and token economy.
 Scenario files live at:
 
 ```text
-.agents/data/benchmarks/scenarios/<pack-id>/<scenario-id>.json
+.afol/data/benchmarks/scenarios/<pack-id>/<scenario-id>.json
 ```
 
 Each scenario must declare:
@@ -137,7 +137,7 @@ Canonical initial scenario ids:
 
 - Local packs run one warmup plus at least three measured samples.
 - Timing comparisons use p50 and p95, never one sample.
-- Baseline files live under `.agents/data/benchmarks/baselines/`.
+- Baseline files live under `.afol/data/benchmarks/baselines/`.
 - Baseline artifacts record scenario ids, scenario versions, sample count,
   warmup count, p50, p95, host profile, runtime versions, and git commit.
 - A comparison is invalid when scenario id, tokenizer id, or host profile differs

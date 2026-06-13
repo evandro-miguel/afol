@@ -48,7 +48,7 @@ risk_level: medium
 
 - Pack: `runtime-flow-live-agent-v2`
 - Final saved result:
-  `.agents/data/benchmarks/results/20260424_122521_runtime-flow-live-agent-v2.json`
+  `.afol/data/benchmarks/results/20260424_122521_runtime-flow-live-agent-v2.json`
 - Metrics: `scenario_count=6`, `duration_ms=79383`,
   `tool_call_count=17`, `error_count=0`, `retry_count=0`, `accuracy=1.0`,
   `tool_success_rate=1.0`
