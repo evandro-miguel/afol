@@ -4,10 +4,17 @@ export type ContextRef = {
 	section?: string;
 };
 
+export type ContextRetrievalMode = "compact" | "balanced" | "deep" | "tokenmax";
+
+export type ContextExpandedSection = SectionEntry & {
+	snippet: string;
+};
+
 export type ContextBundle = {
 	task_id: string;
 	role: string;
 	surface: string;
+	mode: ContextRetrievalMode;
 	refs: ContextRef[];
 	rules: string[];
 	skills: string[];
@@ -19,6 +26,7 @@ export type ContextBundle = {
 	budget: { total_tokens: number; used_tokens: number };
 	gaps: string[];
 	do_not_load: string[];
+	expanded_sections?: ContextExpandedSection[];
 };
 
 export type SectionEntry = {

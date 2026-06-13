@@ -4,6 +4,7 @@ import {
 	resolveSection,
 } from "../services/context";
 import { ContextTrustError } from "../services/context/bundler";
+import type { ContextRetrievalMode } from "../services/context/types";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -24,9 +25,12 @@ type ParsedArgs = {
 	task?: string;
 	role?: string;
 	surface?: string;
+	mode?: ContextRetrievalMode;
 	ref?: string;
 	explain: boolean;
 };
+
+const MODES: readonly ContextRetrievalMode[] = ["compact", "balanced", "deep", "tokenmax"];
 
 function normalizeAction(value: string | undefined): ContextAction {
 	if (!value || value === "build" || value === "b") {
@@ -99,6 +103,18 @@ function parseArgs(args: string[]): ParsedArgs {
 			index += 1;
 			continue;
 		}
+		if (value === "--mode") {
+			const next = args[index + 1];
+			if (!next) {
+				throw new Error("Missing value for --mode.");
+			}
+			if (!MODES.includes(next as ContextRetrievalMode)) {
+				throw new Error(`Invalid ctx mode: ${next}`);
+			}
+			parsed.mode = next as ContextRetrievalMode;
+			index += 1;
+			continue;
+		}
 		if (value === "--ref") {
 			const next = args[index + 1];
 			if (!next) {
@@ -118,6 +134,7 @@ function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
 		`task: ${bundle.task_id || "none"}`,
 		`role: ${bundle.role}`,
 		`surface: ${bundle.surface}`,
+		`mode: ${bundle.mode}`,
 		`refs: ${bundle.refs.length}`,
 		`rules: ${bundle.rules.join(",") || "none"}`,
 		`skills: ${bundle.skills.join(",") || "none"}`,
@@ -212,6 +229,7 @@ export async function runContextCommand(
 				...(parsed.task ? { task: parsed.task } : {}),
 				...(parsed.role ? { role: parsed.role } : {}),
 				...(parsed.surface ? { surface: parsed.surface } : {}),
+				...(parsed.mode ? { mode: parsed.mode } : {}),
 				...(parsed.trusted ? { trusted: true } : {}),
 			});
 		} catch (error) {

@@ -4,16 +4,72 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentOperationContext, remoteOperationContext } from "../core/operation-context";
 import { runSchemaCommand } from "../commands/schema-cmd";
-import { detectShape, writeShapePack } from "../services/schema";
+import { detectResolver, detectShape, resolverPathForRoot, writeResolver, writeShapePack } from "../services/schema";
 
 function mkRoot(name: string): string {
 	return mkdtempSync(join(tmpdir(), `schema-${name}-`));
 }
 
-describe("schema command", () => {
-	test("detect emits a shape pack", async () => {
-		const root = mkRoot("detect");
-		try {
+	describe("schema command", () => {
+		test("resolver detect returns markdown sections", () => {
+			const root = mkRoot("resolver-detect");
+			try {
+				const content = detectResolver(root);
+				expect(content).toContain("# Resolver routing");
+				expect(content).toContain("## Signals");
+				expect(content).toContain("## Rules");
+				expect(content).toContain("## Validation commands");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+		test("resolver write creates file", () => {
+			const root = mkRoot("resolver-write");
+			try {
+				const path = writeResolver(root);
+				expect(path).toBe(resolverPathForRoot(root));
+				expect(existsSync(path)).toBe(true);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+		test("resolver json returns path and content", async () => {
+			const root = mkRoot("resolver-json");
+			try {
+				const out: string[] = [];
+				const io = { stdout: (value: string) => out.push(value), stderr: (_: string) => undefined };
+				expect(await runSchemaCommand("resolver", ["--json"], root, io)).toBe(0);
+				const payload = JSON.parse(out[0] ?? "{}") as { ok: boolean; path: string; content: string };
+				expect(payload.ok).toBe(true);
+				expect(payload.path).toBe(resolverPathForRoot(root));
+				expect(payload.content).toContain("# Resolver routing");
+				expect(existsSync(payload.path)).toBe(false);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+		test("resolver write command creates file", async () => {
+			const root = mkRoot("resolver-write-cmd");
+			try {
+				const out: string[] = [];
+				const io = { stdout: (value: string) => out.push(value), stderr: (_: string) => undefined };
+				expect(await runSchemaCommand("resolver", ["--write", "--json"], root, io)).toBe(0);
+				const payload = JSON.parse(out[0] ?? "{}") as { ok: boolean; path: string; content: string; write: boolean };
+				expect(payload.ok).toBe(true);
+				expect(payload.write).toBe(true);
+				expect(existsSync(payload.path)).toBe(true);
+				expect(payload.content).toContain("## Tools");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+		test("detect emits a shape pack", async () => {
+			const root = mkRoot("detect");
+			try {
 			const out: string[] = [];
 			const io = { stdout: (value: string) => out.push(value), stderr: (_: string) => undefined };
 			expect(await runSchemaCommand("detect", ["--json"], root, io)).toBe(0);

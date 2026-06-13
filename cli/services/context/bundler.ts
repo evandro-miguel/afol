@@ -8,7 +8,12 @@ import { getPstrIndex, validatePstrIndex } from "../pstr";
 import { loadSessionState, validateState } from "../state";
 import { resolveProjectPaths } from "../project/paths";
 import { getSectionIndex, rebuildSectionIndex } from "./section-index";
-import type { ContextBundle, ContextRef } from "./types";
+import type {
+	ContextBundle,
+	ContextRef,
+	ContextRetrievalMode,
+	ContextExpandedSection,
+} from "./types";
 import type { SectionEntry } from "./types";
 
 type BuildOptions = {
@@ -16,6 +21,7 @@ type BuildOptions = {
 	task?: string;
 	role?: string;
 	surface?: string;
+	mode?: ContextRetrievalMode;
 	trusted?: boolean;
 };
 
@@ -36,7 +42,12 @@ type TaskRecord = {
 };
 
 const TASK_ROW_RE = /^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
-const TOTAL_TOKENS = 2000;
+const MODE_BUDGETS: Record<ContextRetrievalMode, number> = {
+	compact: 1000,
+	balanced: 2000,
+	deep: 4000,
+	tokenmax: 8000,
+};
 
 function frontmatter(content: string): Record<string, unknown> {
 	const match = /^---\n([\s\S]*?)\n---\n?/.exec(content);
@@ -108,6 +119,7 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 		bundle.task_id,
 		bundle.role,
 		bundle.surface,
+		bundle.mode,
 		...bundle.refs.map((ref) => `${ref.domain}:${ref.path}:${ref.section ?? ""}`),
 		...bundle.rules,
 		...bundle.skills,
@@ -118,6 +130,12 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 		...bundle.library_refs,
 		...bundle.gaps,
 		...bundle.do_not_load,
+		...(bundle.expanded_sections ?? []).flatMap((section) => [
+			section.ref,
+			section.title,
+			section.source_path,
+			section.snippet,
+		]),
 	]);
 }
 
@@ -134,6 +152,27 @@ function selectSections(root: string, task: TaskRecord | null, surface: string):
 		.filter((section) => section.ref.toLowerCase().includes(surface.toLowerCase()))
 		.slice(0, 3);
 	return surfaceMatches.length > 0 ? surfaceMatches : index.sections.slice(0, 3);
+}
+
+function selectExpandedSections(
+	root: string,
+	sections: SectionEntry[],
+	mode: ContextRetrievalMode,
+): ContextExpandedSection[] {
+	const full = mode === "tokenmax";
+	return sections.slice(0, 3).flatMap((section) => {
+		const filePath = join(root, section.source_path);
+		if (!existsSync(filePath)) {
+			return [];
+		}
+		const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
+		const snippetLines = lines.slice(section.line_start - 1, section.line_end);
+		const snippet = full ? snippetLines.join("\n") : snippetLines.slice(0, 24).join("\n");
+		return [{
+			...section,
+			snippet,
+		}];
+	});
 }
 
 function selectRules(root: string, surface: string): string[] {
@@ -235,7 +274,16 @@ function assertTrustedContext(root: string, session: string | undefined): void {
 
 function trimToBudget(bundle: ContextBundle): ContextBundle {
 	const next = structuredClone(bundle) as ContextBundle;
-	while (estimateBundleTokens(next) > TOTAL_TOKENS) {
+	while (estimateBundleTokens(next) > next.budget.total_tokens) {
+		if (next.expanded_sections && next.expanded_sections.length > 0) {
+			const last = next.expanded_sections[next.expanded_sections.length - 1];
+			if (last && last.snippet.length > 160) {
+				last.snippet = `${last.snippet.slice(0, Math.max(80, Math.floor(last.snippet.length * 0.7))).trimEnd()}\n…`;
+				continue;
+			}
+			next.expanded_sections.pop();
+			continue;
+		}
 		if (next.library_refs.length > 0) {
 			next.library_refs.pop();
 			continue;
@@ -269,6 +317,8 @@ function trimToBudget(bundle: ContextBundle): ContextBundle {
 export function buildContextBundle(root: string, opts: BuildOptions): ContextBundle {
 	const role = (opts.role ?? "worker").trim() || "worker";
 	const surface = (opts.surface ?? "general").trim() || "general";
+	const mode = opts.mode ?? "balanced";
+	const totalTokens = MODE_BUDGETS[mode];
 	const session = opts.session?.trim() || "";
 	const taskId = opts.task?.trim() || "";
 	if (opts.trusted) {
@@ -277,29 +327,35 @@ export function buildContextBundle(root: string, opts: BuildOptions): ContextBun
 	const task = session && taskId ? findTaskRecord(root, session, taskId) : null;
 	const state = session ? loadSessionState(root, session) : null;
 	const sections = selectSections(root, task, surface);
+	const compact = mode === "compact";
+	const expandedSections = mode === "deep" || mode === "tokenmax" ? selectExpandedSections(root, sections, mode) : undefined;
 	const bundle: ContextBundle = {
 		task_id: taskId,
 		role,
 		surface,
+		mode,
 		refs: [
 			...(task ? [{ domain: "task", path: task.path, section: task.taskId }] : []),
 			...sections.map(refFromSection),
 		],
-		rules: selectRules(root, surface),
-		skills: selectSkills(root, surface, role),
-		tools: selectTools(session || undefined, taskId || undefined, surface),
-		validation_commands: selectValidationCommands(session || undefined, taskId || undefined),
-		pstr_refs: selectPstrRefs(root),
-		memory_refs: selectMemoryRefs(root, taskId, surface, role),
-		library_refs: selectLibraryRefs(root, taskId, surface, role),
-		budget: { total_tokens: TOTAL_TOKENS, used_tokens: 0 },
-		gaps: [
-			!session ? "missing session" : "",
-			!task ? "missing task record" : "",
-			sections.length === 0 ? "no matching spec sections" : "",
-			state ? "" : "no hydrated session state",
-		].filter(Boolean),
+		rules: compact ? [] : selectRules(root, surface),
+		skills: compact ? [] : selectSkills(root, surface, role),
+		tools: compact ? [] : selectTools(session || undefined, taskId || undefined, surface),
+		validation_commands: compact ? [] : selectValidationCommands(session || undefined, taskId || undefined),
+		pstr_refs: compact ? [] : selectPstrRefs(root),
+		memory_refs: compact ? [] : selectMemoryRefs(root, taskId, surface, role),
+		library_refs: compact ? [] : selectLibraryRefs(root, taskId, surface, role),
+		budget: { total_tokens: totalTokens, used_tokens: 0 },
+		gaps: compact
+			? []
+			: [
+				!session ? "missing session" : "",
+				!task ? "missing task record" : "",
+				sections.length === 0 ? "no matching spec sections" : "",
+				state ? "" : "no hydrated session state",
+			].filter(Boolean),
 		do_not_load: doNotLoadList(),
+		...(expandedSections ? { expanded_sections: expandedSections } : {}),
 	};
 	return trimToBudget(bundle);
 }

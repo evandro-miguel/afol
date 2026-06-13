@@ -463,6 +463,7 @@ describe("context system", () => {
 			expect(bundle.task_id).toBe("T-01");
 			expect(bundle.role).toBe("designer");
 			expect(bundle.surface).toBe("alpha");
+			expect(bundle.mode).toBe("balanced");
 			expect(Array.isArray(bundle.refs)).toBe(true);
 			expect(Array.isArray(bundle.rules)).toBe(true);
 			expect(Array.isArray(bundle.skills)).toBe(true);
@@ -507,6 +508,60 @@ describe("context system", () => {
 			expect(bundle.refs.length).toBeGreaterThan(0);
 			expect(bundle.rules.length).toBeGreaterThan(0);
 			expect(bundle.skills.length).toBeGreaterThan(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("compact mode uses 1000 token budget and no expanded sections", () => {
+		const root = createBundleFixture();
+		try {
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				mode: "compact",
+			});
+			expect(bundle.mode).toBe("compact");
+			expect(bundle.budget.total_tokens).toBe(1000);
+			expect(bundle.expanded_sections).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("deep mode includes expanded sections", () => {
+		const root = createBundleFixture();
+		try {
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				mode: "deep",
+			});
+			expect(bundle.mode).toBe("deep");
+			expect(bundle.budget.total_tokens).toBe(4000);
+			expect(bundle.expanded_sections?.length).toBeGreaterThan(0);
+			expect(bundle.expanded_sections?.[0]?.snippet).toContain("## Overview");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("tokenmax mode uses 8000 token budget", () => {
+		const root = createBundleFixture();
+		try {
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				mode: "tokenmax",
+			});
+			expect(bundle.mode).toBe("tokenmax");
+			expect(bundle.budget.total_tokens).toBe(8000);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -611,6 +666,7 @@ describe("context system", () => {
 			const captured = captureIo();
 			expect(await runContextCommand("bundle", ["-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(0);
 			expect(captured.stdout[0]).toContain("task: T-01");
+			expect(captured.stdout[0]).toContain("mode: balanced");
 			expect(captured.stdout[0]).toContain("refs:");
 			expect(captured.stdout[0]).toContain("pstr_refs:");
 		} finally {
@@ -694,10 +750,22 @@ describe("context system", () => {
 		try {
 			const captured = captureIo();
 			expect(await runContextCommand("bundle", ["-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha", "--json"], root, captured.io)).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { task_id: string; refs: Array<{ section?: string }>; pstr_refs: string[] };
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as { task_id: string; mode: string; refs: Array<{ section?: string }>; pstr_refs: string[] };
 			expect(payload.task_id).toBe("T-01");
+			expect(payload.mode).toBe("balanced");
 			expect(payload.refs.length).toBeGreaterThan(0);
 			expect(payload.pstr_refs).toEqual(["pstr:alpha-map"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle invalid mode exits 2", async () => {
+		const root = createBundleFixture();
+		try {
+			const captured = captureIo();
+			expect(await runContextCommand("bundle", ["--mode", "nope", "-S", "session-1", "-T", "T-01", "--role", "designer", "--surface", "alpha"], root, captured.io)).toBe(2);
+			expect(captured.stderr[0]).toContain("Invalid ctx mode");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
