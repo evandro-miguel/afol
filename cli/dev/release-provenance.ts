@@ -141,7 +141,9 @@ export function buildReleaseProvenance(
 			kind: scanner.kind,
 			status: scanner.status,
 			...(scanner.reason ? { reason: scanner.reason } : {}),
-			...(scanner.waiver_required ? { waiver_required: scanner.waiver_required } : {}),
+			...(scanner.waiver_required
+				? { waiver_required: scanner.waiver_required }
+				: {}),
 		})),
 	};
 

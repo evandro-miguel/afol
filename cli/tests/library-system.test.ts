@@ -292,25 +292,25 @@ describe("library command", () => {
 		}
 	});
 
-		test("afol library list --json returns JSON", async () => {
-			const root = createFixture();
-			try {
-				const out = capture();
-				expect(await runLibraryCommand("list", ["--json"], root, out.io)).toBe(0);
-				const payload = JSON.parse(out.stdout[0] ?? "{}") as Record<
-					string,
-					unknown
-				>;
-				const data = payload.data as { topics: unknown[] };
-				expect(payload.schema).toBe("afol.result/v1");
-				expect(payload.ok).toBe(true);
-				expect(payload.exit_code).toBe(0);
-				expect(payload.topics).toEqual(data.topics);
-				expect(data.topics).toEqual([]);
-			} finally {
-				rmSync(root, { recursive: true, force: true });
-			}
-		});
+	test("afol library list --json returns JSON", async () => {
+		const root = createFixture();
+		try {
+			const out = capture();
+			expect(await runLibraryCommand("list", ["--json"], root, out.io)).toBe(0);
+			const payload = JSON.parse(out.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			const data = payload.data as { topics: unknown[] };
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.topics).toEqual(data.topics);
+			expect(data.topics).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
 	test('afol library propose --topic x --title "X" --url http://... --json creates topic', async () => {
 		const root = createFixture();
@@ -553,8 +553,13 @@ describe("library command", () => {
 		const root = createFixture();
 		try {
 			const out = capture();
-			expect(await runLibraryCommand("topic", ["--json"], root, out.io)).toBe(2);
-			const payload = JSON.parse(out.stdout[0] ?? "{}") as Record<string, unknown>;
+			expect(await runLibraryCommand("topic", ["--json"], root, out.io)).toBe(
+				2,
+			);
+			const payload = JSON.parse(out.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(false);
 			expect(payload.exit_code).toBe(2);

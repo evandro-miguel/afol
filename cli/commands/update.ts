@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
+import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
 import { atomicWriteText } from "../services/io/atomic";
 import { withSessionLock } from "../services/io/session-lock";
 import {
@@ -15,12 +21,6 @@ import {
 	type UpdateCheckResult,
 	type UpdateOperation,
 } from "../services/update/check";
-import {
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-	type ResultEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -182,12 +182,12 @@ function resultEnvelope<T extends Record<string, unknown>>(
 	return exitCode === 0
 		? envelopeOk(data, { action, exitCode })
 		: {
-			schema: "afol.result/v1",
-			ok: false,
-			action,
-			exit_code: exitCode,
-			data,
-		};
+				schema: "afol.result/v1",
+				ok: false,
+				action,
+				exit_code: exitCode,
+				data,
+			};
 }
 
 function writeJsonResult(
@@ -198,20 +198,17 @@ function writeJsonResult(
 ): void {
 	io.stdout(
 		stringifyEnvelope(
-			envelopeWithLegacyKeys(
-				resultEnvelope(result, action, exitCode),
-				[
-					"hasSource",
-					"currentRevision",
-					"sourceRevision",
-					"upToDate",
-					"changes",
-					"ownershipSource",
-					"ownershipCurrent",
-					"filePreviews",
-					"operations",
-				],
-			),
+			envelopeWithLegacyKeys(resultEnvelope(result, action, exitCode), [
+				"hasSource",
+				"currentRevision",
+				"sourceRevision",
+				"upToDate",
+				"changes",
+				"ownershipSource",
+				"ownershipCurrent",
+				"filePreviews",
+				"operations",
+			]),
 		),
 	);
 }
@@ -401,7 +398,12 @@ export async function runUpdateCommand(
 		}
 
 		parsedArgs.json
-			? writeJsonResult(io, `update.${command}`, result, result.hasSource ? 0 : 1)
+			? writeJsonResult(
+					io,
+					`update.${command}`,
+					result,
+					result.hasSource ? 0 : 1,
+				)
 			: io.stdout(formatUpdateCheck(result, command).trimEnd());
 		return result.hasSource ? 0 : 1;
 	} catch (error) {

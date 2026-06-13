@@ -68,13 +68,13 @@ function createRoot(): string {
 }
 
 describe("memory command", () => {
-		test("lists, shows, searches, and updates entries", async () => {
-			const root = createRoot();
-			try {
-				const listJson = capture();
-				expect(
-					await runMemoryCommand("list", ["--json"], root, listJson.io),
-				).toBe(0);
+	test("lists, shows, searches, and updates entries", async () => {
+		const root = createRoot();
+		try {
+			const listJson = capture();
+			expect(
+				await runMemoryCommand("list", ["--json"], root, listJson.io),
+			).toBe(0);
 			const listPayload = JSON.parse(listJson.stdout[0] ?? "{}") as Record<
 				string,
 				unknown
@@ -85,9 +85,9 @@ describe("memory command", () => {
 			expect(listPayload.exit_code).toBe(0);
 			expect(listPayload.entries).toEqual(listData.entries);
 
-				const list = capture();
-				expect(await runMemoryCommand("list", [], root, list.io)).toBe(0);
-				expect(list.stdout.join("\n")).toContain("memory entries: 4");
+			const list = capture();
+			expect(await runMemoryCommand("list", [], root, list.io)).toBe(0);
+			expect(list.stdout.join("\n")).toContain("memory entries: 4");
 
 			const show = capture();
 			expect(
@@ -115,9 +115,9 @@ describe("memory command", () => {
 			expect(renderPayload.markdown).toBe(renderData.markdown);
 
 			const invalid = capture();
-			expect(
-				await runMemoryCommand("show", ["--json"], root, invalid.io),
-			).toBe(2);
+			expect(await runMemoryCommand("show", ["--json"], root, invalid.io)).toBe(
+				2,
+			);
 			const invalidPayload = JSON.parse(invalid.stdout[0] ?? "{}") as Record<
 				string,
 				unknown

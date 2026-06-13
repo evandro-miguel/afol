@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildReleaseSecurityScanOutcomes } from "../dev/security-scan";
@@ -8,12 +14,19 @@ import { buildReleaseSecurityScanOutcomes } from "../dev/security-scan";
 const repoRoot = join(import.meta.dir, "..", "..");
 
 function runSecurityScan(args: string[], cwd: string, pathDir?: string) {
-	return spawnSync(process.execPath, [join(repoRoot, "cli/dev/security-scan.ts"), ...args], {
-		cwd,
-		encoding: "utf8",
-		env: { ...process.env, PATH: pathDir ?? mkdtempSync(join(tmpdir(), "security-scan-path-")) },
-		shell: false,
-	});
+	return spawnSync(
+		process.execPath,
+		[join(repoRoot, "cli/dev/security-scan.ts"), ...args],
+		{
+			cwd,
+			encoding: "utf8",
+			env: {
+				...process.env,
+				PATH: pathDir ?? mkdtempSync(join(tmpdir(), "security-scan-path-")),
+			},
+			shell: false,
+		},
+	);
 }
 
 describe("security scan CLI", () => {
@@ -78,7 +91,11 @@ describe("security scan CLI", () => {
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
 		try {
-			const result = runSecurityScan(["deps", "--release", "--json"], root, binDir);
+			const result = runSecurityScan(
+				["deps", "--release", "--json"],
+				root,
+				binDir,
+			);
 			expect(result.status).toBe(1);
 			expect(result.stderr).toContain("failed to start");
 
@@ -105,7 +122,11 @@ describe("security scan CLI", () => {
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
 		try {
-			const result = runSecurityScan(["deps", "--release", "--json"], root, binDir);
+			const result = runSecurityScan(
+				["deps", "--release", "--json"],
+				root,
+				binDir,
+			);
 			expect(result.status).toBe(7);
 			const payload = JSON.parse(result.stdout || "{}");
 			expect(payload).toMatchObject({
@@ -122,7 +143,9 @@ describe("security scan CLI", () => {
 	});
 
 	test("release provenance scanner probe failures are failed outcomes", () => {
-		const root = mkdtempSync(join(tmpdir(), "security-scan-provenance-failure-"));
+		const root = mkdtempSync(
+			join(tmpdir(), "security-scan-provenance-failure-"),
+		);
 		const binDir = join(root, "bin");
 		mkdirSync(binDir, { recursive: true });
 		writeFileSync(join(binDir, "osv-scanner"), "#!/bin/sh\nexit 9\n", "utf8");

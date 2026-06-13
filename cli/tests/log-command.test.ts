@@ -97,7 +97,10 @@ describe("log command", () => {
 			]);
 
 			expect(proc.status).toBe(0);
-			const payload = JSON.parse(proc.stdout as string) as Record<string, unknown>;
+			const payload = JSON.parse(proc.stdout as string) as Record<
+				string,
+				unknown
+			>;
 			expect(payload).toMatchObject({
 				schema: "afol.result/v1",
 				ok: true,

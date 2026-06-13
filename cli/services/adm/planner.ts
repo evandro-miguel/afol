@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 export type AdmManifestEntry = {
@@ -18,9 +18,13 @@ function sha256Hex(content: Buffer): string {
 	return createHash("sha256").update(content).digest("hex");
 }
 
-function walkMarkdownFiles(root: string, current: string, files: string[]): void {
-	const entries = readdirSync(current, { withFileTypes: true }).sort((left, right) =>
-		left.name.localeCompare(right.name),
+function walkMarkdownFiles(
+	root: string,
+	current: string,
+	files: string[],
+): void {
+	const entries = readdirSync(current, { withFileTypes: true }).sort(
+		(left, right) => left.name.localeCompare(right.name),
 	);
 	for (const entry of entries) {
 		const absolute = join(current, entry.name);

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { atomicWriteText } from "../io/atomic";
 import { resolveAdmPaths } from "../adm";
+import { atomicWriteText } from "../io/atomic";
 
 export type ChangelogEntryType = "decision" | "behavior" | "breaking" | "fix";
 

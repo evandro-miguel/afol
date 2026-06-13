@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { isAbsolute, relative } from "node:path";
+import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import { resolveProjectPaths } from "../services/project/paths";
 import { resolveProjectPath } from "../services/project/root";
 import {
@@ -7,7 +8,6 @@ import {
 	getSpecCheck,
 	type SpecCheckResult,
 } from "../services/spec-gate";
-import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
 	appendTimelineEntry,
 	closeSession,
@@ -623,11 +623,7 @@ function runVerification(root: string, command: string): { exitCode: number } {
 	return { exitCode: result.status ?? 1 };
 }
 
-function writeJsonError(
-	action: string,
-	error: unknown,
-	exitCode = 2,
-): void {
+function writeJsonError(action: string, error: unknown, exitCode = 2): void {
 	const message = error instanceof Error ? error.message : String(error);
 	console.log(
 		stringifyEnvelope(
@@ -646,7 +642,10 @@ export async function runNewCommand(
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
-					envelopeOk({ ...created, status: "created" }, { action: "workbench.new" }),
+					envelopeOk(
+						{ ...created, status: "created" },
+						{ action: "workbench.new" },
+					),
 				),
 			);
 		} else {
@@ -729,7 +728,9 @@ export async function runDoneCommand(
 				if (parsed.json) {
 					writeJsonError(
 						"workbench.done",
-						new Error(`spec check failed: ${specCheck.spec_id || parsed.taskId}`),
+						new Error(
+							`spec check failed: ${specCheck.spec_id || parsed.taskId}`,
+						),
 						1,
 					);
 				} else {
@@ -759,7 +760,9 @@ export async function runDoneCommand(
 						1,
 					);
 				} else {
-					console.error(`--test failed with exit code ${verification.exitCode}`);
+					console.error(
+						`--test failed with exit code ${verification.exitCode}`,
+					);
 				}
 				return 1;
 			}
@@ -864,15 +867,11 @@ export async function runVerifyTasksCommand(
 			} else {
 				console.log(
 					stringifyEnvelope(
-						envelopeErr(
-							"workbench.error",
-							"Verification failed.",
-							{
-								action: "workbench.verify",
-								exitCode: 1,
-								hint: `open_tasks=${result.openTasks.length}; issues=${result.issues.length}`,
-							},
-						),
+						envelopeErr("workbench.error", "Verification failed.", {
+							action: "workbench.verify",
+							exitCode: 1,
+							hint: `open_tasks=${result.openTasks.length}; issues=${result.issues.length}`,
+						}),
 					),
 				);
 			}

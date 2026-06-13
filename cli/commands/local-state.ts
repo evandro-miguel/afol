@@ -1,4 +1,10 @@
 import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
+import {
 	rebuildProjectIndexes,
 	validateFilesIndex,
 	validateRulesIndex,
@@ -9,12 +15,6 @@ import {
 	rebuildWorkBenchIndex,
 	validateWorkBenchIndex,
 } from "../services/local-state/workbench-index";
-import {
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-	type ResultEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -36,12 +36,12 @@ function resultEnvelope<T extends Record<string, unknown>>(
 	return exitCode === 0
 		? envelopeOk(data, { action, exitCode })
 		: {
-			schema: "afol.result/v1",
-			ok: false,
-			action,
-			exit_code: exitCode,
-			data,
-		};
+				schema: "afol.result/v1",
+				ok: false,
+				action,
+				exit_code: exitCode,
+				data,
+			};
 }
 
 function normalizeCommand(value: string | undefined): LocalStateCommand {
@@ -96,7 +96,11 @@ export async function runLocalStateCommand(
 				io.stdout(
 					stringifyEnvelope(
 						envelopeWithLegacyKeys(
-							resultEnvelope({ ok: true, command, snapshot }, `local-state.${command}`, 0),
+							resultEnvelope(
+								{ ok: true, command, snapshot },
+								`local-state.${command}`,
+								0,
+							),
 							["ok", "command", "snapshot"],
 						),
 					),

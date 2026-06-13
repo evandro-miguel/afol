@@ -1,9 +1,9 @@
-import { runDoctor } from "../services/health";
 import {
 	envelopeOk,
 	envelopeWithLegacyKeys,
 	stringifyEnvelope,
 } from "../core/envelope";
+import { runDoctor } from "../services/health";
 
 type CommandIo = {
 	stdout: (message: string) => void;

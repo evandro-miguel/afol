@@ -156,7 +156,9 @@ describe("schema command", () => {
 			const localPayload = JSON.parse(localOut[0] ?? "{}");
 			expect(localPayload.schema).toBe("afol.result/v1");
 			expect(localPayload.exit_code).toBe(0);
-			expect(localPayload.pack).toEqual((localPayload.data as { pack: unknown }).pack);
+			expect(localPayload.pack).toEqual(
+				(localPayload.data as { pack: unknown }).pack,
+			);
 			expect(
 				existsSync(
 					join(localRoot, ".afol", "adm", "schema", "afol-shape.yaml"),
@@ -244,7 +246,9 @@ describe("schema command", () => {
 			expect(payload.action).toBe("schema.review");
 			expect(payload.detected.name).toBe("afol-shape");
 			expect(Array.isArray(payload.suggestions)).toBe(true);
-			expect(payload.suggestions).toEqual((payload.data as { suggestions: unknown[] }).suggestions);
+			expect(payload.suggestions).toEqual(
+				(payload.data as { suggestions: unknown[] }).suggestions,
+			);
 		} finally {
 			rmSync(reviewRoot, { recursive: true, force: true });
 		}
@@ -265,7 +269,9 @@ describe("schema command", () => {
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.exit_code).toBe(0);
 			expect(payload.dry_run).toBe(true);
-			expect(payload.pack).toEqual((payload.data as { pack: { name: string } }).pack);
+			expect(payload.pack).toEqual(
+				(payload.data as { pack: { name: string } }).pack,
+			);
 			expect(
 				existsSync(join(root, ".afol", "adm", "schema", "afol-shape.yaml")),
 			).toBe(false);
@@ -287,7 +293,9 @@ describe("schema command", () => {
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.exit_code).toBe(2);
 			expect(payload.ok).toBe(false);
-			expect((payload.error as { code: string }).code).toBe("schema.command.error");
+			expect((payload.error as { code: string }).code).toBe(
+				"schema.command.error",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

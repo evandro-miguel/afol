@@ -13,8 +13,8 @@ import { createPatch } from "diff";
 import {
 	envelopeOk,
 	envelopeWithLegacyKeys,
-	stringifyEnvelope,
 	type ResultEnvelope,
+	stringifyEnvelope,
 } from "../core/envelope";
 import {
 	appendMutationRecord,
@@ -53,7 +53,9 @@ type CommandResult = {
 	message?: string;
 };
 
-function fileResultEnvelope(result: CommandResult): ResultEnvelope<CommandResult> {
+function fileResultEnvelope(
+	result: CommandResult,
+): ResultEnvelope<CommandResult> {
 	if (result.status !== "blocked") {
 		return envelopeOk(result, { action: "file", exitCode: 0 });
 	}

@@ -393,7 +393,11 @@ describe("health system", () => {
 			expect(payload.exit_code).toBe(1);
 			expect(payload.ok).toBe(false);
 			expect(Array.isArray(payload.findings)).toBe(true);
-			expect(payload.summary).toEqual({ fail: expect.any(Number), warn: expect.any(Number), info: expect.any(Number) });
+			expect(payload.summary).toEqual({
+				fail: expect.any(Number),
+				warn: expect.any(Number),
+				info: expect.any(Number),
+			});
 			expect(payload.data.checked_at).toBe(payload.checked_at);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -449,29 +453,29 @@ describe("health system", () => {
 					root,
 					captured.io,
 				),
-				).toBe(0);
-				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-					schema: string;
-					ok: boolean;
-					exit_code: number;
-					mode: string;
-					dry_run: boolean;
-					actions: string[];
-					applied: boolean;
-					data?: {
-						mode?: string;
-						dry_run?: boolean;
-						actions?: string[];
-						applied?: boolean;
-					};
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
+				mode: string;
+				dry_run: boolean;
+				actions: string[];
+				applied: boolean;
+				data?: {
+					mode?: string;
+					dry_run?: boolean;
+					actions?: string[];
+					applied?: boolean;
 				};
-				expect(payload.schema).toBe("afol.result/v1");
-				expect(payload.ok).toBe(true);
-				expect(payload.exit_code).toBe(0);
-				expect(payload.mode).toBe("monthly");
-				expect(payload.dry_run).toBe(true);
-				expect(payload.data?.mode).toBe("monthly");
-				expect(payload.data?.dry_run).toBe(true);
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.mode).toBe("monthly");
+			expect(payload.dry_run).toBe(true);
+			expect(payload.data?.mode).toBe("monthly");
+			expect(payload.data?.dry_run).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -614,29 +618,29 @@ describe("health system", () => {
 					root,
 					captured.io,
 				),
-				).toBe(0);
-				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-					schema: string;
-					ok: boolean;
-					exit_code: number;
-					mode: string;
-					dry_run: boolean;
-					actions: string[];
-					applied: boolean;
-					data?: {
-						mode?: string;
-						dry_run?: boolean;
-						actions?: string[];
-						applied?: boolean;
-					};
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
+				mode: string;
+				dry_run: boolean;
+				actions: string[];
+				applied: boolean;
+				data?: {
+					mode?: string;
+					dry_run?: boolean;
+					actions?: string[];
+					applied?: boolean;
 				};
-				expect(payload.schema).toBe("afol.result/v1");
-				expect(payload.ok).toBe(true);
-				expect(payload.exit_code).toBe(0);
-				expect(payload.mode).toBe("monthly");
-				expect(payload.dry_run).toBe(true);
-				expect(payload.data?.mode).toBe("monthly");
-				expect(payload.data?.dry_run).toBe(true);
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.mode).toBe("monthly");
+			expect(payload.dry_run).toBe(true);
+			expect(payload.data?.mode).toBe("monthly");
+			expect(payload.data?.dry_run).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -59,13 +59,15 @@ describe("help formatter", () => {
 		expect(parsed.map((entry) => entry.command)).toEqual(
 			expect.arrayContaining(["status", "pstr", "adm"]),
 		);
-		expect(parsed.find((entry) => entry.command === "status")?.aliases).toEqual([
-			"s",
-		]);
-		expect(parsed.find((entry) => entry.command === "adm")?.aliases).toEqual([]);
-		expect(parsed.every((entry) => !entry.aliases.includes(entry.command))).toBe(
-			true,
+		expect(parsed.find((entry) => entry.command === "status")?.aliases).toEqual(
+			["s"],
 		);
+		expect(parsed.find((entry) => entry.command === "adm")?.aliases).toEqual(
+			[],
+		);
+		expect(
+			parsed.every((entry) => !entry.aliases.includes(entry.command)),
+		).toBe(true);
 	});
 
 	test("builds single command json from registry metadata", () => {

@@ -1,11 +1,11 @@
-import { checkHealth, type HealthArea } from "../services/health";
 import {
 	envelopeErr,
 	envelopeOk,
 	envelopeWithLegacyKeys,
-	stringifyEnvelope,
 	type ResultEnvelope,
+	stringifyEnvelope,
 } from "../core/envelope";
+import { checkHealth, type HealthArea } from "../services/health";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -93,9 +93,9 @@ function writeJsonReport(
 	const envelope = report.ok
 		? envelopeOk(data, { action: "health", exitCode: 0 })
 		: (envelopeErr("HEALTH_FAILED", "health check failed", {
-			action: "health",
-			exitCode: 1,
-		}) as ResultEnvelope<HealthJsonData>);
+				action: "health",
+				exitCode: 1,
+			}) as ResultEnvelope<HealthJsonData>);
 	envelope.data = data;
 	io.stdout(
 		stringifyEnvelope(

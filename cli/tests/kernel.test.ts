@@ -128,7 +128,10 @@ describe("kernel front-door", () => {
 	test("help command prints registry-backed command help", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-command-help-no-project-"));
 		try {
-			for (const args of [["help", "status"], ["help", "s"]]) {
+			for (const args of [
+				["help", "status"],
+				["help", "s"],
+			]) {
 				const proc = runKernel(root, args);
 				expect(proc.status).toBe(0);
 				expect(proc.stdout as string).toContain("Command: status");
@@ -165,12 +168,12 @@ describe("kernel front-door", () => {
 			expect(catalogPayload.map((entry) => entry.command)).toEqual(
 				expect.arrayContaining(["status", "pstr", "adm"]),
 			);
-			expect(catalogPayload.find((entry) => entry.command === "status")?.aliases).toEqual([
-				"s",
-			]);
-			expect(catalogPayload.every((entry) => !entry.aliases.includes(entry.command))).toBe(
-				true,
-			);
+			expect(
+				catalogPayload.find((entry) => entry.command === "status")?.aliases,
+			).toEqual(["s"]);
+			expect(
+				catalogPayload.every((entry) => !entry.aliases.includes(entry.command)),
+			).toBe(true);
 
 			const single = runKernel(root, ["help", "status", "--json"]);
 			expect(single.status).toBe(0);

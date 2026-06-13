@@ -1,16 +1,16 @@
 import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
+import {
 	checkPstrStale,
 	getPstrIndex,
 	getPstrSection,
 	rebuildPstrIndex,
 	validatePstrIndex,
 } from "../services/pstr";
-import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;

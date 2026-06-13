@@ -1,10 +1,10 @@
-import { sweepDaily, sweepMonthly, sweepWeekly } from "../services/sweep";
 import {
 	envelopeOk,
 	envelopeWithLegacyKeys,
-	stringifyEnvelope,
 	type ResultEnvelope,
+	stringifyEnvelope,
 } from "../core/envelope";
+import { sweepDaily, sweepMonthly, sweepWeekly } from "../services/sweep";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -26,12 +26,12 @@ function resultEnvelope<T extends Record<string, unknown>>(
 	return exitCode === 0
 		? envelopeOk(data, { action, exitCode })
 		: {
-			schema: "afol.result/v1",
-			ok: false,
-			action,
-			exit_code: exitCode,
-			data,
-		};
+				schema: "afol.result/v1",
+				ok: false,
+				action,
+				exit_code: exitCode,
+				data,
+			};
 }
 
 function normalizeAction(value: string | undefined): SweepAction {

@@ -8,7 +8,10 @@ import {
 
 describe("envelope", () => {
 	test("ok shape/schema/action/warnings", () => {
-		const envelope = envelopeOk({ value: 42 }, { action: "build", warnings: ["slow"] });
+		const envelope = envelopeOk(
+			{ value: 42 },
+			{ action: "build", warnings: ["slow"] },
+		);
 
 		expect(envelope).toEqual({
 			schema: "afol.result/v1",
@@ -57,7 +60,10 @@ describe("envelope", () => {
 
 	test("missing legacy key not copied", () => {
 		type LegacyData = { present: string; absent?: string };
-		const envelope = envelopeOk<LegacyData>({ present: "yes" }, { action: "sync" });
+		const envelope = envelopeOk<LegacyData>(
+			{ present: "yes" },
+			{ action: "sync" },
+		);
 		const legacy = envelopeWithLegacyKeys(envelope, ["present", "absent"]);
 
 		expect(legacy.present).toBe("yes");

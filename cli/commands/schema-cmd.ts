@@ -1,4 +1,10 @@
 import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
+import {
 	defaultOperationContext,
 	type OperationContext,
 } from "../core/operation-context";
@@ -13,12 +19,6 @@ import {
 	writeResolver,
 	writeShapePack,
 } from "../services/schema";
-import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -145,14 +145,11 @@ export async function runSchemaCommand(
 
 		if (schemaAction === "detect") {
 			if (parsed.json) {
-				writeJsonOk(
-					io,
-					schemaAction,
-					{ pack: detected, shape: detected },
-					["pack", "shape"],
-				);
-			}
-			else io.stdout(formatPack(detected));
+				writeJsonOk(io, schemaAction, { pack: detected, shape: detected }, [
+					"pack",
+					"shape",
+				]);
+			} else io.stdout(formatPack(detected));
 			return 0;
 		}
 
@@ -160,8 +157,7 @@ export async function runSchemaCommand(
 			const suggestions = suggestShape(projectRoot);
 			if (parsed.json) {
 				writeJsonOk(io, schemaAction, { suggestions }, ["suggestions"]);
-			}
-			else
+			} else
 				io.stdout(
 					suggestions.length > 0
 						? suggestions.join("\n")
@@ -180,8 +176,7 @@ export async function runSchemaCommand(
 					{ current, detected, suggestions, shape: detected },
 					["current", "detected", "suggestions", "shape"],
 				);
-			}
-			else
+			} else
 				io.stdout(
 					[
 						current ? formatPack(current) : "schema: missing",
@@ -199,14 +194,12 @@ export async function runSchemaCommand(
 			}
 			const content = detectResolver(projectRoot);
 			if (parsed.json) {
-				writeJsonOk(
-					io,
-					schemaAction,
-					{ write: parsed.write, path, content },
-					["write", "path", "content"],
-				);
-			}
-			else
+				writeJsonOk(io, schemaAction, { write: parsed.write, path, content }, [
+					"write",
+					"path",
+					"content",
+				]);
+			} else
 				io.stdout(
 					parsed.write
 						? `resolver written: ${path}`

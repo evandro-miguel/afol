@@ -48,24 +48,27 @@ function createFixture(withAdmFiles: boolean): string {
 }
 
 describe("adm command", () => {
-		test("paths json reports adm paths under .afol/adm", async () => {
-			const root = createFixture(false);
-			try {
-				const captured = captureIo();
-				const code = await runAdmCommand("paths", ["--json"], root, captured.io);
-				expect(code).toBe(0);
-				const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<string, unknown>;
-				expect(payload.schema).toBe("afol.result/v1");
-				expect(payload.ok).toBe(true);
-				expect(payload.exit_code).toBe(0);
-				expect(payload.action).toBe("paths");
-				expect(payload.data).toMatchObject({ action: "paths" });
-				const paths = payload.paths as Record<string, string>;
-				expect(payload.data).toMatchObject({ paths });
-				expect(paths.admDir).toContain(".afol/adm");
-				expect(paths.schemaDir).toContain(".afol/adm/schema");
-			} finally {
-				rmSync(root, { recursive: true, force: true });
+	test("paths json reports adm paths under .afol/adm", async () => {
+		const root = createFixture(false);
+		try {
+			const captured = captureIo();
+			const code = await runAdmCommand("paths", ["--json"], root, captured.io);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.action).toBe("paths");
+			expect(payload.data).toMatchObject({ action: "paths" });
+			const paths = payload.paths as Record<string, string>;
+			expect(payload.data).toMatchObject({ paths });
+			expect(paths.admDir).toContain(".afol/adm");
+			expect(paths.schemaDir).toContain(".afol/adm/schema");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 

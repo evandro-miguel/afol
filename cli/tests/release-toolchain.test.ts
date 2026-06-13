@@ -185,7 +185,10 @@ describe("release and toolchain contracts", () => {
 			}
 			expect(commitResult.status).toBe(0);
 
-			const provenance = buildReleaseProvenance({ cwd: root, releaseMode: true });
+			const provenance = buildReleaseProvenance({
+				cwd: root,
+				releaseMode: true,
+			});
 			expect(provenance.security_scanners).toHaveLength(2);
 			expect(provenance.security_scanners).toEqual(
 				expect.arrayContaining([

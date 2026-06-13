@@ -1,12 +1,12 @@
 import {
-	addChangelogEntry,
-	type ChangelogEntryType,
-} from "../services/spec-gate";
-import {
 	envelopeOk,
 	envelopeWithLegacyKeys,
 	stringifyEnvelope,
 } from "../core/envelope";
+import {
+	addChangelogEntry,
+	type ChangelogEntryType,
+} from "../services/spec-gate";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -64,11 +64,17 @@ function parseArgs(args: string[]): {
 }
 
 function writeJsonEnvelope(io: CommandIo, data: Record<string, unknown>): void {
-	const envelope = envelopeOk(data, { action: String(data.action ?? "add"), exitCode: 0 });
+	const envelope = envelopeOk(data, {
+		action: String(data.action ?? "add"),
+		exitCode: 0,
+	});
 	envelope.data = data;
 	io.stdout(
 		stringifyEnvelope(
-			envelopeWithLegacyKeys(envelope, Object.keys(data) as (keyof typeof data)[]),
+			envelopeWithLegacyKeys(
+				envelope,
+				Object.keys(data) as (keyof typeof data)[],
+			),
 		),
 	);
 }

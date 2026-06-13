@@ -125,7 +125,10 @@ describe("update command", () => {
 			expect(parsed.ok).toBe(true);
 			expect(parsed.exit_code).toBe(0);
 			expect(parsed).toMatchObject({ hasSource: true, currentRevision: "old" });
-			expect(parsed.data).toMatchObject({ hasSource: true, currentRevision: "old" });
+			expect(parsed.data).toMatchObject({
+				hasSource: true,
+				currentRevision: "old",
+			});
 			expect(parsed.ownershipSource.managed).toBe(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

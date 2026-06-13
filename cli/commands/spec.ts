@@ -1,16 +1,16 @@
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
 import type { SpecCheckResult } from "../services/spec-gate";
 import {
 	checkSpecCompatibility,
 	getSpecCheck,
 	waiveSpecCheck,
 } from "../services/spec-gate";
-import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-	type ResultEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -136,13 +136,16 @@ function writeJsonResult(
 		exitCode === 0
 			? envelopeOk(data, { action: `spec.${action}`, exitCode })
 			: (envelopeErr("SPEC_CONFLICT", "spec compatibility check failed", {
-				action: `spec.${action}`,
-				exitCode,
-			}) as ResultEnvelope<typeof data>);
+					action: `spec.${action}`,
+					exitCode,
+				}) as ResultEnvelope<typeof data>);
 	envelope.data = data;
 	io.stdout(
 		stringifyEnvelope(
-			envelopeWithLegacyKeys(envelope, Object.keys(data) as (keyof typeof data)[]),
+			envelopeWithLegacyKeys(
+				envelope,
+				Object.keys(data) as (keyof typeof data)[],
+			),
 		),
 	);
 }

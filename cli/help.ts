@@ -1,6 +1,15 @@
-import { kernelRegistry, type CommandCategory, type CommandSpec } from "./registry";
+import {
+	type CommandCategory,
+	type CommandSpec,
+	kernelRegistry,
+} from "./registry";
 
-const CATEGORY_ORDER: readonly CommandCategory[] = ["core", "workflow", "inspect", "ops"];
+const CATEGORY_ORDER: readonly CommandCategory[] = [
+	"core",
+	"workflow",
+	"inspect",
+	"ops",
+];
 
 const CATEGORY_LABELS: Record<CommandCategory, string> = {
 	core: "Core",
@@ -46,7 +55,8 @@ export function buildCommandHelpJson(
 	registry = kernelRegistry,
 ): CommandCatalogEntry | null {
 	const canonical = registry.canonicalize(commandOrAlias);
-	const spec = registry.commands.find((entry) => entry.command === canonical) ?? null;
+	const spec =
+		registry.commands.find((entry) => entry.command === canonical) ?? null;
 	if (!spec) {
 		return null;
 	}
@@ -110,6 +120,12 @@ export function formatHelpText(registry = kernelRegistry): string {
 		lines.push(`  ${uncategorized.join(" | ")}`);
 	}
 
-	lines.push("", "Flags", "  -j, --json  JSON output for status", "Aliases", "  a=afol");
+	lines.push(
+		"",
+		"Flags",
+		"  -j, --json  JSON output for status",
+		"Aliases",
+		"  a=afol",
+	);
 	return lines.join("\n");
 }

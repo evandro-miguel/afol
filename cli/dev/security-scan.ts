@@ -105,7 +105,9 @@ function buildCommandOutcome(opts: {
 		kind: opts.kind,
 		mode: opts.mode,
 		status: opts.status === 0 ? "passed" : "failed",
-		...(opts.status === 0 ? {} : { reason: `${opts.tool} exited with status ${opts.status}.` }),
+		...(opts.status === 0
+			? {}
+			: { reason: `${opts.tool} exited with status ${opts.status}.` }),
 		...(waiver_required ? { waiver_required } : {}),
 	};
 }
@@ -171,7 +173,9 @@ function buildReleaseScannerOutcome(opts: {
 	};
 }
 
-export function buildReleaseSecurityScanOutcomes(env?: NodeJS.ProcessEnv): SecurityScanOutcome[] {
+export function buildReleaseSecurityScanOutcomes(
+	env?: NodeJS.ProcessEnv,
+): SecurityScanOutcome[] {
 	return RELEASE_SECURITY_SCANNERS.map((scanner) =>
 		buildReleaseScannerOutcome({
 			...scanner,
@@ -205,9 +209,7 @@ function runOptionalScan(opts: {
 
 		if (result.error) {
 			const error = result.error as Error & { code?: string };
-			if (
-				String(error.code) === "ENOENT"
-			) {
+			if (String(error.code) === "ENOENT") {
 				continue;
 			}
 
@@ -225,9 +227,7 @@ function runOptionalScan(opts: {
 		}
 
 		if (result.status !== 0) {
-			const stderr = opts.json
-				? `${result.stderr ?? ""}`.trim()
-				: "";
+			const stderr = opts.json ? `${result.stderr ?? ""}`.trim() : "";
 			return {
 				outcome: buildCommandOutcome({
 					tool: binary,
@@ -271,7 +271,9 @@ function runOptionalScan(opts: {
 		}),
 		exitCode: 0,
 		stdout:
-			opts.mode === "release" ? opts.missingReleaseMessage : opts.missingMessage,
+			opts.mode === "release"
+				? opts.missingReleaseMessage
+				: opts.missingMessage,
 	};
 }
 

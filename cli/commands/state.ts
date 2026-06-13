@@ -2,8 +2,8 @@ import {
 	envelopeErr,
 	envelopeOk,
 	envelopeWithLegacyKeys,
-	stringifyEnvelope,
 	type ResultEnvelope,
+	stringifyEnvelope,
 } from "../core/envelope";
 import {
 	exportSessionState,
@@ -148,18 +148,16 @@ function writeValidationJson(
 ): void {
 	const envelope = result.ok
 		? envelopeOk<StateValidationJson>(
-			{ session: result.sessionId, result },
-			{ action: "state.validate" },
-		)
+				{ session: result.sessionId, result },
+				{ action: "state.validate" },
+			)
 		: (envelopeErr("STATE_VALIDATE_FAILED", result.message, {
-			action: "state.validate",
-			exitCode: 1,
-		}) as ResultEnvelope<StateValidationJson>);
+				action: "state.validate",
+				exitCode: 1,
+			}) as ResultEnvelope<StateValidationJson>);
 	envelope.data = { session: result.sessionId, result };
 	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(envelope, ["result", "session"]),
-		),
+		stringifyEnvelope(envelopeWithLegacyKeys(envelope, ["result", "session"])),
 	);
 }
 

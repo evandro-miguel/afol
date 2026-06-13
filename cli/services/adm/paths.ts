@@ -16,8 +16,8 @@ export type AdmPaths = {
 };
 
 function walkFiles(root: string, current: string, files: string[]): void {
-	const entries = readdirSync(current, { withFileTypes: true }).sort((left, right) =>
-		left.name.localeCompare(right.name),
+	const entries = readdirSync(current, { withFileTypes: true }).sort(
+		(left, right) => left.name.localeCompare(right.name),
 	);
 	for (const entry of entries) {
 		const absolute = join(current, entry.name);

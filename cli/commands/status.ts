@@ -1,17 +1,17 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
+import {
 	collectSessionIds,
 	detectSessionHealth,
 } from "../services/local-state/workbench-index";
 import { resolveProjectPaths } from "../services/project/paths";
 import { loadProjectRoot } from "../services/project/root";
-import {
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-	type ResultEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -97,12 +97,12 @@ function resultEnvelope<T extends Record<string, unknown>>(
 	return exitCode === 0
 		? envelopeOk(data, { action, exitCode })
 		: {
-			schema: "afol.result/v1",
-			ok: false,
-			action,
-			exit_code: exitCode,
-			data,
-		};
+				schema: "afol.result/v1",
+				ok: false,
+				action,
+				exit_code: exitCode,
+				data,
+			};
 }
 
 function parseFrontmatter(text: string): Record<string, string> {
@@ -421,18 +421,15 @@ export function runStatusCommand(
 		};
 		io.stdout(
 			stringifyEnvelope(
-				envelopeWithLegacyKeys(
-					resultEnvelope(data, "status", 0),
-					[
-						"status",
-						"task",
-						"files_written",
-						"validation_or_checks",
-						"blockers",
-						"next",
-						"paths",
-					],
-				),
+				envelopeWithLegacyKeys(resultEnvelope(data, "status", 0), [
+					"status",
+					"task",
+					"files_written",
+					"validation_or_checks",
+					"blockers",
+					"next",
+					"paths",
+				]),
 			),
 		);
 		return 0;

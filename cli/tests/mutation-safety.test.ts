@@ -101,9 +101,7 @@ describe("mutation safety command family", () => {
 			]);
 
 			expect(proc.status).toBe(0);
-			const result = expectFileEnvelope(
-				parseJsonOutput(proc.stdout as string),
-			);
+			const result = expectFileEnvelope(parseJsonOutput(proc.stdout as string));
 			expect(result.command).toBe("pt");
 			expect(result.status).toBe("dry-run");
 			expect(result.path).toBe("notes/doc.txt");
@@ -141,9 +139,7 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(proc.status).toBe(0);
-			const result = expectFileEnvelope(
-				parseJsonOutput(proc.stdout as string),
-			);
+			const result = expectFileEnvelope(parseJsonOutput(proc.stdout as string));
 			expect(result.status).toBe("write");
 			expect(result.path).toBe("notes/with-backup.txt");
 			expect(result.backup_path).toBeTruthy();
@@ -265,9 +261,7 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(proc.status).toBe(0);
-			const result = expectFileEnvelope(
-				parseJsonOutput(proc.stdout as string),
-			);
+			const result = expectFileEnvelope(parseJsonOutput(proc.stdout as string));
 			expect(result.command).toBe("ar");
 			expect(result.status).toBe("dry-run");
 			expect(result.path).toBe("notes/to-archive.txt");

@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAdmCommand } from "../commands/adm";
@@ -39,38 +45,61 @@ function createFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "adm-plan-"));
 	mkdirSync(join(root, "docs", "arc", "SPECS", "nested"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "DECISIONS"), { recursive: true });
-	writeFileSync(join(root, "docs", "arc", "GENERAL-ROADMAP.md"), "roadmap", "utf8");
-	writeFileSync(join(root, "docs", "arc", "PROJECT-MANIFESTO.md"), "manifesto", "utf8");
-	writeFileSync(join(root, "docs", "arc", "ARCHITECTURE.md"), "architecture", "utf8");
-	writeFileSync(join(root, "docs", "arc", "SPECS", "sample.md"), "spec", "utf8");
+	writeFileSync(
+		join(root, "docs", "arc", "GENERAL-ROADMAP.md"),
+		"roadmap",
+		"utf8",
+	);
+	writeFileSync(
+		join(root, "docs", "arc", "PROJECT-MANIFESTO.md"),
+		"manifesto",
+		"utf8",
+	);
+	writeFileSync(
+		join(root, "docs", "arc", "ARCHITECTURE.md"),
+		"architecture",
+		"utf8",
+	);
+	writeFileSync(
+		join(root, "docs", "arc", "SPECS", "sample.md"),
+		"spec",
+		"utf8",
+	);
 	writeFileSync(
 		join(root, "docs", "arc", "SPECS", "nested", "deep.md"),
 		"deep-spec",
 		"utf8",
 	);
-	writeFileSync(join(root, "docs", "arc", "DECISIONS", "decision.md"), "decision", "utf8");
+	writeFileSync(
+		join(root, "docs", "arc", "DECISIONS", "decision.md"),
+		"decision",
+		"utf8",
+	);
 	writeFileSync(join(root, "docs", "arc", "CHANGELOG.md"), "changelog", "utf8");
 	return root;
 }
 
 describe("adm plan", () => {
-		test("plan json includes manifest entries", async () => {
-			const root = createFixture();
-			try {
-				const captured = captureIo();
-				const code = await runAdmCommand("plan", ["--json"], root, captured.io);
-				expect(code).toBe(0);
-				const payload = JSON.parse(captured.stdout[0] ?? "{}");
-				expect(payload.schema).toBe("afol.result/v1");
-				expect(payload.ok).toBe(true);
-				expect(payload.exit_code).toBe(0);
-				expect(payload.action).toBe("plan");
-				expect(Array.isArray(payload.manifest)).toBe(true);
-				expect(payload.data).toMatchObject({ action: "plan", manifest: payload.manifest });
-				const bySource = new Map(
-					(payload.manifest as Array<{ source_path: string }>).map((entry) => [
-						entry.source_path,
-						entry,
+	test("plan json includes manifest entries", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			const code = await runAdmCommand("plan", ["--json"], root, captured.io);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.action).toBe("plan");
+			expect(Array.isArray(payload.manifest)).toBe(true);
+			expect(payload.data).toMatchObject({
+				action: "plan",
+				manifest: payload.manifest,
+			});
+			const bySource = new Map(
+				(payload.manifest as Array<{ source_path: string }>).map((entry) => [
+					entry.source_path,
+					entry,
 				]),
 			);
 			expect(bySource.get("docs/arc/GENERAL-ROADMAP.md")).toMatchObject({
@@ -119,7 +148,12 @@ describe("adm plan", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			const code = await runAdmCommand("migrate", ["--dry-run", "--json"], root, captured.io);
+			const code = await runAdmCommand(
+				"migrate",
+				["--dry-run", "--json"],
+				root,
+				captured.io,
+			);
 			expect(code).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.dry_run).toBe(true);

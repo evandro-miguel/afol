@@ -238,7 +238,12 @@ describe("workbench lifecycle service", () => {
 				status: "done",
 			});
 
-			const closeProc = runKernel(root, ["close", "--session", created.session, "--json"]);
+			const closeProc = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--json",
+			]);
 			expect(closeProc.status).toBe(0);
 			const closeEnvelope = parseEnvelope(closeProc.stdout as string);
 			expect(closeEnvelope).toMatchObject({
@@ -292,8 +297,8 @@ describe("workbench lifecycle service", () => {
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
-			}
-		});
+		}
+	});
 
 	test("done json emits failure envelope for spec conflict", () => {
 		const root = mkRoot("done-spec-conflict");
@@ -358,7 +363,7 @@ describe("workbench lifecycle service", () => {
 				"--task-id",
 				"T-01",
 				"--test",
-				"bun -e \"process.exit(3)\"",
+				'bun -e "process.exit(3)"',
 				"--json",
 			]);
 

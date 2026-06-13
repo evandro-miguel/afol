@@ -1,18 +1,18 @@
 import { relative } from "node:path";
 import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
+import {
 	buildAdmMigrationPlan,
 	listAdmFiles,
 	migrateAdm,
 	resolveAdmPaths,
 	validateAdmMigration,
 } from "../services/adm";
-import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-	type ResultEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -62,7 +62,10 @@ function parseArgs(args: string[]): { dryRun: boolean; json: boolean } {
 	return { dryRun, json };
 }
 
-function toRelative(root: string, paths: Record<string, string>): Record<string, string> {
+function toRelative(
+	root: string,
+	paths: Record<string, string>,
+): Record<string, string> {
 	const result: Record<string, string> = {};
 	for (const [key, value] of Object.entries(paths)) {
 		result[key] = relative(root, value);
@@ -70,17 +73,24 @@ function toRelative(root: string, paths: Record<string, string>): Record<string,
 	return result;
 }
 
-function writeJsonEnvelope(io: CommandIo, data: Record<string, unknown>, ok: boolean): void {
+function writeJsonEnvelope(
+	io: CommandIo,
+	data: Record<string, unknown>,
+	ok: boolean,
+): void {
 	const envelope = ok
 		? envelopeOk(data, { action: String(data.action ?? "adm"), exitCode: 0 })
 		: (envelopeErr("ADM_FAILED", "adm command failed", {
-			action: String(data.action ?? "adm"),
-			exitCode: 1,
-		}) as ResultEnvelope<Record<string, unknown>>);
+				action: String(data.action ?? "adm"),
+				exitCode: 1,
+			}) as ResultEnvelope<Record<string, unknown>>);
 	envelope.data = data;
 	io.stdout(
 		stringifyEnvelope(
-			envelopeWithLegacyKeys(envelope, Object.keys(data) as (keyof typeof data)[]),
+			envelopeWithLegacyKeys(
+				envelope,
+				Object.keys(data) as (keyof typeof data)[],
+			),
 		),
 	);
 }
@@ -144,10 +154,12 @@ export async function runAdmCommand(
 						true,
 					);
 				} else {
-					io.stdout([
-						`${admAction}: ${result.manifest.length} files`,
-						"archive: (dry-run)",
-					].join("\n"));
+					io.stdout(
+						[
+							`${admAction}: ${result.manifest.length} files`,
+							"archive: (dry-run)",
+						].join("\n"),
+					);
 				}
 				return 0;
 			}
@@ -156,10 +168,12 @@ export async function runAdmCommand(
 			if (parsed.json) {
 				writeJsonEnvelope(io, { action: admAction, ...result }, true);
 			} else {
-				io.stdout([
-					`${admAction}: ${result.manifest.length} files`,
-					`archive: ${result.archive_path}`,
-				].join("\n"));
+				io.stdout(
+					[
+						`${admAction}: ${result.manifest.length} files`,
+						`archive: ${result.archive_path}`,
+					].join("\n"),
+				);
 			}
 			return 0;
 		}

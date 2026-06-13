@@ -1,3 +1,9 @@
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
 import type { LibraryClaim, LibrarySource } from "../services/library";
 import {
 	addClaim,
@@ -9,12 +15,6 @@ import {
 	rebuildLibraryIndex,
 	searchLibrary,
 } from "../services/library";
-import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -280,7 +280,8 @@ export async function runLibraryCommand(
 			if (parsed.json) {
 				writeJsonOk(io, libraryAction, { topic }, ["topic"]);
 			} else {
-				io.stdout([
+				io.stdout(
+					[
 						`topic: ${topic.slug}`,
 						`title: ${topic.title}`,
 						`sources: ${topic.sources.length}`,
@@ -288,7 +289,8 @@ export async function runLibraryCommand(
 						`tags: ${topic.tags.join(", ") || "none"}`,
 						...topic.sources.map(formatSource),
 						...topic.claims.map(formatClaim),
-					].join("\n"));
+					].join("\n"),
+				);
 			}
 			return 0;
 		}
@@ -302,12 +304,14 @@ export async function runLibraryCommand(
 			if (parsed.json) {
 				writeJsonOk(io, libraryAction, { matches }, ["matches"]);
 			} else {
-				io.stdout([
+				io.stdout(
+					[
 						`library matches: ${matches.length}`,
 						...matches.map(
 							(match) => `${match.topic.slug} ${match.topic.title}`,
 						),
-					].join("\n"));
+					].join("\n"),
+				);
 			}
 			return 0;
 		}

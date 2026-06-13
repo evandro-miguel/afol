@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { runAdrCommand } from "./commands/adr";
 import { runAdmCommand } from "./commands/adm";
+import { runAdrCommand } from "./commands/adr";
 import { runBootstrapCommand } from "./commands/bootstrap";
 import { runRuleCommand, runSkillCommand } from "./commands/catalog";
 import { runChangelogCommand } from "./commands/changelog";
@@ -40,8 +40,8 @@ import {
 	formatCommandHelp,
 	formatHelpText,
 } from "./help";
-import { resolveCommand } from "./router";
 import { kernelRegistry } from "./registry";
+import { resolveCommand } from "./router";
 import { loadProjectRoot } from "./services/project/root";
 import { runValidationCommand } from "./validate/contract";
 

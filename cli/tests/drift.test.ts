@@ -228,10 +228,16 @@ describe("drift validation", () => {
 	test("runDriftCheck reports adm drift", () => {
 		const root = createFixture();
 		try {
-			writeFileSync(join(root, ".afol", "adm", "specs", "spec-a.md"), "changed", "utf8");
+			writeFileSync(
+				join(root, ".afol", "adm", "specs", "spec-a.md"),
+				"changed",
+				"utf8",
+			);
 			const report = runDriftCheck(root);
 			expect(report.ok).toBe(false);
-			expect(report.findings.some((finding) => finding.domain === "adm")).toBe(true);
+			expect(report.findings.some((finding) => finding.domain === "adm")).toBe(
+				true,
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

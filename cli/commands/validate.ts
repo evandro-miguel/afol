@@ -1,13 +1,13 @@
-import type { DriftReport } from "../services/drift";
-import { runDriftCheck } from "../services/drift";
-import { validateProjectStructure } from "../services/project/validate";
 import {
 	envelopeErr,
 	envelopeOk,
 	envelopeWithLegacyKeys,
-	stringifyEnvelope,
 	type ResultEnvelope,
+	stringifyEnvelope,
 } from "../core/envelope";
+import type { DriftReport } from "../services/drift";
+import { runDriftCheck } from "../services/drift";
+import { validateProjectStructure } from "../services/project/validate";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -120,9 +120,9 @@ function writeValidationJson(io: CommandIo, report: ValidationReport): void {
 	const envelope = report.ok
 		? envelopeOk(data, { action: "validate", exitCode: 0 })
 		: (envelopeErr("VALIDATION_FAILED", "validation failed", {
-			action: "validate",
-			exitCode: 1,
-		}) as ResultEnvelope<ValidationJsonData>);
+				action: "validate",
+				exitCode: 1,
+			}) as ResultEnvelope<ValidationJsonData>);
 	envelope.data = data;
 	io.stdout(
 		stringifyEnvelope(
@@ -141,13 +141,18 @@ function writeDriftJson(io: CommandIo, report: DriftReport): void {
 	const envelope = report.ok
 		? envelopeOk(data, { action: "validate.drift", exitCode: 0 })
 		: (envelopeErr("DRIFT_FOUND", "drift validation failed", {
-			action: "validate.drift",
-			exitCode: 1,
-		}) as ResultEnvelope<DriftJsonData>);
+				action: "validate.drift",
+				exitCode: 1,
+			}) as ResultEnvelope<DriftJsonData>);
 	envelope.data = data;
 	io.stdout(
 		stringifyEnvelope(
-			envelopeWithLegacyKeys(envelope, ["report", "ok", "findings", "checked_at"]),
+			envelopeWithLegacyKeys(envelope, [
+				"report",
+				"ok",
+				"findings",
+				"checked_at",
+			]),
 		),
 	);
 }

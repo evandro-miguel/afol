@@ -112,36 +112,40 @@ describe("status command", () => {
 		}
 	});
 
-		test("supports --json with simple payload and read paths", () => {
-			const root = createFixture();
-			try {
-				const captured = captureIo();
-				const code = runStatusCommand(root, ["--json"], captured.io);
+	test("supports --json with simple payload and read paths", () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			const code = runStatusCommand(root, ["--json"], captured.io);
 			expect(code).toBe(0);
 			expect(captured.stderr).toEqual([]);
 			expect(captured.stdout.length).toBe(1);
 
-				const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
-					schema: string;
-					ok: boolean;
-					exit_code: number;
-					status: string;
-					task: string;
-					paths: Record<string, unknown>;
-					data?: { status?: string; task?: string; paths?: Record<string, unknown> };
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
+				status: string;
+				task: string;
+				paths: Record<string, unknown>;
+				data?: {
+					status?: string;
+					task?: string;
+					paths?: Record<string, unknown>;
 				};
-				expect(payload.schema).toBe("afol.result/v1");
-				expect(payload.ok).toBe(true);
-				expect(payload.exit_code).toBe(0);
-				expect(payload.status).toBe("in_progress");
-				expect(payload.task).toBe("T-01");
-				expect(payload.data?.status).toBe("in_progress");
-				expect(payload.data?.task).toBe("T-01");
-				const paths = payload.paths;
-				expect(typeof paths.config).toBe("string");
-				expect(typeof paths.lock).toBe("string");
-				expect(typeof paths.active_session).toBe("string");
-				expect(typeof paths.task_file).toBe("string");
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.status).toBe("in_progress");
+			expect(payload.task).toBe("T-01");
+			expect(payload.data?.status).toBe("in_progress");
+			expect(payload.data?.task).toBe("T-01");
+			const paths = payload.paths;
+			expect(typeof paths.config).toBe("string");
+			expect(typeof paths.lock).toBe("string");
+			expect(typeof paths.active_session).toBe("string");
+			expect(typeof paths.task_file).toBe("string");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

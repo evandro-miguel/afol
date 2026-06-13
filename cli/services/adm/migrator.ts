@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { atomicWriteText } from "../io/atomic";
-import { buildAdmMigrationPlan, type AdmManifestEntry } from "./planner";
+import { type AdmManifestEntry, buildAdmMigrationPlan } from "./planner";
 
 export type AdmMigrationArchive = {
 	generated_at: string;
@@ -108,7 +108,10 @@ export function migrateAdm(root: string): AdmMigrationResult {
 		count: plan.manifest.length,
 		manifest: plan.manifest,
 	};
-	atomicWriteText(join(root, archive_path), `${JSON.stringify(archive, null, 2)}\n`);
+	atomicWriteText(
+		join(root, archive_path),
+		`${JSON.stringify(archive, null, 2)}\n`,
+	);
 
 	return {
 		...archive,

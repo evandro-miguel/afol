@@ -1,14 +1,14 @@
 import {
-	checkDbHealth,
-	type DbHealthReport,
-} from "../services/state/db-health";
-import {
 	envelopeErr,
 	envelopeOk,
 	envelopeWithLegacyKeys,
-	stringifyEnvelope,
 	type ResultEnvelope,
+	stringifyEnvelope,
 } from "../core/envelope";
+import {
+	checkDbHealth,
+	type DbHealthReport,
+} from "../services/state/db-health";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -24,9 +24,9 @@ function writeJsonReport(io: CommandIo, report: DbHealthReport): void {
 	const envelope = report.ok
 		? envelopeOk(report, { action: "db.health", exitCode: 0 })
 		: (envelopeErr("DB_HEALTH_FAILED", "db health check failed", {
-			action: "db.health",
-			exitCode: 1,
-		}) as ResultEnvelope<DbHealthReport>);
+				action: "db.health",
+				exitCode: 1,
+			}) as ResultEnvelope<DbHealthReport>);
 	envelope.data = report;
 	io.stdout(
 		stringifyEnvelope(

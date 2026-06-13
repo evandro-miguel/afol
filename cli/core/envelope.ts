@@ -74,7 +74,7 @@ export function envelopeWithLegacyKeys<T extends Record<string, unknown>>(
 
 	if (data) {
 		for (const key of keys) {
-			if (Object.prototype.hasOwnProperty.call(data, key)) {
+			if (Object.hasOwn(data, key)) {
 				legacyRecord[key] = data[key];
 			}
 		}

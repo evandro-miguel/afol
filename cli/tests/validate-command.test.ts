@@ -168,7 +168,9 @@ describe("validate command", () => {
 			expect(payload.ok).toBe(false);
 			expect(payload.report).toBeDefined();
 			const checks = payload.checks as Array<Record<string, unknown>>;
-			expect(checks.some((entry) => entry.id === "manifest" && entry.ok === false)).toBe(true);
+			expect(
+				checks.some((entry) => entry.id === "manifest" && entry.ok === false),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

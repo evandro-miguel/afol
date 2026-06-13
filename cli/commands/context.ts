@@ -1,16 +1,16 @@
 import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
+import {
 	buildContextBundle,
 	rebuildSectionIndex,
 	resolveSection,
 } from "../services/context";
 import { ContextTrustError } from "../services/context/bundler";
 import type { ContextRetrievalMode } from "../services/context/types";
-import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;

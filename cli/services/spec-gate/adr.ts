@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { atomicWriteText } from "../io/atomic";
 import { resolveAdmPaths } from "../adm";
+import { atomicWriteText } from "../io/atomic";
 
 type Frontmatter = Record<string, unknown>;
 

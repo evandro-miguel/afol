@@ -1,3 +1,9 @@
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
 import type { MemoryEntry, MemoryRecallEntry } from "../services/memory";
 import {
 	addEntry,
@@ -12,12 +18,6 @@ import {
 	searchEntries,
 	updateEntry,
 } from "../services/memory";
-import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;

@@ -2,8 +2,8 @@ import {
 	envelopeErr,
 	envelopeOk,
 	envelopeWithLegacyKeys,
-	stringifyEnvelope,
 	type ResultEnvelope,
+	stringifyEnvelope,
 } from "../core/envelope";
 import { hydrateSession } from "../services/state/session-state";
 
@@ -76,7 +76,11 @@ function writeHydrateJson(
 	io.stdout(stringifyEnvelope(envelope));
 }
 
-function writeHydrateError(io: CommandIo, sessionId: string, message: string): void {
+function writeHydrateError(
+	io: CommandIo,
+	sessionId: string,
+	message: string,
+): void {
 	const envelope = envelopeErr("HYDRATE_FAILED", message, {
 		action: "hydrate",
 		exitCode: 1,
@@ -111,11 +115,7 @@ export async function runHydrateCommand(
 			}
 		} catch (error) {
 			if (parsed.json) {
-				writeHydrateError(
-					io,
-					parsed.sessionId,
-					(error as Error).message,
-				);
+				writeHydrateError(io, parsed.sessionId, (error as Error).message);
 			} else {
 				throw error;
 			}

@@ -1,15 +1,15 @@
 import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
+import {
 	abandonAdr,
 	acceptAdr,
 	archiveAdr,
 	createAdr,
 	supersedeAdr,
 } from "../services/spec-gate";
-import {
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -64,11 +64,17 @@ function parseReason(args: string[], commandName: string): string {
 }
 
 function writeJsonEnvelope(io: CommandIo, data: Record<string, unknown>): void {
-	const envelope = envelopeOk(data, { action: String(data.action ?? "adr"), exitCode: 0 });
+	const envelope = envelopeOk(data, {
+		action: String(data.action ?? "adr"),
+		exitCode: 0,
+	});
 	envelope.data = data;
 	io.stdout(
 		stringifyEnvelope(
-			envelopeWithLegacyKeys(envelope, Object.keys(data) as (keyof typeof data)[]),
+			envelopeWithLegacyKeys(
+				envelope,
+				Object.keys(data) as (keyof typeof data)[],
+			),
 		),
 	);
 }

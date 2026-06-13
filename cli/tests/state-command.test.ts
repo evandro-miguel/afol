@@ -113,13 +113,15 @@ describe("state commands", () => {
 			expect((payload.snapshot as { sessionId: string }).sessionId).toBe(
 				"test-session",
 			);
-			expect((payload.session as string)).toBe("test-session");
-			expect((payload.data as { snapshot: { sessionId: string }; session: string }).snapshot.sessionId).toBe(
-				"test-session",
-			);
-			expect((payload.data as { snapshot: { sessionId: string }; session: string }).session).toBe(
-				"test-session",
-			);
+			expect(payload.session as string).toBe("test-session");
+			expect(
+				(payload.data as { snapshot: { sessionId: string }; session: string })
+					.snapshot.sessionId,
+			).toBe("test-session");
+			expect(
+				(payload.data as { snapshot: { sessionId: string }; session: string })
+					.session,
+			).toBe("test-session");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -183,13 +185,15 @@ describe("state commands", () => {
 			expect((payload.result as { sessionId: string }).sessionId).toBe(
 				"test-session",
 			);
-			expect((payload.session as string)).toBe("test-session");
-			expect((payload.data as { result: { sessionId: string }; session: string }).result.sessionId).toBe(
-				"test-session",
-			);
-			expect((payload.data as { result: { sessionId: string }; session: string }).session).toBe(
-				"test-session",
-			);
+			expect(payload.session as string).toBe("test-session");
+			expect(
+				(payload.data as { result: { sessionId: string }; session: string })
+					.result.sessionId,
+			).toBe("test-session");
+			expect(
+				(payload.data as { result: { sessionId: string }; session: string })
+					.session,
+			).toBe("test-session");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -223,12 +227,37 @@ describe("state commands", () => {
 				exit_code: 0,
 				action: "state.show",
 			});
-			expect((payload.snapshot as { sessionId: string; summary: { taskRows: number; evidenceEntries: number } }).sessionId).toBe(
-				"test-session",
-			);
-			expect((payload.session as string)).toBe("test-session");
-			expect((payload.data as { snapshot: { sessionId: string; summary: { taskRows: number; evidenceEntries: number } }; session: string }).snapshot.summary.taskRows).toBe(1);
-			expect((payload.data as { snapshot: { sessionId: string; summary: { taskRows: number; evidenceEntries: number } }; session: string }).snapshot.summary.evidenceEntries).toBe(1);
+			expect(
+				(
+					payload.snapshot as {
+						sessionId: string;
+						summary: { taskRows: number; evidenceEntries: number };
+					}
+				).sessionId,
+			).toBe("test-session");
+			expect(payload.session as string).toBe("test-session");
+			expect(
+				(
+					payload.data as {
+						snapshot: {
+							sessionId: string;
+							summary: { taskRows: number; evidenceEntries: number };
+						};
+						session: string;
+					}
+				).snapshot.summary.taskRows,
+			).toBe(1);
+			expect(
+				(
+					payload.data as {
+						snapshot: {
+							sessionId: string;
+							summary: { taskRows: number; evidenceEntries: number };
+						};
+						session: string;
+					}
+				).snapshot.summary.evidenceEntries,
+			).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -262,12 +291,35 @@ describe("state commands", () => {
 				exit_code: 0,
 				action: "state.export",
 			});
-			expect((payload.snapshot as { sessionId: string; sourceFiles: unknown[] }).sessionId).toBe(
-				"test-session",
-			);
-			expect((payload.session as string)).toBe("test-session");
-			expect((payload.data as { snapshot: { sessionId: string; sourceFiles: unknown[]; summary: { taskRows: number } }; session: string }).snapshot.sourceFiles).toHaveLength(3);
-			expect((payload.data as { snapshot: { sessionId: string; sourceFiles: unknown[]; summary: { taskRows: number } }; session: string }).snapshot.summary.taskRows).toBe(1);
+			expect(
+				(payload.snapshot as { sessionId: string; sourceFiles: unknown[] })
+					.sessionId,
+			).toBe("test-session");
+			expect(payload.session as string).toBe("test-session");
+			expect(
+				(
+					payload.data as {
+						snapshot: {
+							sessionId: string;
+							sourceFiles: unknown[];
+							summary: { taskRows: number };
+						};
+						session: string;
+					}
+				).snapshot.sourceFiles,
+			).toHaveLength(3);
+			expect(
+				(
+					payload.data as {
+						snapshot: {
+							sessionId: string;
+							sourceFiles: unknown[];
+							summary: { taskRows: number };
+						};
+						session: string;
+					}
+				).snapshot.summary.taskRows,
+			).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -305,8 +357,10 @@ describe("state commands", () => {
 				exit_code: 1,
 				action: "state.export",
 			});
-			expect((payload.session as string)).toBe("test-session");
-			expect((payload.data as { session: string }).session).toBe("test-session");
+			expect(payload.session as string).toBe("test-session");
+			expect((payload.data as { session: string }).session).toBe(
+				"test-session",
+			);
 			expect(payload.snapshot).toBeUndefined();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -371,7 +425,7 @@ describe("state commands", () => {
 			expect((payload.snapshot as { sessionId: string }).sessionId).toBe(
 				"test-session",
 			);
-			expect((payload.session as string)).toBe("test-session");
+			expect(payload.session as string).toBe("test-session");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
