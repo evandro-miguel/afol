@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260612_workbench-hydration-and-markdown-projection_spec-child_01
 theme: workbench-hydration-and-markdown-projection
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T12:12:33-03:00'

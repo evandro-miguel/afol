@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260612_global-project-research-library_spec-child_01
 theme: global-project-research-library
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T12:12:33-03:00'

@@ -3,7 +3,7 @@ doc_type: specs_index
 id: "specs_index"
 status: active
 created_at: "2026-05-28T19:41:46+00:00"
-updated_at: "2026-06-12T17:47:40-03:00"
+updated_at: "2026-06-13T00:00:00-03:00"
 ---
 
 # SPECS INDEX
@@ -17,9 +17,9 @@ updated_at: "2026-06-12T17:47:40-03:00"
 | Metric | Count |
 |--------|-------|
 | Total | 68 |
-| Draft | 13 |
+| Draft | 5 |
 | Active | 29 |
-| Final | 26 |
+| Final | 34 |
 
 ## Index
 
@@ -85,14 +85,14 @@ updated_at: "2026-06-12T17:47:40-03:00"
 | 260528_2022_runtime-mirror-cleanup_spec-child_01 | runtime-mirror-cleanup | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260528_2022_runtime-mirror-cleanup_plan_01, task: 260528_2022_runtime-mirror-cleanup_task_01, report: .afol/wb/260528_2022_runtime-mirror-cleanup/260528_2022_runtime-mirror-cleanup_report_01.md |
 | 260528_1946_bootstrap-template-justfile-wiring_spec-child_01 | bootstrap-template-justfile-wiring | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, plan: 260528_1946_bootstrap-template-justfile-wiring_plan_01, task: 260528_1946_bootstrap-template-justfile-wiring_task_01 |
 | 260531_0000_template-cli-boundary-hardening_spec_01 | template-cli-boundary-hardening | active | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md |
-| 260612_afol-administration-project-structure-onion-architecture_spec_01 | afol-administration-project-structure-onion-architecture | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md, architecture: docs/arc/ARCHITECTURE.md, adr: docs/arc/DECISIONS/ADR-004-afol-administration-and-project-structure.md |
-| 260612_agent-operational-state-context-library_spec_01 | agent-operational-state-context-library | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, adr: docs/arc/DECISIONS/ADR-004-afol-administration-and-project-structure.md |
-| 260612_workbench-hydration-and-markdown-projection_spec-child_01 | workbench-hydration-and-markdown-projection | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
-| 260612_context-routing-bundles-and-section-index_spec-child_01 | context-routing-bundles-and-section-index | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
-| 260612_global-project-research-library_spec-child_01 | global-project-research-library | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
-| 260612_spec-compatibility-and-decision-history_spec-child_01 | spec-compatibility-and-decision-history | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md, adr: docs/arc/DECISIONS/ADR-004-afol-administration-and-project-structure.md |
-| 260612_temporal-health-freshness-token-budget_spec-child_01 | temporal-health-freshness-token-budget | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
-| 260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01 | afol-brain-shape-retrieval-doctor-trust | draft | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
+| 260612_afol-administration-project-structure-onion-architecture_spec_01 | afol-administration-project-structure-onion-architecture | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, manifesto: docs/arc/PROJECT-MANIFESTO.md, architecture: docs/arc/ARCHITECTURE.md, adr: docs/arc/DECISIONS/ADR-004-afol-administration-and-project-structure.md |
+| 260612_agent-operational-state-context-library_spec_01 | agent-operational-state-context-library | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, adr: docs/arc/DECISIONS/ADR-004-afol-administration-and-project-structure.md |
+| 260612_workbench-hydration-and-markdown-projection_spec-child_01 | workbench-hydration-and-markdown-projection | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
+| 260612_context-routing-bundles-and-section-index_spec-child_01 | context-routing-bundles-and-section-index | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
+| 260612_global-project-research-library_spec-child_01 | global-project-research-library | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
+| 260612_spec-compatibility-and-decision-history_spec-child_01 | spec-compatibility-and-decision-history | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md, adr: docs/arc/DECISIONS/ADR-004-afol-administration-and-project-structure.md |
+| 260612_temporal-health-freshness-token-budget_spec-child_01 | temporal-health-freshness-token-budget | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
+| 260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01 | afol-brain-shape-retrieval-doctor-trust | final | orchestrator | roadmap: docs/arc/GENERAL-ROADMAP.md, parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md, related: docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md |
 
 <!-- markdownlint-enable MD013 MD060 -->
 

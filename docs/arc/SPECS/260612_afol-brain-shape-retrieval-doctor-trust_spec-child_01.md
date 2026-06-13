@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01
 theme: afol-brain-shape-retrieval-doctor-trust
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T17:47:40-03:00'

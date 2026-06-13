@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260612_agent-operational-state-context-library_spec_01
 theme: agent-operational-state-context-library
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T12:12:33-03:00'

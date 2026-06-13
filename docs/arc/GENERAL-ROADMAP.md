@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-06-12T17:47:40-03:00'
+updated_at: '2026-06-13T00:00:00-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -402,7 +402,7 @@ Minimum acceptance:
 
 ### F-18 Rehome Administration and Project Structure
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md
 - Why: AFOL needs a stable onion architecture and source-boundary model before
@@ -429,10 +429,19 @@ Minimum acceptance:
   - Legacy `.agents/agents`, `.agents/scripts`, `.agents/runtime`,
     `.agents/wb`, `.agents/z-arq`, `agents.config`, and legacy delegate routing
     remain prohibited.
+- Closure note: accepted implementation evidence is commits `282f116`,
+  `6791aca`, `f2e328f`, and `78bf2a1`. F-18 delivered AFOL-only PSTR maps,
+  drift checks, SQLite hydration and `db health`, memory proposal/recall flows,
+  library claims, context bundles with trusted fail-closed mode and retrieval
+  modes, spec gate checks integrated into `done --require-spec-check`, ADR and
+  changelog commands, health/doctor/maintenance, schema/resolver, and sweep
+  commands. `docs/arc/**` remains transitional canonical administration for
+  this repository; `.afol/adm/**` is now the target generated/owned layout for
+  schema and resolver artifacts.
 
 #### F-18.S1 PSTR Map System
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md
 - Why: Agents need a compact structural map of the current project before they
@@ -453,7 +462,7 @@ Minimum acceptance:
 
 #### F-18.S2 ADM/PSTR Drift Validation
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md
 - Why: AFOL must compare desired state in adm/specs with observed structure in
@@ -469,7 +478,7 @@ Minimum acceptance:
 
 #### F-18.S3 SQLite Hydration Layer
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md
 - Why: AFOL needs fast local execution state, FTS, source hashes, and bundle
@@ -484,7 +493,7 @@ Minimum acceptance:
 
 #### F-18.S4 Project Memory System
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md
 - Why: AFOL needs compact long-lived project continuity without turning memory
@@ -498,7 +507,7 @@ Minimum acceptance:
 
 #### F-18.S5 Library Markdown Graph
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_global-project-research-library_spec-child_01.md
 - Why: AFOL needs curated external knowledge with sources, claims, freshness,
@@ -511,7 +520,7 @@ Minimum acceptance:
 
 #### F-18.S6 Context Bundle and Tool Routing
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_context-routing-bundles-and-section-index_spec-child_01.md
 - Why: Agents need the smallest correct task/role context: adm refs, pstr refs,
@@ -525,7 +534,7 @@ Minimum acceptance:
 
 #### F-18.S7 Spec Gate, Cleanup, and Governance
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_spec-compatibility-and-decision-history_spec-child_01.md
 - Why: AFOL needs closure gates, explicit waivers, cleanup/audit flows, ADRs,
@@ -540,7 +549,7 @@ Minimum acceptance:
 
 #### F-18.S8 Temporal Health, Freshness, and Token Budgets
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_temporal-health-freshness-token-budget_spec-child_01.md
 - Why: AFOL must age well over months of use; stale pstr maps, stale memory,
@@ -562,7 +571,7 @@ Minimum acceptance:
 
 #### F-18.S9 AFOL Brain Shape, Think-Lite, and Trust Boundary
 
-- Status: planned
+- Status: final
 - Governing spec:
   docs/arc/SPECS/260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01.md
 - Why: AFOL should gain a small internal brain layer without copying a heavy

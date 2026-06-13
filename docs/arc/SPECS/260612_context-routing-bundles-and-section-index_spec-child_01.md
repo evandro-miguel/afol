@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260612_context-routing-bundles-and-section-index_spec-child_01
 theme: context-routing-bundles-and-section-index
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T12:12:33-03:00'

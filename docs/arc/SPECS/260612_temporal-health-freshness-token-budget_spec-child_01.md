@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260612_temporal-health-freshness-token-budget_spec-child_01
 theme: temporal-health-freshness-token-budget
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T16:47:37-03:00'

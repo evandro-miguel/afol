@@ -2,7 +2,7 @@
 doc_type: spec
 id: 260612_afol-administration-project-structure-onion-architecture_spec_01
 theme: afol-administration-project-structure-onion-architecture
-status: draft
+status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T13:37:19-03:00'
