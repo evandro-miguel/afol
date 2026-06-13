@@ -5,6 +5,12 @@ import {
 	rebuildPstrIndex,
 	validatePstrIndex,
 } from "../services/pstr";
+import {
+	envelopeErr,
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	stringifyEnvelope,
+} from "../core/envelope";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -17,6 +23,37 @@ const DEFAULT_IO: CommandIo = {
 };
 
 type PstrAction = "rebuild" | "show" | "validate" | "stale" | "section";
+
+function hasJsonFlag(args: string[]): boolean {
+	return args.some((value) => value === "--json" || value === "-j");
+}
+
+function writeJsonOk<T extends Record<string, unknown>>(
+	io: CommandIo,
+	action: PstrAction,
+	data: T,
+	legacyKeys: readonly (keyof T)[] = [],
+): void {
+	const envelope = envelopeWithLegacyKeys(
+		envelopeOk(data, { action: `pstr.${action}` }),
+		legacyKeys,
+	);
+	io.stdout(stringifyEnvelope(envelope));
+}
+
+function writeJsonErr(
+	io: CommandIo,
+	action: string,
+	code: string,
+	message: string,
+	exitCode: 1 | 2,
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			envelopeErr(code, message, { action: `pstr.${action}`, exitCode }),
+		),
+	);
+}
 
 function normalizeAction(value: string | undefined): PstrAction {
 	if (!value || value === "show" || value === "sh") {
@@ -84,7 +121,7 @@ export async function runPstrCommand(
 			const json = parseJsonFlag(args);
 			const snapshot = rebuildPstrIndex(projectRoot);
 			if (json) {
-				io.stdout(JSON.stringify({ ok: true, action: pstrAction, snapshot }));
+				writeJsonOk(io, pstrAction, { snapshot }, ["snapshot"]);
 			} else {
 				io.stdout(
 					[
@@ -104,13 +141,21 @@ export async function runPstrCommand(
 			const json = parseJsonFlag(args);
 			const index = getPstrIndex(projectRoot);
 			if (!index) {
+				if (json) {
+					writeJsonErr(
+						io,
+						pstrAction,
+						"pstr.show.missing_index",
+						"pstr show: no index found. Run `afol pstr rebuild` first.",
+						1,
+					);
+					return 1;
+				}
 				io.stderr("pstr show: no index found. Run `afol pstr rebuild` first.");
 				return 1;
 			}
 			if (json) {
-				io.stdout(
-					JSON.stringify({ ok: true, action: pstrAction, snapshot: index }),
-				);
+				writeJsonOk(io, pstrAction, { snapshot: index }, ["snapshot"]);
 			} else {
 				io.stdout(
 					[
@@ -131,7 +176,17 @@ export async function runPstrCommand(
 			const json = parseJsonFlag(args);
 			const result = validatePstrIndex(projectRoot);
 			if (json) {
-				io.stdout(JSON.stringify({ action: pstrAction, ...result }));
+				if (result.ok) {
+					writeJsonOk(io, pstrAction, result);
+				} else {
+					writeJsonErr(
+						io,
+						pstrAction,
+						"pstr.validate.failed",
+						result.message,
+						1,
+					);
+				}
 			} else {
 				io.stdout(
 					`pstr validate: ${result.ok ? "ok" : "fail"} ${result.message}`,
@@ -145,13 +200,18 @@ export async function runPstrCommand(
 			const staleResults = checkPstrStale(projectRoot);
 			const anyStale = staleResults.some((result) => result.stale);
 			if (json) {
-				io.stdout(
-					JSON.stringify({
-						ok: !anyStale,
-						action: pstrAction,
-						areas: staleResults,
-					}),
-				);
+				if (anyStale) {
+					writeJsonErr(
+						io,
+						pstrAction,
+						"pstr.stale.failed",
+						staleResults.find((result) => result.stale)?.message ??
+							"stale areas found",
+						1,
+					);
+				} else {
+					writeJsonOk(io, pstrAction, { areas: staleResults }, ["areas"]);
+				}
 			} else {
 				io.stdout(
 					[
@@ -170,21 +230,39 @@ export async function runPstrCommand(
 			const parsed = parseSectionArgs(args);
 			const section = getPstrSection(projectRoot, parsed.id);
 			if (!section) {
+				if (parsed.json) {
+					writeJsonErr(
+						io,
+						pstrAction,
+						"pstr.section.not_found",
+						`pstr section: not found: ${parsed.id}`,
+						1,
+					);
+					return 1;
+				}
 				io.stderr(`pstr section: not found: ${parsed.id}`);
 				return 1;
 			}
 			if (!section.ok) {
+				if (parsed.json) {
+					writeJsonErr(
+						io,
+						pstrAction,
+						"pstr.section.failed",
+						section.message,
+						2,
+					);
+					return 2;
+				}
 				io.stderr(section.message);
 				return 2;
 			}
 			if (parsed.json) {
-				io.stdout(
-					JSON.stringify({
-						ok: true,
-						action: pstrAction,
-						entry: section.entry,
-						content: section.content,
-					}),
+				writeJsonOk(
+					io,
+					pstrAction,
+					{ entry: section.entry, content: section.content },
+					["entry", "content"],
 				);
 			} else {
 				io.stdout(section.content);
@@ -195,7 +273,12 @@ export async function runPstrCommand(
 		io.stderr(`pstr ${pstrAction}: not yet implemented`);
 		return 1;
 	} catch (error) {
-		io.stderr((error as Error).message);
+		const message = error instanceof Error ? error.message : String(error);
+		if (hasJsonFlag(args)) {
+			writeJsonErr(io, action, "pstr.command.error", message, 2);
+		} else {
+			io.stderr(message);
+		}
 		return 2;
 	}
 }

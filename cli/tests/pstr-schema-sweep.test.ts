@@ -72,6 +72,11 @@ function captureIo(): {
 	};
 }
 
+function expectEnvelope(payload: Record<string, unknown>, action: string): void {
+	expect(payload.schema).toBe("afol.result/v1");
+	expect(payload.action).toBe(action);
+}
+
 function currentIso(): string {
 	return new Date().toISOString();
 }
@@ -168,13 +173,14 @@ describe("pstr command", () => {
 		try {
 			const io = captureIo();
 			expect(await runPstrCommand("rebuild", ["--json"], root, io.io)).toBe(0);
-			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
-				ok: boolean;
-				snapshot: { kind: string; maps: unknown[] };
-			};
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<string, unknown>;
+			expectEnvelope(payload, "pstr.rebuild");
 			expect(payload.ok).toBe(true);
-			expect(payload.snapshot.kind).toBe("pstr_index_v1");
-			expect(payload.snapshot.maps.length).toBeGreaterThan(0);
+			expect(payload.exit_code).toBe(0);
+			expect((payload.snapshot as { kind: string }).kind).toBe("pstr_index_v1");
+			expect((payload.data as { snapshot: { kind: string } }).snapshot.kind).toBe(
+				"pstr_index_v1",
+			);
 		} finally {
 			cleanup(root);
 		}
@@ -209,12 +215,14 @@ describe("pstr command", () => {
 			rebuildPstrIndex(root);
 			const io = captureIo();
 			expect(await runPstrCommand("show", ["--json"], root, io.io)).toBe(0);
-			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
-				ok: boolean;
-				snapshot: { kind: string };
-			};
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<string, unknown>;
+			expectEnvelope(payload, "pstr.show");
 			expect(payload.ok).toBe(true);
-			expect(payload.snapshot.kind).toBe("pstr_index_v1");
+			expect(payload.exit_code).toBe(0);
+			expect((payload.snapshot as { kind: string }).kind).toBe("pstr_index_v1");
+			expect((payload.data as { snapshot: { kind: string } }).snapshot.kind).toBe(
+				"pstr_index_v1",
+			);
 		} finally {
 			cleanup(root);
 		}
@@ -242,16 +250,18 @@ describe("pstr command", () => {
 			expect(await runPstrCommand("sec", ["cli", "--json"], root, io.io)).toBe(
 				0,
 			);
-			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
-				ok: boolean;
-				action: string;
-				entry: { id: string };
-				content: string;
-			};
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<string, unknown>;
+			expectEnvelope(payload, "pstr.section");
 			expect(payload.ok).toBe(true);
-			expect(payload.action).toBe("section");
-			expect(payload.entry.id).toBe("cli");
-			expect(payload.content).toContain("# PSTR: cli");
+			expect(payload.exit_code).toBe(0);
+			expect((payload.entry as { id: string }).id).toBe("cli");
+			expect(payload.content as string).toContain("# PSTR: cli");
+			expect((payload.data as { entry: { id: string }; content: string }).entry.id).toBe(
+				"cli",
+			);
+			expect(
+				(payload.data as { entry: { id: string }; content: string }).content,
+			).toContain("# PSTR: cli");
 		} finally {
 			cleanup(root);
 		}
@@ -369,9 +379,28 @@ describe("pstr command", () => {
 			rebuildPstrIndex(root);
 			const io = captureIo();
 			expect(await runPstrCommand("validate", ["--json"], root, io.io)).toBe(0);
-			const payload = JSON.parse(io.stdout[0] ?? "{}");
-			expect(payload.action).toBe("validate");
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<string, unknown>;
+			expectEnvelope(payload, "pstr.validate");
 			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect((payload.data as { ok: boolean }).ok).toBe(true);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("stale --json returns areas when current", async () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+			const io = captureIo();
+			expect(await runPstrCommand("stale", ["--json"], root, io.io)).toBe(0);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<string, unknown>;
+			expectEnvelope(payload, "pstr.stale");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(Array.isArray(payload.areas)).toBe(true);
+			expect(Array.isArray((payload.data as { areas: unknown[] }).areas)).toBe(true);
 		} finally {
 			cleanup(root);
 		}
@@ -389,9 +418,33 @@ describe("pstr command", () => {
 			});
 			const io = captureIo();
 			expect(await runPstrCommand("stale", ["--json"], root, io.io)).toBe(1);
-			const payload = JSON.parse(io.stdout[0] ?? "{}");
-			expect(payload.action).toBe("stale");
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<string, unknown>;
+			expectEnvelope(payload, "pstr.stale");
 			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(1);
+			expect((payload.error as { code: string; message: string }).code).toBe(
+				"pstr.stale.failed",
+			);
+			expect((payload.error as { code: string; message: string }).message).toContain(
+				"stale",
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("invalid action --json returns error envelope", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(await runPstrCommand("bogus", ["--json"], root, io.io)).toBe(2);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<string, unknown>;
+			expectEnvelope(payload, "pstr.bogus");
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(2);
+			expect((payload.error as { code: string; message: string }).message).toContain(
+				"Unknown pstr action",
+			);
 		} finally {
 			cleanup(root);
 		}
