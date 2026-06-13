@@ -19,5 +19,6 @@ describe("help formatter", () => {
 		expect(help).toContain("n/new");
 		expect(help).toContain("a=afol");
 		expect(help).not.toContain("do/doctor");
+		expect(help).not.toContain("ma/maintenance");
 	});
 });

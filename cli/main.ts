@@ -34,42 +34,11 @@ import {
 	runVerifyTasksCommand,
 } from "./commands/workbench";
 import { CLI_VERSION } from "./generated/version";
+import { formatHelpText } from "./help";
 import { resolveCommand } from "./router";
+import { kernelRegistry } from "./registry";
 import { loadProjectRoot } from "./services/project/root";
 import { runValidationCommand } from "./validate/contract";
-
-const HELP_LINES = [
-	"Usage: afol [command] [options]",
-	"",
-	"Commands",
-	"  s/status               Show status",
-	"  v/validate             Run selected validation gates",
-	"  init                   Install scaffold into current repo",
-	"  n/new                  Create workbench session",
-	"  st/start               Start workbench task",
-	"  e/evidence             Record task evidence",
-	"  d/done                 Complete task with evidence",
-	"  l/log                  Append session log timeline entry",
-	"  vf/verify, verify-tasks Verify workbench tasks",
-	"  r/rule sk/skill up/update ls/local-state Inspect routing, updates, indexes",
-	"  adm                    Inspect adm paths and files",
-	"  ps/pstr cx/ctx lb/library mm/memory ht/health db/health do/doctor ma/maintenance schema/sweep spec/adr/changelog",
-	"  c/close b/bootstrap     Close active session / install scaffold into another repo",
-	"",
-	"Flags",
-	"  -j, --json             JSON output for status",
-	"  -h, --help  -V, --version Show help or version",
-	"Aliases",
-	"  -S --session  -T --task-id  -x --test",
-	"  a=afol",
-	"",
-	"Examples",
-	"  afol s",
-	"  afol validate",
-	"  afol init --dry-run",
-	"  afol new <theme> [--intent ...] [--feature-id ...] [--parent-spec ...] [--task ...]",
-	"  afol done -T T-01",
-].join("\n");
 
 const NEW_COMMAND_HELP = [
 	"Usage: afol new <theme> [options]",
@@ -126,7 +95,7 @@ export async function main(argv: string[]): Promise<number> {
 	const resolution = resolveCommand(args);
 
 	if (resolution.kind === "help") {
-		console.log(HELP_LINES);
+		console.log(formatHelpText(kernelRegistry));
 		return 0;
 	}
 
