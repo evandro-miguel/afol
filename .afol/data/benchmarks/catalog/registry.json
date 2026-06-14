@@ -40,6 +40,21 @@
       "pack_id": "token-economy",
       "min_scenarios": 4,
       "selector_tags": ["token", "prompt", "context"]
+    },
+    {
+      "pack_id": "pstr-integrity",
+      "min_scenarios": 4,
+      "selector_tags": ["pstr", "structure", "index", "stale"]
+    },
+    {
+      "pack_id": "context-bundles",
+      "min_scenarios": 4,
+      "selector_tags": ["ctx", "context", "bundle", "token-budget"]
+    },
+    {
+      "pack_id": "state-projection",
+      "min_scenarios": 4,
+      "selector_tags": ["state", "hydrate", "session"]
     }
   ]
 }

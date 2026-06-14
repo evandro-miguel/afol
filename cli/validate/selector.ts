@@ -24,6 +24,9 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 				"mcp-parity",
 				"runtime-live-agent",
 				"token-economy",
+				"pstr-integrity",
+				"context-bundles",
+				"state-projection",
 			],
 			reasons: ["default-no-paths"],
 		};
@@ -32,6 +35,38 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 	const reasons: string[] = [];
 	for (const changedPath of changedPaths) {
 		const normalizedPath = normalizePath(changedPath);
+		if (
+			hasPrefix(normalizedPath, [
+				"cli/services/pstr/",
+				"cli/commands/pstr",
+			])
+		) {
+			selected.add("pstr-integrity");
+			reasons.push(`pstr-change:${changedPath}`);
+			continue;
+		}
+		if (
+			hasPrefix(normalizedPath, [
+				"cli/services/context/",
+				"cli/commands/context",
+				"cli/commands/ctx",
+			])
+		) {
+			selected.add("context-bundles");
+			reasons.push(`ctx-change:${changedPath}`);
+			continue;
+		}
+		if (
+			hasPrefix(normalizedPath, [
+				"cli/services/state/",
+				"cli/commands/state",
+				"cli/commands/hydrate",
+			])
+		) {
+			selected.add("state-projection");
+			reasons.push(`state-change:${changedPath}`);
+			continue;
+		}
 		if (hasPrefix(normalizedPath, ["cli/mcp/"])) {
 			selected.add("mcp-parity");
 			reasons.push(`mcp-change:${changedPath}`);

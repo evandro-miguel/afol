@@ -112,6 +112,15 @@ const VALIDATION_COMMANDS_BY_PACK: Record<PackId, ValidationCommandSpec[]> = {
 			],
 		},
 	],
+	"pstr-integrity": [
+		{ command: ["bun", "test", "cli/tests/pstr-schema-sweep.test.ts"] },
+	],
+	"context-bundles": [
+		{ command: ["bun", "test", "cli/tests/context-system.test.ts"] },
+	],
+	"state-projection": [
+		{ command: ["bun", "test", "cli/tests/state-command.test.ts"] },
+	],
 };
 
 interface ValidationCommandReport {

@@ -270,7 +270,7 @@ describe("validate output helpers", () => {
 		expect(outputTail("x".repeat(4100))).toBe("x".repeat(4000));
 
 		const summary = registrySummary(snapshot);
-		expect(summary).toHaveLength(8);
+		expect(summary).toHaveLength(11);
 		expect(summary[0]).toMatchObject({
 			pack_id: "cli-kernel-local",
 			min_scenarios: 6,
@@ -335,6 +335,9 @@ describe("validate selector", () => {
 				"mcp-parity",
 				"runtime-live-agent",
 				"token-economy",
+				"pstr-integrity",
+				"context-bundles",
+				"state-projection",
 			],
 			reasons: ["default-no-paths"],
 		});
@@ -347,11 +350,14 @@ describe("validate registry", () => {
 		try {
 			const snapshot = loadRegistry(root);
 			expect(snapshot.schema_version).toBe("1.0.0");
-			expect(snapshot.packs).toHaveLength(8);
-			expect(snapshot.scenariosByPack["runtime-live-agent"]).toHaveLength(3);
-			expect(snapshot.baselinesByPack["cli-kernel-local"]?.timing_p50_ms).toBe(
-				120,
-			);
+		expect(snapshot.packs).toHaveLength(11);
+		expect(snapshot.scenariosByPack["runtime-live-agent"]).toHaveLength(3);
+		expect(snapshot.scenariosByPack["pstr-integrity"]).toHaveLength(4);
+		expect(snapshot.scenariosByPack["context-bundles"]).toHaveLength(4);
+		expect(snapshot.scenariosByPack["state-projection"]).toHaveLength(4);
+		expect(snapshot.baselinesByPack["cli-kernel-local"]?.timing_p50_ms).toBe(
+			120,
+		);
 			expect(validateRegistryContract(snapshot)).toEqual([]);
 
 			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];

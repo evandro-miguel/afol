@@ -294,6 +294,42 @@ describe("validation command family", () => {
 		expect(tokenProc.status).toBe(0);
 		const tokenPayload = parseJsonOutput(tokenProc.stdout as string);
 		expect(tokenPayload.selected_pack_ids).toEqual(["token-economy"]);
+
+		const pstrProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/pstr/index.ts",
+			"--json",
+		]);
+		expect(pstrProc.status).toBe(0);
+		expect(parseJsonOutput(pstrProc.stdout as string).selected_pack_ids).toEqual([
+			"pstr-integrity",
+		]);
+
+		const ctxProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/commands/context.ts",
+			"--json",
+		]);
+		expect(ctxProc.status).toBe(0);
+		expect(parseJsonOutput(ctxProc.stdout as string).selected_pack_ids).toEqual([
+			"context-bundles",
+		]);
+
+		const stateProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/state/session-state.ts",
+			"--json",
+		]);
+		expect(stateProc.status).toBe(0);
+		expect(parseJsonOutput(stateProc.stdout as string).selected_pack_ids).toEqual([
+			"state-projection",
+		]);
 	});
 
 	test("v select changed-path keeps generic cli fallback on cli-kernel-local", () => {
@@ -981,7 +1017,7 @@ describe("validation command family", () => {
 		expect(updatePayload.selected_pack_ids).toEqual(["update-safety"]);
 	}, 10000);
 
-	test("registry contract remains complete for the eight-pack matrix", () => {
+	test("registry contract remains complete for the eleven-pack matrix", () => {
 		const proc = runKernel(["v", "select", "--json"]);
 		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
@@ -995,6 +1031,9 @@ describe("validation command family", () => {
 			"mcp-parity",
 			"runtime-live-agent",
 			"token-economy",
+			"pstr-integrity",
+			"context-bundles",
+			"state-projection",
 		]);
 		expect(
 			registry.every(

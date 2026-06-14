@@ -10,6 +10,9 @@ export const REQUIRED_PACKS = [
 	"mcp-parity",
 	"runtime-live-agent",
 	"token-economy",
+	"pstr-integrity",
+	"context-bundles",
+	"state-projection",
 ] as const;
 
 export type PackId = (typeof REQUIRED_PACKS)[number];
