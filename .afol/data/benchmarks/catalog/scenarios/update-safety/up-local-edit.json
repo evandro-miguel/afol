@@ -9,7 +9,7 @@
   "thresholds": {
     "max_duration_ms": 300,
     "max_p95_ms": 300,
-    "max_output_tokens": 227502,
+    "max_output_tokens": 1244,
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "update-safety-v1",
