@@ -20,6 +20,7 @@ import {
 	normalizeHash,
 	readTextOrEmpty,
 	requireWriteContext,
+	resolveJournalBackupPath,
 	resolveSafePath,
 } from "../shared";
 
@@ -51,10 +52,13 @@ function buildUndoMoveDryRunResult(
 	const afterSource = existsSync(destination.path)
 		? readTextOrEmpty(destination.path)
 		: "";
+	const overwrittenBackupPath = resolveJournalBackupPath(
+		projectRoot,
+		moveMutation.overwrittenBackupPath,
+	);
 	const afterDestination =
-		moveMutation.overwrittenBackupPath &&
-		existsSync(moveMutation.overwrittenBackupPath)
-			? readTextOrEmpty(moveMutation.overwrittenBackupPath)
+		overwrittenBackupPath && existsSync(overwrittenBackupPath)
+			? readTextOrEmpty(overwrittenBackupPath)
 			: "";
 
 	return {
@@ -98,6 +102,10 @@ function applyUndoMoveMutation(
 		: "";
 	const beforeSourceHash =
 		beforeSource.length > 0 ? normalizeHash(beforeSource) : null;
+	const overwrittenBackupPath = resolveJournalBackupPath(
+		projectRoot,
+		moveMutation.overwrittenBackupPath,
+	);
 
 	if (existsSync(source.path)) {
 		return {
@@ -132,12 +140,9 @@ function applyUndoMoveMutation(
 	mkdirSync(dirname(source.path), { recursive: true });
 	renameSync(destination.path, source.path);
 
-	if (
-		moveMutation.overwrittenBackupPath &&
-		existsSync(moveMutation.overwrittenBackupPath)
-	) {
+	if (overwrittenBackupPath && existsSync(overwrittenBackupPath)) {
 		mkdirSync(dirname(destination.path), { recursive: true });
-		cpSync(moveMutation.overwrittenBackupPath, destination.path);
+		cpSync(overwrittenBackupPath, destination.path);
 	}
 
 	const afterSource = existsSync(source.path)

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
 import { createPatch } from "diff";
 import { resolveProjectPaths } from "../../services/project/paths";
 import { resolveProjectPath } from "../../services/project/root";
@@ -184,6 +184,48 @@ export function backupPath(
 ): string {
 	const safe = sanitizeForFilename(relativePath);
 	return join(ensureBackupDir(projectRoot), `${mutationId}-${safe}.bak`);
+}
+
+function pathIsInsideRoot(candidatePath: string, rootPath: string): boolean {
+	return (
+		candidatePath === rootPath || candidatePath.startsWith(`${rootPath}${sep}`)
+	);
+}
+
+export function resolveJournalBackupPath(
+	projectRoot: string,
+	storedPath: string | null | undefined,
+): string | null {
+	if (!storedPath) {
+		return null;
+	}
+
+	const backupsDir = resolveProjectPaths(projectRoot).abs.mutationBackupsDir;
+	const lexicalStoredPath = resolve(storedPath);
+	const lexicalBackupsDir = resolve(backupsDir);
+
+	if (existsSync(storedPath)) {
+		const resolvedStoredPath = realpathSync(storedPath);
+		const resolvedBackupsDir = existsSync(backupsDir)
+			? realpathSync(backupsDir)
+			: lexicalBackupsDir;
+
+		if (!pathIsInsideRoot(resolvedStoredPath, resolvedBackupsDir)) {
+			throw new Error(
+				`journal backup path escapes mutation backups dir: ${storedPath}`,
+			);
+		}
+
+		return storedPath;
+	}
+
+	if (!pathIsInsideRoot(lexicalStoredPath, lexicalBackupsDir)) {
+		throw new Error(
+			`journal backup path escapes mutation backups dir: ${storedPath}`,
+		);
+	}
+
+	return storedPath;
 }
 
 export function archiveDestination(

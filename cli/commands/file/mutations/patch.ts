@@ -15,6 +15,7 @@ import {
 	type PatchArgs,
 	readTextOrEmpty,
 	requireWriteContext,
+	resolveJournalBackupPath,
 	resolveSafePath,
 } from "../shared";
 
@@ -31,7 +32,10 @@ function buildUndoPatchDryRunResult(
 ): CommandResult {
 	const patchMutation = mutation as PatchUndoMutation;
 	const target = resolveSafePath(projectRoot, patchMutation.sourcePath);
-	const backupPathValue = patchMutation.backupPath ?? "";
+	const backupPathValue = resolveJournalBackupPath(
+		projectRoot,
+		patchMutation.backupPath,
+	);
 	const before = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
 	const after =
 		backupPathValue && existsSync(backupPathValue)
@@ -62,7 +66,10 @@ function applyUndoPatchMutation(
 ): CommandResult {
 	const patchMutation = mutation as PatchUndoMutation;
 	const target = resolveSafePath(projectRoot, patchMutation.sourcePath);
-	const backupPathValue = patchMutation.backupPath ?? "";
+	const backupPathValue = resolveJournalBackupPath(
+		projectRoot,
+		patchMutation.backupPath,
+	);
 	const before = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
 	const beforeHash = before.length > 0 ? normalizeHash(before) : null;
 

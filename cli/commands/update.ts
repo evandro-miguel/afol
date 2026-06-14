@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
@@ -14,13 +13,13 @@ import {
 	createMutationId,
 	type MutationRecord,
 } from "../services/mutations/journal";
-import { resolveProjectPaths } from "../services/project/paths";
 import {
 	checkTemplateUpdate,
 	formatUpdateCheck,
 	type UpdateCheckResult,
 	type UpdateOperation,
 } from "../services/update/check";
+import { backupPath as makeBackupPath, normalizeHash } from "./file/shared";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -119,35 +118,6 @@ function requireApplyContext(args: ParsedUpdateArgs): void {
 	}
 }
 
-function sha256Hex(value: string): string {
-	return createHash("sha256").update(value).digest("hex");
-}
-
-function sanitizeForFilename(value: string): string {
-	return value
-		.replace(/[\\/:*?"<>|]/g, "_")
-		.replace(/\.{2,}/g, "_")
-		.replace(/\s+/g, "-")
-		.replace(/^$/g, "root");
-}
-
-function ensureBackupDir(projectRoot: string): string {
-	const backups = resolveProjectPaths(projectRoot).abs.mutationBackupsDir;
-	mkdirSync(backups, { recursive: true });
-	return backups;
-}
-
-function mutationBackupPath(
-	projectRoot: string,
-	mutationId: string,
-	relativePath: string,
-): string {
-	return join(
-		ensureBackupDir(projectRoot),
-		`${mutationId}-${sanitizeForFilename(relativePath)}.bak`,
-	);
-}
-
 function writeAtomically(
 	absolutePath: string,
 	relativePath: string,
@@ -230,7 +200,7 @@ function stageUpdateOperations(
 			: "";
 		const mutationId = createMutationId();
 		const backupPath = beforeExisted
-			? mutationBackupPath(projectRoot, mutationId, operation.path)
+			? makeBackupPath(projectRoot, mutationId, operation.path)
 			: null;
 
 		return [
@@ -251,8 +221,8 @@ function stageUpdateOperations(
 					taskId: context.taskId,
 					reason: context.reason,
 					sourcePath: operation.path,
-					beforeHash: beforeExisted ? sha256Hex(beforeContent) : null,
-					afterHash: sha256Hex(operation.nextContent),
+					beforeHash: beforeExisted ? normalizeHash(beforeContent) : null,
+					afterHash: normalizeHash(operation.nextContent),
 					backupPath,
 					beforeExisted,
 					source: "afol-update",

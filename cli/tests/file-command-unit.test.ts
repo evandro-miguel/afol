@@ -537,6 +537,61 @@ describe("file mutation handlers", () => {
 		}
 	});
 
+	test("undoPatchMutation rejects journal backup paths outside the backups dir", () => {
+		const root = mkProjectRoot();
+		try {
+			const file = writeFileTree(root, "notes/outside-backup.txt", "base");
+			const mutation: MutationRecord = {
+				id: "M-patch-malicious",
+				ts: new Date().toISOString(),
+				kind: "patch",
+				status: "applied",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "R",
+				sourcePath: "notes/outside-backup.txt",
+				backupPath: join(root, "outside", "evil.bak"),
+				beforeExisted: true,
+			};
+
+			expect(() =>
+				undoPatchMutation(
+					{
+						command: "ud",
+						path: "",
+						dryRun: true,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "R",
+					},
+					mutation,
+					root,
+				),
+			).toThrow("journal backup path escapes mutation backups dir");
+
+			expect(() =>
+				undoPatchMutation(
+					{
+						command: "ud",
+						path: "",
+						dryRun: false,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "R",
+					},
+					mutation,
+					root,
+				),
+			).toThrow("journal backup path escapes mutation backups dir");
+			expect(readFileSync(file, "utf8")).toBe("base");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("move covers dry-run, noop, write, and undo restore", () => {
 		const root = mkProjectRoot();
 		try {
@@ -690,6 +745,50 @@ describe("file mutation handlers", () => {
 					root,
 				),
 			).toThrow("Expected move mutation for undo, got patch");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("undoMoveMutation rejects overwritten backup paths outside the backups dir", () => {
+		const root = mkProjectRoot();
+		try {
+			const destination = writeFileTree(
+				root,
+				"mut/malicious-destination.txt",
+				"existing",
+			);
+			const mutation: MutationRecord = {
+				id: "M-move-malicious",
+				ts: new Date().toISOString(),
+				kind: "move",
+				status: "applied",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "R",
+				sourcePath: "mut/malicious-source.txt",
+				destinationPath: "mut/malicious-destination.txt",
+				overwrittenBackupPath: join(root, "outside", "evil-move.bak"),
+			};
+
+			expect(() =>
+				undoMoveMutation(
+					{ dryRun: true, session: "S", taskId: "T", reason: "R" },
+					mutation,
+					root,
+				),
+			).toThrow("journal backup path escapes mutation backups dir");
+
+			expect(() =>
+				undoMoveMutation(
+					{ dryRun: false, session: "S", taskId: "T", reason: "R" },
+					mutation,
+					root,
+				),
+			).toThrow("journal backup path escapes mutation backups dir");
+			expect(readFileSync(destination, "utf8")).toBe("existing");
+			expect(existsSync(join(root, "mut", "malicious-source.txt"))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
