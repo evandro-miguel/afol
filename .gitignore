@@ -8,6 +8,12 @@ uv.lock
 **/__pycache__/
 **/*.pyc
 
+# Local linter/tool caches
+.pytest_cache/
+.ruff_cache/
+.rumdl_cache/
+.codex/
+
 # Structure map cache
 **/.structure-cache.json
 

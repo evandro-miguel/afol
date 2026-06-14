@@ -58,7 +58,7 @@ AFOL-native export is pending.
 ### Validate
 
 ```bash
-afol validate --json
+afol validate project --json
 ```
 
 ## Data Storage

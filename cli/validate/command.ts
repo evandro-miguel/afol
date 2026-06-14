@@ -1,14 +1,14 @@
 import { spawnSync } from "node:child_process";
 import {
 	accessSync,
-	constants as fsConstants,
 	existsSync,
+	constants as fsConstants,
 	mkdtempSync,
 	rmSync,
 	symlinkSync,
 } from "node:fs";
-import { join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { join, relative, resolve } from "node:path";
 import { saveBenchmarkPayload } from "./benchmark-files";
 import {
 	outputJson,
@@ -312,7 +312,10 @@ function applyProjectTokenRule(result: BenchmarkResult): BenchmarkResult {
 	if (outputTokens > TOKEN_RULE_NONIDEAL) {
 		return {
 			...result,
-			notes: [...result.notes, `token-rule:non-ideal(>5k):${outputTokens}tokens`],
+			notes: [
+				...result.notes,
+				`token-rule:non-ideal(>5k):${outputTokens}tokens`,
+			],
 		};
 	}
 	return result;
@@ -381,7 +384,10 @@ function resolveCommandInvocation(
 	tokens: string[],
 	preferLocalWrapper: boolean,
 ): CommandInvocation {
-	const program = tokens[0]!;
+	const program = tokens[0];
+	if (program === undefined) {
+		throw new Error("Empty command tokens");
+	}
 	const args = tokens.slice(1);
 	if (program === "afol" || program === "a") {
 		if (!preferLocalWrapper) {
@@ -445,7 +451,10 @@ function createSandboxRoot(projectRoot: string): string {
 	return sandboxRoot;
 }
 
-function gitStatusPorcelain(projectRoot: string): { ok: boolean; output: string } {
+function gitStatusPorcelain(projectRoot: string): {
+	ok: boolean;
+	output: string;
+} {
 	const result = spawnSync("git", ["status", "--porcelain"], {
 		cwd: projectRoot,
 		encoding: "utf8",
@@ -498,7 +507,9 @@ function cleanupGitStatusDiff(
 	before: string,
 	after: string,
 ): void {
-	const beforeLines = new Set(before.split(/\r?\n/).filter((line) => line.trim()));
+	const beforeLines = new Set(
+		before.split(/\r?\n/).filter((line) => line.trim()),
+	);
 	for (const entry of porcelainEntries(after)) {
 		const line = `${entry.status} ${entry.path}`;
 		if (beforeLines.has(line)) {
@@ -534,7 +545,6 @@ function percentile(values: number[], ratio: number): number {
 	return lower + (upper - lower) * (position - lowerIndex);
 }
 
-
 function runScenarioSample(
 	projectRoot: string,
 	invocation: CommandInvocation,
@@ -556,7 +566,9 @@ function runScenarioSample(
 	};
 }
 
-function coerceMetrics(metrics: Record<string, number>): ScenarioExecutionMetrics {
+function coerceMetrics(
+	metrics: Record<string, number>,
+): ScenarioExecutionMetrics {
 	return {
 		duration_ms: metrics.duration_ms ?? 0,
 		timing_p50_ms: metrics.timing_p50_ms ?? metrics.duration_ms ?? 0,
@@ -617,9 +629,7 @@ function runSandboxScenarioCommand(
 			if (!isCommandSuccess(setupSample)) {
 				return {
 					metrics: coerceMetrics(scenario.deterministic_metrics),
-					notes: [
-						`setup-failed:${index}:${setupSample.exit_code ?? "null"}`,
-					],
+					notes: [`setup-failed:${index}:${setupSample.exit_code ?? "null"}`],
 					passed: false,
 				};
 			}
@@ -636,8 +646,8 @@ function runSandboxScenarioCommand(
 				? [`expected-exit-honored:${expectedExit}`]
 				: []
 			: [
-				`sample-failed:1:exit=${sample.exit_code ?? "null"}:stderr=${outputTail((sample.spawn_error ?? sample.stderr) || sample.stdout)}`,
-			];
+					`sample-failed:1:exit=${sample.exit_code ?? "null"}:stderr=${outputTail((sample.spawn_error ?? sample.stderr) || sample.stdout)}`,
+				];
 		return {
 			metrics: buildSampleMetrics(sample, passed),
 			notes,
@@ -654,16 +664,23 @@ export function runScenarioCommand(
 	projectRoot: string,
 	scenario: Scenario,
 ): ScenarioExecutionResult {
-	const command = typeof scenario.command === "string" ? scenario.command.trim() : "";
+	const command =
+		typeof scenario.command === "string" ? scenario.command.trim() : "";
 	if (command.length === 0) {
 		throw new Error("Scenario command is required for execution");
 	}
-	console.error(`bench: running ${scenario.pack_id}/${scenario.scenario_id} ...`);
+	console.error(
+		`bench: running ${scenario.pack_id}/${scenario.scenario_id} ...`,
+	);
 	if (scenario.sandbox) {
 		return runSandboxScenarioCommand(projectRoot, scenario, command);
 	}
 	const expectedExit = scenario.expected_exit;
-	const invocation = resolveScenarioInvocation(REAL_REPO_ROOT, projectRoot, command);
+	const invocation = resolveScenarioInvocation(
+		REAL_REPO_ROOT,
+		projectRoot,
+		command,
+	);
 	const gitStatusBefore = gitStatusPorcelain(projectRoot);
 	let warmup = runScenarioSample(projectRoot, invocation);
 	for (let index = 1; index < BENCH_WARMUP_SAMPLES; index += 1) {
@@ -690,7 +707,11 @@ export function runScenarioCommand(
 		} else {
 			sideEffectNotes.push("side-effect-leak:unknown");
 		}
-		cleanupGitStatusDiff(projectRoot, gitStatusBefore.output, gitStatusAfter.output);
+		cleanupGitStatusDiff(
+			projectRoot,
+			gitStatusBefore.output,
+			gitStatusAfter.output,
+		);
 	}
 	const sampleFailureNotes = samples.flatMap((sample, index) => {
 		if (scenarioSamplePassed(sample, expectedExit)) {
@@ -702,14 +723,16 @@ export function runScenarioCommand(
 	});
 	const durations = samples.map((sample) => sample.duration_ms);
 	const representativeSample =
-		[...samples].reverse().find((sample) => Buffer.byteLength(sample.stdout, "utf8") > 0) ??
+		[...samples]
+			.reverse()
+			.find((sample) => Buffer.byteLength(sample.stdout, "utf8") > 0) ??
 		samples[samples.length - 1] ??
 		samples[0];
 	const outputBytes = representativeSample
 		? Buffer.byteLength(representativeSample.stdout, "utf8")
 		: 0;
-	const successfulSamples = samples.filter(
-		(sample) => scenarioSamplePassed(sample, expectedExit),
+	const successfulSamples = samples.filter((sample) =>
+		scenarioSamplePassed(sample, expectedExit),
 	).length;
 	const errorCount = samples.length - successfulSamples;
 	const metrics: ScenarioExecutionMetrics = {
@@ -733,7 +756,11 @@ export function runScenarioCommand(
 		errorCount === 0 &&
 		gitStatusBefore.ok &&
 		gitStatusAfter.ok;
-	const executionNotes = [...warmupNotes, ...sampleFailureNotes, ...sideEffectNotes];
+	const executionNotes = [
+		...warmupNotes,
+		...sampleFailureNotes,
+		...sideEffectNotes,
+	];
 	if (passed && typeof expectedExit === "number") {
 		executionNotes.push(`expected-exit-honored:${expectedExit}`);
 	}
@@ -903,13 +930,17 @@ export function buildResult(
 	baseline: Baseline | undefined,
 ): BenchmarkResult {
 	// bench executes scenario.command and measures; deterministic_metrics is legacy/ignored for execution packs
-	const hasCommand = typeof scenario.command === "string" && scenario.command.trim().length > 0;
-	const execution = hasCommand
-		&& (scenario.sandbox || scenario.implementation_status !== "skipped")
-		? runScenarioCommand(projectRoot, scenario)
-		: null;
+	const hasCommand =
+		typeof scenario.command === "string" && scenario.command.trim().length > 0;
+	const execution =
+		hasCommand &&
+		(scenario.sandbox || scenario.implementation_status !== "skipped")
+			? runScenarioCommand(projectRoot, scenario)
+			: null;
 	const metrics = execution?.metrics ?? scenario.deterministic_metrics;
-	const notes = execution?.notes ? [...execution.notes] : ["no-command-fallback"];
+	const notes = execution?.notes
+		? [...execution.notes]
+		: ["no-command-fallback"];
 	const thresholdNotes = collectThresholdNotes(
 		scenario.thresholds,
 		metrics as Record<string, number | undefined>,
@@ -925,11 +956,11 @@ export function buildResult(
 			? "skipped"
 			: !baseline
 				? "baseline-missing"
-					: execution && !execution.passed
+				: execution && !execution.passed
+					? "failed"
+					: thresholdNotes.length > 0 || regressionNotes.length > 0
 						? "failed"
-						: thresholdNotes.length > 0 || regressionNotes.length > 0
-							? "failed"
-							: "passed";
+						: "passed";
 	if (status === "baseline-missing") {
 		notes.push("baseline-missing");
 	} else {
@@ -967,7 +998,7 @@ export function buildResult(
 			status === "skipped"
 				? ["not-implemented-live-runner"]
 				: status === "baseline-missing"
-				? notes
+					? notes
 					: notes,
 	});
 }

@@ -308,10 +308,14 @@ describe("local-state project indexer", () => {
 
 			const snapshot = rebuildFilesIndex(root);
 			expect(
-				snapshot.files.some((entry) => entry.path === "cli/generated/template.ts"),
+				snapshot.files.some(
+					(entry) => entry.path === "cli/generated/template.ts",
+				),
 			).toBe(true);
 			expect(
-				snapshot.files.some((entry) => entry.path === "cli/generated/version.ts"),
+				snapshot.files.some(
+					(entry) => entry.path === "cli/generated/version.ts",
+				),
 			).toBe(false);
 
 			const future = new Date(Date.now() + 60_000);

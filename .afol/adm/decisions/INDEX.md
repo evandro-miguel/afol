@@ -55,7 +55,6 @@ See `docs/templates/adr.md` for the standard format.
 
 - `.afol/adm/doctrine/ARCHITECTURE.md` - Root architecture
 - `.afol/adm/specs/` - Technical specifications
-- [agents-index.md](../agentic/agents-index.md) - Index generation
 
 ---
 

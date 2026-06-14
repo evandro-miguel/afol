@@ -1,14 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(python3 .agents/scripts/migrate-task-board.py --all)",
-      "Bash(make doctor 2>&1 | head -30)",
-      "Bash(make lint 2>&1 | head -20)",
-      "Bash(make lint 2>&1 | head -30)",
-      "Bash(make verify 2>&1 | head -20)",
-      "Bash(make verify 2>&1 | head -40)",
-      "Bash(make all 2>&1 | tail -30)",
-      "Bash(make doctor && make lint 2>&1 | tail -20)"
-    ]
+    "allow": []
   }
 }

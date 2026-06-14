@@ -40,10 +40,7 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 	for (const changedPath of changedPaths) {
 		const normalizedPath = normalizePath(changedPath);
 		if (
-			hasPrefix(normalizedPath, [
-				"cli/services/pstr/",
-				"cli/commands/pstr",
-			])
+			hasPrefix(normalizedPath, ["cli/services/pstr/", "cli/commands/pstr"])
 		) {
 			selected.add("pstr-integrity");
 			reasons.push(`pstr-change:${changedPath}`);
@@ -72,10 +69,7 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 			continue;
 		}
 		if (
-			hasPrefix(normalizedPath, [
-				"cli/services/memory/",
-				"cli/commands/memory",
-			])
+			hasPrefix(normalizedPath, ["cli/services/memory/", "cli/commands/memory"])
 		) {
 			selected.add("memory-governance");
 			reasons.push(`memory-change:${changedPath}`);
@@ -105,12 +99,7 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 			reasons.push(`governance-change:${changedPath}`);
 			continue;
 		}
-		if (
-			hasPrefix(normalizedPath, [
-				"cli/services/adm/",
-				"cli/commands/adm",
-			])
-		) {
+		if (hasPrefix(normalizedPath, ["cli/services/adm/", "cli/commands/adm"])) {
 			selected.add("adm-governance");
 			reasons.push(`adm-change:${changedPath}`);
 			continue;

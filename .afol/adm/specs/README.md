@@ -2,8 +2,8 @@
 doc_type: specs_readme
 id: "SPECS_readme"
 status: active
-created_at: "YYYY-MM-DDTHH:MM:SSZ"
-updated_at: "YYYY-MM-DDTHH:MM:SSZ"
+created_at: "2026-05-28T19:41:46+00:00"
+updated_at: "2026-06-14T00:00:00+00:00"
 ---
 
 # SPECS README

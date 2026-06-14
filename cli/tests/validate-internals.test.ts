@@ -115,7 +115,9 @@ function createFixtureRoot(): string {
 			encoding: "utf8",
 		});
 		if (result.status !== 0) {
-			throw new Error(result.stderr || result.stdout || `git ${args.join(" ")} failed`);
+			throw new Error(
+				result.stderr || result.stdout || `git ${args.join(" ")} failed`,
+			);
 		}
 	}
 	return root;
@@ -145,7 +147,9 @@ function createBenchExecutionFixtureRoot(): string {
 			encoding: "utf8",
 		});
 		if (result.status !== 0) {
-			throw new Error(result.stderr || result.stdout || `git ${args.join(" ")} failed`);
+			throw new Error(
+				result.stderr || result.stdout || `git ${args.join(" ")} failed`,
+			);
 		}
 	}
 	return root;
@@ -412,8 +416,8 @@ describe("validate registry", () => {
 			expect(snapshot.scenariosByPack["governance-history"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["adm-governance"]).toHaveLength(4);
 			expect(snapshot.baselinesByPack["cli-kernel-local"]?.timing_p50_ms).toBe(
-			120,
-		);
+				120,
+			);
 			expect(validateRegistryContract(snapshot)).toEqual([]);
 
 			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];
@@ -515,10 +519,10 @@ describe("scenario benchmark execution", () => {
 				"baseline-v1.json",
 			);
 			mkdirSync(dirname(baselinePath), { recursive: true });
-		const baseline: Baseline = {
-			baseline_id: "bench-v1",
-			pack_id: "pstr-integrity",
-			schema_version: "1.0.0",
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
 				timing_p50_ms: 10_000,
 				timing_p95_ms: 10_000,
 			};
@@ -593,7 +597,9 @@ describe("scenario benchmark execution", () => {
 			expect(failure.result.duration_ms).toBeGreaterThan(0);
 			expect(failure.result.error_count).toBe(3);
 			expect(failure.result.tool_success_rate).toBe(0);
-			expect(failure.result.notes.some((note) => note.startsWith("sample-failed:"))).toBe(true);
+			expect(
+				failure.result.notes.some((note) => note.startsWith("sample-failed:")),
+			).toBe(true);
 
 			const sideEffectScenario: Scenario = {
 				...successScenario,
@@ -615,11 +621,13 @@ describe("scenario benchmark execution", () => {
 				scenario_id: "bench-sandbox",
 				implementation_status: "skipped",
 				sandbox: true,
-				setup: [[
-					"node",
-					"-e",
-					"const fs=require('node:fs'); fs.mkdirSync('.afol/memory',{recursive:true}); fs.writeFileSync('.afol/memory/memory.md','MEM-SB-1\\n','utf8');",
-				]],
+				setup: [
+					[
+						"node",
+						"-e",
+						"const fs=require('node:fs'); fs.mkdirSync('.afol/memory',{recursive:true}); fs.writeFileSync('.afol/memory/memory.md','MEM-SB-1\\n','utf8');",
+					],
+				],
 				command: "node sandbox-mutate.cjs",
 			};
 			writeFileSync(
@@ -645,7 +653,9 @@ describe("scenario benchmark execution", () => {
 			expect(sandbox.result.status).toBe("passed");
 			expect(sandbox.result.tool_call_count).toBe(1);
 			expect(sandbox.result.timing_p50_ms).toBeGreaterThan(0);
-			expect(sandbox.result.notes.some((note) => note.startsWith("sample-failed:"))).toBe(false);
+			expect(
+				sandbox.result.notes.some((note) => note.startsWith("sample-failed:")),
+			).toBe(false);
 
 			const sandboxFailureScenario: Scenario = {
 				...sandboxScenario,
@@ -658,7 +668,9 @@ describe("scenario benchmark execution", () => {
 			expect(sandboxFailure.result.status).toBe("failed");
 			expect(sandboxFailure.result.tool_success_rate).toBe(0);
 			expect(
-				sandboxFailure.result.notes.some((note) => note.startsWith("sample-failed:")),
+				sandboxFailure.result.notes.some((note) =>
+					note.startsWith("sample-failed:"),
+				),
 			).toBe(true);
 
 			const sandboxStatusAfter = spawnSync("git", ["status", "--porcelain"], {
@@ -734,21 +746,38 @@ describe("scenario benchmark execution", () => {
 			});
 
 			const clean = withCapturedConsoleError(() =>
-				buildResult(root, makeScenario("token-clean", 1_000), baselinePath, baseline),
+				buildResult(
+					root,
+					makeScenario("token-clean", 1_000),
+					baselinePath,
+					baseline,
+				),
 			);
 			expect(clean.result.status).toBe("passed");
 			expect(clean.result.pass).toBe(true);
-			expect(clean.result.notes.some((note) => note.startsWith(tokenRulePrefix))).toBe(false);
+			expect(
+				clean.result.notes.some((note) => note.startsWith(tokenRulePrefix)),
+			).toBe(false);
 
 			const nonIdeal = withCapturedConsoleError(() =>
-				buildResult(root, makeScenario("token-non-ideal", 25_000), baselinePath, baseline),
+				buildResult(
+					root,
+					makeScenario("token-non-ideal", 25_000),
+					baselinePath,
+					baseline,
+				),
 			);
 			expect(nonIdeal.result.status).toBe("passed");
 			expect(nonIdeal.result.pass).toBe(true);
 			expect(nonIdeal.result.notes).toContain(tokenRuleNonIdealNote);
 
 			const prohibitive = withCapturedConsoleError(() =>
-				buildResult(root, makeScenario("token-prohibitive", 50_000), baselinePath, baseline),
+				buildResult(
+					root,
+					makeScenario("token-prohibitive", 50_000),
+					baselinePath,
+					baseline,
+				),
 			);
 			expect(prohibitive.result.status).toBe("failed");
 			expect(prohibitive.result.pass).toBe(false);

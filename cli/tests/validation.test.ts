@@ -75,7 +75,9 @@ function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 			encoding: "utf8",
 		});
 		if (result.status !== 0) {
-			throw new Error(result.stderr || result.stdout || `git ${args.join(" ")} failed`);
+			throw new Error(
+				result.stderr || result.stdout || `git ${args.join(" ")} failed`,
+			);
 		}
 	}
 	mutate?.(root);
@@ -321,9 +323,9 @@ describe("validation command family", () => {
 			"--json",
 		]);
 		expect(pstrProc.status).toBe(0);
-		expect(parseJsonOutput(pstrProc.stdout as string).selected_pack_ids).toEqual([
-			"pstr-integrity",
-		]);
+		expect(
+			parseJsonOutput(pstrProc.stdout as string).selected_pack_ids,
+		).toEqual(["pstr-integrity"]);
 
 		const ctxProc = runKernel([
 			"v",
@@ -333,9 +335,9 @@ describe("validation command family", () => {
 			"--json",
 		]);
 		expect(ctxProc.status).toBe(0);
-		expect(parseJsonOutput(ctxProc.stdout as string).selected_pack_ids).toEqual([
-			"context-bundles",
-		]);
+		expect(parseJsonOutput(ctxProc.stdout as string).selected_pack_ids).toEqual(
+			["context-bundles"],
+		);
 
 		const stateProc = runKernel([
 			"v",
@@ -345,9 +347,9 @@ describe("validation command family", () => {
 			"--json",
 		]);
 		expect(stateProc.status).toBe(0);
-		expect(parseJsonOutput(stateProc.stdout as string).selected_pack_ids).toEqual([
-			"state-projection",
-		]);
+		expect(
+			parseJsonOutput(stateProc.stdout as string).selected_pack_ids,
+		).toEqual(["state-projection"]);
 
 		const memoryProc = runKernel([
 			"v",
@@ -357,9 +359,9 @@ describe("validation command family", () => {
 			"--json",
 		]);
 		expect(memoryProc.status).toBe(0);
-		expect(parseJsonOutput(memoryProc.stdout as string).selected_pack_ids).toEqual([
-			"memory-governance",
-		]);
+		expect(
+			parseJsonOutput(memoryProc.stdout as string).selected_pack_ids,
+		).toEqual(["memory-governance"]);
 
 		const libraryProc = runKernel([
 			"v",
@@ -369,9 +371,9 @@ describe("validation command family", () => {
 			"--json",
 		]);
 		expect(libraryProc.status).toBe(0);
-		expect(parseJsonOutput(libraryProc.stdout as string).selected_pack_ids).toEqual([
-			"library-knowledge",
-		]);
+		expect(
+			parseJsonOutput(libraryProc.stdout as string).selected_pack_ids,
+		).toEqual(["library-knowledge"]);
 
 		const governanceProc = runKernel([
 			"v",
@@ -381,9 +383,9 @@ describe("validation command family", () => {
 			"--json",
 		]);
 		expect(governanceProc.status).toBe(0);
-		expect(parseJsonOutput(governanceProc.stdout as string).selected_pack_ids).toEqual([
-			"governance-history",
-		]);
+		expect(
+			parseJsonOutput(governanceProc.stdout as string).selected_pack_ids,
+		).toEqual(["governance-history"]);
 
 		const admProc = runKernel([
 			"v",
@@ -393,9 +395,9 @@ describe("validation command family", () => {
 			"--json",
 		]);
 		expect(admProc.status).toBe(0);
-		expect(parseJsonOutput(admProc.stdout as string).selected_pack_ids).toEqual([
-			"adm-governance",
-		]);
+		expect(parseJsonOutput(admProc.stdout as string).selected_pack_ids).toEqual(
+			["adm-governance"],
+		);
 	});
 
 	test("v select changed-path keeps generic cli fallback on cli-kernel-local", () => {
@@ -602,9 +604,9 @@ describe("validation command family", () => {
 				"bench",
 				"--pack",
 				"cli-kernel-local",
-			"--output",
-			outputPath,
-			"--json",
+				"--output",
+				outputPath,
+				"--json",
 			],
 			fixtureRoot,
 		);

@@ -28,3 +28,8 @@ node_modules/
 dist/
 .bun-build*
 .coverage
+.pytest_cache/
+.ruff_cache/
+.rumdl_cache/
+.gitnexus
+.codex/

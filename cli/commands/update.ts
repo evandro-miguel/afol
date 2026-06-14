@@ -185,10 +185,12 @@ function resultEnvelope<T extends object>(
 				action,
 				exit_code: exitCode,
 				data,
-		  };
+			};
 }
 
-function summarizeUpdateChanges(result: UpdateCheckResult): UpdateChangeSummary {
+function summarizeUpdateChanges(
+	result: UpdateCheckResult,
+): UpdateChangeSummary {
 	const counts: UpdateChangeSummary = {
 		total: 0,
 		create: 0,
@@ -230,15 +232,17 @@ function jsonResultData(
 	result: UpdateCheckResult,
 	verbose: boolean,
 ): UpdateJsonData {
-	return verbose ? result : {
-		hasSource: result.hasSource,
-		currentRevision: result.currentRevision,
-		sourceRevision: result.sourceRevision,
-		upToDate: result.upToDate,
-		changes: summarizeUpdateChanges(result),
-		ownershipSource: result.ownershipSource,
-		ownershipCurrent: result.ownershipCurrent,
-	};
+	return verbose
+		? result
+		: {
+				hasSource: result.hasSource,
+				currentRevision: result.currentRevision,
+				sourceRevision: result.sourceRevision,
+				upToDate: result.upToDate,
+				changes: summarizeUpdateChanges(result),
+				ownershipSource: result.ownershipSource,
+				ownershipCurrent: result.ownershipCurrent,
+			};
 }
 
 function writeJsonResult(
@@ -249,7 +253,9 @@ function writeJsonResult(
 	verbose: boolean,
 ): void {
 	io.stdout(
-		stringifyEnvelope(resultEnvelope(jsonResultData(result, verbose), action, exitCode)),
+		stringifyEnvelope(
+			resultEnvelope(jsonResultData(result, verbose), action, exitCode),
+		),
 	);
 }
 
@@ -406,7 +412,13 @@ export async function runUpdateCommand(
 		if (command === "apply") {
 			if (!result.hasSource) {
 				parsedArgs.json
-					? writeJsonResult(io, `update.${command}`, result, 1, parsedArgs.verbose)
+					? writeJsonResult(
+							io,
+							`update.${command}`,
+							result,
+							1,
+							parsedArgs.verbose,
+						)
 					: io.stdout(formatUpdateCheck(result, command).trimEnd());
 				return 1;
 			}
@@ -446,7 +458,7 @@ export async function runUpdateCommand(
 							result.hasSource ? 0 : 1,
 						),
 					),
-				  )
+				)
 			: io.stdout(formatUpdateCheck(result, command).trimEnd());
 		return result.hasSource ? 0 : 1;
 	} catch (error) {
