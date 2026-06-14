@@ -188,6 +188,7 @@ describe("release and toolchain contracts", () => {
 			const provenance = buildReleaseProvenance({
 				cwd: root,
 				releaseMode: true,
+				env: gitEnv,
 			});
 			expect(provenance.security_scanners).toHaveLength(2);
 			expect(provenance.security_scanners).toEqual(

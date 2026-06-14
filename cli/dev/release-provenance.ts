@@ -45,6 +45,7 @@ type WriteReleaseProvenanceOptions = {
 	artifact?: string;
 	releaseMode?: boolean;
 	buildCommand?: string;
+	env?: NodeJS.ProcessEnv;
 };
 
 function sha256Hex(bytes: Uint8Array | string): string {
@@ -136,15 +137,17 @@ export function buildReleaseProvenance(
 		build_command: options.buildCommand ?? DEFAULT_BUILD_COMMAND,
 		platform: process.platform || "unknown",
 		arch: process.arch || "unknown",
-		security_scanners: buildReleaseSecurityScanOutcomes().map((scanner) => ({
-			tool: scanner.tool,
-			kind: scanner.kind,
-			status: scanner.status,
-			...(scanner.reason ? { reason: scanner.reason } : {}),
-			...(scanner.waiver_required
-				? { waiver_required: scanner.waiver_required }
-				: {}),
-		})),
+		security_scanners: buildReleaseSecurityScanOutcomes(options.env).map(
+			(scanner) => ({
+				tool: scanner.tool,
+				kind: scanner.kind,
+				status: scanner.status,
+				...(scanner.reason ? { reason: scanner.reason } : {}),
+				...(scanner.waiver_required
+					? { waiver_required: scanner.waiver_required }
+					: {}),
+			}),
+		),
 	};
 
 	if (options.releaseMode) {
