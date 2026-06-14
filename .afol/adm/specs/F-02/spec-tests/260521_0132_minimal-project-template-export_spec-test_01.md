@@ -2,11 +2,13 @@
 doc_type: spec-test
 id: 260521_0132_minimal-project-template-export_spec-test_01
 theme: minimal-project-template-export
-status: draft
+status: superseded
+superseded_by: cli/tests/bootstrap-template-cleanliness.test.ts and template-policy enforcement
+closure_note: Minimal-export and forbidden-path rejection enforced by template-policy tests; parent spec F-02 closed.
 owners:
 - tester
 created_at: '2026-05-21T01:32:00+08:00'
-updated_at: '2026-05-21T01:32:00+08:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-02
 parent_spec: 260521_0020_minimal-project-template_spec_01
 links:

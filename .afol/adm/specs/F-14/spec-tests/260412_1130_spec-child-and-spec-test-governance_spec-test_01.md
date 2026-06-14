@@ -2,11 +2,13 @@
 doc_type: spec-test
 id: 260412_1130_spec-child-and-spec-test-governance_spec-test_01
 theme: spec-child-and-spec-test-governance
-status: active
+status: superseded
+superseded_by: cli/tests/spec-gate-system.test.ts and the final sibling spec 260412_1110
+closure_note: Spec-child and spec-test governance is enforced by the spec-gate system tests; this test-strategy draft is historical.
 owners:
 - tester
-created_at: '2026-04-12T11:40:00-03:00'
-updated_at: '2026-04-12T11:34:49-03:00'
+created_at: '2026-04-12T11:30:00-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-14
 parent_spec: 260412_1110_spec-child-and-spec-test-governance_spec_01
 links:

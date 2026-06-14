@@ -2,7 +2,8 @@
 doc_type: spec-child
 id: 260423_1821_runtime-flow-benchmark-runner_spec-child_01
 theme: runtime-flow-benchmark-runner
-status: active
+status: final
+closure_note: Benchmark runner contract (v bench JSON/result schema, pack coverage) is implemented and tested.
 owners:
 - orchestrator
 workstream_intent: feature
@@ -10,7 +11,7 @@ artifact_purpose: Define the first executable slice for controlled runtime-flow
   benchmarks, including the command surface, controlled fixture strategy,
   scenario pack, and result contract.
 created_at: '2026-04-23T18:21:34-03:00'
-updated_at: '2026-04-23T18:21:34-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-19
 spec_role: child
 parent_spec: 260423_1605_controlled-runtime-flow-benchmarks_spec_01

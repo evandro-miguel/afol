@@ -1,9 +1,10 @@
 ---
 doc_type: spec
 id: 260412_0000_specs-folder-guide_spec_01
-status: active
+status: final
+closure_note: Folder convention (spec / spec-child / spec-test / spec-lite) matches current README and template rules.
 created_at: '2026-04-12T00:00:00Z'
-updated_at: '2026-04-12T14:16:32-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 title: Specifications Folder Guide
 ---
 

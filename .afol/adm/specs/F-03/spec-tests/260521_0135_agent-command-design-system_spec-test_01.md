@@ -2,11 +2,13 @@
 doc_type: spec-test
 id: 260521_0135_agent-command-design-system_spec-test_01
 theme: agent-command-design-system
-status: draft
+status: superseded
+superseded_by: cli/tests/registry.test.ts and cli/tests/kernel.test.ts
+closure_note: Command grammar, aliases, and compact/JSON defaults are shipped and covered by the registry/kernel test suites.
 owners:
 - tester
 created_at: '2026-05-21T01:35:00+08:00'
-updated_at: '2026-05-21T01:35:00+08:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-03
 parent_spec: 260521_0030_agent-command-design-system_spec_01
 links:

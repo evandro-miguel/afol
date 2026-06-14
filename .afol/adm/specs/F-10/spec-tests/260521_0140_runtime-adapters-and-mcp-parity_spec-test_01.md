@@ -2,11 +2,13 @@
 doc_type: spec-test
 id: 260521_0140_runtime-adapters-and-mcp-parity_spec-test_01
 theme: runtime-adapters-and-mcp-parity
-status: draft
+status: superseded
+superseded_by: cli/tests/validation.test.ts (mcp-parity and runtime-live-agent packs)
+closure_note: Frozen in legacy terms (afol t s, afol u undo, .agents/runtime, cli/mcp). Native MCP adapters remain deferred per F-12 addendum; harness parity is covered by the bench suite.
 owners:
 - tester
 created_at: '2026-05-21T01:40:00+08:00'
-updated_at: '2026-05-21T01:40:00+08:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-10
 parent_spec: 260521_0100_runtime-adapters-and-mcp_spec_01
 links:

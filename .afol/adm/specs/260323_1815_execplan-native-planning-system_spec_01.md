@@ -2,11 +2,12 @@
 doc_type: spec
 id: 260323_1815_execplan-native-planning-system_spec_01
 theme: execplan-native-planning-system
-status: active
+status: final
+closure_note: Native ExecPlan system is live; PLANS.md, docs/templates/plan.md, and spec-gate/workbench tests enforce living plans and strict final-plan checks.
 owners:
 - orchestrator
 created_at: '2026-03-23T18:15:00Z'
-updated_at: '2026-03-23T18:05:33-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-12
 spec_role: parent
 parent_spec: ''

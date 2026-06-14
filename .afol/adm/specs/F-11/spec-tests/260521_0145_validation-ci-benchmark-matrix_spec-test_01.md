@@ -2,11 +2,13 @@
 doc_type: spec-test
 id: 260521_0145_validation-ci-benchmark-matrix_spec-test_01
 theme: validation-ci-benchmark-matrix
-status: draft
+status: superseded
+superseded_by: cli/tests/validation.test.ts (v select, v bench, pack registry, runtime-live-agent)
+closure_note: Validation/benchmark matrix is exercised by the validation test suite; this formal test contract is now test-suite content.
 owners:
 - tester
 created_at: '2026-05-21T01:45:00+08:00'
-updated_at: '2026-05-21T01:45:00+08:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-11
 parent_spec: 260521_0110_validation-ci-and-benchmarks_spec_01
 links:

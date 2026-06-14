@@ -2,7 +2,9 @@
 doc_type: spec
 id: 260531_0000_template-cli-boundary-hardening_spec_01
 theme: template-cli-boundary-hardening
-status: active
+status: superseded
+superseded_by: cli/schemas/template-policy.ts and cli/tests/bootstrap-template-cleanliness.test.ts
+closure_note: Template-CLI boundary (forbidden/allowed patterns, forbidden legacy references) is enforced by template-policy and the bootstrap cleanup tests.
 owners:
 - orchestrator
 created_at: '2026-05-30T21:47:00-03:00'

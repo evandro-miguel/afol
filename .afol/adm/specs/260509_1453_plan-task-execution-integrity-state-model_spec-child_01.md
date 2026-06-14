@@ -2,14 +2,15 @@
 doc_type: spec-child
 id: 260509_1453_plan-task-execution-integrity-state-model_spec-child_01
 theme: plan-task-execution-integrity-state-model
-status: active
+status: final
+closure_note: Canonical task states ([!] [>] [%] [&] [x]) are exercised in cli/tests/status.test.ts and workbench lifecycle tests.
 owners:
 - orchestrator
 workstream_intent: feature
 artifact_purpose: Define direct-execution plan/task integrity, canonical task states,
   and validation behavior that prevents meta-planning tasks.
 created_at: '2026-05-09T14:53:30-03:00'
-updated_at: '2026-05-09T14:59:47-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-18
 spec_role: child
 parent_spec: 260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01

@@ -2,11 +2,13 @@
 doc_type: spec-test
 id: 260521_0130_universal-agent-cli-kernel-contract_spec-test_01
 theme: universal-agent-cli-kernel-contract
-status: draft
+status: superseded
+superseded_by: cli/tests/kernel.test.ts and cli/tests/registry.test.ts
+closure_note: Test contract describes discontinued legacy delegation (.agents/agents, just, ./a). Live coverage is the native bun:test suite.
 owners:
 - tester
 created_at: '2026-05-21T01:30:00+08:00'
-updated_at: '2026-05-21T01:30:00+08:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-01
 parent_spec: 260521_0010_universal-agent-cli_spec_01
 links:

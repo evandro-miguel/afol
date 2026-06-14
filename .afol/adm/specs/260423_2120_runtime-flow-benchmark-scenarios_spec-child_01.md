@@ -2,14 +2,15 @@
 doc_type: spec-child
 id: 260423_2120_runtime-flow-benchmark-scenarios_spec-child_01
 theme: runtime-flow-benchmark-scenarios
-status: active
+status: final
+closure_note: Scenario pack delivered (runtime-flow-live-agent-v2) with accuracy/tool metrics and a saved baseline.
 owners:
 - orchestrator
 workstream_intent: feature
 artifact_purpose: Expand the controlled live-agent benchmark family with more script-heavy
   scenarios and explicit accuracy metrics.
 created_at: '2026-04-23T21:20:00-03:00'
-updated_at: '2026-04-24T12:29:13-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-19
 spec_role: child
 parent_spec: 260423_1605_controlled-runtime-flow-benchmarks_spec_01

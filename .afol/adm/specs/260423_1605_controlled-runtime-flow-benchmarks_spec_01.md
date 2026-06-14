@@ -2,14 +2,15 @@
 doc_type: spec
 id: 260423_1605_controlled-runtime-flow-benchmarks_spec_01
 theme: controlled-runtime-flow-benchmarks
-status: active
+status: final
+closure_note: Benchmark command family (v select, v bench) and pack registry are shipped and covered by cli/tests/validation.test.ts. The live-runner child (260423_2006) remains pending.
 owners:
 - orchestrator
 workstream_intent: feature
 artifact_purpose: Define the benchmark contract for controlled agent-tool execution
   flows and when those benchmarks should be used as regression measurement.
 created_at: '2026-04-23T16:05:00-03:00'
-updated_at: '2026-04-23T16:05:00-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-19
 spec_role: parent
 parent_spec: ''
