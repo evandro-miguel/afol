@@ -1,6 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { accessSync, constants as fsConstants, rmSync } from "node:fs";
-import { join, relative } from "node:path";
+import {
+	accessSync,
+	constants as fsConstants,
+	existsSync,
+	mkdtempSync,
+	rmSync,
+	symlinkSync,
+} from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { saveBenchmarkPayload } from "./benchmark-files";
 import {
 	outputJson,
@@ -31,6 +39,8 @@ import {
 const BASELINES_RELATIVE_PATH = ".afol/data/benchmarks/catalog/baselines";
 const BENCH_SAMPLES = 3;
 const BENCH_WARMUP_SAMPLES = 1;
+const REAL_REPO_ROOT = resolve(import.meta.dir, "..", "..");
+const SANDBOX_COPY_EXCLUDES = [".git", "node_modules", "dist", ".bun-build*"];
 
 const VALIDATION_COMMANDS_BY_PACK: Record<PackId, ValidationCommandSpec[]> = {
 	"cli-kernel-local": [
@@ -327,6 +337,7 @@ function tokenizeCommand(command: string): string[] {
 }
 
 function resolveScenarioInvocation(
+	repoRoot: string,
 	projectRoot: string,
 	command: string,
 ): CommandInvocation {
@@ -334,9 +345,24 @@ function resolveScenarioInvocation(
 	if (tokens.length === 0) {
 		throw new Error("Empty scenario command");
 	}
+	return resolveCommandInvocation(repoRoot, projectRoot, tokens, true);
+}
+
+function resolveCommandInvocation(
+	repoRoot: string,
+	projectRoot: string,
+	tokens: string[],
+	preferLocalWrapper: boolean,
+): CommandInvocation {
 	const program = tokens[0]!;
 	const args = tokens.slice(1);
 	if (program === "afol" || program === "a") {
+		if (!preferLocalWrapper) {
+			return {
+				command: "bun",
+				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
+			};
+		}
 		const afolPath = join(projectRoot, "afol");
 		try {
 			accessSync(afolPath, fsConstants.X_OK);
@@ -344,11 +370,52 @@ function resolveScenarioInvocation(
 		} catch {
 			return {
 				command: "bun",
-				args: ["run", join(projectRoot, "cli", "main.ts"), ...args],
+				args: ["run", join(repoRoot, "cli", "main.ts"), ...args],
 			};
 		}
 	}
 	return { command: program, args };
+}
+
+function resolveSetupInvocation(
+	repoRoot: string,
+	projectRoot: string,
+	command: string[],
+): CommandInvocation {
+	if (command.length === 0) {
+		throw new Error("Empty setup command");
+	}
+	return resolveCommandInvocation(repoRoot, projectRoot, command, false);
+}
+
+function shellQuote(value: string): string {
+	return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function createSandboxRoot(projectRoot: string): string {
+	const sandboxRoot = mkdtempSync(join(tmpdir(), "afol-bench-sandbox-"));
+	const excludeFlags = SANDBOX_COPY_EXCLUDES.map(
+		(entry) => `--exclude ${shellQuote(entry)}`,
+	).join(" ");
+	const exportCommand = [
+		"set -euo pipefail;",
+		`tar -C ${shellQuote(projectRoot)} ${excludeFlags} -cf - . | tar -C ${shellQuote(sandboxRoot)} -xf -`,
+	].join(" ");
+	const exportResult = spawnSync("bash", ["-lc", exportCommand], {
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+	if (exportResult.status !== 0 || exportResult.signal || exportResult.error) {
+		throw new Error(
+			`Sandbox copy export failed: ${outputTail(
+				String((exportResult.stderr ?? exportResult.error?.message) || "tar"),
+			)}`,
+		);
+	}
+	const realNodeModules = join(REAL_REPO_ROOT, "node_modules");
+	if (existsSync(realNodeModules)) {
+		symlinkSync(realNodeModules, join(sandboxRoot, "node_modules"), "dir");
+	}
+	return sandboxRoot;
 }
 
 function gitStatusPorcelain(projectRoot: string): { ok: boolean; output: string } {
@@ -462,17 +529,114 @@ function runScenarioSample(
 	};
 }
 
+function coerceMetrics(metrics: Record<string, number>): ScenarioExecutionMetrics {
+	return {
+		duration_ms: metrics.duration_ms ?? 0,
+		timing_p50_ms: metrics.timing_p50_ms ?? metrics.duration_ms ?? 0,
+		timing_p95_ms: metrics.timing_p95_ms ?? metrics.duration_ms ?? 0,
+		error_count: metrics.error_count ?? 0,
+		retry_count: metrics.retry_count ?? 0,
+		context_tokens: metrics.context_tokens ?? 0,
+		prompt_tokens: metrics.prompt_tokens ?? 0,
+		output_tokens: metrics.output_tokens ?? 0,
+		context_bytes: metrics.context_bytes ?? 0,
+		output_bytes: metrics.output_bytes ?? 0,
+		tool_call_count: metrics.tool_call_count ?? 1,
+		tool_success_rate: metrics.tool_success_rate ?? 1,
+	};
+}
+
+function isCommandSuccess(sample: ScenarioSampleRun): boolean {
+	return !sample.signal && !sample.spawn_error && sample.exit_code === 0;
+}
+
+function buildSampleMetrics(
+	sample: ScenarioSampleRun,
+	passed: boolean,
+): ScenarioExecutionMetrics {
+	const outputBytes = Buffer.byteLength(sample.stdout, "utf8");
+	return {
+		duration_ms: sample.duration_ms,
+		timing_p50_ms: sample.duration_ms,
+		timing_p95_ms: sample.duration_ms,
+		error_count: passed ? 0 : 1,
+		retry_count: 0,
+		context_tokens: 0,
+		prompt_tokens: 0,
+		output_tokens: Math.round(outputBytes / 4),
+		context_bytes: 0,
+		output_bytes: outputBytes,
+		tool_call_count: 1,
+		tool_success_rate: passed ? 1 : 0,
+	};
+}
+
+function runSandboxScenarioCommand(
+	projectRoot: string,
+	scenario: Scenario,
+	command: string,
+): ScenarioExecutionResult {
+	const expectedExit = scenario.expected_exit;
+	let sandboxRoot: string | null = null;
+	try {
+		sandboxRoot = createSandboxRoot(projectRoot);
+		for (const [index, setupCommand] of (scenario.setup ?? []).entries()) {
+			const setupInvocation = resolveSetupInvocation(
+				REAL_REPO_ROOT,
+				sandboxRoot,
+				setupCommand,
+			);
+			const setupSample = runScenarioSample(sandboxRoot, setupInvocation);
+			if (!isCommandSuccess(setupSample)) {
+				return {
+					metrics: coerceMetrics(scenario.deterministic_metrics),
+					notes: [
+						`setup-failed:${index}:${setupSample.exit_code ?? "null"}`,
+					],
+					passed: false,
+				};
+			}
+		}
+		const invocation = resolveScenarioInvocation(
+			REAL_REPO_ROOT,
+			sandboxRoot,
+			command,
+		);
+		const sample = runScenarioSample(sandboxRoot, invocation);
+		const passed = scenarioSamplePassed(sample, expectedExit);
+		const notes = passed
+			? typeof expectedExit === "number"
+				? [`expected-exit-honored:${expectedExit}`]
+				: []
+			: [
+				`sample-failed:1:exit=${sample.exit_code ?? "null"}:stderr=${outputTail((sample.spawn_error ?? sample.stderr) || sample.stdout)}`,
+			];
+		return {
+			metrics: buildSampleMetrics(sample, passed),
+			notes,
+			passed,
+		};
+	} finally {
+		if (sandboxRoot) {
+			rmSync(sandboxRoot, { recursive: true, force: true });
+		}
+	}
+}
+
 export function runScenarioCommand(
 	projectRoot: string,
-	scenario: Pick<Scenario, "command" | "expected_exit" | "pack_id" | "scenario_id">,
+	scenario: Scenario,
 ): ScenarioExecutionResult {
 	const command = typeof scenario.command === "string" ? scenario.command.trim() : "";
 	if (command.length === 0) {
 		throw new Error("Scenario command is required for execution");
 	}
-	const expectedExit = scenario.expected_exit;
 	console.error(`bench: running ${scenario.pack_id}/${scenario.scenario_id} ...`);
-	const invocation = resolveScenarioInvocation(projectRoot, command);
+	if (scenario.sandbox) {
+		return runSandboxScenarioCommand(projectRoot, scenario, command);
+	}
+	const expectedExit = scenario.expected_exit;
+	const invocation = resolveScenarioInvocation(REAL_REPO_ROOT, projectRoot, command);
 	const gitStatusBefore = gitStatusPorcelain(projectRoot);
 	let warmup = runScenarioSample(projectRoot, invocation);
 	for (let index = 1; index < BENCH_WARMUP_SAMPLES; index += 1) {
@@ -706,7 +870,7 @@ export function buildResult(
 	// bench executes scenario.command and measures; deterministic_metrics is legacy/ignored for execution packs
 	const hasCommand = typeof scenario.command === "string" && scenario.command.trim().length > 0;
 	const execution = hasCommand
-		&& scenario.implementation_status !== "skipped"
+		&& (scenario.sandbox || scenario.implementation_status !== "skipped")
 		? runScenarioCommand(projectRoot, scenario)
 		: null;
 	const metrics = execution?.metrics ?? scenario.deterministic_metrics;
@@ -722,7 +886,7 @@ export function buildResult(
 		metrics as Record<string, number>,
 	);
 	const status: BenchmarkResult["status"] =
-		scenario.implementation_status === "skipped"
+		scenario.implementation_status === "skipped" && !scenario.sandbox
 			? "skipped"
 			: !baseline
 				? "baseline-missing"

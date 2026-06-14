@@ -609,6 +609,64 @@ describe("scenario benchmark execution", () => {
 					note.startsWith("side-effect-leak:"),
 				),
 			).toBe(true);
+
+			const sandboxScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-sandbox",
+				implementation_status: "skipped",
+				sandbox: true,
+				setup: [[
+					"node",
+					"-e",
+					"const fs=require('node:fs'); fs.mkdirSync('.afol/memory',{recursive:true}); fs.writeFileSync('.afol/memory/memory.md','MEM-SB-1\\n','utf8');",
+				]],
+				command: "node sandbox-mutate.cjs",
+			};
+			writeFileSync(
+				join(root, "sandbox-mutate.cjs"),
+				[
+					"const fs = require('node:fs');",
+					"const path = '.afol/memory/memory.md';",
+					"const text = fs.readFileSync(path, 'utf8');",
+					"if (!text.includes('MEM-SB-1')) process.exit(7);",
+					"fs.appendFileSync(path, '\\n<!-- sandboxed -->\\n', 'utf8');",
+				].join("\n"),
+				"utf8",
+			);
+			const sandboxStatusBefore = spawnSync("git", ["status", "--porcelain"], {
+				cwd: root,
+				encoding: "utf8",
+			});
+			expect(sandboxStatusBefore.status).toBe(0);
+
+			const sandbox = withCapturedConsoleError(() =>
+				buildResult(root, sandboxScenario, baselinePath, baseline),
+			);
+			expect(sandbox.result.status).toBe("passed");
+			expect(sandbox.result.tool_call_count).toBe(1);
+			expect(sandbox.result.timing_p50_ms).toBeGreaterThan(0);
+			expect(sandbox.result.notes.some((note) => note.startsWith("sample-failed:"))).toBe(false);
+
+			const sandboxFailureScenario: Scenario = {
+				...sandboxScenario,
+				scenario_id: "bench-sandbox-failure",
+				command: "node -e 'process.exit(7)'",
+			};
+			const sandboxFailure = withCapturedConsoleError(() =>
+				buildResult(root, sandboxFailureScenario, baselinePath, baseline),
+			);
+			expect(sandboxFailure.result.status).toBe("failed");
+			expect(sandboxFailure.result.tool_success_rate).toBe(0);
+			expect(
+				sandboxFailure.result.notes.some((note) => note.startsWith("sample-failed:")),
+			).toBe(true);
+
+			const sandboxStatusAfter = spawnSync("git", ["status", "--porcelain"], {
+				cwd: root,
+				encoding: "utf8",
+			});
+			expect(sandboxStatusAfter.status).toBe(0);
+			expect(sandboxStatusAfter.stdout).toBe(sandboxStatusBefore.stdout);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

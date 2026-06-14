@@ -29,6 +29,8 @@ export interface Scenario {
 	scenario_version: string;
 	pack_id: PackId;
 	command?: string;
+	sandbox?: boolean;
+	setup?: string[][];
 	expected_exit?: number;
 	result_schema: string;
 	oracle: string;

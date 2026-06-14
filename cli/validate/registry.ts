@@ -57,6 +57,29 @@ function parseScenario(
 			`${sourcePath}.deterministic_metrics`,
 		),
 	};
+	if (typeof data.sandbox === "boolean") {
+		scenario.sandbox = data.sandbox;
+	} else if (data.sandbox !== undefined) {
+		throw new Error(`Invalid boolean field: ${sourcePath}.sandbox`);
+	}
+	if (data.setup !== undefined) {
+		if (!Array.isArray(data.setup)) {
+			throw new Error(`Invalid setup commands field: ${sourcePath}.setup`);
+		}
+		scenario.setup = data.setup.map((entry, index) => {
+			if (!Array.isArray(entry) || entry.length === 0) {
+				throw new Error(`Invalid setup command: ${sourcePath}.setup[${index}]`);
+			}
+			return entry.map((value, argIndex) => {
+				if (typeof value !== "string" || value.trim() === "") {
+					throw new Error(
+						`Invalid setup argument: ${sourcePath}.setup[${index}][${argIndex}]`,
+					);
+				}
+				return value;
+			});
+		});
+	}
 	const expectedExit = asOptionalNumber(
 		data.expected_exit,
 		`${sourcePath}.expected_exit`,
