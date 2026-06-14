@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { checkActiveSessionPointerMutation } from "../drift/checker";
 import { detectSessionHealth } from "../local-state/workbench-index";
 import { readMemory } from "../memory";
 import { resolveProjectPaths } from "../project/paths";
@@ -83,6 +84,19 @@ function activeSessionCheck(root: string, report: SweepReport): void {
 	addCheck(report, 1, stale ? 1 : 0, stale ? ["close active session"] : []);
 }
 
+function activeSessionPointerMutationCheck(
+	root: string,
+	report: SweepReport,
+): void {
+	const findings = checkActiveSessionPointerMutation(root);
+	addCheck(
+		report,
+		1,
+		findings.length,
+		findings.length > 0 ? ["review .afol/wb/.active_session mutation"] : [],
+	);
+}
+
 function sessionHealthCheck(root: string, report: SweepReport): void {
 	const warnings = detectSessionHealth(root);
 	addCheck(
@@ -148,6 +162,7 @@ export function sweepDaily(root: string): SweepReport {
 	dbCheck(root, report);
 	memoryCheck(root, report);
 	activeSessionCheck(root, report);
+	activeSessionPointerMutationCheck(root, report);
 	return finalize(report);
 }
 

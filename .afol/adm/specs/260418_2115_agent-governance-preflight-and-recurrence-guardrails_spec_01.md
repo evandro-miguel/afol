@@ -3,6 +3,7 @@ doc_type: spec
 id: 260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01
 theme: agent-governance-preflight-and-recurrence-guardrails
 status: active
+implementation_note: "Partially delivered (2026-06-14): afol preflight command (cli/commands/preflight.ts) performs read-only governance search — spec lookup (.afol/adm/specs), lesson lookup (docs/lessons), similar-system discovery (rg over cli/ + specs), and rule resolution (.agents/rules) with a gaps report. Satisfies §8.2, §8.6, §8.8 (detection), §8.9, §8.11 (resolution). Child plan-task-execution-integrity (260509) already final. Remaining as documented workflow / future children: decision-intake+challenge (§8.4/8.7, in docs/standards/decision-intake.md), recurring-problem heavy-verification + rule creation (§8.8 action side), orchestrator rule injection into delegated agents (§8.11 enforcement side)."
 owners:
 - orchestrator
 workstream_intent: feature
@@ -10,7 +11,7 @@ artifact_purpose: Define the plan/spec preflight, recurring-problem escalation, 
   discovery, direct-execution plan/task integrity, and rule-enforcement contract for
   agents.
 created_at: '2026-04-18T21:15:13-03:00'
-updated_at: '2026-05-09T14:59:47-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 roadmap_feature: F-18
 spec_role: parent
 parent_spec: ''

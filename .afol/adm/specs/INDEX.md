@@ -18,8 +18,8 @@ updated_at: "2026-06-14T00:00:00+00:00"
 |--------|-------|
 | Total | 68 |
 | Draft | 0 |
-| Active | 4 |
-| Final | 40 |
+| Active | 1 |
+| Final | 42 |
 | Superseded | 24 |
 
 ## Index
@@ -38,7 +38,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260306_runtime-command-parity_spec_01 |  | superseded | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, plan: 260306_2128_context-driven-execution-commands_plan_01, task: 260306_2128_context-driven-execution-commands_task_01 |
 | 260306_guided-status-and-implementation_spec_01 |  | superseded | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, plan: 260306_2128_context-driven-execution-commands_plan_01, task: 260306_2128_context-driven-execution-commands_task_01 |
 | 260306_context-driven-execution-commands_spec_01 |  | superseded | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
-| 260307_persistent-planning-memory_spec_01 | persistent-planning-memory | active | orchestrator | roadmap: 260223_0000_arc_roadmap_01 |
+| 260307_persistent-planning-memory_spec_01 | persistent-planning-memory | final | orchestrator | roadmap: 260223_0000_arc_roadmap_01 |
 | 260323_1704_universal-skills-runtime-integration_spec_01 | universal-skills-runtime-integration | superseded | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260323_1815_execplan-native-planning-system_spec_01 | execplan-native-planning-system | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260323_1741_current-state-maps-and-goal-state-governance_spec_01 | current-state-maps-and-goal-state-governance | superseded | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
@@ -59,7 +59,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 | 260423_1821_runtime-flow-benchmark-runner_spec-child_01 | runtime-flow-benchmark-runner | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260423_2006_runtime-flow-benchmark-live-agent_spec-child_01 | runtime-flow-benchmark-live-agent | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260423_2120_runtime-flow-benchmark-scenarios_spec-child_01 | runtime-flow-benchmark-scenarios | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
-| 260426_1215_parallel-session-isolation_spec_01 | parallel-session-isolation | active | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
+| 260426_1215_parallel-session-isolation_spec_01 | parallel-session-isolation | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md |
 | 260509_1453_plan-task-execution-integrity-state-model_spec-child_01 | plan-task-execution-integrity-state-model | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, parent_spec: .afol/adm/specs/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md, plan: .afol/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_plan_01.md, task: .afol/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_task_01.md |
 | 260521_0000_total-reformulation-strategy_spec_01 | total-reformulation-strategy | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md |
 | 260521_0010_universal-agent-cli_spec_01 | universal-agent-cli | final | orchestrator | roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md, manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md |

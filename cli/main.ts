@@ -18,6 +18,7 @@ import { runLibraryCommand } from "./commands/library";
 import { runLocalStateCommand } from "./commands/local-state";
 import { runMaintenanceCommand } from "./commands/maintenance";
 import { runMemoryCommand } from "./commands/memory";
+import { runPreflightCommand } from "./commands/preflight";
 import { runPstrCommand } from "./commands/pstr";
 import { runSchemaCommand } from "./commands/schema-cmd";
 import { runSessionCommand } from "./commands/session";
@@ -233,6 +234,10 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "catchup") {
 		return runCatchupCommand(resolution.args, project.value.root);
+	}
+
+	if (resolution.kind === "preflight") {
+		return runPreflightCommand(resolution.args, project.value.root);
 	}
 
 	if (resolution.kind === "subcommand" && resolution.group === "adm") {

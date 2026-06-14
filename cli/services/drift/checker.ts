@@ -1,7 +1,9 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import { computeSourceHash } from "../../core/source-hash";
 import { validateAdmMigration } from "../adm";
+import { resolveProjectPaths } from "../project/paths";
 import { buildPstrIndexSnapshot, getPstrIndex } from "../pstr/builder";
 import { openDb } from "../state/db";
 import type { DriftFinding, DriftReport } from "./types";
@@ -75,6 +77,61 @@ function walkFiles(root: string): string[] {
 
 function readText(path: string): string {
 	return readFileSync(path, "utf8");
+}
+
+function readGitChangedPaths(
+	root: string,
+	args: string[],
+	parser: (line: string) => string | null,
+): string[] {
+	const result = spawnSync("git", args, {
+		cwd: root,
+		encoding: "utf8",
+		shell: false,
+	});
+	if (result.error || result.status !== 0) {
+		return [];
+	}
+	return result.stdout
+		.split(/\r?\n/)
+		.map((line) => parser(line))
+		.filter((line): line is string => line !== null)
+		.map((line) => line.replace(/\\/g, "/"));
+}
+
+export function checkActiveSessionPointerMutation(
+	root: string,
+): DriftFinding[] {
+	try {
+		const changedPaths = new Set([
+			...readGitChangedPaths(root, ["status", "--porcelain"], (line) => {
+				if (line.length < 4) {
+					return null;
+				}
+				return line.slice(3);
+			}),
+			...readGitChangedPaths(
+				root,
+				["diff", "--cached", "--name-only"],
+				(line) => (line.length > 0 ? line : null),
+			),
+		]);
+		const activeSessionRel = resolveProjectPaths(root).activeSessionFile;
+		if (!changedPaths.has(activeSessionRel)) {
+			return [];
+		}
+		return [
+			makeFinding(
+				"active-session-pointer-mutated",
+				"warn",
+				"state",
+				".afol/wb/.active_session appears in git changes",
+				"commit only if this is an explicit session-management change",
+			),
+		];
+	} catch {
+		return [];
+	}
 }
 
 function parseFrontmatter(content: string): Record<string, string> {

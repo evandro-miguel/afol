@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,8 +9,10 @@ import {
 	checkStateDrift,
 	runDriftCheck,
 } from "../services/drift";
+import { checkActiveSessionPointerMutation } from "../services/drift/checker";
 import { rebuildPstrIndex } from "../services/pstr";
 import { hydrateSession } from "../services/state/session-state";
+import { sweepDaily } from "../services/sweep";
 
 type CapturedIo = {
 	stdout: string[];
@@ -167,6 +170,17 @@ function createFixture(): string {
 	return root;
 }
 
+function initGitRepo(root: string): void {
+	const result = spawnSync("git", ["init"], {
+		cwd: root,
+		encoding: "utf8",
+		shell: false,
+	});
+	if (result.error || result.status !== 0) {
+		throw new Error(result.stderr || result.stdout || "git init failed");
+	}
+}
+
 describe("drift validation", () => {
 	test("runDriftCheck returns ok when all drift surfaces match", () => {
 		const root = createFixture();
@@ -220,6 +234,74 @@ describe("drift validation", () => {
 						finding.domain === "state" && finding.severity === "warn",
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkActiveSessionPointerMutation warns on staged pointer changes", () => {
+		const root = createFixture();
+		try {
+			initGitRepo(root);
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"test-session\n",
+				"utf8",
+			);
+			const addResult = spawnSync("git", ["add", ".afol/wb/.active_session"], {
+				cwd: root,
+				encoding: "utf8",
+				shell: false,
+			});
+			if (addResult.error || addResult.status !== 0) {
+				throw new Error(
+					addResult.stderr || addResult.stdout || "git add failed",
+				);
+			}
+			const findings = checkActiveSessionPointerMutation(root);
+			expect(findings).toHaveLength(1);
+			expect(findings[0]?.id).toBe("active-session-pointer-mutated");
+			expect(findings[0]?.severity).toBe("warn");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("sweepDaily surfaces active session pointer mutation warning", () => {
+		const root = createFixture();
+		try {
+			initGitRepo(root);
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"test-session\n",
+				"utf8",
+			);
+			const addResult = spawnSync("git", ["add", ".afol/wb/.active_session"], {
+				cwd: root,
+				encoding: "utf8",
+				shell: false,
+			});
+			if (addResult.error || addResult.status !== 0) {
+				throw new Error(
+					addResult.stderr || addResult.stdout || "git add failed",
+				);
+			}
+			const report = sweepDaily(root);
+			expect(report.issues).toBeGreaterThan(0);
+			expect(report.actions).toContain(
+				"review .afol/wb/.active_session mutation",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkActiveSessionPointerMutation stays quiet when pointer is untouched", () => {
+		const root = createFixture();
+		try {
+			initGitRepo(root);
+			const findings = checkActiveSessionPointerMutation(root);
+			expect(findings).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

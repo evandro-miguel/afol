@@ -88,7 +88,7 @@ function parseArgs(args: string[]): ParsedArgs {
 		}
 		if (arg === "--session") {
 			const value = args[index + 1];
-			if (!value) {
+			if (!value || value.startsWith("-")) {
 				throw new Error("Missing value for --session in session.");
 			}
 			session = value;
@@ -97,7 +97,7 @@ function parseArgs(args: string[]): ParsedArgs {
 		}
 		if (arg === "--branch") {
 			const value = args[index + 1];
-			if (!value) {
+			if (!value || value.startsWith("-")) {
 				throw new Error("Missing value for --branch in session.");
 			}
 			branch = value;
@@ -106,7 +106,7 @@ function parseArgs(args: string[]): ParsedArgs {
 		}
 		if (arg === "--actor") {
 			const value = args[index + 1];
-			if (!value) {
+			if (!value || value.startsWith("-")) {
 				throw new Error("Missing value for --actor in session.");
 			}
 			actor = value;

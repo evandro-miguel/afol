@@ -421,4 +421,42 @@ describe("bootstrap provider-compatible mutable state", () => {
 			rmSync(target, { recursive: true, force: true });
 		}
 	});
+
+	test("--without-claude with default mutableDir keeps provider-compatible .agents roots", async () => {
+		const target = mkdtempSync(
+			join(tmpdir(), "bootstrap-without-claude-agents-"),
+		);
+		try {
+			const exitCode = await runBootstrapCommand([
+				target,
+				"--mutable-dir",
+				".agents",
+				"--without-claude",
+			]);
+
+			expect(exitCode).toBe(0);
+			// Claude artifacts absent
+			expect(existsSync(join(target, "CLAUDE.md"))).toBe(false);
+			expect(existsSync(join(target, ".claude"))).toBe(false);
+			// Mutable-state template files MUST remain (regression guard:
+			// --without-claude must not trigger provider-root stripping when
+			// mutableDir is .agents). Template ships these under .afol/.
+			expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "data", "README.md"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(
+				true,
+			);
+			expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
+
+			const config = JSON.parse(
+				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+			) as {
+				paths: { mutable_dir: string };
+				adapters?: { claude?: { enabled?: boolean } };
+			};
+			expect(config.adapters?.claude?.enabled).toBe(false);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
 });

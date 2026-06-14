@@ -33,6 +33,7 @@ export type CommandKind =
 	| "sweep"
 	| "schema"
 	| "catchup"
+	| "preflight"
 	| "adapter"
 	| "session";
 export type CommandSideEffect = "read" | "write" | "append" | "generated";
@@ -328,6 +329,15 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description:
 			"Compare active session artifacts against git state and report unsynced context",
+		category: "inspect",
+	},
+	{
+		command: "preflight",
+		aliases: ["pf"],
+		kind: "preflight",
+		sideEffect: "read",
+		description:
+			"Governance preflight: search specs, lessons, systems, and rules before planning",
 		category: "inspect",
 	},
 	{

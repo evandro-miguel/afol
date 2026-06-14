@@ -240,11 +240,15 @@ function buildBootstrapTemplateFiles(
 	withoutClaude: boolean,
 ): TemplateFileMap {
 	const templateFiles: TemplateFileMap = { ...DEFAULT_TEMPLATE_FILES };
-	if (mutableDir === ".agents" && !withoutClaude) {
+	const providerMigration = mutableDir !== ".agents";
+	if (!providerMigration && !withoutClaude) {
 		return templateFiles;
 	}
 
-	if (mutableDir === ".agents") {
+	// Provider-compatible mutable migration strips .agents mutable roots and
+	// .afol/* suffix roots. This must NOT run for a plain --without-claude
+	// install that keeps mutableDir at .agents.
+	if (providerMigration) {
 		for (const path of Object.keys(templateFiles)) {
 			if (
 				PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS.some(
@@ -254,25 +258,24 @@ function buildBootstrapTemplateFiles(
 				delete templateFiles[path];
 			}
 		}
-	}
-	for (const path of Object.keys(templateFiles)) {
-		if (
-			MUTABLE_TEMPLATE_SUFFIX_ROOTS.some((suffix) => {
-				const root = `${mutableDir}/${suffix}`;
-				return path === root || path.startsWith(`${root}/`);
-			})
-		) {
-			delete templateFiles[path];
+		for (const path of Object.keys(templateFiles)) {
+			if (
+				MUTABLE_TEMPLATE_SUFFIX_ROOTS.some((suffix) => {
+					const root = `${mutableDir}/${suffix}`;
+					return path === root || path.startsWith(`${root}/`);
+				})
+			) {
+				delete templateFiles[path];
+			}
 		}
 	}
 
 	const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
-	if (configEntry) {
+	if (configEntry && (providerMigration || withoutClaude)) {
 		const basePayload = Buffer.from(configEntry.contentBase64, "base64");
-		const afterMutable =
-			mutableDir !== ".agents"
-				? mutableConfigPayload(basePayload, mutableDir)
-				: basePayload;
+		const afterMutable = providerMigration
+			? mutableConfigPayload(basePayload, mutableDir)
+			: basePayload;
 		const payload = applyAdapterConfigFlag(afterMutable, withoutClaude);
 		templateFiles[".agents/config.json"] = {
 			path: ".agents/config.json",

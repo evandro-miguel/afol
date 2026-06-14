@@ -2,8 +2,8 @@
 doc_type: spec
 id: 260426_1215_parallel-session-isolation_spec_01
 theme: parallel-session-isolation
-status: active
-implementation_note: "Delivered (2026-06-14): context-local session binding (.afol/wb/session-context.json), resolution contract (explicit > AFOL_SESSION env > context > global; CI mode rejects global fallback), and `afol session list|bind|switch|unbind`. Satisfies acceptance §7.1, §7.2, §7.4. Remaining: §7.3 PR-validation guard for .active_session changes, §7.5 remote-agent review docs."
+status: final
+closure_note: "Delivered (2026-06-14): context-local session binding (.afol/wb/session-context.json), resolution contract (explicit > AFOL_SESSION env > context > global; CI mode rejects global fallback), afol session list|bind|switch|unbind, sweep/drift guard flagging .active_session mutations (§7.3), and remote-agent review docs (§7.5, docs/standards/remote-agent-review.md). All acceptance §7.1-7.5 satisfied."
 owners:
 - orchestrator
 workstream_intent: Make workbench sessions safe for concurrent remote and local agents.

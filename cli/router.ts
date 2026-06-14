@@ -19,6 +19,7 @@ export type CommandResolution =
 	| { kind: "file"; args: string[] }
 	| { kind: "localState"; args: string[] }
 	| { kind: "catchup"; args: string[] }
+	| { kind: "preflight"; args: string[] }
 	| SubCommandResolution
 	| { kind: "unknown"; message: string; exitCode: number };
 
@@ -230,6 +231,10 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind === "catchup") {
 		return { kind: "catchup", args: rest };
+	}
+
+	if (topLevelKind === "preflight") {
+		return { kind: "preflight", args: rest };
 	}
 
 	if (topLevelKind === "adm") {

@@ -45,6 +45,8 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("db")).toBe("db");
 		expect(kernelRegistry.resolveKind("close")).toBe("close");
 		expect(kernelRegistry.resolveKind("c")).toBe("close");
+		expect(kernelRegistry.resolveKind("preflight")).toBe("preflight");
+		expect(kernelRegistry.resolveKind("pf")).toBe("preflight");
 		expect(kernelRegistry.resolveKind("task")).toBeNull();
 		expect(kernelRegistry.resolveKind("query")).toBeNull();
 	});
@@ -92,6 +94,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("maintenance")?.sideEffect).toBe("read");
 		expect(byCommand.get("sweep")?.sideEffect).toBe("read");
 		expect(byCommand.get("schema")?.sideEffect).toBe("read");
+		expect(byCommand.get("preflight")?.sideEffect).toBe("read");
 
 		for (const entry of kernelRegistry.commands) {
 			expect(["read", "write", "append", "generated"]).toContain(
