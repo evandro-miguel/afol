@@ -2,11 +2,13 @@
 doc_type: spec
 id: 260323_1704_universal-skills-runtime-integration_spec_01
 theme: universal-skills-runtime-integration
-status: active
+status: superseded
+superseded_by: 260521_0000_total-reformulation-strategy_spec_01
+superseded_note: "Superseded by the total reformulation strategy (260521_0000); its concerns were redesigned into the F-01..F-18 feature set (skills integration moved to .afol/skills under F-10)."
 owners:
 - orchestrator
 created_at: '2026-03-23T17:04:00Z'
-updated_at: '2026-03-23T17:25:44-03:00'
+updated_at: '2026-06-14T00:00:00+00:00'
 roadmap_feature: F-10
 spec_role: parent
 parent_spec: ''

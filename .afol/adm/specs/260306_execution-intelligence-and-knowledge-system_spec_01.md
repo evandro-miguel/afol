@@ -2,11 +2,13 @@
 doc_type: spec
 id: 260306_execution-intelligence-and-knowledge-system_spec_01
 theme: execution-intelligence-and-knowledge-system
-status: active
+status: superseded
+superseded_by: 260521_0000_total-reformulation-strategy_spec_01
+superseded_note: "Superseded by the total reformulation strategy (260521_0000); its concerns were redesigned into the F-01..F-18 feature set."
 owners:
   - orchestrator
 created_at: '2026-03-06T23:05:00+00:00'
-updated_at: '2026-03-06T23:05:00+00:00'
+updated_at: '2026-06-14T00:00:00+00:00'
 links:
   roadmap: 260223_0000_arc_roadmap_01
 scope:

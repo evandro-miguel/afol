@@ -1,11 +1,13 @@
 ---
 doc_type: spec
 id: 260323_1751_goal-state-canon_spec_01
-status: active
+status: superseded
+superseded_by: 260521_0000_total-reformulation-strategy_spec_01
+superseded_note: "Superseded by the total reformulation strategy (260521_0000); its concerns were redesigned into the F-01..F-18 feature set, specifically replaced by F-18 adm/pstr onion architecture (goal-state canon moved to .afol/adm)."
 owners:
 - orchestrator
 created_at: '2026-03-23T20:56:56Z'
-updated_at: '2026-03-23T20:56:56Z'
+updated_at: '2026-06-14T00:00:00+00:00'
 roadmap_feature: F-11
 spec_role: child
 parent_spec: 260323_1741_current-state-maps-and-goal-state-governance_spec_01

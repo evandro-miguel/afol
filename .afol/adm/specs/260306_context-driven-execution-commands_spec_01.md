@@ -1,11 +1,13 @@
 ---
 doc_type: spec
 id: 260306_context-driven-execution-commands_spec_01
-status: active
+status: superseded
+superseded_by: 260521_0000_total-reformulation-strategy_spec_01
+superseded_note: "Superseded by the total reformulation strategy (260521_0000); its concerns were redesigned into the F-01..F-18 feature set."
 owners:
 - orchestrator
 created_at: '2026-03-07T00:28:26Z'
-updated_at: '2026-03-06T22:04:27-03:00'
+updated_at: '2026-06-14T00:00:00+00:00'
 roadmap_feature: F-08
 spec_role: parent
 parent_spec: ''
