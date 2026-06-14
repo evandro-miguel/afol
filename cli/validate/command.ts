@@ -39,6 +39,10 @@ import {
 const BASELINES_RELATIVE_PATH = ".afol/data/benchmarks/catalog/baselines";
 const BENCH_SAMPLES = 3;
 const BENCH_WARMUP_SAMPLES = 1;
+// Project token rule (see AGENTS.md / low-token principle):
+// >5000 output tokens = non-ideal (warn); >10000 = prohibitive (fail).
+const TOKEN_RULE_NONIDEAL = 5_000;
+const TOKEN_RULE_PROHIBITIVE = 10_000;
 const REAL_REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const SANDBOX_COPY_EXCLUDES = [".git", "node_modules", "dist", ".bun-build*"];
 
@@ -289,6 +293,29 @@ function appendBaselineRegressionNotes(
 			`baseline-regression:timing_p95_ms:${metrics.timing_p95_ms}>${baseline.timing_p95_ms}`,
 		);
 	}
+}
+
+function applyProjectTokenRule(result: BenchmarkResult): BenchmarkResult {
+	if (result.status === "skipped") {
+		return result;
+	}
+	const outputTokens = result.output_tokens ?? 0;
+	if (outputTokens > TOKEN_RULE_PROHIBITIVE) {
+		const tokenRuleNote = `token-rule:prohibitive(>10k):${outputTokens}tokens`;
+		return {
+			...result,
+			status: "failed",
+			pass: false,
+			notes: [tokenRuleNote, ...result.notes],
+		};
+	}
+	if (outputTokens > TOKEN_RULE_NONIDEAL) {
+		return {
+			...result,
+			notes: [...result.notes, `token-rule:non-ideal(>5k):${outputTokens}tokens`],
+		};
+	}
+	return result;
 }
 
 function tokenizeCommand(command: string): string[] {
@@ -796,7 +823,15 @@ function collectBenchmarkPackResults(
 	);
 	const baseline = snapshot.baselinesByPack[packId];
 	if (packId === "runtime-live-agent") {
-		return buildRuntimeLiveAgentResults(projectRoot, scenarios, baselinePath);
+		const runtimeLiveResults = buildRuntimeLiveAgentResults(
+			projectRoot,
+			scenarios,
+			baselinePath,
+		);
+		return {
+			results: runtimeLiveResults.results.map(applyProjectTokenRule),
+			notes: runtimeLiveResults.notes,
+		};
 	}
 	return {
 		results: scenarios.map((scenario) =>
@@ -901,7 +936,7 @@ export function buildResult(
 		notes.push(...thresholdNotes, ...regressionNotes);
 	}
 	const resolvedStatus = resolveBenchmarkStatus(status);
-	return {
+	return applyProjectTokenRule({
 		schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
 		run_id: `${execution ? "bench" : "legacy"}-${scenario.pack_id}-${scenario.scenario_id}-${scenario.scenario_version}`,
 		scenario_id: scenario.scenario_id,
@@ -932,9 +967,9 @@ export function buildResult(
 			status === "skipped"
 				? ["not-implemented-live-runner"]
 				: status === "baseline-missing"
-					? notes
+				? notes
 					: notes,
-	};
+	});
 }
 
 function getGitCommit(projectRoot: string): string {

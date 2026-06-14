@@ -671,6 +671,92 @@ describe("scenario benchmark execution", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("enforces the project token rule independent of scenario thresholds", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const tokenRulePrefix = ["token", "-rule:"].join("");
+			const tokenRuleNonIdealNote = `${tokenRulePrefix}non-ideal(>5k):6250tokens`;
+			const tokenRuleProhibitiveNote = `${tokenRulePrefix}prohibitive(>10k):12500tokens`;
+			const baselinePath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"baselines",
+				"pstr-integrity",
+				"baseline-v1.json",
+			);
+			mkdirSync(dirname(baselinePath), { recursive: true });
+			const baseline: Baseline = {
+				baseline_id: "bench-v1",
+				pack_id: "pstr-integrity",
+				schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			writeFileSync(
+				baselinePath,
+				`${JSON.stringify(baseline, null, 2)}\n`,
+				"utf8",
+			);
+
+			const makeScenario = (scenarioId: string, bytes: number): Scenario => ({
+				schema_version: "1.0.0",
+				scenario_id: scenarioId,
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: `node -e 'process.stdout.write("x".repeat(${bytes}))'`,
+				result_schema: "1.0.0",
+				oracle: "project-token-rule",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 20_000,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "bench-v1",
+				deterministic_metrics: {
+					duration_ms: 120,
+					timing_p50_ms: 120,
+					timing_p95_ms: 120,
+					error_count: 0,
+					retry_count: 0,
+					context_tokens: 0,
+					prompt_tokens: 0,
+					output_tokens: Math.round(bytes / 4),
+					context_bytes: 0,
+					output_bytes: bytes,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+				},
+			});
+
+			const clean = withCapturedConsoleError(() =>
+				buildResult(root, makeScenario("token-clean", 1_000), baselinePath, baseline),
+			);
+			expect(clean.result.status).toBe("passed");
+			expect(clean.result.pass).toBe(true);
+			expect(clean.result.notes.some((note) => note.startsWith(tokenRulePrefix))).toBe(false);
+
+			const nonIdeal = withCapturedConsoleError(() =>
+				buildResult(root, makeScenario("token-non-ideal", 25_000), baselinePath, baseline),
+			);
+			expect(nonIdeal.result.status).toBe("passed");
+			expect(nonIdeal.result.pass).toBe(true);
+			expect(nonIdeal.result.notes).toContain(tokenRuleNonIdealNote);
+
+			const prohibitive = withCapturedConsoleError(() =>
+				buildResult(root, makeScenario("token-prohibitive", 50_000), baselinePath, baseline),
+			);
+			expect(prohibitive.result.status).toBe("failed");
+			expect(prohibitive.result.pass).toBe(false);
+			expect(prohibitive.result.notes[0]).toBe(tokenRuleProhibitiveNote);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("validate benchmark files", () => {
