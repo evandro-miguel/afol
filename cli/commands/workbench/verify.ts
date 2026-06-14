@@ -7,7 +7,11 @@ import {
 	getSpecCheck,
 	type SpecCheckResult,
 } from "../../services/spec-gate";
-import { readActiveSession } from "../../services/workbench/lifecycle";
+import {
+	defaultAllowGlobalFallback,
+	isCiMode,
+	resolveSession as resolveBoundSession,
+} from "../../services/workbench/session-context";
 
 function pathIsInside(root: string, candidate: string): boolean {
 	const relativePath = relative(root, candidate);
@@ -51,15 +55,20 @@ export function resolveSession(
 	session: string,
 	commandName: string,
 ): string {
-	if (session) {
-		return session;
+	const resolved = resolveBoundSession(root, {
+		explicit: session,
+		allowGlobalFallback: defaultAllowGlobalFallback(),
+	});
+	if (resolved) {
+		return resolved.session;
 	}
-	const active = readActiveSession(root);
-	if (active) {
-		return active;
+	if (isCiMode()) {
+		throw new Error(
+			`Missing --session for ${commandName}; set --session, AFOL_SESSION, or bind the current context with afol session bind. Global fallback is disabled in CI.`,
+		);
 	}
 	throw new Error(
-		`Missing --session for ${commandName}; no active session found.`,
+		`Missing --session for ${commandName}; set --session, AFOL_SESSION, or bind the current context with afol session bind.`,
 	);
 }
 

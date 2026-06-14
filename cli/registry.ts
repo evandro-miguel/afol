@@ -32,7 +32,9 @@ export type CommandKind =
 	| "maintenance"
 	| "sweep"
 	| "schema"
-	| "adapter";
+	| "catchup"
+	| "adapter"
+	| "session";
 export type CommandSideEffect = "read" | "write" | "append" | "generated";
 
 export type CommandCategory = "core" | "workflow" | "inspect" | "ops";
@@ -320,12 +322,29 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "ops",
 	},
 	{
+		command: "catchup",
+		aliases: [],
+		kind: "catchup",
+		sideEffect: "read",
+		description:
+			"Compare active session artifacts against git state and report unsynced context",
+		category: "inspect",
+	},
+	{
 		command: "adapter",
 		aliases: [],
 		kind: "adapter",
 		sideEffect: "write",
 		description: "Enable or disable runtime adapters",
 		category: "ops",
+	},
+	{
+		command: "session",
+		aliases: [],
+		kind: "session",
+		sideEffect: "write",
+		description: "List, bind, switch, and unbind workbench sessions",
+		category: "workflow",
 	},
 ]);
 

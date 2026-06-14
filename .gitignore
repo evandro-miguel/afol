@@ -59,6 +59,7 @@ docs/map/extra/
 docs/telemetry/reports/implementation_report.md
 
 .afol/wb/.active_session
+.afol/wb/session-context.json
 
 # Local merge worktrees
 .worktree/

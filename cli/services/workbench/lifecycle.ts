@@ -140,7 +140,7 @@ function planTaskFromMetadata(metadata?: NewWorkstreamMetadata): string {
 	return metadata?.task?.trim() || "Execute requested lifecycle work.";
 }
 
-function sessionPaths(
+export function sessionPaths(
 	root: string,
 	session: string,
 ): {

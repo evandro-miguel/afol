@@ -10,7 +10,7 @@ updated_at: "2026-06-07T09:04:00+00:00"
 
 Low-token discovery index for reusable workbench knowledge artifacts.
 
-- Total indexed docs: 10
+- Total indexed docs: 11
 
 ## Brainstorm
 
@@ -32,4 +32,5 @@ Low-token discovery index for reusable workbench knowledge artifacts.
 
 ## Research
 
+- `planning-memory-mapping` | `docs/knowledge/planning-memory-mapping.md` | Explicit mapping from lightweight planning memory concepts to canonical workbench artifacts.
 - `260413_1551_python-runtime-hardening_research_01` | `.afol/wb/260413_1551_python-runtime-hardening/260413_1551_python-runtime-hardening_research_01.md` | - git diff --check found a real whitespace issue in

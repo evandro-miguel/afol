@@ -18,6 +18,7 @@ export type CommandResolution =
 	| { kind: "update"; args: string[] }
 	| { kind: "file"; args: string[] }
 	| { kind: "localState"; args: string[] }
+	| { kind: "catchup"; args: string[] }
 	| SubCommandResolution
 	| { kind: "unknown"; message: string; exitCode: number };
 
@@ -47,6 +48,7 @@ const SUBCOMMAND_GROUPS = new Set([
 	"sweep",
 	"schema",
 	"adapter",
+	"session",
 ]);
 
 function removeJsonAliases(values: string[]): string[] {
@@ -224,6 +226,10 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind === "localState") {
 		return { kind: "localState", args: rest };
+	}
+
+	if (topLevelKind === "catchup") {
+		return { kind: "catchup", args: rest };
 	}
 
 	if (topLevelKind === "adm") {

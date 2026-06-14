@@ -5,6 +5,7 @@ import { runAdmCommand } from "./commands/adm";
 import { runAdrCommand } from "./commands/adr";
 import { runBootstrapCommand } from "./commands/bootstrap";
 import { runRuleCommand, runSkillCommand } from "./commands/catalog";
+import { runCatchupCommand } from "./commands/catchup";
 import { runChangelogCommand } from "./commands/changelog";
 import { runContextCommand } from "./commands/context";
 import { runDbCommand } from "./commands/db";
@@ -19,6 +20,7 @@ import { runMaintenanceCommand } from "./commands/maintenance";
 import { runMemoryCommand } from "./commands/memory";
 import { runPstrCommand } from "./commands/pstr";
 import { runSchemaCommand } from "./commands/schema-cmd";
+import { runSessionCommand } from "./commands/session";
 import { runSpecCommand } from "./commands/spec";
 import { runStateCommand } from "./commands/state";
 import { runStatusCommand } from "./commands/status";
@@ -229,6 +231,10 @@ export async function main(argv: string[]): Promise<number> {
 		return runLocalStateCommand(resolution.args, project.value.root);
 	}
 
+	if (resolution.kind === "catchup") {
+		return runCatchupCommand(resolution.args, project.value.root);
+	}
+
 	if (resolution.kind === "subcommand" && resolution.group === "adm") {
 		return runAdmCommand(
 			resolution.action,
@@ -272,6 +278,13 @@ export async function main(argv: string[]): Promise<number> {
 		}
 		if (resolution.group === "schema") {
 			return runSchemaCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "session") {
+			return runSessionCommand(
 				resolution.action,
 				resolution.args,
 				project.value.root,

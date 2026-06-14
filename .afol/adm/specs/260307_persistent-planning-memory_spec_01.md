@@ -3,10 +3,11 @@ doc_type: spec
 id: 260307_persistent-planning-memory_spec_01
 theme: persistent-planning-memory
 status: active
+implementation_note: "Delivered (2026-06-14): read-only `afol catchup` command comparing session artifacts vs git state (changed files, artifact presence/mtime, findings_stale + log_behind_diff heuristics, next_step), plus the canonical plan/findings/progress mapping doc at docs/knowledge/planning-memory-mapping.md. Satisfies §10/§14 mapping, catchup, safety boundary, verification philosophy. Remaining: direct status/review/verify freshness surfacing."
 owners:
 - orchestrator
 created_at: '2026-03-07T17:34:00-03:00'
-updated_at: '2026-03-07T18:19:40-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 links:
   roadmap: 260223_0000_arc_roadmap_01
 scope:
