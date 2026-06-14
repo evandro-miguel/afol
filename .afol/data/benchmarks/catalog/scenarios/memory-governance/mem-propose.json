@@ -4,6 +4,7 @@
   "scenario_version": "1.0.0",
   "pack_id": "memory-governance",
   "command": "afol mm propose --id MEM-005 --title Epsilon --body Epsilon",
+  "sandbox": true,
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {
@@ -13,8 +14,6 @@
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "memory-governance-v1",
-  "implementation_status": "skipped",
-  "note": "mutating; requires sandbox fixture; covered by memory-command.test.ts via validate run",
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,

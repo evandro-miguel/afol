@@ -3,7 +3,8 @@
   "scenario_id": "changelog-add",
   "scenario_version": "1.0.0",
   "pack_id": "governance-history",
-  "command": "afol changelog add --type decision --message governance-history",
+  "command": "afol changelog add --type decision --message governance-history --json",
+  "sandbox": true,
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {
@@ -13,8 +14,6 @@
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "governance-history-v1",
-  "implementation_status": "skipped",
-  "note": "mutating; requires sandbox; covered by spec-gate-system.test.ts",
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,

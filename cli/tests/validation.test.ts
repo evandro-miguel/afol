@@ -543,9 +543,9 @@ describe("validation command family", () => {
 		expect(payload.result_count).toBe(5);
 		expect(payload.summary).toEqual({
 			total: 5,
-			passed: 3,
+			passed: 5,
 			failed: 0,
-			skipped: 2,
+			skipped: 0,
 			baseline_missing: 0,
 		});
 		const results = payload.results as Array<Record<string, unknown>>;

@@ -4,6 +4,7 @@
   "scenario_version": "1.0.0",
   "pack_id": "library-knowledge",
   "command": "afol lb propose --topic alpha --title Alpha --url https://example.com",
+  "sandbox": true,
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {
@@ -13,8 +14,6 @@
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "library-knowledge-v1",
-  "implementation_status": "skipped",
-  "note": "mutating; requires sandbox; covered by library-system.test.ts",
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,
