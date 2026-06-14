@@ -4,7 +4,7 @@ id: "ARCHITECTURE_root"
 status: active
 owners: ["orchestrator"]
 created_at: "2026-02-23T00:00:00Z"
-updated_at: "2026-06-12T17:47:40-03:00"
+updated_at: "2026-06-14T00:00:00-03:00"
 ---
 
 # ARCHITECTURE
@@ -39,10 +39,10 @@ In scope:
 - `cli/**`: current Bun/TypeScript CLI kernel, router, schemas, validation,
   registry, adapters, and tests.
 - `src/project-template/**`: exportable downstream scaffold state and policy.
-- `docs/arc/**`: current transitional goal-state roadmap, specs, architecture,
-  and decisions.
-- `.afol/adm/**`: target project administration surface for manifesto,
+- `.afol/adm/**`: canonical project administration surface for manifesto,
   roadmap, specs, ADRs, changelog, archive, and desired-state policy.
+- `docs/arc/**`: frozen transitional archive retained for reversibility and
+  historical reference; see ADR-005.
 - `.afol/pstr/**`: target project-structure map surface for how the project is
   organized today. It stores maps only, not scripts, tasks, automations, specs,
   roadmaps, or future-state governance.
@@ -71,11 +71,10 @@ Modules:
   `.agents/` as static metadata (`config.json`, `lock.json`, `manifest.json`,
   `rules/`, `source/`). Active workbench, skills, validation, and experiments
   live under `.afol/**`.
-- Goal-state docs at `docs/arc/**`: roadmap, specs, decisions, architecture,
-  and execution plans. This remains canonical until `.afol/adm/**` migration is
-  implemented and validated.
-- Project administration at `.afol/adm/**`: target canonical desired-state
-  surface after migration.
+- Goal-state docs at `.afol/adm/**`: roadmap, specs, decisions, architecture,
+  and execution plans.
+- `docs/arc/**` is frozen transitional archive content; ADR-005 records the
+  authority transfer.
 - Project structure at `.afol/pstr/**`: target canonical current project
   structure map surface after migration.
 
@@ -145,8 +144,8 @@ Forbidden dependencies:
 - `.agents/scripts/`, `.agents/runtime/`, `.agents/agents` -> RETIRED
   (discontinued, not present in repository).
 - `.afol/skills/**` -> project-local AFOL-owned skills.
-- `docs/arc/` -> current transitional roadmap, specs, architecture, decisions,
-  and execution plans until `.afol/adm` migration lands.
+- `docs/arc/` -> frozen transitional archive of roadmap, specs, architecture,
+  decisions, and execution plans.
 - `docs/map/` -> legacy/transitional current-state map evidence; do not
   recreate it when `.afol/pstr` becomes available.
 
@@ -290,10 +289,11 @@ Agents should start at L0/L1. L3/L4 require explicit need.
 Source of truth:
 
 - `AGENTS.md` for runtime instruction behavior.
-- `docs/arc/GENERAL-ROADMAP.md` for current roadmap direction.
-- Parent and child specs under `docs/arc/SPECS/` for current feature contracts.
-- Target after migration: `.afol/adm/GENERAL-ROADMAP.md` and
-  `.afol/adm/SPECS/**`.
+- `.afol/adm/roadmap/GENERAL-ROADMAP.md` for current roadmap direction.
+- Parent and child specs under `.afol/adm/specs/` for current feature
+  contracts.
+- Target after migration: `.afol/adm/roadmap/GENERAL-ROADMAP.md` and
+  `.afol/adm/specs/**`.
 - `.agents/config.json`, `.agents/lock.json`, and `.agents/manifest.json` for
   local project state.
 
@@ -537,10 +537,10 @@ Reject:
 
 ## 15) References
 
-- `docs/arc/GENERAL-ROADMAP.md`
-- `docs/arc/SPECS/`
-- `docs/arc/DECISIONS/`
+- `.afol/adm/roadmap/GENERAL-ROADMAP.md`
+- `.afol/adm/specs/`
+- `.afol/adm/decisions/`
 
 ---
 
-*Architecture: `docs/arc/ARCHITECTURE.md`*
+*Architecture: `.afol/adm/doctrine/ARCHITECTURE.md`*

@@ -11,7 +11,7 @@ roadmap_feature: F-11
 spec_role: child
 parent_spec: 260323_1741_current-state-maps-and-goal-state-governance_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   plan: ''
   task: ''
   report: ''

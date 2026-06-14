@@ -11,7 +11,7 @@ roadmap_feature: F-17
 spec_role: parent
 parent_spec: ''
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   plan: .afol/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_plan_01.md
   task: .afol/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_task_01.md
   report: .afol/wb/260528_2043_f17-closeout/260528_2043_f17-closeout_report_01.md

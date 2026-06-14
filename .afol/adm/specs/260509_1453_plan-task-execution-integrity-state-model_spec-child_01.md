@@ -14,8 +14,8 @@ roadmap_feature: F-18
 spec_role: child
 parent_spec: 260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
-  parent_spec: docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
+  parent_spec: .afol/adm/specs/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md
   plan: .afol/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_plan_01.md
   task: .afol/wb/260509_1453_plan-task-execution-integrity/260509_1453_plan-task-execution-integrity_task_01.md
 risk_level: high

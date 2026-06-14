@@ -78,7 +78,7 @@ export function validateAdmMigration(root: string): AdmValidationReport {
 					"warn",
 					"adm",
 					`missing source ${entry.source_path}`,
-					"restore the docs/arc source file",
+					"restore the canonical .afol/adm target file",
 					"missing",
 					entry.source_hash,
 				),

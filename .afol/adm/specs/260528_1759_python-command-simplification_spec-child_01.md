@@ -11,8 +11,8 @@ roadmap_feature: F-15
 spec_role: child
 parent_spec: 260412_2004_repo-wide-simplification-runtime-parity_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
-  parent: docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
+  parent: .afol/adm/specs/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md
   plan: .afol/wb/260528_1759_python-command-simplification/260528_1759_python-command-simplification_plan_01.md
   task: .afol/wb/260528_1759_python-command-simplification/260528_1759_python-command-simplification_task_01.md
   report:

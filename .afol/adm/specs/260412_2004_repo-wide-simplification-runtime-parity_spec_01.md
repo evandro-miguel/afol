@@ -11,7 +11,7 @@ roadmap_feature: F-15
 spec_role: parent
 parent_spec: ''
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   plan: ''
   task: ''
   report: ''

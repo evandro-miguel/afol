@@ -11,8 +11,8 @@ roadmap_feature: F-09
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
-  manifesto: docs/arc/PROJECT-MANIFESTO.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
+  manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md
   plan: .afol/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_plan_01.md
   task: .afol/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_task_01.md
   report: .afol/wb/260528_2137_f09-closeout/260528_2137_f09-closeout_report_01.md

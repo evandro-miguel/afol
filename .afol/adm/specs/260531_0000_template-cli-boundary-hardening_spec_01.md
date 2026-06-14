@@ -11,7 +11,7 @@ roadmap_feature: F-02
 spec_role: parent
 parent_spec: 260521_0020_minimal-project-template_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
 scope:
   repo_areas:
   - src/project-template

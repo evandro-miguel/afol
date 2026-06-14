@@ -10,7 +10,7 @@ roadmap_feature: F-08
 spec_role: child
 parent_spec: 260306_context-driven-execution-commands_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   plan: 260306_2128_context-driven-execution-commands_plan_01
   task: 260306_2128_context-driven-execution-commands_task_01
   report: ''

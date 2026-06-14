@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-06-13T00:00:00-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 ---
 
 # GENERAL ROADMAP
@@ -407,8 +407,8 @@ Minimum acceptance:
   docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md
 - Why: AFOL needs a stable onion architecture and source-boundary model before
   adding SQLite hydration, memory, library, context bundles, and spec gates.
-  Project direction should migrate from `docs/arc/**` into `.afol/adm/**`, and
-  current project-structure maps should live under `.afol/pstr/**`.
+  Project direction now lives in `.afol/adm/**`, and current project-structure
+  maps live under `.afol/pstr/**`.
 - Relationship to prior features: F-18 extends the final F-04 workbench, F-05
   routing, F-06 file-first handoff, F-07 local-state contracts, and the draft
   F-18 operational-state specs. It supersedes the narrow JSON-source direction
@@ -419,8 +419,8 @@ Minimum acceptance:
     specs, ADRs, changelog, archive, and doctrine.
   - `.afol/pstr/**` is specified as target project structure for current-state
     maps only.
-  - `docs/arc/**` remains the current transitional authority until migration
-    commands, drift validation, and indexes are implemented.
+  - `docs/arc/**` is the frozen transitional archive; ADR-005 records the
+    authority transfer to `.afol/adm/**`.
   - Onion layers define doctrine, authority, contracts, hydration/projection,
     domain services, providers, CLI commands, and runtime adapters.
   - Memory and library boundaries are explicit and separate.
@@ -435,9 +435,9 @@ Minimum acceptance:
   library claims, context bundles with trusted fail-closed mode and retrieval
   modes, spec gate checks integrated into `done --require-spec-check`, ADR and
   changelog commands, health/doctor/maintenance, schema/resolver, and sweep
-  commands. `docs/arc/**` remains transitional canonical administration for
-  this repository; `.afol/adm/**` is now the target generated/owned layout for
-  schema and resolver artifacts.
+  commands. `.afol/adm/**` is canonical administration for this repository;
+  `docs/arc/**` is the frozen transitional archive for schema and resolver
+  history.
 
 #### F-18.S1 PSTR Map System
 

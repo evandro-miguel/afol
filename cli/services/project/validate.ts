@@ -192,7 +192,7 @@ export async function validateProjectStructure(
 		validateDirectory(
 			projectRoot,
 			"docs_arc_dir",
-			join(projectRoot, "docs", "arc"),
+			join(projectRoot, ".afol", "adm"),
 		),
 		(() => {
 			const result = validateWorkBenchIndex(projectRoot);

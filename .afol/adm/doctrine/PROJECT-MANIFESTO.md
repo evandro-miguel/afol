@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-06-12T17:47:40-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 ---
 
 # PROJECT MANIFESTO
@@ -42,11 +42,9 @@ Template = Markdown + JSON config, rules, skills, workbench,
            evidence/logs/specs, editable local state
 ```
 
-Direction update: project administration should move from `docs/arc/**` to
-`.afol/adm/**` through an AFOL-managed migration. Current project structure
-maps should move from ad hoc map docs into `.afol/pstr/**`.
-`docs/arc/**` remains the current canonical administration surface until AFOL
-ships migration, hydration, drift validation, and index checks for `.afol/adm`.
+Direction update: project administration now lives under `.afol/adm/**` and
+`docs/arc/**` is a frozen transitional archive preserved for reversibility.
+See ADR-005. Current project structure maps remain under `.afol/pstr/**`.
 
 AFOL separates project direction from project structure.
 
@@ -172,8 +170,8 @@ Target project-local administration surfaces:
   data, devops, CLI, integrations, flows, tests, critical paths, entrypoints,
   dependencies, and structural ownership.
 - `.afol/state/afol.db` owns SQLite materialization and query cache.
-- `docs/arc/**` is the current transitional administration surface until the
-  AFOL migration is implemented and validated.
+- `.afol/adm/**` is the canonical administration surface; `docs/arc/**` is the
+  frozen transitional archive preserved by ADR-005.
 
 Rule of gold:
 

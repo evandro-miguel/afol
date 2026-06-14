@@ -11,7 +11,7 @@ roadmap_feature: F-16
 spec_role: parent
 parent_spec: ''
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   plan: .afol/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_plan_01.md
   task: .afol/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_task_01.md
   report: .afol/wb/260529_1249_f16-project-template-source-separation-closeout/260529_1249_f16-project-template-source-separation-closeout_report_01.md

@@ -14,7 +14,7 @@ roadmap_feature: F-19
 spec_role: child
 parent_spec: 260423_1605_controlled-runtime-flow-benchmarks_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
 risk_level: medium
 ---
 

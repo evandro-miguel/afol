@@ -11,8 +11,8 @@ roadmap_feature: F-08
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
-  manifesto: docs/arc/PROJECT-MANIFESTO.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
+  manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md
 scope:
   repo_areas:
   - cli/files cli/mutations

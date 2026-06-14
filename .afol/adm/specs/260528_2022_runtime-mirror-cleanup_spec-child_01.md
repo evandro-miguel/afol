@@ -13,7 +13,7 @@ roadmap_feature: F-17
 spec_role: child
 parent_spec: 260413_1849_just-command-runner-migration_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   plan: 260528_2022_runtime-mirror-cleanup_plan_01
   task: 260528_2022_runtime-mirror-cleanup_task_01
   report: .afol/wb/260528_2022_runtime-mirror-cleanup/260528_2022_runtime-mirror-cleanup_report_01.md

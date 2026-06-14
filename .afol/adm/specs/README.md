@@ -62,4 +62,4 @@ Update `INDEX.md` for every new spec.
 
 ---
 
-*Specs folder: `docs/arc/SPECS/`*
+*Specs folder: `.afol/adm/specs/`*

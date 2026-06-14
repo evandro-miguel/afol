@@ -11,9 +11,9 @@ roadmap_feature: F-18
 spec_role: child
 parent_spec: 260612_afol-administration-project-structure-onion-architecture_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
-  parent: docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md
-  adr: docs/arc/DECISIONS/ADR-004-afol-administration-and-project-structure.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
+  parent: .afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md
+  adr: .afol/adm/decisions/ADR-004-afol-administration-and-project-structure.md
 scope:
   repo_areas:
   - .afol/wb

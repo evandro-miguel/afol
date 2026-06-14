@@ -10,7 +10,7 @@ updated_at: '2026-05-21T01:35:00+08:00'
 roadmap_feature: F-03
 parent_spec: 260521_0030_agent-command-design-system_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
 scope:
   repo_areas:
   - cli

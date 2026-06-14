@@ -36,7 +36,7 @@ function buildFixture() {
 
 	const rulesDir = join(root, ".agents", "rules");
 	const skillsDir = join(root, ".afol", "skills");
-	const specsDir = join(root, "docs", "arc", "SPECS");
+	const specsDir = join(root, ".afol", "adm", "specs");
 
 	mkdirSync(rulesDir, { recursive: true });
 	mkdirSync(skillsDir, { recursive: true });
@@ -128,8 +128,8 @@ describe("local-state project indexer", () => {
 				"beta skill",
 			]);
 			expect(snapshot.specs.specs.map((spec) => spec.path)).toEqual([
-				"docs/arc/SPECS/001-spec.md",
-				"docs/arc/SPECS/002-spec.md",
+				".afol/adm/specs/001-spec.md",
+				".afol/adm/specs/002-spec.md",
 			]);
 			expect(snapshot.specs.kind).toBe("specs_index_v1");
 			expect(snapshot.specs.version).toBe(1);
@@ -172,8 +172,8 @@ describe("local-state project indexer", () => {
 				".afol/skills/skill-b/SKILL.md",
 			]);
 			expect(specsSnapshot.specs.map((spec) => spec.path)).toEqual([
-				"docs/arc/SPECS/001-spec.md",
-				"docs/arc/SPECS/002-spec.md",
+				".afol/adm/specs/001-spec.md",
+				".afol/adm/specs/002-spec.md",
 			]);
 
 			const blocked = join(root, ".afol", "data", "index", "ignore.txt");
@@ -208,7 +208,7 @@ describe("local-state project indexer", () => {
 			expect(snapshot.specs).toEqual([
 				{
 					id: "S-001",
-					path: "docs/arc/SPECS/001-spec.md",
+					path: ".afol/adm/specs/001-spec.md",
 					title: "Local rules",
 					touched_at: expect.any(String),
 					status: "draft",
@@ -216,7 +216,7 @@ describe("local-state project indexer", () => {
 				},
 				{
 					id: "S-002",
-					path: "docs/arc/SPECS/002-spec.md",
+					path: ".afol/adm/specs/002-spec.md",
 					title: "Second",
 					touched_at: expect.any(String),
 				},
@@ -350,7 +350,7 @@ describe("local-state project indexer", () => {
 			expect(specsSnapshot.specs).toEqual<SpecIndexEntry[]>([
 				{
 					id: "S-001",
-					path: "docs/arc/SPECS/001-spec.md",
+					path: ".afol/adm/specs/001-spec.md",
 					title: "Local rules",
 					touched_at: expect.any(String),
 					status: "draft",
@@ -358,7 +358,7 @@ describe("local-state project indexer", () => {
 				},
 				{
 					id: "S-002",
-					path: "docs/arc/SPECS/002-spec.md",
+					path: ".afol/adm/specs/002-spec.md",
 					title: "Second",
 					touched_at: expect.any(String),
 				},

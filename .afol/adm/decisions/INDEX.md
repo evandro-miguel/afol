@@ -3,7 +3,7 @@ doc_type: index
 id: 260223_0000_decisions_index_01
 title: Architecture Decision Records Index
 created_at: '2026-02-23T00:00:00-03:00'
-updated_at: '2026-06-12T13:37:19-03:00'
+updated_at: '2026-06-14T00:00:00-03:00'
 ---
 
 ## Architecture Decision Records (ADRs)
@@ -21,7 +21,7 @@ ADRs document:
 ### Structure
 
 ```text
-docs/arc/DECISIONS/
+.afol/adm/decisions/
 ├── INDEX.md           # This file - ADR index
 ├── ADR-001-bun-typescript-canonical-runtime.md
 ├── ADR-002-afol-sole-public-entrypoint.md
@@ -38,6 +38,7 @@ docs/arc/DECISIONS/
 | ADR-002 | AFOL as Sole Public Entrypoint | Accepted | 2026-06-09 |
 | ADR-003 | JSON Operational State and Markdown Projection | Superseded | 2026-06-12 |
 | ADR-004 | AFOL Administration and Project Structure Surfaces | Accepted | 2026-06-12 |
+| ADR-005 | AFOL Administration Canonical Authority Transfer | Accepted | 2026-06-14 |
 
 ### Creating an ADR
 
@@ -52,10 +53,10 @@ See `docs/templates/adr.md` for the standard format.
 
 ### Related
 
-- `docs/arc/ARCHITECTURE.md` - Root architecture
-- `docs/arc/SPECS/` - Technical specifications
+- `.afol/adm/doctrine/ARCHITECTURE.md` - Root architecture
+- `.afol/adm/specs/` - Technical specifications
 - [agents-index.md](../agentic/agents-index.md) - Index generation
 
 ---
 
-*Document: `docs/arc/DECISIONS/INDEX.md`*
+*Document: `.afol/adm/decisions/INDEX.md`*

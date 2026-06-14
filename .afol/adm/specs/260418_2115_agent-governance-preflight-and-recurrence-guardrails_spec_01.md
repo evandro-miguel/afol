@@ -15,7 +15,7 @@ roadmap_feature: F-18
 spec_role: parent
 parent_spec: ''
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
 scope:
   repo_areas:
   - AGENTS.md

@@ -277,7 +277,7 @@ function collectFilesUnder(
 function collectSpecFiles(projectRoot: string): string[] {
 	return collectFilesUnder(
 		projectRoot,
-		join("docs", "arc", "SPECS"),
+		join(".afol", "adm", "specs"),
 		(_entry, relativePath) => relativePath.endsWith(".md"),
 	);
 }
@@ -346,7 +346,7 @@ function latestSkillsSource(root: string): number {
 }
 
 function latestSpecsSource(root: string): number {
-	const specsPath = join(root, "docs", "arc", "SPECS");
+	const specsPath = join(root, ".afol", "adm", "specs");
 	const specs = collectSpecFiles(root);
 	return sourceLatestFromPaths(collectSourceFiles([specsPath, ...specs]));
 }
@@ -527,7 +527,7 @@ export function rebuildSpecsIndex(root: string): SpecsIndexSnapshot {
 		version: 1,
 		generated_at: formatNow(),
 		source: {
-			specs_dir: "docs/arc/SPECS",
+			specs_dir: ".afol/adm/specs",
 		},
 		specs,
 	};

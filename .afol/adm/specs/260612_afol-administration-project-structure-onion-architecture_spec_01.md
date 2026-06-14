@@ -11,10 +11,10 @@ roadmap_feature: F-18
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
-  manifesto: docs/arc/PROJECT-MANIFESTO.md
-  architecture: docs/arc/ARCHITECTURE.md
-  adr: docs/arc/DECISIONS/ADR-004-afol-administration-and-project-structure.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
+  manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md
+  architecture: .afol/adm/doctrine/ARCHITECTURE.md
+  adr: .afol/adm/decisions/ADR-004-afol-administration-and-project-structure.md
 scope:
   repo_areas:
   - .afol/adm

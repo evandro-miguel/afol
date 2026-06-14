@@ -13,7 +13,7 @@ roadmap_feature: F-17
 spec_role: child
 parent_spec: 260413_1849_just-command-runner-migration_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   plan: 260528_1946_bootstrap-template-justfile-wiring_plan_01
   task: 260528_1946_bootstrap-template-justfile-wiring_task_01
   report: null

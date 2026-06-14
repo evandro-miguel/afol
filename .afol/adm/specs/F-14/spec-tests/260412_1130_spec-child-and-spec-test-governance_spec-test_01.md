@@ -10,7 +10,7 @@ updated_at: '2026-04-12T11:34:49-03:00'
 roadmap_feature: F-14
 parent_spec: 260412_1110_spec-child-and-spec-test-governance_spec_01
 links:
-  roadmap: docs/arc/GENERAL-ROADMAP.md
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   workbench_plan: 260412_1130_spec-child-and-spec-test-governance_plan_01
 scope:
   repo_areas:

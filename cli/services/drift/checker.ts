@@ -101,7 +101,7 @@ function parseFrontmatter(content: string): Record<string, string> {
 }
 
 function parseSpecIndex(root: string): SpecIndexRow[] {
-	const indexPath = join(root, "docs", "arc", "SPECS", "INDEX.md");
+	const indexPath = join(root, ".afol", "adm", "specs", "INDEX.md");
 	if (!existsSync(indexPath)) {
 		return [];
 	}
@@ -122,7 +122,7 @@ function parseSpecIndex(root: string): SpecIndexRow[] {
 }
 
 function findSpecFile(root: string, specId: string): string | null {
-	const specsRoot = join(root, "docs", "arc", "SPECS");
+	const specsRoot = join(root, ".afol", "adm", "specs");
 	const match = walkFiles(specsRoot).find(
 		(path) => basename(path) === `${specId}.md`,
 	);
@@ -328,7 +328,7 @@ export function checkSpecDrift(root: string): DriftFinding[] {
 				"fail",
 				"adm",
 				"missing active specs index",
-				"restore docs/arc/SPECS/INDEX.md",
+				"restore .afol/adm/specs/INDEX.md",
 			),
 		];
 	}
@@ -342,7 +342,7 @@ export function checkSpecDrift(root: string): DriftFinding[] {
 					"fail",
 					"adm",
 					`missing spec implementation ${row.id}`,
-					"add the spec file under docs/arc/SPECS",
+					"add the spec file under .afol/adm/specs",
 				),
 			);
 			continue;
