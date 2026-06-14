@@ -27,6 +27,10 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 				"pstr-integrity",
 				"context-bundles",
 				"state-projection",
+				"memory-governance",
+				"library-knowledge",
+				"governance-history",
+				"adm-governance",
 			],
 			reasons: ["default-no-paths"],
 		};
@@ -65,6 +69,50 @@ function defaultPackSelection(changedPaths: string[]): SelectorOutput {
 		) {
 			selected.add("state-projection");
 			reasons.push(`state-change:${changedPath}`);
+			continue;
+		}
+		if (
+			hasPrefix(normalizedPath, [
+				"cli/services/memory/",
+				"cli/commands/memory",
+			])
+		) {
+			selected.add("memory-governance");
+			reasons.push(`memory-change:${changedPath}`);
+			continue;
+		}
+		if (
+			hasPrefix(normalizedPath, [
+				"cli/services/library/",
+				"cli/commands/library",
+			])
+		) {
+			selected.add("library-knowledge");
+			reasons.push(`library-change:${changedPath}`);
+			continue;
+		}
+		if (
+			hasPrefix(normalizedPath, [
+				"cli/services/spec",
+				"cli/services/adr",
+				"cli/services/changelog",
+				"cli/commands/spec",
+				"cli/commands/adr",
+				"cli/commands/changelog",
+			])
+		) {
+			selected.add("governance-history");
+			reasons.push(`governance-change:${changedPath}`);
+			continue;
+		}
+		if (
+			hasPrefix(normalizedPath, [
+				"cli/services/adm/",
+				"cli/commands/adm",
+			])
+		) {
+			selected.add("adm-governance");
+			reasons.push(`adm-change:${changedPath}`);
 			continue;
 		}
 		if (hasPrefix(normalizedPath, ["cli/mcp/"])) {

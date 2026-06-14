@@ -330,6 +330,54 @@ describe("validation command family", () => {
 		expect(parseJsonOutput(stateProc.stdout as string).selected_pack_ids).toEqual([
 			"state-projection",
 		]);
+
+		const memoryProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/commands/memory.ts",
+			"--json",
+		]);
+		expect(memoryProc.status).toBe(0);
+		expect(parseJsonOutput(memoryProc.stdout as string).selected_pack_ids).toEqual([
+			"memory-governance",
+		]);
+
+		const libraryProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/library/crud.ts",
+			"--json",
+		]);
+		expect(libraryProc.status).toBe(0);
+		expect(parseJsonOutput(libraryProc.stdout as string).selected_pack_ids).toEqual([
+			"library-knowledge",
+		]);
+
+		const governanceProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/spec-gate/changelog.ts",
+			"--json",
+		]);
+		expect(governanceProc.status).toBe(0);
+		expect(parseJsonOutput(governanceProc.stdout as string).selected_pack_ids).toEqual([
+			"governance-history",
+		]);
+
+		const admProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/adm/validate.ts",
+			"--json",
+		]);
+		expect(admProc.status).toBe(0);
+		expect(parseJsonOutput(admProc.stdout as string).selected_pack_ids).toEqual([
+			"adm-governance",
+		]);
 	});
 
 	test("v select changed-path keeps generic cli fallback on cli-kernel-local", () => {
@@ -1017,7 +1065,7 @@ describe("validation command family", () => {
 		expect(updatePayload.selected_pack_ids).toEqual(["update-safety"]);
 	}, 10000);
 
-	test("registry contract remains complete for the eleven-pack matrix", () => {
+	test("registry contract remains complete for the fifteen-pack matrix", () => {
 		const proc = runKernel(["v", "select", "--json"]);
 		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
@@ -1034,6 +1082,10 @@ describe("validation command family", () => {
 			"pstr-integrity",
 			"context-bundles",
 			"state-projection",
+			"memory-governance",
+			"library-knowledge",
+			"governance-history",
+			"adm-governance",
 		]);
 		expect(
 			registry.every(

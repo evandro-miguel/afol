@@ -13,6 +13,10 @@ export const REQUIRED_PACKS = [
 	"pstr-integrity",
 	"context-bundles",
 	"state-projection",
+	"memory-governance",
+	"library-knowledge",
+	"governance-history",
+	"adm-governance",
 ] as const;
 
 export type PackId = (typeof REQUIRED_PACKS)[number];

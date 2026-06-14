@@ -121,6 +121,26 @@ const VALIDATION_COMMANDS_BY_PACK: Record<PackId, ValidationCommandSpec[]> = {
 	"state-projection": [
 		{ command: ["bun", "test", "cli/tests/state-command.test.ts"] },
 	],
+	"memory-governance": [
+		{ command: ["bun", "test", "cli/tests/memory-command.test.ts"] },
+	],
+	"library-knowledge": [
+		{ command: ["bun", "test", "cli/tests/library-system.test.ts"] },
+	],
+	"governance-history": [
+		{ command: ["bun", "test", "cli/tests/spec-gate-system.test.ts"] },
+	],
+	"adm-governance": [
+		{
+			command: [
+				"bun",
+				"test",
+				"cli/tests/adm-paths.test.ts",
+				"cli/tests/adm-plan.test.ts",
+				"cli/tests/adm-migrate.test.ts",
+			],
+		},
+	],
 };
 
 interface ValidationCommandReport {

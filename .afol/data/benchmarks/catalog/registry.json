@@ -55,6 +55,26 @@
       "pack_id": "state-projection",
       "min_scenarios": 4,
       "selector_tags": ["state", "hydrate", "session"]
+    },
+    {
+      "pack_id": "memory-governance",
+      "min_scenarios": 4,
+      "selector_tags": ["memory", "knowledge", "continuity"]
+    },
+    {
+      "pack_id": "library-knowledge",
+      "min_scenarios": 4,
+      "selector_tags": ["library", "sources", "claims", "research"]
+    },
+    {
+      "pack_id": "governance-history",
+      "min_scenarios": 4,
+      "selector_tags": ["spec", "adr", "changelog", "governance"]
+    },
+    {
+      "pack_id": "adm-governance",
+      "min_scenarios": 3,
+      "selector_tags": ["adm", "migration", "paths", "validation"]
     }
   ]
 }
