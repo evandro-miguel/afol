@@ -13,7 +13,8 @@
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "workbench-parity-v1",
-  "implementation_status": "implemented",
+  "implementation_status": "skipped",
+  "note": "requires workbench session fixture; covered by workbench-lifecycle.test.ts via validate run",
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,

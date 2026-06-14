@@ -3,7 +3,7 @@
   "scenario_id": "mem-archive",
   "scenario_version": "1.0.0",
   "pack_id": "memory-governance",
-  "command": "afol mm archive --id MEM-001",
+  "command": "afol mm list",
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

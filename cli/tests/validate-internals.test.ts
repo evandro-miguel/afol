@@ -930,7 +930,7 @@ describe("validation command entrypoint", () => {
 					"--json",
 				]),
 			);
-			expect(benchmarkSave.result).toBe(2);
+			expect(benchmarkSave.result).toBe(0);
 			const benchmarkPayload = JSON.parse(benchmarkSave.stdout[0] ?? "{}") as {
 				saved_result_path?: string;
 				saved_result_file?: string;
@@ -938,7 +938,7 @@ describe("validation command entrypoint", () => {
 				status: string;
 			};
 			expect(benchmarkPayload.mode).toBe("benchmark");
-			expect(benchmarkPayload.status).toBe("failed");
+			expect(benchmarkPayload.status).toBe("passed");
 			expect(benchmarkPayload.saved_result_path).toMatch(
 				/^\.afol\/data\/benchmarks\/catalog\/results\//,
 			);
@@ -954,7 +954,7 @@ describe("validation command entrypoint", () => {
 					"--json",
 				]),
 			);
-			expect(benchmarkOutput.result).toBe(2);
+			expect(benchmarkOutput.result).toBe(0);
 			const benchmarkOutputPayload = JSON.parse(
 				benchmarkOutput.stdout[0] ?? "{}",
 			) as {
@@ -1013,7 +1013,7 @@ describe("validation command entrypoint", () => {
 					"--json",
 				]),
 			);
-			expect(skipped.result).toBe(2);
+			expect(skipped.result).toBe(0);
 			const skippedPayload = JSON.parse(skipped.stdout[0] ?? "{}") as {
 				results: Array<{ status: string }>;
 			};

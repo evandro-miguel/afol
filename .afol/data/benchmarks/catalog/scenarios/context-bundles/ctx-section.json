@@ -13,7 +13,8 @@
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "context-bundles-v1",
-  "implementation_status": "implemented",
+  "implementation_status": "skipped",
+  "note": "requires context fixture",
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,

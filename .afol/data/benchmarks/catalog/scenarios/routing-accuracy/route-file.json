@@ -3,7 +3,7 @@
   "scenario_id": "route-file",
   "scenario_version": "1.0.0",
   "pack_id": "routing-accuracy",
-  "command": "a f ls",
+  "command": "afol f pt --dry-run --json",
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

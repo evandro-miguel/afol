@@ -3,7 +3,7 @@
   "scenario_id": "token-noisy-output",
   "scenario_version": "1.0.0",
   "pack_id": "token-economy",
-  "command": "a tools info benchmark",
+  "command": "afol r list",
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

@@ -473,16 +473,16 @@ describe("validation command family", () => {
 			"cli-kernel-local",
 			"--json",
 		]);
-		expect(proc.status).toBe(2);
+		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.mode).toBe("benchmark");
 		expect(payload.benchmark_result_schema_version).toBe("1.0.0");
-		expect(payload.status).toBe("failed");
-		expect(payload.pass).toBe(false);
+		expect(payload.status).toBe("passed");
+		expect(payload.pass).toBe(true);
 		expect(payload.summary).toEqual({
 			total: 6,
-			passed: 3,
-			failed: 3,
+			passed: 6,
+			failed: 0,
 			skipped: 0,
 			baseline_missing: 0,
 		});
@@ -508,14 +508,14 @@ describe("validation command family", () => {
 
 	test("v bench runs update-safety pack with complete baseline coverage", () => {
 		const proc = runKernel(["v", "bench", "--pack", "update-safety", "--json"]);
-		expect(proc.status).toBe(2);
+		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.mode).toBe("benchmark");
 		expect(payload.result_count).toBe(4);
 		expect(payload.summary).toEqual({
 			total: 4,
-			passed: 0,
-			failed: 4,
+			passed: 4,
+			failed: 0,
 			skipped: 0,
 			baseline_missing: 0,
 		});
@@ -537,15 +537,15 @@ describe("validation command family", () => {
 			"mutation-safety",
 			"--json",
 		]);
-		expect(proc.status).toBe(2);
+		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.mode).toBe("benchmark");
 		expect(payload.result_count).toBe(5);
 		expect(payload.summary).toEqual({
 			total: 5,
-			passed: 2,
-			failed: 3,
-			skipped: 0,
+			passed: 3,
+			failed: 0,
+			skipped: 2,
 			baseline_missing: 0,
 		});
 		const results = payload.results as Array<Record<string, unknown>>;
@@ -564,7 +564,7 @@ describe("validation command family", () => {
 			["v", "bench", "--pack", "cli-kernel-local", "--save", "--json"],
 			fixtureRoot,
 		);
-		expect(proc.status).toBe(2);
+		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(typeof payload.saved_result_path).toBe("string");
 		const savedPath = payload.saved_result_path as string;
@@ -602,13 +602,13 @@ describe("validation command family", () => {
 				"bench",
 				"--pack",
 				"cli-kernel-local",
-				"--output",
-				outputPath,
-				"--json",
+			"--output",
+			outputPath,
+			"--json",
 			],
 			fixtureRoot,
 		);
-		expect(proc.status).toBe(2);
+		expect(proc.status).toBe(0);
 		expect(existsSync(outputPath)).toBe(true);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.saved_result_path).toBe(

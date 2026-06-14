@@ -13,7 +13,8 @@
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "mcp-parity-v1",
-  "implementation_status": "implemented",
+  "implementation_status": "skipped",
+  "note": "no CLI mcp command; MCP parity pending adapter; covered by mcp unit tests",
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,

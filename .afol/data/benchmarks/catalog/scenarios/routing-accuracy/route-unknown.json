@@ -4,6 +4,7 @@
   "scenario_version": "1.0.0",
   "pack_id": "routing-accuracy",
   "command": "a help unknown-route",
+  "expected_exit": 2,
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

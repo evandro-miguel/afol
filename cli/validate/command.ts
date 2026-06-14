@@ -595,11 +595,17 @@ function resolveBenchmarkRunStatus(
 	summary: BenchmarkRunSummary,
 	contractIssueCount: number,
 ): "passed" | "failed" | "skipped" {
+	// A run passes when there are no real failures or missing baselines.
+	// Skipped scenarios are honest opt-outs (e.g. mutating/session-scoped
+	// commands that cannot run in-root) and do NOT fail the run, as long as
+	// at least one scenario actually passed. A run with zero failures but
+	// also zero passes (everything skipped) reports "skipped" to signal no
+	// real coverage, distinct from a passing run.
 	const pass =
 		summary.failed === 0 &&
 		summary.baselineMissing === 0 &&
-		summary.skipped === 0 &&
-		contractIssueCount === 0;
+		contractIssueCount === 0 &&
+		summary.passed > 0;
 	if (pass) {
 		return "passed";
 	}

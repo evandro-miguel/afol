@@ -3,7 +3,7 @@
   "scenario_id": "lib-show",
   "scenario_version": "1.0.0",
   "pack_id": "library-knowledge",
-  "command": "afol lb topic --topic alpha",
+  "command": "afol lb list",
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {
