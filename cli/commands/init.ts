@@ -21,7 +21,8 @@ function parseInitArgs(args: string[]): InitArgs {
 			arg === "--cleanup-obsolete" ||
 			arg === "--cleanup-provider-compatible-mutable" ||
 			arg === "--confirm-provider-migration" ||
-			arg === "--provider-compatible"
+			arg === "--provider-compatible" ||
+			arg === "--without-claude"
 		) {
 			forwarded.push(arg);
 			continue;

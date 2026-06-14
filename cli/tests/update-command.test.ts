@@ -55,6 +55,23 @@ function mkRoot(): string {
 	return root;
 }
 
+function writeClaudeAdapterConfig(root: string, enabled: boolean): void {
+	writeFileSync(
+		join(root, ".agents", "config.json"),
+		`${JSON.stringify(
+			{
+				schema_version: 1,
+				project: { name: "update-command-test" },
+				paths: {},
+				adapters: { claude: { enabled } },
+			},
+			null,
+			2,
+		)}\n`,
+		"utf8",
+	);
+}
+
 function capture() {
 	const stdout: string[] = [];
 	const stderr: string[] = [];
@@ -94,53 +111,183 @@ describe("update command", () => {
 		}
 	});
 
-		test("preview prints read-only operations and supports ck alias", async () => {
-			const root = mkRoot();
-			try {
-				const preview = capture();
-				expect(await runUpdateCommand(["preview"], root, preview.io)).toBe(0);
-				expect(preview.stdout.join("\n")).toContain("preview operations:");
-				expect(preview.stdout.join("\n")).toContain("diff previews:");
-				expect(preview.stdout.join("\n")).toContain(
-					".agents/lock.json [owner=managed] revision changed",
-				);
-				expect(preview.stdout.join("\n")).toContain("@@");
+	test("check omits Claude-owned paths when the adapter is disabled", async () => {
+		const root = mkRoot();
+		try {
+			writeClaudeAdapterConfig(root, false);
+			writeFileSync(join(root, "CLAUDE.md"), "local claude mirror\n", "utf8");
+			mkdirSync(join(root, ".claude", "rules"), { recursive: true });
+			writeFileSync(
+				join(root, ".claude", "README.md"),
+				"local claude readme\n",
+				"utf8",
+			);
 
-				const json = capture();
-				expect(await runUpdateCommand(["ck", "--json"], root, json.io)).toBe(0);
-				const parsed = JSON.parse(json.stdout[0] ?? "{}") as {
-					schema: string;
-					ok: boolean;
-					action?: string;
-					exit_code: number;
-					data?: {
-						hasSource?: boolean;
-						currentRevision?: string;
-						changes?: {
-							total?: number;
-							paths?: string[];
-						};
-						ownershipSource?: Record<string, number>;
-						filePreviews?: unknown[];
-						operations?: unknown[];
-					};
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					["check", "--json", "--verbose"],
+					root,
+					output.io,
+				),
+			).toBe(0);
+
+			const parsed = JSON.parse(output.stdout[0] ?? "{}") as {
+				data?: {
+					changes?: { paths?: string[] };
+					operations?: { path?: string }[];
+					filePreviews?: { path?: string }[];
 				};
-				expect(parsed.schema).toBe("afol.result/v1");
-				expect(parsed.ok).toBe(true);
-				expect(parsed.action).toBe("update.check");
-				expect(parsed.exit_code).toBe(0);
-				expect(Object.hasOwn(parsed, "hasSource")).toBe(false);
-				expect(Object.hasOwn(parsed, "filePreviews")).toBe(false);
-				expect(Object.hasOwn(parsed, "operations")).toBe(false);
-				expect(parsed.data).toMatchObject({
-					hasSource: true,
-					currentRevision: "old",
-					changes: {
-						total: expect.any(Number),
-						paths: expect.arrayContaining([".agents/manifest.json"]),
+			};
+			const operationPaths =
+				parsed.data?.operations?.flatMap((op) =>
+					typeof op?.path === "string" ? [op.path] : [],
+				) ?? [];
+			const previewPaths =
+				parsed.data?.filePreviews?.flatMap((preview) =>
+					typeof preview?.path === "string" ? [preview.path] : [],
+				) ?? [];
+
+			expect(parsed.data?.changes?.paths ?? []).not.toContain("CLAUDE.md");
+			expect(parsed.data?.changes?.paths ?? []).not.toContain(
+				".claude/README.md",
+			);
+			expect(operationPaths).not.toContain("CLAUDE.md");
+			expect(operationPaths).not.toContain(".claude/README.md");
+			expect(previewPaths).not.toContain("CLAUDE.md");
+			expect(previewPaths).not.toContain(".claude/README.md");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply does not create Claude-owned paths when the adapter is disabled", async () => {
+		const root = mkRoot();
+		try {
+			const disabledConfig = JSON.stringify(
+				{
+					schema_version: 1,
+					project: { name: "update-command-test" },
+					paths: {},
+					adapters: { claude: { enabled: false } },
+				},
+				null,
+				2,
+			);
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				`${disabledConfig}\n`,
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".agents", "lock.json"),
+				JSON.stringify(
+					{
+						schema_version: 1,
+						revision: "old",
+						locked: true,
+						managed_hashes: {
+							"config.json": sha256Hex(`${disabledConfig}\n`),
+						},
 					},
-				});
-				expect(parsed.data?.ownershipSource?.managed).toBe(0);
+					null,
+					2,
+				),
+				"utf8",
+			);
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"apply",
+						"--session",
+						"S-CLAUDE",
+						"--task-id",
+						"T-CLAUDE",
+						"--reason",
+						"verify disabled adapter update",
+					],
+					root,
+					output.io,
+				),
+			).toBe(0);
+
+			expect(existsSync(join(root, "CLAUDE.md"))).toBe(false);
+			expect(existsSync(join(root, ".claude"))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("check keeps Claude-owned paths when the adapter is enabled", async () => {
+		const root = mkRoot();
+		try {
+			writeClaudeAdapterConfig(root, true);
+			const output = capture();
+			expect(await runUpdateCommand(["check", "--json"], root, output.io)).toBe(
+				0,
+			);
+
+			const parsed = JSON.parse(output.stdout[0] ?? "{}") as {
+				data?: {
+					changes?: { paths?: string[] };
+				};
+			};
+			expect(parsed.data?.changes?.paths ?? []).toEqual(
+				expect.arrayContaining(["CLAUDE.md", ".claude/README.md"]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("preview prints read-only operations and supports ck alias", async () => {
+		const root = mkRoot();
+		try {
+			const preview = capture();
+			expect(await runUpdateCommand(["preview"], root, preview.io)).toBe(0);
+			expect(preview.stdout.join("\n")).toContain("preview operations:");
+			expect(preview.stdout.join("\n")).toContain("diff previews:");
+			expect(preview.stdout.join("\n")).toContain(
+				".agents/lock.json [owner=managed] revision changed",
+			);
+			expect(preview.stdout.join("\n")).toContain("@@");
+
+			const json = capture();
+			expect(await runUpdateCommand(["ck", "--json"], root, json.io)).toBe(0);
+			const parsed = JSON.parse(json.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				action?: string;
+				exit_code: number;
+				data?: {
+					hasSource?: boolean;
+					currentRevision?: string;
+					changes?: {
+						total?: number;
+						paths?: string[];
+					};
+					ownershipSource?: Record<string, number>;
+					filePreviews?: unknown[];
+					operations?: unknown[];
+				};
+			};
+			expect(parsed.schema).toBe("afol.result/v1");
+			expect(parsed.ok).toBe(true);
+			expect(parsed.action).toBe("update.check");
+			expect(parsed.exit_code).toBe(0);
+			expect(Object.hasOwn(parsed, "hasSource")).toBe(false);
+			expect(Object.hasOwn(parsed, "filePreviews")).toBe(false);
+			expect(Object.hasOwn(parsed, "operations")).toBe(false);
+			expect(parsed.data).toMatchObject({
+				hasSource: true,
+				currentRevision: "old",
+				changes: {
+					total: expect.any(Number),
+					paths: expect.arrayContaining([".agents/manifest.json"]),
+				},
+			});
+			expect(parsed.data?.ownershipSource?.managed).toBe(0);
 
 			const previewJson = capture();
 			expect(
@@ -158,17 +305,17 @@ describe("update command", () => {
 					operations?: unknown[];
 				};
 			};
-				expect(previewParsed.schema).toBe("afol.result/v1");
-				expect(previewParsed.action).toBe("update.preview");
-				expect(Object.hasOwn(previewParsed, "filePreviews")).toBe(false);
-				expect(Object.hasOwn(previewParsed, "operations")).toBe(false);
-				expect(previewParsed.data).toMatchObject({
+			expect(previewParsed.schema).toBe("afol.result/v1");
+			expect(previewParsed.action).toBe("update.preview");
+			expect(Object.hasOwn(previewParsed, "filePreviews")).toBe(false);
+			expect(Object.hasOwn(previewParsed, "operations")).toBe(false);
+			expect(previewParsed.data).toMatchObject({
 				hasSource: true,
 				changes: {
 					total: expect.any(Number),
 					paths: expect.arrayContaining([".agents/manifest.json"]),
-					},
-				});
+				},
+			});
 
 			const previewVerboseJson = capture();
 			expect(
@@ -196,10 +343,10 @@ describe("update command", () => {
 			expect(Object.hasOwn(previewVerboseParsed, "operations")).toBe(false);
 			expect(previewVerboseParsed.data?.filePreviews).toBeDefined();
 			expect(previewVerboseParsed.data?.operations).toBeDefined();
-			} finally {
-				rmSync(root, { recursive: true, force: true });
-			}
-		});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
 	test("apply dry-run reflects operations and does not write files", async () => {
 		const root = mkRoot();

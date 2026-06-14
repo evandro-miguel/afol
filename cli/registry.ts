@@ -31,7 +31,8 @@ export type CommandKind =
 	| "doctor"
 	| "maintenance"
 	| "sweep"
-	| "schema";
+	| "schema"
+	| "adapter";
 export type CommandSideEffect = "read" | "write" | "append" | "generated";
 
 export type CommandCategory = "core" | "workflow" | "inspect" | "ops";
@@ -316,6 +317,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "schema",
 		sideEffect: "read",
 		description: "Inspect schema state",
+		category: "ops",
+	},
+	{
+		command: "adapter",
+		aliases: [],
+		kind: "adapter",
+		sideEffect: "write",
+		description: "Enable or disable runtime adapters",
 		category: "ops",
 	},
 ]);

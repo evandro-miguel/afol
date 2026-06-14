@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
+import { filterClaudeAdapterFiles } from "../services/adapter/claude";
 import {
 	cleanupBootstrapObsolete,
 	planBootstrapCleanup,
@@ -28,6 +29,7 @@ type BootstrapArgs = {
 	cleanupProviderCompatibleMutable: boolean;
 	confirmProviderMigration: boolean;
 	mutableDir: string;
+	withoutClaude: boolean;
 };
 
 type RawManifest = Record<string, unknown>;
@@ -89,6 +91,7 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 	let cleanupProviderCompatibleMutable = false;
 	let confirmProviderMigration = false;
 	let mutableDir = ".afol";
+	let withoutClaude = false;
 
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -101,6 +104,10 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 		}
 		if (arg === "--provider-compatible") {
 			mutableDir = ".afol";
+			continue;
+		}
+		if (arg === "--without-claude") {
+			withoutClaude = true;
 			continue;
 		}
 		if (arg === "--mutable-dir") {
@@ -155,6 +162,7 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 		cleanupProviderCompatibleMutable,
 		confirmProviderMigration,
 		mutableDir,
+		withoutClaude,
 	};
 }
 
@@ -200,19 +208,51 @@ function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
 	return Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
 
-function buildBootstrapTemplateFiles(mutableDir: string): TemplateFileMap {
+function applyAdapterConfigFlag(
+	content: Buffer,
+	withoutClaude: boolean,
+): Buffer {
+	if (!withoutClaude) {
+		return content;
+	}
+	const config = JSON.parse(content.toString("utf8")) as Record<
+		string,
+		unknown
+	>;
+	const adapters =
+		config.adapters !== null &&
+		typeof config.adapters === "object" &&
+		!Array.isArray(config.adapters)
+			? { ...(config.adapters as Record<string, unknown>) }
+			: {};
+	const claude = adapters.claude
+		? { ...(adapters.claude as Record<string, unknown>) }
+		: {};
+	config.adapters = {
+		...adapters,
+		claude: { ...claude, enabled: false },
+	};
+	return Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+function buildBootstrapTemplateFiles(
+	mutableDir: string,
+	withoutClaude: boolean,
+): TemplateFileMap {
 	const templateFiles: TemplateFileMap = { ...DEFAULT_TEMPLATE_FILES };
-	if (mutableDir === ".agents") {
+	if (mutableDir === ".agents" && !withoutClaude) {
 		return templateFiles;
 	}
 
-	for (const path of Object.keys(templateFiles)) {
-		if (
-			PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS.some(
-				(root) => path === root || path.startsWith(`${root}/`),
-			)
-		) {
-			delete templateFiles[path];
+	if (mutableDir === ".agents") {
+		for (const path of Object.keys(templateFiles)) {
+			if (
+				PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS.some(
+					(root) => path === root || path.startsWith(`${root}/`),
+				)
+			) {
+				delete templateFiles[path];
+			}
 		}
 	}
 	for (const path of Object.keys(templateFiles)) {
@@ -227,19 +267,29 @@ function buildBootstrapTemplateFiles(mutableDir: string): TemplateFileMap {
 	}
 
 	const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
-	if (!configEntry) {
-		return templateFiles;
+	if (configEntry) {
+		const basePayload = Buffer.from(configEntry.contentBase64, "base64");
+		const afterMutable =
+			mutableDir !== ".agents"
+				? mutableConfigPayload(basePayload, mutableDir)
+				: basePayload;
+		const payload = applyAdapterConfigFlag(afterMutable, withoutClaude);
+		templateFiles[".agents/config.json"] = {
+			path: ".agents/config.json",
+			contentBase64: payload.toString("base64"),
+			sha256: sha256Hex(payload),
+			bytes: payload.byteLength,
+		};
 	}
-	const payload = mutableConfigPayload(
-		Buffer.from(configEntry.contentBase64, "base64"),
-		mutableDir,
-	);
-	templateFiles[".agents/config.json"] = {
-		path: ".agents/config.json",
-		contentBase64: payload.toString("base64"),
-		sha256: sha256Hex(payload),
-		bytes: payload.byteLength,
-	};
+
+	if (withoutClaude) {
+		const filtered = filterClaudeAdapterFiles(templateFiles);
+		for (const key of Object.keys(templateFiles)) {
+			if (!(key in filtered)) {
+				delete templateFiles[key];
+			}
+		}
+	}
 	return templateFiles;
 }
 
@@ -511,7 +561,10 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
 		return 2;
 	}
 
-	const templateFiles = buildBootstrapTemplateFiles(parsed.mutableDir);
+	const templateFiles = buildBootstrapTemplateFiles(
+		parsed.mutableDir,
+		parsed.withoutClaude,
+	);
 	const templatePaths = Object.keys(templateFiles).sort();
 	const currentFiles = readTargetFiles(parsed.targetRoot, templatePaths);
 	const manifest = loadBootstrapManifest(parsed.targetRoot, templatePaths);
@@ -544,6 +597,7 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
 			`bootstrap: target=${parsed.targetRoot}`,
 			`mode=${parsed.dryRun ? "dry-run" : "apply"}`,
 			`mutable=${parsed.mutableDir}`,
+			`without-claude=${parsed.withoutClaude}`,
 			`files=${Object.keys(templateFiles).length}`,
 			`operations=${plan.operations.length}`,
 			`conflicts=${conflicts.length}`,

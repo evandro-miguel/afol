@@ -367,4 +367,58 @@ describe("bootstrap provider-compatible mutable state", () => {
 			rmSync(target, { recursive: true, force: true });
 		}
 	});
+
+	test("--without-claude omits Claude artifacts and marks config disabled", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-without-claude-"));
+		try {
+			const exitCode = await runBootstrapCommand([target, "--without-claude"]);
+
+			expect(exitCode).toBe(0);
+			// AGENTS.md is always canonical and must be installed
+			expect(existsSync(join(target, "AGENTS.md"))).toBe(true);
+			// Claude adapter artifacts must be absent
+			expect(existsSync(join(target, "CLAUDE.md"))).toBe(false);
+			expect(existsSync(join(target, ".claude"))).toBe(false);
+			expect(existsSync(join(target, ".claude", "README.md"))).toBe(false);
+
+			const config = JSON.parse(
+				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+			) as {
+				adapters?: { claude?: { enabled?: boolean } };
+			};
+			expect(config.adapters?.claude?.enabled).toBe(false);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("--without-claude combines with --provider-compatible", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-without-claude-pc-"));
+		try {
+			const exitCode = await runBootstrapCommand([
+				target,
+				"--provider-compatible",
+				"--without-claude",
+			]);
+
+			expect(exitCode).toBe(0);
+			expect(existsSync(join(target, "AGENTS.md"))).toBe(true);
+			expect(existsSync(join(target, "CLAUDE.md"))).toBe(false);
+			expect(existsSync(join(target, ".claude"))).toBe(false);
+			expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(
+				true,
+			);
+
+			const config = JSON.parse(
+				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+			) as {
+				paths: { mutable_dir: string };
+				adapters?: { claude?: { enabled?: boolean } };
+			};
+			expect(config.paths.mutable_dir).toBe(".afol");
+			expect(config.adapters?.claude?.enabled).toBe(false);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
 });

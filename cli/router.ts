@@ -46,6 +46,7 @@ const SUBCOMMAND_GROUPS = new Set([
 	"maintenance",
 	"sweep",
 	"schema",
+	"adapter",
 ]);
 
 function removeJsonAliases(values: string[]): string[] {

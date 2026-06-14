@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { runAdapterCommand } from "./commands/adapter";
 import { runAdmCommand } from "./commands/adm";
 import { runAdrCommand } from "./commands/adr";
 import { runBootstrapCommand } from "./commands/bootstrap";
@@ -327,6 +328,13 @@ export async function main(argv: string[]): Promise<number> {
 		}
 		if (resolution.group === "state") {
 			return runStateCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "adapter") {
+			return runAdapterCommand(
 				resolution.action,
 				resolution.args,
 				project.value.root,
