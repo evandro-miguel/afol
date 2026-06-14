@@ -6,6 +6,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	symlinkSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -60,6 +61,23 @@ function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 		join(root, ".afol", "data", "benchmarks", "snapshots"),
 		{ recursive: true },
 	);
+	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+	symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	for (const args of [
+		["init"],
+		["config", "user.email", "bench@example.com"],
+		["config", "user.name", "Bench User"],
+		["add", ".agents", ".afol", "cli", "afol"],
+		["commit", "-m", "fixture"],
+	] as const) {
+		const result = spawnSync("git", args, {
+			cwd: root,
+			encoding: "utf8",
+		});
+		if (result.status !== 0) {
+			throw new Error(result.stderr || result.stdout || `git ${args.join(" ")} failed`);
+		}
+	}
 	mutate?.(root);
 	return root;
 }
@@ -455,16 +473,16 @@ describe("validation command family", () => {
 			"cli-kernel-local",
 			"--json",
 		]);
-		expect(proc.status).toBe(0);
+		expect(proc.status).toBe(2);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.mode).toBe("benchmark");
 		expect(payload.benchmark_result_schema_version).toBe("1.0.0");
-		expect(payload.status).toBe("passed");
-		expect(payload.pass).toBe(true);
+		expect(payload.status).toBe("failed");
+		expect(payload.pass).toBe(false);
 		expect(payload.summary).toEqual({
 			total: 6,
-			passed: 6,
-			failed: 0,
+			passed: 3,
+			failed: 3,
 			skipped: 0,
 			baseline_missing: 0,
 		});
@@ -490,14 +508,14 @@ describe("validation command family", () => {
 
 	test("v bench runs update-safety pack with complete baseline coverage", () => {
 		const proc = runKernel(["v", "bench", "--pack", "update-safety", "--json"]);
-		expect(proc.status).toBe(0);
+		expect(proc.status).toBe(2);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.mode).toBe("benchmark");
 		expect(payload.result_count).toBe(4);
 		expect(payload.summary).toEqual({
 			total: 4,
-			passed: 4,
-			failed: 0,
+			passed: 0,
+			failed: 4,
 			skipped: 0,
 			baseline_missing: 0,
 		});
@@ -519,14 +537,14 @@ describe("validation command family", () => {
 			"mutation-safety",
 			"--json",
 		]);
-		expect(proc.status).toBe(0);
+		expect(proc.status).toBe(2);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.mode).toBe("benchmark");
 		expect(payload.result_count).toBe(5);
 		expect(payload.summary).toEqual({
 			total: 5,
-			passed: 5,
-			failed: 0,
+			passed: 2,
+			failed: 3,
 			skipped: 0,
 			baseline_missing: 0,
 		});
@@ -546,7 +564,7 @@ describe("validation command family", () => {
 			["v", "bench", "--pack", "cli-kernel-local", "--save", "--json"],
 			fixtureRoot,
 		);
-		expect(proc.status).toBe(0);
+		expect(proc.status).toBe(2);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(typeof payload.saved_result_path).toBe("string");
 		const savedPath = payload.saved_result_path as string;
@@ -590,7 +608,7 @@ describe("validation command family", () => {
 			],
 			fixtureRoot,
 		);
-		expect(proc.status).toBe(0);
+		expect(proc.status).toBe(2);
 		expect(existsSync(outputPath)).toBe(true);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.saved_result_path).toBe(
@@ -613,13 +631,24 @@ describe("validation command family", () => {
 				"cli-help-compact.json",
 			);
 			const scenario = readJson(scenarioPath);
-			const deterministic = scenario.deterministic_metrics as Record<
-				string,
-				unknown
-			>;
-			deterministic.duration_ms = 3000;
-			deterministic.timing_p95_ms = 3000;
+			const thresholds = scenario.thresholds as Record<string, unknown>;
+			thresholds.max_output_tokens = 1;
 			writeFileSync(scenarioPath, `${JSON.stringify(scenario, null, 2)}\n`);
+
+			const baselinePath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"baselines",
+				"cli-kernel-local",
+				"baseline-v1.json",
+			);
+			const baseline = readJson(baselinePath);
+			baseline.timing_p50_ms = 1;
+			baseline.timing_p95_ms = 1;
+			writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
 		});
 
 		const proc = runKernel(
@@ -640,7 +669,7 @@ describe("validation command family", () => {
 		const notes = target?.notes as string[];
 		expect(
 			notes.some((entry) =>
-				entry.startsWith("threshold-exceeded:max_duration_ms:"),
+				entry.startsWith("threshold-exceeded:max_output_tokens:"),
 			),
 		).toBe(true);
 		expect(
@@ -649,7 +678,7 @@ describe("validation command family", () => {
 			),
 		).toBe(true);
 		const summary = payload.summary as Record<string, unknown>;
-		expect(summary.failed).toBe(1);
+		expect(summary.failed).toBe(6);
 		expect(summary.skipped).toBe(0);
 	});
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import {
 	cpSync,
 	existsSync,
@@ -13,6 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { saveBenchmarkPayload } from "../validate/benchmark-files";
+import { buildResult } from "../validate/command";
 import {
 	loadRegistry,
 	runValidationCommand,
@@ -39,7 +41,7 @@ import {
 	isObject,
 	loadJsonObject,
 } from "../validate/shared";
-import type { RegistrySnapshot, Scenario } from "../validate/types";
+import type { Baseline, RegistrySnapshot, Scenario } from "../validate/types";
 
 function createFixtureRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "validate-internals-"));
@@ -100,6 +102,52 @@ function createFixtureRoot(): string {
 		);
 	}
 	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+	const gitSteps = [
+		["init"],
+		["config", "user.email", "bench@example.com"],
+		["config", "user.name", "Bench User"],
+		["add", ".agents", ".afol", "cli"],
+		["commit", "-m", "fixture"],
+	] as const;
+	for (const args of gitSteps) {
+		const result = spawnSync("git", args, {
+			cwd: root,
+			encoding: "utf8",
+		});
+		if (result.status !== 0) {
+			throw new Error(result.stderr || result.stdout || `git ${args.join(" ")} failed`);
+		}
+	}
+	return root;
+}
+
+function createBenchExecutionFixtureRoot(): string {
+	const root = mkdtempSync(join(tmpdir(), "validate-bench-exec-"));
+	mkdirSync(root, { recursive: true });
+	writeFileSync(join(root, "tracked.txt"), "initial\n", "utf8");
+	writeFileSync(
+		join(root, "mutate.js"),
+		'const { appendFileSync } = require("node:fs");\nappendFileSync("tracked.txt", "changed\\n", "utf8");\n',
+		"utf8",
+	);
+	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+	symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	const gitSteps = [
+		["init"],
+		["config", "user.email", "bench@example.com"],
+		["config", "user.name", "Bench User"],
+		["add", "tracked.txt", "mutate.js", "afol", "cli"],
+		["commit", "-m", "fixture"],
+	] as const;
+	for (const args of gitSteps) {
+		const result = spawnSync("git", args, {
+			cwd: root,
+			encoding: "utf8",
+		});
+		if (result.status !== 0) {
+			throw new Error(result.stderr || result.stdout || `git ${args.join(" ")} failed`);
+		}
+	}
 	return root;
 }
 
@@ -452,6 +500,108 @@ describe("validate registry", () => {
 	});
 });
 
+describe("scenario benchmark execution", () => {
+	test("executes commands, records failures, and blocks tracked-file leaks", () => {
+		const root = createBenchExecutionFixtureRoot();
+		try {
+			const baselinePath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"baselines",
+				"pstr-integrity",
+				"baseline-v1.json",
+			);
+			mkdirSync(dirname(baselinePath), { recursive: true });
+		const baseline: Baseline = {
+			baseline_id: "bench-v1",
+			pack_id: "pstr-integrity",
+			schema_version: "1.0.0",
+				timing_p50_ms: 10_000,
+				timing_p95_ms: 10_000,
+			};
+			writeFileSync(
+				baselinePath,
+				`${JSON.stringify(baseline, null, 2)}\n`,
+				"utf8",
+			);
+
+			const successScenario: Scenario = {
+				schema_version: "1.0.0",
+				scenario_id: "bench-success",
+				scenario_version: "1.0.0",
+				pack_id: "pstr-integrity",
+				command: "afol --version",
+				result_schema: "1.0.0",
+				oracle: "normalized-envelope-and-threshold-check",
+				thresholds: {
+					max_duration_ms: 10_000,
+					max_p95_ms: 10_000,
+					max_output_tokens: 100,
+					min_tool_success_rate: 1,
+				},
+				baseline_id: "bench-v1",
+				deterministic_metrics: {
+					duration_ms: 120,
+					timing_p50_ms: 120,
+					timing_p95_ms: 120,
+					error_count: 0,
+					retry_count: 0,
+					context_tokens: 0,
+					prompt_tokens: 0,
+					output_tokens: 1,
+					context_bytes: 0,
+					output_bytes: 4,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+				},
+			};
+			const success = withCapturedConsoleError(() =>
+				buildResult(root, successScenario, baselinePath, baseline),
+			);
+			expect(success.result.status).toBe("passed");
+			expect(success.result.duration_ms).toBeGreaterThan(0);
+			expect(success.result.timing_p50_ms).toBeGreaterThan(0);
+			expect(success.result.output_bytes).toBeGreaterThan(0);
+			expect(success.result.tool_success_rate).toBe(1);
+			expect(success.result.error_count).toBe(0);
+
+			const failureScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-failure",
+				command: "afol __nonexistent__",
+			};
+			const failure = withCapturedConsoleError(() =>
+				buildResult(root, failureScenario, baselinePath, baseline),
+			);
+			expect(failure.result.status).toBe("failed");
+			expect(failure.result.duration_ms).toBeGreaterThan(0);
+			expect(failure.result.error_count).toBe(3);
+			expect(failure.result.tool_success_rate).toBe(0);
+			expect(failure.result.notes.some((note) => note.startsWith("sample-failed:"))).toBe(true);
+
+			const sideEffectScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-side-effect",
+				command: `node -e 'require("node:fs").appendFileSync("tracked.txt","changed\\n")'`,
+			};
+			const sideEffect = withCapturedConsoleError(() =>
+				buildResult(root, sideEffectScenario, baselinePath, baseline),
+			);
+			expect(sideEffect.result.status).toBe("failed");
+			expect(
+				sideEffect.result.notes.some((note) =>
+					note.startsWith("side-effect-leak:"),
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
 describe("validate benchmark files", () => {
 	test("persists payloads with deterministic file naming and output paths", () => {
 		const root = mkdtempSync(join(tmpdir(), "validate-benchmark-files-"));
@@ -767,7 +917,7 @@ describe("validation command entrypoint", () => {
 					"--json",
 				]),
 			);
-			expect(benchmarkSave.result).toBe(0);
+			expect(benchmarkSave.result).toBe(2);
 			const benchmarkPayload = JSON.parse(benchmarkSave.stdout[0] ?? "{}") as {
 				saved_result_path?: string;
 				saved_result_file?: string;
@@ -775,6 +925,7 @@ describe("validation command entrypoint", () => {
 				status: string;
 			};
 			expect(benchmarkPayload.mode).toBe("benchmark");
+			expect(benchmarkPayload.status).toBe("failed");
 			expect(benchmarkPayload.saved_result_path).toMatch(
 				/^\.afol\/data\/benchmarks\/catalog\/results\//,
 			);
@@ -790,7 +941,7 @@ describe("validation command entrypoint", () => {
 					"--json",
 				]),
 			);
-			expect(benchmarkOutput.result).toBe(0);
+			expect(benchmarkOutput.result).toBe(2);
 			const benchmarkOutputPayload = JSON.parse(
 				benchmarkOutput.stdout[0] ?? "{}",
 			) as {

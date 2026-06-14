@@ -28,7 +28,7 @@ export interface Scenario {
 	scenario_id: string;
 	scenario_version: string;
 	pack_id: PackId;
-	command: string;
+	command?: string;
 	result_schema: string;
 	oracle: string;
 	thresholds: Record<string, number>;

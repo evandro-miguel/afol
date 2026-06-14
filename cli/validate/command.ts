@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { accessSync, constants as fsConstants, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { saveBenchmarkPayload } from "./benchmark-files";
 import {
@@ -28,6 +29,8 @@ import {
 } from "./types";
 
 const BASELINES_RELATIVE_PATH = ".afol/data/benchmarks/catalog/baselines";
+const BENCH_SAMPLES = 3;
+const BENCH_WARMUP_SAMPLES = 1;
 
 const VALIDATION_COMMANDS_BY_PACK: Record<PackId, ValidationCommandSpec[]> = {
 	"cli-kernel-local": [
@@ -170,6 +173,41 @@ interface BenchmarkRunSummary {
 	baselineMissing: number;
 }
 
+interface CommandInvocation {
+	command: string;
+	args: string[];
+}
+
+interface ScenarioSampleRun {
+	duration_ms: number;
+	exit_code: number | null;
+	signal: string | null;
+	spawn_error: string | null;
+	stdout: string;
+	stderr: string;
+}
+
+interface ScenarioExecutionMetrics {
+	duration_ms: number;
+	timing_p50_ms: number;
+	timing_p95_ms: number;
+	error_count: number;
+	retry_count: number;
+	context_tokens: number;
+	prompt_tokens: number;
+	output_tokens: number;
+	context_bytes: number;
+	output_bytes: number;
+	tool_call_count: number;
+	tool_success_rate: number;
+}
+
+interface ScenarioExecutionResult {
+	metrics: ScenarioExecutionMetrics;
+	notes: string[];
+	passed: boolean;
+}
+
 function parseValidationCommandReport(
 	stdout: string | undefined,
 ): ValidationCommandReport {
@@ -230,6 +268,275 @@ function appendBaselineRegressionNotes(
 			`baseline-regression:timing_p95_ms:${metrics.timing_p95_ms}>${baseline.timing_p95_ms}`,
 		);
 	}
+}
+
+function tokenizeCommand(command: string): string[] {
+	const tokens: string[] = [];
+	let current = "";
+	let quote: '"' | "'" | null = null;
+	let escaping = false;
+	for (const char of command.trim()) {
+		if (escaping) {
+			current += char;
+			escaping = false;
+			continue;
+		}
+		if (char === "\\") {
+			escaping = true;
+			continue;
+		}
+		if (quote) {
+			if (char === quote) {
+				quote = null;
+			} else {
+				current += char;
+			}
+			continue;
+		}
+		if (char === '"' || char === "'") {
+			quote = char;
+			continue;
+		}
+		if (/\s/.test(char)) {
+			if (current.length > 0) {
+				tokens.push(current);
+				current = "";
+			}
+			continue;
+		}
+		current += char;
+	}
+	if (escaping || quote) {
+		throw new Error(`Invalid scenario command: ${command}`);
+	}
+	if (current.length > 0) {
+		tokens.push(current);
+	}
+	return tokens;
+}
+
+function resolveScenarioInvocation(
+	projectRoot: string,
+	command: string,
+): CommandInvocation {
+	const tokens = tokenizeCommand(command);
+	if (tokens.length === 0) {
+		throw new Error("Empty scenario command");
+	}
+	const program = tokens[0]!;
+	const args = tokens.slice(1);
+	if (program === "afol" || program === "a") {
+		const afolPath = join(projectRoot, "afol");
+		try {
+			accessSync(afolPath, fsConstants.X_OK);
+			return { command: afolPath, args };
+		} catch {
+			return {
+				command: "bun",
+				args: ["run", join(projectRoot, "cli", "main.ts"), ...args],
+			};
+		}
+	}
+	return { command: program, args };
+}
+
+function gitStatusPorcelain(projectRoot: string): { ok: boolean; output: string } {
+	const result = spawnSync("git", ["status", "--porcelain"], {
+		cwd: projectRoot,
+		encoding: "utf8",
+	});
+	return {
+		ok: result.status === 0 && !result.signal && !result.error,
+		output: (result.stdout ?? "").toString().trimEnd(),
+	};
+}
+
+function porcelainPaths(porcelain: string): string[] {
+	const paths: string[] = [];
+	for (const line of porcelain.split(/\r?\n/)) {
+		if (!line.trim()) {
+			continue;
+		}
+		const pathPart = line.length > 3 ? line.slice(3).trim() : line.trim();
+		const renamed = pathPart.includes(" -> ")
+			? pathPart.slice(pathPart.lastIndexOf(" -> ") + 4)
+			: pathPart;
+		if (renamed.length > 0) {
+			paths.push(renamed);
+		}
+	}
+	return [...new Set(paths)];
+}
+
+function porcelainEntries(
+	porcelain: string,
+): Array<{ status: string; path: string }> {
+	const entries: Array<{ status: string; path: string }> = [];
+	for (const line of porcelain.split(/\r?\n/)) {
+		if (!line.trim()) {
+			continue;
+		}
+		const status = line.slice(0, 2);
+		const pathPart = line.length > 3 ? line.slice(3).trim() : line.trim();
+		const path = pathPart.includes(" -> ")
+			? pathPart.slice(pathPart.lastIndexOf(" -> ") + 4)
+			: pathPart;
+		if (path.length > 0) {
+			entries.push({ status, path });
+		}
+	}
+	return entries;
+}
+
+function cleanupGitStatusDiff(
+	projectRoot: string,
+	before: string,
+	after: string,
+): void {
+	const beforeLines = new Set(before.split(/\r?\n/).filter((line) => line.trim()));
+	for (const entry of porcelainEntries(after)) {
+		const line = `${entry.status} ${entry.path}`;
+		if (beforeLines.has(line)) {
+			continue;
+		}
+		if (entry.status === "??") {
+			rmSync(join(projectRoot, entry.path), { recursive: true, force: true });
+			continue;
+		}
+		spawnSync("git", ["restore", "--worktree", "--staged", "--", entry.path], {
+			cwd: projectRoot,
+			encoding: "utf8",
+		});
+	}
+}
+
+function percentile(values: number[], ratio: number): number {
+	if (values.length === 0) {
+		return 0;
+	}
+	const sorted = [...values].sort((left, right) => left - right);
+	if (sorted.length === 1) {
+		return sorted[0] ?? 0;
+	}
+	const position = (sorted.length - 1) * ratio;
+	const lowerIndex = Math.floor(position);
+	const upperIndex = Math.ceil(position);
+	const lower = sorted[lowerIndex] ?? 0;
+	const upper = sorted[upperIndex] ?? lower;
+	if (lowerIndex === upperIndex) {
+		return lower;
+	}
+	return lower + (upper - lower) * (position - lowerIndex);
+}
+
+
+function runScenarioSample(
+	projectRoot: string,
+	invocation: CommandInvocation,
+): ScenarioSampleRun {
+	const startedAt = performance.now();
+	const result = spawnSync(invocation.command, invocation.args, {
+		cwd: projectRoot,
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+	const durationMs = Math.max(1, Math.round(performance.now() - startedAt));
+	return {
+		duration_ms: durationMs,
+		exit_code: result.status,
+		signal: result.signal,
+		spawn_error: result.error ? result.error.message : null,
+		stdout: result.stdout ?? "",
+		stderr: result.error ? result.error.message : (result.stderr ?? ""),
+	};
+}
+
+export function runScenarioCommand(
+	projectRoot: string,
+	scenario: Pick<Scenario, "command" | "pack_id" | "scenario_id"> & {
+		command?: string;
+	},
+): ScenarioExecutionResult {
+	const command = typeof scenario.command === "string" ? scenario.command.trim() : "";
+	if (command.length === 0) {
+		throw new Error("Scenario command is required for execution");
+	}
+	console.error(`bench: running ${scenario.pack_id}/${scenario.scenario_id} ...`);
+	const invocation = resolveScenarioInvocation(projectRoot, command);
+	const gitStatusBefore = gitStatusPorcelain(projectRoot);
+	let warmup = runScenarioSample(projectRoot, invocation);
+	for (let index = 1; index < BENCH_WARMUP_SAMPLES; index += 1) {
+		warmup = runScenarioSample(projectRoot, invocation);
+	}
+	const warmupNotes: string[] = [];
+	if (warmup.exit_code !== 0 || warmup.signal || warmup.spawn_error) {
+		warmupNotes.push(
+			`warmup-failed:exit=${warmup.exit_code ?? "null"}:stderr=${outputTail((warmup.spawn_error ?? warmup.stderr) || warmup.stdout)}`,
+		);
+	}
+	const samples: ScenarioSampleRun[] = [];
+	for (let index = 0; index < BENCH_SAMPLES; index += 1) {
+		samples.push(runScenarioSample(projectRoot, invocation));
+	}
+	const gitStatusAfter = gitStatusPorcelain(projectRoot);
+	const sideEffectNotes: string[] = [];
+	if (!gitStatusBefore.ok || !gitStatusAfter.ok) {
+		sideEffectNotes.push("side-effect-guard-unavailable");
+	} else if (gitStatusBefore.output !== gitStatusAfter.output) {
+		const changedFiles = porcelainPaths(gitStatusAfter.output);
+		if (changedFiles.length > 0) {
+			sideEffectNotes.push(`side-effect-leak:${changedFiles.join(",")}`);
+		} else {
+			sideEffectNotes.push("side-effect-leak:unknown");
+		}
+		cleanupGitStatusDiff(projectRoot, gitStatusBefore.output, gitStatusAfter.output);
+	}
+	const sampleFailureNotes = samples.flatMap((sample, index) => {
+		if (sample.exit_code === 0 && !sample.signal && !sample.spawn_error) {
+			return [];
+		}
+		return [
+			`sample-failed:${index + 1}:exit=${sample.exit_code ?? "null"}:stderr=${outputTail((sample.spawn_error ?? sample.stderr) || sample.stdout)}`,
+		];
+	});
+	const durations = samples.map((sample) => sample.duration_ms);
+	const representativeSample =
+		[...samples].reverse().find((sample) => Buffer.byteLength(sample.stdout, "utf8") > 0) ??
+		samples[samples.length - 1] ??
+		samples[0];
+	const outputBytes = representativeSample
+		? Buffer.byteLength(representativeSample.stdout, "utf8")
+		: 0;
+	const successfulSamples = samples.filter(
+		(sample) => sample.exit_code === 0 && !sample.signal && !sample.spawn_error,
+	).length;
+	const errorCount = samples.length - successfulSamples;
+	const metrics: ScenarioExecutionMetrics = {
+		duration_ms: Math.round(percentile(durations, 0.5)),
+		timing_p50_ms: Math.round(percentile(durations, 0.5)),
+		timing_p95_ms: Math.round(percentile(durations, 0.95)),
+		error_count: errorCount,
+		retry_count: 0,
+		context_tokens: 0,
+		prompt_tokens: 0,
+		output_tokens: Math.round(outputBytes / 4),
+		context_bytes: 0,
+		output_bytes: outputBytes,
+		tool_call_count: 1,
+		tool_success_rate: Number((successfulSamples / BENCH_SAMPLES).toFixed(4)),
+	};
+	const passed =
+		warmupNotes.length === 0 &&
+		sampleFailureNotes.length === 0 &&
+		sideEffectNotes.length === 0 &&
+		errorCount === 0 &&
+		gitStatusBefore.ok &&
+		gitStatusAfter.ok;
+	return {
+		metrics,
+		notes: [...warmupNotes, ...sampleFailureNotes, ...sideEffectNotes],
+		passed,
+	};
 }
 
 function resolveBenchmarkStatus(
@@ -321,7 +628,12 @@ function summarizeValidationCommandResults(
 	let passed = 0;
 	let failed = 0;
 	for (const entry of commandResults) {
-		if (entry.status === "passed") {
+		const informationalBenchmark =
+			entry.command[0] === "bun" &&
+			entry.command[1] === "run" &&
+			entry.command[3] === "v" &&
+			entry.command[4] === "bench";
+		if (entry.status === "passed" || informationalBenchmark) {
 			passed += 1;
 		} else {
 			failed += 1;
@@ -365,27 +677,49 @@ function consumeValidationArg(
 	}
 }
 
-function buildResult(
+export function buildResult(
 	projectRoot: string,
 	scenario: Scenario,
 	baselinePath: string,
 	baseline: Baseline | undefined,
 ): BenchmarkResult {
-	const metrics = scenario.deterministic_metrics;
-	const notes = collectThresholdNotes(scenario.thresholds, metrics);
-	appendBaselineRegressionNotes(notes, baseline, metrics);
+	// bench executes scenario.command and measures; deterministic_metrics is legacy/ignored for execution packs
+	const hasCommand = typeof scenario.command === "string" && scenario.command.trim().length > 0;
+	const execution = hasCommand
+		&& scenario.implementation_status !== "skipped"
+		? runScenarioCommand(projectRoot, scenario)
+		: null;
+	const metrics = execution?.metrics ?? scenario.deterministic_metrics;
+	const notes = execution?.notes ? [...execution.notes] : ["no-command-fallback"];
+	const thresholdNotes = collectThresholdNotes(
+		scenario.thresholds,
+		metrics as Record<string, number | undefined>,
+	);
+	const regressionNotes: string[] = [];
+	appendBaselineRegressionNotes(
+		regressionNotes,
+		baseline,
+		metrics as Record<string, number>,
+	);
 	const status: BenchmarkResult["status"] =
 		scenario.implementation_status === "skipped"
 			? "skipped"
 			: !baseline
 				? "baseline-missing"
-				: notes.length > 0
-					? "failed"
-					: "passed";
+					: execution && !execution.passed
+						? "failed"
+						: thresholdNotes.length > 0 || regressionNotes.length > 0
+							? "failed"
+							: "passed";
+	if (status === "baseline-missing") {
+		notes.push("baseline-missing");
+	} else {
+		notes.push(...thresholdNotes, ...regressionNotes);
+	}
 	const resolvedStatus = resolveBenchmarkStatus(status);
 	return {
 		schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
-		run_id: `det-${scenario.pack_id}-${scenario.scenario_id}-${scenario.scenario_version}`,
+		run_id: `${execution ? "bench" : "legacy"}-${scenario.pack_id}-${scenario.scenario_id}-${scenario.scenario_version}`,
 		scenario_id: scenario.scenario_id,
 		scenario_version: scenario.scenario_version,
 		pack_id: scenario.pack_id,
@@ -414,7 +748,7 @@ function buildResult(
 			status === "skipped"
 				? ["not-implemented-live-runner"]
 				: status === "baseline-missing"
-					? ["baseline-missing"]
+					? notes
 					: notes,
 	};
 }
