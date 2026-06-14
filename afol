@@ -2,113 +2,16 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "${SCRIPT_DIR}/cli/main.ts" ]; then
-  KERNEL_SCRIPT="${SCRIPT_DIR}/cli/main.ts"
-else
-  KERNEL_SCRIPT=""
-fi
-AGENTS_WRAPPER="${SCRIPT_DIR}/.agents/agents"
+KERNEL_SCRIPT="${SCRIPT_DIR}/cli/main.ts"
 
-if [ -n "${KERNEL_SCRIPT}" ] && command -v bun >/dev/null 2>&1; then
-  exec bun "${KERNEL_SCRIPT}" "$@"
-fi
-
-if [ ! -x "${AGENTS_WRAPPER}" ]; then
-  echo "❌ Missing executable wrapper: ${AGENTS_WRAPPER}" >&2
+if [ ! -f "${KERNEL_SCRIPT}" ]; then
+  echo "❌ Missing kernel script: ${KERNEL_SCRIPT}" >&2
   exit 127
 fi
 
-json_short=0
-args=("$@")
-status_mode=0
-fallback_command=()
-
-if [ "${#args[@]}" -gt 0 ]; then
-  case "${args[0]}" in
-    -j|--json)
-      if [ "${#args[@]}" -eq 1 ]; then
-        json_short=1
-        status_mode=1
-        args=()
-      elif [ "${args[1]}" = "s" ] || [ "${args[1]}" = "status" ]; then
-        json_short=1
-        status_mode=1
-        args=("${args[@]:2}")
-      fi
-      ;;
-    s|status)
-      status_mode=1
-      args=("${args[@]:1}")
-      ;;
-    ck|check|v|validate)
-      fallback_command=("doctor")
-      args=("${args[@]:1}")
-      ;;
-    st|start)
-      fallback_command=("implement" "start")
-      args=("${args[@]:1}")
-      ;;
-    d|done)
-      fallback_command=("implement" "complete")
-      args=("${args[@]:1}")
-      ;;
-    c|close)
-      fallback_command=("session" "close")
-      args=("${args[@]:1}")
-      ;;
-  esac
+if ! command -v bun >/dev/null 2>&1; then
+  echo "❌ bun >=1.3.14 is required to run afol" >&2
+  exit 127
 fi
 
-if [ "${status_mode}" -eq 1 ]; then
-  normalized=("status")
-  has_json=0
-  for arg in "${args[@]}"; do
-    case "${arg}" in
-      -j|--json)
-        has_json=1
-        normalized+=("--json")
-        ;;
-      *)
-        normalized+=("${arg}")
-        ;;
-    esac
-  done
-  if [ "${json_short}" -eq 1 ] && [ "${has_json}" -eq 0 ]; then
-    normalized+=("--json")
-  fi
-  exec "${AGENTS_WRAPPER}" "${normalized[@]}"
-fi
-
-if [ "${#fallback_command[@]}" -gt 0 ]; then
-  normalized=("${fallback_command[@]}")
-  has_result=0
-  for arg in "${args[@]}"; do
-    case "${arg}" in
-      -S)
-        normalized+=("--session")
-        ;;
-      -T)
-        normalized+=("--task-id")
-        ;;
-      -x)
-        normalized+=("--command")
-        ;;
-      --test)
-        normalized+=("--command")
-        ;;
-      --result)
-        has_result=1
-        normalized+=("${arg}")
-        ;;
-      *)
-        normalized+=("${arg}")
-        ;;
-    esac
-  done
-  if [ "${fallback_command[*]}" = "implement complete" ] && [ "${has_result}" -eq 0 ]; then
-    normalized+=("--result" "passed")
-  fi
-  exec "${AGENTS_WRAPPER}" "${normalized[@]}"
-fi
-
-exec "${AGENTS_WRAPPER}" "$@"
+exec bun "${KERNEL_SCRIPT}" "$@"
