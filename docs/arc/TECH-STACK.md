@@ -25,9 +25,8 @@ updated_at: '2026-03-06T22:29:30-03:00'
 - `gitleaks` installed in the user-local Go bin; release-security lane scans
   tracked project content with `.gitleaks.toml` allowlists
 - Bun test runner (`bun test`) for CLI and focused template-policy checks
-- CLI command surface in progress:
-  - `afol` (public/publicized entrypoint)
-  - `afol` (factory migration wrapper)
+- CLI command surface:
+  - `afol` (public entrypoint, Bun/TypeScript implementation at `cli/main.ts`)
 - Template-policy-based runtime hygiene:
   - `template:check` and `template:check`-adjacent tests in `package.json`
   - forbidden/allowed path patterns and forbidden-text scan in
@@ -103,9 +102,11 @@ package dependencies in `package.json`:
 
 ## Runtime / Tooling Surface
 
-- Canonical governance: `AGENTS.md`, `.agents/*` in factory
-- Primary command runtime: `afol` (shell entrypoint), Bun + TypeScript CLI under
-  `cli/**`
+- Canonical governance: `AGENTS.md`, `.afol/adm/**` (doctrine, decisions,
+  roadmap, specs), `.afol/pstr/**` (structure maps), `.afol/wb/**` (workbench)
+- Primary command runtime: `afol` (Bun/TypeScript implementation at `cli/**`)
+- Retained static metadata: `.agents/config.json`, `.agents/lock.json`,
+  `.agents/manifest.json`, `.agents/rules/`, `.agents/source/`
 - Additional docs-facing adapter behavior documented through repository mirrors
   and local runtime surfaces where configured
 

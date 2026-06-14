@@ -11,15 +11,15 @@ updated_at: "2026-06-12T17:47:40-03:00"
 
 ## 1) Mission
 
-This repository ships the canonical `.agents` scaffold factory and the
-Bun/TypeScript-first universal CLI that operates it.
+This repository ships the `afol` CLI and the Bun/TypeScript-first
+implementation under `cli/**` that operates it.
 
 The architecture is split deliberately:
 
 - Universal CLI owns reusable behavior.
 - Project template owns local state and policy.
-- Factory `.agents/` runtime is development infrastructure, not downstream
-  template payload.
+- Factory runtime is development infrastructure, not downstream template
+  payload.
 
 ## 2) Principles
 
@@ -46,8 +46,9 @@ In scope:
 - `.afol/pstr/**`: target project-structure map surface for how the project is
   organized today. It stores maps only, not scripts, tasks, automations, specs,
   roadmaps, or future-state governance.
-- `.agents/**`: factory workbench, rules, skills, validation, and legacy
-  compatibility surfaces during migration.
+- `.agents/**`: retained static metadata only — `config.json`, `lock.json`,
+  `manifest.json`, `rules/`, `source/`. Factory workbench, skills, and
+  validation have moved to `.afol/**`.
 
 Out of scope:
 
@@ -66,8 +67,10 @@ Modules:
   execution.
 - Template baseline at `src/project-template/**`: config, lock, manifest,
   rules, skills, workbench baseline, docs, and local governance state.
-- Factory runtime at `.agents/**`: project-local development workbench,
-  compatibility wrappers, runtime experiments, validation scripts, and skills.
+- Factory runtime: development-only compatibility surfaces retained under
+  `.agents/` as static metadata (`config.json`, `lock.json`, `manifest.json`,
+  `rules/`, `source/`). Active workbench, skills, validation, and experiments
+  live under `.afol/**`.
 - Goal-state docs at `docs/arc/**`: roadmap, specs, decisions, architecture,
   and execution plans. This remains canonical until `.afol/adm/**` migration is
   implemented and validated.
@@ -139,9 +142,9 @@ Forbidden dependencies:
   `.afol/state/afol.db`.
 - `.afol/wb/` -> governed session execution: plan/task/log/evidence files for
   active and closed AFOL sessions.
-- `.agents/scripts/`, `.agents/runtime/`, `.agents/agents` -> factory-only
-  compatibility surfaces during migration.
-- `.agents/skills/` -> project-local skills.
+- `.agents/scripts/`, `.agents/runtime/`, `.agents/agents` -> RETIRED
+  (discontinued, not present in repository).
+- `.afol/skills/**` -> project-local AFOL-owned skills.
 - `docs/arc/` -> current transitional roadmap, specs, architecture, decisions,
   and execution plans until `.afol/adm` migration lands.
 - `docs/map/` -> legacy/transitional current-state map evidence; do not
