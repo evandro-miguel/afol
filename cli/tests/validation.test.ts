@@ -506,12 +506,14 @@ describe("validation command family", () => {
 		expect(first.pass).toBe(true);
 	});
 
-	test("v bench runs update-safety pack with complete baseline coverage", () => {
+	test("v bench runs update-safety pack with compact update envelopes", () => {
 		const proc = runKernel(["v", "bench", "--pack", "update-safety", "--json"]);
 		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
 		expect(payload.mode).toBe("benchmark");
 		expect(payload.result_count).toBe(4);
+		expect(payload.status).toBe("passed");
+		expect(payload.pass).toBe(true);
 		expect(payload.summary).toEqual({
 			total: 4,
 			passed: 4,
@@ -524,9 +526,7 @@ describe("validation command family", () => {
 		expect(results.every((entry) => entry.pack_id === "update-safety")).toBe(
 			true,
 		);
-		expect(results.some((entry) => entry.status === "baseline-missing")).toBe(
-			false,
-		);
+		expect(results.some((entry) => entry.status === "failed")).toBe(false);
 	});
 
 	test("v bench runs mutation-safety pack with complete baseline coverage", () => {

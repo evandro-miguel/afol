@@ -2,7 +2,6 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
 	envelopeOk,
-	envelopeWithLegacyKeys,
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
@@ -16,6 +15,7 @@ import {
 import {
 	checkTemplateUpdate,
 	formatUpdateCheck,
+	type OwnershipCounts,
 	type UpdateCheckResult,
 	type UpdateOperation,
 } from "../services/update/check";
@@ -33,9 +33,32 @@ const DEFAULT_IO: CommandIo = {
 
 type UpdateSubcommand = "check" | "preview" | "apply";
 
+type UpdateChangeSummary = {
+	total: number;
+	create: number;
+	update: number;
+	conflict: number;
+	preserve: number;
+	paths: string[];
+	conflictPaths: string[];
+};
+
+type UpdateCheckJsonSummary = {
+	hasSource: boolean;
+	currentRevision: string;
+	sourceRevision: string;
+	upToDate: boolean;
+	changes: UpdateChangeSummary;
+	ownershipSource: OwnershipCounts;
+	ownershipCurrent: OwnershipCounts;
+};
+
+type UpdateJsonData = UpdateCheckResult | UpdateCheckJsonSummary;
+
 type ParsedUpdateArgs = {
 	dryRun: boolean;
 	json: boolean;
+	verbose: boolean;
 	session: string;
 	taskId: string;
 	reason: string;
@@ -62,6 +85,7 @@ function parseUpdateArgs(values: string[]): ParsedUpdateArgs {
 	const parsed: ParsedUpdateArgs = {
 		dryRun: false,
 		json: false,
+		verbose: false,
 		session: "",
 		taskId: "",
 		reason: "",
@@ -71,6 +95,10 @@ function parseUpdateArgs(values: string[]): ParsedUpdateArgs {
 		const value = values[index];
 		if (value === "--json" || value === "-j") {
 			parsed.json = true;
+			continue;
+		}
+		if (value === "--verbose" || value === "-v") {
+			parsed.verbose = true;
 			continue;
 		}
 		if (value === "--dry-run") {
@@ -144,7 +172,7 @@ type StagedUpdateOperation = {
 	record: MutationRecord;
 };
 
-function resultEnvelope<T extends Record<string, unknown>>(
+function resultEnvelope<T extends object>(
 	data: T,
 	action: string,
 	exitCode: number,
@@ -157,7 +185,60 @@ function resultEnvelope<T extends Record<string, unknown>>(
 				action,
 				exit_code: exitCode,
 				data,
-			};
+		  };
+}
+
+function summarizeUpdateChanges(result: UpdateCheckResult): UpdateChangeSummary {
+	const counts: UpdateChangeSummary = {
+		total: 0,
+		create: 0,
+		update: 0,
+		conflict: 0,
+		preserve: 0,
+		paths: [],
+		conflictPaths: [],
+	};
+
+	for (const operation of result.operations) {
+		if (operation.kind === "skip-identical") {
+			continue;
+		}
+		counts.total += 1;
+		counts.paths.push(operation.path);
+		if (operation.kind === "create") {
+			counts.create += 1;
+			continue;
+		}
+		if (operation.kind === "update-managed") {
+			counts.update += 1;
+			continue;
+		}
+		if (operation.kind === "preserve-project-owned") {
+			counts.preserve += 1;
+			continue;
+		}
+		if (operation.kind === "conflict") {
+			counts.conflict += 1;
+			counts.conflictPaths.push(operation.path);
+		}
+	}
+
+	return counts;
+}
+
+function jsonResultData(
+	result: UpdateCheckResult,
+	verbose: boolean,
+): UpdateJsonData {
+	return verbose ? result : {
+		hasSource: result.hasSource,
+		currentRevision: result.currentRevision,
+		sourceRevision: result.sourceRevision,
+		upToDate: result.upToDate,
+		changes: summarizeUpdateChanges(result),
+		ownershipSource: result.ownershipSource,
+		ownershipCurrent: result.ownershipCurrent,
+	};
 }
 
 function writeJsonResult(
@@ -165,21 +246,10 @@ function writeJsonResult(
 	action: string,
 	result: UpdateCheckResult,
 	exitCode: number,
+	verbose: boolean,
 ): void {
 	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(resultEnvelope(result, action, exitCode), [
-				"hasSource",
-				"currentRevision",
-				"sourceRevision",
-				"upToDate",
-				"changes",
-				"ownershipSource",
-				"ownershipCurrent",
-				"filePreviews",
-				"operations",
-			]),
-		),
+		stringifyEnvelope(resultEnvelope(jsonResultData(result, verbose), action, exitCode)),
 	);
 }
 
@@ -336,19 +406,19 @@ export async function runUpdateCommand(
 		if (command === "apply") {
 			if (!result.hasSource) {
 				parsedArgs.json
-					? writeJsonResult(io, `update.${command}`, result, 1)
+					? writeJsonResult(io, `update.${command}`, result, 1, parsedArgs.verbose)
 					: io.stdout(formatUpdateCheck(result, command).trimEnd());
 				return 1;
 			}
 			if (blockedCount > 0) {
 				parsedArgs.json
-					? writeJsonResult(io, "update.apply", result, 4)
+					? writeJsonResult(io, "update.apply", result, 4, parsedArgs.verbose)
 					: io.stdout(formatUpdateCheck(result, "apply").trimEnd());
 				return 4;
 			}
 			if (parsedArgs.dryRun) {
 				parsedArgs.json
-					? writeJsonResult(io, "update.apply", result, 0)
+					? writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose)
 					: io.stdout(formatUpdateCheck(result, "apply").trimEnd());
 				return 0;
 			}
@@ -362,18 +432,21 @@ export async function runUpdateCommand(
 				runtime,
 			);
 			parsedArgs.json
-				? writeJsonResult(io, "update.apply", result, 0)
+				? writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose)
 				: io.stdout(formatUpdateCheck(result, command).trimEnd());
 			return 0;
 		}
 
 		parsedArgs.json
-			? writeJsonResult(
-					io,
-					`update.${command}`,
-					result,
-					result.hasSource ? 0 : 1,
-				)
+			? io.stdout(
+					stringifyEnvelope(
+						resultEnvelope(
+							jsonResultData(result, parsedArgs.verbose),
+							`update.${command}`,
+							result.hasSource ? 0 : 1,
+						),
+					),
+				  )
 			: io.stdout(formatUpdateCheck(result, command).trimEnd());
 		return result.hasSource ? 0 : 1;
 	} catch (error) {

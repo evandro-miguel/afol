@@ -94,46 +94,112 @@ describe("update command", () => {
 		}
 	});
 
-	test("preview prints read-only operations and supports ck alias", async () => {
-		const root = mkRoot();
-		try {
-			const preview = capture();
-			expect(await runUpdateCommand(["preview"], root, preview.io)).toBe(0);
-			expect(preview.stdout.join("\n")).toContain("preview operations:");
-			expect(preview.stdout.join("\n")).toContain("diff previews:");
-			expect(preview.stdout.join("\n")).toContain(
-				".agents/lock.json [owner=managed] revision changed",
-			);
-			expect(preview.stdout.join("\n")).toContain("@@");
+		test("preview prints read-only operations and supports ck alias", async () => {
+			const root = mkRoot();
+			try {
+				const preview = capture();
+				expect(await runUpdateCommand(["preview"], root, preview.io)).toBe(0);
+				expect(preview.stdout.join("\n")).toContain("preview operations:");
+				expect(preview.stdout.join("\n")).toContain("diff previews:");
+				expect(preview.stdout.join("\n")).toContain(
+					".agents/lock.json [owner=managed] revision changed",
+				);
+				expect(preview.stdout.join("\n")).toContain("@@");
 
-			const json = capture();
-			expect(await runUpdateCommand(["ck", "--json"], root, json.io)).toBe(0);
-			const parsed = JSON.parse(json.stdout[0] ?? "{}") as {
+				const json = capture();
+				expect(await runUpdateCommand(["ck", "--json"], root, json.io)).toBe(0);
+				const parsed = JSON.parse(json.stdout[0] ?? "{}") as {
+					schema: string;
+					ok: boolean;
+					action?: string;
+					exit_code: number;
+					data?: {
+						hasSource?: boolean;
+						currentRevision?: string;
+						changes?: {
+							total?: number;
+							paths?: string[];
+						};
+						ownershipSource?: Record<string, number>;
+						filePreviews?: unknown[];
+						operations?: unknown[];
+					};
+				};
+				expect(parsed.schema).toBe("afol.result/v1");
+				expect(parsed.ok).toBe(true);
+				expect(parsed.action).toBe("update.check");
+				expect(parsed.exit_code).toBe(0);
+				expect(Object.hasOwn(parsed, "hasSource")).toBe(false);
+				expect(Object.hasOwn(parsed, "filePreviews")).toBe(false);
+				expect(Object.hasOwn(parsed, "operations")).toBe(false);
+				expect(parsed.data).toMatchObject({
+					hasSource: true,
+					currentRevision: "old",
+					changes: {
+						total: expect.any(Number),
+						paths: expect.arrayContaining([".agents/manifest.json"]),
+					},
+				});
+				expect(parsed.data?.ownershipSource?.managed).toBe(0);
+
+			const previewJson = capture();
+			expect(
+				await runUpdateCommand(["preview", "--json"], root, previewJson.io),
+			).toBe(0);
+			const previewParsed = JSON.parse(previewJson.stdout[0] ?? "{}") as {
 				schema: string;
 				ok: boolean;
+				action?: string;
 				exit_code: number;
-				hasSource: boolean;
-				currentRevision: string;
-				ownershipSource: Record<string, number>;
 				data?: {
 					hasSource?: boolean;
-					currentRevision?: string;
-					ownershipSource?: Record<string, number>;
+					changes?: { total?: number; paths?: string[] };
+					filePreviews?: unknown[];
+					operations?: unknown[];
 				};
 			};
-			expect(parsed.schema).toBe("afol.result/v1");
-			expect(parsed.ok).toBe(true);
-			expect(parsed.exit_code).toBe(0);
-			expect(parsed).toMatchObject({ hasSource: true, currentRevision: "old" });
-			expect(parsed.data).toMatchObject({
+				expect(previewParsed.schema).toBe("afol.result/v1");
+				expect(previewParsed.action).toBe("update.preview");
+				expect(Object.hasOwn(previewParsed, "filePreviews")).toBe(false);
+				expect(Object.hasOwn(previewParsed, "operations")).toBe(false);
+				expect(previewParsed.data).toMatchObject({
 				hasSource: true,
-				currentRevision: "old",
-			});
-			expect(parsed.ownershipSource.managed).toBe(0);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
+				changes: {
+					total: expect.any(Number),
+					paths: expect.arrayContaining([".agents/manifest.json"]),
+					},
+				});
+
+			const previewVerboseJson = capture();
+			expect(
+				await runUpdateCommand(
+					["preview", "--json", "--verbose"],
+					root,
+					previewVerboseJson.io,
+				),
+			).toBe(0);
+			const previewVerboseParsed = JSON.parse(
+				previewVerboseJson.stdout[0] ?? "{}",
+			) as {
+				schema: string;
+				ok: boolean;
+				action?: string;
+				exit_code: number;
+				data?: {
+					filePreviews?: unknown[];
+					operations?: unknown[];
+				};
+			};
+			expect(previewVerboseParsed.schema).toBe("afol.result/v1");
+			expect(previewVerboseParsed.action).toBe("update.preview");
+			expect(Object.hasOwn(previewVerboseParsed, "filePreviews")).toBe(false);
+			expect(Object.hasOwn(previewVerboseParsed, "operations")).toBe(false);
+			expect(previewVerboseParsed.data?.filePreviews).toBeDefined();
+			expect(previewVerboseParsed.data?.operations).toBeDefined();
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
 
 	test("apply dry-run reflects operations and does not write files", async () => {
 		const root = mkRoot();
