@@ -296,6 +296,32 @@ describe("local-state project indexer", () => {
 		}
 	});
 
+	test("files index excludes generated version source", () => {
+		const root = buildFixture();
+		try {
+			const generatedDir = join(root, "cli", "generated");
+			mkdirSync(generatedDir, { recursive: true });
+			const templatePath = join(generatedDir, "template.ts");
+			const versionPath = join(generatedDir, "version.ts");
+			writeFileSync(templatePath, "template", "utf8");
+			writeFileSync(versionPath, "version", "utf8");
+
+			const snapshot = rebuildFilesIndex(root);
+			expect(
+				snapshot.files.some((entry) => entry.path === "cli/generated/template.ts"),
+			).toBe(true);
+			expect(
+				snapshot.files.some((entry) => entry.path === "cli/generated/version.ts"),
+			).toBe(false);
+
+			const future = new Date(Date.now() + 60_000);
+			utimesSync(versionPath, future, future);
+			expect(validateFilesIndex(root).ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("skills index has deterministic names and freshness check", () => {
 		const root = buildFixture();
 		try {
