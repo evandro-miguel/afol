@@ -208,6 +208,17 @@ interface ScenarioExecutionResult {
 	passed: boolean;
 }
 
+function scenarioSamplePassed(
+	sample: ScenarioSampleRun,
+	expectedExit: number | undefined,
+): boolean {
+	return (
+		sample.exit_code === (expectedExit ?? 0) &&
+		!sample.signal &&
+		!sample.spawn_error
+	);
+}
+
 function parseValidationCommandReport(
 	stdout: string | undefined,
 ): ValidationCommandReport {
@@ -453,14 +464,13 @@ function runScenarioSample(
 
 export function runScenarioCommand(
 	projectRoot: string,
-	scenario: Pick<Scenario, "command" | "pack_id" | "scenario_id"> & {
-		command?: string;
-	},
+	scenario: Pick<Scenario, "command" | "expected_exit" | "pack_id" | "scenario_id">,
 ): ScenarioExecutionResult {
 	const command = typeof scenario.command === "string" ? scenario.command.trim() : "";
 	if (command.length === 0) {
 		throw new Error("Scenario command is required for execution");
 	}
+	const expectedExit = scenario.expected_exit;
 	console.error(`bench: running ${scenario.pack_id}/${scenario.scenario_id} ...`);
 	const invocation = resolveScenarioInvocation(projectRoot, command);
 	const gitStatusBefore = gitStatusPorcelain(projectRoot);
@@ -469,7 +479,7 @@ export function runScenarioCommand(
 		warmup = runScenarioSample(projectRoot, invocation);
 	}
 	const warmupNotes: string[] = [];
-	if (warmup.exit_code !== 0 || warmup.signal || warmup.spawn_error) {
+	if (!scenarioSamplePassed(warmup, expectedExit)) {
 		warmupNotes.push(
 			`warmup-failed:exit=${warmup.exit_code ?? "null"}:stderr=${outputTail((warmup.spawn_error ?? warmup.stderr) || warmup.stdout)}`,
 		);
@@ -492,7 +502,7 @@ export function runScenarioCommand(
 		cleanupGitStatusDiff(projectRoot, gitStatusBefore.output, gitStatusAfter.output);
 	}
 	const sampleFailureNotes = samples.flatMap((sample, index) => {
-		if (sample.exit_code === 0 && !sample.signal && !sample.spawn_error) {
+		if (scenarioSamplePassed(sample, expectedExit)) {
 			return [];
 		}
 		return [
@@ -508,7 +518,7 @@ export function runScenarioCommand(
 		? Buffer.byteLength(representativeSample.stdout, "utf8")
 		: 0;
 	const successfulSamples = samples.filter(
-		(sample) => sample.exit_code === 0 && !sample.signal && !sample.spawn_error,
+		(sample) => scenarioSamplePassed(sample, expectedExit),
 	).length;
 	const errorCount = samples.length - successfulSamples;
 	const metrics: ScenarioExecutionMetrics = {
@@ -532,9 +542,13 @@ export function runScenarioCommand(
 		errorCount === 0 &&
 		gitStatusBefore.ok &&
 		gitStatusAfter.ok;
+	const executionNotes = [...warmupNotes, ...sampleFailureNotes, ...sideEffectNotes];
+	if (passed && typeof expectedExit === "number") {
+		executionNotes.push(`expected-exit-honored:${expectedExit}`);
+	}
 	return {
 		metrics,
-		notes: [...warmupNotes, ...sampleFailureNotes, ...sideEffectNotes],
+		notes: executionNotes,
 		passed,
 	};
 }

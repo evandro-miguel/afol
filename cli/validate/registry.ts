@@ -57,6 +57,13 @@ function parseScenario(
 			`${sourcePath}.deterministic_metrics`,
 		),
 	};
+	const expectedExit = asOptionalNumber(
+		data.expected_exit,
+		`${sourcePath}.expected_exit`,
+	);
+	if (expectedExit !== undefined) {
+		scenario.expected_exit = expectedExit;
+	}
 	if (typeof data.implementation_status === "string") {
 		if (
 			data.implementation_status === "implemented" ||

@@ -568,6 +568,19 @@ describe("scenario benchmark execution", () => {
 			expect(success.result.tool_success_rate).toBe(1);
 			expect(success.result.error_count).toBe(0);
 
+			const expectedExitScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-expected-exit",
+				command: "afol __nonexistent__",
+				expected_exit: 2,
+			};
+			const expectedExit = withCapturedConsoleError(() =>
+				buildResult(root, expectedExitScenario, baselinePath, baseline),
+			);
+			expect(expectedExit.result.status).toBe("passed");
+			expect(expectedExit.result.tool_success_rate).toBe(1);
+			expect(expectedExit.result.error_count).toBe(0);
+
 			const failureScenario: Scenario = {
 				...successScenario,
 				scenario_id: "bench-failure",
