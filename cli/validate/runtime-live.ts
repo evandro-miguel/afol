@@ -389,64 +389,57 @@ function runtimeLiveDirectEvidenceNote(
 	return `${reason}:${scenario.scenario_id}:${mappedId};artifact:${evidence.savedResultPathRelative};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`;
 }
 
-export function buildRuntimeLiveAgentResults(
+interface RuntimeLiveScenarioOutcome {
+	result: BenchmarkResult;
+	matchedDirectEvidence: boolean;
+	incompleteArtifact: boolean;
+}
+
+function buildRuntimeLiveScenarioResult(
 	projectRoot: string,
-	scenarios: Scenario[],
+	scenario: Scenario,
 	baselinePath: string,
-): RuntimeLiveAgentResults {
-	let evidence: RuntimeLiveEvidence;
-	try {
-		evidence = loadRuntimeLiveEvidence(projectRoot);
-	} catch (error) {
-		const note = (error as Error).message;
+	evidence: RuntimeLiveEvidence,
+	liveById: Map<string, LiveRunnerScenarioResult>,
+	usedLiveScenarioIds: Set<string>,
+): RuntimeLiveScenarioOutcome {
+	const mappingId = scenario.live_runner_scenario_id;
+	if (!mappingId) {
 		return {
-			results: scenarios.map((scenario) =>
-				failedRuntimeLiveResult(projectRoot, scenario, baselinePath, note),
+			result: failedRuntimeLiveResult(
+				projectRoot,
+				scenario,
+				baselinePath,
+				runtimeLiveDirectEvidenceNote(
+					evidence,
+					scenario,
+					"runtime-live-direct-evidence-missing",
+				),
 			),
-			notes: [note],
+			matchedDirectEvidence: false,
+			incompleteArtifact: true,
 		};
 	}
-
-	const liveById = new Map<string, LiveRunnerScenarioResult>();
-	for (const liveScenario of evidence.payload.scenarios) {
-		liveById.set(liveScenario.id, liveScenario);
+	const mappedScenario = liveById.get(mappingId);
+	if (!mappedScenario) {
+		return {
+			result: failedRuntimeLiveResult(
+				projectRoot,
+				scenario,
+				baselinePath,
+				runtimeLiveDirectEvidenceNote(
+					evidence,
+					scenario,
+					"runtime-live-direct-evidence-missing",
+				),
+			),
+			matchedDirectEvidence: false,
+			incompleteArtifact: true,
+		};
 	}
-	const usedLiveScenarioIds = new Set<string>();
-	let matchedDirectEvidenceCount = 0;
-	let incompleteArtifact = false;
-
-	const results = scenarios.map((scenario) => {
-		const mappingId = scenario.live_runner_scenario_id;
-		if (!mappingId) {
-			incompleteArtifact = true;
-			return failedRuntimeLiveResult(
-				projectRoot,
-				scenario,
-				baselinePath,
-				runtimeLiveDirectEvidenceNote(
-					evidence,
-					scenario,
-					"runtime-live-direct-evidence-missing",
-				),
-			);
-		}
-		const mappedScenario = liveById.get(mappingId);
-		if (!mappedScenario) {
-			incompleteArtifact = true;
-			return failedRuntimeLiveResult(
-				projectRoot,
-				scenario,
-				baselinePath,
-				runtimeLiveDirectEvidenceNote(
-					evidence,
-					scenario,
-					"runtime-live-direct-evidence-missing",
-				),
-			);
-		}
-		if (usedLiveScenarioIds.has(mappedScenario.id)) {
-			incompleteArtifact = true;
-			return failedRuntimeLiveResult(
+	if (usedLiveScenarioIds.has(mappedScenario.id)) {
+		return {
+			result: failedRuntimeLiveResult(
 				projectRoot,
 				scenario,
 				baselinePath,
@@ -455,42 +448,44 @@ export function buildRuntimeLiveAgentResults(
 					scenario,
 					"runtime-live-direct-evidence-reused",
 				),
-			);
-		}
-		usedLiveScenarioIds.add(mappedScenario.id);
-		matchedDirectEvidenceCount += 1;
-		const mappedId = mappedScenario.id;
-		const metrics: Record<string, number> = {
-			duration_ms: mappedScenario.duration_ms,
-			timing_p50_ms: mappedScenario.duration_ms,
-			timing_p95_ms: mappedScenario.duration_ms,
-			error_count: mappedScenario.error_count,
-			retry_count: mappedScenario.retry_count,
-			context_tokens: mappedScenario.input_tokens,
-			prompt_tokens: mappedScenario.input_tokens,
-			output_tokens: mappedScenario.output_tokens,
-			total_tokens: mappedScenario.total_tokens,
-			context_bytes: mappedScenario.context_bytes,
-			output_bytes: mappedScenario.prompt_bytes,
-			tool_call_count: mappedScenario.tool_call_count,
-			tool_success_rate: mappedScenario.tool_success_rate,
+			),
+			matchedDirectEvidence: false,
+			incompleteArtifact: true,
 		};
-		const thresholdNotes = collectThresholdNotes(scenario.thresholds, metrics);
-		const status: BenchmarkResult["status"] =
-			mappedScenario.pass && thresholdNotes.length === 0 ? "passed" : "failed";
-		const notes = [
-			`live-runner-artifact:${evidence.savedResultPathRelative}`,
-			`live-runner-snapshot:${evidence.snapshotPathRelative}`,
-			`live-runner-evidence-source:${evidence.payloadSource}`,
-			`live-runner-scenario:${mappedId}`,
-			`live-runner-generated-at:${evidence.payload.generated_at}`,
-			`live-runner-profile:${evidence.payload.benchmark_profile.model}/${evidence.payload.benchmark_profile.reasoning_effort}`,
-		];
-		if (!mappedScenario.pass) {
-			notes.push("live-runner-scenario-failed");
-		}
-		notes.push(...thresholdNotes);
-		return {
+	}
+	usedLiveScenarioIds.add(mappedScenario.id);
+	const metrics: Record<string, number> = {
+		duration_ms: mappedScenario.duration_ms,
+		timing_p50_ms: mappedScenario.duration_ms,
+		timing_p95_ms: mappedScenario.duration_ms,
+		error_count: mappedScenario.error_count,
+		retry_count: mappedScenario.retry_count,
+		context_tokens: mappedScenario.input_tokens,
+		prompt_tokens: mappedScenario.input_tokens,
+		output_tokens: mappedScenario.output_tokens,
+		total_tokens: mappedScenario.total_tokens,
+		context_bytes: mappedScenario.context_bytes,
+		output_bytes: mappedScenario.prompt_bytes,
+		tool_call_count: mappedScenario.tool_call_count,
+		tool_success_rate: mappedScenario.tool_success_rate,
+	};
+	const thresholdNotes = collectThresholdNotes(scenario.thresholds, metrics);
+	const status: BenchmarkResult["status"] =
+		mappedScenario.pass && thresholdNotes.length === 0 ? "passed" : "failed";
+	const notes = [
+		`live-runner-artifact:${evidence.savedResultPathRelative}`,
+		`live-runner-snapshot:${evidence.snapshotPathRelative}`,
+		`live-runner-evidence-source:${evidence.payloadSource}`,
+		`live-runner-scenario:${mappedScenario.id}`,
+		`live-runner-generated-at:${evidence.payload.generated_at}`,
+		`live-runner-profile:${evidence.payload.benchmark_profile.model}/${evidence.payload.benchmark_profile.reasoning_effort}`,
+	];
+	if (!mappedScenario.pass) {
+		notes.push("live-runner-scenario-failed");
+	}
+	notes.push(...thresholdNotes);
+	return {
+		result: {
 			schema_version: BENCHMARK_RESULT_SCHEMA_VERSION,
 			run_id: `live-runtime-live-agent-${scenario.scenario_id}-${scenario.scenario_version}`,
 			scenario_id: scenario.scenario_id,
@@ -518,7 +513,49 @@ export function buildRuntimeLiveAgentResults(
 			tool_success_rate: metrics.tool_success_rate ?? 0,
 			git_commit: getGitCommit(projectRoot),
 			notes,
+		},
+		matchedDirectEvidence: true,
+		incompleteArtifact: false,
+	};
+}
+
+export function buildRuntimeLiveAgentResults(
+	projectRoot: string,
+	scenarios: Scenario[],
+	baselinePath: string,
+): RuntimeLiveAgentResults {
+	let evidence: RuntimeLiveEvidence;
+	try {
+		evidence = loadRuntimeLiveEvidence(projectRoot);
+	} catch (error) {
+		const note = (error as Error).message;
+		return {
+			results: scenarios.map((scenario) =>
+				failedRuntimeLiveResult(projectRoot, scenario, baselinePath, note),
+			),
+			notes: [note],
 		};
+	}
+
+	const liveById = new Map<string, LiveRunnerScenarioResult>();
+	for (const liveScenario of evidence.payload.scenarios) {
+		liveById.set(liveScenario.id, liveScenario);
+	}
+	const usedLiveScenarioIds = new Set<string>();
+	let matchedDirectEvidenceCount = 0;
+	let incompleteArtifact = false;
+	const results = scenarios.map((scenario) => {
+		const outcome = buildRuntimeLiveScenarioResult(
+			projectRoot,
+			scenario,
+			baselinePath,
+			evidence,
+			liveById,
+			usedLiveScenarioIds,
+		);
+		matchedDirectEvidenceCount += outcome.matchedDirectEvidence ? 1 : 0;
+		incompleteArtifact = incompleteArtifact || outcome.incompleteArtifact;
+		return outcome.result;
 	});
 
 	if (matchedDirectEvidenceCount !== scenarios.length) {
