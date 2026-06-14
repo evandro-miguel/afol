@@ -18,6 +18,95 @@ import {
 	resolveSafePath,
 } from "../shared";
 
+type PatchUndoMutation = MutationRecord & {
+	kind: "patch";
+	backupPath?: string | null | undefined;
+};
+
+function buildUndoPatchDryRunResult(
+	args: CommandArgs,
+	mutation: MutationRecord,
+	projectRoot: string,
+	reason: string,
+): CommandResult {
+	const patchMutation = mutation as PatchUndoMutation;
+	const target = resolveSafePath(projectRoot, patchMutation.sourcePath);
+	const backupPathValue = patchMutation.backupPath ?? "";
+	const before = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
+	const after =
+		backupPathValue && existsSync(backupPathValue)
+			? readTextOrEmpty(backupPathValue)
+			: "";
+	return {
+		command: "ud",
+		status: "dry-run",
+		dry_run: true,
+		session: args.session,
+		task_id: args.taskId,
+		reason,
+		path: patchMutation.sourcePath,
+		destination: patchMutation.sourcePath,
+		target_mutation_id: patchMutation.id,
+		before_hash: before.length > 0 ? normalizeHash(before) : null,
+		after_hash: after.length > 0 ? normalizeHash(after) : null,
+		backup_path: patchMutation.backupPath ?? null,
+		diff_preview: makeDiffPreview(before, after, target.relativePath),
+	};
+}
+
+function applyUndoPatchMutation(
+	args: CommandArgs,
+	mutation: MutationRecord,
+	projectRoot: string,
+	reason: string,
+): CommandResult {
+	const patchMutation = mutation as PatchUndoMutation;
+	const target = resolveSafePath(projectRoot, patchMutation.sourcePath);
+	const backupPathValue = patchMutation.backupPath ?? "";
+	const before = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
+	const beforeHash = before.length > 0 ? normalizeHash(before) : null;
+
+	if (backupPathValue && existsSync(backupPathValue)) {
+		cpSync(backupPathValue, target.path);
+	} else if (existsSync(target.path)) {
+		rmSync(target.path);
+	}
+
+	const after = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
+	const afterHash = after.length > 0 ? normalizeHash(after) : null;
+	const mutationId = createMutationId();
+
+	appendMutationRecord(projectRoot, {
+		id: mutationId,
+		ts: new Date().toISOString(),
+		kind: "undo",
+		status: "applied",
+		dryRun: false,
+		session: args.session,
+		taskId: args.taskId,
+		reason: `undo ${patchMutation.id}`,
+		targetMutationId: patchMutation.id,
+		sourcePath: patchMutation.sourcePath,
+		destinationPath: patchMutation.sourcePath,
+	});
+
+	return {
+		command: "ud",
+		status: "write",
+		dry_run: false,
+		session: args.session,
+		task_id: args.taskId,
+		reason,
+		path: patchMutation.sourcePath,
+		destination: patchMutation.sourcePath,
+		target_mutation_id: patchMutation.id,
+		before_hash: beforeHash,
+		after_hash: afterHash,
+		backup_path: patchMutation.backupPath ?? null,
+		diff_preview: makeDiffPreview(before, after, target.relativePath),
+	};
+}
+
 export function runPatchMutation(
 	args: PatchArgs,
 	projectRoot: string,
@@ -133,74 +222,8 @@ export function undoPatchMutation(
 
 	const reason = args.reason || `undo ${mutation.id}`;
 	if (args.dryRun) {
-		const target = resolveSafePath(projectRoot, mutation.sourcePath);
-		const backupPathValue = mutation.backupPath ?? "";
-		const before = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
-		const after =
-			backupPathValue && existsSync(backupPathValue)
-				? readTextOrEmpty(backupPathValue)
-				: "";
-		return {
-			command: "ud",
-			status: "dry-run",
-			dry_run: true,
-			session: args.session,
-			task_id: args.taskId,
-			reason,
-			path: mutation.sourcePath,
-			destination: mutation.sourcePath,
-			target_mutation_id: mutation.id,
-			before_hash: before.length > 0 ? normalizeHash(before) : null,
-			after_hash: after.length > 0 ? normalizeHash(after) : null,
-			backup_path: mutation.backupPath ?? null,
-			diff_preview: makeDiffPreview(before, after, target.relativePath),
-		};
+		return buildUndoPatchDryRunResult(args, mutation, projectRoot, reason);
 	}
 
-	const target = resolveSafePath(projectRoot, mutation.sourcePath);
-	const backupPathValue = mutation.backupPath ?? "";
-	const before = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
-	const beforeHash = before.length > 0 ? normalizeHash(before) : null;
-
-	if (backupPathValue && existsSync(backupPathValue)) {
-		cpSync(backupPathValue, target.path);
-	} else {
-		if (existsSync(target.path)) {
-			rmSync(target.path);
-		}
-	}
-
-	const after = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
-	const afterHash = after.length > 0 ? normalizeHash(after) : null;
-	const mutationId = createMutationId();
-
-	appendMutationRecord(projectRoot, {
-		id: mutationId,
-		ts: new Date().toISOString(),
-		kind: "undo",
-		status: "applied",
-		dryRun: false,
-		session: args.session,
-		taskId: args.taskId,
-		reason: `undo ${mutation.id}`,
-		targetMutationId: mutation.id,
-		sourcePath: mutation.sourcePath,
-		destinationPath: mutation.sourcePath,
-	});
-
-	return {
-		command: "ud",
-		status: "write",
-		dry_run: false,
-		session: args.session,
-		task_id: args.taskId,
-		reason,
-		path: mutation.sourcePath,
-		destination: mutation.sourcePath,
-		target_mutation_id: mutation.id,
-		before_hash: beforeHash,
-		after_hash: afterHash,
-		backup_path: mutation.backupPath ?? null,
-		diff_preview: makeDiffPreview(before, after, target.relativePath),
-	};
+	return applyUndoPatchMutation(args, mutation, projectRoot, reason);
 }

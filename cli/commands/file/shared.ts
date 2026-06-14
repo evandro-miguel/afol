@@ -54,6 +54,23 @@ export type UndoArgs = CommandArgs & {
 	mutationId?: string | undefined;
 };
 
+export function makeUnsupportedUndoResult(
+	args: Pick<CommandArgs, "dryRun" | "session" | "taskId" | "reason">,
+	target: { id: string; sourcePath: string; kind: string },
+): CommandResult {
+	return {
+		command: "ud",
+		status: "blocked",
+		dry_run: args.dryRun,
+		session: args.session,
+		task_id: args.taskId,
+		reason: args.reason,
+		path: target.sourcePath,
+		target_mutation_id: target.id,
+		message: `Unsupported mutation kind: ${target.kind}`,
+	};
+}
+
 export const DEFAULT_IO: CommandIo = {
 	stdout: (message) => console.log(message),
 	stderr: (message) => console.error(message),

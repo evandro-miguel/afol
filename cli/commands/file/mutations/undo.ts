@@ -2,7 +2,11 @@ import {
 	findLatestSupportedMutation,
 	findMutationById,
 } from "../../../services/mutations/journal";
-import type { CommandResult, UndoArgs } from "../shared";
+import {
+	type CommandResult,
+	makeUnsupportedUndoResult,
+	type UndoArgs,
+} from "../shared";
 import { undoArchiveMutation } from "./archive";
 import { undoMoveMutation } from "./move";
 import { undoPatchMutation } from "./patch";
@@ -38,17 +42,7 @@ export function runUndoMutation(
 		if (target.kind === "move") {
 			return undoMoveMutation(args, target, projectRoot);
 		}
-		return {
-			command: "ud",
-			status: "blocked",
-			dry_run: true,
-			session: args.session,
-			task_id: args.taskId,
-			reason: args.reason,
-			path: target.sourcePath,
-			target_mutation_id: target.id,
-			message: `Unsupported mutation kind: ${target.kind}`,
-		};
+		return makeUnsupportedUndoResult(args, target);
 	}
 
 	if (
@@ -72,15 +66,5 @@ export function runUndoMutation(
 		return undoArchiveMutation(args, target, projectRoot);
 	}
 
-	return {
-		command: "ud",
-		status: "blocked",
-		dry_run: false,
-		session: args.session,
-		task_id: args.taskId,
-		reason: args.reason,
-		path: target.sourcePath,
-		target_mutation_id: target.id,
-		message: `Unsupported mutation kind: ${target.kind}`,
-	};
+	return makeUnsupportedUndoResult(args, target);
 }

@@ -21,6 +21,18 @@ type ParsedArgs = {
 	appendText: string | undefined;
 };
 
+function readFlagValue(
+	values: string[],
+	index: number,
+	flag: string,
+): [string, number] {
+	const next = values[index + 1];
+	if (!next) {
+		throw new Error(`Missing value for ${flag}`);
+	}
+	return [next, index + 1];
+}
+
 function parseGenericArgs(values: string[]): ParsedArgs {
 	let dryRun = false;
 	let json = false;
@@ -38,81 +50,62 @@ function parseGenericArgs(values: string[]): ParsedArgs {
 		if (!value) {
 			continue;
 		}
-		if (value === "--dry-run") {
-			dryRun = true;
-			continue;
-		}
-		if (value === "--json" || value === "-j") {
-			json = true;
-			continue;
-		}
-		if (value === "--session") {
-			const next = values[index + 1];
-			if (!next) {
-				throw new Error("Missing value for --session");
+		switch (value) {
+			case "--dry-run":
+				dryRun = true;
+				break;
+			case "--json":
+			case "-j":
+				json = true;
+				break;
+			case "--session": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				session = next;
+				index = nextIndex;
+				break;
 			}
-			session = next;
-			index += 1;
-			continue;
-		}
-		if (value === "--task-id") {
-			const next = values[index + 1];
-			if (!next) {
-				throw new Error("Missing value for --task-id");
+			case "--task-id": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				taskId = next;
+				index = nextIndex;
+				break;
 			}
-			taskId = next;
-			index += 1;
-			continue;
-		}
-		if (value === "--reason") {
-			const next = values[index + 1];
-			if (!next) {
-				throw new Error("Missing value for --reason");
+			case "--reason": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				reason = next;
+				index = nextIndex;
+				break;
 			}
-			reason = next;
-			index += 1;
-			continue;
-		}
-		if (value === "--path") {
-			const next = values[index + 1];
-			if (!next) {
-				throw new Error("Missing value for --path");
+			case "--path": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				pathArg = next;
+				index = nextIndex;
+				break;
 			}
-			pathArg = next;
-			index += 1;
-			continue;
-		}
-		if (value === "--to") {
-			const next = values[index + 1];
-			if (!next) {
-				throw new Error("Missing value for --to");
+			case "--to": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				destinationArg = next;
+				index = nextIndex;
+				break;
 			}
-			destinationArg = next;
-			index += 1;
-			continue;
-		}
-		if (value === "--id") {
-			const next = values[index + 1];
-			if (!next) {
-				throw new Error("Missing value for --id");
+			case "--id": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				mutationId = next;
+				index = nextIndex;
+				break;
 			}
-			mutationId = next;
-			index += 1;
-			continue;
-		}
-		if (value === "--append") {
-			const next = values[index + 1];
-			if (!next) {
-				throw new Error("Missing value for --append");
+			case "--append": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				appendText = `${appendText ?? ""}${next}`;
+				index = nextIndex;
+				break;
 			}
-			appendText = `${appendText ?? ""}${next}`;
-			index += 1;
-			continue;
+			default:
+				if (value.startsWith("-")) {
+					throw new Error(`Unknown file argument ${value}`);
+				}
+				positional.push(value);
 		}
-		if (value.startsWith("-")) {
-			throw new Error(`Unknown file argument ${value}`);
-		}
-		positional.push(value);
 	}
 
 	return {

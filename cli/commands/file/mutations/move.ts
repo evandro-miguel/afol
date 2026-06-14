@@ -23,6 +23,165 @@ import {
 	resolveSafePath,
 } from "../shared";
 
+type MoveUndoMutation = MutationRecord & {
+	kind: "move";
+	sourcePath: string;
+	destinationPath: string;
+	overwrittenBackupPath?: string | null | undefined;
+};
+
+function buildUndoMoveDryRunResult(
+	args: { dryRun: boolean; session: string; taskId: string; reason: string },
+	mutation: MutationRecord,
+	projectRoot: string,
+	reason: string,
+): CommandResult {
+	const moveMutation = mutation as MoveUndoMutation;
+	const source = resolveSafePath(projectRoot, moveMutation.sourcePath);
+	const destination = resolveSafePath(
+		projectRoot,
+		moveMutation.destinationPath,
+	);
+	const beforeSource = existsSync(source.path)
+		? readTextOrEmpty(source.path)
+		: "";
+	const beforeDestination = existsSync(destination.path)
+		? readTextOrEmpty(destination.path)
+		: "";
+	const afterSource = existsSync(destination.path)
+		? readTextOrEmpty(destination.path)
+		: "";
+	const afterDestination =
+		moveMutation.overwrittenBackupPath &&
+		existsSync(moveMutation.overwrittenBackupPath)
+			? readTextOrEmpty(moveMutation.overwrittenBackupPath)
+			: "";
+
+	return {
+		command: "ud",
+		status: "dry-run",
+		dry_run: true,
+		session: args.session,
+		task_id: args.taskId,
+		reason,
+		path: moveMutation.sourcePath,
+		destination: moveMutation.destinationPath,
+		target_mutation_id: moveMutation.id,
+		before_hash: beforeSource.length > 0 ? normalizeHash(beforeSource) : null,
+		after_hash: afterSource.length > 0 ? normalizeHash(afterSource) : null,
+		diff_preview: makeDiffPreview(
+			beforeDestination,
+			afterDestination,
+			moveMutation.destinationPath,
+		),
+	};
+}
+
+function applyUndoMoveMutation(
+	args: { dryRun: boolean; session: string; taskId: string; reason: string },
+	mutation: MutationRecord,
+	projectRoot: string,
+	reason: string,
+): CommandResult {
+	const moveMutation = mutation as MoveUndoMutation;
+	const source = resolveSafePath(projectRoot, moveMutation.sourcePath);
+	const destination = resolveSafePath(
+		projectRoot,
+		moveMutation.destinationPath,
+	);
+
+	const beforeSource = existsSync(source.path)
+		? readTextOrEmpty(source.path)
+		: "";
+	const beforeDestination = existsSync(destination.path)
+		? readTextOrEmpty(destination.path)
+		: "";
+	const beforeSourceHash =
+		beforeSource.length > 0 ? normalizeHash(beforeSource) : null;
+
+	if (existsSync(source.path)) {
+		return {
+			command: "ud",
+			status: "blocked",
+			dry_run: false,
+			session: args.session,
+			task_id: args.taskId,
+			reason,
+			path: moveMutation.sourcePath,
+			destination: moveMutation.destinationPath,
+			target_mutation_id: moveMutation.id,
+			message: `Undo blocked: source already exists: ${moveMutation.sourcePath}`,
+		};
+	}
+
+	if (!existsSync(destination.path)) {
+		return {
+			command: "ud",
+			status: "blocked",
+			dry_run: false,
+			session: args.session,
+			task_id: args.taskId,
+			reason,
+			path: moveMutation.sourcePath,
+			destination: moveMutation.destinationPath,
+			target_mutation_id: moveMutation.id,
+			message: `Undo blocked: destination missing for ${moveMutation.destinationPath}`,
+		};
+	}
+
+	mkdirSync(dirname(source.path), { recursive: true });
+	renameSync(destination.path, source.path);
+
+	if (
+		moveMutation.overwrittenBackupPath &&
+		existsSync(moveMutation.overwrittenBackupPath)
+	) {
+		mkdirSync(dirname(destination.path), { recursive: true });
+		cpSync(moveMutation.overwrittenBackupPath, destination.path);
+	}
+
+	const afterSource = existsSync(source.path)
+		? readTextOrEmpty(source.path)
+		: "";
+	const afterDestination = existsSync(destination.path)
+		? readTextOrEmpty(destination.path)
+		: "";
+	const mutationId = createMutationId();
+
+	appendMutationRecord(projectRoot, {
+		id: mutationId,
+		ts: new Date().toISOString(),
+		kind: "undo",
+		status: "applied",
+		dryRun: false,
+		session: args.session,
+		taskId: args.taskId,
+		reason: `undo ${moveMutation.id}`,
+		targetMutationId: moveMutation.id,
+		sourcePath: moveMutation.sourcePath,
+		destinationPath: moveMutation.destinationPath,
+	});
+
+	return {
+		command: "ud",
+		status: "write",
+		dry_run: false,
+		session: args.session,
+		task_id: args.taskId,
+		reason,
+		path: moveMutation.sourcePath,
+		destination: moveMutation.destinationPath,
+		target_mutation_id: moveMutation.id,
+		before_hash: beforeSourceHash,
+		after_hash: afterSource.length > 0 ? normalizeHash(afterSource) : null,
+		diff_preview: makeDiffPreview(
+			beforeDestination,
+			afterDestination,
+			moveMutation.destinationPath,
+		),
+	};
+}
+
 export function runMoveMutation(
 	args: MoveArgs,
 	projectRoot: string,
@@ -137,134 +296,8 @@ export function undoMoveMutation(
 
 	const reason = args.reason || `undo ${mutation.id}`;
 	if (args.dryRun) {
-		const source = resolveSafePath(projectRoot, mutation.sourcePath);
-		const destination = resolveSafePath(projectRoot, mutation.destinationPath);
-		const beforeSource = existsSync(source.path)
-			? readTextOrEmpty(source.path)
-			: "";
-		const beforeDestination = existsSync(destination.path)
-			? readTextOrEmpty(destination.path)
-			: "";
-		const afterSource = existsSync(destination.path)
-			? readTextOrEmpty(destination.path)
-			: "";
-		const afterDestination =
-			mutation.overwrittenBackupPath &&
-			existsSync(mutation.overwrittenBackupPath)
-				? readTextOrEmpty(mutation.overwrittenBackupPath)
-				: "";
-
-		return {
-			command: "ud",
-			status: "dry-run",
-			dry_run: true,
-			session: args.session,
-			task_id: args.taskId,
-			reason,
-			path: mutation.sourcePath,
-			destination: mutation.destinationPath,
-			target_mutation_id: mutation.id,
-			before_hash: beforeSource.length > 0 ? normalizeHash(beforeSource) : null,
-			after_hash: afterSource.length > 0 ? normalizeHash(afterSource) : null,
-			diff_preview: makeDiffPreview(
-				beforeDestination,
-				afterDestination,
-				mutation.destinationPath,
-			),
-		};
+		return buildUndoMoveDryRunResult(args, mutation, projectRoot, reason);
 	}
 
-	const source = resolveSafePath(projectRoot, mutation.sourcePath);
-	const destination = resolveSafePath(projectRoot, mutation.destinationPath);
-
-	const beforeSource = existsSync(source.path)
-		? readTextOrEmpty(source.path)
-		: "";
-	const beforeDestination = existsSync(destination.path)
-		? readTextOrEmpty(destination.path)
-		: "";
-	const beforeSourceHash =
-		beforeSource.length > 0 ? normalizeHash(beforeSource) : null;
-
-	if (existsSync(source.path)) {
-		return {
-			command: "ud",
-			status: "blocked",
-			dry_run: false,
-			session: args.session,
-			task_id: args.taskId,
-			reason,
-			path: mutation.sourcePath,
-			destination: mutation.destinationPath,
-			target_mutation_id: mutation.id,
-			message: `Undo blocked: source already exists: ${mutation.sourcePath}`,
-		};
-	}
-
-	if (existsSync(destination.path)) {
-		mkdirSync(dirname(source.path), { recursive: true });
-		renameSync(destination.path, source.path);
-	} else {
-		return {
-			command: "ud",
-			status: "blocked",
-			dry_run: false,
-			session: args.session,
-			task_id: args.taskId,
-			reason,
-			path: mutation.sourcePath,
-			destination: mutation.destinationPath,
-			target_mutation_id: mutation.id,
-			message: `Undo blocked: destination missing for ${mutation.destinationPath}`,
-		};
-	}
-
-	if (
-		mutation.overwrittenBackupPath &&
-		existsSync(mutation.overwrittenBackupPath)
-	) {
-		mkdirSync(dirname(destination.path), { recursive: true });
-		cpSync(mutation.overwrittenBackupPath, destination.path);
-	}
-
-	const afterSource = existsSync(source.path)
-		? readTextOrEmpty(source.path)
-		: "";
-	const afterDestination = existsSync(destination.path)
-		? readTextOrEmpty(destination.path)
-		: "";
-	const mutationId = createMutationId();
-
-	appendMutationRecord(projectRoot, {
-		id: mutationId,
-		ts: new Date().toISOString(),
-		kind: "undo",
-		status: "applied",
-		dryRun: false,
-		session: args.session,
-		taskId: args.taskId,
-		reason: `undo ${mutation.id}`,
-		targetMutationId: mutation.id,
-		sourcePath: mutation.sourcePath,
-		destinationPath: mutation.destinationPath,
-	});
-
-	return {
-		command: "ud",
-		status: "write",
-		dry_run: false,
-		session: args.session,
-		task_id: args.taskId,
-		reason,
-		path: mutation.sourcePath,
-		destination: mutation.destinationPath,
-		target_mutation_id: mutation.id,
-		before_hash: beforeSourceHash,
-		after_hash: afterSource.length > 0 ? normalizeHash(afterSource) : null,
-		diff_preview: makeDiffPreview(
-			beforeDestination,
-			afterDestination,
-			mutation.destinationPath,
-		),
-	};
+	return applyUndoMoveMutation(args, mutation, projectRoot, reason);
 }
