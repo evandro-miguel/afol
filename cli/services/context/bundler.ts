@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveRules } from "../catalog/rules";
 import { listSkills, searchSkills } from "../catalog/skills";
-import { searchLibrary } from "../library";
+import { buildLibraryGraph, searchLibrary } from "../library";
 import { recallEntries } from "../memory";
 import { resolveProjectPaths } from "../project/paths";
 import { getPstrIndex, validatePstrIndex } from "../pstr";
@@ -296,13 +296,23 @@ function selectLibraryRefs(
 	if (!query) {
 		return [];
 	}
-	return searchLibrary(root, query)
+	const matches = searchLibrary(root, query);
+	const claimRefs = matches
 		.flatMap((result) =>
 			result.matching_claims.map(
 				(claim) => `library:${result.topic.slug}#${claim.id}`,
 			),
 		)
 		.slice(0, 3);
+	const matchedSlugs = new Set(matches.map((result) => result.topic.slug));
+	const matchedTopics = new Set(
+		matches.map((result) => `library:${result.topic.slug}`),
+	);
+	const graphRefs = buildLibraryGraph(root, { slugs: matchedSlugs })
+		.edges.filter((edge) => matchedTopics.has(edge.from))
+		.slice(0, Math.max(0, 3 - claimRefs.length))
+		.map((edge) => `library-graph:${edge.from}->${edge.to}[${edge.type}]`);
+	return [...claimRefs, ...graphRefs].slice(0, 3);
 }
 
 function doNotLoadList(): string[] {

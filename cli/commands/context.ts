@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import {
 	envelopeErr,
 	envelopeOk,
@@ -11,6 +13,11 @@ import {
 } from "../services/context";
 import { ContextTrustError } from "../services/context/bundler";
 import type { ContextRetrievalMode } from "../services/context/types";
+import { checkHealth } from "../services/health";
+import { listTopics } from "../services/library";
+import { readMemory } from "../services/memory";
+import { resolveProjectPaths } from "../services/project/paths";
+import { checkPstrStale, validatePstrIndex } from "../services/pstr";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -155,7 +162,40 @@ function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
 	].join("\n");
 }
 
-function formatExplanation(bundle: ReturnType<typeof buildContextBundle>) {
+function memoryFreshness(root: string): "fresh" | "stale" | "missing" {
+	const memory = readMemory(root);
+	if (!memory) return "missing";
+	const updated = Date.parse(memory.updated_at);
+	if (!Number.isFinite(updated)) return "stale";
+	return Date.now() - updated > 30 * 24 * 60 * 60 * 1000 ? "stale" : "fresh";
+}
+
+function pstrFreshness(root: string): "fresh" | "stale" | "missing" {
+	const validation = validatePstrIndex(root);
+	if (!validation.ok) {
+		return existsSync(join(resolveProjectPaths(root).abs.pstrDir, "index.json"))
+			? "stale"
+			: "missing";
+	}
+	return checkPstrStale(root).some((entry) => entry.stale) ? "stale" : "fresh";
+}
+
+function libraryFreshness(root: string): "fresh" | "stale" | "missing" {
+	if (!existsSync(resolveProjectPaths(root).abs.libraryDir)) return "missing";
+	return listTopics(root).some((slug) => slug.trim()) ? "fresh" : "missing";
+}
+
+function formatExplanation(
+	root: string,
+	bundle: ReturnType<typeof buildContextBundle>,
+) {
+	const healthFindings = checkHealth(root, { deep: false }).findings.filter(
+		(finding) => finding.severity === "fail" || finding.severity === "warn",
+	);
+	const relevantAreas = new Set(["pstr", "memory", "library", "state"]);
+	const relevantHealth = healthFindings.filter((finding) =>
+		relevantAreas.has(finding.area),
+	);
 	const evidenceTags = Array.from(
 		new Set([
 			...bundle.refs.map((ref) => ref.domain),
@@ -177,11 +217,16 @@ function formatExplanation(bundle: ReturnType<typeof buildContextBundle>) {
 			],
 			excluded: bundle.do_not_load,
 		},
-		gaps: bundle.gaps,
+		gaps: [...bundle.gaps],
+		project_health: relevantHealth.map((finding) => {
+			const rootPattern = root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+			const msg = finding.message.replace(new RegExp(rootPattern, "g"), ".");
+			return `${finding.area}: ${msg}`;
+		}),
 		freshness: {
-			pstr: bundle.pstr_refs.length > 0 ? "fresh" : "missing",
-			memory: bundle.memory_refs.length > 0 ? "fresh" : "missing",
-			library: bundle.library_refs.length > 0 ? "fresh" : "missing",
+			pstr: pstrFreshness(root),
+			memory: memoryFreshness(root),
+			library: libraryFreshness(root),
 			state: bundle.gaps.includes("no hydrated session state")
 				? "missing"
 				: "fresh",
@@ -313,7 +358,7 @@ export async function runContextCommand(
 
 		if (ctxAction === "bundle") {
 			if (parsed.explain) {
-				const explanation = formatExplanation(bundle);
+				const explanation = formatExplanation(projectRoot, bundle);
 				if (parsed.json) {
 					writeJsonOk(io, ctxAction, explanation);
 				} else {
@@ -330,7 +375,7 @@ export async function runContextCommand(
 		}
 
 		if (ctxAction === "explain") {
-			const explanation = formatExplanation(bundle);
+			const explanation = formatExplanation(projectRoot, bundle);
 			if (parsed.json) {
 				writeJsonOk(io, ctxAction, explanation);
 			} else {

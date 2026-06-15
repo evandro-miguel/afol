@@ -1,4 +1,9 @@
 import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
+import {
 	parseArchiveArgs,
 	parseMoveArgs,
 	parsePatchArgs,
@@ -23,6 +28,7 @@ export async function runFileCommand(
 	args: string[],
 	projectRoot: string,
 	io: CommandIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
 		const [rawCommand, ...rest] = args;
@@ -38,6 +44,10 @@ export async function runFileCommand(
 				parsePatchArgs(rest),
 				projectRoot,
 			);
+			// Restricted callers may inspect dry-run mutation plans, but real writes require local approval.
+			if (!parsed.dryRun && requiresApproval(ctx)) {
+				throw new Error("file patch requires local interactive approval");
+			}
 			asJson = parsed.json;
 			result = runPatchMutation(parsed, projectRoot);
 		} else if (rawCommand === "mv" || rawCommand === "move") {
@@ -45,10 +55,16 @@ export async function runFileCommand(
 				parseMoveArgs(rest),
 				projectRoot,
 			);
+			if (!parsed.dryRun && requiresApproval(ctx)) {
+				throw new Error("file move requires local interactive approval");
+			}
 			asJson = parsed.json;
 			result = runMoveMutation(parsed, projectRoot);
 		} else if (rawCommand === "ud" || rawCommand === "undo") {
 			const parsed = parseUndoArgs(rest);
+			if (!parsed.dryRun && requiresApproval(ctx)) {
+				throw new Error("file undo requires local interactive approval");
+			}
 			asJson = parsed.json;
 			if (!parsed.dryRun) {
 				requireWriteContext(parsed);
@@ -59,6 +75,9 @@ export async function runFileCommand(
 				parseArchiveArgs(rest),
 				projectRoot,
 			);
+			if (!parsed.dryRun && requiresApproval(ctx)) {
+				throw new Error("file archive requires local interactive approval");
+			}
 			asJson = parsed.json;
 			result = runArchiveMutation(parsed, projectRoot);
 		} else {

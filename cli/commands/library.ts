@@ -4,10 +4,17 @@ import {
 	envelopeWithLegacyKeys,
 	stringifyEnvelope,
 } from "../core/envelope";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
+import { checkAreaHealth, runDoctor } from "../services/health";
 import type { LibraryClaim, LibrarySource } from "../services/library";
 import {
 	addClaim,
 	addSource,
+	buildLibraryGraph,
 	getTopic,
 	invalidateClaim,
 	listTopics,
@@ -64,7 +71,10 @@ type LibraryAction =
 	| "add-claim"
 	| "invalidate"
 	| "search"
-	| "rebuild-index";
+	| "rebuild-index"
+	| "graph"
+	| "health"
+	| "doctor";
 
 type ParsedArgs = {
 	json: boolean;
@@ -102,6 +112,15 @@ function normalizeAction(value: string | undefined): LibraryAction {
 	}
 	if (value === "rebuild-index") {
 		return "rebuild-index";
+	}
+	if (value === "graph") {
+		return "graph";
+	}
+	if (value === "health") {
+		return "health";
+	}
+	if (value === "doctor") {
+		return "doctor";
 	}
 	throw new Error(`Unknown library action: ${value}`);
 }
@@ -235,16 +254,37 @@ function formatClaim(claim: LibraryClaim): string {
 	return `${claim.id} [${claim.status}] ${claim.text}`;
 }
 
+function isMutation(action: LibraryAction): boolean {
+	return [
+		"propose",
+		"add-source",
+		"add-claim",
+		"invalidate",
+		"rebuild-index",
+	].includes(action);
+}
+
+function assertMutationAllowed(
+	action: LibraryAction,
+	ctx: OperationContext,
+): void {
+	if (isMutation(action) && requiresApproval(ctx)) {
+		throw new Error(`library ${action} requires local interactive approval`);
+	}
+}
+
 export async function runLibraryCommand(
 	action: string,
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	const wantsJson = args.some((value) => value === "--json" || value === "-j");
 	try {
 		const libraryAction = normalizeAction(action);
 		const parsed = parseArgs(args);
+		assertMutationAllowed(libraryAction, ctx);
 		const topicSlug = parsed.topic || parsed.positional[0] || "";
 
 		if (libraryAction === "list") {
@@ -322,6 +362,60 @@ export async function runLibraryCommand(
 				writeJsonOk(io, libraryAction, { snapshot }, ["snapshot"]);
 			} else {
 				io.stdout(`library rebuild-index: ok topics=${snapshot.topics.length}`);
+			}
+			return 0;
+		}
+
+		if (libraryAction === "graph") {
+			const graph = buildLibraryGraph(projectRoot);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { graph }, ["graph"]);
+			} else {
+				io.stdout(
+					[
+						`library graph: nodes=${graph.nodes.length} edges=${graph.edges.length}`,
+						...graph.edges.map(
+							(edge) => `${edge.from} -> ${edge.to} [${edge.type}]`,
+						),
+					].join("\n"),
+				);
+			}
+			return 0;
+		}
+
+		if (libraryAction === "health") {
+			const findings = checkAreaHealth(projectRoot, "library", true);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { findings }, ["findings"]);
+			} else {
+				io.stdout(
+					[
+						`library health: ${findings.some((finding) => finding.severity === "fail") ? "issues found" : "ok"}`,
+						...findings.map(
+							(finding) =>
+								`${finding.severity.toUpperCase()} ${finding.message}${finding.hint ? ` hint=${finding.hint}` : ""}`,
+						),
+					].join("\n"),
+				);
+			}
+			return findings.some((finding) => finding.severity === "fail") ? 1 : 0;
+		}
+
+		if (libraryAction === "doctor") {
+			const remediation = runDoctor(projectRoot).remediation.filter(
+				(step) => step.area === "library",
+			);
+			if (parsed.json) {
+				writeJsonOk(io, libraryAction, { remediation }, ["remediation"]);
+			} else {
+				io.stdout(
+					[
+						`library doctor: ${remediation.length} remediation steps`,
+						...remediation.map(
+							(step) => `${step.step}. ${step.severity} ${step.action}`,
+						),
+					].join("\n"),
+				);
 			}
 			return 0;
 		}

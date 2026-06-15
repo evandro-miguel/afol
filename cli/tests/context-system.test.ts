@@ -677,7 +677,10 @@ describe("context system", () => {
 				role: "designer",
 				surface: "alpha",
 			});
-			expect(bundle.library_refs).toEqual(["library:alpha#CLAIM-CURRENT"]);
+			expect(bundle.library_refs).toContain("library:alpha#CLAIM-CURRENT");
+			expect(
+				bundle.library_refs.some((ref) => ref.startsWith("library-graph:")),
+			).toBe(true);
 			expect(bundle.library_refs.join(" ")).not.toContain("CLAIM-INVALID");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1009,7 +1012,7 @@ describe("context system", () => {
 		}
 	});
 
-	test("afol ctx bundle --json returns JSON", async () => {
+	test("afol ctx bundle --json returns JSON with graph refs and project_health", async () => {
 		const root = createBundleFixture();
 		try {
 			const captured = captureIo();
@@ -1041,11 +1044,15 @@ describe("context system", () => {
 					mode: string;
 					refs: Array<{ section?: string }>;
 					pstr_refs: string[];
+					memory_refs: string[];
+					library_refs: string[];
 				};
 				task_id: string;
 				mode: string;
 				refs: Array<{ section?: string }>;
 				pstr_refs: string[];
+				memory_refs: string[];
+				library_refs: string[];
 			};
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
@@ -1056,6 +1063,10 @@ describe("context system", () => {
 			expect(payload.mode).toBe("balanced");
 			expect(payload.refs.length).toBeGreaterThan(0);
 			expect(payload.pstr_refs).toEqual(["pstr:alpha-map"]);
+			expect(Array.isArray(payload.data.memory_refs)).toBe(true);
+			expect(Array.isArray(payload.data.library_refs)).toBe(true);
+			expect(Array.isArray(payload.memory_refs)).toBe(true);
+			expect(Array.isArray(payload.library_refs)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1185,7 +1196,7 @@ describe("context system", () => {
 		}
 	});
 
-	test("afol ctx explain returns explanation", async () => {
+	test("afol ctx explain returns explanation with gaps and project_health separation", async () => {
 		const root = createBundleFixture();
 		try {
 			const captured = captureIo();
@@ -1210,6 +1221,7 @@ describe("context system", () => {
 				ok: boolean;
 				why: unknown;
 				gaps: string[];
+				project_health: string[];
 				freshness: unknown;
 				evidence_tags: string[];
 				create_safety_hints: string[];
@@ -1219,17 +1231,20 @@ describe("context system", () => {
 			expect(payload.ok).toBe(true);
 			expect(payload.why).toBeDefined();
 			expect(payload.gaps).toEqual(expect.any(Array));
+			expect(payload.project_health).toEqual(expect.any(Array));
 			expect(payload.freshness).toBeDefined();
 			expect(payload.evidence_tags).toEqual(expect.any(Array));
 			expect(payload.create_safety_hints).toEqual(expect.any(Array));
 			expect(payload.do_not_load).toContain("raw .afol/state/afol.db");
 			expect(payload.bundle).toBeDefined();
+			expect(Array.isArray(payload.gaps)).toBe(true);
+			expect(Array.isArray(payload.project_health)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("afol ctx explain --json returns envelope", async () => {
+	test("afol ctx explain --json returns envelope with gaps and project_health", async () => {
 		const root = createBundleFixture();
 		try {
 			const captured = captureIo();
@@ -1259,6 +1274,7 @@ describe("context system", () => {
 				data: {
 					why: unknown;
 					gaps: string[];
+					project_health: string[];
 					freshness: unknown;
 					evidence_tags: string[];
 					create_safety_hints: string[];
@@ -1267,6 +1283,7 @@ describe("context system", () => {
 				};
 				why: unknown;
 				gaps: string[];
+				project_health: string[];
 				freshness: unknown;
 				evidence_tags: string[];
 				create_safety_hints: string[];
@@ -1280,11 +1297,41 @@ describe("context system", () => {
 			expect(payload.data.why).toBeDefined();
 			expect(payload.why).toBeDefined();
 			expect(payload.gaps).toEqual(expect.any(Array));
+			expect(payload.data.gaps).toEqual(expect.any(Array));
+			expect(payload.project_health).toEqual(expect.any(Array));
+			expect(payload.data.project_health).toEqual(expect.any(Array));
 			expect(payload.freshness).toBeDefined();
 			expect(payload.evidence_tags).toEqual(expect.any(Array));
 			expect(payload.create_safety_hints).toEqual(expect.any(Array));
 			expect(payload.do_not_load).toContain("raw .afol/state/afol.db");
 			expect(payload.bundle).toBeDefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx explain reports health-backed stale PSTR in project_health", async () => {
+		const root = createBundleFixture({ pstr: "stale" });
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"explain",
+					["-S", "session-1", "-T", "T-01", "--surface", "alpha", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				freshness: { pstr: string };
+				gaps: string[];
+				project_health: string[];
+			};
+			expect(payload.freshness.pstr).toBe("stale");
+			expect(
+				payload.project_health.some((entry) => entry.includes("pstr:")),
+			).toBe(true);
+			expect(payload.gaps).toEqual(expect.any(Array));
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

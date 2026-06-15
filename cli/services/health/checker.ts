@@ -10,7 +10,7 @@ import {
 } from "../local-state/workbench-index";
 import { readMemory } from "../memory";
 import { resolveProjectPaths } from "../project/paths";
-import { checkPstrStale } from "../pstr";
+import { checkPstrStale, validatePstrIndex } from "../pstr";
 import type { HealthArea, HealthFinding, HealthReport } from "./types";
 
 const HEALTH_AREAS: readonly HealthArea[] = [
@@ -168,6 +168,13 @@ function checkAdmHealth(root: string, deep: boolean): HealthFinding[] {
 
 function checkPstrHealth(root: string, deep: boolean): HealthFinding[] {
 	const findings: HealthFinding[] = [];
+	const validation = validatePstrIndex(root);
+	if (!validation.ok) {
+		findings.push(
+			makeFinding("pstr", "fail", validation.message, "run afol pstr rebuild"),
+		);
+		return findings;
+	}
 	const stale = checkPstrStale(root);
 	for (const entry of stale) {
 		addIf(

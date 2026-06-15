@@ -12,6 +12,7 @@ import {
 	runDoctor,
 } from "../services/health";
 import { writeMemory as writeProjectMemory } from "../services/memory";
+import { rebuildPstrIndex } from "../services/pstr";
 import { openDb } from "../services/state";
 
 type CapturedIo = {
@@ -53,6 +54,9 @@ function createFixture(): string {
 	mkdirSync(join(root, ".afol", "memory"), { recursive: true });
 	mkdirSync(join(root, ".afol", "library"), { recursive: true });
 	mkdirSync(join(root, ".afol", "data", "index"), { recursive: true });
+	mkdirSync(join(root, "cli"), { recursive: true });
+	mkdirSync(join(root, "src", "project-template"), { recursive: true });
+	mkdirSync(join(root, "docs"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "DECISIONS"), { recursive: true });
 	writeFileSync(
@@ -70,6 +74,12 @@ function createFixture(): string {
 		'{"commands":[]}',
 		"utf8",
 	);
+	writeFileSync(join(root, "cli", "main.ts"), "export const cli = true;\n");
+	writeFileSync(
+		join(root, "src", "project-template", "index.ts"),
+		"export const template = true;\n",
+	);
+	writeFileSync(join(root, "docs", "readme.md"), "# Docs\n");
 	return root;
 }
 
@@ -121,64 +131,19 @@ function writeSectionIndex(root: string, generatedAt: string): void {
 }
 
 function writePstrIndex(root: string, staleAfter: string): void {
+	const snapshot = rebuildPstrIndex(root);
+	const next = {
+		...snapshot,
+		generated_at: staleAfter,
+		maps: snapshot.maps.map((map) => ({
+			...map,
+			updated_at: staleAfter,
+			stale_after: staleAfter,
+		})),
+	};
 	writeFileSync(
 		join(root, ".afol", "pstr", "index.json"),
-		`${JSON.stringify({
-			kind: "pstr_index_v1",
-			version: 1,
-			generated_at: staleAfter,
-			source: { project_root: root, pstr_dir: join(root, ".afol", "pstr") },
-			maps: [
-				{
-					id: "cli",
-					scope: "cli",
-					status: "current",
-					authority: "observed",
-					source_paths: ["cli/main.ts"],
-					source_hash: "hash-cli",
-					file_count: 1,
-					updated_at: staleAfter,
-					stale_after: staleAfter,
-					tags: ["pstr"],
-				},
-				{
-					id: "template",
-					scope: "template",
-					status: "current",
-					authority: "observed",
-					source_paths: ["src/project-template/index.ts"],
-					source_hash: "hash-template",
-					file_count: 1,
-					updated_at: staleAfter,
-					stale_after: staleAfter,
-					tags: ["pstr"],
-				},
-				{
-					id: "docs",
-					scope: "docs",
-					status: "current",
-					authority: "observed",
-					source_paths: ["docs/arc/SPECS/test.md"],
-					source_hash: "hash-docs",
-					file_count: 1,
-					updated_at: staleAfter,
-					stale_after: staleAfter,
-					tags: ["pstr"],
-				},
-				{
-					id: "config",
-					scope: "config",
-					status: "current",
-					authority: "observed",
-					source_paths: [".agents/config.json"],
-					source_hash: "hash-config",
-					file_count: 1,
-					updated_at: staleAfter,
-					stale_after: staleAfter,
-					tags: ["pstr"],
-				},
-			],
-		})}\n`,
+		`${JSON.stringify(next)}\n`,
 		"utf8",
 	);
 }

@@ -44,6 +44,7 @@ import {
 	requireWriteContext,
 	resolveSafePath,
 } from "../commands/file/shared";
+import { agentOperationContext } from "../core/operation-context";
 import {
 	appendMutationRecord,
 	type MutationRecord,
@@ -326,6 +327,37 @@ describe("file command dispatcher", () => {
 			const undoIo = captureIo();
 			expect(await runFileCommand(["ud"], root, undoIo.io)).toBe(2);
 			expect(undoIo.stderr[0]).toContain("Real file mutation requires");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("denies real file mutations for restricted agent callers", async () => {
+		const root = mkProjectRoot();
+		try {
+			writeFileTree(root, "notes/doc.txt", "alpha");
+			const io = captureIo();
+			expect(
+				await runFileCommand(
+					[
+						"pt",
+						"--path",
+						"notes/doc.txt",
+						"--append",
+						"beta",
+						"--session",
+						"S",
+						"--task-id",
+						"T-01",
+						"--reason",
+						"trust test",
+					],
+					root,
+					io.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(io.stderr[0]).toContain("requires local interactive approval");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

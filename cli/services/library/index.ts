@@ -9,4 +9,6 @@ export {
 	rebuildLibraryIndex,
 	searchLibrary,
 } from "./crud";
+export type { LibraryGraphEdge, LibraryGraphSnapshot } from "./graph";
+export { buildLibraryGraph } from "./graph";
 export type { LibraryClaim, LibrarySource, LibraryTopic } from "./types";

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runMemoryCommand } from "../commands/memory";
+import { agentOperationContext } from "../core/operation-context";
 
 function capture() {
 	const stdout: string[] = [];
@@ -252,6 +253,27 @@ describe("memory command", () => {
 			).toBe(2);
 			expect(missing.stderr.join("\n")).toContain(
 				"Missing --id or --reason for memory reject.",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("memory mutations are denied for restricted agent callers", async () => {
+		const root = createRoot();
+		try {
+			const out = capture();
+			expect(
+				await runMemoryCommand(
+					"add",
+					["--id", "MEM-999", "--title", "Nope", "--body", "Nope"],
+					root,
+					out.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(out.stderr.join("\n")).toContain(
+				"requires local interactive approval",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

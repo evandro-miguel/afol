@@ -28,3 +28,25 @@ export type PstrValidationResult = {
 	ok: boolean;
 	message: string;
 };
+
+export type PstrDetectedArea = {
+	id: string;
+	scope: string;
+	source_roots: string[];
+	file_count: number;
+	tags: string[];
+};
+
+export type PstrSuggestion = {
+	id: string;
+	severity: "info" | "warn" | "fail";
+	message: string;
+	action: string;
+};
+
+export type PstrReviewCandidate = {
+	id: string;
+	title: string;
+	action: "rebuild-all";
+	reason: string;
+};

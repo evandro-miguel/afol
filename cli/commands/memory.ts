@@ -4,6 +4,11 @@ import {
 	envelopeWithLegacyKeys,
 	stringifyEnvelope,
 } from "../core/envelope";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
 import type { MemoryEntry, MemoryRecallEntry } from "../services/memory";
 import {
 	addEntry,
@@ -224,15 +229,32 @@ function currentTime(): string {
 	return new Date().toISOString();
 }
 
+function isMutation(action: MemoryAction): boolean {
+	return ["add", "update", "archive", "propose", "promote", "reject"].includes(
+		action,
+	);
+}
+
+function assertMutationAllowed(
+	action: MemoryAction,
+	ctx: OperationContext,
+): void {
+	if (isMutation(action) && requiresApproval(ctx)) {
+		throw new Error(`memory ${action} requires local interactive approval`);
+	}
+}
+
 export async function runMemoryCommand(
 	action: string,
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	const wantsJson = args.some((value) => value === "--json" || value === "-j");
 	try {
 		const parsed = parseMemoryArgs(action, args);
+		assertMutationAllowed(parsed.action, ctx);
 
 		if (parsed.action === "list") {
 			const memory = readMemory(projectRoot);

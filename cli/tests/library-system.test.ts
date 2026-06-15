@@ -9,6 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runLibraryCommand } from "../commands/library";
+import { agentOperationContext } from "../core/operation-context";
 import {
 	addClaim,
 	addSource,
@@ -19,6 +20,7 @@ import {
 	rebuildLibraryIndex,
 	searchLibrary,
 } from "../services/library/crud";
+import { buildLibraryGraph } from "../services/library/graph";
 import type { LibraryClaim, LibrarySource } from "../services/library/types";
 
 function createFixture(): string {
@@ -278,6 +280,46 @@ describe("library crud", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("buildLibraryGraph materializes topic, claim, source, and wikilink edges", () => {
+		const root = createFixture();
+		try {
+			proposeTopic(root, "alpha", "Alpha", [source()]);
+			addClaim(root, "alpha", claim({ text: "See [[library/beta]]" }));
+			const topicPath = join(
+				root,
+				".afol",
+				"library",
+				"topics",
+				"alpha",
+				"INDEX.md",
+			);
+			writeFileSync(
+				topicPath,
+				`${readFileSync(topicPath, "utf8")}\nRelated: [[library/beta]]\n`,
+			);
+			const graph = buildLibraryGraph(root);
+			expect(graph.kind).toBe("library_graph_v1");
+			expect(graph.nodes).toContain("library:alpha");
+			expect(graph.edges).toContainEqual({
+				from: "library:alpha",
+				to: "source:alpha#src-1",
+				type: "topic-source",
+			});
+			expect(graph.edges).toContainEqual({
+				from: "claim:alpha#claim-1",
+				to: "source:alpha#src-1",
+				type: "claim-source",
+			});
+			expect(graph.edges).toContainEqual({
+				from: "library:alpha",
+				to: "wikilink:library/beta",
+				type: "wikilink",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("library command", () => {
@@ -472,6 +514,59 @@ describe("library command", () => {
 		}
 	});
 
+	test("afol library graph and health expose JSON", async () => {
+		const root = createFixture();
+		try {
+			proposeTopic(root, "x", "X", [source({ id: "src1" })]);
+			addClaim(root, "x", claim({ text: "text", source_ids: ["src1"] }));
+			const graphOut = capture();
+			expect(
+				await runLibraryCommand("graph", ["--json"], root, graphOut.io),
+			).toBe(0);
+			const graphPayload = JSON.parse(graphOut.stdout[0] ?? "{}") as {
+				ok: boolean;
+				graph: { kind: string; edges: unknown[] };
+			};
+			expect(graphPayload.ok).toBe(true);
+			expect(graphPayload.graph.kind).toBe("library_graph_v1");
+			expect(graphPayload.graph.edges.length).toBeGreaterThan(0);
+
+			const healthOut = capture();
+			expect(
+				await runLibraryCommand("health", ["--json"], root, healthOut.io),
+			).toBe(0);
+			const healthPayload = JSON.parse(healthOut.stdout[0] ?? "{}") as {
+				ok: boolean;
+				findings: unknown[];
+			};
+			expect(healthPayload.ok).toBe(true);
+			expect(Array.isArray(healthPayload.findings)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("library mutations are denied for restricted agent callers", async () => {
+		const root = createFixture();
+		try {
+			const out = capture();
+			expect(
+				await runLibraryCommand(
+					"propose",
+					["--topic", "x", "--title", "X"],
+					root,
+					out.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(out.stderr.join("\n")).toContain(
+				"requires local interactive approval",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol library search without query returns error exit code", async () => {
 		const root = createFixture();
 		try {
@@ -648,6 +743,80 @@ describe("library command", () => {
 			expect(out.stderr.join("\n")).toContain(
 				"Library topic not found: missing",
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol library doctor --json returns remediation array", async () => {
+		const root = createFixture();
+		try {
+			const out = capture();
+			expect(await runLibraryCommand("doctor", ["--json"], root, out.io)).toBe(
+				0,
+			);
+			const payload = JSON.parse(out.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				data: { remediation: unknown[] };
+				remediation: unknown[];
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("library.doctor");
+			expect(payload.exit_code).toBe(0);
+			expect(Array.isArray(payload.data.remediation)).toBe(true);
+			expect(Array.isArray(payload.remediation)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("library graph filtering", () => {
+	test("buildLibraryGraph with slugs filter returns only matching topics", () => {
+		const root = createFixture();
+		try {
+			proposeTopic(root, "alpha", "Alpha", [source({ id: "src-a" })]);
+			addClaim(
+				root,
+				"alpha",
+				claim({ id: "claim-a", text: "Alpha claim", source_ids: ["src-a"] }),
+			);
+			proposeTopic(root, "beta", "Beta", [source({ id: "src-b" })]);
+			addClaim(
+				root,
+				"beta",
+				claim({ id: "claim-b", text: "Beta claim", source_ids: ["src-b"] }),
+			);
+
+			const allGraph = buildLibraryGraph(root);
+			expect(allGraph.nodes).toContain("library:alpha");
+			expect(allGraph.nodes).toContain("library:beta");
+
+			const alphaOnly = buildLibraryGraph(root, {
+				slugs: new Set(["alpha"]),
+			});
+			expect(alphaOnly.nodes).toContain("library:alpha");
+			expect(alphaOnly.nodes).not.toContain("library:beta");
+			expect(alphaOnly.nodes).toContain("source:alpha#src-a");
+			expect(alphaOnly.nodes).toContain("claim:alpha#claim-a");
+			expect(alphaOnly.nodes).not.toContain("source:beta#src-b");
+			expect(alphaOnly.nodes).not.toContain("claim:beta#claim-b");
+
+			const betaOnly = buildLibraryGraph(root, {
+				slugs: new Set(["beta"]),
+			});
+			expect(betaOnly.nodes).not.toContain("library:alpha");
+			expect(betaOnly.nodes).toContain("library:beta");
+
+			const emptyFilter = buildLibraryGraph(root, {
+				slugs: new Set(["nonexistent"]),
+			});
+			expect(emptyFilter.nodes).toEqual([]);
+			expect(emptyFilter.edges).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

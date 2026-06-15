@@ -10,8 +10,11 @@ import { computeSourceHash } from "../../core/source-hash";
 import { atomicWriteText } from "../io/atomic";
 import { resolveProjectPaths } from "../project/paths";
 import type {
+	PstrDetectedArea,
 	PstrIndexSnapshot,
 	PstrMapEntry,
+	PstrReviewCandidate,
+	PstrSuggestion,
 	PstrValidationResult,
 } from "./types";
 
@@ -207,6 +210,76 @@ export function buildPstrIndexSnapshot(projectRoot: string): PstrIndexSnapshot {
 		},
 		maps,
 	};
+}
+
+export function detectPstrAreas(projectRoot: string): PstrDetectedArea[] {
+	return PSTR_AREAS.map((area) => {
+		const files = uniqueSorted(
+			area.sourcePaths.flatMap((sourcePath) =>
+				collectSourceFiles(projectRoot, sourcePath),
+			),
+		);
+		return {
+			id: area.id,
+			scope: area.scope,
+			source_roots: [...area.sourcePaths],
+			file_count: files.length,
+			tags: uniqueSorted(area.tags),
+		};
+	}).filter((area) => area.file_count > 0);
+}
+
+export function suggestPstrChanges(root: string): PstrSuggestion[] {
+	const suggestions: PstrSuggestion[] = [];
+	const validation = validatePstrIndex(root);
+	if (!validation.ok) {
+		suggestions.push({
+			id: "rebuild-all",
+			severity: "fail",
+			message: validation.message,
+			action: "run afol pstr rebuild",
+		});
+	}
+
+	for (const stale of checkPstrStale(root)) {
+		if (!stale.stale) {
+			continue;
+		}
+		suggestions.push({
+			id: `rebuild-${stale.id}`,
+			severity: "warn",
+			message: stale.message,
+			action: `run afol pstr rebuild for ${stale.id}`,
+		});
+	}
+
+	return suggestions.length > 0
+		? suggestions
+		: [
+				{
+					id: "current",
+					severity: "info",
+					message: "pstr index is current",
+					action: "none",
+				},
+			];
+}
+
+export function reviewPstrCandidates(root: string): PstrReviewCandidate[] {
+	const suggestions = suggestPstrChanges(root).filter(
+		(suggestion) => suggestion.id !== "current",
+	);
+	if (suggestions.length === 0) {
+		return [];
+	}
+	return [
+		{
+			id: "rebuild-all",
+			title: "Rebuild every PSTR map",
+			action: "rebuild-all",
+			reason: suggestions.map((suggestion) => suggestion.message).join("; "),
+		},
+	];
 }
 
 function readJsonFile<T>(path: string): T | null {

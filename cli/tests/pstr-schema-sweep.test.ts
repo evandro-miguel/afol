@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runPstrCommand } from "../commands/pstr";
+import { agentOperationContext } from "../core/operation-context";
 import { rebuildPstrIndex } from "../services/pstr/builder";
 import {
 	detectShape,
@@ -199,6 +200,94 @@ describe("pstr command", () => {
 			const io = captureIo();
 			expect(await runPstrCommand("show", [], root, io.io)).toBe(0);
 			expect(io.stdout[0] ?? "").toContain("pstr show:");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("detect --json returns discovered areas", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(await runPstrCommand("detect", ["--json"], root, io.io)).toBe(0);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expectEnvelope(payload, "pstr.detect");
+			expect(payload.ok).toBe(true);
+			expect(Array.isArray(payload.areas)).toBe(true);
+			expect(
+				(payload.areas as Array<{ id: string }>).some(
+					(area) => area.id === "cli",
+				),
+			).toBe(true);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("suggest reports current or rebuild guidance", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(await runPstrCommand("suggest", ["--json"], root, io.io)).toBe(0);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expectEnvelope(payload, "pstr.suggest");
+			expect(payload.ok).toBe(true);
+			expect(Array.isArray(payload.suggestions)).toBe(true);
+			expect(
+				(payload.suggestions as Array<{ id: string }>).some(
+					(suggestion) => suggestion.id === "rebuild-all",
+				),
+			).toBe(true);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("review-candidates can apply rebuild candidate", async () => {
+		const root = createFixture();
+		try {
+			const reviewIo = captureIo();
+			expect(
+				await runPstrCommand(
+					"review-candidates",
+					["--json"],
+					root,
+					reviewIo.io,
+				),
+			).toBe(0);
+			const reviewPayload = JSON.parse(reviewIo.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expectEnvelope(reviewPayload, "pstr.review-candidates");
+			expect(
+				(reviewPayload.candidates as Array<{ id: string }>).some(
+					(candidate) => candidate.id === "rebuild-all",
+				),
+			).toBe(true);
+
+			const applyIo = captureIo();
+			expect(
+				await runPstrCommand(
+					"review-candidates",
+					["--apply", "rebuild-all", "--json"],
+					root,
+					applyIo.io,
+				),
+			).toBe(0);
+			const applyPayload = JSON.parse(applyIo.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expectEnvelope(applyPayload, "pstr.review-candidates");
+			expect((applyPayload.applied as { id: string }).id).toBe("rebuild-all");
+			expect(existsSync(join(root, ".afol", "pstr", "index.json"))).toBe(true);
 		} finally {
 			cleanup(root);
 		}
@@ -482,6 +571,95 @@ describe("pstr command", () => {
 			const io = captureIo();
 			expect(await runPstrCommand("show", ["--bogus"], root, io.io)).toBe(2);
 			expect(io.stderr[0] ?? "").toContain("Unknown pstr argument: --bogus");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("restricted context denies pstr rebuild", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(
+				await runPstrCommand(
+					"rebuild",
+					[],
+					root,
+					io.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(io.stderr[0] ?? "").toContain(
+				"requires local interactive approval",
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("restricted context denies pstr review-candidates --apply", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(
+				await runPstrCommand(
+					"review-candidates",
+					["--apply", "rebuild-all"],
+					root,
+					io.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(io.stderr[0] ?? "").toContain(
+				"requires local interactive approval",
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("restricted context allows read-only pstr review-candidates", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(
+				await runPstrCommand(
+					"review-candidates",
+					["--json"],
+					root,
+					io.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expectEnvelope(payload, "pstr.review-candidates");
+			expect(Array.isArray(payload.candidates)).toBe(true);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("detect without json prints human output", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(await runPstrCommand("detect", [], root, io.io)).toBe(0);
+			expect(io.stdout[0] ?? "").toContain("pstr detect:");
+			expect(io.stdout[0] ?? "").toContain("areas");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("suggest without json prints human output", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(await runPstrCommand("suggest", [], root, io.io)).toBe(0);
+			expect(io.stdout[0] ?? "").toContain("pstr suggest:");
 		} finally {
 			cleanup(root);
 		}
