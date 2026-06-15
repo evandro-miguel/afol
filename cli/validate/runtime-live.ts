@@ -21,7 +21,7 @@ const LIVE_BENCHMARK_EXPECTED_PACK_ID = "runtime-flow-live-agent-v4";
 const LIVE_BENCHMARK_REFRESH_COMMAND =
 	"afol validate bench --pack runtime-live-agent --json";
 const LIVE_BENCHMARK_REFRESH_NOTE =
-	"snapshot validation; live refresh runner pending AFOL-native migration";
+	"snapshot validation; live runner pending (spec 260423_2006 in .afol/adm/specs/)";
 
 interface LiveRunnerProfile {
 	runtime: string;

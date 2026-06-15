@@ -22,7 +22,7 @@ const runtimeLiveBenchmarkProfile = {
 const runtimeLiveBenchmarkRefreshCommand =
 	"afol validate bench --pack runtime-live-agent --json";
 const runtimeLiveBenchmarkRefreshNote =
-	"snapshot validation; live refresh runner pending AFOL-native migration";
+	"snapshot validation; live runner pending (spec 260423_2006 in .afol/adm/specs/)";
 
 function runKernel(
 	args: string[],
