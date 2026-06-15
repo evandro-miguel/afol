@@ -12,6 +12,7 @@ export type CommandResolution =
 	| { kind: "done"; args: string[] }
 	| { kind: "close"; args: string[] }
 	| { kind: "log"; args: string[] }
+	| { kind: "quickTask"; args: string[] }
 	| { kind: "verifyTasks"; args: string[] }
 	| { kind: "rule"; args: string[] }
 	| { kind: "skill"; args: string[] }
@@ -50,6 +51,7 @@ const SUBCOMMAND_GROUPS = new Set([
 	"schema",
 	"bench",
 	"adapter",
+	"telemetry",
 	"session",
 ]);
 
@@ -204,6 +206,10 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind === "log") {
 		return { kind: "log", args: normalizeTokenOptimizedFlags(rest) };
+	}
+
+	if (topLevelKind === "quickTask") {
+		return { kind: "quickTask", args: normalizeTokenOptimizedFlags(rest) };
 	}
 
 	if (topLevelKind === "verifyTasks") {

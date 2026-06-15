@@ -2,7 +2,7 @@
 doc_type: telemetry_guide
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-04-13T19:37:05-03:00'
+updated_at: '2026-06-15T00:00:00Z'
 ---
 
 # Telemetry Guide
@@ -23,10 +23,15 @@ AFOL lifecycle and validation commands may capture:
 - Task completion
 - Errors and blockers
 
-### Manual Commands (Optional)
+### Public Read Commands
 
-Manual telemetry query/report/export commands are pending AFOL-native parity. Do
-not use retired compatibility command runners as public workflows.
+AFOL exposes telemetry read-only surfaces for local diagnostics:
+
+```bash
+afol telemetry query --json
+afol telemetry report --json
+afol telemetry export --format jsonl
+```
 
 ## Event Types (Auto-Captured)
 
@@ -38,22 +43,29 @@ not use retired compatibility command runners as public workflows.
 | `task_complete` | Marking task done | `afol d` |
 | `blocker` | Manual (optional) | User |
 | `error` | Tool failure | Wrapper |
-| `pattern_applied` | Using pattern suggestion | AFOL-native command pending |
+| `task_start` | Starting task work | `afol st` |
 
 ## Commands
 
 ### Query Events
 
-AFOL-native telemetry query is pending. Until it lands, inspect telemetry data as
-JSONL only for factory debugging and do not document legacy command fallbacks.
+```bash
+afol telemetry query --type task_complete --limit 20
+afol telemetry query --session <session-id> --json
+```
 
 ### Generate Report
 
-AFOL-native report generation is pending.
+```bash
+afol telemetry report --json
+```
 
 ### Export Data
 
-AFOL-native export is pending.
+```bash
+afol telemetry export --format jsonl
+afol telemetry export --json
+```
 
 ### Validate
 
@@ -86,8 +98,8 @@ The following events are captured **automatically** - no manual action needed:
 
 ## Manual Events (Optional)
 
-Manual blocker/error telemetry is pending AFOL-native parity. Record blockers in
-the governed task/report until the public command exists.
+Manual blocker/error telemetry writes are pending AFOL-native parity. Record
+blockers in the governed task/report until the public write command exists.
 
 ## Privacy & Security
 
@@ -110,15 +122,15 @@ the governed task/report until the public command exists.
 
 ### Session Duration Trend
 
-Use JSONL inspection with `jq` only for local factory diagnostics.
+Use `afol telemetry query --session <session-id> --json` for local diagnostics.
 
 ### Tool Usage Frequency
 
-Use JSONL inspection with `jq` only for local factory diagnostics.
+Use `afol telemetry report --json` for local diagnostics.
 
 ### Success Rate
 
-AFOL-native success-rate reporting is pending.
+Use `afol telemetry report --json` and inspect `by_outcome`.
 
 ## Troubleshooting
 
@@ -144,7 +156,7 @@ AFOL-native success-rate reporting is pending.
 
 - `docs/patterns/` - Pattern catalog
 - `docs/lessons/` - Lessons learned
-- `.agents/tools.json` - Tool catalog
+- `.afol/data/telemetry/schemas/event.json` - Event schema
 
 ---
 

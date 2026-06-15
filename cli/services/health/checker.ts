@@ -126,16 +126,44 @@ function estimateSectionTokens(
 }
 
 function checkAdmHealth(root: string, deep: boolean): HealthFinding[] {
-	void root;
-	return deep
-		? [
+	const findings: HealthFinding[] = [];
+	const admRoot = join(root, ".afol", "adm");
+	if (!existsSync(admRoot)) {
+		return [
+			makeFinding(
+				"adm",
+				"fail",
+				"missing .afol/adm directory",
+				"restore AFOL administration files or run the project bootstrap/update flow",
+			),
+		];
+	}
+
+	const requiredDirs = ["roadmap", "specs", "decisions", "doctrine"];
+	for (const dir of requiredDirs) {
+		const path = join(admRoot, dir);
+		if (!existsSync(path)) {
+			findings.push(
 				makeFinding(
 					"adm",
-					"info",
-					"administration checks are not implemented in MVP",
+					"warn",
+					`missing .afol/adm/${dir} directory`,
+					`create .afol/adm/${dir} or update project administration layout`,
 				),
-			]
-		: [];
+			);
+		}
+	}
+
+	if (deep && findings.length === 0) {
+		findings.push(
+			makeFinding(
+				"adm",
+				"info",
+				`adm structure present (${walkMarkdownFiles(admRoot).length} markdown files)`,
+			),
+		);
+	}
+	return findings;
 }
 
 function checkPstrHealth(root: string, deep: boolean): HealthFinding[] {

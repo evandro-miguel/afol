@@ -411,27 +411,33 @@ export async function runUpdateCommand(
 
 		if (command === "apply") {
 			if (!result.hasSource) {
-				parsedArgs.json
-					? writeJsonResult(
-							io,
-							`update.${command}`,
-							result,
-							1,
-							parsedArgs.verbose,
-						)
-					: io.stdout(formatUpdateCheck(result, command).trimEnd());
+				if (parsedArgs.json) {
+					writeJsonResult(
+						io,
+						`update.${command}`,
+						result,
+						1,
+						parsedArgs.verbose,
+					);
+				} else {
+					io.stdout(formatUpdateCheck(result, command).trimEnd());
+				}
 				return 1;
 			}
 			if (blockedCount > 0) {
-				parsedArgs.json
-					? writeJsonResult(io, "update.apply", result, 4, parsedArgs.verbose)
-					: io.stdout(formatUpdateCheck(result, "apply").trimEnd());
+				if (parsedArgs.json) {
+					writeJsonResult(io, "update.apply", result, 4, parsedArgs.verbose);
+				} else {
+					io.stdout(formatUpdateCheck(result, "apply").trimEnd());
+				}
 				return 4;
 			}
 			if (parsedArgs.dryRun) {
-				parsedArgs.json
-					? writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose)
-					: io.stdout(formatUpdateCheck(result, "apply").trimEnd());
+				if (parsedArgs.json) {
+					writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose);
+				} else {
+					io.stdout(formatUpdateCheck(result, "apply").trimEnd());
+				}
 				return 0;
 			}
 			if (writableOperations.length > 0) {
@@ -443,23 +449,27 @@ export async function runUpdateCommand(
 				parsedArgs,
 				runtime,
 			);
-			parsedArgs.json
-				? writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose)
-				: io.stdout(formatUpdateCheck(result, command).trimEnd());
+			if (parsedArgs.json) {
+				writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose);
+			} else {
+				io.stdout(formatUpdateCheck(result, command).trimEnd());
+			}
 			return 0;
 		}
 
-		parsedArgs.json
-			? io.stdout(
-					stringifyEnvelope(
-						resultEnvelope(
-							jsonResultData(result, parsedArgs.verbose),
-							`update.${command}`,
-							result.hasSource ? 0 : 1,
-						),
+		if (parsedArgs.json) {
+			io.stdout(
+				stringifyEnvelope(
+					resultEnvelope(
+						jsonResultData(result, parsedArgs.verbose),
+						`update.${command}`,
+						result.hasSource ? 0 : 1,
 					),
-				)
-			: io.stdout(formatUpdateCheck(result, command).trimEnd());
+				),
+			);
+		} else {
+			io.stdout(formatUpdateCheck(result, command).trimEnd());
+		}
 		return result.hasSource ? 0 : 1;
 	} catch (error) {
 		io.stderr((error as Error).message);

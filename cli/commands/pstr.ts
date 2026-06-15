@@ -270,8 +270,13 @@ export async function runPstrCommand(
 			return 0;
 		}
 
-		io.stderr(`pstr ${pstrAction}: not yet implemented`);
-		return 1;
+		const message = `internal error: unhandled pstr action '${pstrAction}'. This is a bug.`;
+		if (hasJsonFlag(args)) {
+			writeJsonErr(io, pstrAction, "pstr.action.unhandled", message, 2);
+		} else {
+			io.stderr(message);
+		}
+		return 2;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		if (hasJsonFlag(args)) {

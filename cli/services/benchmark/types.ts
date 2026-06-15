@@ -1,5 +1,5 @@
 export const BENCH_SCHEMA_VERSION = "2.0.0" as const;
-export const DEFAULT_BENCH_MODEL = "gpt-5.4-mini/low" as const;
+export const DEFAULT_BENCH_MODEL = "gpt-5.4-mini/medium" as const;
 export const DEFAULT_BENCH_PACK_ID = "comprehensive-live" as const;
 export const DEFAULT_CLI_PACK_ID = "cli-micro" as const;
 

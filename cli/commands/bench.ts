@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
@@ -31,7 +31,18 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-type BenchAction = "run" | "cli" | "list" | "report" | "baseline";
+type BenchAction =
+	| "run"
+	| "cli"
+	| "list"
+	| "report"
+	| "baseline"
+	| "runtime-live";
+
+const RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH =
+	".afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json";
+const RUNTIME_LIVE_VALIDATE_COMMAND =
+	"afol validate bench --pack runtime-live-agent --json";
 
 type ParsedArgs = {
 	json: boolean;
@@ -102,6 +113,92 @@ function parseArgs(action: BenchAction, args: string[]): ParsedArgs {
 		throw new Error("Use either --scenario or --all, not both.");
 	}
 	return parsed;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+	return typeof value === "object" && value !== null && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: null;
+}
+
+function readJsonFile(path: string): {
+	data: Record<string, unknown> | null;
+	error: string | null;
+} {
+	try {
+		return {
+			data: asRecord(JSON.parse(readFileSync(path, "utf8"))),
+			error: null,
+		};
+	} catch (error) {
+		return { data: null, error: (error as Error).message };
+	}
+}
+
+function runtimeLiveProfile(snapshot: Record<string, unknown> | null): {
+	runtime: string;
+	model: string;
+	reasoning_effort: string;
+} {
+	const profile = asRecord(snapshot?.benchmark_profile);
+	return {
+		runtime: typeof profile?.runtime === "string" ? profile.runtime : "codex",
+		model: typeof profile?.model === "string" ? profile.model : "gpt-5.4-mini",
+		reasoning_effort:
+			typeof profile?.reasoning_effort === "string"
+				? profile.reasoning_effort
+				: "medium",
+	};
+}
+
+function runtimeLiveDryRun(projectRoot: string): Record<string, unknown> {
+	const snapshotPath = join(projectRoot, RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH);
+	const snapshotExists = existsSync(snapshotPath);
+	const loadedSnapshot = snapshotExists
+		? readJsonFile(snapshotPath)
+		: { data: null, error: null };
+	const snapshot = loadedSnapshot.data;
+	const scenariosRaw = snapshot?.scenarios;
+	const scenarioIds = Array.isArray(scenariosRaw)
+		? scenariosRaw
+				.map((entry) =>
+					typeof entry === "object" && entry && "id" in entry
+						? String((entry as { id: unknown }).id)
+						: null,
+				)
+				.filter((entry): entry is string => Boolean(entry))
+		: [];
+	const note = loadedSnapshot.error
+		? `dry-run only; snapshot parse failed: ${loadedSnapshot.error}`
+		: "dry-run only; no codex exec or network execution was started";
+	return {
+		pack_id: "runtime-live-agent",
+		live_pack_id: snapshot?.pack_id ?? "runtime-flow-live-agent-v4",
+		mode: "dry-run",
+		live_execution: false,
+		snapshot_path: RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH,
+		snapshot_exists: snapshotExists,
+		saved_result_path: snapshot?.saved_result_path ?? null,
+		benchmark_profile: runtimeLiveProfile(snapshot),
+		snapshot_parse_error: loadedSnapshot.error,
+		scenario_count: scenarioIds.length,
+		scenario_ids: scenarioIds,
+		validation_command: RUNTIME_LIVE_VALIDATE_COMMAND,
+		note,
+	};
+}
+
+function formatRuntimeLiveDryRun(data: Record<string, unknown>): string {
+	const profile = runtimeLiveProfile(asRecord(data));
+	return [
+		`bench runtime-live: ${data.mode}`,
+		`live_execution: ${data.live_execution}`,
+		`snapshot: ${data.snapshot_path} exists=${data.snapshot_exists}`,
+		`profile: ${profile.model}/${profile.reasoning_effort}`,
+		`scenarios: ${data.scenario_count}`,
+		`validate: ${data.validation_command}`,
+		String(data.note),
+	].join("\n");
 }
 
 function formatScenarioList(scenarios: BenchScenario[]): string {
@@ -207,6 +304,15 @@ export async function runBenchCommand(
 		const scenarios = listBenchScenarios();
 
 		switch (benchAction) {
+			case "runtime-live": {
+				const data = runtimeLiveDryRun(projectRoot);
+				if (parsed.json) {
+					emitJson(io, "bench.runtime-live", data);
+				} else {
+					io.stdout(formatRuntimeLiveDryRun(data));
+				}
+				return 0;
+			}
 			case "list": {
 				const data = {
 					pack_id: DEFAULT_BENCH_PACK_ID,

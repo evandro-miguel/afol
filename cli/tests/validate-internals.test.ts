@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { DEFAULT_BENCH_MODEL } from "../services/benchmark/types";
 import { saveBenchmarkPayload } from "../validate/benchmark-files";
 import { buildResult } from "../validate/command";
 import {
@@ -930,6 +931,40 @@ describe("runtime live validation helpers", () => {
 					),
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("profile constants align with spec child canonical values", () => {
+		// Spec child 260423_2006 defines default live benchmark profile:
+		//   runtime: codex, model: gpt-5.4-mini, reasoning_effort: medium
+		expect(DEFAULT_BENCH_MODEL).toBe("gpt-5.4-mini/medium");
+		// The validation layer in runtime-live.ts enforces medium (verified by
+		// snapshot and payload checks). The live-runner.ts passes
+		// model_reasoning_effort="medium" to codex exec. This test locks
+		// the constant so any future drift is caught at typecheck+test time.
+	});
+
+	test("runtime-live-agent catalog scenarios map to all 3 spec child scenario IDs", () => {
+		const root = createFixtureRoot();
+		try {
+			const snapshot = loadRegistry(root);
+			const scenarios = snapshot.scenariosByPack["runtime-live-agent"] ?? [];
+			expect(scenarios.length).toBe(3);
+
+			const mappedIds = scenarios
+				.map((s) => s.live_runner_scenario_id)
+				.filter(Boolean);
+			// Spec child "First Live Scenario Pack":
+			//   live-tools-benchmark-discovery
+			//   live-implement-next-governance-preflight
+			//   live-implement-start-complete-evidence
+			expect(mappedIds.sort()).toEqual([
+				"live-implement-next-governance-preflight",
+				"live-implement-start-complete-evidence",
+				"live-tools-benchmark-discovery",
+			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

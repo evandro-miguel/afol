@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readTelemetryEvents } from "../services/events/telemetry";
 import { validateFilesIndex } from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
@@ -427,6 +428,63 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("quick-task command runs lifecycle end to end", () => {
+		const root = mkRoot("quick-task");
+		try {
+			writeCliProjectContract(root);
+			const proc = runKernel(root, [
+				"quick-task",
+				"quick task parity",
+				"--command",
+				"bun --version",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const payload = parseEnvelope(proc.stdout as string);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "quick-task",
+			});
+			expect(payload.data).toMatchObject({ status: "closed" });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("quick-task records failed evidence when command fails", () => {
+		const root = mkRoot("quick-task-failed");
+		try {
+			writeCliProjectContract(root);
+			const proc = runKernel(root, [
+				"quick-task",
+				"quick task failed",
+				"--command",
+				"false",
+				"--json",
+			]);
+			expect(proc.status).toBe(1);
+			const payload = parseEnvelope(proc.stdout as string) as {
+				error: { message: string };
+			};
+			expect(payload.error.message).toContain("failed_step=verification");
+			expect(payload.error.message).toContain(
+				"--result passed was downgraded to failed",
+			);
+			const session = payload.error.message.match(/session=([^ ]+)/)?.[1];
+			expect(session).toBeTruthy();
+			const evidence = readFileSync(
+				join(root, ".afol", "wb", session as string, ".evidence.jsonl"),
+				"utf8",
+			).trim();
+			const entry = JSON.parse(evidence) as Record<string, unknown>;
+			expect(entry.result).toBe("failed");
+			expect(entry.exit_code).not.toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("recordEvidence serializes concurrent evidence and event JSONL appends", async () => {
 		const root = mkRoot("evidence-concurrency");
 		try {
@@ -474,9 +532,15 @@ describe("workbench lifecycle service", () => {
 			).toBe(8);
 
 			const eventRows = readLocalStateEvents(root);
-			expect(eventRows).toHaveLength(9);
+			// 9 workbench events + telemetry events (session_start + 8 tool_exec)
+			expect(eventRows).toHaveLength(18);
 			expect(
 				eventRows.filter((row) => row.type === "workbench.record_evidence"),
+			).toHaveLength(8);
+			expect(
+				eventRows.filter(
+					(row) => row.source === "afol-cli" && row.event_type === "tool_exec",
+				),
 			).toHaveLength(8);
 			expect(
 				existsSync(
@@ -708,6 +772,75 @@ describe("workbench lifecycle service", () => {
 				"failed strict verification",
 			);
 			expect(existsSync(created.activeSessionPath)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("lifecycle emits telemetry events alongside workbench events", () => {
+		const root = mkRoot("telemetry");
+		try {
+			const created = newWorkstream(root, "telemetry-lifecycle");
+
+			startTask(root, { session: created.session, taskId: "T-01" });
+
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test --filter foo",
+				result: "passed",
+			});
+
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			closeSession(root, created.session);
+
+			const telemetry = readTelemetryEvents(root);
+			const eventMap = new Map(
+				telemetry.map((entry) => [entry.event_type, entry]),
+			);
+
+			// All 5 telemetry event types present
+			expect(eventMap.has("session_start")).toBe(true);
+			expect(eventMap.has("task_start")).toBe(true);
+			expect(eventMap.has("tool_exec")).toBe(true);
+			expect(eventMap.has("task_complete")).toBe(true);
+			expect(eventMap.has("session_end")).toBe(true);
+
+			// schema_version is always "1"
+			for (const entry of telemetry) {
+				expect(entry.schema_version).toBe("1");
+				expect(entry.source).toBe("afol-cli");
+				expect(entry.session_id).toBe(created.session);
+			}
+
+			// Command sanitized to first token only
+			const toolEvent = eventMap.get("tool_exec");
+			expect(toolEvent?.cmd_type).toBe("bun");
+			expect(toolEvent?.task_id).toBe("T-01");
+			expect(toolEvent?.outcome).toBe("success");
+
+			// Task events carry correct task_id
+			expect(eventMap.get("task_start")?.task_id).toBe("T-01");
+			expect(eventMap.get("task_complete")?.task_id).toBe("T-01");
+
+			// Session events do not have task_id
+			expect(eventMap.get("session_start")?.task_id).toBeUndefined();
+			expect(eventMap.get("session_end")?.task_id).toBeUndefined();
+
+			// Workbench events still present alongside telemetry
+			const wbEventPath = resolveWorkbenchEventLogPath(root);
+			const wbContent = readFileSync(wbEventPath, "utf8");
+			const wbEvents = wbContent
+				.split("\n")
+				.filter((line) => line.trim().length > 0)
+				.map((line) => JSON.parse(line));
+			const wbTypes = new Set(wbEvents.map((e: { type: string }) => e.type));
+			expect(wbTypes.has("workbench.new")).toBe(true);
+			expect(wbTypes.has("workbench.start_task")).toBe(true);
+			expect(wbTypes.has("workbench.record_evidence")).toBe(true);
+			expect(wbTypes.has("workbench.mark_done")).toBe(true);
+			expect(wbTypes.has("workbench.close")).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

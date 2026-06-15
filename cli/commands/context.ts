@@ -339,8 +339,13 @@ export async function runContextCommand(
 			return 0;
 		}
 
-		io.stderr(`ctx ${ctxAction}: not yet implemented`);
-		return 1;
+		const message = `internal error: unhandled ctx action '${ctxAction}'. This is a bug.`;
+		if (parsed.json) {
+			writeJsonErr(io, action, "CTX_ACTION_UNHANDLED", message, 2);
+		} else {
+			io.stderr(message);
+		}
+		return 2;
 	} catch (error) {
 		if (wantsJson && error instanceof Error && error.message) {
 			writeJsonErr(io, action, "CTX_USAGE_ERROR", error.message, 2);

@@ -76,6 +76,8 @@ function formatReport(report: PreflightReport): string {
 		"rules",
 		formatCollection(report.rules, (rule) => `${rule.path} | ${rule.title}`),
 		"",
+		`recurrence_detected: ${report.recurrence_detected}`,
+		"",
 		"gaps",
 		formatCollection(report.gaps, (gap) => gap),
 	].join("\n");

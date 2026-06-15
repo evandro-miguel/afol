@@ -34,6 +34,8 @@ export type PreflightReport = {
 	rules: PreflightRuleResult[];
 	gaps: string[];
 	summary: string;
+	/** True when the query matched one or more lesson entries, suggesting this may be a recurring problem. Read-only advisory flag — never causes command failure. */
+	recurrence_detected: boolean;
 };
 
 const STOP_WORDS = new Set([
@@ -467,7 +469,7 @@ export function runPreflight(root: string, query: string): PreflightReport {
 		gaps.push("no applicable rules found");
 	}
 
-	const report: Omit<PreflightReport, "summary"> = {
+	const report: Omit<PreflightReport, "summary" | "recurrence_detected"> = {
 		query,
 		specs,
 		lessons,
@@ -475,9 +477,11 @@ export function runPreflight(root: string, query: string): PreflightReport {
 		rules,
 		gaps,
 	};
+	const recurrence_detected = lessons.length > 0;
 
 	return {
 		...report,
 		summary: formatSummary(report),
+		recurrence_detected,
 	};
 }

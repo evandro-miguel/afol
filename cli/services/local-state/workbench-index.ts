@@ -72,6 +72,12 @@ function formatNow(): string {
 	return new Date().toISOString();
 }
 
+function formatFreshTimestamp(root: string): string {
+	return new Date(
+		Math.max(Date.now(), Math.ceil(latestSourceMtime(root))),
+	).toISOString();
+}
+
 function parseTouchedAt(path: string): string {
 	try {
 		return statSync(path).mtime.toISOString();
@@ -371,7 +377,7 @@ export function rebuildWorkBenchIndex(
 		if (!hasSession) {
 			const filtered = {
 				...(current ?? emptySnapshot(root)),
-				generated_at: formatNow(),
+				generated_at: formatFreshTimestamp(root),
 				sessions: existingSessions.filter(
 					(entry) => entry.session !== sessionScope,
 				),
@@ -383,7 +389,7 @@ export function rebuildWorkBenchIndex(
 		const next: WorkbenchIndexSnapshot = {
 			kind: "workbench_index_v1",
 			version: 1,
-			generated_at: formatNow(),
+			generated_at: formatFreshTimestamp(root),
 			source: {
 				...workbenchSource(root),
 			},
@@ -403,7 +409,7 @@ export function rebuildWorkBenchIndex(
 	const full: WorkbenchIndexSnapshot = {
 		kind: "workbench_index_v1",
 		version: 1,
-		generated_at: formatNow(),
+		generated_at: formatFreshTimestamp(root),
 		source: {
 			...workbenchSource(root),
 		},

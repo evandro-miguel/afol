@@ -204,7 +204,7 @@ export function runLiveBenchmark(
 				"-c",
 				'model="gpt-5.4-mini"',
 				"-c",
-				'model_reasoning_effort="low"',
+				'model_reasoning_effort="medium"',
 				scenario.prompt.trim(),
 			],
 			{

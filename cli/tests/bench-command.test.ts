@@ -193,6 +193,79 @@ describe("bench command surfaces", () => {
 		).toBe(true);
 	});
 
+	test("runtime-live action exposes dry-run metadata without execution", async () => {
+		const captured = captureIo();
+		const code = await runBenchCommand(
+			"runtime-live",
+			["--json"],
+			process.cwd(),
+			captured.io,
+		);
+		expect(code).toBe(0);
+		const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+			action: string;
+			data: {
+				mode: string;
+				live_execution: boolean;
+				benchmark_profile: { model: string; reasoning_effort: string };
+				scenario_count: number;
+				validation_command: string;
+			};
+		};
+		expect(payload.action).toBe("bench.runtime-live");
+		expect(payload.data.mode).toBe("dry-run");
+		expect(payload.data.live_execution).toBe(false);
+		expect(payload.data.benchmark_profile.model).toBe("gpt-5.4-mini");
+		expect(payload.data.benchmark_profile.reasoning_effort).toBe("medium");
+		expect(payload.data.scenario_count).toBeGreaterThan(0);
+		expect(payload.data.validation_command).toBe(
+			"afol validate bench --pack runtime-live-agent --json",
+		);
+	});
+
+	test("runtime-live dry-run reports malformed snapshot without executing", async () => {
+		const root = createProjectRoot();
+		try {
+			mkdirSync(join(root, ".afol", "data", "benchmarks", "snapshots"), {
+				recursive: true,
+			});
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"data",
+					"benchmarks",
+					"snapshots",
+					"runtime-flow-live-agent-v4-latest.json",
+				),
+				"{not json",
+				"utf8",
+			);
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"runtime-live",
+				["--json"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				data: {
+					live_execution: boolean;
+					snapshot_exists: boolean;
+					snapshot_parse_error: string | null;
+					note: string;
+				};
+			};
+			expect(payload.data.live_execution).toBe(false);
+			expect(payload.data.snapshot_exists).toBe(true);
+			expect(payload.data.snapshot_parse_error).toBeTruthy();
+			expect(payload.data.note).toContain("snapshot parse failed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("runCliMicroBenchmark reports read-only command metrics", () => {
 		const results = runCliMicroBenchmark(process.cwd());
 		expect(results).toHaveLength(7);

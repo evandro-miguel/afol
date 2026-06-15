@@ -154,10 +154,30 @@ describe("preflight search service", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("recurrence_detected is true when lessons match", () => {
+		const root = createRoot();
+		try {
+			const report = runPreflight(root, "session isolation");
+			expect(report.recurrence_detected).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("recurrence_detected is false when no lessons match", () => {
+		const root = createRoot();
+		try {
+			const report = runPreflight(root, "unrelated query");
+			expect(report.recurrence_detected).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("afol preflight command", () => {
-	test("text output contains the summary line", async () => {
+	test("text output contains summary and recurrence_detected", async () => {
 		const root = createRoot();
 		const out = capture();
 		try {
@@ -166,7 +186,9 @@ describe("afol preflight command", () => {
 				stderr: (message) => out.stderr.push(message),
 			});
 			expect(code).toBe(0);
-			expect(out.stdout.join("\n")).toContain("summary:");
+			const output = out.stdout.join("\n");
+			expect(output).toContain("summary:");
+			expect(output).toContain("recurrence_detected: true");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

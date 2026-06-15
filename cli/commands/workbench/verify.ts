@@ -132,14 +132,20 @@ function splitCommandLine(command: string): string[] {
 	return tokens;
 }
 
+export type RunVerificationResult = {
+	exitCode: number;
+	error?: string;
+	signal?: string;
+};
+
 export function runVerification(
 	root: string,
 	command: string,
-): { exitCode: number } {
+): RunVerificationResult {
 	const argv = splitCommandLine(command);
 	const executable = argv[0];
 	if (!executable) {
-		throw new Error("Empty --test command.");
+		return { exitCode: 1, error: "Empty --test command." };
 	}
 	const result = spawnSync(executable, argv.slice(1), {
 		cwd: root,
@@ -148,7 +154,14 @@ export function runVerification(
 		timeout: 120_000,
 	});
 	if (result.error) {
-		throw new Error(`Failed to run --test command: ${result.error.message}`);
+		return {
+			exitCode: 1,
+			error: result.error.message,
+			...(result.signal ? { signal: result.signal } : {}),
+		};
 	}
-	return { exitCode: result.status ?? 1 };
+	return {
+		exitCode: result.status ?? 1,
+		...(result.signal ? { signal: result.signal } : {}),
+	};
 }

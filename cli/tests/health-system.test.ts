@@ -46,6 +46,10 @@ function createFixture(): string {
 	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
 	mkdirSync(join(root, ".afol", "state"), { recursive: true });
 	mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "decisions"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "doctrine"), { recursive: true });
 	mkdirSync(join(root, ".afol", "memory"), { recursive: true });
 	mkdirSync(join(root, ".afol", "library"), { recursive: true });
 	mkdirSync(join(root, ".afol", "data", "index"), { recursive: true });

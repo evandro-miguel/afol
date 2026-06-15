@@ -1,19 +1,18 @@
 # Telemetry Quick Reference
 
-Telemetry public commands are pending AFOL-native parity.
+Telemetry read commands are AFOL-native and read-only.
 
-Use the supported public gates for current checks:
+Use the supported telemetry commands for local diagnostics:
 
 ```bash
-afol validate --json
-afol local-state freshness
-afol verify-tasks --strict
+afol telemetry query --json
+afol telemetry query --type task_complete --limit 20
+afol telemetry report --json
+afol telemetry export --format jsonl
 ```
 
-Telemetry data remains an internal factory artifact until query, report, export,
-heat scoring, and dashboard commands are implemented in the Bun/TypeScript AFOL
-CLI. Do not document retired compatibility command runners as downstream
-workflows.
+Heat scoring and dashboard commands are still not public AFOL features. Do not
+document retired compatibility command runners as downstream workflows.
 
 For governed delivery evidence, use:
 

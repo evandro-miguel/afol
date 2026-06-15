@@ -76,3 +76,18 @@ afol catchup --session <id>
 - Accept code that improves behavior.
 - Reject code that mutates global session identity.
 - When in doubt, preserve the work and delete the pointer change.
+
+## Quick-task execution model
+
+- `afol quick-task` runs the `--command` locally via `spawnSync` on the host
+  shell path.
+- There is no sandbox, container, or remote execution layer. The command has the
+  same privileges as the AFOL process itself.
+- Evidence is recorded with the actual exit code (or `exit_code: 1` with the
+  error string when the command cannot be spawned, e.g. ENOENT). If the exit
+  code is non-zero, the `--result passed` flag is automatically downgraded to
+  `failed` in the evidence ledger.
+- Signal termination (including timeout via `maxBuffer`/`timeout` in spawnSync)
+  surfaces in the evidence via the `exit_code`; signal name is not recorded in
+  the evidence entry itself, only in the in-memory result during the same
+  process invocation.

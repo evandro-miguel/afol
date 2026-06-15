@@ -174,10 +174,14 @@ describe("log command", () => {
 				.trim()
 				.split("\n")
 				.map((line) => JSON.parse(line) as Record<string, unknown>);
-			expect(eventRows).toHaveLength(9);
+			// 1 workbench.new + 1 telemetry session_start + 8 workbench.append_log
+			expect(eventRows).toHaveLength(10);
 			expect(
 				eventRows.filter((row) => row.type === "workbench.append_log"),
 			).toHaveLength(8);
+			expect(eventRows.filter((row) => row.source === "afol-cli")).toHaveLength(
+				1,
+			);
 			expect(
 				existsSync(
 					join(root, ".afol", "wb", ".locks", `${created.session}.lock`),

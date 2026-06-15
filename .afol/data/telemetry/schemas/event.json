@@ -1,78 +1,69 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "telemetry-event-schema-v1",
-  "title": "Telemetry Event",
-  "description": "Schema for telemetry events in .agents system",
+  "title": "Telemetry Event (AFOL-native)",
+  "description": "Schema for AFOL-native telemetry events stored in .afol/data/events/events.jsonl",
   "type": "object",
-  "required": ["timestamp", "event_type", "session_id"],
+  "required": ["schema_version", "id", "ts", "source", "event_type", "session_id"],
   "properties": {
-    "timestamp": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1"],
+      "description": "Schema version for forward compatibility"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^TEL-\\d+-\\d{6}$",
+      "description": "Unique event identifier (TEL-<timestamp>-<counter>)"
+    },
+    "ts": {
       "type": "string",
       "format": "date-time",
-      "description": "ISO 8601 timestamp with timezone"
+      "description": "ISO 8601 timestamp"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["afol-cli"],
+      "description": "Source component that emitted the event"
     },
     "event_type": {
       "type": "string",
       "enum": [
         "session_start",
         "session_end",
-        "tool_exec",
+        "task_start",
         "task_complete",
-        "task_status_change",
-        "blocker",
+        "tool_exec",
         "error",
-        "pattern_applied",
-        "file_changed"
+        "blocker"
       ],
-      "description": "Type of telemetry event"
+      "description": "Type of AFOL-native telemetry event"
     },
     "session_id": {
       "type": "string",
       "description": "Workstream session ID (YYMMDD_HHMM_theme)"
     },
-    "event_id": {
+    "task_id": {
       "type": "string",
-      "format": "uuid",
-      "description": "Unique event identifier"
+      "pattern": "^T-\\d{2,3}$",
+      "description": "Task identifier (T-NN)"
     },
-    "metadata": {
-      "type": "object",
-      "description": "Event-specific metadata",
-      "properties": {
-        "theme": { "type": "string" },
-        "workstream_type": { "type": "string" },
-        "tool_name": { "type": "string" },
-        "tool_command": { "type": "string" },
-        "task_id": { "type": "string" },
-        "task_description": { "type": "string" },
-        "previous_status": { "type": "string" },
-        "new_status": { "type": "string" },
-        "blocker_reason": { "type": "string" },
-        "error_message": { "type": "string" },
-        "error_stack": { "type": "string" },
-        "pattern_id": { "type": "string" },
-        "pattern_type": { "type": "string" },
-        "file_path": { "type": "string" },
-        "file_type": { "type": "string" },
-        "lines_added": { "type": "integer" },
-        "lines_removed": { "type": "integer" },
-        "duration_seconds": { "type": "number" },
-        "outcome": {
-          "type": "string",
-          "enum": ["success", "failure", "partial", "skipped"]
-        }
-      }
+    "cmd_type": {
+      "type": "string",
+      "description": "Sanitized command type — first token only, never full args or secrets"
     },
-    "context": {
-      "type": "object",
-      "description": "Execution context",
-      "properties": {
-        "agent": { "type": "string" },
-        "user": { "type": "string" },
-        "environment": { "type": "string" },
-        "git_branch": { "type": "string" },
-        "git_commit": { "type": "string" }
-      }
+    "outcome": {
+      "type": "string",
+      "enum": ["success", "failure"],
+      "description": "Event outcome"
+    },
+    "note": {
+      "type": "string",
+      "description": "Human-readable note (no secrets)"
+    },
+    "error_type": {
+      "type": "string",
+      "description": "Error or blocker type when event_type is error or blocker"
     }
   }
 }

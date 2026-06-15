@@ -9,6 +9,7 @@ export type CommandKind =
 	| "done"
 	| "close"
 	| "log"
+	| "quickTask"
 	| "verifyTasks"
 	| "rule"
 	| "skill"
@@ -36,6 +37,7 @@ export type CommandKind =
 	| "bench"
 	| "preflight"
 	| "adapter"
+	| "telemetry"
 	| "session";
 export type CommandSideEffect = "read" | "write" | "append" | "generated";
 
@@ -105,6 +107,15 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "log",
 		sideEffect: "append",
 		description: "Append a session log entry",
+		category: "workflow",
+	},
+	{
+		command: "quick-task",
+		aliases: [],
+		kind: "quickTask",
+		sideEffect: "write",
+		description:
+			"Run a single-task lifecycle after executing a verification command",
 		category: "workflow",
 	},
 	{
@@ -329,7 +340,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "bench",
 		sideEffect: "read",
 		description:
-			"Run comprehensive benchmarks: live agent metrics, CLI token economy, regressions",
+			"Run benchmarks: live metrics, CLI token economy, runtime-live dry-run",
 		category: "inspect",
 	},
 	{
@@ -357,6 +368,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Enable or disable runtime adapters",
 		category: "ops",
+	},
+	{
+		command: "telemetry",
+		aliases: ["tel"],
+		kind: "telemetry",
+		sideEffect: "read",
+		description: "Query, report, and export AFOL telemetry events",
+		category: "inspect",
 	},
 	{
 		command: "session",

@@ -102,8 +102,8 @@ export function writeClaudeAdapterEnabled(
 		? objectAt(existingAdapters, "claude")
 		: null;
 	config.adapters = {
-		...(existingAdapters ?? {}),
-		claude: { ...(existingClaude ?? {}), enabled },
+		...existingAdapters,
+		claude: { ...existingClaude, enabled },
 	};
 	const payload = `${JSON.stringify(config, null, 2)}\n`;
 	mkdirSync(dirname(configPath), { recursive: true });

@@ -21,12 +21,14 @@ import { runMaintenanceCommand } from "./commands/maintenance";
 import { runMemoryCommand } from "./commands/memory";
 import { runPreflightCommand } from "./commands/preflight";
 import { runPstrCommand } from "./commands/pstr";
+import { runQuickTaskCommand } from "./commands/quick-task";
 import { runSchemaCommand } from "./commands/schema-cmd";
 import { runSessionCommand } from "./commands/session";
 import { runSpecCommand } from "./commands/spec";
 import { runStateCommand } from "./commands/state";
 import { runStatusCommand } from "./commands/status";
 import { runSweepCommand } from "./commands/sweep";
+import { runTelemetryCommand } from "./commands/telemetry";
 import { runUpdateCommand } from "./commands/update";
 import { runValidateCommand } from "./commands/validate";
 import {
@@ -205,6 +207,10 @@ export async function main(argv: string[]): Promise<number> {
 		return runLogCommand(resolution.args, project.value.root);
 	}
 
+	if (resolution.kind === "quickTask") {
+		return runQuickTaskCommand(resolution.args, project.value.root);
+	}
+
 	if (resolution.kind === "verifyTasks") {
 		return runVerifyTasksCommand(resolution.args, project.value.root);
 	}
@@ -366,6 +372,13 @@ export async function main(argv: string[]): Promise<number> {
 				project.value.root,
 			);
 		}
+		if (resolution.group === "telemetry") {
+			return runTelemetryCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
 		if (resolution.group === "hydrate") {
 			return runHydrateCommand(
 				"hydrate",
@@ -374,9 +387,9 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		console.error(
-			`afol ${resolution.group} ${resolution.action}: not yet implemented`,
+			`err unknown-group group=${resolution.group} action=${resolution.action} hint="run afol -h"`,
 		);
-		return 1;
+		return 2;
 	}
 
 	console.error("err unsupported-command");
