@@ -106,6 +106,7 @@ describe("kernel front-door", () => {
 			expect(proc.stdout as string).toContain("s/status");
 			expect(proc.stdout as string).toContain("v/validate");
 			expect(proc.stdout as string).toContain("n/new");
+			expect(proc.stdout as string).toContain("bench");
 			expect(proc.stdout as string).toContain("a=afol");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -166,7 +167,7 @@ describe("kernel front-door", () => {
 				category?: string;
 			}>;
 			expect(catalogPayload.map((entry) => entry.command)).toEqual(
-				expect.arrayContaining(["status", "pstr", "adm"]),
+				expect.arrayContaining(["status", "pstr", "adm", "bench"]),
 			);
 			expect(
 				catalogPayload.find((entry) => entry.command === "status")?.aliases,

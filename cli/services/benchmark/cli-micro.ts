@@ -1,0 +1,90 @@
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
+import { DEFAULT_CLI_PACK_ID } from "./types";
+
+export type CliMicroResult = {
+	command: string;
+	args: string[];
+	exit_code: number | null;
+	wall_clock_ms: number;
+	output_bytes: number;
+	estimated_output_tokens: number;
+	status: "passed" | "failed";
+	notes: string[];
+};
+
+const MICRO_COMMANDS: string[][] = [
+	["status"],
+	["validate", "project", "--json"],
+	["rule"],
+	["-h"],
+	["session", "list"],
+	["catchup"],
+	["preflight", "test"],
+];
+
+export function runCliMicroBenchmark(root: string): CliMicroResult[] {
+	const afolPath = join(root, "afol");
+	return MICRO_COMMANDS.map((args) => {
+		const startedAt = Date.now();
+		const result = spawnSync(afolPath, args, {
+			cwd: root,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+		const wallClockMs = Date.now() - startedAt;
+		const stdout = result.stdout ?? "";
+		const stderr = result.stderr ?? "";
+		const outputBytes = Buffer.byteLength(stdout, "utf8");
+		return {
+			command: "afol",
+			args,
+			exit_code: result.status,
+			wall_clock_ms: wallClockMs,
+			output_bytes: outputBytes,
+			estimated_output_tokens: Math.ceil(outputBytes / 4),
+			status: result.status === 0 ? "passed" : "failed",
+			notes:
+				result.status === 0
+					? []
+					: [
+							stderr.trim().length > 0
+								? stderr.trim()
+								: `exit:${result.status ?? "null"}`,
+						],
+		};
+	});
+}
+
+export function summarizeCliMicro(results: CliMicroResult[]): {
+	pack_id: typeof DEFAULT_CLI_PACK_ID;
+	total_wall_clock_ms: number;
+	total_output_bytes: number;
+	total_estimated_output_tokens: number;
+	passed: number;
+	failed: number;
+} {
+	let totalWallClockMs = 0;
+	let totalOutputBytes = 0;
+	let totalTokens = 0;
+	let passed = 0;
+	let failed = 0;
+	for (const result of results) {
+		totalWallClockMs += result.wall_clock_ms;
+		totalOutputBytes += result.output_bytes;
+		totalTokens += result.estimated_output_tokens;
+		if (result.status === "passed") {
+			passed += 1;
+		} else {
+			failed += 1;
+		}
+	}
+	return {
+		pack_id: DEFAULT_CLI_PACK_ID,
+		total_wall_clock_ms: totalWallClockMs,
+		total_output_bytes: totalOutputBytes,
+		total_estimated_output_tokens: totalTokens,
+		passed,
+		failed,
+	};
+}

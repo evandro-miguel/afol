@@ -48,6 +48,7 @@ const SUBCOMMAND_GROUPS = new Set([
 	"maintenance",
 	"sweep",
 	"schema",
+	"bench",
 	"adapter",
 	"session",
 ]);

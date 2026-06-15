@@ -3,6 +3,7 @@
 import { runAdapterCommand } from "./commands/adapter";
 import { runAdmCommand } from "./commands/adm";
 import { runAdrCommand } from "./commands/adr";
+import { runBenchCommand } from "./commands/bench";
 import { runBootstrapCommand } from "./commands/bootstrap";
 import { runRuleCommand, runSkillCommand } from "./commands/catalog";
 import { runCatchupCommand } from "./commands/catchup";
@@ -290,6 +291,13 @@ export async function main(argv: string[]): Promise<number> {
 		}
 		if (resolution.group === "session") {
 			return runSessionCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "bench") {
+			return runBenchCommand(
 				resolution.action,
 				resolution.args,
 				project.value.root,

@@ -33,6 +33,7 @@ export type CommandKind =
 	| "sweep"
 	| "schema"
 	| "catchup"
+	| "bench"
 	| "preflight"
 	| "adapter"
 	| "session";
@@ -321,6 +322,15 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect schema state",
 		category: "ops",
+	},
+	{
+		command: "bench",
+		aliases: [],
+		kind: "bench",
+		sideEffect: "read",
+		description:
+			"Run comprehensive benchmarks: live agent metrics, CLI token economy, regressions",
+		category: "inspect",
 	},
 	{
 		command: "catchup",

@@ -1,0 +1,2 @@
+{"id":"E-20260615094213298-93c67d","task_id":"T-01","created_at":"2026-06-15T13:42:13.298Z","command":"afol bench cli && afol bench run --scenario governed-task-lifecycle","result":"failed","exit_code":2}
+{"id":"E-20260615094236676-184dfb","task_id":"T-01","created_at":"2026-06-15T13:42:36.676Z","command":"bun test cli/tests/bench-command.test.ts","result":"passed"}
