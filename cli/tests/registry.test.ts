@@ -83,7 +83,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("evidence")?.sideEffect).toBe("append");
 		expect(byCommand.get("local-state")?.sideEffect).toBe("generated");
 		expect(byCommand.get("pstr")?.sideEffect).toBe("read");
-		expect(byCommand.get("ctx")?.sideEffect).toBe("read");
+		expect(byCommand.get("ctx")?.sideEffect).toBe("generated");
 		expect(byCommand.get("state")?.sideEffect).toBe("read");
 		expect(byCommand.get("hydrate")?.sideEffect).toBe("generated");
 		expect(byCommand.get("render")?.sideEffect).toBe("generated");
@@ -155,6 +155,38 @@ describe("kernel registry", () => {
 				usage: "generate",
 				sideEffect: "generated",
 				description: "Refresh generated outputs with local approval",
+			},
+		]);
+	});
+
+	test("publishes ctx subcommand metadata for lazy section generation", () => {
+		const ctx = kernelRegistry.commands.find((entry) => entry.command === "ctx");
+
+		expect(ctx?.subcommands).toEqual([
+			{
+				usage: "build",
+				sideEffect: "generated",
+				description: "Rebuild the section index",
+			},
+			{
+				usage: "bundle",
+				sideEffect: "generated",
+				description: "Build a context bundle and refresh sections if needed",
+			},
+			{
+				usage: "section --ref <ref>",
+				sideEffect: "generated",
+				description: "Read one section and refresh sections if needed",
+			},
+			{
+				usage: "explain",
+				sideEffect: "generated",
+				description: "Explain bundle inputs and refresh sections if needed",
+			},
+			{
+				usage: "tools",
+				sideEffect: "generated",
+				description: "List context helpers and refresh sections if needed",
 			},
 		]);
 	});

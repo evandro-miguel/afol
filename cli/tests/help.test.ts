@@ -65,6 +65,24 @@ describe("help formatter", () => {
 		expect(help).toContain("generate [generated]");
 	});
 
+	test("formats ctx help with generated subcommands", () => {
+		const help = formatCommandHelp("ctx", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected ctx command help");
+		}
+		expect(help).toContain("Command: ctx");
+		expect(help).toContain("Aliases: cx");
+		expect(help).toContain("Side effect: generated");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("build [generated]");
+		expect(help).toContain("bundle [generated]");
+		expect(help).toContain("section --ref <ref> [generated]");
+		expect(help).toContain("explain [generated]");
+		expect(help).toContain("tools [generated]");
+	});
+
 	test("builds catalog json without fake aliases", () => {
 		const catalog = buildCommandCatalog(kernelRegistry);
 		const parsed = JSON.parse(formatCatalogJson(kernelRegistry)) as Array<{
@@ -147,5 +165,46 @@ describe("help formatter", () => {
 				description: "Refresh generated outputs with local approval",
 			},
 		]);
+	});
+
+	test("builds ctx json with generated subcommand metadata", () => {
+		const help = buildCommandHelpJson("ctx", kernelRegistry);
+		expect(help).not.toBeNull();
+		expect(help).toEqual({
+			command: "ctx",
+			aliases: ["cx"],
+			kind: "ctx",
+			sideEffect: "generated",
+			description: "Inspect context bundles",
+			category: "inspect",
+			subcommands: [
+				{
+					usage: "build",
+					sideEffect: "generated",
+					description: "Rebuild the section index",
+				},
+				{
+					usage: "bundle",
+					sideEffect: "generated",
+					description: "Build a context bundle and refresh sections if needed",
+				},
+				{
+					usage: "section --ref <ref>",
+					sideEffect: "generated",
+					description: "Read one section and refresh sections if needed",
+				},
+				{
+					usage: "explain",
+					sideEffect: "generated",
+					description: "Explain bundle inputs and refresh sections if needed",
+				},
+				{
+					usage: "tools",
+					sideEffect: "generated",
+					description:
+						"List context helpers and refresh sections if needed",
+				},
+			],
+		});
 	});
 });

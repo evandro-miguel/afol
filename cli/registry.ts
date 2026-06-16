@@ -218,9 +218,37 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		command: "ctx",
 		aliases: ["cx"],
 		kind: "ctx",
-		sideEffect: "read",
+		sideEffect: "generated",
 		description: "Inspect context bundles",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "build",
+				sideEffect: "generated",
+				description: "Rebuild the section index",
+			},
+			{
+				usage: "bundle",
+				sideEffect: "generated",
+				description: "Build a context bundle and refresh sections if needed",
+			},
+			{
+				usage: "section --ref <ref>",
+				sideEffect: "generated",
+				description: "Read one section and refresh sections if needed",
+			},
+			{
+				usage: "explain",
+				sideEffect: "generated",
+				description:
+					"Explain bundle inputs and refresh sections if needed",
+			},
+			{
+				usage: "tools",
+				sideEffect: "generated",
+				description: "List context helpers and refresh sections if needed",
+			},
+		],
 	},
 	{
 		command: "state",

@@ -699,6 +699,18 @@ describe("context system", () => {
 		}
 	});
 
+	test("afol ctx defaults to build and rebuilds sections", async () => {
+		const root = createSectionFixture();
+		try {
+			const captured = captureIo();
+			expect(await runContextCommand("", [], root, captured.io)).toBe(0);
+			expect(getSectionIndex(root)?.sections.length).toBe(4);
+			expect(captured.stdout[0]).toContain("ctx build: ok sections=4");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol ctx build --json returns JSON", async () => {
 		const root = createSectionFixture();
 		try {
