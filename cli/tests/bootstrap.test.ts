@@ -299,6 +299,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 					target,
 					"--provider-compatible",
 					"--cleanup-provider-compatible-mutable",
+					"--verbose",
 				]),
 			).toBe(0);
 
@@ -388,6 +389,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 					target,
 					"--provider-compatible",
 					"--dry-run",
+					"--verbose",
 				]),
 			).toBe(0);
 

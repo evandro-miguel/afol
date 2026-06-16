@@ -566,8 +566,8 @@ describe("kernel front-door", () => {
 		const target = join(root, "target");
 		try {
 			for (const args of [
-				["bootstrap", target, "--dry-run"],
-				["b", target, "--dry-run"],
+				["bootstrap", target, "--dry-run", "--verbose"],
+				["b", target, "--dry-run", "--verbose"],
 			]) {
 				const proc = runKernel(root, args);
 				expect(proc.status).toBe(0);
@@ -584,7 +584,7 @@ describe("kernel front-door", () => {
 	test("init dry-run uses current directory without requiring project files", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-init-no-project-"));
 		try {
-			const proc = runKernel(root, ["init", "--dry-run"]);
+			const proc = runKernel(root, ["init", "--dry-run", "--verbose"]);
 			expect(proc.status).toBe(0);
 			expect(proc.stderr as string).toBe("");
 			expect(proc.stdout as string).toContain(`bootstrap: target=${root}`);
@@ -628,6 +628,7 @@ describe("kernel front-door", () => {
 				"--provider-compatible",
 				"--cleanup-provider-compatible-mutable",
 				"--confirm-provider-migration",
+				"--verbose",
 			]);
 
 			expect(proc.status).toBe(0);

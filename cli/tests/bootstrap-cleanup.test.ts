@@ -93,7 +93,11 @@ describe("bootstrap cleanup of legacy Python scaffold", () => {
 		try {
 			writeLegacyTargetFixture(target);
 
-			const proc = runBootstrap(target, ["--dry-run", "--cleanup-obsolete"]);
+			const proc = runBootstrap(target, [
+				"--dry-run",
+				"--cleanup-obsolete",
+				"--verbose",
+			]);
 			expect(proc.status).toBe(0);
 			expect(proc.stdout as string).toContain(
 				"cleanup-pending .agents/scripts legacy-script-root",
@@ -140,7 +144,10 @@ describe("bootstrap cleanup of legacy Python scaffold", () => {
 				true,
 			);
 
-			const cleanupProc = runBootstrap(target, ["--cleanup-obsolete"]);
+			const cleanupProc = runBootstrap(target, [
+				"--cleanup-obsolete",
+				"--verbose",
+			]);
 			expect(cleanupProc.status).toBe(0);
 			expect(cleanupProc.stdout).toContain(
 				"cleanup-removed .agents/scripts legacy-script-root",
