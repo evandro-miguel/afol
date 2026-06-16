@@ -160,7 +160,9 @@ describe("kernel registry", () => {
 	});
 
 	test("publishes ctx subcommand metadata for lazy section generation", () => {
-		const ctx = kernelRegistry.commands.find((entry) => entry.command === "ctx");
+		const ctx = kernelRegistry.commands.find(
+			(entry) => entry.command === "ctx",
+		);
 
 		expect(ctx?.subcommands).toEqual([
 			{

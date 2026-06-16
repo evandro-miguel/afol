@@ -201,8 +201,7 @@ describe("help formatter", () => {
 				{
 					usage: "tools",
 					sideEffect: "generated",
-					description:
-						"List context helpers and refresh sections if needed",
+					description: "List context helpers and refresh sections if needed",
 				},
 			],
 		});

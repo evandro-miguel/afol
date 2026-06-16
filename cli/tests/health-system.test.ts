@@ -396,8 +396,9 @@ describe("health system", () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(await runMaintenanceCommand(["weekly", "--json"], root, captured.io))
-				.toBe(0);
+			expect(
+				await runMaintenanceCommand(["weekly", "--json"], root, captured.io),
+			).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				mode: string;
 				dry_run: boolean;

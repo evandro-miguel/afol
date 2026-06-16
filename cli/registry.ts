@@ -240,8 +240,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 			{
 				usage: "explain",
 				sideEffect: "generated",
-				description:
-					"Explain bundle inputs and refresh sections if needed",
+				description: "Explain bundle inputs and refresh sections if needed",
 			},
 			{
 				usage: "tools",
