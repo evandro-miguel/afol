@@ -192,4 +192,28 @@ describe("kernel registry", () => {
 			},
 		]);
 	});
+
+	test("publishes telemetry subcommand metadata", () => {
+		const telemetry = kernelRegistry.commands.find(
+			(entry) => entry.command === "telemetry",
+		);
+
+		expect(telemetry?.subcommands).toEqual([
+			{
+				usage: "query --limit <n>",
+				sideEffect: "read",
+				description: "Show recent telemetry events; defaults to latest 10",
+			},
+			{
+				usage: "report --limit <n>",
+				sideEffect: "read",
+				description: "Summarize telemetry counts by session, type, and outcome",
+			},
+			{
+				usage: "export --format jsonl",
+				sideEffect: "read",
+				description: "Export filtered telemetry events",
+			},
+		]);
+	});
 });

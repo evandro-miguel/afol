@@ -141,12 +141,24 @@ describe("telemetry command", () => {
 
 			const defaultQuery = captureIo();
 			expect(
-				await runTelemetryCommand("query", ["--json"], root, defaultQuery.io),
+				await runTelemetryCommand("query", [], root, defaultQuery.io),
 			).toBe(0);
-			const defaultPayload = JSON.parse(defaultQuery.stdout[0] ?? "{}") as {
+			expect(defaultQuery.stdout[0]).toContain("telemetry query: 10 latest");
+
+			const defaultJson = captureIo();
+			expect(
+				await runTelemetryCommand("query", ["--json"], root, defaultJson.io),
+			).toBe(0);
+			const defaultPayload = JSON.parse(defaultJson.stdout[0] ?? "{}") as {
 				data: { count: number };
 			};
 			expect(defaultPayload.data.count).toBe(10);
+
+			const topLevelLimit = captureIo();
+			expect(
+				await runTelemetryCommand("--limit", ["3"], root, topLevelLimit.io),
+			).toBe(0);
+			expect(topLevelLimit.stdout[0]).toContain("telemetry query: 3 latest");
 
 			const explicitLimit = captureIo();
 			expect(

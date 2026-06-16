@@ -458,6 +458,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Query, report, and export AFOL telemetry events",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "query --limit <n>",
+				sideEffect: "read",
+				description: "Show recent telemetry events; defaults to latest 10",
+			},
+			{
+				usage: "report --limit <n>",
+				sideEffect: "read",
+				description: "Summarize telemetry counts by session, type, and outcome",
+			},
+			{
+				usage: "export --format jsonl",
+				sideEffect: "read",
+				description: "Export filtered telemetry events",
+			},
+		],
 	},
 	{
 		command: "session",

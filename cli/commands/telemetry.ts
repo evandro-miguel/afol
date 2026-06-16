@@ -40,7 +40,7 @@ function normalizeInvocation(
 	action: string,
 	args: string[],
 ): { action: TelemetryAction; args: string[] } {
-	if (action === "--json" || action === "-j") {
+	if (action.startsWith("-")) {
 		return { action: "query", args: [action, ...args] };
 	}
 	return { action: normalizeAction(action), args };
@@ -174,7 +174,7 @@ function emitJsonError(io: CommandIo, action: string, message: string): void {
 
 function formatQuery(events: TelemetryEvent[]): string {
 	return [
-		`telemetry query: ${events.length}`,
+		`telemetry query: ${events.length} latest`,
 		...events.map(
 			(event) =>
 				`${event.ts} ${event.event_type} session=${event.session_id}${event.task_id ? ` task=${event.task_id}` : ""}${event.cmd_type ? ` cmd=${event.cmd_type}` : ""}${event.outcome ? ` outcome=${event.outcome}` : ""}`,

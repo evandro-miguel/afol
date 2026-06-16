@@ -83,6 +83,20 @@ describe("help formatter", () => {
 		expect(help).toContain("tools [generated]");
 	});
 
+	test("formats telemetry help with read-only subcommands", () => {
+		const help = formatCommandHelp("telemetry", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected telemetry command help");
+		}
+		expect(help).toContain("Command: telemetry");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("query --limit <n> [read]");
+		expect(help).toContain("report --limit <n> [read]");
+		expect(help).toContain("export --format jsonl [read]");
+	});
+
 	test("builds catalog json without fake aliases", () => {
 		const catalog = buildCommandCatalog(kernelRegistry);
 		const parsed = JSON.parse(formatCatalogJson(kernelRegistry)) as Array<{
