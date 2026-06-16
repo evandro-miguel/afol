@@ -15,6 +15,8 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
+const DEFAULT_QUERY_LIMIT = 10;
+
 type TelemetryAction = "query" | "report" | "export";
 
 type ParsedArgs = {
@@ -72,7 +74,7 @@ function parseArgs(args: string[]): ParsedArgs {
 		json: false,
 		type: null,
 		session: null,
-		limit: 50,
+		limit: DEFAULT_QUERY_LIMIT,
 		format: "json",
 	};
 	for (let index = 0; index < args.length; index += 1) {

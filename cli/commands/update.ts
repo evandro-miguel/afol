@@ -420,7 +420,11 @@ export async function runUpdateCommand(
 						parsedArgs.verbose,
 					);
 				} else {
-					io.stdout(formatUpdateCheck(result, command).trimEnd());
+					io.stdout(
+						formatUpdateCheck(result, command, {
+							verbose: parsedArgs.verbose,
+						}).trimEnd(),
+					);
 				}
 				return 1;
 			}
@@ -428,7 +432,11 @@ export async function runUpdateCommand(
 				if (parsedArgs.json) {
 					writeJsonResult(io, "update.apply", result, 4, parsedArgs.verbose);
 				} else {
-					io.stdout(formatUpdateCheck(result, "apply").trimEnd());
+					io.stdout(
+						formatUpdateCheck(result, "apply", {
+							verbose: parsedArgs.verbose,
+						}).trimEnd(),
+					);
 				}
 				return 4;
 			}
@@ -436,7 +444,11 @@ export async function runUpdateCommand(
 				if (parsedArgs.json) {
 					writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose);
 				} else {
-					io.stdout(formatUpdateCheck(result, "apply").trimEnd());
+					io.stdout(
+						formatUpdateCheck(result, "apply", {
+							verbose: parsedArgs.verbose,
+						}).trimEnd(),
+					);
 				}
 				return 0;
 			}
@@ -452,7 +464,11 @@ export async function runUpdateCommand(
 			if (parsedArgs.json) {
 				writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose);
 			} else {
-				io.stdout(formatUpdateCheck(result, command).trimEnd());
+				io.stdout(
+					formatUpdateCheck(result, command, {
+						verbose: parsedArgs.verbose,
+					}).trimEnd(),
+				);
 			}
 			return 0;
 		}
@@ -468,7 +484,11 @@ export async function runUpdateCommand(
 				),
 			);
 		} else {
-			io.stdout(formatUpdateCheck(result, command).trimEnd());
+			io.stdout(
+				formatUpdateCheck(result, command, {
+					verbose: parsedArgs.verbose,
+				}).trimEnd(),
+			);
 		}
 		return result.hasSource ? 0 : 1;
 	} catch (error) {

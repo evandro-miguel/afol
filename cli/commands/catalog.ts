@@ -24,6 +24,24 @@ function formatSkill(skill: ReturnType<typeof listSkills>[number]): string {
 	return `${skill.name} ${skill.path}${suffix}`;
 }
 
+function formatSkillBrief(
+	skill: ReturnType<typeof listSkills>[number],
+): string {
+	return `${skill.name} ${skill.path}`;
+}
+
+function parseVerboseListArgs(values: string[]): boolean {
+	let verbose = false;
+	for (const value of values) {
+		if (value === "--verbose" || value === "-v") {
+			verbose = true;
+			continue;
+		}
+		throw new Error(`Unknown skill list argument: ${value}`);
+	}
+	return verbose;
+}
+
 function splitCsv(value: string): string[] {
 	return value
 		.split(",")
@@ -114,9 +132,13 @@ export async function runSkillCommand(
 	try {
 		const [command = "list", ...rest] = args;
 		if (command === "list" || command === "ls") {
+			const verbose = parseVerboseListArgs(rest);
 			const skills = listSkills(projectRoot);
 			io.stdout(
-				[`skills: ${skills.length}`, ...skills.map(formatSkill)].join("\n"),
+				[
+					`skills: ${skills.length}${verbose ? "" : " (use skill show <name> or skill list --verbose for descriptions)"}`,
+					...skills.map(verbose ? formatSkill : formatSkillBrief),
+				].join("\n"),
 			);
 			return 0;
 		}

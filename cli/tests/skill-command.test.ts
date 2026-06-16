@@ -43,6 +43,18 @@ describe("skill command", () => {
 			expect(await runSkillCommand(["list"], root, list.io)).toBe(0);
 			expect(list.stdout.join("\n")).toContain("skills: 2");
 			expect(list.stdout.join("\n")).toContain("bun-development");
+			expect(list.stdout.join("\n")).toContain("skill list --verbose");
+			expect(list.stdout.join("\n")).not.toContain(
+				"Fast Bun TypeScript workflows.",
+			);
+
+			const verboseList = capture();
+			expect(
+				await runSkillCommand(["list", "--verbose"], root, verboseList.io),
+			).toBe(0);
+			expect(verboseList.stdout.join("\n")).toContain(
+				"Fast Bun TypeScript workflows.",
+			);
 
 			const show = capture();
 			expect(

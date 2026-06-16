@@ -394,6 +394,46 @@ describe("state commands", () => {
 		}
 	});
 
+	test("afol state defaults to active session when session is omitted", async () => {
+		const root = createFixture();
+		try {
+			const hydrated = captureIo();
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					hydrated.io,
+				),
+			).toBe(0);
+			writeFileSync(
+				join(root, ".afol", "wb", ".active_session"),
+				"test-session\n",
+				"utf8",
+			);
+			const captured = captureIo();
+			expect(await runStateCommand("", [], root, captured.io)).toBe(0);
+			expect(captured.stdout.join("\n")).toContain("state: test-session");
+			expect(captured.stderr).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol state without session or active session returns actionable error", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(await runStateCommand("", [], root, captured.io)).toBe(2);
+			expect(captured.stderr.join("\n")).toContain(
+				"Missing --session for state and no active session found",
+			);
+			expect(captured.stderr.join("\n")).toContain("afol session list");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol state sync --json returns hydrated snapshot", async () => {
 		const root = createFixture();
 		try {

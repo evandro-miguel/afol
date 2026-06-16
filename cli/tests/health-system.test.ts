@@ -556,6 +556,9 @@ describe("health system", () => {
 			expect(await runDoctorCommand([], root, captured.io)).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("doctor scores:");
 			expect(captured.stdout.join("\n")).toContain("pstr:");
+			expect(captured.stdout.join("\n")).toContain(
+				"afol doctor --remediation-plan",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

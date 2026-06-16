@@ -28,6 +28,25 @@ const DEFAULT_IO: CommandIo = {
 
 type LocalStateCommand = "rebuild" | "freshness";
 
+type LocalStateSnapshot = {
+	workbench: ReturnType<typeof rebuildWorkBenchIndex>;
+} & ReturnType<typeof rebuildProjectIndexes>;
+
+function summarizeSnapshot(
+	snapshot: LocalStateSnapshot,
+): Record<string, unknown> {
+	return {
+		workbench: {
+			sessions: snapshot.workbench.sessions.length,
+			tasks: snapshot.workbench.tasks.length,
+		},
+		rules: snapshot.rules.rules.length,
+		skills: snapshot.skills.skills.length,
+		specs: snapshot.specs.specs.length,
+		files: snapshot.files.files.length,
+	};
+}
+
 function resultEnvelope<T extends Record<string, unknown>>(
 	data: T,
 	action: string,
@@ -71,6 +90,17 @@ function formatFreshness(root: string): {
 	};
 }
 
+function formatFreshnessLine(check: {
+	id: string;
+	ok: boolean;
+	message: string;
+}): string {
+	if (check.ok) {
+		return `ok ${check.id}`;
+	}
+	return `fail ${check.id} ${check.message}`;
+}
+
 export async function runLocalStateCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
@@ -80,10 +110,15 @@ export async function runLocalStateCommand(
 		const [rawCommand, ...rest] = args;
 		const command = normalizeCommand(rawCommand);
 		let json = false;
+		let verbose = false;
 
 		for (const value of rest) {
 			if (value === "--json" || value === "-j") {
 				json = true;
+				continue;
+			}
+			if (value === "--verbose" || value === "-v") {
+				verbose = true;
 				continue;
 			}
 			throw new Error(`Unknown local-state argument: ${value}`);
@@ -92,16 +127,18 @@ export async function runLocalStateCommand(
 		if (command === "rebuild") {
 			const workbench = rebuildWorkBenchIndex(projectRoot);
 			const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
+			const summary = summarizeSnapshot(snapshot);
 			if (json) {
+				const payload = verbose
+					? { ok: true, command, summary, snapshot }
+					: { ok: true, command, summary };
 				io.stdout(
 					stringifyEnvelope(
 						envelopeWithLegacyKeys(
-							resultEnvelope(
-								{ ok: true, command, snapshot },
-								`local-state.${command}`,
-								0,
-							),
-							["ok", "command", "snapshot"],
+							resultEnvelope(payload, `local-state.${command}`, 0),
+							verbose
+								? ["ok", "command", "summary", "snapshot"]
+								: ["ok", "command", "summary"],
 						),
 					),
 				);
@@ -134,10 +171,7 @@ export async function runLocalStateCommand(
 			io.stdout(
 				[
 					`local-state freshness: ${result.ok ? "ok" : "failed"}`,
-					...result.checks.map(
-						(check) =>
-							`${check.ok ? "ok" : "fail"} ${check.id} ${check.message}`,
-					),
+					...result.checks.map(formatFreshnessLine),
 				].join("\n"),
 			);
 		}

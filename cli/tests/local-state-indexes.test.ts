@@ -423,9 +423,11 @@ describe("local-state project indexer", () => {
 				ok: boolean;
 				exit_code: number;
 				command: string;
+				summary?: { workbench?: { sessions?: number; tasks?: number } };
 				snapshot?: { workbench?: { kind?: string } };
 				data?: {
 					command?: string;
+					summary?: { workbench?: { sessions?: number; tasks?: number } };
 					snapshot?: { workbench?: { kind?: string } };
 				};
 			};
@@ -433,10 +435,24 @@ describe("local-state project indexer", () => {
 			expect(rebuildPayload.ok).toBe(true);
 			expect(rebuildPayload.exit_code).toBe(0);
 			expect(rebuildPayload.command).toBe("rebuild");
-			expect(rebuildPayload.snapshot?.workbench?.kind).toBe(
+			expect(rebuildPayload.summary?.workbench?.sessions).toBe(0);
+			expect(rebuildPayload.snapshot).toBeUndefined();
+			expect(rebuildPayload.data?.command).toBe("rebuild");
+			expect(rebuildPayload.data?.summary?.workbench?.tasks).toBe(0);
+
+			expect(
+				await runLocalStateCommand(
+					["rebuild", "--json", "--verbose"],
+					root,
+					io,
+				),
+			).toBe(0);
+			const verboseRebuildPayload = JSON.parse(stdout.at(-1) ?? "{}") as {
+				snapshot?: { workbench?: { kind?: string } };
+			};
+			expect(verboseRebuildPayload.snapshot?.workbench?.kind).toBe(
 				"workbench_index_v1",
 			);
-			expect(rebuildPayload.data?.command).toBe("rebuild");
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
 
 			expect(

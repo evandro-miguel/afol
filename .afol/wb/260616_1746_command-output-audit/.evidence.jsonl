@@ -1,0 +1,7 @@
+{"id":"E-20260616174645477-883fae","task_id":"T-01","created_at":"2026-06-16T21:46:45.477Z","command":"plan updated at .afol/wb/260616_1746_command-output-audit/260616_1746_command-output-audit_plan_01.md","result":"passed"}
+{"id":"E-20260616174903227-f4d965","task_id":"T-02","created_at":"2026-06-16T21:49:03.227Z","command":"measured 43 representative AFOL commands into /tmp/afol-command-output-audit; largest defaults: update check 4389 lines/161134 bytes, local-state rebuild --json 1 line/260324 bytes, skill list 26 lines/8301 bytes, telemetry 51 lines/5576 bytes","result":"passed"}
+{"id":"E-20260616175905566-a35956","task_id":"T-03","created_at":"2026-06-16T21:59:05.566Z","command":"compact output fixes: update check, local-state json/freshness, skill list, telemetry, memory, doctor","result":"passed"}
+{"id":"E-20260616175905745-391448","task_id":"T-04","created_at":"2026-06-16T21:59:05.745Z","command":"bun test cli/tests/update-command.test.ts cli/tests/skill-command.test.ts cli/tests/local-state-indexes.test.ts cli/tests/telemetry-command.test.ts cli/tests/memory-command.test.ts cli/tests/health-system.test.ts","result":"passed"}
+{"id":"E-20260616175905806-df14fe","task_id":"T-04","created_at":"2026-06-16T21:59:05.806Z","command":"bun test","result":"passed"}
+{"id":"E-20260616175905871-563803","task_id":"T-04","created_at":"2026-06-16T21:59:05.871Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260616175905937-a97f84","task_id":"T-04","created_at":"2026-06-16T21:59:05.937Z","command":"bun run validate:release","result":"passed"}
