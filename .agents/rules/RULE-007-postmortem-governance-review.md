@@ -75,9 +75,8 @@ If the answer is "no" for every promotion category, record that explicitly.
 
 Before closure:
 
-- `./.agents/agents wb-update status --session <session-id> --file postmortem --value final`
-  must succeed without unresolved placeholders.
-- `./.agents/agents verify-tasks --strict .afol/wb/<session-id>` must not
+- The postmortem artifact must be finalized without unresolved placeholders.
+- `afol verify-tasks --strict` must not
   report incomplete postmortem governance review.
 
 ---

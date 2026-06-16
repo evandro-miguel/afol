@@ -2,15 +2,15 @@
 doc_type: rule
 id: RULE-005
 theme: folder-structure
-version: 1.0
+version: 2.0
 created: 2026-02-23
+updated_at: '2026-06-16T00:00:00Z'
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
-updated_at: '2026-04-18T22:35:01-03:00'
 ---
 
 # Folder Structure
 
-**Purpose:** Define required .agents folder structure and configuration.
+**Purpose:** define the AFOL-only scaffold layout.
 
 ---
 
@@ -18,175 +18,53 @@ updated_at: '2026-04-18T22:35:01-03:00'
 
 ```text
 docs/
-├── arc/                    # Goal-state canon and architecture docs
 ├── map/                    # Current-state repository mapping
-├── standards/              # Human-readable standards
-├── templates/              # Document templates
-├── plans/                  # Durable ExecPlans and governed plan sessions
-├── lessons/                # Lessons learned
-└── agentic/                # Tool documentation
+└── ...                     # Project docs owned outside runtime state
+
+.afol/
+├── adm/                    # Roadmap, specs, ADRs, strategy, desired state
+├── pstr/                   # Current project-structure maps only
+└── wb/                     # Governed execution sessions, evidence, indexes
 
 .agents/
-├── agents.config           # Central configuration (YAML)
-├── tools.json              # Tool catalog (JSON)
-├── agents                  # CLI wrapper (bash)
-├── runtime/                # Runtime package mirror and adapters
-├── data/
-│   └── session/            # Local active-session pointer
-├── scripts/
-│   ├── agents-*.py         # Tool scripts
-│   └── lib/
-│       └── agents_config.py
-└── rules/                  # Agent rules
+├── config.json             # Static scaffold metadata
+├── lock.json               # Static scaffold metadata
+├── manifest.json           # Static scaffold metadata
+├── rules/                  # Static agent rules
+└── source/                 # Static source metadata
 
 src/
-└── project-template/       # Exportable default project baseline
+└── project-template/       # Exportable downstream scaffold
 ```
 
 ---
 
-## Required Folders
+## Ownership
 
-| Folder | Purpose |
-|--------|---------|
-| `docs/templates/` | Document templates |
-| `.afol/wb/` | Durable ExecPlans and governed plan sessions |
-| `docs/standards/` | Human standards |
-| `docs/lessons/` | Lessons learned |
-| `docs/agentic/` | Tool documentation |
-| `docs/arc/` | Architecture docs |
-| `docs/arc/SPECS/` | Technical specifications |
-| `docs/arc/DECISIONS/` | Architecture decisions |
-| `docs/map/` | Current-state repository mapping |
-| `src/project-template/` | Exportable scaffold baseline source |
-| `.agents/rules/` | Agent rules |
-| `.agents/scripts/` | Tool scripts |
-| `.agents/skills/` | Agent skills |
-| `.agents/z-arq/` | Archived work and notes |
+| Path | Purpose |
+|------|---------|
+| `.afol/adm/` | Project direction, specs, decisions, strategy |
+| `.afol/pstr/` | Current project-structure maps only |
+| `.afol/wb/` | Mutable sessions, events, evidence, indexes, benchmarks |
+| `.agents/config.json` | Static scaffold config metadata |
+| `.agents/lock.json` | Static scaffold lock metadata |
+| `.agents/manifest.json` | Static scaffold manifest metadata |
+| `.agents/rules/` | Static rules for agents |
+| `.agents/source/` | Static source metadata |
+| `src/project-template/` | Exportable template baseline |
 
-**Validate:**
+Mutable runtime state belongs under `.afol/`.
+
+---
+
+## Validate
 
 ```bash
-just doctor
-```
-
----
-
-## Configuration Files
-
-### agents.config (YAML)
-
-```yaml
-version: 1
-
-paths:
-  agents_dir: .agents
-  docs_dir: docs
-  wb_dir: .afol/wb
-  active_session_file: .afol/wb/.active_session
-  templates_dir: docs/templates
-  arc_dir: docs/arc
-
-time:
-  default_offset: "+00:00"
-  wb_offset: "-03:00"
-
-lint:
-  excluded_path_prefixes:
-    - docs/map/extra/
-    - docs/map/structure/
-
-doctor:
-  required_folders: [...]
-  required_templates: [...]
-
-sync:
-  source_file: AGENTS.md
-  target_files:
-    - CLAUDE.md
-```
-
-**Location:** `.agents/agents.config`
-
----
-
-### tools.json (JSON)
-
-```json
-{
-  "version": "1.0.0",
-  "tools": [...],
-  "tool_categories": {...},
-  "execution_modes": {...},
-  "justfile_aliases": {
-    "st": "structure",
-    "ix": "index",
-    "sy": "sync",
-    "vf": "verify",
-    "dr": "doctor"
-  }
-}
-```
-
-**Location:** `.agents/tools.json`
-
-**Validate:**
-
-```bash
+afol status
+afol local-state rebuild --json
+afol validate project --json
+afol verify-tasks --strict
 python -m json.tool .agents/tools.json
-```
-
----
-
-### .active_session
-
-```text
-260223_1800_auth-refactor
-```
-
-**Purpose:** Points to current workstream
-
-**Location:** `.afol/wb/.active_session`
-
-**Update automatically:**
-
-```bash
-./.agents/agents new <theme>
-```
-
----
-
-## Documentation Locations
-
-| Type | Location |
-|------|----------|
-| Tool documentation | `docs/agentic/` |
-| Human standards | `docs/standards/` |
-| Templates | `docs/templates/` |
-| Lessons learned | `docs/lessons/` |
-| Architecture | `docs/arc/` |
-| Structure docs | `docs/map/structure/` |
-| Specifications | `docs/arc/SPECS/` |
-| Decisions (ADRs) | `docs/arc/DECISIONS/` |
-| Agent rules | `.agents/rules/` |
-
----
-
-## Workstream Structure
-
-```text
-.afol/wb/
-└── 260223_1800_auth-refactor/
-    ├── 260223_1800_auth-refactor_plan_01.md
-    ├── 260223_1800_auth-refactor_task_01.md
-    ├── 260223_1800_auth-refactor_log_01.md
-    └── 260223_1800_auth-refactor_spec-lite_01.md
-```
-
-**Create with:**
-
-```bash
-./.agents/agents new auth-refactor --spec-lite
 ```
 
 ---
@@ -195,55 +73,23 @@ python -m json.tool .agents/tools.json
 
 **DO:**
 
-- ✅ Use `.afol/wb/` for durable plan/session files
-- ✅ Use `.agents/` for runtime state and agent-owned local files
-- ✅ Keep configuration in `.agents/agents.config`
-- ✅ Store tool docs in `docs/agentic/`
-- ✅ Store human docs in `docs/standards/`
-- ✅ During cleanup/update work, identify obsolete or duplicated rules, docs,
-  workflow elements, generated artifacts, caches, and adapters
-- ✅ Ask the user whether to remove or adapt obsolete folder elements unless
-  removal/adaptation was already explicitly authorized
-- ✅ Validate structure with `just doctor`
+- Use `.afol/wb/` for governed sessions.
+- Use `.afol/adm/` for durable project direction.
+- Use `.afol/pstr/` only for current-state structure maps.
+- Keep `.agents/` limited to retained static metadata.
+- Validate scaffold metadata after edits.
 
 **DON'T:**
 
-- ❌ Put durable plans or active sessions under legacy `.agents/wb/`
-- ❌ Edit `agents.config` without validating YAML
-- ❌ Edit `tools.json` without validating JSON
-- ❌ Delete required folders
-- ❌ Leave obsolete rules, docs, or duplicated surfaces in place without naming
-  the cleanup/adaptation decision
-
----
-
-## Troubleshooting
-
-```bash
-# Check structure
-just doctor
-
-# Check config
-python -c "import yaml; yaml.safe_load(open('.agents/agents.config'))"
-
-# Check tools.json
-python -m json.tool .agents/tools.json
-
-# List governed plan sessions
-ls -la .afol/wb/
-
-# Check active session
-cat .afol/wb/.active_session
-```
+- Recreate discontinued command wrappers, Python runners, or compatibility adapters.
+- Put mutable session state under `.agents/`.
+- Store roadmap, specs, execution automation, or benchmark results under `.agents/`.
+- Leave static metadata pointing agents to retired entrypoints.
 
 ---
 
 ## References
 
-- `docs/agentic/agents-config.md` - Config loader docs
-- `docs/agentic/tools-json.md` - tools.json docs
+- `AGENTS.md`
+- `src/project-template/`
 - RULE-006 - Applicable Rule Resolution
-
----
-
-*Version: 1.0 | Lines: ~160 | Max: 250*

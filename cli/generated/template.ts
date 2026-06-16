@@ -15,7 +15,7 @@ export const DEFAULT_TEMPLATE_METADATA = Object.freeze({
 	excludedForbiddenCount: 0,
 	generatedAt: "1970-01-01T00:00:00.000Z",
 	templateHash:
-		"f5e82a982ba4d2683ea9ab5142285e67aebe2ad55929393f4b58f861a0ba2df1",
+		"b44677880a4ae1da7fd815ef606a65a9135955a68d9de264482063480dfa24d3",
 	forbiddenPatterns: [
 		"a",
 		"Justfile",
@@ -83,16 +83,16 @@ export const DEFAULT_TEMPLATE_FILES: Readonly<
 	".afol/library/GRAPH.md": {
 		path: ".afol/library/GRAPH.md",
 		contentBase64:
-			"IyBMaWJyYXJ5IEdyYXBoCgpNYXRlcmlhbGl6ZWQgZ3JhcGggbm90ZXMgZm9yIHdpa2lsaW5rcywgc291cmNlIHJlZnMsIGFuZCBjbGFpbSByZWZzLgo=",
-		sha256: "c955a84ac838642a6d4ce9bd7d382690d4abeb0290aadea0be859f35145ef186",
-		bytes: 86,
+			"IyBMaWJyYXJ5IEdyYXBoCgpUaGlzIGdyYXBoIGlzIG1hdGVyaWFsaXplZCBmcm9tIGN1cmF0ZWQgdG9waWMgbGlua3MsIHdpa2lsaW5rcywgc291cmNlIHJlZnMsIGFuZCBjbGFpbSByZWZzLgoKUnVuIGBhZm9sIGxpYnJhcnkgZ3JhcGggLS1qc29uYCBhZnRlciB0b3BpYyBjaGFuZ2VzIHRvIGluc3BlY3QgZWRnZXMuCg==",
+		sha256: "c06de5e463e7149c50213ea0b0747221bf99c2c498b3bdb962c55dfca27cd2a8",
+		bytes: 181,
 	},
 	".afol/library/INDEX.md": {
 		path: ".afol/library/INDEX.md",
 		contentBase64:
-			"IyBBRk9MIExpYnJhcnkKCkN1cmF0ZWQgcHJvamVjdCByZXNlYXJjaCBsaXZlcyB1bmRlciBgdG9waWNzLzx0b3BpYz4vSU5ERVgubWRgLgo=",
-		sha256: "40297160c39c801891e11649b9e73cc3e1d295d2d9e243fcc448a424ca03ad1f",
-		bytes: 80,
+			"IyBBRk9MIExpYnJhcnkKCkN1cmF0ZWQgcHJvamVjdCByZXNlYXJjaCBsaXZlcyB1bmRlciBgdG9waWNzLzx0b3BpYz4vSU5ERVgubWRgLgoKVXNlIGBhZm9sIGxpYnJhcnkgcHJvcG9zZWAsIGBhZm9sIGxpYnJhcnkgYWRkLXNvdXJjZWAsIGBhZm9sIGxpYnJhcnkgYWRkLWNsYWltYCwgYW5kIGBhZm9sIGxpYnJhcnkgcmVidWlsZC1pbmRleGAgdG8gbWFpbnRhaW4gdGhpcyBzdXJmYWNlLgo=",
+		sha256: "1a8f41fa06a0ba0b40b0fecbdce4ac82493fd3e56f79fede5b5b1bc3711aa528",
+		bytes: 221,
 	},
 	".afol/library/TAGS.md": {
 		path: ".afol/library/TAGS.md",

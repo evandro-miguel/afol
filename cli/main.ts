@@ -203,27 +203,35 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "new") {
-		return runNewCommand(resolution.args, project.value.root);
+		return runNewCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "start") {
-		return runStartCommand(resolution.args, project.value.root);
+		return runStartCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "evidence") {
-		return runEvidenceCommand(resolution.args, project.value.root);
+		return runEvidenceCommand(
+			resolution.args,
+			project.value.root,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "done") {
-		return runDoneCommand(resolution.args, project.value.root);
+		return runDoneCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "log") {
-		return runLogCommand(resolution.args, project.value.root);
+		return runLogCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "quickTask") {
-		return runQuickTaskCommand(resolution.args, project.value.root);
+		return runQuickTaskCommand(
+			resolution.args,
+			project.value.root,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "verifyTasks") {
@@ -243,7 +251,7 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "close") {
-		return runCloseCommand(resolution.args, project.value.root);
+		return runCloseCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "file") {

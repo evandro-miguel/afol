@@ -12,47 +12,47 @@
 
 ## Sub-task Checklist (T-01)
 
-- [ ] Identify OperationContext construction in cli/main.ts
-- [ ] Add CLI flags/env for restricted context: `--agent`/`-A`, `--remote`/`-R`, `AFOL_AGENT`, `AFOL_REMOTE`
-- [ ] Wire flags to OperationContext factory with restricted permissions
-- [ ] Verify restricted context hits mutation gates (requiresApproval returns true)
-- [ ] Add unit test for restricted context mutation denial
-- [ ] Record evidence: `afol evidence --session 260615_1938_spec-code-closure --task-id T-01 --command "<test-cmd>" --result passed`
+- [x] Identify OperationContext construction in cli/main.ts
+- [x] Add CLI flags/env for restricted context: `--agent`/`-A`, `--remote`/`-R`, `AFOL_AGENT`, `AFOL_REMOTE`
+- [x] Wire flags to OperationContext factory with restricted permissions
+- [x] Verify restricted context hits mutation gates (requiresApproval returns true)
+- [x] Add unit test for restricted context mutation denial
+- [x] Record evidence: `afol evidence --session 260615_1938_spec-code-closure --task-id T-01 --command "<test-cmd>" --result passed`
 
 ## Sub-task Checklist (T-02)
 
-- [ ] Locate schema detector and review output code
-- [ ] Implement cache-key struct with all contract fields
-- [ ] Source git branch/commit when available (graceful fallback)
-- [ ] Propagate through review output JSON
-- [ ] Add unit tests for cache-key structure
-- [ ] Record evidence
+- [x] Locate schema detector and review output code
+- [x] Implement cache-key struct with all contract fields
+- [x] Source git branch/commit when available (graceful fallback)
+- [x] Propagate through review output JSON
+- [x] Add unit tests for cache-key structure
+- [x] Record evidence
 
 ## Sub-task Checklist (T-03)
 
-- [ ] Run coverage report for quick-task.ts
-- [ ] If gaps: add tests for command parsing, context, execution
-- [ ] If covered: document coverage map in evidence
-- [ ] Record evidence
+- [x] Run coverage report for quick-task.ts
+- [x] If gaps: add tests for command parsing, context, execution
+- [x] If covered: document coverage map in evidence
+- [x] Record evidence
 
 ## Sub-task Checklist (T-04)
 
-- [ ] Evidence: CLI restricted-context mutation denial (via `--agent` or `AFOL_AGENT=true`)
-- [ ] Evidence: schema cache-key output verification
-- [ ] Evidence: ctx explain output
-- [ ] Evidence: doctor remediation
-- [ ] Evidence: pstr/library command probes
-- [ ] Record each via afol evidence
+- [x] Evidence: CLI restricted-context mutation denial (via `--agent` or `AFOL_AGENT=true`)
+- [x] Evidence: schema cache-key output verification
+- [x] Evidence: ctx explain output
+- [x] Evidence: doctor remediation
+- [x] Evidence: pstr/library command probes
+- [x] Record each via afol evidence
 
 ## Sub-task Checklist (T-05)
 
-- [ ] bun run lint:biome
-- [ ] bun run typecheck
-- [ ] bun test
-- [ ] ./afol validate project --json
-- [ ] ./afol health --deep
-- [ ] ./afol validate drift --json
-- [ ] Verify no open tasks
-- [ ] Record final gate evidence
+- [x] bun run lint:biome
+- [x] bun run typecheck
+- [x] bun test
+- [x] ./afol validate project --json
+- [x] ./afol health --deep
+- [x] ./afol validate drift --json
+- [x] Verify no open tasks
+- [x] Record final gate evidence
 
 (End of file)

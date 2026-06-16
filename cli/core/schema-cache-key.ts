@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { isAbsolute, relative, resolve } from "node:path";
 
 /**
  * Schema cache key — a deterministic identifier for the current schema shape.
@@ -27,7 +28,7 @@ export type SchemaCacheKey = {
 
 function tryGitBranch(cwd: string): string {
 	try {
-		return (
+		const branch =
 			execSync("git rev-parse --abbrev-ref HEAD", {
 				cwd,
 				encoding: "utf8",
@@ -36,8 +37,8 @@ function tryGitBranch(cwd: string): string {
 			})
 				.trim()
 				.split("\n")[0]
-				?.trim() ?? "unknown"
-		);
+				?.trim() ?? "";
+		return branch && branch !== "HEAD" ? branch : "unknown";
 	} catch {
 		return "unknown";
 	}
@@ -59,6 +60,14 @@ function tryGitCommit(cwd: string): string {
 	} catch {
 		return "unknown";
 	}
+}
+
+function normalizeSourcePath(sourcePath: string, cwd: string): string {
+	const normalized = isAbsolute(sourcePath)
+		? relative(resolve(cwd), resolve(sourcePath))
+		: sourcePath;
+	const portable = normalized.replaceAll("\\", "/");
+	return portable && !portable.startsWith("../") ? portable : sourcePath;
 }
 
 /**
@@ -87,7 +96,7 @@ export function buildSchemaCacheKey(
 	return {
 		shape_name: shapeName,
 		shape_version: shapeVersion,
-		source_path: sourcePath,
+		source_path: normalizeSourcePath(sourcePath, cwd),
 		source_hash: hash,
 		git_branch: tryGitBranch(cwd),
 		git_commit: tryGitCommit(cwd),

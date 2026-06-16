@@ -149,6 +149,17 @@ describe("workbench lifecycle service", () => {
 				"created",
 			);
 
+			const deniedAgentNew = runKernel(root, [
+				"--agent",
+				"new",
+				"agent denied",
+				"--json",
+			]);
+			expect(deniedAgentNew.status).toBe(2);
+			expect(deniedAgentNew.stdout as string).toContain(
+				"workbench.new denied for agent callers",
+			);
+
 			const created = newWorkstream(root, "cli done json");
 			const startProc = runKernel(root, [
 				"start",

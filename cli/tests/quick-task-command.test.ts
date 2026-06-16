@@ -3,6 +3,7 @@ import {
 	parseQuickTaskArgs,
 	runQuickTaskCommand,
 } from "../commands/quick-task";
+import { agentOperationContext } from "../core/operation-context";
 
 describe("quick-task parseQuickTaskArgs", () => {
 	test("parses theme and defaults", () => {
@@ -140,6 +141,15 @@ describe("quick-task parseQuickTaskArgs", () => {
 });
 
 describe("quick-task runQuickTaskCommand", () => {
+	test("denies restricted agent callers before filesystem mutation", async () => {
+		const exitCode = await runQuickTaskCommand(
+			["alpha"],
+			"/tmp/nonexistent",
+			agentOperationContext(),
+		);
+		expect(exitCode).toBe(2);
+	});
+
 	test("returns non-zero when theme is missing", async () => {
 		// The command exits before touching the filesystem when parse fails
 		const exitCode = await runQuickTaskCommand([], "/tmp/nonexistent");

@@ -1,4 +1,9 @@
 import { envelopeOk, stringifyEnvelope } from "../core/envelope";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
 import type { NewWorkstreamMetadata } from "../services/workbench/lifecycle";
 import {
 	closeSession,
@@ -118,12 +123,18 @@ function renderSuccess(message: string, hint: string): string {
 export async function runQuickTaskCommand(
 	args: string[],
 	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	let parsed: ParsedQuickTaskArgs | null = null;
 	let session: string | null = null;
 	let failedStep = "parse";
 	let exitCode = 2;
 	try {
+		if (requiresApproval(ctx)) {
+			throw new Error(
+				`quick-task denied for ${ctx.callerType} callers; rerun from a trusted local context`,
+			);
+		}
 		parsed = parseQuickTaskArgs(args);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
 		session = created.session;

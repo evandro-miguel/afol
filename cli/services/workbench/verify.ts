@@ -5,6 +5,7 @@ import { resolveProjectPaths } from "../project/paths";
 import { loadProjectRoot } from "../project/root";
 
 const LEGACY_TASK_RE = /^\s*-\s\[( |\/|%|&|!|>|x)\]\s+(T-\d{2,3})\s+(.+?)\s*$/;
+const OPEN_CHECKLIST_RE = /^\s*-\s\[( |\/|%|&|!)\]\s+(.+?)\s*$/;
 const STATE_BOARD_TASK_RE =
 	/^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|?\s*$/;
 
@@ -50,6 +51,7 @@ export type VerifyIssue = {
 	type:
 		| "missing_evidence"
 		| "failed_evidence"
+		| "open_checklist_item"
 		| "missing_session"
 		| "missing_tasks";
 	taskId?: string;
@@ -221,6 +223,35 @@ function parseTasks(content: string, file: string): VerifyTask[] {
 	return tasks;
 }
 
+function findOpenChecklistItems(content: string, file: string): VerifyIssue[] {
+	const issues: VerifyIssue[] = [];
+	const lines = content.split(/\r?\n/);
+	let inCodeBlock = false;
+
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index] ?? "";
+		const trimmed = line.trim();
+		if (trimmed.startsWith("```")) {
+			inCodeBlock = !inCodeBlock;
+			continue;
+		}
+		if (inCodeBlock || LEGACY_TASK_RE.test(line)) {
+			continue;
+		}
+		const checklistMatch = line.match(OPEN_CHECKLIST_RE);
+		if (!checklistMatch?.[2]) {
+			continue;
+		}
+		issues.push({
+			type: "open_checklist_item",
+			file,
+			line: index + 1,
+			message: `Open checklist item: ${checklistMatch[2].trim()}`,
+		});
+	}
+	return issues;
+}
+
 function evidenceScopeFor(taskFile: string, sessionPath: string): string {
 	let current = resolve(taskFile);
 	const root = resolve(sessionPath);
@@ -387,6 +418,9 @@ export function verifyWorkbenchTasks(
 	for (const taskFile of taskFiles) {
 		const content = readFileSync(taskFile, "utf8");
 		const tasks = parseTasks(content, taskFile);
+		if (strict) {
+			result.issues.push(...findOpenChecklistItems(content, taskFile));
+		}
 		const evidenceScope = evidenceScopeFor(taskFile, scanRoot);
 		if (strict && !evidenceByScope.has(evidenceScope)) {
 			evidenceByScope.set(evidenceScope, loadEvidence(evidenceScope));

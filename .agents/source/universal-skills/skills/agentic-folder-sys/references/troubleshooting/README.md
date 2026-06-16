@@ -1,86 +1,29 @@
----
-description: Validation and recovery guidance for scaffold install, upgrade, workbench, and skills drift
-metadata:
-  tags: "agentic-folder-sys, troubleshooting, validation, bootstrap, skills-sync, workbench"
----
+# AFOL Troubleshooting
 
-# Agentic Folder Sys Troubleshooting
-
-Use this reference when scaffold operations fail or when the repo state is
-unclear.
-
-## 1. Bootstrap Fails on a New Path
-
-Symptom:
-
-- `Target directory not found`
-
-Cause:
-
-- the target path points to a file, or the bootstrap path is malformed
-
-Fix:
+## Structure Or State Drift
 
 ```bash
-./.agents/agents bootstrap /path/to/new-project
+afol status
+afol local-state rebuild --json
+afol validate project --json
 ```
 
-Full bootstrap creates the target directory when it is missing.
-
-## 2. Partial Install Fails
-
-Symptom:
-
-- `Partial install requires an existing target directory`
-
-Cause:
-
-- `--partial` is only for an already existing repo
-
-Fix:
-
-- create the repo first use full bootstrap for a new repo
-
-## 3. Pull Did Not Update Installed Skills
-
-Symptom:
-
-- upstream refresh ran, but `.agents/skills/` did not change
-
-Cause:
-
-- `skills-sync pull` only refreshed the external source when one was configured
-
-Fix:
+## Workbench Evidence Drift
 
 ```bash
-./.agents/agents skills-sync update --runtime codex
+afol verify-tasks --strict
 ```
 
-## 4. Existing Repo Already Owns `make all`
+Fix task state, evidence, or checklist mismatches in `.afol/wb/`, then rerun
+the verification command.
 
-Use:
+## Update Drift
 
 ```bash
-make agents-all
+afol update check
+afol update preview
+afol update apply --dry-run
 ```
 
-The scaffold preserves the host `all` target and exposes the aggregate scaffold
-validation through `agents-all`.
-
-## 5. Minimal Recovery Checks
-
-Run the smallest proof set first:
-
-```bash
-make doctor
-make lint
-make test-scripts
-./.agents/agents skills-sync check
-```
-
-For governed workstreams:
-
-```bash
-./.agents/agents verify-tasks --strict .afol/wb/$(cat .afol/wb/.active_session)
-```
+Use compact output first. Inspect verbose update output only when a conflict
+requires file-by-file detail.

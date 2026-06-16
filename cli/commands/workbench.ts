@@ -1,5 +1,10 @@
 import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
+import {
 	appendTimelineEntry,
 	closeSession,
 	doneTask,
@@ -24,11 +29,23 @@ import {
 import { writeJsonError } from "./workbench/shared";
 import { resolveRequiredSpecCheck, runVerification } from "./workbench/verify";
 
+function assertWorkbenchMutationAllowed(
+	ctx: OperationContext,
+	action: string,
+): void {
+	if (!requiresApproval(ctx)) return;
+	throw new Error(
+		`${action} denied for ${ctx.callerType} callers; rerun from a trusted local context`,
+	);
+}
+
 export async function runNewCommand(
 	args: string[],
 	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.new");
 		const parsed = parseNewArgs(args);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
 		if (parsed.json) {
@@ -57,8 +74,10 @@ export async function runNewCommand(
 export async function runStartCommand(
 	args: string[],
 	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.start");
 		const parsed = parseSessionTaskArgs(args, "start", root, {
 			allowAutoTask: true,
 		});
@@ -93,8 +112,10 @@ export async function runStartCommand(
 export async function runEvidenceCommand(
 	args: string[],
 	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.evidence");
 		const record = recordEvidence(root, parseEvidenceArgs(args, root));
 		console.log(`evidence recorded: ${record.id}`);
 		return 0;
@@ -107,8 +128,10 @@ export async function runEvidenceCommand(
 export async function runDoneCommand(
 	args: string[],
 	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.done");
 		const parsed = parseDoneArgs(args, root);
 		if (parsed.requireSpecCheck) {
 			const specCheck = resolveRequiredSpecCheck(
@@ -200,8 +223,10 @@ export async function runDoneCommand(
 export async function runLogCommand(
 	args: string[],
 	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.log");
 		const parsed = parseLogArgs(args, root);
 		const result = appendTimelineEntry(root, parsed.session, parsed.message);
 		if (parsed.json) {
@@ -284,8 +309,10 @@ export async function runVerifyTasksCommand(
 export async function runCloseCommand(
 	args: string[],
 	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.close");
 		const parsed = parseSessionOnlyArgs(args, "close", root);
 		closeSession(root, parsed.session);
 		if (parsed.json) {

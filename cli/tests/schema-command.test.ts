@@ -475,6 +475,22 @@ describe("schema cache-key unit", () => {
 		expect(typeof key1.git_commit).toBe("string");
 	});
 
+	test("buildSchemaCacheKey normalizes absolute source paths relative to cwd", () => {
+		const root = mkRoot("cache-key-path");
+		try {
+			const key = buildSchemaCacheKey(
+				"test-shape",
+				"2",
+				JSON.stringify({ name: "test-shape", version: "2" }),
+				join(root, ".afol", "adm", "schema", "test-shape.yaml"),
+				root,
+			);
+			expect(key.source_path).toBe(".afol/adm/schema/test-shape.yaml");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("buildSchemaCacheKey different input produces different hash", () => {
 		const key1 = buildSchemaCacheKey(
 			"shape-a",
