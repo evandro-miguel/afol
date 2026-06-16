@@ -5,13 +5,15 @@ import { spawnSync } from "node:child_process";
 const THRESHOLD = 80;
 
 type CoverageTotals = {
+	file?: string;
 	lines: number;
 	functions: number;
 };
 
+const parsedArgs = parseArgs(process.argv.slice(2));
 const result = spawnSync(
 	"bun",
-	["test", "--coverage", "--coverage-reporter=text"],
+	["test", ...parsedArgs.testArgs, "--coverage", "--coverage-reporter=text"],
 	{
 		cwd: process.cwd(),
 		encoding: "utf8",
@@ -32,17 +34,24 @@ if (result.status !== 0) {
 	process.exit(result.status ?? 1);
 }
 
-const totals = parseBunTextCoverage(
+const report = parseBunTextCoverage(
 	`${result.stdout ?? ""}\n${result.stderr ?? ""}`,
 );
-const passed = totals.lines >= THRESHOLD && totals.functions >= THRESHOLD;
+const totals = selectCoverageRows(report, parsedArgs.includePrefixes);
+const failedRows = totals.filter(
+	(row) => row.lines < THRESHOLD || row.functions < THRESHOLD,
+);
+const passed = failedRows.length === 0;
 
-console.log(
-	`coverage lines: ${formatPercent(totals.lines)}% (threshold ${THRESHOLD}%)`,
-);
-console.log(
-	`coverage functions: ${formatPercent(totals.functions)}% (threshold ${THRESHOLD}%)`,
-);
+for (const row of totals) {
+	const label = row.file ?? "All files";
+	console.log(
+		`coverage ${label} lines: ${formatPercent(row.lines)}% (threshold ${THRESHOLD}%)`,
+	);
+	console.log(
+		`coverage ${label} functions: ${formatPercent(row.functions)}% (threshold ${THRESHOLD}%)`,
+	);
+}
 
 if (!passed) {
 	console.error("coverage: failed");
@@ -51,27 +60,84 @@ if (!passed) {
 
 console.log("coverage: passed");
 
-function parseBunTextCoverage(output: string): CoverageTotals {
+function parseArgs(args: string[]): {
+	includePrefixes: string[];
+	testArgs: string[];
+} {
+	const includePrefixes: string[] = [];
+	const testArgs: string[] = [];
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (!arg) {
+			continue;
+		}
+		if (arg === "--include") {
+			const value = args[index + 1];
+			if (!value) {
+				console.error("coverage: --include requires a path prefix");
+				process.exit(1);
+			}
+			includePrefixes.push(value);
+			index += 1;
+			continue;
+		}
+		testArgs.push(arg);
+	}
+	return { includePrefixes, testArgs };
+}
+
+function parseBunTextCoverage(output: string): CoverageTotals[] {
 	const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 	const plainOutput = output.replace(ansiEscape, "");
-	const line = plainOutput
+	const rows = plainOutput
 		.split(/\r?\n/)
 		.map((value) => value.trim())
-		.find((value) => value.startsWith("All files"));
-	if (!line) {
+		.filter((value) => value.includes("|"))
+		.map((line) => {
+			const columns = line.split("|").map((value) => value.trim());
+			const functions = Number(columns[1]);
+			const lines = Number(columns[2]);
+			if (!Number.isFinite(functions) || !Number.isFinite(lines)) {
+				return null;
+			}
+			return { file: columns[0], functions, lines };
+		})
+		.filter((row): row is CoverageTotals & { file: string } => row !== null);
+	if (!rows.some((row) => row.file === "All files")) {
 		console.error("coverage: could not find Bun coverage summary");
 		process.exit(1);
 	}
 
-	const columns = line.split("|").map((value) => value.trim());
-	const functions = Number(columns[1]);
-	const lines = Number(columns[2]);
-	if (!Number.isFinite(functions) || !Number.isFinite(lines)) {
-		console.error("coverage: could not parse Bun coverage summary");
-		process.exit(1);
+	return rows;
+}
+
+function selectCoverageRows(
+	rows: CoverageTotals[],
+	includePrefixes: string[],
+): CoverageTotals[] {
+	if (includePrefixes.length === 0) {
+		const allFiles = rows.find((row) => row.file === "All files");
+		if (!allFiles) {
+			console.error("coverage: could not find Bun coverage summary");
+			process.exit(1);
+		}
+		return [{ functions: allFiles.functions, lines: allFiles.lines }];
 	}
 
-	return { functions, lines };
+	const selected = rows.filter(
+		(row) =>
+			row.file !== "All files" &&
+			includePrefixes.some(
+				(prefix) => row.file === prefix || row.file?.startsWith(`${prefix}/`),
+			),
+	);
+	if (selected.length === 0) {
+		console.error(
+			`coverage: no files matched include prefix: ${includePrefixes.join(", ")}`,
+		);
+		process.exit(1);
+	}
+	return selected;
 }
 
 function formatPercent(value: number): string {

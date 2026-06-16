@@ -50,6 +50,7 @@ const SUBCOMMAND_GROUPS = new Set([
 	"sweep",
 	"schema",
 	"bench",
+	"projectBenchmark",
 	"adapter",
 	"telemetry",
 	"session",

@@ -44,6 +44,10 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("ht")).toBe("health");
 		expect(kernelRegistry.resolveKind("db")).toBe("db");
 		expect(kernelRegistry.resolveKind("bench")).toBe("bench");
+		expect(kernelRegistry.resolveKind("project-benchmark")).toBe(
+			"projectBenchmark",
+		);
+		expect(kernelRegistry.resolveKind("pb")).toBe("projectBenchmark");
 		expect(kernelRegistry.resolveKind("close")).toBe("close");
 		expect(kernelRegistry.resolveKind("c")).toBe("close");
 		expect(kernelRegistry.resolveKind("preflight")).toBe("preflight");
@@ -87,6 +91,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("memory")?.sideEffect).toBe("read");
 		expect(byCommand.get("adm")?.sideEffect).toBe("read");
 		expect(byCommand.get("bench")?.sideEffect).toBe("read");
+		expect(byCommand.get("project-benchmark")?.sideEffect).toBe("generated");
 		expect(byCommand.get("spec")?.sideEffect).toBe("read");
 		expect(byCommand.get("adr")?.sideEffect).toBe("read");
 		expect(byCommand.get("changelog")?.sideEffect).toBe("read");

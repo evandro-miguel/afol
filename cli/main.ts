@@ -20,6 +20,7 @@ import { runLocalStateCommand } from "./commands/local-state";
 import { runMaintenanceCommand } from "./commands/maintenance";
 import { runMemoryCommand } from "./commands/memory";
 import { runPreflightCommand } from "./commands/preflight";
+import { runProjectBenchmarkCommand } from "./commands/project-benchmark";
 import { runPstrCommand } from "./commands/pstr";
 import { runQuickTaskCommand } from "./commands/quick-task";
 import { runSchemaCommand } from "./commands/schema-cmd";
@@ -336,6 +337,13 @@ export async function main(argv: string[]): Promise<number> {
 		}
 		if (resolution.group === "bench") {
 			return runBenchCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "projectBenchmark") {
+			return runProjectBenchmarkCommand(
 				resolution.action,
 				resolution.args,
 				project.value.root,

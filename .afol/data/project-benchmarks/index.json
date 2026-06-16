@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0.0",
+  "generated_by": "afol pb generate",
+  "generated_at": "2026-06-16T17:14:51.491Z",
+  "project_count": 5,
+  "projects": [
+    {
+      "id": "openhands",
+      "name": "OpenHands",
+      "category": "direct_comparable",
+      "status": "active",
+      "confidence": "high",
+      "score": 90,
+      "stale": false,
+      "axis_count": 4,
+      "axes": {
+        "agent_task_lifecycle": 5,
+        "safe_mutation": 4,
+        "evals_benchmarks": 5,
+        "multi_agent": 4
+      }
+    },
+    {
+      "id": "roo-code",
+      "name": "Roo Code",
+      "category": "direct_comparable",
+      "status": "active",
+      "confidence": "high",
+      "score": 80,
+      "stale": false,
+      "axis_count": 3,
+      "axes": {
+        "skills_modes_rules": 5,
+        "safe_mutation": 4,
+        "multi_agent": 3
+      }
+    },
+    {
+      "id": "mcp",
+      "name": "Model Context Protocol",
+      "category": "protocol_reference",
+      "status": "active",
+      "confidence": "high",
+      "score": 73,
+      "stale": false,
+      "axis_count": 3,
+      "axes": {
+        "mcp_tools": 5,
+        "release_governance": 3,
+        "safe_mutation": 3
+      }
+    },
+    {
+      "id": "aider",
+      "name": "Aider",
+      "category": "direct_comparable",
+      "status": "active",
+      "confidence": "high",
+      "score": 67,
+      "stale": false,
+      "axis_count": 3,
+      "axes": {
+        "repo_context_map": 5,
+        "safe_mutation": 3,
+        "agent_task_lifecycle": 2
+      }
+    },
+    {
+      "id": "codex-agents-md",
+      "name": "Codex AGENTS.md",
+      "category": "adjacent_reference",
+      "status": "active",
+      "confidence": "high",
+      "score": 60,
+      "stale": false,
+      "axis_count": 3,
+      "axes": {
+        "skills_modes_rules": 4,
+        "repo_context_map": 3,
+        "local_state": 2
+      }
+    }
+  ]
+}

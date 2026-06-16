@@ -50,6 +50,78 @@ function mkProjectRoot(name: string, fakeAgentsBody: string): string {
 	return root;
 }
 
+function writeJson(path: string, value: unknown): void {
+	writeFileSync(path, JSON.stringify(value, null, 2), "utf8");
+}
+
+function writeProjectBenchmarkCatalog(root: string): void {
+	mkdirSync(join(root, ".agents"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "project-benchmarks", "projects"), {
+		recursive: true,
+	});
+	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
+	writeJson(join(root, ".agents", "manifest.json"), {
+		schema_version: 1,
+		managed_hashes: {},
+	});
+	writeJson(join(root, ".afol", "adm", "project-benchmarks", "schema.json"), {
+		schema_version: "1.0.0",
+	});
+	writeJson(join(root, ".afol", "adm", "project-benchmarks", "axes.json"), {
+		schema_version: "1.0.0",
+		axes: {
+			repo_context_map: {
+				weight: 15,
+				description: "Uses compact repository maps or context ranking",
+			},
+		},
+	});
+	writeJson(
+		join(root, ".afol", "adm", "project-benchmarks", "projects", "aider.json"),
+		{
+			schema_version: "1.0.0",
+			id: "aider",
+			name: "Aider",
+			category: "direct_comparable",
+			status: "active",
+			source_access: "open_source",
+			last_reviewed_at: "2026-06-16",
+			stale_after_days: 90,
+			confidence: "high",
+			similarity_axes: {
+				repo_context_map: {
+					score: 5,
+					evidence_refs: ["aider-repomap"],
+				},
+			},
+			similarities: [
+				{
+					axis: "repo_context_map",
+					claim: "Uses a compact repository map.",
+					evidence_refs: ["aider-repomap"],
+				},
+			],
+			differences: [{ claim: "Interactive coding rather than governance." }],
+			lessons_for_afol: [
+				{
+					axis: "repo_context_map",
+					lesson: "Build compact project context.",
+				},
+			],
+			do_not_copy: [{ reason: "Do not copy chat-only workflow assumptions." }],
+			source_refs: [
+				{
+					id: "aider-repomap",
+					title: "Aider repository map",
+					url: "https://aider.chat/docs/repomap.html",
+					source_type: "official_doc",
+					claim: "Aider documents a concise repository map.",
+				},
+			],
+		},
+	);
+}
+
 function writeSpec(root: string, id: string, status: string): void {
 	const specDir = join(root, "docs", "arc", "SPECS");
 	mkdirSync(specDir, { recursive: true });
@@ -194,6 +266,79 @@ describe("kernel front-door", () => {
 				description: "Show current project status",
 				category: "core",
 			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project-benchmark routes through the kernel front-door", () => {
+		const root = mkProjectRoot("project-benchmark", "");
+		try {
+			writeProjectBenchmarkCatalog(root);
+
+			const list = runKernel(root, ["pb", "list", "--json"]);
+			expect(list.status).toBe(0);
+			const listPayload = JSON.parse(list.stdout as string) as {
+				action: string;
+				data: { projects: Array<{ id: string }> };
+			};
+			expect(listPayload.action).toBe("project-benchmark.list");
+			expect(listPayload.data.projects[0]?.id).toBe("aider");
+
+			const show = runKernel(root, ["pb", "show", "aider", "--json"]);
+			expect(show.status).toBe(0);
+			const showPayload = JSON.parse(show.stdout as string) as {
+				action: string;
+				data: { project: { id: string } };
+			};
+			expect(showPayload.action).toBe("project-benchmark.show");
+			expect(showPayload.data.project.id).toBe("aider");
+
+			const matrix = runKernel(root, ["pb", "matrix", "--json"]);
+			expect(matrix.status).toBe(0);
+			const matrixPayload = JSON.parse(matrix.stdout as string) as {
+				action: string;
+				data: { projects: Array<{ id: string }> };
+			};
+			expect(matrixPayload.action).toBe("project-benchmark.matrix");
+			expect(matrixPayload.data.projects[0]?.id).toBe("aider");
+
+			const recommend = runKernel(root, [
+				"project-benchmark",
+				"recommend",
+				"--for",
+				"repo_context_map",
+			]);
+			expect(recommend.status).toBe(0);
+			expect(recommend.stdout as string).toContain("axis: repo_context_map");
+			expect(recommend.stdout as string).toContain("top references:");
+
+			const validate = runKernel(root, ["pb", "validate", "--json"]);
+			expect(validate.status).toBe(0);
+			const validatePayload = JSON.parse(validate.stdout as string) as {
+				action: string;
+				data: { ok: boolean };
+			};
+			expect(validatePayload.action).toBe("project-benchmark.validate");
+			expect(validatePayload.data.ok).toBe(true);
+
+			const generate = runKernel(root, ["pb", "generate", "--json"]);
+			expect(generate.status).toBe(0);
+			const generatePayload = JSON.parse(generate.stdout as string) as {
+				action: string;
+				data: { files: Array<{ path: string }> };
+			};
+			expect(generatePayload.action).toBe("project-benchmark.generate");
+			expect(
+				generatePayload.data.files.some((file) =>
+					file.path.endsWith("similarity-matrix.json"),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(root, ".afol", "data", "project-benchmarks", "index.json"),
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

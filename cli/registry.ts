@@ -35,6 +35,7 @@ export type CommandKind =
 	| "schema"
 	| "catchup"
 	| "bench"
+	| "projectBenchmark"
 	| "preflight"
 	| "adapter"
 	| "telemetry"
@@ -341,6 +342,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description:
 			"Run benchmarks: live metrics, CLI token economy, runtime-live dry-run",
+		category: "inspect",
+	},
+	{
+		command: "project-benchmark",
+		aliases: ["pb"],
+		kind: "projectBenchmark",
+		sideEffect: "generated",
+		description: "Compare AFOL against curated reference projects",
 		category: "inspect",
 	},
 	{
