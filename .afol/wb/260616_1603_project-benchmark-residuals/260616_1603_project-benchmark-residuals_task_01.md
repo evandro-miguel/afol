@@ -16,7 +16,7 @@
 | T-03 | done | builder | `cli/services/project-benchmark/scoring.ts`, `cli/services/project-benchmark/render.ts`, `cli/tests/project-benchmark-command.test.ts` |
 | T-04 | done | builder | `cli/services/project-benchmark/validate.ts`, `cli/tests/project-benchmark-validation.test.ts`, `cli/tests/project-benchmark-command.test.ts` |
 | T-05 | done | builder | `cli/registry.ts`, `cli/help.ts`, `cli/tests/help.test.ts`, `cli/tests/registry.test.ts` |
-| T-06 | in_progress | verifier | `git diff --check`, `bun run validate:project-benchmarks`, `bun run smoke:dist`, `bun run validate:release` |
+| T-06 | done | verifier | `git diff --check`, `bun run validate:project-benchmarks`, `bun run smoke:dist`, `bun run validate:release` |
 
 ## Task Detail
 

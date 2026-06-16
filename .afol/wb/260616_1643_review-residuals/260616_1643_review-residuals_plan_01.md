@@ -70,22 +70,29 @@
    - Forbidden: ctx, maintenance, docs, benchmark, and retired runtime
      surfaces.
    - Validate: `bun test cli/tests/health-system.test.ts`.
-2. T-02 ctx explain read-only accuracy.
+2. T-02 ctx side-effect registry accuracy.
    - Owner: builder.
    - Allowed write scope: `cli/commands/context.ts`,
      `cli/services/context/bundler.ts`,
      `cli/services/context/section-index.ts`,
-     `cli/tests/context-system.test.ts`.
+     `cli/registry.ts` only if side-effect metadata needs correction,
+     `cli/help.ts` only if help output needs correction,
+     `cli/tests/context-system.test.ts`,
+     `cli/tests/registry.test.ts`,
+     `cli/tests/help.test.ts`.
    - Forbidden: health, maintenance, docs, benchmark, and retired runtime
      surfaces.
-   - Validate: `bun test cli/tests/context-system.test.ts`.
+   - Validate: `bun test cli/tests/context-system.test.ts
+     cli/tests/registry.test.ts cli/tests/help.test.ts`.
 3. T-03 maintenance dry-run UX.
    - Owner: builder.
-   - Allowed write scope: `cli/commands/maintenance.ts`, `cli/registry.ts`,
-     `cli/tests/maintenance.test.ts`, `cli/tests/registry.test.ts`.
+   - Allowed write scope: `cli/commands/maintenance.ts`,
+     `cli/tests/maintenance.test.ts`.
+   - Conditional scope: `cli/registry.ts`, `cli/tests/registry.test.ts` only
+     if maintenance metadata changes.
    - Forbidden: ctx, health core logic, docs, benchmark, and retired runtime
      surfaces.
-   - Validate: `bun test cli/tests/maintenance.test.ts cli/tests/registry.test.ts`.
+   - Validate: `bun test cli/tests/maintenance.test.ts`.
 4. T-04 template and skill-mirror drift.
    - Owner: docs.
    - Allowed write scope: `docs/templates/AGENTS_TEMPLATE.md`,
@@ -140,8 +147,8 @@
 ## Verification Plan
 
 - T-01: `bun test cli/tests/health-system.test.ts`
-- T-02: `bun test cli/tests/context-system.test.ts`
-- T-03: `bun test cli/tests/maintenance.test.ts cli/tests/registry.test.ts`
+- T-02: `bun test cli/tests/context-system.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts`
+- T-03: `bun test cli/tests/maintenance.test.ts`
 - T-04: `bun run validate:template`
 - T-05: `afol validate project --json`
 - T-06: `afol validate project`, `bun run typecheck`, targeted task tests, and
