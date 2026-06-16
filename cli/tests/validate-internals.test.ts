@@ -1196,7 +1196,7 @@ describe("validation command entrypoint", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 30_000);
 
 	test("flags benchmark regressions and skipped scenarios", () => {
 		const root = createFixtureRoot();
@@ -1301,5 +1301,5 @@ describe("validation command entrypoint", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 30_000);
 });

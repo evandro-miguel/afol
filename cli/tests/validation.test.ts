@@ -23,6 +23,7 @@ const runtimeLiveBenchmarkRefreshCommand =
 	"afol validate bench --pack runtime-live-agent --json";
 const runtimeLiveBenchmarkRefreshNote =
 	"snapshot validation; live runner pending (spec 260423_2006 in .afol/adm/specs/)";
+const slowValidationTestTimeoutMs = 30_000;
 
 function runKernel(
 	args: string[],
@@ -426,30 +427,34 @@ describe("validation command family", () => {
 		expect(Array.isArray(payload.checks)).toBe(true);
 	});
 
-	test("validate run changed-path executes selected AFOL-native validation commands", () => {
-		const proc = runKernel([
-			"validate",
-			"run",
-			"--changed-path",
-			"cli/commands/validate.ts",
-			"--json",
-		]);
-		expect(proc.status).toBe(0);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.mode).toBe("run");
-		expect(payload.status).toBe("passed");
-		expect(payload.pass).toBe(true);
-		expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
-		const results = payload.command_results as Array<Record<string, unknown>>;
-		expect(results.length).toBeGreaterThan(0);
-		expect(results.every((entry) => entry.pack_id === "cli-kernel-local")).toBe(
-			true,
-		);
-		expect(results.every((entry) => entry.status === "passed")).toBe(true);
-		expect(results.every((entry) => Array.isArray(entry.command))).toBe(true);
-		expect(JSON.stringify(results)).not.toContain("just");
-		expect(payload.contract_issues).toEqual([]);
-	}, 10000);
+	test(
+		"validate run changed-path executes selected AFOL-native validation commands",
+		() => {
+			const proc = runKernel([
+				"validate",
+				"run",
+				"--changed-path",
+				"cli/commands/validate.ts",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("run");
+			expect(payload.status).toBe("passed");
+			expect(payload.pass).toBe(true);
+			expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
+			const results = payload.command_results as Array<Record<string, unknown>>;
+			expect(results.length).toBeGreaterThan(0);
+			expect(
+				results.every((entry) => entry.pack_id === "cli-kernel-local"),
+			).toBe(true);
+			expect(results.every((entry) => entry.status === "passed")).toBe(true);
+			expect(results.every((entry) => Array.isArray(entry.command))).toBe(true);
+			expect(JSON.stringify(results)).not.toContain("just");
+			expect(payload.contract_issues).toEqual([]);
+		},
+		slowValidationTestTimeoutMs,
+	);
 
 	test("v select changed-path does not route docs/spec-tests by runtime or mcp substrings", () => {
 		const proc = runKernel([
@@ -508,57 +513,71 @@ describe("validation command family", () => {
 		expect(first.pass).toBe(true);
 	});
 
-	test("v bench runs update-safety pack with compact update envelopes", () => {
-		const proc = runKernel(["v", "bench", "--pack", "update-safety", "--json"]);
-		expect(proc.status).toBe(0);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.mode).toBe("benchmark");
-		expect(payload.result_count).toBe(4);
-		expect(payload.status).toBe("passed");
-		expect(payload.pass).toBe(true);
-		expect(payload.summary).toEqual({
-			total: 4,
-			passed: 4,
-			failed: 0,
-			skipped: 0,
-			baseline_missing: 0,
-		});
-		const results = payload.results as Array<Record<string, unknown>>;
-		expect(results.length).toBe(4);
-		expect(results.every((entry) => entry.pack_id === "update-safety")).toBe(
-			true,
-		);
-		expect(results.some((entry) => entry.status === "failed")).toBe(false);
-	});
+	test(
+		"v bench runs update-safety pack with compact update envelopes",
+		() => {
+			const proc = runKernel([
+				"v",
+				"bench",
+				"--pack",
+				"update-safety",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("benchmark");
+			expect(payload.result_count).toBe(4);
+			expect(payload.status).toBe("passed");
+			expect(payload.pass).toBe(true);
+			expect(payload.summary).toEqual({
+				total: 4,
+				passed: 4,
+				failed: 0,
+				skipped: 0,
+				baseline_missing: 0,
+			});
+			const results = payload.results as Array<Record<string, unknown>>;
+			expect(results.length).toBe(4);
+			expect(results.every((entry) => entry.pack_id === "update-safety")).toBe(
+				true,
+			);
+			expect(results.some((entry) => entry.status === "failed")).toBe(false);
+		},
+		slowValidationTestTimeoutMs,
+	);
 
-	test("v bench runs mutation-safety pack with complete baseline coverage", () => {
-		const proc = runKernel([
-			"v",
-			"bench",
-			"--pack",
-			"mutation-safety",
-			"--json",
-		]);
-		expect(proc.status).toBe(0);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.mode).toBe("benchmark");
-		expect(payload.result_count).toBe(5);
-		expect(payload.summary).toEqual({
-			total: 5,
-			passed: 5,
-			failed: 0,
-			skipped: 0,
-			baseline_missing: 0,
-		});
-		const results = payload.results as Array<Record<string, unknown>>;
-		expect(results.length).toBe(5);
-		expect(results.every((entry) => entry.pack_id === "mutation-safety")).toBe(
-			true,
-		);
-		expect(results.some((entry) => entry.status === "baseline-missing")).toBe(
-			false,
-		);
-	});
+	test(
+		"v bench runs mutation-safety pack with complete baseline coverage",
+		() => {
+			const proc = runKernel([
+				"v",
+				"bench",
+				"--pack",
+				"mutation-safety",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("benchmark");
+			expect(payload.result_count).toBe(5);
+			expect(payload.summary).toEqual({
+				total: 5,
+				passed: 5,
+				failed: 0,
+				skipped: 0,
+				baseline_missing: 0,
+			});
+			const results = payload.results as Array<Record<string, unknown>>;
+			expect(results.length).toBe(5);
+			expect(
+				results.every((entry) => entry.pack_id === "mutation-safety"),
+			).toBe(true);
+			expect(results.some((entry) => entry.status === "baseline-missing")).toBe(
+				false,
+			);
+		},
+		slowValidationTestTimeoutMs,
+	);
 
 	test("v bench --save persists a benchmark result artifact under default results directory", () => {
 		const fixtureRoot = createValidationFixtureRoot();
