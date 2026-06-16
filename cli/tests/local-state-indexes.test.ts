@@ -405,9 +405,30 @@ describe("local-state project indexer", () => {
 		}
 	});
 
-	test("local-state command rebuilds indexes and reports freshness", async () => {
+	test("local-state rebuild keeps JSON compact by default and exposes snapshots only with --verbose", async () => {
 		const root = buildFixture();
 		try {
+			const bulkDir = join(root, "bulk");
+			mkdirSync(bulkDir, { recursive: true });
+			for (let index = 0; index < 50; index += 1) {
+				writeFileSync(join(bulkDir, `file-${index}.txt`), "indexed\n");
+			}
+			const sessionDir = join(root, ".afol", "wb", "260616_token_budget");
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, "260616_token_budget_task_01.md"),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | codex | rebuilt |",
+					"| T-02 | blocked | codex | waiting |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
 			const stdout: string[] = [];
 			const stderr: string[] = [];
 			const io = {
@@ -423,21 +444,126 @@ describe("local-state project indexer", () => {
 				ok: boolean;
 				exit_code: number;
 				command: string;
-				snapshot?: { workbench?: { kind?: string } };
+				summary?: {
+					workbench?: {
+						sessions?: number;
+						tasks?: number;
+						open_tasks?: number;
+						problem_tasks?: number;
+					};
+					rules?: { count?: number };
+					skills?: { count?: number };
+					specs?: { count?: number };
+					files?: { count?: number };
+				};
+				output?: string;
+				hint?: string;
+				snapshot?: unknown;
 				data?: {
 					command?: string;
-					snapshot?: { workbench?: { kind?: string } };
+					output?: string;
+					summary?: {
+						workbench?: {
+							sessions?: number;
+							tasks?: number;
+							open_tasks?: number;
+							problem_tasks?: number;
+						};
+						rules?: { count?: number };
+						skills?: { count?: number };
+						specs?: { count?: number };
+						files?: { count?: number };
+					};
+					snapshot?: unknown;
 				};
 			};
 			expect(rebuildPayload.schema).toBe("afol.result/v1");
 			expect(rebuildPayload.ok).toBe(true);
 			expect(rebuildPayload.exit_code).toBe(0);
 			expect(rebuildPayload.command).toBe("rebuild");
-			expect(rebuildPayload.snapshot?.workbench?.kind).toBe(
+			expect(rebuildPayload.output).toBe("compact");
+			expect(rebuildPayload.summary?.workbench?.sessions).toBe(1);
+			expect(rebuildPayload.summary?.workbench?.tasks).toBe(2);
+			expect(rebuildPayload.summary?.workbench?.open_tasks).toBe(1);
+			expect(rebuildPayload.summary?.workbench?.problem_tasks).toBe(1);
+			expect(rebuildPayload.summary?.rules?.count).toBe(2);
+			expect(rebuildPayload.summary?.skills?.count).toBe(2);
+			expect(rebuildPayload.summary?.specs?.count).toBe(2);
+			expect(rebuildPayload.summary?.files?.count).toBeGreaterThan(50);
+			expect(rebuildPayload.snapshot).toBeUndefined();
+			expect(rebuildPayload.data?.snapshot).toBeUndefined();
+			expect(rebuildPayload.hint).toContain("--verbose");
+			expect(stdout.at(-1)?.length ?? 0).toBeLessThan(2000);
+			expect(stdout.at(-1)).not.toContain("workbench_index_v1");
+			expect(rebuildPayload.data?.command).toBe("rebuild");
+			expect(rebuildPayload.data?.output).toBe("compact");
+			expect(rebuildPayload.data?.summary?.workbench?.sessions).toBe(1);
+			expect(rebuildPayload.data?.summary?.workbench?.tasks).toBe(2);
+			expect(rebuildPayload.data?.summary?.workbench?.open_tasks).toBe(1);
+			expect(rebuildPayload.data?.summary?.workbench?.problem_tasks).toBe(1);
+			expect(rebuildPayload.data?.summary?.rules?.count).toBe(2);
+			expect(rebuildPayload.data?.summary?.skills?.count).toBe(2);
+			expect(rebuildPayload.data?.summary?.specs?.count).toBe(2);
+			expect(rebuildPayload.data?.summary?.files?.count).toBeGreaterThan(50);
+			expect(validateWorkBenchIndex(root).ok).toBe(true);
+
+			expect(
+				await runLocalStateCommand(
+					["rebuild", "--json", "--verbose"],
+					root,
+					io,
+				),
+			).toBe(0);
+			const verbosePayload = JSON.parse(stdout.at(-1) ?? "{}") as {
+				output?: string;
+				snapshot?: {
+					workbench?: {
+						kind?: string;
+						sessions?: unknown[];
+						tasks?: unknown[];
+					};
+					rules?: { rules?: unknown[] };
+					skills?: { skills?: unknown[] };
+					specs?: { specs?: unknown[] };
+					files?: { files?: unknown[] };
+				};
+				data?: {
+					snapshot?: {
+						workbench?: {
+							kind?: string;
+							sessions?: unknown[];
+							tasks?: unknown[];
+						};
+						rules?: { rules?: unknown[] };
+						skills?: { skills?: unknown[] };
+						specs?: { specs?: unknown[] };
+						files?: { files?: unknown[] };
+					};
+				};
+			};
+			expect(verbosePayload.output).toBe("verbose");
+			expect(verbosePayload.snapshot?.workbench?.kind).toBe(
 				"workbench_index_v1",
 			);
-			expect(rebuildPayload.data?.command).toBe("rebuild");
-			expect(validateWorkBenchIndex(root).ok).toBe(true);
+			expect(verbosePayload.snapshot?.workbench?.sessions).toHaveLength(1);
+			expect(verbosePayload.snapshot?.workbench?.tasks).toHaveLength(2);
+			expect(verbosePayload.snapshot?.rules?.rules).toHaveLength(2);
+			expect(verbosePayload.snapshot?.skills?.skills).toHaveLength(2);
+			expect(verbosePayload.snapshot?.specs?.specs).toHaveLength(2);
+			expect(verbosePayload.snapshot?.files?.files?.length).toBeGreaterThan(50);
+			expect(verbosePayload.data?.snapshot?.workbench?.kind).toBe(
+				"workbench_index_v1",
+			);
+			expect(verbosePayload.data?.snapshot?.workbench?.sessions).toHaveLength(
+				1,
+			);
+			expect(verbosePayload.data?.snapshot?.workbench?.tasks).toHaveLength(2);
+			expect(verbosePayload.data?.snapshot?.rules?.rules).toHaveLength(2);
+			expect(verbosePayload.data?.snapshot?.skills?.skills).toHaveLength(2);
+			expect(verbosePayload.data?.snapshot?.specs?.specs).toHaveLength(2);
+			expect(
+				verbosePayload.data?.snapshot?.files?.files?.length,
+			).toBeGreaterThan(50);
 
 			expect(
 				await runLocalStateCommand(["freshness", "--json"], root, io),
