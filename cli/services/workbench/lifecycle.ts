@@ -7,6 +7,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import { appendTelemetryEvent, firstToken } from "../events/telemetry";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import { rebuildFilesIndex } from "../local-state/project-indexes";
@@ -19,7 +20,7 @@ import { evidenceResultIsSuccess, verifyWorkbenchTasks } from "./verify";
 const TASK_ROW_RE =
 	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
 const BLOCKING_STATES = new Set(["pending", "in_progress", "problem"]);
-const SESSION_NAME_RE = /^[A-Za-z0-9._-]+$/;
+const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
 export type WorkbenchTaskRef = {
 	session: string;
@@ -86,7 +87,11 @@ function sanitizeTheme(theme: string): string {
 
 function resolveSafeSessionPath(root: string, session: string): string {
 	const normalized = session.trim();
-	if (!SESSION_NAME_RE.test(normalized) || normalized.length === 0) {
+	if (
+		!SESSION_NAME_RE.test(normalized) ||
+		normalized.includes("..") ||
+		normalized.length === 0
+	) {
 		throw new Error(`Invalid session identifier: ${session}`);
 	}
 
@@ -136,7 +141,7 @@ function planTaskFromMetadata(metadata?: NewWorkstreamMetadata): string {
 	return metadata?.task?.trim() || "Execute requested lifecycle work.";
 }
 
-function sessionPaths(
+export function sessionPaths(
 	root: string,
 	session: string,
 ): {
@@ -430,6 +435,12 @@ export function newWorkstream(
 			theme: theme.trim(),
 		},
 	});
+	appendTelemetryEvent(root, {
+		event_type: "session_start",
+		session_id: session,
+		cmd_type: "new",
+		outcome: "success",
+	});
 	refreshWorkbenchLocalState(root, session);
 
 	return {
@@ -452,6 +463,13 @@ export function startTask(root: string, input: WorkbenchTaskRef): void {
 			session: input.session,
 			taskId: input.taskId,
 		});
+		appendTelemetryEvent(root, {
+			event_type: "task_start",
+			session_id: input.session,
+			task_id: input.taskId,
+			cmd_type: "start",
+			outcome: "success",
+		});
 		refreshWorkbenchLocalState(root, input.session);
 	});
 }
@@ -460,13 +478,13 @@ export function recordEvidence(
 	root: string,
 	input: RecordEvidenceInput,
 ): EvidenceEntry {
-	return withSessionLock(root, input.session, () => {
+	const entry = withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${paths.sessionDir}`);
 		}
 		const now = new Date();
-		const entry: EvidenceEntry = {
+		const evidence: EvidenceEntry = {
 			id: evidenceId(now),
 			task_id: input.taskId,
 			created_at: now.toISOString(),
@@ -474,15 +492,15 @@ export function recordEvidence(
 			result: input.result,
 		};
 		if (input.exitCode !== undefined) {
-			entry.exit_code = input.exitCode;
+			evidence.exit_code = input.exitCode;
 		}
 		if (input.artifact) {
-			entry.artifact = input.artifact;
+			evidence.artifact = input.artifact;
 		}
 		if (input.note) {
-			entry.note = input.note;
+			evidence.note = input.note;
 		}
-		writeFileSync(paths.evidencePath, `${JSON.stringify(entry)}\n`, {
+		writeFileSync(paths.evidencePath, `${JSON.stringify(evidence)}\n`, {
 			encoding: "utf8",
 			flag: "a",
 		});
@@ -493,9 +511,17 @@ export function recordEvidence(
 			command: input.command,
 			result: input.result,
 		});
+		appendTelemetryEvent(root, {
+			event_type: "tool_exec",
+			session_id: input.session,
+			task_id: input.taskId,
+			cmd_type: firstToken(input.command),
+			outcome: evidenceResultIsSuccess(input.result) ? "success" : "failure",
+		});
 		refreshWorkbenchLocalState(root, input.session);
-		return entry;
+		return evidence;
 	});
+	return entry;
 }
 
 export function appendTimelineEntry(
@@ -545,6 +571,13 @@ export function doneTask(root: string, input: WorkbenchTaskRef): void {
 			session: input.session,
 			taskId: input.taskId,
 		});
+		appendTelemetryEvent(root, {
+			event_type: "task_complete",
+			session_id: input.session,
+			task_id: input.taskId,
+			cmd_type: "done",
+			outcome: "success",
+		});
 		refreshWorkbenchLocalState(root, input.session);
 	});
 }
@@ -583,6 +616,12 @@ export function closeSession(root: string, session: string): void {
 		appendWorkbenchEvent(root, {
 			type: "workbench.close",
 			session,
+		});
+		appendTelemetryEvent(root, {
+			event_type: "session_end",
+			session_id: session,
+			cmd_type: "close",
+			outcome: "success",
 		});
 		refreshWorkbenchLocalState(root, session);
 	});

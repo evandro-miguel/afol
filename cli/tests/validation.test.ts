@@ -6,6 +6,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	symlinkSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -21,7 +22,8 @@ const runtimeLiveBenchmarkProfile = {
 const runtimeLiveBenchmarkRefreshCommand =
 	"afol validate bench --pack runtime-live-agent --json";
 const runtimeLiveBenchmarkRefreshNote =
-	"snapshot validation; live refresh runner pending AFOL-native migration";
+	"snapshot validation; live runner pending (spec 260423_2006 in .afol/adm/specs/)";
+const slowValidationTestTimeoutMs = 30_000;
 
 function runKernel(
 	args: string[],
@@ -60,6 +62,25 @@ function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 		join(root, ".afol", "data", "benchmarks", "snapshots"),
 		{ recursive: true },
 	);
+	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
+	symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	for (const args of [
+		["init"],
+		["config", "user.email", "bench@example.com"],
+		["config", "user.name", "Bench User"],
+		["add", ".agents", ".afol", "cli", "afol"],
+		["commit", "-m", "fixture"],
+	] as const) {
+		const result = spawnSync("git", args, {
+			cwd: root,
+			encoding: "utf8",
+		});
+		if (result.status !== 0) {
+			throw new Error(
+				result.stderr || result.stdout || `git ${args.join(" ")} failed`,
+			);
+		}
+	}
 	mutate?.(root);
 	return root;
 }
@@ -294,6 +315,90 @@ describe("validation command family", () => {
 		expect(tokenProc.status).toBe(0);
 		const tokenPayload = parseJsonOutput(tokenProc.stdout as string);
 		expect(tokenPayload.selected_pack_ids).toEqual(["token-economy"]);
+
+		const pstrProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/pstr/index.ts",
+			"--json",
+		]);
+		expect(pstrProc.status).toBe(0);
+		expect(
+			parseJsonOutput(pstrProc.stdout as string).selected_pack_ids,
+		).toEqual(["pstr-integrity"]);
+
+		const ctxProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/commands/context.ts",
+			"--json",
+		]);
+		expect(ctxProc.status).toBe(0);
+		expect(parseJsonOutput(ctxProc.stdout as string).selected_pack_ids).toEqual(
+			["context-bundles"],
+		);
+
+		const stateProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/state/session-state.ts",
+			"--json",
+		]);
+		expect(stateProc.status).toBe(0);
+		expect(
+			parseJsonOutput(stateProc.stdout as string).selected_pack_ids,
+		).toEqual(["state-projection"]);
+
+		const memoryProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/commands/memory.ts",
+			"--json",
+		]);
+		expect(memoryProc.status).toBe(0);
+		expect(
+			parseJsonOutput(memoryProc.stdout as string).selected_pack_ids,
+		).toEqual(["memory-governance"]);
+
+		const libraryProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/library/crud.ts",
+			"--json",
+		]);
+		expect(libraryProc.status).toBe(0);
+		expect(
+			parseJsonOutput(libraryProc.stdout as string).selected_pack_ids,
+		).toEqual(["library-knowledge"]);
+
+		const governanceProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/spec-gate/changelog.ts",
+			"--json",
+		]);
+		expect(governanceProc.status).toBe(0);
+		expect(
+			parseJsonOutput(governanceProc.stdout as string).selected_pack_ids,
+		).toEqual(["governance-history"]);
+
+		const admProc = runKernel([
+			"v",
+			"select",
+			"--changed-path",
+			"cli/services/adm/validate.ts",
+			"--json",
+		]);
+		expect(admProc.status).toBe(0);
+		expect(parseJsonOutput(admProc.stdout as string).selected_pack_ids).toEqual(
+			["adm-governance"],
+		);
 	});
 
 	test("v select changed-path keeps generic cli fallback on cli-kernel-local", () => {
@@ -312,37 +417,44 @@ describe("validation command family", () => {
 	test("plain validate stays on structural validation even when benchmark registry exists", () => {
 		const fixtureRoot = createValidationFixtureRoot();
 		const proc = runKernel(["validate", "--json"], fixtureRoot);
-		expect(proc.status).toBe(2);
+		expect(proc.status).toBe(1);
 		const payload = parseJsonOutput(proc.stdout as string);
+		expect(payload.schema).toBe("afol.result/v1");
+		expect(payload.exit_code).toBe(1);
 		expect(payload.mode).toBeUndefined();
 		expect(typeof payload.ok).toBe("boolean");
+		expect(payload.report).toBeDefined();
 		expect(Array.isArray(payload.checks)).toBe(true);
 	});
 
-	test("validate run changed-path executes selected AFOL-native validation commands", () => {
-		const proc = runKernel([
-			"validate",
-			"run",
-			"--changed-path",
-			"cli/commands/validate.ts",
-			"--json",
-		]);
-		expect(proc.status).toBe(0);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.mode).toBe("run");
-		expect(payload.status).toBe("passed");
-		expect(payload.pass).toBe(true);
-		expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
-		const results = payload.command_results as Array<Record<string, unknown>>;
-		expect(results.length).toBeGreaterThan(0);
-		expect(results.every((entry) => entry.pack_id === "cli-kernel-local")).toBe(
-			true,
-		);
-		expect(results.every((entry) => entry.status === "passed")).toBe(true);
-		expect(results.every((entry) => Array.isArray(entry.command))).toBe(true);
-		expect(JSON.stringify(results)).not.toContain("just");
-		expect(payload.contract_issues).toEqual([]);
-	}, 10000);
+	test(
+		"validate run changed-path executes selected AFOL-native validation commands",
+		() => {
+			const proc = runKernel([
+				"validate",
+				"run",
+				"--changed-path",
+				"cli/commands/validate.ts",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("run");
+			expect(payload.status).toBe("passed");
+			expect(payload.pass).toBe(true);
+			expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
+			const results = payload.command_results as Array<Record<string, unknown>>;
+			expect(results.length).toBeGreaterThan(0);
+			expect(
+				results.every((entry) => entry.pack_id === "cli-kernel-local"),
+			).toBe(true);
+			expect(results.every((entry) => entry.status === "passed")).toBe(true);
+			expect(results.every((entry) => Array.isArray(entry.command))).toBe(true);
+			expect(JSON.stringify(results)).not.toContain("just");
+			expect(payload.contract_issues).toEqual([]);
+		},
+		slowValidationTestTimeoutMs,
+	);
 
 	test("v select changed-path does not route docs/spec-tests by runtime or mcp substrings", () => {
 		const proc = runKernel([
@@ -401,57 +513,71 @@ describe("validation command family", () => {
 		expect(first.pass).toBe(true);
 	});
 
-	test("v bench runs update-safety pack with complete baseline coverage", () => {
-		const proc = runKernel(["v", "bench", "--pack", "update-safety", "--json"]);
-		expect(proc.status).toBe(0);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.mode).toBe("benchmark");
-		expect(payload.result_count).toBe(4);
-		expect(payload.summary).toEqual({
-			total: 4,
-			passed: 4,
-			failed: 0,
-			skipped: 0,
-			baseline_missing: 0,
-		});
-		const results = payload.results as Array<Record<string, unknown>>;
-		expect(results.length).toBe(4);
-		expect(results.every((entry) => entry.pack_id === "update-safety")).toBe(
-			true,
-		);
-		expect(results.some((entry) => entry.status === "baseline-missing")).toBe(
-			false,
-		);
-	});
+	test(
+		"v bench runs update-safety pack with compact update envelopes",
+		() => {
+			const proc = runKernel([
+				"v",
+				"bench",
+				"--pack",
+				"update-safety",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("benchmark");
+			expect(payload.result_count).toBe(4);
+			expect(payload.status).toBe("passed");
+			expect(payload.pass).toBe(true);
+			expect(payload.summary).toEqual({
+				total: 4,
+				passed: 4,
+				failed: 0,
+				skipped: 0,
+				baseline_missing: 0,
+			});
+			const results = payload.results as Array<Record<string, unknown>>;
+			expect(results.length).toBe(4);
+			expect(results.every((entry) => entry.pack_id === "update-safety")).toBe(
+				true,
+			);
+			expect(results.some((entry) => entry.status === "failed")).toBe(false);
+		},
+		slowValidationTestTimeoutMs,
+	);
 
-	test("v bench runs mutation-safety pack with complete baseline coverage", () => {
-		const proc = runKernel([
-			"v",
-			"bench",
-			"--pack",
-			"mutation-safety",
-			"--json",
-		]);
-		expect(proc.status).toBe(0);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.mode).toBe("benchmark");
-		expect(payload.result_count).toBe(5);
-		expect(payload.summary).toEqual({
-			total: 5,
-			passed: 5,
-			failed: 0,
-			skipped: 0,
-			baseline_missing: 0,
-		});
-		const results = payload.results as Array<Record<string, unknown>>;
-		expect(results.length).toBe(5);
-		expect(results.every((entry) => entry.pack_id === "mutation-safety")).toBe(
-			true,
-		);
-		expect(results.some((entry) => entry.status === "baseline-missing")).toBe(
-			false,
-		);
-	});
+	test(
+		"v bench runs mutation-safety pack with complete baseline coverage",
+		() => {
+			const proc = runKernel([
+				"v",
+				"bench",
+				"--pack",
+				"mutation-safety",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("benchmark");
+			expect(payload.result_count).toBe(5);
+			expect(payload.summary).toEqual({
+				total: 5,
+				passed: 5,
+				failed: 0,
+				skipped: 0,
+				baseline_missing: 0,
+			});
+			const results = payload.results as Array<Record<string, unknown>>;
+			expect(results.length).toBe(5);
+			expect(
+				results.every((entry) => entry.pack_id === "mutation-safety"),
+			).toBe(true);
+			expect(results.some((entry) => entry.status === "baseline-missing")).toBe(
+				false,
+			);
+		},
+		slowValidationTestTimeoutMs,
+	);
 
 	test("v bench --save persists a benchmark result artifact under default results directory", () => {
 		const fixtureRoot = createValidationFixtureRoot();
@@ -526,13 +652,24 @@ describe("validation command family", () => {
 				"cli-help-compact.json",
 			);
 			const scenario = readJson(scenarioPath);
-			const deterministic = scenario.deterministic_metrics as Record<
-				string,
-				unknown
-			>;
-			deterministic.duration_ms = 3000;
-			deterministic.timing_p95_ms = 3000;
+			const thresholds = scenario.thresholds as Record<string, unknown>;
+			thresholds.max_output_tokens = 1;
 			writeFileSync(scenarioPath, `${JSON.stringify(scenario, null, 2)}\n`);
+
+			const baselinePath = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"baselines",
+				"cli-kernel-local",
+				"baseline-v1.json",
+			);
+			const baseline = readJson(baselinePath);
+			baseline.timing_p50_ms = 1;
+			baseline.timing_p95_ms = 1;
+			writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
 		});
 
 		const proc = runKernel(
@@ -553,7 +690,7 @@ describe("validation command family", () => {
 		const notes = target?.notes as string[];
 		expect(
 			notes.some((entry) =>
-				entry.startsWith("threshold-exceeded:max_duration_ms:"),
+				entry.startsWith("threshold-exceeded:max_output_tokens:"),
 			),
 		).toBe(true);
 		expect(
@@ -562,7 +699,7 @@ describe("validation command family", () => {
 			),
 		).toBe(true);
 		const summary = payload.summary as Record<string, unknown>;
-		expect(summary.failed).toBe(1);
+		expect(summary.failed).toBe(6);
 		expect(summary.skipped).toBe(0);
 	});
 
@@ -978,7 +1115,7 @@ describe("validation command family", () => {
 		expect(updatePayload.selected_pack_ids).toEqual(["update-safety"]);
 	}, 10000);
 
-	test("registry contract remains complete for the eight-pack matrix", () => {
+	test("registry contract remains complete for the fifteen-pack matrix", () => {
 		const proc = runKernel(["v", "select", "--json"]);
 		expect(proc.status).toBe(0);
 		const payload = parseJsonOutput(proc.stdout as string);
@@ -992,6 +1129,13 @@ describe("validation command family", () => {
 			"mcp-parity",
 			"runtime-live-agent",
 			"token-economy",
+			"pstr-integrity",
+			"context-bundles",
+			"state-projection",
+			"memory-governance",
+			"library-knowledge",
+			"governance-history",
+			"adm-governance",
 		]);
 		expect(
 			registry.every(

@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
+import { filterClaudeAdapterFiles } from "../services/adapter/claude";
 import {
 	cleanupBootstrapObsolete,
 	planBootstrapCleanup,
@@ -28,6 +29,7 @@ type BootstrapArgs = {
 	cleanupProviderCompatibleMutable: boolean;
 	confirmProviderMigration: boolean;
 	mutableDir: string;
+	withoutClaude: boolean;
 };
 
 type RawManifest = Record<string, unknown>;
@@ -49,7 +51,7 @@ type ProviderCompatibleCleanupArchiveResult =
 		archivePath: string;
 	};
 
-const MUTABLE_BASELINE_SOURCES = [
+const BASE_MUTABLE_BASELINE_SOURCES = [
 	{ suffix: "skills/README.md", sourcePath: ".afol/skills/README.md" },
 	{ suffix: "tmp/README.md", sourcePath: ".afol/tmp/README.md" },
 	{ suffix: "data/README.md", sourcePath: ".afol/data/README.md" },
@@ -66,6 +68,8 @@ const MUTABLE_BASELINE_SOURCES = [
 		sourcePath: ".afol/data/telemetry/schemas/event.json",
 	},
 ] as const;
+
+const MUTABLE_BENCHMARK_CATALOG_PREFIX = ".afol/data/benchmarks/catalog/";
 
 const PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS = [
 	".agents/data",
@@ -89,6 +93,7 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 	let cleanupProviderCompatibleMutable = false;
 	let confirmProviderMigration = false;
 	let mutableDir = ".afol";
+	let withoutClaude = false;
 
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -101,6 +106,10 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 		}
 		if (arg === "--provider-compatible") {
 			mutableDir = ".afol";
+			continue;
+		}
+		if (arg === "--without-claude") {
+			withoutClaude = true;
 			continue;
 		}
 		if (arg === "--mutable-dir") {
@@ -155,6 +164,7 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 		cleanupProviderCompatibleMutable,
 		confirmProviderMigration,
 		mutableDir,
+		withoutClaude,
 	};
 }
 
@@ -200,46 +210,91 @@ function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
 	return Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
 
-function buildBootstrapTemplateFiles(mutableDir: string): TemplateFileMap {
+function applyAdapterConfigFlag(
+	content: Buffer,
+	withoutClaude: boolean,
+): Buffer {
+	if (!withoutClaude) {
+		return content;
+	}
+	const config = JSON.parse(content.toString("utf8")) as Record<
+		string,
+		unknown
+	>;
+	const adapters =
+		config.adapters !== null &&
+		typeof config.adapters === "object" &&
+		!Array.isArray(config.adapters)
+			? { ...(config.adapters as Record<string, unknown>) }
+			: {};
+	const claude = adapters.claude
+		? { ...(adapters.claude as Record<string, unknown>) }
+		: {};
+	config.adapters = {
+		...adapters,
+		claude: { ...claude, enabled: false },
+	};
+	return Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+function buildBootstrapTemplateFiles(
+	mutableDir: string,
+	withoutClaude: boolean,
+): TemplateFileMap {
 	const templateFiles: TemplateFileMap = { ...DEFAULT_TEMPLATE_FILES };
-	if (mutableDir === ".agents") {
+	const providerMigration = mutableDir !== ".agents";
+	if (!providerMigration && !withoutClaude) {
 		return templateFiles;
 	}
 
-	for (const path of Object.keys(templateFiles)) {
-		if (
-			PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS.some(
-				(root) => path === root || path.startsWith(`${root}/`),
-			)
-		) {
-			delete templateFiles[path];
+	// Provider-compatible mutable migration strips .agents mutable roots and
+	// .afol/* suffix roots. This must NOT run for a plain --without-claude
+	// install that keeps mutableDir at .agents.
+	if (providerMigration) {
+		for (const path of Object.keys(templateFiles)) {
+			if (
+				PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS.some(
+					(root) => path === root || path.startsWith(`${root}/`),
+				)
+			) {
+				delete templateFiles[path];
+			}
 		}
-	}
-	for (const path of Object.keys(templateFiles)) {
-		if (
-			MUTABLE_TEMPLATE_SUFFIX_ROOTS.some((suffix) => {
-				const root = `${mutableDir}/${suffix}`;
-				return path === root || path.startsWith(`${root}/`);
-			})
-		) {
-			delete templateFiles[path];
+		for (const path of Object.keys(templateFiles)) {
+			if (
+				MUTABLE_TEMPLATE_SUFFIX_ROOTS.some((suffix) => {
+					const root = `${mutableDir}/${suffix}`;
+					return path === root || path.startsWith(`${root}/`);
+				})
+			) {
+				delete templateFiles[path];
+			}
 		}
 	}
 
 	const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
-	if (!configEntry) {
-		return templateFiles;
+	if (configEntry && (providerMigration || withoutClaude)) {
+		const basePayload = Buffer.from(configEntry.contentBase64, "base64");
+		const afterMutable = providerMigration
+			? mutableConfigPayload(basePayload, mutableDir)
+			: basePayload;
+		const payload = applyAdapterConfigFlag(afterMutable, withoutClaude);
+		templateFiles[".agents/config.json"] = {
+			path: ".agents/config.json",
+			contentBase64: payload.toString("base64"),
+			sha256: sha256Hex(payload),
+			bytes: payload.byteLength,
+		};
 	}
-	const payload = mutableConfigPayload(
-		Buffer.from(configEntry.contentBase64, "base64"),
-		mutableDir,
-	);
-	templateFiles[".agents/config.json"] = {
-		path: ".agents/config.json",
-		contentBase64: payload.toString("base64"),
-		sha256: sha256Hex(payload),
-		bytes: payload.byteLength,
-	};
+
+	if (withoutClaude) {
+		const filtered = filterClaudeAdapterFiles(templateFiles);
+		for (const key of Object.keys(templateFiles)) {
+			if (!(key in filtered)) {
+				delete templateFiles[key];
+			}
+		}
+	}
 	return templateFiles;
 }
 
@@ -252,7 +307,21 @@ function planMutableBaselines(
 	}
 
 	const operations: MutableBaselineOperation[] = [];
-	for (const baseline of MUTABLE_BASELINE_SOURCES) {
+	const baselineSources = [
+		...BASE_MUTABLE_BASELINE_SOURCES,
+		...Object.keys(DEFAULT_TEMPLATE_FILES)
+			.filter(
+				(sourcePath) =>
+					sourcePath.startsWith(MUTABLE_BENCHMARK_CATALOG_PREFIX) &&
+					!sourcePath.includes("/providers/"),
+			)
+			.sort()
+			.map((sourcePath) => ({
+				sourcePath,
+				suffix: sourcePath.replace(/^\.afol\//, ""),
+			})),
+	];
+	for (const baseline of baselineSources) {
 		const source = DEFAULT_TEMPLATE_FILES[baseline.sourcePath];
 		if (!source) {
 			continue;
@@ -511,7 +580,10 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
 		return 2;
 	}
 
-	const templateFiles = buildBootstrapTemplateFiles(parsed.mutableDir);
+	const templateFiles = buildBootstrapTemplateFiles(
+		parsed.mutableDir,
+		parsed.withoutClaude,
+	);
 	const templatePaths = Object.keys(templateFiles).sort();
 	const currentFiles = readTargetFiles(parsed.targetRoot, templatePaths);
 	const manifest = loadBootstrapManifest(parsed.targetRoot, templatePaths);
@@ -544,6 +616,7 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
 			`bootstrap: target=${parsed.targetRoot}`,
 			`mode=${parsed.dryRun ? "dry-run" : "apply"}`,
 			`mutable=${parsed.mutableDir}`,
+			`without-claude=${parsed.withoutClaude}`,
 			`files=${Object.keys(templateFiles).length}`,
 			`operations=${plan.operations.length}`,
 			`conflicts=${conflicts.length}`,

@@ -82,6 +82,40 @@ describe("log command", () => {
 		}
 	});
 
+	test("emits a json envelope when requested", () => {
+		const root = mkProjectRoot("json");
+		try {
+			const created = newWorkstream(root, "json-log");
+
+			const proc = runKernel(root, [
+				"log",
+				"--session",
+				created.session,
+				"--message",
+				"json timeline",
+				"--json",
+			]);
+
+			expect(proc.status).toBe(0);
+			const payload = JSON.parse(proc.stdout as string) as Record<
+				string,
+				unknown
+			>;
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.log",
+			});
+			expect(payload.data).toMatchObject({
+				session: created.session,
+				status: "logged",
+				message: "json timeline",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("accepts token-optimized session flag and positional message", () => {
 		const root = mkProjectRoot("session");
 		try {
@@ -140,10 +174,14 @@ describe("log command", () => {
 				.trim()
 				.split("\n")
 				.map((line) => JSON.parse(line) as Record<string, unknown>);
-			expect(eventRows).toHaveLength(9);
+			// 1 workbench.new + 1 telemetry session_start + 8 workbench.append_log
+			expect(eventRows).toHaveLength(10);
 			expect(
 				eventRows.filter((row) => row.type === "workbench.append_log"),
 			).toHaveLength(8);
+			expect(eventRows.filter((row) => row.source === "afol-cli")).toHaveLength(
+				1,
+			);
 			expect(
 				existsSync(
 					join(root, ".afol", "wb", ".locks", `${created.session}.lock`),

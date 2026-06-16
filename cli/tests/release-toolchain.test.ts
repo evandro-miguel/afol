@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -38,7 +39,13 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:security:required"]).toBe(
 			"bun run security:scan:required",
 		);
+		expect(scripts["validate:security:release"]).toBe(
+			"bun run security:scan:release",
+		);
 		expect(scripts["validate:release"]).toContain(
+			"bun run validate:security:release",
+		);
+		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:security:required",
 		);
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
@@ -70,6 +77,7 @@ describe("release and toolchain contracts", () => {
 		expect(workflow).toContain('OSV_SCANNER_VERSION: "2.3.8"');
 		expect(workflow).toContain('GITLEAKS_VERSION: "8.24.2"');
 		expect(workflow).toContain("Install pinned security scanners");
+		expect(workflow).toContain("continue-on-error: true");
 		expect(workflow).toContain(
 			"https://github.com/google/osv-scanner/releases/download/v",
 		);
@@ -116,6 +124,158 @@ describe("release and toolchain contracts", () => {
 				'export const CLI_PACKAGE_NAME = "fixture-cli";',
 			);
 			expect(output).toContain('export const CLI_VERSION = "1.2.3-beta.1";');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release provenance records scanner statuses", () => {
+		const root = mkdtempSync(join(tmpdir(), "release-provenance-scanners-"));
+		const distDir = join(root, "dist");
+		const binDir = join(root, "bin");
+		mkdirSync(distDir, { recursive: true });
+		mkdirSync(binDir, { recursive: true });
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+		symlinkSync("/usr/bin/git", join(binDir, "git"));
+
+		const gitEnv = {
+			...process.env,
+			PATH: binDir,
+			GIT_AUTHOR_NAME: "Test User",
+			GIT_AUTHOR_EMAIL: "test@example.com",
+			GIT_COMMITTER_NAME: "Test User",
+			GIT_COMMITTER_EMAIL: "test@example.com",
+		};
+
+		try {
+			const result = spawnSync("git", ["init"], {
+				cwd: root,
+				encoding: "utf8",
+				env: gitEnv,
+				shell: false,
+			});
+			if (result.error) {
+				throw result.error;
+			}
+			expect(result.status).toBe(0);
+
+			const addResult = spawnSync("git", ["add", "dist/afol"], {
+				cwd: root,
+				encoding: "utf8",
+				env: gitEnv,
+				shell: false,
+			});
+			if (addResult.error) {
+				throw addResult.error;
+			}
+			expect(addResult.status).toBe(0);
+
+			const commitResult = spawnSync(
+				"git",
+				["commit", "--no-verify", "-m", "test release provenance"],
+				{
+					cwd: root,
+					encoding: "utf8",
+					env: gitEnv,
+					shell: false,
+				},
+			);
+			if (commitResult.error) {
+				throw commitResult.error;
+			}
+			expect(commitResult.status).toBe(0);
+
+			const provenance = buildReleaseProvenance({
+				cwd: root,
+				releaseMode: true,
+				env: gitEnv,
+			});
+			expect(provenance.security_scanners).toHaveLength(2);
+			expect(provenance.security_scanners).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						tool: "osv-scanner",
+						kind: "deps",
+						status: "waived",
+						reason: expect.stringContaining("missing binary"),
+						waiver_required: true,
+					}),
+					expect.objectContaining({
+						tool: "gitleaks",
+						kind: "secrets",
+						status: "waived",
+						reason: expect.stringContaining("missing binary"),
+						waiver_required: true,
+					}),
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release provenance uses GitHub head ref in detached PR checkout", () => {
+		const root = mkdtempSync(join(tmpdir(), "release-provenance-detached-"));
+		const distDir = join(root, "dist");
+		mkdirSync(distDir, { recursive: true });
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+
+		const gitEnv = {
+			...process.env,
+			GIT_AUTHOR_NAME: "Test User",
+			GIT_AUTHOR_EMAIL: "test@example.com",
+			GIT_COMMITTER_NAME: "Test User",
+			GIT_COMMITTER_EMAIL: "test@example.com",
+		};
+
+		try {
+			for (const args of [
+				["init"],
+				["add", "dist/afol", "bun.lock"],
+				["commit", "--no-verify", "-m", "test release provenance"],
+			]) {
+				const result = spawnSync("git", args, {
+					cwd: root,
+					encoding: "utf8",
+					env: gitEnv,
+					shell: false,
+				});
+				if (result.error) {
+					throw result.error;
+				}
+				expect(result.status).toBe(0);
+			}
+
+			const sha = spawnSync("git", ["rev-parse", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+				env: gitEnv,
+				shell: false,
+			}).stdout.trim();
+			expect(sha.length).toBeGreaterThan(0);
+
+			const checkout = spawnSync("git", ["checkout", "--detach", sha], {
+				cwd: root,
+				encoding: "utf8",
+				env: gitEnv,
+				shell: false,
+			});
+			if (checkout.error) {
+				throw checkout.error;
+			}
+			expect(checkout.status).toBe(0);
+
+			const provenance = buildReleaseProvenance({
+				cwd: root,
+				releaseMode: true,
+				env: {
+					...gitEnv,
+					GITHUB_HEAD_REF: "adminitration_refactor",
+				},
+			});
+			expect(provenance.branch).toBe("adminitration_refactor");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

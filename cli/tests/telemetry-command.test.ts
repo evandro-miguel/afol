@@ -1,0 +1,175 @@
+import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { runTelemetryCommand } from "../commands/telemetry";
+import { appendTelemetryEvent } from "../services/events/telemetry";
+
+function mkRoot(): string {
+	const root = mkdtempSync(join(tmpdir(), "telemetry-command-"));
+	mkdirSync(join(root, ".agents"), { recursive: true });
+	writeFileSync(
+		join(root, ".agents", "config.json"),
+		JSON.stringify({
+			schema_version: 1,
+			paths: {
+				agents_dir: ".agents",
+				mutable_dir: ".afol",
+				wb_dir: ".afol/wb",
+				active_session_file: ".afol/wb/.active_session",
+				data_dir: ".afol/data",
+				data_index_dir: ".afol/data/index",
+				events_file: ".afol/data/events/events.jsonl",
+			},
+		}),
+		"utf8",
+	);
+	return root;
+}
+
+function captureIo() {
+	const stdout: string[] = [];
+	const stderr: string[] = [];
+	return {
+		stdout,
+		stderr,
+		io: {
+			stdout: (message: string) => stdout.push(message),
+			stderr: (message: string) => stderr.push(message),
+		},
+	};
+}
+
+describe("telemetry command", () => {
+	test("query filters telemetry events", async () => {
+		const root = mkRoot();
+		try {
+			appendTelemetryEvent(root, {
+				event_type: "session_start",
+				session_id: "S-1",
+				cmd_type: "new",
+				outcome: "success",
+			});
+			appendTelemetryEvent(root, {
+				event_type: "task_complete",
+				session_id: "S-1",
+				task_id: "T-01",
+				outcome: "success",
+			});
+			const captured = captureIo();
+			const code = await runTelemetryCommand(
+				"query",
+				["--type", "task_complete", "--json"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				data: { count: number; events: Array<{ event_type: string }> };
+			};
+			expect(payload.data.count).toBe(1);
+			expect(payload.data.events[0]?.event_type).toBe("task_complete");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("report summarizes events", async () => {
+		const root = mkRoot();
+		try {
+			appendTelemetryEvent(root, {
+				event_type: "session_start",
+				session_id: "S-1",
+				outcome: "success",
+			});
+			const captured = captureIo();
+			const code = await runTelemetryCommand(
+				"report",
+				["--json"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				data: {
+					total: number;
+					sessions: number;
+					by_type: Record<string, number>;
+				};
+			};
+			expect(payload.data.total).toBe(1);
+			expect(payload.data.sessions).toBe(1);
+			expect(payload.data.by_type.session_start).toBe(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("top-level json defaults to query", async () => {
+		const root = mkRoot();
+		try {
+			appendTelemetryEvent(root, {
+				event_type: "session_start",
+				session_id: "S-1",
+				outcome: "success",
+			});
+			const captured = captureIo();
+			const code = await runTelemetryCommand("--json", [], root, captured.io);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				action: string;
+				data: { count: number };
+			};
+			expect(payload.action).toBe("telemetry.query");
+			expect(payload.data.count).toBe(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("export defaults to an envelope unless jsonl is requested", async () => {
+		const root = mkRoot();
+		try {
+			appendTelemetryEvent(root, {
+				event_type: "session_start",
+				session_id: "S-1",
+				outcome: "success",
+			});
+			const captured = captureIo();
+			const code = await runTelemetryCommand("export", [], root, captured.io);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				action: string;
+				data: { count: number };
+			};
+			expect(payload.action).toBe("telemetry.export");
+			expect(payload.data.count).toBe(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("json errors use the result envelope", async () => {
+		const root = mkRoot();
+		try {
+			const captured = captureIo();
+			const code = await runTelemetryCommand(
+				"query",
+				["--type", "bogus", "--json"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stderr).toHaveLength(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: { code: string; message: string };
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.error.code).toBe("telemetry.command.error");
+			expect(payload.error.message).toContain("Unknown telemetry event type");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});

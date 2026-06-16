@@ -33,8 +33,21 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("up")).toBe("update");
 		expect(kernelRegistry.resolveKind("local-state")).toBe("localState");
 		expect(kernelRegistry.resolveKind("ls")).toBe("localState");
+		expect(kernelRegistry.resolveKind("pstr")).toBe("pstr");
+		expect(kernelRegistry.resolveKind("ps")).toBe("pstr");
+		expect(kernelRegistry.resolveKind("ctx")).toBe("ctx");
+		expect(kernelRegistry.resolveKind("cx")).toBe("ctx");
+		expect(kernelRegistry.resolveKind("library")).toBe("library");
+		expect(kernelRegistry.resolveKind("lb")).toBe("library");
+		expect(kernelRegistry.resolveKind("adm")).toBe("adm");
+		expect(kernelRegistry.resolveKind("health")).toBe("health");
+		expect(kernelRegistry.resolveKind("ht")).toBe("health");
+		expect(kernelRegistry.resolveKind("db")).toBe("db");
+		expect(kernelRegistry.resolveKind("bench")).toBe("bench");
 		expect(kernelRegistry.resolveKind("close")).toBe("close");
 		expect(kernelRegistry.resolveKind("c")).toBe("close");
+		expect(kernelRegistry.resolveKind("preflight")).toBe("preflight");
+		expect(kernelRegistry.resolveKind("pf")).toBe("preflight");
 		expect(kernelRegistry.resolveKind("task")).toBeNull();
 		expect(kernelRegistry.resolveKind("query")).toBeNull();
 	});
@@ -65,12 +78,33 @@ describe("kernel registry", () => {
 		expect(byCommand.get("update")?.sideEffect).toBe("write");
 		expect(byCommand.get("evidence")?.sideEffect).toBe("append");
 		expect(byCommand.get("local-state")?.sideEffect).toBe("generated");
+		expect(byCommand.get("pstr")?.sideEffect).toBe("read");
+		expect(byCommand.get("ctx")?.sideEffect).toBe("read");
+		expect(byCommand.get("state")?.sideEffect).toBe("read");
+		expect(byCommand.get("hydrate")?.sideEffect).toBe("generated");
+		expect(byCommand.get("render")?.sideEffect).toBe("generated");
+		expect(byCommand.get("library")?.sideEffect).toBe("read");
+		expect(byCommand.get("memory")?.sideEffect).toBe("read");
+		expect(byCommand.get("adm")?.sideEffect).toBe("read");
+		expect(byCommand.get("bench")?.sideEffect).toBe("read");
+		expect(byCommand.get("spec")?.sideEffect).toBe("read");
+		expect(byCommand.get("adr")?.sideEffect).toBe("read");
+		expect(byCommand.get("changelog")?.sideEffect).toBe("read");
+		expect(byCommand.get("health")?.sideEffect).toBe("read");
+		expect(byCommand.get("db")?.sideEffect).toBe("read");
+		expect(byCommand.get("doctor")?.sideEffect).toBe("read");
+		expect(byCommand.get("maintenance")?.sideEffect).toBe("read");
+		expect(byCommand.get("sweep")?.sideEffect).toBe("read");
+		expect(byCommand.get("schema")?.sideEffect).toBe("read");
+		expect(byCommand.get("preflight")?.sideEffect).toBe("read");
 
 		for (const entry of kernelRegistry.commands) {
 			expect(["read", "write", "append", "generated"]).toContain(
 				entry.sideEffect,
 			);
 			expect(entry.command.length).toBeGreaterThan(0);
+			expect(entry.description.length).toBeGreaterThan(0);
+			expect(entry.description.length).toBeLessThanOrEqual(80);
 		}
 	});
 });

@@ -132,6 +132,46 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(
 				existsSync(join(target, ".afol", "data", "index", "README.md")),
 			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"data",
+						"benchmarks",
+						"catalog",
+						"registry.json",
+					),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"data",
+						"benchmarks",
+						"catalog",
+						"scenarios",
+						"cli-kernel-local",
+						"cli-help-compact.json",
+					),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"data",
+						"benchmarks",
+						"catalog",
+						"baselines",
+						"cli-kernel-local",
+						"baseline-v1.json",
+					),
+				),
+			).toBe(true);
 
 			const config = JSON.parse(
 				readFileSync(join(target, ".agents", "config.json"), "utf8"),
@@ -361,9 +401,104 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(output).toContain(
 				"mutable-baseline-create .afol/data/README.md source=.afol/data/README.md missing-target-file",
 			);
+			expect(output).toContain(
+				"mutable-baseline-create .afol/data/benchmarks/catalog/registry.json source=.afol/data/benchmarks/catalog/registry.json missing-target-file",
+			);
 			expect(output).not.toContain("provider-compatible-cleanup-removed");
 		} finally {
 			console.log = originalLog;
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("--without-claude omits Claude artifacts and marks config disabled", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-without-claude-"));
+		try {
+			const exitCode = await runBootstrapCommand([target, "--without-claude"]);
+
+			expect(exitCode).toBe(0);
+			// AGENTS.md is always canonical and must be installed
+			expect(existsSync(join(target, "AGENTS.md"))).toBe(true);
+			// Claude adapter artifacts must be absent
+			expect(existsSync(join(target, "CLAUDE.md"))).toBe(false);
+			expect(existsSync(join(target, ".claude"))).toBe(false);
+			expect(existsSync(join(target, ".claude", "README.md"))).toBe(false);
+
+			const config = JSON.parse(
+				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+			) as {
+				adapters?: { claude?: { enabled?: boolean } };
+			};
+			expect(config.adapters?.claude?.enabled).toBe(false);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("--without-claude combines with --provider-compatible", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-without-claude-pc-"));
+		try {
+			const exitCode = await runBootstrapCommand([
+				target,
+				"--provider-compatible",
+				"--without-claude",
+			]);
+
+			expect(exitCode).toBe(0);
+			expect(existsSync(join(target, "AGENTS.md"))).toBe(true);
+			expect(existsSync(join(target, "CLAUDE.md"))).toBe(false);
+			expect(existsSync(join(target, ".claude"))).toBe(false);
+			expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(
+				true,
+			);
+
+			const config = JSON.parse(
+				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+			) as {
+				paths: { mutable_dir: string };
+				adapters?: { claude?: { enabled?: boolean } };
+			};
+			expect(config.paths.mutable_dir).toBe(".afol");
+			expect(config.adapters?.claude?.enabled).toBe(false);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("--without-claude with default mutableDir keeps provider-compatible .agents roots", async () => {
+		const target = mkdtempSync(
+			join(tmpdir(), "bootstrap-without-claude-agents-"),
+		);
+		try {
+			const exitCode = await runBootstrapCommand([
+				target,
+				"--mutable-dir",
+				".agents",
+				"--without-claude",
+			]);
+
+			expect(exitCode).toBe(0);
+			// Claude artifacts absent
+			expect(existsSync(join(target, "CLAUDE.md"))).toBe(false);
+			expect(existsSync(join(target, ".claude"))).toBe(false);
+			// Mutable-state template files MUST remain (regression guard:
+			// --without-claude must not trigger provider-root stripping when
+			// mutableDir is .agents). Template ships these under .afol/.
+			expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "data", "README.md"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(
+				true,
+			);
+			expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
+
+			const config = JSON.parse(
+				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+			) as {
+				paths: { mutable_dir: string };
+				adapters?: { claude?: { enabled?: boolean } };
+			};
+			expect(config.adapters?.claude?.enabled).toBe(false);
+		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}
 	});

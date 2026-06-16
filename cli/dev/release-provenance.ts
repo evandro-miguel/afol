@@ -6,7 +6,10 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_TEMPLATE_HASH } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
-import { supportedDependencyLockfile } from "./security-scan";
+import {
+	buildReleaseSecurityScanOutcomes,
+	supportedDependencyLockfile,
+} from "./security-scan";
 
 const DEFAULT_ARTIFACT = "dist/afol";
 const DEFAULT_BUILD_COMMAND = "bun run build:deterministic";
@@ -28,6 +31,13 @@ type ReleaseProvenance = {
 	build_command: string;
 	platform: string;
 	arch: string;
+	security_scanners: Array<{
+		tool: string;
+		kind: string;
+		status: string;
+		reason?: string;
+		waiver_required?: boolean;
+	}>;
 };
 
 type WriteReleaseProvenanceOptions = {
@@ -35,6 +45,7 @@ type WriteReleaseProvenanceOptions = {
 	artifact?: string;
 	releaseMode?: boolean;
 	buildCommand?: string;
+	env?: NodeJS.ProcessEnv;
 };
 
 function sha256Hex(bytes: Uint8Array | string): string {
@@ -52,6 +63,45 @@ function runGitCommand(cwd: string, args: string[]): string {
 	}
 	const value = `${result.stdout ?? ""}`.trim();
 	return value.length > 0 ? value : "unknown";
+}
+
+function githubRefBranch(env: NodeJS.ProcessEnv | undefined): string {
+	const headRef = env?.GITHUB_HEAD_REF?.trim();
+	if (headRef) {
+		return headRef;
+	}
+
+	const refName = env?.GITHUB_REF_NAME?.trim();
+	if (refName) {
+		return refName;
+	}
+
+	const ref = env?.GITHUB_REF?.trim();
+	if (ref?.startsWith("refs/heads/")) {
+		return ref.slice("refs/heads/".length);
+	}
+	if (ref?.startsWith("refs/pull/")) {
+		return ref;
+	}
+
+	return "unknown";
+}
+
+function resolveBranch(
+	cwd: string,
+	env: NodeJS.ProcessEnv | undefined,
+): string {
+	const currentBranch = runGitCommand(cwd, ["branch", "--show-current"]);
+	if (currentBranch !== "unknown") {
+		return currentBranch;
+	}
+
+	const branchFromEnv = githubRefBranch(env);
+	if (branchFromEnv !== "unknown") {
+		return branchFromEnv;
+	}
+
+	return runGitCommand(cwd, ["name-rev", "--name-only", "HEAD"]);
 }
 
 function readLockMetadata(cwd: string): {
@@ -80,6 +130,7 @@ function assertKnownReleaseFields(provenance: ReleaseProvenance): void {
 		"build_command",
 		"platform",
 		"arch",
+		"security_scanners",
 	];
 	const unknownFields = requiredFields.filter(
 		(field) => provenance[field] === "unknown",
@@ -114,7 +165,7 @@ export function buildReleaseProvenance(
 		node: process.version,
 		generated_at: new Date().toISOString(),
 		commit_sha: runGitCommand(cwd, ["rev-parse", "HEAD"]),
-		branch: runGitCommand(cwd, ["branch", "--show-current"]),
+		branch: resolveBranch(cwd, options.env ?? process.env),
 		lockfile: lockMetadata.lockfile,
 		lock_sha256: lockMetadata.lock_sha256,
 		template_hash:
@@ -125,6 +176,17 @@ export function buildReleaseProvenance(
 		build_command: options.buildCommand ?? DEFAULT_BUILD_COMMAND,
 		platform: process.platform || "unknown",
 		arch: process.arch || "unknown",
+		security_scanners: buildReleaseSecurityScanOutcomes(options.env).map(
+			(scanner) => ({
+				tool: scanner.tool,
+				kind: scanner.kind,
+				status: scanner.status,
+				...(scanner.reason ? { reason: scanner.reason } : {}),
+				...(scanner.waiver_required
+					? { waiver_required: scanner.waiver_required }
+					: {}),
+			}),
+		),
 	};
 
 	if (options.releaseMode) {

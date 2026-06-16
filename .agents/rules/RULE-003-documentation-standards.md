@@ -71,8 +71,7 @@ status: superseded  # Replaced by newer version
 **Set status:**
 
 ```bash
-./.agents/agents wb-update status --value active --file plan
-just wb-status STATUS=active
+afol log --session <session-id> --message "plan status: active"
 ```
 
 ---
@@ -95,7 +94,7 @@ updated_at: 2026-02-23T14:30:00-03:00
 **Normalize timestamps:**
 
 ```bash
-./.agents/agents wb-update normalize-time --all-wb
+afol validate project --json
 ```
 
 ---
@@ -117,7 +116,7 @@ links:
 **Set link:**
 
 ```bash
-./.agents/agents wb-update link --file plan --key related --value "260220_1000_other"
+afol log --session <session-id> --message "related: 260220_1000_other"
 ```
 
 ---
@@ -167,10 +166,10 @@ links:
 
 ```bash
 # Validate frontmatter
-./.agents/agents lint-docs .afol/wb/
+afol validate project --json
 
 # Fix issues automatically
-./.agents/agents lint-docs .afol/wb --fix
+afol validate project --json
 ```
 
 ---

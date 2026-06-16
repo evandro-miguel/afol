@@ -1,4 +1,10 @@
 import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
+import {
 	rebuildProjectIndexes,
 	validateFilesIndex,
 	validateRulesIndex,
@@ -21,6 +27,22 @@ const DEFAULT_IO: CommandIo = {
 };
 
 type LocalStateCommand = "rebuild" | "freshness";
+
+function resultEnvelope<T extends Record<string, unknown>>(
+	data: T,
+	action: string,
+	exitCode: number,
+): ResultEnvelope<T> {
+	return exitCode === 0
+		? envelopeOk(data, { action, exitCode })
+		: {
+				schema: "afol.result/v1",
+				ok: false,
+				action,
+				exit_code: exitCode,
+				data,
+			};
+}
 
 function normalizeCommand(value: string | undefined): LocalStateCommand {
 	if (!value || value === "freshness" || value === "fs") {
@@ -71,7 +93,18 @@ export async function runLocalStateCommand(
 			const workbench = rebuildWorkBenchIndex(projectRoot);
 			const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
 			if (json) {
-				io.stdout(JSON.stringify({ ok: true, command, snapshot }));
+				io.stdout(
+					stringifyEnvelope(
+						envelopeWithLegacyKeys(
+							resultEnvelope(
+								{ ok: true, command, snapshot },
+								`local-state.${command}`,
+								0,
+							),
+							["ok", "command", "snapshot"],
+						),
+					),
+				);
 			} else {
 				io.stdout(
 					[
@@ -89,7 +122,14 @@ export async function runLocalStateCommand(
 
 		const result = formatFreshness(projectRoot);
 		if (json) {
-			io.stdout(JSON.stringify(result));
+			io.stdout(
+				stringifyEnvelope(
+					envelopeWithLegacyKeys(
+						resultEnvelope(result, "local-state.freshness", result.ok ? 0 : 1),
+						["ok", "checks"],
+					),
+				),
+			);
 		} else {
 			io.stdout(
 				[

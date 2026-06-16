@@ -1,27 +1,35 @@
-# Example ignore file for local agent workspaces
-# Copy/merge into your local .gitignore after cloning this repository.
+# Example ignore file for local AFOL workspaces.
+# Copy or merge into your local .gitignore after cloning this repository.
 
-# Agents scripts virtualenv and caches
-.agents/scripts/.venv/
-.agents/scripts/uv.lock
-uv.lock
-.agents/scripts/__pycache__/
-.agents/scripts/*.pyc
-**/__pycache__/
-**/*.pyc
+# AFOL mutable state
+.afol/pstr/*
+!.afol/pstr/
+.afol/state/*
+!.afol/state/
+.afol/data/events/
+.afol/data/index/
+.afol/data/session/
+.afol/data/mutations/
+.afol/data/migrations/*
+!.afol/data/migrations/
+!.afol/data/migrations/legacy-system-retirement-260609/
+!.afol/data/migrations/legacy-system-retirement-260609/z-arq-README.md
+.afol/data/migrations/legacy-system-retirement-260609/legacy-*/
+.afol/data/benchmarks/catalog/results/*
+.afol/wb/.active_session
+.afol/tmp/*
+!.afol/tmp/
+!.afol/tmp/README.md
 
-# Structure map cache
-.agents/arc/structure/.structure-cache.json
+# Generic local/generated artifacts
 **/.structure-cache.json
-
-# Runtime telemetry events
-.agents/data/telemetry/events.jsonl
-
-# Local temporary/reference workspace
-.agents/.tmp/
-
-# Workbench sessions (operational state)
-.agents/wb/
-
-# Local coverage artifact
+.DS_Store
+node_modules/
+dist/
+.bun-build*
 .coverage
+.pytest_cache/
+.ruff_cache/
+.rumdl_cache/
+.gitnexus
+.codex/

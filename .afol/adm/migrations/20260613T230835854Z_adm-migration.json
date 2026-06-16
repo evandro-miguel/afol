@@ -1,0 +1,552 @@
+{
+  "generated_at": "2026-06-13T23:08:35.854Z",
+  "count": 78,
+  "manifest": [
+    {
+      "source_path": "docs/arc/ARCHITECTURE.md",
+      "target_path": ".afol/adm/doctrine/ARCHITECTURE.md",
+      "source_hash": "3de9793471fdcedf11187152279ed24a68595cbc7b74a97abc35c19d6dff7349",
+      "size_bytes": 16825,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/DECISIONS/ADR-001-bun-typescript-canonical-runtime.md",
+      "target_path": ".afol/adm/decisions/ADR-001-bun-typescript-canonical-runtime.md",
+      "source_hash": "ebabfc3db601f207da4942d2f384549a6e841d280c46e88223a06d0ab746c94a",
+      "size_bytes": 1986,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/DECISIONS/ADR-002-afol-sole-public-entrypoint.md",
+      "target_path": ".afol/adm/decisions/ADR-002-afol-sole-public-entrypoint.md",
+      "source_hash": "2f78c29275b2df429b31f8bfc3e48cf020b13182c59b76218580b0f75ffc698a",
+      "size_bytes": 1622,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/DECISIONS/ADR-003-json-operational-state-and-markdown-projection.md",
+      "target_path": ".afol/adm/decisions/ADR-003-json-operational-state-and-markdown-projection.md",
+      "source_hash": "6a9290e1a3e668e96256d523b09770ad2f52b169fe2f98ff664f834014c255ae",
+      "size_bytes": 4331,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/DECISIONS/ADR-004-afol-administration-and-project-structure.md",
+      "target_path": ".afol/adm/decisions/ADR-004-afol-administration-and-project-structure.md",
+      "source_hash": "ee82cf7be607dc690ca993579221a17cf8676ed9a629978ed30b896b288fd9e2",
+      "size_bytes": 4437,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/DECISIONS/INDEX.md",
+      "target_path": ".afol/adm/decisions/INDEX.md",
+      "source_hash": "33e981f74ba3e161e6605ff08707bb3b092f6f317487297fe4593840f0dcf2c4",
+      "size_bytes": 1647,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/GENERAL-ROADMAP.md",
+      "target_path": ".afol/adm/roadmap/GENERAL-ROADMAP.md",
+      "source_hash": "442286e08879e2967890ea235067e85371b3990cb95e70c668f1916fc4901c92",
+      "size_bytes": 30096,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/PROJECT-MANIFESTO.md",
+      "target_path": ".afol/adm/doctrine/PROJECT-MANIFESTO.md",
+      "source_hash": "761b0dad7029b8c67fb535d40fd485152949172a359548fbcaf34566b21d5e62",
+      "size_bytes": 10708,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_artifact-resolution-layer_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_artifact-resolution-layer_spec_01.md",
+      "source_hash": "48579086ea4633d2497733c8b9f0ca0968bde604f2bf25709b9be4248dafd51f",
+      "size_bytes": 4128,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_context-driven-execution-commands_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_context-driven-execution-commands_spec_01.md",
+      "source_hash": "e701037706c9b9a165c59edebc2674c5551dbf1331152c95bfe0f456a89ac787",
+      "size_bytes": 7880,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_execution-intelligence-and-knowledge-system_spec_01.md",
+      "source_hash": "8494258de16b29e3c72f8dbac2a601e44f7f8e76677b6ee2497e1626e50499fa",
+      "size_bytes": 6294,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_guided-status-and-implementation_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_guided-status-and-implementation_spec_01.md",
+      "source_hash": "3e3b07c0b6781c1fdc03c65a5025146dcab954169693a06ded94436bcd2cbac4",
+      "size_bytes": 3190,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_knowledge-reuse-and-token-efficiency_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_knowledge-reuse-and-token-efficiency_spec_01.md",
+      "source_hash": "415a67eb10146ac4e8d3ee35542eaf7ca9e954c2272d640e29308ba22e611a31",
+      "size_bytes": 1588,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_planning-rigor-and-explorer-gates_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_planning-rigor-and-explorer-gates_spec_01.md",
+      "source_hash": "a543ddd4bf2c4f47877af3f92377ea916870af726cc203a5b6a32fab5c6826ce",
+      "size_bytes": 1946,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_primary-agent-runtime-compatibility_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_primary-agent-runtime-compatibility_spec_01.md",
+      "source_hash": "abc63c4a38f076033b0411cbb7ebf23704f47f1bb49b2789ed86f7557f1e1aac",
+      "size_bytes": 8582,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_project-context-canon-and-setup_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_project-context-canon-and-setup_spec_01.md",
+      "source_hash": "77f996dd0414c908d0d0da8423f32e3eaa7c9b511768ac0990391e186ec20bda",
+      "size_bytes": 3653,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_review-and-logical-revert_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_review-and-logical-revert_spec_01.md",
+      "source_hash": "1597ff6cb0f564c9af965d0235239794b0a309e17a1d537165d647d0ad9f19a3",
+      "size_bytes": 2859,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_roadmap-first-delivery-system_spec_01.md",
+      "source_hash": "06ec436ed884d65e0f0e2d81879a4219d7a4106020817d603d09aed6e95e14a4",
+      "size_bytes": 12251,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_runtime-command-parity_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_runtime-command-parity_spec_01.md",
+      "source_hash": "2de0a195316aac0504b96f74eb61566b835137e9aa8e893d147c092e7283c7d7",
+      "size_bytes": 2616,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260306_session-pack-structure-and-postmortem_spec_01.md",
+      "target_path": ".afol/adm/specs/260306_session-pack-structure-and-postmortem_spec_01.md",
+      "source_hash": "febcc209d5637c6c6d2c6ae8efef572a8a137aba2c7978cdd5fe28d0227dadff",
+      "size_bytes": 2107,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260307_persistent-planning-memory_spec_01.md",
+      "target_path": ".afol/adm/specs/260307_persistent-planning-memory_spec_01.md",
+      "source_hash": "e16e02e836164f00492a9f91416c14c8f7c992b3ac988ebb5a9c2f9a0a233203",
+      "size_bytes": 7472,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260323_1704_universal-skills-runtime-integration_spec_01.md",
+      "target_path": ".afol/adm/specs/260323_1704_universal-skills-runtime-integration_spec_01.md",
+      "source_hash": "bda5b8de7e61f5b289e8cf52096c59ddaf14406f92f731413fdc2fbec2541969",
+      "size_bytes": 7747,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260323_1741_current-state-maps-and-goal-state-governance_spec_01.md",
+      "target_path": ".afol/adm/specs/260323_1741_current-state-maps-and-goal-state-governance_spec_01.md",
+      "source_hash": "1f175e6a9f55f92c0db8f0ef0260517ff13e4f16eac7976b5f80633848fc7e8c",
+      "size_bytes": 7355,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260323_1750_current-state-map-contract_spec_01.md",
+      "target_path": ".afol/adm/specs/260323_1750_current-state-map-contract_spec_01.md",
+      "source_hash": "a1b34ab2f794ace5330ebf81728d705830093ccd61ddf356d54a06e5e5069e90",
+      "size_bytes": 5898,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260323_1751_goal-state-canon_spec_01.md",
+      "target_path": ".afol/adm/specs/260323_1751_goal-state-canon_spec_01.md",
+      "source_hash": "9a39ce77a86a0d59b43d921241fdf1833f0e15ea8b841a810b45c2468b70a289",
+      "size_bytes": 6860,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260323_1752_workflow-and-bootstrap-integration_spec_01.md",
+      "target_path": ".afol/adm/specs/260323_1752_workflow-and-bootstrap-integration_spec_01.md",
+      "source_hash": "79b78630d83dc9f2d9cf0c50df526d2e4dc13e3e34e9eb5eb40e57d4ad0fbad4",
+      "size_bytes": 12444,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260323_1815_execplan-native-planning-system_spec_01.md",
+      "target_path": ".afol/adm/specs/260323_1815_execplan-native-planning-system_spec_01.md",
+      "source_hash": "b915824ae6530c345156f5c8ca72e4bf043df90f58eca2cd256cdc4238928384",
+      "size_bytes": 5134,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260411_agentic-runtime-restructure_spec_01.md",
+      "target_path": ".afol/adm/specs/260411_agentic-runtime-restructure_spec_01.md",
+      "source_hash": "2a7eec48c3ec33281322f1cf6da85d11880195701c10bd2ed22da0addb8c5831",
+      "size_bytes": 6728,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md",
+      "target_path": ".afol/adm/specs/260412_1110_spec-child-and-spec-test-governance_spec_01.md",
+      "source_hash": "37584dab36538c13f1efa4f6d8a99674eca913ebb693e72e4ab675d7e88b13c6",
+      "size_bytes": 7381,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md",
+      "target_path": ".afol/adm/specs/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md",
+      "source_hash": "22bbb7a2b0b1ce72de035861e18548fd800ead2da902a301d9b38bd1ea21acb3",
+      "size_bytes": 8938,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md",
+      "target_path": ".afol/adm/specs/260413_1250_project-template-source-separation_spec_01.md",
+      "source_hash": "78b71bcd2d0285a615b09eb30793abc9145b7708d1045877315350e1cd6aeb63",
+      "size_bytes": 3704,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260413_1250_project-template-source-separation_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260413_1250_project-template-source-separation_spec-child_01.md",
+      "source_hash": "01f0bbc551dfc22ca7c0711e247a40277f4f8557a7f589f148cf8ca1463b98d3",
+      "size_bytes": 2508,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md",
+      "target_path": ".afol/adm/specs/260413_1849_just-command-runner-migration_spec_01.md",
+      "source_hash": "e5714fbd135d5f140cbdddf36cd9a808f7a1a7dd94984a1eb1bb401c5b3b643c",
+      "size_bytes": 7914,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260415_2121_scripts-cleanup-optimization_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260415_2121_scripts-cleanup-optimization_spec-child_01.md",
+      "source_hash": "7ad3b7cc9cea4312ef02f4f2bc85d9060d7a38ab1ee480dc5f3fafac1b7a8211",
+      "size_bytes": 1512,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md",
+      "target_path": ".afol/adm/specs/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md",
+      "source_hash": "ec75c1cbe9fce9699812a9525632db0f0e444abcb36b7b1c39938f037bd7441e",
+      "size_bytes": 23904,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md",
+      "target_path": ".afol/adm/specs/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md",
+      "source_hash": "5d6542c9753de34d4878a5ea4b7a999206f016b951ec706656e4c7e690e792f5",
+      "size_bytes": 10813,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260423_1821_runtime-flow-benchmark-runner_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260423_1821_runtime-flow-benchmark-runner_spec-child_01.md",
+      "source_hash": "e11ffa521a4f9e6271991eb2d00a105047f23722acf95068ee6156fc1d402bf0",
+      "size_bytes": 5040,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260423_2006_runtime-flow-benchmark-live-agent_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260423_2006_runtime-flow-benchmark-live-agent_spec-child_01.md",
+      "source_hash": "3e15292d46c1a805bbc0b029205e127b3bbf005ddaffdfcb8105fb124faca787",
+      "size_bytes": 4392,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260423_2120_runtime-flow-benchmark-scenarios_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260423_2120_runtime-flow-benchmark-scenarios_spec-child_01.md",
+      "source_hash": "4cdb0dce1fbb132331a3342928d107e3e96a3505548bb2f7f348f877437a5aea",
+      "size_bytes": 1830,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260426_1215_parallel-session-isolation_spec_01.md",
+      "target_path": ".afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md",
+      "source_hash": "d01bb4e42d6550d23421800ce66bfcb9ebd266ae70e6f8625c8d8562e611ae93",
+      "size_bytes": 7139,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260509_1453_plan-task-execution-integrity-state-model_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260509_1453_plan-task-execution-integrity-state-model_spec-child_01.md",
+      "source_hash": "8ac248b4d990d8437428c4a2dc73a647907eaff814e093f3a412a6af044cbdd4",
+      "size_bytes": 8748,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0000_total-reformulation-strategy_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md",
+      "source_hash": "06e4ebf2d4db12dd58c3691386dc1b30dafc755585c073106dac38bc27e253fc",
+      "size_bytes": 2568,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0010_universal-agent-cli_spec_01.md",
+      "source_hash": "aa4c56588ba338e66997cc82b9a95bf4a51ca2fdcf262f262d5ab6ba1900cf4d",
+      "size_bytes": 8125,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0020_minimal-project-template_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0020_minimal-project-template_spec_01.md",
+      "source_hash": "b3205ecd059c4c16cfee2201af586076d65dd572ea64044e09ef27db90602cd4",
+      "size_bytes": 5289,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0030_agent-command-design-system_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md",
+      "source_hash": "4aac95fcf5135d0823c876eb02c244b73db50f604430a43254de9507d8b42f76",
+      "size_bytes": 6557,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0040_governance-workbench-system_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0040_governance-workbench-system_spec_01.md",
+      "source_hash": "477ea7689656ac21cc82e7ef95101bd17647f8abbf349cb1fca739f65de954ca",
+      "size_bytes": 2990,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0050_smart-rules-and-skills-routing_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0050_smart-rules-and-skills-routing_spec_01.md",
+      "source_hash": "9e38de3dd3d8a4a11d8ab0d760bcab589142dc1d01965322a4c430964e18057d",
+      "size_bytes": 4021,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0060_file-first-low-token-execution_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0060_file-first-low-token-execution_spec_01.md",
+      "source_hash": "12a1b8a9a2a7720257f90054bc3eee871110f9ebcc88c6f8c0b03f4237f51619",
+      "size_bytes": 2218,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0070_local-state-index-and-event-log_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0070_local-state-index-and-event-log_spec_01.md",
+      "source_hash": "275a4c82962746a8f353333705c25483e1ce76b258d0354e31b45eb0ecb3e140",
+      "size_bytes": 4361,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0080_safe-file-mutation-and-undo_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0080_safe-file-mutation-and-undo_spec_01.md",
+      "source_hash": "ed11ed50bbc4e4d6a1b7b3eb40a9ca1441070f638a816328a32f84f64897dcf5",
+      "size_bytes": 3448,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0090_template-update-and-versioning_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0090_template-update-and-versioning_spec_01.md",
+      "source_hash": "b6dc231379d41c1185ace3d1baa21a5966151a43923c517383af9e14dba480cc",
+      "size_bytes": 3699,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0100_runtime-adapters-and-mcp_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0100_runtime-adapters-and-mcp_spec_01.md",
+      "source_hash": "888dbaee173e5aa35eae4ad07af16e643138e9443fef78ea07c9603c8aa1cbbb",
+      "size_bytes": 7978,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0110_validation-ci-and-benchmarks_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0110_validation-ci-and-benchmarks_spec_01.md",
+      "source_hash": "dd1b7372d19c6eeda20e1aa6edcd9b292dbf8aed778dd763a6476c1cf946f84e",
+      "size_bytes": 14871,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260521_0120_public-distribution-and-onboarding_spec_01.md",
+      "target_path": ".afol/adm/specs/260521_0120_public-distribution-and-onboarding_spec_01.md",
+      "source_hash": "acf0c220101e2c0aeecdd5b4e7175fea5be5f654548298037d55a2f1dad1e97b",
+      "size_bytes": 4405,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260528_1723_map-boundary-cleanup_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260528_1723_map-boundary-cleanup_spec-child_01.md",
+      "source_hash": "37d01d70a2446709fd56673d4a7387df5ad163aecddac87b8b439ca9e8592e43",
+      "size_bytes": 2897,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260528_1745_runtime-registry-parity_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260528_1745_runtime-registry-parity_spec-child_01.md",
+      "source_hash": "bc770aa6ef8678f2be3a9c1cb5f8cc1c9db1e5ac68d4ebaa60c5d1a5afc638c2",
+      "size_bytes": 2786,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260528_1759_python-command-simplification_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260528_1759_python-command-simplification_spec-child_01.md",
+      "source_hash": "a1ac6bd72166758205d16bef1c07290eceb1f9ac684286ac775ceb6d7f1b93a2",
+      "size_bytes": 2950,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260528_1913_command-parity-gate-hardening_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260528_1913_command-parity-gate-hardening_spec-child_01.md",
+      "source_hash": "660a89497c53710eddc8a59ffadd50914242be92c54334df9141789672560944",
+      "size_bytes": 2563,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260528_1946_bootstrap-template-justfile-wiring_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260528_1946_bootstrap-template-justfile-wiring_spec-child_01.md",
+      "source_hash": "c6749b303e9d179e747934f95140db6cac4ad881d940f8931ae3c7586463316a",
+      "size_bytes": 2480,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260528_2022_runtime-mirror-cleanup_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260528_2022_runtime-mirror-cleanup_spec-child_01.md",
+      "source_hash": "4ec987729c0254d06dea4e321ac504aea36c0ba5fdc6804ca22a2e54b6b336e3",
+      "size_bytes": 2799,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260531_0000_template-cli-boundary-hardening_spec_01.md",
+      "target_path": ".afol/adm/specs/260531_0000_template-cli-boundary-hardening_spec_01.md",
+      "source_hash": "c4354a0091f5b0dcd6a35d851bba8c30844e59f03affee43da5260d406a0af18",
+      "size_bytes": 7569,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md",
+      "target_path": ".afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md",
+      "source_hash": "27188679a9a3d9bab7816166056f2c439fd698c77b296929156bf20ee4e3c4bd",
+      "size_bytes": 12794,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01.md",
+      "source_hash": "195332e9f2f03fd41d0f3a17f002989c76b59e7b514ce7d4c57a1d93da6117ff",
+      "size_bytes": 6589,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md",
+      "target_path": ".afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md",
+      "source_hash": "c42c6d9216f72dd5b9e3f36388fd0bc1fd6791c8557006e5ca98211aa5215469",
+      "size_bytes": 14043,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260612_context-routing-bundles-and-section-index_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260612_context-routing-bundles-and-section-index_spec-child_01.md",
+      "source_hash": "f1defd3c7c697c4befa3ab42840290fac2e431205db878b6fde8caf4da0f04b7",
+      "size_bytes": 7289,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260612_global-project-research-library_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260612_global-project-research-library_spec-child_01.md",
+      "source_hash": "dca0b533870ccbaecbd851f1413fb6648db4a36ec0d6171301b5a7e990d022ae",
+      "size_bytes": 7142,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260612_spec-compatibility-and-decision-history_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260612_spec-compatibility-and-decision-history_spec-child_01.md",
+      "source_hash": "d66c8a0453d70d4eaa6e9006a8ec0bfb4313fc7d5b6eba0dbd9e1ecb6484f8e7",
+      "size_bytes": 7601,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260612_temporal-health-freshness-token-budget_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260612_temporal-health-freshness-token-budget_spec-child_01.md",
+      "source_hash": "c4063f7ce0e1a1955710899afacf937038cfb716e97e6de317ef159f11f71045",
+      "size_bytes": 4352,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/260612_workbench-hydration-and-markdown-projection_spec-child_01.md",
+      "target_path": ".afol/adm/specs/260612_workbench-hydration-and-markdown-projection_spec-child_01.md",
+      "source_hash": "31bdc7e2dfeeed7c2c33fb9c0dafc05ce826d2bdebe408a1149712fee35b3d21",
+      "size_bytes": 8355,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/F-01/spec-tests/260521_0130_universal-agent-cli-kernel-contract_spec-test_01.md",
+      "target_path": ".afol/adm/specs/F-01/spec-tests/260521_0130_universal-agent-cli-kernel-contract_spec-test_01.md",
+      "source_hash": "ef56d870b21c92b726ab1d3a4f43408fbdaaf5861e193c92e7ed25c45ddeca78",
+      "size_bytes": 3302,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/F-02/spec-tests/260521_0132_minimal-project-template-export_spec-test_01.md",
+      "target_path": ".afol/adm/specs/F-02/spec-tests/260521_0132_minimal-project-template-export_spec-test_01.md",
+      "source_hash": "870bc34ec12af8430f3a61f5be4b45956bd66c42a1336f3458aa9d562dfaf2cd",
+      "size_bytes": 1867,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/F-03/spec-tests/260521_0135_agent-command-design-system_spec-test_01.md",
+      "target_path": ".afol/adm/specs/F-03/spec-tests/260521_0135_agent-command-design-system_spec-test_01.md",
+      "source_hash": "de17664857758b137abe08ae6e582935d082595dbc0bacff3e4d52a66338fce2",
+      "size_bytes": 2061,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/F-10/spec-tests/260521_0140_runtime-adapters-and-mcp-parity_spec-test_01.md",
+      "target_path": ".afol/adm/specs/F-10/spec-tests/260521_0140_runtime-adapters-and-mcp-parity_spec-test_01.md",
+      "source_hash": "fb38f775186c6b9b69ab366ba0783d75e7869eadfeb3cebf743b5ed2cd89e254",
+      "size_bytes": 2627,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/F-11/spec-tests/260521_0145_validation-ci-benchmark-matrix_spec-test_01.md",
+      "target_path": ".afol/adm/specs/F-11/spec-tests/260521_0145_validation-ci-benchmark-matrix_spec-test_01.md",
+      "source_hash": "58c0b3fd23e9ff52df1cd975a09f32656342f33d15fadb7d878b6b1b7e3404ae",
+      "size_bytes": 6514,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/F-14/spec-tests/260412_1130_spec-child-and-spec-test-governance_spec-test_01.md",
+      "target_path": ".afol/adm/specs/F-14/spec-tests/260412_1130_spec-child-and-spec-test-governance_spec-test_01.md",
+      "source_hash": "fa21cfb9ce997ca395aead817f441ce6d786d8385219128f2cbd5c7af52be8a4",
+      "size_bytes": 3101,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/FOLDER_GUIDE.md",
+      "target_path": ".afol/adm/specs/FOLDER_GUIDE.md",
+      "source_hash": "356ffc65f990a5b4cdad90d61c49e4fcb8bb41ae9d64f2df56b0a42c2ee7c903",
+      "size_bytes": 2580,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/INDEX.md",
+      "target_path": ".afol/adm/specs/INDEX.md",
+      "source_hash": "94940e8f59631de5516e5573eb2c4225a063f532ec9fff24d8edc67ab8329a19",
+      "size_bytes": 16953,
+      "status": "planned"
+    },
+    {
+      "source_path": "docs/arc/SPECS/README.md",
+      "target_path": ".afol/adm/specs/README.md",
+      "source_hash": "4ef99a849313fa889aa83beb31bf0e202a2798d580985324d488dbb24c2b4aa2",
+      "size_bytes": 1557,
+      "status": "planned"
+    }
+  ]
+}

@@ -12,13 +12,48 @@ export type CommandResolution =
 	| { kind: "done"; args: string[] }
 	| { kind: "close"; args: string[] }
 	| { kind: "log"; args: string[] }
+	| { kind: "quickTask"; args: string[] }
 	| { kind: "verifyTasks"; args: string[] }
 	| { kind: "rule"; args: string[] }
 	| { kind: "skill"; args: string[] }
 	| { kind: "update"; args: string[] }
 	| { kind: "file"; args: string[] }
 	| { kind: "localState"; args: string[] }
+	| { kind: "catchup"; args: string[] }
+	| { kind: "preflight"; args: string[] }
+	| SubCommandResolution
 	| { kind: "unknown"; message: string; exitCode: number };
+
+export type SubCommandResolution = {
+	kind: "subcommand";
+	group: string;
+	action: string;
+	args: string[];
+};
+
+const SUBCOMMAND_GROUPS = new Set([
+	"pstr",
+	"ctx",
+	"state",
+	"hydrate",
+	"render",
+	"library",
+	"memory",
+	"adm",
+	"spec",
+	"adr",
+	"changelog",
+	"health",
+	"db",
+	"doctor",
+	"maintenance",
+	"sweep",
+	"schema",
+	"bench",
+	"adapter",
+	"telemetry",
+	"session",
+]);
 
 function removeJsonAliases(values: string[]): string[] {
 	return values.filter((value) => !kernelRegistry.isJsonAlias(value));
@@ -173,6 +208,10 @@ export function resolveCommand(args: string[]): CommandResolution {
 		return { kind: "log", args: normalizeTokenOptimizedFlags(rest) };
 	}
 
+	if (topLevelKind === "quickTask") {
+		return { kind: "quickTask", args: normalizeTokenOptimizedFlags(rest) };
+	}
+
 	if (topLevelKind === "verifyTasks") {
 		return { kind: "verifyTasks", args: normalizeTokenOptimizedFlags(rest) };
 	}
@@ -195,6 +234,37 @@ export function resolveCommand(args: string[]): CommandResolution {
 
 	if (topLevelKind === "localState") {
 		return { kind: "localState", args: rest };
+	}
+
+	if (topLevelKind === "catchup") {
+		return { kind: "catchup", args: rest };
+	}
+
+	if (topLevelKind === "preflight") {
+		return { kind: "preflight", args: rest };
+	}
+
+	if (topLevelKind === "adm") {
+		const first = rest[0];
+		if (first && kernelRegistry.isJsonAlias(first)) {
+			return { kind: "subcommand", group: "adm", action: "", args: rest };
+		}
+		return {
+			kind: "subcommand",
+			group: "adm",
+			action: first ?? "",
+			args: rest.slice(1),
+		};
+	}
+
+	if (topLevelKind && SUBCOMMAND_GROUPS.has(topLevelKind)) {
+		const action = rest[0] ?? "";
+		return {
+			kind: "subcommand",
+			group: topLevelKind,
+			action,
+			args: rest.slice(1),
+		};
 	}
 
 	if (topLevel.startsWith("-")) {

@@ -4,6 +4,10 @@ import { join } from "node:path";
 import { createPatch } from "diff";
 import { DEFAULT_TEMPLATE_FILES } from "../../generated/template";
 import {
+	isClaudeAdapterPath,
+	readClaudeAdapterEnabled,
+} from "../adapter/claude";
+import {
 	type BootstrapManifestEntry,
 	type ManagedOwnership,
 	planBootstrapOperations,
@@ -501,12 +505,13 @@ function planUpdateOperations(
 	sourceLockContent: string,
 	sourceManifestContent: string,
 	currentFiles: Record<string, string>,
+	updateTargets: UpdateFilePath[],
 ): UpdateOperation[] {
 	const operations: UpdateOperation[] = [];
 	const currentManifestEntries = collectCurrentManifestEntries(
 		currentManifest,
 		currentLock,
-		UPDATE_TARGETS,
+		updateTargets,
 	);
 
 	const entries = [
@@ -669,7 +674,7 @@ function planUpdateOperations(
 
 	const templateFiles: TemplateFileMap = {};
 	const genericCurrentFiles: Record<string, string> = {};
-	const genericPaths = UPDATE_TARGETS.filter(
+	const genericPaths = updateTargets.filter(
 		(path) => !SPECIAL_UPDATE_TARGETS.has(path),
 	);
 
@@ -740,8 +745,12 @@ function serializeOwnership(counts: OwnershipCounts): string {
 }
 
 export function checkTemplateUpdate(projectRoot: string): UpdateCheckResult {
+	const claudeEnabled = readClaudeAdapterEnabled(projectRoot);
+	const updateTargets = claudeEnabled
+		? UPDATE_TARGETS
+		: UPDATE_TARGETS.filter((path) => !isClaudeAdapterPath(path));
 	const currentFiles: Record<string, string> = {};
-	for (const path of UPDATE_TARGETS) {
+	for (const path of updateTargets) {
 		const content = readText(join(projectRoot, path));
 		if (content.length > 0) {
 			currentFiles[path] = content;
@@ -765,9 +774,10 @@ export function checkTemplateUpdate(projectRoot: string): UpdateCheckResult {
 		sourceLockContent,
 		sourceManifestContent,
 		currentFiles,
+		updateTargets,
 	);
 
-	const hasSource = UPDATE_TARGETS.length > 0;
+	const hasSource = updateTargets.length > 0;
 	const currentRevision = revisionOf(currentLock);
 	const sourceRevision = revisionOf(sourceLock);
 	const ownershipCurrent = collectOwnershipFromManifest(currentManifest);

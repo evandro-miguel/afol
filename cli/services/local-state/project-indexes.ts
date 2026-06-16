@@ -110,6 +110,8 @@ const FILE_INDEX_EXCLUDED_DIR_SEGMENTS = new Set([
 	"dist",
 ]);
 
+const FILE_INDEX_EXCLUDED_PATHS = new Set(["cli/generated/version.ts"]);
+
 const ZERO_TIME = new Date(0).toISOString();
 const FRESHNESS_CLOCK_SKEW_MS = 1_000;
 
@@ -231,6 +233,11 @@ function isDirectoryExcluded(
 	);
 }
 
+function isFileExcluded(projectRoot: string, filePath: string): boolean {
+	const normalizedPath = toRelativeProjectPath(projectRoot, filePath);
+	return FILE_INDEX_EXCLUDED_PATHS.has(normalizedPath);
+}
+
 function collectFilesUnder(
 	root: string,
 	startPath: string,
@@ -265,7 +272,11 @@ function collectFilesUnder(
 				continue;
 			}
 
-			if (entry.isFile() && predicate(entry, relativePath, entryPath)) {
+			if (
+				entry.isFile() &&
+				!isFileExcluded(root, entryPath) &&
+				predicate(entry, relativePath, entryPath)
+			) {
 				out.push(entryPath);
 			}
 		}
@@ -277,7 +288,7 @@ function collectFilesUnder(
 function collectSpecFiles(projectRoot: string): string[] {
 	return collectFilesUnder(
 		projectRoot,
-		join("docs", "arc", "SPECS"),
+		join(".afol", "adm", "specs"),
 		(_entry, relativePath) => relativePath.endsWith(".md"),
 	);
 }
@@ -346,7 +357,7 @@ function latestSkillsSource(root: string): number {
 }
 
 function latestSpecsSource(root: string): number {
-	const specsPath = join(root, "docs", "arc", "SPECS");
+	const specsPath = join(root, ".afol", "adm", "specs");
 	const specs = collectSpecFiles(root);
 	return sourceLatestFromPaths(collectSourceFiles([specsPath, ...specs]));
 }
@@ -527,7 +538,7 @@ export function rebuildSpecsIndex(root: string): SpecsIndexSnapshot {
 		version: 1,
 		generated_at: formatNow(),
 		source: {
-			specs_dir: "docs/arc/SPECS",
+			specs_dir: ".afol/adm/specs",
 		},
 		specs,
 	};

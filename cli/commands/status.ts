@@ -1,11 +1,21 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+	envelopeOk,
+	envelopeWithLegacyKeys,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
+import {
 	collectSessionIds,
 	detectSessionHealth,
 } from "../services/local-state/workbench-index";
 import { resolveProjectPaths } from "../services/project/paths";
 import { loadProjectRoot } from "../services/project/root";
+import {
+	type CatchupReport,
+	computeCatchup,
+} from "../services/workbench/catchup";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -25,6 +35,31 @@ type StatusSnapshot = {
 	taskFilePath?: string;
 	sessionCount?: number;
 	sessionHealth?: string[];
+	catchup: CatchupReport | undefined;
+};
+
+type StatusSessionInfo = {
+	id: string;
+	status: string;
+	changed_files: number;
+	freshness: CatchupReport["freshness"];
+	next_step: string;
+};
+
+type StatusJsonData = {
+	status: string;
+	task: string;
+	files_written: string[];
+	validation_or_checks: string[];
+	blockers: string[];
+	next: string[];
+	paths: {
+		config: string;
+		lock: string;
+		active_session: string;
+		task_file: string | null;
+	};
+	session: StatusSessionInfo | undefined;
 };
 
 const DEFAULT_IO: CommandIo = {
@@ -47,16 +82,33 @@ const FIELD_HEADERS = [
 const TASK_ROW_RE =
 	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
 
-function parseStatusArgs(args: string[]): { json: boolean } {
+function parseStatusArgs(args: string[]): {
+	json: boolean;
+	session: string | null;
+} {
 	let json = false;
+	let session: string | null = null;
 	const values = [...args];
 	if (values[0] === "status") {
 		values.shift();
 	}
 
-	for (const value of values) {
+	for (let index = 0; index < values.length; index += 1) {
+		const value = values[index];
+		if (!value) {
+			continue;
+		}
 		if (value === "--json" || value === "-j") {
 			json = true;
+			continue;
+		}
+		if (value === "--session" || value === "-S") {
+			const next = values[index + 1];
+			if (!next || next.startsWith("-")) {
+				throw new Error("Missing value for --session in status.");
+			}
+			session = next;
+			index += 1;
 			continue;
 		}
 		if (value.startsWith("-")) {
@@ -65,7 +117,23 @@ function parseStatusArgs(args: string[]): { json: boolean } {
 		throw new Error(`Unexpected status argument: ${value}`);
 	}
 
-	return { json };
+	return { json, session };
+}
+
+function resultEnvelope<T extends Record<string, unknown>>(
+	data: T,
+	action: string,
+	exitCode: number,
+): ResultEnvelope<T> {
+	return exitCode === 0
+		? envelopeOk(data, { action, exitCode })
+		: {
+				schema: "afol.result/v1",
+				ok: false,
+				action,
+				exit_code: exitCode,
+				data,
+			};
 }
 
 function parseFrontmatter(text: string): Record<string, string> {
@@ -235,7 +303,23 @@ function computeSessionHealth(projectRoot: string): {
 	}
 }
 
-function readStatusSnapshot(projectRoot: string): StatusSnapshot {
+function formatFreshness(report: CatchupReport): string {
+	const changedFiles = report.git_changed_files.length;
+	if (
+		!report.freshness.findings_stale &&
+		!report.freshness.log_behind_diff &&
+		changedFiles === 0
+	) {
+		return "freshness: ok";
+	}
+
+	return `freshness: findings_stale=${report.freshness.findings_stale ? "yes" : "no"} log_behind_diff=${report.freshness.log_behind_diff ? "yes" : "no"} changed_files=${changedFiles} next=${JSON.stringify(report.next_step)}`;
+}
+
+function readStatusSnapshot(
+	projectRoot: string,
+	freshnessSession: string | null,
+): StatusSnapshot {
 	const loaded = loadProjectRoot(projectRoot);
 	if (!loaded.ok) {
 		const error = new Error(loaded.error.message);
@@ -248,23 +332,14 @@ function readStatusSnapshot(projectRoot: string): StatusSnapshot {
 	const activeSessionPath = projectPaths.abs.activeSessionFile;
 
 	const healthInfo = computeSessionHealth(loaded.value.root);
+	const activeSession = existsSync(activeSessionPath)
+		? readFileSync(activeSessionPath, "utf8").trim() || null
+		: null;
+	const catchupSession = freshnessSession ?? activeSession;
+	const catchupReport = catchupSession
+		? computeCatchup(loaded.value.root, { session: catchupSession })
+		: undefined;
 
-	if (!existsSync(activeSessionPath)) {
-		return {
-			status: "none",
-			task: "none",
-			filesWritten: ["none"],
-			validationOrChecks: ["none"],
-			blockers: ["none"],
-			next: ["none"],
-			configPath: loaded.value.configPath,
-			lockPath,
-			activeSessionPath,
-			...healthInfo,
-		};
-	}
-
-	const activeSession = readFileSync(activeSessionPath, "utf8").trim();
 	if (!activeSession) {
 		return {
 			status: "none",
@@ -277,6 +352,7 @@ function readStatusSnapshot(projectRoot: string): StatusSnapshot {
 			lockPath,
 			activeSessionPath,
 			...healthInfo,
+			catchup: catchupReport,
 		};
 	}
 
@@ -293,6 +369,7 @@ function readStatusSnapshot(projectRoot: string): StatusSnapshot {
 			lockPath,
 			activeSessionPath,
 			...healthInfo,
+			catchup: catchupReport,
 		};
 	}
 
@@ -315,6 +392,7 @@ function readStatusSnapshot(projectRoot: string): StatusSnapshot {
 		activeSessionPath,
 		taskFilePath,
 		...computeSessionHealth(projectRoot),
+		catchup: catchupReport,
 	};
 }
 
@@ -342,6 +420,10 @@ function formatCompact(snapshot: StatusSnapshot): string {
 		}
 	}
 
+	if (snapshot.catchup) {
+		lines.push(formatFreshness(snapshot.catchup));
+	}
+
 	return lines.join("\n");
 }
 
@@ -350,7 +432,7 @@ export function runStatusCommand(
 	args: string[],
 	io: CommandIo = DEFAULT_IO,
 ): number {
-	let parsed: { json: boolean };
+	let parsed: { json: boolean; session: string | null };
 	try {
 		parsed = parseStatusArgs(args);
 	} catch (error) {
@@ -360,7 +442,7 @@ export function runStatusCommand(
 
 	let snapshot: StatusSnapshot;
 	try {
-		snapshot = readStatusSnapshot(projectRoot);
+		snapshot = readStatusSnapshot(projectRoot, parsed.session);
 	} catch (error) {
 		const commandError = error as Error & { code?: number };
 		io.stderr(commandError.message);
@@ -368,21 +450,41 @@ export function runStatusCommand(
 	}
 
 	if (parsed.json) {
+		const data: StatusJsonData = {
+			status: snapshot.status,
+			task: snapshot.task,
+			files_written: snapshot.filesWritten,
+			validation_or_checks: snapshot.validationOrChecks,
+			blockers: snapshot.blockers,
+			next: snapshot.next,
+			paths: {
+				config: snapshot.configPath,
+				lock: snapshot.lockPath,
+				active_session: snapshot.activeSessionPath,
+				task_file: snapshot.taskFilePath ?? null,
+			},
+			session: snapshot.catchup
+				? {
+						id: snapshot.catchup.session ?? "none",
+						status: snapshot.catchup.session_status,
+						changed_files: snapshot.catchup.git_changed_files.length,
+						freshness: snapshot.catchup.freshness,
+						next_step: snapshot.catchup.next_step,
+					}
+				: undefined,
+		};
 		io.stdout(
-			JSON.stringify({
-				status: snapshot.status,
-				task: snapshot.task,
-				files_written: snapshot.filesWritten,
-				validation_or_checks: snapshot.validationOrChecks,
-				blockers: snapshot.blockers,
-				next: snapshot.next,
-				paths: {
-					config: snapshot.configPath,
-					lock: snapshot.lockPath,
-					active_session: snapshot.activeSessionPath,
-					task_file: snapshot.taskFilePath ?? null,
-				},
-			}),
+			stringifyEnvelope(
+				envelopeWithLegacyKeys(resultEnvelope(data, "status", 0), [
+					"status",
+					"task",
+					"files_written",
+					"validation_or_checks",
+					"blockers",
+					"next",
+					"paths",
+				]),
+			),
 		);
 		return 0;
 	}

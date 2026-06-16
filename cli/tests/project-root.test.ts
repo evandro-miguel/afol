@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { resolveProjectPaths } from "../services/project/paths";
 import { loadProjectRoot, resolveProjectPath } from "../services/project/root";
 
 const templateConfig = JSON.stringify({
@@ -40,6 +41,23 @@ function mkProjectRoot(name: string): string {
 }
 
 describe("project root loader", () => {
+	test("resolves new AFOL path defaults", () => {
+		const root = mkProjectRoot("paths");
+		try {
+			const paths = resolveProjectPaths(root);
+			expect(paths.admDir).toBe(".afol/adm");
+			expect(paths.pstrDir).toBe(".afol/pstr");
+			expect(paths.stateDb).toBe(".afol/state/afol.db");
+			expect(paths.libraryDir).toBe(".afol/library");
+			expect(paths.memoryFile).toBe(".afol/memory/memory.md");
+			expect(paths.abs.admDir).toBe(join(root, ".afol/adm"));
+			expect(paths.abs.stateDb).toBe(join(root, ".afol/state/afol.db"));
+			expect(paths.abs.memoryFile).toBe(join(root, ".afol/memory/memory.md"));
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("walks up from nested directory and loads project state", () => {
 		const root = mkProjectRoot("nested");
 		const nested = join(root, "a", "b", "c");

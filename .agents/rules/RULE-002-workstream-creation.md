@@ -58,19 +58,19 @@ For `plan`, `task`, and `report` artifacts in this workstream:
 
 ```bash
 # Basic (plan + task + log) linked to roadmap + parent spec
-./.agents/agents new <theme-name> --feature-id F-01 --parent-spec <parent-spec-id>
+afol new <theme-name> --feature-id F-01 --parent-spec <parent-spec-id>
 
 # With local workstream spec refinement
-./.agents/agents new <theme-name> --feature-id F-01 --parent-spec <parent-spec-id> --spec
+afol new <theme-name> --feature-id F-01 --parent-spec <parent-spec-id> --spec
 
 # With local workstream spec-lite refinement
-./.agents/agents new <theme-name> --feature-id F-01 --parent-spec <parent-spec-id> --spec-lite
+afol new <theme-name> --feature-id F-01 --parent-spec <parent-spec-id> --spec-lite
 
 # With child spec linkage for large features
-./.agents/agents new <theme-name> --feature-id F-01 --parent-spec <parent-spec-id> --child-spec <child-spec-id>
+afol new <theme-name> --feature-id F-01 --parent-spec <parent-spec-id> --child-spec <child-spec-id>
 
 # With a pack folder for another major track inside an existing session
-./.agents/agents new <theme-name> --feature-id F-07 --parent-spec <parent-spec-id> --pack <pack-slug> --into-session <session-id> --spec
+afol new <theme-name> --feature-id F-07 --parent-spec <parent-spec-id> --pack <pack-slug> --into-session <session-id> --spec
 
 # Via Justfile
 just new THEME=<theme-name> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
@@ -79,7 +79,7 @@ just new THEME=<theme-name> FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 ### Quick Task (in active session)
 
 ```bash
-./.agents/agents new "Quick task description" --quick
+afol quick-task "Quick task description"
 ```
 
 Quick mode is only valid when the work is already inside an approved feature context in the active session.
@@ -119,22 +119,21 @@ Quick mode is only valid when the work is already inside an approved feature con
 
 ```bash
 # Preferred governed execution path
-./.agents/agents implement start --session <session-id> --task-id T-01
-./.agents/agents implement complete --session <session-id> --task-id T-01 \
-  --command "just verify" --result passed --artifact .afol/wb/<session-id>/<report-or-log>
+afol start --session <session-id> --task-id T-01
+afol evidence --session <session-id> --task-id T-01 \
+  --command "afol verify-tasks --strict" --result passed
+afol done --session <session-id> --task-id T-01
 
 # Manual evidence path when implement complete is not the right wrapper
-./.agents/agents wb-update evidence T-01 --session <session-id> \
-  --command "just verify" --result passed --artifact .afol/wb/<session-id>/<report-or-log>
-./.agents/agents wb-update task T-01 --session <session-id> --mark-done --evidence-id E-...
+afol evidence --session <session-id> --task-id T-01 \
+  --command "afol verify-tasks --strict" --result passed
+afol done --session <session-id> --task-id T-01
 
 # Intermediate/problem states
-./.agents/agents wb-update task T-02 --session <session-id> --mark-in-progress
-./.agents/agents wb-update task T-03 --session <session-id> --mark-implemented
-./.agents/agents wb-update task T-04 --session <session-id> --mark-tested
-./.agents/agents wb-update task T-05 --session <session-id> --mark-problem
-
-# Legacy aliases still parse, but new work should use the canonical states.
+afol start --session <session-id> --task-id T-02
+afol log --session <session-id> --message "T-03 implemented; validation pending"
+afol log --session <session-id> --message "T-04 tested; spec validation pending"
+afol log --session <session-id> --message "T-05 blocked: <reason>"
 ```
 
 ---
@@ -183,38 +182,37 @@ just new THEME=feature-name FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 #    finalize it before closure.
 
 # 8. Reuse prior findings when relevant
-./.agents/agents knowledge search <query>
+rg "<query>" docs .afol .agents/rules
 
 # 9. Start the task before product edits
-./.agents/agents implement start --session <session-id> --task-id T-01
+afol start --session <session-id> --task-id T-01
 
 # 10. Work on tasks, validate, and close with evidence
-./.agents/agents implement complete --session <session-id> --task-id T-01 \
-  --command "just verify" --result passed --artifact .afol/wb/<session-id>/<report-or-log>
+afol evidence --session <session-id> --task-id T-01 \
+  --command "afol verify-tasks --strict" --result passed
+afol done --session <session-id> --task-id T-01
 
 # 11. Finalize optional artifacts that exist before closing report
-./.agents/agents wb-update status --session <session-id> --file report --value final
+afol log --session <session-id> --message "Report finalized"
 
 # 12. Validate
-just doctor
-just lint
-just verify
+afol validate project --json
+afol verify-tasks --strict
 ```
 
 ### Feature Skill and Documentation Propagation
 
 For every feature addition or meaningful feature behavior change:
 
-- Update the affected project-local skill under `.agents/skills/` when future
+- Update the affected project-local skill under `.afol/skills/` when future
   agents must follow the new behavior.
 - Update affected project docs, command references, standards, roadmap, and
   specs so operator-facing guidance matches the behavior.
 - Add a visible pending item in the roadmap, spec, task, plan, or report to
   propose the relevant project-local skill change back to the external
   `universal-skills` checkout.
-- Propagate skills only through the approved branch/PR flow, such as
-  `./.agents/agents skills-sync push <skill> --branch <branch> --commit --push --pr`;
-  never push directly to universal `main`.
+- Propagate shared skills only through the approved external repository
+  branch/PR flow; never push directly to universal `main`.
 - Do not mark the feature fully closed unless local skill/docs updates are
   complete and the universal-skills propagation pending item is recorded.
 
@@ -226,14 +224,14 @@ For every feature addition or meaningful feature behavior change:
 # 2. Use parent spec or create a low-risk feature spec if needed
 
 # 3. Create workstream with linked governance context
-./.agents/agents new bugfix-description --feature-id F-01 --parent-spec <parent-spec-id> --spec-lite
+afol new bugfix-description --feature-id F-01 --parent-spec <parent-spec-id> --spec-lite
 
 # 4. Investigate and document in spec-lite.md
 
 # 5. Implement fix
 
 # 6. Validate
-just verify
+afol verify-tasks --strict
 ```
 
 ---
@@ -251,7 +249,7 @@ just verify
 **Add timeline entry:**
 
 ```bash
-./.agents/agents wb-update timeline --message "Implementation started"
+afol log --session <session-id> --message "Implementation started"
 ```
 
 ---
@@ -271,7 +269,7 @@ just verify
 - ✅ Keep plans focused on direct execution, not pre-plan research or broad discovery tasks
 - ✅ Use brainstorm, research, or explorer-check only when requested or needed as a small blocking proof
 - ✅ Avoid low-value workbench files; each artifact must have an operational reason
-- ✅ Reuse `.agents/agents knowledge` before repeating research
+- ✅ Reuse repository search and existing AFOL evidence before repeating research
 - ✅ Finalize every optional artifact that exists before final session closure
 - ✅ Use `--spec` or `--spec-lite` only as local refinement, not as a replacement for the parent feature spec
 - ✅ Choose `--spec-lite` freely when a lighter workstream-level refinement is enough

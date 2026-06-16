@@ -140,6 +140,9 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 - `AGENTS.md` is canonical runtime instructions.
 - `CLAUDE.md` is the committed mirror; keep it compatible and synced.
+- The Claude adapter is optional. Disable it with
+  `afol adapter disable claude` (archives `CLAUDE.md` + `.claude/`) or install
+  without it via `afol init --without-claude`. `AGENTS.md` always remains.
 - Keep committed adapters thin and traceable.
 - Prefer project-local skills only for project-specific behavior.
 - Project-local skills are optional; use a native downstream sync command only

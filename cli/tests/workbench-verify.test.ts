@@ -392,6 +392,44 @@ describe("verifyWorkbenchTasks", () => {
 		}
 	});
 
+	test("strict verification rejects open generic checklist items in task files", () => {
+		const root = mkRoot("open-checklist");
+		try {
+			const session = "260615_1200_open_checklist";
+			const sessionDir = join(root, ".afol", "wb", session);
+			write(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"# Tasks",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | complete |",
+					"",
+					"## Sub-task Checklist (T-01)",
+					"",
+					"- [ ] Run final gate",
+					"",
+				].join("\n"),
+			);
+			write(
+				join(sessionDir, ".evidence.jsonl"),
+				`${JSON.stringify({ task_id: "T-01", command: "bun test", result: "passed" })}\n`,
+			);
+
+			const result = verifyWorkbenchTasks(root, true);
+
+			expect(result.allCompleted).toBe(false);
+			expect(
+				result.issues.some((issue) => issue.type === "open_checklist_item"),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("verifyAllSessions isolates evidence per session (cross-session task ID reuse)", () => {
 		const root = mkRoot("cross-session");
 		try {

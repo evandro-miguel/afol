@@ -1,11 +1,34 @@
 #!/usr/bin/env bun
 
+import { runAdapterCommand } from "./commands/adapter";
+import { runAdmCommand } from "./commands/adm";
+import { runAdrCommand } from "./commands/adr";
+import { runBenchCommand } from "./commands/bench";
 import { runBootstrapCommand } from "./commands/bootstrap";
 import { runRuleCommand, runSkillCommand } from "./commands/catalog";
+import { runCatchupCommand } from "./commands/catchup";
+import { runChangelogCommand } from "./commands/changelog";
+import { runContextCommand } from "./commands/context";
+import { runDbCommand } from "./commands/db";
+import { runDoctorCommand } from "./commands/doctor";
 import { runFileCommand } from "./commands/file";
+import { runHealthCommand } from "./commands/health";
+import { runHydrateCommand } from "./commands/hydrate";
 import { runInitCommand } from "./commands/init";
+import { runLibraryCommand } from "./commands/library";
 import { runLocalStateCommand } from "./commands/local-state";
+import { runMaintenanceCommand } from "./commands/maintenance";
+import { runMemoryCommand } from "./commands/memory";
+import { runPreflightCommand } from "./commands/preflight";
+import { runPstrCommand } from "./commands/pstr";
+import { runQuickTaskCommand } from "./commands/quick-task";
+import { runSchemaCommand } from "./commands/schema-cmd";
+import { runSessionCommand } from "./commands/session";
+import { runSpecCommand } from "./commands/spec";
+import { runStateCommand } from "./commands/state";
 import { runStatusCommand } from "./commands/status";
+import { runSweepCommand } from "./commands/sweep";
+import { runTelemetryCommand } from "./commands/telemetry";
 import { runUpdateCommand } from "./commands/update";
 import { runValidateCommand } from "./commands/validate";
 import {
@@ -17,43 +40,22 @@ import {
 	runStartCommand,
 	runVerifyTasksCommand,
 } from "./commands/workbench";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	resolveOperationContext,
+} from "./core/operation-context";
 import { CLI_VERSION } from "./generated/version";
+import {
+	buildCommandHelpJson,
+	formatCatalogJson,
+	formatCommandHelp,
+	formatHelpText,
+} from "./help";
+import { kernelRegistry } from "./registry";
 import { resolveCommand } from "./router";
 import { loadProjectRoot } from "./services/project/root";
 import { runValidationCommand } from "./validate/contract";
-
-const HELP_LINES = [
-	"Usage: afol [command] [options]",
-	"",
-	"Commands",
-	"  s/status               Show status",
-	"  v/validate             Run selected validation gates",
-	"  init                   Install scaffold into current repo",
-	"  n/new                  Create workbench session",
-	"  st/start               Start workbench task",
-	"  e/evidence             Record task evidence",
-	"  d/done                 Complete task with evidence",
-	"  l/log                  Append session log timeline entry",
-	"  vf/verify, verify-tasks Verify workbench tasks",
-	"  r/rule sk/skill up/update ls/local-state Inspect routing, updates, indexes",
-	"  c/close                Close active session",
-	"  b/bootstrap            Install scaffold into another repo",
-	"",
-	"Flags",
-	"  -j, --json             JSON output for status",
-	"  -h, --help  -V, --version Show help or version",
-	"",
-	"Aliases",
-	"  -S --session  -T --task-id  -x --test",
-	"  a=afol",
-	"",
-	"Examples",
-	"  afol s",
-	"  afol validate",
-	"  afol init --dry-run",
-	"  afol new <theme> [--intent ...] [--feature-id ...] [--parent-spec ...] [--task ...]",
-	"  afol done -T T-01",
-].join("\n");
 
 const NEW_COMMAND_HELP = [
 	"Usage: afol new <theme> [options]",
@@ -98,7 +100,17 @@ function resolveValidateMode(
 }
 
 export async function main(argv: string[]): Promise<number> {
-	const args = argv.slice(2);
+	let args = argv.slice(2);
+
+	// Resolve restricted operation context from env/flags early so mutation
+	// gates in schema/pstr/library/memory/file commands work for agent/remote
+	// callers. Default is local interactive (trusted, no approval required).
+	let operationCtx: OperationContext = defaultOperationContext();
+	{
+		const resolved = resolveOperationContext(args);
+		operationCtx = resolved.ctx;
+		args = resolved.remainingArgs;
+	}
 	if (
 		args.length === 1 &&
 		(args[0] === "--version" || args[0] === "-V" || args[0] === "version")
@@ -107,10 +119,43 @@ export async function main(argv: string[]): Promise<number> {
 		return 0;
 	}
 
+	if (args[0] === "help") {
+		const jsonRequested = args.some((arg) => kernelRegistry.isJsonAlias(arg));
+		const helpTarget = args[1] ?? "";
+		if (jsonRequested) {
+			if (helpTarget && !kernelRegistry.isJsonAlias(helpTarget)) {
+				const help = buildCommandHelpJson(helpTarget, kernelRegistry);
+				if (help) {
+					console.log(`${JSON.stringify(help, null, 2)}\n`);
+					return 0;
+				}
+				console.error(
+					`err unknown-command command=${helpTarget} hint="run afol -h"`,
+				);
+				return 2;
+			}
+			console.log(formatCatalogJson(kernelRegistry));
+			return 0;
+		}
+		if (args.length === 1) {
+			console.log(formatHelpText(kernelRegistry));
+			return 0;
+		}
+		const help = formatCommandHelp(helpTarget, kernelRegistry);
+		if (help) {
+			console.log(help);
+			return 0;
+		}
+		console.error(
+			`err unknown-command command=${args[1] ?? ""} hint="run afol -h"`,
+		);
+		return 2;
+	}
+
 	const resolution = resolveCommand(args);
 
 	if (resolution.kind === "help") {
-		console.log(HELP_LINES);
+		console.log(formatHelpText(kernelRegistry));
 		return 0;
 	}
 
@@ -158,23 +203,35 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "new") {
-		return runNewCommand(resolution.args, project.value.root);
+		return runNewCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "start") {
-		return runStartCommand(resolution.args, project.value.root);
+		return runStartCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "evidence") {
-		return runEvidenceCommand(resolution.args, project.value.root);
+		return runEvidenceCommand(
+			resolution.args,
+			project.value.root,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "done") {
-		return runDoneCommand(resolution.args, project.value.root);
+		return runDoneCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "log") {
-		return runLogCommand(resolution.args, project.value.root);
+		return runLogCommand(resolution.args, project.value.root, operationCtx);
+	}
+
+	if (resolution.kind === "quickTask") {
+		return runQuickTaskCommand(
+			resolution.args,
+			project.value.root,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "verifyTasks") {
@@ -194,15 +251,181 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "close") {
-		return runCloseCommand(resolution.args, project.value.root);
+		return runCloseCommand(resolution.args, project.value.root, operationCtx);
 	}
 
 	if (resolution.kind === "file") {
-		return runFileCommand(resolution.args, project.value.root);
+		return runFileCommand(
+			resolution.args,
+			project.value.root,
+			undefined,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "localState") {
 		return runLocalStateCommand(resolution.args, project.value.root);
+	}
+
+	if (resolution.kind === "catchup") {
+		return runCatchupCommand(resolution.args, project.value.root);
+	}
+
+	if (resolution.kind === "preflight") {
+		return runPreflightCommand(resolution.args, project.value.root);
+	}
+
+	if (resolution.kind === "subcommand" && resolution.group === "adm") {
+		return runAdmCommand(
+			resolution.action,
+			resolution.args,
+			project.value.root,
+		);
+	}
+
+	if (resolution.kind === "subcommand") {
+		if (resolution.group === "health") {
+			return runHealthCommand(
+				[resolution.action, ...resolution.args].filter(Boolean),
+				project.value.root,
+			);
+		}
+		if (resolution.group === "db") {
+			return runDbCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "doctor") {
+			return runDoctorCommand(
+				[resolution.action, ...resolution.args].filter(Boolean),
+				project.value.root,
+			);
+		}
+		if (resolution.group === "maintenance") {
+			return runMaintenanceCommand(
+				[resolution.action, ...resolution.args].filter(Boolean),
+				project.value.root,
+			);
+		}
+		if (resolution.group === "pstr") {
+			return runPstrCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+				undefined,
+				operationCtx,
+			);
+		}
+		if (resolution.group === "schema") {
+			return runSchemaCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+				undefined,
+				operationCtx,
+			);
+		}
+		if (resolution.group === "session") {
+			return runSessionCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "bench") {
+			return runBenchCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "sweep") {
+			return runSweepCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "spec") {
+			return runSpecCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "adr") {
+			return runAdrCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "changelog") {
+			return runChangelogCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "ctx") {
+			return runContextCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "library") {
+			return runLibraryCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+				undefined,
+				operationCtx,
+			);
+		}
+		if (resolution.group === "memory") {
+			return runMemoryCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+				undefined,
+				operationCtx,
+			);
+		}
+		if (resolution.group === "state") {
+			return runStateCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "adapter") {
+			return runAdapterCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "telemetry") {
+			return runTelemetryCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+			);
+		}
+		if (resolution.group === "hydrate") {
+			return runHydrateCommand(
+				"hydrate",
+				[resolution.action, ...resolution.args],
+				project.value.root,
+			);
+		}
+		console.error(
+			`err unknown-group group=${resolution.group} action=${resolution.action} hint="run afol -h"`,
+		);
+		return 2;
 	}
 
 	console.error("err unsupported-command");

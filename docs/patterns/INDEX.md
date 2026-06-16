@@ -9,7 +9,7 @@ updated_at: '2026-04-13T13:36:58-03:00'
 
 ## Purpose
 
-Central catalog of patterns, anti-patterns, and best practices for .agents system usage.
+Central catalog of patterns, anti-patterns, and best practices for AFOL system usage.
 
 ## Pattern Types
 
@@ -17,8 +17,8 @@ Central catalog of patterns, anti-patterns, and best practices for .agents syste
 |------|-------------|----------|
 | **Success** | Proven approaches that work well | `patterns/success/` |
 | **Anti-Pattern** | Approaches to avoid | `patterns/anti/` |
-| **Tool** | Tool effectiveness and usage patterns | `patterns/tools/` |
-| **Template** | Template patterns for documents | `patterns/templates/` |
+| **Tool** | Tool effectiveness and usage patterns | (planned) |
+| **Template** | Template patterns for documents | (planned) |
 
 ## Effectiveness Ratings
 
@@ -34,15 +34,12 @@ Central catalog of patterns, anti-patterns, and best practices for .agents syste
 |----|------|------|---------------|
 | PAT-001 | Discovery-First Tool Usage | process, tools | high |
 | PAT-002 | Single Active Session | process, workbench | high |
-| PAT-003 | Template-First Documentation | docs, process | high |
 
 ### Anti-Patterns
 
 | ID | Name | Tags | Severity |
 |----|------|------|----------|
 | PAT-101 | Workbench Sprawl | process, workbench | high |
-| PAT-102 | Manual Metadata Edits | docs, process | medium |
-| PAT-103 | Large Unreviewed Diffs | process, quality | high |
 
 ### Tool Patterns
 
@@ -50,7 +47,6 @@ Central catalog of patterns, anti-patterns, and best practices for .agents syste
 |----|------|--------|-------|
 | PAT-201 | `afol validate project` | high | Run before all work |
 | PAT-202 | `afol new` | high | Use for all new workstreams |
-| PAT-203 | `afol validate project` | high | Run before marking done |
 
 ### Template Patterns
 
@@ -97,7 +93,7 @@ Central catalog of patterns, anti-patterns, and best practices for .agents syste
 
 - `docs/lessons/` - Detailed lessons learned
 - `docs/telemetry/` - Telemetry data on pattern usage
-- `.agents/rules/` - Operational rules
+- `.afol/adm/decisions/` - Architecture decision records
 
 ---
 

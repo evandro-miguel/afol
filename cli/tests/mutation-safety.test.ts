@@ -28,6 +28,23 @@ function parseJsonOutput(stdout: string): Record<string, unknown> {
 	return JSON.parse(stdout) as Record<string, unknown>;
 }
 
+function expectFileEnvelope(
+	payload: Record<string, unknown>,
+	exitCode = 0,
+	ok = exitCode === 0,
+): Record<string, unknown> & { data: Record<string, unknown> } {
+	expect(payload.schema).toBe("afol.result/v1");
+	expect(payload.ok).toBe(ok);
+	expect(payload.exit_code).toBe(exitCode);
+	expect(payload.action).toBe("file");
+	const data = payload.data as Record<string, unknown>;
+	expect(data).toBeTruthy();
+	for (const [key, value] of Object.entries(data)) {
+		expect(payload[key]).toEqual(value);
+	}
+	return payload as Record<string, unknown> & { data: Record<string, unknown> };
+}
+
 function mkProjectRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "mutation-safety-"));
 	const agentsDir = join(root, ".agents");
@@ -84,7 +101,7 @@ describe("mutation safety command family", () => {
 			]);
 
 			expect(proc.status).toBe(0);
-			const result = parseJsonOutput(proc.stdout as string);
+			const result = expectFileEnvelope(parseJsonOutput(proc.stdout as string));
 			expect(result.command).toBe("pt");
 			expect(result.status).toBe("dry-run");
 			expect(result.path).toBe("notes/doc.txt");
@@ -122,7 +139,7 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(proc.status).toBe(0);
-			const result = parseJsonOutput(proc.stdout as string);
+			const result = expectFileEnvelope(parseJsonOutput(proc.stdout as string));
 			expect(result.status).toBe("write");
 			expect(result.path).toBe("notes/with-backup.txt");
 			expect(result.backup_path).toBeTruthy();
@@ -166,7 +183,9 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(moveProc.status).toBe(0);
-			const moveResult = parseJsonOutput(moveProc.stdout as string);
+			const moveResult = expectFileEnvelope(
+				parseJsonOutput(moveProc.stdout as string),
+			);
 			expect(moveResult.status).toBe("write");
 			expect(typeof moveResult.overwritten_backup_path).toBe("string");
 
@@ -185,7 +204,9 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(undoProc.status).toBe(0);
-			const undoResult = parseJsonOutput(undoProc.stdout as string);
+			const undoResult = expectFileEnvelope(
+				parseJsonOutput(undoProc.stdout as string),
+			);
 			expect(undoResult.status).toBe("write");
 			expect(readFileSync(source, "utf8")).toBe("from");
 			expect(readFileSync(destination, "utf8")).toBe("existing");
@@ -240,7 +261,7 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(proc.status).toBe(0);
-			const result = parseJsonOutput(proc.stdout as string);
+			const result = expectFileEnvelope(parseJsonOutput(proc.stdout as string));
 			expect(result.command).toBe("ar");
 			expect(result.status).toBe("dry-run");
 			expect(result.path).toBe("notes/to-archive.txt");
@@ -276,7 +297,9 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(archiveProc.status).toBe(0);
-			const archiveResult = parseJsonOutput(archiveProc.stdout as string);
+			const archiveResult = expectFileEnvelope(
+				parseJsonOutput(archiveProc.stdout as string),
+			);
 			expect(archiveResult.status).toBe("write");
 			expect(archiveResult.path).toBe("notes/to-archive.txt");
 
@@ -302,7 +325,9 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(undoProc.status).toBe(0);
-			const undoResult = parseJsonOutput(undoProc.stdout as string);
+			const undoResult = expectFileEnvelope(
+				parseJsonOutput(undoProc.stdout as string),
+			);
 			expect(undoResult.status).toBe("write");
 			expect(undoResult.target_mutation_id).toBe(archiveResult.mutation_id);
 			expect(readFileSync(target, "utf8")).toBe("for-archive");
@@ -366,7 +391,10 @@ describe("mutation safety command family", () => {
 
 			expect(proc.status).toBe(4);
 			expect(proc.stderr as string).toBe("");
-			const result = parseJsonOutput(proc.stdout as string);
+			const result = expectFileEnvelope(
+				parseJsonOutput(proc.stdout as string),
+				4,
+			);
 			expect(result.status).toBe("blocked");
 			expect(result.dry_run).toBe(true);
 			expect(result.message).toBe(
@@ -405,7 +433,10 @@ describe("mutation safety command family", () => {
 
 			expect(proc.status).toBe(4);
 			expect(proc.stderr as string).toBe("");
-			const result = parseJsonOutput(proc.stdout as string);
+			const result = expectFileEnvelope(
+				parseJsonOutput(proc.stdout as string),
+				4,
+			);
 			expect(result.status).toBe("blocked");
 			expect(result.dry_run).toBe(false);
 			expect(result.message).toBe(
@@ -460,7 +491,10 @@ describe("mutation safety command family", () => {
 
 			expect(blockedUndoProc.status).toBe(4);
 			expect(blockedUndoProc.stderr as string).toBe("");
-			const blockedResult = parseJsonOutput(blockedUndoProc.stdout as string);
+			const blockedResult = expectFileEnvelope(
+				parseJsonOutput(blockedUndoProc.stdout as string),
+				4,
+			);
 			expect(blockedResult.status).toBe("blocked");
 			expect(blockedResult.message).toBe(
 				"Undo blocked: source already exists: mut/undo-source.txt",
@@ -510,7 +544,9 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(dryRunUndo.status).toBe(0);
-			const dryRunUndoResult = parseJsonOutput(dryRunUndo.stdout as string);
+			const dryRunUndoResult = expectFileEnvelope(
+				parseJsonOutput(dryRunUndo.stdout as string),
+			);
 			expect(dryRunUndoResult.status).toBe("dry-run");
 			expect(readFileSync(target, "utf8")).toBe("orig/updated");
 
@@ -563,7 +599,9 @@ describe("mutation safety command family", () => {
 				"--json",
 			]);
 			expect(undoProc.status).toBe(0);
-			const undoResult = parseJsonOutput(undoProc.stdout as string);
+			const undoResult = expectFileEnvelope(
+				parseJsonOutput(undoProc.stdout as string),
+			);
 			expect(undoResult.status).toBe("write");
 			expect(readFileSync(target, "utf8")).toBe("base");
 		} finally {

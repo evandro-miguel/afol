@@ -8,10 +8,20 @@ uv.lock
 **/__pycache__/
 **/*.pyc
 
+# Local linter/tool caches
+.pytest_cache/
+.ruff_cache/
+.rumdl_cache/
+.codex/
+
 # Structure map cache
 **/.structure-cache.json
 
 # AFOL mutable data
+.afol/pstr/*
+!.afol/pstr/
+.afol/state/*
+!.afol/state/
 .afol/data/events/
 .afol/data/index/
 .afol/data/session/
@@ -49,6 +59,7 @@ docs/map/extra/
 docs/telemetry/reports/implementation_report.md
 
 .afol/wb/.active_session
+.afol/wb/session-context.json
 
 # Local merge worktrees
 .worktree/

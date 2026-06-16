@@ -36,7 +36,7 @@ function buildFixture() {
 
 	const rulesDir = join(root, ".agents", "rules");
 	const skillsDir = join(root, ".afol", "skills");
-	const specsDir = join(root, "docs", "arc", "SPECS");
+	const specsDir = join(root, ".afol", "adm", "specs");
 
 	mkdirSync(rulesDir, { recursive: true });
 	mkdirSync(skillsDir, { recursive: true });
@@ -128,8 +128,8 @@ describe("local-state project indexer", () => {
 				"beta skill",
 			]);
 			expect(snapshot.specs.specs.map((spec) => spec.path)).toEqual([
-				"docs/arc/SPECS/001-spec.md",
-				"docs/arc/SPECS/002-spec.md",
+				".afol/adm/specs/001-spec.md",
+				".afol/adm/specs/002-spec.md",
 			]);
 			expect(snapshot.specs.kind).toBe("specs_index_v1");
 			expect(snapshot.specs.version).toBe(1);
@@ -172,8 +172,8 @@ describe("local-state project indexer", () => {
 				".afol/skills/skill-b/SKILL.md",
 			]);
 			expect(specsSnapshot.specs.map((spec) => spec.path)).toEqual([
-				"docs/arc/SPECS/001-spec.md",
-				"docs/arc/SPECS/002-spec.md",
+				".afol/adm/specs/001-spec.md",
+				".afol/adm/specs/002-spec.md",
 			]);
 
 			const blocked = join(root, ".afol", "data", "index", "ignore.txt");
@@ -208,7 +208,7 @@ describe("local-state project indexer", () => {
 			expect(snapshot.specs).toEqual([
 				{
 					id: "S-001",
-					path: "docs/arc/SPECS/001-spec.md",
+					path: ".afol/adm/specs/001-spec.md",
 					title: "Local rules",
 					touched_at: expect.any(String),
 					status: "draft",
@@ -216,7 +216,7 @@ describe("local-state project indexer", () => {
 				},
 				{
 					id: "S-002",
-					path: "docs/arc/SPECS/002-spec.md",
+					path: ".afol/adm/specs/002-spec.md",
 					title: "Second",
 					touched_at: expect.any(String),
 				},
@@ -296,6 +296,36 @@ describe("local-state project indexer", () => {
 		}
 	});
 
+	test("files index excludes generated version source", () => {
+		const root = buildFixture();
+		try {
+			const generatedDir = join(root, "cli", "generated");
+			mkdirSync(generatedDir, { recursive: true });
+			const templatePath = join(generatedDir, "template.ts");
+			const versionPath = join(generatedDir, "version.ts");
+			writeFileSync(templatePath, "template", "utf8");
+			writeFileSync(versionPath, "version", "utf8");
+
+			const snapshot = rebuildFilesIndex(root);
+			expect(
+				snapshot.files.some(
+					(entry) => entry.path === "cli/generated/template.ts",
+				),
+			).toBe(true);
+			expect(
+				snapshot.files.some(
+					(entry) => entry.path === "cli/generated/version.ts",
+				),
+			).toBe(false);
+
+			const future = new Date(Date.now() + 60_000);
+			utimesSync(versionPath, future, future);
+			expect(validateFilesIndex(root).ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("skills index has deterministic names and freshness check", () => {
 		const root = buildFixture();
 		try {
@@ -350,7 +380,7 @@ describe("local-state project indexer", () => {
 			expect(specsSnapshot.specs).toEqual<SpecIndexEntry[]>([
 				{
 					id: "S-001",
-					path: "docs/arc/SPECS/001-spec.md",
+					path: ".afol/adm/specs/001-spec.md",
 					title: "Local rules",
 					touched_at: expect.any(String),
 					status: "draft",
@@ -358,7 +388,7 @@ describe("local-state project indexer", () => {
 				},
 				{
 					id: "S-002",
-					path: "docs/arc/SPECS/002-spec.md",
+					path: ".afol/adm/specs/002-spec.md",
 					title: "Second",
 					touched_at: expect.any(String),
 				},
@@ -389,14 +419,41 @@ describe("local-state project indexer", () => {
 				0,
 			);
 			const rebuildPayload = JSON.parse(stdout.at(-1) ?? "{}") as {
+				schema: string;
 				ok: boolean;
+				exit_code: number;
+				command: string;
 				snapshot?: { workbench?: { kind?: string } };
+				data?: {
+					command?: string;
+					snapshot?: { workbench?: { kind?: string } };
+				};
 			};
+			expect(rebuildPayload.schema).toBe("afol.result/v1");
 			expect(rebuildPayload.ok).toBe(true);
+			expect(rebuildPayload.exit_code).toBe(0);
+			expect(rebuildPayload.command).toBe("rebuild");
 			expect(rebuildPayload.snapshot?.workbench?.kind).toBe(
 				"workbench_index_v1",
 			);
+			expect(rebuildPayload.data?.command).toBe("rebuild");
 			expect(validateWorkBenchIndex(root).ok).toBe(true);
+
+			expect(
+				await runLocalStateCommand(["freshness", "--json"], root, io),
+			).toBe(0);
+			const freshnessPayload = JSON.parse(stdout.at(-1) ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
+				checks: unknown[];
+				data?: { checks?: unknown[] };
+			};
+			expect(freshnessPayload.schema).toBe("afol.result/v1");
+			expect(freshnessPayload.ok).toBe(true);
+			expect(freshnessPayload.exit_code).toBe(0);
+			expect(Array.isArray(freshnessPayload.checks)).toBe(true);
+			expect(freshnessPayload.data?.checks).toBeDefined();
 
 			expect(await runLocalStateCommand(["freshness"], root, io)).toBe(0);
 			expect(stdout.at(-1)).toContain("local-state freshness: ok");

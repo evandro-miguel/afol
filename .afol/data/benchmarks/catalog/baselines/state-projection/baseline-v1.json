@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "baseline_id": "state-projection-v1",
+  "pack_id": "state-projection",
+  "host_profile_id": "ci-linux-x64",
+  "sample_count": 3,
+  "warmup_count": 1,
+  "timing_p50_ms": 120,
+  "timing_p95_ms": 180,
+  "tokenizer_id": "tiktoken-o200k-base",
+  "tokenizer_version": "recorded",
+  "git_commit": "baseline-fixture"
+}

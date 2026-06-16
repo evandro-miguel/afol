@@ -1,6 +1,10 @@
-import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
+import {
+	envelopeOk,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
 import { atomicWriteText } from "../services/io/atomic";
 import { withSessionLock } from "../services/io/session-lock";
 import {
@@ -8,12 +12,14 @@ import {
 	createMutationId,
 	type MutationRecord,
 } from "../services/mutations/journal";
-import { resolveProjectPaths } from "../services/project/paths";
 import {
 	checkTemplateUpdate,
 	formatUpdateCheck,
+	type OwnershipCounts,
+	type UpdateCheckResult,
 	type UpdateOperation,
 } from "../services/update/check";
+import { backupPath as makeBackupPath, normalizeHash } from "./file/shared";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -27,9 +33,32 @@ const DEFAULT_IO: CommandIo = {
 
 type UpdateSubcommand = "check" | "preview" | "apply";
 
+type UpdateChangeSummary = {
+	total: number;
+	create: number;
+	update: number;
+	conflict: number;
+	preserve: number;
+	paths: string[];
+	conflictPaths: string[];
+};
+
+type UpdateCheckJsonSummary = {
+	hasSource: boolean;
+	currentRevision: string;
+	sourceRevision: string;
+	upToDate: boolean;
+	changes: UpdateChangeSummary;
+	ownershipSource: OwnershipCounts;
+	ownershipCurrent: OwnershipCounts;
+};
+
+type UpdateJsonData = UpdateCheckResult | UpdateCheckJsonSummary;
+
 type ParsedUpdateArgs = {
 	dryRun: boolean;
 	json: boolean;
+	verbose: boolean;
 	session: string;
 	taskId: string;
 	reason: string;
@@ -56,6 +85,7 @@ function parseUpdateArgs(values: string[]): ParsedUpdateArgs {
 	const parsed: ParsedUpdateArgs = {
 		dryRun: false,
 		json: false,
+		verbose: false,
 		session: "",
 		taskId: "",
 		reason: "",
@@ -65,6 +95,10 @@ function parseUpdateArgs(values: string[]): ParsedUpdateArgs {
 		const value = values[index];
 		if (value === "--json" || value === "-j") {
 			parsed.json = true;
+			continue;
+		}
+		if (value === "--verbose" || value === "-v") {
+			parsed.verbose = true;
 			continue;
 		}
 		if (value === "--dry-run") {
@@ -112,35 +146,6 @@ function requireApplyContext(args: ParsedUpdateArgs): void {
 	}
 }
 
-function sha256Hex(value: string): string {
-	return createHash("sha256").update(value).digest("hex");
-}
-
-function sanitizeForFilename(value: string): string {
-	return value
-		.replace(/[\\/:*?"<>|]/g, "_")
-		.replace(/\.{2,}/g, "_")
-		.replace(/\s+/g, "-")
-		.replace(/^$/g, "root");
-}
-
-function ensureBackupDir(projectRoot: string): string {
-	const backups = resolveProjectPaths(projectRoot).abs.mutationBackupsDir;
-	mkdirSync(backups, { recursive: true });
-	return backups;
-}
-
-function mutationBackupPath(
-	projectRoot: string,
-	mutationId: string,
-	relativePath: string,
-): string {
-	return join(
-		ensureBackupDir(projectRoot),
-		`${mutationId}-${sanitizeForFilename(relativePath)}.bak`,
-	);
-}
-
 function writeAtomically(
 	absolutePath: string,
 	relativePath: string,
@@ -167,6 +172,93 @@ type StagedUpdateOperation = {
 	record: MutationRecord;
 };
 
+function resultEnvelope<T extends object>(
+	data: T,
+	action: string,
+	exitCode: number,
+): ResultEnvelope<T> {
+	return exitCode === 0
+		? envelopeOk(data, { action, exitCode })
+		: {
+				schema: "afol.result/v1",
+				ok: false,
+				action,
+				exit_code: exitCode,
+				data,
+			};
+}
+
+function summarizeUpdateChanges(
+	result: UpdateCheckResult,
+): UpdateChangeSummary {
+	const counts: UpdateChangeSummary = {
+		total: 0,
+		create: 0,
+		update: 0,
+		conflict: 0,
+		preserve: 0,
+		paths: [],
+		conflictPaths: [],
+	};
+
+	for (const operation of result.operations) {
+		if (operation.kind === "skip-identical") {
+			continue;
+		}
+		counts.total += 1;
+		counts.paths.push(operation.path);
+		if (operation.kind === "create") {
+			counts.create += 1;
+			continue;
+		}
+		if (operation.kind === "update-managed") {
+			counts.update += 1;
+			continue;
+		}
+		if (operation.kind === "preserve-project-owned") {
+			counts.preserve += 1;
+			continue;
+		}
+		if (operation.kind === "conflict") {
+			counts.conflict += 1;
+			counts.conflictPaths.push(operation.path);
+		}
+	}
+
+	return counts;
+}
+
+function jsonResultData(
+	result: UpdateCheckResult,
+	verbose: boolean,
+): UpdateJsonData {
+	return verbose
+		? result
+		: {
+				hasSource: result.hasSource,
+				currentRevision: result.currentRevision,
+				sourceRevision: result.sourceRevision,
+				upToDate: result.upToDate,
+				changes: summarizeUpdateChanges(result),
+				ownershipSource: result.ownershipSource,
+				ownershipCurrent: result.ownershipCurrent,
+			};
+}
+
+function writeJsonResult(
+	io: CommandIo,
+	action: string,
+	result: UpdateCheckResult,
+	exitCode: number,
+	verbose: boolean,
+): void {
+	io.stdout(
+		stringifyEnvelope(
+			resultEnvelope(jsonResultData(result, verbose), action, exitCode),
+		),
+	);
+}
+
 function stageUpdateOperations(
 	projectRoot: string,
 	operations: UpdateOperation[],
@@ -184,7 +276,7 @@ function stageUpdateOperations(
 			: "";
 		const mutationId = createMutationId();
 		const backupPath = beforeExisted
-			? mutationBackupPath(projectRoot, mutationId, operation.path)
+			? makeBackupPath(projectRoot, mutationId, operation.path)
 			: null;
 
 		return [
@@ -205,8 +297,8 @@ function stageUpdateOperations(
 					taskId: context.taskId,
 					reason: context.reason,
 					sourcePath: operation.path,
-					beforeHash: beforeExisted ? sha256Hex(beforeContent) : null,
-					afterHash: sha256Hex(operation.nextContent),
+					beforeHash: beforeExisted ? normalizeHash(beforeContent) : null,
+					afterHash: normalizeHash(operation.nextContent),
 					backupPath,
 					beforeExisted,
 					source: "afol-update",
@@ -319,27 +411,33 @@ export async function runUpdateCommand(
 
 		if (command === "apply") {
 			if (!result.hasSource) {
-				io.stdout(
-					parsedArgs.json
-						? JSON.stringify(result)
-						: formatUpdateCheck(result, command).trimEnd(),
-				);
+				if (parsedArgs.json) {
+					writeJsonResult(
+						io,
+						`update.${command}`,
+						result,
+						1,
+						parsedArgs.verbose,
+					);
+				} else {
+					io.stdout(formatUpdateCheck(result, command).trimEnd());
+				}
 				return 1;
 			}
 			if (blockedCount > 0) {
-				io.stdout(
-					parsedArgs.json
-						? JSON.stringify(result)
-						: formatUpdateCheck(result, "apply").trimEnd(),
-				);
+				if (parsedArgs.json) {
+					writeJsonResult(io, "update.apply", result, 4, parsedArgs.verbose);
+				} else {
+					io.stdout(formatUpdateCheck(result, "apply").trimEnd());
+				}
 				return 4;
 			}
 			if (parsedArgs.dryRun) {
-				io.stdout(
-					parsedArgs.json
-						? JSON.stringify(result)
-						: formatUpdateCheck(result, "apply").trimEnd(),
-				);
+				if (parsedArgs.json) {
+					writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose);
+				} else {
+					io.stdout(formatUpdateCheck(result, "apply").trimEnd());
+				}
 				return 0;
 			}
 			if (writableOperations.length > 0) {
@@ -351,19 +449,27 @@ export async function runUpdateCommand(
 				parsedArgs,
 				runtime,
 			);
-			io.stdout(
-				parsedArgs.json
-					? JSON.stringify(result)
-					: formatUpdateCheck(result, command).trimEnd(),
-			);
+			if (parsedArgs.json) {
+				writeJsonResult(io, "update.apply", result, 0, parsedArgs.verbose);
+			} else {
+				io.stdout(formatUpdateCheck(result, command).trimEnd());
+			}
 			return 0;
 		}
 
-		io.stdout(
-			parsedArgs.json
-				? JSON.stringify(result)
-				: formatUpdateCheck(result, command).trimEnd(),
-		);
+		if (parsedArgs.json) {
+			io.stdout(
+				stringifyEnvelope(
+					resultEnvelope(
+						jsonResultData(result, parsedArgs.verbose),
+						`update.${command}`,
+						result.hasSource ? 0 : 1,
+					),
+				),
+			);
+		} else {
+			io.stdout(formatUpdateCheck(result, command).trimEnd());
+		}
 		return result.hasSource ? 0 : 1;
 	} catch (error) {
 		io.stderr((error as Error).message);

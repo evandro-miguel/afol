@@ -39,8 +39,8 @@ jobs:
             -o "$RUNNER_TEMP/gitleaks.tar.gz"
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$tool_dir" gitleaks
           chmod +x "$tool_dir/gitleaks"
-          osv-scanner --version
-          gitleaks version
+          "$tool_dir/osv-scanner" --version
+          "$tool_dir/gitleaks" version
 
       - name: Release validation
         run: bun run validate:release
@@ -51,6 +51,7 @@ jobs:
       - name: Upload release evidence
         uses: actions/upload-artifact@v4
         if: always()
+        continue-on-error: true
         with:
           name: afol-release-evidence
           path: |

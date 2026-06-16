@@ -18,6 +18,10 @@ system has been retired and must not be restored.
 - `.afol/**`: mutable AFOL-owned state, including workbench sessions, indexes,
   events, mutations, temporary files, benchmark catalog/results, and migration
   archives.
+- Target `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy,
+  and desired-state administration.
+- Target `.afol/pstr/**`: current project-structure maps only; commands live in
+  `cli/**`, and pstr contains map outputs.
 
 Removed legacy surfaces:
 
@@ -70,6 +74,31 @@ afol bootstrap /path/to/repo --provider-compatible
 
 Provider-compatible installs keep static scaffold metadata in `.agents/` and
 write mutable state under `.afol/`.
+
+## Runtime Adapters
+
+Optional integration surfaces can be toggled off when a downstream project does
+not want them. The Claude adapter owns `CLAUDE.md` and `.claude/`; `AGENTS.md`
+is always canonical and is never removed.
+
+Install without the Claude adapter:
+
+```bash
+afol init --without-claude
+afol bootstrap /path/to/repo --without-claude
+```
+
+Toggle at runtime (archives `CLAUDE.md` + `.claude/` under
+`.afol/data/migrations/`, reversible):
+
+```bash
+afol adapter list
+afol adapter disable claude
+afol adapter enable claude
+```
+
+Both subcommands accept `--dry-run` and `--json`. The state is persisted in
+`.agents/config.json` under `adapters.claude.enabled` (omitted = enabled).
 
 ## Legacy Policy
 

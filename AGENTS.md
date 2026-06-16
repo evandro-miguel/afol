@@ -23,12 +23,23 @@ Retained `.agents` content is static scaffold metadata only:
 - `.agents/lock.json`
 - `.agents/manifest.json`
 - `.agents/rules/**`
-- `.afol/skills/**`
 - `.agents/source/**`
 
 Mutable AFOL state belongs under `.afol/`, including workbench sessions,
 events, indexes, mutations, temporary files, benchmark catalog/results, and
 migration archives.
+
+AFOL-owned project-local skills live under `.afol/skills/**`.
+
+Target governance layout:
+
+- `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and
+  desired-state administration.
+- `.afol/pstr/**`: current project-structure maps only. No scripts, task
+  execution, automations, roadmap, specs, or future-state governance.
+- `.afol/wb/**`: execution sessions. Do not create a workbench session for
+  small docs/spec direction edits unless the user explicitly asks for governed
+  execution evidence.
 
 Canonical commands:
 
@@ -45,6 +56,25 @@ afol update check
 afol update preview
 afol update apply --dry-run
 ```
+
+## Token Economy (HARD RULE — never abuse tokens)
+
+AFOL is a low-token system by design. Token economy is mandatory, not optional.
+
+- Any single `afol` command emitting **>5,000 output tokens is non-ideal**;
+  **>10,000 output tokens is prohibited**. `afol validate bench` enforces this
+  automatically — a scenario exceeding 10k tokens FAILS the bench; 5k–10k
+  warns. Do not merge a command that violates this.
+- Use the **compact/default** form of every command. Only pass `--verbose`
+  when you specifically need the full manifest/diff for a concrete reason.
+- `afol up check` returns a compact summary (revisions, counts, conflict
+  names). `afol up preview` and `--verbose` carry the full file-by-file
+  manifest and are token-heavy — use them only when an update conflict
+  genuinely requires inspecting every changed file.
+- Do **not** pipe large `--json` payloads into your own context. If you need
+  one field, target it; otherwise prefer the human-readable compact form.
+- Treat any `afol` command that emits >5k tokens by default as a BUG and fix
+  the command. The bench guard will already be failing it.
 
 Before editing code, inspect the live repo state and use the smallest AFOL
 validation that proves the change. For cross-cutting scaffold/release work, run:
