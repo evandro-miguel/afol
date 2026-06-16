@@ -38,15 +38,21 @@ export type CommandCatalogEntry = {
 export function buildCommandCatalog(
 	registry = kernelRegistry,
 ): CommandCatalogEntry[] {
-	return registry.commands.map((spec) => ({
-		command: spec.command,
-		aliases: [...spec.aliases],
-		kind: spec.kind,
-		sideEffect: spec.sideEffect,
-		description: spec.description,
-		category: spec.category ?? "uncategorized",
-		subcommands: spec.subcommands?.map((entry) => ({ ...entry })),
-	}));
+	return registry.commands.map((spec) => {
+		const entry: CommandCatalogEntry = {
+			command: spec.command,
+			aliases: [...spec.aliases],
+			kind: spec.kind,
+			sideEffect: spec.sideEffect,
+			description: spec.description,
+			category: spec.category ?? "uncategorized",
+		};
+		const subcommands = spec.subcommands?.map((entry) => ({ ...entry }));
+		if (subcommands !== undefined) {
+			entry.subcommands = subcommands;
+		}
+		return entry;
+	});
 }
 
 export function formatCatalogJson(registry = kernelRegistry): string {
@@ -64,15 +70,19 @@ export function buildCommandHelpJson(
 		return null;
 	}
 
-	return {
+	const entry: CommandCatalogEntry = {
 		command: spec.command,
 		aliases: [...spec.aliases],
 		kind: spec.kind,
 		sideEffect: spec.sideEffect,
 		description: spec.description,
 		category: spec.category ?? "uncategorized",
-		subcommands: spec.subcommands?.map((entry) => ({ ...entry })),
 	};
+	const subcommands = spec.subcommands?.map((entry) => ({ ...entry }));
+	if (subcommands !== undefined) {
+		entry.subcommands = subcommands;
+	}
+	return entry;
 }
 
 export function formatCommandHelp(
