@@ -1,83 +1,172 @@
 ---
-description: Operational playbooks for skills refresh, upstream PR proposals, and workbench execution
+description: Operational playbooks for AFOL skill updates, scaffold adoption, updates, and workbench execution
 metadata:
-  tags: "agentic-folder-sys, skills-sync, git, workbench, operational-playbooks"
+  tags: "agentic-folder-sys, afol, bootstrap, update, workbench, skills"
 ---
 
 # Agentic Folder Sys Patterns
 
-Use these playbooks when the scaffold is already installed and the agent needs
-to operate it safely.
+Use these playbooks when an AFOL scaffold is installed or being adopted by an
+existing project. AFOL is the only active runtime. Do not use the retired
+`.agents` command system.
 
-## 1. Git-Backed Skills Refresh
+## 1. Install AFOL Into The Current Project
 
-```bash
-./.agents/agents skills-sync status
-./.agents/agents skills-sync pull
-./.agents/agents skills-sync update --runtime codex
-```
-
-Use this when the project already has the scaffold and you want the installed
-skills under `.agents/skills/` to reflect the current upstream git source.
-
-Rule:
-
-- `skills-sync pull` refreshes only an external git-backed source when one is
-  configured. `skills-sync sync` / `skills-sync update` refresh the actual
-  project skill copies under `.agents/skills/`. Treat skill and profile names
-  from CLI, manifest, and upstream profiles as identifiers, not paths. A safe
-  implementation rejects absolute paths, path separators, NUL bytes, `.`, and
-  `..`, then verifies resolved source and destination paths stay under their
-  configured roots before delete/copy/link.
-
-## 2. Ensure One Operational Skill
+Inspect the repo first:
 
 ```bash
-./.agents/agents skills-sync ensure agentic-folder-sys --runtime codex --pull
+pwd
+git status --short --branch
+afol status
 ```
 
-Use this when the repo needs the scaffold-operating skill available locally
-without doing a broader skill refresh.
-
-## 3. Verified Scaffold Refresh
+Dry-run the provider-compatible install:
 
 ```bash
-./.agents/agents scaffold-update --channel stable \
-  --source /path/to/scaffold-source --plan-only
-./.agents/agents scaffold-update --channel stable \
-  --source /path/to/scaffold-source --diff-only
+afol init --provider-compatible --dry-run
 ```
 
-Use this only for scaffold-owned `.agents` files, not project-owned docs or app
-code. The source must provide stable channel metadata and release artifacts; the
-command verifies the signed tag when the source is a git checkout, validates the
-allowlisted payload checksum, stages changes, backs up touched files, and rolls
-back if validation fails. Add `--apply` only after the plan/diff is expected.
-
-## 4. Propose a Local Skill Change Back to Universal-Skills
+Apply only after the plan is understood:
 
 ```bash
-./.agents/agents skills-sync push agentic-folder-sys \
-  --branch skills-sync/agentic-folder-sys \
-  --commit --push --pr
+afol init --provider-compatible
+afol validate project
 ```
 
-Use this only with an external universal-skills checkout configured. The command
-creates a proposal branch and can open a PR; it must never push directly to
-universal `main`.
+Provider-compatible install keeps `.agents/**` as static provider metadata and
+places mutable AFOL state under `.afol/**`.
 
-## 5. Governed Workbench Execution
+## 2. Install AFOL Into Another Project
 
-When the change is non-trivial, use the scaffold's workbench flow:
+From the AFOL source checkout:
 
 ```bash
-./.agents/agents new <theme> --feature-id F-10 --parent-spec <spec-id>
-./.agents/agents wb-update touch
-./.agents/agents verify-tasks --strict .afol/wb/$(cat .afol/wb/.active_session)
+afol bootstrap /path/to/project --provider-compatible --dry-run
+afol bootstrap /path/to/project --provider-compatible
+afol validate project
 ```
 
-State rules:
+Alias:
 
-- use the task marker board as the source of truth with canonical markers: `[
-  ]`, `[/]`, `[!]`, `[>]`, `[%]`, `[&]`, `[x]` move from `[%]` to `[&]` only
-  after test evidence exists mark `[x]` only after closure evidence exists
+```bash
+afol b /path/to/project --provider-compatible --dry-run
+```
+
+Do not use `--partial`; current AFOL rejects partial installs.
+
+## 3. Handle Existing Operational Files During Adoption
+
+Before applying, inventory the receiving project:
+
+- project-owned guidance and docs such as `AGENTS.md`, `CLAUDE.md`, `RTK.md`,
+  root `docs/**`, runbooks, and local operational files agents already use;
+- current static scaffold metadata under `.agents/config.json`,
+  `.agents/lock.json`, `.agents/manifest.json`, `.agents/rules/**`, and
+  `.agents/source/**`;
+- current mutable AFOL state under `.afol/wb/**`, `.afol/skills/**`,
+  `.afol/data/**`, `.afol/tmp/**`, `.afol/adm/**`, and `.afol/pstr/**`;
+- retired operational files such as `.agents/agents`, `.agents/scripts/**`,
+  `.agents/runtime/**`, `.agents/wb`, `.agents/skills`, `.agents/tmp`,
+  `.agents/data`, `.agents/z-arq`, and `agents.config`.
+
+Read the dry-run output as an adoption plan:
+
+- `create`: new AFOL/static scaffold file.
+- `update-managed`: AFOL-managed file that can be rewritten.
+- `preserve-project-owned`: project-owned file left untouched.
+- `conflict`: existing file differs and needs review.
+- `mutable-baseline-create`: missing `.afol/**` runtime baseline.
+- `cleanup-pending`: obsolete legacy file preserved unless cleanup is enabled.
+- `provider-compatible-cleanup-pending`: legacy mutable `.agents/**` root
+  preserved unless archive migration is explicitly confirmed.
+
+Use cleanup flags only after inspecting the listed paths:
+
+```bash
+afol init --provider-compatible --cleanup-obsolete --dry-run
+afol init --provider-compatible --cleanup-provider-compatible-mutable \
+  --confirm-provider-migration --dry-run
+```
+
+`--cleanup-obsolete` removes retired scaffold files such as `.agents/scripts`
+and `.agents/runtime` when confirmed by the plan. Provider-compatible mutable
+cleanup archives old `.agents/data`, `.agents/skills`, `.agents/tmp`,
+`.agents/wb`, and `.agents/z-arq` into
+`.afol/data/migrations/<stamp>_provider-compatible-mutable-migration`.
+
+The final adoption note should distinguish: already present, created, updated,
+preserved project-owned, legacy cleanup pending, and cleanup flags required.
+Patch stale AFOL instructions in project-owned docs without erasing local
+product context.
+
+## 4. Update An Installed Scaffold
+
+Use the compact update lane first:
+
+```bash
+afol update check
+afol update preview
+afol update apply --dry-run
+```
+
+Use verbose output only when a conflict requires the full file manifest. Apply
+only after the target paths and conflicts are understood.
+
+## 5. Maintain Project-Local Skills
+
+Project-local AFOL skills live under `.afol/skills/**`.
+
+When updating this skill for a project:
+
+- edit the relevant `.afol/skills/<skill-name>/` files;
+- keep the global copy under `~/.codex/skills/<skill-name>/` in sync only when
+  the change is intended for all projects;
+- do not copy caches, generated mirrors, or universal-skills source checkouts
+  into `.afol/skills`;
+- route durable shared skill changes through the universal-skills repo and its
+  normal review path.
+
+## 6. Governed Workbench Execution
+
+Use a workbench session for non-trivial implementation, validation, benchmark,
+or migration work:
+
+```bash
+afol new <theme> --feature-id F-10 --parent-spec <spec-id>
+afol start --session <session-id> --task-id T-01
+afol evidence --session <session-id> --task-id T-01 \
+  --command "<verification command>" --result passed
+afol done --session <session-id> --task-id T-01
+afol close --session <session-id>
+```
+
+State lives in the configured `paths.wb_dir`, which defaults to `.afol/wb`.
+Pass `--session` explicitly when multiple agents or terminals are active.
+
+Task markers:
+
+- `[ ]`: planned.
+- `[/]`: in progress.
+- `[!]`: blocked.
+- `[>]`: deferred.
+- `[%]`: implementation complete, verification pending.
+- `[&]`: verified, closure pending.
+- `[x]`: closed.
+
+Move to `[&]` only after evidence exists. Move to `[x]` only after closure
+evidence exists.
+
+## 7. Parallel Agent Handoff
+
+When delegating AFOL work, include:
+
+- goal and exact repo root;
+- allowed files and forbidden legacy surfaces;
+- current branch and dirty-state warning;
+- relevant skill names;
+- expected output contract;
+- whether the agent may edit or is read-only;
+- session id and task id when governed workbench state is active.
+
+Tell helpers to read `.agents/config.json` for the path contract and to write
+mutable runtime state only under `.afol/**`.

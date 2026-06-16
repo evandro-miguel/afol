@@ -23,6 +23,7 @@ const HEALTH_AREAS: readonly HealthArea[] = [
 	"ctx",
 	"token_budget",
 ];
+const CORE_HEALTH_AREAS: readonly HealthArea[] = ["wb"];
 const MEMORY_STALE_AFTER_DAYS = 30;
 const TOKEN_WARN_AT = 2000;
 const TOKEN_FAIL_AT = 4000;
@@ -505,9 +506,13 @@ export function checkAreaHealth(
 
 export function checkHealth(
 	root: string,
-	opts?: { area?: HealthArea; deep?: boolean },
+	opts?: { area?: HealthArea; deep?: boolean; includeAuxiliary?: boolean },
 ): HealthReport {
-	const areas = opts?.area ? [opts.area] : [...HEALTH_AREAS];
+	const areas = opts?.area
+		? [opts.area]
+		: opts?.deep || opts?.includeAuxiliary
+			? [...HEALTH_AREAS]
+			: [...CORE_HEALTH_AREAS];
 	const findings = areas.flatMap((area) =>
 		checkAreaHealth(root, area, opts?.deep ?? false),
 	);

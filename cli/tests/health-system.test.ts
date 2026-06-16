@@ -212,6 +212,20 @@ describe("health system", () => {
 		}
 	});
 
+	test("checkHealth default ignores auxiliary health surfaces", () => {
+		const root = createFixture();
+		try {
+			writePstrIndex(root, hoursAgo(24 * 45));
+			writeMemory(root, hoursAgo(24 * 45));
+
+			const report = checkHealth(root);
+			expect(report.ok).toBe(true);
+			expect(report.findings).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("checkHealth detects missing memory", () => {
 		const root = createFixture();
 		try {
@@ -351,12 +365,14 @@ describe("health system", () => {
 		}
 	});
 
-	test("afol health --json returns JSON report", async () => {
+	test("afol health --release --json returns JSON report", async () => {
 		const root = createFixture();
 		try {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			const captured = captureIo();
-			expect(await runHealthCommand(["--json"], root, captured.io)).toBe(1);
+			expect(
+				await runHealthCommand(["--release", "--json"], root, captured.io),
+			).toBe(1);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}");
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.exit_code).toBe(1);
@@ -367,6 +383,7 @@ describe("health system", () => {
 				warn: expect.any(Number),
 				info: expect.any(Number),
 			});
+			expect(payload.release).toBe(true);
 			expect(payload.data.checked_at).toBe(payload.checked_at);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -453,10 +470,13 @@ describe("health system", () => {
 	test("afol health defaults to human output", async () => {
 		const root = createFixture();
 		try {
-			seedHealthyRoot(root);
+			writePstrIndex(root, hoursAgo(24 * 45));
+			writeMemory(root, hoursAgo(24 * 45));
 			const captured = captureIo();
 			expect(await runHealthCommand([], root, captured.io)).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("health: ok");
+			expect(captured.stdout.join("\n")).not.toContain("pstr");
+			expect(captured.stdout.join("\n")).not.toContain("memory");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

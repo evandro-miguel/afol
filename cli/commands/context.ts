@@ -189,7 +189,10 @@ function formatExplanation(
 	root: string,
 	bundle: ReturnType<typeof buildContextBundle>,
 ) {
-	const healthFindings = checkHealth(root, { deep: false }).findings.filter(
+	const healthFindings = checkHealth(root, {
+		deep: false,
+		includeAuxiliary: true,
+	}).findings.filter(
 		(finding) => finding.severity === "fail" || finding.severity === "warn",
 	);
 	const relevantAreas = new Set(["pstr", "memory", "library", "state"]);

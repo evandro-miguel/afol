@@ -1,121 +1,192 @@
 ---
-description: Core install, bootstrap, and upgrade flows for the agentic folder system
+description: Core AFOL install, adoption, update, and validation flows
 metadata:
-  tags: "agentic-folder-sys, bootstrap, install, upgrade, scaffold"
+  tags: "agentic-folder-sys, afol, bootstrap, init, provider-compatible, install, upgrade, scaffold"
 ---
 
 # Agentic Folder Sys Core Workflow
 
-Use this reference when the task is to install or upgrade the scaffold in
-another repository.
+Use this reference when installing or updating AFOL in a repository.
 
 ## Governed Delivery Reminder
 
 If you opened this reference while delivering a governed implementation,
-validation, or fix in the current repository, do not bootstrap or inspect
-scaffold internals first. Use the already-installed scaffold wrapper and keep
-the order of state changes clear:
+validation, or fix in an already adopted repo, do not bootstrap first. Use the
+installed AFOL front door:
 
-1. create or target the `.afol/wb/` session,
+1. create or target the configured `.afol/wb/` session,
 2. move the execution task to in progress,
 3. edit the product,
 4. run the named acceptance check,
 5. record task-scoped evidence and complete the task.
 
-Treat named acceptance checks and validation scripts as the contract for the
-task. Do not edit them to make the check pass unless the user explicitly asked
-to change the validator itself.
+## 1. In-Place Adoption
 
-## 1. Brand-New Repository Adoption
+Use `afol init` inside the target repo. It defaults to the current directory.
 
-Full bootstrap can create the target directory when it does not exist yet.
+Preview:
 
 ```bash
-mkdir -p /path/to/new-project
-git -C /path/to/new-project init  # optional but recommended
-./.agents/agents bootstrap /path/to/new-project
+afol init --provider-compatible --dry-run
 ```
 
-What this does:
-
-- installs the `.agents` runtime surface writes the generic governance baseline
-  keeps project-owned repository mapping under `docs/map/` seeds
-  `.agents/source/universal-skills` inside the target repo runs the
-  post-bootstrap checks unless `--skip-checks` is used
-
-## 2. Existing Repository Adoption
-
-For a live project, use partial mode so project-owned files are preserved.
+Apply:
 
 ```bash
-./.agents/agents bootstrap /path/to/existing-project --partial
+afol init --provider-compatible
 ```
 
-Important notes:
+Use `--without-claude` when the receiving repo should not get Claude adapter
+files. Use `--mutable-dir <dir>` only when the target repo has a deliberate
+non-default mutable path contract.
 
-- `--partial` is the safe default for repos with live content. If the target
-  repo already owns `make all`, use `make agents-all` for the scaffold aggregate
-  validation. Use `--force` only when the overwrite is intentional.
+## 2. Adoption From Another Checkout
 
-## 3. Verified Scaffold Update
+Use `afol bootstrap` or its `b` alias when operating on an explicit target path.
 
-Use `scaffold-update` when the repo already has the scaffold and you need to
-refresh scaffold-owned `.agents` files from a source checkout that already has
-stable channel metadata, release artifacts, and a verifiable signed tag.
-
-Preview first:
+Preview:
 
 ```bash
-./.agents/agents scaffold-update --channel stable \
-  --source /path/to/scaffold-source --plan-only
-./.agents/agents scaffold-update --channel stable \
-  --source /path/to/scaffold-source --diff-only
+afol b /path/to/project --provider-compatible --dry-run
 ```
 
-Apply only after the preview is expected:
+Apply:
 
 ```bash
-./.agents/agents scaffold-update --channel stable \
-  --source /path/to/scaffold-source \
-  --apply \
-  --validate-command "make agents-all"
+afol b /path/to/project --provider-compatible
 ```
 
-Rules:
+`--partial` is not supported by current AFOL. For live repositories, safety
+comes from dry-run, manifest ownership, conflict detection, and
+provider-compatible mutable paths, not from partial mode.
 
-- do not use a floating branch as a stable source unless release metadata and
-  signed-tag verification pass; do not apply from a source without
-  `releases/channels/stable.json`; inspect the plan/diff before `--apply`; rely
-  on the command backup under `.agents/tmp/scaffold-update/backups/<timestamp>/`
-  for rollback evidence.
+## 3. Reading The Bootstrap Plan
 
-If the source checkout does not yet have stable channel metadata, use the
-partial bootstrap flow below instead of pretending the update is verified.
+Important output classes:
 
-## 4. Legacy Partial Bootstrap Upgrade
+- `create`: scaffold file will be created.
+- `update-managed`: scaffold-owned file can be updated.
+- `preserve-project-owned`: target owns the file; AFOL will not overwrite it.
+- `conflict`: local drift or unknown ownership; inspect before applying
+  `--force-managed`.
+- `cleanup-pending`: retired Python scaffold artifacts were detected.
+- `provider-compatible-cleanup-pending`: legacy mutable roots under `.agents/`
+  were detected.
+- `mutable-baseline-create`: AFOL will seed missing `.afol/**` baseline files.
+- `mutable-baseline-skip-existing`: AFOL will preserve existing `.afol/**`
+  mutable baseline files.
+
+Apply `--force-managed` only for confirmed scaffold-owned conflicts. Do not use
+it to overwrite project-owned docs, app code, secrets, or user data.
+
+## 4. Inventory And Update Decisions
+
+Before applying a receiving-project update, produce a compact inventory:
+
+- project-owned guidance and docs: `AGENTS.md`, `CLAUDE.md`, `RTK.md`,
+  root `docs/**`, project runbooks, and local operational files agents already
+  use
+- present static scaffold metadata: `.agents/config.json`,
+  `.agents/lock.json`, `.agents/manifest.json`, `.agents/rules/**`,
+  `.agents/source/**`
+- present mutable AFOL state: `.afol/wb/**`, `.afol/skills/**`,
+  `.afol/data/**`, `.afol/tmp/**`, `.afol/adm/**`, `.afol/pstr/**`
+- retired Python/runtime files: `.agents/agents`, `.agents/agents-mcp`,
+  `.agents/scripts/**`, `.agents/runtime/**`, old Python metadata/cache files
+- legacy mutable roots: `.agents/data`, `.agents/skills`, `.agents/tmp`,
+  `.agents/wb`, `.agents/z-arq`
+- retired config fallback: `agents.config`
+
+Use this classification:
+
+- `create`: safe scaffold creation.
+- `update-managed`: safe scaffold update unless the dry-run reports a conflict.
+- `preserve-project-owned`: do not overwrite; migrate only the useful intent.
+- `conflict`: inspect diff and ownership before `--force-managed`.
+- `cleanup-pending`: cleanup only with `--cleanup-obsolete`.
+- `provider-compatible-cleanup-pending`: archive only with
+  `--cleanup-provider-compatible-mutable` and
+  `--confirm-provider-migration`.
+- `mutable-baseline-skip-existing`: preserve existing `.afol/**` mutable files.
+
+The agent handoff/report should explicitly name what exists, what needs an
+AFOL-managed update, what stays preserved, what is legacy cleanup, and what flag
+would be required to perform that cleanup.
+
+Project guidance and docs are not scaffold defaults to be reset. Keep local
+product facts, stack commands, architecture notes, and runbooks; patch only the
+stale AFOL operational parts.
+
+## 5. Legacy Cleanup During Adoption
+
+Retired Python/runtime artifacts:
 
 ```bash
-./.agents/agents bootstrap /path/to/adopted-project --partial
-./.agents/agents skills-sync update --runtime codex
-make -C /path/to/adopted-project agents-all
+afol b /path/to/project --provider-compatible --dry-run --cleanup-obsolete
+afol b /path/to/project --provider-compatible --cleanup-obsolete
 ```
 
-Use this flow when the repo already contains the scaffold and you want to
-refresh the local framework surface without the stable channel updater.
+This targets obsolete scaffold files such as `.agents/agents`,
+`.agents/agents-mcp`, `.agents/scripts/**`, `.agents/runtime/**`, and Python
+metadata/cache files from the old scaffold.
 
-## 5. Minimal Validation
-
-After bootstrap or upgrade, validate with:
+Legacy mutable roots under `.agents/`:
 
 ```bash
-make doctor
-make lint
-make test-scripts
-make agents-all
+afol b /path/to/project --provider-compatible \
+  --cleanup-provider-compatible-mutable \
+  --confirm-provider-migration
 ```
 
-For isolated wrapper verification:
+This archives `.agents/data`, `.agents/skills`, `.agents/tmp`, `.agents/wb`,
+and `.agents/z-arq` under
+`.afol/data/migrations/<timestamp>_provider-compatible-mutable-migration/`.
+Without both flags, AFOL preserves these paths.
+
+Inspect before cleanup. If a legacy file contains useful project-owned content,
+convert it into `AGENTS.md`, `.afol/adm/**`, `.afol/skills/**`, or project docs
+instead of deleting it.
+
+## 6. Path Contract After Install
+
+After install, read:
 
 ```bash
-PATH=/usr/bin:/bin ./.agents/agents doctor
+cat .agents/config.json
+```
+
+Use `paths.mutable_dir`, `paths.wb_dir`, `paths.skills_dir`, `paths.tmp_dir`,
+`paths.data_dir`, and `paths.events_file` for all AFOL-owned writes.
+
+Default provider-compatible layout:
+
+- static scaffold metadata: `.agents/config.json`, `.agents/lock.json`,
+  `.agents/manifest.json`, `.agents/rules/**`, `.agents/source/**`
+- mutable state: `.afol/wb/**`, `.afol/skills/**`, `.afol/data/**`,
+  `.afol/tmp/**`, `.afol/adm/**`, `.afol/pstr/**`
+
+## 7. Minimal Validation
+
+For a receiving repo:
+
+```bash
+afol s
+afol validate project
+```
+
+For AFOL source repo scaffold/template changes:
+
+```bash
+bun run validate:bootstrap
+bun run validate:template
+```
+
+For AFOL source repo release readiness:
+
+```bash
+afol local-state rebuild --json
+afol validate project --json
+bun run typecheck
+bun test
+bun run validate:release
 ```
