@@ -7,11 +7,12 @@ import type {
 } from "./types";
 import type { ProjectBenchmarkValidationResult } from "./validate";
 
-type RenderableProjectBenchmarkRecommendation = ProjectBenchmarkRecommendation & {
-	risk_flags?: string[];
-	risk_level?: "low" | "medium" | "high";
-	do_not_copy?: string[];
-};
+type RenderableProjectBenchmarkRecommendation =
+	ProjectBenchmarkRecommendation & {
+		risk_flags?: string[];
+		risk_level?: "low" | "medium" | "high";
+		do_not_copy?: string[];
+	};
 
 export function formatProjectBenchmarkList(
 	scores: ProjectBenchmarkScore[],

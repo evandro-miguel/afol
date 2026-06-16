@@ -372,7 +372,8 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 			{
 				usage: "matrix --for <axis>",
 				sideEffect: "read",
-				description: "Filter the score matrix by axis; omit --for for the full matrix",
+				description:
+					"Filter the score matrix by axis; omit --for for the full matrix",
 			},
 			{
 				usage: "recommend --for <axis>",
@@ -382,7 +383,8 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 			{
 				usage: "validate --strict",
 				sideEffect: "read",
-				description: "Fail validation on warnings; omit --strict for standard validation",
+				description:
+					"Fail validation on warnings; omit --strict for standard validation",
 			},
 			{
 				usage: "generate --check",

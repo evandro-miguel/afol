@@ -174,7 +174,9 @@ function inferMissingSourceRefAxes(
 				: {};
 		for (const [axisId, scoreValue] of Object.entries(similarityAxes)) {
 			const evidenceRefs =
-				scoreValue && typeof scoreValue === "object" && !Array.isArray(scoreValue)
+				scoreValue &&
+				typeof scoreValue === "object" &&
+				!Array.isArray(scoreValue)
 					? (scoreValue as { evidence_refs?: unknown }).evidence_refs
 					: [];
 			if (!Array.isArray(evidenceRefs)) {
@@ -222,7 +224,9 @@ function inferMissingSourceRefAxes(
 			};
 			if (
 				Array.isArray(sourceRef.axes) &&
-				sourceRef.axes.some((axis) => typeof axis === "string" && axis.length > 0)
+				sourceRef.axes.some(
+					(axis) => typeof axis === "string" && axis.length > 0,
+				)
 			) {
 				continue;
 			}
@@ -239,7 +243,9 @@ function inferMissingSourceRefAxes(
 	return catalog;
 }
 
-function requireValidCatalog(catalog: ReturnType<typeof loadProjectBenchmarkCatalog>): {
+function requireValidCatalog(
+	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
+): {
 	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>;
 	axes: ProjectBenchmarkAxesFile;
 	projects: ProjectBenchmarkProject[];
@@ -492,7 +498,8 @@ export async function runProjectBenchmarkCommand(
 
 		const misplacedFiles = findProjectBenchmarkMisplacedOutputs(projectRoot, {
 			catalogDir: sourceCatalog.paths.admDir,
-			runtimeBenchmarkCatalogDir: sourceCatalog.paths.runtimeBenchmarkCatalogDir,
+			runtimeBenchmarkCatalogDir:
+				sourceCatalog.paths.runtimeBenchmarkCatalogDir,
 		});
 		if (misplacedFiles.length > 0) {
 			if (parsed.json) {

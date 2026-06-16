@@ -226,7 +226,7 @@ describe("project-benchmark validation hardening", () => {
 			);
 			writeFileSync(
 				runtimeCopy,
-				"{\n  \"generated_by\": \"afol pb generate\"\n}\n",
+				'{\n  "generated_by": "afol pb generate"\n}\n',
 				"utf8",
 			);
 			const contaminationFiles = validateProjectBenchmarkCatalog(

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
@@ -262,7 +262,9 @@ function collectMisplacedOutputs(
 				scan(entryPath, location);
 				continue;
 			}
-			if (!fileLooksLikeProjectBenchmarkGeneratedOutput(entryPath, entry.name)) {
+			if (
+				!fileLooksLikeProjectBenchmarkGeneratedOutput(entryPath, entry.name)
+			) {
 				continue;
 			}
 			const rel = relative(projectRoot, entryPath) || entryPath;

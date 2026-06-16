@@ -64,7 +64,9 @@ type ProjectRecord = Record<string, unknown> & {
 };
 
 function readProject(root: string, id = "aider"): ProjectRecord {
-	return JSON.parse(readFileSync(projectPath(root, id), "utf8")) as ProjectRecord;
+	return JSON.parse(
+		readFileSync(projectPath(root, id), "utf8"),
+	) as ProjectRecord;
 }
 
 function issueCodes(root: string, now = new Date("2026-06-20T00:00:00.000Z")) {
@@ -891,9 +893,12 @@ describe("project-benchmark command", () => {
 				"scenarios",
 				"copied-index.json",
 			);
-			mkdirSync(join(root, ".afol", "data", "benchmarks", "catalog", "scenarios"), {
-				recursive: true,
-			});
+			mkdirSync(
+				join(root, ".afol", "data", "benchmarks", "catalog", "scenarios"),
+				{
+					recursive: true,
+				},
+			);
 			writeFileSync(
 				catalogCopy,
 				readFileSync(join(dataDir, "generated-summary.md"), "utf8"),
@@ -1299,11 +1304,7 @@ describe("project-benchmark command", () => {
 			expect(weakReference?.recommendation_score).toBeLessThan(80);
 			expect(weakReference?.risk_level).toBe("high");
 			expect(weakReference?.risk_flags).toEqual(
-				expect.arrayContaining([
-					"stale",
-					"low_confidence",
-					"closed_source",
-				]),
+				expect.arrayContaining(["stale", "low_confidence", "closed_source"]),
 			);
 			expect(weakReference?.warnings).toEqual(
 				expect.arrayContaining([
