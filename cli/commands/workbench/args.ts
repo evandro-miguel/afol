@@ -67,7 +67,9 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 			if (!value) {
 				throw new Error("Missing value for --task in new.");
 			}
-			metadata.task = value;
+			metadata.task ??= value;
+			metadata.tasks ??= [];
+			metadata.tasks.push(value);
 			index += 1;
 			continue;
 		}

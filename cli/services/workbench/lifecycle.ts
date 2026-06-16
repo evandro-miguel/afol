@@ -51,6 +51,7 @@ export type NewWorkstreamMetadata = {
 	featureId?: string;
 	parentSpec?: string;
 	task?: string;
+	tasks?: string[];
 };
 
 export type TimelineEntryResult = {
@@ -130,15 +131,28 @@ function uniqueSessionId(wbRoot: string, base: string): string {
 	}
 }
 
-function taskNoteFromMetadata(metadata?: NewWorkstreamMetadata): string {
+function explicitTaskSummaries(metadata?: NewWorkstreamMetadata): string[] {
+	const taskList =
+		metadata?.tasks
+			?.map((task) => task.trim())
+			.filter((task) => task.length > 0) ?? [];
+	if (taskList.length > 0) {
+		return taskList;
+	}
 	const task = metadata?.task?.trim();
-	const note =
-		task && task.length > 0 ? task : "Execute requested lifecycle work.";
-	return note.replace(/\|/g, "/");
+	return task ? [task] : [];
 }
 
-function planTaskFromMetadata(metadata?: NewWorkstreamMetadata): string {
-	return metadata?.task?.trim() || "Execute requested lifecycle work.";
+function taskSummariesFromMetadata(metadata?: NewWorkstreamMetadata): string[] {
+	const taskList = explicitTaskSummaries(metadata);
+	if (taskList.length > 0) {
+		return taskList;
+	}
+	return ["Execute requested lifecycle work."];
+}
+
+function escapeTaskNote(task: string): string {
+	return task.replace(/\|/g, "/");
 }
 
 export function sessionPaths(
@@ -366,14 +380,21 @@ export function newWorkstream(
 	if (metadata?.parentSpec) {
 		metadataLines.push(`- parent_spec: ${metadata.parentSpec}`);
 	}
-	if (metadata?.task) {
-		metadataLines.push(`- task: ${metadata.task}`);
+	for (const task of explicitTaskSummaries(metadata)) {
+		metadataLines.push(`- task: ${task}`);
 	}
 	const metadataSection =
 		metadataLines.length > 0
 			? ["", "## Native command metadata", ...metadataLines]
 			: [];
-	const planTask = planTaskFromMetadata(metadata);
+	const taskSummaries = taskSummariesFromMetadata(metadata);
+	const planTaskLines = taskSummaries.map(
+		(task, index) => `- T-${twoDigits(index + 1)}: ${task}`,
+	);
+	const stateBoardRows = taskSummaries.map(
+		(task, index) =>
+			`| T-${twoDigits(index + 1)} | pending | worker | ${escapeTaskNote(task)} |`,
+	);
 
 	atomicWriteText(
 		paths.planPath,
@@ -385,7 +406,7 @@ export function newWorkstream(
 			"",
 			"## Execution Plan",
 			"",
-			`- T-01: ${planTask}`,
+			...planTaskLines,
 			"- Keep edits scoped to the task and repository rules.",
 			"- Record evidence before marking the task done.",
 			"",
@@ -396,7 +417,7 @@ export function newWorkstream(
 			"",
 			"## Closure Criteria",
 			"",
-			"- T-01 is marked done only after passed evidence exists.",
+			"- Every task is marked done only after passed evidence exists.",
 			"- Delivery notes identify the changed files and verification result.",
 			"",
 		].join("\n"),
@@ -410,7 +431,7 @@ export function newWorkstream(
 			"",
 			"| Task | State | Owner | Notes |",
 			"|------|-------|-------|-------|",
-			`| T-01 | pending | worker | ${taskNoteFromMetadata(metadata)} |`,
+			...stateBoardRows,
 			"",
 		].join("\n"),
 	);
