@@ -27,7 +27,7 @@
 		"test:ci": "AGENT=1 bun test --concurrent --max-concurrency 4 --bail=1",
 		"coverage": "bun test --coverage --coverage-reporter=text",
 		"coverage:check": "bun run cli/dev/coverage-check.ts",
-		"coverage:project-benchmarks": "bun run cli/dev/coverage-check.ts --include cli/commands/project-benchmark.ts --include cli/services/project-benchmark cli/tests/project-benchmark-command.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts",
+		"coverage:project-benchmarks": "bun run cli/dev/coverage-check.ts --include cli/commands/project-benchmark.ts --include cli/services/project-benchmark cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts",
 		"validate": "bun run typecheck && bun test",
 		"typecheck:ts7:informative": "if bunx --bun -p typescript@next tsc --noEmit --project tsconfig.json; then exit 0; else echo 'TypeScript 7 lane not available or not safe to run locally'; fi",
 		"validate:template": "bun run template:generate && bun test cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts",
@@ -47,7 +47,7 @@
 		"security:scan:release": "bun run security:deps:release && bun run security:secrets:release",
 		"validate:security:required": "bun run security:scan:required",
 		"validate:security:release": "bun run security:scan:release",
-		"validate:project-benchmarks": "bun run coverage:project-benchmarks && bun run kernel -- pb validate --json",
+		"validate:project-benchmarks": "bun run coverage:project-benchmarks && bun run kernel -- pb validate --strict --json && bun run kernel -- pb generate --check --json",
 		"validate:release": "bun run validate:toolchain && bun run validate:template && bun run validate:bootstrap && bun run validate:project-benchmarks && bun run coverage:check && bun run build:deterministic && bun run smoke:dist && bun run validate:security:release && bun run release:provenance:release",
 		"release:provenance": "bun run cli/dev/release-provenance.ts",
 		"release:provenance:release": "bun run cli/dev/release-provenance.ts --release",
@@ -65,5 +65,9 @@
 		"oxlint": "^1.67.0",
 		"typescript": "^6.0.3",
 		"valibot": "^1.4.1"
+	},
+	"knip": {
+		"ignoreBinaries": ["biome", "knip", "oxlint", "tsc"],
+		"ignoreDependencies": ["@biomejs/biome", "oxlint"]
 	}
 }

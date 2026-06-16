@@ -28,6 +28,7 @@
     },
     "similarity_axes": {
       "type": "object",
+      "minProperties": 1,
       "additionalProperties": {
         "type": "object",
         "required": ["score", "evidence_refs"],

@@ -326,9 +326,17 @@ describe("kernel front-door", () => {
 			expect(generate.status).toBe(0);
 			const generatePayload = JSON.parse(generate.stdout as string) as {
 				action: string;
-				data: { files: Array<{ path: string }> };
+				data: {
+					mode: string;
+					ok: boolean;
+					files: Array<{ path: string }>;
+					changed_files: Array<{ path: string }>;
+				};
 			};
 			expect(generatePayload.action).toBe("project-benchmark.generate");
+			expect(generatePayload.data.mode).toBe("write");
+			expect(generatePayload.data.ok).toBe(true);
+			expect(generatePayload.data.changed_files).toHaveLength(4);
 			expect(
 				generatePayload.data.files.some((file) =>
 					file.path.endsWith("similarity-matrix.json"),
@@ -339,6 +347,96 @@ describe("kernel front-door", () => {
 					join(root, ".afol", "data", "project-benchmarks", "index.json"),
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project-benchmark generate honors approval gate while allowing check for restricted callers", () => {
+		const root = mkProjectRoot("project-benchmark-agent", "");
+		try {
+			writeProjectBenchmarkCatalog(root);
+
+			const denied = runKernel(root, ["--agent", "pb", "generate", "--json"]);
+			expect(denied.status).toBe(2);
+			const deniedPayload = JSON.parse(denied.stdout as string) as {
+				ok: boolean;
+				error: { code: string };
+			};
+			expect(deniedPayload.ok).toBe(false);
+			expect(deniedPayload.error.code).toBe("approval-required");
+
+			const remoteDenied = runKernel(root, [
+				"--remote",
+				"pb",
+				"generate",
+				"--json",
+			]);
+			expect(remoteDenied.status).toBe(2);
+			const remoteDeniedPayload = JSON.parse(remoteDenied.stdout as string) as {
+				ok: boolean;
+				error: { code: string };
+			};
+			expect(remoteDeniedPayload.ok).toBe(false);
+			expect(remoteDeniedPayload.error.code).toBe("approval-required");
+
+			const staleCheck = runKernel(root, [
+				"--agent",
+				"pb",
+				"generate",
+				"--check",
+				"--json",
+			]);
+			expect(staleCheck.status).toBe(1);
+			const staleCheckPayload = JSON.parse(staleCheck.stdout as string) as {
+				ok: boolean;
+				error: { code: string };
+				data: { mode: string; ok: boolean; changed_files: unknown[] };
+			};
+			expect(staleCheckPayload.ok).toBe(false);
+			expect(staleCheckPayload.error.code).toBe("generated-output-stale");
+			expect(staleCheckPayload.data.mode).toBe("check");
+			expect(staleCheckPayload.data.ok).toBe(false);
+			expect(staleCheckPayload.data.changed_files).toHaveLength(4);
+
+			const generated = runKernel(root, ["pb", "generate", "--json"]);
+			expect(generated.status).toBe(0);
+
+			const cleanCheck = runKernel(root, [
+				"--agent",
+				"pb",
+				"generate",
+				"--check",
+				"--json",
+			]);
+			expect(cleanCheck.status).toBe(0);
+			const cleanCheckPayload = JSON.parse(cleanCheck.stdout as string) as {
+				ok: boolean;
+				data: { mode: string; ok: boolean; changed_files: unknown[] };
+			};
+			expect(cleanCheckPayload.ok).toBe(true);
+			expect(cleanCheckPayload.data.mode).toBe("check");
+			expect(cleanCheckPayload.data.ok).toBe(true);
+			expect(cleanCheckPayload.data.changed_files).toHaveLength(0);
+
+			const remoteCleanCheck = runKernel(root, [
+				"--remote",
+				"pb",
+				"generate",
+				"--check",
+				"--json",
+			]);
+			expect(remoteCleanCheck.status).toBe(0);
+			const remoteCleanCheckPayload = JSON.parse(
+				remoteCleanCheck.stdout as string,
+			) as {
+				ok: boolean;
+				data: { mode: string; ok: boolean; changed_files: unknown[] };
+			};
+			expect(remoteCleanCheckPayload.ok).toBe(true);
+			expect(remoteCleanCheckPayload.data.mode).toBe("check");
+			expect(remoteCleanCheckPayload.data.ok).toBe(true);
+			expect(remoteCleanCheckPayload.data.changed_files).toHaveLength(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

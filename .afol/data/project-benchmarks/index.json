@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "generated_by": "afol pb generate",
-  "generated_at": "2026-06-16T17:14:51.491Z",
+  "generated_at": "2026-06-16T18:18:54.948Z",
   "project_count": 5,
   "projects": [
     {
@@ -11,6 +11,9 @@
       "status": "active",
       "confidence": "high",
       "score": 90,
+      "overall_score": 45,
+      "focused_score": 90,
+      "coverage_weight": 50,
       "stale": false,
       "axis_count": 4,
       "axes": {
@@ -21,12 +24,33 @@
       }
     },
     {
+      "id": "aider",
+      "name": "Aider",
+      "category": "direct_comparable",
+      "status": "active",
+      "confidence": "high",
+      "score": 67,
+      "overall_score": 30,
+      "focused_score": 67,
+      "coverage_weight": 45,
+      "stale": false,
+      "axis_count": 3,
+      "axes": {
+        "repo_context_map": 5,
+        "safe_mutation": 3,
+        "agent_task_lifecycle": 2
+      }
+    },
+    {
       "id": "roo-code",
       "name": "Roo Code",
       "category": "direct_comparable",
       "status": "active",
       "confidence": "high",
       "score": 80,
+      "overall_score": 28,
+      "focused_score": 80,
+      "coverage_weight": 35,
       "stale": false,
       "axis_count": 3,
       "axes": {
@@ -42,6 +66,9 @@
       "status": "active",
       "confidence": "high",
       "score": 73,
+      "overall_score": 22,
+      "focused_score": 73,
+      "coverage_weight": 30,
       "stale": false,
       "axis_count": 3,
       "axes": {
@@ -51,27 +78,15 @@
       }
     },
     {
-      "id": "aider",
-      "name": "Aider",
-      "category": "direct_comparable",
-      "status": "active",
-      "confidence": "high",
-      "score": 67,
-      "stale": false,
-      "axis_count": 3,
-      "axes": {
-        "repo_context_map": 5,
-        "safe_mutation": 3,
-        "agent_task_lifecycle": 2
-      }
-    },
-    {
       "id": "codex-agents-md",
       "name": "Codex AGENTS.md",
       "category": "adjacent_reference",
       "status": "active",
       "confidence": "high",
       "score": 60,
+      "overall_score": 21,
+      "focused_score": 60,
+      "coverage_weight": 35,
       "stale": false,
       "axis_count": 3,
       "axes": {

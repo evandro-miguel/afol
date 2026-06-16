@@ -98,7 +98,23 @@ export type ProjectBenchmarkScore = {
 	status: string;
 	confidence: string;
 	score: number;
+	overall_score: number;
+	focused_score: number;
+	coverage_weight: number;
 	stale: boolean;
 	axis_count: number;
 	axes: Record<string, number>;
+};
+
+export type ProjectBenchmarkRecommendation = {
+	id: string;
+	name: string;
+	axis_score: number;
+	recommendation_score: number;
+	confidence: ProjectBenchmarkProject["confidence"];
+	source_access: ProjectBenchmarkProject["source_access"];
+	category: ProjectBenchmarkProject["category"];
+	stale: boolean;
+	warnings: string[];
+	lesson: string | null;
 };

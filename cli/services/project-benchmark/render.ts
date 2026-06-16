@@ -2,6 +2,7 @@ import type { ProjectBenchmarkGeneratedFile } from "./generate";
 import type {
 	ProjectBenchmarkAxesFile,
 	ProjectBenchmarkProject,
+	ProjectBenchmarkRecommendation,
 	ProjectBenchmarkScore,
 } from "./types";
 import type { ProjectBenchmarkValidationResult } from "./validate";
@@ -13,7 +14,7 @@ export function formatProjectBenchmarkList(
 		`project-benchmark: ${scores.length} projects`,
 		...scores.map(
 			(project) =>
-				`${project.id.padEnd(18)} score=${project.score} category=${project.category} status=${project.status} stale=${project.stale}`,
+				`${project.id.padEnd(18)} overall=${project.overall_score} focused=${project.focused_score} axes=${project.axis_count} category=${project.category} status=${project.status} stale=${project.stale}`,
 		),
 	].join("\n");
 }
@@ -32,7 +33,7 @@ export function formatProjectBenchmarkShow(
 		.map((lesson) => `- ${lesson.axis}: ${lesson.lesson}`);
 	return [
 		`${project.id}: ${project.name}`,
-		`score=${score.score} category=${project.category} status=${project.status} confidence=${project.confidence} stale=${score.stale}`,
+		`overall=${score.overall_score} focused=${score.focused_score} coverage_weight=${score.coverage_weight} category=${project.category} status=${project.status} confidence=${project.confidence} stale=${score.stale}`,
 		`axes: ${topAxes || "none"}`,
 		`sources: ${project.source_refs.length}`,
 		"lessons:",
@@ -42,37 +43,28 @@ export function formatProjectBenchmarkShow(
 
 export function formatProjectBenchmarkMatrix(
 	scores: ProjectBenchmarkScore[],
+	axis?: string,
 ): string {
 	return [
-		`project-benchmark matrix: ${scores.length} projects`,
+		axis
+			? `project-benchmark matrix: ${scores.length} projects axis=${axis}`
+			: `project-benchmark matrix: ${scores.length} projects`,
 		...scores.map((project) => {
-			const axes = Object.entries(project.axes)
-				.map(([axis, value]) => `${axis}:${value}`)
-				.join(",");
-			return `${project.id} score=${project.score} axes=${axes}`;
+			const axes = axis
+				? `${axis}:${project.axes[axis] ?? 0}`
+				: Object.entries(project.axes)
+						.map(([axisId, value]) => `${axisId}:${value}`)
+						.join(",");
+			return `${project.id} overall=${project.overall_score} focused=${project.focused_score} axes=${axes}`;
 		}),
 	].join("\n");
 }
 
 export function formatProjectBenchmarkRecommend(
 	axis: string,
-	projects: ProjectBenchmarkProject[],
+	references: ProjectBenchmarkRecommendation[],
 	axes: ProjectBenchmarkAxesFile,
 ): string {
-	const references = projects
-		.map((project) => ({
-			project,
-			score: project.similarity_axes[axis]?.score ?? 0,
-			lesson: project.lessons_for_afol.find((entry) => entry.axis === axis)
-				?.lesson,
-		}))
-		.filter((entry) => entry.score > 0)
-		.sort(
-			(left, right) =>
-				right.score - left.score ||
-				left.project.id.localeCompare(right.project.id),
-		)
-		.slice(0, 5);
 	const recommendations = references
 		.map((entry) => entry.lesson)
 		.filter((lesson): lesson is string => Boolean(lesson));
@@ -80,10 +72,13 @@ export function formatProjectBenchmarkRecommend(
 		`axis: ${axis}`,
 		`description: ${axes.axes[axis]?.description ?? "unknown"}`,
 		"top references:",
-		...references.map(
-			(entry) =>
-				`- ${entry.project.id}: score=${entry.score}${entry.lesson ? ` - ${entry.lesson}` : ""}`,
-		),
+		...references.map((entry) => {
+			const warningText =
+				entry.warnings.length > 0
+					? ` warnings=${entry.warnings.join(",")}`
+					: "";
+			return `- ${entry.id}: recommendation=${entry.recommendation_score} axis_score=${entry.axis_score} confidence=${entry.confidence} source=${entry.source_access} category=${entry.category} stale=${entry.stale}${warningText}${entry.lesson ? ` - ${entry.lesson}` : ""}`;
+		}),
 		"recommendations:",
 		...(recommendations.length > 0
 			? recommendations.slice(0, 5).map((lesson) => `- ${lesson}`)
@@ -100,7 +95,6 @@ export function formatProjectBenchmarkValidation(
 	return [
 		`project-benchmark validate: failed errors=${result.error_count} warnings=${result.warning_count}`,
 		...result.issues
-			.filter((issue) => issue.severity === "error")
 			.slice(0, 12)
 			.map(
 				(issue) =>
