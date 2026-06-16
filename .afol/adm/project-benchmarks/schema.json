@@ -90,7 +90,7 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "title", "url", "source_type", "claim"],
+        "required": ["id", "title", "url", "source_type", "claim", "axes"],
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "title": { "type": "string", "minLength": 1 },
@@ -99,7 +99,12 @@
             "type": "string",
             "enum": ["official_doc", "official_repo", "spec", "paper", "article"]
           },
-          "claim": { "type": "string", "minLength": 1 }
+          "claim": { "type": "string", "minLength": 1 },
+          "axes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
         },
         "additionalProperties": false
       }

@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname } from "node:path";
+import { findProjectBenchmarkMisplacedOutputs } from "./generate";
 import { isProjectBenchmarkStale } from "./scoring";
 import {
 	PROJECT_BENCHMARK_SCHEMA_VERSION,
@@ -294,59 +294,23 @@ function validateProjectShape(
 	return project;
 }
 
-function hasProjectBenchmarkGeneratedMarker(path: string): boolean {
-	if (!path.endsWith(".json")) {
-		return false;
-	}
-	try {
-		const value = JSON.parse(readFileSync(path, "utf8")) as unknown;
-		if (!isRecord(value)) {
-			return false;
-		}
-		return (
-			value.generated_by === "afol pb generate" ||
-			(typeof value.command === "string" &&
-				value.command.startsWith("project-benchmark."))
-		);
-	} catch {
-		return false;
-	}
-}
-
 function validateRuntimeBenchmarkSeparation(
 	catalog: ProjectBenchmarkCatalog,
 	issues: ProjectBenchmarkIssue[],
 ): void {
-	const runtimeDir = catalog.paths.runtimeBenchmarkCatalogDir;
-	if (!existsSync(runtimeDir)) {
-		return;
+	const projectRoot = dirname(dirname(dirname(catalog.paths.admDir)));
+	for (const file of findProjectBenchmarkMisplacedOutputs(projectRoot, {
+		catalogDir: catalog.paths.admDir,
+		runtimeBenchmarkCatalogDir: catalog.paths.runtimeBenchmarkCatalogDir,
+	})) {
+		push(
+			issues,
+			"error",
+			"runtime-benchmark-catalog-contamination",
+			file.path,
+			"project-benchmark generated output cannot live outside .afol/data/project-benchmarks",
+		);
 	}
-	const scan = (dir: string, relativeParts: string[]): void => {
-		for (const entry of readdirSync(dir, { withFileTypes: true })) {
-			const entryPath = join(dir, entry.name);
-			const relativePath = join(
-				".afol/data/benchmarks/catalog",
-				...relativeParts,
-				entry.name,
-			);
-			const looksLikeProjectBenchmark =
-				/^project-benchmarks?(\.json)?$/.test(entry.name) ||
-				hasProjectBenchmarkGeneratedMarker(entryPath);
-			if (looksLikeProjectBenchmark) {
-				push(
-					issues,
-					"error",
-					"runtime-benchmark-catalog-contamination",
-					relativePath,
-					"project-benchmark data cannot live under runtime benchmark catalog",
-				);
-			}
-			if (entry.isDirectory()) {
-				scan(entryPath, [...relativeParts, entry.name]);
-			}
-		}
-	};
-	scan(runtimeDir, []);
 }
 
 function validateSourceRefEnums(
