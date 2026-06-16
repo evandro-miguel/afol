@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T17:47:40-03:00'
-updated_at: '2026-06-12T17:47:40-03:00'
+updated_at: '2026-06-16T00:00:00-03:00'
 roadmap_feature: F-18
 roadmap_slice: F-18.S9
 spec_role: child
@@ -15,9 +15,9 @@ links:
   roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
   parent: .afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md
   related:
-  - docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md
-  - docs/arc/SPECS/260612_context-routing-bundles-and-section-index_spec-child_01.md
-  - docs/arc/SPECS/260612_temporal-health-freshness-token-budget_spec-child_01.md
+  - .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md
+  - .afol/adm/specs/260612_context-routing-bundles-and-section-index_spec-child_01.md
+  - .afol/adm/specs/260612_temporal-health-freshness-token-budget_spec-child_01.md
 scope:
   repo_areas:
   - .afol/adm/schema
@@ -64,6 +64,8 @@ Adopt:
 - Resolver-based routing for rules, skills, tools, adm, pstr, memory, and
   library.
 - Trust boundary between local, agent, and remote callers.
+- Temporal Reliability v1 as the first safety slice before deeper graph,
+  daemon, embedding, or schema-evolution work.
 
 Do not adopt in MVP:
 
@@ -232,6 +234,9 @@ Policy:
 - Sweep commands generate maintenance findings without requiring a daemon.
 - Doctor can return scores and an ordered remediation plan.
 - OperationContext trust policy gates sensitive mutation.
+- Temporal Reliability v1 is complete before tokenmax expansion, deeper graph
+  traversal, embeddings, or physical archive moves are treated as implementation
+  dependencies.
 
 ## 9) Non-goals
 

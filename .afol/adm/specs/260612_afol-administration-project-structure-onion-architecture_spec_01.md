@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T13:37:19-03:00'
-updated_at: '2026-06-12T17:47:40-03:00'
+updated_at: '2026-06-16T00:00:00-03:00'
 roadmap_feature: F-18
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -43,11 +43,10 @@ risk_level: high
 
 ## 2) Problem
 
-The current project direction lives under `docs/arc/**`, while mutable AFOL
-runtime state already lives under `.afol/**`. That split was useful during the
-transition from the legacy `.agents` runtime, but it now creates a weak
-boundary: project administration is outside the AFOL-owned project-local state
-tree, and current-state maps have no clear target location.
+Project direction now lives under `.afol/adm/**`, while current project maps
+live under `.afol/pstr/**`. The prior `docs/arc/**` surface is a frozen
+transitional archive, not active authority. This closes the weak boundary where
+administration, runtime state, and maps could drift across unrelated trees.
 
 Without a firmer architecture, later work can accidentally create many parallel
 sources of truth: Markdown, JSON, SQLite, memory, library, specs, session state,
@@ -64,15 +63,12 @@ Primary users:
 
 User journey:
 
-1. A maintainer changes doctrine, roadmap, specs, or ADRs under the current
-   administration surface.
-2. AFOL treats `docs/arc/**` as canonical until migration commands exist.
-3. The migration creates `.afol/adm/**` with manifesto, architecture, roadmap,
-   specs, ADRs, changelog, archive, and policy.
-4. AFOL creates `.afol/pstr/**` for current project-structure maps.
-5. AFOL hydrates canonical Markdown/YAML into `.afol/state/afol.db`.
-6. AFOL validates source hashes, managed projections, indexes, and drift.
-7. AFOL refuses stale maps, stale materialization, stale memory, or stale
+1. A maintainer changes doctrine, roadmap, specs, or ADRs under `.afol/adm/**`.
+2. AFOL treats `docs/arc/**` as archive-only history.
+3. AFOL maintains `.afol/pstr/**` for current project-structure maps.
+4. AFOL hydrates canonical Markdown/YAML into `.afol/state/afol.db`.
+5. AFOL validates source hashes, managed projections, indexes, and drift.
+6. AFOL refuses stale maps, stale materialization, stale memory, or stale
    library claims as trusted context unless the command explicitly allows a
    warning-only mode.
 
@@ -149,11 +145,10 @@ Spec/ADR in .afol/adm > Workbench > Evidence ledger > Library > Memory >
 SQLite materialization > Chat
 ```
 
-Current transitional authority:
+Archived transitional authority:
 
 ```text
-Spec/ADR in docs/arc > Workbench > Evidence ledger > Library > Memory >
-SQLite/materialized indexes > Chat
+docs/arc is historical evidence only and does not outrank .afol/adm.
 ```
 
 Evidence exception:
@@ -286,7 +281,7 @@ wb:260612_1400/T-01
 In scope:
 
 - Define `.afol/adm/**` and `.afol/pstr/**` as target surfaces.
-- Keep `docs/arc/**` canonical until migration commands exist.
+- Keep `docs/arc/**` as frozen transitional archive.
 - Define the onion architecture and authority hierarchy.
 - Define SQLite as rebuildable execution materialization.
 - Separate memory from library.
@@ -305,7 +300,7 @@ In scope:
 
 Out of scope:
 
-- Physically moving `docs/arc/**` in this slice.
+- Reviving `docs/arc/**` as active authority.
 - Implementing SQLite, memory, library, IWE, or context commands in this slice.
 - Letting providers mutate `.afol/adm`, `.afol/wb`, `.afol/state`, or evidence
   directly.
@@ -315,9 +310,10 @@ Out of scope:
 
 Assumptions:
 
-- Existing docs and tests still refer to `docs/arc/**`.
-- Migration must be command-managed, reversible where feasible, and validated by
-  source hashes and indexes.
+- Some historical docs and tests may still mention `docs/arc/**`; current F-18
+  direction and new implementation work must point to `.afol/adm/**`.
+- Any remaining migration or archive handling must be command-managed,
+  reversible where feasible, and validated by source hashes and indexes.
 
 Constraints:
 
@@ -362,6 +358,9 @@ Constraints:
 - AFOL shape pack and resolver are documented as target routing contracts.
 - Context bundles support think-lite explain output with why, gaps, freshness,
   evidence tags, create-safety hints, and do-not-load.
+- Temporal Reliability v1 is the immediate implementation slice for explicit
+  path config, pstr stale reporting, trusted-context stale gates,
+  state/library/memory health, and maintenance dry-run reports.
 - ADR records the supersession of the narrow JSON-source direction.
 - Follow-on slices are named without implementing across layers at once.
 
@@ -370,19 +369,22 @@ Constraints:
 Rollout approach:
 
 1. Document architecture and authority boundaries.
-2. Add migration spec/commands for `.afol/adm` and `.afol/pstr`.
+2. Keep `.afol/adm` and `.afol/pstr` as active F-18 authority and map
+   surfaces.
 3. Add SQLite foundation under `.afol/state/`.
 4. Add hydration/projection/drift checks.
 5. Add memory, library, context bundles, spec gates, and cleanup commands in
    separate slices.
-6. Add temporal health, freshness, maintenance, archive, and token-budget checks
-   as a separate slice.
-7. Add brain-shape, retrieval, doctor, resolver, and trust-boundary behavior as
-   a separate slice.
+6. Add Temporal Reliability v1: explicit path config, pstr stale reporting,
+   trusted-context stale gates, state/library/memory health, and maintenance
+   dry-run reports.
+7. Add deeper brain-shape retrieval, doctor remediation, resolver, and
+   trust-boundary behavior as separate follow-on slices.
 
 Backout or deferral:
 
-- If `.afol/adm` migration is deferred, `docs/arc/**` remains canonical.
+- If an old `docs/arc/**` artifact is still needed, link it from `.afol/adm/**`
+  as archive evidence instead of restoring it as authority.
 - If SQLite is deferred, JSON indexes remain rebuildable caches, not authority.
 - If IWE is deferred, library uses native parser/search.
 
