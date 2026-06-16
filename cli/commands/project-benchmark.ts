@@ -10,7 +10,10 @@ import {
 	requiresApproval,
 } from "../core/operation-context";
 import { loadProjectBenchmarkCatalog } from "../services/project-benchmark/catalog";
-import { generateProjectBenchmarkOutputs } from "../services/project-benchmark/generate";
+import {
+	findProjectBenchmarkMisplacedOutputs,
+	generateProjectBenchmarkOutputs,
+} from "../services/project-benchmark/generate";
 import { buildProjectBenchmarkMatrix } from "../services/project-benchmark/matrix";
 import {
 	formatProjectBenchmarkGeneration,
@@ -145,13 +148,103 @@ function findProjectByIdOrName(
 	);
 }
 
-function requireValidCatalog(projectRoot: string): {
+function inferMissingSourceRefAxes(
+	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
+): ReturnType<typeof loadProjectBenchmarkCatalog> {
+	for (const entry of catalog.projects) {
+		const project = entry.project as Record<string, unknown>;
+		const sourceRefs = Array.isArray(project.source_refs)
+			? project.source_refs
+			: [];
+		const inferred = new Map<string, Set<string>>();
+		const addAxis = (sourceId: unknown, axisId: unknown): void => {
+			if (typeof sourceId !== "string" || typeof axisId !== "string") {
+				return;
+			}
+			const supportedAxes = inferred.get(sourceId) ?? new Set<string>();
+			supportedAxes.add(axisId);
+			inferred.set(sourceId, supportedAxes);
+		};
+
+		const similarityAxes =
+			project.similarity_axes &&
+			typeof project.similarity_axes === "object" &&
+			!Array.isArray(project.similarity_axes)
+				? (project.similarity_axes as Record<string, unknown>)
+				: {};
+		for (const [axisId, scoreValue] of Object.entries(similarityAxes)) {
+			const evidenceRefs =
+				scoreValue && typeof scoreValue === "object" && !Array.isArray(scoreValue)
+					? (scoreValue as { evidence_refs?: unknown }).evidence_refs
+					: [];
+			if (!Array.isArray(evidenceRefs)) {
+				continue;
+			}
+			for (const evidenceRef of evidenceRefs) {
+				addAxis(evidenceRef, axisId);
+			}
+		}
+
+		const similarities = Array.isArray(project.similarities)
+			? project.similarities
+			: [];
+		for (const similarityValue of similarities) {
+			if (
+				!similarityValue ||
+				typeof similarityValue !== "object" ||
+				Array.isArray(similarityValue)
+			) {
+				continue;
+			}
+			const similarity = similarityValue as {
+				axis?: unknown;
+				evidence_refs?: unknown;
+			};
+			if (!Array.isArray(similarity.evidence_refs)) {
+				continue;
+			}
+			for (const evidenceRef of similarity.evidence_refs) {
+				addAxis(evidenceRef, similarity.axis);
+			}
+		}
+
+		for (const sourceRefValue of sourceRefs) {
+			if (
+				!sourceRefValue ||
+				typeof sourceRefValue !== "object" ||
+				Array.isArray(sourceRefValue)
+			) {
+				continue;
+			}
+			const sourceRef = sourceRefValue as {
+				id?: unknown;
+				axes?: unknown;
+			};
+			if (
+				Array.isArray(sourceRef.axes) &&
+				sourceRef.axes.some((axis) => typeof axis === "string" && axis.length > 0)
+			) {
+				continue;
+			}
+			const inferredAxes = inferred.get(sourceRef.id as string);
+			if (!inferredAxes || inferredAxes.size === 0) {
+				continue;
+			}
+			sourceRef.axes = [...inferredAxes].sort((left, right) =>
+				left.localeCompare(right),
+			);
+		}
+	}
+
+	return catalog;
+}
+
+function requireValidCatalog(catalog: ReturnType<typeof loadProjectBenchmarkCatalog>): {
 	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>;
 	axes: ProjectBenchmarkAxesFile;
 	projects: ProjectBenchmarkProject[];
 	validation: ReturnType<typeof validateProjectBenchmarkCatalog>;
 } {
-	const catalog = loadProjectBenchmarkCatalog(projectRoot);
 	const validation = validateProjectBenchmarkCatalog(catalog);
 	if (!catalog.axes) {
 		throw new ProjectBenchmarkCatalogError(
@@ -171,6 +264,20 @@ function requireValidCatalog(projectRoot: string): {
 		projects: projectList(catalog.projects.map((entry) => entry.project)),
 		validation,
 	};
+}
+
+function isProjectBenchmarkCatalogUnavailable(
+	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
+): boolean {
+	const codes = new Set(catalog.loadIssues.map((issue) => issue.code));
+	return (
+		catalog.axes === null &&
+		catalog.projects.length === 0 &&
+		catalog.loadIssues.length === 3 &&
+		codes.has("missing-axes") &&
+		codes.has("missing-schema") &&
+		codes.has("missing-projects-dir")
+	);
 }
 
 function writeJson(
@@ -208,6 +315,9 @@ function writeGenerateJson(
 	data: Record<string, unknown>,
 	ok: boolean,
 ): void {
+	const misplacedFiles = Array.isArray(data.misplaced_files)
+		? data.misplaced_files
+		: [];
 	const envelope: ResultEnvelope<Record<string, unknown>> = {
 		schema: "afol.result/v1",
 		ok,
@@ -217,11 +327,68 @@ function writeGenerateJson(
 	};
 	if (!ok) {
 		envelope.error = {
-			code: "generated-output-stale",
-			message: "project-benchmark generated outputs are out of date",
+			code:
+				misplacedFiles.length > 0
+					? "generated-output-misplaced"
+					: "generated-output-stale",
+			message:
+				misplacedFiles.length > 0
+					? "project-benchmark generated outputs are outside .afol/data/project-benchmarks"
+					: "project-benchmark generated outputs are out of date",
 		};
 	}
 	io.stdout(stringifyEnvelope(envelope));
+}
+
+function writeUnavailableError(
+	io: CommandIo,
+	action: string,
+	projectRoot: string,
+	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
+	json: boolean,
+): void {
+	const message = "project-benchmark catalog is not installed in this repo";
+	if (json) {
+		writeActionError(
+			io,
+			action,
+			"project-benchmark-not-available",
+			message,
+			1,
+			{
+				catalog_dir: catalog.paths.admDir.replace(`${projectRoot}/`, ""),
+			},
+		);
+		return;
+	}
+	io.stderr(
+		`err project-benchmark-not-available catalog=${catalog.paths.admDir.replace(
+			`${projectRoot}/`,
+			"",
+		)}`,
+	);
+}
+
+function projectBenchmarkGenerateFailureData(
+	projectRoot: string,
+	dataDir: string,
+	check: boolean,
+	misplacedFiles: ReturnType<typeof findProjectBenchmarkMisplacedOutputs>,
+	projectCount: number,
+): Record<string, unknown> {
+	return {
+		schema_version: "1.0.0",
+		command: "project-benchmark.generate",
+		generated_by: "afol pb generate",
+		mode: check ? "check" : "write",
+		ok: false,
+		generated_at: new Date().toISOString(),
+		data_dir: dataDir.replace(`${projectRoot}/`, ""),
+		files: [],
+		changed_files: [],
+		misplaced_files: misplacedFiles,
+		project_count: projectCount,
+	};
 }
 
 function writeActionError(
@@ -266,9 +433,16 @@ export async function runProjectBenchmarkCommand(
 		return 2;
 	}
 
+	const sourceCatalog = inferMissingSourceRefAxes(
+		loadProjectBenchmarkCatalog(projectRoot),
+	);
+	if (isProjectBenchmarkCatalogUnavailable(sourceCatalog)) {
+		writeUnavailableError(io, action, projectRoot, sourceCatalog, parsed.json);
+		return 1;
+	}
+
 	if (action === "validate") {
-		const catalog = loadProjectBenchmarkCatalog(projectRoot);
-		const validation = validateProjectBenchmarkCatalog(catalog);
+		const validation = validateProjectBenchmarkCatalog(sourceCatalog);
 		const ok =
 			validation.ok && (!parsed.strict || validation.warning_count === 0);
 		const data = {
@@ -304,9 +478,57 @@ export async function runProjectBenchmarkCommand(
 		return ok ? 0 : 1;
 	}
 
+	if (action === "generate") {
+		if (!parsed.check && requiresApproval(ctx)) {
+			const message =
+				"project-benchmark generate requires local interactive approval";
+			if (parsed.json) {
+				writeActionError(io, action, "approval-required", message, 2);
+			} else {
+				io.stderr(`err approval-required ${message}`);
+			}
+			return 2;
+		}
+
+		const misplacedFiles = findProjectBenchmarkMisplacedOutputs(projectRoot, {
+			catalogDir: sourceCatalog.paths.admDir,
+			runtimeBenchmarkCatalogDir: sourceCatalog.paths.runtimeBenchmarkCatalogDir,
+		});
+		if (misplacedFiles.length > 0) {
+			if (parsed.json) {
+				writeGenerateJson(
+					io,
+					projectBenchmarkGenerateFailureData(
+						projectRoot,
+						sourceCatalog.paths.dataDir,
+						parsed.check,
+						misplacedFiles,
+						sourceCatalog.projects.length,
+					),
+					false,
+				);
+			} else if (parsed.check) {
+				io.stdout(
+					[
+						`project-benchmark generate: check failed misplaced=${misplacedFiles.length}`,
+						...misplacedFiles.map((file) => `${file.location}: ${file.path}`),
+					].join("\n"),
+				);
+			} else {
+				io.stderr(
+					[
+						`err generated-output-misplaced count=${misplacedFiles.length}`,
+						...misplacedFiles.map((file) => `${file.location}: ${file.path}`),
+					].join("\n"),
+				);
+			}
+			return 1;
+		}
+	}
+
 	let catalog: ReturnType<typeof requireValidCatalog>;
 	try {
-		catalog = requireValidCatalog(projectRoot);
+		catalog = requireValidCatalog(sourceCatalog);
 	} catch (error) {
 		const message = (error as Error).message;
 		const issues =
@@ -420,26 +642,21 @@ export async function runProjectBenchmarkCommand(
 	}
 
 	if (action === "generate") {
-		if (!parsed.check && requiresApproval(ctx)) {
-			const message =
-				"project-benchmark generate requires local interactive approval";
-			if (parsed.json) {
-				writeActionError(io, action, "approval-required", message, 2);
-			} else {
-				io.stderr(`err approval-required ${message}`);
-			}
-			return 2;
-		}
 		const result = generateProjectBenchmarkOutputs(
 			projectRoot,
-			catalog.catalog.paths.dataDir,
+			{
+				dataDir: catalog.catalog.paths.dataDir,
+				catalogDir: catalog.catalog.paths.admDir,
+				runtimeBenchmarkCatalogDir:
+					catalog.catalog.paths.runtimeBenchmarkCatalogDir,
+			},
 			catalog.projects,
 			catalog.axes,
 			catalog.validation,
 			{ check: parsed.check },
 		);
 		if (parsed.json) {
-			if (parsed.check) {
+			if (parsed.check || !result.ok) {
 				writeGenerateJson(io, result, result.ok);
 			} else {
 				writeJson(io, "project-benchmark.generate", result);
@@ -448,6 +665,15 @@ export async function runProjectBenchmarkCommand(
 			if (result.ok) {
 				io.stdout(
 					`project-benchmark generate: check ok projects=${result.project_count} files=${result.files.length}`,
+				);
+			} else if (result.misplaced_files.length > 0) {
+				io.stdout(
+					[
+						`project-benchmark generate: check failed misplaced=${result.misplaced_files.length}`,
+						...result.misplaced_files.map(
+							(file) => `${file.location}: ${file.path}`,
+						),
+					].join("\n"),
 				);
 			} else {
 				io.stdout(
@@ -458,6 +684,17 @@ export async function runProjectBenchmarkCommand(
 				);
 			}
 		} else {
+			if (!result.ok) {
+				io.stderr(
+					[
+						`err generated-output-misplaced count=${result.misplaced_files.length}`,
+						...result.misplaced_files.map(
+							(file) => `${file.location}: ${file.path}`,
+						),
+					].join("\n"),
+				);
+				return 1;
+			}
 			io.stdout(
 				formatProjectBenchmarkGeneration(result.project_count, result.files),
 			);

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "generated_by": "afol pb generate",
-  "generated_at": "2026-06-16T18:18:54.948Z",
+  "generated_at": "2026-06-16T20:20:52.599Z",
   "project_count": 5,
   "projects": [
     {
@@ -10,35 +10,16 @@
       "category": "direct_comparable",
       "status": "active",
       "confidence": "high",
-      "score": 90,
-      "overall_score": 45,
-      "focused_score": 90,
-      "coverage_weight": 50,
-      "stale": false,
-      "axis_count": 4,
-      "axes": {
-        "agent_task_lifecycle": 5,
-        "safe_mutation": 4,
-        "evals_benchmarks": 5,
-        "multi_agent": 4
-      }
-    },
-    {
-      "id": "aider",
-      "name": "Aider",
-      "category": "direct_comparable",
-      "status": "active",
-      "confidence": "high",
-      "score": 67,
-      "overall_score": 30,
-      "focused_score": 67,
-      "coverage_weight": 45,
+      "score": 93,
+      "overall_score": 37,
+      "focused_score": 93,
+      "coverage_weight": 40,
       "stale": false,
       "axis_count": 3,
       "axes": {
-        "repo_context_map": 5,
-        "safe_mutation": 3,
-        "agent_task_lifecycle": 2
+        "agent_task_lifecycle": 5,
+        "safe_mutation": 4,
+        "evals_benchmarks": 5
       }
     },
     {
@@ -47,16 +28,15 @@
       "category": "direct_comparable",
       "status": "active",
       "confidence": "high",
-      "score": 80,
-      "overall_score": 28,
-      "focused_score": 80,
-      "coverage_weight": 35,
+      "score": 88,
+      "overall_score": 22,
+      "focused_score": 88,
+      "coverage_weight": 25,
       "stale": false,
-      "axis_count": 3,
+      "axis_count": 2,
       "axes": {
         "skills_modes_rules": 5,
-        "safe_mutation": 4,
-        "multi_agent": 3
+        "safe_mutation": 4
       }
     },
     {
@@ -83,16 +63,31 @@
       "category": "adjacent_reference",
       "status": "active",
       "confidence": "high",
-      "score": 60,
-      "overall_score": 21,
-      "focused_score": 60,
-      "coverage_weight": 35,
+      "score": 68,
+      "overall_score": 17,
+      "focused_score": 68,
+      "coverage_weight": 25,
       "stale": false,
-      "axis_count": 3,
+      "axis_count": 2,
       "axes": {
         "skills_modes_rules": 4,
-        "repo_context_map": 3,
-        "local_state": 2
+        "repo_context_map": 3
+      }
+    },
+    {
+      "id": "aider",
+      "name": "Aider",
+      "category": "direct_comparable",
+      "status": "active",
+      "confidence": "high",
+      "score": 100,
+      "overall_score": 15,
+      "focused_score": 100,
+      "coverage_weight": 15,
+      "stale": false,
+      "axis_count": 1,
+      "axes": {
+        "repo_context_map": 5
       }
     }
   ]

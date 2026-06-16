@@ -39,7 +39,14 @@ const SIMILARITY_KEYS = ["axis", "claim", "evidence_refs"] as const;
 const DIFFERENCE_KEYS = ["claim"] as const;
 const LESSON_KEYS = ["axis", "lesson"] as const;
 const DO_NOT_COPY_KEYS = ["reason"] as const;
-const SOURCE_REF_KEYS = ["id", "title", "url", "source_type", "claim"] as const;
+const SOURCE_REF_KEYS = [
+	"id",
+	"title",
+	"url",
+	"source_type",
+	"claim",
+	"axes",
+] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -364,6 +371,15 @@ function validateSourceRefEnums(
 	}
 }
 
+function readSupportedAxes(value: unknown): string[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	return value.filter(
+		(axis): axis is string => typeof axis === "string" && axis.length > 0,
+	);
+}
+
 export function validateProjectBenchmarkCatalog(
 	catalog: ProjectBenchmarkCatalog,
 	now = new Date(),
@@ -453,6 +469,7 @@ export function validateProjectBenchmarkCatalog(
 		}
 
 		const sourceIds = new Set<string>();
+		const sourceAxes = new Map<string, Set<string>>();
 		validateSourceRefEnums(projectSourceRefs, file, issues);
 		for (const sourceValue of projectSourceRefs) {
 			if (!isRecord(sourceValue)) {
@@ -507,6 +524,27 @@ export function validateProjectBenchmarkCatalog(
 					`source_ref missing claim: ${sourceId}`,
 				);
 			}
+			const supportedAxes = readSupportedAxes(sourceValue.axes);
+			if (supportedAxes.length === 0) {
+				push(
+					issues,
+					"error",
+					"missing-source-ref-axes",
+					file,
+					`source_ref missing axes: ${sourceId}`,
+				);
+			}
+			for (const supportedAxis of supportedAxes) {
+				if (!axes[supportedAxis]) {
+					push(
+						issues,
+						"error",
+						"unknown-source-ref-axis",
+						file,
+						`Unknown source_ref axis for ${sourceId}: ${supportedAxis}`,
+					);
+				}
+			}
 			if (typeof sourceValue.id === "string" && sourceValue.id.length > 0) {
 				if (sourceIds.has(sourceValue.id)) {
 					push(
@@ -518,6 +556,7 @@ export function validateProjectBenchmarkCatalog(
 					);
 				} else {
 					sourceIds.add(sourceValue.id);
+					sourceAxes.set(sourceValue.id, new Set(supportedAxes));
 				}
 			}
 		}
@@ -577,6 +616,16 @@ export function validateProjectBenchmarkCatalog(
 						"unknown-evidence-ref",
 						file,
 						`Unknown evidence ref for axis ${axisId}: ${String(ref)}`,
+					);
+					continue;
+				}
+				if (!sourceAxes.get(ref)?.has(axisId)) {
+					push(
+						issues,
+						"error",
+						"unsupported-evidence-axis",
+						file,
+						`Evidence ref ${ref} does not support axis ${axisId}`,
 					);
 				}
 			}

@@ -16,10 +16,6 @@
     "safe_mutation": {
       "score": 4,
       "evidence_refs": ["roo-custom-modes"]
-    },
-    "multi_agent": {
-      "score": 3,
-      "evidence_refs": ["roo-custom-modes"]
     }
   },
   "similarities": [
@@ -55,7 +51,8 @@
       "title": "Roo Code custom modes",
       "url": "https://roocodeinc.github.io/Roo-Code/features/custom-modes/",
       "source_type": "official_doc",
-      "claim": "Roo Code documents custom modes that can specialize behavior and restrict access to files, commands, or tools."
+      "claim": "Roo Code documents custom modes that can specialize behavior and restrict access to files, commands, or tools.",
+      "axes": ["skills_modes_rules", "safe_mutation"]
     }
   ]
 }

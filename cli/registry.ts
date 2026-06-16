@@ -44,6 +44,12 @@ export type CommandSideEffect = "read" | "write" | "append" | "generated";
 
 export type CommandCategory = "core" | "workflow" | "inspect" | "ops";
 
+export type CommandSubcommandSpec = {
+	usage: string;
+	sideEffect: CommandSideEffect;
+	description: string;
+};
+
 export type CommandSpec = {
 	command: string;
 	aliases: readonly string[];
@@ -51,6 +57,7 @@ export type CommandSpec = {
 	sideEffect: CommandSideEffect;
 	description: string;
 	category?: CommandCategory;
+	subcommands?: readonly CommandSubcommandSpec[];
 };
 
 const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
@@ -351,6 +358,43 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "generated",
 		description: "Compare AFOL against curated reference projects",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List scored reference projects",
+			},
+			{
+				usage: "show <project-id>",
+				sideEffect: "read",
+				description: "Inspect one reference project by id or name",
+			},
+			{
+				usage: "matrix --for <axis>",
+				sideEffect: "read",
+				description: "Filter the score matrix by axis; omit --for for the full matrix",
+			},
+			{
+				usage: "recommend --for <axis>",
+				sideEffect: "read",
+				description: "Rank the best reference projects for one axis",
+			},
+			{
+				usage: "validate --strict",
+				sideEffect: "read",
+				description: "Fail validation on warnings; omit --strict for standard validation",
+			},
+			{
+				usage: "generate --check",
+				sideEffect: "read",
+				description: "Check generated outputs without writing files",
+			},
+			{
+				usage: "generate",
+				sideEffect: "generated",
+				description: "Refresh generated outputs with local approval",
+			},
+		],
 	},
 	{
 		command: "catchup",

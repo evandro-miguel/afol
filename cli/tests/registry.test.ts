@@ -112,4 +112,50 @@ describe("kernel registry", () => {
 			expect(entry.description.length).toBeLessThanOrEqual(80);
 		}
 	});
+
+	test("publishes project-benchmark subcommand metadata", () => {
+		const projectBenchmark = kernelRegistry.commands.find(
+			(entry) => entry.command === "project-benchmark",
+		);
+
+		expect(projectBenchmark?.subcommands).toEqual([
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List scored reference projects",
+			},
+			{
+				usage: "show <project-id>",
+				sideEffect: "read",
+				description: "Inspect one reference project by id or name",
+			},
+			{
+				usage: "matrix --for <axis>",
+				sideEffect: "read",
+				description:
+					"Filter the score matrix by axis; omit --for for the full matrix",
+			},
+			{
+				usage: "recommend --for <axis>",
+				sideEffect: "read",
+				description: "Rank the best reference projects for one axis",
+			},
+			{
+				usage: "validate --strict",
+				sideEffect: "read",
+				description:
+					"Fail validation on warnings; omit --strict for standard validation",
+			},
+			{
+				usage: "generate --check",
+				sideEffect: "read",
+				description: "Check generated outputs without writing files",
+			},
+			{
+				usage: "generate",
+				sideEffect: "generated",
+				description: "Refresh generated outputs with local approval",
+			},
+		]);
+	});
 });

@@ -16,6 +16,7 @@ export type ProjectBenchmarkSourceRef = {
 	url: string;
 	source_type: "official_doc" | "official_repo" | "spec" | "paper" | "article";
 	claim: string;
+	axes: string[];
 };
 
 export type ProjectBenchmarkAxisScore = {

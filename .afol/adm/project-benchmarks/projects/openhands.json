@@ -20,10 +20,6 @@
     "evals_benchmarks": {
       "score": 5,
       "evidence_refs": ["openhands-evals"]
-    },
-    "multi_agent": {
-      "score": 4,
-      "evidence_refs": ["openhands-sdk-overview"]
     }
   },
   "similarities": [
@@ -64,28 +60,32 @@
       "title": "OpenHands SDK agent API",
       "url": "https://docs.openhands.dev/sdk/api-reference/openhands.sdk.agent",
       "source_type": "official_doc",
-      "claim": "OpenHands documents an Agent class that interacts with tools, processes messages, and executes actions."
+      "claim": "OpenHands documents an Agent class that interacts with tools, processes messages, and executes actions.",
+      "axes": ["agent_task_lifecycle"]
     },
     {
       "id": "openhands-sandbox",
       "title": "OpenHands sandbox overview",
       "url": "https://docs.openhands.dev/openhands/usage/sandboxes/overview",
       "source_type": "official_doc",
-      "claim": "OpenHands documents Docker, process, and remote sandbox providers with different isolation tradeoffs."
+      "claim": "OpenHands documents Docker, process, and remote sandbox providers with different isolation tradeoffs.",
+      "axes": ["safe_mutation"]
     },
     {
       "id": "openhands-evals",
       "title": "OpenHands evaluation harness",
       "url": "https://docs.openhands.dev/openhands/usage/developers/evaluation-harness",
       "source_type": "official_doc",
-      "claim": "OpenHands documents an evaluation harness for integrating benchmark tasks into the framework."
+      "claim": "OpenHands documents an evaluation harness for integrating benchmark tasks into the framework.",
+      "axes": ["evals_benchmarks"]
     },
     {
       "id": "openhands-sdk-overview",
       "title": "OpenHands SDK architecture overview",
       "url": "https://docs.openhands.dev/sdk/arch/overview",
       "source_type": "official_doc",
-      "claim": "OpenHands describes a composable SDK for building and deploying agents with clear package boundaries."
+      "claim": "OpenHands describes a composable SDK for building and deploying agents with clear package boundaries.",
+      "axes": ["multi_agent"]
     }
   ]
 }

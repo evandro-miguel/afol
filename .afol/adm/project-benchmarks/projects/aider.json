@@ -12,14 +12,6 @@
     "repo_context_map": {
       "score": 5,
       "evidence_refs": ["aider-repomap"]
-    },
-    "safe_mutation": {
-      "score": 3,
-      "evidence_refs": ["aider-repomap"]
-    },
-    "agent_task_lifecycle": {
-      "score": 2,
-      "evidence_refs": ["aider-repomap"]
     }
   },
   "similarities": [
@@ -51,7 +43,8 @@
       "title": "Aider repository map",
       "url": "https://aider.chat/docs/repomap.html",
       "source_type": "official_doc",
-      "claim": "Aider documents a concise repository map containing important classes, functions, types, and call signatures within a token budget."
+      "claim": "Aider documents a concise repository map containing important classes, functions, types, and call signatures within a token budget.",
+      "axes": ["repo_context_map"]
     }
   ]
 }

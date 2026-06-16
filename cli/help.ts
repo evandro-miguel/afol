@@ -1,6 +1,7 @@
 import {
 	type CommandCategory,
 	type CommandSpec,
+	type CommandSubcommandSpec,
 	kernelRegistry,
 } from "./registry";
 
@@ -31,6 +32,7 @@ export type CommandCatalogEntry = {
 	sideEffect: CommandSpec["sideEffect"];
 	description: string;
 	category: CommandCategory | "uncategorized";
+	subcommands?: CommandSubcommandSpec[];
 };
 
 export function buildCommandCatalog(
@@ -43,6 +45,7 @@ export function buildCommandCatalog(
 		sideEffect: spec.sideEffect,
 		description: spec.description,
 		category: spec.category ?? "uncategorized",
+		subcommands: spec.subcommands?.map((entry) => ({ ...entry })),
 	}));
 }
 
@@ -68,6 +71,7 @@ export function buildCommandHelpJson(
 		sideEffect: spec.sideEffect,
 		description: spec.description,
 		category: spec.category ?? "uncategorized",
+		subcommands: spec.subcommands?.map((entry) => ({ ...entry })),
 	};
 }
 
@@ -86,6 +90,15 @@ export function formatCommandHelp(
 		`Category: ${spec.category ?? "uncategorized"}`,
 		`Side effect: ${spec.sideEffect}`,
 		`Description: ${spec.description}`,
+		...(spec.subcommands?.length
+			? [
+					"Subcommands:",
+					...spec.subcommands.map(
+						(entry) =>
+							`  ${entry.usage} [${entry.sideEffect}] - ${entry.description}`,
+					),
+				]
+			: []),
 	].join("\n");
 }
 
@@ -123,7 +136,7 @@ export function formatHelpText(registry = kernelRegistry): string {
 	lines.push(
 		"",
 		"Flags",
-		"  -j, --json  JSON output for status",
+		"  -j, --json  JSON output when supported",
 		"Aliases",
 		"  a=afol",
 	);

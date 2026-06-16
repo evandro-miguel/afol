@@ -16,10 +16,6 @@
     "repo_context_map": {
       "score": 3,
       "evidence_refs": ["codex-agents-md"]
-    },
-    "local_state": {
-      "score": 2,
-      "evidence_refs": ["codex-agents-md"]
     }
   },
   "similarities": [
@@ -51,7 +47,8 @@
       "title": "Codex custom instructions with AGENTS.md",
       "url": "https://developers.openai.com/codex/guides/agents-md",
       "source_type": "official_doc",
-      "claim": "Codex documents repository-level AGENTS.md files for layering project instructions on top of global guidance."
+      "claim": "Codex documents repository-level AGENTS.md files for layering project instructions on top of global guidance.",
+      "axes": ["skills_modes_rules", "repo_context_map"]
     }
   ]
 }

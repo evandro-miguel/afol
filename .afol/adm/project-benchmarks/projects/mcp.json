@@ -51,14 +51,16 @@
       "title": "MCP tools specification",
       "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
       "source_type": "spec",
-      "claim": "MCP tools include metadata describing their schema and are exposed for model invocation through clients."
+      "claim": "MCP tools include metadata describing their schema and are exposed for model invocation through clients.",
+      "axes": ["mcp_tools", "safe_mutation"]
     },
     {
       "id": "mcp-spec-repo",
       "title": "MCP specification repository",
       "url": "https://github.com/modelcontextprotocol/modelcontextprotocol",
       "source_type": "official_repo",
-      "claim": "The official repository publishes the protocol specification and schema assets."
+      "claim": "The official repository publishes the protocol specification and schema assets.",
+      "axes": ["release_governance"]
     }
   ]
 }

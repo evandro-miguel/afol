@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
@@ -16,6 +16,11 @@ export type ProjectBenchmarkGeneratedFile = {
 	kind: "index" | "matrix" | "summary" | "validation";
 };
 
+export type ProjectBenchmarkMisplacedFile = {
+	path: string;
+	location: "catalog" | "runtime-benchmark-catalog";
+};
+
 export type ProjectBenchmarkGenerationResult = {
 	schema_version: "1.0.0";
 	command: "project-benchmark.generate";
@@ -26,7 +31,14 @@ export type ProjectBenchmarkGenerationResult = {
 	data_dir: string;
 	files: ProjectBenchmarkGeneratedFile[];
 	changed_files: ProjectBenchmarkGeneratedFile[];
+	misplaced_files: ProjectBenchmarkMisplacedFile[];
 	project_count: number;
+};
+
+type ProjectBenchmarkGeneratePaths = {
+	dataDir: string;
+	catalogDir: string;
+	runtimeBenchmarkCatalogDir: string;
 };
 
 type ProjectBenchmarkGenerateOptions = {
@@ -154,6 +166,13 @@ type GeneratedFileContent = {
 	content: string;
 };
 
+const GENERATED_FILE_NAMES = new Set([
+	"index.json",
+	"similarity-matrix.json",
+	"generated-summary.md",
+	"validation-report.json",
+]);
+
 function buildGeneratedFiles(
 	projectRoot: string,
 	dataDir: string,
@@ -200,6 +219,74 @@ function contentMatches(path: string, content: string): boolean {
 	return existsSync(path) && readFileSync(path, "utf8") === content;
 }
 
+function fileLooksLikeProjectBenchmarkGeneratedOutput(
+	path: string,
+	fileName: string,
+): boolean {
+	if (GENERATED_FILE_NAMES.has(fileName)) {
+		return true;
+	}
+	try {
+		return readFileSync(path, "utf8").includes("afol pb generate");
+	} catch {
+		return false;
+	}
+}
+
+function collectMisplacedOutputs(
+	projectRoot: string,
+	paths: Pick<
+		ProjectBenchmarkGeneratePaths,
+		"catalogDir" | "runtimeBenchmarkCatalogDir"
+	>,
+): ProjectBenchmarkMisplacedFile[] {
+	const misplaced = new Map<string, ProjectBenchmarkMisplacedFile>();
+	const scan = (
+		dir: string,
+		location: ProjectBenchmarkMisplacedFile["location"],
+	): void => {
+		if (!existsSync(dir)) {
+			return;
+		}
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			const entryPath = join(dir, entry.name);
+			if (
+				location === "runtime-benchmark-catalog" &&
+				entry.isDirectory() &&
+				/^project-benchmarks?$/.test(entry.name)
+			) {
+				const rel = relative(projectRoot, entryPath) || entryPath;
+				misplaced.set(rel, { path: rel, location });
+			}
+			if (entry.isDirectory()) {
+				scan(entryPath, location);
+				continue;
+			}
+			if (!fileLooksLikeProjectBenchmarkGeneratedOutput(entryPath, entry.name)) {
+				continue;
+			}
+			const rel = relative(projectRoot, entryPath) || entryPath;
+			misplaced.set(rel, { path: rel, location });
+		}
+	};
+
+	scan(paths.catalogDir, "catalog");
+	scan(paths.runtimeBenchmarkCatalogDir, "runtime-benchmark-catalog");
+	return [...misplaced.values()].sort((left, right) =>
+		left.path.localeCompare(right.path),
+	);
+}
+
+export function findProjectBenchmarkMisplacedOutputs(
+	projectRoot: string,
+	paths: Pick<
+		ProjectBenchmarkGeneratePaths,
+		"catalogDir" | "runtimeBenchmarkCatalogDir"
+	>,
+): ProjectBenchmarkMisplacedFile[] {
+	return collectMisplacedOutputs(projectRoot, paths);
+}
+
 function publicFile(
 	file: Pick<GeneratedFileContent, "relativePath" | "kind">,
 ): ProjectBenchmarkGeneratedFile {
@@ -233,7 +320,7 @@ function canReuseGeneratedAt(
 
 export function generateProjectBenchmarkOutputs(
 	projectRoot: string,
-	dataDir: string,
+	generatePaths: ProjectBenchmarkGeneratePaths,
 	projects: ProjectBenchmarkProject[],
 	axes: ProjectBenchmarkAxesFile,
 	validation: ProjectBenchmarkValidationResult,
@@ -243,26 +330,31 @@ export function generateProjectBenchmarkOutputs(
 		const now = options.now ?? new Date();
 		const check = options.check === true;
 		const matrix = buildProjectBenchmarkMatrix(projects, axes, now);
-		const paths = {
-			index: join(dataDir, "index.json"),
-			matrix: join(dataDir, "similarity-matrix.json"),
-			summary: join(dataDir, "generated-summary.md"),
-			validation: join(dataDir, "validation-report.json"),
+		const misplacedFiles = collectMisplacedOutputs(projectRoot, generatePaths);
+		const filePaths = {
+			index: join(generatePaths.dataDir, "index.json"),
+			matrix: join(generatePaths.dataDir, "similarity-matrix.json"),
+			summary: join(generatePaths.dataDir, "generated-summary.md"),
+			validation: join(generatePaths.dataDir, "validation-report.json"),
 		};
-		const priorGeneratedAt = readGeneratedAt(paths.index);
+		const priorGeneratedAt = readGeneratedAt(filePaths.index);
 		const generatedAt =
 			priorGeneratedAt &&
-			canReuseGeneratedAt(priorGeneratedAt, paths, matrix, validation)
+			canReuseGeneratedAt(priorGeneratedAt, filePaths, matrix, validation)
 				? priorGeneratedAt
 				: now.toISOString();
 		const payloads = buildGeneratedPayloads(generatedAt, matrix, validation);
-		const files = buildGeneratedFiles(projectRoot, dataDir, payloads);
+		const files = buildGeneratedFiles(
+			projectRoot,
+			generatePaths.dataDir,
+			payloads,
+		);
 		const changedFiles = files.filter(
 			(file) => !contentMatches(file.path, file.content),
 		);
 
-		if (!check && changedFiles.length > 0) {
-			mkdirSync(dataDir, { recursive: true });
+		if (!check && misplacedFiles.length === 0 && changedFiles.length > 0) {
+			mkdirSync(generatePaths.dataDir, { recursive: true });
 			for (const file of changedFiles) {
 				if (file.kind === "summary") {
 					writeTextIfChanged(file.path, file.content);
@@ -284,11 +376,14 @@ export function generateProjectBenchmarkOutputs(
 			command: "project-benchmark.generate",
 			generated_by: "afol pb generate",
 			mode: check ? "check" : "write",
-			ok: check ? changedFiles.length === 0 : true,
+			ok:
+				misplacedFiles.length === 0 &&
+				(check ? changedFiles.length === 0 : true),
 			generated_at: generatedAt,
-			data_dir: relative(projectRoot, dataDir),
+			data_dir: relative(projectRoot, generatePaths.dataDir),
 			files: files.map(publicFile),
 			changed_files: changedFiles.map(publicFile),
+			misplaced_files: misplacedFiles,
 			project_count: matrix.projects.length,
 		};
 	});

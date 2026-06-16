@@ -48,6 +48,7 @@ function createValidProject() {
 				url: "https://aider.chat/docs/repomap.html",
 				source_type: "official_doc",
 				claim: "Aider documents a concise repository map.",
+				axes: ["repo_context_map"],
 			},
 		],
 	};
@@ -82,6 +83,10 @@ function createProjectRoot(
 			repo_context_map: {
 				weight: 15,
 				description: "Uses compact repository maps or context ranking",
+			},
+			safe_mutation: {
+				weight: 10,
+				description: "Keeps mutations bounded, reviewed, or permissioned",
 			},
 		},
 	});
@@ -125,6 +130,7 @@ describe("project-benchmark validation hardening", () => {
 					url: "docs/repomap",
 					source_type: "official_doc",
 					claim: "Relative paths are not valid URIs.",
+					axes: ["repo_context_map"],
 				},
 				{
 					id: "dup-source",
@@ -132,6 +138,7 @@ describe("project-benchmark validation hardening", () => {
 					url: "https://example.com/repomap",
 					source_type: "official_doc",
 					claim: "Duplicate ids should be rejected.",
+					axes: ["repo_context_map"],
 				},
 			],
 		});
@@ -145,6 +152,43 @@ describe("project-benchmark validation hardening", () => {
 					"duplicate-source-ref-id",
 				]),
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("requires source refs to declare supported axes", () => {
+		const root = createProjectRoot({
+			...createValidProject(),
+			source_refs: [
+				{
+					id: "aider-repomap",
+					title: "Aider repository map",
+					url: "https://aider.chat/docs/repomap.html",
+					source_type: "official_doc",
+					claim: "Aider documents a concise repository map.",
+				},
+			],
+		});
+		try {
+			expect(issueCodes(root)).toContain("missing-source-ref-axes");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects axis scores backed by refs that do not support that axis", () => {
+		const root = createProjectRoot({
+			...createValidProject(),
+			similarity_axes: {
+				safe_mutation: {
+					score: 3,
+					evidence_refs: ["aider-repomap"],
+				},
+			},
+		});
+		try {
+			expect(issueCodes(root)).toContain("unsupported-evidence-axis");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -195,6 +239,7 @@ describe("project-benchmark validation hardening", () => {
 					url: "https://aider.chat/docs/repomap.html",
 					source_type: "official_doc",
 					claim: "Aider documents a concise repository map.",
+					axes: ["repo_context_map"],
 					extra_source_flag: true,
 				},
 			],

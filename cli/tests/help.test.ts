@@ -46,6 +46,25 @@ describe("help formatter", () => {
 		expect(unknown).toBeNull();
 	});
 
+	test("formats project-benchmark help with safe and generated subcommands", () => {
+		const help = formatCommandHelp("pb", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected pb command help");
+		}
+		expect(help).toContain("Command: project-benchmark");
+		expect(help).toContain("Aliases: pb");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("list [read]");
+		expect(help).toContain("show <project-id> [read]");
+		expect(help).toContain("matrix --for <axis> [read]");
+		expect(help).toContain("recommend --for <axis> [read]");
+		expect(help).toContain("validate --strict [read]");
+		expect(help).toContain("generate --check [read]");
+		expect(help).toContain("generate [generated]");
+	});
+
 	test("builds catalog json without fake aliases", () => {
 		const catalog = buildCommandCatalog(kernelRegistry);
 		const parsed = JSON.parse(formatCatalogJson(kernelRegistry)) as Array<{
@@ -84,5 +103,49 @@ describe("help formatter", () => {
 			category: "core",
 		});
 		expect(buildCommandHelpJson("nope", kernelRegistry)).toBeNull();
+	});
+
+	test("builds project-benchmark json with subcommand metadata", () => {
+		const help = buildCommandHelpJson("pb", kernelRegistry);
+		expect(help).not.toBeNull();
+		expect(help?.subcommands).toEqual([
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List scored reference projects",
+			},
+			{
+				usage: "show <project-id>",
+				sideEffect: "read",
+				description: "Inspect one reference project by id or name",
+			},
+			{
+				usage: "matrix --for <axis>",
+				sideEffect: "read",
+				description:
+					"Filter the score matrix by axis; omit --for for the full matrix",
+			},
+			{
+				usage: "recommend --for <axis>",
+				sideEffect: "read",
+				description: "Rank the best reference projects for one axis",
+			},
+			{
+				usage: "validate --strict",
+				sideEffect: "read",
+				description:
+					"Fail validation on warnings; omit --strict for standard validation",
+			},
+			{
+				usage: "generate --check",
+				sideEffect: "read",
+				description: "Check generated outputs without writing files",
+			},
+			{
+				usage: "generate",
+				sideEffect: "generated",
+				description: "Refresh generated outputs with local approval",
+			},
+		]);
 	});
 });
