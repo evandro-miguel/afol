@@ -77,6 +77,7 @@ describe("release and toolchain contracts", () => {
 		expect(workflow).toContain('OSV_SCANNER_VERSION: "2.3.8"');
 		expect(workflow).toContain('GITLEAKS_VERSION: "8.24.2"');
 		expect(workflow).toContain("Install pinned security scanners");
+		expect(workflow).toContain("continue-on-error: true");
 		expect(workflow).toContain(
 			"https://github.com/google/osv-scanner/releases/download/v",
 		);
@@ -209,6 +210,72 @@ describe("release and toolchain contracts", () => {
 					}),
 				]),
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release provenance uses GitHub head ref in detached PR checkout", () => {
+		const root = mkdtempSync(join(tmpdir(), "release-provenance-detached-"));
+		const distDir = join(root, "dist");
+		mkdirSync(distDir, { recursive: true });
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+
+		const gitEnv = {
+			...process.env,
+			GIT_AUTHOR_NAME: "Test User",
+			GIT_AUTHOR_EMAIL: "test@example.com",
+			GIT_COMMITTER_NAME: "Test User",
+			GIT_COMMITTER_EMAIL: "test@example.com",
+		};
+
+		try {
+			for (const args of [
+				["init"],
+				["add", "dist/afol", "bun.lock"],
+				["commit", "--no-verify", "-m", "test release provenance"],
+			]) {
+				const result = spawnSync("git", args, {
+					cwd: root,
+					encoding: "utf8",
+					env: gitEnv,
+					shell: false,
+				});
+				if (result.error) {
+					throw result.error;
+				}
+				expect(result.status).toBe(0);
+			}
+
+			const sha = spawnSync("git", ["rev-parse", "HEAD"], {
+				cwd: root,
+				encoding: "utf8",
+				env: gitEnv,
+				shell: false,
+			}).stdout.trim();
+			expect(sha.length).toBeGreaterThan(0);
+
+			const checkout = spawnSync("git", ["checkout", "--detach", sha], {
+				cwd: root,
+				encoding: "utf8",
+				env: gitEnv,
+				shell: false,
+			});
+			if (checkout.error) {
+				throw checkout.error;
+			}
+			expect(checkout.status).toBe(0);
+
+			const provenance = buildReleaseProvenance({
+				cwd: root,
+				releaseMode: true,
+				env: {
+					...gitEnv,
+					GITHUB_HEAD_REF: "adminitration_refactor",
+				},
+			});
+			expect(provenance.branch).toBe("adminitration_refactor");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -51,6 +51,7 @@ jobs:
       - name: Upload release evidence
         uses: actions/upload-artifact@v4
         if: always()
+        continue-on-error: true
         with:
           name: afol-release-evidence
           path: |

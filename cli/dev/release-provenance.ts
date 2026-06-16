@@ -65,6 +65,45 @@ function runGitCommand(cwd: string, args: string[]): string {
 	return value.length > 0 ? value : "unknown";
 }
 
+function githubRefBranch(env: NodeJS.ProcessEnv | undefined): string {
+	const headRef = env?.GITHUB_HEAD_REF?.trim();
+	if (headRef) {
+		return headRef;
+	}
+
+	const refName = env?.GITHUB_REF_NAME?.trim();
+	if (refName) {
+		return refName;
+	}
+
+	const ref = env?.GITHUB_REF?.trim();
+	if (ref?.startsWith("refs/heads/")) {
+		return ref.slice("refs/heads/".length);
+	}
+	if (ref?.startsWith("refs/pull/")) {
+		return ref;
+	}
+
+	return "unknown";
+}
+
+function resolveBranch(
+	cwd: string,
+	env: NodeJS.ProcessEnv | undefined,
+): string {
+	const currentBranch = runGitCommand(cwd, ["branch", "--show-current"]);
+	if (currentBranch !== "unknown") {
+		return currentBranch;
+	}
+
+	const branchFromEnv = githubRefBranch(env);
+	if (branchFromEnv !== "unknown") {
+		return branchFromEnv;
+	}
+
+	return runGitCommand(cwd, ["name-rev", "--name-only", "HEAD"]);
+}
+
 function readLockMetadata(cwd: string): {
 	lockfile: string;
 	lock_sha256: string;
@@ -126,7 +165,7 @@ export function buildReleaseProvenance(
 		node: process.version,
 		generated_at: new Date().toISOString(),
 		commit_sha: runGitCommand(cwd, ["rev-parse", "HEAD"]),
-		branch: runGitCommand(cwd, ["branch", "--show-current"]),
+		branch: resolveBranch(cwd, options.env ?? process.env),
 		lockfile: lockMetadata.lockfile,
 		lock_sha256: lockMetadata.lock_sha256,
 		template_hash:
