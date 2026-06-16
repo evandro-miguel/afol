@@ -1,0 +1,10 @@
+{"id":"E-20260615201153876-efd5f3","task_id":"T-01","created_at":"2026-06-16T00:11:53.876Z","command":"bash -c 'AFOL_AGENT=true ./afol schema apply --json 2>/dev/null; ec=$?; test \"$ec\" -eq 2'","result":"passed"}
+{"id":"E-20260615201211442-e53183","task_id":"T-01","created_at":"2026-06-16T00:12:11.442Z","command":"./afol schema detect --json","result":"passed"}
+{"id":"E-20260615201217788-464e8c","task_id":"T-01","created_at":"2026-06-16T00:12:17.788Z","command":"./afol ctx explain --json","result":"passed"}
+{"id":"E-20260615201226691-86329f","task_id":"T-01","created_at":"2026-06-16T00:12:26.691Z","command":"./afol doctor --remediation-plan --json","result":"passed"}
+{"id":"E-20260615201234294-c3596d","task_id":"T-01","created_at":"2026-06-16T00:12:34.294Z","command":"./afol pstr detect --json && ./afol library graph --json","result":"passed"}
+{"id":"E-20260615201243253-39fe30","task_id":"T-01","created_at":"2026-06-16T00:12:43.253Z","command":"bun run lint:biome","result":"passed"}
+{"id":"E-20260615201253474-4efed8","task_id":"T-01","created_at":"2026-06-16T00:12:53.474Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260615201343369-9a0145","task_id":"T-01","created_at":"2026-06-16T00:13:43.369Z","command":"bun test","result":"passed"}
+{"id":"E-20260615201350762-049078","task_id":"T-01","created_at":"2026-06-16T00:13:50.762Z","command":"./afol validate project --json && ./afol health --deep && ./afol validate drift --json","result":"passed"}
+{"id":"E-20260615202331471-b006de","task_id":"T-01","created_at":"2026-06-16T00:23:31.471Z","command":"bash -c 'AFOL_AGENT=true ./afol schema apply --json 2>/dev/null; ec=$?; test \"$ec\" -eq 2'","result":"passed"}

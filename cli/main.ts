@@ -40,6 +40,11 @@ import {
 	runStartCommand,
 	runVerifyTasksCommand,
 } from "./commands/workbench";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	resolveOperationContext,
+} from "./core/operation-context";
 import { CLI_VERSION } from "./generated/version";
 import {
 	buildCommandHelpJson,
@@ -95,7 +100,17 @@ function resolveValidateMode(
 }
 
 export async function main(argv: string[]): Promise<number> {
-	const args = argv.slice(2);
+	let args = argv.slice(2);
+
+	// Resolve restricted operation context from env/flags early so mutation
+	// gates in schema/pstr/library/memory/file commands work for agent/remote
+	// callers. Default is local interactive (trusted, no approval required).
+	let operationCtx: OperationContext = defaultOperationContext();
+	{
+		const resolved = resolveOperationContext(args);
+		operationCtx = resolved.ctx;
+		args = resolved.remainingArgs;
+	}
 	if (
 		args.length === 1 &&
 		(args[0] === "--version" || args[0] === "-V" || args[0] === "version")
@@ -232,7 +247,12 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "file") {
-		return runFileCommand(resolution.args, project.value.root);
+		return runFileCommand(
+			resolution.args,
+			project.value.root,
+			undefined,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "localState") {
@@ -286,6 +306,8 @@ export async function main(argv: string[]): Promise<number> {
 				resolution.action,
 				resolution.args,
 				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "schema") {
@@ -293,6 +315,8 @@ export async function main(argv: string[]): Promise<number> {
 				resolution.action,
 				resolution.args,
 				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "session") {
@@ -349,6 +373,8 @@ export async function main(argv: string[]): Promise<number> {
 				resolution.action,
 				resolution.args,
 				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "memory") {
@@ -356,6 +382,8 @@ export async function main(argv: string[]): Promise<number> {
 				resolution.action,
 				resolution.args,
 				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "state") {

@@ -8,6 +8,7 @@ import {
 	defaultOperationContext,
 	type OperationContext,
 } from "../core/operation-context";
+import { buildSchemaCacheKey } from "../core/schema-cache-key";
 import type { ShapePack } from "../services/schema";
 import {
 	detectResolver,
@@ -126,6 +127,25 @@ function canApply(
 	return { ok: true };
 }
 
+function canWriteResolver(ctx: OperationContext): {
+	ok: boolean;
+	message?: string;
+} {
+	if (ctx.callerType === "remote") {
+		return {
+			ok: false,
+			message: "schema resolver --write denied for remote callers",
+		};
+	}
+	if (ctx.callerType === "agent") {
+		return {
+			ok: false,
+			message: "schema resolver --write denied for agent callers",
+		};
+	}
+	return { ok: true };
+}
+
 function formatResolver(content: string, path: string): string {
 	return [`resolver: ${path}`, "", content].join("\n");
 }
@@ -145,10 +165,19 @@ export async function runSchemaCommand(
 
 		if (schemaAction === "detect") {
 			if (parsed.json) {
-				writeJsonOk(io, schemaAction, { pack: detected, shape: detected }, [
-					"pack",
-					"shape",
-				]);
+				const cacheKey = buildSchemaCacheKey(
+					detected.name,
+					detected.version,
+					JSON.stringify(detected),
+					shapePackPathForRoot(projectRoot),
+					projectRoot,
+				);
+				writeJsonOk(
+					io,
+					schemaAction,
+					{ pack: detected, shape: detected, cache_key: cacheKey },
+					["pack", "shape", "cache_key"],
+				);
 			} else io.stdout(formatPack(detected));
 			return 0;
 		}
@@ -170,11 +199,24 @@ export async function runSchemaCommand(
 			const current = readShapePack(projectRoot);
 			const suggestions = suggestShape(projectRoot);
 			if (parsed.json) {
+				const cacheKey = buildSchemaCacheKey(
+					detected.name,
+					detected.version,
+					JSON.stringify(detected),
+					shapePackPathForRoot(projectRoot),
+					projectRoot,
+				);
 				writeJsonOk(
 					io,
 					schemaAction,
-					{ current, detected, suggestions, shape: detected },
-					["current", "detected", "suggestions", "shape"],
+					{
+						current,
+						detected,
+						suggestions,
+						shape: detected,
+						cache_key: cacheKey,
+					},
+					["current", "detected", "suggestions", "shape", "cache_key"],
 				);
 			} else
 				io.stdout(
@@ -188,10 +230,25 @@ export async function runSchemaCommand(
 		}
 
 		if (schemaAction === "resolver") {
-			const path = resolverPathForRoot(projectRoot);
 			if (parsed.write) {
+				const gate = canWriteResolver(ctx);
+				if (!gate.ok) {
+					if (parsed.json) {
+						writeJsonErr(
+							io,
+							schemaAction,
+							"schema.resolver.denied",
+							gate.message ?? "schema resolver --write denied",
+							2,
+						);
+					} else {
+						io.stderr(gate.message ?? "schema resolver --write denied");
+					}
+					return 2;
+				}
 				writeResolver(projectRoot);
 			}
+			const path = resolverPathForRoot(projectRoot);
 			const content = detectResolver(projectRoot);
 			if (parsed.json) {
 				writeJsonOk(io, schemaAction, { write: parsed.write, path, content }, [
@@ -227,6 +284,13 @@ export async function runSchemaCommand(
 			writeShapePack(projectRoot, detected);
 		}
 		if (parsed.json) {
+			const cacheKey = buildSchemaCacheKey(
+				detected.name,
+				detected.version,
+				JSON.stringify(detected),
+				shapePackPathForRoot(projectRoot),
+				projectRoot,
+			);
 			writeJsonOk(
 				io,
 				schemaAction,
@@ -235,8 +299,9 @@ export async function runSchemaCommand(
 					path: shapePackPathForRoot(projectRoot),
 					pack: detected,
 					shape: detected,
+					cache_key: cacheKey,
 				},
-				["dry_run", "path", "pack", "shape"],
+				["dry_run", "path", "pack", "shape", "cache_key"],
 			);
 		} else {
 			io.stdout(

@@ -15,7 +15,7 @@ import {
 import { writeJsonError } from "./workbench/shared";
 import { runVerification } from "./workbench/verify";
 
-type ParsedQuickTaskArgs = {
+export type ParsedQuickTaskArgs = {
 	theme: string;
 	json: boolean;
 	metadata: NewWorkstreamMetadata;
@@ -25,7 +25,7 @@ type ParsedQuickTaskArgs = {
 	note?: string;
 };
 
-function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
+export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 	let theme = "";
 	let json = false;
 	let command = "quick-task";

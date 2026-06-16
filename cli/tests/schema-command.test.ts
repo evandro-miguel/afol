@@ -7,6 +7,7 @@ import {
 	agentOperationContext,
 	remoteOperationContext,
 } from "../core/operation-context";
+import { buildSchemaCacheKey } from "../core/schema-cache-key";
 import {
 	detectResolver,
 	detectShape,
@@ -254,6 +255,80 @@ describe("schema command", () => {
 		}
 	});
 
+	test("resolver --write denied for remote callers", async () => {
+		const root = mkRoot("resolver-deny-remote");
+		try {
+			const err: string[] = [];
+			const io = {
+				stdout: (_: string) => undefined,
+				stderr: (value: string) => err.push(value),
+			};
+			expect(
+				await runSchemaCommand(
+					"resolver",
+					["--write"],
+					root,
+					io,
+					remoteOperationContext(),
+				),
+			).toBe(2);
+			expect(err[0]).toContain("denied for remote callers");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("resolver --write denied for agent callers", async () => {
+		const root = mkRoot("resolver-deny-agent");
+		try {
+			const out: string[] = [];
+			const io = {
+				stdout: (value: string) => out.push(value),
+				stderr: (_: string) => undefined,
+			};
+			expect(
+				await runSchemaCommand(
+					"resolver",
+					["--write", "--json"],
+					root,
+					io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			const payload = JSON.parse(out[0] ?? "{}") as {
+				ok: boolean;
+				error: { code: string; message: string };
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.error.code).toBe("schema.resolver.denied");
+			expect(payload.error.message).toContain("denied for agent callers");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("resolver --write allowed for local callers", async () => {
+		const root = mkRoot("resolver-allow-local");
+		try {
+			const out: string[] = [];
+			const io = {
+				stdout: (value: string) => out.push(value),
+				stderr: (_: string) => undefined,
+			};
+			expect(
+				await runSchemaCommand("resolver", ["--write", "--json"], root, io),
+			).toBe(0);
+			const payload = JSON.parse(out[0] ?? "{}") as {
+				ok: boolean;
+				path: string;
+			};
+			expect(payload.ok).toBe(true);
+			expect(existsSync(payload.path)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("apply dry-run reports without writing", async () => {
 		const root = mkRoot("dry-run");
 		try {
@@ -299,5 +374,120 @@ describe("schema command", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("detect json includes cache_key with required fields", async () => {
+		const root = mkRoot("cache-key-detect");
+		try {
+			const out: string[] = [];
+			const io = {
+				stdout: (value: string) => out.push(value),
+				stderr: (_: string) => undefined,
+			};
+			expect(await runSchemaCommand("detect", ["--json"], root, io)).toBe(0);
+			const payload = JSON.parse(out[0] ?? "{}") as {
+				data: { cache_key: Record<string, unknown> };
+				cache_key: Record<string, unknown>;
+			};
+			const cacheKey = payload.data.cache_key as Record<string, string>;
+			expect(cacheKey.shape_name).toBe("afol-shape");
+			expect(typeof cacheKey.shape_version).toBe("string");
+			expect(typeof cacheKey.source_path).toBe("string");
+			expect(typeof cacheKey.source_hash).toBe("string");
+			expect(cacheKey.source_hash ?? "").toMatch(/^[a-f0-9]{64}$/);
+			expect(typeof cacheKey.git_branch).toBe("string");
+			expect(typeof cacheKey.git_commit).toBe("string");
+			// Legacy key promotion
+			const legacyKey = payload.cache_key as Record<string, string>;
+			expect(legacyKey.shape_name).toBe("afol-shape");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("review json includes cache_key with sha256 hash", async () => {
+		const root = mkRoot("cache-key-review");
+		try {
+			writeShapePack(root, detectShape(root));
+			const out: string[] = [];
+			const io = {
+				stdout: (value: string) => out.push(value),
+				stderr: (_: string) => undefined,
+			};
+			expect(await runSchemaCommand("review", ["--json"], root, io)).toBe(0);
+			const payload = JSON.parse(out[0] ?? "{}") as {
+				data: { cache_key: Record<string, unknown> };
+				cache_key: Record<string, unknown>;
+			};
+			const cacheKey = payload.data.cache_key as Record<string, string>;
+			expect(cacheKey.shape_name).toBe("afol-shape");
+			expect(cacheKey.source_hash).toMatch(/^[a-f0-9]{64}$/);
+			// Legacy key
+			const legacy = payload.cache_key as Record<string, string>;
+			expect(legacy.source_hash).toMatch(/^[a-f0-9]{64}$/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply json includes cache_key", async () => {
+		const root = mkRoot("cache-key-apply");
+		try {
+			const out: string[] = [];
+			const io = {
+				stdout: (value: string) => out.push(value),
+				stderr: (_: string) => undefined,
+			};
+			expect(
+				await runSchemaCommand("apply", ["--dry-run", "--json"], root, io),
+			).toBe(0);
+			const payload = JSON.parse(out[0] ?? "{}") as {
+				data: { cache_key: Record<string, unknown> };
+			};
+			const cacheKey = payload.data.cache_key as Record<string, string>;
+			expect(cacheKey.shape_name).toBe("afol-shape");
+			expect(cacheKey.source_hash).toMatch(/^[a-f0-9]{64}$/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("schema cache-key unit", () => {
+	test("buildSchemaCacheKey produces deterministic output for same input", () => {
+		const key1 = buildSchemaCacheKey(
+			"test-shape",
+			"2",
+			JSON.stringify({ name: "test-shape", version: "2" }),
+			".afol/adm/schema/test-shape.yaml",
+		);
+		const key2 = buildSchemaCacheKey(
+			"test-shape",
+			"2",
+			JSON.stringify({ name: "test-shape", version: "2" }),
+			".afol/adm/schema/test-shape.yaml",
+		);
+		expect(key1.shape_name).toBe("test-shape");
+		expect(key1.shape_version).toBe("2");
+		expect(key1.source_hash).toBe(key2.source_hash);
+		// git fields are either real values or "unknown"
+		expect(typeof key1.git_branch).toBe("string");
+		expect(typeof key1.git_commit).toBe("string");
+	});
+
+	test("buildSchemaCacheKey different input produces different hash", () => {
+		const key1 = buildSchemaCacheKey(
+			"shape-a",
+			"1",
+			JSON.stringify({ name: "shape-a" }),
+			"path/a.yaml",
+		);
+		const key2 = buildSchemaCacheKey(
+			"shape-b",
+			"2",
+			JSON.stringify({ name: "shape-b" }),
+			"path/b.yaml",
+		);
+		expect(key1.source_hash).not.toBe(key2.source_hash);
 	});
 });
