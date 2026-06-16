@@ -462,6 +462,19 @@ describe("health system", () => {
 		}
 	});
 
+	test("afol health default run still checks non-wb areas", async () => {
+		const root = createFixture();
+		try {
+			seedHealthyRoot(root);
+			writePstrIndex(root, hoursAgo(24 * 45));
+			const captured = captureIo();
+			expect(await runHealthCommand([], root, captured.io)).toBe(1);
+			expect(captured.stdout.join("\n")).toContain("FAIL pstr: stale pstr map");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol health --json returns success on healthy root", async () => {
 		const root = createFixture();
 		try {
