@@ -51,7 +51,7 @@ type ProviderCompatibleCleanupArchiveResult =
 		archivePath: string;
 	};
 
-const MUTABLE_BASELINE_SOURCES = [
+const BASE_MUTABLE_BASELINE_SOURCES = [
 	{ suffix: "skills/README.md", sourcePath: ".afol/skills/README.md" },
 	{ suffix: "tmp/README.md", sourcePath: ".afol/tmp/README.md" },
 	{ suffix: "data/README.md", sourcePath: ".afol/data/README.md" },
@@ -68,6 +68,8 @@ const MUTABLE_BASELINE_SOURCES = [
 		sourcePath: ".afol/data/telemetry/schemas/event.json",
 	},
 ] as const;
+
+const MUTABLE_BENCHMARK_CATALOG_PREFIX = ".afol/data/benchmarks/catalog/";
 
 const PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS = [
 	".agents/data",
@@ -305,7 +307,21 @@ function planMutableBaselines(
 	}
 
 	const operations: MutableBaselineOperation[] = [];
-	for (const baseline of MUTABLE_BASELINE_SOURCES) {
+	const baselineSources = [
+		...BASE_MUTABLE_BASELINE_SOURCES,
+		...Object.keys(DEFAULT_TEMPLATE_FILES)
+			.filter(
+				(sourcePath) =>
+					sourcePath.startsWith(MUTABLE_BENCHMARK_CATALOG_PREFIX) &&
+					!sourcePath.includes("/providers/"),
+			)
+			.sort()
+			.map((sourcePath) => ({
+				sourcePath,
+				suffix: sourcePath.replace(/^\.afol\//, ""),
+			})),
+	];
+	for (const baseline of baselineSources) {
 		const source = DEFAULT_TEMPLATE_FILES[baseline.sourcePath];
 		if (!source) {
 			continue;

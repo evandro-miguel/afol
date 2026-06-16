@@ -132,6 +132,46 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(
 				existsSync(join(target, ".afol", "data", "index", "README.md")),
 			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"data",
+						"benchmarks",
+						"catalog",
+						"registry.json",
+					),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"data",
+						"benchmarks",
+						"catalog",
+						"scenarios",
+						"cli-kernel-local",
+						"cli-help-compact.json",
+					),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"data",
+						"benchmarks",
+						"catalog",
+						"baselines",
+						"cli-kernel-local",
+						"baseline-v1.json",
+					),
+				),
+			).toBe(true);
 
 			const config = JSON.parse(
 				readFileSync(join(target, ".agents", "config.json"), "utf8"),
@@ -360,6 +400,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 			);
 			expect(output).toContain(
 				"mutable-baseline-create .afol/data/README.md source=.afol/data/README.md missing-target-file",
+			);
+			expect(output).toContain(
+				"mutable-baseline-create .afol/data/benchmarks/catalog/registry.json source=.afol/data/benchmarks/catalog/registry.json missing-target-file",
 			);
 			expect(output).not.toContain("provider-compatible-cleanup-removed");
 		} finally {

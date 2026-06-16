@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "token-routing",
+  "scenario_version": "1.0.0",
+  "pack_id": "token-economy",
+  "command": "afol r show RULE-004",
+  "result_schema": "1.0.0",
+  "oracle": "normalized-envelope-and-threshold-check",
+  "thresholds": {
+    "max_duration_ms": 300,
+    "max_p95_ms": 300,
+    "max_output_tokens": 66,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "token-economy-v1",
+  "implementation_status": "implemented",
+  "deterministic_metrics": {
+    "duration_ms": 120,
+    "timing_p50_ms": 110,
+    "timing_p95_ms": 160,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 180,
+    "prompt_tokens": 0,
+    "output_tokens": 42,
+    "context_bytes": 1024,
+    "output_bytes": 240,
+    "tool_call_count": 1,
+    "tool_success_rate": 1
+  }
+}

@@ -54,4 +54,16 @@ describe("generated template cleanliness", () => {
 			plan.operations.some((operation) => operation.path === "Justfile"),
 		).toBe(false);
 	});
+
+	test("generated payload includes benchmark catalog required by validate bench", () => {
+		const paths = Object.keys(DEFAULT_TEMPLATE_FILES);
+
+		expect(paths).toContain(".afol/data/benchmarks/catalog/registry.json");
+		expect(paths).toContain(
+			".afol/data/benchmarks/catalog/scenarios/cli-kernel-local/cli-help-compact.json",
+		);
+		expect(paths).toContain(
+			".afol/data/benchmarks/catalog/baselines/cli-kernel-local/baseline-v1.json",
+		);
+	});
 });
