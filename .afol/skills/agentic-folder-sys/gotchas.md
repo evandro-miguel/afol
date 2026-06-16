@@ -12,14 +12,14 @@ Do not edit workbench timestamps manually.
 
 Always update metadata via scripts:
 
-- `make wb-touch` `./.agents/agents wb-update touch`
+- `make wb-touch`
 
 ## 2. `--partial` Still Requires an Existing Repo
 
 Full bootstrap can create a missing target directory. `bootstrap --partial`
 still requires an existing repository path.
 
-## 3. `skills-sync pull` Does Not Update `.agents/skills/`
+## 3. `skills-sync pull` Does Not Update `.afol/skills/`
 
 Use `skills-sync sync` or `skills-sync update` to refresh the installed project
 skills.
@@ -43,7 +43,7 @@ a direct push to universal `main`.
 Reject skill and profile identifiers that are empty, absolute paths, contain
 path separators, contain NUL bytes, or equal `.` / `..`. Validate CLI, manifest,
 and upstream profile selections before removing or copying any destination under
-`.agents/skills/`.
+`.afol/skills/`.
 
 ## 7. Use `--partial` for Live Repositories
 
@@ -52,7 +52,7 @@ intentional.
 
 ## 8. The Project Skill Surface Is a Curated Subset
 
-Do not copy mirrors or caches into `.agents/skills/`. Keep `.agents/skills/` as
+Do not copy mirrors or caches into `.afol/skills/`. Keep `.afol/skills/` as
 the project-owned subset that the agent actually uses.
 
 ## 9. Do Not Split Scaffold And Workbench Routing
@@ -68,12 +68,12 @@ Do not mark tasks `[x]` just because files changed.
 ## 11. Use the Scaffold Repo-Map Wrapper
 
 Do not call raw repo-analysis repo-map generation without an explicit output
-root. Use `./.agents/agents repo-map .` or `make repo-map` so the map stays in
-`docs/map/` instead of legacy locations.
+root. Use `make repo-map` so the map stays in `docs/map/` instead of legacy
+locations.
 
 ## 12. Safety Rules
 
 - Never expose secrets in code, logs, docs, or commits. Avoid destructive
   operations unless explicitly authorized. Do not delete logic, only refactor.
-  Archive before delete under `.agents/z-arq/YYYYMMDD_<description>/`. Do not
-  add dependencies without clear justification.
+  Archive before delete under the configured AFOL archive path. Do not add
+  dependencies without clear justification.

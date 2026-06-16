@@ -22,7 +22,7 @@ Skills are modular definitions that provide:
 ## Structure
 
 ```text
-.agents/skills/
+.afol/skills/
 ├── README.md                 # This file
 ├── <skill-name>/
 │   ├── SKILL.md             # Skill definition
@@ -46,7 +46,7 @@ evidence checks.
 - Keep scripted checks primary and use qualitative review only where needed
 - Review token/tool efficiency, scope control, evidence, and report clarity
 
-**Location:** `.agents/skills/agentic-benchmarking/`
+**Location:** `.afol/skills/agentic-benchmarking/`
 
 ### agentic-folder-sys
 
@@ -60,7 +60,7 @@ scaffold plus governed `.afol/wb/` sessions.
 - Follow governed workbench execution and validation
 - Keep plans, tasks, reports, logs, templates, and closure evidence aligned
 
-**Location:** `.agents/skills/agentic-folder-sys/`
+**Location:** `.afol/skills/agentic-folder-sys/`
 
 ### agentic-scaffold-mcp
 
@@ -73,69 +73,69 @@ Runtime MCP lane for compact scaffold inspection, search, validation, safe archi
 - Validate required scaffold structure
 - Use archive/write/patch/undo through the central runtime and FastMCP adapter
 
-**Location:** `.agents/skills/agentic-scaffold-mcp/`
+**Location:** `.afol/skills/agentic-scaffold-mcp/`
 
 ## Python Script Improvement Skills
 
 These project-local skills support maintenance of the scaffold's Python scripts
-and runtime. They are installed directly in `.agents/skills/` and are not part
+and runtime. They are installed directly in `.afol/skills/` and are not part
 of the universal `skills-sync` manifest.
 
 ### async-python-patterns
 
 Asyncio and async/await guidance for non-blocking Python paths.
 
-**Location:** `.agents/skills/async-python-patterns/`
+**Location:** `.afol/skills/async-python-patterns/`
 
 ### python-code-style
 
 Python style, linting, naming, and documentation guidance.
 
-**Location:** `.agents/skills/python-code-style/`
+**Location:** `.afol/skills/python-code-style/`
 
 ### python-design-patterns
 
 Minimal Python design principles for cohesive, testable components.
 
-**Location:** `.agents/skills/python-design-patterns/`
+**Location:** `.afol/skills/python-design-patterns/`
 
 ### python-mcp-server-generator
 
 Python MCP server guidance, useful for the scaffold runtime and FastMCP
 surface.
 
-**Location:** `.agents/skills/python-mcp-server-generator/`
+**Location:** `.afol/skills/python-mcp-server-generator/`
 
 ### python-performance-optimization
 
 Profiling and optimization guidance for slow or memory-heavy Python code.
 
-**Location:** `.agents/skills/python-performance-optimization/`
+**Location:** `.afol/skills/python-performance-optimization/`
 
 ### python-resource-management
 
 Context manager, cleanup, streaming, and deterministic resource handling
 guidance.
 
-**Location:** `.agents/skills/python-resource-management/`
+**Location:** `.afol/skills/python-resource-management/`
 
 ### python-testing-patterns
 
 Pytest, fixtures, mocking, and focused Python testing guidance.
 
-**Location:** `.agents/skills/python-testing-patterns/`
+**Location:** `.afol/skills/python-testing-patterns/`
 
 ### python-type-safety
 
 Type hints, generics, protocols, and static checking guidance.
 
-**Location:** `.agents/skills/python-type-safety/`
+**Location:** `.afol/skills/python-type-safety/`
 
 ## Adding New Skills
 
 ### Manual Addition
 
-1. Create directory: `.agents/skills/<skill-name>/`
+1. Create directory: `.afol/skills/<skill-name>/`
 2. Create `SKILL.md` with definition
 3. Add prompts, rules, examples
 4. Update this README
@@ -143,19 +143,12 @@ Type hints, generics, protocols, and static checking guidance.
 ### Via Skills Sync
 
 ```bash
-# One-step update from universal-skills into .agents/skills/
+# One-step update from universal-skills into .afol/skills/
 make skills-sync SKILLS=new-skill
 make skills-update SKILLS=new-skill
 
-# Ensure the scaffold-operating skill is available locally
-./.agents/agents skills-sync ensure agentic-folder-sys --runtime codex --pull
-
-# Or individual commands
-./.agents/agents skills-sync pull
-./.agents/agents skills-sync apply --skills=new-skill
-
-# Propose a locally edited skill back through a branch/PR
-./.agents/agents skills-sync push new-skill --branch skills-sync/new-skill --commit --push --pr
+# Inspect installed skills
+afol sk
 ```
 
 ## Skill Definition Format
@@ -188,9 +181,9 @@ Usage examples.
 ## Related
 
 - [agents-skills-sync.md](../agentic/agents-skills-sync.md) - Skills synchronization
-- `.agents/skills/agentic-folder-sys/` - Canonical scaffold and workbench operation skill
-- `.agents/agents.config` - Skills configuration
+- `.afol/skills/agentic-folder-sys/` - Canonical scaffold and workbench operation skill
+- `.agents/config.json` - Skills configuration
 
 ---
 
-*Document: `.agents/skills/README.md`*
+*Document: `.afol/skills/README.md`*

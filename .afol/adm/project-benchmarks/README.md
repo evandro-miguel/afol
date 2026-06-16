@@ -3,6 +3,13 @@
 Curated reference catalog for comparing AFOL with adjacent projects and
 protocols. This is strategic architecture evidence, not runtime benchmarking.
 
+Use `afol bench` and `afol validate bench` for runtime benchmark runs. Those
+artifacts live under `.afol/data/benchmarks`.
+
+Use `afol pb` for project-benchmark comparisons. That catalog lives under
+`.afol/adm/project-benchmarks/` and generated outputs live under
+`.afol/data/project-benchmarks/`.
+
 Editable source lives here:
 
 ```txt

@@ -10,12 +10,13 @@ status: draft
 
 ## Project Overview
 
-`{project_name}` uses a local `.agents` workflow for LLM-assisted delivery.
+`{project_name}` uses the local `afol` front door for LLM-assisted delivery.
 Replace this section after bootstrap with real product context.
 
 ## Governed Execution
 
-- Use `.afol/wb/` for implementation, validation, and delivery work.
+- Use the configured plan path for implementation, validation, and delivery
+  work. It defaults to `.afol/wb/`.
 - Start task before product edits.
 - Close task with evidence.
 - Canonical path:
@@ -33,7 +34,10 @@ Replace this section after bootstrap with real product context.
 
 ## Repository Map
 
-- `.afol/wb/`
+- `.agents/config.json` path contract for mutable state, plan storage, skills,
+  tmp, and data locations
+- `.afol/wb/` or configured `paths.wb_dir` governed plan state
+- `.afol/data/` or configured data path for telemetry data and indexes when the downstream CLI exposes them
 - `.agents/rules/` local contracts only
 - `.afol/skills/` only required project-local behavior
 - `docs/` project docs, `docs/map/` evidence only
@@ -62,6 +66,13 @@ Replace this section after bootstrap with real product context.
 - Syntax: `sg`/`ast-grep`.
 - Validation/docs/tasks: `afol` and project-local package commands.
 
+## Telemetry And Indexes
+
+Telemetry is a state surface in the template export. If the downstream repo
+ships a native telemetry command, call it through `afol`.
+Otherwise, treat telemetry reports, exports, and indexes as CLI-owned future
+work and keep this template focused on the stored data and docs contract.
+
 ## Planning And Evidence
 
 - Keep plans executable.
@@ -70,7 +81,7 @@ Replace this section after bootstrap with real product context.
 
 ## Verification
 
-- Required gates: `just doctor`, `just lint`, `just verify`.
+- Required template gate: `afol ck`.
 - Choose focused checks first.
 
 ## Docs And Boundaries
@@ -83,9 +94,10 @@ Replace this section after bootstrap with real product context.
 
 - `AGENTS.md` is canonical runtime source.
 - Keep `CLAUDE.md` mirror compatible.
-- Use `skills-sync` flow; do not push direct to universal `main`.
+- Use a configured native skill synchronization flow only when this repo
+  provides one; do not push direct to universal `main`.
 
 ## Optional Memory
 
-- Repo-local workbench docs and `knowledge` are canonical.
+- Repo-local `.afol/wb/` and `knowledge` are canonical.
 - External memory is auxiliary only.

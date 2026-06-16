@@ -11,6 +11,11 @@ afol telemetry report --json
 afol telemetry export --format jsonl
 ```
 
+Runtime benchmark packs stay separate from project-benchmark catalogs:
+`afol bench` and `afol validate bench` use `.afol/data/benchmarks`, while
+`afol pb` uses `.afol/adm/project-benchmarks/` and
+`.afol/data/project-benchmarks/`.
+
 Heat scoring and dashboard commands are still not public AFOL features. Do not
 document retired compatibility command runners as downstream workflows.
 

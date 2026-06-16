@@ -10,6 +10,8 @@ afol local-state freshness
 afol verify-tasks --strict
 ```
 
+For release health checks, use `afol ht` and `afol doctor`.
+
 Before heat scoring is documented as a public workflow, implement Bun/TypeScript
 AFOL commands for:
 
