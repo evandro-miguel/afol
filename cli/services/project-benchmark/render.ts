@@ -7,6 +7,12 @@ import type {
 } from "./types";
 import type { ProjectBenchmarkValidationResult } from "./validate";
 
+type RenderableProjectBenchmarkRecommendation = ProjectBenchmarkRecommendation & {
+	risk_flags?: string[];
+	risk_level?: "low" | "medium" | "high";
+	do_not_copy?: string[];
+};
+
 export function formatProjectBenchmarkList(
 	scores: ProjectBenchmarkScore[],
 ): string {
@@ -72,12 +78,26 @@ export function formatProjectBenchmarkRecommend(
 		`axis: ${axis}`,
 		`description: ${axes.axes[axis]?.description ?? "unknown"}`,
 		"top references:",
-		...references.map((entry) => {
+		...references.map((reference) => {
+			const entry = reference as RenderableProjectBenchmarkRecommendation;
 			const warningText =
 				entry.warnings.length > 0
 					? ` warnings=${entry.warnings.join(",")}`
 					: "";
-			return `- ${entry.id}: recommendation=${entry.recommendation_score} axis_score=${entry.axis_score} confidence=${entry.confidence} source=${entry.source_access} category=${entry.category} stale=${entry.stale}${warningText}${entry.lesson ? ` - ${entry.lesson}` : ""}`;
+			const riskText = ` risk=${entry.risk_level ?? "unknown"}`;
+			const doNotCopyText =
+				entry.do_not_copy && entry.do_not_copy.length > 0
+					? [`  do_not_copy: ${entry.do_not_copy.join(" | ")}`]
+					: [];
+			const riskFlagsText =
+				entry.risk_flags && entry.risk_flags.length > 0
+					? [`  risk_flags: ${entry.risk_flags.join(",")}`]
+					: [];
+			return [
+				`- ${entry.id}: recommendation=${entry.recommendation_score} axis_score=${entry.axis_score} confidence=${entry.confidence} source=${entry.source_access} category=${entry.category} stale=${entry.stale}${riskText}${warningText}${entry.lesson ? ` - ${entry.lesson}` : ""}`,
+				...riskFlagsText,
+				...doNotCopyText,
+			].join("\n");
 		}),
 		"recommendations:",
 		...(recommendations.length > 0

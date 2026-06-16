@@ -59,11 +59,12 @@ function axesPath(root: string): string {
 	return join(root, ".afol", "adm", "project-benchmarks", "axes.json");
 }
 
-function readProject(root: string, id = "aider"): Record<string, unknown> {
-	return JSON.parse(readFileSync(projectPath(root, id), "utf8")) as Record<
-		string,
-		unknown
-	>;
+type ProjectRecord = Record<string, unknown> & {
+	source_refs?: Array<Record<string, unknown>>;
+};
+
+function readProject(root: string, id = "aider"): ProjectRecord {
+	return JSON.parse(readFileSync(projectPath(root, id), "utf8")) as ProjectRecord;
 }
 
 function issueCodes(root: string, now = new Date("2026-06-20T00:00:00.000Z")) {
@@ -565,7 +566,10 @@ describe("project-benchmark command", () => {
 						id: string;
 						axis_score: number;
 						recommendation_score: number;
+						risk_level: string;
+						risk_flags: string[];
 						warnings: string[];
+						do_not_copy: string[];
 					}>;
 				};
 			};
@@ -575,7 +579,12 @@ describe("project-benchmark command", () => {
 			expect(
 				recommendPayload.data.top_references[0]?.recommendation_score,
 			).toBe(100);
+			expect(recommendPayload.data.top_references[0]?.risk_level).toBe("low");
+			expect(recommendPayload.data.top_references[0]?.risk_flags).toEqual([]);
 			expect(recommendPayload.data.top_references[0]?.warnings).toEqual([]);
+			expect(recommendPayload.data.top_references[0]?.do_not_copy).toEqual([
+				"Do not copy chat-only workflow assumptions.",
+			]);
 
 			const validate = captureIo();
 			expect(
@@ -676,6 +685,10 @@ describe("project-benchmark command", () => {
 			expect(recommend.stdout.join("\n")).toContain("axis: repo_context_map");
 			expect(recommend.stdout.join("\n")).toContain("top references:");
 			expect(recommend.stdout.join("\n")).toContain("recommendation=100");
+			expect(recommend.stdout.join("\n")).toContain("risk=low");
+			expect(recommend.stdout.join("\n")).toContain(
+				"do_not_copy: Do not copy chat-only workflow assumptions.",
+			);
 			expect(recommend.stdout.join("\n")).toContain("recommendations:");
 
 			const emptyRecommendation = captureIo();
@@ -1234,6 +1247,13 @@ describe("project-benchmark command", () => {
 			openReference.confidence = "high";
 			openReference.last_reviewed_at = "2026-06-16";
 			writeJson(projectPath(root, "open"), openReference);
+			addProjectCopy(root, "adjacent", 5, "Use only as an adjacent pattern.");
+			const adjacentReference = readProject(root, "adjacent");
+			adjacentReference.category = "adjacent_reference";
+			adjacentReference.source_access = "open_source";
+			adjacentReference.confidence = "high";
+			adjacentReference.last_reviewed_at = "2026-06-16";
+			writeJson(projectPath(root, "adjacent"), adjacentReference);
 
 			const recommend = captureIo();
 			expect(
@@ -1250,7 +1270,10 @@ describe("project-benchmark command", () => {
 						id: string;
 						axis_score: number;
 						recommendation_score: number;
+						risk_level: string;
+						risk_flags: string[];
 						warnings: string[];
+						do_not_copy: string[];
 					}>;
 				};
 			};
@@ -1258,12 +1281,30 @@ describe("project-benchmark command", () => {
 				id: "open",
 				axis_score: 4,
 				recommendation_score: 80,
+				risk_level: "low",
 			});
+			const adjacent = payload.data.top_references.find(
+				(entry) => entry.id === "adjacent",
+			);
+			expect(adjacent).toMatchObject({
+				axis_score: 5,
+				recommendation_score: 80,
+				risk_level: "medium",
+			});
+			expect(adjacent?.risk_flags).toContain("adjacent_reference");
 			const weakReference = payload.data.top_references.find(
 				(entry) => entry.id === "aider",
 			);
 			expect(weakReference?.axis_score).toBe(5);
 			expect(weakReference?.recommendation_score).toBeLessThan(80);
+			expect(weakReference?.risk_level).toBe("high");
+			expect(weakReference?.risk_flags).toEqual(
+				expect.arrayContaining([
+					"stale",
+					"low_confidence",
+					"closed_source",
+				]),
+			);
 			expect(weakReference?.warnings).toEqual(
 				expect.arrayContaining([
 					"stale",
@@ -1271,6 +1312,9 @@ describe("project-benchmark command", () => {
 					"source_access=closed_source",
 				]),
 			);
+			expect(weakReference?.do_not_copy).toEqual([
+				"Do not copy chat-only workflow assumptions.",
+			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

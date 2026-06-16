@@ -7,6 +7,19 @@ import type {
 
 const MAX_AXIS_SCORE = 5;
 
+type RecommendationRiskFlag =
+	| "stale"
+	| "low_confidence"
+	| "docs_only"
+	| "closed_source"
+	| "adjacent_reference";
+
+type RankedProjectBenchmarkRecommendation = ProjectBenchmarkRecommendation & {
+	risk_flags: RecommendationRiskFlag[];
+	risk_level: "low" | "medium" | "high";
+	do_not_copy: string[];
+};
+
 export function isProjectBenchmarkStale(
 	project: ProjectBenchmarkProject,
 	now = new Date(),
@@ -149,6 +162,45 @@ function recommendationWarnings(
 	return warnings;
 }
 
+function recommendationRiskFlags(
+	project: ProjectBenchmarkProject,
+	stale: boolean,
+): RecommendationRiskFlag[] {
+	const flags: RecommendationRiskFlag[] = [];
+	if (stale) {
+		flags.push("stale");
+	}
+	if (project.confidence === "low") {
+		flags.push("low_confidence");
+	}
+	if (project.source_access === "docs_only") {
+		flags.push("docs_only");
+	}
+	if (project.source_access === "closed_source") {
+		flags.push("closed_source");
+	}
+	if (project.category === "adjacent_reference") {
+		flags.push("adjacent_reference");
+	}
+	return flags;
+}
+
+function recommendationRiskLevel(
+	flags: RecommendationRiskFlag[],
+): "low" | "medium" | "high" {
+	if (
+		flags.includes("stale") ||
+		flags.includes("low_confidence") ||
+		flags.includes("closed_source")
+	) {
+		return "high";
+	}
+	if (flags.length > 0) {
+		return "medium";
+	}
+	return "low";
+}
+
 export function rankProjectBenchmarkRecommendations(
 	axis: string,
 	projects: ProjectBenchmarkProject[],
@@ -161,6 +213,7 @@ export function rankProjectBenchmarkRecommendations(
 				return null;
 			}
 			const stale = isProjectBenchmarkStale(project, now);
+			const riskFlags = recommendationRiskFlags(project, stale);
 			const staleFactor = stale ? 0.75 : 1;
 			const recommendationScore = Math.round(
 				axisScore *
@@ -170,7 +223,7 @@ export function rankProjectBenchmarkRecommendations(
 					categoryFactor(project.category) *
 					staleFactor,
 			);
-			return {
+			const recommendation: RankedProjectBenchmarkRecommendation = {
 				id: project.id,
 				name: project.name,
 				axis_score: axisScore,
@@ -180,15 +233,22 @@ export function rankProjectBenchmarkRecommendations(
 				category: project.category,
 				stale,
 				warnings: recommendationWarnings(project, stale),
+				risk_flags: riskFlags,
+				risk_level: recommendationRiskLevel(riskFlags),
+				do_not_copy: project.do_not_copy.map((entry) => entry.reason),
 				lesson:
 					project.lessons_for_afol.find((entry) => entry.axis === axis)
 						?.lesson ?? null,
 			};
+			return recommendation;
 		})
-		.filter((entry): entry is ProjectBenchmarkRecommendation => entry !== null)
+		.filter(
+			(entry): entry is RankedProjectBenchmarkRecommendation => entry !== null,
+		)
 		.sort(
 			(left, right) =>
 				right.recommendation_score - left.recommendation_score ||
+				left.risk_flags.length - right.risk_flags.length ||
 				right.axis_score - left.axis_score ||
 				left.id.localeCompare(right.id),
 		);
