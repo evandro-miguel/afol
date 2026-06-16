@@ -3,7 +3,7 @@ import { checkHealth } from "./checker";
 export function maintenanceWeekly(
 	root: string,
 	dryRun: boolean,
-): { actions: string[]; applied: boolean } {
+): { actions: string[]; planOnly: true } {
 	const report = checkHealth(root, { deep: false });
 	const actions = [
 		"check PSTR stale",
@@ -14,13 +14,13 @@ export function maintenanceWeekly(
 		actions.unshift("review health failures");
 	}
 	void dryRun;
-	return { actions, applied: false };
+	return { actions, planOnly: true };
 }
 
 export function maintenanceMonthly(
 	root: string,
 	dryRun: boolean,
-): { actions: string[]; applied: boolean } {
+): { actions: string[]; planOnly: true } {
 	const report = checkHealth(root, { deep: false });
 	const actions = [
 		"rotate logs",
@@ -31,5 +31,5 @@ export function maintenanceMonthly(
 		actions.unshift("review health failures");
 	}
 	void dryRun;
-	return { actions, applied: false };
+	return { actions, planOnly: true };
 }

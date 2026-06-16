@@ -327,11 +327,11 @@ describe("health system", () => {
 		}
 	});
 
-	test("maintenanceWeekly(root, true) returns suggestions", () => {
+	test("maintenanceWeekly(root, true) returns plan-only suggestions", () => {
 		const root = createFixture();
 		try {
 			const result = maintenanceWeekly(root, true);
-			expect(result.applied).toBe(false);
+			expect(result.planOnly).toBe(true);
 			expect(result.actions).toContain("check PSTR stale");
 			expect(result.actions).toContain("archive old sessions");
 		} finally {
@@ -339,11 +339,11 @@ describe("health system", () => {
 		}
 	});
 
-	test("maintenanceMonthly(root, true) returns suggestions", () => {
+	test("maintenanceMonthly(root, false) returns plan-only suggestions", () => {
 		const root = createFixture();
 		try {
-			const result = maintenanceMonthly(root, true);
-			expect(result.applied).toBe(false);
+			const result = maintenanceMonthly(root, false);
+			expect(result.planOnly).toBe(true);
 			expect(result.actions).toContain("rotate logs");
 			expect(result.actions).toContain("rebuild stale indexes");
 		} finally {
@@ -392,21 +392,31 @@ describe("health system", () => {
 		}
 	});
 
-	test("afol maintenance weekly --json returns JSON", async () => {
+	test("afol maintenance weekly --json returns plan-only JSON", async () => {
 		const root = createFixture();
 		try {
 			const captured = captureIo();
-			expect(
-				await runMaintenanceCommand(
-					["weekly", "--dry-run", "--json"],
-					root,
-					captured.io,
-				),
-			).toBe(0);
-			const payload = JSON.parse(captured.stdout[0] ?? "{}");
+			expect(await runMaintenanceCommand(["weekly", "--json"], root, captured.io))
+				.toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				mode: string;
+				dry_run: boolean;
+				plan_only: boolean;
+				actions: string[];
+				data?: {
+					mode?: string;
+					dry_run?: boolean;
+					plan_only?: boolean;
+					actions?: string[];
+				};
+			};
 			expect(payload.mode).toBe("weekly");
-			expect(payload.dry_run).toBe(true);
+			expect(payload.dry_run).toBe(false);
+			expect(payload.plan_only).toBe(true);
 			expect(Array.isArray(payload.actions)).toBe(true);
+			expect(payload.data?.mode).toBe("weekly");
+			expect(payload.data?.dry_run).toBe(false);
+			expect(payload.data?.plan_only).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -429,13 +439,13 @@ describe("health system", () => {
 				exit_code: number;
 				mode: string;
 				dry_run: boolean;
+				plan_only: boolean;
 				actions: string[];
-				applied: boolean;
 				data?: {
 					mode?: string;
 					dry_run?: boolean;
+					plan_only?: boolean;
 					actions?: string[];
-					applied?: boolean;
 				};
 			};
 			expect(payload.schema).toBe("afol.result/v1");
@@ -443,8 +453,10 @@ describe("health system", () => {
 			expect(payload.exit_code).toBe(0);
 			expect(payload.mode).toBe("monthly");
 			expect(payload.dry_run).toBe(true);
+			expect(payload.plan_only).toBe(true);
 			expect(payload.data?.mode).toBe("monthly");
 			expect(payload.data?.dry_run).toBe(true);
+			expect(payload.data?.plan_only).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -583,7 +595,8 @@ describe("health system", () => {
 			expect(await runMaintenanceCommand(["weekly"], root, captured.io)).toBe(
 				0,
 			);
-			expect(captured.stdout.join("\n")).toContain("maintenance weekly:");
+			expect(captured.stdout.join("\n")).toContain("maintenance weekly plan:");
+			expect(captured.stdout.join("\n")).not.toContain("applied:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -607,13 +620,13 @@ describe("health system", () => {
 				exit_code: number;
 				mode: string;
 				dry_run: boolean;
+				plan_only: boolean;
 				actions: string[];
-				applied: boolean;
 				data?: {
 					mode?: string;
 					dry_run?: boolean;
+					plan_only?: boolean;
 					actions?: string[];
-					applied?: boolean;
 				};
 			};
 			expect(payload.schema).toBe("afol.result/v1");
@@ -621,8 +634,10 @@ describe("health system", () => {
 			expect(payload.exit_code).toBe(0);
 			expect(payload.mode).toBe("monthly");
 			expect(payload.dry_run).toBe(true);
+			expect(payload.plan_only).toBe(true);
 			expect(payload.data?.mode).toBe("monthly");
 			expect(payload.data?.dry_run).toBe(true);
+			expect(payload.data?.plan_only).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -6,5 +6,5 @@
 |------|-------|-------|-------|
 | T-01 | done | worker | health default-area regression lock |
 | T-02 | done | worker | ctx side-effect registry accuracy |
-| T-03 | pending | worker | maintenance dry-run plan UX |
+| T-03 | done | worker | maintenance dry-run plan UX |
 | T-04 | pending | worker | final validation and closeout |
