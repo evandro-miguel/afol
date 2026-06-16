@@ -52,11 +52,13 @@
 		"smoke:dist": "bun run build && bun run cli/dev/dist-smoke.ts",
 		"smoke:clean": "bash -lc 'set -euo pipefail; tmpdir=$(mktemp -d); trap \"rm -rf \\\"$tmpdir\\\"\" EXIT; checkout=\"$tmpdir/checkout\"; mkdir -p \"$checkout\"; tar -C \"$PWD\" --exclude .git --exclude node_modules --exclude dist --exclude .bun-build\\* -cf - . | tar -C \"$checkout\" -xf -; cd \"$checkout\"; bun install --frozen-lockfile; bun run build; ./dist/afol --help > /dev/null'"
 	},
+	"dependencies": {
+		"diff": "^9.0.0"
+	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.16",
 		"@types/bun": "^1.3.2",
 		"citty": "^0.2.2",
-		"diff": "^9.0.0",
 		"knip": "^6.15.0",
 		"oxlint": "^1.67.0",
 		"typescript": "^6.0.3",

@@ -418,7 +418,7 @@ function resolveSetupInvocation(
 	if (command.length === 0) {
 		throw new Error("Empty setup command");
 	}
-	return resolveCommandInvocation(repoRoot, projectRoot, command, false);
+	return resolveCommandInvocation(repoRoot, projectRoot, command, true);
 }
 
 function shellQuote(value: string): string {
@@ -444,9 +444,9 @@ function createSandboxRoot(projectRoot: string): string {
 			)}`,
 		);
 	}
-	const realNodeModules = join(REAL_REPO_ROOT, "node_modules");
-	if (existsSync(realNodeModules)) {
-		symlinkSync(realNodeModules, join(sandboxRoot, "node_modules"), "dir");
+	const projectNodeModules = join(projectRoot, "node_modules");
+	if (existsSync(projectNodeModules)) {
+		symlinkSync(projectNodeModules, join(sandboxRoot, "node_modules"), "dir");
 	}
 	return sandboxRoot;
 }

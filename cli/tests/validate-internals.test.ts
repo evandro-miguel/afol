@@ -133,8 +133,15 @@ function createBenchExecutionFixtureRoot(): string {
 		'const { appendFileSync } = require("node:fs");\nappendFileSync("tracked.txt", "changed\\n", "utf8");\n',
 		"utf8",
 	);
-	symlinkSync(join(process.cwd(), "cli"), join(root, "cli"), "dir");
-	symlinkSync(join(process.cwd(), "afol"), join(root, "afol"));
+	cpSync(join(process.cwd(), "cli"), join(root, "cli"), { recursive: true });
+	cpSync(join(process.cwd(), "afol"), join(root, "afol"));
+	if (existsSync(join(process.cwd(), "node_modules"))) {
+		symlinkSync(
+			join(process.cwd(), "node_modules"),
+			join(root, "node_modules"),
+			"dir",
+		);
+	}
 	const gitSteps = [
 		["init"],
 		["config", "user.email", "bench@example.com"],
