@@ -1,10 +1,4 @@
 import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
-import {
 	defaultOperationContext,
 	type OperationContext,
 } from "../core/operation-context";
@@ -20,46 +14,9 @@ import {
 	writeResolver,
 	writeShapePack,
 } from "../services/schema";
+import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
-
-function writeJsonOk<T extends Record<string, unknown>>(
-	io: CommandIo,
-	action: string,
-	data: T,
-	legacyKeys: readonly (keyof T)[],
-): void {
-	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(
-				envelopeOk(data, { action: `schema.${action}` }),
-				legacyKeys,
-			),
-		),
-	);
-}
-
-function writeJsonErr(
-	io: CommandIo,
-	action: string,
-	code: string,
-	message: string,
-	exitCode: 1 | 2,
-): void {
-	io.stdout(
-		stringifyEnvelope(
-			envelopeErr(code, message, { action: `schema.${action}`, exitCode }),
-		),
-	);
-}
+const jsonOutput = createJsonWriters("schema");
 
 type SchemaAction = "detect" | "suggest" | "review" | "apply" | "resolver";
 
@@ -172,7 +129,7 @@ export async function runSchemaCommand(
 					shapePackPathForRoot(projectRoot),
 					projectRoot,
 				);
-				writeJsonOk(
+				jsonOutput.ok(
 					io,
 					schemaAction,
 					{ pack: detected, shape: detected, cache_key: cacheKey },
@@ -185,7 +142,7 @@ export async function runSchemaCommand(
 		if (schemaAction === "suggest") {
 			const suggestions = suggestShape(projectRoot);
 			if (parsed.json) {
-				writeJsonOk(io, schemaAction, { suggestions }, ["suggestions"]);
+				jsonOutput.ok(io, schemaAction, { suggestions }, ["suggestions"]);
 			} else
 				io.stdout(
 					suggestions.length > 0
@@ -206,7 +163,7 @@ export async function runSchemaCommand(
 					shapePackPathForRoot(projectRoot),
 					projectRoot,
 				);
-				writeJsonOk(
+				jsonOutput.ok(
 					io,
 					schemaAction,
 					{
@@ -234,7 +191,7 @@ export async function runSchemaCommand(
 				const gate = canWriteResolver(ctx);
 				if (!gate.ok) {
 					if (parsed.json) {
-						writeJsonErr(
+						jsonOutput.err(
 							io,
 							schemaAction,
 							"schema.resolver.denied",
@@ -251,11 +208,12 @@ export async function runSchemaCommand(
 			const path = resolverPathForRoot(projectRoot);
 			const content = detectResolver(projectRoot);
 			if (parsed.json) {
-				writeJsonOk(io, schemaAction, { write: parsed.write, path, content }, [
-					"write",
-					"path",
-					"content",
-				]);
+				jsonOutput.ok(
+					io,
+					schemaAction,
+					{ write: parsed.write, path, content },
+					["write", "path", "content"],
+				);
 			} else
 				io.stdout(
 					parsed.write
@@ -268,7 +226,7 @@ export async function runSchemaCommand(
 		const apply = canApply(ctx, parsed.dryRun);
 		if (!apply.ok) {
 			if (parsed.json) {
-				writeJsonErr(
+				jsonOutput.err(
 					io,
 					schemaAction,
 					"schema.apply.denied",
@@ -291,7 +249,7 @@ export async function runSchemaCommand(
 				shapePackPathForRoot(projectRoot),
 				projectRoot,
 			);
-			writeJsonOk(
+			jsonOutput.ok(
 				io,
 				schemaAction,
 				{
@@ -311,7 +269,7 @@ export async function runSchemaCommand(
 		return 0;
 	} catch (error) {
 		if (wantsJson && error instanceof Error && error.message) {
-			writeJsonErr(io, action, "schema.command.error", error.message, 2);
+			jsonOutput.err(io, action, "schema.command.error", error.message, 2);
 			return 2;
 		}
 		io.stderr((error as Error).message);

@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { readdir } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { join } from "node:path";
 import { Glob } from "bun";
+import { collectRelativeFilePaths, toPosixPath } from "../core/file-paths";
 
 export const TEMPLATE_ROOT = "src/project-template";
 
@@ -90,37 +90,6 @@ const ALLOWED_GLOBS = TEMPLATE_ALLOWED_PATTERNS.map(
 	(pattern) => new Glob(pattern),
 );
 
-function toPosixPath(path: string): string {
-	return path.split(sep).join("/");
-}
-
-async function collectRelativeFilePaths(root: string): Promise<string[]> {
-	const paths: string[] = [];
-
-	async function walk(currentDir: string): Promise<void> {
-		const entries = await readdir(currentDir, { withFileTypes: true });
-
-		for (const entry of entries) {
-			const absolutePath = join(currentDir, entry.name);
-			if (entry.isDirectory()) {
-				await walk(absolutePath);
-				continue;
-			}
-			if (!entry.isFile()) {
-				continue;
-			}
-			paths.push(toPosixPath(relative(root, absolutePath)));
-		}
-	}
-
-	if (!existsSync(root)) {
-		return paths;
-	}
-
-	await walk(root);
-	return paths.sort();
-}
-
 export function matchesTemplateForbiddenPattern(relativePath: string): boolean {
 	const normalized = toPosixPath(relativePath);
 	return FORBIDDEN_GLOBS.some((glob) => glob.match(normalized));
@@ -134,7 +103,9 @@ export function matchesTemplateAllowedPattern(relativePath: string): boolean {
 export async function scanTemplateForbiddenPaths(
 	templateRoot: string,
 ): Promise<string[]> {
-	const relativeFilePaths = await collectRelativeFilePaths(templateRoot);
+	const relativeFilePaths = await collectRelativeFilePaths(templateRoot, {
+		missingRoot: "empty",
+	});
 	return relativeFilePaths.filter((relativePath) =>
 		matchesTemplateForbiddenPattern(relativePath),
 	);
@@ -143,7 +114,9 @@ export async function scanTemplateForbiddenPaths(
 export async function scanTemplateUnknownAllowedPaths(
 	templateRoot: string,
 ): Promise<string[]> {
-	const relativeFilePaths = await collectRelativeFilePaths(templateRoot);
+	const relativeFilePaths = await collectRelativeFilePaths(templateRoot, {
+		missingRoot: "empty",
+	});
 	return relativeFilePaths.filter(
 		(relativePath) => !matchesTemplateAllowedPattern(relativePath),
 	);

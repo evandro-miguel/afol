@@ -5,16 +5,7 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import { sweepDaily, sweepMonthly, sweepWeekly } from "../services/sweep";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 type SweepAction = "daily" | "weekly" | "monthly";
 

@@ -4,16 +4,7 @@ import {
 	type TelemetryEvent,
 	type TelemetryEventType,
 } from "../services/events/telemetry";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 const DEFAULT_QUERY_LIMIT = 10;
 

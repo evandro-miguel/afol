@@ -1,26 +1,10 @@
-import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	type ResultEnvelope,
-	stringifyEnvelope,
-} from "../core/envelope";
 import type { SpecCheckResult } from "../services/spec-gate";
 import {
 	checkSpecCompatibility,
 	getSpecCheck,
 	waiveSpecCheck,
 } from "../services/spec-gate";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO, writeLegacyJsonEnvelope } from "./io";
 
 type SpecAction = "check" | "conflict" | "waive";
 
@@ -132,22 +116,12 @@ function writeJsonResult(
 	exitCode: number,
 ): void {
 	const data = { action, ...result };
-	const envelope =
-		exitCode === 0
-			? envelopeOk(data, { action: `spec.${action}`, exitCode })
-			: (envelopeErr("SPEC_CONFLICT", "spec compatibility check failed", {
-					action: `spec.${action}`,
-					exitCode,
-				}) as ResultEnvelope<typeof data>);
-	envelope.data = data;
-	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(
-				envelope,
-				Object.keys(data) as (keyof typeof data)[],
-			),
-		),
-	);
+	writeLegacyJsonEnvelope(io, `spec.${action}`, data, {
+		ok: exitCode === 0,
+		errorCode: "SPEC_CONFLICT",
+		errorMessage: "spec compatibility check failed",
+		exitCode,
+	});
 }
 
 export async function runSpecCommand(

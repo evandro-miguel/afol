@@ -1,10 +1,4 @@
 import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
-import {
 	defaultOperationContext,
 	type OperationContext,
 	requiresApproval,
@@ -22,46 +16,9 @@ import {
 	rebuildLibraryIndex,
 	searchLibrary,
 } from "../services/library";
+import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
-
-function writeJsonOk<T extends Record<string, unknown>>(
-	io: CommandIo,
-	action: string,
-	data: T,
-	legacyKeys: readonly (keyof T)[],
-): void {
-	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(
-				envelopeOk(data, { action: `library.${action}` }),
-				legacyKeys,
-			),
-		),
-	);
-}
-
-function writeJsonErr(
-	io: CommandIo,
-	action: string,
-	code: string,
-	message: string,
-	exitCode: 1 | 2,
-): void {
-	io.stdout(
-		stringifyEnvelope(
-			envelopeErr(code, message, { action: `library.${action}`, exitCode }),
-		),
-	);
-}
+const jsonOutput = createJsonWriters("library");
 
 type LibraryAction =
 	| "list"
@@ -290,7 +247,7 @@ export async function runLibraryCommand(
 		if (libraryAction === "list") {
 			const topics = listTopics(projectRoot);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { topics }, ["topics"]);
+				jsonOutput.ok(io, libraryAction, { topics }, ["topics"]);
 			} else {
 				io.stdout([`library topics: ${topics.length}`, ...topics].join("\n"));
 			}
@@ -305,7 +262,7 @@ export async function runLibraryCommand(
 			const topic = getTopic(projectRoot, slug);
 			if (!topic) {
 				if (parsed.json) {
-					writeJsonErr(
+					jsonOutput.err(
 						io,
 						libraryAction,
 						"library.topic.not_found",
@@ -318,7 +275,7 @@ export async function runLibraryCommand(
 				return 1;
 			}
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { topic }, ["topic"]);
+				jsonOutput.ok(io, libraryAction, { topic }, ["topic"]);
 			} else {
 				io.stdout(
 					[
@@ -342,7 +299,7 @@ export async function runLibraryCommand(
 			}
 			const matches = searchLibrary(projectRoot, query);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { matches }, ["matches"]);
+				jsonOutput.ok(io, libraryAction, { matches }, ["matches"]);
 			} else {
 				io.stdout(
 					[
@@ -359,7 +316,7 @@ export async function runLibraryCommand(
 		if (libraryAction === "rebuild-index") {
 			const snapshot = rebuildLibraryIndex(projectRoot);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { snapshot }, ["snapshot"]);
+				jsonOutput.ok(io, libraryAction, { snapshot }, ["snapshot"]);
 			} else {
 				io.stdout(`library rebuild-index: ok topics=${snapshot.topics.length}`);
 			}
@@ -369,7 +326,7 @@ export async function runLibraryCommand(
 		if (libraryAction === "graph") {
 			const graph = buildLibraryGraph(projectRoot);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { graph }, ["graph"]);
+				jsonOutput.ok(io, libraryAction, { graph }, ["graph"]);
 			} else {
 				io.stdout(
 					[
@@ -386,7 +343,7 @@ export async function runLibraryCommand(
 		if (libraryAction === "health") {
 			const findings = checkAreaHealth(projectRoot, "library", true);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { findings }, ["findings"]);
+				jsonOutput.ok(io, libraryAction, { findings }, ["findings"]);
 			} else {
 				io.stdout(
 					[
@@ -406,7 +363,7 @@ export async function runLibraryCommand(
 				(step) => step.area === "library",
 			);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { remediation }, ["remediation"]);
+				jsonOutput.ok(io, libraryAction, { remediation }, ["remediation"]);
 			} else {
 				io.stdout(
 					[
@@ -440,7 +397,7 @@ export async function runLibraryCommand(
 				: [];
 			const topic = proposeTopic(projectRoot, slug, parsed.title, sources);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { topic }, ["topic"]);
+				jsonOutput.ok(io, libraryAction, { topic }, ["topic"]);
 			} else {
 				io.stdout(`library propose: ${topic.slug}`);
 			}
@@ -464,7 +421,10 @@ export async function runLibraryCommand(
 			};
 			const topic = addSource(projectRoot, slug, source);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { topic, source }, ["topic", "source"]);
+				jsonOutput.ok(io, libraryAction, { topic, source }, [
+					"topic",
+					"source",
+				]);
 			} else {
 				io.stdout(`library add-source: ${source.id}`);
 			}
@@ -491,7 +451,7 @@ export async function runLibraryCommand(
 			};
 			const topic = addClaim(projectRoot, slug, claim);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { topic, claim }, ["topic", "claim"]);
+				jsonOutput.ok(io, libraryAction, { topic, claim }, ["topic", "claim"]);
 			} else {
 				io.stdout(`library add-claim: ${claim.id}`);
 			}
@@ -513,7 +473,7 @@ export async function runLibraryCommand(
 			}
 			const topic = invalidateClaim(projectRoot, slug, claimId, parsed.reason);
 			if (parsed.json) {
-				writeJsonOk(io, libraryAction, { topic }, ["topic"]);
+				jsonOutput.ok(io, libraryAction, { topic }, ["topic"]);
 			} else {
 				io.stdout(`library invalidate: ${claimId}`);
 			}
@@ -523,7 +483,7 @@ export async function runLibraryCommand(
 		throw new Error(`Unknown library action: ${libraryAction}`);
 	} catch (error) {
 		if (wantsJson && error instanceof Error && error.message) {
-			writeJsonErr(io, action, "library.command.error", error.message, 2);
+			jsonOutput.err(io, action, "library.command.error", error.message, 2);
 			return 2;
 		}
 		io.stderr((error as Error).message);

@@ -12,16 +12,7 @@ import {
 	validateSessionState,
 } from "../services/state/session-state";
 import { readActiveSession } from "../services/workbench/lifecycle";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 type StateAction = "show" | "validate" | "sync" | "export";
 

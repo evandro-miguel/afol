@@ -1,11 +1,5 @@
 import { relative } from "node:path";
 import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
-import {
 	defaultOperationContext,
 	type OperationContext,
 	requiresApproval,
@@ -20,16 +14,9 @@ import {
 	suggestPstrChanges,
 	validatePstrIndex,
 } from "../services/pstr";
+import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+const jsonOutput = createJsonWriters("pstr");
 
 type PstrAction =
 	| "rebuild"
@@ -43,33 +30,6 @@ type PstrAction =
 
 function hasJsonFlag(args: string[]): boolean {
 	return args.some((value) => value === "--json" || value === "-j");
-}
-
-function writeJsonOk<T extends Record<string, unknown>>(
-	io: CommandIo,
-	action: PstrAction,
-	data: T,
-	legacyKeys: readonly (keyof T)[] = [],
-): void {
-	const envelope = envelopeWithLegacyKeys(
-		envelopeOk(data, { action: `pstr.${action}` }),
-		legacyKeys,
-	);
-	io.stdout(stringifyEnvelope(envelope));
-}
-
-function writeJsonErr(
-	io: CommandIo,
-	action: string,
-	code: string,
-	message: string,
-	exitCode: 1 | 2,
-): void {
-	io.stdout(
-		stringifyEnvelope(
-			envelopeErr(code, message, { action: `pstr.${action}`, exitCode }),
-		),
-	);
 }
 
 function normalizeAction(value: string | undefined): PstrAction {
@@ -212,7 +172,7 @@ export async function runPstrCommand(
 			const json = parseJsonFlag(args);
 			const snapshot = rebuildPstrIndex(projectRoot);
 			if (json) {
-				writeJsonOk(
+				jsonOutput.ok(
 					io,
 					pstrAction,
 					{
@@ -240,7 +200,7 @@ export async function runPstrCommand(
 			const index = getPstrIndex(projectRoot);
 			if (!index) {
 				if (json) {
-					writeJsonErr(
+					jsonOutput.err(
 						io,
 						pstrAction,
 						"pstr.show.missing_index",
@@ -253,7 +213,7 @@ export async function runPstrCommand(
 				return 1;
 			}
 			if (json) {
-				writeJsonOk(
+				jsonOutput.ok(
 					io,
 					pstrAction,
 					{ snapshot: snapshotWithRepoRelativePaths(index, projectRoot) },
@@ -279,7 +239,7 @@ export async function runPstrCommand(
 			const json = parseJsonFlag(args);
 			const areas = detectPstrAreas(projectRoot);
 			if (json) {
-				writeJsonOk(io, pstrAction, { areas }, ["areas"]);
+				jsonOutput.ok(io, pstrAction, { areas }, ["areas"]);
 			} else {
 				io.stdout(
 					[
@@ -298,7 +258,7 @@ export async function runPstrCommand(
 			const json = parseJsonFlag(args);
 			const suggestions = suggestPstrChanges(projectRoot);
 			if (json) {
-				writeJsonOk(io, pstrAction, { suggestions }, ["suggestions"]);
+				jsonOutput.ok(io, pstrAction, { suggestions }, ["suggestions"]);
 			} else {
 				io.stdout(
 					[
@@ -323,7 +283,7 @@ export async function runPstrCommand(
 						candidates.map((entry) => entry.id).join(", ") || "none";
 					const message = `pstr review-candidates: candidate not found: ${parsed.apply}; available: ${available}`;
 					if (parsed.json) {
-						writeJsonErr(
+						jsonOutput.err(
 							io,
 							pstrAction,
 							"pstr.review_candidate.not_found",
@@ -340,7 +300,7 @@ export async function runPstrCommand(
 					projectRoot,
 				);
 				if (parsed.json) {
-					writeJsonOk(io, pstrAction, { applied: candidate, snapshot }, [
+					jsonOutput.ok(io, pstrAction, { applied: candidate, snapshot }, [
 						"applied",
 						"snapshot",
 					]);
@@ -350,7 +310,7 @@ export async function runPstrCommand(
 				return 0;
 			}
 			if (parsed.json) {
-				writeJsonOk(io, pstrAction, { candidates }, ["candidates"]);
+				jsonOutput.ok(io, pstrAction, { candidates }, ["candidates"]);
 			} else {
 				io.stdout(
 					[
@@ -371,9 +331,9 @@ export async function runPstrCommand(
 			const msg = normalizeMessagePath(result.message, projectRoot);
 			if (json) {
 				if (result.ok) {
-					writeJsonOk(io, pstrAction, { ...result, message: msg });
+					jsonOutput.ok(io, pstrAction, { ...result, message: msg });
 				} else {
-					writeJsonErr(io, pstrAction, "pstr.validate.failed", msg, 1);
+					jsonOutput.err(io, pstrAction, "pstr.validate.failed", msg, 1);
 				}
 			} else {
 				io.stdout(`pstr validate: ${result.ok ? "ok" : "fail"} ${msg}`);
@@ -391,7 +351,7 @@ export async function runPstrCommand(
 			const anyStale = normalized.some((result) => result.stale);
 			if (json) {
 				if (anyStale) {
-					writeJsonErr(
+					jsonOutput.err(
 						io,
 						pstrAction,
 						"pstr.stale.failed",
@@ -400,7 +360,7 @@ export async function runPstrCommand(
 						1,
 					);
 				} else {
-					writeJsonOk(io, pstrAction, { areas: normalized }, ["areas"]);
+					jsonOutput.ok(io, pstrAction, { areas: normalized }, ["areas"]);
 				}
 			} else {
 				io.stdout(
@@ -421,7 +381,7 @@ export async function runPstrCommand(
 			const section = getPstrSection(projectRoot, parsed.id);
 			if (!section) {
 				if (parsed.json) {
-					writeJsonErr(
+					jsonOutput.err(
 						io,
 						pstrAction,
 						"pstr.section.not_found",
@@ -436,14 +396,14 @@ export async function runPstrCommand(
 			if (!section.ok) {
 				const msg = normalizeMessagePath(section.message, projectRoot);
 				if (parsed.json) {
-					writeJsonErr(io, pstrAction, "pstr.section.failed", msg, 2);
+					jsonOutput.err(io, pstrAction, "pstr.section.failed", msg, 2);
 					return 2;
 				}
 				io.stderr(msg);
 				return 2;
 			}
 			if (parsed.json) {
-				writeJsonOk(
+				jsonOutput.ok(
 					io,
 					pstrAction,
 					{ entry: section.entry, content: section.content },
@@ -457,7 +417,7 @@ export async function runPstrCommand(
 
 		const message = `internal error: unhandled pstr action '${pstrAction}'. This is a bug.`;
 		if (hasJsonFlag(args)) {
-			writeJsonErr(io, pstrAction, "pstr.action.unhandled", message, 2);
+			jsonOutput.err(io, pstrAction, "pstr.action.unhandled", message, 2);
 		} else {
 			io.stderr(message);
 		}
@@ -465,7 +425,7 @@ export async function runPstrCommand(
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		if (hasJsonFlag(args)) {
-			writeJsonErr(io, action, "pstr.command.error", message, 2);
+			jsonOutput.err(io, action, "pstr.command.error", message, 2);
 		} else {
 			io.stderr(message);
 		}

@@ -16,11 +16,7 @@ import {
 	type CatchupReport,
 	computeCatchup,
 } from "../services/workbench/catchup";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 type StatusSnapshot = {
 	status: string;
@@ -60,15 +56,6 @@ type StatusJsonData = {
 		task_file: string | null;
 	};
 	session: StatusSessionInfo | undefined;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message: string) => {
-		console.log(message);
-	},
-	stderr: (message: string) => {
-		console.error(message);
-	},
 };
 
 const FIELD_HEADERS = [

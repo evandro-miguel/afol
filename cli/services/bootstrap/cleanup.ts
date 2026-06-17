@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, rmSync } from "node:fs";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 
 export type BootstrapCleanupCandidate = {
 	path: string;
@@ -18,10 +18,6 @@ const LEGACY_FILE_NAMES = [
 	".python-version",
 ] as const;
 
-function toPosixPath(path: string): string {
-	return path.split(sep).join("/");
-}
-
 function isLegacyDirectory(path: string): boolean {
 	return LEGACY_ROOTS.includes(path as (typeof LEGACY_ROOTS)[number]);
 }
@@ -33,23 +29,29 @@ function isLegacyExactFile(path: string): boolean {
 }
 
 function isLegacyFileName(path: string): boolean {
-	const base = path.split("/").at(-1);
+	const separatorIndex = path.lastIndexOf("/");
+	const base = separatorIndex === -1 ? path : path.slice(separatorIndex + 1);
 	if (!base) {
 		return false;
 	}
 	return LEGACY_FILE_NAMES.includes(base as (typeof LEGACY_FILE_NAMES)[number]);
 }
 
-function hasLegacyDirSuffix(path: string, dirName: string): boolean {
-	return path.split("/").includes(dirName);
+function hasPathSegment(path: string, segment: string): boolean {
+	return (
+		path === segment ||
+		path.startsWith(`${segment}/`) ||
+		path.endsWith(`/${segment}`) ||
+		path.includes(`/${segment}/`)
+	);
 }
 
 function isPycacheCandidate(path: string): boolean {
 	return (
-		path.split("/").includes("__pycache__") &&
+		hasPathSegment(path, "__pycache__") &&
 		(path.startsWith(".agents/scripts") ||
 			path.startsWith(".agents/runtime") ||
-			hasLegacyDirSuffix(path, ".venv"))
+			hasPathSegment(path, ".venv"))
 	);
 }
 
@@ -101,23 +103,18 @@ function collectLegacyCandidates(root: string): string[] {
 		for (const entry of entries) {
 			const nextRelative = relative ? `${relative}/${entry.name}` : entry.name;
 			const nextAbsolute = join(current, entry.name);
-			const normalized = toPosixPath(nextRelative);
 
 			if (entry.isDirectory()) {
-				if (isLegacyPath(normalized)) {
-					candidates.add(normalized);
+				if (isLegacyPath(nextRelative)) {
+					candidates.add(nextRelative);
 					continue;
 				}
-				if (isPycacheCandidate(normalized)) {
-					candidates.add(normalized);
-					continue;
-				}
-				walk(nextAbsolute, normalized);
+				walk(nextAbsolute, nextRelative);
 				continue;
 			}
 
-			if (isLegacyPath(normalized)) {
-				candidates.add(normalized);
+			if (isLegacyPath(nextRelative)) {
+				candidates.add(nextRelative);
 			}
 		}
 	};
@@ -142,8 +139,6 @@ export function cleanupBootstrapObsolete(
 ): void {
 	for (const candidate of candidates) {
 		const absolute = join(targetRoot, candidate.path);
-		if (existsSync(absolute)) {
-			rmSync(absolute, { recursive: true, force: true });
-		}
+		rmSync(absolute, { recursive: true, force: true });
 	}
 }

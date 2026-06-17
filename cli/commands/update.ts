@@ -20,16 +20,7 @@ import {
 	type UpdateOperation,
 } from "../services/update/check";
 import { backupPath as makeBackupPath, normalizeHash } from "./file/shared";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message: string) => console.log(message),
-	stderr: (message: string) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 type UpdateSubcommand = "check" | "preview" | "apply";
 

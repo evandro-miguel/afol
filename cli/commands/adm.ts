@@ -1,28 +1,12 @@
 import { relative } from "node:path";
 import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	type ResultEnvelope,
-	stringifyEnvelope,
-} from "../core/envelope";
-import {
 	buildAdmMigrationPlan,
 	listAdmFiles,
 	migrateAdm,
 	resolveAdmPaths,
 	validateAdmMigration,
 } from "../services/adm";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO, writeLegacyJsonEnvelope } from "./io";
 
 type AdmAction = "paths" | "show" | "plan" | "migrate" | "validate";
 
@@ -78,21 +62,12 @@ function writeJsonEnvelope(
 	data: Record<string, unknown>,
 	ok: boolean,
 ): void {
-	const envelope = ok
-		? envelopeOk(data, { action: String(data.action ?? "adm"), exitCode: 0 })
-		: (envelopeErr("ADM_FAILED", "adm command failed", {
-				action: String(data.action ?? "adm"),
-				exitCode: 1,
-			}) as ResultEnvelope<Record<string, unknown>>);
-	envelope.data = data;
-	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(
-				envelope,
-				Object.keys(data) as (keyof typeof data)[],
-			),
-		),
-	);
+	writeLegacyJsonEnvelope(io, String(data.action ?? "adm"), data, {
+		ok,
+		errorCode: "ADM_FAILED",
+		errorMessage: "adm command failed",
+		exitCode: ok ? 0 : 1,
+	});
 }
 
 export async function runAdmCommand(

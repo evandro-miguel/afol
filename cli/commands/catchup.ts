@@ -3,16 +3,7 @@ import {
 	type CatchupReport,
 	computeCatchup,
 } from "../services/workbench/catchup";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 function parseCatchupArgs(args: string[]): {
 	json: boolean;

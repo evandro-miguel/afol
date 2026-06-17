@@ -4,16 +4,7 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import { runDoctor } from "../services/health";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 type DoctorJsonData = ReturnType<typeof runDoctor> & {
 	ok: boolean;

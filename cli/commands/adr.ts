@@ -1,25 +1,11 @@
 import {
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
-import {
 	abandonAdr,
 	acceptAdr,
 	archiveAdr,
 	createAdr,
 	supersedeAdr,
 } from "../services/spec-gate";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO, writeLegacyJsonEnvelope } from "./io";
 
 type AdrAction = "new" | "accept" | "supersede" | "abandon" | "archive";
 
@@ -64,19 +50,7 @@ function parseReason(args: string[], commandName: string): string {
 }
 
 function writeJsonEnvelope(io: CommandIo, data: Record<string, unknown>): void {
-	const envelope = envelopeOk(data, {
-		action: String(data.action ?? "adr"),
-		exitCode: 0,
-	});
-	envelope.data = data;
-	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(
-				envelope,
-				Object.keys(data) as (keyof typeof data)[],
-			),
-		),
-	);
+	writeLegacyJsonEnvelope(io, String(data.action ?? "adr"), data);
 }
 
 export async function runAdrCommand(
