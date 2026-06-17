@@ -235,9 +235,9 @@ export function rankProjectBenchmarkRecommendations(
 				warnings: recommendationWarnings(project, stale),
 				risk_flags: riskFlags,
 				risk_level: recommendationRiskLevel(riskFlags),
-				do_not_copy: project.do_not_copy.map((entry) => entry.reason),
+				do_not_copy: (project.do_not_copy ?? []).map((entry) => entry.reason),
 				lesson:
-					project.lessons_for_afol.find((entry) => entry.axis === axis)
+					(project.lessons_for_afol ?? []).find((entry) => entry.axis === axis)
 						?.lesson ?? null,
 			};
 			return recommendation;

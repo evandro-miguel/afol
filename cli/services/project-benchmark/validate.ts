@@ -740,6 +740,7 @@ export function validateProjectBenchmarkCatalog(
 		if (
 			projectRecord.status === "active" &&
 			typeof projectRecord.last_reviewed_at === "string" &&
+			typeof projectRecord.stale_after_days === "number" &&
 			Number.isInteger(projectRecord.stale_after_days) &&
 			hasDateShape(projectRecord.last_reviewed_at) &&
 			isProjectBenchmarkStale(

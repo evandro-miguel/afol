@@ -472,11 +472,10 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "hydrate") {
-			return runHydrateCommand(
-				"hydrate",
-				[resolution.action, ...resolution.args],
-				project.value.root,
-			);
+			const hydrateArgs = resolution.action
+				? [resolution.action, ...resolution.args]
+				: resolution.args;
+			return runHydrateCommand("hydrate", hydrateArgs, project.value.root);
 		}
 		console.error(
 			`err unknown-group group=${resolution.group} action=${resolution.action} hint="run afol -h"`,

@@ -54,6 +54,38 @@ function writeJson(path: string, value: unknown): void {
 	writeFileSync(path, JSON.stringify(value, null, 2), "utf8");
 }
 
+function writeWorkbenchSession(root: string, sessionId: string): void {
+	const sessionDir = join(root, ".afol", "wb", sessionId);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(join(sessionDir, "plan.md"), "# Plan\n\nkernel test\n", "utf8");
+	writeFileSync(
+		join(sessionDir, "task.md"),
+		[
+			"# Tasks",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			"| T-01 | pending | worker | first task |",
+			"",
+		].join("\n"),
+		"utf8",
+	);
+	writeFileSync(
+		join(sessionDir, ".evidence.jsonl"),
+		[
+			JSON.stringify({
+				id: "E-1",
+				task_id: "T-01",
+				created_at: "2026-06-12T00:00:00.000Z",
+				command: "bun test",
+				result: "passed",
+			}),
+			"",
+		].join("\n"),
+		"utf8",
+	);
+}
+
 function writeProjectBenchmarkCatalog(root: string): void {
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "adm", "project-benchmarks", "projects"), {
@@ -538,6 +570,27 @@ describe("kernel front-door", () => {
 					expect(proc.stdout as string).toContain("STATUS: none");
 					expect(proc.stdout as string).toContain("TASK: none");
 				}
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("hydrate flag-only aliases route without empty action argument", () => {
+		const root = mkProjectRoot("hydrate-flag-aliases", "");
+		writeWorkbenchSession(root, "test-session");
+		try {
+			for (const args of [
+				["hydrate", "-S", "test-session"],
+				["hy", "-S", "test-session"],
+			]) {
+				const proc = runKernel(root, args);
+				expect(proc.status).toBe(0);
+				expect(proc.stdout as string).toContain("hydrate: ok");
+				expect(proc.stdout as string).toContain("session: test-session");
+				expect(proc.stderr as string).not.toContain(
+					"Unknown hydrate argument:",
+				);
 			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });

@@ -226,6 +226,13 @@ function fileLooksLikeProjectBenchmarkGeneratedOutput(
 	if (GENERATED_FILE_NAMES.has(fileName)) {
 		return true;
 	}
+	if (
+		!fileName.endsWith(".json") &&
+		!fileName.endsWith(".md") &&
+		!fileName.endsWith(".txt")
+	) {
+		return false;
+	}
 	try {
 		return readFileSync(path, "utf8").includes("afol pb generate");
 	} catch {
