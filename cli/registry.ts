@@ -265,6 +265,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "inspect",
 	},
 	{
+		command: "render",
+		aliases: [],
+		kind: "memory",
+		sideEffect: "generated",
+		description: "Deprecated alias for memory render",
+		category: "inspect",
+	},
+	{
 		command: "library",
 		aliases: ["lb"],
 		kind: "library",

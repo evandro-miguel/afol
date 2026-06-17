@@ -168,6 +168,15 @@ export function resolveCommand(args: string[]): CommandResolution {
 	}
 
 	const topLevelKind = kernelRegistry.resolveKind(topLevel);
+	if (topLevel === "render" && topLevelKind === "memory") {
+		return {
+			kind: "subcommand",
+			group: "memory",
+			action: "render",
+			args: normalizeScopedFlags("memory", rest),
+		};
+	}
+
 	if (topLevelKind === "validate") {
 		return { kind: "validate", args: rest };
 	}

@@ -45,7 +45,7 @@ function copyMinimalWorkspace(root: string, sandboxRoot: string): void {
 		safeCopy(join(root, relativePath), join(sandboxRoot, relativePath));
 	}
 	mkdirSync(join(sandboxRoot, ".agents", "rules"), { recursive: true });
-	mkdirSync(join(sandboxRoot, ".afol", "skills"), { recursive: true });
+	mkdirSync(join(sandboxRoot, ".agents", "skills"), { recursive: true });
 	mkdirSync(join(sandboxRoot, ".afol", "adm"), { recursive: true });
 	mkdirSync(join(sandboxRoot, ".afol", "wb"), { recursive: true });
 	mkdirSync(join(sandboxRoot, "docs", "arc", "SPECS"), { recursive: true });

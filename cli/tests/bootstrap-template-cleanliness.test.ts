@@ -65,5 +65,18 @@ describe("generated template cleanliness", () => {
 		expect(paths).toContain(
 			".afol/data/benchmarks/catalog/baselines/cli-kernel-local/baseline-v1.json",
 		);
+		expect(paths).toContain(".afol/adm/project-benchmarks/axes.json");
+		expect(paths).toContain(".afol/adm/project-benchmarks/schema.json");
+		expect(paths).toContain(".afol/adm/project-benchmarks/projects/aider.json");
+		expect(paths).toContain(".afol/data/project-benchmarks/index.json");
+		expect(paths).toContain(
+			".afol/data/project-benchmarks/similarity-matrix.json",
+		);
+		expect(paths).toContain(
+			".afol/data/project-benchmarks/generated-summary.md",
+		);
+		expect(paths).toContain(
+			".afol/data/project-benchmarks/validation-report.json",
+		);
 	});
 });

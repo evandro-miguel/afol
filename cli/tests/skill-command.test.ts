@@ -6,7 +6,7 @@ import { runSkillCommand } from "../commands/catalog";
 
 function mkRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "skill-command-"));
-	const skillsRoot = join(root, ".afol", "skills");
+	const skillsRoot = join(root, ".agents", "skills");
 	mkdirSync(join(skillsRoot, "bun-development"), { recursive: true });
 	mkdirSync(join(skillsRoot, "typescript-expert"), { recursive: true });
 	writeFileSync(
@@ -78,7 +78,7 @@ describe("skill command", () => {
 		const root = mkRoot();
 		try {
 			writeFileSync(
-				join(root, ".afol", "skills", "typescript-expert", "SKILL.md"),
+				join(root, ".agents", "skills", "typescript-expert", "SKILL.md"),
 				"---\nname: [broken\ndescription: nope\n---\n\n# TS\n",
 				"utf8",
 			);
@@ -87,7 +87,7 @@ describe("skill command", () => {
 			expect(await runSkillCommand(["list"], root, list.io)).toBe(0);
 			expect(list.stderr).toEqual([]);
 			expect(list.stdout.join("\n")).toContain(
-				"typescript-expert .afol/skills/typescript-expert/SKILL.md",
+				"typescript-expert .agents/skills/typescript-expert/SKILL.md",
 			);
 
 			const show = capture();

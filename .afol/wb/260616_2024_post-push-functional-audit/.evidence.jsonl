@@ -1,0 +1,8 @@
+{"id":"E-20260616202641140-e085b7","task_id":"T-01","created_at":"2026-06-17T00:26:41.140Z","command":"bun test cli/tests/router.test.ts cli/tests/kernel.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/log-command.test.ts","result":"passed"}
+{"id":"E-20260616202641187-f38ceb","task_id":"T-01","created_at":"2026-06-17T00:26:41.187Z","command":"./dist/afol local-state rebuild --json && ./dist/afol validate project --json && ./dist/afol local-state freshness --json","result":"passed"}
+{"id":"E-20260616202708483-c91235","task_id":"T-01","created_at":"2026-06-17T00:27:08.483Z","command":"./dist/afol front-door smoke for commands, aliases, safe dry-runs/checks (100 checks)","result":"passed"}
+{"id":"E-20260616204954931-5f3de9","task_id":"T-01","created_at":"2026-06-17T00:49:54.931Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260616204954977-93bade","task_id":"T-01","created_at":"2026-06-17T00:49:54.977Z","command":"bun test","result":"passed"}
+{"id":"E-20260616204955030-7552c7","task_id":"T-01","created_at":"2026-06-17T00:49:55.030Z","command":"bun run validate:release","result":"passed"}
+{"id":"E-20260616204955081-d0d5b6","task_id":"T-01","created_at":"2026-06-17T00:49:55.081Z","command":"./dist/afol ls rb --json && ./dist/afol v project --json && ./dist/afol ls fs --json && ./dist/afol pb gen -c --json && ./dist/afol render --json","result":"passed"}
+{"id":"E-20260616204959543-66e51c","task_id":"T-01","created_at":"2026-06-17T00:49:59.543Z","command":"bun run validate:release","result":"passed"}

@@ -124,7 +124,9 @@ function createBundleFixture(options?: {
 }): string {
 	const root = createSectionFixture();
 	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
-	mkdirSync(join(root, ".afol", "skills", "alpha-helper"), { recursive: true });
+	mkdirSync(join(root, ".agents", "skills", "alpha-helper"), {
+		recursive: true,
+	});
 	mkdirSync(join(root, ".afol", "library"), { recursive: true });
 	mkdirSync(join(root, ".afol", "memory"), { recursive: true });
 	mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
@@ -153,7 +155,7 @@ function createBundleFixture(options?: {
 	);
 
 	writeFileSync(
-		join(root, ".afol", "skills", "alpha-helper", "SKILL.md"),
+		join(root, ".agents", "skills", "alpha-helper", "SKILL.md"),
 		[
 			"---",
 			"name: alpha helper",

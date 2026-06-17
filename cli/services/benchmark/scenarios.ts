@@ -4,7 +4,7 @@ import type { BenchScenario } from "./types";
 
 function seedProjectSkeleton(root: string): void {
 	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
-	mkdirSync(join(root, ".afol", "skills"), { recursive: true });
+	mkdirSync(join(root, ".agents", "skills"), { recursive: true });
 	mkdirSync(join(root, ".afol", "adm"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });

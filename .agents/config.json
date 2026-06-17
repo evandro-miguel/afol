@@ -6,7 +6,7 @@
   "paths": {
     "agents_dir": ".agents",
     "mutable_dir": ".afol",
-    "skills_dir": ".afol/skills",
+    "skills_dir": ".agents/skills",
     "wb_dir": ".afol/wb",
     "active_session_file": ".afol/wb/.active_session",
     "tmp_dir": ".afol/tmp",
@@ -19,6 +19,6 @@
     "docs_dir": "docs"
   },
   "skills_sync": {
-    "project_dir": ".afol/skills"
+    "project_dir": ".agents/skills"
   }
 }

@@ -26,6 +26,22 @@ function runBun(
 	});
 }
 
+function runAfol(
+	cwd: string,
+	args: string[],
+	env: NodeJS.ProcessEnv = process.env,
+): ReturnType<typeof spawnSync> {
+	return spawnSync("./afol", args, {
+		cwd,
+		env: {
+			...env,
+			AGENTIC_CLI_PATH: kernelPath,
+		},
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+}
+
 function listFilesRecursive(root: string): string[] {
 	const out: string[] = [];
 	const walk = (currentAbs: string, currentRel: string): void => {
@@ -83,13 +99,12 @@ describe("downstream bootstrap smoke", () => {
 			const bootstrap = runBun(sandbox, [kernelPath, "bootstrap", target]);
 			assertOk(bootstrap, "bootstrap");
 
-			const statusBefore = runBun(target, [kernelPath, "status"]);
+			const statusBefore = runAfol(target, ["status"]);
 			assertOk(statusBefore, "status before new");
 			expect(statusBefore.stdout as string).toContain("STATUS: none");
 			expect(statusBefore.stdout as string).toContain("SESSIONS: 0");
 
-			const created = runBun(target, [
-				kernelPath,
+			const created = runAfol(target, [
 				"new",
 				"smoke",
 				"--task",
@@ -98,17 +113,49 @@ describe("downstream bootstrap smoke", () => {
 			assertOk(created, "new");
 			const session = sessionFrom(created.stdout as string);
 
-			const statusAfterNew = runBun(target, [kernelPath, "status"]);
+			const statusAfterNew = runAfol(target, ["status"]);
 			assertOk(statusAfterNew, "status after new");
 			expect(statusAfterNew.stdout as string).toContain("STATUS: pending");
 			expect(statusAfterNew.stdout as string).toContain("TASK: T-01");
 			expect(statusAfterNew.stdout as string).toContain("SESSIONS: 1");
 
-			const start = runBun(target, [kernelPath, "start", "--task-id", "T-01"]);
+			const render = runAfol(target, ["render", "--json"]);
+			assertOk(render, "render");
+			const renderPayload = JSON.parse(render.stdout as string) as {
+				action: string;
+				ok: boolean;
+			};
+			expect(renderPayload.ok).toBe(true);
+			expect(renderPayload.action).toBe("memory.render");
+
+			const pbList = runAfol(target, ["pb", "list", "--json"]);
+			assertOk(pbList, "pb list");
+			const pbListPayload = JSON.parse(pbList.stdout as string) as {
+				action: string;
+				ok: boolean;
+				data: { projects: unknown[] };
+			};
+			expect(pbListPayload.ok).toBe(true);
+			expect(pbListPayload.action).toBe("project-benchmark.list");
+			expect(pbListPayload.data.projects.length).toBeGreaterThan(0);
+
+			const pbValidate = runAfol(target, [
+				"project-benchmark",
+				"validate",
+				"--json",
+			]);
+			assertOk(pbValidate, "project-benchmark validate");
+			const pbValidatePayload = JSON.parse(pbValidate.stdout as string) as {
+				action: string;
+				ok: boolean;
+			};
+			expect(pbValidatePayload.ok).toBe(true);
+			expect(pbValidatePayload.action).toBe("project-benchmark.validate");
+
+			const start = runAfol(target, ["start", "--task-id", "T-01"]);
 			assertOk(start, "start");
 
-			const evidence = runBun(target, [
-				kernelPath,
+			const evidence = runAfol(target, [
 				"evidence",
 				"T-01",
 				"--command",
@@ -118,7 +165,7 @@ describe("downstream bootstrap smoke", () => {
 			]);
 			assertOk(evidence, "evidence");
 
-			const done = runBun(target, [kernelPath, "done", "--task-id", "T-01"]);
+			const done = runAfol(target, ["done", "--task-id", "T-01"]);
 			assertOk(done, "done");
 
 			const taskDoc = readFileSync(
@@ -135,7 +182,7 @@ describe("downstream bootstrap smoke", () => {
 			expect(evidenceDoc).toContain('"command":"smoke"');
 			expect(evidenceDoc).toContain('"result":"passed"');
 
-			const close = runBun(target, [kernelPath, "close"]);
+			const close = runAfol(target, ["close"]);
 			assertOk(close, "close");
 
 			const allPaths = listFilesRecursive(target);

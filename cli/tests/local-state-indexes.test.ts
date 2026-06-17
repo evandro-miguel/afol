@@ -35,7 +35,7 @@ function buildFixture() {
 	const root = mkdtempSync(join(tmpdir(), "proj-indexes-"));
 
 	const rulesDir = join(root, ".agents", "rules");
-	const skillsDir = join(root, ".afol", "skills");
+	const skillsDir = join(root, ".agents", "skills");
 	const specsDir = join(root, ".afol", "adm", "specs");
 
 	mkdirSync(rulesDir, { recursive: true });
@@ -168,8 +168,8 @@ describe("local-state project indexer", () => {
 				orderedSkills,
 			);
 			expect(skillsSnapshot.skills.map((skill) => skill.path)).toEqual([
-				".afol/skills/skill-a/SKILL.md",
-				".afol/skills/skill-b/SKILL.md",
+				".agents/skills/skill-a/SKILL.md",
+				".agents/skills/skill-b/SKILL.md",
 			]);
 			expect(specsSnapshot.specs.map((spec) => spec.path)).toEqual([
 				".afol/adm/specs/001-spec.md",
@@ -332,12 +332,12 @@ describe("local-state project indexer", () => {
 			const snapshot = rebuildSkillsIndex(root) as SkillsIndexSnapshot;
 			expect(snapshot.skills[0]).toMatchObject({
 				name: "alpha skill",
-				path: ".afol/skills/skill-a/SKILL.md",
+				path: ".agents/skills/skill-a/SKILL.md",
 				description: "alpha",
 				touched_at: expect.any(String),
 			} satisfies Partial<SkillIndexEntry>);
 
-			const skillPath = join(root, ".afol", "skills", "skill-a", "SKILL.md");
+			const skillPath = join(root, ".agents", "skills", "skill-a", "SKILL.md");
 			const future = new Date(Date.now() + 60_000);
 			utimesSync(skillPath, future, future);
 
@@ -353,18 +353,18 @@ describe("local-state project indexer", () => {
 		const root = buildFixture();
 		try {
 			writeFileSync(
-				join(root, ".afol", "skills", "skill-a", "SKILL.md"),
+				join(root, ".agents", "skills", "skill-a", "SKILL.md"),
 				"---\nname: [broken\ndescription: no\n---\n\npayload\n",
 				"utf8",
 			);
 
 			const snapshot = rebuildSkillsIndex(root) as SkillsIndexSnapshot;
 			const fallbackSkill = snapshot.skills.find(
-				(skill) => skill.path === ".afol/skills/skill-a/SKILL.md",
+				(skill) => skill.path === ".agents/skills/skill-a/SKILL.md",
 			);
 			expect(fallbackSkill).toMatchObject({
 				name: "skill-a",
-				path: ".afol/skills/skill-a/SKILL.md",
+				path: ".agents/skills/skill-a/SKILL.md",
 				description: "",
 			} satisfies Partial<SkillIndexEntry>);
 			expect(validateSkillsIndex(root).ok).toBe(true);

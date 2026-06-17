@@ -30,7 +30,7 @@ Mutable AFOL state belongs under `.afol/`, including workbench sessions,
 events, indexes, mutations, temporary files, benchmark catalog/results, and
 migration archives.
 
-AFOL-owned project-local skills live under `.afol/skills/**`.
+Project-local provider skills live under `.agents/skills/**`.
 
 Target governance layout:
 

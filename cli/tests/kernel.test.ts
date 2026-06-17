@@ -352,6 +352,71 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("project-benchmark compact aliases match canonical front-door behavior", () => {
+		const root = mkProjectRoot("project-benchmark-parity", "");
+		try {
+			writeProjectBenchmarkCatalog(root);
+
+			const cases: Array<{ compact: string[]; canonical: string[] }> = [
+				{
+					compact: ["pb", "list", "--json"],
+					canonical: ["project-benchmark", "list", "--json"],
+				},
+				{
+					compact: ["pb", "validate", "--json"],
+					canonical: ["project-benchmark", "validate", "--json"],
+				},
+				{
+					compact: ["pb", "rec", "-f", "repo_context_map"],
+					canonical: [
+						"project-benchmark",
+						"recommend",
+						"--for",
+						"repo_context_map",
+					],
+				},
+			];
+
+			for (const { compact, canonical } of cases) {
+				const compactProc = runKernel(root, compact);
+				const canonicalProc = runKernel(root, canonical);
+				expect(compactProc.status).toBe(0);
+				expect(canonicalProc.status).toBe(0);
+				expect(compactProc.stdout).toBe(canonicalProc.stdout);
+				expect(compactProc.stderr).toBe(canonicalProc.stderr);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project-benchmark compact aliases preserve native argument failures", () => {
+		const root = mkProjectRoot("project-benchmark-negative", "");
+		try {
+			writeProjectBenchmarkCatalog(root);
+			const cases: Array<{ args: string[]; message: string }> = [
+				{ args: ["pb", "zz"], message: "err unknown-action action=zz" },
+				{
+					args: ["pb", "rec"],
+					message: "Missing --for <axis> for pb recommend.",
+				},
+				{
+					args: ["pb", "v", "--badflag"],
+					message: "Unknown project-benchmark argument: --badflag",
+				},
+			];
+
+			for (const { args, message } of cases) {
+				const proc = runKernel(root, args);
+				expect(proc.status).toBe(2);
+				expect(proc.stdout as string).toBe("");
+				expect(proc.stderr as string).toContain(message);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("project-benchmark generate honors approval gate while allowing check for restricted callers", () => {
 		const root = mkProjectRoot("project-benchmark-agent", "");
 		try {
@@ -453,7 +518,10 @@ describe("kernel front-door", () => {
 				["--json"],
 				["-j", "s"],
 				["s", "-j"],
+				["s", "-j", "--json"],
 				["status", "--json"],
+				["status", "-j", "--json"],
+				["-j", "status", "--json"],
 			];
 
 			for (const args of statusCases) {
@@ -470,6 +538,62 @@ describe("kernel front-door", () => {
 					expect(proc.stdout as string).toContain("STATUS: none");
 					expect(proc.stdout as string).toContain("TASK: none");
 				}
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("deprecated render command routes to memory render", () => {
+		const root = mkProjectRoot(
+			"render-compat",
+			"#!/usr/bin/env bash\necho LEGACY:$*",
+		);
+		try {
+			const proc = runKernel(root, ["render", "--json"]);
+			expect(proc.status).toBe(0);
+			const payload = JSON.parse(proc.stdout as string) as {
+				ok: boolean;
+				data: { markdown: string };
+			};
+			expect(payload.ok).toBe(true);
+			expect(payload.data.markdown).toContain("entries: 0");
+			expect(proc.stderr as string).not.toContain("unknown-command");
+			expect(proc.stdout as string).not.toContain("LEGACY:");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("compact aliases preserve native failures for unknown scoped input", () => {
+		const root = mkProjectRoot(
+			"alias-negative",
+			"#!/usr/bin/env bash\necho LEGACY:$*",
+		);
+		try {
+			const cases: Array<{ args: string[]; message: string }> = [
+				{ args: ["ad", "zz"], message: "Unknown adm action: zz" },
+				{
+					args: ["ss", "zz"],
+					message: "err session-action-unknown",
+				},
+				{ args: ["be", "-T"], message: "Unknown bench argument: -T" },
+				{
+					args: ["update", "ck", "-x"],
+					message: "Unknown update argument: -x",
+				},
+				{
+					args: ["-j", "sttaus"],
+					message: "err unknown-flag flag=-j",
+				},
+			];
+
+			for (const { args, message } of cases) {
+				const proc = runKernel(root, args);
+				expect(proc.status).toBe(2);
+				expect(proc.stdout as string).toBe("");
+				expect(proc.stderr as string).toContain(message);
+				expect(proc.stdout as string).not.toContain("LEGACY:");
 			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -633,14 +757,16 @@ describe("kernel front-door", () => {
 
 			expect(proc.status).toBe(0);
 			expect(proc.stderr as string).toBe("");
-			expect(proc.stdout as string).toContain(
+			expect(proc.stdout as string).not.toContain(
 				"provider-compatible-cleanup-archived .agents/skills",
 			);
 			expect(proc.stdout as string).toContain(
 				"provider-compatible-cleanup-archived .agents/wb",
 			);
 			expect(proc.stdout as string).toContain("archive=.afol/data/migrations/");
-			expect(existsSync(join(root, ".agents", "skills"))).toBe(false);
+			expect(existsSync(join(root, ".agents", "skills", "custom.md"))).toBe(
+				true,
+			);
 			expect(existsSync(join(root, ".agents", "wb"))).toBe(false);
 			expect(existsSync(join(root, ".agents", "tmp"))).toBe(false);
 			expect(existsSync(join(root, ".agents", "data"))).toBe(false);
@@ -653,7 +779,7 @@ describe("kernel front-door", () => {
 				"migrations",
 				archives[0] ?? "",
 			);
-			expect(existsSync(join(archiveRoot, "skills", "custom.md"))).toBe(true);
+			expect(existsSync(join(archiveRoot, "skills", "custom.md"))).toBe(false);
 			expect(existsSync(join(archiveRoot, "wb", "session", "task.md"))).toBe(
 				true,
 			);

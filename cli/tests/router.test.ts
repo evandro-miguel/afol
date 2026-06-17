@@ -1,9 +1,43 @@
 import { describe, expect, test } from "bun:test";
+import { FLAG_ALIASES, SUBCOMMAND_ACTION_ALIASES } from "../aliases";
 import { DIRECT_DISPATCH_KINDS, SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry } from "../registry";
 import { ROUTED_SUBCOMMAND_GROUPS, resolveCommand } from "../router";
 
 describe("router alias grammar", () => {
+	test("keeps alias tables scoped to dispatched command kinds", () => {
+		const commandKinds = new Set<string>(
+			kernelRegistry.commands.map((spec) => spec.kind),
+		);
+
+		for (const [scope, aliases] of Object.entries(SUBCOMMAND_ACTION_ALIASES)) {
+			expect(commandKinds.has(scope)).toBe(true);
+			for (const [alias, canonical] of Object.entries(aliases)) {
+				expect(alias).not.toBe("");
+				expect(canonical).not.toBe("");
+				expect(alias).not.toBe(canonical);
+				expect(alias.startsWith("-")).toBe(false);
+				expect(canonical.startsWith("-")).toBe(false);
+				expect(alias.trim()).toBe(alias);
+				expect(canonical.trim()).toBe(canonical);
+			}
+		}
+
+		for (const [scope, aliases] of Object.entries(FLAG_ALIASES)) {
+			expect(commandKinds.has(scope)).toBe(true);
+			for (const [alias, canonical] of Object.entries(aliases)) {
+				expect(alias).not.toBe("");
+				expect(canonical).not.toBe("");
+				expect(alias).not.toBe(canonical);
+				expect(alias.startsWith("-")).toBe(true);
+				expect(alias.startsWith("--")).toBe(false);
+				expect(canonical.startsWith("--")).toBe(true);
+				expect(alias.trim()).toBe(alias);
+				expect(canonical.trim()).toBe(canonical);
+			}
+		}
+	});
+
 	test("normalizes compact workflow flags for direct commands", () => {
 		expect(
 			resolveCommand([
@@ -210,6 +244,76 @@ describe("router alias grammar", () => {
 			action: "apply",
 			args: ["--dry-run"],
 		});
+	});
+
+	test("keeps deprecated render command routed to memory render", () => {
+		expect(resolveCommand(["render"])).toEqual({
+			kind: "subcommand",
+			group: "memory",
+			action: "render",
+			args: [],
+		});
+		expect(resolveCommand(["render", "--json"])).toEqual({
+			kind: "subcommand",
+			group: "memory",
+			action: "render",
+			args: ["--json"],
+		});
+	});
+
+	test("keeps compact command forms behaviorally aligned with canonical forms", () => {
+		const cases: Array<{ compact: string[]; canonical: string[] }> = [
+			{
+				compact: ["ss", "sw", "-S", "session-1", "-b", "main"],
+				canonical: [
+					"session",
+					"switch",
+					"--session",
+					"session-1",
+					"--branch",
+					"main",
+				],
+			},
+			{
+				compact: ["be", "r", "-s", "cli-help", "-k"],
+				canonical: [
+					"bench",
+					"run",
+					"--scenario",
+					"cli-help",
+					"--keep-artifacts",
+				],
+			},
+			{
+				compact: ["pb", "rec", "-f", "token-economy"],
+				canonical: ["project-benchmark", "recommend", "--for", "token-economy"],
+			},
+			{
+				compact: ["sc", "ap", "-D"],
+				canonical: ["schema", "apply", "--dry-run"],
+			},
+			{
+				compact: ["up", "ck", "-S", "session-1", "-T", "T-01", "-r", "sync"],
+				canonical: [
+					"update",
+					"check",
+					"--session",
+					"session-1",
+					"--task-id",
+					"T-01",
+					"--reason",
+					"sync",
+				],
+			},
+			{
+				compact: ["ls", "rb"],
+				canonical: ["local-state", "rebuild"],
+			},
+		];
+
+		for (const { compact, canonical } of cases) {
+			expect(resolveCommand(compact)).toEqual(resolveCommand(canonical));
+		}
 	});
 
 	test("normalizes scoped flags when subcommand action is omitted", () => {

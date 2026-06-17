@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://afol.local/schemas/project-benchmark.schema.json",
+  "title": "AFOL Project Benchmark Catalog",
+  "type": "object",
+  "required": ["schema_version", "id", "name", "category", "status", "source_access", "last_reviewed_at", "stale_after_days", "confidence", "similarity_axes", "similarities", "differences", "lessons_for_afol", "do_not_copy", "source_refs"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "category": {
+      "type": "string",
+      "enum": ["direct_comparable", "protocol_reference", "adjacent_reference"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "paused", "archived"]
+    },
+    "source_access": {
+      "type": "string",
+      "enum": ["open_source", "official_docs", "docs_only", "closed_source"]
+    },
+    "last_reviewed_at": { "type": "string", "format": "date" },
+    "stale_after_days": { "type": "integer", "minimum": 1 },
+    "confidence": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "similarity_axes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["score", "evidence_refs"],
+        "properties": {
+          "score": { "type": "integer", "minimum": 0, "maximum": 5 },
+          "evidence_refs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "similarities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/axisClaim" }
+    },
+    "differences": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["claim"],
+        "properties": {
+          "claim": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "lessons_for_afol": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["axis", "lesson"],
+        "properties": {
+          "axis": { "type": "string" },
+          "lesson": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "do_not_copy": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "reason": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "url", "source_type", "claim", "axes"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "format": "uri" },
+          "source_type": {
+            "type": "string",
+            "enum": ["official_doc", "official_repo", "spec", "paper", "article"]
+          },
+          "claim": { "type": "string", "minLength": 1 },
+          "axes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "axisClaim": {
+      "type": "object",
+      "required": ["axis", "claim", "evidence_refs"],
+      "properties": {
+        "axis": { "type": "string" },
+        "claim": { "type": "string", "minLength": 1 },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

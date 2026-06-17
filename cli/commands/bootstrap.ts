@@ -53,7 +53,6 @@ type ProviderCompatibleCleanupArchiveResult =
 	};
 
 const BASE_MUTABLE_BASELINE_SOURCES = [
-	{ suffix: "skills/README.md", sourcePath: ".afol/skills/README.md" },
 	{ suffix: "tmp/README.md", sourcePath: ".afol/tmp/README.md" },
 	{ suffix: "data/README.md", sourcePath: ".afol/data/README.md" },
 	{
@@ -70,11 +69,13 @@ const BASE_MUTABLE_BASELINE_SOURCES = [
 	},
 ] as const;
 
-const MUTABLE_BENCHMARK_CATALOG_PREFIX = ".afol/data/benchmarks/catalog/";
+const MUTABLE_BASELINE_TEMPLATE_PREFIXES = [
+	".afol/data/benchmarks/catalog/",
+	".afol/data/project-benchmarks/",
+] as const;
 
 const PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS = [
 	".agents/data",
-	".agents/skills",
 	".agents/tmp",
 	".agents/wb",
 	".agents/z-arq",
@@ -193,7 +194,7 @@ function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
 		agents_dir: ".agents",
 		mutable_dir: mutableDir,
 		rules_dir: ".agents/rules",
-		skills_dir: `${mutableDir}/skills`,
+		skills_dir: ".agents/skills",
 		wb_dir: ".afol/wb",
 		active_session_file: `${mutableDir}/wb/.active_session`,
 		tmp_dir: `${mutableDir}/tmp`,
@@ -212,7 +213,7 @@ function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
 		!Array.isArray(config.skills_sync)
 			? (config.skills_sync as Record<string, unknown>)
 			: {}),
-		project_dir: `${mutableDir}/skills`,
+		project_dir: ".agents/skills",
 	};
 	return Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
@@ -317,11 +318,12 @@ function planMutableBaselines(
 	const baselineSources = [
 		...BASE_MUTABLE_BASELINE_SOURCES,
 		...Object.keys(DEFAULT_TEMPLATE_FILES)
-			.filter(
-				(sourcePath) =>
-					sourcePath.startsWith(MUTABLE_BENCHMARK_CATALOG_PREFIX) &&
-					!sourcePath.includes("/providers/"),
+			.filter((sourcePath) =>
+				MUTABLE_BASELINE_TEMPLATE_PREFIXES.some((prefix) =>
+					sourcePath.startsWith(prefix),
+				),
 			)
+			.filter((sourcePath) => !sourcePath.includes("/providers/"))
 			.sort()
 			.map((sourcePath) => ({
 				sourcePath,

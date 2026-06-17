@@ -16,7 +16,7 @@ Define how to install the `.agents` scaffold into another repository, including:
 - partial installation for an existing repo
 - limitations and safe usage notes
 - the skills baseline that should be prepared for future universal-skills contract evolution
-- the preferred project-local skill model, where each repo carries its own `.afol/skills` subset instead of depending on many global Codex skills
+- the preferred project-local skill model, where each repo carries its own `.agents/skills` subset instead of depending on many global Codex skills
 - the export source boundary, where the reusable baseline lives under `src/project-template/` in this repo instead of the live development root
 - the canonical operator front door `afol`; downstream installs must not depend
   on legacy aliases or legacy just command runners
@@ -140,7 +140,7 @@ silently replace additional project content.
 - Optional upstream skills sync may emit warnings; those warnings are non-blocking.
 - Bootstrap does not copy scaffold-local skill history; it only prepares the baseline needed for the target repo to own its selection and upgrade path.
 - Bootstrap should reinforce project-local skills, not turn global Codex skills into a second project contract.
-- `skills-sync pull` refreshes only a configured external git-backed source; use `skills-sync sync` / `skills-sync update` to actually refresh `.afol/skills/` in the target repo.
+- `skills-sync pull` refreshes only a configured external git-backed source; use `skills-sync sync` / `skills-sync update` to actually refresh `.agents/skills/` in the target repo.
 - Python/uv bootstrap scripts are factory-only compatibility surfaces. Public
   downstream installs should use the native `afol bootstrap` path and should
   not require `.agents/scripts`, `.agents/runtime`, or project-local uv
