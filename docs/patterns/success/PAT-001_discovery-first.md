@@ -27,7 +27,7 @@ Starting scaffold work or choosing validation for a changed path.
 ```bash
 afol -h
 afol validate select --changed-path cli/main.ts --json
-afol new auth-refactor --feature-id F-01 --parent-spec docs/arc/SPECS/example.md
+afol new auth-refactor --feature-id F-01 --parent-spec .afol/adm/specs/example.md
 ```
 
 Do not use retired `.agents/agents` tools discovery.

@@ -37,7 +37,7 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 - Status: planned
 - Why: <why this feature matters>
-- Governing spec: `docs/arc/SPECS/<parent-spec-file>.md`
+- Governing spec: `.afol/adm/specs/<parent-spec-file>.md`
 - Child spec policy:
   - Required: <yes/no>
   - Child specs:
@@ -54,7 +54,7 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 - Status: planned
 - Why: <why this feature matters>
-- Governing spec: `docs/arc/SPECS/<parent-spec-file>.md`
+- Governing spec: `.afol/adm/specs/<parent-spec-file>.md`
 - Child spec policy:
   - Required: <yes/no>
   - Child specs:

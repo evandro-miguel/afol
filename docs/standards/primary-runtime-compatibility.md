@@ -24,8 +24,11 @@ Compatibility runtimes kept in sync for broader reuse:
 ## Canonical Source Rule
 
 - `AGENTS.md` is the canonical instruction source.
-- `docs/arc/GENERAL-ROADMAP.md` and `docs/arc/SPECS/` remain the canonical strategic layer.
+- `.afol/adm/` is the canonical strategic and governance layer.
+- `.afol/pstr/` is the canonical current project-structure map layer.
 - `.afol/wb/` remains the canonical execution layer.
+- `.agents/` is static scaffold metadata, rules, source seed, and provider skill
+  content only.
 
 Runtime-specific files must adapt this canonical layer, not redefine it.
 
@@ -77,10 +80,10 @@ Committed runtime config must stay safe to review publicly inside the repository
 
 ## Verification
 
-- `afol validate --changed-path <adapter-path>`
-- `afol validate --changed-path AGENTS.md`
-- `afol validate --changed-path CLAUDE.md`
-- `afol validate --json`
+- `afol validate select --changed-path <adapter-path>`
+- `afol validate select --changed-path AGENTS.md`
+- `afol validate select --changed-path CLAUDE.md`
+- `afol validate project --json`
 - `bun run validate:release`
 
 ## Acceptance

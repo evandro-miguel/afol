@@ -26,7 +26,7 @@ Managing multiple tasks or workstreams with AFOL.
 
 ```bash
 afol status
-afol new oauth-integration --feature-id F-02 --parent-spec docs/arc/SPECS/oauth.md
+afol new oauth-integration --feature-id F-02 --parent-spec .afol/adm/specs/oauth.md
 afol evidence --session 260224_1200_feature-a --task-id T-01 --command "bun test" --result passed
 afol done --session 260224_1200_feature-a --task-id T-01
 ```

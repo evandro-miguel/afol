@@ -23,6 +23,20 @@ system has been retired and must not be restored.
 - Target `.afol/pstr/**`: current project-structure maps only; commands live in
   `cli/**`, and pstr contains map outputs.
 
+## Documentation Map
+
+- `docs/README.md`: canonical index for repository documentation.
+- `docs/afol-runtime-reference.md`: AFOL command groups, runtime state
+  ownership, and validation gates.
+- `.afol/adm/doctrine/ARCHITECTURE.md`: architecture authority and boundary
+  rules.
+- `.afol/adm/roadmap/GENERAL-ROADMAP.md`: feature inventory and roadmap status.
+- `.afol/adm/specs/**`: governing specs.
+- `.afol/adm/decisions/**`: ADRs and durable decisions.
+- `.afol/pstr/**`: generated current project-structure maps.
+- `PLANS.md`: ExecPlan requirements for governed workbench sessions.
+- `.afol/adm/doctrine/RELEASE-RUNBOOK.md`: release readiness checklist.
+
 Removed legacy surfaces:
 
 - `.agents/agents`

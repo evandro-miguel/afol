@@ -10,7 +10,7 @@ updated_at: '2026-05-04T16:08:30-03:00'
 
 ## Purpose
 
-Define how to install the `.agents` scaffold into another repository, including:
+Define how to install the AFOL scaffold into another repository, including:
 
 - full bootstrap for a fresh repo
 - partial installation for an existing repo
@@ -20,6 +20,7 @@ Define how to install the `.agents` scaffold into another repository, including:
 - the export source boundary, where the reusable baseline lives under `src/project-template/` in this repo instead of the live development root
 - the canonical operator front door `afol`; downstream installs must not depend
   on legacy aliases or legacy just command runners
+- the static `.agents` metadata boundary and mutable `.afol` runtime boundary
 
 ## Public onboarding requirements
 
@@ -35,7 +36,7 @@ Define how to install the `.agents` scaffold into another repository, including:
   - `afol s` (or `afol status`) confirms onboarding command visibility.
   - `afol b /path/to/existing-project --partial` confirms the partial install path.
   - `afol status`
-  - `afol validate`
+  - `afol validate project`
 
 ## Modes
 
@@ -46,10 +47,13 @@ Use full bootstrap when the target repo is new or mostly empty.
 What it does:
 
 - creates the target directory when it does not exist yet
-- installs the native `.agents` baseline
+- installs the native AFOL baseline
+- installs static `.agents` scaffold metadata
+- prepares mutable `.afol` runtime state
 - generates the generic governance baseline
-- prepares the goal-state canon under `docs/arc/` and the optional current-state map surface under `docs/map/`
-- creates the workbench/local-state directories without copying source-repo workbench history
+- prepares desired-state administration under `.afol/adm/`
+- prepares current-state map ownership under `.afol/pstr/`
+- creates the workbench/local-state directories under `.afol/` without copying source-repo workbench history
 - validates through the native front door after bootstrap
 - prepares `.agents/source/universal-skills` as the preferred repo-local upstream source checkout
 - seeds that checkout from committed scaffold assets, so the default bootstrap path does not require a network clone
@@ -67,7 +71,7 @@ Use partial installation when the target repo already exists and has project con
 Behavior:
 
 - existing files are preserved by default
-- missing `.agents` files and folders are added
+- missing scaffold files and folders are added
 - generated governance files are written only where the target does not already have a file
 - the target receives the state-vs-goal split without adding a second planning tree
 - `--force-managed` is required to overwrite managed scaffold conflicts
@@ -152,14 +156,14 @@ After install, validate the target repo with:
 
 ```bash
 afol status
-afol validate
+afol validate project
 ```
 
 For isolated environments, point `AGENTIC_CLI_PATH` at the source checkout's
 native CLI and confirm the exported front door works:
 
 ```bash
-AGENTIC_CLI_PATH=/path/to/source/cli/main.ts afol validate
+AGENTIC_CLI_PATH=/path/to/source/cli/main.ts afol validate project
 ```
 
 ---

@@ -31,6 +31,17 @@ migration archives.
 
 Project-local provider skills live under `.agents/skills/**`.
 
+## Project RAG
+
+- Project RAG id: `md72gw7nfa3n1dfd12cqzgwa9d88t1q5`
+- Project RAG slug: `main-dev`
+- Indexed root: `/home/ozy/apps/agentic_start_folder/.worktree/main_dev`
+- Indexed include roots: `cli`, `src`, `docs`, `.afol`, `.agents`
+- Critical read-only checks:
+  - `ragctl project verify --project main-dev --json`
+  - `ragctl project search --project main-dev "<query>" --mode vector --json`
+  - `ragctl project file --project main-dev --file <repo-relative-path> --json`
+
 Target governance layout:
 
 - `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and
