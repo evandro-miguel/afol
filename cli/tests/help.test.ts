@@ -20,14 +20,27 @@ describe("help formatter", () => {
 		expect(help.split("\n").length).toBeLessThanOrEqual(30);
 		expect(help).toContain("Usage: afol");
 		expect(help).toContain("Commands");
+		expect(help).toContain("\n  s/status");
 		expect(help).toContain("s/status");
 		expect(help).toContain("v/validate");
 		expect(help).toContain("n/new");
 		expect(help).toContain("bench");
 		expect(help).toContain("pb/project-benchmark");
+		expect(help).toContain("Side effects");
+		expect(help).toContain("write=changes files/state");
+		expect(help).toContain("afol help <command>");
 		expect(help).toContain("a=afol");
 		expect(help).not.toContain("do/doctor");
 		expect(help).not.toContain("ma/maintenance");
+	});
+
+	test("keeps compact help lines scan-friendly", () => {
+		const lines = formatHelpText().split("\n");
+
+		expect(lines.length).toBeLessThanOrEqual(30);
+		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
+			120,
+		);
 	});
 
 	test("formats per-command help from registry metadata", () => {
@@ -44,6 +57,51 @@ describe("help formatter", () => {
 		expect(help).toContain("Side effect: read");
 		expect(help).toContain("Description: Show current project status");
 		expect(unknown).toBeNull();
+	});
+
+	test("makes risky file operations explicit in command help", () => {
+		const help = formatCommandHelp("file", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected file command help");
+		}
+		expect(help).toContain("Command: file");
+		expect(help).toContain("Category: ops");
+		expect(help).toContain("Side effect: write");
+		expect(help).toContain(
+			"Description: Safely patch, move, archive, and undo files; supports dry-run",
+		);
+		expect(help).toContain("pt|patch --path <path> --dry-run [read]");
+		expect(help).toContain("pt|patch --path <path> [write]");
+		expect(help).toContain("ud|undo --mutation-id <id> [write]");
+	});
+
+	test("publishes write-risk metadata for schema apply flows", () => {
+		const help = buildCommandHelpJson("schema", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		expect(help).toMatchObject({
+			command: "schema",
+			sideEffect: "write",
+			description:
+				"Review schema state; apply and resolver --write can write files",
+			category: "ops",
+		});
+		expect(help?.subcommands).toEqual(
+			expect.arrayContaining([
+				{
+					usage: "apply --dry-run",
+					sideEffect: "read",
+					description: "Preview schema apply without writing",
+				},
+				{
+					usage: "apply",
+					sideEffect: "write",
+					description: "Write the detected schema pack for local callers",
+				},
+			]),
+		);
 	});
 
 	test("formats project-benchmark help with safe and generated subcommands", () => {

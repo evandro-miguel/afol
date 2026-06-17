@@ -84,4 +84,4 @@ import { Z } from './sibling'
 
 - Related ADR: `<ADR-ID>`
 - Related SPEC: `<SPEC-ID>`
-- Architecture: `docs/arc/ARCHITECTURE.md`
+- Architecture: `.afol/adm/doctrine/ARCHITECTURE.md`

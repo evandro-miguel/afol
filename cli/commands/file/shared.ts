@@ -4,11 +4,12 @@ import { join, resolve, sep } from "node:path";
 import { createPatch } from "diff";
 import { resolveProjectPaths } from "../../services/project/paths";
 import { resolveProjectPath } from "../../services/project/root";
+import {
+	DEFAULT_IO as SHARED_DEFAULT_IO,
+	type CommandIo as SharedCommandIo,
+} from "../io";
 
-export type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
+export type CommandIo = SharedCommandIo;
 
 type FileCommand = "pt" | "mv" | "ud" | "ar";
 type FileStatus = "noop" | "dry-run" | "write" | "blocked";
@@ -71,10 +72,7 @@ export function makeUnsupportedUndoResult(
 	};
 }
 
-export const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+export const DEFAULT_IO: CommandIo = SHARED_DEFAULT_IO;
 
 export const DEFAULT_PATCH_PATH = ".afol/data/mutations/.file-probe.txt";
 export const DEFAULT_MOVE_SOURCE = ".afol/data/mutations/move-source.txt";

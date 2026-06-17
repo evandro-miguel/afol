@@ -6,20 +6,11 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import { hydrateSession } from "../services/state/session-state";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 type HydrateJsonData = {
 	session?: string;
 	snapshot?: ReturnType<typeof hydrateSession>;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
 };
 
 function parseHydrateArgs(args: string[]): {

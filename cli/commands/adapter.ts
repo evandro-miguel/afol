@@ -12,16 +12,7 @@ import {
 	restoreClaudeArtifacts,
 	writeClaudeAdapterEnabled,
 } from "../services/adapter/claude";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 const KNOWN_ADAPTERS: Set<string> = new Set([CLAUDE_ADAPTER_ID]);
 

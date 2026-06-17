@@ -1,6 +1,5 @@
 import {
 	envelopeErr,
-	envelopeOk,
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
@@ -35,16 +34,7 @@ import type {
 	ProjectBenchmarkProject,
 } from "../services/project-benchmark/types";
 import { validateProjectBenchmarkCatalog } from "../services/project-benchmark/validate";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
 type ParsedArgs = {
 	json: boolean;
@@ -53,6 +43,23 @@ type ParsedArgs = {
 	check: boolean;
 	strict: boolean;
 };
+
+type ValidProjectBenchmarkCatalog = {
+	ok: true;
+	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>;
+	axes: ProjectBenchmarkAxesFile;
+	projects: ProjectBenchmarkProject[];
+	validation: ReturnType<typeof validateProjectBenchmarkCatalog>;
+};
+
+type InvalidProjectBenchmarkCatalog = {
+	ok: false;
+	error: ProjectBenchmarkCatalogError;
+};
+
+type ProjectBenchmarkCatalogResolution =
+	| ValidProjectBenchmarkCatalog
+	| InvalidProjectBenchmarkCatalog;
 
 class ProjectBenchmarkCatalogError extends Error {
 	readonly issues: ProjectBenchmarkIssue[];
@@ -63,6 +70,8 @@ class ProjectBenchmarkCatalogError extends Error {
 		this.issues = issues;
 	}
 }
+
+const jsonWriters = createJsonWriters("project-benchmark");
 
 function parseArgs(action: string, args: string[]): ParsedArgs {
 	const parsed: ParsedArgs = {
@@ -245,26 +254,28 @@ function inferMissingSourceRefAxes(
 
 function requireValidCatalog(
 	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
-): {
-	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>;
-	axes: ProjectBenchmarkAxesFile;
-	projects: ProjectBenchmarkProject[];
-	validation: ReturnType<typeof validateProjectBenchmarkCatalog>;
-} {
+): ProjectBenchmarkCatalogResolution {
 	const validation = validateProjectBenchmarkCatalog(catalog);
 	if (!catalog.axes) {
-		throw new ProjectBenchmarkCatalogError(
-			"project-benchmark catalog is missing axes.json",
-			validation.issues,
-		);
+		return {
+			ok: false,
+			error: new ProjectBenchmarkCatalogError(
+				"project-benchmark catalog is missing axes.json",
+				validation.issues,
+			),
+		};
 	}
 	if (!validation.ok) {
-		throw new ProjectBenchmarkCatalogError(
-			"project-benchmark catalog validation failed",
-			validation.issues,
-		);
+		return {
+			ok: false,
+			error: new ProjectBenchmarkCatalogError(
+				"project-benchmark catalog validation failed",
+				validation.issues,
+			),
+		};
 	}
 	return {
+		ok: true,
 		catalog,
 		axes: catalog.axes,
 		projects: projectList(catalog.projects.map((entry) => entry.project)),
@@ -284,14 +295,6 @@ function isProjectBenchmarkCatalogUnavailable(
 		codes.has("missing-schema") &&
 		codes.has("missing-projects-dir")
 	);
-}
-
-function writeJson(
-	io: CommandIo,
-	action: string,
-	data: Record<string, unknown>,
-): void {
-	io.stdout(stringifyEnvelope(envelopeOk(data, { action })));
 }
 
 function writeValidationJson(
@@ -451,6 +454,17 @@ export async function runProjectBenchmarkCommand(
 		const validation = validateProjectBenchmarkCatalog(sourceCatalog);
 		const ok =
 			validation.ok && (!parsed.strict || validation.warning_count === 0);
+		const error = ok
+			? null
+			: validation.ok
+				? {
+						code: "project-benchmark-validation-warning",
+						message: "project-benchmark validation strict mode failed",
+					}
+				: {
+						code: "invalid-project-benchmark-catalog",
+						message: "project-benchmark catalog validation failed",
+					};
 		const data = {
 			schema_version: "1.0.0",
 			command: "project-benchmark.validate",
@@ -462,22 +476,7 @@ export async function runProjectBenchmarkCommand(
 			project_count: validation.project_count,
 		};
 		if (parsed.json) {
-			writeValidationJson(
-				io,
-				data,
-				ok,
-				ok
-					? null
-					: validation.ok
-						? {
-								code: "project-benchmark-validation-warning",
-								message: "project-benchmark validation strict mode failed",
-							}
-						: {
-								code: "invalid-project-benchmark-catalog",
-								message: "project-benchmark catalog validation failed",
-							},
-			);
+			writeValidationJson(io, data, ok, error);
 		} else {
 			io.stdout(formatProjectBenchmarkValidation({ ...validation, ok }));
 		}
@@ -533,24 +532,20 @@ export async function runProjectBenchmarkCommand(
 		}
 	}
 
-	let catalog: ReturnType<typeof requireValidCatalog>;
-	try {
-		catalog = requireValidCatalog(sourceCatalog);
-	} catch (error) {
-		const message = (error as Error).message;
-		const issues =
-			error instanceof ProjectBenchmarkCatalogError ? error.issues : [];
+	const catalog = requireValidCatalog(sourceCatalog);
+	if (!catalog.ok) {
+		const { error } = catalog;
 		if (parsed.json) {
 			writeActionError(
 				io,
 				action,
 				"invalid-project-benchmark-catalog",
-				message,
+				error.message,
 				1,
-				issues.length > 0 ? { issues } : undefined,
+				error.issues.length > 0 ? { issues: error.issues } : undefined,
 			);
 		} else {
-			io.stderr(`err invalid-project-benchmark-catalog ${message}`);
+			io.stderr(`err invalid-project-benchmark-catalog ${error.message}`);
 		}
 		return 1;
 	}
@@ -563,7 +558,7 @@ export async function runProjectBenchmarkCommand(
 			projects: scores,
 		};
 		if (parsed.json) {
-			writeJson(io, "project-benchmark.list", data);
+			jsonWriters.ok(io, "list", data);
 		} else {
 			io.stdout(formatProjectBenchmarkList(scores));
 		}
@@ -598,7 +593,7 @@ export async function runProjectBenchmarkCommand(
 			score,
 		};
 		if (parsed.json) {
-			writeJson(io, "project-benchmark.show", data);
+			jsonWriters.ok(io, "show", data);
 		} else {
 			io.stdout(formatProjectBenchmarkShow(project, score));
 		}
@@ -639,7 +634,7 @@ export async function runProjectBenchmarkCommand(
 			projects,
 		};
 		if (parsed.json) {
-			writeJson(io, "project-benchmark.matrix", data);
+			jsonWriters.ok(io, "matrix", data);
 		} else {
 			io.stdout(
 				formatProjectBenchmarkMatrix(projects, parsed.axis ?? undefined),
@@ -666,7 +661,7 @@ export async function runProjectBenchmarkCommand(
 			if (parsed.check || !result.ok) {
 				writeGenerateJson(io, result, result.ok);
 			} else {
-				writeJson(io, "project-benchmark.generate", result);
+				jsonWriters.ok(io, "generate", result);
 			}
 		} else if (parsed.check) {
 			if (result.ok) {
@@ -740,7 +735,7 @@ export async function runProjectBenchmarkCommand(
 				.filter((lesson): lesson is string => Boolean(lesson)),
 		};
 		if (parsed.json) {
-			writeJson(io, "project-benchmark.recommend", data);
+			jsonWriters.ok(io, "recommend", data);
 		} else {
 			io.stdout(
 				formatProjectBenchmarkRecommend(axis, references, catalog.axes),

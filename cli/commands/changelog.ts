@@ -1,22 +1,8 @@
 import {
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
-import {
 	addChangelogEntry,
 	type ChangelogEntryType,
 } from "../services/spec-gate";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO, writeLegacyJsonEnvelope } from "./io";
 
 function parseArgs(args: string[]): {
 	type: ChangelogEntryType;
@@ -64,19 +50,7 @@ function parseArgs(args: string[]): {
 }
 
 function writeJsonEnvelope(io: CommandIo, data: Record<string, unknown>): void {
-	const envelope = envelopeOk(data, {
-		action: String(data.action ?? "add"),
-		exitCode: 0,
-	});
-	envelope.data = data;
-	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(
-				envelope,
-				Object.keys(data) as (keyof typeof data)[],
-			),
-		),
-	);
+	writeLegacyJsonEnvelope(io, String(data.action ?? "add"), data);
 }
 
 export async function runChangelogCommand(

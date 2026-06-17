@@ -1,9 +1,10 @@
 ---
 doc_type: standard
 id: 000000_000000_document-starter-standards_standard_01
-status: active
+status: superseded
+superseded_by: docs/standards/frontmatter.md
 created_at: 2026-02-23 00:00:00+00:00
-updated_at: '2026-05-14T20:05:00-03:00'
+updated_at: '2026-06-17T08:35:36-03:00'
 title: Document Starter Standards
 ---
 
@@ -11,6 +12,9 @@ title: Document Starter Standards
 
 Reusable starters live in `docs/templates/`.
 Keep them short and executable.
+
+Historical note: this starter is retained for reference only. The canonical
+frontmatter schema lives in `docs/standards/frontmatter.md`.
 
 ### Frontmatter Requirements
 

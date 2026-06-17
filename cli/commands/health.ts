@@ -9,16 +9,7 @@ import {
 } from "../core/envelope";
 import { checkHealth, type HealthArea } from "../services/health";
 import { resolveProjectPaths } from "../services/project/paths";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 type HealthJsonData = ReturnType<typeof checkHealth> & { release: boolean };
 

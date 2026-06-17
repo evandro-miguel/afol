@@ -4,16 +4,7 @@ import {
 	listSkills,
 	searchSkills,
 } from "../services/catalog/skills";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message: string) => console.log(message),
-	stderr: (message: string) => console.error(message),
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 function formatRule(rule: ReturnType<typeof listRules>[number]): string {
 	return `${rule.id} ${rule.name} ${rule.path}`;

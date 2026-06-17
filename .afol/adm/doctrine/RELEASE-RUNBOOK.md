@@ -11,14 +11,16 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 ## Purpose
 
-`bun run validate:release` is the single release gate. It proves:
+`bun run validate:release` is the distribution/release artifact gate. It proves:
 
-- TypeScript typecheck passes (`bun run typecheck`)
 - All tests pass with coverage ≥80% lines and functions (`bun run coverage:check`)
 - Deterministic build succeeds (`bun run build:deterministic`)
 - Distribution binary smokes (`bun run smoke:dist`)
 - Security scans execute (or are explicitly waived) (`bun run validate:security:release`)
 - Release provenance is generated (`bun run release:provenance:release`)
+
+It does not currently run the AFOL project hygiene gate or the TypeScript
+typecheck. Run those as explicit release preflight commands.
 
 ## Required Tools on PATH
 
@@ -40,6 +42,9 @@ updated_at: "2026-06-14T00:00:00+00:00"
 
 ```bash
 bun install --frozen-lockfile
+afol local-state rebuild --json
+afol validate project --json
+bun run typecheck
 bun run validate:release
 ```
 

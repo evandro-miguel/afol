@@ -25,5 +25,8 @@ rg -n "<topic>" docs/knowledge .afol/wb
 rg -n "_research_|_report_|_postmortem_" .afol/wb
 ```
 
-AFOL-native knowledge indexing is future work. Do not use or restore the
-retired `.agents/agents` command system.
+Use `docs/knowledge/INDEX.md` as the curated low-token index when it exists.
+AFOL-owned library and memory surfaces live under `.afol/library/**` and
+`.afol/memory/**`.
+
+Do not use or restore the retired `.agents/agents` command system.

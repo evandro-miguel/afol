@@ -1,10 +1,4 @@
 import {
-	envelopeErr,
-	envelopeOk,
-	envelopeWithLegacyKeys,
-	stringifyEnvelope,
-} from "../core/envelope";
-import {
 	defaultOperationContext,
 	type OperationContext,
 	requiresApproval,
@@ -23,46 +17,9 @@ import {
 	searchEntries,
 	updateEntry,
 } from "../services/memory";
+import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message) => console.log(message),
-	stderr: (message) => console.error(message),
-};
-
-function writeJsonOk<T extends Record<string, unknown>>(
-	io: CommandIo,
-	action: string,
-	data: T,
-	legacyKeys: readonly (keyof T)[],
-): void {
-	io.stdout(
-		stringifyEnvelope(
-			envelopeWithLegacyKeys(
-				envelopeOk(data, { action: `memory.${action}` }),
-				legacyKeys,
-			),
-		),
-	);
-}
-
-function writeJsonErr(
-	io: CommandIo,
-	action: string,
-	code: string,
-	message: string,
-	exitCode: 1 | 2,
-): void {
-	io.stdout(
-		stringifyEnvelope(
-			envelopeErr(code, message, { action: `memory.${action}`, exitCode }),
-		),
-	);
-}
+const jsonOutput = createJsonWriters("memory");
 
 type MemoryAction =
 	| "list"
@@ -260,7 +217,7 @@ export async function runMemoryCommand(
 			const memory = readMemory(projectRoot);
 			const entries = memory?.entries ?? [];
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entries }, ["entries"]);
+				jsonOutput.ok(io, parsed.action, { entries }, ["entries"]);
 			} else {
 				const lines = [`memory entries: ${entries.length}`];
 				if (entries.length === 0) {
@@ -283,7 +240,7 @@ export async function runMemoryCommand(
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
 				if (parsed.json) {
-					writeJsonErr(
+					jsonOutput.err(
 						io,
 						parsed.action,
 						"memory.entry.not_found",
@@ -296,7 +253,7 @@ export async function runMemoryCommand(
 				return 1;
 			}
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
+				jsonOutput.ok(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(formatEntry(entry));
 			}
@@ -310,7 +267,7 @@ export async function runMemoryCommand(
 			}
 			const entries = searchEntries(projectRoot, query);
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entries }, ["entries"]);
+				jsonOutput.ok(io, parsed.action, { entries }, ["entries"]);
 			} else {
 				io.stdout(
 					[
@@ -338,7 +295,7 @@ export async function runMemoryCommand(
 			};
 			addEntry(projectRoot, entry);
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
+				jsonOutput.ok(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory add: ${entry.id}`);
 			}
@@ -357,7 +314,7 @@ export async function runMemoryCommand(
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
 				if (parsed.json) {
-					writeJsonErr(
+					jsonOutput.err(
 						io,
 						parsed.action,
 						"memory.entry.not_found",
@@ -370,7 +327,7 @@ export async function runMemoryCommand(
 				return 1;
 			}
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
+				jsonOutput.ok(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory update: ${entry.id}`);
 			}
@@ -385,7 +342,7 @@ export async function runMemoryCommand(
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
 				if (parsed.json) {
-					writeJsonErr(
+					jsonOutput.err(
 						io,
 						parsed.action,
 						"memory.entry.not_found",
@@ -398,7 +355,7 @@ export async function runMemoryCommand(
 				return 1;
 			}
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
+				jsonOutput.ok(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory archive: ${entry.id}`);
 			}
@@ -421,7 +378,7 @@ export async function runMemoryCommand(
 			};
 			proposeEntry(projectRoot, entry);
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
+				jsonOutput.ok(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory propose: ${entry.id}`);
 			}
@@ -436,7 +393,7 @@ export async function runMemoryCommand(
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
 				if (parsed.json) {
-					writeJsonErr(
+					jsonOutput.err(
 						io,
 						parsed.action,
 						"memory.entry.not_found",
@@ -449,7 +406,7 @@ export async function runMemoryCommand(
 				return 1;
 			}
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
+				jsonOutput.ok(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory promote: ${entry.id}`);
 			}
@@ -464,7 +421,7 @@ export async function runMemoryCommand(
 			const entry = getEntry(projectRoot, parsed.id);
 			if (!entry) {
 				if (parsed.json) {
-					writeJsonErr(
+					jsonOutput.err(
 						io,
 						parsed.action,
 						"memory.entry.not_found",
@@ -477,7 +434,7 @@ export async function runMemoryCommand(
 				return 1;
 			}
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entry }, ["entry"]);
+				jsonOutput.ok(io, parsed.action, { entry }, ["entry"]);
 			} else {
 				io.stdout(`memory reject: ${entry.id}`);
 			}
@@ -487,7 +444,7 @@ export async function runMemoryCommand(
 		if (parsed.action === "render") {
 			const markdown = renderMemory(projectRoot);
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { markdown }, ["markdown"]);
+				jsonOutput.ok(io, parsed.action, { markdown }, ["markdown"]);
 			} else {
 				io.stdout(markdown);
 			}
@@ -501,7 +458,7 @@ export async function runMemoryCommand(
 			}
 			const entries = recallEntries(projectRoot, query);
 			if (parsed.json) {
-				writeJsonOk(io, parsed.action, { entries }, ["entries"]);
+				jsonOutput.ok(io, parsed.action, { entries }, ["entries"]);
 			} else {
 				io.stdout(
 					[
@@ -516,7 +473,7 @@ export async function runMemoryCommand(
 		throw new Error(`Unknown memory action: ${parsed.action}`);
 	} catch (error) {
 		if (wantsJson && error instanceof Error && error.message) {
-			writeJsonErr(io, action, "memory.command.error", error.message, 2);
+			jsonOutput.err(io, action, "memory.command.error", error.message, 2);
 			return 2;
 		}
 		io.stderr((error as Error).message);

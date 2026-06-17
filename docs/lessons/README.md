@@ -4,7 +4,7 @@ id: readme
 theme: lessons
 status: active
 created_at: '2026-05-05T11:44:41+00:00'
-updated_at: '2026-05-05T11:44:41+00:00'
+updated_at: '2026-06-17T08:35:36-03:00'
 ---
 
 # Lessons
@@ -14,6 +14,8 @@ This folder contains lessons learned and prevention rules.
 ## Purpose
 
 Capture learnings from user corrections and project experiences to prevent repeating mistakes.
+`general-lessons.md` is retained as a historical aggregate only; new lessons
+live in `docs/lessons/entries/`.
 
 ## Structure
 
@@ -22,7 +24,7 @@ lessons/
 ├── entries/                                # One lesson per file (mandatory)
 │   ├── YYYYMMDD_HHMM_<slug>.md
 │   └── README.md
-├── general-lessons.md                      # Legacy aggregated lessons (historical)
+├── general-lessons.md                      # Historical aggregate (retained)
 └── README.md
 ```
 

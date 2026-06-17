@@ -1,0 +1,15 @@
+{"id":"E-20260617080358158-eeb17a","task_id":"T-01","created_at":"2026-06-17T12:03:58.158Z","command":"sed -n '1,260p' .afol/wb/260617_0801_refactor-typed-validation/260617_0801_refactor-typed-validation_plan_01.md","result":"passed"}
+{"id":"E-20260617081032846-9d26ef","task_id":"T-02","created_at":"2026-06-17T12:10:32.846Z","command":"bun test cli/tests/kernel.test.ts cli/tests/router.test.ts cli/tests/validate-command.test.ts --bail=1","result":"passed"}
+{"id":"E-20260617081032876-173523","task_id":"T-03","created_at":"2026-06-17T12:10:32.876Z","command":"bun test cli/tests/update-command.test.ts cli/tests/local-state-indexes.test.ts --bail=1","result":"passed"}
+{"id":"E-20260617081032914-344e1d","task_id":"T-02","created_at":"2026-06-17T12:10:32.914Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260617081032943-1772bd","task_id":"T-03","created_at":"2026-06-17T12:10:32.943Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260617081424094-143f48","task_id":"T-05","created_at":"2026-06-17T12:14:24.094Z","command":"bun test cli/tests/workbench-lifecycle.test.ts cli/tests/workbench-verify.test.ts --bail=1","result":"passed"}
+{"id":"E-20260617081424156-939fd8","task_id":"T-05","created_at":"2026-06-17T12:14:24.156Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260617081626016-dee0b3","task_id":"T-04","created_at":"2026-06-17T12:16:26.016Z","command":"bun test cli/tests/project-benchmark-validation.test.ts cli/tests/project-benchmark-command.test.ts --bail=1","result":"passed"}
+{"id":"E-20260617081626082-e3a159","task_id":"T-04","created_at":"2026-06-17T12:16:26.082Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260617081641908-3e751a","task_id":"T-06","created_at":"2026-06-17T12:16:41.908Z","command":"afol validate project","result":"passed"}
+{"id":"E-20260617081916799-e092b6","task_id":"T-06","created_at":"2026-06-17T12:19:16.799Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260617081916847-94dcee","task_id":"T-06","created_at":"2026-06-17T12:19:16.847Z","command":"bun test","result":"passed"}
+{"id":"E-20260617081931755-d107af","task_id":"T-06","created_at":"2026-06-17T12:19:31.755Z","command":"afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260617082103171-b53049","task_id":"T-06","created_at":"2026-06-17T12:21:03.171Z","command":"bun run validate:release","result":"passed"}
+{"id":"E-20260617082111928-16fe45","task_id":"T-06","created_at":"2026-06-17T12:21:11.928Z","command":"afol verify-tasks .afol/wb --strict","result":"passed"}

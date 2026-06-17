@@ -56,7 +56,10 @@ import {
 import { kernelRegistry } from "./registry";
 import { resolveCommand } from "./router";
 import { loadProjectRoot } from "./services/project/root";
-import { runValidationCommand } from "./validate/contract";
+import {
+	resolveValidateInvocation,
+	runValidationCommand,
+} from "./validate/command";
 
 const NEW_COMMAND_HELP = [
 	"Usage: afol new <theme> [options]",
@@ -117,34 +120,6 @@ export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
 	"telemetry",
 	"hydrate",
 ]);
-
-function resolveValidateMode(
-	projectRoot: string,
-	args: string[],
-): {
-	mode: "project" | "benchmark";
-	args: string[];
-} {
-	void projectRoot;
-	const explicitProject = args[0] === "project" || args.includes("--project");
-	if (explicitProject) {
-		return {
-			mode: "project",
-			args: args.filter((arg) => arg !== "project" && arg !== "--project"),
-		};
-	}
-
-	const explicitBenchmarkMode = args[0];
-	if (
-		explicitBenchmarkMode === "bench" ||
-		explicitBenchmarkMode === "select" ||
-		explicitBenchmarkMode === "run"
-	) {
-		return { mode: "benchmark", args };
-	}
-
-	return { mode: "project", args };
-}
 
 export async function main(argv: string[]): Promise<number> {
 	let args = argv.slice(2);
@@ -235,14 +210,11 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "validate") {
-		const validateMode = resolveValidateMode(
-			project.value.root,
-			resolution.args,
-		);
-		if (validateMode.mode === "benchmark") {
-			return runValidationCommand(project.value.root, validateMode.args);
+		const validateInvocation = resolveValidateInvocation(resolution.args);
+		if (validateInvocation.kind === "benchmark") {
+			return runValidationCommand(project.value.root, validateInvocation.args);
 		}
-		return runValidateCommand(project.value.root, validateMode.args);
+		return runValidateCommand(project.value.root, validateInvocation.args);
 	}
 
 	if (resolution.kind === "status") {

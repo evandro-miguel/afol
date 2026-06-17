@@ -65,6 +65,39 @@ function buildPatch(
 	);
 }
 
+function buildPreserveProjectOwnedOperation(
+	path: string,
+	owner: ManagedOwnership | undefined,
+	isMissing: boolean,
+): BootstrapOperation | null {
+	if (owner !== "project-owned" && owner !== "ignored") {
+		return null;
+	}
+	return {
+		kind: "preserve-project-owned",
+		path,
+		reason: `manifest-owner-${owner}${isMissing ? "-missing" : ""}`,
+		owner,
+	};
+}
+
+function buildOperationWithPatch(
+	kind: Extract<BootstrapOperationKind, "conflict" | "update-managed">,
+	path: string,
+	reason: string,
+	owner: ManagedOwnership,
+	currentContent: string,
+	templateContent: string,
+): BootstrapOperation {
+	return {
+		kind,
+		path,
+		reason,
+		owner,
+		diffPreview: buildPatch(path, currentContent, templateContent),
+	};
+}
+
 export function planBootstrapOperations(
 	input: BootstrapPlanInput,
 ): BootstrapPlan {
@@ -91,22 +124,13 @@ export function planBootstrapOperations(
 		).toString("utf8");
 
 		if (typeof currentContent !== "string") {
-			if (manifestEntry?.owner === "ignored") {
-				operations.push({
-					kind: "preserve-project-owned",
-					path,
-					reason: "manifest-owner-ignored-missing",
-					owner: manifestEntry.owner,
-				});
-				continue;
-			}
-			if (manifestEntry?.owner === "project-owned") {
-				operations.push({
-					kind: "preserve-project-owned",
-					path,
-					reason: "manifest-owner-project-owned-missing",
-					owner: manifestEntry.owner,
-				});
+			const preserveOperation = buildPreserveProjectOwnedOperation(
+				path,
+				manifestEntry?.owner,
+				true,
+			);
+			if (preserveOperation) {
+				operations.push(preserveOperation);
 				continue;
 			}
 			operations.push({
@@ -129,45 +153,41 @@ export function planBootstrapOperations(
 			continue;
 		}
 
-		if (manifestEntry?.owner === "project-owned") {
-			operations.push({
-				kind: "preserve-project-owned",
-				path,
-				reason: "manifest-owner-project-owned",
-				owner: manifestEntry.owner,
-			});
-			continue;
-		}
-
-		if (manifestEntry?.owner === "ignored") {
-			operations.push({
-				kind: "preserve-project-owned",
-				path,
-				reason: "manifest-owner-ignored",
-				owner: manifestEntry.owner,
-			});
+		const preserveOperation = buildPreserveProjectOwnedOperation(
+			path,
+			manifestEntry?.owner,
+			false,
+		);
+		if (preserveOperation) {
+			operations.push(preserveOperation);
 			continue;
 		}
 
 		if (manifestEntry?.owner === "conflict") {
-			operations.push({
-				kind: "conflict",
-				path,
-				reason: "manifest-owner-conflict",
-				owner: "conflict",
-				diffPreview: buildPatch(path, currentContent, templateContent),
-			});
+			operations.push(
+				buildOperationWithPatch(
+					"conflict",
+					path,
+					"manifest-owner-conflict",
+					"conflict",
+					currentContent,
+					templateContent,
+				),
+			);
 			continue;
 		}
 
 		if (manifestEntry?.owner === "generated") {
-			operations.push({
-				kind: "update-managed",
-				path,
-				reason: "manifest-owner-generated",
-				owner: manifestEntry.owner,
-				diffPreview: buildPatch(path, currentContent, templateContent),
-			});
+			operations.push(
+				buildOperationWithPatch(
+					"update-managed",
+					path,
+					"manifest-owner-generated",
+					manifestEntry.owner,
+					currentContent,
+					templateContent,
+				),
+			);
 			continue;
 		}
 
@@ -175,23 +195,29 @@ export function planBootstrapOperations(
 			manifestEntry?.owner === "managed" &&
 			manifestEntry.hash === currentHash
 		) {
-			operations.push({
-				kind: "update-managed",
-				path,
-				reason: "managed-hash-matches-manifest",
-				owner: manifestEntry.owner,
-				diffPreview: buildPatch(path, currentContent, templateContent),
-			});
+			operations.push(
+				buildOperationWithPatch(
+					"update-managed",
+					path,
+					"managed-hash-matches-manifest",
+					manifestEntry.owner,
+					currentContent,
+					templateContent,
+				),
+			);
 			continue;
 		}
 
-		operations.push({
-			kind: "conflict",
-			path,
-			reason: "local-drift-or-unknown-ownership",
-			owner: owner === "managed" ? "conflict" : owner,
-			diffPreview: buildPatch(path, currentContent, templateContent),
-		});
+		operations.push(
+			buildOperationWithPatch(
+				"conflict",
+				path,
+				"local-drift-or-unknown-ownership",
+				owner === "managed" ? "conflict" : owner,
+				currentContent,
+				templateContent,
+			),
+		);
 	}
 
 	return {

@@ -33,7 +33,7 @@ delegation, or implementation.
 
 #### Step 1: Roadmap
 
-Create or update the roadmap feature in `docs/arc/GENERAL-ROADMAP.md`
+Create or update the roadmap feature in `.afol/adm/roadmap/GENERAL-ROADMAP.md`
 
 - Every meaningful feature must have a roadmap entry
 - The roadmap is the source of truth for feature inventory and status
@@ -41,7 +41,7 @@ Create or update the roadmap feature in `docs/arc/GENERAL-ROADMAP.md`
 
 #### Step 2: Parent Spec
 
-Create or update the governing feature spec in `docs/arc/SPECS/`
+Create or update the governing feature spec in `.afol/adm/specs/`
 
 - Define feature intent, user journey, constraints, and acceptance
 - Keep implementation detail out of the spec
@@ -51,7 +51,7 @@ Create or update the governing feature spec in `docs/arc/SPECS/`
 - Keep `spec-lite` as a historical compatibility alias, not the default for
   new work.
 - Test-focused workstreams should link a `spec-test` strategy artifact before implementing or changing tests
-- Keep current-state evidence in `docs/map/` when needed, and keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder
+- Keep current-state evidence in `.afol/pstr/` when needed, and keep desired-state intent in roadmap/spec/ADR/architecture docs outside that folder
 
 #### Step 3: Plan
 
@@ -93,7 +93,7 @@ Materialize and update log only after real execution starts or a real decision/b
 - Update task status
 - After each meaningful documentation-sensitive change, update the corresponding strategy and process artifacts in the same session
 - Keep this section as the canonical place for execution narrative so agents do not reconstruct work from terminal history alone
-- Use `docs/map/` as descriptive input evidence only; do not treat map artifacts as substitutes for roadmap/spec/workbench authority
+- Use `.afol/pstr/` as descriptive input evidence only; do not treat map artifacts as substitutes for roadmap/spec/workbench authority
 
 #### Step 6: Report
 

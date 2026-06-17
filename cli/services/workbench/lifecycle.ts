@@ -69,6 +69,14 @@ export type NewWorkstreamResult = {
 	activeSessionPath: string;
 };
 
+type TaskRow = {
+	line: string;
+	taskId: string;
+	state: string;
+	owner: string;
+	notes: string;
+};
+
 function sanitizeTheme(theme: string): string {
 	const cleaned = theme
 		.trim()
@@ -195,25 +203,35 @@ export function readActiveSession(root: string): string | null {
 	return active.length > 0 ? active : null;
 }
 
-function readTaskRows(
-	taskPath: string,
-): Array<{ line: string; taskId: string; state: string }> {
+function parseTaskRow(line: string): TaskRow | null {
+	const match = line.trim().match(TASK_ROW_RE);
+	if (!match?.[1] || !match[2]) {
+		return null;
+	}
+	return {
+		line,
+		taskId: match[1],
+		state: match[2].trim(),
+		owner: (match[3] ?? "").trim(),
+		notes: (match[4] ?? "").trim(),
+	};
+}
+
+function renderTaskRow(row: Omit<TaskRow, "line">): string {
+	return `| ${row.taskId} | ${row.state} | ${row.owner} | ${row.notes} |`;
+}
+
+function readTaskRows(taskPath: string): TaskRow[] {
 	if (!existsSync(taskPath)) {
 		throw new Error(`Task file not found: ${taskPath}`);
 	}
 	const lines = readFileSync(taskPath, "utf8").split("\n");
-	const rows: Array<{ line: string; taskId: string; state: string }> = [];
+	const rows: TaskRow[] = [];
 	for (const line of lines) {
-		const match = line.trim().match(TASK_ROW_RE);
-		if (!match) {
-			continue;
+		const row = parseTaskRow(line);
+		if (row) {
+			rows.push(row);
 		}
-		const taskId = match[1];
-		const state = match[2];
-		if (!taskId || !state) {
-			continue;
-		}
-		rows.push({ line, taskId, state: state.trim() });
 	}
 	return rows;
 }
@@ -226,14 +244,12 @@ function updateTaskState(
 	const lines = readFileSync(taskPath, "utf8").split("\n");
 	let changed = false;
 	const nextLines = lines.map((line) => {
-		const match = line.trim().match(TASK_ROW_RE);
-		if (!match || match[1] !== taskId) {
+		const row = parseTaskRow(line);
+		if (!row || row.taskId !== taskId) {
 			return line;
 		}
 		changed = true;
-		const owner = (match[3] ?? "").trim();
-		const notes = (match[4] ?? "").trim();
-		return `| ${taskId} | ${state} | ${owner} | ${notes} |`;
+		return renderTaskRow({ ...row, state });
 	});
 	if (!changed) {
 		throw new Error(`Task ${taskId} not found in ${taskPath}`);

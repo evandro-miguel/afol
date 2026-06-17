@@ -108,6 +108,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("rule")?.sideEffect).toBe("read");
 		expect(byCommand.get("skill")?.sideEffect).toBe("read");
 		expect(byCommand.get("update")?.sideEffect).toBe("write");
+		expect(byCommand.get("file")?.sideEffect).toBe("write");
 		expect(byCommand.get("evidence")?.sideEffect).toBe("append");
 		expect(byCommand.get("local-state")?.sideEffect).toBe("generated");
 		expect(byCommand.get("pstr")?.sideEffect).toBe("read");
@@ -127,7 +128,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("doctor")?.sideEffect).toBe("read");
 		expect(byCommand.get("maintenance")?.sideEffect).toBe("read");
 		expect(byCommand.get("sweep")?.sideEffect).toBe("read");
-		expect(byCommand.get("schema")?.sideEffect).toBe("read");
+		expect(byCommand.get("schema")?.sideEffect).toBe("write");
 		expect(byCommand.get("preflight")?.sideEffect).toBe("read");
 
 		for (const entry of kernelRegistry.commands) {
@@ -137,6 +138,15 @@ describe("kernel registry", () => {
 			expect(entry.command.length).toBeGreaterThan(0);
 			expect(entry.description.length).toBeGreaterThan(0);
 			expect(entry.description.length).toBeLessThanOrEqual(80);
+		}
+	});
+
+	test("does not label write commands as simple inspection", () => {
+		for (const entry of kernelRegistry.commands) {
+			if (entry.sideEffect !== "write") {
+				continue;
+			}
+			expect(entry.description).not.toMatch(/^Inspect /);
 		}
 	});
 

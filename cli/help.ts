@@ -22,7 +22,29 @@ const CATEGORY_LABELS: Record<CommandCategory, string> = {
 function formatEntry(spec: CommandSpec): string {
 	const alias = spec.aliases[0];
 	const name = alias ? `${alias}/${spec.command}` : spec.command;
-	return `${name} - ${spec.description}`;
+	return `${name}[${spec.sideEffect}]`;
+}
+
+function pushWrappedEntries(
+	lines: string[],
+	entries: string[],
+	maxWidth = 120,
+): void {
+	let current = "  ";
+	for (const entry of entries) {
+		const next = `${current}${entry}`;
+		if (next.length <= maxWidth) {
+			current = `${next} | `;
+			continue;
+		}
+		if (current.trim().length > 0) {
+			lines.push(current.slice(0, -3));
+		}
+		current = `  ${entry} | `;
+	}
+	if (current.trim().length > 0) {
+		lines.push(current.slice(0, -3));
+	}
 }
 
 export type CommandCatalogEntry = {
@@ -134,19 +156,23 @@ export function formatHelpText(registry = kernelRegistry): string {
 		}
 
 		lines.push(CATEGORY_LABELS[category]);
-		lines.push(`  ${entries.join(" | ")}`);
+		pushWrappedEntries(lines, entries);
 	}
 
 	const uncategorized = grouped.get("uncategorized");
 	if (uncategorized?.length) {
 		lines.push("Other");
-		lines.push(`  ${uncategorized.join(" | ")}`);
+		pushWrappedEntries(lines, uncategorized);
 	}
 
 	lines.push(
 		"",
 		"Flags",
 		"  -j, --json  JSON output when supported",
+		"Details",
+		"  afol help <command>",
+		"Side effects",
+		"  read=no writes; generated=refreshes derived state; append=adds rows; write=changes files/state",
 		"Aliases",
 		"  a=afol",
 	);

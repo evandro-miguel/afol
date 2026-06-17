@@ -1,5 +1,6 @@
 import { existsSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { toPosixPath } from "../../core/file-paths";
 import type { Result } from "../../core/result";
 import { err, ok } from "../../core/result";
 import { loadJsonObject, type SchemaObject } from "../../core/schema";
@@ -129,6 +130,6 @@ export function resolveProjectPath(
 
 	return ok({
 		path: candidate,
-		relativePath: relative(root, candidate).split(sep).join("/"),
+		relativePath: toPosixPath(relative(root, candidate)),
 	});
 }

@@ -19,9 +19,9 @@ work.
 ## Anti-Pattern
 
 ```bash
-afol new auth-refactor --feature-id F-01 --parent-spec docs/arc/SPECS/auth.md
-afol new oauth-integration --feature-id F-02 --parent-spec docs/arc/SPECS/oauth.md
-afol new session-management --feature-id F-03 --parent-spec docs/arc/SPECS/session.md
+afol new auth-refactor --feature-id F-01 --parent-spec .afol/adm/specs/auth.md
+afol new oauth-integration --feature-id F-02 --parent-spec .afol/adm/specs/oauth.md
+afol new session-management --feature-id F-03 --parent-spec .afol/adm/specs/session.md
 ```
 
 ## Better Approach

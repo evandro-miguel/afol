@@ -42,10 +42,10 @@ Simple append-only log format for tracking execution events.
 
 ### Log Location
 
-Event logs should be stored in:
+AFOL-owned event data is stored under:
 
 ```text
-.agents/logs/usage.log
+.afol/data/events/
 ```
 
 Or in session-specific logs:
@@ -67,13 +67,13 @@ Or in session-specific logs:
 
 ```bash
 # Count by document type
-grep "task" .agents/logs/usage.log | wc -l
+rg "task" .afol/data/events .afol/wb | wc -l
 
 # Completion rate
-grep -c "completed.*pass" .agents/logs/usage.log
+rg -c "completed.*pass" .afol/data/events .afol/wb
 
 # Average duration
-awk -F'|' '{sum+=$6; count++} END {print sum/count}' .agents/logs/usage.log
+rg "<duration-field-or-marker>" .afol/data/events .afol/wb
 ```
 
 ### Integration with Task Workflow

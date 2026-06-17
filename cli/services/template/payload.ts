@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { collectRelativeFilePaths } from "../../core/file-paths";
 import {
 	matchesTemplateForbiddenPattern,
 	TEMPLATE_FORBIDDEN_PATTERNS,
@@ -25,10 +26,6 @@ export type TemplatePayload = {
 	files: TemplateFileMap;
 };
 
-function toPosixPath(path: string): string {
-	return path.split(sep).join("/");
-}
-
 function sha256Hex(value: string | Uint8Array): string {
 	return createHash("sha256").update(value).digest("hex");
 }
@@ -39,28 +36,6 @@ function reproducibleGeneratedAt(): string {
 		return new Date(Number(sourceDateEpoch) * 1000).toISOString();
 	}
 	return "1970-01-01T00:00:00.000Z";
-}
-
-async function collectRelativeFilePaths(root: string): Promise<string[]> {
-	const paths: string[] = [];
-
-	async function walk(currentDir: string): Promise<void> {
-		const entries = await readdir(currentDir, { withFileTypes: true });
-		for (const entry of entries) {
-			const absolutePath = join(currentDir, entry.name);
-			if (entry.isDirectory()) {
-				await walk(absolutePath);
-				continue;
-			}
-			if (!entry.isFile()) {
-				continue;
-			}
-			paths.push(toPosixPath(relative(root, absolutePath)));
-		}
-	}
-
-	await walk(root);
-	return paths.sort();
 }
 
 export async function buildTemplatePayload(

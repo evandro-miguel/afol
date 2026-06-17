@@ -8,20 +8,7 @@ import {
 import type { DriftReport } from "../services/drift";
 import { runDriftCheck } from "../services/drift";
 import { validateProjectStructure } from "../services/project/validate";
-
-type CommandIo = {
-	stdout: (message: string) => void;
-	stderr: (message: string) => void;
-};
-
-const DEFAULT_IO: CommandIo = {
-	stdout: (message: string) => {
-		console.log(message);
-	},
-	stderr: (message: string) => {
-		console.error(message);
-	},
-};
+import { type CommandIo, DEFAULT_IO } from "./io";
 
 type ValidationCheck = {
 	id: string;

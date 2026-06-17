@@ -89,8 +89,7 @@ Before starting work, consult relevant resources:
 
 ### Prevention Rules
 
-- [ ] Check [../lessons/general-lessons.md](../lessons/general-lessons.md)
-- [ ] Check lesson entries in [../lessons/entries/](../lessons/entries/)
+- [ ] Check [../lessons/entries/README.md](../lessons/entries/README.md)
 
 ### Useful Resources
 
