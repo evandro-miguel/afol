@@ -115,9 +115,9 @@ describe("help formatter", () => {
 		expect(parsed.find((entry) => entry.command === "status")?.aliases).toEqual(
 			["s"],
 		);
-		expect(parsed.find((entry) => entry.command === "adm")?.aliases).toEqual(
-			[],
-		);
+		expect(parsed.find((entry) => entry.command === "adm")?.aliases).toEqual([
+			"ad",
+		]);
 		expect(
 			parsed.every((entry) => !entry.aliases.includes(entry.command)),
 		).toBe(true);

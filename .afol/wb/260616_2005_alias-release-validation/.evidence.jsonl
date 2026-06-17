@@ -1,0 +1,11 @@
+{"id":"E-20260616200607882-4e2834","task_id":"T-01","created_at":"2026-06-17T00:06:07.882Z","command":"afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260616200607909-1fbd6c","task_id":"T-01","created_at":"2026-06-17T00:06:07.909Z","command":"afol validate project --json","result":"passed"}
+{"id":"E-20260616200607958-b7032c","task_id":"T-01","created_at":"2026-06-17T00:06:07.958Z","command":"bun test","result":"passed"}
+{"id":"E-20260616200607983-fa7610","task_id":"T-01","created_at":"2026-06-17T00:06:07.983Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260616200705899-2c6523","task_id":"T-01","created_at":"2026-06-17T00:07:05.899Z","command":"bun run validate:release","result":"passed"}
+{"id":"E-20260616201006072-05416f","task_id":"T-01","created_at":"2026-06-17T00:10:06.072Z","command":"front-door smoke for all advertised commands and compact aliases (111 checks)","result":"passed"}
+{"id":"E-20260616201006118-452150","task_id":"T-01","created_at":"2026-06-17T00:10:06.118Z","command":"afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260616201006164-747cbf","task_id":"T-01","created_at":"2026-06-17T00:10:06.164Z","command":"afol validate project --json","result":"passed"}
+{"id":"E-20260616201144490-0dd472","task_id":"T-01","created_at":"2026-06-17T00:11:44.490Z","command":"bun run typecheck && bun test","result":"passed"}
+{"id":"E-20260616201243289-eae16c","task_id":"T-01","created_at":"2026-06-17T00:12:43.289Z","command":"bun run validate:release","result":"passed"}
+{"id":"E-20260616201243515-627d28","task_id":"T-01","created_at":"2026-06-17T00:12:43.515Z","command":"bun run validate:release","result":"passed"}

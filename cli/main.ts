@@ -72,6 +72,52 @@ const exit = (code: number): never => {
 	process.exit(code);
 };
 
+export const DIRECT_DISPATCH_KINDS = Object.freeze([
+	"bootstrap",
+	"init",
+	"validate",
+	"status",
+	"new",
+	"start",
+	"evidence",
+	"done",
+	"log",
+	"quickTask",
+	"verifyTasks",
+	"rule",
+	"skill",
+	"update",
+	"close",
+	"file",
+	"localState",
+	"catchup",
+	"preflight",
+]);
+
+export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
+	"adm",
+	"health",
+	"db",
+	"doctor",
+	"maintenance",
+	"pstr",
+	"schema",
+	"session",
+	"bench",
+	"projectBenchmark",
+	"sweep",
+	"spec",
+	"adr",
+	"changelog",
+	"ctx",
+	"library",
+	"memory",
+	"state",
+	"adapter",
+	"telemetry",
+	"hydrate",
+]);
+
 function resolveValidateMode(
 	projectRoot: string,
 	args: string[],

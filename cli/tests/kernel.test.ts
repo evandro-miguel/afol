@@ -695,6 +695,26 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("adm compact action aliases route through native handler", () => {
+		const script = "#!/usr/bin/env bash\necho LEGACY:$*";
+		const root = mkProjectRoot("adm-compact-aliases", script);
+		try {
+			const paths = runKernel(root, ["ad", "p"]);
+			expect(paths.status).toBe(0);
+			expect(paths.stdout as string).toContain("admDir:");
+			expect(paths.stderr as string).toBe("");
+			expect(paths.stdout as string).not.toContain("LEGACY:");
+
+			const validate = runKernel(root, ["ad", "v"]);
+			expect(validate.status).toBe(0);
+			expect(validate.stdout as string).toContain("validate:");
+			expect(validate.stderr as string).toBe("");
+			expect(validate.stdout as string).not.toContain("Unknown adm action");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("new --help is native help only and does not create session", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-new-help-"));
 		try {

@@ -20,7 +20,6 @@ export type CommandKind =
 	| "ctx"
 	| "state"
 	| "hydrate"
-	| "render"
 	| "library"
 	| "memory"
 	| "adm"
@@ -79,7 +78,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "init",
-		aliases: [],
+		aliases: ["i"],
 		kind: "init",
 		sideEffect: "write",
 		description: "Install the scaffold",
@@ -119,7 +118,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "quick-task",
-		aliases: [],
+		aliases: ["qt"],
 		kind: "quickTask",
 		sideEffect: "write",
 		description:
@@ -192,7 +191,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "verify-tasks",
-		aliases: [],
+		aliases: ["vt"],
 		kind: "verifyTasks",
 		sideEffect: "read",
 		description: "Verify workbench tasks",
@@ -251,7 +250,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "state",
-		aliases: [],
+		aliases: ["stt"],
 		kind: "state",
 		sideEffect: "read",
 		description: "Inspect state snapshot",
@@ -259,18 +258,10 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "hydrate",
-		aliases: [],
+		aliases: ["hy"],
 		kind: "hydrate",
 		sideEffect: "generated",
 		description: "Generate hydrated project state",
-		category: "inspect",
-	},
-	{
-		command: "render",
-		aliases: [],
-		kind: "render",
-		sideEffect: "generated",
-		description: "Render project artifacts",
 		category: "inspect",
 	},
 	{
@@ -291,7 +282,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "adm",
-		aliases: [],
+		aliases: ["ad"],
 		kind: "adm",
 		sideEffect: "read",
 		description: "Inspect adm paths and files",
@@ -299,7 +290,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "spec",
-		aliases: [],
+		aliases: ["sp"],
 		kind: "spec",
 		sideEffect: "read",
 		description: "Inspect specs",
@@ -315,7 +306,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "changelog",
-		aliases: [],
+		aliases: ["cl"],
 		kind: "changelog",
 		sideEffect: "read",
 		description: "Inspect changelog entries",
@@ -339,7 +330,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "doctor",
-		aliases: [],
+		aliases: ["dr"],
 		kind: "doctor",
 		sideEffect: "read",
 		description: "Inspect doctor checks",
@@ -347,7 +338,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "maintenance",
-		aliases: [],
+		aliases: ["mt"],
 		kind: "maintenance",
 		sideEffect: "read",
 		description: "Run maintenance checks",
@@ -355,7 +346,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "sweep",
-		aliases: [],
+		aliases: ["sw"],
 		kind: "sweep",
 		sideEffect: "read",
 		description: "Run repository sweep checks",
@@ -363,7 +354,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "schema",
-		aliases: [],
+		aliases: ["sc"],
 		kind: "schema",
 		sideEffect: "read",
 		description: "Inspect schema state",
@@ -371,7 +362,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "bench",
-		aliases: [],
+		aliases: ["be"],
 		kind: "bench",
 		sideEffect: "read",
 		description:
@@ -427,7 +418,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "catchup",
-		aliases: [],
+		aliases: ["cu"],
 		kind: "catchup",
 		sideEffect: "read",
 		description:
@@ -445,7 +436,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "adapter",
-		aliases: [],
+		aliases: ["adp"],
 		kind: "adapter",
 		sideEffect: "write",
 		description: "Enable or disable runtime adapters",
@@ -478,7 +469,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "session",
-		aliases: [],
+		aliases: ["ss"],
 		kind: "session",
 		sideEffect: "write",
 		description: "List, bind, switch, and unbind workbench sessions",
@@ -498,6 +489,12 @@ for (const spec of COMMAND_SPECS) {
 	aliasToCommand.set(spec.command, spec.command);
 	knownTokens.add(spec.command);
 	for (const alias of spec.aliases) {
+		const existing = aliasToCommand.get(alias);
+		if (existing && existing !== spec.command) {
+			throw new Error(
+				`Duplicate top-level alias "${alias}" for ${existing} and ${spec.command}`,
+			);
+		}
 		aliasToCommand.set(alias, spec.command);
 		knownTokens.add(alias);
 	}

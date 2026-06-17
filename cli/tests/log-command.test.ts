@@ -194,27 +194,23 @@ describe("log command", () => {
 });
 
 describe("workbench command parity", () => {
-	test("start auto-selects the only pending task and evidence/done persist metadata", () => {
+	test("compact workflow aliases preserve evidence and done metadata", () => {
 		const root = mkProjectRoot("command-parity");
 		try {
 			const created = newWorkstream(root, "command-parity");
 
-			const startProc = runKernel(root, [
-				"start",
-				"--session",
-				created.session,
-			]);
+			const startProc = runKernel(root, ["st", "-S", created.session]);
 			expect(startProc.status).toBe(0);
 
 			const evidenceProc = runKernel(root, [
-				"evidence",
-				"--session",
+				"e",
+				"-S",
 				created.session,
-				"--task-id",
+				"-T",
 				"T-01",
-				"--command",
+				"-c",
 				"bun test",
-				"--result",
+				"-o",
 				"passed",
 				"--artifact",
 				"reports/unit.md",
@@ -224,14 +220,14 @@ describe("workbench command parity", () => {
 			expect(evidenceProc.status).toBe(0);
 
 			const doneProc = runKernel(root, [
-				"done",
-				"--session",
+				"d",
+				"-S",
 				created.session,
-				"--task-id",
+				"-T",
 				"T-01",
-				"--command",
+				"-c",
 				"bun run validate",
-				"--result",
+				"-o",
 				"passed",
 				"--artifact",
 				"reports/validate.md",
