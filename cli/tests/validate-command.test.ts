@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
+import { resolveValidateInvocation } from "../validate/command";
 
 type CapturedIo = {
 	stdout: string[];
@@ -68,6 +69,29 @@ function createValidationFixture(): string {
 }
 
 describe("validate command", () => {
+	test("resolves typed validate invocations without changing current grammar", () => {
+		expect(resolveValidateInvocation([])).toEqual({
+			kind: "project",
+			args: [],
+		});
+		expect(resolveValidateInvocation(["drift", "--json"])).toEqual({
+			kind: "project",
+			args: ["drift", "--json"],
+		});
+		expect(resolveValidateInvocation(["project", "--json"])).toEqual({
+			kind: "project",
+			args: ["--json"],
+		});
+		expect(resolveValidateInvocation(["--project", "bench"])).toEqual({
+			kind: "project",
+			args: ["bench"],
+		});
+		expect(resolveValidateInvocation(["select", "--json"])).toEqual({
+			kind: "benchmark",
+			args: ["select", "--json"],
+		});
+	});
+
 	test("passes structural checks in a minimal project fixture", async () => {
 		const root = createValidationFixture();
 		try {

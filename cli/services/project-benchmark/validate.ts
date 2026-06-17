@@ -16,6 +16,56 @@ export type ProjectBenchmarkValidationResult = {
 	project_count: number;
 };
 
+type ProjectBenchmarkProjectRecord = Record<string, unknown> & {
+	schema_version?: unknown;
+	id?: unknown;
+	name?: unknown;
+	category?: unknown;
+	status?: unknown;
+	source_access?: unknown;
+	last_reviewed_at?: unknown;
+	stale_after_days?: unknown;
+	confidence?: unknown;
+	similarity_axes?: unknown;
+	similarities?: unknown;
+	differences?: unknown;
+	lessons_for_afol?: unknown;
+	do_not_copy?: unknown;
+	source_refs?: unknown;
+};
+
+type ProjectBenchmarkSourceRefRecord = Record<string, unknown> & {
+	id?: unknown;
+	title?: unknown;
+	url?: unknown;
+	source_type?: unknown;
+	claim?: unknown;
+	axes?: unknown;
+};
+
+type ProjectBenchmarkAxisScoreRecord = Record<string, unknown> & {
+	score?: unknown;
+	evidence_refs?: unknown;
+};
+
+type ProjectBenchmarkSimilarityRecord = Record<string, unknown> & {
+	axis?: unknown;
+	evidence_refs?: unknown;
+};
+
+type ProjectBenchmarkLessonRecord = Record<string, unknown> & {
+	axis?: unknown;
+};
+
+type ProjectBenchmarkCollections = {
+	sourceRefs: unknown[];
+	similarityAxes: Record<string, unknown>;
+	similarities: unknown[];
+	differences: unknown[];
+	lessons: unknown[];
+	doNotCopy: unknown[];
+};
+
 const PROJECT_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const PROJECT_KEYS = [
 	"schema_version",
@@ -132,7 +182,7 @@ function validateProjectShape(
 	project: unknown,
 	file: string,
 	issues: ProjectBenchmarkIssue[],
-): Record<string, unknown> | null {
+): ProjectBenchmarkProjectRecord | null {
 	if (!isRecord(project)) {
 		push(issues, "error", "invalid-project", file, "Project must be an object");
 		return null;
@@ -294,6 +344,43 @@ function validateProjectShape(
 	return project;
 }
 
+function readProjectCollections(
+	project: ProjectBenchmarkProjectRecord,
+): ProjectBenchmarkCollections {
+	return {
+		sourceRefs: Array.isArray(project.source_refs) ? project.source_refs : [],
+		similarityAxes: isRecord(project.similarity_axes)
+			? project.similarity_axes
+			: {},
+		similarities: Array.isArray(project.similarities)
+			? project.similarities
+			: [],
+		differences: Array.isArray(project.differences) ? project.differences : [],
+		lessons: Array.isArray(project.lessons_for_afol)
+			? project.lessons_for_afol
+			: [],
+		doNotCopy: Array.isArray(project.do_not_copy) ? project.do_not_copy : [],
+	};
+}
+
+function readSourceRef(value: unknown): ProjectBenchmarkSourceRefRecord | null {
+	return isRecord(value) ? value : null;
+}
+
+function readAxisScore(value: unknown): ProjectBenchmarkAxisScoreRecord | null {
+	return isRecord(value) ? value : null;
+}
+
+function readSimilarity(
+	value: unknown,
+): ProjectBenchmarkSimilarityRecord | null {
+	return isRecord(value) ? value : null;
+}
+
+function readLesson(value: unknown): ProjectBenchmarkLessonRecord | null {
+	return isRecord(value) ? value : null;
+}
+
 function validateRuntimeBenchmarkSeparation(
 	catalog: ProjectBenchmarkCatalog,
 	issues: ProjectBenchmarkIssue[],
@@ -389,26 +476,9 @@ export function validateProjectBenchmarkCatalog(
 		if (!projectRecord) {
 			continue;
 		}
+		const collections = readProjectCollections(projectRecord);
 		const projectId =
 			typeof projectRecord.id === "string" ? projectRecord.id : null;
-		const projectSourceRefs = Array.isArray(projectRecord.source_refs)
-			? projectRecord.source_refs
-			: [];
-		const projectSimilarityAxes = isRecord(projectRecord.similarity_axes)
-			? projectRecord.similarity_axes
-			: {};
-		const projectSimilarities = Array.isArray(projectRecord.similarities)
-			? projectRecord.similarities
-			: [];
-		const projectDifferences = Array.isArray(projectRecord.differences)
-			? projectRecord.differences
-			: [];
-		const projectLessons = Array.isArray(projectRecord.lessons_for_afol)
-			? projectRecord.lessons_for_afol
-			: [];
-		const projectDoNotCopy = Array.isArray(projectRecord.do_not_copy)
-			? projectRecord.do_not_copy
-			: [];
 
 		if (projectId !== null && projectId !== fileNameId) {
 			push(
@@ -434,9 +504,10 @@ export function validateProjectBenchmarkCatalog(
 
 		const sourceIds = new Set<string>();
 		const sourceAxes = new Map<string, Set<string>>();
-		validateSourceRefEnums(projectSourceRefs, file, issues);
-		for (const sourceValue of projectSourceRefs) {
-			if (!isRecord(sourceValue)) {
+		validateSourceRefEnums(collections.sourceRefs, file, issues);
+		for (const sourceValue of collections.sourceRefs) {
+			const sourceRecord = readSourceRef(sourceValue);
+			if (!sourceRecord) {
 				push(
 					issues,
 					"error",
@@ -449,18 +520,18 @@ export function validateProjectBenchmarkCatalog(
 			pushUnexpectedProperties(
 				issues,
 				file,
-				sourceValue,
+				sourceRecord,
 				SOURCE_REF_KEYS,
 				"unexpected-source-ref-property",
 				"source_ref",
 			);
 			const sourceId =
-				typeof sourceValue.id === "string" ? sourceValue.id : "unknown";
+				typeof sourceRecord.id === "string" ? sourceRecord.id : "unknown";
 			if (
-				!sourceValue.id ||
-				!sourceValue.title ||
-				!sourceValue.url ||
-				!sourceValue.source_type
+				!sourceRecord.id ||
+				!sourceRecord.title ||
+				!sourceRecord.url ||
+				!sourceRecord.source_type
 			) {
 				push(
 					issues,
@@ -470,7 +541,7 @@ export function validateProjectBenchmarkCatalog(
 					`Invalid source_ref: ${sourceId}`,
 				);
 			}
-			if (sourceValue.url && !hasAbsoluteUriShape(sourceValue.url)) {
+			if (sourceRecord.url && !hasAbsoluteUriShape(sourceRecord.url)) {
 				push(
 					issues,
 					"error",
@@ -479,7 +550,7 @@ export function validateProjectBenchmarkCatalog(
 					`Invalid source_ref url: ${sourceId}`,
 				);
 			}
-			if (!sourceValue.claim) {
+			if (!sourceRecord.claim) {
 				push(
 					issues,
 					"error",
@@ -488,7 +559,7 @@ export function validateProjectBenchmarkCatalog(
 					`source_ref missing claim: ${sourceId}`,
 				);
 			}
-			const supportedAxes = readSupportedAxes(sourceValue.axes);
+			const supportedAxes = readSupportedAxes(sourceRecord.axes);
 			if (supportedAxes.length === 0) {
 				push(
 					issues,
@@ -509,40 +580,40 @@ export function validateProjectBenchmarkCatalog(
 					);
 				}
 			}
-			if (typeof sourceValue.id === "string" && sourceValue.id.length > 0) {
-				if (sourceIds.has(sourceValue.id)) {
+			if (typeof sourceRecord.id === "string" && sourceRecord.id.length > 0) {
+				if (sourceIds.has(sourceRecord.id)) {
 					push(
 						issues,
 						"error",
 						"duplicate-source-ref-id",
 						file,
-						`Duplicate source_ref id: ${sourceValue.id}`,
+						`Duplicate source_ref id: ${sourceRecord.id}`,
 					);
 				} else {
-					sourceIds.add(sourceValue.id);
-					sourceAxes.set(sourceValue.id, new Set(supportedAxes));
+					sourceIds.add(sourceRecord.id);
+					sourceAxes.set(sourceRecord.id, new Set(supportedAxes));
 				}
 			}
 		}
 
 		for (const [axisId, axisScoreValue] of Object.entries(
-			projectSimilarityAxes,
+			collections.similarityAxes,
 		)) {
 			if (!axes[axisId]) {
 				push(issues, "error", "unknown-axis", file, `Unknown axis: ${axisId}`);
 			}
-			const axisScore = isRecord(axisScoreValue) ? axisScoreValue : {};
-			if (isRecord(axisScoreValue)) {
+			const axisScore = readAxisScore(axisScoreValue);
+			if (axisScore) {
 				pushUnexpectedProperties(
 					issues,
 					file,
-					axisScoreValue,
+					axisScore,
 					AXIS_SCORE_KEYS,
 					"unexpected-axis-score-property",
 					"similarity_axes entry",
 				);
 			}
-			const score = axisScore.score;
+			const score = axisScore?.score;
 			if (
 				typeof score !== "number" ||
 				!Number.isInteger(score) ||
@@ -557,11 +628,11 @@ export function validateProjectBenchmarkCatalog(
 					`Score out of range for axis: ${axisId}`,
 				);
 			}
-			const evidenceRefs = Array.isArray(axisScore.evidence_refs)
+			const evidenceRefs = Array.isArray(axisScore?.evidence_refs)
 				? axisScore.evidence_refs
 				: [];
 			if (
-				!Array.isArray(axisScore.evidence_refs) ||
+				!Array.isArray(axisScore?.evidence_refs) ||
 				evidenceRefs.length === 0
 			) {
 				push(
@@ -595,19 +666,19 @@ export function validateProjectBenchmarkCatalog(
 			}
 		}
 
-		for (const similarityValue of projectSimilarities) {
-			const similarity = isRecord(similarityValue) ? similarityValue : {};
-			if (isRecord(similarityValue)) {
+		for (const similarityValue of collections.similarities) {
+			const similarity = readSimilarity(similarityValue);
+			if (similarity) {
 				pushUnexpectedProperties(
 					issues,
 					file,
-					similarityValue,
+					similarity,
 					SIMILARITY_KEYS,
 					"unexpected-similarity-property",
 					"similarity",
 				);
 			}
-			const similarityAxis = similarity.axis;
+			const similarityAxis = similarity?.axis;
 			if (typeof similarityAxis !== "string" || similarityAxis.length === 0) {
 				push(
 					issues,
@@ -625,11 +696,11 @@ export function validateProjectBenchmarkCatalog(
 					`Unknown similarity axis: ${similarityAxis}`,
 				);
 			}
-			const evidenceRefs = Array.isArray(similarity.evidence_refs)
+			const evidenceRefs = Array.isArray(similarity?.evidence_refs)
 				? similarity.evidence_refs
 				: [];
 			if (
-				!Array.isArray(similarity.evidence_refs) ||
+				!Array.isArray(similarity?.evidence_refs) ||
 				evidenceRefs.length === 0
 			) {
 				push(
@@ -653,7 +724,7 @@ export function validateProjectBenchmarkCatalog(
 			}
 		}
 
-		for (const differenceValue of projectDifferences) {
+		for (const differenceValue of collections.differences) {
 			if (!isRecord(differenceValue)) {
 				continue;
 			}
@@ -667,19 +738,19 @@ export function validateProjectBenchmarkCatalog(
 			);
 		}
 
-		for (const lessonValue of projectLessons) {
-			const lesson = isRecord(lessonValue) ? lessonValue : {};
-			if (isRecord(lessonValue)) {
+		for (const lessonValue of collections.lessons) {
+			const lesson = readLesson(lessonValue);
+			if (lesson) {
 				pushUnexpectedProperties(
 					issues,
 					file,
-					lessonValue,
+					lesson,
 					LESSON_KEYS,
 					"unexpected-lesson-property",
 					"lesson",
 				);
 			}
-			const lessonAxis = lesson.axis;
+			const lessonAxis = lesson?.axis;
 			if (typeof lessonAxis !== "string" || lessonAxis.length === 0) {
 				push(
 					issues,
@@ -699,7 +770,7 @@ export function validateProjectBenchmarkCatalog(
 			}
 		}
 
-		for (const itemValue of projectDoNotCopy) {
+		for (const itemValue of collections.doNotCopy) {
 			if (!isRecord(itemValue)) {
 				continue;
 			}

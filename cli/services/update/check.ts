@@ -20,13 +20,6 @@ type UpdateMode = "check" | "preview" | "apply";
 
 type UpdateFilePath = string;
 
-type UpdateOperationKind =
-	| "create"
-	| "skip-identical"
-	| "update-managed"
-	| "preserve-project-owned"
-	| "conflict";
-
 const SPECIAL_UPDATE_TARGETS = new Set<UpdateFilePath>([
 	".agents/lock.json",
 	".agents/manifest.json",
@@ -53,14 +46,34 @@ export type UpdateFilePreview = {
 	diff: string;
 };
 
-export type UpdateOperation = {
-	kind: UpdateOperationKind;
+type UpdateOperationBase = {
 	path: UpdateFilePath;
 	owner: ManagedOwnership;
 	reason: string;
-	diff?: string;
-	nextContent?: string;
 };
+
+type UpdateDiffOperation = UpdateOperationBase & {
+	diff: string;
+};
+
+export type UpdateOperation =
+	| (UpdateOperationBase & {
+			kind: "skip-identical";
+	  })
+	| (UpdateOperationBase & {
+			kind: "preserve-project-owned";
+	  })
+	| (UpdateDiffOperation & {
+			kind: "conflict";
+	  })
+	| (UpdateDiffOperation & {
+			kind: "create";
+			nextContent: string;
+	  })
+	| (UpdateDiffOperation & {
+			kind: "update-managed";
+			nextContent: string;
+	  });
 
 export type UpdateCheckResult = {
 	hasSource: boolean;
@@ -490,12 +503,15 @@ function diffManifestCommands(current: string[], source: string[]): string[] {
 
 function buildFilePreviews(operations: UpdateOperation[]): UpdateFilePreview[] {
 	return operations
-		.filter((operation) => operation.diff !== undefined)
+		.filter(
+			(operation): operation is Extract<UpdateOperation, { diff: string }> =>
+				"diff" in operation,
+		)
 		.map((operation) => ({
 			path: operation.path,
 			owner: operation.owner,
 			reason: operation.reason,
-			diff: operation.diff ?? "",
+			diff: operation.diff,
 		}));
 }
 
@@ -625,49 +641,35 @@ function planUpdateOperations(
 		}
 
 		if (managedHash !== undefined && currentHash === managedHash) {
+			const nextContent = safeManagedContent(
+				entry.path,
+				entry.currentContent,
+				entry.sourceContent,
+			);
 			operations.push({
 				kind: "update-managed",
 				path: entry.path,
 				owner,
 				reason: entry.managedReason,
-				nextContent: safeManagedContent(
-					entry.path,
-					entry.currentContent,
-					entry.sourceContent,
-				),
-				diff: buildPatch(
-					entry.path,
-					entry.currentContent,
-					safeManagedContent(
-						entry.path,
-						entry.currentContent,
-						entry.sourceContent,
-					),
-				),
+				nextContent,
+				diff: buildPatch(entry.path, entry.currentContent, nextContent),
 			});
 			continue;
 		}
 
 		if (managedHash === undefined) {
+			const nextContent = safeManagedContent(
+				entry.path,
+				entry.currentContent,
+				entry.sourceContent,
+			);
 			operations.push({
 				kind: "update-managed",
 				path: entry.path,
 				owner,
 				reason: entry.defaultReason,
-				nextContent: safeManagedContent(
-					entry.path,
-					entry.currentContent,
-					entry.sourceContent,
-				),
-				diff: buildPatch(
-					entry.path,
-					entry.currentContent,
-					safeManagedContent(
-						entry.path,
-						entry.currentContent,
-						entry.sourceContent,
-					),
-				),
+				nextContent,
+				diff: buildPatch(entry.path, entry.currentContent, nextContent),
 			});
 		}
 	}
@@ -713,12 +715,6 @@ function planUpdateOperations(
 			templateEntry.contentBase64,
 			"base64",
 		).toString("utf8");
-		const updateOperation: UpdateOperation = {
-			kind: operation.kind,
-			path: operation.path,
-			owner: operation.owner,
-			reason: operation.reason,
-		};
 		const diff =
 			operation.diffPreview ??
 			(operation.kind === "create" ||
@@ -726,11 +722,31 @@ function planUpdateOperations(
 			operation.kind === "conflict"
 				? buildPatch(operation.path, currentContent, nextContent)
 				: undefined);
-		if (diff !== undefined) {
-			updateOperation.diff = diff;
-		}
+		let updateOperation: UpdateOperation;
 		if (operation.kind === "create" || operation.kind === "update-managed") {
-			updateOperation.nextContent = nextContent;
+			updateOperation = {
+				kind: operation.kind,
+				path: operation.path,
+				owner: operation.owner,
+				reason: operation.reason,
+				nextContent,
+				diff: diff ?? buildPatch(operation.path, currentContent, nextContent),
+			};
+		} else if (operation.kind === "conflict") {
+			updateOperation = {
+				kind: "conflict",
+				path: operation.path,
+				owner: operation.owner,
+				reason: operation.reason,
+				diff: diff ?? buildPatch(operation.path, currentContent, nextContent),
+			};
+		} else {
+			updateOperation = {
+				kind: operation.kind,
+				path: operation.path,
+				owner: operation.owner,
+				reason: operation.reason,
+			};
 		}
 		operations.push(updateOperation);
 	}

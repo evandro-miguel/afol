@@ -33,6 +33,11 @@ const DEFAULT_IO: CommandIo = {
 
 type UpdateSubcommand = "check" | "preview" | "apply";
 
+type WritableUpdateOperation = Extract<
+	UpdateOperation,
+	{ kind: "create" | "update-managed" }
+>;
+
 type UpdateChangeSummary = {
 	total: number;
 	create: number;
@@ -77,7 +82,9 @@ function normalizeSubcommand(value: string | undefined): UpdateSubcommand {
 	throw new Error(`Unknown update command: ${value}`);
 }
 
-function isWritableOperation(operation: UpdateOperation): boolean {
+function isWritableOperation(
+	operation: UpdateOperation,
+): operation is WritableUpdateOperation {
 	return operation.kind === "create" || operation.kind === "update-managed";
 }
 
@@ -163,7 +170,7 @@ type UpdateApplyRuntime = {
 };
 
 type StagedUpdateOperation = {
-	operation: UpdateOperation;
+	operation: WritableUpdateOperation;
 	absolutePath: string;
 	beforeExisted: boolean;
 	beforeContent: string;
@@ -266,9 +273,6 @@ function stageUpdateOperations(
 ): StagedUpdateOperation[] {
 	const batchId = createMutationId();
 	return operations.filter(isWritableOperation).flatMap((operation) => {
-		if (!operation.nextContent) {
-			return [];
-		}
 		const absolutePath = join(projectRoot, operation.path);
 		const beforeExisted = existsSync(absolutePath);
 		const beforeContent = beforeExisted
@@ -351,10 +355,6 @@ function applyUpdateOperations(
 		const applied: StagedUpdateOperation[] = [];
 		try {
 			for (const entry of staged) {
-				const nextContent = entry.operation.nextContent;
-				if (!nextContent) {
-					continue;
-				}
 				const dir = dirname(entry.absolutePath);
 				if (!existsSync(dir)) {
 					mkdirSync(dir, { recursive: true });
@@ -363,7 +363,7 @@ function applyUpdateOperations(
 					entry.absolutePath,
 					entry.operation.path,
 					entry.mutationId,
-					nextContent,
+					entry.operation.nextContent,
 				);
 				applied.push(entry);
 				if (

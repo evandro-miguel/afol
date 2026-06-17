@@ -1225,6 +1225,29 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("check benchmark family preserves benchmark parser behavior", () => {
+		const root = mkProjectRoot(
+			"check-benchmark-route",
+			"#!/usr/bin/env bash\necho LEGACY:$*\n",
+		);
+		try {
+			for (const args of [
+				["check", "select", "--broken"],
+				["ck", "select", "--broken"],
+			]) {
+				const proc = runKernel(root, args);
+				expect(proc.status).toBe(2);
+				expect(proc.stderr as string).toContain(
+					"Unknown validation argument: --broken",
+				);
+				expect(proc.stdout as string).toBe("");
+				expect(proc.stdout as string).not.toContain("LEGACY:");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("detects project root by walking up directories", () => {
 		const root = mkProjectRoot(
 			"detection",

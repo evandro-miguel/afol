@@ -39,6 +39,25 @@ const SUCCESS_RESULT_RE =
 const FAILURE_RESULT_RE =
 	/\b(?:fail|failed|failure|error|fatal|blocked|exit code [1-9])\b/i;
 
+type CountedTaskState =
+	| "done"
+	| "moved"
+	| "pending"
+	| "in_progress"
+	| "implemented_untested"
+	| "tested_needs_spec_validation"
+	| "problem";
+
+const RESULT_COUNT_KEY_BY_STATE = {
+	done: "completed",
+	moved: "moved",
+	pending: "pending",
+	in_progress: "inProgress",
+	implemented_untested: "implementedUntested",
+	tested_needs_spec_validation: "testedNeedsSpecValidation",
+	problem: "problem",
+} as const satisfies Record<CountedTaskState, keyof VerifyResult>;
+
 export type VerifyTask = {
 	id: string;
 	description: string;
@@ -314,6 +333,14 @@ function evidenceIsSuccess(entry: EvidenceEntry): boolean {
 	return evidenceResultIsSuccess(entry.result);
 }
 
+function hasRunnableSuccessEvidence(entry: EvidenceEntry): boolean {
+	return (
+		evidenceIsSuccess(entry) &&
+		typeof entry.command === "string" &&
+		entry.command.trim().length > 0
+	);
+}
+
 function evidenceText(entry: EvidenceEntry): string {
 	return JSON.stringify(entry);
 }
@@ -345,46 +372,41 @@ function unresolvedFailedEvidence(entries: EvidenceEntry[]): EvidenceEntry[] {
 	return unresolved;
 }
 
-function hasStrictClosureEvidence(entries: EvidenceEntry[]): boolean {
+function doneTaskEvidenceIssue(
+	task: VerifyTask,
+	entries: EvidenceEntry[],
+): VerifyIssue | null {
 	if (unresolvedFailedEvidence(entries).length > 0) {
-		return false;
+		return {
+			type: "failed_evidence",
+			taskId: task.id,
+			file: task.file,
+			line: task.line,
+			message: `Task ${task.id} has blocking failed evidence`,
+		};
 	}
-	return entries.some(
-		(entry) =>
-			evidenceIsSuccess(entry) &&
-			typeof entry.command === "string" &&
-			entry.command.trim(),
-	);
+	if (entries.some(hasRunnableSuccessEvidence)) {
+		return null;
+	}
+	return {
+		type: "missing_evidence",
+		taskId: task.id,
+		file: task.file,
+		line: task.line,
+		message: `Task ${task.id} marked done but lacks passed evidence`,
+	};
+}
+
+function isCountedTaskState(state: string): state is CountedTaskState {
+	return state in RESULT_COUNT_KEY_BY_STATE;
 }
 
 function incrementState(result: VerifyResult, task: VerifyTask): void {
-	if (task.state === "done") {
-		result.completed += 1;
+	if (!isCountedTaskState(task.state)) {
 		return;
 	}
-	if (task.state === "moved") {
-		result.moved += 1;
-		return;
-	}
-	if (task.state === "pending") {
-		result.pending += 1;
-		return;
-	}
-	if (task.state === "in_progress") {
-		result.inProgress += 1;
-		return;
-	}
-	if (task.state === "implemented_untested") {
-		result.implementedUntested += 1;
-		return;
-	}
-	if (task.state === "tested_needs_spec_validation") {
-		result.testedNeedsSpecValidation += 1;
-		return;
-	}
-	if (task.state === "problem") {
-		result.problem += 1;
-	}
+	const key = RESULT_COUNT_KEY_BY_STATE[task.state];
+	result[key] += 1;
 }
 
 export function verifyWorkbenchTasks(
@@ -434,18 +456,12 @@ export function verifyWorkbenchTasks(
 				result.openTasks.push(task);
 			}
 			if (strict && task.state === "done") {
-				const entries = scopedEvidence?.get(task.id) ?? [];
-				if (!hasStrictClosureEvidence(entries)) {
-					const hasFailure = unresolvedFailedEvidence(entries).length > 0;
-					result.issues.push({
-						type: hasFailure ? "failed_evidence" : "missing_evidence",
-						taskId: task.id,
-						file: task.file,
-						line: task.line,
-						message: hasFailure
-							? `Task ${task.id} has blocking failed evidence`
-							: `Task ${task.id} marked done but lacks passed evidence`,
-					});
+				const issue = doneTaskEvidenceIssue(
+					task,
+					scopedEvidence?.get(task.id) ?? [],
+				);
+				if (issue) {
+					result.issues.push(issue);
 				}
 			}
 		}

@@ -54,6 +54,38 @@ type ParsedArgs = {
 	strict: boolean;
 };
 
+type ValidProjectBenchmarkCatalog = {
+	ok: true;
+	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>;
+	axes: ProjectBenchmarkAxesFile;
+	projects: ProjectBenchmarkProject[];
+	validation: ReturnType<typeof validateProjectBenchmarkCatalog>;
+};
+
+type InvalidProjectBenchmarkCatalog = {
+	ok: false;
+	error: ProjectBenchmarkCatalogError;
+};
+
+type ProjectBenchmarkCatalogResolution =
+	| ValidProjectBenchmarkCatalog
+	| InvalidProjectBenchmarkCatalog;
+
+type ProjectBenchmarkValidationStatus =
+	| {
+			ok: true;
+			error: null;
+	  }
+	| {
+			ok: false;
+			error: {
+				code:
+					| "project-benchmark-validation-warning"
+					| "invalid-project-benchmark-catalog";
+				message: string;
+			};
+	  };
+
 class ProjectBenchmarkCatalogError extends Error {
 	readonly issues: ProjectBenchmarkIssue[];
 
@@ -243,28 +275,55 @@ function inferMissingSourceRefAxes(
 	return catalog;
 }
 
-function requireValidCatalog(
-	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
-): {
-	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>;
-	axes: ProjectBenchmarkAxesFile;
-	projects: ProjectBenchmarkProject[];
-	validation: ReturnType<typeof validateProjectBenchmarkCatalog>;
-} {
-	const validation = validateProjectBenchmarkCatalog(catalog);
-	if (!catalog.axes) {
-		throw new ProjectBenchmarkCatalogError(
-			"project-benchmark catalog is missing axes.json",
-			validation.issues,
-		);
+function resolveValidationStatus(
+	validation: ReturnType<typeof validateProjectBenchmarkCatalog>,
+	strict: boolean,
+): ProjectBenchmarkValidationStatus {
+	if (validation.ok && (!strict || validation.warning_count === 0)) {
+		return { ok: true, error: null };
 	}
-	if (!validation.ok) {
-		throw new ProjectBenchmarkCatalogError(
-			"project-benchmark catalog validation failed",
-			validation.issues,
-		);
+	if (validation.ok) {
+		return {
+			ok: false,
+			error: {
+				code: "project-benchmark-validation-warning",
+				message: "project-benchmark validation strict mode failed",
+			},
+		};
 	}
 	return {
+		ok: false,
+		error: {
+			code: "invalid-project-benchmark-catalog",
+			message: "project-benchmark catalog validation failed",
+		},
+	};
+}
+
+function requireValidCatalog(
+	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
+): ProjectBenchmarkCatalogResolution {
+	const validation = validateProjectBenchmarkCatalog(catalog);
+	if (!catalog.axes) {
+		return {
+			ok: false,
+			error: new ProjectBenchmarkCatalogError(
+				"project-benchmark catalog is missing axes.json",
+				validation.issues,
+			),
+		};
+	}
+	if (!validation.ok) {
+		return {
+			ok: false,
+			error: new ProjectBenchmarkCatalogError(
+				"project-benchmark catalog validation failed",
+				validation.issues,
+			),
+		};
+	}
+	return {
+		ok: true,
 		catalog,
 		axes: catalog.axes,
 		projects: projectList(catalog.projects.map((entry) => entry.project)),
@@ -449,12 +508,11 @@ export async function runProjectBenchmarkCommand(
 
 	if (action === "validate") {
 		const validation = validateProjectBenchmarkCatalog(sourceCatalog);
-		const ok =
-			validation.ok && (!parsed.strict || validation.warning_count === 0);
+		const status = resolveValidationStatus(validation, parsed.strict);
 		const data = {
 			schema_version: "1.0.0",
 			command: "project-benchmark.validate",
-			ok,
+			ok: status.ok,
 			strict: parsed.strict,
 			issues: validation.issues,
 			error_count: validation.error_count,
@@ -462,26 +520,13 @@ export async function runProjectBenchmarkCommand(
 			project_count: validation.project_count,
 		};
 		if (parsed.json) {
-			writeValidationJson(
-				io,
-				data,
-				ok,
-				ok
-					? null
-					: validation.ok
-						? {
-								code: "project-benchmark-validation-warning",
-								message: "project-benchmark validation strict mode failed",
-							}
-						: {
-								code: "invalid-project-benchmark-catalog",
-								message: "project-benchmark catalog validation failed",
-							},
-			);
+			writeValidationJson(io, data, status.ok, status.error);
 		} else {
-			io.stdout(formatProjectBenchmarkValidation({ ...validation, ok }));
+			io.stdout(
+				formatProjectBenchmarkValidation({ ...validation, ok: status.ok }),
+			);
 		}
-		return ok ? 0 : 1;
+		return status.ok ? 0 : 1;
 	}
 
 	if (action === "generate") {
@@ -533,24 +578,20 @@ export async function runProjectBenchmarkCommand(
 		}
 	}
 
-	let catalog: ReturnType<typeof requireValidCatalog>;
-	try {
-		catalog = requireValidCatalog(sourceCatalog);
-	} catch (error) {
-		const message = (error as Error).message;
-		const issues =
-			error instanceof ProjectBenchmarkCatalogError ? error.issues : [];
+	const catalog = requireValidCatalog(sourceCatalog);
+	if (!catalog.ok) {
+		const { error } = catalog;
 		if (parsed.json) {
 			writeActionError(
 				io,
 				action,
 				"invalid-project-benchmark-catalog",
-				message,
+				error.message,
 				1,
-				issues.length > 0 ? { issues } : undefined,
+				error.issues.length > 0 ? { issues: error.issues } : undefined,
 			);
 		} else {
-			io.stderr(`err invalid-project-benchmark-catalog ${message}`);
+			io.stderr(`err invalid-project-benchmark-catalog ${error.message}`);
 		}
 		return 1;
 	}

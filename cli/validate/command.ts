@@ -174,6 +174,16 @@ interface ParsedValidationArgs {
 	outputPath?: string;
 }
 
+export type ValidateInvocation =
+	| {
+			kind: "project";
+			args: string[];
+	  }
+	| {
+			kind: "benchmark";
+			args: string[];
+	  };
+
 interface BenchmarkPackResults {
 	results: BenchmarkResult[];
 	notes: string[];
@@ -220,6 +230,29 @@ interface ScenarioExecutionResult {
 	metrics: ScenarioExecutionMetrics;
 	notes: string[];
 	passed: boolean;
+}
+
+export function resolveValidateInvocation(args: string[]): ValidateInvocation {
+	const explicitProject = args[0] === "project" || args.includes("--project");
+	if (explicitProject) {
+		return {
+			kind: "project",
+			args: args.filter((arg) => arg !== "project" && arg !== "--project"),
+		};
+	}
+
+	const modeArg = args[0];
+	if (modeArg === "bench" || modeArg === "select" || modeArg === "run") {
+		return {
+			kind: "benchmark",
+			args,
+		};
+	}
+
+	return {
+		kind: "project",
+		args,
+	};
 }
 
 function scenarioSamplePassed(
