@@ -426,8 +426,8 @@ export function validateWorkBenchIndex(root: string): {
 	const indexPath = resolveWorkbenchIndexPath(root);
 	if (!existsSync(indexPath)) {
 		return {
-			ok: true,
-			message: `skipped workbench index: no snapshot at ${indexPath}`,
+			ok: false,
+			message: `missing workbench index snapshot: ${indexPath}; run afol local-state rebuild`,
 		};
 	}
 

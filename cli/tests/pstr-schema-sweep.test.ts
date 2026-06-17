@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import {
 	existsSync,
 	mkdirSync,
@@ -13,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runPstrCommand } from "../commands/pstr";
 import { agentOperationContext } from "../core/operation-context";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { rebuildPstrIndex } from "../services/pstr/builder";
 import {
 	detectShape,
@@ -27,6 +29,22 @@ import {
 	sweepMonthly,
 	sweepWeekly,
 } from "../services/sweep/runner";
+
+function initGitRepo(root: string): void {
+	const git = (args: string[]): void => {
+		const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+		if (result.status !== 0) {
+			throw new Error(
+				result.stderr || result.stdout || `git ${args.join(" ")}`,
+			);
+		}
+	};
+	git(["init"]);
+	git(["config", "user.email", "afol@example.test"]);
+	git(["config", "user.name", "AFOL Test"]);
+	git(["add", "."]);
+	git(["commit", "--no-gpg-sign", "-m", "init"]);
+}
 
 function createFixture(includeSource = true): string {
 	const root = mkdtempSync(join(tmpdir(), "pss-test-"));
@@ -119,8 +137,10 @@ function prepareCurrentSweepRoot(): string {
 	const root = createFixture();
 	const now = currentIso();
 	rebuildPstrIndex(root);
+	rebuildWorkBenchIndex(root);
 	openDb(root).close();
 	writeMemoryFile(root, now);
+	initGitRepo(root);
 	return root;
 }
 
@@ -777,7 +797,9 @@ describe("sweep runner", () => {
 		const root = createFixture();
 		try {
 			rebuildPstrIndex(root);
+			rebuildWorkBenchIndex(root);
 			writeMemoryFile(root, currentIso());
+			initGitRepo(root);
 			const report = sweepDaily(root);
 			expect(report.actions).toContain("initialize state database");
 			expect(report.issues).toBe(1);
@@ -790,8 +812,10 @@ describe("sweep runner", () => {
 		const root = createFixture();
 		try {
 			rebuildPstrIndex(root);
+			rebuildWorkBenchIndex(root);
 			openDb(root).close();
 			writeMemoryFile(root, isoDaysAgo(45));
+			initGitRepo(root);
 			const report = sweepDaily(root);
 			expect(report.actions).toContain("refresh project memory");
 			expect(report.issues).toBe(1);
@@ -804,6 +828,7 @@ describe("sweep runner", () => {
 		const root = createFixture();
 		try {
 			rebuildPstrIndex(root);
+			rebuildWorkBenchIndex(root);
 			openDb(root).close();
 			writeMemoryFile(root, currentIso());
 			writeActiveSession(root, "000001_0001_demo");

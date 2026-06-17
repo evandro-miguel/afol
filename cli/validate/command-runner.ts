@@ -123,6 +123,7 @@ const VALIDATION_COMMANDS_BY_PACK: Record<PackId, ValidationCommandSpec[]> = {
 interface ValidationCommandReport {
 	reportedStatus?: string;
 	reportedPass?: boolean;
+	parseFailed?: boolean;
 }
 
 export type ValidationCommandSummary = {
@@ -135,25 +136,43 @@ export type ValidationCommandRun = {
 	summary: ValidationCommandSummary;
 };
 
+type ValidationCommandOutcome = {
+	commandResult: ValidationCommandResult;
+	countsAsPassed: boolean;
+};
+
 function parseValidationCommandReport(
 	stdout: string | undefined,
+	expectsJsonReport: boolean,
 ): ValidationCommandReport {
 	if (stdout === undefined || stdout === "") {
-		return {};
+		return expectsJsonReport ? { parseFailed: true } : {};
 	}
 	try {
-		const payload = JSON.parse(stdout) as Record<string, unknown>;
-		const report: ValidationCommandReport = {};
-		if (typeof payload.status === "string") {
-			report.reportedStatus = payload.status;
+		const payload = JSON.parse(stdout) as unknown;
+		if (
+			typeof payload !== "object" ||
+			payload === null ||
+			Array.isArray(payload)
+		) {
+			return expectsJsonReport ? { parseFailed: true } : {};
 		}
-		if (typeof payload.pass === "boolean") {
-			report.reportedPass = payload.pass;
+		const reportPayload = payload as Record<string, unknown>;
+		const report: ValidationCommandReport = {};
+		if (typeof reportPayload.status === "string") {
+			report.reportedStatus = reportPayload.status;
+		}
+		if (typeof reportPayload.pass === "boolean") {
+			report.reportedPass = reportPayload.pass;
 		}
 		return report;
 	} catch {
-		return {};
+		return expectsJsonReport ? { parseFailed: true } : {};
 	}
+}
+
+function expectsJsonReport(command: readonly string[]): boolean {
+	return command.includes("--json");
 }
 
 function isValidationCommandPassing(
@@ -164,6 +183,7 @@ function isValidationCommandPassing(
 		result.status === 0 &&
 		!result.signal &&
 		!result.error &&
+		!report.parseFailed &&
 		report.reportedPass !== false &&
 		report.reportedStatus !== "failed"
 	);
@@ -173,7 +193,7 @@ function runPackCommand(
 	projectRoot: string,
 	packId: PackId,
 	spec: ValidationCommandSpec,
-): ValidationCommandResult {
+): ValidationCommandOutcome {
 	const startedAt = performance.now();
 	const [command, ...args] = spec.command;
 	if (!command) {
@@ -185,7 +205,10 @@ function runPackCommand(
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	const durationMs = Math.round(performance.now() - startedAt);
-	const report = parseValidationCommandReport(result.stdout ?? "");
+	const report = parseValidationCommandReport(
+		result.stdout ?? "",
+		expectsJsonReport(spec.command),
+	);
 	const passed = isValidationCommandPassing(result, report);
 	const commandResult: ValidationCommandResult = {
 		pack_id: packId,
@@ -205,28 +228,19 @@ function runPackCommand(
 	if (report.reportedPass !== undefined) {
 		commandResult.reported_pass = report.reportedPass;
 	}
-	return commandResult;
-}
-
-function isInformationalBenchmarkCommand(command: readonly string[]): boolean {
-	return (
-		command[0] === "bun" &&
-		command[1] === "run" &&
-		command[3] === "v" &&
-		command[4] === "bench"
-	);
+	return {
+		commandResult,
+		countsAsPassed: passed,
+	};
 }
 
 function summarizeValidationCommandResults(
-	commandResults: ValidationCommandResult[],
+	commandOutcomes: ValidationCommandOutcome[],
 ): ValidationCommandSummary {
 	let passed = 0;
 	let failed = 0;
-	for (const entry of commandResults) {
-		const informationalBenchmark = isInformationalBenchmarkCommand(
-			entry.command,
-		);
-		if (entry.status === "passed" || informationalBenchmark) {
+	for (const entry of commandOutcomes) {
+		if (entry.countsAsPassed) {
 			passed += 1;
 		} else {
 			failed += 1;
@@ -239,14 +253,17 @@ export function runValidationCommands(
 	projectRoot: string,
 	selectedPacks: PackId[],
 ): ValidationCommandRun {
+	const commandOutcomes: ValidationCommandOutcome[] = [];
 	const commandResults: ValidationCommandResult[] = [];
 	for (const packId of selectedPacks) {
 		for (const spec of VALIDATION_COMMANDS_BY_PACK[packId] ?? []) {
-			commandResults.push(runPackCommand(projectRoot, packId, spec));
+			const outcome = runPackCommand(projectRoot, packId, spec);
+			commandOutcomes.push(outcome);
+			commandResults.push(outcome.commandResult);
 		}
 	}
 	return {
 		commandResults,
-		summary: summarizeValidationCommandResults(commandResults),
+		summary: summarizeValidationCommandResults(commandOutcomes),
 	};
 }

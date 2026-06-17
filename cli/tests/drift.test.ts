@@ -181,10 +181,30 @@ function initGitRepo(root: string): void {
 	}
 }
 
+function stageActiveSessionPointer(
+	root: string,
+	session = "test-session",
+): void {
+	writeFileSync(
+		join(root, ".afol", "wb", ".active_session"),
+		`${session}\n`,
+		"utf8",
+	);
+	const addResult = spawnSync("git", ["add", ".afol/wb/.active_session"], {
+		cwd: root,
+		encoding: "utf8",
+		shell: false,
+	});
+	if (addResult.error || addResult.status !== 0) {
+		throw new Error(addResult.stderr || addResult.stdout || "git add failed");
+	}
+}
+
 describe("drift validation", () => {
 	test("runDriftCheck returns ok when all drift surfaces match", () => {
 		const root = createFixture();
 		try {
+			initGitRepo(root);
 			const report = runDriftCheck(root);
 			expect(report.ok).toBe(true);
 			expect(report.findings).toEqual([]);
@@ -243,21 +263,7 @@ describe("drift validation", () => {
 		const root = createFixture();
 		try {
 			initGitRepo(root);
-			writeFileSync(
-				join(root, ".afol", "wb", ".active_session"),
-				"test-session\n",
-				"utf8",
-			);
-			const addResult = spawnSync("git", ["add", ".afol/wb/.active_session"], {
-				cwd: root,
-				encoding: "utf8",
-				shell: false,
-			});
-			if (addResult.error || addResult.status !== 0) {
-				throw new Error(
-					addResult.stderr || addResult.stdout || "git add failed",
-				);
-			}
+			stageActiveSessionPointer(root);
 			const findings = checkActiveSessionPointerMutation(root);
 			expect(findings).toHaveLength(1);
 			expect(findings[0]?.id).toBe("active-session-pointer-mutated");
@@ -271,21 +277,7 @@ describe("drift validation", () => {
 		const root = createFixture();
 		try {
 			initGitRepo(root);
-			writeFileSync(
-				join(root, ".afol", "wb", ".active_session"),
-				"test-session\n",
-				"utf8",
-			);
-			const addResult = spawnSync("git", ["add", ".afol/wb/.active_session"], {
-				cwd: root,
-				encoding: "utf8",
-				shell: false,
-			});
-			if (addResult.error || addResult.status !== 0) {
-				throw new Error(
-					addResult.stderr || addResult.stdout || "git add failed",
-				);
-			}
+			stageActiveSessionPointer(root);
 			const report = sweepDaily(root);
 			expect(report.issues).toBeGreaterThan(0);
 			expect(report.actions).toContain(
@@ -310,6 +302,7 @@ describe("drift validation", () => {
 	test("runDriftCheck reports adm drift", () => {
 		const root = createFixture();
 		try {
+			initGitRepo(root);
 			writeFileSync(
 				join(root, ".afol", "adm", "specs", "spec-a.md"),
 				"changed",
@@ -328,6 +321,7 @@ describe("drift validation", () => {
 	test("afol validate drift returns JSON report", async () => {
 		const root = createFixture();
 		try {
+			initGitRepo(root);
 			const captured = captureIo();
 			expect(
 				await runValidateCommand(root, ["drift", "--json"], captured.io),
@@ -347,6 +341,24 @@ describe("drift validation", () => {
 			expect(payload.findings).toEqual([]);
 			expect(payload.data?.report?.ok).toBe(true);
 			expect(captured.stderr).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("runDriftCheck reports git collection failure", () => {
+		const root = createFixture();
+		try {
+			const report = runDriftCheck(root);
+			expect(report.ok).toBe(false);
+			expect(report.findings).toHaveLength(1);
+			expect(report.findings[0]).toMatchObject({
+				id: "state:git:collection-failed",
+				severity: "fail",
+				domain: "state",
+				message: "failed to collect git drift for .afol/wb/.active_session",
+			});
+			expect(report.findings[0]?.actual).toContain("not a git repository");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

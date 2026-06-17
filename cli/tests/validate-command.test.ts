@@ -3,6 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
+import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { resolveValidateInvocation } from "../validate/command";
 
 type CapturedIo = {
@@ -68,6 +70,11 @@ function createValidationFixture(): string {
 	return root;
 }
 
+function rebuildValidationFixtureIndexes(root: string): void {
+	rebuildWorkBenchIndex(root);
+	rebuildProjectIndexes(root);
+}
+
 describe("validate command", () => {
 	test("resolves typed validate invocations without changing current grammar", () => {
 		expect(resolveValidateInvocation([])).toEqual({
@@ -95,6 +102,7 @@ describe("validate command", () => {
 	test("passes structural checks in a minimal project fixture", async () => {
 		const root = createValidationFixture();
 		try {
+			rebuildValidationFixtureIndexes(root);
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
 			expect(code).toBe(0);
@@ -165,6 +173,36 @@ describe("validate command", () => {
 						entry.id === "files_local_state_index" && entry.ok === true,
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails when local-state index snapshots are missing", async () => {
+		const root = createValidationFixture();
+		try {
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				exit_code: number;
+				ok: boolean;
+				checks: Array<{ id: string; ok: boolean; message?: string }>;
+			};
+			expect(payload.exit_code).toBe(1);
+			expect(payload.ok).toBe(false);
+			for (const id of [
+				"wb_local_state_index",
+				"rules_local_state_index",
+				"skills_local_state_index",
+				"specs_local_state_index",
+				"files_local_state_index",
+			]) {
+				const check = payload.checks.find((entry) => entry.id === id);
+				expect(check).toBeDefined();
+				expect(check?.ok).toBe(false);
+				expect(check?.message).toContain("run afol local-state rebuild");
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -277,6 +315,7 @@ describe("validate command", () => {
 				"# Rule 1\n",
 				"utf8",
 			);
+			rebuildValidationFixtureIndexes(root);
 
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);

@@ -290,6 +290,47 @@ describe("verifyWorkbenchTasks", () => {
 		}
 	});
 
+	test("strict verification rejects malformed evidence JSONL lines", () => {
+		const root = mkRoot("invalid-evidence");
+		try {
+			const session = "260531_1206_verify";
+			const sessionDir = join(root, ".afol", "wb", session);
+			seedDoneWorkbenchTask(root, session);
+			write(
+				join(sessionDir, ".evidence.jsonl"),
+				[
+					"{not-json",
+					JSON.stringify({
+						id: "E-pass",
+						task_id: "T-01",
+						command: "bun test",
+						result: "passed",
+					}),
+					"",
+				].join("\n"),
+			);
+
+			const result = verifyWorkbenchTasks(root, true);
+
+			expect(result.allCompleted).toBe(false);
+			expect(result.issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						type: "invalid_evidence",
+						line: 1,
+					}),
+				]),
+			);
+			expect(result.issues).not.toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ type: "missing_evidence" }),
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("reports missing sessions and strict missing task sessions", () => {
 		const root = mkRoot("missing");
 		try {

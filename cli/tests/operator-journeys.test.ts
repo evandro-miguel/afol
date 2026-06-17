@@ -10,6 +10,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 
@@ -68,6 +70,8 @@ function createProjectRoot(name: string): string {
 		"export const SESSION_ISOLATION_MARKER = true;\n",
 		"utf8",
 	);
+	rebuildWorkBenchIndex(root);
+	rebuildProjectIndexes(root);
 	return root;
 }
 

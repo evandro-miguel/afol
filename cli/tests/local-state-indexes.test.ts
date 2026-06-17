@@ -95,6 +95,24 @@ function buildFixture() {
 }
 
 describe("local-state project indexer", () => {
+	test("missing index snapshots are non-green and point to rebuild", () => {
+		const root = buildFixture();
+		try {
+			for (const result of [
+				validateWorkBenchIndex(root),
+				validateRulesIndex(root),
+				validateSkillsIndex(root),
+				validateSpecsIndex(root),
+				validateFilesIndex(root),
+			]) {
+				expect(result.ok).toBe(false);
+				expect(result.message).toContain("run afol local-state rebuild");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rebuildProjectIndexes builds ordered snapshots and omits .afol/data/index", () => {
 		const root = buildFixture();
 		try {

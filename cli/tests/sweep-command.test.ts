@@ -1,10 +1,28 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runSweepCommand } from "../commands/sweep";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { writeMemory as writeProjectMemory } from "../services/memory";
 import { openDb } from "../services/state";
+
+function initGitRepo(root: string): void {
+	const git = (args: string[]): void => {
+		const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+		if (result.status !== 0) {
+			throw new Error(
+				result.stderr || result.stdout || `git ${args.join(" ")}`,
+			);
+		}
+	};
+	git(["init"]);
+	git(["config", "user.email", "afol@example.test"]);
+	git(["config", "user.name", "AFOL Test"]);
+	git(["add", "."]);
+	git(["commit", "--no-gpg-sign", "-m", "init"]);
+}
 
 function createHealthyFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "sweep-healthy-"));
@@ -88,6 +106,8 @@ function createHealthyFixture(): string {
 		})}\n`,
 		"utf8",
 	);
+	rebuildWorkBenchIndex(root);
+	initGitRepo(root);
 	return root;
 }
 

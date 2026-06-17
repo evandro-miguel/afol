@@ -1205,6 +1205,136 @@ describe("validation command entrypoint", () => {
 		}
 	}, 30_000);
 
+	test("fails JSON-reporting packs when the child emits malformed JSON", () => {
+		const root = createFixtureRoot();
+		try {
+			unlinkSync(join(root, "cli"));
+			mkdirSync(join(root, "cli"), { recursive: true });
+			writeFileSync(
+				join(root, "cli", "main.ts"),
+				'process.stdout.write("{invalid-json\\n");\nprocess.exit(0);\n',
+				"utf8",
+			);
+
+			const runJson = withCapturedStdout(() =>
+				runValidationCommand(root, [
+					"run",
+					"--pack",
+					"runtime-live-agent",
+					"--json",
+				]),
+			);
+			expect(runJson.result).toBe(2);
+			const payload = JSON.parse(runJson.stdout[0] ?? "{}") as {
+				status: string;
+				pass: boolean;
+				summary: { failed: number; passed: number };
+				command_results: Array<{
+					status: string;
+					exit_code: number | null;
+					reported_status?: string;
+				}>;
+			};
+			expect(payload.status).toBe("failed");
+			expect(payload.pass).toBe(false);
+			expect(payload.summary).toMatchObject({ passed: 0, failed: 1 });
+			expect(payload.command_results[0]).toMatchObject({
+				status: "failed",
+				exit_code: 0,
+			});
+			expect(payload.command_results[0]?.reported_status).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails JSON-reporting packs when the child emits empty or non-object JSON", () => {
+		for (const [name, script] of [
+			["empty", "process.exit(0);\n"],
+			["array", 'process.stdout.write("[]");\nprocess.exit(0);\n'],
+		] as const) {
+			const root = createFixtureRoot();
+			try {
+				unlinkSync(join(root, "cli"));
+				mkdirSync(join(root, "cli"), { recursive: true });
+				writeFileSync(join(root, "cli", "main.ts"), script, "utf8");
+
+				const runJson = withCapturedStdout(() =>
+					runValidationCommand(root, [
+						"run",
+						"--pack",
+						"runtime-live-agent",
+						"--json",
+					]),
+				);
+				expect(runJson.result, name).toBe(2);
+				const payload = JSON.parse(runJson.stdout[0] ?? "{}") as {
+					status: string;
+					pass: boolean;
+					summary: { failed: number; passed: number };
+				};
+				expect(payload.status, name).toBe("failed");
+				expect(payload.pass, name).toBe(false);
+				expect(payload.summary, name).toMatchObject({ passed: 0, failed: 1 });
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("fails JSON-reporting packs when the child reports failure", () => {
+		const root = createFixtureRoot();
+		try {
+			unlinkSync(join(root, "cli"));
+			mkdirSync(join(root, "cli"), { recursive: true });
+			writeFileSync(
+				join(root, "cli", "main.ts"),
+				[
+					"process.stdout.write(JSON.stringify({",
+					'  status: "failed",',
+					"  pass: false,",
+					"  summary: { passed: 0, failed: 1 },",
+					"}));",
+					"process.exit(0);",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const runJson = withCapturedStdout(() =>
+				runValidationCommand(root, [
+					"run",
+					"--pack",
+					"runtime-live-agent",
+					"--json",
+				]),
+			);
+			expect(runJson.result).toBe(2);
+			const payload = JSON.parse(runJson.stdout[0] ?? "{}") as {
+				status: string;
+				pass: boolean;
+				summary: { failed: number; passed: number };
+				command_results: Array<{
+					status: string;
+					exit_code: number | null;
+					reported_pass?: boolean;
+					reported_status?: string;
+				}>;
+			};
+			expect(payload.status).toBe("failed");
+			expect(payload.pass).toBe(false);
+			expect(payload.summary).toMatchObject({ passed: 0, failed: 1 });
+			expect(payload.command_results[0]).toMatchObject({
+				status: "failed",
+				exit_code: 0,
+				reported_pass: false,
+				reported_status: "failed",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("flags benchmark regressions and skipped scenarios", () => {
 		const root = createFixtureRoot();
 		try {

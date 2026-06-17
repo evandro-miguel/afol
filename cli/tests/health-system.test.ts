@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +12,7 @@ import {
 	maintenanceWeekly,
 	runDoctor,
 } from "../services/health";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { writeMemory as writeProjectMemory } from "../services/memory";
 import { rebuildPstrIndex } from "../services/pstr";
 import { openDb } from "../services/state";
@@ -39,6 +41,22 @@ function captureIo(): CapturedIo {
 			},
 		},
 	};
+}
+
+function initGitRepo(root: string): void {
+	const git = (args: string[]): void => {
+		const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+		if (result.status !== 0) {
+			throw new Error(
+				result.stderr || result.stdout || `git ${args.join(" ")}`,
+			);
+		}
+	};
+	git(["init"]);
+	git(["config", "user.email", "afol@example.test"]);
+	git(["config", "user.name", "AFOL Test"]);
+	git(["add", "."]);
+	git(["commit", "--no-gpg-sign", "-m", "init"]);
 }
 
 function createFixture(): string {
@@ -170,7 +188,9 @@ function seedHealthyRoot(root: string): void {
 	});
 	writePstrIndex(root, hoursAgo(-1));
 	writeSectionIndex(root, hoursAgo(-1));
+	rebuildWorkBenchIndex(root);
 	openDb(root).close();
+	initGitRepo(root);
 }
 
 function seedDeepHealthRoot(root: string): void {
@@ -217,6 +237,7 @@ describe("health system", () => {
 		try {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			writeMemory(root, hoursAgo(24 * 45));
+			rebuildWorkBenchIndex(root);
 
 			const report = checkHealth(root);
 			expect(report.ok).toBe(true);
@@ -485,6 +506,7 @@ describe("health system", () => {
 		try {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			writeMemory(root, hoursAgo(24 * 45));
+			rebuildWorkBenchIndex(root);
 			const captured = captureIo();
 			expect(await runHealthCommand([], root, captured.io)).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("health: ok");

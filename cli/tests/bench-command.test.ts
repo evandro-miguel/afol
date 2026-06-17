@@ -57,6 +57,44 @@ function createProjectRoot(): string {
 	return root;
 }
 
+function validSavedBenchResult(overrides: Record<string, unknown> = {}) {
+	return {
+		schema_version: "afol.benchmark/v2",
+		run_id: "run-1",
+		scenario_id: "scenario-1",
+		pack_id: "comprehensive-live",
+		status: "passed",
+		mode: "cli-micro",
+		git_commit: "fixture",
+		model: "codex",
+		timestamp: "2026-06-17T00:00:00.000Z",
+		tokens: {
+			input: 1,
+			output: 1,
+			cached_input: 0,
+			reasoning_output: 0,
+			total: 2,
+		},
+		timing: { wall_clock_ms: 1 },
+		tools: {
+			total_calls: 1,
+			success_rate: 1,
+			by_type: { file_read: 0, afol_command: 1, shell: 0, agent_message: 0 },
+			error_count: 0,
+		},
+		effectiveness: { task_completed: true, error_count: 0 },
+		plan_quality: { meta_planning_detected: false, direct_execution: true },
+		thresholds: {
+			max_output_tokens: 10_000,
+			max_duration_ms: 60_000,
+			min_tool_success_rate: 0.95,
+		},
+		pass: true,
+		notes: [],
+		...overrides,
+	};
+}
+
 describe("benchmark metrics", () => {
 	test("classifyCommand groups file inspection, afol, and shell commands", () => {
 		expect(classifyCommand("sed -n '1,20p' file.txt")).toBe("file_read");
@@ -261,6 +299,91 @@ describe("bench command surfaces", () => {
 			expect(payload.data.snapshot_exists).toBe(true);
 			expect(payload.data.snapshot_parse_error).toBeTruthy();
 			expect(payload.data.note).toContain("snapshot parse failed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("report filters malformed saved run rows", async () => {
+		const root = createProjectRoot();
+		try {
+			const runPath = join(root, "malformed-run.json");
+			writeFileSync(
+				runPath,
+				JSON.stringify({
+					results: [{ scenario_id: "s1" }, validSavedBenchResult()],
+				}),
+				"utf8",
+			);
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["--run", runPath],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(0);
+			expect(captured.stderr).toHaveLength(0);
+			expect(captured.stdout[0]).toContain(
+				"results: 1 passed=1 failed=0 blocked=0",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("report rejects saved runs with no valid rows", async () => {
+		const root = createProjectRoot();
+		try {
+			const runPath = join(root, "invalid-run.json");
+			writeFileSync(
+				runPath,
+				JSON.stringify({ results: [{ scenario_id: "s1" }] }),
+				"utf8",
+			);
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["--run", runPath],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stdout).toHaveLength(0);
+			expect(captured.stderr).toHaveLength(1);
+			expect(captured.stderr[0]).toContain("Malformed benchmark run");
+			expect(captured.stderr[0]).toContain("results must include");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("baseline rejects malformed baseline JSON", async () => {
+		const root = createProjectRoot();
+		try {
+			const baselineDir = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"baselines",
+				"comprehensive-live",
+			);
+			mkdirSync(baselineDir, { recursive: true });
+			writeFileSync(join(baselineDir, "baseline-v1.json"), "{bad-json\n");
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"baseline",
+				["--json"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stdout).toHaveLength(0);
+			expect(captured.stderr).toHaveLength(1);
+			expect(captured.stderr[0]).toContain("Malformed benchmark JSON");
+			expect(captured.stderr[0]).toContain("baseline-v1.json");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

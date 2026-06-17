@@ -277,7 +277,7 @@ function loadEvidenceEntries(evidencePath: string): EvidenceEntry[] {
 		.map((line) => line.trim())
 		.filter((line) => line.length > 0);
 	const entries: EvidenceEntry[] = [];
-	for (const row of rows) {
+	for (const [index, row] of rows.entries()) {
 		try {
 			const parsed = JSON.parse(row) as Partial<EvidenceEntry> & {
 				taskId?: unknown;
@@ -314,7 +314,11 @@ function loadEvidenceEntries(evidencePath: string): EvidenceEntry[] {
 				}
 				entries.push(entry);
 			}
-		} catch {}
+		} catch (error) {
+			throw new Error(
+				`Malformed evidence ledger ${evidencePath}:${index + 1}: ${(error as Error).message}`,
+			);
+		}
 	}
 	return entries;
 }

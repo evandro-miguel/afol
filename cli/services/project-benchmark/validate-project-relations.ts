@@ -94,6 +94,34 @@ function readSupportedAxes(value: unknown): string[] {
 	);
 }
 
+function readEvidenceRefs(value: unknown): unknown[] {
+	return Array.isArray(value) ? value : [];
+}
+
+function validateKnownEvidenceRefs(
+	evidenceRefs: readonly unknown[],
+	sourceIds: ReadonlySet<string>,
+	file: string,
+	issues: ProjectBenchmarkIssue[],
+	messageForUnknownRef: (ref: unknown) => string,
+): string[] {
+	const knownRefs: string[] = [];
+	for (const ref of evidenceRefs) {
+		if (typeof ref !== "string" || !sourceIds.has(ref)) {
+			push(
+				issues,
+				"error",
+				"unknown-evidence-ref",
+				file,
+				messageForUnknownRef(ref),
+			);
+			continue;
+		}
+		knownRefs.push(ref);
+	}
+	return knownRefs;
+}
+
 export function validateProjectIdentity(
 	projectId: string | null,
 	fileNameId: string,
@@ -273,10 +301,8 @@ export function validateAxisScores(
 				`Score out of range for axis: ${axisId}`,
 			);
 		}
-		const evidenceRefs = Array.isArray(axisScore?.evidence_refs)
-			? axisScore.evidence_refs
-			: [];
-		if (!Array.isArray(axisScore?.evidence_refs) || evidenceRefs.length === 0) {
+		const evidenceRefs = readEvidenceRefs(axisScore?.evidence_refs);
+		if (evidenceRefs.length === 0) {
 			push(
 				issues,
 				"error",
@@ -285,17 +311,13 @@ export function validateAxisScores(
 				`Score without evidence_refs for axis: ${axisId}`,
 			);
 		}
-		for (const ref of evidenceRefs) {
-			if (typeof ref !== "string" || !refs.sourceIds.has(ref)) {
-				push(
-					issues,
-					"error",
-					"unknown-evidence-ref",
-					file,
-					`Unknown evidence ref for axis ${axisId}: ${String(ref)}`,
-				);
-				continue;
-			}
+		for (const ref of validateKnownEvidenceRefs(
+			evidenceRefs,
+			refs.sourceIds,
+			file,
+			issues,
+			(ref) => `Unknown evidence ref for axis ${axisId}: ${String(ref)}`,
+		)) {
 			if (!refs.sourceAxes.get(ref)?.has(axisId)) {
 				push(
 					issues,
@@ -350,13 +372,8 @@ export function validateSimilarities(
 				`Unknown similarity axis: ${similarityAxis}`,
 			);
 		}
-		const evidenceRefs = Array.isArray(similarity?.evidence_refs)
-			? similarity.evidence_refs
-			: [];
-		if (
-			!Array.isArray(similarity?.evidence_refs) ||
-			evidenceRefs.length === 0
-		) {
+		const evidenceRefs = readEvidenceRefs(similarity?.evidence_refs);
+		if (evidenceRefs.length === 0) {
 			push(
 				issues,
 				"error",
@@ -365,17 +382,13 @@ export function validateSimilarities(
 				"Similarity missing evidence_refs",
 			);
 		}
-		for (const ref of evidenceRefs) {
-			if (typeof ref !== "string" || !sourceIds.has(ref)) {
-				push(
-					issues,
-					"error",
-					"unknown-evidence-ref",
-					file,
-					`Unknown similarity evidence ref: ${String(ref)}`,
-				);
-			}
-		}
+		validateKnownEvidenceRefs(
+			evidenceRefs,
+			sourceIds,
+			file,
+			issues,
+			(ref) => `Unknown similarity evidence ref: ${String(ref)}`,
+		);
 	}
 }
 
