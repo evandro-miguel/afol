@@ -4,7 +4,7 @@ export function maintenanceWeekly(
 	root: string,
 	dryRun: boolean,
 ): { actions: string[]; planOnly: true } {
-	const report = checkHealth(root, { deep: false });
+	const report = checkHealth(root, { deep: false, includeAuxiliary: true });
 	const actions = [
 		"check PSTR stale",
 		"rebuild stale indexes",
@@ -21,7 +21,7 @@ export function maintenanceMonthly(
 	root: string,
 	dryRun: boolean,
 ): { actions: string[]; planOnly: true } {
-	const report = checkHealth(root, { deep: false });
+	const report = checkHealth(root, { deep: false, includeAuxiliary: true });
 	const actions = [
 		"rotate logs",
 		"archive closed sessions older than 90 days",

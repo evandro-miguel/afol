@@ -1,79 +1,104 @@
 ---
-description: Known traps for scaffold install, skills sync, governed execution, and workbench sessions
+description: Known traps for AFOL scaffold install, adoption, updates, skills, and workbench sessions
 metadata:
-  tags: "agentic-folder-sys, gotchas, bootstrap, skills-sync, workbench"
+  tags: "agentic-folder-sys, afol, gotchas, bootstrap, workbench, skills"
 ---
 
 # Agentic Folder Sys Gotchas
 
-## 1. Do Not Modify `updated_at` Manually
+## 1. AFOL Replaced The Old `.agents` Runtime
 
-Do not edit workbench timestamps manually.
+Do not run, document, restore, or extend:
 
-Always update metadata via scripts:
+- `.agents/agents`
+- `.agents/scripts`
+- `.agents/runtime`
+- `.agents/wb` as active state
+- `.agents/z-arq`
+- `agents.config`
+- `legacy:` command routing
 
-- `make wb-touch` `./.agents/agents wb-update touch`
+Use `afol` commands only.
 
-## 2. `--partial` Still Requires an Existing Repo
+## 2. `.agents` Is Static Metadata, `.afol` Is Mutable State
 
-Full bootstrap can create a missing target directory. `bootstrap --partial`
-still requires an existing repository path.
+Retained `.agents/**` content is static provider metadata:
 
-## 3. `skills-sync pull` Does Not Update `.agents/skills/`
+- `.agents/config.json`
+- `.agents/lock.json`
+- `.agents/manifest.json`
+- `.agents/rules/**`
+- `.agents/source/**`
 
-Use `skills-sync sync` or `skills-sync update` to refresh the installed project
-skills.
+Mutable AFOL state belongs under `.afol/**`, including workbench sessions,
+events, indexes, mutations, temporary files, benchmark data, migration
+archives, and project-local skills.
 
-## 4. `scaffold-update` Is Preview-First
+## 3. Read `.agents/config.json` Before Moving Files
 
-`scaffold-update --channel stable` does not mutate by default. Use `--plan-only`
-or `--diff-only` first, and add `--apply` only after the source channel,
-allowlist, and expected diff are clear. Do not bypass this with a mutable
-checkout that lacks `releases/channels/stable.json`.
+Do not guess paths. Read the path contract and follow fields such as
+`paths.mutable_dir`, `paths.skills_dir`, `paths.wb_dir`, `paths.data_dir`, and
+`paths.tmp_dir`.
 
-## 5. Git Refreshes, PRs Propose
+## 4. `--partial` Is Stale
 
-Treat the repo-local seed under `.agents/source/universal-skills` as the local
-baseline. Treat a configured external universal-skills checkout as the refresh
-path. Any upstream skill change must go through a proposal branch and PR, never
-a direct push to universal `main`.
+Current AFOL rejects partial installs. Use provider-compatible dry-runs instead:
 
-## 6. Skill Names Are Not Paths
+```bash
+afol init --provider-compatible --dry-run
+afol bootstrap /path/to/project --provider-compatible --dry-run
+```
 
-Reject skill and profile identifiers that are empty, absolute paths, contain
-path separators, contain NUL bytes, or equal `.` / `..`. Validate CLI, manifest,
-and upstream profile selections before removing or copying any destination under
-`.agents/skills/`.
+## 5. Provider-Compatible Cleanup Preserves By Default
 
-## 7. Use `--partial` for Live Repositories
+Legacy mutable roots under `.agents/**` are preserved unless both cleanup and
+confirmation are passed:
 
-Do not full-bootstrap over a repo with active project files unless overwrite is
-intentional.
+```bash
+afol init --provider-compatible --cleanup-provider-compatible-mutable \
+  --confirm-provider-migration --dry-run
+```
 
-## 8. The Project Skill Surface Is a Curated Subset
+The confirmed migration archives old mutable roots under `.afol/data/migrations`
+instead of treating them as active runtime state.
 
-Do not copy mirrors or caches into `.agents/skills/`. Keep `.agents/skills/` as
-the project-owned subset that the agent actually uses.
+## 6. `--cleanup-obsolete` Is Not A General Delete Flag
 
-## 9. Do Not Split Scaffold And Workbench Routing
+Use it only for obsolete AFOL-known legacy scaffold paths reported by the
+dry-run plan. Never delete unrelated project files, user data, vaults, caches,
+or secrets during adoption cleanup.
 
-Use `agentic-folder-sys` for both scaffold lifecycle operations and governed
-`.afol/wb/` work. Do not reintroduce separate `agentic-system-workflow` and
-`workbench-agent-teams` skills in this repo.
+## 7. `--force-managed` Is Narrow
+
+`--force-managed` is for AFOL-managed files proven by the manifest. It is not a
+project-wide overwrite switch.
+
+## 8. Project-Local Skills Live Under `.agents/skills`
+
+Do not copy caches or source mirrors into the project skill directory. Keep only
+the curated skills agents should use in that project. Shared durable changes
+belong in the universal-skills repo and then sync outward through the approved
+flow.
+
+## 9. Do Not Recreate Legacy Archive Paths
+
+Do not archive new material under `.agents/z-arq`. Use AFOL migration archives,
+AFOL file/archive commands when available, or a clearly reviewed project-owned
+path.
 
 ## 10. Verify Before Closing
 
-Do not mark tasks `[x]` just because files changed.
+Do not mark work `[x]` just because files changed. Record evidence with
+`afol evidence`, move to verified only after checks run, and close only after
+closure evidence exists.
 
-## 11. Use the Scaffold Repo-Map Wrapper
+## 11. Keep AFOL Output Compact
 
-Do not call raw repo-analysis repo-map generation without an explicit output
-root. Use `./.agents/agents repo-map .` or `make repo-map` so the map stays in
-`docs/map/` instead of legacy locations.
+AFOL is designed for low-token operation. Prefer compact/default command output.
+Use verbose manifests only when resolving a concrete conflict.
 
-## 12. Safety Rules
+## 12. Safety Rules Still Apply
 
-- Never expose secrets in code, logs, docs, or commits. Avoid destructive
-  operations unless explicitly authorized. Do not delete logic, only refactor.
-  Archive before delete under `.agents/z-arq/YYYYMMDD_<description>/`. Do not
-  add dependencies without clear justification.
+Never expose secrets in code, logs, docs, or commits. Avoid destructive
+operations unless explicitly authorized. Prefer dry-runs and archive migrations
+over deletion during adoption.

@@ -68,7 +68,7 @@ function remediationAction(finding: HealthFinding): string {
 }
 
 export function runDoctor(root: string): DoctorReport {
-	const report = checkHealth(root, { deep: false });
+	const report = checkHealth(root, { deep: false, includeAuxiliary: true });
 	const scores = AREAS.map((area) => {
 		const findings = report.findings.filter((finding) => finding.area === area);
 		return { area, score: scoreFor(findings), max: 100 };

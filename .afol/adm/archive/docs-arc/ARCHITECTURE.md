@@ -144,7 +144,7 @@ Forbidden dependencies:
   active and closed AFOL sessions.
 - `.agents/scripts/`, `.agents/runtime/`, `.agents/agents` -> RETIRED
   (discontinued, not present in repository).
-- `.afol/skills/**` -> project-local AFOL-owned skills.
+- `.agents/skills/**` -> project-local AFOL-owned skills.
 - `docs/arc/` -> current transitional roadmap, specs, architecture, decisions,
   and execution plans until `.afol/adm` migration lands.
 - `docs/map/` -> legacy/transitional current-state map evidence; do not

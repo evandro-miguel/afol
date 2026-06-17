@@ -65,7 +65,7 @@ const NEW_COMMAND_HELP = [
 	"  --intent <intent>        Delivery or planning intent",
 	"  --feature-id <id>        Governing roadmap feature ID",
 	"  --parent-spec <spec-id>  Parent spec identifier",
-	"  --task <text>            Initial task summary",
+	"  --task <text>            Initial task summary; repeat for multiple tasks",
 ].join("\n");
 
 const exit = (code: number): never => {

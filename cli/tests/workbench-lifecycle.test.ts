@@ -22,6 +22,7 @@ import {
 	recordEvidence,
 	startTask,
 } from "../services/workbench/lifecycle";
+import { verifyWorkbenchTasks } from "../services/workbench/verify";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 
@@ -124,6 +125,62 @@ describe("workbench lifecycle service", () => {
 			expect(readFileSync(created.activeSessionPath, "utf8")).toBe(
 				`${created.session}\n`,
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("newWorkstream renders multiple task rows in the canonical task board", () => {
+		const root = mkRoot("new-multi-task");
+		try {
+			const created = newWorkstream(root, "cli native command parity", {
+				tasks: ["Investigate parser state", "Patch lifecycle renderer"],
+			});
+
+			const plan = readFileSync(created.planPath, "utf8");
+			const taskDoc = readFileSync(created.taskPath, "utf8");
+
+			expect(plan).toContain("- T-01: Investigate parser state");
+			expect(plan).toContain("- T-02: Patch lifecycle renderer");
+			expect(taskDoc).toContain(
+				"| T-01 | pending | worker | Investigate parser state |",
+			);
+			expect(taskDoc).toContain(
+				"| T-02 | pending | worker | Patch lifecycle renderer |",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("newWorkstream multi-task sessions verify every generated task row", () => {
+		const root = mkRoot("new-multi-task-verify");
+		try {
+			const created = newWorkstream(root, "cli native command parity", {
+				tasks: ["Investigate parser state", "Patch lifecycle renderer"],
+			});
+
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-02",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			doneTask(root, { session: created.session, taskId: "T-02" });
+
+			const result = verifyWorkbenchTasks(created.sessionDir, true);
+			expect(result.allCompleted).toBe(true);
+			expect(result.totalTasks).toBe(2);
+			expect(result.completed).toBe(2);
+			expect(result.openTasks).toHaveLength(0);
+			expect(result.issues).toHaveLength(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -403,6 +460,29 @@ describe("workbench lifecycle service", () => {
 
 			const taskDoc = readFileSync(created.taskPath, "utf8");
 			expect(taskDoc).toContain("| T-01 | in_progress | worker |");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("startTask auto-selection still fails when multiple pending tasks exist", () => {
+		const root = mkRoot("start-multi-pending");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "start-task", {
+				tasks: ["Investigate parser state", "Patch lifecycle renderer"],
+			});
+			const proc = runKernel(root, [
+				"start",
+				"--session",
+				created.session,
+				"--json",
+			]);
+
+			expect(proc.status).toBe(2);
+			expect(proc.stdout as string).toContain(
+				`multiple pending tasks found in ${created.session}: T-01, T-02`,
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -754,6 +834,38 @@ describe("workbench lifecycle service", () => {
 			expect(() => closeSession(root, created.session)).toThrow(
 				"blocking tasks",
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession blocks multi-task sessions until every task is done", () => {
+		const root = mkRoot("close-multi-task");
+		try {
+			const created = newWorkstream(root, "close-session", {
+				tasks: ["Patch lifecycle renderer", "Verify multi-task closure"],
+			});
+
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			expect(() => closeSession(root, created.session)).toThrow(
+				"blocking tasks",
+			);
+
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-02",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-02" });
+			closeSession(root, created.session);
+			expect(existsSync(created.activeSessionPath)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

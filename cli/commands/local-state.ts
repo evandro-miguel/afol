@@ -28,24 +28,36 @@ const DEFAULT_IO: CommandIo = {
 
 type LocalStateCommand = "rebuild" | "freshness";
 
-type LocalStateSnapshot = {
+type ParsedArgs = {
+	json: boolean;
+	verbose: boolean;
+};
+
+type RebuildSnapshot = {
 	workbench: ReturnType<typeof rebuildWorkBenchIndex>;
 } & ReturnType<typeof rebuildProjectIndexes>;
 
-function summarizeSnapshot(
-	snapshot: LocalStateSnapshot,
-): Record<string, unknown> {
-	return {
-		workbench: {
-			sessions: snapshot.workbench.sessions.length,
-			tasks: snapshot.workbench.tasks.length,
-		},
-		rules: snapshot.rules.rules.length,
-		skills: snapshot.skills.skills.length,
-		specs: snapshot.specs.specs.length,
-		files: snapshot.files.files.length,
+type RebuildSummary = {
+	workbench: {
+		sessions: number;
+		tasks: number;
+		open_tasks: number;
+		problem_tasks: number;
 	};
-}
+	rules: { count: number };
+	skills: { count: number };
+	specs: { count: number };
+	files: { count: number };
+};
+
+type RebuildPayload = {
+	ok: true;
+	command: LocalStateCommand;
+	summary: RebuildSummary;
+	output: "compact" | "verbose";
+	hint?: string;
+	snapshot?: RebuildSnapshot;
+};
 
 function resultEnvelope<T extends Record<string, unknown>>(
 	data: T,
@@ -73,6 +85,43 @@ function normalizeCommand(value: string | undefined): LocalStateCommand {
 	throw new Error(`Unknown local-state command: ${value}`);
 }
 
+function parseArgs(values: string[]): ParsedArgs {
+	const parsed: ParsedArgs = { json: false, verbose: false };
+
+	for (const value of values) {
+		if (value === "--json" || value === "-j") {
+			parsed.json = true;
+			continue;
+		}
+		if (value === "--verbose" || value === "-v") {
+			parsed.verbose = true;
+			continue;
+		}
+		throw new Error(`Unknown local-state argument: ${value}`);
+	}
+
+	return parsed;
+}
+
+function summarizeRebuild(snapshot: RebuildSnapshot): RebuildSummary {
+	return {
+		workbench: {
+			sessions: snapshot.workbench.sessions.length,
+			tasks: snapshot.workbench.tasks.length,
+			open_tasks: snapshot.workbench.tasks.filter(
+				(task) => task.state !== "done",
+			).length,
+			problem_tasks: snapshot.workbench.tasks.filter(
+				(task) => task.state === "blocked" || task.state === "problem",
+			).length,
+		},
+		rules: { count: snapshot.rules.rules.length },
+		skills: { count: snapshot.skills.skills.length },
+		specs: { count: snapshot.specs.specs.length },
+		files: { count: snapshot.files.files.length },
+	};
+}
+
 function formatFreshness(root: string): {
 	ok: boolean;
 	checks: { id: string; ok: boolean; message: string }[];
@@ -90,17 +139,6 @@ function formatFreshness(root: string): {
 	};
 }
 
-function formatFreshnessLine(check: {
-	id: string;
-	ok: boolean;
-	message: string;
-}): string {
-	if (check.ok) {
-		return `ok ${check.id}`;
-	}
-	return `fail ${check.id} ${check.message}`;
-}
-
 export async function runLocalStateCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
@@ -109,36 +147,32 @@ export async function runLocalStateCommand(
 	try {
 		const [rawCommand, ...rest] = args;
 		const command = normalizeCommand(rawCommand);
-		let json = false;
-		let verbose = false;
-
-		for (const value of rest) {
-			if (value === "--json" || value === "-j") {
-				json = true;
-				continue;
-			}
-			if (value === "--verbose" || value === "-v") {
-				verbose = true;
-				continue;
-			}
-			throw new Error(`Unknown local-state argument: ${value}`);
-		}
+		const parsed = parseArgs(rest);
 
 		if (command === "rebuild") {
 			const workbench = rebuildWorkBenchIndex(projectRoot);
 			const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
-			const summary = summarizeSnapshot(snapshot);
-			if (json) {
-				const payload = verbose
-					? { ok: true, command, summary, snapshot }
-					: { ok: true, command, summary };
+			const summary = summarizeRebuild(snapshot);
+
+			if (parsed.json) {
+				const compactPayload: RebuildPayload = {
+					ok: true,
+					command,
+					summary,
+					output: parsed.verbose ? "verbose" : "compact",
+					...(parsed.verbose
+						? { snapshot }
+						: {
+								hint: "Use `afol local-state rebuild --json --verbose` for full index snapshots.",
+							}),
+				};
 				io.stdout(
 					stringifyEnvelope(
 						envelopeWithLegacyKeys(
-							resultEnvelope(payload, `local-state.${command}`, 0),
-							verbose
-								? ["ok", "command", "summary", "snapshot"]
-								: ["ok", "command", "summary"],
+							resultEnvelope(compactPayload, `local-state.${command}`, 0),
+							parsed.verbose
+								? ["ok", "command", "summary", "output", "snapshot"]
+								: ["ok", "command", "summary", "output", "hint"],
 						),
 					),
 				);
@@ -146,11 +180,11 @@ export async function runLocalStateCommand(
 				io.stdout(
 					[
 						"local-state rebuild: ok",
-						`workbench: ${snapshot.workbench.sessions.length} sessions, ${snapshot.workbench.tasks.length} tasks`,
-						`rules: ${snapshot.rules.rules.length}`,
-						`skills: ${snapshot.skills.skills.length}`,
-						`specs: ${snapshot.specs.specs.length}`,
-						`files: ${snapshot.files.files.length}`,
+						`workbench: ${summary.workbench.sessions} sessions, ${summary.workbench.tasks} tasks`,
+						`rules: ${summary.rules.count}`,
+						`skills: ${summary.skills.count}`,
+						`specs: ${summary.specs.count}`,
+						`files: ${summary.files.count}`,
 					].join("\n"),
 				);
 			}
@@ -158,7 +192,7 @@ export async function runLocalStateCommand(
 		}
 
 		const result = formatFreshness(projectRoot);
-		if (json) {
+		if (parsed.json) {
 			io.stdout(
 				stringifyEnvelope(
 					envelopeWithLegacyKeys(
@@ -171,7 +205,10 @@ export async function runLocalStateCommand(
 			io.stdout(
 				[
 					`local-state freshness: ${result.ok ? "ok" : "failed"}`,
-					...result.checks.map(formatFreshnessLine),
+					...result.checks.map(
+						(check) =>
+							`${check.ok ? "ok" : "fail"} ${check.id} ${check.message}`,
+					),
 				].join("\n"),
 			);
 		}

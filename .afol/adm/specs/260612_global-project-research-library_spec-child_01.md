@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-06-12T12:12:33-03:00'
-updated_at: '2026-06-12T17:47:40-03:00'
+updated_at: '2026-06-16T00:00:00-03:00'
 roadmap_feature: F-18
 spec_role: child
 parent_spec: 260612_afol-administration-project-structure-onion-architecture_spec_01
@@ -124,6 +124,7 @@ In scope:
 - `afol library rebuild-index`.
 - `afol library health --json`.
 - `afol library doctor --json`.
+- `afol health --area library --json`.
 
 Out of scope:
 
@@ -168,7 +169,10 @@ Constraints:
   reading all raw files into agent context.
 - `afol ctx bundle --include-library` can include relevant current claims.
 - Stale docs, invalidated claims, broken wikilinks, duplicate aliases, missing
-  `accessed_at`, and unsupported claims are reported by library health.
+  `accessed_at`, invalid tags, oversized docs without summaries, and
+  unsupported claims are reported by library health.
+- Normal library search and context bundles exclude stale docs and invalidated
+  claims unless the caller explicitly requests stale or invalidated records.
 
 ## 9) Risks and Tradeoffs
 

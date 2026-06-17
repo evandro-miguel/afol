@@ -6,7 +6,7 @@ Scope: canonical-layout routing reference; verify path existence before load.
 ## Signals
 | task signal | load |
 | --- | --- |
-| rules or skills | `.agents/rules/README.md`, `.agents/rules/RULE-006-applicable-rule-resolution.md`, `.afol/skills/**` (if present) |
+| rules or skills | `.agents/rules/README.md`, `.agents/rules/RULE-006-applicable-rule-resolution.md`, `.agents/skills/**` (if present) |
 | tools or commands | `afol schema resolver --json`, `afol schema resolver --write`, `afol validate project` |
 | adm or routing docs | `.afol/adm/doctrine/ARCHITECTURE.md#9.4-resolver`, `.afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md` |
 | pstr or surface maps | `.afol/pstr/cli.md`, `.afol/pstr/docs.md`, `.afol/pstr/template.md`, `.afol/pstr/config.md` (generated; verify present) |
@@ -20,11 +20,11 @@ Scope: canonical-layout routing reference; verify path existence before load.
 - `.agents/rules/RULE-005-folder-structure.md`
 
 ## Skills
-- `.afol/skills/agentic-folder-sys/`
-- `.afol/skills/afol-integration-test/`
-- `.afol/skills/typescript-expert/`
-- `.afol/skills/javascript-testing-patterns/`
-- `.afol/skills/bun-development/`
+- `.agents/skills/agentic-folder-sys/`
+- `.agents/skills/afol-integration-test/`
+- `.agents/skills/typescript-expert/`
+- `.agents/skills/javascript-testing-patterns/`
+- `.agents/skills/bun-development/`
 
 ## Tools
 - `afol schema resolver --json` -> inspect content

@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import {
 	envelopeErr,
 	envelopeOk,
@@ -6,6 +8,7 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import { checkHealth, type HealthArea } from "../services/health";
+import { resolveProjectPaths } from "../services/project/paths";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -110,6 +113,15 @@ function writeJsonReport(
 	);
 }
 
+function hasHydratedAuxiliaryState(projectRoot: string): boolean {
+	const paths = resolveProjectPaths(projectRoot).abs;
+	return (
+		existsSync(paths.stateDb) &&
+		existsSync(paths.memoryFile) &&
+		existsSync(join(paths.dataIndexDir, "sections.json"))
+	);
+}
+
 export async function runHealthCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
@@ -117,11 +129,19 @@ export async function runHealthCommand(
 ): Promise<number> {
 	try {
 		const parsed = parseArgs(args);
+		const includeAuxiliary =
+			!parsed.area &&
+			!parsed.deep &&
+			!parsed.release &&
+			hasHydratedAuxiliaryState(projectRoot);
 		const report = checkHealth(
 			projectRoot,
 			parsed.area
 				? { area: parsed.area, deep: parsed.deep || parsed.release }
-				: { deep: parsed.deep || parsed.release },
+				: {
+						deep: parsed.deep || parsed.release,
+						includeAuxiliary,
+					},
 		);
 		if (parsed.json) {
 			writeJsonReport(io, report, parsed.release);

@@ -916,6 +916,57 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("new accepts repeated --task flags and renders multiple task rows", () => {
+		const script = "#!/usr/bin/env bash\necho LEGACY:$*";
+		const root = mkProjectRoot("new-multi-task-flags", script);
+		try {
+			const proc = runKernel(root, [
+				"new",
+				"retirement-bridge",
+				"--task",
+				"Investigate parser state",
+				"--task",
+				"Patch lifecycle renderer",
+				"--json",
+			]);
+
+			expect(proc.status).toBe(0);
+			const payload = JSON.parse(proc.stdout as string) as {
+				data: { session: string };
+			};
+			const session = payload.data.session;
+			const planPath = join(
+				root,
+				".afol",
+				"wb",
+				session,
+				`${session}_plan_01.md`,
+			);
+			const taskPath = join(
+				root,
+				".afol",
+				"wb",
+				session,
+				`${session}_task_01.md`,
+			);
+			const plan = readFileSync(planPath, "utf8");
+			const task = readFileSync(taskPath, "utf8");
+
+			expect(plan).toContain("- task: Investigate parser state");
+			expect(plan).toContain("- task: Patch lifecycle renderer");
+			expect(plan).toContain("- T-01: Investigate parser state");
+			expect(plan).toContain("- T-02: Patch lifecycle renderer");
+			expect(task).toContain(
+				"| T-01 | pending | worker | Investigate parser state |",
+			);
+			expect(task).toContain(
+				"| T-02 | pending | worker | Patch lifecycle renderer |",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("workbench task command rejects unsafe session identifiers", () => {
 		const root = mkProjectRoot(
 			"unsafe-session",
