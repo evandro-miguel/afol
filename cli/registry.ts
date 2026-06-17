@@ -81,7 +81,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["i"],
 		kind: "init",
 		sideEffect: "write",
-		description: "Install the scaffold",
+		description: "Install scaffold; use --dry-run to preview writes",
 		category: "core",
 	},
 	{
@@ -162,15 +162,44 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["f"],
 		kind: "file",
 		sideEffect: "write",
-		description: "Inspect files",
-		category: "inspect",
+		description:
+			"Safely patch, move, archive, and undo files; supports dry-run",
+		category: "ops",
+		subcommands: [
+			{
+				usage: "pt|patch --path <path> --dry-run",
+				sideEffect: "read",
+				description: "Preview patch diff without writing",
+			},
+			{
+				usage: "pt|patch --path <path>",
+				sideEffect: "write",
+				description: "Patch file with backup and mutation journal",
+			},
+			{
+				usage: "mv|move --from <path> --to <path>",
+				sideEffect: "write",
+				description: "Move file with backup and mutation journal",
+			},
+			{
+				usage: "ar|archive --path <path>",
+				sideEffect: "write",
+				description: "Archive file with undo support",
+			},
+			{
+				usage: "ud|undo --mutation-id <id>",
+				sideEffect: "write",
+				description: "Undo a recorded mutation",
+			},
+		],
 	},
 	{
 		command: "update",
 		aliases: ["up"],
 		kind: "update",
 		sideEffect: "write",
-		description: "Run scaffold updates",
+		description:
+			"Run scaffold updates; preview and apply --dry-run are safe checks",
 		category: "ops",
 	},
 	{
@@ -178,7 +207,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["b"],
 		kind: "bootstrap",
 		sideEffect: "write",
-		description: "Install scaffold into another repo",
+		description: "Install scaffold into another repo; use --dry-run to preview",
 		category: "workflow",
 	},
 	{
@@ -364,9 +393,47 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		command: "schema",
 		aliases: ["sc"],
 		kind: "schema",
-		sideEffect: "read",
-		description: "Inspect schema state",
+		sideEffect: "write",
+		description:
+			"Review schema state; apply and resolver --write can write files",
 		category: "ops",
+		subcommands: [
+			{
+				usage: "detect",
+				sideEffect: "read",
+				description: "Detect the project shape without writing",
+			},
+			{
+				usage: "suggest",
+				sideEffect: "read",
+				description: "Suggest schema actions without writing",
+			},
+			{
+				usage: "review",
+				sideEffect: "read",
+				description: "Compare detected and current schema",
+			},
+			{
+				usage: "resolver",
+				sideEffect: "read",
+				description: "Render resolver guidance without writing",
+			},
+			{
+				usage: "resolver --write",
+				sideEffect: "write",
+				description: "Write resolver guidance for local callers",
+			},
+			{
+				usage: "apply --dry-run",
+				sideEffect: "read",
+				description: "Preview schema apply without writing",
+			},
+			{
+				usage: "apply",
+				sideEffect: "write",
+				description: "Write the detected schema pack for local callers",
+			},
+		],
 	},
 	{
 		command: "bench",
@@ -447,7 +514,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["adp"],
 		kind: "adapter",
 		sideEffect: "write",
-		description: "Enable or disable runtime adapters",
+		description: "Enable or disable runtime adapters; use --dry-run to preview",
 		category: "ops",
 	},
 	{
