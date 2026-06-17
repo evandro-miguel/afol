@@ -2,7 +2,7 @@
 doc_type: lessons
 status: active
 created_at: '2026-02-23T00:00:00Z'
-updated_at: '2026-05-09T18:05:26-03:00'
+updated_at: '2026-06-17T08:35:36-03:00'
 ---
 
 # General Lessons
@@ -11,6 +11,9 @@ updated_at: '2026-05-09T18:05:26-03:00'
 
 Central repository of learnings and prevention rules.
 Updated after every user correction.
+This file is retained as a historical aggregate. New lessons live one per file
+under `docs/lessons/entries/`, and `docs/lessons/README.md` is the current
+folder entrypoint.
 
 ## Review Routine
 
@@ -183,4 +186,4 @@ Lessons should be reviewed periodically:
 
 ---
 
-*Lessons: `docs/lessons/general-lessons.md`*
+*Historical lessons: `docs/lessons/general-lessons.md`*

@@ -3,7 +3,7 @@ doc_type: index
 id: docs_index
 status: active
 created_at: '2026-06-17T00:00:00Z'
-updated_at: '2026-06-17T00:00:00Z'
+updated_at: '2026-06-17T08:38:34-03:00'
 ---
 
 # Documentation Index
@@ -42,8 +42,8 @@ observed structure changes.
 
 ## Support Docs
 
-- `docs/standards/`: reusable workflow, bootstrap, runtime, verification, and
-  process standards.
+- `docs/standards/README.md`: reusable workflow, bootstrap, runtime,
+  verification, and process standards.
 - `docs/templates/`: starter artifact templates.
 - `docs/patterns/`: success and anti-pattern examples.
 - `docs/knowledge/`: low-token lookup index for prior workbench knowledge.

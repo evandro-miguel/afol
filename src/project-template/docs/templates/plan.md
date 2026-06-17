@@ -8,7 +8,7 @@ owners:
 workstream_intent: <workstream_intent>
 artifact_purpose: <artifact_purpose>
 created_at: YYYY-MM-DDTHH:MM:SSZ
-updated_at: '2026-04-04T10:08:11-03:00'
+updated_at: '2026-06-17T08:35:36-03:00'
 roadmap_feature: <feature_id>
 parent_spec: <parent_spec_id>
 child_spec: <child_spec_id_or_empty>
@@ -25,7 +25,7 @@ branch: <branch_or_worktree>
 
 # Plan: <theme>
 
-This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current as work proceeds. Follow this starter's structure and `.agents/rules/RULE-002-workstream-creation.md` when writing or revising this file.
+This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current as work proceeds. Follow this starter's structure and `docs/standards/workflow.md` when writing or revising this file.
 
 ## Purpose / Big Picture
 
