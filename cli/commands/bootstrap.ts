@@ -30,6 +30,7 @@ type BootstrapArgs = {
 	confirmProviderMigration: boolean;
 	mutableDir: string;
 	withoutClaude: boolean;
+	verbose: boolean;
 };
 
 type RawManifest = Record<string, unknown>;
@@ -52,7 +53,6 @@ type ProviderCompatibleCleanupArchiveResult =
 	};
 
 const BASE_MUTABLE_BASELINE_SOURCES = [
-	{ suffix: "skills/README.md", sourcePath: ".afol/skills/README.md" },
 	{ suffix: "tmp/README.md", sourcePath: ".afol/tmp/README.md" },
 	{ suffix: "data/README.md", sourcePath: ".afol/data/README.md" },
 	{
@@ -69,11 +69,13 @@ const BASE_MUTABLE_BASELINE_SOURCES = [
 	},
 ] as const;
 
-const MUTABLE_BENCHMARK_CATALOG_PREFIX = ".afol/data/benchmarks/catalog/";
+const MUTABLE_BASELINE_TEMPLATE_PREFIXES = [
+	".afol/data/benchmarks/catalog/",
+	".afol/data/project-benchmarks/",
+] as const;
 
 const PROVIDER_COMPATIBLE_AGENTS_MUTABLE_ROOTS = [
 	".agents/data",
-	".agents/skills",
 	".agents/tmp",
 	".agents/wb",
 	".agents/z-arq",
@@ -94,6 +96,7 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 	let confirmProviderMigration = false;
 	let mutableDir = ".afol";
 	let withoutClaude = false;
+	let verbose = false;
 
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -110,6 +113,10 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 		}
 		if (arg === "--without-claude") {
 			withoutClaude = true;
+			continue;
+		}
+		if (arg === "--verbose") {
+			verbose = true;
 			continue;
 		}
 		if (arg === "--mutable-dir") {
@@ -165,6 +172,7 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 		confirmProviderMigration,
 		mutableDir,
 		withoutClaude,
+		verbose,
 	};
 }
 
@@ -186,7 +194,7 @@ function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
 		agents_dir: ".agents",
 		mutable_dir: mutableDir,
 		rules_dir: ".agents/rules",
-		skills_dir: `${mutableDir}/skills`,
+		skills_dir: ".agents/skills",
 		wb_dir: ".afol/wb",
 		active_session_file: `${mutableDir}/wb/.active_session`,
 		tmp_dir: `${mutableDir}/tmp`,
@@ -205,7 +213,7 @@ function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
 		!Array.isArray(config.skills_sync)
 			? (config.skills_sync as Record<string, unknown>)
 			: {}),
-		project_dir: `${mutableDir}/skills`,
+		project_dir: ".agents/skills",
 	};
 	return Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
@@ -310,11 +318,12 @@ function planMutableBaselines(
 	const baselineSources = [
 		...BASE_MUTABLE_BASELINE_SOURCES,
 		...Object.keys(DEFAULT_TEMPLATE_FILES)
-			.filter(
-				(sourcePath) =>
-					sourcePath.startsWith(MUTABLE_BENCHMARK_CATALOG_PREFIX) &&
-					!sourcePath.includes("/providers/"),
+			.filter((sourcePath) =>
+				MUTABLE_BASELINE_TEMPLATE_PREFIXES.some((prefix) =>
+					sourcePath.startsWith(prefix),
+				),
 			)
+			.filter((sourcePath) => !sourcePath.includes("/providers/"))
 			.sort()
 			.map((sourcePath) => ({
 				sourcePath,
@@ -622,24 +631,27 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
 			`conflicts=${conflicts.length}`,
 			`cleanup=${cleanupPlan.candidates.length}`,
 			`provider_cleanup=${providerCompatibleCleanupPlan.length}`,
+			parsed.verbose ? "details=verbose" : "details=run-with---verbose",
 		].join(" "),
 	);
 
-	for (const operation of plan.operations) {
-		console.log(`${operation.kind} ${operation.path} ${operation.reason}`);
-	}
-	for (const candidate of cleanupPlan.candidates) {
-		console.log(`cleanup-pending ${candidate.path} ${candidate.reason}`);
-	}
-	for (const operation of mutableBaselinePlan) {
-		console.log(
-			`mutable-baseline-${operation.kind} ${operation.path} source=${operation.sourcePath} ${operation.reason}`,
-		);
-	}
-	for (const operation of providerCompatibleCleanupPlan) {
-		console.log(
-			`provider-compatible-cleanup-pending ${operation.path} ${operation.reason}`,
-		);
+	if (parsed.verbose) {
+		for (const operation of plan.operations) {
+			console.log(`${operation.kind} ${operation.path} ${operation.reason}`);
+		}
+		for (const candidate of cleanupPlan.candidates) {
+			console.log(`cleanup-pending ${candidate.path} ${candidate.reason}`);
+		}
+		for (const operation of mutableBaselinePlan) {
+			console.log(
+				`mutable-baseline-${operation.kind} ${operation.path} source=${operation.sourcePath} ${operation.reason}`,
+			);
+		}
+		for (const operation of providerCompatibleCleanupPlan) {
+			console.log(
+				`provider-compatible-cleanup-pending ${operation.path} ${operation.reason}`,
+			);
+		}
 	}
 
 	if (parsed.dryRun) {
@@ -658,8 +670,10 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
 	}
 	if (parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) {
 		cleanupBootstrapObsolete(parsed.targetRoot, cleanupPlan.candidates);
-		for (const candidate of cleanupPlan.candidates) {
-			console.log(`cleanup-removed ${candidate.path} ${candidate.reason}`);
+		if (parsed.verbose) {
+			for (const candidate of cleanupPlan.candidates) {
+				console.log(`cleanup-removed ${candidate.path} ${candidate.reason}`);
+			}
 		}
 	}
 	if (parsed.forceManaged) {
@@ -676,20 +690,24 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
 			parsed.targetRoot,
 			providerCompatibleCleanupPlan,
 		);
-		for (const operation of archived) {
-			console.log(
-				`provider-compatible-cleanup-archived ${operation.path} archive=${operation.archivePath} ${operation.reason}`,
-			);
+		if (parsed.verbose) {
+			for (const operation of archived) {
+				console.log(
+					`provider-compatible-cleanup-archived ${operation.path} archive=${operation.archivePath} ${operation.reason}`,
+				);
+			}
 		}
 	} else {
-		for (const operation of providerCompatibleCleanupPlan) {
-			console.log(
-				`provider-compatible-cleanup-preserved ${operation.path} ${
-					parsed.cleanupProviderCompatibleMutable
-						? "requires-confirm-provider-migration"
-						: "requires-explicit-opt-in"
-				}`,
-			);
+		if (parsed.verbose) {
+			for (const operation of providerCompatibleCleanupPlan) {
+				console.log(
+					`provider-compatible-cleanup-preserved ${operation.path} ${
+						parsed.cleanupProviderCompatibleMutable
+							? "requires-confirm-provider-migration"
+							: "requires-explicit-opt-in"
+					}`,
+				);
+			}
 		}
 	}
 

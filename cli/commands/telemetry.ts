@@ -15,6 +15,8 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
+const DEFAULT_QUERY_LIMIT = 10;
+
 type TelemetryAction = "query" | "report" | "export";
 
 type ParsedArgs = {
@@ -38,7 +40,7 @@ function normalizeInvocation(
 	action: string,
 	args: string[],
 ): { action: TelemetryAction; args: string[] } {
-	if (action === "--json" || action === "-j") {
+	if (action.startsWith("-")) {
 		return { action: "query", args: [action, ...args] };
 	}
 	return { action: normalizeAction(action), args };
@@ -72,7 +74,7 @@ function parseArgs(args: string[]): ParsedArgs {
 		json: false,
 		type: null,
 		session: null,
-		limit: 50,
+		limit: DEFAULT_QUERY_LIMIT,
 		format: "json",
 	};
 	for (let index = 0; index < args.length; index += 1) {
@@ -172,7 +174,7 @@ function emitJsonError(io: CommandIo, action: string, message: string): void {
 
 function formatQuery(events: TelemetryEvent[]): string {
 	return [
-		`telemetry query: ${events.length}`,
+		`telemetry query: ${events.length} latest`,
 		...events.map(
 			(event) =>
 				`${event.ts} ${event.event_type} session=${event.session_id}${event.task_id ? ` task=${event.task_id}` : ""}${event.cmd_type ? ` cmd=${event.cmd_type}` : ""}${event.outcome ? ` outcome=${event.outcome}` : ""}`,

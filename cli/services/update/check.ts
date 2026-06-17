@@ -806,9 +806,64 @@ export function checkTemplateUpdate(projectRoot: string): UpdateCheckResult {
 	};
 }
 
+type FormatUpdateCheckOptions = {
+	verbose?: boolean;
+};
+
+function operationSummary(result: UpdateCheckResult): {
+	total: number;
+	create: number;
+	update: number;
+	conflict: number;
+	preserve: number;
+	conflictPaths: string[];
+} {
+	const summary = {
+		total: 0,
+		create: 0,
+		update: 0,
+		conflict: 0,
+		preserve: 0,
+		conflictPaths: [] as string[],
+	};
+	for (const operation of result.operations) {
+		if (operation.kind === "skip-identical") {
+			continue;
+		}
+		summary.total += 1;
+		if (operation.kind === "create") {
+			summary.create += 1;
+			continue;
+		}
+		if (operation.kind === "update-managed") {
+			summary.update += 1;
+			continue;
+		}
+		if (operation.kind === "conflict") {
+			summary.conflict += 1;
+			summary.conflictPaths.push(operation.path);
+			continue;
+		}
+		if (operation.kind === "preserve-project-owned") {
+			summary.preserve += 1;
+		}
+	}
+	return summary;
+}
+
+function limitedPathLines(paths: string[], limit: number): string[] {
+	const lines = paths.slice(0, limit).map((path) => `- ${path}`);
+	const remaining = paths.length - lines.length;
+	if (remaining > 0) {
+		lines.push(`... ${remaining} more`);
+	}
+	return lines;
+}
+
 export function formatUpdateCheck(
 	result: UpdateCheckResult,
 	mode: UpdateMode,
+	options: FormatUpdateCheckOptions = {},
 ): string {
 	const lines: string[] = [
 		`update ${mode}: ${result.upToDate ? "up-to-date" : result.hasSource ? "changes available" : "no-source"}`,
@@ -817,6 +872,23 @@ export function formatUpdateCheck(
 		`ownership(current): ${serializeOwnership(result.ownershipCurrent)}`,
 		`ownership(source): ${serializeOwnership(result.ownershipSource)}`,
 	];
+
+	if (mode === "check" && !options.verbose) {
+		const summary = operationSummary(result);
+		lines.push(
+			`operations: total=${summary.total} create=${summary.create} update=${summary.update} conflict=${summary.conflict} preserve=${summary.preserve}`,
+		);
+		if (summary.conflictPaths.length > 0) {
+			lines.push("conflicts:");
+			lines.push(...limitedPathLines(summary.conflictPaths, 20));
+		}
+		if (summary.total > 0) {
+			lines.push(
+				"hint: run afol update preview for diff previews or afol update check --verbose for full details",
+			);
+		}
+		return `${lines.join("\n")}\n`;
+	}
 
 	if (result.changes.length > 0) {
 		const label =

@@ -1,3 +1,4 @@
+import { normalizeScopedFlags, normalizeSubcommandAction } from "./aliases";
 import { kernelRegistry } from "./registry";
 
 export type CommandResolution =
@@ -31,12 +32,11 @@ export type SubCommandResolution = {
 	args: string[];
 };
 
-const SUBCOMMAND_GROUPS = new Set([
+export const ROUTED_SUBCOMMAND_GROUPS = Object.freeze([
 	"pstr",
 	"ctx",
 	"state",
 	"hydrate",
-	"render",
 	"library",
 	"memory",
 	"adm",
@@ -55,6 +55,25 @@ const SUBCOMMAND_GROUPS = new Set([
 	"telemetry",
 	"session",
 ]);
+
+const SUBCOMMAND_GROUPS = new Set(ROUTED_SUBCOMMAND_GROUPS);
+
+function normalizeActionAndArgs(
+	scope: string,
+	args: readonly string[],
+): { action: string; args: string[] } {
+	const [rawAction, ...rest] = args;
+	if (!rawAction || rawAction.startsWith("-")) {
+		return {
+			action: "",
+			args: normalizeScopedFlags(scope, args),
+		};
+	}
+	return {
+		action: normalizeSubcommandAction(scope, rawAction),
+		args: normalizeScopedFlags(scope, rest),
+	};
+}
 
 function removeJsonAliases(values: string[]): string[] {
 	return values.filter((value) => !kernelRegistry.isJsonAlias(value));
@@ -98,26 +117,6 @@ function normalizeArguments(values: string[]): string[] {
 	}
 
 	return [kernelRegistry.canonicalize(first), ...values.slice(1)];
-}
-
-function normalizeTokenOptimizedFlags(values: string[]): string[] {
-	const normalized: string[] = [];
-	for (const value of values) {
-		if (value === "-S") {
-			normalized.push("--session");
-			continue;
-		}
-		if (value === "-T") {
-			normalized.push("--task-id");
-			continue;
-		}
-		if (value === "-x") {
-			normalized.push("--test");
-			continue;
-		}
-		normalized.push(value);
-	}
-	return normalized;
 }
 
 function suggestionFor(command: string): string | null {
@@ -169,6 +168,15 @@ export function resolveCommand(args: string[]): CommandResolution {
 	}
 
 	const topLevelKind = kernelRegistry.resolveKind(topLevel);
+	if (topLevel === "render" && topLevelKind === "memory") {
+		return {
+			kind: "subcommand",
+			group: "memory",
+			action: "render",
+			args: normalizeScopedFlags("memory", rest),
+		};
+	}
+
 	if (topLevelKind === "validate") {
 		return { kind: "validate", args: rest };
 	}
@@ -186,35 +194,41 @@ export function resolveCommand(args: string[]): CommandResolution {
 	}
 
 	if (topLevelKind === "new") {
-		return { kind: "new", args: normalizeTokenOptimizedFlags(rest) };
+		return { kind: "new", args: normalizeScopedFlags("new", rest) };
 	}
 
 	if (topLevelKind === "start") {
-		return { kind: "start", args: normalizeTokenOptimizedFlags(rest) };
+		return { kind: "start", args: normalizeScopedFlags("start", rest) };
 	}
 
 	if (topLevelKind === "evidence") {
-		return { kind: "evidence", args: normalizeTokenOptimizedFlags(rest) };
+		return { kind: "evidence", args: normalizeScopedFlags("evidence", rest) };
 	}
 
 	if (topLevelKind === "done") {
-		return { kind: "done", args: normalizeTokenOptimizedFlags(rest) };
+		return { kind: "done", args: normalizeScopedFlags("done", rest) };
 	}
 
 	if (topLevelKind === "close") {
-		return { kind: "close", args: normalizeTokenOptimizedFlags(rest) };
+		return { kind: "close", args: normalizeScopedFlags("close", rest) };
 	}
 
 	if (topLevelKind === "log") {
-		return { kind: "log", args: normalizeTokenOptimizedFlags(rest) };
+		return { kind: "log", args: normalizeScopedFlags("log", rest) };
 	}
 
 	if (topLevelKind === "quickTask") {
-		return { kind: "quickTask", args: normalizeTokenOptimizedFlags(rest) };
+		return {
+			kind: "quickTask",
+			args: normalizeScopedFlags("quickTask", rest),
+		};
 	}
 
 	if (topLevelKind === "verifyTasks") {
-		return { kind: "verifyTasks", args: normalizeTokenOptimizedFlags(rest) };
+		return {
+			kind: "verifyTasks",
+			args: normalizeScopedFlags("verifyTasks", rest),
+		};
 	}
 
 	if (topLevelKind === "rule") {
@@ -226,19 +240,37 @@ export function resolveCommand(args: string[]): CommandResolution {
 	}
 
 	if (topLevelKind === "update") {
-		return { kind: "update", args: rest };
+		const normalizedAction = normalizeActionAndArgs("update", rest);
+		return {
+			kind: "update",
+			args: normalizedAction.action
+				? [normalizedAction.action, ...normalizedAction.args]
+				: normalizedAction.args,
+		};
 	}
 
 	if (topLevelKind === "file") {
-		return { kind: "file", args: normalizeTokenOptimizedFlags(rest) };
+		const normalizedAction = normalizeActionAndArgs("file", rest);
+		return {
+			kind: "file",
+			args: normalizedAction.action
+				? [normalizedAction.action, ...normalizedAction.args]
+				: normalizedAction.args,
+		};
 	}
 
 	if (topLevelKind === "localState") {
-		return { kind: "localState", args: rest };
+		const normalizedAction = normalizeActionAndArgs("localState", rest);
+		return {
+			kind: "localState",
+			args: normalizedAction.action
+				? [normalizedAction.action, ...normalizedAction.args]
+				: normalizedAction.args,
+		};
 	}
 
 	if (topLevelKind === "catchup") {
-		return { kind: "catchup", args: rest };
+		return { kind: "catchup", args: normalizeScopedFlags("catchup", rest) };
 	}
 
 	if (topLevelKind === "preflight") {
@@ -246,25 +278,25 @@ export function resolveCommand(args: string[]): CommandResolution {
 	}
 
 	if (topLevelKind === "adm") {
-		const first = rest[0];
-		if (first && kernelRegistry.isJsonAlias(first)) {
-			return { kind: "subcommand", group: "adm", action: "", args: rest };
-		}
+		const { action, args: scopedArgs } = normalizeActionAndArgs("adm", rest);
 		return {
 			kind: "subcommand",
 			group: "adm",
-			action: first ?? "",
-			args: rest.slice(1),
+			action,
+			args: scopedArgs,
 		};
 	}
 
 	if (topLevelKind && SUBCOMMAND_GROUPS.has(topLevelKind)) {
-		const action = rest[0] ?? "";
+		const { action, args: scopedArgs } = normalizeActionAndArgs(
+			topLevelKind,
+			rest,
+		);
 		return {
 			kind: "subcommand",
 			group: topLevelKind,
 			action,
-			args: rest.slice(1),
+			args: scopedArgs,
 		};
 	}
 

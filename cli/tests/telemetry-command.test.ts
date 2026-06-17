@@ -127,6 +127,57 @@ describe("telemetry command", () => {
 		}
 	});
 
+	test("query defaults to a compact event limit", async () => {
+		const root = mkRoot();
+		try {
+			for (let index = 0; index < 12; index += 1) {
+				appendTelemetryEvent(root, {
+					event_type: "tool_exec",
+					session_id: "S-1",
+					task_id: `T-${String(index + 1).padStart(2, "0")}`,
+					outcome: "success",
+				});
+			}
+
+			const defaultQuery = captureIo();
+			expect(
+				await runTelemetryCommand("query", [], root, defaultQuery.io),
+			).toBe(0);
+			expect(defaultQuery.stdout[0]).toContain("telemetry query: 10 latest");
+
+			const defaultJson = captureIo();
+			expect(
+				await runTelemetryCommand("query", ["--json"], root, defaultJson.io),
+			).toBe(0);
+			const defaultPayload = JSON.parse(defaultJson.stdout[0] ?? "{}") as {
+				data: { count: number };
+			};
+			expect(defaultPayload.data.count).toBe(10);
+
+			const topLevelLimit = captureIo();
+			expect(
+				await runTelemetryCommand("--limit", ["3"], root, topLevelLimit.io),
+			).toBe(0);
+			expect(topLevelLimit.stdout[0]).toContain("telemetry query: 3 latest");
+
+			const explicitLimit = captureIo();
+			expect(
+				await runTelemetryCommand(
+					"query",
+					["--limit", "12", "--json"],
+					root,
+					explicitLimit.io,
+				),
+			).toBe(0);
+			const explicitPayload = JSON.parse(explicitLimit.stdout[0] ?? "{}") as {
+				data: { count: number };
+			};
+			expect(explicitPayload.data.count).toBe(12);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("export defaults to an envelope unless jsonl is requested", async () => {
 		const root = mkRoot();
 		try {

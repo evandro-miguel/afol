@@ -63,7 +63,7 @@ Before applying, inventory the receiving project:
 - current static scaffold metadata under `.agents/config.json`,
   `.agents/lock.json`, `.agents/manifest.json`, `.agents/rules/**`, and
   `.agents/source/**`;
-- current mutable AFOL state under `.afol/wb/**`, `.afol/skills/**`,
+- current mutable AFOL state under `.afol/wb/**`, `.agents/skills/**`,
   `.afol/data/**`, `.afol/tmp/**`, `.afol/adm/**`, and `.afol/pstr/**`;
 - retired operational files such as `.agents/agents`, `.agents/scripts/**`,
   `.agents/runtime/**`, `.agents/wb`, `.agents/skills`, `.agents/tmp`,
@@ -114,15 +114,15 @@ only after the target paths and conflicts are understood.
 
 ## 5. Maintain Project-Local Skills
 
-Project-local AFOL skills live under `.afol/skills/**`.
+Project-local AFOL skills live under `.agents/skills/**`.
 
 When updating this skill for a project:
 
-- edit the relevant `.afol/skills/<skill-name>/` files;
+- edit the relevant `.agents/skills/<skill-name>/` files;
 - keep the global copy under `~/.codex/skills/<skill-name>/` in sync only when
   the change is intended for all projects;
 - do not copy caches, generated mirrors, or universal-skills source checkouts
-  into `.afol/skills`;
+  into `.agents/skills`;
 - route durable shared skill changes through the universal-skills repo and its
   normal review path.
 

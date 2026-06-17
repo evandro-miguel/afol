@@ -10,6 +10,7 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("check")).toBe("validate");
 		expect(kernelRegistry.resolveKind("ck")).toBe("validate");
 		expect(kernelRegistry.resolveKind("init")).toBe("init");
+		expect(kernelRegistry.resolveKind("i")).toBe("init");
 		expect(kernelRegistry.resolveKind("bootstrap")).toBe("bootstrap");
 		expect(kernelRegistry.resolveKind("b")).toBe("bootstrap");
 		expect(kernelRegistry.resolveKind("start")).toBe("start");
@@ -22,9 +23,12 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("d")).toBe("done");
 		expect(kernelRegistry.resolveKind("log")).toBe("log");
 		expect(kernelRegistry.resolveKind("l")).toBe("log");
+		expect(kernelRegistry.resolveKind("quick-task")).toBe("quickTask");
+		expect(kernelRegistry.resolveKind("qt")).toBe("quickTask");
 		expect(kernelRegistry.resolveKind("verify")).toBe("verifyTasks");
 		expect(kernelRegistry.resolveKind("vf")).toBe("verifyTasks");
 		expect(kernelRegistry.resolveKind("verify-tasks")).toBe("verifyTasks");
+		expect(kernelRegistry.resolveKind("vt")).toBe("verifyTasks");
 		expect(kernelRegistry.resolveKind("rule")).toBe("rule");
 		expect(kernelRegistry.resolveKind("r")).toBe("rule");
 		expect(kernelRegistry.resolveKind("skill")).toBe("skill");
@@ -37,21 +41,45 @@ describe("kernel registry", () => {
 		expect(kernelRegistry.resolveKind("ps")).toBe("pstr");
 		expect(kernelRegistry.resolveKind("ctx")).toBe("ctx");
 		expect(kernelRegistry.resolveKind("cx")).toBe("ctx");
+		expect(kernelRegistry.resolveKind("state")).toBe("state");
+		expect(kernelRegistry.resolveKind("stt")).toBe("state");
+		expect(kernelRegistry.resolveKind("hydrate")).toBe("hydrate");
+		expect(kernelRegistry.resolveKind("hy")).toBe("hydrate");
 		expect(kernelRegistry.resolveKind("library")).toBe("library");
 		expect(kernelRegistry.resolveKind("lb")).toBe("library");
 		expect(kernelRegistry.resolveKind("adm")).toBe("adm");
+		expect(kernelRegistry.resolveKind("ad")).toBe("adm");
+		expect(kernelRegistry.resolveKind("spec")).toBe("spec");
+		expect(kernelRegistry.resolveKind("sp")).toBe("spec");
+		expect(kernelRegistry.resolveKind("changelog")).toBe("changelog");
+		expect(kernelRegistry.resolveKind("cl")).toBe("changelog");
 		expect(kernelRegistry.resolveKind("health")).toBe("health");
 		expect(kernelRegistry.resolveKind("ht")).toBe("health");
 		expect(kernelRegistry.resolveKind("db")).toBe("db");
+		expect(kernelRegistry.resolveKind("doctor")).toBe("doctor");
+		expect(kernelRegistry.resolveKind("dr")).toBe("doctor");
+		expect(kernelRegistry.resolveKind("maintenance")).toBe("maintenance");
+		expect(kernelRegistry.resolveKind("mt")).toBe("maintenance");
+		expect(kernelRegistry.resolveKind("sweep")).toBe("sweep");
+		expect(kernelRegistry.resolveKind("sw")).toBe("sweep");
+		expect(kernelRegistry.resolveKind("schema")).toBe("schema");
+		expect(kernelRegistry.resolveKind("sc")).toBe("schema");
 		expect(kernelRegistry.resolveKind("bench")).toBe("bench");
+		expect(kernelRegistry.resolveKind("be")).toBe("bench");
 		expect(kernelRegistry.resolveKind("project-benchmark")).toBe(
 			"projectBenchmark",
 		);
 		expect(kernelRegistry.resolveKind("pb")).toBe("projectBenchmark");
+		expect(kernelRegistry.resolveKind("catchup")).toBe("catchup");
+		expect(kernelRegistry.resolveKind("cu")).toBe("catchup");
 		expect(kernelRegistry.resolveKind("close")).toBe("close");
 		expect(kernelRegistry.resolveKind("c")).toBe("close");
 		expect(kernelRegistry.resolveKind("preflight")).toBe("preflight");
 		expect(kernelRegistry.resolveKind("pf")).toBe("preflight");
+		expect(kernelRegistry.resolveKind("adapter")).toBe("adapter");
+		expect(kernelRegistry.resolveKind("adp")).toBe("adapter");
+		expect(kernelRegistry.resolveKind("session")).toBe("session");
+		expect(kernelRegistry.resolveKind("ss")).toBe("session");
 		expect(kernelRegistry.resolveKind("task")).toBeNull();
 		expect(kernelRegistry.resolveKind("query")).toBeNull();
 	});
@@ -83,10 +111,9 @@ describe("kernel registry", () => {
 		expect(byCommand.get("evidence")?.sideEffect).toBe("append");
 		expect(byCommand.get("local-state")?.sideEffect).toBe("generated");
 		expect(byCommand.get("pstr")?.sideEffect).toBe("read");
-		expect(byCommand.get("ctx")?.sideEffect).toBe("read");
+		expect(byCommand.get("ctx")?.sideEffect).toBe("generated");
 		expect(byCommand.get("state")?.sideEffect).toBe("read");
 		expect(byCommand.get("hydrate")?.sideEffect).toBe("generated");
-		expect(byCommand.get("render")?.sideEffect).toBe("generated");
 		expect(byCommand.get("library")?.sideEffect).toBe("read");
 		expect(byCommand.get("memory")?.sideEffect).toBe("read");
 		expect(byCommand.get("adm")?.sideEffect).toBe("read");
@@ -111,5 +138,119 @@ describe("kernel registry", () => {
 			expect(entry.description.length).toBeGreaterThan(0);
 			expect(entry.description.length).toBeLessThanOrEqual(80);
 		}
+	});
+
+	test("does not publish duplicate top-level aliases", () => {
+		const seen = new Map<string, string>();
+		for (const spec of kernelRegistry.commands) {
+			for (const token of [spec.command, ...spec.aliases]) {
+				expect(seen.has(token)).toBe(false);
+				seen.set(token, spec.command);
+			}
+		}
+	});
+
+	test("publishes project-benchmark subcommand metadata", () => {
+		const projectBenchmark = kernelRegistry.commands.find(
+			(entry) => entry.command === "project-benchmark",
+		);
+
+		expect(projectBenchmark?.subcommands).toEqual([
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List scored reference projects",
+			},
+			{
+				usage: "show <project-id>",
+				sideEffect: "read",
+				description: "Inspect one reference project by id or name",
+			},
+			{
+				usage: "matrix --for <axis>",
+				sideEffect: "read",
+				description:
+					"Filter the score matrix by axis; omit --for for the full matrix",
+			},
+			{
+				usage: "recommend --for <axis>",
+				sideEffect: "read",
+				description: "Rank the best reference projects for one axis",
+			},
+			{
+				usage: "validate --strict",
+				sideEffect: "read",
+				description:
+					"Fail validation on warnings; omit --strict for standard validation",
+			},
+			{
+				usage: "generate --check",
+				sideEffect: "read",
+				description: "Check generated outputs without writing files",
+			},
+			{
+				usage: "generate",
+				sideEffect: "generated",
+				description: "Refresh generated outputs with local approval",
+			},
+		]);
+	});
+
+	test("publishes ctx subcommand metadata for lazy section generation", () => {
+		const ctx = kernelRegistry.commands.find(
+			(entry) => entry.command === "ctx",
+		);
+
+		expect(ctx?.subcommands).toEqual([
+			{
+				usage: "build",
+				sideEffect: "generated",
+				description: "Rebuild the section index",
+			},
+			{
+				usage: "bundle",
+				sideEffect: "generated",
+				description: "Build a context bundle and refresh sections if needed",
+			},
+			{
+				usage: "section --ref <ref>",
+				sideEffect: "generated",
+				description: "Read one section and refresh sections if needed",
+			},
+			{
+				usage: "explain",
+				sideEffect: "generated",
+				description: "Explain bundle inputs and refresh sections if needed",
+			},
+			{
+				usage: "tools",
+				sideEffect: "generated",
+				description: "List context helpers and refresh sections if needed",
+			},
+		]);
+	});
+
+	test("publishes telemetry subcommand metadata", () => {
+		const telemetry = kernelRegistry.commands.find(
+			(entry) => entry.command === "telemetry",
+		);
+
+		expect(telemetry?.subcommands).toEqual([
+			{
+				usage: "query --limit <n>",
+				sideEffect: "read",
+				description: "Show recent telemetry events; defaults to latest 10",
+			},
+			{
+				usage: "report --limit <n>",
+				sideEffect: "read",
+				description: "Summarize telemetry counts by session, type, and outcome",
+			},
+			{
+				usage: "export --format jsonl",
+				sideEffect: "read",
+				description: "Export filtered telemetry events",
+			},
+		]);
 	});
 });

@@ -167,8 +167,8 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 		skillsDir: normalizeProjectRelativePath(
 			stringAt(config, ["paths", "skills_dir"]) ??
 				stringAt(config, ["skills_sync", "project_dir"]) ??
-				`${mutableDir}/skills`,
-			`${mutableDir}/skills`,
+				`${agentsDir}/skills`,
+			`${agentsDir}/skills`,
 		),
 		wbDir,
 		activeSessionFile: fromConfig(

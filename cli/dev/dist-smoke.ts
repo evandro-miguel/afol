@@ -208,6 +208,18 @@ try {
 	assertOk(updateCheck, "dist update check");
 	assertContains(updateCheck, "dist update check", [
 		"update check: changes available",
+		"operations:",
+		"hint: run afol update preview",
+	]);
+
+	const updateCheckVerbose = runDist(updateTarget, [
+		"update",
+		"check",
+		"--verbose",
+	]);
+	assertOk(updateCheckVerbose, "dist update check verbose");
+	assertContains(updateCheckVerbose, "dist update check verbose", [
+		"update check: changes available",
 		".agents/lock.json [owner=managed] revision changed",
 	]);
 

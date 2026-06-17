@@ -204,7 +204,7 @@ afol verify-tasks --strict
 
 For every feature addition or meaningful feature behavior change:
 
-- Update the affected project-local skill under `.afol/skills/` when future
+- Update the affected project-local skill under `.agents/skills/` when future
   agents must follow the new behavior.
 - Update affected project docs, command references, standards, roadmap, and
   specs so operator-facing guidance matches the behavior.

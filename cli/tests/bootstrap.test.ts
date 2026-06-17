@@ -116,13 +116,13 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(existsSync(join(target, ".agents", "rules", "index.json"))).toBe(
 				true,
 			);
-			expect(existsSync(join(target, ".agents", "skills"))).toBe(false);
+			expect(existsSync(join(target, ".agents", "skills", "README.md"))).toBe(
+				true,
+			);
 			expect(existsSync(join(target, ".agents", "wb"))).toBe(false);
 			expect(existsSync(join(target, ".agents", "tmp"))).toBe(false);
 			expect(existsSync(join(target, ".agents", "data"))).toBe(false);
-			expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(
-				true,
-			);
+			expect(existsSync(join(target, ".afol", "skills"))).toBe(false);
 			expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
 			expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
 			expect(existsSync(join(target, ".afol", "data", "README.md"))).toBe(true);
@@ -172,6 +172,66 @@ describe("bootstrap provider-compatible mutable state", () => {
 					),
 				),
 			).toBe(true);
+			expect(
+				existsSync(
+					join(target, ".afol", "data", "project-benchmarks", "index.json"),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"data",
+						"project-benchmarks",
+						"similarity-matrix.json",
+					),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"data",
+						"project-benchmarks",
+						"generated-summary.md",
+					),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"data",
+						"project-benchmarks",
+						"validation-report.json",
+					),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(target, ".afol", "adm", "project-benchmarks", "axes.json"),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(target, ".afol", "adm", "project-benchmarks", "schema.json"),
+				),
+			).toBe(true);
+			expect(
+				existsSync(
+					join(
+						target,
+						".afol",
+						"adm",
+						"project-benchmarks",
+						"projects",
+						"aider.json",
+					),
+				),
+			).toBe(true);
 
 			const config = JSON.parse(
 				readFileSync(join(target, ".agents", "config.json"), "utf8"),
@@ -183,13 +243,13 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(config.paths.mutable_dir).toBe(".afol");
 			expect(config.paths.wb_dir).toBe(".afol/wb");
 			expect(config.paths.active_session_file).toBe(".afol/wb/.active_session");
-			expect(config.paths.skills_dir).toBe(".afol/skills");
+			expect(config.paths.skills_dir).toBe(".agents/skills");
 			expect(config.paths.tmp_dir).toBe(".afol/tmp");
 			expect(config.paths.data_dir).toBe(".afol/data");
 			expect(config.paths.events_file).toBe(".afol/data/events/events.jsonl");
 			expect(config.paths.data_index_dir).toBe(".afol/data/index");
 			expect(config.paths.mutations_dir).toBe(".afol/data/mutations");
-			expect(config.skills_sync.project_dir).toBe(".afol/skills");
+			expect(config.skills_sync.project_dir).toBe(".agents/skills");
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}
@@ -262,7 +322,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(
 				existsSync(join(target, ".agents", "data", "events", "events.jsonl")),
 			).toBe(true);
-			expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(
+			expect(existsSync(join(target, ".agents", "skills", "README.md"))).toBe(
 				true,
 			);
 			expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
@@ -299,6 +359,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 					target,
 					"--provider-compatible",
 					"--cleanup-provider-compatible-mutable",
+					"--verbose",
 				]),
 			).toBe(0);
 
@@ -315,7 +376,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 				existsSync(join(target, ".agents", "data", "events", "events.jsonl")),
 			).toBe(true);
 			expect(logs.join("\n")).toContain(
-				"provider-compatible-cleanup-preserved .agents/skills requires-confirm-provider-migration",
+				"provider-compatible-cleanup-preserved .agents/wb requires-confirm-provider-migration",
 			);
 		} finally {
 			console.log = originalLog;
@@ -348,7 +409,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 				]),
 			).toBe(0);
 
-			expect(existsSync(join(target, ".agents", "skills"))).toBe(false);
+			expect(existsSync(join(target, ".agents", "skills", "custom.md"))).toBe(
+				true,
+			);
 			expect(existsSync(join(target, ".agents", "wb"))).toBe(false);
 			expect(existsSync(join(target, ".agents", "tmp"))).toBe(false);
 			expect(existsSync(join(target, ".agents", "data"))).toBe(false);
@@ -362,7 +425,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 				"migrations",
 				archives[0] ?? "",
 			);
-			expect(existsSync(join(archiveRoot, "skills", "custom.md"))).toBe(true);
+			expect(existsSync(join(archiveRoot, "skills", "custom.md"))).toBe(false);
 			expect(existsSync(join(archiveRoot, "wb", "session", "task.md"))).toBe(
 				true,
 			);
@@ -388,13 +451,13 @@ describe("bootstrap provider-compatible mutable state", () => {
 					target,
 					"--provider-compatible",
 					"--dry-run",
+					"--verbose",
 				]),
 			).toBe(0);
 
 			const output = logs.join("\n");
-			expect(output).toContain(
-				"mutable-baseline-create .afol/skills/README.md source=.afol/skills/README.md missing-target-file",
-			);
+			expect(output).toContain("create .agents/skills/README.md");
+			expect(output).not.toContain("mutable-baseline-create .afol/skills");
 			expect(output).toContain(
 				"mutable-baseline-create .afol/tmp/README.md source=.afol/tmp/README.md missing-target-file",
 			);
@@ -403,6 +466,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 			);
 			expect(output).toContain(
 				"mutable-baseline-create .afol/data/benchmarks/catalog/registry.json source=.afol/data/benchmarks/catalog/registry.json missing-target-file",
+			);
+			expect(output).toContain(
+				"mutable-baseline-create .afol/data/project-benchmarks/index.json source=.afol/data/project-benchmarks/index.json missing-target-file",
 			);
 			expect(output).not.toContain("provider-compatible-cleanup-removed");
 		} finally {
@@ -448,7 +514,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(existsSync(join(target, "AGENTS.md"))).toBe(true);
 			expect(existsSync(join(target, "CLAUDE.md"))).toBe(false);
 			expect(existsSync(join(target, ".claude"))).toBe(false);
-			expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(
+			expect(existsSync(join(target, ".agents", "skills", "README.md"))).toBe(
 				true,
 			);
 
@@ -481,14 +547,15 @@ describe("bootstrap provider-compatible mutable state", () => {
 			// Claude artifacts absent
 			expect(existsSync(join(target, "CLAUDE.md"))).toBe(false);
 			expect(existsSync(join(target, ".claude"))).toBe(false);
-			// Mutable-state template files MUST remain (regression guard:
+			// Template files MUST remain (regression guard:
 			// --without-claude must not trigger provider-root stripping when
-			// mutableDir is .agents). Template ships these under .afol/.
-			expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
-			expect(existsSync(join(target, ".afol", "data", "README.md"))).toBe(true);
-			expect(existsSync(join(target, ".afol", "skills", "README.md"))).toBe(
+			// mutableDir is .agents).
+			expect(existsSync(join(target, ".agents", "skills", "README.md"))).toBe(
 				true,
 			);
+			expect(existsSync(join(target, ".afol", "wb", "README.md"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "data", "README.md"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "skills"))).toBe(false);
 			expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
 
 			const config = JSON.parse(

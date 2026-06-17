@@ -11,6 +11,7 @@ import {
 	loadSessionState,
 	validateSessionState,
 } from "../services/state/session-state";
+import { readActiveSession } from "../services/workbench/lifecycle";
 
 type CommandIo = {
 	stdout: (message: string) => void;
@@ -50,7 +51,7 @@ function normalizeAction(value: string | undefined): StateAction {
 	throw new Error(`Unknown state action: ${value}`);
 }
 
-function parseStateArgs(args: string[]): { json: boolean; sessionId: string } {
+function parseStateArgs(args: string[]): { json: boolean; sessionId?: string } {
 	let json = false;
 	let sessionId = "";
 	for (let index = 0; index < args.length; index += 1) {
@@ -70,10 +71,17 @@ function parseStateArgs(args: string[]): { json: boolean; sessionId: string } {
 		}
 		throw new Error(`Unknown state argument: ${value}`);
 	}
+	return { json, ...(sessionId ? { sessionId } : {}) };
+}
+
+function resolveSessionId(projectRoot: string, parsed: { sessionId?: string }) {
+	const sessionId = parsed.sessionId ?? readActiveSession(projectRoot);
 	if (!sessionId) {
-		throw new Error("Missing --session for state.");
+		throw new Error(
+			"Missing --session for state and no active session found. Run afol session list.",
+		);
 	}
-	return { json, sessionId };
+	return sessionId;
 }
 
 function formatSnapshot(
@@ -172,10 +180,11 @@ export async function runStateCommand(
 		const stateAction =
 			action && !action.startsWith("-") ? normalizeAction(action) : "show";
 		const parsed = parseStateArgs(stateArgs);
+		const sessionId = resolveSessionId(projectRoot, parsed);
 
 		if (stateAction === "sync") {
 			try {
-				const snapshot = hydrateSession(projectRoot, parsed.sessionId);
+				const snapshot = hydrateSession(projectRoot, sessionId);
 				if (parsed.json) {
 					writeSnapshotJson(io, stateAction, snapshot);
 				} else {
@@ -194,7 +203,7 @@ export async function runStateCommand(
 					writeSnapshotError(
 						io,
 						stateAction,
-						parsed.sessionId,
+						sessionId,
 						(error as Error).message,
 					);
 					return 1;
@@ -204,7 +213,7 @@ export async function runStateCommand(
 		}
 
 		if (stateAction === "validate") {
-			const result = validateSessionState(projectRoot, parsed.sessionId);
+			const result = validateSessionState(projectRoot, sessionId);
 			if (parsed.json) {
 				writeValidationJson(io, result);
 			} else {
@@ -214,20 +223,20 @@ export async function runStateCommand(
 		}
 
 		if (stateAction === "export") {
-			const snapshot = exportSessionState(projectRoot, parsed.sessionId);
+			const snapshot = exportSessionState(projectRoot, sessionId);
 			if (!snapshot) {
 				if (parsed.json) {
 					writeSnapshotError(
 						io,
 						stateAction,
-						parsed.sessionId,
-						`state export: no hydrated state for ${parsed.sessionId}. Run ` +
+						sessionId,
+						`state export: no hydrated state for ${sessionId}. Run ` +
 							"`afol hydrate -S <session>` first.",
 					);
 					return 1;
 				}
 				io.stderr(
-					`state export: no hydrated state for ${parsed.sessionId}. Run ` +
+					`state export: no hydrated state for ${sessionId}. Run ` +
 						"`afol hydrate -S <session>` first.",
 				);
 				return 1;
@@ -240,20 +249,20 @@ export async function runStateCommand(
 			return 0;
 		}
 
-		const snapshot = loadSessionState(projectRoot, parsed.sessionId);
+		const snapshot = loadSessionState(projectRoot, sessionId);
 		if (!snapshot) {
 			if (parsed.json) {
 				writeSnapshotError(
 					io,
 					stateAction,
-					parsed.sessionId,
-					`state show: no hydrated state for ${parsed.sessionId}. Run ` +
+					sessionId,
+					`state show: no hydrated state for ${sessionId}. Run ` +
 						"`afol hydrate -S <session>` first.",
 				);
 				return 1;
 			}
 			io.stderr(
-				`state show: no hydrated state for ${parsed.sessionId}. Run ` +
+				`state show: no hydrated state for ${sessionId}. Run ` +
 					"`afol hydrate -S <session>` first.",
 			);
 			return 1;

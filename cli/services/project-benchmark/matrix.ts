@@ -1,4 +1,7 @@
-import { scoreProjectBenchmark } from "./scoring";
+import {
+	compareProjectBenchmarkScores,
+	scoreProjectBenchmark,
+} from "./scoring";
 import type {
 	ProjectBenchmarkAxesFile,
 	ProjectBenchmarkProject,
@@ -21,9 +24,6 @@ export function buildProjectBenchmarkMatrix(
 		generated_by: "afol pb matrix",
 		projects: projects
 			.map((project) => scoreProjectBenchmark(project, axes, now))
-			.sort(
-				(left, right) =>
-					right.score - left.score || left.id.localeCompare(right.id),
-			),
+			.sort(compareProjectBenchmarkScores),
 	};
 }

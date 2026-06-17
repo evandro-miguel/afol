@@ -81,6 +81,7 @@ export async function runDoctorCommand(
 				...report.scores.map(
 					(score) => `  ${score.area}: ${score.score}/${score.max}`,
 				),
+				"hint: run afol doctor --remediation-plan for next actions",
 			].join("\n"),
 		);
 		return 0;

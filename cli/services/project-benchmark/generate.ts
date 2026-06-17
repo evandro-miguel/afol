@@ -1,5 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { atomicWriteText } from "../io/atomic";
+import { withSessionLock } from "../io/session-lock";
 import type { ProjectBenchmarkMatrix } from "./matrix";
 import { buildProjectBenchmarkMatrix } from "./matrix";
 import type {
@@ -14,14 +16,34 @@ export type ProjectBenchmarkGeneratedFile = {
 	kind: "index" | "matrix" | "summary" | "validation";
 };
 
+export type ProjectBenchmarkMisplacedFile = {
+	path: string;
+	location: "catalog" | "runtime-benchmark-catalog";
+};
+
 export type ProjectBenchmarkGenerationResult = {
 	schema_version: "1.0.0";
 	command: "project-benchmark.generate";
 	generated_by: "afol pb generate";
+	mode: "write" | "check";
+	ok: boolean;
 	generated_at: string;
 	data_dir: string;
 	files: ProjectBenchmarkGeneratedFile[];
+	changed_files: ProjectBenchmarkGeneratedFile[];
+	misplaced_files: ProjectBenchmarkMisplacedFile[];
 	project_count: number;
+};
+
+type ProjectBenchmarkGeneratePaths = {
+	dataDir: string;
+	catalogDir: string;
+	runtimeBenchmarkCatalogDir: string;
+};
+
+type ProjectBenchmarkGenerateOptions = {
+	check?: boolean;
+	now?: Date;
 };
 
 type GeneratedIndex = {
@@ -51,7 +73,7 @@ function writeTextIfChanged(path: string, text: string): void {
 	if (existsSync(path) && readFileSync(path, "utf8") === text) {
 		return;
 	}
-	writeFileSync(path, text, "utf8");
+	atomicWriteText(path, text);
 }
 
 function buildSummary(
@@ -72,7 +94,7 @@ function buildSummary(
 			.slice(0, 10)
 			.map(
 				(project) =>
-					`- ${project.id}: score=${project.score} category=${project.category} stale=${project.stale}`,
+					`- ${project.id}: overall=${project.overall_score} focused=${project.focused_score} category=${project.category} stale=${project.stale}`,
 			),
 		"",
 	];
@@ -137,6 +159,149 @@ function jsonText(value: unknown): string {
 	return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+type GeneratedFileContent = {
+	path: string;
+	relativePath: string;
+	kind: ProjectBenchmarkGeneratedFile["kind"];
+	content: string;
+};
+
+const GENERATED_FILE_NAMES = new Set([
+	"index.json",
+	"similarity-matrix.json",
+	"generated-summary.md",
+	"validation-report.json",
+]);
+
+function buildGeneratedFiles(
+	projectRoot: string,
+	dataDir: string,
+	payloads: ReturnType<typeof buildGeneratedPayloads>,
+): GeneratedFileContent[] {
+	return [
+		{
+			path: join(dataDir, "index.json"),
+			relativePath: relative(projectRoot, join(dataDir, "index.json")),
+			kind: "index",
+			content: jsonText(payloads.index),
+		},
+		{
+			path: join(dataDir, "similarity-matrix.json"),
+			relativePath: relative(
+				projectRoot,
+				join(dataDir, "similarity-matrix.json"),
+			),
+			kind: "matrix",
+			content: jsonText(payloads.generatedMatrix),
+		},
+		{
+			path: join(dataDir, "generated-summary.md"),
+			relativePath: relative(
+				projectRoot,
+				join(dataDir, "generated-summary.md"),
+			),
+			kind: "summary",
+			content: payloads.summary,
+		},
+		{
+			path: join(dataDir, "validation-report.json"),
+			relativePath: relative(
+				projectRoot,
+				join(dataDir, "validation-report.json"),
+			),
+			kind: "validation",
+			content: jsonText(payloads.validationReport),
+		},
+	];
+}
+
+function contentMatches(path: string, content: string): boolean {
+	return existsSync(path) && readFileSync(path, "utf8") === content;
+}
+
+function fileLooksLikeProjectBenchmarkGeneratedOutput(
+	path: string,
+	fileName: string,
+): boolean {
+	if (GENERATED_FILE_NAMES.has(fileName)) {
+		return true;
+	}
+	if (
+		!fileName.endsWith(".json") &&
+		!fileName.endsWith(".md") &&
+		!fileName.endsWith(".txt")
+	) {
+		return false;
+	}
+	try {
+		return readFileSync(path, "utf8").includes("afol pb generate");
+	} catch {
+		return false;
+	}
+}
+
+function collectMisplacedOutputs(
+	projectRoot: string,
+	paths: Pick<
+		ProjectBenchmarkGeneratePaths,
+		"catalogDir" | "runtimeBenchmarkCatalogDir"
+	>,
+): ProjectBenchmarkMisplacedFile[] {
+	const misplaced = new Map<string, ProjectBenchmarkMisplacedFile>();
+	const scan = (
+		dir: string,
+		location: ProjectBenchmarkMisplacedFile["location"],
+	): void => {
+		if (!existsSync(dir)) {
+			return;
+		}
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			const entryPath = join(dir, entry.name);
+			if (
+				location === "runtime-benchmark-catalog" &&
+				entry.isDirectory() &&
+				/^project-benchmarks?$/.test(entry.name)
+			) {
+				const rel = relative(projectRoot, entryPath) || entryPath;
+				misplaced.set(rel, { path: rel, location });
+			}
+			if (entry.isDirectory()) {
+				scan(entryPath, location);
+				continue;
+			}
+			if (
+				!fileLooksLikeProjectBenchmarkGeneratedOutput(entryPath, entry.name)
+			) {
+				continue;
+			}
+			const rel = relative(projectRoot, entryPath) || entryPath;
+			misplaced.set(rel, { path: rel, location });
+		}
+	};
+
+	scan(paths.catalogDir, "catalog");
+	scan(paths.runtimeBenchmarkCatalogDir, "runtime-benchmark-catalog");
+	return [...misplaced.values()].sort((left, right) =>
+		left.path.localeCompare(right.path),
+	);
+}
+
+export function findProjectBenchmarkMisplacedOutputs(
+	projectRoot: string,
+	paths: Pick<
+		ProjectBenchmarkGeneratePaths,
+		"catalogDir" | "runtimeBenchmarkCatalogDir"
+	>,
+): ProjectBenchmarkMisplacedFile[] {
+	return collectMisplacedOutputs(projectRoot, paths);
+}
+
+function publicFile(
+	file: Pick<GeneratedFileContent, "relativePath" | "kind">,
+): ProjectBenchmarkGeneratedFile {
+	return { path: file.relativePath, kind: file.kind };
+}
+
 function canReuseGeneratedAt(
 	generatedAt: string,
 	files: {
@@ -164,60 +329,71 @@ function canReuseGeneratedAt(
 
 export function generateProjectBenchmarkOutputs(
 	projectRoot: string,
-	dataDir: string,
+	generatePaths: ProjectBenchmarkGeneratePaths,
 	projects: ProjectBenchmarkProject[],
 	axes: ProjectBenchmarkAxesFile,
 	validation: ProjectBenchmarkValidationResult,
-	now = new Date(),
+	options: ProjectBenchmarkGenerateOptions = {},
 ): ProjectBenchmarkGenerationResult {
-	const matrix = buildProjectBenchmarkMatrix(projects, axes, now);
-	mkdirSync(dataDir, { recursive: true });
-	const indexFile = {
-		path: join(dataDir, "index.json"),
-		kind: "index" as const,
-	};
-	const matrixFile = {
-		path: join(dataDir, "similarity-matrix.json"),
-		kind: "matrix" as const,
-	};
-	const summaryFile = {
-		path: join(dataDir, "generated-summary.md"),
-		kind: "summary" as const,
-	};
-	const validationFile = {
-		path: join(dataDir, "validation-report.json"),
-		kind: "validation" as const,
-	};
-	const files = [indexFile, matrixFile, summaryFile, validationFile];
-	const paths = {
-		index: indexFile.path,
-		matrix: matrixFile.path,
-		summary: summaryFile.path,
-		validation: validationFile.path,
-	};
-	const priorGeneratedAt = readGeneratedAt(indexFile.path);
-	const generatedAt =
-		priorGeneratedAt &&
-		canReuseGeneratedAt(priorGeneratedAt, paths, matrix, validation)
-			? priorGeneratedAt
-			: now.toISOString();
-	const payloads = buildGeneratedPayloads(generatedAt, matrix, validation);
+	return withSessionLock(projectRoot, "project-benchmark.generate", () => {
+		const now = options.now ?? new Date();
+		const check = options.check === true;
+		const matrix = buildProjectBenchmarkMatrix(projects, axes, now);
+		const misplacedFiles = collectMisplacedOutputs(projectRoot, generatePaths);
+		const filePaths = {
+			index: join(generatePaths.dataDir, "index.json"),
+			matrix: join(generatePaths.dataDir, "similarity-matrix.json"),
+			summary: join(generatePaths.dataDir, "generated-summary.md"),
+			validation: join(generatePaths.dataDir, "validation-report.json"),
+		};
+		const priorGeneratedAt = readGeneratedAt(filePaths.index);
+		const generatedAt =
+			priorGeneratedAt &&
+			canReuseGeneratedAt(priorGeneratedAt, filePaths, matrix, validation)
+				? priorGeneratedAt
+				: now.toISOString();
+		const payloads = buildGeneratedPayloads(generatedAt, matrix, validation);
+		const files = buildGeneratedFiles(
+			projectRoot,
+			generatePaths.dataDir,
+			payloads,
+		);
+		const changedFiles = files.filter(
+			(file) => !contentMatches(file.path, file.content),
+		);
 
-	writeStableJson(indexFile.path, payloads.index);
-	writeStableJson(matrixFile.path, payloads.generatedMatrix);
-	writeTextIfChanged(summaryFile.path, payloads.summary);
-	writeStableJson(validationFile.path, payloads.validationReport);
+		if (!check && misplacedFiles.length === 0 && changedFiles.length > 0) {
+			mkdirSync(generatePaths.dataDir, { recursive: true });
+			for (const file of changedFiles) {
+				if (file.kind === "summary") {
+					writeTextIfChanged(file.path, file.content);
+					continue;
+				}
+				writeStableJson(
+					file.path,
+					file.kind === "index"
+						? payloads.index
+						: file.kind === "matrix"
+							? payloads.generatedMatrix
+							: payloads.validationReport,
+				);
+			}
+		}
 
-	return {
-		schema_version: "1.0.0",
-		command: "project-benchmark.generate",
-		generated_by: "afol pb generate",
-		generated_at: generatedAt,
-		data_dir: relative(projectRoot, dataDir),
-		files: files.map((file) => ({
-			path: relative(projectRoot, file.path),
-			kind: file.kind,
-		})),
-		project_count: matrix.projects.length,
-	};
+		return {
+			schema_version: "1.0.0",
+			command: "project-benchmark.generate",
+			generated_by: "afol pb generate",
+			mode: check ? "check" : "write",
+			ok:
+				misplacedFiles.length === 0 &&
+				(check ? changedFiles.length === 0 : true),
+			generated_at: generatedAt,
+			data_dir: relative(projectRoot, generatePaths.dataDir),
+			files: files.map(publicFile),
+			changed_files: changedFiles.map(publicFile),
+			misplaced_files: misplacedFiles,
+			project_count: matrix.projects.length,
+		};
+	});
 }

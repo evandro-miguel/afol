@@ -69,6 +69,19 @@ function createRoot(): string {
 }
 
 describe("memory command", () => {
+	test("empty list points agents at the memory path", async () => {
+		const root = mkdtempSync(join(tmpdir(), "memory-command-empty-"));
+		try {
+			const list = capture();
+			expect(await runMemoryCommand("list", [], root, list.io)).toBe(0);
+			expect(list.stdout.join("\n")).toContain("memory entries: 0");
+			expect(list.stdout.join("\n")).toContain(".afol/memory/memory.md");
+			expect(list.stdout.join("\n")).toContain("afol memory add");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("lists, shows, searches, and updates entries", async () => {
 		const root = createRoot();
 		try {

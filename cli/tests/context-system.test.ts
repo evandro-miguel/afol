@@ -124,7 +124,9 @@ function createBundleFixture(options?: {
 }): string {
 	const root = createSectionFixture();
 	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
-	mkdirSync(join(root, ".afol", "skills", "alpha-helper"), { recursive: true });
+	mkdirSync(join(root, ".agents", "skills", "alpha-helper"), {
+		recursive: true,
+	});
 	mkdirSync(join(root, ".afol", "library"), { recursive: true });
 	mkdirSync(join(root, ".afol", "memory"), { recursive: true });
 	mkdirSync(join(root, ".afol", "pstr"), { recursive: true });
@@ -153,7 +155,7 @@ function createBundleFixture(options?: {
 	);
 
 	writeFileSync(
-		join(root, ".afol", "skills", "alpha-helper", "SKILL.md"),
+		join(root, ".agents", "skills", "alpha-helper", "SKILL.md"),
 		[
 			"---",
 			"name: alpha helper",
@@ -694,6 +696,57 @@ describe("context system", () => {
 			expect(await runContextCommand("build", [], root, captured.io)).toBe(0);
 			expect(getSectionIndex(root)?.sections.length).toBe(4);
 			expect(captured.stdout[0]).toContain("ctx build: ok sections=4");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx defaults to summary without rebuilding sections", async () => {
+		const root = createSectionFixture();
+		try {
+			const captured = captureIo();
+			expect(await runContextCommand("", [], root, captured.io)).toBe(0);
+			expect(getSectionIndex(root)).toBeNull();
+			expect(captured.stdout[0]).toContain("ctx: choose an action");
+			expect(captured.stdout[0]).toContain("hint: run afol ctx build");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx --json defaults to summary without rebuilding sections", async () => {
+		const root = createSectionFixture();
+		try {
+			const captured = captureIo();
+			expect(await runContextCommand("", ["--json"], root, captured.io)).toBe(
+				0,
+			);
+			expect(getSectionIndex(root)).toBeNull();
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				action: string;
+				ok: boolean;
+				data: { sections: number; write_actions: string[] };
+			};
+			expect(payload.action).toBe("ctx.summary");
+			expect(payload.ok).toBe(true);
+			expect(payload.data.sections).toBe(0);
+			expect(payload.data.write_actions).toEqual(["build"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx parses leading --json as summary flag", async () => {
+		const root = createSectionFixture();
+		try {
+			const captured = captureIo();
+			expect(await runContextCommand("--json", [], root, captured.io)).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				action: string;
+				ok: boolean;
+			};
+			expect(payload.action).toBe("ctx.summary");
+			expect(payload.ok).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

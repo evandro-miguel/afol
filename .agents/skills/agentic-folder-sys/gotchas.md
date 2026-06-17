@@ -73,7 +73,7 @@ or secrets during adoption cleanup.
 `--force-managed` is for AFOL-managed files proven by the manifest. It is not a
 project-wide overwrite switch.
 
-## 8. Project-Local Skills Live Under `.afol/skills`
+## 8. Project-Local Skills Live Under `.agents/skills`
 
 Do not copy caches or source mirrors into the project skill directory. Keep only
 the curated skills agents should use in that project. Shared durable changes

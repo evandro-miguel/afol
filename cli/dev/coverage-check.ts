@@ -22,15 +22,21 @@ const result = spawnSync(
 	},
 );
 
-process.stdout.write(result.stdout ?? "");
-process.stderr.write(result.stderr ?? "");
-
 if (result.error) {
 	console.error(`coverage: failed to start bun test: ${result.error.message}`);
 	process.exit(1);
 }
 
+if (parsedArgs.verbose) {
+	process.stdout.write(result.stdout ?? "");
+	process.stderr.write(result.stderr ?? "");
+}
+
 if (result.status !== 0) {
+	if (!parsedArgs.verbose) {
+		process.stdout.write(result.stdout ?? "");
+		process.stderr.write(result.stderr ?? "");
+	}
 	process.exit(result.status ?? 1);
 }
 
@@ -63,12 +69,18 @@ console.log("coverage: passed");
 function parseArgs(args: string[]): {
 	includePrefixes: string[];
 	testArgs: string[];
+	verbose: boolean;
 } {
 	const includePrefixes: string[] = [];
 	const testArgs: string[] = [];
+	let verbose = false;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		if (!arg) {
+			continue;
+		}
+		if (arg === "--verbose") {
+			verbose = true;
 			continue;
 		}
 		if (arg === "--include") {
@@ -83,7 +95,7 @@ function parseArgs(args: string[]): {
 		}
 		testArgs.push(arg);
 	}
-	return { includePrefixes, testArgs };
+	return { includePrefixes, testArgs, verbose };
 }
 
 function parseBunTextCoverage(output: string): CoverageTotals[] {

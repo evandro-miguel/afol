@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runProjectBenchmarkCommand } from "../commands/project-benchmark";
+import { agentOperationContext } from "../core/operation-context";
 import { loadProjectBenchmarkCatalog } from "../services/project-benchmark/catalog";
 import { validateProjectBenchmarkCatalog } from "../services/project-benchmark/validate";
 
@@ -54,11 +55,18 @@ function projectPath(root: string, id = "aider"): string {
 	);
 }
 
-function readProject(root: string, id = "aider"): Record<string, unknown> {
-	return JSON.parse(readFileSync(projectPath(root, id), "utf8")) as Record<
-		string,
-		unknown
-	>;
+function axesPath(root: string): string {
+	return join(root, ".afol", "adm", "project-benchmarks", "axes.json");
+}
+
+type ProjectRecord = Record<string, unknown> & {
+	source_refs?: Array<Record<string, unknown>>;
+};
+
+function readProject(root: string, id = "aider"): ProjectRecord {
+	return JSON.parse(
+		readFileSync(projectPath(root, id), "utf8"),
+	) as ProjectRecord;
 }
 
 function issueCodes(root: string, now = new Date("2026-06-20T00:00:00.000Z")) {
@@ -169,6 +177,7 @@ function createProjectRoot(): string {
 					url: "https://aider.chat/docs/repomap.html",
 					source_type: "official_doc",
 					claim: "Aider documents a concise repository map.",
+					axes: ["repo_context_map", "safe_mutation"],
 				},
 			],
 		},
@@ -464,12 +473,21 @@ describe("project-benchmark command", () => {
 			const listPayload = JSON.parse(list.stdout[0] ?? "{}") as {
 				schema: string;
 				action: string;
-				data: { projects: Array<{ id: string; score: number }> };
+				data: {
+					projects: Array<{
+						id: string;
+						score: number;
+						overall_score: number;
+						focused_score: number;
+					}>;
+				};
 			};
 			expect(listPayload.schema).toBe("afol.result/v1");
 			expect(listPayload.action).toBe("project-benchmark.list");
 			expect(listPayload.data.projects[0]?.id).toBe("aider");
 			expect(listPayload.data.projects[0]?.score).toBe(80);
+			expect(listPayload.data.projects[0]?.overall_score).toBe(80);
+			expect(listPayload.data.projects[0]?.focused_score).toBe(80);
 
 			const show = captureIo();
 			expect(
@@ -482,11 +500,20 @@ describe("project-benchmark command", () => {
 			).toBe(0);
 			const showPayload = JSON.parse(show.stdout[0] ?? "{}") as {
 				action: string;
-				data: { project: { id: string }; score: { score: number } };
+				data: {
+					project: { id: string };
+					score: {
+						score: number;
+						overall_score: number;
+						focused_score: number;
+					};
+				};
 			};
 			expect(showPayload.action).toBe("project-benchmark.show");
 			expect(showPayload.data.project.id).toBe("aider");
 			expect(showPayload.data.score.score).toBe(80);
+			expect(showPayload.data.score.overall_score).toBe(80);
+			expect(showPayload.data.score.focused_score).toBe(80);
 
 			const matrix = captureIo();
 			expect(
@@ -495,11 +522,35 @@ describe("project-benchmark command", () => {
 			const matrixPayload = JSON.parse(matrix.stdout[0] ?? "{}") as {
 				data: {
 					generated_by: string;
+					axis: string | null;
 					projects: Array<{ axes: Record<string, number> }>;
 				};
 			};
 			expect(matrixPayload.data.generated_by).toBe("afol pb matrix");
+			expect(matrixPayload.data.axis).toBe(null);
 			expect(matrixPayload.data.projects[0]?.axes.repo_context_map).toBe(5);
+
+			const filteredMatrix = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"matrix",
+					["--for", "repo_context_map", "--json"],
+					root,
+					filteredMatrix.io,
+				),
+			).toBe(0);
+			const filteredMatrixPayload = JSON.parse(
+				filteredMatrix.stdout[0] ?? "{}",
+			) as {
+				data: {
+					axis: string;
+					projects: Array<{ axes: Record<string, number> }>;
+				};
+			};
+			expect(filteredMatrixPayload.data.axis).toBe("repo_context_map");
+			expect(
+				filteredMatrixPayload.data.projects[0]?.axes.repo_context_map,
+			).toBe(5);
 
 			const recommend = captureIo();
 			expect(
@@ -511,10 +562,31 @@ describe("project-benchmark command", () => {
 				),
 			).toBe(0);
 			const recommendPayload = JSON.parse(recommend.stdout[0] ?? "{}") as {
-				data: { axis: string; top_references: Array<{ id: string }> };
+				data: {
+					axis: string;
+					top_references: Array<{
+						id: string;
+						axis_score: number;
+						recommendation_score: number;
+						risk_level: string;
+						risk_flags: string[];
+						warnings: string[];
+						do_not_copy: string[];
+					}>;
+				};
 			};
 			expect(recommendPayload.data.axis).toBe("repo_context_map");
 			expect(recommendPayload.data.top_references[0]?.id).toBe("aider");
+			expect(recommendPayload.data.top_references[0]?.axis_score).toBe(5);
+			expect(
+				recommendPayload.data.top_references[0]?.recommendation_score,
+			).toBe(100);
+			expect(recommendPayload.data.top_references[0]?.risk_level).toBe("low");
+			expect(recommendPayload.data.top_references[0]?.risk_flags).toEqual([]);
+			expect(recommendPayload.data.top_references[0]?.warnings).toEqual([]);
+			expect(recommendPayload.data.top_references[0]?.do_not_copy).toEqual([
+				"Do not copy chat-only workflow assumptions.",
+			]);
 
 			const validate = captureIo();
 			expect(
@@ -544,17 +616,23 @@ describe("project-benchmark command", () => {
 				action: string;
 				data: {
 					generated_by: string;
+					mode: string;
+					ok: boolean;
 					files: Array<{ path: string; kind: string }>;
+					changed_files: Array<{ path: string; kind: string }>;
 				};
 			};
 			expect(generatePayload.action).toBe("project-benchmark.generate");
 			expect(generatePayload.data.generated_by).toBe("afol pb generate");
+			expect(generatePayload.data.mode).toBe("write");
+			expect(generatePayload.data.ok).toBe(true);
 			expect(generatePayload.data.files.map((file) => file.kind)).toEqual([
 				"index",
 				"matrix",
 				"summary",
 				"validation",
 			]);
+			expect(generatePayload.data.changed_files).toHaveLength(4);
 			expect(
 				existsSync(join(root, ".afol", "data", "project-benchmarks")),
 			).toBe(true);
@@ -572,6 +650,7 @@ describe("project-benchmark command", () => {
 			);
 			expect(list.stdout.join("\n")).toContain("project-benchmark: 1 projects");
 			expect(list.stdout.join("\n")).toContain("aider");
+			expect(list.stdout.join("\n")).toContain("overall=80 focused=80");
 
 			const matrix = captureIo();
 			expect(
@@ -581,6 +660,20 @@ describe("project-benchmark command", () => {
 				"project-benchmark matrix: 1 projects",
 			);
 			expect(matrix.stdout.join("\n")).toContain("repo_context_map:5");
+			expect(matrix.stdout.join("\n")).toContain("overall=80 focused=80");
+
+			const filteredMatrix = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"matrix",
+					["--for", "repo_context_map"],
+					root,
+					filteredMatrix.io,
+				),
+			).toBe(0);
+			expect(filteredMatrix.stdout.join("\n")).toContain(
+				"project-benchmark matrix: 1 projects axis=repo_context_map",
+			);
 
 			const recommend = captureIo();
 			expect(
@@ -593,6 +686,11 @@ describe("project-benchmark command", () => {
 			).toBe(0);
 			expect(recommend.stdout.join("\n")).toContain("axis: repo_context_map");
 			expect(recommend.stdout.join("\n")).toContain("top references:");
+			expect(recommend.stdout.join("\n")).toContain("recommendation=100");
+			expect(recommend.stdout.join("\n")).toContain("risk=low");
+			expect(recommend.stdout.join("\n")).toContain(
+				"do_not_copy: Do not copy chat-only workflow assumptions.",
+			);
 			expect(recommend.stdout.join("\n")).toContain("recommendations:");
 
 			const emptyRecommendation = captureIo();
@@ -646,7 +744,12 @@ describe("project-benchmark command", () => {
 			) as {
 				generated_by: string;
 				project_count: number;
-				projects: Array<{ id: string; score: number }>;
+				projects: Array<{
+					id: string;
+					score: number;
+					overall_score: number;
+					focused_score: number;
+				}>;
 			};
 			const matrix = JSON.parse(
 				readFileSync(join(dataDir, "similarity-matrix.json"), "utf8"),
@@ -664,7 +767,12 @@ describe("project-benchmark command", () => {
 
 			expect(index.generated_by).toBe("afol pb generate");
 			expect(index.project_count).toBe(1);
-			expect(index.projects[0]).toMatchObject({ id: "aider", score: 80 });
+			expect(index.projects[0]).toMatchObject({
+				id: "aider",
+				score: 80,
+				overall_score: 80,
+				focused_score: 80,
+			});
 			expect(matrix.generated_by).toBe("afol pb generate");
 			expect(matrix.projects[0]?.axes.repo_context_map).toBe(5);
 			expect(validation).toMatchObject({
@@ -672,6 +780,7 @@ describe("project-benchmark command", () => {
 				ok: true,
 			});
 			expect(summary).toContain("Generated by `afol pb generate`");
+			expect(summary).toContain("overall=80 focused=80");
 			expect(
 				existsSync(join(root, ".afol", "data", "benchmarks", "catalog")),
 			).toBe(false);
@@ -711,7 +820,315 @@ describe("project-benchmark command", () => {
 		}
 	});
 
-	test("sorts scored outputs by score then id", async () => {
+	test("infers missing source-ref axes for legacy command catalogs", async () => {
+		const root = createProjectRoot();
+		try {
+			const raw = readProject(root);
+			raw.source_refs = [
+				{
+					...(raw.source_refs?.[0] as Record<string, unknown>),
+				},
+			];
+			delete (raw.source_refs[0] as Record<string, unknown>).axes;
+			writeJson(projectPath(root), raw);
+			addProjectCopy(root, "bbb", 4, "Second reference for matrix sorting.");
+
+			const validate = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"validate",
+					["--json"],
+					root,
+					validate.io,
+				),
+			).toBe(0);
+			expect(JSON.parse(validate.stdout[0] ?? "{}").data.ok).toBe(true);
+
+			const matrix = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"matrix",
+					["--for", "repo_context_map", "--json"],
+					root,
+					matrix.io,
+				),
+			).toBe(0);
+			expect(
+				JSON.parse(matrix.stdout[0] ?? "{}").data.projects.map(
+					(project: { id: string }) => project.id,
+				),
+			).toEqual(["aider", "bbb"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("generate check rejects misplaced generated outputs outside project-benchmark data", async () => {
+		const root = createProjectRoot();
+		try {
+			const generated = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"generate",
+					["--json"],
+					root,
+					generated.io,
+				),
+			).toBe(0);
+
+			const dataDir = join(root, ".afol", "data", "project-benchmarks");
+			const catalogCopy = join(
+				root,
+				".afol",
+				"adm",
+				"project-benchmarks",
+				"generated-summary.md",
+			);
+			const runtimeCopy = join(
+				root,
+				".afol",
+				"data",
+				"benchmarks",
+				"catalog",
+				"scenarios",
+				"copied-index.json",
+			);
+			mkdirSync(
+				join(root, ".afol", "data", "benchmarks", "catalog", "scenarios"),
+				{
+					recursive: true,
+				},
+			);
+			writeFileSync(
+				catalogCopy,
+				readFileSync(join(dataDir, "generated-summary.md"), "utf8"),
+				"utf8",
+			);
+			writeFileSync(
+				runtimeCopy,
+				readFileSync(join(dataDir, "index.json"), "utf8"),
+				"utf8",
+			);
+
+			const check = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"generate",
+					["--check", "--json"],
+					root,
+					check.io,
+				),
+			).toBe(1);
+			const payload = JSON.parse(check.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: { code: string };
+				data: {
+					ok: boolean;
+					misplaced_files: Array<{ path: string; location: string }>;
+					changed_files: Array<{ path: string }>;
+				};
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.error.code).toBe("generated-output-misplaced");
+			expect(payload.data.ok).toBe(false);
+			expect(payload.data.changed_files).toHaveLength(0);
+			expect(payload.data.misplaced_files).toEqual(
+				expect.arrayContaining([
+					{
+						path: ".afol/adm/project-benchmarks/generated-summary.md",
+						location: "catalog",
+					},
+					{
+						path: ".afol/data/benchmarks/catalog/scenarios/copied-index.json",
+						location: "runtime-benchmark-catalog",
+					},
+				]),
+			);
+
+			const rewrite = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"generate",
+					["--json"],
+					root,
+					rewrite.io,
+				),
+			).toBe(1);
+			expect(JSON.parse(rewrite.stdout[0] ?? "{}").error.code).toBe(
+				"generated-output-misplaced",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("validate strict fails on warnings and generate check stays non-mutating", async () => {
+		const root = createProjectRoot();
+		try {
+			const raw = readProject(root);
+			raw.source_access = "docs_only";
+			raw.confidence = "high";
+			writeJson(projectPath(root), raw);
+
+			const validate = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"validate",
+					["--json"],
+					root,
+					validate.io,
+				),
+			).toBe(0);
+			const validatePayload = JSON.parse(validate.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { ok: boolean; strict: boolean; warning_count: number };
+			};
+			expect(validatePayload.ok).toBe(true);
+			expect(validatePayload.data.ok).toBe(true);
+			expect(validatePayload.data.strict).toBe(false);
+			expect(validatePayload.data.warning_count).toBe(1);
+
+			const strict = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"validate",
+					["--strict", "--json"],
+					root,
+					strict.io,
+				),
+			).toBe(1);
+			const strictPayload = JSON.parse(strict.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: { code: string };
+				data: { ok: boolean; strict: boolean; warning_count: number };
+			};
+			expect(strictPayload.ok).toBe(false);
+			expect(strictPayload.error.code).toBe(
+				"project-benchmark-validation-warning",
+			);
+			expect(strictPayload.data.ok).toBe(false);
+			expect(strictPayload.data.strict).toBe(true);
+			expect(strictPayload.data.warning_count).toBe(1);
+
+			const strictText = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"validate",
+					["--strict"],
+					root,
+					strictText.io,
+				),
+			).toBe(1);
+			expect(strictText.stdout.join("\n")).toContain("warning ");
+			expect(strictText.stdout.join("\n")).toContain(
+				"docs-only-high-confidence",
+			);
+
+			const check = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"generate",
+					["--check", "--json"],
+					root,
+					check.io,
+				),
+			).toBe(1);
+			const checkPayload = JSON.parse(check.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: { code: string };
+				data: {
+					mode: string;
+					ok: boolean;
+					changed_files: Array<{ kind: string }>;
+				};
+			};
+			expect(checkPayload.ok).toBe(false);
+			expect(checkPayload.error.code).toBe("generated-output-stale");
+			expect(checkPayload.data.mode).toBe("check");
+			expect(checkPayload.data.ok).toBe(false);
+			expect(checkPayload.data.changed_files).toHaveLength(4);
+			expect(
+				existsSync(join(root, ".afol", "data", "project-benchmarks")),
+			).toBe(false);
+
+			const generated = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"generate",
+					["--json"],
+					root,
+					generated.io,
+				),
+			).toBe(0);
+
+			const cleanCheck = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"generate",
+					["--check", "--json"],
+					root,
+					cleanCheck.io,
+				),
+			).toBe(0);
+			const cleanCheckPayload = JSON.parse(cleanCheck.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: {
+					mode: string;
+					ok: boolean;
+					changed_files: Array<{ kind: string }>;
+				};
+			};
+			expect(cleanCheckPayload.ok).toBe(true);
+			expect(cleanCheckPayload.data.mode).toBe("check");
+			expect(cleanCheckPayload.data.ok).toBe(true);
+			expect(cleanCheckPayload.data.changed_files).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("generate mutation is approval-gated for restricted callers but check is allowed", async () => {
+		const root = createProjectRoot();
+		try {
+			const denied = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"generate",
+					["--json"],
+					root,
+					denied.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			const deniedPayload = JSON.parse(denied.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: { code: string };
+			};
+			expect(deniedPayload.ok).toBe(false);
+			expect(deniedPayload.error.code).toBe("approval-required");
+			expect(
+				existsSync(join(root, ".afol", "data", "project-benchmarks")),
+			).toBe(false);
+
+			const check = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"generate",
+					["--check", "--json"],
+					root,
+					check.io,
+					agentOperationContext(),
+				),
+			).toBe(1);
+			expect(JSON.parse(check.stdout[0] ?? "{}").error.code).toBe(
+				"generated-output-stale",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("sorts scored outputs by overall score then focused score and id", async () => {
 		const root = createProjectRoot();
 		try {
 			addProjectCopy(root, "bbb", 5, "Same score second id.");
@@ -747,6 +1164,163 @@ describe("project-benchmark command", () => {
 		}
 	});
 
+	test("uses overall score to avoid overranking narrow project coverage", async () => {
+		const root = createProjectRoot();
+		try {
+			writeJson(axesPath(root), {
+				schema_version: "1.0.0",
+				axes: {
+					repo_context_map: {
+						weight: 15,
+						description: "Uses compact repository maps or context ranking",
+					},
+					safe_mutation: {
+						weight: 15,
+						description: "Controls edits and approvals",
+					},
+					agent_runtime: {
+						weight: 15,
+						description: "Supports agent runtime lifecycle.",
+					},
+				},
+			});
+			const broad = readProject(root);
+			broad.id = "broad";
+			broad.name = "Broad";
+			broad.source_refs = [
+				{
+					...(broad.source_refs?.[0] as Record<string, unknown>),
+					axes: ["repo_context_map", "safe_mutation", "agent_runtime"],
+				},
+			];
+			broad.similarity_axes = {
+				repo_context_map: { score: 4, evidence_refs: ["aider-repomap"] },
+				safe_mutation: { score: 4, evidence_refs: ["aider-repomap"] },
+				agent_runtime: { score: 4, evidence_refs: ["aider-repomap"] },
+			};
+			broad.lessons_for_afol = [
+				{
+					axis: "agent_runtime",
+					lesson: "Cover the runtime lifecycle explicitly.",
+				},
+			];
+			writeJson(projectPath(root, "broad"), broad);
+
+			const list = captureIo();
+			expect(
+				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
+			).toBe(0);
+			const payload = JSON.parse(list.stdout[0] ?? "{}") as {
+				data: {
+					projects: Array<{
+						id: string;
+						overall_score: number;
+						focused_score: number;
+					}>;
+				};
+			};
+			expect(payload.data.projects.map((project) => project.id)).toEqual([
+				"broad",
+				"aider",
+			]);
+			expect(payload.data.projects[0]).toMatchObject({
+				id: "broad",
+				overall_score: 80,
+				focused_score: 80,
+			});
+			expect(payload.data.projects[1]).toMatchObject({
+				id: "aider",
+				overall_score: 53,
+				focused_score: 80,
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("recommendations penalize stale and weaker evidence even with high axis score", async () => {
+		const root = createProjectRoot();
+		try {
+			const weakHighScore = readProject(root);
+			weakHighScore.source_access = "closed_source";
+			weakHighScore.confidence = "low";
+			weakHighScore.last_reviewed_at = "2020-01-01";
+			writeJson(projectPath(root), weakHighScore);
+			addProjectCopy(root, "open", 4, "Prefer open high-confidence evidence.");
+			const openReference = readProject(root, "open");
+			openReference.source_access = "open_source";
+			openReference.confidence = "high";
+			openReference.last_reviewed_at = "2026-06-16";
+			writeJson(projectPath(root, "open"), openReference);
+			addProjectCopy(root, "adjacent", 5, "Use only as an adjacent pattern.");
+			const adjacentReference = readProject(root, "adjacent");
+			adjacentReference.category = "adjacent_reference";
+			adjacentReference.source_access = "open_source";
+			adjacentReference.confidence = "high";
+			adjacentReference.last_reviewed_at = "2026-06-16";
+			writeJson(projectPath(root, "adjacent"), adjacentReference);
+
+			const recommend = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"recommend",
+					["--for", "repo_context_map", "--json"],
+					root,
+					recommend.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(recommend.stdout[0] ?? "{}") as {
+				data: {
+					top_references: Array<{
+						id: string;
+						axis_score: number;
+						recommendation_score: number;
+						risk_level: string;
+						risk_flags: string[];
+						warnings: string[];
+						do_not_copy: string[];
+					}>;
+				};
+			};
+			expect(payload.data.top_references[0]).toMatchObject({
+				id: "open",
+				axis_score: 4,
+				recommendation_score: 80,
+				risk_level: "low",
+			});
+			const adjacent = payload.data.top_references.find(
+				(entry) => entry.id === "adjacent",
+			);
+			expect(adjacent).toMatchObject({
+				axis_score: 5,
+				recommendation_score: 80,
+				risk_level: "medium",
+			});
+			expect(adjacent?.risk_flags).toContain("adjacent_reference");
+			const weakReference = payload.data.top_references.find(
+				(entry) => entry.id === "aider",
+			);
+			expect(weakReference?.axis_score).toBe(5);
+			expect(weakReference?.recommendation_score).toBeLessThan(80);
+			expect(weakReference?.risk_level).toBe("high");
+			expect(weakReference?.risk_flags).toEqual(
+				expect.arrayContaining(["stale", "low_confidence", "closed_source"]),
+			);
+			expect(weakReference?.warnings).toEqual(
+				expect.arrayContaining([
+					"stale",
+					"confidence=low",
+					"source_access=closed_source",
+				]),
+			);
+			expect(weakReference?.do_not_copy).toEqual([
+				"Do not copy chat-only workflow assumptions.",
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("show returns a compact text summary and structured not-found error", async () => {
 		const root = createProjectRoot();
 		try {
@@ -755,7 +1329,20 @@ describe("project-benchmark command", () => {
 				await runProjectBenchmarkCommand("show", ["aider"], root, text.io),
 			).toBe(0);
 			expect(text.stdout.join("\n")).toContain("aider: Aider");
-			expect(text.stdout.join("\n")).toContain("score=80");
+			expect(text.stdout.join("\n")).toContain("overall=80 focused=80");
+
+			const byName = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"show",
+					["Aider", "--json"],
+					root,
+					byName.io,
+				),
+			).toBe(0);
+			expect(JSON.parse(byName.stdout[0] ?? "{}").data.project.id).toBe(
+				"aider",
+			);
 
 			const missing = captureIo();
 			expect(
@@ -852,16 +1439,47 @@ describe("project-benchmark command", () => {
 				"unknown-axis",
 			);
 
+			const unknownMatrixAxis = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"matrix",
+					["--for", "missing_axis", "--json"],
+					root,
+					unknownMatrixAxis.io,
+				),
+			).toBe(1);
+			expect(JSON.parse(unknownMatrixAxis.stdout[0] ?? "{}").error.code).toBe(
+				"unknown-axis",
+			);
+
 			const raw = readProject(root);
 			raw.source_refs = [];
+			raw.similarity_axes = {};
+			raw.similarities = [];
+			raw.differences = [];
+			raw.lessons_for_afol = [];
+			raw.do_not_copy = [];
 			writeJson(projectPath(root), raw);
 
 			const list = captureIo();
 			expect(
 				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
 			).toBe(1);
-			expect(JSON.parse(list.stdout[0] ?? "{}").error.code).toBe(
-				"invalid-project-benchmark-catalog",
+			const listPayload = JSON.parse(list.stdout[0] ?? "{}") as {
+				error: { code: string };
+				data: { issues: Array<{ code: string }> };
+			};
+			expect(listPayload.error.code).toBe("invalid-project-benchmark-catalog");
+			expect(listPayload.data.issues.length).toBeGreaterThan(5);
+			expect(listPayload.data.issues.map((issue) => issue.code)).toEqual(
+				expect.arrayContaining([
+					"empty-similarity-axes",
+					"missing-source-refs",
+					"missing-similarities",
+					"missing-differences",
+					"missing-lessons",
+					"missing-do-not-copy",
+				]),
 			);
 
 			const validate = captureIo();
@@ -893,6 +1511,67 @@ describe("project-benchmark command", () => {
 			expect(payload.error.code).toBe("invalid-project-benchmark-catalog");
 			expect(payload.data.ok).toBe(false);
 			expect(payload.data.error_count).toBeGreaterThan(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("returns not-available when downstream repo has no project-benchmark catalog", async () => {
+		const root = createProjectRoot();
+		try {
+			rmSync(join(root, ".afol", "adm", "project-benchmarks"), {
+				recursive: true,
+				force: true,
+			});
+
+			const validate = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"validate",
+					["--json"],
+					root,
+					validate.io,
+				),
+			).toBe(1);
+			const validatePayload = JSON.parse(validate.stdout[0] ?? "{}") as {
+				error: { code: string };
+				data: { catalog_dir: string };
+			};
+			expect(validatePayload.error.code).toBe(
+				"project-benchmark-not-available",
+			);
+			expect(validatePayload.data.catalog_dir).toBe(
+				".afol/adm/project-benchmarks",
+			);
+
+			const list = captureIo();
+			expect(
+				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
+			).toBe(1);
+			expect(JSON.parse(list.stdout[0] ?? "{}").error.code).toBe(
+				"project-benchmark-not-available",
+			);
+
+			const generate = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"generate",
+					["--check", "--json"],
+					root,
+					generate.io,
+				),
+			).toBe(1);
+			expect(JSON.parse(generate.stdout[0] ?? "{}").error.code).toBe(
+				"project-benchmark-not-available",
+			);
+
+			const validateText = captureIo();
+			expect(
+				await runProjectBenchmarkCommand("validate", [], root, validateText.io),
+			).toBe(1);
+			expect(validateText.stderr.join("\n")).toContain(
+				"err project-benchmark-not-available",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

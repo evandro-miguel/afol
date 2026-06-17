@@ -46,6 +46,57 @@ describe("help formatter", () => {
 		expect(unknown).toBeNull();
 	});
 
+	test("formats project-benchmark help with safe and generated subcommands", () => {
+		const help = formatCommandHelp("pb", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected pb command help");
+		}
+		expect(help).toContain("Command: project-benchmark");
+		expect(help).toContain("Aliases: pb");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("list [read]");
+		expect(help).toContain("show <project-id> [read]");
+		expect(help).toContain("matrix --for <axis> [read]");
+		expect(help).toContain("recommend --for <axis> [read]");
+		expect(help).toContain("validate --strict [read]");
+		expect(help).toContain("generate --check [read]");
+		expect(help).toContain("generate [generated]");
+	});
+
+	test("formats ctx help with generated subcommands", () => {
+		const help = formatCommandHelp("ctx", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected ctx command help");
+		}
+		expect(help).toContain("Command: ctx");
+		expect(help).toContain("Aliases: cx");
+		expect(help).toContain("Side effect: generated");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("build [generated]");
+		expect(help).toContain("bundle [generated]");
+		expect(help).toContain("section --ref <ref> [generated]");
+		expect(help).toContain("explain [generated]");
+		expect(help).toContain("tools [generated]");
+	});
+
+	test("formats telemetry help with read-only subcommands", () => {
+		const help = formatCommandHelp("telemetry", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected telemetry command help");
+		}
+		expect(help).toContain("Command: telemetry");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("query --limit <n> [read]");
+		expect(help).toContain("report --limit <n> [read]");
+		expect(help).toContain("export --format jsonl [read]");
+	});
+
 	test("builds catalog json without fake aliases", () => {
 		const catalog = buildCommandCatalog(kernelRegistry);
 		const parsed = JSON.parse(formatCatalogJson(kernelRegistry)) as Array<{
@@ -64,9 +115,9 @@ describe("help formatter", () => {
 		expect(parsed.find((entry) => entry.command === "status")?.aliases).toEqual(
 			["s"],
 		);
-		expect(parsed.find((entry) => entry.command === "adm")?.aliases).toEqual(
-			[],
-		);
+		expect(parsed.find((entry) => entry.command === "adm")?.aliases).toEqual([
+			"ad",
+		]);
 		expect(
 			parsed.every((entry) => !entry.aliases.includes(entry.command)),
 		).toBe(true);
@@ -84,5 +135,89 @@ describe("help formatter", () => {
 			category: "core",
 		});
 		expect(buildCommandHelpJson("nope", kernelRegistry)).toBeNull();
+	});
+
+	test("builds project-benchmark json with subcommand metadata", () => {
+		const help = buildCommandHelpJson("pb", kernelRegistry);
+		expect(help).not.toBeNull();
+		expect(help?.subcommands).toEqual([
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List scored reference projects",
+			},
+			{
+				usage: "show <project-id>",
+				sideEffect: "read",
+				description: "Inspect one reference project by id or name",
+			},
+			{
+				usage: "matrix --for <axis>",
+				sideEffect: "read",
+				description:
+					"Filter the score matrix by axis; omit --for for the full matrix",
+			},
+			{
+				usage: "recommend --for <axis>",
+				sideEffect: "read",
+				description: "Rank the best reference projects for one axis",
+			},
+			{
+				usage: "validate --strict",
+				sideEffect: "read",
+				description:
+					"Fail validation on warnings; omit --strict for standard validation",
+			},
+			{
+				usage: "generate --check",
+				sideEffect: "read",
+				description: "Check generated outputs without writing files",
+			},
+			{
+				usage: "generate",
+				sideEffect: "generated",
+				description: "Refresh generated outputs with local approval",
+			},
+		]);
+	});
+
+	test("builds ctx json with generated subcommand metadata", () => {
+		const help = buildCommandHelpJson("ctx", kernelRegistry);
+		expect(help).not.toBeNull();
+		expect(help).toEqual({
+			command: "ctx",
+			aliases: ["cx"],
+			kind: "ctx",
+			sideEffect: "generated",
+			description: "Inspect context bundles",
+			category: "inspect",
+			subcommands: [
+				{
+					usage: "build",
+					sideEffect: "generated",
+					description: "Rebuild the section index",
+				},
+				{
+					usage: "bundle",
+					sideEffect: "generated",
+					description: "Build a context bundle and refresh sections if needed",
+				},
+				{
+					usage: "section --ref <ref>",
+					sideEffect: "generated",
+					description: "Read one section and refresh sections if needed",
+				},
+				{
+					usage: "explain",
+					sideEffect: "generated",
+					description: "Explain bundle inputs and refresh sections if needed",
+				},
+				{
+					usage: "tools",
+					sideEffect: "generated",
+					description: "List context helpers and refresh sections if needed",
+				},
+			],
+		});
 	});
 });

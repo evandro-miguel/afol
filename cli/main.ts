@@ -72,6 +72,52 @@ const exit = (code: number): never => {
 	process.exit(code);
 };
 
+export const DIRECT_DISPATCH_KINDS = Object.freeze([
+	"bootstrap",
+	"init",
+	"validate",
+	"status",
+	"new",
+	"start",
+	"evidence",
+	"done",
+	"log",
+	"quickTask",
+	"verifyTasks",
+	"rule",
+	"skill",
+	"update",
+	"close",
+	"file",
+	"localState",
+	"catchup",
+	"preflight",
+]);
+
+export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
+	"adm",
+	"health",
+	"db",
+	"doctor",
+	"maintenance",
+	"pstr",
+	"schema",
+	"session",
+	"bench",
+	"projectBenchmark",
+	"sweep",
+	"spec",
+	"adr",
+	"changelog",
+	"ctx",
+	"library",
+	"memory",
+	"state",
+	"adapter",
+	"telemetry",
+	"hydrate",
+]);
+
 function resolveValidateMode(
 	projectRoot: string,
 	args: string[],
@@ -347,6 +393,8 @@ export async function main(argv: string[]): Promise<number> {
 				resolution.action,
 				resolution.args,
 				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "sweep") {
@@ -424,11 +472,10 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "hydrate") {
-			return runHydrateCommand(
-				"hydrate",
-				[resolution.action, ...resolution.args],
-				project.value.root,
-			);
+			const hydrateArgs = resolution.action
+				? [resolution.action, ...resolution.args]
+				: resolution.args;
+			return runHydrateCommand("hydrate", hydrateArgs, project.value.root);
 		}
 		console.error(
 			`err unknown-group group=${resolution.group} action=${resolution.action} hint="run afol -h"`,

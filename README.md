@@ -13,7 +13,7 @@ system has been retired and must not be restored.
 - `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`: static
   scaffold metadata.
 - `.agents/rules/**`, `.agents/source/**`: static protocol/source seed
-- `.afol/skills/**`: project-local skills
+- `.agents/skills/**`: project-local provider skills
   scaffold guidance and skill seed content.
 - `.afol/**`: mutable AFOL-owned state, including workbench sessions, indexes,
   events, mutations, temporary files, benchmark catalog/results, and migration

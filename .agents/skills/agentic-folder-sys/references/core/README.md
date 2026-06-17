@@ -89,7 +89,7 @@ Before applying a receiving-project update, produce a compact inventory:
 - present static scaffold metadata: `.agents/config.json`,
   `.agents/lock.json`, `.agents/manifest.json`, `.agents/rules/**`,
   `.agents/source/**`
-- present mutable AFOL state: `.afol/wb/**`, `.afol/skills/**`,
+- present mutable AFOL state: `.afol/wb/**`, `.agents/skills/**`,
   `.afol/data/**`, `.afol/tmp/**`, `.afol/adm/**`, `.afol/pstr/**`
 - retired Python/runtime files: `.agents/agents`, `.agents/agents-mcp`,
   `.agents/scripts/**`, `.agents/runtime/**`, old Python metadata/cache files
@@ -144,7 +144,7 @@ and `.agents/z-arq` under
 Without both flags, AFOL preserves these paths.
 
 Inspect before cleanup. If a legacy file contains useful project-owned content,
-convert it into `AGENTS.md`, `.afol/adm/**`, `.afol/skills/**`, or project docs
+convert it into `AGENTS.md`, `.afol/adm/**`, `.agents/skills/**`, or project docs
 instead of deleting it.
 
 ## 6. Path Contract After Install
@@ -162,7 +162,7 @@ Default provider-compatible layout:
 
 - static scaffold metadata: `.agents/config.json`, `.agents/lock.json`,
   `.agents/manifest.json`, `.agents/rules/**`, `.agents/source/**`
-- mutable state: `.afol/wb/**`, `.afol/skills/**`, `.afol/data/**`,
+- mutable state: `.afol/wb/**`, `.agents/skills/**`, `.afol/data/**`,
   `.afol/tmp/**`, `.afol/adm/**`, `.afol/pstr/**`
 
 ## 7. Minimal Validation

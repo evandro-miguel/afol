@@ -35,7 +35,7 @@ function createValidationFixture(): string {
 	const agentsDir = join(root, ".agents");
 
 	mkdirSync(join(agentsDir, "rules"), { recursive: true });
-	mkdirSync(join(root, ".afol", "skills"), { recursive: true });
+	mkdirSync(join(agentsDir, "skills"), { recursive: true });
 	mkdirSync(join(root, ".afol", "adm"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc"), { recursive: true });

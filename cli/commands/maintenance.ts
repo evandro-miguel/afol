@@ -80,20 +80,20 @@ export async function runMaintenanceCommand(
 								ok: true,
 								mode: parsed.mode,
 								dry_run: parsed.dryRun,
-								...result,
+								actions: result.actions,
+								plan_only: result.planOnly,
 							},
 							`maintenance.${parsed.mode}`,
 							0,
 						),
-						["ok", "mode", "dry_run", "actions", "applied"],
+						["ok", "mode", "dry_run", "actions", "plan_only"],
 					),
 				),
 			);
 		} else {
 			io.stdout(
 				[
-					`maintenance ${parsed.mode}: ${parsed.dryRun ? "dry-run" : "suggestions"}`,
-					`applied: ${result.applied}`,
+					`maintenance ${parsed.mode} plan${parsed.dryRun ? " (dry-run)" : ""}:`,
 					...result.actions.map((action) => `  - ${action}`),
 				].join("\n"),
 			);

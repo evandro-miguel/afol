@@ -147,15 +147,8 @@ Type hints, generics, protocols, and static checking guidance.
 make skills-sync SKILLS=new-skill
 make skills-update SKILLS=new-skill
 
-# Ensure the scaffold-operating skill is available locally
-./.agents/agents skills-sync ensure agentic-folder-sys --runtime codex --pull
-
-# Or individual commands
-./.agents/agents skills-sync pull
-./.agents/agents skills-sync apply --skills=new-skill
-
-# Propose a locally edited skill back through a branch/PR
-./.agents/agents skills-sync push new-skill --branch skills-sync/new-skill --commit --push --pr
+# Inspect installed skills
+afol sk
 ```
 
 ## Skill Definition Format
@@ -189,7 +182,7 @@ Usage examples.
 
 - [agents-skills-sync.md](../agentic/agents-skills-sync.md) - Skills synchronization
 - `.agents/skills/agentic-folder-sys/` - Canonical scaffold and workbench operation skill
-- `.agents/agents.config` - Skills configuration
+- `.agents/config.json` - Skills configuration
 
 ---
 

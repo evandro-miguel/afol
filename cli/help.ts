@@ -1,6 +1,7 @@
 import {
 	type CommandCategory,
 	type CommandSpec,
+	type CommandSubcommandSpec,
 	kernelRegistry,
 } from "./registry";
 
@@ -31,19 +32,27 @@ export type CommandCatalogEntry = {
 	sideEffect: CommandSpec["sideEffect"];
 	description: string;
 	category: CommandCategory | "uncategorized";
+	subcommands?: CommandSubcommandSpec[];
 };
 
 export function buildCommandCatalog(
 	registry = kernelRegistry,
 ): CommandCatalogEntry[] {
-	return registry.commands.map((spec) => ({
-		command: spec.command,
-		aliases: [...spec.aliases],
-		kind: spec.kind,
-		sideEffect: spec.sideEffect,
-		description: spec.description,
-		category: spec.category ?? "uncategorized",
-	}));
+	return registry.commands.map((spec) => {
+		const entry: CommandCatalogEntry = {
+			command: spec.command,
+			aliases: [...spec.aliases],
+			kind: spec.kind,
+			sideEffect: spec.sideEffect,
+			description: spec.description,
+			category: spec.category ?? "uncategorized",
+		};
+		const subcommands = spec.subcommands?.map((entry) => ({ ...entry }));
+		if (subcommands !== undefined) {
+			entry.subcommands = subcommands;
+		}
+		return entry;
+	});
 }
 
 export function formatCatalogJson(registry = kernelRegistry): string {
@@ -61,7 +70,7 @@ export function buildCommandHelpJson(
 		return null;
 	}
 
-	return {
+	const entry: CommandCatalogEntry = {
 		command: spec.command,
 		aliases: [...spec.aliases],
 		kind: spec.kind,
@@ -69,6 +78,11 @@ export function buildCommandHelpJson(
 		description: spec.description,
 		category: spec.category ?? "uncategorized",
 	};
+	const subcommands = spec.subcommands?.map((entry) => ({ ...entry }));
+	if (subcommands !== undefined) {
+		entry.subcommands = subcommands;
+	}
+	return entry;
 }
 
 export function formatCommandHelp(
@@ -86,6 +100,15 @@ export function formatCommandHelp(
 		`Category: ${spec.category ?? "uncategorized"}`,
 		`Side effect: ${spec.sideEffect}`,
 		`Description: ${spec.description}`,
+		...(spec.subcommands?.length
+			? [
+					"Subcommands:",
+					...spec.subcommands.map(
+						(entry) =>
+							`  ${entry.usage} [${entry.sideEffect}] - ${entry.description}`,
+					),
+				]
+			: []),
 	].join("\n");
 }
 
@@ -123,7 +146,7 @@ export function formatHelpText(registry = kernelRegistry): string {
 	lines.push(
 		"",
 		"Flags",
-		"  -j, --json  JSON output for status",
+		"  -j, --json  JSON output when supported",
 		"Aliases",
 		"  a=afol",
 	);

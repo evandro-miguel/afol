@@ -4,7 +4,7 @@ id: 260323_1704_universal-skills-runtime-integration_spec_01
 theme: universal-skills-runtime-integration
 status: superseded
 superseded_by: 260521_0000_total-reformulation-strategy_spec_01
-superseded_note: "Superseded by the total reformulation strategy (260521_0000); its concerns were redesigned into the F-01..F-18 feature set (skills integration moved to .afol/skills under F-10)."
+superseded_note: "Superseded by the total reformulation strategy (260521_0000); its concerns were redesigned into the F-01..F-18 feature set (skills integration moved to .agents/skills under F-10)."
 owners:
 - orchestrator
 created_at: '2026-03-23T17:04:00Z'

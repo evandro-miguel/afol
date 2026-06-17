@@ -8,6 +8,7 @@ import {
 } from "../core/envelope";
 import {
 	buildContextBundle,
+	getSectionIndex,
 	rebuildSectionIndex,
 	resolveSection,
 } from "../services/context";
@@ -29,7 +30,13 @@ const DEFAULT_IO: CommandIo = {
 	stderr: (message) => console.error(message),
 };
 
-type ContextAction = "build" | "tools" | "bundle" | "section" | "explain";
+type ContextAction =
+	| "summary"
+	| "build"
+	| "tools"
+	| "bundle"
+	| "section"
+	| "explain";
 
 type ParsedArgs = {
 	json: boolean;
@@ -51,7 +58,10 @@ const MODES: readonly ContextRetrievalMode[] = [
 ];
 
 function normalizeAction(value: string | undefined): ContextAction {
-	if (!value || value === "build" || value === "b") {
+	if (!value) {
+		return "summary";
+	}
+	if (value === "build" || value === "b") {
 		return "build";
 	}
 	if (value === "tools" || value === "t") {
@@ -67,6 +77,16 @@ function normalizeAction(value: string | undefined): ContextAction {
 		return "explain";
 	}
 	throw new Error(`Unknown ctx action: ${value}`);
+}
+
+function formatSummary(root: string): string {
+	const sectionCount = getSectionIndex(root)?.sections.length ?? 0;
+	return [
+		"ctx: choose an action",
+		"actions: build, bundle, section, tools, explain",
+		`sections: ${sectionCount}`,
+		"hint: run afol ctx build to rebuild the section index",
+	].join("\n");
 }
 
 function parseArgs(args: string[]): ParsedArgs {
@@ -290,10 +310,28 @@ export async function runContextCommand(
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
 ): Promise<number> {
-	const wantsJson = args.some((value) => value === "--json" || value === "-j");
+	const ctxArgs = action?.startsWith("-") ? [action, ...args] : args;
+	const wantsJson = ctxArgs.some(
+		(value) => value === "--json" || value === "-j",
+	);
 	try {
-		const ctxAction = normalizeAction(action);
-		const parsed = parseArgs(args);
+		const ctxAction =
+			action && !action.startsWith("-") ? normalizeAction(action) : "summary";
+		const parsed = parseArgs(ctxArgs);
+
+		if (ctxAction === "summary") {
+			if (parsed.json) {
+				writeJsonOk(io, ctxAction, {
+					actions: ["build", "bundle", "section", "tools", "explain"],
+					sections: getSectionIndex(projectRoot)?.sections.length ?? 0,
+					write_actions: ["build"],
+					hint: "run afol ctx build to rebuild the section index",
+				});
+			} else {
+				io.stdout(formatSummary(projectRoot));
+			}
+			return 0;
+		}
 
 		if (ctxAction === "build") {
 			const snapshot = rebuildSectionIndex(projectRoot);

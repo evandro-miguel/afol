@@ -20,7 +20,6 @@ export type CommandKind =
 	| "ctx"
 	| "state"
 	| "hydrate"
-	| "render"
 	| "library"
 	| "memory"
 	| "adm"
@@ -44,6 +43,12 @@ export type CommandSideEffect = "read" | "write" | "append" | "generated";
 
 export type CommandCategory = "core" | "workflow" | "inspect" | "ops";
 
+export type CommandSubcommandSpec = {
+	usage: string;
+	sideEffect: CommandSideEffect;
+	description: string;
+};
+
 export type CommandSpec = {
 	command: string;
 	aliases: readonly string[];
@@ -51,6 +56,7 @@ export type CommandSpec = {
 	sideEffect: CommandSideEffect;
 	description: string;
 	category?: CommandCategory;
+	subcommands?: readonly CommandSubcommandSpec[];
 };
 
 const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
@@ -72,7 +78,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "init",
-		aliases: [],
+		aliases: ["i"],
 		kind: "init",
 		sideEffect: "write",
 		description: "Install the scaffold",
@@ -112,7 +118,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "quick-task",
-		aliases: [],
+		aliases: ["qt"],
 		kind: "quickTask",
 		sideEffect: "write",
 		description:
@@ -185,7 +191,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "verify-tasks",
-		aliases: [],
+		aliases: ["vt"],
 		kind: "verifyTasks",
 		sideEffect: "read",
 		description: "Verify workbench tasks",
@@ -211,13 +217,40 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		command: "ctx",
 		aliases: ["cx"],
 		kind: "ctx",
-		sideEffect: "read",
+		sideEffect: "generated",
 		description: "Inspect context bundles",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "build",
+				sideEffect: "generated",
+				description: "Rebuild the section index",
+			},
+			{
+				usage: "bundle",
+				sideEffect: "generated",
+				description: "Build a context bundle and refresh sections if needed",
+			},
+			{
+				usage: "section --ref <ref>",
+				sideEffect: "generated",
+				description: "Read one section and refresh sections if needed",
+			},
+			{
+				usage: "explain",
+				sideEffect: "generated",
+				description: "Explain bundle inputs and refresh sections if needed",
+			},
+			{
+				usage: "tools",
+				sideEffect: "generated",
+				description: "List context helpers and refresh sections if needed",
+			},
+		],
 	},
 	{
 		command: "state",
-		aliases: [],
+		aliases: ["stt"],
 		kind: "state",
 		sideEffect: "read",
 		description: "Inspect state snapshot",
@@ -225,7 +258,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "hydrate",
-		aliases: [],
+		aliases: ["hy"],
 		kind: "hydrate",
 		sideEffect: "generated",
 		description: "Generate hydrated project state",
@@ -234,9 +267,9 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	{
 		command: "render",
 		aliases: [],
-		kind: "render",
+		kind: "memory",
 		sideEffect: "generated",
-		description: "Render project artifacts",
+		description: "Deprecated alias for memory render",
 		category: "inspect",
 	},
 	{
@@ -257,7 +290,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "adm",
-		aliases: [],
+		aliases: ["ad"],
 		kind: "adm",
 		sideEffect: "read",
 		description: "Inspect adm paths and files",
@@ -265,7 +298,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "spec",
-		aliases: [],
+		aliases: ["sp"],
 		kind: "spec",
 		sideEffect: "read",
 		description: "Inspect specs",
@@ -281,7 +314,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "changelog",
-		aliases: [],
+		aliases: ["cl"],
 		kind: "changelog",
 		sideEffect: "read",
 		description: "Inspect changelog entries",
@@ -305,7 +338,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "doctor",
-		aliases: [],
+		aliases: ["dr"],
 		kind: "doctor",
 		sideEffect: "read",
 		description: "Inspect doctor checks",
@@ -313,7 +346,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "maintenance",
-		aliases: [],
+		aliases: ["mt"],
 		kind: "maintenance",
 		sideEffect: "read",
 		description: "Run maintenance checks",
@@ -321,7 +354,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "sweep",
-		aliases: [],
+		aliases: ["sw"],
 		kind: "sweep",
 		sideEffect: "read",
 		description: "Run repository sweep checks",
@@ -329,7 +362,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "schema",
-		aliases: [],
+		aliases: ["sc"],
 		kind: "schema",
 		sideEffect: "read",
 		description: "Inspect schema state",
@@ -337,7 +370,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "bench",
-		aliases: [],
+		aliases: ["be"],
 		kind: "bench",
 		sideEffect: "read",
 		description:
@@ -351,10 +384,49 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "generated",
 		description: "Compare AFOL against curated reference projects",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List scored reference projects",
+			},
+			{
+				usage: "show <project-id>",
+				sideEffect: "read",
+				description: "Inspect one reference project by id or name",
+			},
+			{
+				usage: "matrix --for <axis>",
+				sideEffect: "read",
+				description:
+					"Filter the score matrix by axis; omit --for for the full matrix",
+			},
+			{
+				usage: "recommend --for <axis>",
+				sideEffect: "read",
+				description: "Rank the best reference projects for one axis",
+			},
+			{
+				usage: "validate --strict",
+				sideEffect: "read",
+				description:
+					"Fail validation on warnings; omit --strict for standard validation",
+			},
+			{
+				usage: "generate --check",
+				sideEffect: "read",
+				description: "Check generated outputs without writing files",
+			},
+			{
+				usage: "generate",
+				sideEffect: "generated",
+				description: "Refresh generated outputs with local approval",
+			},
+		],
 	},
 	{
 		command: "catchup",
-		aliases: [],
+		aliases: ["cu"],
 		kind: "catchup",
 		sideEffect: "read",
 		description:
@@ -372,7 +444,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 	{
 		command: "adapter",
-		aliases: [],
+		aliases: ["adp"],
 		kind: "adapter",
 		sideEffect: "write",
 		description: "Enable or disable runtime adapters",
@@ -385,10 +457,27 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Query, report, and export AFOL telemetry events",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "query --limit <n>",
+				sideEffect: "read",
+				description: "Show recent telemetry events; defaults to latest 10",
+			},
+			{
+				usage: "report --limit <n>",
+				sideEffect: "read",
+				description: "Summarize telemetry counts by session, type, and outcome",
+			},
+			{
+				usage: "export --format jsonl",
+				sideEffect: "read",
+				description: "Export filtered telemetry events",
+			},
+		],
 	},
 	{
 		command: "session",
-		aliases: [],
+		aliases: ["ss"],
 		kind: "session",
 		sideEffect: "write",
 		description: "List, bind, switch, and unbind workbench sessions",
@@ -408,6 +497,12 @@ for (const spec of COMMAND_SPECS) {
 	aliasToCommand.set(spec.command, spec.command);
 	knownTokens.add(spec.command);
 	for (const alias of spec.aliases) {
+		const existing = aliasToCommand.get(alias);
+		if (existing && existing !== spec.command) {
+			throw new Error(
+				`Duplicate top-level alias "${alias}" for ${existing} and ${spec.command}`,
+			);
+		}
 		aliasToCommand.set(alias, spec.command);
 		knownTokens.add(alias);
 	}

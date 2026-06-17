@@ -262,12 +262,16 @@ export async function runMemoryCommand(
 			if (parsed.json) {
 				writeJsonOk(io, parsed.action, { entries }, ["entries"]);
 			} else {
-				io.stdout(
-					[
-						`memory entries: ${entries.length}`,
-						...entries.map(formatEntry),
-					].join("\n"),
-				);
+				const lines = [`memory entries: ${entries.length}`];
+				if (entries.length === 0) {
+					lines.push("path: .afol/memory/memory.md");
+					lines.push(
+						"hint: use afol memory add --id <id> --title <title> --body <text>",
+					);
+				} else {
+					lines.push(...entries.map(formatEntry));
+				}
+				io.stdout(lines.join("\n"));
 			}
 			return 0;
 		}

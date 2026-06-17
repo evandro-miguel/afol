@@ -96,14 +96,25 @@ describe("update command", () => {
 			expect(output.stdout.join("\n")).toContain(
 				"update check: changes available",
 			);
+			expect(output.stdout.join("\n")).toContain("current revision: old");
 			expect(output.stdout.join("\n")).toContain(
-				`revision old -> ${sourceLock.revision}`,
+				`source revision: ${sourceLock.revision}`,
 			);
-			expect(output.stdout.join("\n")).toContain("add command validate");
 			expect(output.stdout.join("\n")).toContain("ownership(current):");
 			expect(output.stdout.join("\n")).toContain("ownership(source):");
-			expect(output.stdout.join("\n")).toContain("diff previews:");
+			expect(output.stdout.join("\n")).toContain("operations:");
 			expect(output.stdout.join("\n")).toContain(
+				"hint: run afol update preview",
+			);
+			expect(output.stdout.join("\n")).not.toContain("diff previews:");
+
+			const verboseOutput = capture();
+			expect(
+				await runUpdateCommand(["check", "--verbose"], root, verboseOutput.io),
+			).toBe(0);
+			expect(verboseOutput.stdout.join("\n")).toContain("add command validate");
+			expect(verboseOutput.stdout.join("\n")).toContain("diff previews:");
+			expect(verboseOutput.stdout.join("\n")).toContain(
 				".agents/manifest.json [owner=managed] manifest commands changed",
 			);
 		} finally {

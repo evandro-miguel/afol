@@ -10,7 +10,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 - This repository was created from the minimal scaffold template.
 - The template owns local protocol files only: `AGENTS.md`,
   `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
-  `.agents/rules/`, `.afol/skills/` baseline, `.afol/wb/` baseline, and
+  `.agents/rules/`, `.agents/skills/` baseline, `.afol/wb/` baseline, and
   minimal docs.
 - Some sandbox providers make `.agents/` read-only. When this project was
   initialized with `afol init --provider-compatible` or
@@ -55,8 +55,8 @@ Replace this section after bootstrap with real product purpose and constraints.
   `paths.skills_dir`, `paths.tmp_dir`, and `paths.data_dir` before writing
   agent-owned state.
 - `.agents/rules/`: local operational contracts only.
-- `.afol/skills/` or configured `paths.skills_dir`: project-local skills only
-  when needed.
+- `.agents/skills/` or configured `paths.skills_dir`: project-local provider
+  skills only when needed.
 - `.afol/wb/` or configured `paths.wb_dir`: durable governed plan sessions
   for this downstream project only.
 - `.afol/`: provider-compatible mutable state when configured.
