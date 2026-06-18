@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Buffer } from "node:buffer";
 import {
 	DEFAULT_TEMPLATE_FILES,
 	DEFAULT_TEMPLATE_METADATA,
@@ -33,6 +34,23 @@ describe("generated template cleanliness", () => {
 			false,
 		);
 		expect(paths.some((path) => path.startsWith("docs/agentic/"))).toBe(false);
+	});
+
+	test("generated payload keeps project skills under .agents/skills", () => {
+		const paths = Object.keys(DEFAULT_TEMPLATE_FILES);
+		const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
+		expect(configEntry).toBeDefined();
+		expect(paths.some((path) => path.startsWith(".afol/skills/"))).toBe(false);
+		expect(paths).not.toContain(".afol/skills");
+
+		const config = JSON.parse(
+			Buffer.from(configEntry?.contentBase64 ?? "", "base64").toString("utf8"),
+		) as {
+			paths: { skills_dir: string };
+			skills_sync: { project_dir: string };
+		};
+		expect(config.paths.skills_dir).toBe(".agents/skills");
+		expect(config.skills_sync.project_dir).toBe(".agents/skills");
 	});
 
 	test("bootstrap planner never emits forbidden operations", () => {

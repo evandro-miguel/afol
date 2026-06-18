@@ -58,11 +58,13 @@ Replace this section after bootstrap with real product purpose and constraints.
   `paths.skills_dir`, `paths.tmp_dir`, and `paths.data_dir` before writing
   agent-owned state.
 - `.agents/rules/`: local operational contracts only.
-- `.agents/skills/` or configured `paths.skills_dir`: project-local provider
-  skills only when needed.
+- `.agents/skills/`: project-local provider skills only when needed.
+  `paths.skills_dir` must stay here or in a child path; do not create
+  `.afol/skills/`.
 - `.afol/wb/` or configured `paths.wb_dir`: durable governed plan sessions
   for this downstream project only.
-- `.afol/`: provider-compatible mutable state when configured.
+- `.afol/`: provider-compatible mutable state when configured; not a skills
+  root.
 - `.agents/source/universal-skills/`: local seed, not nested git.
 - `docs/`: project docs.
 - `docs/map/`: current-state evidence only.

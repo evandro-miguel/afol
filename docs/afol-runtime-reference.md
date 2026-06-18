@@ -75,7 +75,8 @@ agent context.
   scaffold metadata and root detection inputs.
 - `.agents/rules/**`: static local contracts.
 - `.agents/source/**`: static source seed content.
-- `.agents/skills/**`: project-local provider skills.
+- `.agents/skills/**`: project-local provider skills. `paths.skills_dir` must
+  stay here or in a child path; `.afol/skills/**` is not an active skills root.
 - `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and
   desired-state administration.
 - `.afol/pstr/**`: generated current project-structure maps.

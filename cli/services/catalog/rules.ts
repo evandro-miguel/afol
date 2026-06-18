@@ -278,7 +278,9 @@ export function listRules(
 		}
 		return fallbackRules(projectPaths);
 	}
-	const rawRules = Array.isArray(parsed.value) ? parsed.value : parsed.value.rules;
+	const rawRules = Array.isArray(parsed.value)
+		? parsed.value
+		: parsed.value.rules;
 	if (!Array.isArray(rawRules)) {
 		if (options.strictIndex === true) {
 			throw new RuleResolverError(

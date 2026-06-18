@@ -30,6 +30,8 @@ events, indexes, mutations, temporary files, benchmark catalog/results, and
 migration archives.
 
 Project-local provider skills live under `.agents/skills/**`.
+Do not create or use `.afol/skills/**`; `.afol/**` is mutable runtime state,
+not a project-local skills root.
 
 ## Project RAG
 

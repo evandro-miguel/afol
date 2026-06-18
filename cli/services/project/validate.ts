@@ -55,15 +55,73 @@ function validateConfig(projectRoot: string): ProjectValidationCheck {
 	const configPath = join(projectRoot, ".agents", "config.json");
 	if (existsSync(configPath)) {
 		const loaded = loadJsonObject(configPath);
-		return loaded.ok
-			? { id: "config", ok: true, message: `ok ${configPath}` }
-			: { id: "config", ok: false, message: loaded.error };
+		if (!loaded.ok) {
+			return { id: "config", ok: false, message: loaded.error };
+		}
+		const skillPathError = validateSkillPathConfig(loaded.value);
+		if (skillPathError) {
+			return {
+				id: "config",
+				ok: false,
+				message: `${configPath}: ${skillPathError}`,
+			};
+		}
+		return { id: "config", ok: true, message: `ok ${configPath}` };
 	}
 	return {
 		id: "config",
 		ok: false,
 		message: `missing .agents/config.json under ${projectRoot}`,
 	};
+}
+
+function nestedObject(
+	record: Record<string, unknown>,
+	key: string,
+): Record<string, unknown> | null {
+	const value = record[key];
+	return value !== null && typeof value === "object" && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: null;
+}
+
+function stringField(
+	record: Record<string, unknown>,
+	key: string,
+): string | null {
+	const value = record[key];
+	return typeof value === "string" ? value : null;
+}
+
+function normalizeConfigPath(path: string): string {
+	return path.replace(/\\/g, "/").replace(/\/+$/g, "").replace(/^\.\//, "");
+}
+
+function isProjectSkillPath(path: string): boolean {
+	const normalized = normalizeConfigPath(path);
+	return (
+		normalized === ".agents/skills" || normalized.startsWith(".agents/skills/")
+	);
+}
+
+function validateSkillPathConfig(
+	config: Record<string, unknown>,
+): string | null {
+	const paths = nestedObject(config, "paths");
+	const skillsSync = nestedObject(config, "skills_sync");
+	const skillsDir = paths ? stringField(paths, "skills_dir") : null;
+	const skillsSyncDir = skillsSync
+		? stringField(skillsSync, "project_dir")
+		: null;
+	for (const [field, value] of [
+		["paths.skills_dir", skillsDir],
+		["skills_sync.project_dir", skillsSyncDir],
+	] as const) {
+		if (value !== null && !isProjectSkillPath(value)) {
+			return `${field} must stay under .agents/skills; .afol/skills is not an active skills root`;
+		}
+	}
+	return null;
 }
 
 function validateJsonFile(

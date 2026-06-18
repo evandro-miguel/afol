@@ -19,6 +19,7 @@ export const TEMPLATE_FORBIDDEN_PATTERNS = [
 	".agents/tools/**",
 	".agents/agents",
 	".agents/agents-mcp",
+	".afol/skills/**",
 	"tests/**",
 	"docs/standards/**",
 	"docs/agentic/**",

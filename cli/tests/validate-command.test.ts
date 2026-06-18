@@ -178,6 +178,42 @@ describe("validate command", () => {
 		}
 	});
 
+	test("rejects skills_dir outside .agents/skills", async () => {
+		const root = createValidationFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					schema_version: 1,
+					project: { name: "validate-fixture" },
+					paths: {
+						skills_dir: ".afol/skills",
+					},
+					skills_sync: {
+						project_dir: ".afol/skills",
+					},
+				}),
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				checks: Array<{ id: string; ok: boolean; message?: string }>;
+			};
+			expect(payload.ok).toBe(false);
+			const configCheck = payload.checks.find((entry) => entry.id === "config");
+			expect(configCheck?.ok).toBe(false);
+			expect(configCheck?.message).toContain("paths.skills_dir");
+			expect(configCheck?.message).toContain(".agents/skills");
+			expect(configCheck?.message).toContain(".afol/skills");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("fails when local-state index snapshots are missing", async () => {
 		const root = createValidationFixture();
 		try {
