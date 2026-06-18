@@ -1,11 +1,17 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolveRules } from "../catalog/rules";
 import { listSkills, searchSkills } from "../catalog/skills";
 import { buildLibraryGraph, searchLibrary } from "../library";
 import { recallEntries } from "../memory";
 import { resolveProjectPaths } from "../project/paths";
 import { getPstrIndex, validatePstrIndex } from "../pstr";
+import {
+	deriveRuleSelectionContext,
+	RuleInjectionError,
+	resolveAndRecordRuleInjection,
+	resolveContextRules,
+	resolveRuleInjectionShape,
+} from "../rules/injection";
 import { loadSessionState, validateState } from "../state";
 import { getSectionIndex, rebuildSectionIndex } from "./section-index";
 import type {
@@ -21,8 +27,11 @@ type BuildOptions = {
 	task?: string;
 	role?: string;
 	surface?: string;
+	scope?: string;
+	filePath?: string;
 	mode?: ContextRetrievalMode;
 	trusted?: boolean;
+	persistRuleInjection?: boolean;
 };
 
 export class ContextTrustError extends Error {
@@ -129,6 +138,7 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 		bundle.task_id,
 		bundle.role,
 		bundle.surface,
+		bundle.file_path ?? "",
 		bundle.mode,
 		...bundle.refs.map(
 			(ref) => `${ref.domain}:${ref.path}:${ref.section ?? ""}`,
@@ -142,6 +152,22 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 		...bundle.library_refs,
 		...bundle.gaps,
 		...bundle.do_not_load,
+		bundle.rule_injection.identity,
+		bundle.rule_injection.state_path,
+		...bundle.rule_injection.injected.flatMap((rule) => [
+			rule.id,
+			rule.path,
+			rule.content,
+		]),
+		...bundle.rule_injection.already_injected.flatMap((rule) => [
+			rule.id,
+			rule.path,
+		]),
+		...bundle.rule_injection.omitted.flatMap((rule) => [
+			rule.id,
+			rule.path,
+			rule.reason,
+		]),
 		...(bundle.expanded_sections ?? []).flatMap((section) => [
 			section.ref,
 			section.title,
@@ -201,8 +227,19 @@ function selectExpandedSections(
 	});
 }
 
-function selectRules(root: string, surface: string): string[] {
-	return resolveRules(root, { surfaces: [surface], workType: "delivery" })
+function selectRules(
+	root: string,
+	options: Pick<BuildOptions, "surface" | "scope" | "filePath">,
+): string[] {
+	const surface = options.surface?.trim() || "general";
+	const scope = options.scope?.trim();
+	const filePath = options.filePath?.trim();
+	return resolveContextRules(root, {
+		workType: "delivery",
+		surface,
+		...(scope ? { scope } : {}),
+		...(filePath ? { filePath } : {}),
+	})
 		.slice(0, 5)
 		.map((rule) => rule.id);
 }
@@ -413,7 +450,18 @@ export function buildContextBundle(
 	opts: BuildOptions,
 ): ContextBundle {
 	const role = (opts.role ?? "worker").trim() || "worker";
-	const surface = (opts.surface ?? "general").trim() || "general";
+	const requestedSurface = opts.surface?.trim();
+	const scope = opts.scope?.trim();
+	const inferredContext = deriveRuleSelectionContext({
+		workType: "delivery",
+		...(requestedSurface ? { surface: requestedSurface } : {}),
+		...(scope ? { scope } : {}),
+		...(opts.filePath ? { filePath: opts.filePath } : {}),
+	});
+	const filePath = inferredContext.filePath;
+	const surface =
+		(requestedSurface || inferredContext.surfaces[0] || "general").trim() ||
+		"general";
 	const mode = opts.mode ?? "balanced";
 	const totalTokens = MODE_BUDGETS[mode];
 	const session = opts.session?.trim() || "";
@@ -425,6 +473,26 @@ export function buildContextBundle(
 	const state = session ? loadSessionState(root, session) : null;
 	const sections = selectSections(root, task, surface);
 	const compact = mode === "compact";
+	const rules = compact
+		? []
+		: selectRules(root, {
+				surface,
+				...(scope ? { scope } : {}),
+				...(filePath ? { filePath } : {}),
+			});
+	const ruleInjectionOptions = {
+		role,
+		surface,
+		workType: "delivery",
+		...(session ? { session } : {}),
+		...(taskId ? { task: taskId } : {}),
+		...(scope ? { scope } : {}),
+		...(filePath ? { filePath } : {}),
+	};
+	const ruleInjection =
+		opts.persistRuleInjection === true && !compact
+			? resolveAndRecordRuleInjection(root, ruleInjectionOptions)
+			: resolveRuleInjectionShape(root, ruleInjectionOptions);
 	const expandedSections =
 		mode === "deep" || mode === "tokenmax"
 			? selectExpandedSections(root, sections, mode)
@@ -433,6 +501,7 @@ export function buildContextBundle(
 		task_id: taskId,
 		role,
 		surface,
+		file_path: filePath,
 		mode,
 		refs: [
 			...(task
@@ -440,7 +509,7 @@ export function buildContextBundle(
 				: []),
 			...sections.map(refFromSection),
 		],
-		rules: compact ? [] : selectRules(root, surface),
+		rules,
 		skills: compact ? [] : selectSkills(root, surface, role),
 		tools: compact
 			? []
@@ -461,7 +530,10 @@ export function buildContextBundle(
 					state ? "" : "no hydrated session state",
 				].filter(Boolean),
 		do_not_load: doNotLoadList(),
+		rule_injection: ruleInjection,
 		...(expandedSections ? { expanded_sections: expandedSections } : {}),
 	};
 	return trimToBudget(bundle);
 }
+
+export { RuleInjectionError };

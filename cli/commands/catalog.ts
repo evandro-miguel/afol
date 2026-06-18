@@ -69,17 +69,40 @@ export async function runRuleCommand(
 					`rule: ${rule.id}`,
 					`name: ${rule.name}`,
 					`path: ${rule.path}`,
+					`scope: ${rule.scope ?? "none"}`,
+					`required: ${rule.required ? "true" : "false"}`,
+					`domains: ${rule.domains.join(",") || "none"}`,
 					`surfaces: ${rule.surfaces.join(",") || "none"}`,
 					`work_types: ${rule.workTypes.join(",") || "none"}`,
+					`languages: ${rule.languages.join(",") || "none"}`,
+					`file_globs: ${rule.fileGlobs.join(",") || "none"}`,
+					`exact_files: ${rule.exactFiles.join(",") || "none"}`,
+					`inject: ${rule.inject ?? "none"}`,
+					`char_count: ${rule.charCount}`,
 				].join("\n"),
 			);
 			return 0;
 		}
 		if (command === "resolve") {
+			const domains: string[] = [];
 			const surfaces: string[] = [];
+			const languages: string[] = [];
 			let workType = "delivery";
+			let filePath: string | undefined;
+			let scope: string | undefined;
+			let inject: string | undefined;
+			let required = false;
 			for (let index = 0; index < rest.length; index += 1) {
 				const value = rest[index];
+				if (value === "--domain" || value === "--domains") {
+					const next = rest[index + 1];
+					if (!next) {
+						throw new Error(`Missing value for ${value}.`);
+					}
+					domains.push(...splitCsv(next));
+					index += 1;
+					continue;
+				}
 				if (value === "--surface" || value === "--surfaces") {
 					const next = rest[index + 1];
 					if (!next) {
@@ -98,9 +121,67 @@ export async function runRuleCommand(
 					index += 1;
 					continue;
 				}
+				if (value === "--language" || value === "--languages") {
+					const next = rest[index + 1];
+					if (!next) {
+						throw new Error(`Missing value for ${value}.`);
+					}
+					languages.push(...splitCsv(next));
+					index += 1;
+					continue;
+				}
+				if (value === "--file") {
+					const next = rest[index + 1];
+					if (!next) {
+						throw new Error("Missing value for --file.");
+					}
+					filePath = next;
+					index += 1;
+					continue;
+				}
+				if (value === "--scope") {
+					const next = rest[index + 1];
+					if (!next) {
+						throw new Error("Missing value for --scope.");
+					}
+					scope = next;
+					index += 1;
+					continue;
+				}
+				if (value === "--inject") {
+					const next = rest[index + 1];
+					if (!next) {
+						throw new Error("Missing value for --inject.");
+					}
+					inject = next;
+					index += 1;
+					continue;
+				}
+				if (value === "--required") {
+					required = true;
+					continue;
+				}
 				throw new Error(`Unknown rule resolve argument: ${value}`);
 			}
-			const rules = resolveRules(projectRoot, { surfaces, workType });
+			const options: Parameters<typeof resolveRules>[1] = {
+				domains,
+				surfaces,
+				workType,
+				languages,
+			};
+			if (filePath) {
+				options.filePath = filePath;
+			}
+			if (scope) {
+				options.scope = scope;
+			}
+			if (inject) {
+				options.inject = inject;
+			}
+			if (required) {
+				options.required = true;
+			}
+			const rules = resolveRules(projectRoot, options);
 			io.stdout(
 				[`resolved rules: ${rules.length}`, ...rules.map(formatRule)].join(
 					"\n",

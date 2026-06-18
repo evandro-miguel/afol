@@ -23,5 +23,11 @@
   },
   "skills_sync": {
     "project_dir": ".agents/skills"
+  },
+  "rules": {
+    "resolver": {
+      "max_chars_per_rule": 2000,
+      "max_chars_total": 4000
+    }
   }
 }

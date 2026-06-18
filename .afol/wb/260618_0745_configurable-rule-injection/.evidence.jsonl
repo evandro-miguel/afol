@@ -1,1 +1,20 @@
 {"id":"E-20260618074708040-26c951","task_id":"T-01","created_at":"2026-06-18T11:47:08.040Z","command":"test -s .afol/wb/260618_0745_configurable-rule-injection/260618_0745_configurable-rule-injection_plan_01.md","result":"passed"}
+{"id":"E-20260618080904940-b7f8ac","task_id":"T-02","created_at":"2026-06-18T12:09:04.940Z","command":"bun test cli/tests/rule-command.test.ts","result":"passed"}
+{"id":"E-20260618080904989-205361","task_id":"T-02","created_at":"2026-06-18T12:09:04.989Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260618081032746-a8c44b","task_id":"T-02","created_at":"2026-06-18T12:10:32.746Z","command":"bun test cli/tests/rule-command.test.ts","result":"passed"}
+{"id":"E-20260618082731121-bce480","task_id":"T-03","created_at":"2026-06-18T12:27:31.121Z","command":"bun test cli/tests/context-system.test.ts","result":"passed"}
+{"id":"E-20260618082731180-9f859e","task_id":"T-03","created_at":"2026-06-18T12:27:31.180Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260618082853193-71711d","task_id":"T-03","created_at":"2026-06-18T12:28:53.193Z","command":"bun test cli/tests/context-system.test.ts cli/tests/rule-command.test.ts","result":"passed"}
+{"id":"E-20260618082853254-6fe9a1","task_id":"T-03","created_at":"2026-06-18T12:28:53.254Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260618082853315-a3abd4","task_id":"T-03","created_at":"2026-06-18T12:28:53.315Z","command":"bun run template:check","result":"passed"}
+{"id":"E-20260618123300224-4f2a10","task_id":"T-04","created_at":"2026-06-18T12:33:00.224Z","command":"./afol validate project","result":"passed"}
+{"id":"E-20260618123300284-8b31de","task_id":"T-04","created_at":"2026-06-18T12:33:00.284Z","command":"bun test cli/tests/context-system.test.ts cli/tests/rule-command.test.ts","result":"passed"}
+{"id":"E-20260618123300344-c19ef7","task_id":"T-04","created_at":"2026-06-18T12:33:00.344Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260618123330529-a54d62","task_id":"T-04","created_at":"2026-06-18T12:33:30.529Z","command":"./afol verify-tasks --strict","result":"passed"}
+{"id":"E-20260618083252726-f6b8a4","task_id":"T-03","created_at":"2026-06-18T12:32:52.726Z","command":"bun test cli/tests/context-system.test.ts cli/tests/rule-command.test.ts cli/tests/preflight-command.test.ts","result":"passed"}
+{"id":"E-20260618083252786-77e859","task_id":"T-03","created_at":"2026-06-18T12:32:52.786Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260618083252850-ed81e0","task_id":"T-03","created_at":"2026-06-18T12:32:52.850Z","command":"bunx @biomejs/biome check cli/services/catalog/rules.ts cli/tests/rule-command.test.ts cli/commands/catalog.ts cli/commands/context.ts cli/services/context/bundler.ts cli/services/context/types.ts cli/services/rules/injection.ts cli/tests/context-system.test.ts","result":"passed"}
+{"id":"E-20260618083252921-c0d848","task_id":"T-04","created_at":"2026-06-18T12:32:52.921Z","command":"bun test cli/tests/memory-crud.test.ts cli/tests/memory-command.test.ts cli/tests/library-system.test.ts cli/tests/context-system.test.ts cli/tests/rule-command.test.ts cli/tests/validate-internals.test.ts","result":"passed"}
+{"id":"E-20260618083252983-8c881c","task_id":"T-04","created_at":"2026-06-18T12:32:52.983Z","command":"bun run coverage:check","result":"passed"}
+{"id":"E-20260618083603990-5b42a8","task_id":"T-04","created_at":"2026-06-18T12:36:03.990Z","command":"bun test","result":"passed"}
+{"id":"E-20260618083604048-0f7295","task_id":"T-04","created_at":"2026-06-18T12:36:04.048Z","command":"bun run validate:release","result":"passed"}
