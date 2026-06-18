@@ -240,6 +240,25 @@ describe("kernel registry", () => {
 		]);
 	});
 
+	test("publishes local-state subcommand metadata", () => {
+		const localState = kernelRegistry.commands.find(
+			(entry) => entry.command === "local-state",
+		);
+
+		expect(localState?.subcommands).toEqual([
+			{
+				usage: "freshness|fs",
+				sideEffect: "read",
+				description: "Validate local-state snapshots without rebuilding",
+			},
+			{
+				usage: "rebuild|rb",
+				sideEffect: "generated",
+				description: "Rebuild local-state snapshots",
+			},
+		]);
+	});
+
 	test("publishes telemetry subcommand metadata", () => {
 		const telemetry = kernelRegistry.commands.find(
 			(entry) => entry.command === "telemetry",

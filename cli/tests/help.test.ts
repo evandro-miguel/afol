@@ -155,6 +155,20 @@ describe("help formatter", () => {
 		expect(help).toContain("export --format jsonl [read]");
 	});
 
+	test("formats local-state help with freshness and rebuild discovery", () => {
+		const help = formatCommandHelp("local-state", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected local-state command help");
+		}
+		expect(help).toContain("Command: local-state");
+		expect(help).toContain("Aliases: ls");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("freshness|fs [read]");
+		expect(help).toContain("rebuild|rb [generated]");
+	});
+
 	test("builds catalog json without fake aliases", () => {
 		const catalog = buildCommandCatalog(kernelRegistry);
 		const parsed = JSON.parse(formatCatalogJson(kernelRegistry)) as Array<{
@@ -274,6 +288,31 @@ describe("help formatter", () => {
 					usage: "tools",
 					sideEffect: "generated",
 					description: "List context helpers and refresh sections if needed",
+				},
+			],
+		});
+	});
+
+	test("builds local-state json with subcommand metadata", () => {
+		const help = buildCommandHelpJson("local-state", kernelRegistry);
+		expect(help).not.toBeNull();
+		expect(help).toEqual({
+			command: "local-state",
+			aliases: ["ls"],
+			kind: "localState",
+			sideEffect: "generated",
+			description: "Inspect local project indexes",
+			category: "inspect",
+			subcommands: [
+				{
+					usage: "freshness|fs",
+					sideEffect: "read",
+					description: "Validate local-state snapshots without rebuilding",
+				},
+				{
+					usage: "rebuild|rb",
+					sideEffect: "generated",
+					description: "Rebuild local-state snapshots",
 				},
 			],
 		});

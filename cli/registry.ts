@@ -233,6 +233,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "generated",
 		description: "Inspect local project indexes",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "freshness|fs",
+				sideEffect: "read",
+				description: "Validate local-state snapshots without rebuilding",
+			},
+			{
+				usage: "rebuild|rb",
+				sideEffect: "generated",
+				description: "Rebuild local-state snapshots",
+			},
+		],
 	},
 	{
 		command: "pstr",

@@ -266,7 +266,13 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "update") {
-		return runUpdateCommand(resolution.args, project.value.root);
+		return runUpdateCommand(
+			resolution.args,
+			project.value.root,
+			undefined,
+			undefined,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "close") {

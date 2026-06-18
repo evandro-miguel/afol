@@ -5,6 +5,11 @@ import {
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
 import { atomicWriteText } from "../services/io/atomic";
 import { withSessionLock } from "../services/io/session-lock";
 import {
@@ -385,6 +390,7 @@ export async function runUpdateCommand(
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
 	runtime: UpdateApplyRuntime = {},
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
 		const [rawCommand, ...rest] = args;
@@ -444,6 +450,11 @@ export async function runUpdateCommand(
 				return 0;
 			}
 			if (writableOperations.length > 0) {
+				if (requiresApproval(ctx)) {
+					throw new Error(
+						"Real update apply requires local interactive approval.",
+					);
+				}
 				requireApplyContext(parsedArgs);
 			}
 			applyUpdateOperations(
