@@ -820,7 +820,7 @@ describe("project-benchmark command", () => {
 		}
 	});
 
-	test("infers missing source-ref axes for legacy command catalogs", async () => {
+	test("strict validate rejects missing source-ref axes before operational inference", async () => {
 		const root = createProjectRoot();
 		try {
 			const raw = readProject(root);
@@ -841,8 +841,12 @@ describe("project-benchmark command", () => {
 					root,
 					validate.io,
 				),
-			).toBe(0);
-			expect(JSON.parse(validate.stdout[0] ?? "{}").data.ok).toBe(true);
+			).toBe(1);
+			const validation = JSON.parse(validate.stdout[0] ?? "{}");
+			expect(validation.data.ok).toBe(false);
+			expect(
+				validation.data.issues.map((issue: { code: string }) => issue.code),
+			).toContain("missing-source-ref-axes");
 
 			const matrix = captureIo();
 			expect(

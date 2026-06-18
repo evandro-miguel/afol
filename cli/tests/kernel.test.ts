@@ -147,6 +147,7 @@ function writeProjectBenchmarkCatalog(root: string): void {
 					title: "Aider repository map",
 					url: "https://aider.chat/docs/repomap.html",
 					source_type: "official_doc",
+					axes: ["repo_context_map"],
 					claim: "Aider documents a concise repository map.",
 				},
 			],

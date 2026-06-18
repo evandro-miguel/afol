@@ -3,7 +3,7 @@ doc_type: lesson_entry
 id: lesson_20260224_1832_enforce-rules-with-executable-gates
 status: active
 created_at: '2026-02-24T18:32:00-03:00'
-updated_at: '2026-02-24T18:32:00-03:00'
+updated_at: '2026-06-18T13:15:00-04:00'
 source: user_correction
 related_session: 260224_1253_execution-integrity-hardening
 ---
@@ -32,7 +32,7 @@ Every critical rule must have a deterministic automated check that can fail exec
 Before accepting agent execution as complete, run:
 
 ```bash
-./.agents/agents verify-tasks .afol/wb/<session> --strict
+afol verify-tasks --strict .afol/wb/<session>
 ```
 
 Completion is valid only when strict mode passes with zero errors.

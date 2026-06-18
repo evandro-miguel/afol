@@ -442,16 +442,14 @@ export async function runProjectBenchmarkCommand(
 		return 2;
 	}
 
-	const sourceCatalog = inferMissingSourceRefAxes(
-		loadProjectBenchmarkCatalog(projectRoot),
-	);
-	if (isProjectBenchmarkCatalogUnavailable(sourceCatalog)) {
-		writeUnavailableError(io, action, projectRoot, sourceCatalog, parsed.json);
+	const rawCatalog = loadProjectBenchmarkCatalog(projectRoot);
+	if (isProjectBenchmarkCatalogUnavailable(rawCatalog)) {
+		writeUnavailableError(io, action, projectRoot, rawCatalog, parsed.json);
 		return 1;
 	}
 
 	if (action === "validate") {
-		const validation = validateProjectBenchmarkCatalog(sourceCatalog);
+		const validation = validateProjectBenchmarkCatalog(rawCatalog);
 		const ok =
 			validation.ok && (!parsed.strict || validation.warning_count === 0);
 		const error = ok
@@ -482,6 +480,8 @@ export async function runProjectBenchmarkCommand(
 		}
 		return ok ? 0 : 1;
 	}
+
+	const sourceCatalog = inferMissingSourceRefAxes(rawCatalog);
 
 	if (action === "generate") {
 		if (!parsed.check && requiresApproval(ctx)) {
