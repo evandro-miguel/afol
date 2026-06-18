@@ -385,6 +385,9 @@ export function proposeTopic(
 	if (!trimmedTitle) {
 		throw new Error("Missing library topic title.");
 	}
+	if (existsSync(topicDir(root, normalized))) {
+		throw new Error(`Library topic already exists: ${normalized}`);
+	}
 	const validatedSources = sources.map(assertSource);
 	const topic: LibraryTopic = {
 		slug: normalized,

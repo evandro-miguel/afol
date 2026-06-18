@@ -262,13 +262,16 @@ function selectPstrRefs(root: string): string[] {
 	return index.maps.slice(0, 5).map((map) => `pstr:${map.id}`);
 }
 
-function bundleSearchQuery(
+function bundleSearchTerms(
 	taskId: string,
 	surface: string,
 	role: string,
-): string {
-	const queryParts = taskId ? [taskId, surface, role] : [surface, role];
-	return queryParts.filter(Boolean).join(" ").trim();
+): string[] {
+	return [
+		...new Set(
+			[taskId, surface, role].map((value) => value.trim()).filter(Boolean),
+		),
+	];
 }
 
 function selectMemoryRefs(
@@ -277,13 +280,22 @@ function selectMemoryRefs(
 	surface: string,
 	role: string,
 ): string[] {
-	const query = bundleSearchQuery(taskId, surface, role);
-	if (!query) {
-		return [];
+	const refs: string[] = [];
+	const seen = new Set<string>();
+	for (const query of bundleSearchTerms(taskId, surface, role)) {
+		for (const entry of recallEntries(root, query, { limit: 3 })) {
+			const ref = `memory:${entry.id}`;
+			if (seen.has(ref)) {
+				continue;
+			}
+			seen.add(ref);
+			refs.push(ref);
+			if (refs.length >= 3) {
+				return refs;
+			}
+		}
 	}
-	return recallEntries(root, query, { limit: 3 }).map(
-		(entry) => `memory:${entry.id}`,
-	);
+	return refs;
 }
 
 function selectLibraryRefs(
@@ -292,26 +304,41 @@ function selectLibraryRefs(
 	surface: string,
 	role: string,
 ): string[] {
-	const query = bundleSearchQuery(taskId, surface, role);
-	if (!query) {
+	const queries = bundleSearchTerms(taskId, surface, role);
+	if (queries.length === 0) {
 		return [];
 	}
-	const matches = searchLibrary(root, query);
-	const claimRefs = matches
-		.flatMap((result) =>
-			result.matching_claims.map(
-				(claim) => `library:${result.topic.slug}#${claim.id}`,
-			),
-		)
-		.slice(0, 3);
-	const matchedSlugs = new Set(matches.map((result) => result.topic.slug));
+	const claimRefs: string[] = [];
+	const seenClaims = new Set<string>();
+	const matchedSlugs = new Set<string>();
+	for (const query of queries) {
+		for (const result of searchLibrary(root, query)) {
+			matchedSlugs.add(result.topic.slug);
+			for (const claim of result.matching_claims) {
+				const ref = `library:${result.topic.slug}#${claim.id}`;
+				if (seenClaims.has(ref)) {
+					continue;
+				}
+				seenClaims.add(ref);
+				claimRefs.push(ref);
+				if (claimRefs.length >= 3) {
+					break;
+				}
+			}
+		}
+		if (claimRefs.length >= 3) {
+			break;
+		}
+	}
 	const matchedTopics = new Set(
-		matches.map((result) => `library:${result.topic.slug}`),
+		[...matchedSlugs].map((slug) => `library:${slug}`),
 	);
 	const graphRefs = buildLibraryGraph(root, { slugs: matchedSlugs })
 		.edges.filter((edge) => matchedTopics.has(edge.from))
+		.map((edge) => `library-graph:${edge.from}->${edge.to}[${edge.type}]`)
+		.filter((ref, index, items) => items.indexOf(ref) === index)
 		.slice(0, Math.max(0, 3 - claimRefs.length))
-		.map((edge) => `library-graph:${edge.from}->${edge.to}[${edge.type}]`);
+		.map((ref) => ref);
 	return [...claimRefs, ...graphRefs].slice(0, 3);
 }
 

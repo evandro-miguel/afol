@@ -442,6 +442,7 @@ describe("local-state project indexer", () => {
 					"|------|-------|-------|-------|",
 					"| T-01 | done | codex | rebuilt |",
 					"| T-02 | blocked | codex | waiting |",
+					"| T-03 | moved | codex | covered elsewhere |",
 					"",
 				].join("\n"),
 				"utf8",
@@ -501,7 +502,7 @@ describe("local-state project indexer", () => {
 			expect(rebuildPayload.command).toBe("rebuild");
 			expect(rebuildPayload.output).toBe("compact");
 			expect(rebuildPayload.summary?.workbench?.sessions).toBe(1);
-			expect(rebuildPayload.summary?.workbench?.tasks).toBe(2);
+			expect(rebuildPayload.summary?.workbench?.tasks).toBe(3);
 			expect(rebuildPayload.summary?.workbench?.open_tasks).toBe(1);
 			expect(rebuildPayload.summary?.workbench?.problem_tasks).toBe(1);
 			expect(rebuildPayload.summary?.rules?.count).toBe(2);
@@ -516,7 +517,7 @@ describe("local-state project indexer", () => {
 			expect(rebuildPayload.data?.command).toBe("rebuild");
 			expect(rebuildPayload.data?.output).toBe("compact");
 			expect(rebuildPayload.data?.summary?.workbench?.sessions).toBe(1);
-			expect(rebuildPayload.data?.summary?.workbench?.tasks).toBe(2);
+			expect(rebuildPayload.data?.summary?.workbench?.tasks).toBe(3);
 			expect(rebuildPayload.data?.summary?.workbench?.open_tasks).toBe(1);
 			expect(rebuildPayload.data?.summary?.workbench?.problem_tasks).toBe(1);
 			expect(rebuildPayload.data?.summary?.rules?.count).toBe(2);
@@ -564,7 +565,7 @@ describe("local-state project indexer", () => {
 				"workbench_index_v1",
 			);
 			expect(verbosePayload.snapshot?.workbench?.sessions).toHaveLength(1);
-			expect(verbosePayload.snapshot?.workbench?.tasks).toHaveLength(2);
+			expect(verbosePayload.snapshot?.workbench?.tasks).toHaveLength(3);
 			expect(verbosePayload.snapshot?.rules?.rules).toHaveLength(2);
 			expect(verbosePayload.snapshot?.skills?.skills).toHaveLength(2);
 			expect(verbosePayload.snapshot?.specs?.specs).toHaveLength(2);
@@ -575,7 +576,7 @@ describe("local-state project indexer", () => {
 			expect(verbosePayload.data?.snapshot?.workbench?.sessions).toHaveLength(
 				1,
 			);
-			expect(verbosePayload.data?.snapshot?.workbench?.tasks).toHaveLength(2);
+			expect(verbosePayload.data?.snapshot?.workbench?.tasks).toHaveLength(3);
 			expect(verbosePayload.data?.snapshot?.rules?.rules).toHaveLength(2);
 			expect(verbosePayload.data?.snapshot?.skills?.skills).toHaveLength(2);
 			expect(verbosePayload.data?.snapshot?.specs?.specs).toHaveLength(2);

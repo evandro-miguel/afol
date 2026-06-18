@@ -295,15 +295,25 @@ export function writeMemory(root: string, memory: MemoryFile): void {
 	atomicWriteText(path, memoryText(memory));
 }
 
+function findEntriesById(memory: MemoryFile, id: string): MemoryEntry[] {
+	const needle = id.trim().toLowerCase();
+	return memory.entries.filter((entry) => entry.id.toLowerCase() === needle);
+}
+
+function getUniqueEntry(memory: MemoryFile, id: string): MemoryEntry | null {
+	const matches = findEntriesById(memory, id);
+	if (matches.length > 1) {
+		throw new Error(`Duplicate memory entry id: ${id}`);
+	}
+	return matches[0] ?? null;
+}
+
 export function getEntry(root: string, id: string): MemoryEntry | null {
 	const memory = readMemory(root);
 	if (!memory) {
 		return null;
 	}
-	const needle = id.trim().toLowerCase();
-	return (
-		memory.entries.find((entry) => entry.id.toLowerCase() === needle) ?? null
-	);
+	return getUniqueEntry(memory, id);
 }
 
 export function addEntry(root: string, entry: MemoryEntry): void {
@@ -312,6 +322,9 @@ export function addEntry(root: string, entry: MemoryEntry): void {
 		entries: [],
 		updated_at: entry.updated_at,
 	};
+	if (findEntriesById(memory, entry.id).length > 0) {
+		throw new Error(`Memory entry already exists: ${entry.id}`);
+	}
 	writeMemory(root, {
 		updated_at: entry.updated_at,
 		entries: [...memory.entries, entry],
@@ -332,16 +345,18 @@ export function updateEntry(
 	if (!memory) {
 		return;
 	}
+	const current = getUniqueEntry(memory, id);
+	if (!current) {
+		return;
+	}
 	const needle = id.trim().toLowerCase();
 	const now = new Date().toISOString();
-	let found = false;
 	const entries = memory.entries.map((entry) => {
 		if (entry.id.toLowerCase() !== needle) {
 			return entry;
 		}
-		found = true;
 		return {
-			...entry,
+			...current,
 			...(typeof patch.title === "string" ? { title: patch.title } : {}),
 			...(typeof patch.body === "string" ? { body: patch.body } : {}),
 			...(patch.status ? { status: patch.status } : {}),
@@ -349,9 +364,6 @@ export function updateEntry(
 			updated_at: now,
 		};
 	});
-	if (!found) {
-		return;
-	}
 	writeMemory(root, { updated_at: now, entries });
 }
 
@@ -376,7 +388,9 @@ export function promoteEntry(root: string, id: string): void {
 		return;
 	}
 	if (current.status !== "proposed" && current.status !== "rejected") {
-		return;
+		throw new Error(
+			`Memory entry ${current.id} cannot be promoted from status ${current.status}.`,
+		);
 	}
 	updateEntry(root, id, { status: "active" });
 }

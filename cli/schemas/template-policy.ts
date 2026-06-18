@@ -40,6 +40,7 @@ export const TEMPLATE_ALLOWED_PATTERNS = [
 	".afol/adm/**",
 	".afol/data/**",
 	".afol/library/**",
+	".afol/memory/**",
 	".afol/tmp/**",
 	"docs/arc/**",
 	".afol/wb/**",

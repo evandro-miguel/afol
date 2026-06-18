@@ -4,9 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	addEntry,
+	getEntry,
 	invalidateEntry,
 	promoteEntry,
 	proposeEntry,
+	readMemory,
 	recallEntries,
 	rejectEntry,
 	renderMemory,
@@ -106,5 +108,85 @@ describe("memory crud", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("guards duplicate ids and rejects promote when status would not change", () => {
+		const root = createRoot();
+		try {
+			writeMemory(root, {
+				updated_at: "2026-06-13T00:00:00.000Z",
+				entries: [
+					{
+						id: "MEM-001",
+						title: "Alpha",
+						body: "Alpha body.",
+						status: "active",
+						created_at: "2026-06-13T00:00:00.000Z",
+						updated_at: "2026-06-13T00:00:00.000Z",
+						tags: [],
+					},
+					{
+						id: "MEM-DUP",
+						title: "Duplicate one",
+						body: "One.",
+						status: "proposed",
+						created_at: "2026-06-13T00:00:00.000Z",
+						updated_at: "2026-06-13T00:00:00.000Z",
+						tags: [],
+					},
+					{
+						id: "MEM-DUP",
+						title: "Duplicate two",
+						body: "Two.",
+						status: "proposed",
+						created_at: "2026-06-13T00:00:00.000Z",
+						updated_at: "2026-06-13T00:00:00.000Z",
+						tags: [],
+					},
+				],
+			});
+
+			expect(() =>
+				addEntry(root, {
+					id: "MEM-001",
+					title: "Again",
+					body: "Again.",
+					status: "active",
+					created_at: "2026-06-13T00:00:00.000Z",
+					updated_at: "2026-06-13T00:00:00.000Z",
+					tags: [],
+				}),
+			).toThrow("Memory entry already exists: MEM-001");
+			expect(() =>
+				proposeEntry(root, {
+					id: "MEM-001",
+					title: "Again",
+					body: "Again.",
+					created_at: "2026-06-13T00:00:00.000Z",
+					updated_at: "2026-06-13T00:00:00.000Z",
+					tags: [],
+				}),
+			).toThrow("Memory entry already exists: MEM-001");
+			expect(() => getEntry(root, "MEM-DUP")).toThrow(
+				"Duplicate memory entry id: MEM-DUP",
+			);
+			expect(() => updateEntry(root, "MEM-DUP", { title: "Nope" })).toThrow(
+				"Duplicate memory entry id: MEM-DUP",
+			);
+			expect(() => promoteEntry(root, "MEM-001")).toThrow(
+				"Memory entry MEM-001 cannot be promoted from status active.",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("exportable template ships valid initial memory", () => {
+		const templateRoot = join(process.cwd(), "src", "project-template");
+		expect(readMemory(templateRoot)).toEqual({
+			updated_at: "2026-06-18T00:00:00.000Z",
+			entries: [],
+		});
+		expect(renderMemory(templateRoot)).toContain("doc_type: project_memory");
 	});
 });

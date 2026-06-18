@@ -7,19 +7,19 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import {
-	collectSessionIds,
-	detectSessionHealth,
-	validateWorkBenchIndex,
-} from "../services/local-state/workbench-index";
-import {
 	validateFilesIndex,
 	validateRulesIndex,
 	validateSkillsIndex,
 	validateSpecsIndex,
 } from "../services/local-state/project-indexes";
-import { validatePstrIndex } from "../services/pstr/builder";
+import {
+	collectSessionIds,
+	detectSessionHealth,
+	validateWorkBenchIndex,
+} from "../services/local-state/workbench-index";
 import { resolveProjectPaths } from "../services/project/paths";
 import { loadProjectRoot } from "../services/project/root";
+import { validatePstrIndex } from "../services/pstr/builder";
 import {
 	type CatchupReport,
 	computeCatchup,
@@ -310,13 +310,16 @@ function normalizeGlobalMessage(message: string): {
 } {
 	const [validation, next] = message.split(/;\s+/, 2);
 	return {
-		validation:
-			(validation?.trim() || message).replace(/: (?:\.?\/|\/).*$/, "").trim(),
+		validation: (validation?.trim() || message)
+			.replace(/: (?:\.?\/|\/).*$/, "")
+			.trim(),
 		next: next?.trim() || null,
 	};
 }
 
-function collectGlobalStatusFindings(projectRoot: string): GlobalStatusFinding[] {
+function collectGlobalStatusFindings(
+	projectRoot: string,
+): GlobalStatusFinding[] {
 	const findings: GlobalStatusFinding[] = [];
 	const addFinding = (
 		scope: string,

@@ -10,12 +10,12 @@ export type GeneratedTemplateFile = {
 
 export const DEFAULT_TEMPLATE_METADATA = Object.freeze({
 	sourceRoot: "src/project-template",
-	sourceFileCount: 175,
-	includedFileCount: 175,
+	sourceFileCount: 176,
+	includedFileCount: 176,
 	excludedForbiddenCount: 0,
 	generatedAt: "1970-01-01T00:00:00.000Z",
 	templateHash:
-		"0f87f6f245cf22f5650cca3103395a8396c31b70b7854ca95a73a3881440a308",
+		"658b25d652a9722e2914504e56c20ed982c74dfbcecc74d740a4906a32e65c0e",
 	forbiddenPatterns: [
 		"a",
 		"Justfile",
@@ -807,6 +807,13 @@ export const DEFAULT_TEMPLATE_FILES: Readonly<
 			"IyBMaWJyYXJ5IFRhZ3MKCi0gYWZvbAotIHJlc2VhcmNoCi0gc291cmNlZC1jbGFpbQo=",
 		sha256: "aef9fb6efe58592288d9b95ce4d8ee71de2e4fdb2eaed215ad22f9a2515d6070",
 		bytes: 50,
+	},
+	".afol/memory/memory.md": {
+		path: ".afol/memory/memory.md",
+		contentBase64:
+			"LS0tCmRvY190eXBlOiBwcm9qZWN0X21lbW9yeQp1cGRhdGVkX2F0OiAyMDI2LTA2LTE4VDAwOjAwOjAwLjAwMFoKZW50cmllczogMAotLS0KCiMgUHJvamVjdCBNZW1vcnkKCiMjIGFjdGl2ZQo=",
+		sha256: "6a432511f37822a888519715a7832d32611a1d24f6267c05c45eb19dcb4cc51a",
+		bytes: 110,
 	},
 	".afol/tmp/README.md": {
 		path: ".afol/tmp/README.md",

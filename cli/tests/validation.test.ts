@@ -6,6 +6,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	rmSync,
 	symlinkSync,
 	unlinkSync,
 	writeFileSync,
@@ -473,44 +474,63 @@ describe("validation command family", () => {
 	});
 
 	test("v bench returns benchmark schema with scenario results", () => {
-		const proc = runKernel([
-			"v",
-			"bench",
-			"--pack",
-			"cli-kernel-local",
-			"--json",
-		]);
-		expect(proc.status).toBe(0);
-		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.mode).toBe("benchmark");
-		expect(payload.benchmark_result_schema_version).toBe("1.0.0");
-		expect(payload.status).toBe("passed");
-		expect(payload.pass).toBe(true);
-		expect(payload.summary).toEqual({
-			total: 6,
-			passed: 6,
-			failed: 0,
-			skipped: 0,
-			baseline_missing: 0,
-		});
-		const results = payload.results as Array<Record<string, unknown>>;
-		expect(results.length).toBeGreaterThanOrEqual(6);
-		const first = results[0];
-		if (!first) {
-			throw new Error("Expected at least one benchmark result");
+		const root = createValidationFixtureRoot();
+		try {
+			const proc = runKernel(
+				["v", "bench", "--pack", "cli-kernel-local", "--json"],
+				root,
+			);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("benchmark");
+			expect(payload.benchmark_result_schema_version).toBe("1.0.0");
+			expect(payload.status).toBe("passed");
+			expect(payload.pass).toBe(true);
+			expect(payload.summary).toEqual({
+				total: 6,
+				passed: 6,
+				failed: 0,
+				skipped: 0,
+				baseline_missing: 0,
+			});
+			const results = payload.results as Array<Record<string, unknown>>;
+			expect(results.length).toBeGreaterThanOrEqual(6);
+			const first = results[0];
+			if (!first) {
+				throw new Error("Expected at least one benchmark result");
+			}
+			expect(typeof first.scenario_id).toBe("string");
+			expect(typeof first.duration_ms).toBe("number");
+			expect(typeof first.status).toBe("string");
+			expect(typeof first.baseline_reference).toBe("string");
+			expect(
+				(first.baseline_reference as string).startsWith(
+					".afol/data/benchmarks/catalog/baselines/",
+				),
+			).toBe(true);
+			expect((first.baseline_reference as string).startsWith("/")).toBe(false);
+			expect(typeof first.threshold_reference).toBe("object");
+			expect(first.pass).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
-		expect(typeof first.scenario_id).toBe("string");
-		expect(typeof first.duration_ms).toBe("number");
-		expect(typeof first.status).toBe("string");
-		expect(typeof first.baseline_reference).toBe("string");
-		expect(
-			(first.baseline_reference as string).startsWith(
-				".afol/data/benchmarks/catalog/baselines/",
-			),
-		).toBe(true);
-		expect((first.baseline_reference as string).startsWith("/")).toBe(false);
-		expect(typeof first.threshold_reference).toBe("object");
-		expect(first.pass).toBe(true);
+	});
+
+	test("bench --pack aliases to validation benchmark contract", () => {
+		const root = createValidationFixtureRoot();
+		try {
+			const proc = runKernel(
+				["bench", "--pack", "cli-kernel-local", "--json"],
+				root,
+			);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("benchmark");
+			expect(payload.selected_pack_ids).toEqual(["cli-kernel-local"]);
+			expect(payload.pass).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	test(

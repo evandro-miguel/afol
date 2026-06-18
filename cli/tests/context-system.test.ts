@@ -670,6 +670,112 @@ describe("context system", () => {
 		}
 	});
 
+	test("buildContextBundle queries memory and library refs by separate terms with dedupe", () => {
+		const root = createBundleFixture();
+		try {
+			writeMemory(root, {
+				updated_at: "2026-06-13T00:00:00.000Z",
+				entries: [
+					{
+						id: "MEM-TASK",
+						title: "Task-only memory",
+						body: "T-01 isolated memory",
+						status: "active",
+						created_at: "2026-06-13T00:00:00.000Z",
+						updated_at: "2026-06-13T00:00:00.000Z",
+						tags: [],
+					},
+					{
+						id: "MEM-SURFACE",
+						title: "Surface-only memory",
+						body: "alpha isolated memory",
+						status: "active",
+						created_at: "2026-06-13T00:00:00.000Z",
+						updated_at: "2026-06-13T00:00:00.000Z",
+						tags: [],
+					},
+					{
+						id: "MEM-BOTH",
+						title: "Shared memory",
+						body: "T-01 alpha shared memory",
+						status: "active",
+						created_at: "2026-06-13T00:00:00.000Z",
+						updated_at: "2026-06-13T00:00:00.000Z",
+						tags: [],
+					},
+				],
+			});
+			proposeTopic(root, "alpha", "Alpha library", [
+				{
+					id: "SRC-ALPHA",
+					url: "https://example.com/alpha",
+					title: "Alpha source",
+					accessed_at: "2026-06-13T00:00:00.000Z",
+				},
+			]);
+			addClaim(root, "alpha", {
+				id: "CLAIM-BOTH",
+				text: "T-01 alpha shared claim",
+				source_ids: ["SRC-ALPHA"],
+				status: "current",
+				created_at: "2026-06-13T00:00:00.000Z",
+			});
+			proposeTopic(root, "task-only", "Task-only library", [
+				{
+					id: "SRC-TASK",
+					url: "https://example.com/task",
+					title: "Task source",
+					accessed_at: "2026-06-13T00:00:00.000Z",
+				},
+			]);
+			addClaim(root, "task-only", {
+				id: "CLAIM-TASK",
+				text: "T-01 isolated claim",
+				source_ids: ["SRC-TASK"],
+				status: "current",
+				created_at: "2026-06-13T00:00:00.000Z",
+			});
+			proposeTopic(root, "surface-only", "Surface-only library", [
+				{
+					id: "SRC-SURFACE",
+					url: "https://example.com/surface",
+					title: "Surface source",
+					accessed_at: "2026-06-13T00:00:00.000Z",
+				},
+			]);
+			addClaim(root, "surface-only", {
+				id: "CLAIM-SURFACE",
+				text: "alpha isolated claim",
+				source_ids: ["SRC-SURFACE"],
+				status: "current",
+				created_at: "2026-06-13T00:00:00.000Z",
+			});
+
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+			});
+
+			expect(bundle.memory_refs).toEqual([
+				"memory:MEM-TASK",
+				"memory:MEM-BOTH",
+				"memory:MEM-SURFACE",
+			]);
+			expect(bundle.library_refs).toContain("library:alpha#CLAIM-BOTH");
+			expect(bundle.library_refs).toContain("library:task-only#CLAIM-TASK");
+			expect(bundle.library_refs).toContain(
+				"library:surface-only#CLAIM-SURFACE",
+			);
+			expect(
+				bundle.library_refs.filter((ref) => ref === "library:alpha#CLAIM-BOTH"),
+			).toHaveLength(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("buildContextBundle includes current library claim refs and excludes invalidated claims", () => {
 		const root = createBundleFixture({ libraryRefs: true });
 		try {

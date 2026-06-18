@@ -360,6 +360,12 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "bench") {
+			if (resolution.action === "" && resolution.args.includes("--pack")) {
+				return runValidationCommand(project.value.root, [
+					"bench",
+					...resolution.args,
+				]);
+			}
 			return runBenchCommand(
 				resolution.action,
 				resolution.args,
