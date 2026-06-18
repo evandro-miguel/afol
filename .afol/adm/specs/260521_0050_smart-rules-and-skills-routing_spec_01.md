@@ -15,7 +15,7 @@ links:
   manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md
 scope:
   repo_areas:
-  - .agents/rules
+  - .afol/adm/rules
   - .agents/skills cli/rules cli/skills
   packages:
   - agentic-cli

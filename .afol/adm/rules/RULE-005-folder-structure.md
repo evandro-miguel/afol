@@ -22,7 +22,7 @@ docs/
 └── ...                     # Project docs owned outside runtime state
 
 .afol/
-├── adm/                    # Roadmap, specs, ADRs, strategy, desired state
+├── adm/                    # Roadmap, specs, hooks, rules, seeds, desired state
 ├── pstr/                   # Current project-structure maps only
 └── wb/                     # Governed execution sessions, evidence, indexes
 
@@ -30,8 +30,7 @@ docs/
 ├── config.json             # Static scaffold metadata
 ├── lock.json               # Static scaffold metadata
 ├── manifest.json           # Static scaffold metadata
-├── rules/                  # Static agent rules
-└── source/                 # Static source metadata
+└── skills/                 # Project-local provider skills
 
 src/
 └── project-template/       # Exportable downstream scaffold
@@ -44,13 +43,16 @@ src/
 | Path | Purpose |
 |------|---------|
 | `.afol/adm/` | Project direction, specs, decisions, strategy |
+| `.afol/adm/hooks/` | Static provider-neutral hook catalog |
+| `.afol/adm/rules/` | Static rules for agents |
+| `.afol/adm/source/` | Static source seed metadata |
+| `.afol/adm/tools.json` | Static AFOL command catalog |
 | `.afol/pstr/` | Current project-structure maps only |
 | `.afol/wb/` | Mutable sessions, events, evidence, indexes, benchmarks |
 | `.agents/config.json` | Static scaffold config metadata |
 | `.agents/lock.json` | Static scaffold lock metadata |
 | `.agents/manifest.json` | Static scaffold manifest metadata |
-| `.agents/rules/` | Static rules for agents |
-| `.agents/source/` | Static source metadata |
+| `.agents/skills/` | Project-local provider skills |
 | `src/project-template/` | Exportable template baseline |
 
 Mutable runtime state belongs under `.afol/`.
@@ -64,7 +66,7 @@ afol status
 afol local-state rebuild --json
 afol validate project --json
 afol verify-tasks --strict
-python -m json.tool .agents/tools.json
+python -m json.tool .afol/adm/tools.json
 ```
 
 ---
@@ -76,14 +78,15 @@ python -m json.tool .agents/tools.json
 - Use `.afol/wb/` for governed sessions.
 - Use `.afol/adm/` for durable project direction.
 - Use `.afol/pstr/` only for current-state structure maps.
-- Keep `.agents/` limited to retained static metadata.
+- Keep `.agents/` limited to retained static metadata and project-local skills.
 - Validate scaffold metadata after edits.
 
 **DON'T:**
 
 - Recreate discontinued command wrappers, Python runners, or compatibility adapters.
 - Put mutable session state under `.agents/`.
-- Store roadmap, specs, execution automation, or benchmark results under `.agents/`.
+- Store hooks, rules, seeds, roadmap, specs, execution automation, or benchmark
+  results under `.agents/`.
 - Leave static metadata pointing agents to retired entrypoints.
 
 ---

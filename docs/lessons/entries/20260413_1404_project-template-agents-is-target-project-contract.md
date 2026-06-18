@@ -16,7 +16,7 @@ tags:
 
 The exported `src/project-template/AGENTS.md` read like documentation about a
 template instead of the operating contract for the repository receiving it.
-It also did not make the expected folder structure and `.agents/rules/`
+It also did not make the expected folder structure and `.afol/adm/rules/`
 decision points explicit enough.
 
 ## Lesson
@@ -29,7 +29,7 @@ files without referring to itself as a template.
 
 When editing `src/project-template/AGENTS.md`, avoid template narration such as
 "this template". Use project placeholders, include the expected folder tree,
-and point agents to the mandatory `.agents/rules/` files they must follow.
+and point agents to the mandatory `.afol/adm/rules/` files they must follow.
 
 ## Guardrail
 

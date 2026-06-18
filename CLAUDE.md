@@ -18,13 +18,25 @@ documented, restored, or extended:
 - no `agents.config` YAML fallback
 - no `legacy:` command routing or delegate fallback
 
-Retained `.agents` content is static scaffold metadata only:
+Retained `.agents` content is limited to provider-facing metadata and
+project-local skills:
 
 - `.agents/config.json`
 - `.agents/lock.json`
 - `.agents/manifest.json`
-- `.agents/rules/**`
-- `.agents/source/**`
+- `.agents/skills/**`
+
+AFOL-owned static governance payloads live under `.afol/adm/**`, including:
+
+- `.afol/adm/hooks/**`
+- `.afol/adm/rules/**`
+- `.afol/adm/source/**`
+- `.afol/adm/tools.json`
+
+Project-local hooks under `.afol/adm/hooks/**` are static, provider-neutral
+context contribution metadata only. They do not execute scripts, install
+plugins, mutate lifecycle state, or restore discontinued `.agents` runtime
+surfaces.
 
 Mutable AFOL state belongs under `.afol/`, including workbench sessions,
 events, indexes, mutations, temporary files, benchmark catalog/results, and

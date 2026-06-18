@@ -18,7 +18,7 @@ scope:
   repo_areas:
   - docs/knowledge
   - .agents/scripts/agents-knowledge.py
-  - .agents/tools.json
+  - .afol/adm/tools.json
   - docs/standards
   packages:
   - knowledge reuse

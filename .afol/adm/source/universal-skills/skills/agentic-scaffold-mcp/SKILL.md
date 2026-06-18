@@ -15,6 +15,6 @@ afol verify-tasks --strict
 afol update check
 ```
 
-Keep `.agents/source/` as static metadata only. New runtime behavior belongs in
+Keep `.afol/adm/source/` as static metadata only. New runtime behavior belongs in
 the TypeScript AFOL implementation under `cli/**` and the downstream template
 under `src/project-template/`.

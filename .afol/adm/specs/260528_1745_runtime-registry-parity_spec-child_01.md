@@ -59,7 +59,7 @@ risk_level: low
 - Out of scope:
   - new MCP tools/resources/prompts/widgets
   - command-family expansion or CLI contract redesign
-  - broad `.agents/tools.json` redesign
+  - broad `.afol/adm/tools.json` redesign
 
 ## Risks and Mitigations
 

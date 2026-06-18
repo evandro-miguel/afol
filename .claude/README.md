@@ -34,7 +34,7 @@ just fix-symlinks MODE=copy
 ```
 
 This command repairs `.claude/skills` and `.claude/rules/default`.
-When symlink creation is unavailable, it replicates content from `.agents/skills` and `.agents/rules`.
+When symlink creation is unavailable, it replicates content from `.agents/skills` and `.afol/adm/rules`.
 
 ---
 

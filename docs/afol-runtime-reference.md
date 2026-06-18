@@ -73,8 +73,9 @@ agent context.
 
 - `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`: static
   scaffold metadata and root detection inputs.
-- `.agents/rules/**`: static local contracts.
-- `.agents/source/**`: static source seed content.
+- `.afol/adm/hooks/**`: static provider-neutral hook catalog.
+- `.afol/adm/rules/**`: static local contracts.
+- `.afol/adm/source/**`: static source seed content.
 - `.agents/skills/**`: project-local provider skills. `paths.skills_dir` must
   stay here or in a child path; `.afol/skills/**` is not an active skills root.
 - `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and
@@ -108,8 +109,32 @@ agent context.
 - Missing optional rule markdown is omitted with a reason; missing required
   rule markdown fails loudly; invalid injection state or invalid rules index
   also fails loudly.
-- `.agents/rules/**` content is static and must not be edited unless the user
+- `.afol/adm/rules/**` content is static and must not be edited unless the user
   explicitly requests a rule-content change.
+
+## Hooks
+
+Hooks are declarative context contributions stored in `.afol/adm/hooks/index.json`.
+They are provider-neutral metadata, not executable plugins.
+
+- `afol hook list`, `afol hook show <id>`, and `afol hook resolve` inspect the
+  static hook catalog.
+- `afol ctx bundle` resolves hooks for the `context.bundle` event using the same
+  delivery dimensions used by rules: role, surface, work type, scope, language,
+  and optional file path.
+- Hook entries may target `events`, `roles`, `surfaces`, `work_types`,
+  `languages`, `file_globs`, `exact_files`, and optional `scope`.
+- Contributions may add `messages`, `tools`, `validation_commands`,
+  `pstr_refs`, `memory_refs`, `library_refs`, and `do_not_load` guidance to the
+  context bundle.
+- Resolver limits come from `.agents/config.json` under
+  `hooks.resolver.max_chars_per_message` and `hooks.resolver.max_chars_total`;
+  defaults are `1000` and `3000`.
+- Missing `.afol/adm/hooks/index.json` means no hooks. Invalid JSON is ignored by
+  default listing but fails in strict resolver paths.
+- Hooks do not execute scripts, install skills/plugins, write lifecycle state,
+  or publish adapter side effects. Future lifecycle hooks must enter through
+  AFOL core event handling, not adapter-local trigger code or `.agents/scripts`.
 
 ## Validation Gates
 

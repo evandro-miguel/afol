@@ -182,7 +182,7 @@ just new THEME=feature-name FEATURE_ID=F-01 PARENT_SPEC=<parent-spec-id>
 #    finalize it before closure.
 
 # 8. Reuse prior findings when relevant
-rg "<query>" docs .afol .agents/rules
+rg "<query>" docs .afol .afol/adm/rules
 
 # 9. Start the task before product edits
 afol start --session <session-id> --task-id T-01

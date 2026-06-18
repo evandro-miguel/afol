@@ -53,7 +53,9 @@ afol verify-tasks --strict
 
 - Use `afol` for supported scaffold, validation, workbench, update, evidence,
   and lifecycle operations.
-- Keep `.agents/` as static scaffold metadata.
+- Keep `.agents/` limited to provider-facing metadata and project-local skills.
+- Keep AFOL-owned hooks, rules, source seeds, and command catalogs under
+  `.afol/adm/`.
 - Keep mutable runtime state under `.afol/`.
 - Do not add examples for retired entrypoints.
 
@@ -64,5 +66,8 @@ afol verify-tasks --strict
 | Location | Content |
 |----------|---------|
 | `AGENTS.md` | Repository-level AFOL policy |
-| `.agents/tools.json` | Static AFOL command catalog |
-| `.agents/rules/` | Static rule set |
+| `.afol/adm/tools.json` | Static AFOL command catalog |
+| `.afol/adm/rules/` | Static rule set |
+| `.afol/adm/hooks/` | Static provider-neutral hook catalog |
+| `.afol/adm/source/` | Static source seed metadata |
+| `.agents/skills/` | Project-local provider skills |

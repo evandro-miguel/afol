@@ -128,7 +128,7 @@ Out of scope:
 - A marketplace of tools.
 - Loading every skill or rule by default.
 - Depending on manual orchestration judgment for all routing.
-- Legacy `.agents/tools.json` as active operational state.
+- Legacy `.afol/adm/tools.json` as active operational state.
 
 ## 6) Child Spec Strategy
 

@@ -105,7 +105,7 @@ Touched layers:
 
 - Strategic docs (`docs/arc/`)
 - Templates and standards (`docs/`)
-- Workflow rules (`.agents/rules/`)
+- Workflow rules (`.afol/adm/rules/`)
 - Operational scripts and validators (`.agents/scripts/`)
 - Workbench execution artifacts (`.afol/wb/`)
 

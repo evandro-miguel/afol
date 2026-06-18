@@ -20,7 +20,7 @@ scope:
   - .agents/runtime
   - .agents/scripts
   - .agents/agents
-  - .agents/tools.json
+  - .afol/adm/tools.json
   - .agents/skills
   - docs
   - .github/workflows
@@ -41,7 +41,7 @@ risk_level: high
 
 ## 2) Problem
 
-- Agents and operators currently discover behavior through long docs, `.agents/tools.json`, wrapper help text, and many separate scripts.
+- Agents and operators currently discover behavior through long docs, `.afol/adm/tools.json`, wrapper help text, and many separate scripts.
 - Repeated operations such as workspace inspection, search, validation, safe archiving, text writes, patching, and undo are not exposed through a first-class MCP surface.
 - The script layer is difficult to refactor because public command behavior is coupled to standalone files rather than a shared runtime registry and service model.
 - Documentation, tool catalog entries, current-state maps, and verification gates can describe different realities.

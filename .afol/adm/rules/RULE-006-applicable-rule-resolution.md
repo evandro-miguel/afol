@@ -52,7 +52,7 @@ to chat memory alone.
 | Python code | Python project config, nearest tests, relevant Python skill |
 | TypeScript/JavaScript code | TS/JS project config if present, nearest tests, relevant TS/JS or UI skill |
 | Runtime command/tool | README, `docs/standards/`, runtime mirrors, command tests |
-| Tool discovery | `docs/agentic/agents-tools.md`, `.agents/tools.json` |
+| Tool discovery | `docs/agentic/agents-tools.md`, `.afol/adm/tools.json` |
 | Markdown docs | RULE-003, doc templates, `just lint` |
 | Folder or scaffold structure | RULE-005, `docs/map/`, bootstrap docs |
 | Validation or release gate | RULE-004 and affected command docs |

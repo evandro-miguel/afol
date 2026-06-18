@@ -22,17 +22,18 @@ Use `afol` commands only.
 
 ## 2. `.agents` Is Static Metadata, `.afol` Is Mutable State
 
-Retained `.agents/**` content is static provider metadata:
+Retained `.agents/**` content is limited to provider-facing metadata and
+project-local skills:
 
 - `.agents/config.json`
 - `.agents/lock.json`
 - `.agents/manifest.json`
-- `.agents/rules/**`
-- `.agents/source/**`
+- `.agents/skills/**`
 
-Mutable AFOL state belongs under `.afol/**`, including workbench sessions,
-events, indexes, mutations, temporary files, benchmark data, migration
-archives, and project-local skills.
+AFOL-owned static governance payloads live under `.afol/adm/**`, including
+hooks, rules, command catalogs, and source seeds. Mutable AFOL state also
+belongs under `.afol/**`, including workbench sessions, events, indexes,
+mutations, temporary files, benchmark data, and migration archives.
 
 ## 3. Read `.agents/config.json` Before Moving Files
 

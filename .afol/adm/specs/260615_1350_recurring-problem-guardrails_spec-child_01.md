@@ -69,7 +69,7 @@ This spec enforces **no blocking checks**. Specifically:
 The preflight recurrence detection checks:
 
 1. `docs/lessons/` — any lesson matching the problem description tokens.
-2. `.agents/rules/` — any rule whose title or body references the problem pattern (rules often encode recurring fixes).
+2. `.afol/adm/rules/` — any rule whose title or body references the problem pattern (rules often encode recurring fixes).
 3. Active workbench artifacts (future — out of scope for v1).
 
 The recurrence signal is **detected = true** when lessons exist and at least one lesson matches query tokens. False positives are acceptable — the signal is advisory, not blocking.
@@ -95,7 +95,7 @@ When recurrence is detected, the agent should **propose** (never create automati
   - fix applied
   - verification steps taken
   - related rules or specs
-- A new or updated rule in `.agents/rules/` if the problem pattern is general enough to warrant a prevention rule.
+- A new or updated rule in `.afol/adm/rules/` if the problem pattern is general enough to warrant a prevention rule.
 - A note in the active workbench plan/session recording the recurring-problem handling.
 
 Proposal must be explicit ("Propose creating RULE-999-foo.md with content X") and must await user approval before any file mutation.

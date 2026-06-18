@@ -95,7 +95,7 @@ Required local files:
 | `.agents/lock.json` | managed | CLI/template version lock |
 | `.agents/manifest.json` | managed | managed file hashes and ownership |
 | `.afol/wb/` | project | sessions, tasks, logs, evidence |
-| `.agents/rules/` | project | local rules and routing metadata |
+| `.afol/adm/rules/` | project | local rules and routing metadata |
 | `.agents/skills/` | project | local skills and metadata |
 | `.afol/data/` | generated | indexes, events, benchmark results |
 | `AGENTS.md` | project | runtime instruction front door |

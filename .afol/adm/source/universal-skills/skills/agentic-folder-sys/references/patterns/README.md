@@ -60,10 +60,11 @@ Before applying, inventory the receiving project:
 
 - project-owned guidance and docs such as `AGENTS.md`, `CLAUDE.md`, `RTK.md`,
   root `docs/**`, runbooks, and local operational files agents already use;
-- current static scaffold metadata under `.agents/config.json`,
-  `.agents/lock.json`, `.agents/manifest.json`, `.agents/rules/**`, and
-  `.agents/source/**`;
-- current mutable AFOL state under `.afol/wb/**`, `.agents/skills/**`,
+- current provider-facing metadata and skills under `.agents/config.json`,
+  `.agents/lock.json`, `.agents/manifest.json`, and `.agents/skills/**`;
+- current AFOL governance payloads under `.afol/adm/rules/**`,
+  `.afol/adm/hooks/**`, `.afol/adm/source/**`, and `.afol/adm/tools.json`;
+- current mutable AFOL state under `.afol/wb/**`,
   `.afol/data/**`, `.afol/tmp/**`, `.afol/adm/**`, and `.afol/pstr/**`;
 - retired operational files such as `.agents/agents`, `.agents/scripts/**`,
   `.agents/runtime/**`, `.agents/wb`, `.agents/skills`, `.agents/tmp`,

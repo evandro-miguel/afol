@@ -86,10 +86,11 @@ Before applying a receiving-project update, produce a compact inventory:
 - project-owned guidance and docs: `AGENTS.md`, `CLAUDE.md`, `RTK.md`,
   root `docs/**`, project runbooks, and local operational files agents already
   use
-- present static scaffold metadata: `.agents/config.json`,
-  `.agents/lock.json`, `.agents/manifest.json`, `.agents/rules/**`,
-  `.agents/source/**`
-- present mutable AFOL state: `.afol/wb/**`, `.agents/skills/**`,
+- present provider-facing scaffold metadata and skills: `.agents/config.json`,
+  `.agents/lock.json`, `.agents/manifest.json`, `.agents/skills/**`
+- present AFOL governance payloads: `.afol/adm/rules/**`,
+  `.afol/adm/hooks/**`, `.afol/adm/source/**`, `.afol/adm/tools.json`
+- present mutable AFOL state: `.afol/wb/**`,
   `.afol/data/**`, `.afol/tmp/**`, `.afol/adm/**`, `.afol/pstr/**`
 - retired Python/runtime files: `.agents/agents`, `.agents/agents-mcp`,
   `.agents/scripts/**`, `.agents/runtime/**`, old Python metadata/cache files
@@ -160,9 +161,11 @@ Use `paths.mutable_dir`, `paths.wb_dir`, `paths.skills_dir`, `paths.tmp_dir`,
 
 Default provider-compatible layout:
 
-- static scaffold metadata: `.agents/config.json`, `.agents/lock.json`,
-  `.agents/manifest.json`, `.agents/rules/**`, `.agents/source/**`
-- mutable state: `.afol/wb/**`, `.agents/skills/**`, `.afol/data/**`,
+- provider-facing metadata and skills: `.agents/config.json`,
+  `.agents/lock.json`, `.agents/manifest.json`, `.agents/skills/**`
+- AFOL governance payloads: `.afol/adm/rules/**`, `.afol/adm/hooks/**`,
+  `.afol/adm/source/**`, `.afol/adm/tools.json`
+- mutable state: `.afol/wb/**`, `.afol/data/**`,
   `.afol/tmp/**`, `.afol/adm/**`, `.afol/pstr/**`
 
 ## 7. Minimal Validation

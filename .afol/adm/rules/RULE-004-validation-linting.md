@@ -45,7 +45,7 @@ afol verify-tasks --strict
 | TypeScript | `bun run typecheck` |
 | Tests | `bun test` |
 | Release gate | `bun run validate:release` |
-| Static JSON | `python -m json.tool .agents/tools.json` |
+| Static JSON | `python -m json.tool .afol/adm/tools.json` |
 
 ---
 

@@ -21,7 +21,7 @@ scope:
   - docs/standards
   - src/project-template
   - .agents/scripts
-  - .agents/tools.json
+  - .afol/adm/tools.json
   - .github/workflows
   - README.md
   packages:
