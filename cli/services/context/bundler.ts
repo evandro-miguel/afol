@@ -8,6 +8,7 @@ import { resolveProjectPaths } from "../project/paths";
 import { getPstrIndex, validatePstrIndex } from "../pstr";
 import {
 	deriveRuleSelectionContext,
+	forgetRecordedRuleInjections,
 	RuleInjectionError,
 	resolveAndRecordRuleInjection,
 	resolveContextRules,
@@ -469,8 +470,32 @@ function assertTrustedContext(root: string, session: string | undefined): void {
 	}
 }
 
-function trimToBudget(bundle: ContextBundle): ContextBundle {
+function omitLastInjectedRuleForBudget(next: ContextBundle): string | null {
+	const removed = next.rule_injection.injected.pop();
+	if (!removed) {
+		return null;
+	}
+	next.rule_injection.budget.used_chars = Math.max(
+		0,
+		next.rule_injection.budget.used_chars - removed.char_count,
+	);
+	next.rule_injection.omitted.push({
+		id: removed.id,
+		path: removed.path,
+		required: removed.required,
+		char_count: removed.char_count,
+		reason: `rule injection omitted to keep bundle token budget (${next.budget.total_tokens})`,
+	});
+	return removed.id;
+}
+
+function trimToBudget(
+	root: string,
+	bundle: ContextBundle,
+	options: { persistRuleInjection?: boolean } = {},
+): ContextBundle {
 	const next = structuredClone(bundle) as ContextBundle;
+	const omittedPersistedRuleIds: string[] = [];
 	while (estimateBundleTokens(next) > next.budget.total_tokens) {
 		if (next.expanded_sections && next.expanded_sections.length > 0) {
 			const last = next.expanded_sections[next.expanded_sections.length - 1];
@@ -523,9 +548,26 @@ function trimToBudget(bundle: ContextBundle): ContextBundle {
 			next.tools.pop();
 			continue;
 		}
+		if (next.rule_injection.injected.length > 0) {
+			const omittedRuleId = omitLastInjectedRuleForBudget(next);
+			if (omittedRuleId) {
+				omittedPersistedRuleIds.push(omittedRuleId);
+			}
+			continue;
+		}
 		break;
 	}
 	next.budget.used_tokens = estimateBundleTokens(next);
+	if (
+		options.persistRuleInjection === true &&
+		omittedPersistedRuleIds.length > 0
+	) {
+		forgetRecordedRuleInjections(
+			root,
+			next.rule_injection.identity,
+			omittedPersistedRuleIds,
+		);
+	}
 	return next;
 }
 
@@ -661,7 +703,9 @@ export function buildContextBundle(
 		rule_injection: ruleInjection,
 		...(expandedSections ? { expanded_sections: expandedSections } : {}),
 	};
-	return trimToBudget(bundle);
+	return trimToBudget(root, bundle, {
+		persistRuleInjection: opts.persistRuleInjection === true && !compact,
+	});
 }
 
 export { RuleInjectionError };

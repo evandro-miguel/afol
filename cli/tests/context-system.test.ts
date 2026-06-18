@@ -767,6 +767,61 @@ describe("context system", () => {
 		}
 	});
 
+	test("buildContextBundle reinjects matching rules when markdown content changes", () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				"# Alpha rule\n\nInitial governance text.\n",
+				"utf8",
+			);
+
+			const first = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(first.rule_injection.injected[0]?.content).toContain("Initial");
+
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				"# Alpha rule\n\nUpdated governance text.\n",
+				"utf8",
+			);
+
+			const second = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(second.rule_injection.injected.map((rule) => rule.id)).toEqual([
+				"RULE-ALPHA",
+			]);
+			expect(second.rule_injection.injected[0]?.content).toContain("Updated");
+			expect(second.rule_injection.already_injected).toEqual([]);
+
+			const state = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			) as {
+				identities: Record<
+					string,
+					{ rules: Record<string, { content_hash?: string }> }
+				>;
+			};
+			const identity = Object.keys(state.identities)[0] ?? "";
+			expect(
+				state.identities[identity]?.rules["RULE-ALPHA"]?.content_hash,
+			).toBeTruthy();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("buildContextBundle omits optional injected rules with missing markdown files and does not persist them", () => {
 		const root = createBundleFixture();
 		try {
@@ -1000,6 +1055,79 @@ describe("context system", () => {
 				"max_total_chars",
 			);
 			expect(bundle.rule_injection.budget.used_chars).toBe(18);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle omits injected rule content that would exceed token budget", () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					version: "0.1.0",
+					rules: {
+						resolver: {
+							max_chars_per_rule: 20000,
+							max_chars_total: 20000,
+						},
+					},
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-BIG",
+							name: "big rule",
+							path: "big.md",
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 100,
+						},
+					],
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "big.md"),
+				"Budget pressure.\n".repeat(1000),
+				"utf8",
+			);
+
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+
+			expect(bundle.budget.used_tokens).toBeLessThanOrEqual(
+				bundle.budget.total_tokens,
+			);
+			expect(bundle.rule_injection.injected).toEqual([]);
+			expect(bundle.rule_injection.omitted.map((rule) => rule.id)).toContain(
+				"RULE-BIG",
+			);
+			expect(bundle.rule_injection.omitted[0]?.reason).toContain(
+				"bundle token budget",
+			);
+
+			const state = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			) as {
+				identities: Record<
+					string,
+					{ rules: Record<string, { content_hash?: string }> }
+				>;
+			};
+			const identity = Object.keys(state.identities)[0] ?? "";
+			expect(state.identities[identity]?.rules["RULE-BIG"]).toBeUndefined();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

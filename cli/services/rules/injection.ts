@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import {
@@ -32,6 +33,7 @@ const GENERIC_SURFACE_TOKENS = new Set([
 type RuleInjectionRecord = {
 	path: string;
 	char_count: number;
+	content_hash: string;
 	injected_at: string;
 };
 
@@ -304,6 +306,10 @@ function readRuleContent(projectRoot: string, path: string): string | null {
 	return readFileSync(absolutePath, "utf8");
 }
 
+function contentFingerprint(content: string): string {
+	return createHash("sha256").update(content).digest("hex");
+}
+
 function usedCharsForIdentity(
 	identityState: RuleInjectionIdentityState | undefined,
 ): number {
@@ -454,12 +460,13 @@ export function resolveAndRecordRuleInjection(
 
 		for (const rule of matchingInjectableRules(projectRoot, context)) {
 			const reference = ruleRef(rule);
-			if (identityState.rules[rule.id]) {
-				alreadyInjected.push(reference);
-				continue;
-			}
+			const existingRecord = identityState.rules[rule.id];
 			const content = readRuleContent(projectRoot, rule.path);
 			if (content === null) {
+				if (existingRecord) {
+					usedChars = Math.max(0, usedChars - existingRecord.char_count);
+					delete identityState.rules[rule.id];
+				}
 				const reason = `rule markdown file missing (${rule.path})`;
 				if (rule.required) {
 					throw new RuleInjectionError(`${rule.id}: ${reason}`);
@@ -468,6 +475,19 @@ export function resolveAndRecordRuleInjection(
 				continue;
 			}
 			const charCount = content.length;
+			const contentHash = contentFingerprint(content);
+			if (
+				existingRecord &&
+				existingRecord.path === rule.path &&
+				existingRecord.char_count === charCount &&
+				existingRecord.content_hash === contentHash
+			) {
+				alreadyInjected.push(reference);
+				continue;
+			}
+			if (existingRecord) {
+				usedChars = Math.max(0, usedChars - existingRecord.char_count);
+			}
 			if (charCount > resolverConfig.maxCharsPerRule) {
 				const reason = `rule exceeds max_chars_per_rule (${charCount}/${resolverConfig.maxCharsPerRule})`;
 				if (rule.required) {
@@ -487,6 +507,7 @@ export function resolveAndRecordRuleInjection(
 			identityState.rules[rule.id] = {
 				path: rule.path,
 				char_count: charCount,
+				content_hash: contentHash,
 				injected_at: now,
 			};
 			usedChars += charCount;
@@ -510,5 +531,26 @@ export function resolveAndRecordRuleInjection(
 				used_chars: usedChars,
 			},
 		};
+	});
+}
+
+export function forgetRecordedRuleInjections(
+	projectRoot: string,
+	identity: string,
+	ruleIds: readonly string[],
+): void {
+	if (ruleIds.length === 0) {
+		return;
+	}
+	withSessionLock(projectRoot, RULE_INJECTION_LOCK_NAME, () => {
+		const state = readState(projectRoot);
+		const identityState = state.identities[identity];
+		if (!identityState) {
+			return;
+		}
+		for (const ruleId of ruleIds) {
+			delete identityState.rules[ruleId];
+		}
+		writeState(projectRoot, state);
 	});
 }
