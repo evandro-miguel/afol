@@ -193,7 +193,9 @@ function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
 		...paths,
 		agents_dir: ".agents",
 		mutable_dir: mutableDir,
-		rules_dir: ".agents/rules",
+		adm_dir: `${mutableDir}/adm`,
+		rules_dir: ".afol/adm/rules",
+		hooks_dir: ".afol/adm/hooks",
 		skills_dir: ".agents/skills",
 		wb_dir: ".afol/wb",
 		active_session_file: `${mutableDir}/wb/.active_session`,
@@ -464,9 +466,25 @@ function manifestTemplatePatterns(path: string): string[] {
 	if (!normalized) {
 		return [];
 	}
-	return normalized.startsWith(".agents/")
-		? [normalized]
-		: [normalized, `.agents/${normalized}`];
+	if (normalized.startsWith(".agents/") || normalized.startsWith(".afol/")) {
+		return [normalized];
+	}
+
+	const legacyAfolAdmPrefixes = ["hooks/", "rules/", "source/"];
+	for (const prefix of legacyAfolAdmPrefixes) {
+		if (normalized.startsWith(prefix)) {
+			return [`.afol/adm/${normalized}`, normalized, `.agents/${normalized}`];
+		}
+	}
+
+	if (normalized === "tools.json") {
+		return [".afol/adm/tools.json", normalized, `.agents/${normalized}`];
+	}
+	if (normalized.startsWith("data/") || normalized.startsWith("tmp/")) {
+		return [`.afol/${normalized}`, normalized, `.agents/${normalized}`];
+	}
+
+	return [normalized, `.agents/${normalized}`];
 }
 
 function resolveManifestTemplatePath(

@@ -113,9 +113,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 
 			expect(exitCode).toBe(0);
 			expect(existsSync(join(target, ".agents", "config.json"))).toBe(true);
-			expect(existsSync(join(target, ".agents", "rules", "index.json"))).toBe(
-				true,
-			);
+			expect(
+				existsSync(join(target, ".afol", "adm", "rules", "index.json")),
+			).toBe(true);
 			expect(existsSync(join(target, ".agents", "skills", "README.md"))).toBe(
 				true,
 			);
@@ -241,6 +241,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 			};
 			expect(config.paths.agents_dir).toBe(".agents");
 			expect(config.paths.mutable_dir).toBe(".afol");
+			expect(config.paths.adm_dir).toBe(".afol/adm");
+			expect(config.paths.rules_dir).toBe(".afol/adm/rules");
+			expect(config.paths.hooks_dir).toBe(".afol/adm/hooks");
 			expect(config.paths.wb_dir).toBe(".afol/wb");
 			expect(config.paths.active_session_file).toBe(".afol/wb/.active_session");
 			expect(config.paths.skills_dir).toBe(".agents/skills");

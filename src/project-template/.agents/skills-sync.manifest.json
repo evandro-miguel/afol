@@ -3,7 +3,7 @@
   "repo": "https://github.com/evandro-miguel/skill-universal.git",
   "ref": "v0.3.1",
   "channel": "stable",
-  "source_dir": ".agents/source/universal-skills",
+  "source_dir": ".afol/adm/source/universal-skills",
   "mode": "copy",
   "installs": [
     {

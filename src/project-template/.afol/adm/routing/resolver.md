@@ -6,7 +6,7 @@ Scope: canonical-layout routing reference; verify path existence before load.
 
 | task signal | load |
 | --- | --- |
-| rules or skills | `.agents/rules/README.md`, `.afol/skills/**` |
+| rules or skills | `.afol/adm/rules/README.md`, `.agents/skills/**` |
 | tools or commands | `afol schema resolver --json`, `afol validate project` |
 | adm or routing docs | `.afol/adm/**` |
 | pstr or surface maps | `.afol/pstr/**` generated maps |

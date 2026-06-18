@@ -152,9 +152,25 @@ function manifestTemplatePatterns(path: string): string[] {
 	if (!normalized) {
 		return [];
 	}
-	return normalized.startsWith(".agents/")
-		? [normalized]
-		: [normalized, `.agents/${normalized}`];
+	if (normalized.startsWith(".agents/") || normalized.startsWith(".afol/")) {
+		return [normalized];
+	}
+
+	const legacyAfolAdmPrefixes = ["hooks/", "rules/", "source/"];
+	for (const prefix of legacyAfolAdmPrefixes) {
+		if (normalized.startsWith(prefix)) {
+			return [`.afol/adm/${normalized}`, normalized, `.agents/${normalized}`];
+		}
+	}
+
+	if (normalized === "tools.json") {
+		return [".afol/adm/tools.json", normalized, `.agents/${normalized}`];
+	}
+	if (normalized.startsWith("data/") || normalized.startsWith("tmp/")) {
+		return [`.afol/${normalized}`, normalized, `.agents/${normalized}`];
+	}
+
+	return [normalized, `.agents/${normalized}`];
 }
 
 function resolveManifestTemplatePath(

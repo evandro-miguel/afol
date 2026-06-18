@@ -21,7 +21,7 @@ Mandatory local rules for downstream bootstrap.
 ## Structure
 
 ```text
-.agents/rules/
+.afol/adm/rules/
 ├── README.md
 ├── RULE-001-tool-discovery.md
 ├── RULE-002-workstream-creation.md

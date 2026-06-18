@@ -51,7 +51,7 @@ docs/
 | `docs/arc/` | Goal-state docs |
 | `docs/map/` | Current-state evidence |
 | `.agents/config.json` | Path contract for thin scaffold and mutable state |
-| `.agents/rules/` | Local rules |
+| `.afol/adm/rules/` | Local rules |
 | `.agents/manifest.json` | Template ownership metadata |
 | `.agents/lock.json` | Scaffold lock metadata |
 | `.agents/skills/` | Baseline skills when `paths.mutable_dir` is `.agents` |
