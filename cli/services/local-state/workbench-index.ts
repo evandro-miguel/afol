@@ -19,6 +19,15 @@ export type WorkbenchIndexTask = {
 	file: string;
 	line: number;
 	touched_at: string;
+	planned_files: WorkbenchIndexFileClaim[];
+	touched_files: WorkbenchIndexFileClaim[];
+};
+
+export type WorkbenchIndexFileClaim = {
+	path: string;
+	kind: "exact" | "glob";
+	source: "planned" | "touched";
+	line: number;
 };
 
 export type WorkbenchIndexSession = {
@@ -42,6 +51,15 @@ export type WorkbenchIndexSnapshot = {
 	tasks: WorkbenchIndexTask[];
 };
 
+type WorkbenchIndexSnapshotInput = Omit<WorkbenchIndexSnapshot, "tasks"> & {
+	tasks: Array<
+		Omit<WorkbenchIndexTask, "planned_files" | "touched_files"> & {
+			planned_files?: WorkbenchIndexFileClaim[] | null;
+			touched_files?: WorkbenchIndexFileClaim[] | null;
+		}
+	>;
+};
+
 const TASK_FILE_RE = /^.+_task_\d+\.md$/;
 const STATE_BOARD_HEADER_RE =
 	/^\s*\|\s*Task\s*\|\s*State\s*\|\s*Owner\s*\|\s*Notes\s*\|?\s*$/i;
@@ -49,6 +67,11 @@ const TASK_ROW_RE =
 	/^\s*\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|?\s*$/;
 const TASK_TABLE_SEPARATOR_RE =
 	/^\s*\|\s*-+\s*\|\s*-+\s*\|\s*-+\s*\|\s*-+\s*\|?\s*$/;
+const TASK_HEADING_RE = /^#{2,6}\s+(T-\d{2,3})\b/i;
+const CHECKPOINT_HEADING_RE = /^#{2,6}\s+.+checkpoint\b/i;
+const FILE_CLAIM_LABEL_RE = /^\s*-\s*Files\s+(planned|touched)\s*:\s*$/i;
+const NESTED_LIST_ITEM_RE = /^\s{2,}[-*]\s+(.+?)\s*$/;
+const GLOB_TOKEN_RE = /[*?[\]{}]/;
 
 const ZERO_TIME = new Date(0).toISOString();
 
@@ -113,63 +136,270 @@ function sessionTaskFiles(sessionDir: string): string[] {
 	}
 }
 
+type ParsedTaskClaims = {
+	planned_files: WorkbenchIndexFileClaim[];
+	touched_files: WorkbenchIndexFileClaim[];
+};
+
+type FileClaimField = keyof ParsedTaskClaims;
+
+function emptyTaskClaims(): ParsedTaskClaims {
+	return {
+		planned_files: [],
+		touched_files: [],
+	};
+}
+
+function sortClaims(
+	claims: WorkbenchIndexFileClaim[],
+): WorkbenchIndexFileClaim[] {
+	return [...claims].sort((a, b) => {
+		if (a.path !== b.path) {
+			return a.path.localeCompare(b.path);
+		}
+		if (a.source !== b.source) {
+			return a.source.localeCompare(b.source);
+		}
+		return a.line - b.line;
+	});
+}
+
+function dedupeClaims(
+	claims: WorkbenchIndexFileClaim[],
+): WorkbenchIndexFileClaim[] {
+	const seen = new Set<string>();
+	const deduped: WorkbenchIndexFileClaim[] = [];
+	for (const claim of sortClaims(claims)) {
+		const key = `${claim.source}:${claim.kind}:${claim.path}:${claim.line}`;
+		if (seen.has(key)) {
+			continue;
+		}
+		seen.add(key);
+		deduped.push(claim);
+	}
+	return deduped;
+}
+
+function normalizeClaimValue(raw: string): string {
+	let value = raw.trim();
+	const fullCodeMatch = value.match(/^`([^`]+)`$/);
+	if (fullCodeMatch?.[1]) {
+		value = fullCodeMatch[1];
+	}
+	value = value.replace(/\\/g, "/").replace(/^\.\//, "");
+	while (
+		value.length > 0 &&
+		/[),.;:]$/.test(value) &&
+		(value.includes("/") ||
+			value.startsWith(".") ||
+			GLOB_TOKEN_RE.test(value) ||
+			/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(value))
+	) {
+		value = value.slice(0, -1);
+	}
+	return value.trim();
+}
+
+function looksLikeClaimPath(value: string): boolean {
+	const normalized = normalizeClaimValue(value);
+	const lower = normalized.toLowerCase();
+	if (
+		normalized.length === 0 ||
+		lower === "n/a" ||
+		lower === "none" ||
+		lower.startsWith("n/a ") ||
+		lower.startsWith("pending") ||
+		lower.startsWith("see ")
+	) {
+		return false;
+	}
+	return (
+		normalized.includes("/") ||
+		normalized.startsWith(".") ||
+		GLOB_TOKEN_RE.test(normalized) ||
+		/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(normalized)
+	);
+}
+
+function parseTaskFileClaim(
+	raw: string,
+	source: WorkbenchIndexFileClaim["source"],
+	line: number,
+): WorkbenchIndexFileClaim | null {
+	if (!looksLikeClaimPath(raw)) {
+		return null;
+	}
+	const path = normalizeClaimValue(raw);
+	return {
+		path,
+		kind: GLOB_TOKEN_RE.test(path) ? "glob" : "exact",
+		source,
+		line,
+	};
+}
+
+function parseStateBoardTasks(
+	session: string,
+	file: string,
+	lines: string[],
+): Array<Omit<WorkbenchIndexTask, "planned_files" | "touched_files">> {
+	const tasks: Array<
+		Omit<WorkbenchIndexTask, "planned_files" | "touched_files">
+	> = [];
+	let stateBoard = false;
+	let insideCodeBlock = false;
+
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index] ?? "";
+		const trimmed = line.trim();
+		if (!trimmed) {
+			if (stateBoard) {
+				stateBoard = false;
+			}
+			continue;
+		}
+
+		if (trimmed.startsWith("```")) {
+			insideCodeBlock = !insideCodeBlock;
+			continue;
+		}
+		if (insideCodeBlock) {
+			continue;
+		}
+
+		if (!stateBoard && STATE_BOARD_HEADER_RE.test(trimmed)) {
+			stateBoard = true;
+			continue;
+		}
+		if (!stateBoard) {
+			continue;
+		}
+		if (TASK_TABLE_SEPARATOR_RE.test(trimmed)) {
+			continue;
+		}
+		if (!trimmed.startsWith("|")) {
+			continue;
+		}
+
+		const match = trimmed.match(TASK_ROW_RE);
+		if (!match?.[1]) {
+			continue;
+		}
+
+		tasks.push({
+			session,
+			task_id: match[1],
+			state: (match[2] ?? "").trim().toLowerCase(),
+			owner: (match[3] ?? "").trim(),
+			notes: (match[4] ?? "").trim(),
+			file,
+			line: index + 1,
+			touched_at: parseTouchedAt(file),
+		});
+	}
+
+	return tasks;
+}
+
+function parseTaskClaims(
+	lines: string[],
+	taskIds: string[],
+): Map<string, ParsedTaskClaims> {
+	const taskIdSet = new Set(taskIds);
+	const parsed = new Map<string, ParsedTaskClaims>();
+	const singleTaskId = taskIds.length === 1 ? (taskIds[0] ?? null) : null;
+	let insideCodeBlock = false;
+	let currentTaskId: string | null = null;
+	let currentField: FileClaimField | null = null;
+
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index] ?? "";
+		const trimmed = line.trim();
+
+		if (trimmed.startsWith("```")) {
+			insideCodeBlock = !insideCodeBlock;
+			continue;
+		}
+		if (insideCodeBlock) {
+			continue;
+		}
+
+		const taskHeading = trimmed.match(TASK_HEADING_RE);
+		if (taskHeading?.[1]) {
+			currentField = null;
+			currentTaskId = taskIdSet.has(taskHeading[1]) ? taskHeading[1] : null;
+			continue;
+		}
+
+		if (CHECKPOINT_HEADING_RE.test(trimmed)) {
+			currentField = null;
+			currentTaskId = singleTaskId;
+			continue;
+		}
+
+		if (trimmed.startsWith("#")) {
+			currentField = null;
+			currentTaskId = null;
+			continue;
+		}
+
+		const labelMatch = trimmed.match(FILE_CLAIM_LABEL_RE);
+		if (labelMatch?.[1] && currentTaskId) {
+			currentField =
+				labelMatch[1].toLowerCase() === "planned"
+					? "planned_files"
+					: "touched_files";
+			continue;
+		}
+
+		if (!currentTaskId || !currentField) {
+			continue;
+		}
+
+		const itemMatch = line.match(NESTED_LIST_ITEM_RE);
+		if (!itemMatch?.[1]) {
+			if (
+				trimmed.length > 0 &&
+				!line.startsWith("  ") &&
+				!line.startsWith("\t")
+			) {
+				currentField = null;
+			}
+			continue;
+		}
+
+		const claim = parseTaskFileClaim(
+			itemMatch[1],
+			currentField === "planned_files" ? "planned" : "touched",
+			index + 1,
+		);
+		if (!claim) {
+			continue;
+		}
+		const bucket = parsed.get(currentTaskId) ?? emptyTaskClaims();
+		bucket[currentField].push(claim);
+		parsed.set(currentTaskId, bucket);
+	}
+
+	return parsed;
+}
+
 function parseTaskRows(session: string, file: string): WorkbenchIndexTask[] {
 	try {
 		const lines = readFileSync(file, "utf8").split("\n");
-		const tasks: WorkbenchIndexTask[] = [];
-		let stateBoard = false;
-		let insideCodeBlock = false;
-
-		for (let index = 0; index < lines.length; index += 1) {
-			const line = lines[index] ?? "";
-			const trimmed = line.trim();
-			if (!trimmed) {
-				if (stateBoard) {
-					stateBoard = false;
-				}
-				continue;
-			}
-
-			if (trimmed.startsWith("```")) {
-				insideCodeBlock = !insideCodeBlock;
-				continue;
-			}
-			if (insideCodeBlock) {
-				continue;
-			}
-
-			if (!stateBoard && STATE_BOARD_HEADER_RE.test(trimmed)) {
-				stateBoard = true;
-				continue;
-			}
-			if (!stateBoard) {
-				continue;
-			}
-			if (TASK_TABLE_SEPARATOR_RE.test(trimmed)) {
-				continue;
-			}
-			if (!trimmed.startsWith("|")) {
-				continue;
-			}
-
-			const match = trimmed.match(TASK_ROW_RE);
-			if (!match?.[1]) {
-				continue;
-			}
-
-			tasks.push({
-				session,
-				task_id: match[1],
-				state: (match[2] ?? "").trim().toLowerCase(),
-				owner: (match[3] ?? "").trim(),
-				notes: (match[4] ?? "").trim(),
-				file,
-				line: index + 1,
-				touched_at: parseTouchedAt(file),
-			});
-		}
-
-		return tasks;
+		const tasks = parseStateBoardTasks(session, file, lines);
+		const parsedClaims = parseTaskClaims(
+			lines,
+			tasks.map((task) => task.task_id),
+		);
+		return tasks.map((task) => {
+			const claims = parsedClaims.get(task.task_id) ?? emptyTaskClaims();
+			return {
+				...task,
+				planned_files: dedupeClaims(claims.planned_files),
+				touched_files: dedupeClaims(claims.touched_files),
+			};
+		});
 	} catch {
 		return [];
 	}
@@ -262,6 +492,23 @@ function emptySnapshot(root: string): WorkbenchIndexSnapshot {
 	};
 }
 
+export function collectWorkBenchSnapshot(
+	root: string,
+	sessionScope?: string,
+): WorkbenchIndexSnapshot {
+	const scoped = sessionScope
+		? buildSessionsSnapshot(root, [sessionScope])
+		: allSessionsSnapshot(root);
+	return {
+		kind: "workbench_index_v1",
+		version: 1,
+		generated_at: formatFreshTimestamp(root),
+		source: workbenchSource(root),
+		sessions: scoped.sessions,
+		tasks: scoped.tasks,
+	};
+}
+
 function writeSnapshot(
 	root: string,
 	snapshot: WorkbenchIndexSnapshot,
@@ -272,7 +519,28 @@ function writeSnapshot(
 	return snapshot;
 }
 
-function loadSnapshot(root: string): WorkbenchIndexSnapshot | null {
+function normalizeWorkbenchTask(
+	task: WorkbenchIndexSnapshotInput["tasks"][number],
+): WorkbenchIndexTask {
+	return {
+		...task,
+		planned_files: Array.isArray(task.planned_files) ? task.planned_files : [],
+		touched_files: Array.isArray(task.touched_files) ? task.touched_files : [],
+	};
+}
+
+export function normalizeWorkbenchSnapshot(
+	snapshot: WorkbenchIndexSnapshotInput,
+): WorkbenchIndexSnapshot {
+	return {
+		...snapshot,
+		tasks: snapshot.tasks.map(normalizeWorkbenchTask),
+	};
+}
+
+export function loadWorkBenchIndexSnapshot(
+	root: string,
+): WorkbenchIndexSnapshot | null {
 	const indexPath = resolveWorkbenchIndexPath(root);
 	if (!existsSync(indexPath)) {
 		return null;
@@ -292,7 +560,7 @@ function loadSnapshot(root: string): WorkbenchIndexSnapshot | null {
 		) {
 			return null;
 		}
-		return parsed as WorkbenchIndexSnapshot;
+		return normalizeWorkbenchSnapshot(parsed as WorkbenchIndexSnapshotInput);
 	} catch {
 		return null;
 	}
@@ -364,7 +632,7 @@ export function rebuildWorkBenchIndex(
 	root: string,
 	sessionScope?: string,
 ): WorkbenchIndexSnapshot {
-	const current = loadSnapshot(root);
+	const current = loadWorkBenchIndexSnapshot(root);
 
 	if (sessionScope) {
 		const targetSnapshot = buildSessionsSnapshot(root, [sessionScope]);
@@ -405,18 +673,7 @@ export function rebuildWorkBenchIndex(
 		return writeSnapshot(root, next);
 	}
 
-	const snapshot = allSessionsSnapshot(root);
-	const full: WorkbenchIndexSnapshot = {
-		kind: "workbench_index_v1",
-		version: 1,
-		generated_at: formatFreshTimestamp(root),
-		source: {
-			...workbenchSource(root),
-		},
-		sessions: snapshot.sessions,
-		tasks: snapshot.tasks,
-	};
-	return writeSnapshot(root, full);
+	return writeSnapshot(root, collectWorkBenchSnapshot(root));
 }
 
 export function validateWorkBenchIndex(root: string): {
@@ -431,7 +688,7 @@ export function validateWorkBenchIndex(root: string): {
 		};
 	}
 
-	const snapshot = loadSnapshot(root);
+	const snapshot = loadWorkBenchIndexSnapshot(root);
 	if (!snapshot) {
 		return {
 			ok: false,

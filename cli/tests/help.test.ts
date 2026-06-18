@@ -24,6 +24,7 @@ describe("help formatter", () => {
 		expect(help).toContain("s/status");
 		expect(help).toContain("v/validate");
 		expect(help).toContain("n/new");
+		expect(help).toContain("hk/hook");
 		expect(help).toContain("bench");
 		expect(help).toContain("pb/project-benchmark");
 		expect(help).toContain("Side effects");
@@ -182,7 +183,13 @@ describe("help formatter", () => {
 
 		expect(parsed).toEqual(catalog);
 		expect(parsed.map((entry) => entry.command)).toEqual(
-			expect.arrayContaining(["status", "pstr", "adm", "project-benchmark"]),
+			expect.arrayContaining([
+				"status",
+				"hook",
+				"pstr",
+				"adm",
+				"project-benchmark",
+			]),
 		);
 		expect(parsed.find((entry) => entry.command === "status")?.aliases).toEqual(
 			["s"],

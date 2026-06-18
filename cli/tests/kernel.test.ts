@@ -272,7 +272,7 @@ describe("kernel front-door", () => {
 				category?: string;
 			}>;
 			expect(catalogPayload.map((entry) => entry.command)).toEqual(
-				expect.arrayContaining(["status", "pstr", "adm", "bench"]),
+				expect.arrayContaining(["status", "hook", "pstr", "adm", "bench"]),
 			);
 			expect(
 				catalogPayload.find((entry) => entry.command === "status")?.aliases,

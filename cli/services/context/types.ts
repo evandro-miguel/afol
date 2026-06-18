@@ -43,6 +43,18 @@ export type ContextRuleInjection = {
 	};
 };
 
+export type ContextHookContribution = {
+	id: string;
+	path: string;
+	messages: string[];
+	tools: string[];
+	validation_commands: string[];
+	pstr_refs: string[];
+	memory_refs: string[];
+	library_refs: string[];
+	do_not_load: string[];
+};
+
 export type ContextBundle = {
 	task_id: string;
 	role: string;
@@ -51,6 +63,9 @@ export type ContextBundle = {
 	mode: ContextRetrievalMode;
 	refs: ContextRef[];
 	rules: string[];
+	hooks: string[];
+	hook_messages: string[];
+	hook_contributions: ContextHookContribution[];
 	skills: string[];
 	tools: string[];
 	validation_commands: string[];

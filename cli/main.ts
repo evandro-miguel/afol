@@ -5,7 +5,11 @@ import { runAdmCommand } from "./commands/adm";
 import { runAdrCommand } from "./commands/adr";
 import { runBenchCommand } from "./commands/bench";
 import { runBootstrapCommand } from "./commands/bootstrap";
-import { runRuleCommand, runSkillCommand } from "./commands/catalog";
+import {
+	runHookCommand,
+	runRuleCommand,
+	runSkillCommand,
+} from "./commands/catalog";
 import { runCatchupCommand } from "./commands/catchup";
 import { runChangelogCommand } from "./commands/changelog";
 import { runContextCommand } from "./commands/context";
@@ -87,6 +91,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 	"log",
 	"quickTask",
 	"verifyTasks",
+	"hook",
 	"rule",
 	"skill",
 	"update",
@@ -255,6 +260,10 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "verifyTasks") {
 		return runVerifyTasksCommand(resolution.args, project.value.root);
+	}
+
+	if (resolution.kind === "hook") {
+		return runHookCommand(resolution.args, project.value.root);
 	}
 
 	if (resolution.kind === "rule") {

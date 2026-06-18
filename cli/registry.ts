@@ -11,6 +11,7 @@ export type CommandKind =
 	| "log"
 	| "quickTask"
 	| "verifyTasks"
+	| "hook"
 	| "rule"
 	| "skill"
 	| "update"
@@ -132,6 +133,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "append",
 		description: "Record task evidence",
 		category: "workflow",
+	},
+	{
+		command: "hook",
+		aliases: ["hk"],
+		kind: "hook",
+		sideEffect: "read",
+		description: "Inspect hooks",
+		category: "inspect",
 	},
 	{
 		command: "rule",

@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { type HookEntry, resolveHooks } from "../catalog/hooks";
 import { listSkills, searchSkills } from "../catalog/skills";
 import { buildLibraryGraph, searchLibrary } from "../library";
 import { recallEntries } from "../memory";
@@ -17,6 +18,7 @@ import { getSectionIndex, rebuildSectionIndex } from "./section-index";
 import type {
 	ContextBundle,
 	ContextExpandedSection,
+	ContextHookContribution,
 	ContextRef,
 	ContextRetrievalMode,
 	SectionEntry,
@@ -144,6 +146,19 @@ function estimateBundleTokens(bundle: ContextBundle): number {
 			(ref) => `${ref.domain}:${ref.path}:${ref.section ?? ""}`,
 		),
 		...bundle.rules,
+		...bundle.hooks,
+		...bundle.hook_messages,
+		...bundle.hook_contributions.flatMap((hook) => [
+			hook.id,
+			hook.path,
+			...hook.messages,
+			...hook.tools,
+			...hook.validation_commands,
+			...hook.pstr_refs,
+			...hook.memory_refs,
+			...hook.library_refs,
+			...hook.do_not_load,
+		]),
 		...bundle.skills,
 		...bundle.tools,
 		...bundle.validation_commands,
@@ -249,6 +264,57 @@ function selectSkills(root: string, surface: string, role: string): string[] {
 	const matches = query ? searchSkills(root, query) : listSkills(root);
 	const selected = matches.length > 0 ? matches : listSkills(root);
 	return selected.slice(0, 5).map((skill) => skill.name);
+}
+
+function selectHooks(
+	root: string,
+	options: Pick<BuildOptions, "scope" | "filePath"> & {
+		role: string;
+		surface: string;
+	},
+): HookEntry[] {
+	const context = deriveRuleSelectionContext({
+		workType: "delivery",
+		surface: options.surface,
+		...(options.scope ? { scope: options.scope } : {}),
+		...(options.filePath ? { filePath: options.filePath } : {}),
+	});
+	return resolveHooks(root, {
+		event: "context.bundle",
+		roles: [options.role],
+		surfaces: context.surfaces,
+		workType: context.workType,
+		languages: context.languages,
+		...(context.scope ? { scope: context.scope } : {}),
+		...(context.filePath ? { filePath: context.filePath } : {}),
+	}).slice(0, 5);
+}
+
+function contextHookContribution(hook: HookEntry): ContextHookContribution {
+	return {
+		id: hook.id,
+		path: hook.path,
+		messages: hook.contributions.messages,
+		tools: hook.contributions.tools,
+		validation_commands: hook.contributions.validationCommands,
+		pstr_refs: hook.contributions.pstrRefs,
+		memory_refs: hook.contributions.memoryRefs,
+		library_refs: hook.contributions.libraryRefs,
+		do_not_load: hook.contributions.doNotLoad,
+	};
+}
+
+function uniqueStrings(values: string[]): string[] {
+	const seen = new Set<string>();
+	const unique: string[] = [];
+	for (const value of values) {
+		if (seen.has(value)) {
+			continue;
+		}
+		seen.add(value);
+		unique.push(value);
+	}
+	return unique;
 }
 
 function selectTools(
@@ -431,6 +497,24 @@ function trimToBudget(bundle: ContextBundle): ContextBundle {
 			next.rules.pop();
 			continue;
 		}
+		if (next.hook_messages.length > 0) {
+			const removed = next.hook_messages.pop();
+			if (removed) {
+				for (const hook of next.hook_contributions) {
+					const index = hook.messages.lastIndexOf(removed);
+					if (index >= 0) {
+						hook.messages.splice(index, 1);
+						break;
+					}
+				}
+			}
+			continue;
+		}
+		if (next.hook_contributions.length > 3) {
+			next.hook_contributions.pop();
+			next.hooks.pop();
+			continue;
+		}
 		if (next.skills.length > 3) {
 			next.skills.pop();
 			continue;
@@ -493,6 +577,26 @@ export function buildContextBundle(
 		opts.persistRuleInjection === true && !compact
 			? resolveAndRecordRuleInjection(root, ruleInjectionOptions)
 			: resolveRuleInjectionShape(root, ruleInjectionOptions);
+	const hookEntries = compact
+		? []
+		: selectHooks(root, {
+				role,
+				surface,
+				...(scope ? { scope } : {}),
+				...(filePath ? { filePath } : {}),
+			});
+	const hookContributions = hookEntries.map(contextHookContribution);
+	const hookMessages = hookContributions.flatMap((hook) => hook.messages);
+	const hookTools = hookContributions.flatMap((hook) => hook.tools);
+	const hookValidationCommands = hookContributions.flatMap(
+		(hook) => hook.validation_commands,
+	);
+	const hookPstrRefs = hookContributions.flatMap((hook) => hook.pstr_refs);
+	const hookMemoryRefs = hookContributions.flatMap((hook) => hook.memory_refs);
+	const hookLibraryRefs = hookContributions.flatMap(
+		(hook) => hook.library_refs,
+	);
+	const hookDoNotLoad = hookContributions.flatMap((hook) => hook.do_not_load);
 	const expandedSections =
 		mode === "deep" || mode === "tokenmax"
 			? selectExpandedSections(root, sections, mode)
@@ -510,16 +614,40 @@ export function buildContextBundle(
 			...sections.map(refFromSection),
 		],
 		rules,
+		hooks: hookEntries.map((hook) => hook.id),
+		hook_messages: hookMessages,
+		hook_contributions: hookContributions,
 		skills: compact ? [] : selectSkills(root, surface, role),
 		tools: compact
 			? []
-			: selectTools(session || undefined, taskId || undefined, surface),
+			: uniqueStrings([
+					...selectTools(session || undefined, taskId || undefined, surface),
+					...hookTools,
+				]),
 		validation_commands: compact
 			? []
-			: selectValidationCommands(session || undefined, taskId || undefined),
-		pstr_refs: compact ? [] : selectPstrRefs(root),
-		memory_refs: compact ? [] : selectMemoryRefs(root, taskId, surface, role),
-		library_refs: compact ? [] : selectLibraryRefs(root, taskId, surface, role),
+			: uniqueStrings([
+					...selectValidationCommands(
+						session || undefined,
+						taskId || undefined,
+					),
+					...hookValidationCommands,
+				]),
+		pstr_refs: compact
+			? []
+			: uniqueStrings([...selectPstrRefs(root), ...hookPstrRefs]),
+		memory_refs: compact
+			? []
+			: uniqueStrings([
+					...selectMemoryRefs(root, taskId, surface, role),
+					...hookMemoryRefs,
+				]),
+		library_refs: compact
+			? []
+			: uniqueStrings([
+					...selectLibraryRefs(root, taskId, surface, role),
+					...hookLibraryRefs,
+				]),
 		budget: { total_tokens: totalTokens, used_tokens: 0 },
 		gaps: compact
 			? []
@@ -529,7 +657,7 @@ export function buildContextBundle(
 					sections.length === 0 ? "no matching spec sections" : "",
 					state ? "" : "no hydrated session state",
 				].filter(Boolean),
-		do_not_load: doNotLoadList(),
+		do_not_load: uniqueStrings([...doNotLoadList(), ...hookDoNotLoad]),
 		rule_injection: ruleInjection,
 		...(expandedSections ? { expanded_sections: expandedSections } : {}),
 	};

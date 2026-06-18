@@ -187,6 +187,8 @@ function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
 		`refs: ${bundle.refs.length}`,
 		`rules: ${bundle.rules.join(",") || "none"}`,
 		`rule_injection: first_use=${bundle.rule_injection.first_use ? "yes" : "no"} injected=${bundle.rule_injection.injected.map((rule) => rule.id).join(",") || "none"} already=${bundle.rule_injection.already_injected.map((rule) => rule.id).join(",") || "none"} omitted=${bundle.rule_injection.omitted.map((rule) => rule.id).join(",") || "none"}`,
+		`hooks: ${bundle.hooks.join(",") || "none"}`,
+		`hook_messages: ${bundle.hook_messages.length}`,
 		`skills: ${bundle.skills.join(",") || "none"}`,
 		`tools: ${bundle.tools.length}`,
 		`pstr_refs: ${bundle.pstr_refs.join(",") || "none"}`,

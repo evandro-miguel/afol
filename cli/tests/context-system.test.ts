@@ -57,7 +57,7 @@ function ruleInjectionStatePath(root: string): string {
 
 function writeInjectableAlphaRule(root: string): void {
 	writeFileSync(
-		join(root, ".agents", "rules", "index.json"),
+		join(root, ".afol", "adm", "rules", "index.json"),
 		JSON.stringify({
 			rules: [
 				{
@@ -154,7 +154,7 @@ function createBundleFixture(options?: {
 	libraryRefs?: boolean;
 }): string {
 	const root = createSectionFixture();
-	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
 	mkdirSync(join(root, ".agents", "skills", "alpha-helper"), {
 		recursive: true,
 	});
@@ -164,7 +164,7 @@ function createBundleFixture(options?: {
 	mkdirSync(join(root, ".afol", "wb", "session-1"), { recursive: true });
 
 	writeFileSync(
-		join(root, ".agents", "rules", "index.json"),
+		join(root, ".afol", "adm", "rules", "index.json"),
 		JSON.stringify({
 			rules: [
 				{
@@ -180,7 +180,7 @@ function createBundleFixture(options?: {
 		"utf8",
 	);
 	writeFileSync(
-		join(root, ".agents", "rules", "alpha.md"),
+		join(root, ".afol", "adm", "rules", "alpha.md"),
 		"# Alpha rule\n",
 		"utf8",
 	);
@@ -411,6 +411,64 @@ function createBundleFixture(options?: {
 	return root;
 }
 
+function writeAlphaHook(root: string): void {
+	mkdirSync(join(root, ".afol", "adm", "hooks"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "hooks", "index.json"),
+		JSON.stringify({
+			hooks: [
+				{
+					id: "HOOK-ALPHA",
+					name: "alpha hook",
+					path: "alpha-hook.md",
+					events: ["context.bundle"],
+					roles: ["designer"],
+					surfaces: ["alpha"],
+					work_types: ["delivery"],
+					priority: 90,
+					contributions: {
+						messages: ["Use alpha hook message."],
+						tools: ["afol hook resolve --event context.bundle"],
+						validation_commands: ["bun run alpha-check"],
+						pstr_refs: ["pstr:hook-map"],
+						memory_refs: ["memory:hook-alpha"],
+						library_refs: ["library:hook-alpha"],
+						do_not_load: ["raw plugin payloads"],
+					},
+				},
+			],
+		}),
+		"utf8",
+	);
+}
+
+function writeCoordinationRadarHook(root: string): void {
+	mkdirSync(join(root, ".afol", "adm", "hooks"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "hooks", "index.json"),
+		JSON.stringify({
+			hooks: [
+				{
+					id: "COORDINATION-RADAR",
+					name: "coordination radar reminder",
+					path: "coordination-radar.md",
+					events: ["context.bundle"],
+					roles: ["orchestrator"],
+					work_types: ["delivery", "all"],
+					priority: 90,
+					contributions: {
+						messages: [
+							"Before delegating or editing across governed AFOL sessions, review `afol session radar`.",
+						],
+						tools: ["afol session radar", "afol session radar --json"],
+					},
+				},
+			],
+		}),
+		"utf8",
+	);
+}
+
 describe("context system", () => {
 	test("rebuildSectionIndex creates valid index from spec and adr files", () => {
 		const root = createSectionFixture();
@@ -542,6 +600,9 @@ describe("context system", () => {
 			expect(bundle.mode).toBe("balanced");
 			expect(Array.isArray(bundle.refs)).toBe(true);
 			expect(Array.isArray(bundle.rules)).toBe(true);
+			expect(Array.isArray(bundle.hooks)).toBe(true);
+			expect(Array.isArray(bundle.hook_messages)).toBe(true);
+			expect(Array.isArray(bundle.hook_contributions)).toBe(true);
 			expect(Array.isArray(bundle.skills)).toBe(true);
 			expect(Array.isArray(bundle.tools)).toBe(true);
 			expect(Array.isArray(bundle.validation_commands)).toBe(true);
@@ -568,6 +629,74 @@ describe("context system", () => {
 				"afol state validate -S session-1",
 			);
 			expect(bundle.validation_commands).toContain("bun test");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle includes matching hook contributions", () => {
+		const root = createBundleFixture();
+		try {
+			writeAlphaHook(root);
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+			});
+			expect(bundle.hooks).toEqual(["HOOK-ALPHA"]);
+			expect(bundle.hook_messages).toEqual(["Use alpha hook message."]);
+			expect(bundle.hook_contributions).toEqual([
+				{
+					id: "HOOK-ALPHA",
+					path: ".afol/adm/hooks/alpha-hook.md",
+					messages: ["Use alpha hook message."],
+					tools: ["afol hook resolve --event context.bundle"],
+					validation_commands: ["bun run alpha-check"],
+					pstr_refs: ["pstr:hook-map"],
+					memory_refs: ["memory:hook-alpha"],
+					library_refs: ["library:hook-alpha"],
+					do_not_load: ["raw plugin payloads"],
+				},
+			]);
+			expect(bundle.tools).toContain(
+				"afol hook resolve --event context.bundle",
+			);
+			expect(bundle.validation_commands).toContain("bun run alpha-check");
+			expect(bundle.pstr_refs).toContain("pstr:hook-map");
+			expect(bundle.memory_refs).toContain("memory:hook-alpha");
+			expect(bundle.library_refs).toContain("library:hook-alpha");
+			expect(bundle.do_not_load).toContain("raw plugin payloads");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle includes coordination radar only for orchestrators", () => {
+		const root = createBundleFixture();
+		try {
+			writeCoordinationRadarHook(root);
+			const orchestrator = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "orchestrator",
+				surface: "alpha",
+			});
+			const designer = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+			});
+
+			expect(orchestrator.hooks).toEqual(["COORDINATION-RADAR"]);
+			expect(orchestrator.hook_messages.join("\n")).toContain(
+				"afol session radar",
+			);
+			expect(orchestrator.tools).toContain("afol session radar");
+			expect(orchestrator.tools).toContain("afol session radar --json");
+			expect(designer.hooks).not.toContain("COORDINATION-RADAR");
+			expect(designer.tools).not.toContain("afol session radar");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -642,7 +771,7 @@ describe("context system", () => {
 		const root = createBundleFixture();
 		try {
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				JSON.stringify({
 					rules: [
 						{
@@ -668,7 +797,7 @@ describe("context system", () => {
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "present.md"),
+				join(root, ".afol", "adm", "rules", "present.md"),
 				"# Present rule\n",
 				"utf8",
 			);
@@ -710,7 +839,7 @@ describe("context system", () => {
 		try {
 			writeInjectableAlphaRule(root);
 			writeFileSync(
-				join(root, ".agents", "rules", "alpha.md"),
+				join(root, ".afol", "adm", "rules", "alpha.md"),
 				"# Alpha rule\n",
 				"utf8",
 			);
@@ -758,7 +887,7 @@ describe("context system", () => {
 				"export {};\n",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				JSON.stringify({
 					rules: [
 						{
@@ -777,7 +906,7 @@ describe("context system", () => {
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "context-ts.md"),
+				join(root, ".afol", "adm", "rules", "context-ts.md"),
 				"# Context TS rule\n",
 				"utf8",
 			);
@@ -820,7 +949,7 @@ describe("context system", () => {
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				JSON.stringify({
 					rules: [
 						{
@@ -845,9 +974,12 @@ describe("context system", () => {
 				}),
 				"utf8",
 			);
-			writeFileSync(join(root, ".agents", "rules", "first.md"), "A".repeat(18));
 			writeFileSync(
-				join(root, ".agents", "rules", "second.md"),
+				join(root, ".afol", "adm", "rules", "first.md"),
+				"A".repeat(18),
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "second.md"),
 				"B".repeat(18),
 			);
 
@@ -896,6 +1028,7 @@ describe("context system", () => {
 	test("compact mode uses 1000 token budget and no expanded sections", () => {
 		const root = createBundleFixture();
 		try {
+			writeAlphaHook(root);
 			const bundle = buildContextBundle(root, {
 				session: "session-1",
 				task: "T-01",
@@ -905,6 +1038,9 @@ describe("context system", () => {
 			});
 			expect(bundle.mode).toBe("compact");
 			expect(bundle.budget.total_tokens).toBe(1000);
+			expect(bundle.hooks).toEqual([]);
+			expect(bundle.hook_messages).toEqual([]);
+			expect(bundle.hook_contributions).toEqual([]);
 			expect(bundle.expanded_sections).toBeUndefined();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1460,7 +1596,7 @@ describe("context system", () => {
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				JSON.stringify({
 					rules: [
 						{
@@ -1478,7 +1614,7 @@ describe("context system", () => {
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "required.md"),
+				join(root, ".afol", "adm", "rules", "required.md"),
 				"01234567890",
 				"utf8",
 			);
@@ -1527,7 +1663,7 @@ describe("context system", () => {
 		const root = createBundleFixture();
 		try {
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				JSON.stringify({
 					rules: [
 						{
@@ -1590,12 +1726,12 @@ describe("context system", () => {
 		const root = createBundleFixture();
 		try {
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				"{not-json\n",
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "RULE-001-fallback.md"),
+				join(root, ".afol", "adm", "rules", "RULE-001-fallback.md"),
 				"# Fallback\n",
 				"utf8",
 			);

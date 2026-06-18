@@ -144,6 +144,33 @@ try {
 	]);
 	assertOk(created, "dist new");
 	const session = sessionFrom(created.stdout as string);
+	const lifecycleTaskPath = join(
+		lifecycleTarget,
+		".afol",
+		"wb",
+		session,
+		`${session}_task_01.md`,
+	);
+	writeFileSync(
+		lifecycleTaskPath,
+		[
+			readFileSync(lifecycleTaskPath, "utf8"),
+			"",
+			"## T-01",
+			"",
+			"- Files planned:",
+			"  - cli/commands/session.ts",
+			"- Files touched:",
+			"  - cli/dev/dist-smoke.ts",
+			"",
+		].join("\n"),
+		"utf8",
+	);
+	const localStateRebuild = runDist(lifecycleTarget, [
+		"local-state",
+		"rebuild",
+	]);
+	assertOk(localStateRebuild, "dist local-state rebuild before radar");
 
 	const statusAfterNew = runDist(lifecycleTarget, ["status"]);
 	assertOk(statusAfterNew, "dist status after new");
@@ -152,6 +179,45 @@ try {
 		"TASK: T-01",
 		"SESSIONS: 1",
 	]);
+
+	const radarAfterNew = runDist(lifecycleTarget, ["session", "radar"]);
+	assertOk(radarAfterNew, "dist session radar");
+	assertContains(radarAfterNew, "dist session radar", [
+		"session radar: warnings are context only, not locks",
+		"summary:",
+	]);
+
+	const radarJsonAfterNew = runDist(lifecycleTarget, [
+		"session",
+		"radar",
+		"--json",
+	]);
+	assertOk(radarJsonAfterNew, "dist session radar json");
+	assertContains(radarJsonAfterNew, "dist session radar json", [
+		'"action":"session.radar"',
+		'"warning_policy":"context-only"',
+	]);
+	const radarPayload = JSON.parse(radarJsonAfterNew.stdout as string) as {
+		data?: {
+			summary?: { open_tasks?: number };
+			tasks?: Array<{
+				task_id?: string;
+				planned_files?: Array<{ path?: string }>;
+				touched_files?: Array<{ path?: string }>;
+			}>;
+		};
+	};
+	const radarTask = radarPayload.data?.tasks?.[0];
+	if (
+		radarPayload.data?.summary?.open_tasks !== 1 ||
+		radarTask?.task_id !== "T-01" ||
+		radarTask.planned_files?.[0]?.path !== "cli/commands/session.ts" ||
+		radarTask.touched_files?.[0]?.path !== "cli/dev/dist-smoke.ts"
+	) {
+		throw new Error(
+			`dist session radar json missing real task file claims\n${radarJsonAfterNew.stdout}`,
+		);
+	}
 
 	const start = runDist(lifecycleTarget, ["start", "--task-id", "T-01"]);
 	assertOk(start, "dist start");
@@ -169,10 +235,7 @@ try {
 	const done = runDist(lifecycleTarget, ["done", "--task-id", "T-01"]);
 	assertOk(done, "dist done");
 
-	const taskDoc = readFileSync(
-		join(lifecycleTarget, ".afol", "wb", session, `${session}_task_01.md`),
-		"utf8",
-	);
+	const taskDoc = readFileSync(lifecycleTaskPath, "utf8");
 	if (!taskDoc.includes("| T-01 | done | worker | Dist smoke proof |")) {
 		throw new Error(`task doc missing done row\n${taskDoc}`);
 	}
@@ -266,10 +329,10 @@ try {
 
 	const applyTarget = bootstrapTarget(sandbox, "update-apply-target");
 	const applyLockPath = join(applyTarget, ".agents", "lock.json");
-	const applyRulePath = join(applyTarget, ".agents", "rules", "README.md");
+	const applyRulePath = join(applyTarget, ".afol", "adm", "rules", "README.md");
 	const applyLock = readJson<ManagedLock>(applyLockPath);
 	const downstreamRuleReadme = "downstream rules note\n";
-	const sourceRuleReadme = templateText(".agents/rules/README.md");
+	const sourceRuleReadme = templateText(".afol/adm/rules/README.md");
 	applyLock.revision = "old";
 	applyLock.managed_hashes = {
 		...applyLock.managed_hashes,
@@ -292,7 +355,7 @@ try {
 	assertContains(realApply, "dist update apply", [
 		"update apply: changes available",
 		"update-managed .agents/lock.json revision changed",
-		"update-managed .agents/rules/README.md managed-hash-matches-manifest",
+		"update-managed .afol/adm/rules/README.md managed-hash-matches-manifest",
 	]);
 	if (readJson<ManagedLock>(applyLockPath).revision === "old") {
 		throw new Error("real update apply did not restore lock revision");
@@ -304,7 +367,7 @@ try {
 		join(applyTarget, ".afol", "data", "mutations", "mutations.jsonl"),
 		"utf8",
 	);
-	if (!mutationJournal.includes('"sourcePath":".agents/rules/README.md"')) {
+	if (!mutationJournal.includes('"sourcePath":".afol/adm/rules/README.md"')) {
 		throw new Error(
 			`mutation journal missing rules update record\n${mutationJournal}`,
 		);

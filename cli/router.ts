@@ -15,6 +15,7 @@ export type CommandResolution =
 	| { kind: "log"; args: string[] }
 	| { kind: "quickTask"; args: string[] }
 	| { kind: "verifyTasks"; args: string[] }
+	| { kind: "hook"; args: string[] }
 	| { kind: "rule"; args: string[] }
 	| { kind: "skill"; args: string[] }
 	| { kind: "update"; args: string[] }
@@ -229,6 +230,10 @@ export function resolveCommand(args: string[]): CommandResolution {
 			kind: "verifyTasks",
 			args: normalizeScopedFlags("verifyTasks", rest),
 		};
+	}
+
+	if (topLevelKind === "hook") {
+		return { kind: "hook", args: rest };
 	}
 
 	if (topLevelKind === "rule") {
