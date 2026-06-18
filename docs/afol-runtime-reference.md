@@ -3,7 +3,7 @@ doc_type: reference
 id: afol_runtime_reference
 status: active
 created_at: '2026-06-17T00:00:00Z'
-updated_at: '2026-06-17T00:00:00Z'
+updated_at: '2026-06-18T00:00:00Z'
 ---
 
 # AFOL Runtime Reference
@@ -86,6 +86,29 @@ agent context.
 - `.afol/state/afol.db`: local state database.
 - `.afol/tmp/**`: temporary AFOL-owned files.
 - `.afol/library/**` and `.afol/memory/**`: local knowledge and memory surfaces.
+
+## Rule Injection
+
+- `afol ctx bundle` is the only context command that can persist first-use rule
+  injection state for an identity.
+- Identity dimensions are `session`, `task`, `role`, `surface`, and optional
+  `file`; missing session/task collapse to `none`, and the file dimension is
+  omitted when no file is present.
+- `afol ctx explain`, `afol ctx tools`, and `afol ctx bundle --mode compact`
+  resolve context without consuming first-use injection state.
+- Rule metadata can target `domains`, `surfaces`, `work_types`, `languages`,
+  `file_globs`, and `exact_files`; only rules marked `inject: "always"` are
+  eligible for injection.
+- Resolver limits come from `.agents/config.json` under
+  `rules.resolver.max_chars_per_rule` and `rules.resolver.max_chars_total`;
+  defaults are `2000` and `4000`.
+- Persistent state lives at `.afol/data/rules/injection-state.json`, is
+  serialized under the rule-injection lock, and is written atomically.
+- Missing optional rule markdown is omitted with a reason; missing required
+  rule markdown fails loudly; invalid injection state or invalid rules index
+  also fails loudly.
+- `.agents/rules/**` content is static and must not be edited unless the user
+  explicitly requests a rule-content change.
 
 ## Validation Gates
 

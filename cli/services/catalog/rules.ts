@@ -59,6 +59,7 @@ export type ResolveRulesOptions = {
 	inject?: string | undefined;
 	maxCharsPerRule?: number | undefined;
 	maxCharsTotal?: number | undefined;
+	strictIndex?: boolean | undefined;
 };
 
 export class RuleResolverError extends Error {}
@@ -191,15 +192,27 @@ function fallbackRules(projectPaths: ResolvedProjectPaths): RuleEntry[] {
 		});
 }
 
-function parseRulesIndex(
-	indexPath: string,
-): { rules?: RawRule[] } | RawRule[] | null {
+type ParsedRulesIndex =
+	| { ok: true; value: { rules?: RawRule[] } | RawRule[] }
+	| { ok: false; message: string };
+
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function parseRulesIndex(indexPath: string): ParsedRulesIndex {
 	try {
-		return JSON.parse(readFileSync(indexPath, "utf8")) as
-			| { rules?: RawRule[] }
-			| RawRule[];
-	} catch {
-		return null;
+		return {
+			ok: true,
+			value: JSON.parse(readFileSync(indexPath, "utf8")) as
+				| { rules?: RawRule[] }
+				| RawRule[],
+		};
+	} catch (error) {
+		return {
+			ok: false,
+			message: errorMessage(error),
+		};
 	}
 }
 
@@ -247,18 +260,31 @@ export function getRuleResolverConfig(projectRoot: string): RuleResolverConfig {
 	};
 }
 
-export function listRules(projectRoot: string): RuleEntry[] {
+export function listRules(
+	projectRoot: string,
+	options: { strictIndex?: boolean | undefined } = {},
+): RuleEntry[] {
 	const projectPaths = resolveProjectPaths(projectRoot);
 	const indexPath = join(projectPaths.abs.rulesDir, "index.json");
 	if (!existsSync(indexPath)) {
 		return fallbackRules(projectPaths);
 	}
 	const parsed = parseRulesIndex(indexPath);
-	if (parsed === null) {
+	if (!parsed.ok) {
+		if (options.strictIndex === true) {
+			throw new RuleResolverError(
+				`Invalid rules index ${indexPath}: ${parsed.message}`,
+			);
+		}
 		return fallbackRules(projectPaths);
 	}
-	const rawRules = Array.isArray(parsed) ? parsed : parsed.rules;
+	const rawRules = Array.isArray(parsed.value) ? parsed.value : parsed.value.rules;
 	if (!Array.isArray(rawRules)) {
+		if (options.strictIndex === true) {
+			throw new RuleResolverError(
+				`Invalid rules index ${indexPath}: expected rules array`,
+			);
+		}
 		return fallbackRules(projectPaths);
 	}
 	return rawRules
@@ -356,7 +382,9 @@ export function resolveRules(
 		defaults.maxCharsTotal,
 	);
 	let totalChars = 0;
-	const matchingRules = listRules(projectRoot)
+	const matchingRules = listRules(projectRoot, {
+		strictIndex: options.strictIndex,
+	})
 		.filter((rule) => {
 			const workMatch =
 				rule.workTypes.length === 0 ||

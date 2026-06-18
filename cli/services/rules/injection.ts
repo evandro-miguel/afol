@@ -1,10 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import {
 	getRuleResolverConfig,
 	type RuleEntry,
+	RuleResolverError,
 	resolveRules,
 } from "../catalog/rules";
+import { atomicWriteText } from "../io/atomic";
+import { withSessionLock } from "../io/session-lock";
 import {
 	normalizeProjectRelativePath,
 	resolveProjectPaths,
@@ -13,6 +16,7 @@ import {
 const RULE_INJECTION_STATE_KIND = "rule_injection_state_v1";
 const RULE_INJECTION_VERSION = 1;
 const RULE_INJECTION_MODE = "always";
+const RULE_INJECTION_LOCK_NAME = "rule-injection-state";
 
 const GENERIC_SURFACE_TOKENS = new Set([
 	"cli",
@@ -101,6 +105,10 @@ export class RuleInjectionError extends Error {
 		super(message);
 		this.name = "RuleInjectionError";
 	}
+}
+
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }
 
 function normalizeText(value: string | undefined, fallback: string): string {
@@ -240,18 +248,24 @@ function readState(projectRoot: string): RuleInjectionState {
 			typeof parsed.identities !== "object" ||
 			Array.isArray(parsed.identities)
 		) {
-			return emptyState();
+			throw new RuleInjectionError(
+				`Invalid rule injection state ${path}: unexpected schema`,
+			);
 		}
 		return parsed;
-	} catch {
-		return emptyState();
+	} catch (error) {
+		if (error instanceof RuleInjectionError) {
+			throw error;
+		}
+		throw new RuleInjectionError(
+			`Invalid rule injection state ${path}: ${errorMessage(error)}`,
+		);
 	}
 }
 
 function writeState(projectRoot: string, state: RuleInjectionState): void {
 	const path = statePath(projectRoot).absolute;
-	mkdirSync(dirname(path), { recursive: true });
-	writeFileSync(path, JSON.stringify(state, null, 2), "utf8");
+	atomicWriteText(path, `${JSON.stringify(state, null, 2)}\n`);
 }
 
 function buildIdentity(options: {
@@ -282,10 +296,10 @@ function ruleRef(rule: RuleEntry): RuleInjectionReference {
 	};
 }
 
-function readRuleContent(projectRoot: string, path: string): string {
+function readRuleContent(projectRoot: string, path: string): string | null {
 	const absolutePath = join(projectRoot, path);
 	if (!existsSync(absolutePath)) {
-		return "";
+		return null;
 	}
 	return readFileSync(absolutePath, "utf8");
 }
@@ -303,17 +317,25 @@ function matchingInjectableRules(
 	projectRoot: string,
 	context: RuleSelectionContext,
 ): RuleEntry[] {
-	return resolveRules(projectRoot, {
-		scope: context.scope ?? undefined,
-		domains: context.domains,
-		surfaces: context.surfaces,
-		workType: context.workType,
-		languages: context.languages,
-		filePath: context.filePath ?? undefined,
-		inject: RULE_INJECTION_MODE,
-		maxCharsPerRule: Number.MAX_SAFE_INTEGER,
-		maxCharsTotal: Number.MAX_SAFE_INTEGER,
-	});
+	try {
+		return resolveRules(projectRoot, {
+			scope: context.scope ?? undefined,
+			domains: context.domains,
+			surfaces: context.surfaces,
+			workType: context.workType,
+			languages: context.languages,
+			filePath: context.filePath ?? undefined,
+			inject: RULE_INJECTION_MODE,
+			maxCharsPerRule: Number.MAX_SAFE_INTEGER,
+			maxCharsTotal: Number.MAX_SAFE_INTEGER,
+			strictIndex: true,
+		});
+	} catch (error) {
+		if (error instanceof RuleResolverError) {
+			throw new RuleInjectionError(error.message);
+		}
+		throw error;
+	}
 }
 
 function injectionMetadata(
@@ -410,72 +432,83 @@ export function resolveAndRecordRuleInjection(
 		role,
 		surface,
 	} = injectionMetadata(projectRoot, options);
-	const state = readState(projectRoot);
-	const now = new Date().toISOString();
-	const existing = state.identities[identity];
-	const firstUse = !existing;
-	const identityState: RuleInjectionIdentityState = existing ?? {
-		session: normalizeSessionOrTask(options.session),
-		task: normalizeSessionOrTask(options.task),
-		role,
-		surface,
-		file_path: context.filePath,
-		first_seen_at: now,
-		last_seen_at: now,
-		rules: {},
-	};
-	const injected: RuleInjectionPayload[] = [];
-	const alreadyInjected: RuleInjectionReference[] = [];
-	const omitted: RuleInjectionOmission[] = [];
-	let usedChars = usedCharsForIdentity(identityState);
-
-	for (const rule of matchingInjectableRules(projectRoot, context)) {
-		const reference = ruleRef(rule);
-		if (identityState.rules[rule.id]) {
-			alreadyInjected.push(reference);
-			continue;
-		}
-		if (rule.charCount > resolverConfig.maxCharsPerRule) {
-			const reason = `rule exceeds max_chars_per_rule (${rule.charCount}/${resolverConfig.maxCharsPerRule})`;
-			if (rule.required) {
-				throw new RuleInjectionError(`${rule.id}: ${reason}`);
-			}
-			omitted.push({ ...reference, reason });
-			continue;
-		}
-		if (usedChars + rule.charCount > resolverConfig.maxCharsTotal) {
-			const reason = `rule exceeds max_total_chars (${usedChars + rule.charCount}/${resolverConfig.maxCharsTotal})`;
-			if (rule.required) {
-				throw new RuleInjectionError(`${rule.id}: ${reason}`);
-			}
-			omitted.push({ ...reference, reason });
-			continue;
-		}
-		const content = readRuleContent(projectRoot, rule.path);
-		identityState.rules[rule.id] = {
-			path: rule.path,
-			char_count: content.length,
-			injected_at: now,
+	return withSessionLock(projectRoot, RULE_INJECTION_LOCK_NAME, () => {
+		const state = readState(projectRoot);
+		const now = new Date().toISOString();
+		const existing = state.identities[identity];
+		const firstUse = !existing;
+		const identityState: RuleInjectionIdentityState = existing ?? {
+			session: normalizeSessionOrTask(options.session),
+			task: normalizeSessionOrTask(options.task),
+			role,
+			surface,
+			file_path: context.filePath,
+			first_seen_at: now,
+			last_seen_at: now,
+			rules: {},
 		};
-		usedChars += content.length;
-		injected.push({ ...reference, char_count: content.length, content });
-	}
+		const injected: RuleInjectionPayload[] = [];
+		const alreadyInjected: RuleInjectionReference[] = [];
+		const omitted: RuleInjectionOmission[] = [];
+		let usedChars = usedCharsForIdentity(identityState);
 
-	identityState.last_seen_at = now;
-	state.identities[identity] = identityState;
-	writeState(projectRoot, state);
+		for (const rule of matchingInjectableRules(projectRoot, context)) {
+			const reference = ruleRef(rule);
+			if (identityState.rules[rule.id]) {
+				alreadyInjected.push(reference);
+				continue;
+			}
+			const content = readRuleContent(projectRoot, rule.path);
+			if (content === null) {
+				const reason = `rule markdown file missing (${rule.path})`;
+				if (rule.required) {
+					throw new RuleInjectionError(`${rule.id}: ${reason}`);
+				}
+				omitted.push({ ...reference, reason });
+				continue;
+			}
+			const charCount = content.length;
+			if (charCount > resolverConfig.maxCharsPerRule) {
+				const reason = `rule exceeds max_chars_per_rule (${charCount}/${resolverConfig.maxCharsPerRule})`;
+				if (rule.required) {
+					throw new RuleInjectionError(`${rule.id}: ${reason}`);
+				}
+				omitted.push({ ...reference, char_count: charCount, reason });
+				continue;
+			}
+			if (usedChars + charCount > resolverConfig.maxCharsTotal) {
+				const reason = `rule exceeds max_total_chars (${usedChars + charCount}/${resolverConfig.maxCharsTotal})`;
+				if (rule.required) {
+					throw new RuleInjectionError(`${rule.id}: ${reason}`);
+				}
+				omitted.push({ ...reference, char_count: charCount, reason });
+				continue;
+			}
+			identityState.rules[rule.id] = {
+				path: rule.path,
+				char_count: charCount,
+				injected_at: now,
+			};
+			usedChars += charCount;
+			injected.push({ ...reference, char_count: charCount, content });
+		}
 
-	return {
-		identity,
-		state_path: relativeStatePath,
-		first_use: firstUse,
-		injected,
-		already_injected: alreadyInjected,
-		omitted: omitted,
-		budget: {
-			max_chars_per_rule: resolverConfig.maxCharsPerRule,
-			max_total_chars: resolverConfig.maxCharsTotal,
-			used_chars: usedChars,
-		},
-	};
+		identityState.last_seen_at = now;
+		state.identities[identity] = identityState;
+		writeState(projectRoot, state);
+
+		return {
+			identity,
+			state_path: relativeStatePath,
+			first_use: firstUse,
+			injected,
+			already_injected: alreadyInjected,
+			omitted: omitted,
+			budget: {
+				max_chars_per_rule: resolverConfig.maxCharsPerRule,
+				max_total_chars: resolverConfig.maxCharsTotal,
+				used_chars: usedChars,
+			},
+		};
+	});
 }

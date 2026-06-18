@@ -638,6 +638,117 @@ describe("context system", () => {
 		}
 	});
 
+	test("buildContextBundle omits optional injected rules with missing markdown files and does not persist them", () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-PRESENT",
+							name: "present rule",
+							path: "present.md",
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 100,
+						},
+						{
+							id: "RULE-MISSING",
+							name: "missing rule",
+							path: "missing.md",
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 90,
+						},
+					],
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".agents", "rules", "present.md"),
+				"# Present rule\n",
+				"utf8",
+			);
+
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(bundle.rule_injection.injected.map((rule) => rule.id)).toEqual([
+				"RULE-PRESENT",
+			]);
+			expect(bundle.rule_injection.omitted.map((rule) => rule.id)).toEqual([
+				"RULE-MISSING",
+			]);
+			expect(bundle.rule_injection.omitted[0]?.reason).toContain(
+				"rule markdown file missing",
+			);
+			expect(bundle.rule_injection.omitted[0]?.reason).toContain("missing.md");
+
+			const state = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			) as {
+				identities: Record<string, { rules: Record<string, unknown> }>;
+			};
+			const identity = Object.keys(state.identities)[0] ?? "";
+			expect(Object.keys(state.identities[identity]?.rules ?? {})).toEqual([
+				"RULE-PRESENT",
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle --json rejects corrupt rule injection state without overwriting it", async () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			writeFileSync(
+				join(root, ".agents", "rules", "alpha.md"),
+				"# Alpha rule\n",
+				"utf8",
+			);
+			const statePath = ruleInjectionStatePath(root);
+			mkdirSync(join(root, ".afol", "data", "rules"), { recursive: true });
+			writeFileSync(statePath, "{not-json\n", "utf8");
+
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			expect(captured.stderr).toEqual([]);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				error: { code: string; message: string };
+			};
+			expect(payload.error.code).toBe("CTX_RULE_INJECTION_ERROR");
+			expect(payload.error.message).toContain("Invalid rule injection state");
+			expect(readFileSync(statePath, "utf8")).toBe("{not-json\n");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("buildContextBundle infers TS surface and language from file path", () => {
 		const root = createBundleFixture();
 		try {
@@ -1407,6 +1518,114 @@ describe("context system", () => {
 			expect(payload.error.code).toBe("CTX_RULE_INJECTION_ERROR");
 			expect(payload.error.message).toContain("RULE-REQUIRED");
 			expect(payload.error.message).toContain("max_chars_per_rule");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle --json returns injection error when a required rule file is missing", async () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-REQUIRED",
+							name: "required rule",
+							path: "required.md",
+							required: true,
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 100,
+						},
+					],
+				}),
+				"utf8",
+			);
+
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			expect(captured.stderr).toEqual([]);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
+				error: {
+					code: string;
+					message: string;
+				};
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(1);
+			expect(payload.error.code).toBe("CTX_RULE_INJECTION_ERROR");
+			expect(payload.error.message).toContain("RULE-REQUIRED");
+			expect(payload.error.message).toContain("rule markdown file missing");
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle --json rejects invalid indexed rules before fallback injection", async () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "rules", "index.json"),
+				"{not-json\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".agents", "rules", "RULE-001-fallback.md"),
+				"# Fallback\n",
+				"utf8",
+			);
+
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			expect(captured.stderr).toEqual([]);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				error: { code: string; message: string };
+			};
+			expect(payload.error.code).toBe("CTX_RULE_INJECTION_ERROR");
+			expect(payload.error.message).toContain("Invalid rules index");
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
