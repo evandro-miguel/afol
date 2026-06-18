@@ -37,9 +37,10 @@ function createValidationFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "validate-command-"));
 	const agentsDir = join(root, ".agents");
 
-	mkdirSync(join(agentsDir, "rules"), { recursive: true });
 	mkdirSync(join(agentsDir, "skills"), { recursive: true });
-	mkdirSync(join(root, ".afol", "adm"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "hooks"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "source"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc"), { recursive: true });
 
@@ -64,6 +65,11 @@ function createValidationFixture(): string {
 	writeFileSync(
 		join(agentsDir, "manifest.json"),
 		JSON.stringify({ schema_version: 1, managed_hashes: {} }),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, ".afol", "adm", "tools.json"),
+		JSON.stringify({ version: "test", tools: [] }),
 		"utf8",
 	);
 
@@ -134,14 +140,28 @@ describe("validate command", () => {
 				checks.some((entry) => entry.id === "rules_dir" && entry.ok === true),
 			).toBe(true);
 			expect(
+				checks.some((entry) => entry.id === "hooks_dir" && entry.ok === true),
+			).toBe(true);
+			expect(
+				checks.some(
+					(entry) => entry.id === "adm_source_dir" && entry.ok === true,
+				),
+			).toBe(true);
+			expect(
+				checks.some((entry) => entry.id === "adm_tools" && entry.ok === true),
+			).toBe(true);
+			expect(
 				checks.some((entry) => entry.id === "skills_dir" && entry.ok === true),
 			).toBe(true);
 			expect(
 				checks.some((entry) => entry.id === "wb_dir" && entry.ok === true),
 			).toBe(true);
 			expect(
+				checks.some((entry) => entry.id === "adm_dir" && entry.ok === true),
+			).toBe(true);
+			expect(
 				checks.some(
-					(entry) => entry.id === "docs_arc_dir" && entry.ok === true,
+					(entry) => entry.id === "agents_payload_clean" && entry.ok === true,
 				),
 			).toBe(true);
 			expect(
@@ -342,12 +362,12 @@ describe("validate command", () => {
 		const root = createValidationFixture();
 		try {
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				"{invalid-json",
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "RULE-001-example.md"),
+				join(root, ".afol", "adm", "rules", "RULE-001-example.md"),
 				"# Rule 1\n",
 				"utf8",
 			);

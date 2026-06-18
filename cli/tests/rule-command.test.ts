@@ -14,7 +14,8 @@ function mkRoot(config?: {
 	maxCharsTotal?: number;
 }): string {
 	const root = mkdtempSync(join(tmpdir(), "rule-command-"));
-	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
+	mkdirSync(join(root, ".agents"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
 	writeFileSync(
 		join(root, ".agents", "config.json"),
 		JSON.stringify({
@@ -30,7 +31,7 @@ function mkRoot(config?: {
 		"utf8",
 	);
 	writeFileSync(
-		join(root, ".agents", "rules", "index.json"),
+		join(root, ".afol", "adm", "rules", "index.json"),
 		JSON.stringify({
 			rules: [
 				{
@@ -54,12 +55,12 @@ function mkRoot(config?: {
 		"utf8",
 	);
 	writeFileSync(
-		join(root, ".agents", "rules", "RULE-001-tool-discovery.md"),
+		join(root, ".afol", "adm", "rules", "RULE-001-tool-discovery.md"),
 		"# Rule 1\n",
 		"utf8",
 	);
 	writeFileSync(
-		join(root, ".agents", "rules", "RULE-004-validation-linting.md"),
+		join(root, ".afol", "adm", "rules", "RULE-004-validation-linting.md"),
 		"# Rule 4\n",
 		"utf8",
 	);
@@ -86,12 +87,12 @@ function writeRuleFixture(
 	},
 ): void {
 	writeFileSync(
-		join(root, ".agents", "rules", options.path),
+		join(root, ".afol", "adm", "rules", options.path),
 		options.content,
 		"utf8",
 	);
 	writeFileSync(
-		join(root, ".agents", "rules", "index.json"),
+		join(root, ".afol", "adm", "rules", "index.json"),
 		JSON.stringify({
 			rules: [
 				{
@@ -169,7 +170,7 @@ describe("rule command", () => {
 		const root = mkRoot();
 		try {
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				"{invalid-json",
 				"utf8",
 			);
@@ -208,7 +209,7 @@ describe("rule command", () => {
 			expect(rules).toHaveLength(1);
 			expect(rules[0]?.required).toBe(true);
 			expect(rules[0]?.path).toBe(
-				".agents/rules/RULE-011-surface-domain-rule.md",
+				".afol/adm/rules/RULE-011-surface-domain-rule.md",
 			);
 			expect(rules[0]?.charCount).toBe("alpha matching rule".length);
 			expect(getRuleResolverConfig(root)).toEqual({
@@ -217,12 +218,12 @@ describe("rule command", () => {
 			});
 
 			writeFileSync(
-				join(root, ".agents", "rules", "RULE-012-big-rule.md"),
+				join(root, ".afol", "adm", "rules", "RULE-012-big-rule.md"),
 				"x".repeat(25),
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				JSON.stringify({
 					rules: [
 						{
@@ -363,17 +364,17 @@ describe("rule command", () => {
 		const root = mkRoot({ maxCharsPerRule: 20, maxCharsTotal: 30 });
 		try {
 			writeFileSync(
-				join(root, ".agents", "rules", "RULE-031-required-a.md"),
+				join(root, ".afol", "adm", "rules", "RULE-031-required-a.md"),
 				"a".repeat(18),
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "RULE-032-required-b.md"),
+				join(root, ".afol", "adm", "rules", "RULE-032-required-b.md"),
 				"b".repeat(18),
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				JSON.stringify({
 					rules: [
 						{
@@ -460,12 +461,12 @@ describe("rule command", () => {
 		const root = mkRoot();
 		try {
 			writeFileSync(
-				join(root, ".agents", "rules", "RULE-099-safe-name.md"),
+				join(root, ".afol", "adm", "rules", "RULE-099-safe-name.md"),
 				"safe path rule",
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				JSON.stringify({
 					rules: [
 						{
@@ -478,7 +479,7 @@ describe("rule command", () => {
 				"utf8",
 			);
 			const rule = listRules(root)[0];
-			expect(rule?.path).toBe(".agents/rules/RULE-099-safe-name.md");
+			expect(rule?.path).toBe(".afol/adm/rules/RULE-099-safe-name.md");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

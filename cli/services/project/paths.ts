@@ -11,6 +11,7 @@ type ProjectPathConfig = {
 	libraryDir: string;
 	memoryFile: string;
 	rulesDir: string;
+	hooksDir: string;
 	skillsDir: string;
 	wbDir: string;
 	activeSessionFile: string;
@@ -113,6 +114,7 @@ function absolute(root: string, paths: ProjectPathConfig): ProjectPathConfig {
 		libraryDir: resolve(root, paths.libraryDir),
 		memoryFile: resolve(root, paths.memoryFile),
 		rulesDir: resolve(root, paths.rulesDir),
+		hooksDir: resolve(root, paths.hooksDir),
 		skillsDir: resolve(root, paths.skillsDir),
 		wbDir: resolve(root, paths.wbDir),
 		activeSessionFile: resolve(root, paths.activeSessionFile),
@@ -142,11 +144,12 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 		`${dataDir}/mutations`,
 	);
 	const wbDir = fromConfig(config, ["paths", "wb_dir"], ".afol/wb");
+	const admDir = fromConfig(config, ["paths", "adm_dir"], `${mutableDir}/adm`);
 
 	const paths: ProjectPathConfig = {
 		agentsDir,
 		mutableDir,
-		admDir: fromConfig(config, ["paths", "adm_dir"], `${mutableDir}/adm`),
+		admDir,
 		pstrDir: fromConfig(config, ["paths", "pstr_dir"], `${mutableDir}/pstr`),
 		stateDb: fromConfig(
 			config,
@@ -163,7 +166,8 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 			["paths", "memory_file"],
 			`${mutableDir}/memory/memory.md`,
 		),
-		rulesDir: fromConfig(config, ["paths", "rules_dir"], `${agentsDir}/rules`),
+		rulesDir: fromConfig(config, ["paths", "rules_dir"], `${admDir}/rules`),
+		hooksDir: fromConfig(config, ["paths", "hooks_dir"], `${admDir}/hooks`),
 		skillsDir: normalizeProjectRelativePath(
 			stringAt(config, ["paths", "skills_dir"]) ??
 				stringAt(config, ["skills_sync", "project_dir"]) ??

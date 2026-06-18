@@ -24,10 +24,14 @@ export type ProjectValidationCheck = {
 		| "config"
 		| "lock"
 		| "manifest"
+		| "adm_dir"
 		| "rules_dir"
+		| "hooks_dir"
+		| "adm_source_dir"
+		| "adm_tools"
 		| "skills_dir"
 		| "wb_dir"
-		| "docs_arc_dir"
+		| "agents_payload_clean"
 		| "template_forbidden"
 		| "rules_local_state_index"
 		| "skills_local_state_index"
@@ -125,7 +129,7 @@ function validateSkillPathConfig(
 }
 
 function validateJsonFile(
-	id: "lock" | "manifest",
+	id: "lock" | "manifest" | "adm_tools",
 	path: string,
 ): ProjectValidationCheck {
 	const loaded = loadJsonObject(path);
@@ -137,7 +141,13 @@ function validateJsonFile(
 
 function validateDirectory(
 	_projectRoot: string,
-	id: "rules_dir" | "skills_dir" | "wb_dir" | "docs_arc_dir",
+	id:
+		| "adm_dir"
+		| "rules_dir"
+		| "hooks_dir"
+		| "adm_source_dir"
+		| "skills_dir"
+		| "wb_dir",
 	path: string,
 ): ProjectValidationCheck {
 	if (!existsSync(path)) {
@@ -156,6 +166,32 @@ function validateDirectory(
 		};
 	}
 	return { id, ok: true, message: `ok ${path}` };
+}
+
+function validateAgentsPayloadClean(
+	projectRoot: string,
+): ProjectValidationCheck {
+	const forbidden = [
+		".agents/hooks",
+		".agents/rules",
+		".agents/source",
+		".agents/tools",
+		".agents/tools.json",
+	].filter((path) => existsSync(join(projectRoot, path)));
+
+	if (forbidden.length > 0) {
+		return {
+			id: "agents_payload_clean",
+			ok: false,
+			message: `operational AFOL payload must not live under .agents: ${forbidden.join(", ")}`,
+		};
+	}
+
+	return {
+		id: "agents_payload_clean",
+		ok: true,
+		message: "ok .agents contains provider-safe static payload only",
+	};
 }
 
 async function validateTemplateForbidden(
@@ -244,14 +280,18 @@ export async function validateProjectStructure(
 		validateConfig(projectRoot),
 		validateJsonFile("lock", projectPaths.abs.lockFile),
 		validateJsonFile("manifest", projectPaths.abs.manifestFile),
+		validateDirectory(projectRoot, "adm_dir", projectPaths.abs.admDir),
 		validateDirectory(projectRoot, "rules_dir", projectPaths.abs.rulesDir),
-		validateDirectory(projectRoot, "skills_dir", projectPaths.abs.skillsDir),
-		validateDirectory(projectRoot, "wb_dir", projectPaths.abs.wbDir),
+		validateDirectory(projectRoot, "hooks_dir", projectPaths.abs.hooksDir),
 		validateDirectory(
 			projectRoot,
-			"docs_arc_dir",
-			join(projectRoot, ".afol", "adm"),
+			"adm_source_dir",
+			join(projectPaths.abs.admDir, "source"),
 		),
+		validateJsonFile("adm_tools", join(projectPaths.abs.admDir, "tools.json")),
+		validateDirectory(projectRoot, "skills_dir", projectPaths.abs.skillsDir),
+		validateDirectory(projectRoot, "wb_dir", projectPaths.abs.wbDir),
+		validateAgentsPayloadClean(projectRoot),
 		(() => {
 			const result = validateWorkBenchIndex(projectRoot);
 			return {
