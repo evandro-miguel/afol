@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import {
+	closeSync,
+	existsSync,
+	mkdirSync,
+	openSync,
+	readdirSync,
+	readFileSync,
+	readSync,
+} from "node:fs";
 import { join, relative } from "node:path";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
@@ -174,6 +182,7 @@ const GENERATED_FILE_NAMES = new Set([
 	"generated-summary.md",
 	"validation-report.json",
 ]);
+const GENERATED_MARKER_READ_LIMIT_BYTES = 64 * 1024;
 
 function buildGeneratedFiles(
 	projectRoot: string,
@@ -216,6 +225,17 @@ function contentMatches(path: string, content: string): boolean {
 	return existsSync(path) && readFileSync(path, "utf8") === content;
 }
 
+function readFilePrefix(path: string): string {
+	const file = openSync(path, "r");
+	try {
+		const buffer = Buffer.alloc(GENERATED_MARKER_READ_LIMIT_BYTES);
+		const bytesRead = readSync(file, buffer, 0, buffer.length, 0);
+		return buffer.subarray(0, bytesRead).toString("utf8");
+	} finally {
+		closeSync(file);
+	}
+}
+
 function fileLooksLikeProjectBenchmarkGeneratedOutput(
 	path: string,
 	fileName: string,
@@ -231,7 +251,7 @@ function fileLooksLikeProjectBenchmarkGeneratedOutput(
 		return false;
 	}
 	try {
-		const content = readFileSync(path, "utf8");
+		const content = readFilePrefix(path);
 		if (fileName.endsWith(".json")) {
 			try {
 				const value = JSON.parse(content) as unknown;
