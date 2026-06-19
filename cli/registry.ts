@@ -183,12 +183,13 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Mark a task complete",
 			},
 			{
-				usage: "--test \"<cmd>\"",
+				usage: '--test "<cmd>"',
 				sideEffect: "write",
-				description: "Run a verification command, record evidence, then complete",
+				description:
+					"Run a verification command, record evidence, then complete",
 			},
 			{
-				usage: "--command \"<cmd>\" --result passed",
+				usage: '--command "<cmd>" --result passed',
 				sideEffect: "write",
 				description: "Record explicit evidence while completing the task",
 			},
@@ -254,9 +255,10 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		category: "workflow",
 		subcommands: [
 			{
-				usage: "<theme> --task <summary> --command \"<cmd>\"",
+				usage: '<theme> --task <summary> --command "<cmd>"',
 				sideEffect: "write",
-				description: "Create, start, verify, record evidence, and close one task",
+				description:
+					"Create, start, verify, record evidence, and close one task",
 			},
 			{
 				usage: "--result passed --artifact <path> --note <text>",
@@ -279,7 +281,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Target the task that owns the evidence",
 			},
 			{
-				usage: "--command \"<cmd>\" --result passed",
+				usage: '--command "<cmd>" --result passed',
 				sideEffect: "append",
 				description: "Record the verification command and result",
 			},

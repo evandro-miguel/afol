@@ -29,7 +29,9 @@ describe("help formatter", () => {
 		expect(help).toContain("hk/hook");
 		expect(help).toContain("bench");
 		expect(help).toContain("pb/project-benchmark");
-		expect(help).toContain("pb/project-benchmark[generated] - compare references");
+		expect(help).toContain(
+			"pb/project-benchmark[generated] - compare references",
+		);
 		expect(help).toContain("Side effects");
 		expect(help).toContain("write=changes files/state");
 		expect(help).toContain("afol help <command>");
@@ -75,7 +77,9 @@ describe("help formatter", () => {
 		);
 		expect(help).toContain("    subcommands:");
 		expect(help).toContain("      generate --check [read]");
-		expect(help).toContain("  --verbose  Expanded human catalog with subcommands");
+		expect(help).toContain(
+			"  --verbose  Expanded human catalog with subcommands",
+		);
 	});
 
 	test("formats per-command help from registry metadata", () => {

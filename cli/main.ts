@@ -156,8 +156,7 @@ export async function main(argv: string[]): Promise<number> {
 			args
 				.slice(1)
 				.find(
-					(arg) =>
-						!kernelRegistry.isJsonAlias(arg) && !isVerboseHelpArg(arg),
+					(arg) => !kernelRegistry.isJsonAlias(arg) && !isVerboseHelpArg(arg),
 				) ?? "";
 		const verboseRequested = args.some(isVerboseHelpArg);
 		if (jsonRequested) {
@@ -176,7 +175,9 @@ export async function main(argv: string[]): Promise<number> {
 			return 0;
 		}
 		if (!helpTarget) {
-			console.log(formatHelpText(kernelRegistry, { verbose: verboseRequested }));
+			console.log(
+				formatHelpText(kernelRegistry, { verbose: verboseRequested }),
+			);
 			return 0;
 		}
 		const help = formatCommandHelp(helpTarget, kernelRegistry);
