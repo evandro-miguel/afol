@@ -204,14 +204,39 @@ describe("kernel front-door", () => {
 			const proc = runKernel(root, ["-h"]);
 			expect(proc.status).toBe(0);
 			const lines = (proc.stdout as string).trim().split("\n");
-			expect(lines.length).toBeLessThanOrEqual(30);
+			expect(lines.length).toBeLessThanOrEqual(70);
 			expect(proc.stdout as string).toContain("Usage: afol");
 			expect(proc.stdout as string).toContain("Commands");
 			expect(proc.stdout as string).toContain("s/status");
+			expect(proc.stdout as string).toContain(
+				"s/status[read] - project status",
+			);
 			expect(proc.stdout as string).toContain("v/validate");
 			expect(proc.stdout as string).toContain("n/new");
 			expect(proc.stdout as string).toContain("bench");
+			expect(proc.stdout as string).toContain("afol help --verbose");
 			expect(proc.stdout as string).toContain("a=afol");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("--help --verbose prints expanded catalog without requiring project files", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-help-verbose-no-project-"));
+		try {
+			for (const args of [
+				["help", "--verbose"],
+				["--help", "--verbose"],
+			]) {
+				const proc = runKernel(root, args);
+				expect(proc.status).toBe(0);
+				expect(proc.stdout as string).toContain("  project-benchmark");
+				expect(proc.stdout as string).toContain("    aliases: pb");
+				expect(proc.stdout as string).toContain("    subcommands:");
+				expect(proc.stdout as string).toContain(
+					"      generate --check [read]",
+				);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -289,6 +314,11 @@ describe("kernel front-door", () => {
 				sideEffect: string;
 				description: string;
 				category?: string;
+				subcommands?: Array<{
+					usage: string;
+					sideEffect: string;
+					description: string;
+				}>;
 			};
 			expect(singlePayload).toEqual({
 				command: "status",
@@ -297,6 +327,18 @@ describe("kernel front-door", () => {
 				sideEffect: "read",
 				description: "Show current project status",
 				category: "core",
+				subcommands: [
+					{
+						usage: "--json",
+						sideEffect: "read",
+						description: "Emit machine-readable project status",
+					},
+					{
+						usage: "--session <session-id>",
+						sideEffect: "read",
+						description: "Resolve status around a specific session",
+					},
+				],
 			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });

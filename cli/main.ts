@@ -121,6 +121,10 @@ export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
 	"hydrate",
 ]);
 
+function isVerboseHelpArg(arg: string): boolean {
+	return arg === "--verbose";
+}
+
 export async function main(argv: string[]): Promise<number> {
 	let args = argv.slice(2);
 
@@ -143,7 +147,14 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (args[0] === "help") {
 		const jsonRequested = args.some((arg) => kernelRegistry.isJsonAlias(arg));
-		const helpTarget = args[1] ?? "";
+		const helpTarget =
+			args
+				.slice(1)
+				.find(
+					(arg) =>
+						!kernelRegistry.isJsonAlias(arg) && !isVerboseHelpArg(arg),
+				) ?? "";
+		const verboseRequested = args.some(isVerboseHelpArg);
 		if (jsonRequested) {
 			if (helpTarget && !kernelRegistry.isJsonAlias(helpTarget)) {
 				const help = buildCommandHelpJson(helpTarget, kernelRegistry);
@@ -159,8 +170,8 @@ export async function main(argv: string[]): Promise<number> {
 			console.log(formatCatalogJson(kernelRegistry));
 			return 0;
 		}
-		if (args.length === 1) {
-			console.log(formatHelpText(kernelRegistry));
+		if (!helpTarget) {
+			console.log(formatHelpText(kernelRegistry, { verbose: verboseRequested }));
 			return 0;
 		}
 		const help = formatCommandHelp(helpTarget, kernelRegistry);
@@ -177,7 +188,9 @@ export async function main(argv: string[]): Promise<number> {
 	const resolution = resolveCommand(args);
 
 	if (resolution.kind === "help") {
-		console.log(formatHelpText(kernelRegistry));
+		console.log(
+			formatHelpText(kernelRegistry, { verbose: args.some(isVerboseHelpArg) }),
+		);
 		return 0;
 	}
 

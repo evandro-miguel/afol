@@ -56,6 +56,7 @@ export type CommandSpec = {
 	sideEffect: CommandSideEffect;
 	description: string;
 	category?: CommandCategory;
+	guidance?: readonly string[];
 	subcommands?: readonly CommandSubcommandSpec[];
 };
 
@@ -67,6 +68,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Show current project status",
 		category: "core",
+		subcommands: [
+			{
+				usage: "--json",
+				sideEffect: "read",
+				description: "Emit machine-readable project status",
+			},
+			{
+				usage: "--session <session-id>",
+				sideEffect: "read",
+				description: "Resolve status around a specific session",
+			},
+		],
 	},
 	{
 		command: "validate",
@@ -75,6 +88,42 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Run validation gates",
 		category: "core",
+		guidance: [
+			"Use project validation for scaffold health before and after edits.",
+			"Use bench validation when command output, latency, or token budget changes.",
+		],
+		subcommands: [
+			{
+				usage: "project --json",
+				sideEffect: "read",
+				description: "Validate project structure and AFOL indexes",
+			},
+			{
+				usage: "project --check-drift --json",
+				sideEffect: "read",
+				description: "Validate project structure and include drift checks",
+			},
+			{
+				usage: "drift --json",
+				sideEffect: "read",
+				description: "Run drift validation only",
+			},
+			{
+				usage: "bench --pack <pack-id> --json",
+				sideEffect: "read",
+				description: "Run one benchmark pack with its configured gates",
+			},
+			{
+				usage: "select --changed-path <path>",
+				sideEffect: "read",
+				description: "Show which benchmark packs match changed paths",
+			},
+			{
+				usage: "run --changed-path <path>",
+				sideEffect: "read",
+				description: "Run benchmark packs selected from changed paths",
+			},
+		],
 	},
 	{
 		command: "init",
@@ -83,6 +132,13 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Install scaffold; use --dry-run to preview writes",
 		category: "core",
+		subcommands: [
+			{
+				usage: "--dry-run",
+				sideEffect: "read",
+				description: "Preview scaffold install without writing",
+			},
+		],
 	},
 	{
 		command: "start",
@@ -91,6 +147,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Start a workbench task",
 		category: "workflow",
+		subcommands: [
+			{
+				usage: "--session <session-id> --task-id <task-id>",
+				sideEffect: "write",
+				description: "Start a specific task in a specific session",
+			},
+			{
+				usage: "--task-id <task-id>",
+				sideEffect: "write",
+				description: "Start a task in the active or context session",
+			},
+			{
+				usage: "--json",
+				sideEffect: "write",
+				description: "Emit machine-readable start result",
+			},
+		],
 	},
 	{
 		command: "done",
@@ -99,6 +172,31 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Complete a task session",
 		category: "workflow",
+		guidance: [
+			"Record evidence before done, or use --test/--command to record evidence while closing.",
+		],
+		subcommands: [
+			{
+				usage: "--session <session-id> --task-id <task-id>",
+				sideEffect: "write",
+				description: "Mark a task complete",
+			},
+			{
+				usage: "--test \"<cmd>\"",
+				sideEffect: "write",
+				description: "Run a verification command, record evidence, then complete",
+			},
+			{
+				usage: "--command \"<cmd>\" --result passed",
+				sideEffect: "write",
+				description: "Record explicit evidence while completing the task",
+			},
+			{
+				usage: "--require-spec-check",
+				sideEffect: "write",
+				description: "Block done when the linked spec check conflicts",
+			},
+		],
 	},
 	{
 		command: "new",
@@ -107,6 +205,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Create a workbench session",
 		category: "core",
+		subcommands: [
+			{
+				usage: "<theme> --task <summary>",
+				sideEffect: "write",
+				description: "Create a session with one or more initial tasks",
+			},
+			{
+				usage: "<theme> --feature-id <F-id> --parent-spec <spec-id>",
+				sideEffect: "write",
+				description: "Create a governed session linked to feature/spec",
+			},
+			{
+				usage: "<theme> --intent <text>",
+				sideEffect: "write",
+				description: "Attach explicit intent metadata to the session",
+			},
+		],
 	},
 	{
 		command: "log",
@@ -115,6 +230,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "append",
 		description: "Append a session log entry",
 		category: "workflow",
+		subcommands: [
+			{
+				usage: "--session <session-id> --message <text>",
+				sideEffect: "append",
+				description: "Append a timeline note to a session",
+			},
+			{
+				usage: "--json",
+				sideEffect: "append",
+				description: "Emit machine-readable log result",
+			},
+		],
 	},
 	{
 		command: "quick-task",
@@ -124,6 +251,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description:
 			"Run a single-task lifecycle after executing a verification command",
 		category: "workflow",
+		subcommands: [
+			{
+				usage: "<theme> --task <summary> --command \"<cmd>\"",
+				sideEffect: "write",
+				description: "Create, start, verify, record evidence, and close one task",
+			},
+			{
+				usage: "--result passed --artifact <path> --note <text>",
+				sideEffect: "write",
+				description: "Attach explicit evidence metadata to the quick task",
+			},
+		],
 	},
 	{
 		command: "evidence",
@@ -132,6 +271,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "append",
 		description: "Record task evidence",
 		category: "workflow",
+		subcommands: [
+			{
+				usage: "--session <session-id> --task-id <task-id>",
+				sideEffect: "append",
+				description: "Target the task that owns the evidence",
+			},
+			{
+				usage: "--command \"<cmd>\" --result passed",
+				sideEffect: "append",
+				description: "Record the verification command and result",
+			},
+			{
+				usage: "--artifact <path> --note <text>",
+				sideEffect: "append",
+				description: "Attach optional artifact and note metadata",
+			},
+		],
 	},
 	{
 		command: "rule",
@@ -156,6 +312,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Close the active session",
 		category: "workflow",
+		subcommands: [
+			{
+				usage: "--session <session-id>",
+				sideEffect: "write",
+				description: "Close a specific session after its tasks are complete",
+			},
+			{
+				usage: "--json",
+				sideEffect: "write",
+				description: "Emit machine-readable close result",
+			},
+		],
 	},
 	{
 		command: "file",
@@ -201,6 +369,32 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description:
 			"Run scaffold updates; preview and apply --dry-run are safe checks",
 		category: "ops",
+		guidance: [
+			"Prefer check, then preview, then apply --dry-run before real apply.",
+			"Real apply requires session, task id, and reason metadata.",
+		],
+		subcommands: [
+			{
+				usage: "check",
+				sideEffect: "read",
+				description: "Summarize available scaffold update changes",
+			},
+			{
+				usage: "preview",
+				sideEffect: "read",
+				description: "Show the planned update manifest without writing",
+			},
+			{
+				usage: "apply --dry-run",
+				sideEffect: "read",
+				description: "Validate apply behavior without writing files",
+			},
+			{
+				usage: "apply --session <id> --task-id <id> --reason <text>",
+				sideEffect: "write",
+				description: "Apply managed updates and record mutation metadata",
+			},
+		],
 	},
 	{
 		command: "bootstrap",
@@ -209,6 +403,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Install scaffold into another repo; use --dry-run to preview",
 		category: "workflow",
+		subcommands: [
+			{
+				usage: "<target-path> --dry-run",
+				sideEffect: "read",
+				description: "Preview bootstrap into another repository",
+			},
+			{
+				usage: "<target-path>",
+				sideEffect: "write",
+				description: "Install the scaffold into the target repository",
+			},
+		],
 	},
 	{
 		command: "verify",
@@ -217,6 +423,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Verify workbench tasks",
 		category: "workflow",
+		subcommands: [
+			{
+				usage: "[session-path] --strict",
+				sideEffect: "read",
+				description: "Require all tasks in a session path to be complete",
+			},
+			{
+				usage: "--session <session-id> --json",
+				sideEffect: "read",
+				description: "Verify one session and emit machine-readable output",
+			},
+		],
 	},
 	{
 		command: "verify-tasks",
@@ -225,6 +443,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Verify workbench tasks",
 		category: "workflow",
+		subcommands: [
+			{
+				usage: "[session-path] --strict",
+				sideEffect: "read",
+				description: "Require all tasks in a session path to be complete",
+			},
+			{
+				usage: "--session <session-id> --json",
+				sideEffect: "read",
+				description: "Verify one session and emit machine-readable output",
+			},
+		],
 	},
 	{
 		command: "local-state",
@@ -233,6 +463,27 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "generated",
 		description: "Inspect local project indexes",
 		category: "inspect",
+		guidance: [
+			"Run rebuild before validation when indexes may be stale.",
+			"Use --verbose only when the full index snapshot is needed.",
+		],
+		subcommands: [
+			{
+				usage: "freshness --json",
+				sideEffect: "read",
+				description: "Check whether local-state indexes are fresh",
+			},
+			{
+				usage: "rebuild --json",
+				sideEffect: "generated",
+				description: "Refresh indexes and emit compact counts",
+			},
+			{
+				usage: "rebuild --json --verbose",
+				sideEffect: "generated",
+				description: "Refresh indexes and include full snapshots",
+			},
+		],
 	},
 	{
 		command: "pstr",
@@ -443,6 +694,33 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description:
 			"Run benchmarks: live metrics, CLI token economy, runtime-live dry-run",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List live benchmark scenarios",
+			},
+			{
+				usage: "run --scenario <id>",
+				sideEffect: "read",
+				description: "Run one live benchmark scenario",
+			},
+			{
+				usage: "cli",
+				sideEffect: "read",
+				description: "Run CLI micro benchmarks",
+			},
+			{
+				usage: "report --run <path>",
+				sideEffect: "read",
+				description: "Summarize a saved benchmark run",
+			},
+			{
+				usage: "runtime-live",
+				sideEffect: "read",
+				description: "Show runtime-live dry-run profile and validation command",
+			},
+		],
 	},
 	{
 		command: "project-benchmark",
@@ -516,6 +794,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Enable or disable runtime adapters; use --dry-run to preview",
 		category: "ops",
+		subcommands: [
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List runtime adapter state",
+			},
+			{
+				usage: "enable <name> --dry-run",
+				sideEffect: "read",
+				description: "Preview enabling an adapter",
+			},
+			{
+				usage: "disable <name> --dry-run",
+				sideEffect: "read",
+				description: "Preview disabling an adapter",
+			},
+		],
 	},
 	{
 		command: "telemetry",
@@ -549,6 +844,33 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "List, bind, switch, and unbind workbench sessions",
 		category: "workflow",
+		subcommands: [
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "Show active session, context session, and bindings",
+			},
+			{
+				usage: "bind --session <id> --dry-run",
+				sideEffect: "read",
+				description: "Preview binding a session to current branch/worktree",
+			},
+			{
+				usage: "bind --session <id> --actor <name>",
+				sideEffect: "write",
+				description: "Bind a session to current branch/worktree context",
+			},
+			{
+				usage: "switch <session-id>",
+				sideEffect: "write",
+				description: "Set active session and bind current context",
+			},
+			{
+				usage: "unbind <session-id>",
+				sideEffect: "write",
+				description: "Remove a session context binding",
+			},
+		],
 	},
 ]);
 
