@@ -11,11 +11,17 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { runPstrCommand } from "../commands/pstr";
 import { agentOperationContext } from "../core/operation-context";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
+import {
+	buildPstrDiff,
+	getPstrAffectedAreas,
+	PSTR_AREAS,
+} from "../services/pstr";
 import { rebuildPstrIndex } from "../services/pstr/builder";
+import { getPstrWatchTargets } from "../services/pstr/watch";
 import {
 	detectShape,
 	readShapePack,
@@ -346,6 +352,112 @@ describe("pstr command", () => {
 		}
 	});
 
+	test("diff --json returns diff payload", async () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+			writeFileSync(join(root, "docs", "readme.md"), "# Docs changed\n");
+			const io = captureIo();
+			expect(await runPstrCommand("diff", ["--json"], root, io.io)).toBe(0);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expectEnvelope(payload, "pstr.diff");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(
+				(payload.diff as { changed: Array<{ id: string }> }).changed.some(
+					(entry) => entry.id === "docs",
+				),
+			).toBe(true);
+			expect(
+				Array.isArray(
+					(payload.data as { diff: { changed: unknown[] } }).diff.changed,
+				),
+			).toBe(true);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("diff --path limits affected-path reporting", async () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+			writeFileSync(join(root, "cli", "test.ts"), "export const x = 2;\n");
+			const io = captureIo();
+			expect(
+				await runPstrCommand("diff", ["--path", "cli/test.ts"], root, io.io),
+			).toBe(0);
+			const output = io.stdout[0] ?? "";
+			expect(output).toContain("pstr diff: changes detected");
+			expect(output).toContain("changed=1");
+			expect(output).toContain("cli/test.ts -> cli");
+			expect(output).not.toContain("docs/readme.md");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("watch --once --json rebuilds incrementally and returns snapshot", async () => {
+		const root = createFixture();
+		try {
+			const initial = rebuildPstrIndex(root);
+			const initialCli = initial.maps.find((entry) => entry.id === "cli");
+			const initialDocs = initial.maps.find((entry) => entry.id === "docs");
+			writeFileSync(join(root, "cli", "test.ts"), "export const x = 3;\n");
+			const io = captureIo();
+			expect(
+				await runPstrCommand(
+					"watch",
+					["--once", "--json", "--path", "cli/test.ts"],
+					root,
+					io.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expectEnvelope(payload, "pstr.watch");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.event).toBe("once");
+			expect(payload.rebuilt).toBe(true);
+			expect(
+				(
+					payload.diff as {
+						affected_paths: Array<{
+							path: string;
+							area_ids: string[];
+							scopes: string[];
+						}>;
+					}
+				).affected_paths,
+			).toEqual([
+				{
+					path: "cli/test.ts",
+					area_ids: ["cli"],
+					scopes: ["cli"],
+				},
+			]);
+			const snapshot = payload.snapshot as {
+				kind: string;
+				maps: Array<{ id: string; source_hash: string; updated_at: string }>;
+			};
+			expect(snapshot.kind).toBe("pstr_index_v1");
+			expect(
+				snapshot.maps.find((entry) => entry.id === "cli")?.source_hash,
+			).not.toBe(initialCli?.source_hash);
+			expect(
+				snapshot.maps.find((entry) => entry.id === "docs")?.updated_at,
+			).toBe(initialDocs?.updated_at);
+		} finally {
+			cleanup(root);
+		}
+	});
+
 	test("section returns content after rebuild", async () => {
 		const root = createFixture();
 		try {
@@ -596,6 +708,21 @@ describe("pstr command", () => {
 		}
 	});
 
+	test("watch rejects invalid debounce value", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(
+				await runPstrCommand("watch", ["--debounce-ms", "nope"], root, io.io),
+			).toBe(2);
+			expect(io.stderr[0] ?? "").toContain(
+				"Invalid value for --debounce-ms: nope",
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
 	test("restricted context denies pstr rebuild", async () => {
 		const root = createFixture();
 		try {
@@ -680,6 +807,166 @@ describe("pstr command", () => {
 			const io = captureIo();
 			expect(await runPstrCommand("suggest", [], root, io.io)).toBe(0);
 			expect(io.stdout[0] ?? "").toContain("pstr suggest:");
+		} finally {
+			cleanup(root);
+		}
+	});
+});
+
+describe("pstr service helpers", () => {
+	test("registry and affected-area matching stay stable", () => {
+		const root = createFixture();
+		try {
+			expect(PSTR_AREAS.map((area) => area.id)).toEqual([
+				"cli",
+				"template",
+				"docs",
+				"config",
+			]);
+
+			const affected = getPstrAffectedAreas(root, [
+				".\\cli\\test.ts",
+				"docs/readme.md",
+				".agents/manifest.json",
+				"README.md",
+			]);
+			expect(affected.find((entry) => entry.path === "cli/test.ts")).toEqual({
+				path: "cli/test.ts",
+				area_ids: ["cli"],
+				scopes: ["cli"],
+			});
+			expect(affected.find((entry) => entry.path === "docs/readme.md")).toEqual(
+				{
+					path: "docs/readme.md",
+					area_ids: ["docs"],
+					scopes: ["docs"],
+				},
+			);
+			expect(
+				affected.find((entry) => entry.path === ".agents/manifest.json"),
+			).toEqual({
+				path: ".agents/manifest.json",
+				area_ids: ["config"],
+				scopes: ["config"],
+			});
+			expect(affected.find((entry) => entry.path === "README.md")).toEqual({
+				path: "README.md",
+				area_ids: [],
+				scopes: [],
+			});
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("incremental rebuild updates only affected areas and refreshes manifest", () => {
+		const root = createFixture();
+		try {
+			const initial = rebuildPstrIndex(root);
+			const initialCli = initial.maps.find((entry) => entry.id === "cli");
+			const initialDocs = initial.maps.find((entry) => entry.id === "docs");
+
+			writeFileSync(join(root, "cli", "test.ts"), "export const x = 2;\n");
+
+			const next = rebuildPstrIndex(root, { changedPaths: ["cli/test.ts"] });
+			const nextCli = next.maps.find((entry) => entry.id === "cli");
+			const nextDocs = next.maps.find((entry) => entry.id === "docs");
+			const manifest = next.manifest;
+
+			expect(initialCli?.source_hash).not.toBe(nextCli?.source_hash);
+			expect(nextDocs).toEqual(initialDocs);
+			expect(manifest).toBeDefined();
+			expect(manifest?.areas.cli?.source_hash).toBe(nextCli?.source_hash);
+			expect(manifest?.areas.docs?.updated_at).toBe(initialDocs?.updated_at);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("incremental rebuild removes dropped areas and stale markdown", () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+			rmSync(join(root, "docs", "readme.md"));
+
+			const snapshot = rebuildPstrIndex(root, {
+				changedPaths: ["docs/readme.md"],
+			});
+
+			expect(snapshot.maps.some((entry) => entry.id === "docs")).toBe(false);
+			expect(existsSync(join(root, ".afol", "pstr", "docs.md"))).toBe(false);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("watch targets recurse into existing subdirectories", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, "cli", "nested", "deep"), { recursive: true });
+			const targets = getPstrWatchTargets(root, ["cli/test.ts"]).map((path) =>
+				relative(root, path),
+			);
+			expect(targets).toEqual(["cli", "cli/nested", "cli/nested/deep"]);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("buildPstrDiff reports added removed changed missing and affected paths", () => {
+		const root = createFixture(false);
+		try {
+			rebuildPstrIndex(root);
+			writeFileSync(join(root, "cli", "test.ts"), "export const x = 1;\n");
+			writeFileSync(join(root, "docs", "readme.md"), "# Docs changed\n");
+			rmSync(join(root, "src", "project-template", "index.ts"));
+			rmSync(join(root, ".afol", "pstr", "config.md"));
+
+			const diff = buildPstrDiff(root, {
+				changedPaths: [
+					"cli/test.ts",
+					"docs/readme.md",
+					"src/project-template/index.ts",
+				],
+			});
+
+			expect(diff.added.map((entry) => entry.id)).toContain("cli");
+			expect(diff.changed.map((entry) => entry.id)).toContain("docs");
+			expect(diff.removed.map((entry) => entry.id)).toContain("template");
+			expect(diff.missing.map((entry) => entry.id)).toContain("config");
+			expect(
+				diff.affected_paths.find((entry) => entry.path === "cli/test.ts"),
+			).toEqual({
+				path: "cli/test.ts",
+				area_ids: ["cli"],
+				scopes: ["cli"],
+			});
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("buildPstrDiff reports stale and unchanged entries", () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+			mutatePstrIndex(root, (snapshot) => {
+				const maps = snapshot.maps as Array<{
+					id: string;
+					stale_after: string;
+				}>;
+				const docs = maps.find((entry) => entry.id === "docs");
+				if (docs) {
+					docs.stale_after = "1970-01-01T00:00:00.000Z";
+				}
+			});
+
+			const diff = buildPstrDiff(root);
+
+			expect(diff.stale.map((entry) => entry.id)).toContain("docs");
+			expect(diff.unchanged.map((entry) => entry.id)).toEqual(
+				expect.arrayContaining(["cli", "template", "config"]),
+			);
 		} finally {
 			cleanup(root);
 		}

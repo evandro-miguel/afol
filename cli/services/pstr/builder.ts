@@ -3,46 +3,52 @@ import {
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	rmSync,
 	statSync,
 } from "node:fs";
-import { extname, join, relative, resolve } from "node:path";
+import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import { computeSourceHash } from "../../core/source-hash";
 import { atomicWriteText } from "../io/atomic";
 import { resolveProjectPaths } from "../project/paths";
 import type {
+	PstrAffectedArea,
+	PstrAreaRegistryEntry,
 	PstrDetectedArea,
+	PstrDiffEntry,
+	PstrDiffResult,
 	PstrIndexSnapshot,
 	PstrMapEntry,
+	PstrRebuildOptions,
 	PstrReviewCandidate,
+	PstrSnapshotManifest,
+	PstrSnapshotManifestEntry,
 	PstrSuggestion,
 	PstrValidationResult,
 } from "./types";
 
-type PstrArea = {
-	id: string;
-	scope: string;
-	sourcePaths: string[];
-	tags: string[];
-};
-
-const PSTR_AREAS: PstrArea[] = [
+export const PSTR_AREAS: readonly PstrAreaRegistryEntry[] = [
 	{
 		id: "cli",
 		scope: "cli",
-		sourcePaths: ["cli/"],
+		source_roots: ["cli/"],
 		tags: ["pstr", "cli", "typescript"],
 	},
 	{
 		id: "template",
 		scope: "template",
-		sourcePaths: ["src/project-template/"],
+		source_roots: ["src/project-template/"],
 		tags: ["pstr", "template"],
 	},
-	{ id: "docs", scope: "docs", sourcePaths: ["docs/"], tags: ["pstr", "docs"] },
+	{
+		id: "docs",
+		scope: "docs",
+		source_roots: ["docs/"],
+		tags: ["pstr", "docs"],
+	},
 	{
 		id: "config",
 		scope: "config",
-		sourcePaths: [
+		source_roots: [
 			".agents/config.json",
 			".agents/lock.json",
 			".agents/manifest.json",
@@ -70,6 +76,19 @@ function formatNow(): string {
 
 function normalizeRelativePath(path: string): string {
 	return path.replace(/\\/g, "/").replace(/\/+$/g, "");
+}
+
+function normalizeChangedPath(projectRoot: string, pathValue: string): string {
+	const trimmed = pathValue.trim();
+	if (!trimmed) {
+		return "";
+	}
+
+	const normalized = trimmed.replace(/\\/g, "/");
+	const relativePath = isAbsolute(normalized)
+		? toRelativeProjectPath(projectRoot, normalized)
+		: normalized.replace(/^\.\//, "");
+	return normalizeRelativePath(relativePath);
 }
 
 function toRelativeProjectPath(projectRoot: string, pathValue: string): string {
@@ -172,9 +191,12 @@ function staleAfter(updatedAt: string): string {
 	).toISOString();
 }
 
-function buildMapEntry(projectRoot: string, area: PstrArea): PstrMapEntry {
+function buildMapEntry(
+	projectRoot: string,
+	area: PstrAreaRegistryEntry,
+): PstrMapEntry {
 	const files = uniqueSorted(
-		area.sourcePaths.flatMap((sourcePath) =>
+		area.source_roots.flatMap((sourcePath) =>
 			collectSourceFiles(projectRoot, sourcePath),
 		),
 	);
@@ -194,13 +216,22 @@ function buildMapEntry(projectRoot: string, area: PstrArea): PstrMapEntry {
 	};
 }
 
-export function buildPstrIndexSnapshot(projectRoot: string): PstrIndexSnapshot {
-	const pstrPaths = resolveProjectPaths(projectRoot);
-	const maps = PSTR_AREAS.map((area) =>
-		buildMapEntry(projectRoot, area),
-	).filter((entry) => entry.file_count > 0);
+function buildLiveMapEntries(
+	projectRoot: string,
+	areaIds?: Iterable<string>,
+): PstrMapEntry[] {
+	const allowedIds = areaIds ? new Set(areaIds) : null;
+	return PSTR_AREAS.filter((area) => !allowedIds || allowedIds.has(area.id))
+		.map((area) => buildMapEntry(projectRoot, area))
+		.filter((entry) => entry.file_count > 0);
+}
 
-	return {
+function buildPstrSnapshot(
+	projectRoot: string,
+	maps: PstrMapEntry[],
+): PstrIndexSnapshot {
+	const pstrPaths = resolveProjectPaths(projectRoot);
+	const snapshot: PstrIndexSnapshot = {
 		kind: "pstr_index_v1",
 		version: 1,
 		generated_at: formatNow(),
@@ -210,19 +241,316 @@ export function buildPstrIndexSnapshot(projectRoot: string): PstrIndexSnapshot {
 		},
 		maps,
 	};
+	return {
+		...snapshot,
+		manifest: buildPstrSnapshotManifest(snapshot),
+	};
+}
+
+function sourceRootMatchesPath(path: string, sourceRoot: string): boolean {
+	const normalizedSourceRoot = normalizeRelativePath(sourceRoot);
+	if (sourceRoot.endsWith("/")) {
+		return (
+			path === normalizedSourceRoot ||
+			path.startsWith(`${normalizedSourceRoot}/`)
+		);
+	}
+	return path === normalizedSourceRoot;
+}
+
+function getAreaById(id: string): PstrAreaRegistryEntry | undefined {
+	return PSTR_AREAS.find((area) => area.id === id);
+}
+
+function compareStringArrays(left: string[], right: string[]): boolean {
+	return (
+		left.length === right.length &&
+		left.every((value, index) => value === right[index])
+	);
+}
+
+function mapEntriesMatch(left: PstrMapEntry, right: PstrMapEntry): boolean {
+	return (
+		left.id === right.id &&
+		left.scope === right.scope &&
+		left.status === right.status &&
+		left.authority === right.authority &&
+		left.source_hash === right.source_hash &&
+		left.file_count === right.file_count &&
+		compareStringArrays(left.source_paths, right.source_paths) &&
+		compareStringArrays(left.tags, right.tags)
+	);
+}
+
+function snapshotBelongsToRoot(
+	root: string,
+	snapshot: PstrIndexSnapshot | null,
+): snapshot is PstrIndexSnapshot {
+	if (!snapshot) {
+		return false;
+	}
+
+	const paths = resolveProjectPaths(root);
+	return (
+		snapshot.source.project_root === resolve(root) &&
+		snapshot.source.pstr_dir === paths.abs.pstrDir
+	);
+}
+
+function loadValidPstrIndex(root: string): PstrIndexSnapshot | null {
+	const indexPath = pstrIndexPath(root);
+	if (!existsSync(indexPath)) {
+		return null;
+	}
+
+	const snapshot = readJsonFile<PstrIndexSnapshot>(indexPath);
+	return snapshotShapeIsValid(snapshot) ? snapshot : null;
+}
+
+function buildDiffEntry(
+	root: string,
+	id: string,
+	reason: string,
+	snapshot: PstrMapEntry | null,
+	live: PstrMapEntry | null,
+): PstrDiffEntry {
+	const area = getAreaById(id);
+	return {
+		id,
+		scope: live?.scope ?? snapshot?.scope ?? area?.scope ?? id,
+		source_roots: area ? [...area.source_roots] : [],
+		section_path: pstrAreaPath(root, id),
+		reason,
+		snapshot,
+		live,
+	};
+}
+
+function snapshotEntryIsStale(root: string, entry: PstrMapEntry): boolean {
+	if (!Number.isFinite(Date.parse(entry.stale_after))) {
+		return true;
+	}
+	if (Date.parse(entry.stale_after) <= Date.now()) {
+		return true;
+	}
+	return !existsSync(pstrAreaPath(root, entry.id));
+}
+
+function manifestEntriesMatch(
+	left: PstrSnapshotManifestEntry,
+	right: PstrSnapshotManifestEntry,
+): boolean {
+	return (
+		left.id === right.id &&
+		left.scope === right.scope &&
+		left.status === right.status &&
+		left.source_hash === right.source_hash &&
+		left.file_count === right.file_count &&
+		left.updated_at === right.updated_at &&
+		left.stale_after === right.stale_after &&
+		compareStringArrays(left.source_roots, right.source_roots) &&
+		compareStringArrays(left.source_paths, right.source_paths) &&
+		compareStringArrays(left.tags, right.tags)
+	);
+}
+
+function manifestMatchesSnapshot(
+	manifest: PstrSnapshotManifest,
+	snapshot: PstrIndexSnapshot,
+): boolean {
+	const expected = buildPstrSnapshotManifest(snapshot);
+	if (!compareStringArrays(manifest.area_order, expected.area_order)) {
+		return false;
+	}
+
+	const expectedIds = Object.keys(expected.areas).sort((a, b) =>
+		a.localeCompare(b),
+	);
+	const actualIds = Object.keys(manifest.areas).sort((a, b) =>
+		a.localeCompare(b),
+	);
+	if (!compareStringArrays(actualIds, expectedIds)) {
+		return false;
+	}
+
+	return expectedIds.every((id) => {
+		const actualEntry = manifest.areas[id];
+		const expectedEntry = expected.areas[id];
+		return Boolean(
+			actualEntry &&
+				expectedEntry &&
+				manifestEntriesMatch(actualEntry, expectedEntry),
+		);
+	});
+}
+
+export function buildPstrSnapshotManifest(
+	input: Pick<PstrIndexSnapshot, "maps">,
+): PstrSnapshotManifest {
+	const areas = Object.fromEntries(
+		input.maps.map((entry) => {
+			const area = getAreaById(entry.id);
+			return [
+				entry.id,
+				{
+					id: entry.id,
+					scope: entry.scope,
+					status: entry.status,
+					source_roots: area ? [...area.source_roots] : [],
+					source_paths: [...entry.source_paths],
+					source_hash: entry.source_hash,
+					file_count: entry.file_count,
+					updated_at: entry.updated_at,
+					stale_after: entry.stale_after,
+					tags: [...entry.tags],
+				} satisfies PstrSnapshotManifestEntry,
+			];
+		}),
+	);
+
+	return {
+		area_order: input.maps.map((entry) => entry.id),
+		areas,
+	};
+}
+
+export function getPstrAffectedAreas(
+	projectRoot: string,
+	changedPaths: string[],
+): PstrAffectedArea[] {
+	return uniqueSorted(
+		changedPaths
+			.map((pathValue) => normalizeChangedPath(projectRoot, pathValue))
+			.filter((pathValue) => pathValue.length > 0),
+	).map((pathValue) => {
+		const affected = PSTR_AREAS.filter((area) =>
+			area.source_roots.some((sourceRoot) =>
+				sourceRootMatchesPath(pathValue, sourceRoot),
+			),
+		);
+		return {
+			path: pathValue,
+			area_ids: affected.map((area) => area.id),
+			scopes: affected.map((area) => area.scope),
+		};
+	});
+}
+
+function getAffectedAreaIds(
+	projectRoot: string,
+	changedPaths: string[],
+): string[] {
+	return uniqueSorted(
+		getPstrAffectedAreas(projectRoot, changedPaths).flatMap(
+			(entry) => entry.area_ids,
+		),
+	);
+}
+
+export function buildPstrIndexSnapshot(projectRoot: string): PstrIndexSnapshot {
+	return buildPstrSnapshot(projectRoot, buildLiveMapEntries(projectRoot));
+}
+
+export function buildPstrDiff(
+	root: string,
+	options: PstrRebuildOptions = {},
+): PstrDiffResult {
+	const liveMaps = new Map(
+		buildLiveMapEntries(root).map((entry) => [entry.id, entry] as const),
+	);
+	const snapshot = loadValidPstrIndex(root);
+	const snapshotMaps = new Map(
+		(snapshot?.maps ?? []).map((entry) => [entry.id, entry] as const),
+	);
+	const allIds = uniqueSorted([
+		...PSTR_AREAS.map((area) => area.id),
+		...snapshotMaps.keys(),
+		...liveMaps.keys(),
+	]);
+	const diff: PstrDiffResult = {
+		snapshot_exists: existsSync(pstrIndexPath(root)),
+		affected_paths: getPstrAffectedAreas(root, options.changedPaths ?? []),
+		added: [],
+		removed: [],
+		changed: [],
+		unchanged: [],
+		missing: [],
+		stale: [],
+	};
+
+	for (const id of allIds) {
+		const live = liveMaps.get(id) ?? null;
+		const saved = snapshotMaps.get(id) ?? null;
+		if (!saved && !live) {
+			continue;
+		}
+		if (!saved && live) {
+			diff.added.push(
+				buildDiffEntry(root, id, "snapshot missing live area", null, live),
+			);
+			continue;
+		}
+		if (saved && !live) {
+			diff.removed.push(
+				buildDiffEntry(
+					root,
+					id,
+					"live area no longer has source files",
+					saved,
+					null,
+				),
+			);
+			continue;
+		}
+		if (!saved || !live) {
+			continue;
+		}
+		if (!existsSync(pstrAreaPath(root, id))) {
+			diff.missing.push(
+				buildDiffEntry(root, id, "missing pstr section file", saved, live),
+			);
+			continue;
+		}
+		if (
+			!snapshotBelongsToRoot(root, snapshot) ||
+			snapshotEntryIsStale(root, saved)
+		) {
+			diff.stale.push(
+				buildDiffEntry(root, id, "snapshot entry is stale", saved, live),
+			);
+			continue;
+		}
+		if (!mapEntriesMatch(saved, live)) {
+			diff.changed.push(
+				buildDiffEntry(
+					root,
+					id,
+					"live area differs from snapshot",
+					saved,
+					live,
+				),
+			);
+			continue;
+		}
+		diff.unchanged.push(
+			buildDiffEntry(root, id, "snapshot matches live area", saved, live),
+		);
+	}
+
+	return diff;
 }
 
 export function detectPstrAreas(projectRoot: string): PstrDetectedArea[] {
 	return PSTR_AREAS.map((area) => {
 		const files = uniqueSorted(
-			area.sourcePaths.flatMap((sourcePath) =>
+			area.source_roots.flatMap((sourcePath) =>
 				collectSourceFiles(projectRoot, sourcePath),
 			),
 		);
 		return {
 			id: area.id,
 			scope: area.scope,
-			source_roots: [...area.sourcePaths],
+			source_roots: [...area.source_roots],
 			file_count: files.length,
 			tags: uniqueSorted(area.tags),
 		};
@@ -341,6 +669,49 @@ function writeAreaMarkdown(root: string, entry: PstrMapEntry): void {
 	atomicWriteText(pstrAreaPath(root, entry.id), `${frontmatter}`);
 }
 
+function manifestShapeIsValid(
+	manifest: unknown,
+): manifest is PstrSnapshotManifest {
+	if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+		return false;
+	}
+
+	const candidate = manifest as PstrSnapshotManifest;
+	if (!Array.isArray(candidate.area_order)) {
+		return false;
+	}
+	if (
+		!candidate.area_order.every((id) => typeof id === "string") ||
+		!candidate.areas ||
+		typeof candidate.areas !== "object" ||
+		Array.isArray(candidate.areas)
+	) {
+		return false;
+	}
+
+	return Object.values(candidate.areas).every(
+		(entry) =>
+			entry &&
+			typeof entry === "object" &&
+			typeof entry.id === "string" &&
+			typeof entry.scope === "string" &&
+			(entry.status === "current" ||
+				entry.status === "stale" ||
+				entry.status === "partial" ||
+				entry.status === "missing") &&
+			Array.isArray(entry.source_roots) &&
+			entry.source_roots.every((path) => typeof path === "string") &&
+			Array.isArray(entry.source_paths) &&
+			entry.source_paths.every((path) => typeof path === "string") &&
+			typeof entry.source_hash === "string" &&
+			typeof entry.file_count === "number" &&
+			typeof entry.updated_at === "string" &&
+			typeof entry.stale_after === "string" &&
+			Array.isArray(entry.tags) &&
+			entry.tags.every((tag) => typeof tag === "string"),
+	);
+}
+
 function snapshotShapeIsValid(
 	snapshot: PstrIndexSnapshot | null,
 ): snapshot is PstrIndexSnapshot {
@@ -372,15 +743,73 @@ function snapshotShapeIsValid(
 					typeof entry.stale_after === "string" &&
 					Array.isArray(entry.tags) &&
 					entry.tags.every((tag) => typeof tag === "string"),
-			),
+			) &&
+			(snapshot.manifest === undefined ||
+				manifestShapeIsValid(snapshot.manifest)),
 	);
 }
 
-export function rebuildPstrIndex(projectRoot: string): PstrIndexSnapshot {
-	const snapshot = buildPstrIndexSnapshot(projectRoot);
+export function rebuildPstrIndex(
+	projectRoot: string,
+	options: PstrRebuildOptions = {},
+): PstrIndexSnapshot {
+	const rawPreviousSnapshot = loadValidPstrIndex(projectRoot);
+	const previousSnapshot = snapshotBelongsToRoot(
+		projectRoot,
+		rawPreviousSnapshot,
+	)
+		? rawPreviousSnapshot
+		: null;
+	const affectedAreaIds =
+		options.changedPaths && options.changedPaths.length > 0
+			? getAffectedAreaIds(projectRoot, options.changedPaths)
+			: null;
+	let snapshot: PstrIndexSnapshot;
+	let rewrittenAreaIds: string[] | null = null;
+
+	if (previousSnapshot && affectedAreaIds && affectedAreaIds.length === 0) {
+		snapshot = buildPstrSnapshot(projectRoot, [...previousSnapshot.maps]);
+	} else if (
+		previousSnapshot &&
+		affectedAreaIds &&
+		affectedAreaIds.length > 0
+	) {
+		const nextMapById = new Map(
+			previousSnapshot.maps.map((entry) => [entry.id, entry] as const),
+		);
+		for (const areaId of affectedAreaIds) {
+			nextMapById.delete(areaId);
+		}
+		for (const entry of buildLiveMapEntries(projectRoot, affectedAreaIds)) {
+			nextMapById.set(entry.id, entry);
+		}
+		snapshot = buildPstrSnapshot(
+			projectRoot,
+			PSTR_AREAS.map((area) => nextMapById.get(area.id)).filter(
+				(entry): entry is PstrMapEntry => Boolean(entry),
+			),
+		);
+		rewrittenAreaIds = affectedAreaIds;
+	} else {
+		snapshot = buildPstrIndexSnapshot(projectRoot);
+	}
 
 	writeSnapshot(pstrIndexPath(projectRoot), snapshot);
-	for (const entry of snapshot.maps) {
+	const previousAreaIds = new Set(
+		previousSnapshot?.maps.map((entry) => entry.id) ?? [],
+	);
+	const nextAreaIds = new Set(snapshot.maps.map((entry) => entry.id));
+	for (const previousAreaId of previousAreaIds) {
+		if (!nextAreaIds.has(previousAreaId)) {
+			rmSync(pstrAreaPath(projectRoot, previousAreaId), { force: true });
+		}
+	}
+
+	const entriesToWrite =
+		rewrittenAreaIds === null
+			? snapshot.maps
+			: snapshot.maps.filter((entry) => rewrittenAreaIds.includes(entry.id));
+	for (const entry of entriesToWrite) {
 		writeAreaMarkdown(projectRoot, entry);
 	}
 	return snapshot;
@@ -404,11 +833,17 @@ export function validatePstrIndex(root: string): PstrValidationResult {
 	) {
 		return { ok: false, message: `stale pstr index snapshot: ${indexPath}` };
 	}
+	if (
+		snapshot.manifest &&
+		!manifestMatchesSnapshot(snapshot.manifest, snapshot)
+	) {
+		return { ok: false, message: `stale pstr index snapshot: ${indexPath}` };
+	}
 
 	const current = new Map(
-		PSTR_AREAS.map((area) => [area.id, buildMapEntry(root, area)] as const),
+		buildLiveMapEntries(root).map((entry) => [entry.id, entry] as const),
 	);
-	if (snapshot.maps.length !== PSTR_AREAS.length) {
+	if (snapshot.maps.length !== current.size) {
 		return { ok: false, message: `stale pstr index snapshot: ${indexPath}` };
 	}
 	for (const entry of snapshot.maps) {
@@ -416,17 +851,7 @@ export function validatePstrIndex(root: string): PstrValidationResult {
 		if (!live) {
 			return { ok: false, message: `unknown pstr map entry: ${entry.id}` };
 		}
-		if (
-			entry.scope !== live.scope ||
-			entry.status !== live.status ||
-			entry.authority !== live.authority ||
-			entry.file_count !== live.file_count ||
-			entry.source_hash !== live.source_hash ||
-			entry.source_paths.length !== live.source_paths.length ||
-			entry.source_paths.some(
-				(path, index) => path !== live.source_paths[index],
-			)
-		) {
+		if (!mapEntriesMatch(entry, live)) {
 			return { ok: false, message: `stale pstr index snapshot: ${indexPath}` };
 		}
 	}
@@ -437,7 +862,10 @@ export function validatePstrIndex(root: string): PstrValidationResult {
 export function checkPstrStale(
 	root: string,
 ): { id: string; stale: boolean; message: string }[] {
-	const snapshot = getPstrIndex(root);
+	const rawSnapshot = loadValidPstrIndex(root);
+	const snapshot = snapshotBelongsToRoot(root, rawSnapshot)
+		? rawSnapshot
+		: null;
 	if (!snapshot) {
 		return PSTR_AREAS.map((area) => ({
 			id: area.id,
