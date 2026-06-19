@@ -14,7 +14,7 @@ import {
 } from "../services/health";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { writeMemory as writeProjectMemory } from "../services/memory";
-import { rebuildPstrIndex } from "../services/pstr";
+import { buildPstrSnapshotManifest, rebuildPstrIndex } from "../services/pstr";
 import { openDb } from "../services/state";
 
 type CapturedIo = {
@@ -150,14 +150,16 @@ function writeSectionIndex(root: string, generatedAt: string): void {
 
 function writePstrIndex(root: string, staleAfter: string): void {
 	const snapshot = rebuildPstrIndex(root);
+	const maps = snapshot.maps.map((map) => ({
+		...map,
+		updated_at: staleAfter,
+		stale_after: staleAfter,
+	}));
 	const next = {
 		...snapshot,
 		generated_at: staleAfter,
-		maps: snapshot.maps.map((map) => ({
-			...map,
-			updated_at: staleAfter,
-			stale_after: staleAfter,
-		})),
+		maps,
+		manifest: buildPstrSnapshotManifest({ maps }),
 	};
 	writeFileSync(
 		join(root, ".afol", "pstr", "index.json"),
