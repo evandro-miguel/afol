@@ -19,7 +19,7 @@ Workbench context: `260411_1559_uv-fastapi-script-refactor`.
 ### Prevention Rule
 
 - Never create, refresh, commit, or push a universal-skills git checkout under `.agents/cache/universal-skills`.
-- Keep `.agents/source/universal-skills` as a repo-local seed only; if Git is needed, use an explicit external checkout through `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`.
+- Keep `.afol/adm/source/universal-skills` as a repo-local seed only; if Git is needed, use an explicit external checkout through `AGENTS_UNIVERSAL_SKILLS_SOURCE` or `skills_sync.external_source_dir`.
 - Keep `skills-sync push` as a branch/PR proposal flow only; never publish directly to universal `main`.
 
 ### Guardrail

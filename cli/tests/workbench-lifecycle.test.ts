@@ -793,6 +793,23 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("doneTask reports malformed evidence ledger lines", () => {
+		const root = mkRoot("done-malformed-evidence");
+		try {
+			const created = newWorkstream(root, "done malformed evidence");
+			writeFileSync(created.evidencePath, "{not-json\n", "utf8");
+
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("Malformed evidence ledger");
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow(`${created.evidencePath}:1`);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("closeSession blocks pending/in_progress/problem and clears active pointer on success", () => {
 		const root = mkRoot("close");
 		try {

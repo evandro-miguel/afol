@@ -60,9 +60,12 @@ User journey:
 
 1. A session creates a bounded research draft under the workbench session.
 2. `afol library propose -S <session>` validates schema, purpose, sources,
-   duplicates, and conflicts.
-3. `afol library promote -S <session> --topic <topic>` writes or updates
-   curated Markdown library documents under `.afol/library/topics/<topic>/`.
+   duplicates, and conflicts. A proposed topic slug that already exists is a
+   hard conflict and must not overwrite existing claims or sources.
+3. `afol library promote -S <session> --topic <topic>` writes curated Markdown
+   library documents under `.afol/library/topics/<topic>/`; updates to an
+   existing topic must use explicit add/update flows that preserve existing
+   claims and sources.
 4. `afol library search "<query>" --json` returns current claims and sources.
 5. `afol library invalidate --claim <id> --reason "<reason>" --source <id>`
    marks stale or contradicted claims.
@@ -72,7 +75,8 @@ Failure or friction points:
 
 - Claim without source -> proposal fails.
 - Source without `accessed_at` -> proposal fails.
-- Duplicate or conflicting claim -> proposal reports conflict for review.
+- Duplicate topic, duplicate claim, or conflicting claim -> proposal reports
+  conflict for review and does not overwrite existing topic state.
 - Raw copied page content -> validation rejects or flags as out of scope.
 - Stale or invalidated research -> normal search and context bundles exclude it
   unless the caller explicitly asks for stale/invalidated records.

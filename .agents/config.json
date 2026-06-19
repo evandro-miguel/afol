@@ -6,6 +6,9 @@
   "paths": {
     "agents_dir": ".agents",
     "mutable_dir": ".afol",
+    "adm_dir": ".afol/adm",
+    "rules_dir": ".afol/adm/rules",
+    "hooks_dir": ".afol/adm/hooks",
     "skills_dir": ".agents/skills",
     "wb_dir": ".afol/wb",
     "active_session_file": ".afol/wb/.active_session",
@@ -20,5 +23,17 @@
   },
   "skills_sync": {
     "project_dir": ".agents/skills"
+  },
+  "rules": {
+    "resolver": {
+      "max_chars_per_rule": 2000,
+      "max_chars_total": 4000
+    }
+  },
+  "hooks": {
+    "resolver": {
+      "max_chars_per_message": 1000,
+      "max_chars_total": 3000
+    }
   }
 }

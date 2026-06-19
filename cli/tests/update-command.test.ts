@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runUpdateCommand } from "../commands/update";
+import { agentOperationContext } from "../core/operation-context";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 
 type TemplateUpdatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
@@ -389,12 +390,12 @@ describe("update command", () => {
 		const sourceManifest = templateJson<{ commands: Record<string, string[]> }>(
 			".agents/manifest.json",
 		);
-		const sourceRuleReadme = templateText(".agents/rules/README.md");
+		const sourceRuleReadme = templateText(".afol/adm/rules/README.md");
 		const downstreamRuleReadme = "downstream rules note\n";
 		try {
-			mkdirSync(join(root, ".agents", "rules"), { recursive: true });
+			mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
 			writeFileSync(
-				join(root, ".agents", "rules", "README.md"),
+				join(root, ".afol", "adm", "rules", "README.md"),
 				downstreamRuleReadme,
 				"utf8",
 			);
@@ -441,7 +442,7 @@ describe("update command", () => {
 			expect(lock.project).toBe(sourceLock.project);
 			expect(manifest.commands).toEqual(sourceManifest.commands);
 			expect(
-				readFileSync(join(root, ".agents", "rules", "README.md"), "utf8"),
+				readFileSync(join(root, ".afol", "adm", "rules", "README.md"), "utf8"),
 			).toBe(sourceRuleReadme);
 			expect(output.stdout.join("\n")).toContain(
 				"update apply: changes available",
@@ -470,7 +471,7 @@ describe("update command", () => {
 						},
 				);
 			const ruleEntry = journalRows.find(
-				(row) => row.sourcePath === ".agents/rules/README.md",
+				(row) => row.sourcePath === ".afol/adm/rules/README.md",
 			);
 			const lockEntry = journalRows.find(
 				(row) => row.sourcePath === ".agents/lock.json",
@@ -500,6 +501,41 @@ describe("update command", () => {
 			expect(await runUpdateCommand(["apply"], root, output.io)).toBe(2);
 			expect(output.stderr.join("\n")).toContain(
 				"Real update apply requires --session, --task-id, and --reason.",
+			);
+			expect(
+				readFileSync(join(root, ".agents", "lock.json"), "utf8"),
+			).not.toContain("new");
+			expect(
+				readFileSync(join(root, ".agents", "manifest.json"), "utf8"),
+			).not.toContain("validate");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply blocks restricted operation contexts before writing", async () => {
+		const root = mkRoot();
+		try {
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"apply",
+						"--session",
+						"S-01",
+						"--task-id",
+						"T-01",
+						"--reason",
+						"restricted caller",
+					],
+					root,
+					output.io,
+					{},
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(output.stderr.join("\n")).toContain(
+				"Real update apply requires local interactive approval.",
 			);
 			expect(
 				readFileSync(join(root, ".agents", "lock.json"), "utf8"),
@@ -583,7 +619,7 @@ describe("update command", () => {
 			expect(readFileSync(join(root, ".agents", "manifest.json"), "utf8")).toBe(
 				originalManifest,
 			);
-			expect(existsSync(join(root, ".agents", "rules", "README.md"))).toBe(
+			expect(existsSync(join(root, ".afol", "adm", "rules", "README.md"))).toBe(
 				false,
 			);
 			const journalPath = join(

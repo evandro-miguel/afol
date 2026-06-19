@@ -1,31 +1,73 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
+import { loadJsonObject, type SchemaObject } from "../../core/schema";
 import {
+	normalizeProjectRelativePath,
 	type ResolvedProjectPaths,
 	resolveProjectPaths,
 } from "../project/paths";
+
+const DEFAULT_MAX_RULE_CHARS = 2000;
+const DEFAULT_MAX_TOTAL_RULE_CHARS = 4000;
 
 type RawRule = {
 	id?: unknown;
 	name?: unknown;
 	path?: unknown;
+	scope?: unknown;
+	required?: unknown;
+	domains?: unknown;
 	surfaces?: unknown;
 	work_types?: unknown;
+	languages?: unknown;
+	file_globs?: unknown;
+	exact_files?: unknown;
+	inject?: unknown;
 	priority?: unknown;
+};
+
+export type RuleResolverConfig = {
+	maxCharsPerRule: number;
+	maxCharsTotal: number;
 };
 
 export type RuleEntry = {
 	id: string;
 	name: string;
 	path: string;
+	scope: string | null;
+	required: boolean;
+	domains: string[];
 	surfaces: string[];
 	workTypes: string[];
+	languages: string[];
+	fileGlobs: string[];
+	exactFiles: string[];
+	inject: string | null;
 	priority: number;
+	charCount: number;
 };
 
-function normalizeTextList(value: unknown): string[] {
+export type ResolveRulesOptions = {
+	scope?: string | undefined;
+	required?: boolean | undefined;
+	domains?: string[] | undefined;
+	surfaces: string[];
+	workType: string;
+	languages?: string[] | undefined;
+	filePath?: string | undefined;
+	inject?: string | undefined;
+	maxCharsPerRule?: number | undefined;
+	maxCharsTotal?: number | undefined;
+	strictIndex?: boolean | undefined;
+};
+
+export class RuleResolverError extends Error {}
+
+function normalizeTextList(value: unknown, lowercase = true): string[] {
 	if (typeof value === "string") {
-		return value.trim() ? [value.trim().toLowerCase()] : [];
+		const normalized = lowercase ? value.trim().toLowerCase() : value.trim();
+		return normalized ? [normalized] : [];
 	}
 	if (!Array.isArray(value)) {
 		return [];
@@ -34,21 +76,70 @@ function normalizeTextList(value: unknown): string[] {
 		...new Set(
 			value
 				.filter((item): item is string => typeof item === "string")
-				.map((item) => item.trim().toLowerCase())
+				.map((item) => (lowercase ? item.trim().toLowerCase() : item.trim()))
 				.filter(Boolean),
 		),
 	].sort();
 }
 
-function normalizeRule(raw: RawRule, rulesDir: string): RuleEntry | null {
+function normalizeOptionalText(value: unknown): string | null {
+	if (typeof value !== "string") {
+		return null;
+	}
+	const normalized = value.trim().toLowerCase();
+	return normalized || null;
+}
+
+function normalizeProjectFileList(value: unknown): string[] {
+	return normalizeTextList(value, false)
+		.map((item) => normalizeProjectRelativePath(item, ""))
+		.filter(Boolean)
+		.sort();
+}
+
+function normalizeRulePath(
+	rawPath: unknown,
+	id: string,
+	rulesDir: string,
+): string {
+	const fallback = `${rulesDir}/${id}.md`;
+	if (typeof rawPath !== "string" || !rawPath.trim()) {
+		return fallback;
+	}
+	const cleaned = normalizeProjectRelativePath(rawPath, "");
+	const candidate = cleaned
+		? cleaned.startsWith(`${rulesDir}/`)
+			? cleaned
+			: `${rulesDir}/${cleaned}`
+		: "";
+	if (candidate.startsWith(`${rulesDir}/`)) {
+		return candidate;
+	}
+	const safeLeaf = normalizeProjectRelativePath(
+		basename(rawPath.trim().replace(/\\/g, "/")),
+		"",
+	);
+	return safeLeaf ? `${rulesDir}/${safeLeaf}` : fallback;
+}
+
+function ruleCharCount(projectRoot: string, path: string): number {
+	const absolutePath = join(projectRoot, path);
+	if (!existsSync(absolutePath)) {
+		return 0;
+	}
+	return readFileSync(absolutePath, "utf8").length;
+}
+
+function normalizeRule(
+	raw: RawRule,
+	projectRoot: string,
+	rulesDir: string,
+): RuleEntry | null {
 	const id = typeof raw.id === "string" ? raw.id.trim().toUpperCase() : "";
 	if (!id) {
 		return null;
 	}
-	const rawPath = typeof raw.path === "string" ? raw.path.trim() : `${id}.md`;
-	const path = rawPath.startsWith(`${rulesDir}/`)
-		? rawPath
-		: `${rulesDir}/${rawPath}`;
+	const path = normalizeRulePath(raw.path, id, rulesDir);
 	return {
 		id,
 		name:
@@ -56,9 +147,17 @@ function normalizeRule(raw: RawRule, rulesDir: string): RuleEntry | null {
 				? raw.name.trim()
 				: id.toLowerCase(),
 		path,
+		scope: normalizeOptionalText(raw.scope),
+		required: raw.required === true,
+		domains: normalizeTextList(raw.domains),
 		surfaces: normalizeTextList(raw.surfaces),
 		workTypes: normalizeTextList(raw.work_types),
+		languages: normalizeTextList(raw.languages),
+		fileGlobs: normalizeTextList(raw.file_globs, false),
+		exactFiles: normalizeProjectFileList(raw.exact_files),
+		inject: normalizeOptionalText(raw.inject),
 		priority: typeof raw.priority === "number" ? raw.priority : 50,
+		charCount: ruleCharCount(projectRoot, path),
 	};
 }
 
@@ -78,41 +177,120 @@ function fallbackRules(projectPaths: ResolvedProjectPaths): RuleEntry[] {
 				id,
 				name: name.replace(/\.md$/, "").toLowerCase(),
 				path: `${projectPaths.rulesDir}/${name}`,
+				scope: null,
+				required: false,
+				domains: [],
 				surfaces: [],
 				workTypes: [],
+				languages: [],
+				fileGlobs: [],
+				exactFiles: [],
+				inject: null,
 				priority: 50,
+				charCount: readFileSync(join(rulesRoot, name), "utf8").length,
 			};
 		});
 }
 
-function parseRulesIndex(
-	indexPath: string,
-): { rules?: RawRule[] } | RawRule[] | null {
+type ParsedRulesIndex =
+	| { ok: true; value: { rules?: RawRule[] } | RawRule[] }
+	| { ok: false; message: string };
+
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function parseRulesIndex(indexPath: string): ParsedRulesIndex {
 	try {
-		return JSON.parse(readFileSync(indexPath, "utf8")) as
-			| { rules?: RawRule[] }
-			| RawRule[];
-	} catch {
-		return null;
+		return {
+			ok: true,
+			value: JSON.parse(readFileSync(indexPath, "utf8")) as
+				| { rules?: RawRule[] }
+				| RawRule[],
+		};
+	} catch (error) {
+		return {
+			ok: false,
+			message: errorMessage(error),
+		};
 	}
 }
 
-export function listRules(projectRoot: string): RuleEntry[] {
+function readRulesConfig(projectRoot: string): SchemaObject {
+	const configPath = join(projectRoot, ".agents", "config.json");
+	if (!existsSync(configPath)) {
+		return {};
+	}
+	const loaded = loadJsonObject(configPath);
+	return loaded.ok ? loaded.value : {};
+}
+
+function readObject(
+	record: SchemaObject,
+	key: string,
+): Record<string, unknown> | null {
+	const value = record[key];
+	return value !== null && typeof value === "object" && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: null;
+}
+
+function normalizeLimit(value: unknown, fallback: number): number {
+	if (typeof value !== "number" || !Number.isFinite(value)) {
+		return fallback;
+	}
+	const normalized = Math.floor(value);
+	return normalized > 0 ? normalized : fallback;
+}
+
+export function getRuleResolverConfig(projectRoot: string): RuleResolverConfig {
+	const config = readRulesConfig(projectRoot);
+	const rules = readObject(config, "rules");
+	const resolver =
+		rules === null ? null : readObject(rules as SchemaObject, "resolver");
+	return {
+		maxCharsPerRule: normalizeLimit(
+			resolver?.max_chars_per_rule,
+			DEFAULT_MAX_RULE_CHARS,
+		),
+		maxCharsTotal: normalizeLimit(
+			resolver?.max_chars_total,
+			DEFAULT_MAX_TOTAL_RULE_CHARS,
+		),
+	};
+}
+
+export function listRules(
+	projectRoot: string,
+	options: { strictIndex?: boolean | undefined } = {},
+): RuleEntry[] {
 	const projectPaths = resolveProjectPaths(projectRoot);
 	const indexPath = join(projectPaths.abs.rulesDir, "index.json");
 	if (!existsSync(indexPath)) {
 		return fallbackRules(projectPaths);
 	}
 	const parsed = parseRulesIndex(indexPath);
-	if (parsed === null) {
+	if (!parsed.ok) {
+		if (options.strictIndex === true) {
+			throw new RuleResolverError(
+				`Invalid rules index ${indexPath}: ${parsed.message}`,
+			);
+		}
 		return fallbackRules(projectPaths);
 	}
-	const rawRules = Array.isArray(parsed) ? parsed : parsed.rules;
+	const rawRules = Array.isArray(parsed.value)
+		? parsed.value
+		: parsed.value.rules;
 	if (!Array.isArray(rawRules)) {
+		if (options.strictIndex === true) {
+			throw new RuleResolverError(
+				`Invalid rules index ${indexPath}: expected rules array`,
+			);
+		}
 		return fallbackRules(projectPaths);
 	}
 	return rawRules
-		.map((raw) => normalizeRule(raw, projectPaths.rulesDir))
+		.map((raw) => normalizeRule(raw, projectRoot, projectPaths.rulesDir))
 		.filter((entry): entry is RuleEntry => entry !== null)
 		.sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -133,17 +311,82 @@ export function findRule(
 	);
 }
 
+function matchesListFilter(
+	ruleValues: string[],
+	wantedValues: Set<string>,
+): boolean {
+	if (wantedValues.size === 0 || ruleValues.length === 0) {
+		return true;
+	}
+	return ruleValues.some((value) => wantedValues.has(value));
+}
+
+function matchesScope(rule: RuleEntry, scope: string | null): boolean {
+	if (!scope || rule.scope === null) {
+		return true;
+	}
+	return rule.scope === scope;
+}
+
+function normalizeOptionalRelativePath(
+	value: string | undefined,
+): string | null {
+	if (!value?.trim()) {
+		return null;
+	}
+	const normalized = normalizeProjectRelativePath(value, "");
+	if (!normalized) {
+		throw new RuleResolverError(`Invalid rule resolve file path: ${value}`);
+	}
+	return normalized;
+}
+
+function matchesFile(rule: RuleEntry, filePath: string | null): boolean {
+	if (!filePath) {
+		return true;
+	}
+	if (rule.exactFiles.length > 0 && rule.exactFiles.includes(filePath)) {
+		return true;
+	}
+	if (rule.fileGlobs.length === 0 && rule.exactFiles.length === 0) {
+		return true;
+	}
+	return rule.fileGlobs.some((pattern) =>
+		new Bun.Glob(pattern).match(filePath),
+	);
+}
+
+function matchesInject(rule: RuleEntry, inject: string | null): boolean {
+	if (!inject || rule.inject === null) {
+		return true;
+	}
+	return rule.inject === inject;
+}
+
 export function resolveRules(
 	projectRoot: string,
-	options: { surfaces: string[]; workType: string },
+	options: ResolveRulesOptions,
 ): RuleEntry[] {
-	const wantedSurfaces = new Set(
-		options.surfaces
-			.map((surface) => surface.trim().toLowerCase())
-			.filter(Boolean),
-	);
+	const defaults = getRuleResolverConfig(projectRoot);
+	const wantedDomains = new Set(normalizeTextList(options.domains));
+	const wantedSurfaces = new Set(normalizeTextList(options.surfaces));
+	const wantedLanguages = new Set(normalizeTextList(options.languages));
 	const workType = options.workType.trim().toLowerCase() || "delivery";
-	return listRules(projectRoot)
+	const scope = normalizeOptionalText(options.scope);
+	const inject = normalizeOptionalText(options.inject);
+	const filePath = normalizeOptionalRelativePath(options.filePath);
+	const maxCharsPerRule = normalizeLimit(
+		options.maxCharsPerRule,
+		defaults.maxCharsPerRule,
+	);
+	const maxCharsTotal = normalizeLimit(
+		options.maxCharsTotal,
+		defaults.maxCharsTotal,
+	);
+	let totalChars = 0;
+	const matchingRules = listRules(projectRoot, {
+		strictIndex: options.strictIndex,
+	})
 		.filter((rule) => {
 			const workMatch =
 				rule.workTypes.length === 0 ||
@@ -152,10 +395,44 @@ export function resolveRules(
 			if (!workMatch) {
 				return false;
 			}
-			if (wantedSurfaces.size === 0 || rule.surfaces.length === 0) {
-				return true;
+			if (options.required === true && !rule.required) {
+				return false;
 			}
-			return rule.surfaces.some((surface) => wantedSurfaces.has(surface));
+			return (
+				matchesScope(rule, scope) &&
+				matchesInject(rule, inject) &&
+				matchesListFilter(rule.domains, wantedDomains) &&
+				matchesListFilter(rule.surfaces, wantedSurfaces) &&
+				matchesListFilter(rule.languages, wantedLanguages) &&
+				matchesFile(rule, filePath)
+			);
 		})
-		.sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+		.sort((a, b) => {
+			if (a.required !== b.required) {
+				return a.required ? -1 : 1;
+			}
+			return b.priority - a.priority || a.id.localeCompare(b.id);
+		});
+	const resolved: RuleEntry[] = [];
+	for (const rule of matchingRules) {
+		if (rule.charCount > maxCharsPerRule) {
+			if (rule.required) {
+				throw new RuleResolverError(
+					`Required rule ${rule.id} cannot be resolved: rule exceeds max_chars_per_rule (${rule.charCount}/${maxCharsPerRule})`,
+				);
+			}
+			continue;
+		}
+		if (totalChars + rule.charCount > maxCharsTotal) {
+			if (rule.required) {
+				throw new RuleResolverError(
+					`Required rule ${rule.id} cannot be resolved: rule exceeds max_total_chars (${totalChars + rule.charCount}/${maxCharsTotal})`,
+				);
+			}
+			continue;
+		}
+		totalChars += rule.charCount;
+		resolved.push(rule);
+	}
+	return resolved;
 }

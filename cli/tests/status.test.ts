@@ -310,6 +310,24 @@ describe("status command", () => {
 		}
 	});
 
+	test("surfaces global index failures instead of masking blockers as none", () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			const code = runStatusCommand(root, [], captured.io);
+			expect(code).toBe(0);
+
+			const text = captured.stdout[0] ?? "";
+			expect(text).toContain("VALIDATION_OR_CHECKS:");
+			expect(text).toContain("BLOCKERS:");
+			expect(text).toContain("project indexes need rebuild");
+			expect(text).toContain("run afol local-state rebuild; afol pstr rebuild");
+			expect(text).not.toContain("BLOCKERS:\n- none");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("--json includes freshness under session when active", () => {
 		const { root, session } = createFreshnessFixture("fresh");
 		try {

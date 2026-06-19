@@ -106,6 +106,54 @@ describe("library crud", () => {
 		}
 	});
 
+	test("proposeTopic rejects an existing slug without overwriting claims or sources", () => {
+		const root = createFixture();
+		try {
+			proposeTopic(root, "alpha", "Alpha", [source()]);
+			addSource(
+				root,
+				"alpha",
+				source({
+					id: "src-2",
+					url: "http://example.com/beta",
+					title: "Beta source",
+				}),
+			);
+			addClaim(
+				root,
+				"alpha",
+				claim({
+					id: "claim-2",
+					text: "Keep this claim",
+					source_ids: ["src-1"],
+				}),
+			);
+			const before = readFileSync(
+				join(root, ".afol", "library", "topics", "alpha", "INDEX.md"),
+				"utf8",
+			);
+
+			expect(() =>
+				proposeTopic(root, "alpha", "Alpha replacement", [
+					source({ id: "src-9" }),
+				]),
+			).toThrow("Library topic already exists: alpha");
+
+			expect(
+				readFileSync(
+					join(root, ".afol", "library", "topics", "alpha", "INDEX.md"),
+					"utf8",
+				),
+			).toBe(before);
+			expect(getTopic(root, "alpha")).toMatchObject({
+				sources: [{ id: "src-1" }, { id: "src-2" }],
+				claims: [{ id: "claim-2", text: "Keep this claim" }],
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("proposeTopic rejects missing accessed_at", () => {
 		const root = createFixture();
 		try {
@@ -394,6 +442,46 @@ describe("library command", () => {
 			expect(payload.topic.sources[0]?.accessed_at).toMatch(/T/);
 			expect(payload.data.topic.slug).toBe(payload.topic.slug);
 			expect(payload.data.topic.title).toBe(payload.topic.title);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol library propose fails on an existing slug and preserves topic data", async () => {
+		const root = createFixture();
+		try {
+			proposeTopic(root, "alpha", "Alpha", [source()]);
+			addClaim(root, "alpha", claim({ id: "claim-2", text: "Keep claim" }));
+			const before = readFileSync(
+				join(root, ".afol", "library", "topics", "alpha", "INDEX.md"),
+				"utf8",
+			);
+			const out = capture();
+
+			expect(
+				await runLibraryCommand(
+					"propose",
+					[
+						"--topic",
+						"alpha",
+						"--title",
+						"Alpha replacement",
+						"--url",
+						"http://example.com/replacement",
+					],
+					root,
+					out.io,
+				),
+			).toBe(2);
+			expect(out.stderr.join("\n")).toContain(
+				"Library topic already exists: alpha",
+			);
+			expect(
+				readFileSync(
+					join(root, ".afol", "library", "topics", "alpha", "INDEX.md"),
+					"utf8",
+				),
+			).toBe(before);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -3,6 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
+import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { resolveValidateInvocation } from "../validate/command";
 
 type CapturedIo = {
@@ -35,9 +37,10 @@ function createValidationFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "validate-command-"));
 	const agentsDir = join(root, ".agents");
 
-	mkdirSync(join(agentsDir, "rules"), { recursive: true });
 	mkdirSync(join(agentsDir, "skills"), { recursive: true });
-	mkdirSync(join(root, ".afol", "adm"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "hooks"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "source"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
 	mkdirSync(join(root, "docs", "arc"), { recursive: true });
 
@@ -64,8 +67,18 @@ function createValidationFixture(): string {
 		JSON.stringify({ schema_version: 1, managed_hashes: {} }),
 		"utf8",
 	);
+	writeFileSync(
+		join(root, ".afol", "adm", "tools.json"),
+		JSON.stringify({ version: "test", tools: [] }),
+		"utf8",
+	);
 
 	return root;
+}
+
+function rebuildValidationFixtureIndexes(root: string): void {
+	rebuildWorkBenchIndex(root);
+	rebuildProjectIndexes(root);
 }
 
 describe("validate command", () => {
@@ -95,6 +108,7 @@ describe("validate command", () => {
 	test("passes structural checks in a minimal project fixture", async () => {
 		const root = createValidationFixture();
 		try {
+			rebuildValidationFixtureIndexes(root);
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);
 			expect(code).toBe(0);
@@ -126,14 +140,28 @@ describe("validate command", () => {
 				checks.some((entry) => entry.id === "rules_dir" && entry.ok === true),
 			).toBe(true);
 			expect(
+				checks.some((entry) => entry.id === "hooks_dir" && entry.ok === true),
+			).toBe(true);
+			expect(
+				checks.some(
+					(entry) => entry.id === "adm_source_dir" && entry.ok === true,
+				),
+			).toBe(true);
+			expect(
+				checks.some((entry) => entry.id === "adm_tools" && entry.ok === true),
+			).toBe(true);
+			expect(
 				checks.some((entry) => entry.id === "skills_dir" && entry.ok === true),
 			).toBe(true);
 			expect(
 				checks.some((entry) => entry.id === "wb_dir" && entry.ok === true),
 			).toBe(true);
 			expect(
+				checks.some((entry) => entry.id === "adm_dir" && entry.ok === true),
+			).toBe(true);
+			expect(
 				checks.some(
-					(entry) => entry.id === "docs_arc_dir" && entry.ok === true,
+					(entry) => entry.id === "agents_payload_clean" && entry.ok === true,
 				),
 			).toBe(true);
 			expect(
@@ -165,6 +193,98 @@ describe("validate command", () => {
 						entry.id === "files_local_state_index" && entry.ok === true,
 				),
 			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects discontinued skills-sync manifest in .agents", async () => {
+		const root = createValidationFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "skills-sync.manifest.json"),
+				"{}\n",
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const check = payload.checks?.find(
+				(entry) => entry.id === "agents_payload_clean",
+			);
+
+			expect(code).toBe(1);
+			expect(check?.ok).toBe(false);
+			expect(check?.message).toContain(".agents/skills-sync.manifest.json");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects skills_dir outside .agents/skills", async () => {
+		const root = createValidationFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					schema_version: 1,
+					project: { name: "validate-fixture" },
+					paths: {
+						skills_dir: ".afol/skills",
+					},
+					skills_sync: {
+						project_dir: ".afol/skills",
+					},
+				}),
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				checks: Array<{ id: string; ok: boolean; message?: string }>;
+			};
+			expect(payload.ok).toBe(false);
+			const configCheck = payload.checks.find((entry) => entry.id === "config");
+			expect(configCheck?.ok).toBe(false);
+			expect(configCheck?.message).toContain("paths.skills_dir");
+			expect(configCheck?.message).toContain(".agents/skills");
+			expect(configCheck?.message).toContain(".afol/skills");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails when local-state index snapshots are missing", async () => {
+		const root = createValidationFixture();
+		try {
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				exit_code: number;
+				ok: boolean;
+				checks: Array<{ id: string; ok: boolean; message?: string }>;
+			};
+			expect(payload.exit_code).toBe(1);
+			expect(payload.ok).toBe(false);
+			for (const id of [
+				"wb_local_state_index",
+				"rules_local_state_index",
+				"skills_local_state_index",
+				"specs_local_state_index",
+				"files_local_state_index",
+			]) {
+				const check = payload.checks.find((entry) => entry.id === id);
+				expect(check).toBeDefined();
+				expect(check?.ok).toBe(false);
+				expect(check?.message).toContain("run afol local-state rebuild");
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -268,15 +388,16 @@ describe("validate command", () => {
 		const root = createValidationFixture();
 		try {
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				"{invalid-json",
 				"utf8",
 			);
 			writeFileSync(
-				join(root, ".agents", "rules", "RULE-001-example.md"),
+				join(root, ".afol", "adm", "rules", "RULE-001-example.md"),
 				"# Rule 1\n",
 				"utf8",
 			);
+			rebuildValidationFixtureIndexes(root);
 
 			const captured = captureIo();
 			const code = await runValidateCommand(root, ["--json"], captured.io);

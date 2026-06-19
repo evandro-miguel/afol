@@ -175,6 +175,35 @@ describe("router alias grammar", () => {
 		});
 	});
 
+	test("preserves flag-like option values while normalizing scoped aliases", () => {
+		expect(
+			resolveCommand([
+				"memory",
+				"add",
+				"--id",
+				"m",
+				"--title",
+				"-b",
+				"--body",
+				"text",
+			]),
+		).toEqual({
+			kind: "subcommand",
+			group: "memory",
+			action: "add",
+			args: ["--id", "m", "--title", "-b", "--body", "text"],
+		});
+
+		expect(
+			resolveCommand(["memory", "add", "-i", "m", "-t", "-b", "-b", "text"]),
+		).toEqual({
+			kind: "subcommand",
+			group: "memory",
+			action: "add",
+			args: ["--id", "m", "--title", "-b", "--body", "text"],
+		});
+	});
+
 	test("normalizes broad command, action, and flag aliases", () => {
 		expect(
 			resolveCommand(["qt", "alias-smoke", "-t", "task", "-o", "passed"]),

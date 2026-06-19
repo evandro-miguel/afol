@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runContextCommand } from "../commands/context";
@@ -42,6 +49,30 @@ function captureIo(): IoCapture {
 			},
 		},
 	};
+}
+
+function ruleInjectionStatePath(root: string): string {
+	return join(root, ".afol", "data", "rules", "injection-state.json");
+}
+
+function writeInjectableAlphaRule(root: string): void {
+	writeFileSync(
+		join(root, ".afol", "adm", "rules", "index.json"),
+		JSON.stringify({
+			rules: [
+				{
+					id: "RULE-ALPHA",
+					name: "alpha rule",
+					path: "alpha.md",
+					surfaces: ["alpha"],
+					work_types: ["delivery"],
+					inject: "always",
+					priority: 90,
+				},
+			],
+		}),
+		"utf8",
+	);
 }
 
 function createBaseFixture(): string {
@@ -123,7 +154,7 @@ function createBundleFixture(options?: {
 	libraryRefs?: boolean;
 }): string {
 	const root = createSectionFixture();
-	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
 	mkdirSync(join(root, ".agents", "skills", "alpha-helper"), {
 		recursive: true,
 	});
@@ -133,7 +164,7 @@ function createBundleFixture(options?: {
 	mkdirSync(join(root, ".afol", "wb", "session-1"), { recursive: true });
 
 	writeFileSync(
-		join(root, ".agents", "rules", "index.json"),
+		join(root, ".afol", "adm", "rules", "index.json"),
 		JSON.stringify({
 			rules: [
 				{
@@ -149,7 +180,7 @@ function createBundleFixture(options?: {
 		"utf8",
 	);
 	writeFileSync(
-		join(root, ".agents", "rules", "alpha.md"),
+		join(root, ".afol", "adm", "rules", "alpha.md"),
 		"# Alpha rule\n",
 		"utf8",
 	);
@@ -380,6 +411,64 @@ function createBundleFixture(options?: {
 	return root;
 }
 
+function writeAlphaHook(root: string): void {
+	mkdirSync(join(root, ".afol", "adm", "hooks"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "hooks", "index.json"),
+		JSON.stringify({
+			hooks: [
+				{
+					id: "HOOK-ALPHA",
+					name: "alpha hook",
+					path: "alpha-hook.md",
+					events: ["context.bundle"],
+					roles: ["designer"],
+					surfaces: ["alpha"],
+					work_types: ["delivery"],
+					priority: 90,
+					contributions: {
+						messages: ["Use alpha hook message."],
+						tools: ["afol hook resolve --event context.bundle"],
+						validation_commands: ["bun run alpha-check"],
+						pstr_refs: ["pstr:hook-map"],
+						memory_refs: ["memory:hook-alpha"],
+						library_refs: ["library:hook-alpha"],
+						do_not_load: ["raw plugin payloads"],
+					},
+				},
+			],
+		}),
+		"utf8",
+	);
+}
+
+function writeCoordinationRadarHook(root: string): void {
+	mkdirSync(join(root, ".afol", "adm", "hooks"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "hooks", "index.json"),
+		JSON.stringify({
+			hooks: [
+				{
+					id: "COORDINATION-RADAR",
+					name: "coordination radar reminder",
+					path: "coordination-radar.md",
+					events: ["context.bundle"],
+					roles: ["orchestrator"],
+					work_types: ["delivery", "all"],
+					priority: 90,
+					contributions: {
+						messages: [
+							"Before delegating or editing across governed AFOL sessions, review `afol session radar`.",
+						],
+						tools: ["afol session radar", "afol session radar --json"],
+					},
+				},
+			],
+		}),
+		"utf8",
+	);
+}
+
 describe("context system", () => {
 	test("rebuildSectionIndex creates valid index from spec and adr files", () => {
 		const root = createSectionFixture();
@@ -511,6 +600,9 @@ describe("context system", () => {
 			expect(bundle.mode).toBe("balanced");
 			expect(Array.isArray(bundle.refs)).toBe(true);
 			expect(Array.isArray(bundle.rules)).toBe(true);
+			expect(Array.isArray(bundle.hooks)).toBe(true);
+			expect(Array.isArray(bundle.hook_messages)).toBe(true);
+			expect(Array.isArray(bundle.hook_contributions)).toBe(true);
 			expect(Array.isArray(bundle.skills)).toBe(true);
 			expect(Array.isArray(bundle.tools)).toBe(true);
 			expect(Array.isArray(bundle.validation_commands)).toBe(true);
@@ -542,6 +634,505 @@ describe("context system", () => {
 		}
 	});
 
+	test("buildContextBundle includes matching hook contributions", () => {
+		const root = createBundleFixture();
+		try {
+			writeAlphaHook(root);
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+			});
+			expect(bundle.hooks).toEqual(["HOOK-ALPHA"]);
+			expect(bundle.hook_messages).toEqual(["Use alpha hook message."]);
+			expect(bundle.hook_contributions).toEqual([
+				{
+					id: "HOOK-ALPHA",
+					path: ".afol/adm/hooks/alpha-hook.md",
+					messages: ["Use alpha hook message."],
+					tools: ["afol hook resolve --event context.bundle"],
+					validation_commands: ["bun run alpha-check"],
+					pstr_refs: ["pstr:hook-map"],
+					memory_refs: ["memory:hook-alpha"],
+					library_refs: ["library:hook-alpha"],
+					do_not_load: ["raw plugin payloads"],
+				},
+			]);
+			expect(bundle.tools).toContain(
+				"afol hook resolve --event context.bundle",
+			);
+			expect(bundle.validation_commands).toContain("bun run alpha-check");
+			expect(bundle.pstr_refs).toContain("pstr:hook-map");
+			expect(bundle.memory_refs).toContain("memory:hook-alpha");
+			expect(bundle.library_refs).toContain("library:hook-alpha");
+			expect(bundle.do_not_load).toContain("raw plugin payloads");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle includes coordination radar only for orchestrators", () => {
+		const root = createBundleFixture();
+		try {
+			writeCoordinationRadarHook(root);
+			const orchestrator = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "orchestrator",
+				surface: "alpha",
+			});
+			const designer = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+			});
+
+			expect(orchestrator.hooks).toEqual(["COORDINATION-RADAR"]);
+			expect(orchestrator.hook_messages.join("\n")).toContain(
+				"afol session radar",
+			);
+			expect(orchestrator.tools).toContain("afol session radar");
+			expect(orchestrator.tools).toContain("afol session radar --json");
+			expect(designer.hooks).not.toContain("COORDINATION-RADAR");
+			expect(designer.tools).not.toContain("afol session radar");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle injects matching rules once per identity and persists state", () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+
+			const first = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(first.rule_injection.first_use).toBe(true);
+			expect(first.rule_injection.injected.map((rule) => rule.id)).toEqual([
+				"RULE-ALPHA",
+			]);
+			expect(first.rule_injection.already_injected).toEqual([]);
+			expect(first.rule_injection.state_path).toBe(
+				".afol/data/rules/injection-state.json",
+			);
+
+			const state = JSON.parse(
+				readFileSync(
+					join(root, ".afol", "data", "rules", "injection-state.json"),
+					"utf8",
+				),
+			) as {
+				identities: Record<
+					string,
+					{
+						file_path: string | null;
+						rules: Record<string, unknown>;
+					}
+				>;
+			};
+			const identities = Object.keys(state.identities);
+			const expectedIdentity = [
+				`${["sess", "ion"].join("")}:session-1`,
+				"task:T-01",
+				"role:designer",
+				"surface:alpha",
+			].join("|");
+			expect(identities).toEqual([expectedIdentity]);
+			expect(state.identities[identities[0] ?? ""]?.file_path).toBeNull();
+			expect(
+				Object.keys(state.identities[identities[0] ?? ""]?.rules ?? {}),
+			).toEqual(["RULE-ALPHA"]);
+
+			const second = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(second.rule_injection.first_use).toBe(false);
+			expect(second.rule_injection.injected).toEqual([]);
+			expect(
+				second.rule_injection.already_injected.map((rule) => rule.id),
+			).toEqual(["RULE-ALPHA"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle reinjects matching rules when markdown content changes", () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				"# Alpha rule\n\nInitial governance text.\n",
+				"utf8",
+			);
+
+			const first = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(first.rule_injection.injected[0]?.content).toContain("Initial");
+
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				"# Alpha rule\n\nUpdated governance text.\n",
+				"utf8",
+			);
+
+			const second = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(second.rule_injection.injected.map((rule) => rule.id)).toEqual([
+				"RULE-ALPHA",
+			]);
+			expect(second.rule_injection.injected[0]?.content).toContain("Updated");
+			expect(second.rule_injection.already_injected).toEqual([]);
+
+			const state = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			) as {
+				identities: Record<
+					string,
+					{ rules: Record<string, { content_hash?: string }> }
+				>;
+			};
+			const identity = Object.keys(state.identities)[0] ?? "";
+			expect(
+				state.identities[identity]?.rules["RULE-ALPHA"]?.content_hash,
+			).toBeTruthy();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle omits optional injected rules with missing markdown files and does not persist them", () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-PRESENT",
+							name: "present rule",
+							path: "present.md",
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 100,
+						},
+						{
+							id: "RULE-MISSING",
+							name: "missing rule",
+							path: "missing.md",
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 90,
+						},
+					],
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "present.md"),
+				"# Present rule\n",
+				"utf8",
+			);
+
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(bundle.rule_injection.injected.map((rule) => rule.id)).toEqual([
+				"RULE-PRESENT",
+			]);
+			expect(bundle.rule_injection.omitted.map((rule) => rule.id)).toEqual([
+				"RULE-MISSING",
+			]);
+			expect(bundle.rule_injection.omitted[0]?.reason).toContain(
+				"rule markdown file missing",
+			);
+			expect(bundle.rule_injection.omitted[0]?.reason).toContain("missing.md");
+
+			const state = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			) as {
+				identities: Record<string, { rules: Record<string, unknown> }>;
+			};
+			const identity = Object.keys(state.identities)[0] ?? "";
+			expect(Object.keys(state.identities[identity]?.rules ?? {})).toEqual([
+				"RULE-PRESENT",
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle --json rejects corrupt rule injection state without overwriting it", async () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				"# Alpha rule\n",
+				"utf8",
+			);
+			const statePath = ruleInjectionStatePath(root);
+			mkdirSync(join(root, ".afol", "data", "rules"), { recursive: true });
+			writeFileSync(statePath, "{not-json\n", "utf8");
+
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			expect(captured.stderr).toEqual([]);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				error: { code: string; message: string };
+			};
+			expect(payload.error.code).toBe("CTX_RULE_INJECTION_ERROR");
+			expect(payload.error.message).toContain("Invalid rule injection state");
+			expect(readFileSync(statePath, "utf8")).toBe("{not-json\n");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle infers TS surface and language from file path", () => {
+		const root = createBundleFixture();
+		try {
+			mkdirSync(join(root, "cli", "commands"), { recursive: true });
+			writeFileSync(
+				join(root, "cli", "commands", "context.ts"),
+				"export {};\n",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-CONTEXT-TS",
+							name: "context ts rule",
+							path: "context-ts.md",
+							domains: ["cli"],
+							surfaces: ["context"],
+							work_types: ["delivery"],
+							languages: ["ts"],
+							inject: "always",
+							priority: 95,
+						},
+					],
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "context-ts.md"),
+				"# Context TS rule\n",
+				"utf8",
+			);
+
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				filePath: "cli/commands/context.ts",
+				persistRuleInjection: true,
+			});
+			expect(bundle.surface).toBe("context");
+			expect(bundle.file_path).toBe("cli/commands/context.ts");
+			expect(bundle.rules).toContain("RULE-CONTEXT-TS");
+			expect(bundle.rule_injection.injected.map((rule) => rule.id)).toEqual([
+				"RULE-CONTEXT-TS",
+			]);
+			expect(bundle.rule_injection.identity).toContain(
+				"|file:cli/commands/context.ts",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle omits optional injected rules that exceed total budget", () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					version: "0.1.0",
+					rules: {
+						resolver: {
+							max_chars_per_rule: 2000,
+							max_chars_total: 30,
+						},
+					},
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-FIRST",
+							name: "first rule",
+							path: "first.md",
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 100,
+						},
+						{
+							id: "RULE-SECOND",
+							name: "second rule",
+							path: "second.md",
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 90,
+						},
+					],
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "first.md"),
+				"A".repeat(18),
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "second.md"),
+				"B".repeat(18),
+			);
+
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(bundle.rule_injection.injected.map((rule) => rule.id)).toEqual([
+				"RULE-FIRST",
+			]);
+			expect(bundle.rule_injection.omitted.map((rule) => rule.id)).toEqual([
+				"RULE-SECOND",
+			]);
+			expect(bundle.rule_injection.omitted[0]?.reason).toContain(
+				"max_total_chars",
+			);
+			expect(bundle.rule_injection.budget.used_chars).toBe(18);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle omits injected rule content that would exceed token budget", () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					version: "0.1.0",
+					rules: {
+						resolver: {
+							max_chars_per_rule: 20000,
+							max_chars_total: 20000,
+						},
+					},
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-BIG",
+							name: "big rule",
+							path: "big.md",
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 100,
+						},
+					],
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "big.md"),
+				"Budget pressure.\n".repeat(1000),
+				"utf8",
+			);
+
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+
+			expect(bundle.budget.used_tokens).toBeLessThanOrEqual(
+				bundle.budget.total_tokens,
+			);
+			expect(bundle.rule_injection.injected).toEqual([]);
+			expect(bundle.rule_injection.omitted.map((rule) => rule.id)).toContain(
+				"RULE-BIG",
+			);
+			expect(bundle.rule_injection.omitted[0]?.reason).toContain(
+				"bundle token budget",
+			);
+
+			const state = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			) as {
+				identities: Record<
+					string,
+					{ rules: Record<string, { content_hash?: string }> }
+				>;
+			};
+			const identity = Object.keys(state.identities)[0] ?? "";
+			expect(state.identities[identity]?.rules["RULE-BIG"]).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("buildContextBundle respects token budget", () => {
 		const root = createBundleFixture({ inflate: true });
 		try {
@@ -565,6 +1156,7 @@ describe("context system", () => {
 	test("compact mode uses 1000 token budget and no expanded sections", () => {
 		const root = createBundleFixture();
 		try {
+			writeAlphaHook(root);
 			const bundle = buildContextBundle(root, {
 				session: "session-1",
 				task: "T-01",
@@ -574,6 +1166,9 @@ describe("context system", () => {
 			});
 			expect(bundle.mode).toBe("compact");
 			expect(bundle.budget.total_tokens).toBe(1000);
+			expect(bundle.hooks).toEqual([]);
+			expect(bundle.hook_messages).toEqual([]);
+			expect(bundle.hook_contributions).toEqual([]);
 			expect(bundle.expanded_sections).toBeUndefined();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -665,6 +1260,112 @@ describe("context system", () => {
 			expect(bundle.memory_refs.join(" ")).not.toContain("MEM-ARCHIVED");
 			expect(bundle.memory_refs.join(" ")).not.toContain("MEM-REJECTED");
 			expect(bundle.memory_refs.join(" ")).not.toContain("MEM-INVALIDATED");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildContextBundle queries memory and library refs by separate terms with dedupe", () => {
+		const root = createBundleFixture();
+		try {
+			writeMemory(root, {
+				updated_at: "2026-06-13T00:00:00.000Z",
+				entries: [
+					{
+						id: "MEM-TASK",
+						title: "Task-only memory",
+						body: "T-01 isolated memory",
+						status: "active",
+						created_at: "2026-06-13T00:00:00.000Z",
+						updated_at: "2026-06-13T00:00:00.000Z",
+						tags: [],
+					},
+					{
+						id: "MEM-SURFACE",
+						title: "Surface-only memory",
+						body: "alpha isolated memory",
+						status: "active",
+						created_at: "2026-06-13T00:00:00.000Z",
+						updated_at: "2026-06-13T00:00:00.000Z",
+						tags: [],
+					},
+					{
+						id: "MEM-BOTH",
+						title: "Shared memory",
+						body: "T-01 alpha shared memory",
+						status: "active",
+						created_at: "2026-06-13T00:00:00.000Z",
+						updated_at: "2026-06-13T00:00:00.000Z",
+						tags: [],
+					},
+				],
+			});
+			proposeTopic(root, "alpha", "Alpha library", [
+				{
+					id: "SRC-ALPHA",
+					url: "https://example.com/alpha",
+					title: "Alpha source",
+					accessed_at: "2026-06-13T00:00:00.000Z",
+				},
+			]);
+			addClaim(root, "alpha", {
+				id: "CLAIM-BOTH",
+				text: "T-01 alpha shared claim",
+				source_ids: ["SRC-ALPHA"],
+				status: "current",
+				created_at: "2026-06-13T00:00:00.000Z",
+			});
+			proposeTopic(root, "task-only", "Task-only library", [
+				{
+					id: "SRC-TASK",
+					url: "https://example.com/task",
+					title: "Task source",
+					accessed_at: "2026-06-13T00:00:00.000Z",
+				},
+			]);
+			addClaim(root, "task-only", {
+				id: "CLAIM-TASK",
+				text: "T-01 isolated claim",
+				source_ids: ["SRC-TASK"],
+				status: "current",
+				created_at: "2026-06-13T00:00:00.000Z",
+			});
+			proposeTopic(root, "surface-only", "Surface-only library", [
+				{
+					id: "SRC-SURFACE",
+					url: "https://example.com/surface",
+					title: "Surface source",
+					accessed_at: "2026-06-13T00:00:00.000Z",
+				},
+			]);
+			addClaim(root, "surface-only", {
+				id: "CLAIM-SURFACE",
+				text: "alpha isolated claim",
+				source_ids: ["SRC-SURFACE"],
+				status: "current",
+				created_at: "2026-06-13T00:00:00.000Z",
+			});
+
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+			});
+
+			expect(bundle.memory_refs).toEqual([
+				"memory:MEM-TASK",
+				"memory:MEM-BOTH",
+				"memory:MEM-SURFACE",
+			]);
+			expect(bundle.library_refs).toContain("library:alpha#CLAIM-BOTH");
+			expect(bundle.library_refs).toContain("library:task-only#CLAIM-TASK");
+			expect(bundle.library_refs).toContain(
+				"library:surface-only#CLAIM-SURFACE",
+			);
+			expect(
+				bundle.library_refs.filter((ref) => ref === "library:alpha#CLAIM-BOTH"),
+			).toHaveLength(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1006,6 +1707,194 @@ describe("context system", () => {
 		}
 	});
 
+	test("afol ctx bundle --json returns injection error when a required rule exceeds budget", async () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					version: "0.1.0",
+					rules: {
+						resolver: {
+							max_chars_per_rule: 10,
+							max_chars_total: 10,
+						},
+					},
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-REQUIRED",
+							name: "required rule",
+							path: "required.md",
+							required: true,
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 100,
+						},
+					],
+				}),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "required.md"),
+				"01234567890",
+				"utf8",
+			);
+
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			expect(captured.stderr).toEqual([]);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
+				error: {
+					code: string;
+					message: string;
+				};
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(1);
+			expect(payload.error.code).toBe("CTX_RULE_INJECTION_ERROR");
+			expect(payload.error.message).toContain("RULE-REQUIRED");
+			expect(payload.error.message).toContain("max_chars_per_rule");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle --json returns injection error when a required rule file is missing", async () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				JSON.stringify({
+					rules: [
+						{
+							id: "RULE-REQUIRED",
+							name: "required rule",
+							path: "required.md",
+							required: true,
+							surfaces: ["alpha"],
+							work_types: ["delivery"],
+							inject: "always",
+							priority: 100,
+						},
+					],
+				}),
+				"utf8",
+			);
+
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			expect(captured.stderr).toEqual([]);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
+				error: {
+					code: string;
+					message: string;
+				};
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(1);
+			expect(payload.error.code).toBe("CTX_RULE_INJECTION_ERROR");
+			expect(payload.error.message).toContain("RULE-REQUIRED");
+			expect(payload.error.message).toContain("rule markdown file missing");
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle --json rejects invalid indexed rules before fallback injection", async () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				"{not-json\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "RULE-001-fallback.md"),
+				"# Fallback\n",
+				"utf8",
+			);
+
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			expect(captured.stderr).toEqual([]);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				error: { code: string; message: string };
+			};
+			expect(payload.error.code).toBe("CTX_RULE_INJECTION_ERROR");
+			expect(payload.error.message).toContain("Invalid rules index");
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol ctx bundle --trusted passes after pstr rebuild and hydrated state", async () => {
 		const root = createBundleFixture({ pstr: "missing" });
 		try {
@@ -1068,6 +1957,7 @@ describe("context system", () => {
 	test("afol ctx bundle --json returns JSON with graph refs and project_health", async () => {
 		const root = createBundleFixture();
 		try {
+			writeInjectableAlphaRule(root);
 			const captured = captureIo();
 			expect(
 				await runContextCommand(
@@ -1120,6 +2010,186 @@ describe("context system", () => {
 			expect(Array.isArray(payload.data.library_refs)).toBe(true);
 			expect(Array.isArray(payload.memory_refs)).toBe(true);
 			expect(Array.isArray(payload.library_refs)).toBe(true);
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx tools does not consume first-use rule injection state", async () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"tools",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+
+			const bundleOutput = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"--json",
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					bundleOutput.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(bundleOutput.stdout[0] ?? "{}") as {
+				data: {
+					rule_injection: {
+						first_use: boolean;
+						injected: Array<{ id: string }>;
+					};
+				};
+			};
+			expect(payload.data.rule_injection.first_use).toBe(true);
+			expect(
+				payload.data.rule_injection.injected.map((rule) => rule.id),
+			).toEqual(["RULE-ALPHA"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx explain and bundle --explain do not consume first-use rule injection state", async () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			for (const [action, args] of [
+				[
+					"explain",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+				],
+				[
+					"bundle",
+					[
+						"--explain",
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+				],
+			] as const) {
+				const captured = captureIo();
+				expect(
+					await runContextCommand(action, [...args], root, captured.io),
+				).toBe(0);
+				expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle compact keeps rule injection shape without persistent state", async () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"--json",
+						"--mode",
+						"compact",
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				data: {
+					rule_injection: {
+						identity: string;
+						state_path: string;
+						first_use: boolean;
+						injected: unknown[];
+						already_injected: unknown[];
+						omitted: unknown[];
+					};
+				};
+			};
+			expect(payload.data.rule_injection.identity).toContain("surface:alpha");
+			expect(payload.data.rule_injection.state_path).toBe(
+				".afol/data/rules/injection-state.json",
+			);
+			expect(payload.data.rule_injection.first_use).toBe(false);
+			expect(payload.data.rule_injection.injected).toEqual([]);
+			expect(payload.data.rule_injection.already_injected).toEqual([]);
+			expect(payload.data.rule_injection.omitted).toEqual([]);
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle rejects invalid rule file paths", async () => {
+		const root = createBundleFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					["--file", "../escape.ts", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				error: { message: string };
+			};
+			expect(payload.error.message).toContain(
+				"Invalid rule resolve file path: ../escape.ts",
+			);
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

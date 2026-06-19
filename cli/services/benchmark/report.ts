@@ -239,12 +239,294 @@ function readJson(path: string): Record<string, unknown> | null {
 	}
 	try {
 		const data = JSON.parse(readFileSync(path, "utf8")) as unknown;
-		return typeof data === "object" && data !== null
-			? (data as Record<string, unknown>)
-			: null;
-	} catch {
-		return null;
+		if (typeof data === "object" && data !== null && !Array.isArray(data)) {
+			return data as Record<string, unknown>;
+		}
+		throw new Error("root must be an object.");
+	} catch (error) {
+		throw new Error(
+			`Malformed benchmark JSON ${path}: ${(error as Error).message}`,
+		);
 	}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function invalidSavedRun(
+	path: string,
+	fieldPath: string,
+	message: string,
+): never {
+	throw new Error(`Malformed benchmark run ${path}: ${fieldPath} ${message}`);
+}
+
+function requireRecord(
+	value: unknown,
+	path: string,
+	fieldPath: string,
+): Record<string, unknown> {
+	if (!isRecord(value)) {
+		invalidSavedRun(path, fieldPath, "must be an object.");
+	}
+	return value;
+}
+
+function requireString(
+	value: unknown,
+	path: string,
+	fieldPath: string,
+): string {
+	if (typeof value !== "string") {
+		invalidSavedRun(path, fieldPath, "must be a string.");
+	}
+	return value;
+}
+
+function requireBoolean(
+	value: unknown,
+	path: string,
+	fieldPath: string,
+): boolean {
+	if (typeof value !== "boolean") {
+		invalidSavedRun(path, fieldPath, "must be a boolean.");
+	}
+	return value;
+}
+
+function requireFiniteNumber(
+	value: unknown,
+	path: string,
+	fieldPath: string,
+): number {
+	if (typeof value !== "number" || !Number.isFinite(value)) {
+		invalidSavedRun(path, fieldPath, "must be a finite number.");
+	}
+	return value;
+}
+
+function requireEnum<T extends string>(
+	value: unknown,
+	options: readonly T[],
+	path: string,
+	fieldPath: string,
+): T {
+	if (typeof value !== "string" || !options.includes(value as T)) {
+		invalidSavedRun(path, fieldPath, `must be one of: ${options.join(", ")}.`);
+	}
+	return value as T;
+}
+
+function requireStringArray(
+	value: unknown,
+	path: string,
+	fieldPath: string,
+): string[] {
+	if (
+		!Array.isArray(value) ||
+		value.some((entry) => typeof entry !== "string")
+	) {
+		invalidSavedRun(path, fieldPath, "must be an array of strings.");
+	}
+	return value;
+}
+
+function parseBenchResult(
+	entry: unknown,
+	path: string,
+	index: number,
+): BenchResult {
+	const rowPath = `results[${index}]`;
+	const record = requireRecord(entry, path, rowPath);
+	const tokens = requireRecord(record.tokens, path, `${rowPath}.tokens`);
+	const timing = requireRecord(record.timing, path, `${rowPath}.timing`);
+	const tools = requireRecord(record.tools, path, `${rowPath}.tools`);
+	const toolCounts = requireRecord(
+		tools.by_type,
+		path,
+		`${rowPath}.tools.by_type`,
+	);
+	const effectiveness = requireRecord(
+		record.effectiveness,
+		path,
+		`${rowPath}.effectiveness`,
+	);
+	const thresholds = requireRecord(
+		record.thresholds,
+		path,
+		`${rowPath}.thresholds`,
+	);
+	const planQualityValue = record.plan_quality;
+	const planQuality =
+		planQualityValue === null
+			? null
+			: (() => {
+					const parsed = requireRecord(
+						planQualityValue,
+						path,
+						`${rowPath}.plan_quality`,
+					);
+					return {
+						meta_planning_detected: requireBoolean(
+							parsed.meta_planning_detected,
+							path,
+							`${rowPath}.plan_quality.meta_planning_detected`,
+						),
+						direct_execution: requireBoolean(
+							parsed.direct_execution,
+							path,
+							`${rowPath}.plan_quality.direct_execution`,
+						),
+					};
+				})();
+
+	return {
+		schema_version: requireString(
+			record.schema_version,
+			path,
+			`${rowPath}.schema_version`,
+		) as typeof BENCH_SCHEMA_VERSION,
+		run_id: requireString(record.run_id, path, `${rowPath}.run_id`),
+		scenario_id: requireString(
+			record.scenario_id,
+			path,
+			`${rowPath}.scenario_id`,
+		),
+		pack_id: requireString(record.pack_id, path, `${rowPath}.pack_id`),
+		status: requireEnum(
+			record.status,
+			["passed", "failed", "blocked"],
+			path,
+			`${rowPath}.status`,
+		),
+		mode: requireEnum(
+			record.mode,
+			["live", "cli-micro"],
+			path,
+			`${rowPath}.mode`,
+		),
+		git_commit: requireString(record.git_commit, path, `${rowPath}.git_commit`),
+		model: requireString(record.model, path, `${rowPath}.model`),
+		timestamp: requireString(record.timestamp, path, `${rowPath}.timestamp`),
+		tokens: {
+			input: requireFiniteNumber(tokens.input, path, `${rowPath}.tokens.input`),
+			output: requireFiniteNumber(
+				tokens.output,
+				path,
+				`${rowPath}.tokens.output`,
+			),
+			cached_input: requireFiniteNumber(
+				tokens.cached_input,
+				path,
+				`${rowPath}.tokens.cached_input`,
+			),
+			reasoning_output: requireFiniteNumber(
+				tokens.reasoning_output,
+				path,
+				`${rowPath}.tokens.reasoning_output`,
+			),
+			total: requireFiniteNumber(tokens.total, path, `${rowPath}.tokens.total`),
+		},
+		timing: {
+			wall_clock_ms: requireFiniteNumber(
+				timing.wall_clock_ms,
+				path,
+				`${rowPath}.timing.wall_clock_ms`,
+			),
+		},
+		tools: {
+			total_calls: requireFiniteNumber(
+				tools.total_calls,
+				path,
+				`${rowPath}.tools.total_calls`,
+			),
+			success_rate: requireFiniteNumber(
+				tools.success_rate,
+				path,
+				`${rowPath}.tools.success_rate`,
+			),
+			by_type: {
+				file_read: requireFiniteNumber(
+					toolCounts.file_read,
+					path,
+					`${rowPath}.tools.by_type.file_read`,
+				),
+				afol_command: requireFiniteNumber(
+					toolCounts.afol_command,
+					path,
+					`${rowPath}.tools.by_type.afol_command`,
+				),
+				shell: requireFiniteNumber(
+					toolCounts.shell,
+					path,
+					`${rowPath}.tools.by_type.shell`,
+				),
+				agent_message: requireFiniteNumber(
+					toolCounts.agent_message,
+					path,
+					`${rowPath}.tools.by_type.agent_message`,
+				),
+			},
+			error_count: requireFiniteNumber(
+				tools.error_count,
+				path,
+				`${rowPath}.tools.error_count`,
+			),
+		},
+		effectiveness: {
+			task_completed: requireBoolean(
+				effectiveness.task_completed,
+				path,
+				`${rowPath}.effectiveness.task_completed`,
+			),
+			error_count: requireFiniteNumber(
+				effectiveness.error_count,
+				path,
+				`${rowPath}.effectiveness.error_count`,
+			),
+		},
+		plan_quality: planQuality,
+		thresholds: {
+			max_output_tokens: requireFiniteNumber(
+				thresholds.max_output_tokens,
+				path,
+				`${rowPath}.thresholds.max_output_tokens`,
+			),
+			max_duration_ms: requireFiniteNumber(
+				thresholds.max_duration_ms,
+				path,
+				`${rowPath}.thresholds.max_duration_ms`,
+			),
+			min_tool_success_rate: requireFiniteNumber(
+				thresholds.min_tool_success_rate,
+				path,
+				`${rowPath}.thresholds.min_tool_success_rate`,
+			),
+		},
+		pass: requireBoolean(record.pass, path, `${rowPath}.pass`),
+		notes: requireStringArray(record.notes, path, `${rowPath}.notes`),
+	};
+}
+
+function parseSavedRunResults(
+	resultsRaw: unknown[],
+	path: string,
+): BenchResult[] {
+	const results: BenchResult[] = [];
+	for (const [index, entry] of resultsRaw.entries()) {
+		try {
+			results.push(parseBenchResult(entry, path, index));
+		} catch (error) {
+			if (!(error instanceof Error)) {
+				throw error;
+			}
+			if (!error.message.startsWith(`Malformed benchmark run ${path}:`)) {
+				throw error;
+			}
+		}
+	}
+	return results;
 }
 
 function parseToolCounts(value: unknown): BenchToolTypeCounts | null {
@@ -458,13 +740,10 @@ export function loadSavedRun(path: string): SavedRunArchive | null {
 	if (!resultsRaw) {
 		return null;
 	}
-	const results = resultsRaw.filter((entry): entry is BenchResult => {
-		return (
-			typeof entry === "object" &&
-			entry !== null &&
-			typeof (entry as { scenario_id?: unknown }).scenario_id === "string"
-		);
-	});
+	const results = parseSavedRunResults(resultsRaw, path);
+	if (resultsRaw.length > 0 && results.length === 0) {
+		invalidSavedRun(path, "results", "must include at least one valid row.");
+	}
 	return {
 		schema_version:
 			typeof data.schema_version === "string"

@@ -10,6 +10,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 
@@ -27,8 +29,10 @@ function parseEnvelope(stdout: string): Record<string, unknown> {
 
 function createProjectRoot(name: string): string {
 	const root = mkdtempSync(join(tmpdir(), `operator-journey-${name}-`));
-	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
 	mkdirSync(join(root, ".agents", "skills"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "hooks"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "source"), { recursive: true });
 	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
 	mkdirSync(join(root, "docs", "lessons", "entries"), { recursive: true });
@@ -49,6 +53,11 @@ function createProjectRoot(name: string): string {
 		"utf8",
 	);
 	writeFileSync(
+		join(root, ".afol", "adm", "tools.json"),
+		`${JSON.stringify({ version: "test", tools: [] }, null, 2)}\n`,
+		"utf8",
+	);
+	writeFileSync(
 		join(root, ".afol", "adm", "specs", "session-isolation.md"),
 		"# Session isolation\n\nSearch session isolation behavior.\n",
 		"utf8",
@@ -59,7 +68,7 @@ function createProjectRoot(name: string): string {
 		"utf8",
 	);
 	writeFileSync(
-		join(root, ".agents", "rules", "RULE-123-session-isolation.md"),
+		join(root, ".afol", "adm", "rules", "RULE-123-session-isolation.md"),
 		"# Session Isolation Rule\n\nPrefer session isolation over shared state.\n",
 		"utf8",
 	);
@@ -68,6 +77,8 @@ function createProjectRoot(name: string): string {
 		"export const SESSION_ISOLATION_MARKER = true;\n",
 		"utf8",
 	);
+	rebuildWorkBenchIndex(root);
+	rebuildProjectIndexes(root);
 	return root;
 }
 

@@ -421,8 +421,8 @@ export function validateRulesIndex(root: string): ValidationResult {
 	const indexPath = resolveDataIndexPath(root, "rules.json");
 	if (!existsSync(indexPath)) {
 		return {
-			ok: true,
-			message: `skipped rules index snapshot: no snapshot at ${indexPath}`,
+			ok: false,
+			message: `missing rules index snapshot: ${indexPath}; run afol local-state rebuild`,
 		};
 	}
 
@@ -482,8 +482,8 @@ export function validateSkillsIndex(root: string): ValidationResult {
 	const indexPath = resolveDataIndexPath(root, "skills.json");
 	if (!existsSync(indexPath)) {
 		return {
-			ok: true,
-			message: `skipped skills index snapshot: no snapshot at ${indexPath}`,
+			ok: false,
+			message: `missing skills index snapshot: ${indexPath}; run afol local-state rebuild`,
 		};
 	}
 
@@ -551,8 +551,8 @@ export function validateSpecsIndex(root: string): ValidationResult {
 	const indexPath = resolveDataIndexPath(root, "specs.json");
 	if (!existsSync(indexPath)) {
 		return {
-			ok: true,
-			message: `skipped specs index snapshot: no snapshot at ${indexPath}`,
+			ok: false,
+			message: `missing specs index snapshot: ${indexPath}; run afol local-state rebuild`,
 		};
 	}
 
@@ -611,8 +611,8 @@ export function validateFilesIndex(root: string): ValidationResult {
 	const indexPath = resolveDataIndexPath(root, "files.json");
 	if (!existsSync(indexPath)) {
 		return {
-			ok: true,
-			message: `skipped files index snapshot: no snapshot at ${indexPath}`,
+			ok: false,
+			message: `missing files index snapshot: ${indexPath}; run afol local-state rebuild`,
 		};
 	}
 

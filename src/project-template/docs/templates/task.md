@@ -80,6 +80,10 @@ Before starting work, consult relevant resources:
 
 ## Implementation Checkpoint
 
+- Fill `Files planned` before edits so ownership is explicit.
+- Update `Files touched` after edits with the actual changed paths.
+- Files planned:
+  - <path or glob>
 - Files touched:
   - <path>
 - Key decisions:

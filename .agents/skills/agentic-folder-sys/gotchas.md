@@ -22,21 +22,21 @@ Use `afol` commands only.
 
 ## 2. `.agents` Is Metadata Plus Configured Provider Skills
 
-Retained `.agents/**` content is static provider metadata:
+Retained `.agents/**` content is limited to provider-facing metadata and
+project-local skills:
 
 - `.agents/config.json`
 - `.agents/lock.json`
 - `.agents/manifest.json`
-- `.agents/rules/**`
-- `.agents/source/**`
 - configured provider skills such as `.agents/skills/**` when
   `paths.skills_dir` points there
 
-Mutable AFOL state belongs under `.afol/**`, including workbench sessions,
-events, indexes, mutations, temporary files, benchmark data, migration
-archives, and other configured mutable paths. Project-local skills follow
-`paths.skills_dir`; in the current provider-compatible layout this is commonly
-`.agents/skills`.
+AFOL-owned static governance payloads live under `.afol/adm/**`, including
+hooks, rules, command catalogs, and source seeds. Mutable AFOL state also
+belongs under `.afol/**`, including workbench sessions, events, indexes,
+mutations, temporary files, benchmark data, migration archives, and other
+configured mutable paths. Project-local skills follow `paths.skills_dir`; in
+the current provider-compatible layout this is commonly `.agents/skills`.
 
 ## 3. Read `.agents/config.json` Before Moving Files
 

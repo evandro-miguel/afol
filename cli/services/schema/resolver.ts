@@ -29,7 +29,7 @@ export function detectResolver(root: string): string {
 		...section("Signals", [
 			"| task signal | load |",
 			"| --- | --- |",
-			"| rules or skills | `.agents/rules/README.md`, `.agents/rules/RULE-006-applicable-rule-resolution.md`, `.agents/skills/**` (if present) |",
+			"| rules or skills | `.afol/adm/rules/README.md`, `.afol/adm/rules/RULE-006-applicable-rule-resolution.md`, `.agents/skills/**` (if present) |",
 			"| tools or commands | `afol schema resolver --json`, `afol schema resolver --write`, `afol validate project` |",
 			"| adm or routing docs | `docs/arc/ARCHITECTURE.md#9.4 Resolver`, `docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md` |",
 			"| pstr or surface maps | `.afol/pstr/cli.md`, `.afol/pstr/docs.md`, `.afol/pstr/template.md`, `.afol/pstr/config.md` (generated; verify present) |",
@@ -37,10 +37,10 @@ export function detectResolver(root: string): string {
 			"| validation or trust | `bun run typecheck`, `bun test cli/tests/schema-command.test.ts` |",
 		]),
 		...section("Rules", [
-			"- `.agents/rules/README.md`",
-			"- `.agents/rules/RULE-006-applicable-rule-resolution.md`",
-			"- `.agents/rules/RULE-004-validation-linting.md`",
-			"- `.agents/rules/RULE-005-folder-structure.md`",
+			"- `.afol/adm/rules/README.md`",
+			"- `.afol/adm/rules/RULE-006-applicable-rule-resolution.md`",
+			"- `.afol/adm/rules/RULE-004-validation-linting.md`",
+			"- `.afol/adm/rules/RULE-005-folder-structure.md`",
 		]),
 		...section("Skills", [
 			"- `.agents/skills/agentic-folder-sys/`",

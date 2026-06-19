@@ -82,7 +82,7 @@ managed files update safely; validation runs after update.
 
 - Accepted implementation evidence:
   - `5a1811fe0a967fc8a89c2c78a2722d972e210700` - scaffold update ignores
-    `.agents/source/**` seed content.
+    `.afol/adm/source/**` seed content.
   - `6fc611a095cca821c9276aad5b29ecc1fbd3ea96` - template bootstrap installs
     lock and manifest.
 - Closeout session: `.afol/wb/260528_2137_f09-closeout/`

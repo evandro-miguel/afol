@@ -10,6 +10,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runLocalStateCommand } from "../commands/local-state";
+import {
+	buildCoordinationRadar,
+	type CoordinationWarningId,
+	loadCoordinationRadar,
+} from "../services/local-state/coordination-radar";
 import type {
 	FilesIndexSnapshot,
 	RulesIndexSnapshot,
@@ -29,12 +34,19 @@ import {
 	validateSkillsIndex,
 	validateSpecsIndex,
 } from "../services/local-state/project-indexes";
-import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
+import {
+	rebuildWorkBenchIndex,
+	validateWorkBenchIndex,
+} from "../services/local-state/workbench-index";
+import {
+	appendMutationRecord,
+	type MutationRecord,
+} from "../services/mutations/journal";
 
 function buildFixture() {
 	const root = mkdtempSync(join(tmpdir(), "proj-indexes-"));
 
-	const rulesDir = join(root, ".agents", "rules");
+	const rulesDir = join(root, ".afol", "adm", "rules");
 	const skillsDir = join(root, ".agents", "skills");
 	const specsDir = join(root, ".afol", "adm", "specs");
 
@@ -95,6 +107,24 @@ function buildFixture() {
 }
 
 describe("local-state project indexer", () => {
+	test("missing index snapshots are non-green and point to rebuild", () => {
+		const root = buildFixture();
+		try {
+			for (const result of [
+				validateWorkBenchIndex(root),
+				validateRulesIndex(root),
+				validateSkillsIndex(root),
+				validateSpecsIndex(root),
+				validateFilesIndex(root),
+			]) {
+				expect(result.ok).toBe(false);
+				expect(result.message).toContain("run afol local-state rebuild");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rebuildProjectIndexes builds ordered snapshots and omits .afol/data/index", () => {
 		const root = buildFixture();
 		try {
@@ -105,7 +135,7 @@ describe("local-state project indexer", () => {
 				{
 					id: "RULE-010",
 					name: "rule-010",
-					path: ".agents/rules/RULE-010.md",
+					path: ".afol/adm/rules/RULE-010.md",
 					surfaces: [],
 					work_types: [],
 					priority: 50,
@@ -114,7 +144,7 @@ describe("local-state project indexer", () => {
 				{
 					id: "RULE-200",
 					name: "rule-200",
-					path: ".agents/rules/RULE-200.md",
+					path: ".afol/adm/rules/RULE-200.md",
 					surfaces: [],
 					work_types: [],
 					priority: 50,
@@ -226,6 +256,373 @@ describe("local-state project indexer", () => {
 		}
 	});
 
+	test("rebuildWorkBenchIndex parses explicit planned and touched file claims", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-claims-"));
+		try {
+			const multiSessionDir = join(root, ".afol", "wb", "260618_multi");
+			const singleSessionDir = join(root, ".afol", "wb", "260618_single");
+			mkdirSync(multiSessionDir, { recursive: true });
+			mkdirSync(singleSessionDir, { recursive: true });
+
+			writeFileSync(
+				join(multiSessionDir, "260618_multi_task_01.md"),
+				[
+					"# Tasks: multi",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress | alice | data model |",
+					"| T-02 | done | bob | closed |",
+					"",
+					"## Coordination Claims",
+					"",
+					"### T-01 Data Model",
+					"",
+					"- Files planned:",
+					"  - `cli/services/local-state/workbench-index.ts`",
+					"  - `cli/services/local-state/*coordination*.ts`",
+					"- Files touched:",
+					"  - `cli/tests/local-state-indexes.test.ts`",
+					"",
+					"### T-02 Closed",
+					"",
+					"- Files planned:",
+					"  - N/A",
+					"",
+					"## Implementation Checkpoint",
+					"",
+					"- Files touched:",
+					"  - `cli/commands/session.ts`",
+				].join("\n"),
+				"utf8",
+			);
+
+			writeFileSync(
+				join(singleSessionDir, "260618_single_task_01.md"),
+				[
+					"# Tasks: single",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | implemented_untested | carol | verify touched parsing |",
+					"",
+					"## Implementation Checkpoint",
+					"",
+					"- Files touched:",
+					"  - `cli/services/mutations/journal.ts`",
+				].join("\n"),
+				"utf8",
+			);
+
+			const snapshot = rebuildWorkBenchIndex(root);
+			const multiTask = snapshot.tasks.find(
+				(task) => task.session === "260618_multi" && task.task_id === "T-01",
+			);
+			const closedTask = snapshot.tasks.find(
+				(task) => task.session === "260618_multi" && task.task_id === "T-02",
+			);
+			const singleTask = snapshot.tasks.find(
+				(task) => task.session === "260618_single" && task.task_id === "T-01",
+			);
+
+			expect(multiTask?.planned_files).toEqual([
+				{
+					path: "cli/services/local-state/*coordination*.ts",
+					kind: "glob",
+					source: "planned",
+					line: 16,
+				},
+				{
+					path: "cli/services/local-state/workbench-index.ts",
+					kind: "exact",
+					source: "planned",
+					line: 15,
+				},
+			]);
+			expect(multiTask?.touched_files).toEqual([
+				{
+					path: "cli/tests/local-state-indexes.test.ts",
+					kind: "exact",
+					source: "touched",
+					line: 18,
+				},
+			]);
+			expect(closedTask?.planned_files).toEqual([]);
+			expect(closedTask?.touched_files).toEqual([]);
+			expect(singleTask?.touched_files).toEqual([
+				{
+					path: "cli/services/mutations/journal.ts",
+					kind: "exact",
+					source: "touched",
+					line: 12,
+				},
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("loadCoordinationRadar derives open tasks, mutation touches, and warning ids", () => {
+		const root = mkdtempSync(join(tmpdir(), "coordination-radar-"));
+		try {
+			const sessionA = join(root, ".afol", "wb", "260618_alpha");
+			const sessionB = join(root, ".afol", "wb", "260618_beta");
+			const sessionC = join(root, ".afol", "wb", "260618_gamma");
+			const sessionD = join(root, ".afol", "wb", "260618_delta");
+			const archived = join(root, ".afol", "wb", "_archive", "260618_archived");
+			for (const dir of [sessionA, sessionB, sessionC, sessionD, archived]) {
+				mkdirSync(dir, { recursive: true });
+			}
+
+			writeFileSync(
+				join(sessionA, "260618_alpha_task_01.md"),
+				[
+					"# Tasks: alpha",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress | alice | plan coordination service |",
+					"",
+					"## Coordination Claims",
+					"",
+					"### T-01 Data Model",
+					"",
+					"- Files planned:",
+					"  - `cli/services/local-state/*coordination*.ts`",
+				].join("\n"),
+				"utf8",
+			);
+
+			writeFileSync(
+				join(sessionB, "260618_beta_task_01.md"),
+				[
+					"# Tasks: beta",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | implemented_untested | bob | touched shared files |",
+					"",
+					"## Coordination Claims",
+					"",
+					"### T-01 Builder",
+					"",
+					"- Files planned:",
+					"  - `cli/services/local-state/coordination-radar.ts`",
+					"- Files touched:",
+					"  - `cli/services/local-state/workbench-index.ts`",
+				].join("\n"),
+				"utf8",
+			);
+
+			writeFileSync(
+				join(sessionC, "260618_gamma_task_01.md"),
+				[
+					"# Tasks: gamma",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress |  | missing intent |",
+				].join("\n"),
+				"utf8",
+			);
+
+			writeFileSync(
+				join(sessionD, "260618_delta_task_01.md"),
+				[
+					"# Tasks: delta",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress | carol | exact overlap |",
+					"",
+					"## Coordination Claims",
+					"",
+					"### T-01 Validator",
+					"",
+					"- Files planned:",
+					"  - `cli/services/local-state/workbench-index.ts`",
+				].join("\n"),
+				"utf8",
+			);
+
+			writeFileSync(
+				join(archived, "260618_archived_task_01.md"),
+				[
+					"# Tasks: archived",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress | ghost | should be ignored |",
+					"",
+					"## Coordination Claims",
+					"",
+					"### T-01 Archived",
+					"",
+					"- Files planned:",
+					"  - `cli/services/local-state/workbench-index.ts`",
+				].join("\n"),
+				"utf8",
+			);
+
+			const staleTime = new Date("2026-06-15T12:00:00.000Z");
+			const gammaTaskPath = join(sessionC, "260618_gamma_task_01.md");
+			utimesSync(gammaTaskPath, staleTime, staleTime);
+
+			const mutation: MutationRecord = {
+				id: "M-1",
+				ts: "2026-06-18T16:00:00.000Z",
+				kind: "patch",
+				status: "applied",
+				dryRun: false,
+				session: "260618_beta",
+				taskId: "T-01",
+				reason: "shared file changed",
+				sourcePath: "cli/services/local-state/coordination-radar.ts",
+				afterHash: "after",
+			};
+			appendMutationRecord(root, mutation);
+
+			const radar = loadCoordinationRadar(root, {
+				now: new Date("2026-06-18T18:00:00.000Z"),
+			});
+			const warningIds = new Set(
+				radar.warnings.map((warning) => warning.id),
+			) as Set<CoordinationWarningId>;
+
+			expect(radar.kind).toBe("coordination_radar_v1");
+			expect(radar.source.workbench_status).toBe("missing");
+			expect(radar.open_tasks).toHaveLength(4);
+			expect(
+				radar.open_tasks.some((task) => task.session === "260618_archived"),
+			).toBe(false);
+			expect(warningIds).toEqual(
+				new Set<CoordinationWarningId>([
+					"path_overlap_planned",
+					"path_overlap_touched",
+					"mutation_overlap",
+					"missing_file_intent",
+					"missing_owner",
+					"stale_task_context",
+					"stale_coordination_index",
+				]),
+			);
+
+			const alphaTask = radar.open_tasks.find(
+				(task) => task.session === "260618_alpha",
+			);
+			const betaTask = radar.open_tasks.find(
+				(task) => task.session === "260618_beta",
+			);
+			const gammaTask = radar.open_tasks.find(
+				(task) => task.session === "260618_gamma",
+			);
+			const deltaTask = radar.open_tasks.find(
+				(task) => task.session === "260618_delta",
+			);
+
+			expect(alphaTask?.warning_ids).toContain("path_overlap_planned");
+			expect(alphaTask?.warning_ids).toContain("mutation_overlap");
+			expect(
+				betaTask?.touched_files.some((path) => path.source === "mutation"),
+			).toBe(true);
+			expect(gammaTask?.warning_ids).toEqual([
+				"missing_file_intent",
+				"missing_owner",
+				"stale_task_context",
+			]);
+			expect(deltaTask?.warning_ids).toContain("path_overlap_touched");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("coordination radar tolerates legacy workbench tasks without file claim arrays", () => {
+		const root = mkdtempSync(join(tmpdir(), "coordination-radar-legacy-"));
+		try {
+			const legacySnapshot = {
+				kind: "workbench_index_v1",
+				version: 1,
+				generated_at: "2026-06-18T18:00:00.000Z",
+				source: {
+					wb_dir: ".afol/wb",
+					event_log: ".afol/data/events/workbench.jsonl",
+				},
+				sessions: [
+					{
+						session: "260618_legacy",
+						task_count: 1,
+						completed: 0,
+						open: 1,
+						problem: 0,
+						touched_at: "2026-06-18T18:00:00.000Z",
+					},
+				],
+				tasks: [
+					{
+						session: "260618_legacy",
+						task_id: "T-01",
+						state: "in_progress",
+						owner: "legacy",
+						notes: "old snapshot",
+						file: ".afol/wb/260618_legacy/260618_legacy_task_01.md",
+						line: 7,
+						touched_at: "2026-06-18T18:00:00.000Z",
+					},
+				],
+			};
+
+			const injected = buildCoordinationRadar(root, {
+				now: new Date("2026-06-18T19:00:00.000Z"),
+				workbench: legacySnapshot as never,
+				workbenchStatus: { ok: true, message: "fresh workbench index" },
+			});
+
+			expect(injected.open_tasks).toHaveLength(1);
+			expect(injected.open_tasks[0]?.planned_files).toEqual([]);
+			expect(injected.open_tasks[0]?.touched_files).toEqual([]);
+			expect(injected.warnings.map((warning) => warning.id)).toContain(
+				"missing_file_intent",
+			);
+
+			const workbenchIndexPath = join(
+				root,
+				".afol",
+				"data",
+				"index",
+				"workbench.json",
+			);
+			mkdirSync(join(root, ".afol", "data", "index"), { recursive: true });
+			writeFileSync(
+				workbenchIndexPath,
+				`${JSON.stringify(legacySnapshot)}\n`,
+				"utf8",
+			);
+
+			const loaded = loadCoordinationRadar(root, {
+				now: new Date("2026-06-18T19:00:00.000Z"),
+			});
+			expect(loaded.open_tasks).toHaveLength(1);
+			expect(loaded.open_tasks[0]?.planned_files).toEqual([]);
+			expect(loaded.open_tasks[0]?.touched_files).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rules index freshness is detected when source changes", () => {
 		const root = buildFixture();
 		try {
@@ -233,7 +630,7 @@ describe("local-state project indexer", () => {
 			expect(validateRulesIndex(root).ok).toBe(true);
 			expect(rebuilt.rules[0]?.path).toContain("RULE-");
 
-			const rulePath = join(root, ".agents", "rules", "RULE-010.md");
+			const rulePath = join(root, ".afol", "adm", "rules", "RULE-010.md");
 			const future = new Date(Date.now() + 60_000);
 			utimesSync(rulePath, future, future);
 
@@ -254,7 +651,7 @@ describe("local-state project indexer", () => {
 		const root = buildFixture();
 		try {
 			writeFileSync(
-				join(root, ".agents", "rules", "index.json"),
+				join(root, ".afol", "adm", "rules", "index.json"),
 				"{invalid-json",
 				"utf8",
 			);
@@ -424,6 +821,7 @@ describe("local-state project indexer", () => {
 					"|------|-------|-------|-------|",
 					"| T-01 | done | codex | rebuilt |",
 					"| T-02 | blocked | codex | waiting |",
+					"| T-03 | moved | codex | covered elsewhere |",
 					"",
 				].join("\n"),
 				"utf8",
@@ -483,7 +881,7 @@ describe("local-state project indexer", () => {
 			expect(rebuildPayload.command).toBe("rebuild");
 			expect(rebuildPayload.output).toBe("compact");
 			expect(rebuildPayload.summary?.workbench?.sessions).toBe(1);
-			expect(rebuildPayload.summary?.workbench?.tasks).toBe(2);
+			expect(rebuildPayload.summary?.workbench?.tasks).toBe(3);
 			expect(rebuildPayload.summary?.workbench?.open_tasks).toBe(1);
 			expect(rebuildPayload.summary?.workbench?.problem_tasks).toBe(1);
 			expect(rebuildPayload.summary?.rules?.count).toBe(2);
@@ -498,7 +896,7 @@ describe("local-state project indexer", () => {
 			expect(rebuildPayload.data?.command).toBe("rebuild");
 			expect(rebuildPayload.data?.output).toBe("compact");
 			expect(rebuildPayload.data?.summary?.workbench?.sessions).toBe(1);
-			expect(rebuildPayload.data?.summary?.workbench?.tasks).toBe(2);
+			expect(rebuildPayload.data?.summary?.workbench?.tasks).toBe(3);
 			expect(rebuildPayload.data?.summary?.workbench?.open_tasks).toBe(1);
 			expect(rebuildPayload.data?.summary?.workbench?.problem_tasks).toBe(1);
 			expect(rebuildPayload.data?.summary?.rules?.count).toBe(2);
@@ -546,7 +944,7 @@ describe("local-state project indexer", () => {
 				"workbench_index_v1",
 			);
 			expect(verbosePayload.snapshot?.workbench?.sessions).toHaveLength(1);
-			expect(verbosePayload.snapshot?.workbench?.tasks).toHaveLength(2);
+			expect(verbosePayload.snapshot?.workbench?.tasks).toHaveLength(3);
 			expect(verbosePayload.snapshot?.rules?.rules).toHaveLength(2);
 			expect(verbosePayload.snapshot?.skills?.skills).toHaveLength(2);
 			expect(verbosePayload.snapshot?.specs?.specs).toHaveLength(2);
@@ -557,7 +955,7 @@ describe("local-state project indexer", () => {
 			expect(verbosePayload.data?.snapshot?.workbench?.sessions).toHaveLength(
 				1,
 			);
-			expect(verbosePayload.data?.snapshot?.workbench?.tasks).toHaveLength(2);
+			expect(verbosePayload.data?.snapshot?.workbench?.tasks).toHaveLength(3);
 			expect(verbosePayload.data?.snapshot?.rules?.rules).toHaveLength(2);
 			expect(verbosePayload.data?.snapshot?.skills?.skills).toHaveLength(2);
 			expect(verbosePayload.data?.snapshot?.specs?.specs).toHaveLength(2);

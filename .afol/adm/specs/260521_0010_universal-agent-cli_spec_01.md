@@ -98,7 +98,7 @@ Authoritative local files:
 .agents/lock.json
 .agents/manifest.json
 .afol/wb/
-.agents/rules/
+.afol/adm/rules/
 .agents/skills/
 .afol/data/
 ```

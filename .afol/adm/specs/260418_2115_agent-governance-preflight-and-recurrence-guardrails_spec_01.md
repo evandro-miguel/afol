@@ -3,7 +3,7 @@ doc_type: spec
 id: 260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01
 theme: agent-governance-preflight-and-recurrence-guardrails
 status: active
-implementation_note: "Partially delivered (2026-06-14): afol preflight command (cli/commands/preflight.ts) performs read-only governance search — spec lookup (.afol/adm/specs), lesson lookup (docs/lessons), similar-system discovery (rg over cli/ + specs), and rule resolution (.agents/rules) with a gaps report. Satisfies §8.2, §8.6, §8.8 (detection), §8.9, §8.11 (resolution). Child plan-task-execution-integrity (260509) already final. Remaining as documented workflow / future children: decision-intake+challenge (§8.4/8.7, in docs/standards/decision-intake.md), recurring-problem heavy-verification + rule creation (§8.8 action side), orchestrator rule injection into delegated agents (§8.11 enforcement side)."
+implementation_note: "Partially delivered (2026-06-14): afol preflight command (cli/commands/preflight.ts) performs read-only governance search — spec lookup (.afol/adm/specs), lesson lookup (docs/lessons), similar-system discovery (rg over cli/ + specs), and rule resolution (.afol/adm/rules) with a gaps report. Satisfies §8.2, §8.6, §8.8 (detection), §8.9, §8.11 (resolution). Child plan-task-execution-integrity (260509) already final. Remaining as documented workflow / future children: decision-intake+challenge (§8.4/8.7, in docs/standards/decision-intake.md), recurring-problem heavy-verification + rule creation (§8.8 action side), orchestrator rule injection into delegated agents (§8.11 enforcement side)."
 owners:
 - orchestrator
 workstream_intent: feature
@@ -20,7 +20,7 @@ links:
 scope:
   repo_areas:
   - AGENTS.md
-  - .agents/rules
+  - .afol/adm/rules
   - .agents/scripts
   - .agents/runtime
   - .agents/skills
@@ -69,7 +69,7 @@ risk_level: medium
 - Agents can implement a new function without checking whether a similar system
   already exists, increasing duplication and future refactor cost.
 - The orchestrator can route work to agents without explicitly loading and
-  enforcing every applicable `.agents/rules/` file.
+  enforcing every applicable `.afol/adm/rules/` file.
 - Plans and task boards can still encode meta-work such as creating the plan,
   researching so a later real plan can be made, or assigning subagents to write
   plan artifacts instead of executing the approved slice.
@@ -164,7 +164,7 @@ Expected behavior:
   three-day slices are preferred planning cuts when the user asks for a lean MVP
   or fast validation.
 - Before fixing a user-reported recurring problem, the agent searches
-  `docs/lessons/`, `.agents/rules/`, active workbench artifacts, and knowledge
+  `docs/lessons/`, `.afol/adm/rules/`, active workbench artifacts, and knowledge
   surfaces for prior occurrences.
 - If the problem has happened before, the agent uses a heavier verification
   path than a normal one-off fix and adds a general or specific prevention rule
@@ -180,7 +180,7 @@ Expected behavior:
   modify the existing similar system.
 - Code comments may be added only at the exact lines where future refactor debt
   must be discoverable from the code itself.
-- The orchestrator loads all applicable `.agents/rules/` files before routing
+- The orchestrator loads all applicable `.afol/adm/rules/` files before routing
   governed work and includes the relevant rule obligations in the delegated
   agent's task instructions.
 - Before touching any file or artifact, the agent resolves the applicable rule,
@@ -205,9 +205,9 @@ or extended carefully during implementation:
 
 - `AGENTS.md` already requires roadmap-first delivery, lesson capture after user
   correction, prevention rules, and verification before done.
-- `.agents/rules/RULE-002-workstream-creation.md` already defines roadmap/spec
+- `.afol/adm/rules/RULE-002-workstream-creation.md` already defines roadmap/spec
   workstream creation and brainstorm/explorer-check gates.
-- `.agents/rules/RULE-004-validation-linting.md` already defines validation
+- `.afol/adm/rules/RULE-004-validation-linting.md` already defines validation
   expectations before completion.
 - `docs/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md`
   already governs exploration, reusable knowledge, and session closure.
@@ -321,7 +321,7 @@ Out of scope:
 10. Add future-refactor debt capture to workbench/report/spec outputs, plus
    optional narrow code comments only where the future refactor must stay
    visible to maintainers.
-11. Implement orchestrator rule loading so all applicable `.agents/rules/` are
+11. Implement orchestrator rule loading so all applicable `.afol/adm/rules/` are
    read before routing and summarized into delegated-agent task instructions.
 12. Update affected project-local skills and docs, then record a pending item to
    propagate the skill change back to universal-skills through the branch/PR

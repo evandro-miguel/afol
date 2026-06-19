@@ -1,0 +1,5 @@
+{"id":"E-20260617153027911-dbd8e6","task_id":"T-01","created_at":"2026-06-17T19:30:27.911Z","command":"bun test cli/tests/status.test.ts cli/tests/file-command-unit.test.ts cli/tests/update-command.test.ts cli/tests/help.test.ts cli/tests/registry.test.ts","result":"passed"}
+{"id":"E-20260617153027941-9b8472","task_id":"T-01","created_at":"2026-06-17T19:30:27.941Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260617153027970-975072","task_id":"T-01","created_at":"2026-06-17T19:30:27.970Z","command":"./afol local-state rebuild && ./afol pstr rebuild","result":"passed"}
+{"id":"E-20260617153027995-97160a","task_id":"T-01","created_at":"2026-06-17T19:30:27.995Z","command":"./afol file mv --path .afol/tmp/codex-missing-source-for-audit.txt --to .afol/tmp/codex-missing-destination-for-audit.txt --dry-run --json","result":"passed"}
+{"id":"E-20260617153028021-7c2859","task_id":"T-01","created_at":"2026-06-17T19:30:28.021Z","command":"./afol validate project && ./afol pstr validate && ./afol health --release","result":"passed"}

@@ -113,9 +113,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 
 			expect(exitCode).toBe(0);
 			expect(existsSync(join(target, ".agents", "config.json"))).toBe(true);
-			expect(existsSync(join(target, ".agents", "rules", "index.json"))).toBe(
-				true,
-			);
+			expect(
+				existsSync(join(target, ".afol", "adm", "rules", "index.json")),
+			).toBe(true);
 			expect(existsSync(join(target, ".agents", "skills", "README.md"))).toBe(
 				true,
 			);
@@ -241,6 +241,9 @@ describe("bootstrap provider-compatible mutable state", () => {
 			};
 			expect(config.paths.agents_dir).toBe(".agents");
 			expect(config.paths.mutable_dir).toBe(".afol");
+			expect(config.paths.adm_dir).toBe(".afol/adm");
+			expect(config.paths.rules_dir).toBe(".afol/adm/rules");
+			expect(config.paths.hooks_dir).toBe(".afol/adm/hooks");
 			expect(config.paths.wb_dir).toBe(".afol/wb");
 			expect(config.paths.active_session_file).toBe(".afol/wb/.active_session");
 			expect(config.paths.skills_dir).toBe(".agents/skills");
@@ -565,6 +568,39 @@ describe("bootstrap provider-compatible mutable state", () => {
 				adapters?: { claude?: { enabled?: boolean } };
 			};
 			expect(config.adapters?.claude?.enabled).toBe(false);
+			expect(config.paths.mutable_dir).toBe(".afol");
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("custom mutable dir keeps governance paths on .afol payload", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-custom-mutable-"));
+		try {
+			const exitCode = await runBootstrapCommand([
+				target,
+				"--mutable-dir",
+				".state",
+			]);
+
+			expect(exitCode).toBe(0);
+			expect(
+				existsSync(join(target, ".afol", "adm", "rules", "README.md")),
+			).toBe(true);
+			expect(existsSync(join(target, ".state", "adm", "README.md"))).toBe(
+				false,
+			);
+
+			const config = JSON.parse(
+				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+			) as {
+				paths: Record<string, string>;
+			};
+			expect(config.paths.mutable_dir).toBe(".state");
+			expect(config.paths.adm_dir).toBe(".afol/adm");
+			expect(config.paths.rules_dir).toBe(".afol/adm/rules");
+			expect(config.paths.hooks_dir).toBe(".afol/adm/hooks");
+			expect(config.paths.data_dir).toBe(".state/data");
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}

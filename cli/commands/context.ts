@@ -6,7 +6,10 @@ import {
 	rebuildSectionIndex,
 	resolveSection,
 } from "../services/context";
-import { ContextTrustError } from "../services/context/bundler";
+import {
+	ContextTrustError,
+	RuleInjectionError,
+} from "../services/context/bundler";
 import type { ContextRetrievalMode } from "../services/context/types";
 import { checkHealth } from "../services/health";
 import { listTopics } from "../services/library";
@@ -32,6 +35,8 @@ type ParsedArgs = {
 	task?: string;
 	role?: string;
 	surface?: string;
+	scope?: string;
+	filePath?: string;
 	mode?: ContextRetrievalMode;
 	ref?: string;
 	explain: boolean;
@@ -128,6 +133,24 @@ function parseArgs(args: string[]): ParsedArgs {
 			index += 1;
 			continue;
 		}
+		if (value === "--scope") {
+			const next = args[index + 1];
+			if (!next) {
+				throw new Error("Missing value for --scope.");
+			}
+			parsed.scope = next;
+			index += 1;
+			continue;
+		}
+		if (value === "--file") {
+			const next = args[index + 1];
+			if (!next) {
+				throw new Error("Missing value for --file.");
+			}
+			parsed.filePath = next;
+			index += 1;
+			continue;
+		}
 		if (value === "--mode") {
 			const next = args[index + 1];
 			if (!next) {
@@ -159,9 +182,13 @@ function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
 		`task: ${bundle.task_id || "none"}`,
 		`role: ${bundle.role}`,
 		`surface: ${bundle.surface}`,
+		`file: ${bundle.file_path ?? "none"}`,
 		`mode: ${bundle.mode}`,
 		`refs: ${bundle.refs.length}`,
 		`rules: ${bundle.rules.join(",") || "none"}`,
+		`rule_injection: first_use=${bundle.rule_injection.first_use ? "yes" : "no"} injected=${bundle.rule_injection.injected.map((rule) => rule.id).join(",") || "none"} already=${bundle.rule_injection.already_injected.map((rule) => rule.id).join(",") || "none"} omitted=${bundle.rule_injection.omitted.map((rule) => rule.id).join(",") || "none"}`,
+		`hooks: ${bundle.hooks.join(",") || "none"}`,
+		`hook_messages: ${bundle.hook_messages.length}`,
 		`skills: ${bundle.skills.join(",") || "none"}`,
 		`tools: ${bundle.tools.length}`,
 		`pstr_refs: ${bundle.pstr_refs.join(",") || "none"}`,
@@ -339,17 +366,38 @@ export async function runContextCommand(
 
 		let bundle: ReturnType<typeof buildContextBundle>;
 		try {
+			const persistRuleInjection =
+				ctxAction === "bundle" &&
+				!parsed.explain &&
+				(parsed.mode ?? "balanced") !== "compact";
 			bundle = buildContextBundle(projectRoot, {
 				...(parsed.session ? { session: parsed.session } : {}),
 				...(parsed.task ? { task: parsed.task } : {}),
 				...(parsed.role ? { role: parsed.role } : {}),
 				...(parsed.surface ? { surface: parsed.surface } : {}),
+				...(parsed.scope ? { scope: parsed.scope } : {}),
+				...(parsed.filePath ? { filePath: parsed.filePath } : {}),
 				...(parsed.mode ? { mode: parsed.mode } : {}),
 				...(parsed.trusted ? { trusted: true } : {}),
+				...(persistRuleInjection ? { persistRuleInjection: true } : {}),
 			});
 		} catch (error) {
 			if (error instanceof ContextTrustError) {
 				emitTrustError(io, ctxAction, parsed.json, error);
+				return 1;
+			}
+			if (error instanceof RuleInjectionError) {
+				if (parsed.json) {
+					jsonOutput.err(
+						io,
+						ctxAction,
+						"CTX_RULE_INJECTION_ERROR",
+						error.message,
+						1,
+					);
+				} else {
+					io.stderr(error.message);
+				}
 				return 1;
 			}
 			throw error;

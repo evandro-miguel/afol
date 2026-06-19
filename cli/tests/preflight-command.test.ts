@@ -7,7 +7,8 @@ import { runPreflight } from "../services/preflight/search";
 
 function createRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "preflight-command-"));
-	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
+	mkdirSync(join(root, ".agents"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
 	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
 	mkdirSync(join(root, "docs", "lessons", "entries"), { recursive: true });
 	mkdirSync(join(root, "cli", "services"), { recursive: true });
@@ -66,7 +67,7 @@ function createRoot(): string {
 		"utf8",
 	);
 	writeFileSync(
-		join(root, ".agents", "rules", "RULE-123-session-isolation.md"),
+		join(root, ".afol", "adm", "rules", "RULE-123-session-isolation.md"),
 		"# Session Isolation Rule\n\nPrefer session isolation over shared state.\n",
 		"utf8",
 	);
@@ -135,7 +136,7 @@ describe("preflight search service", () => {
 		try {
 			const report = runPreflight(root, "session isolation");
 			expect(report.rules[0]?.path).toBe(
-				".agents/rules/RULE-123-session-isolation.md",
+				".afol/adm/rules/RULE-123-session-isolation.md",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

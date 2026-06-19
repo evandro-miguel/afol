@@ -10,8 +10,8 @@ Replace this section after bootstrap with real product purpose and constraints.
 - This repository was created from the minimal scaffold template.
 - The template owns local protocol files only: `AGENTS.md`,
   `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
-  `.agents/rules/`, `.agents/skills/` baseline, `.afol/wb/` baseline, and
-  minimal docs.
+  `.afol/adm/hooks/`, `.afol/adm/rules/`, `.agents/skills/` baseline,
+  `.afol/wb/` baseline, and minimal docs.
 - Some sandbox providers make `.agents/` read-only. When this project was
   initialized with `afol init --provider-compatible` or
   `afol init --mutable-dir .afol`, mutable agent state lives under `.afol/`.
@@ -54,13 +54,18 @@ Replace this section after bootstrap with real product purpose and constraints.
 - `.agents/config.json`: path contract. Check `paths.mutable_dir`, `paths.wb_dir`,
   `paths.skills_dir`, `paths.tmp_dir`, and `paths.data_dir` before writing
   agent-owned state.
-- `.agents/rules/`: local operational contracts only.
-- `.agents/skills/` or configured `paths.skills_dir`: project-local provider
-  skills only when needed.
+- `.afol/adm/hooks/`: static provider-neutral hook catalog. Hooks may contribute
+  context messages and advisory refs; they must not execute scripts or mutate
+  AFOL state.
+- `.afol/adm/rules/`: local operational contracts only.
+- `.agents/skills/`: project-local provider skills only when needed.
+  `paths.skills_dir` must stay here or in a child path; do not create
+  `.afol/skills/`.
 - `.afol/wb/` or configured `paths.wb_dir`: durable governed plan sessions
   for this downstream project only.
-- `.afol/`: provider-compatible mutable state when configured.
-- `.agents/source/universal-skills/`: local seed, not nested git.
+- `.afol/`: provider-compatible mutable state when configured; not a skills
+  root.
+- `.afol/adm/source/universal-skills/`: local seed, not nested git.
 - `docs/`: project docs.
 - `docs/map/`: current-state evidence only.
 

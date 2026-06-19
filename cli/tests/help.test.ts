@@ -26,9 +26,12 @@ describe("help formatter", () => {
 		expect(help).toContain("v/validate");
 		expect(help).toContain("v/validate[read] - validation gates");
 		expect(help).toContain("n/new");
+		expect(help).toContain("hk/hook");
 		expect(help).toContain("bench");
 		expect(help).toContain("pb/project-benchmark");
-		expect(help).toContain("pb/project-benchmark[generated] - compare references");
+		expect(help).toContain(
+			"pb/project-benchmark[generated] - compare references",
+		);
 		expect(help).toContain("Side effects");
 		expect(help).toContain("write=changes files/state");
 		expect(help).toContain("afol help <command>");
@@ -74,7 +77,9 @@ describe("help formatter", () => {
 		);
 		expect(help).toContain("    subcommands:");
 		expect(help).toContain("      generate --check [read]");
-		expect(help).toContain("  --verbose  Expanded human catalog with subcommands");
+		expect(help).toContain(
+			"  --verbose  Expanded human catalog with subcommands",
+		);
 	});
 
 	test("formats per-command help from registry metadata", () => {
@@ -215,6 +220,22 @@ describe("help formatter", () => {
 		expect(help).toContain("export --format jsonl [read]");
 	});
 
+	test("formats local-state help with freshness and rebuild discovery", () => {
+		const help = formatCommandHelp("local-state", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected local-state command help");
+		}
+		expect(help).toContain("Command: local-state");
+		expect(help).toContain("Aliases: ls");
+		expect(help).toContain("Guidance:");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("freshness|fs --json [read]");
+		expect(help).toContain("rebuild|rb --json [generated]");
+		expect(help).toContain("rebuild|rb --json --verbose [generated]");
+	});
+
 	test("builds catalog json without fake aliases", () => {
 		const catalog = buildCommandCatalog(kernelRegistry);
 		const parsed = JSON.parse(formatCatalogJson(kernelRegistry)) as Array<{
@@ -228,7 +249,13 @@ describe("help formatter", () => {
 
 		expect(parsed).toEqual(catalog);
 		expect(parsed.map((entry) => entry.command)).toEqual(
-			expect.arrayContaining(["status", "pstr", "adm", "project-benchmark"]),
+			expect.arrayContaining([
+				"status",
+				"hook",
+				"pstr",
+				"adm",
+				"project-benchmark",
+			]),
 		);
 		expect(parsed.find((entry) => entry.command === "status")?.aliases).toEqual(
 			["s"],
@@ -359,6 +386,40 @@ describe("help formatter", () => {
 					usage: "tools",
 					sideEffect: "generated",
 					description: "List context helpers and refresh sections if needed",
+				},
+			],
+		});
+	});
+
+	test("builds local-state json with subcommand metadata", () => {
+		const help = buildCommandHelpJson("local-state", kernelRegistry);
+		expect(help).not.toBeNull();
+		expect(help).toEqual({
+			command: "local-state",
+			aliases: ["ls"],
+			kind: "localState",
+			sideEffect: "generated",
+			description: "Inspect local project indexes",
+			category: "inspect",
+			guidance: [
+				"Run rebuild before validation when indexes may be stale.",
+				"Use --verbose only when the full index snapshot is needed.",
+			],
+			subcommands: [
+				{
+					usage: "freshness|fs --json",
+					sideEffect: "read",
+					description: "Check whether local-state indexes are fresh",
+				},
+				{
+					usage: "rebuild|rb --json",
+					sideEffect: "generated",
+					description: "Refresh indexes and emit compact counts",
+				},
+				{
+					usage: "rebuild|rb --json --verbose",
+					sideEffect: "generated",
+					description: "Refresh indexes and include full snapshots",
 				},
 			],
 		});

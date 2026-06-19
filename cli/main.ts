@@ -5,7 +5,11 @@ import { runAdmCommand } from "./commands/adm";
 import { runAdrCommand } from "./commands/adr";
 import { runBenchCommand } from "./commands/bench";
 import { runBootstrapCommand } from "./commands/bootstrap";
-import { runRuleCommand, runSkillCommand } from "./commands/catalog";
+import {
+	runHookCommand,
+	runRuleCommand,
+	runSkillCommand,
+} from "./commands/catalog";
 import { runCatchupCommand } from "./commands/catchup";
 import { runChangelogCommand } from "./commands/changelog";
 import { runContextCommand } from "./commands/context";
@@ -87,6 +91,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 	"log",
 	"quickTask",
 	"verifyTasks",
+	"hook",
 	"rule",
 	"skill",
 	"update",
@@ -151,8 +156,7 @@ export async function main(argv: string[]): Promise<number> {
 			args
 				.slice(1)
 				.find(
-					(arg) =>
-						!kernelRegistry.isJsonAlias(arg) && !isVerboseHelpArg(arg),
+					(arg) => !kernelRegistry.isJsonAlias(arg) && !isVerboseHelpArg(arg),
 				) ?? "";
 		const verboseRequested = args.some(isVerboseHelpArg);
 		if (jsonRequested) {
@@ -171,7 +175,9 @@ export async function main(argv: string[]): Promise<number> {
 			return 0;
 		}
 		if (!helpTarget) {
-			console.log(formatHelpText(kernelRegistry, { verbose: verboseRequested }));
+			console.log(
+				formatHelpText(kernelRegistry, { verbose: verboseRequested }),
+			);
 			return 0;
 		}
 		const help = formatCommandHelp(helpTarget, kernelRegistry);
@@ -270,6 +276,10 @@ export async function main(argv: string[]): Promise<number> {
 		return runVerifyTasksCommand(resolution.args, project.value.root);
 	}
 
+	if (resolution.kind === "hook") {
+		return runHookCommand(resolution.args, project.value.root);
+	}
+
 	if (resolution.kind === "rule") {
 		return runRuleCommand(resolution.args, project.value.root);
 	}
@@ -279,7 +289,13 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "update") {
-		return runUpdateCommand(resolution.args, project.value.root);
+		return runUpdateCommand(
+			resolution.args,
+			project.value.root,
+			undefined,
+			undefined,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "close") {
@@ -367,6 +383,12 @@ export async function main(argv: string[]): Promise<number> {
 			);
 		}
 		if (resolution.group === "bench") {
+			if (resolution.action === "" && resolution.args.includes("--pack")) {
+				return runValidationCommand(project.value.root, [
+					"bench",
+					...resolution.args,
+				]);
+			}
 			return runBenchCommand(
 				resolution.action,
 				resolution.args,

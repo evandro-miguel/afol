@@ -1,0 +1,108 @@
+{
+  "version": "2.0.0",
+  "updated_at": "2026-06-16T00:00:00Z",
+  "description": "Static AFOL-only command catalog for retained scaffold metadata.",
+  "tools": [
+    {
+      "id": "status",
+      "name": "AFOL Status",
+      "tool": "afol",
+      "wrapper_command": "afol status",
+      "type": "inspection",
+      "execution_mode": "on-demand",
+      "description": "Show compact project and session state before governed work."
+    },
+    {
+      "id": "new",
+      "name": "AFOL New",
+      "tool": "afol",
+      "wrapper_command": "afol new <theme> --feature-id <feature-id> --parent-spec <spec-id>",
+      "type": "creation",
+      "execution_mode": "on-demand",
+      "description": "Create a governed session under .afol/wb for implementation or delivery work."
+    },
+    {
+      "id": "start",
+      "name": "AFOL Start",
+      "tool": "afol",
+      "wrapper_command": "afol start --session <session-id> --task-id <task-id>",
+      "type": "lifecycle",
+      "execution_mode": "on-demand",
+      "description": "Move a governed task to in_progress before edits."
+    },
+    {
+      "id": "evidence",
+      "name": "AFOL Evidence",
+      "tool": "afol",
+      "wrapper_command": "afol evidence --session <session-id> --task-id <task-id> --command \"<cmd>\" --result passed",
+      "type": "lifecycle",
+      "execution_mode": "on-demand",
+      "description": "Record command evidence for a governed task."
+    },
+    {
+      "id": "done",
+      "name": "AFOL Done",
+      "tool": "afol",
+      "wrapper_command": "afol done --session <session-id> --task-id <task-id>",
+      "type": "lifecycle",
+      "execution_mode": "on-demand",
+      "description": "Mark a task complete after relevant validation and evidence."
+    },
+    {
+      "id": "close",
+      "name": "AFOL Close",
+      "tool": "afol",
+      "wrapper_command": "afol close --session <session-id>",
+      "type": "lifecycle",
+      "execution_mode": "on-demand",
+      "description": "Close a governed session after tasks are complete."
+    },
+    {
+      "id": "verify-tasks",
+      "name": "AFOL Verify Tasks",
+      "tool": "afol",
+      "wrapper_command": "afol verify-tasks --strict",
+      "type": "validation",
+      "execution_mode": "on-demand",
+      "description": "Verify workbench task state and evidence consistency."
+    },
+    {
+      "id": "validate-project",
+      "name": "AFOL Validate Project",
+      "tool": "afol",
+      "wrapper_command": "afol validate project --json",
+      "type": "validation",
+      "execution_mode": "on-demand",
+      "description": "Run compact project validation."
+    },
+    {
+      "id": "local-state",
+      "name": "AFOL Local State",
+      "tool": "afol",
+      "wrapper_command": "afol local-state rebuild --json",
+      "type": "indexing",
+      "execution_mode": "on-demand",
+      "description": "Rebuild local AFOL state indexes when scaffold metadata changes."
+    },
+    {
+      "id": "update",
+      "name": "AFOL Update",
+      "tool": "afol",
+      "wrapper_command": "afol update check",
+      "type": "maintenance",
+      "execution_mode": "on-demand",
+      "description": "Check scaffold updates with compact output."
+    }
+  ],
+  "tool_categories": {
+    "inspection": ["status"],
+    "creation": ["new"],
+    "lifecycle": ["start", "evidence", "done", "close"],
+    "validation": ["verify-tasks", "validate-project"],
+    "indexing": ["local-state"],
+    "maintenance": ["update"]
+  },
+  "execution_modes": {
+    "on-demand": "Run only when the active task needs the command evidence or state transition."
+  }
+}

@@ -147,6 +147,7 @@ function writeProjectBenchmarkCatalog(root: string): void {
 					title: "Aider repository map",
 					url: "https://aider.chat/docs/repomap.html",
 					source_type: "official_doc",
+					axes: ["repo_context_map"],
 					claim: "Aider documents a concise repository map.",
 				},
 			],
@@ -296,7 +297,7 @@ describe("kernel front-door", () => {
 				category?: string;
 			}>;
 			expect(catalogPayload.map((entry) => entry.command)).toEqual(
-				expect.arrayContaining(["status", "pstr", "adm", "bench"]),
+				expect.arrayContaining(["status", "hook", "pstr", "adm", "bench"]),
 			);
 			expect(
 				catalogPayload.find((entry) => entry.command === "status")?.aliases,

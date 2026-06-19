@@ -391,7 +391,7 @@ function searchRules(
 	tokens: readonly string[],
 ): PreflightRuleResult[] {
 	const results: Array<PreflightRuleResult & { score: number }> = [];
-	for (const relativePath of collectFiles(root, ".agents/rules")) {
+	for (const relativePath of collectFiles(root, ".afol/adm/rules")) {
 		if (!relativePath.endsWith(".md")) {
 			continue;
 		}

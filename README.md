@@ -11,10 +11,11 @@ system has been retired and must not be restored.
 - `cli/**`: Bun/TypeScript implementation.
 - `src/project-template/**`: exportable downstream scaffold payload.
 - `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`: static
-  scaffold metadata.
-- `.agents/rules/**`, `.agents/source/**`: static protocol/source seed
-- `.agents/skills/**`: project-local provider skills
-  scaffold guidance and skill seed content.
+  provider-facing scaffold metadata.
+- `.agents/skills/**`: project-local provider skills.
+- `.afol/adm/hooks/**`, `.afol/adm/rules/**`,
+  `.afol/adm/source/**`, `.afol/adm/tools.json`: AFOL-owned static governance
+  payloads, hook/rule catalogs, and skill seed content.
 - `.afol/**`: mutable AFOL-owned state, including workbench sessions, indexes,
   events, mutations, temporary files, benchmark catalog/results, and migration
   archives.

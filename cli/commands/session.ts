@@ -6,6 +6,7 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import { atomicWriteText } from "../services/io/atomic";
+import { loadCoordinationRadar } from "../services/local-state/coordination-radar";
 import { resolveProjectPaths } from "../services/project/paths";
 import { readActiveSession } from "../services/workbench/lifecycle";
 import {
@@ -22,6 +23,84 @@ type ActionResult = {
 	exitCode: number;
 };
 
+type CoordinationRadarPath = {
+	path: string;
+	source?: string | null;
+	confidence?: string | null;
+};
+
+type CoordinationRadarTask = {
+	session: string;
+	task_id: string;
+	state: string;
+	owner?: string | null;
+	notes?: string | null;
+	touched_at?: string | null;
+	planned_files?: CoordinationRadarPath[];
+	touched_files?: CoordinationRadarPath[];
+	warning_ids?: string[];
+	archived?: boolean;
+};
+
+type CoordinationRadarWarning = {
+	id: string;
+	severity: "info" | "warning" | "critical" | string;
+	message?: string | null;
+	reason?: string | null;
+	recovery_hint?: string | null;
+	affected_tasks?: Array<string | { session: string; task_id: string }>;
+	affected_paths?: string[];
+};
+
+type CoordinationRadarSession = {
+	session: string;
+	open_tasks?: number;
+	touched_at?: string | null;
+	archived?: boolean;
+};
+
+type CoordinationRadarSummary = {
+	sessions: number;
+	open_tasks: number;
+	warnings: number;
+	critical: number;
+	warning: number;
+	info: number;
+};
+
+type CoordinationRadarReport = {
+	generated_at?: string | null;
+	freshness?: Record<string, unknown> | null;
+	sessions?: CoordinationRadarSession[];
+	tasks: CoordinationRadarTask[];
+	warnings: CoordinationRadarWarning[];
+	summary?: Partial<CoordinationRadarSummary>;
+};
+
+type CoordinationRadarSnapshot = {
+	generated_at?: string | null;
+	source?: Record<string, unknown> | null;
+	sessions?: CoordinationRadarSession[];
+	open_tasks?: CoordinationRadarTask[];
+	warnings?: CoordinationRadarWarning[];
+	summary?: Partial<CoordinationRadarSummary>;
+};
+
+type CoordinationRadarInput =
+	| CoordinationRadarReport
+	| CoordinationRadarSnapshot;
+
+type CoordinationRadarReader = (
+	projectRoot: string,
+) => CoordinationRadarInput | Promise<CoordinationRadarInput>;
+
+const RADAR_TEXT_WARNING_LIMIT = 3;
+const RADAR_JSON_TASK_LIMIT = 25;
+const RADAR_JSON_WARNING_LIMIT = 10;
+const RADAR_JSON_SESSION_LIMIT = 20;
+
+let radarReaderOverride: CoordinationRadarReader | null = null;
+
 type ParsedArgs = {
 	json: boolean;
 	dryRun: boolean;
@@ -30,6 +109,168 @@ type ParsedArgs = {
 	session: string | null;
 	positional: string[];
 };
+
+function severityWeight(value: string): number {
+	if (value === "critical") {
+		return 0;
+	}
+	if (value === "warning") {
+		return 1;
+	}
+	if (value === "info") {
+		return 2;
+	}
+	return 3;
+}
+
+function isOpenTask(task: CoordinationRadarTask): boolean {
+	return (
+		task.archived !== true && task.state !== "done" && task.state !== "moved"
+	);
+}
+
+function summarizeRadar(
+	report: CoordinationRadarReport,
+): CoordinationRadarSummary {
+	const tasks = report.tasks.filter(isOpenTask);
+	const sessions =
+		report.sessions?.filter((session) => session.archived !== true).length ??
+		new Set(tasks.map((task) => task.session)).size;
+	const warnings = report.warnings.length;
+	const critical = report.warnings.filter(
+		(warning) => warning.severity === "critical",
+	).length;
+	const warning = report.warnings.filter(
+		(entry) => entry.severity === "warning",
+	).length;
+	const info = report.warnings.filter(
+		(entry) => entry.severity === "info",
+	).length;
+	return {
+		sessions: report.summary?.sessions ?? sessions,
+		open_tasks: report.summary?.open_tasks ?? tasks.length,
+		warnings: report.summary?.warnings ?? warnings,
+		critical: report.summary?.critical ?? critical,
+		warning: report.summary?.warning ?? warning,
+		info: report.summary?.info ?? info,
+	};
+}
+
+function compactList(values: readonly string[], limit: number): string {
+	if (values.length === 0) {
+		return "none";
+	}
+	if (values.length <= limit) {
+		return values.join(", ");
+	}
+	const visible = values.slice(0, limit).join(", ");
+	return `${visible} +${values.length - limit} more`;
+}
+
+function primaryTaskPath(task: CoordinationRadarTask): string {
+	const first =
+		task.planned_files?.[0]?.path ??
+		task.touched_files?.[0]?.path ??
+		task.notes?.trim() ??
+		"";
+	return first.length > 0 ? first : "(none)";
+}
+
+function compactTimestamp(value: string | null | undefined): string {
+	if (!value) {
+		return "(unknown)";
+	}
+	return value.replace(".000Z", "Z");
+}
+
+function formatRadarWarning(warning: CoordinationRadarWarning): string {
+	const summary =
+		warning.message?.trim() || warning.reason?.trim() || "context warning";
+	return `  - ${warning.severity} ${warning.id}: ${summary}`;
+}
+
+function formatRadarTask(task: CoordinationRadarTask): string {
+	const warningIds = compactList(task.warning_ids ?? [], 2);
+	return [
+		`  - ${task.session} ${task.task_id} ${task.state}`,
+		`owner=${task.owner?.trim() || "(missing)"}`,
+		`planned=${task.planned_files?.length ?? 0}`,
+		`touched=${task.touched_files?.length ?? 0}`,
+		`warnings=${warningIds}`,
+		`path=${primaryTaskPath(task)}`,
+		`updated=${compactTimestamp(task.touched_at)}`,
+	].join(" ");
+}
+
+function boundRadarTask(task: CoordinationRadarTask): CoordinationRadarTask {
+	return {
+		...task,
+		planned_files: (task.planned_files ?? []).slice(0, 4),
+		touched_files: (task.touched_files ?? []).slice(0, 4),
+		warning_ids: (task.warning_ids ?? []).slice(0, 6),
+	};
+}
+
+function normalizeRadarReport(
+	report: CoordinationRadarInput,
+): CoordinationRadarReport {
+	const freshness =
+		"freshness" in report
+			? (report.freshness ?? null)
+			: "source" in report
+				? (report.source ?? null)
+				: null;
+	const normalized: CoordinationRadarReport = {
+		generated_at: report.generated_at ?? null,
+		freshness,
+		tasks: "tasks" in report ? report.tasks : (report.open_tasks ?? []),
+		warnings: report.warnings ?? [],
+	};
+	if (report.sessions !== undefined) {
+		normalized.sessions = report.sessions;
+	}
+	if (report.summary !== undefined) {
+		normalized.summary = report.summary;
+	}
+	return normalized;
+}
+
+function getCoordinationRadarReader(): CoordinationRadarReader {
+	return radarReaderOverride ?? loadCoordinationRadar;
+}
+
+async function radarSessions(projectRoot: string): Promise<ActionResult> {
+	const reader = getCoordinationRadarReader();
+	const report = await reader(projectRoot);
+	return prepareRadarResult(normalizeRadarReport(report));
+}
+
+function emitRadarError(
+	parsed: ParsedArgs,
+	io: CommandIo,
+	message: string,
+): number {
+	if (parsed.json) {
+		io.stdout(
+			stringifyEnvelope(
+				envelopeErr("SESSION_RADAR_UNAVAILABLE", message, {
+					action: "session.radar",
+					exitCode: 2,
+					hint: "check local-state index health and rebuild with afol local-state rebuild",
+				}),
+			),
+		);
+	} else {
+		io.stderr(`err session-radar-unavailable message="${message}"`);
+	}
+	return 2;
+}
+
+export function setCoordinationRadarReaderForTests(
+	reader: CoordinationRadarReader | null,
+): void {
+	radarReaderOverride = reader;
+}
 
 function currentGitBranch(root: string): string | null {
 	const result = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
@@ -171,6 +412,48 @@ function listSessions(projectRoot: string): ActionResult {
 	};
 }
 
+function prepareRadarResult(report: CoordinationRadarReport): ActionResult {
+	const tasks = report.tasks.filter(isOpenTask);
+	const warnings = [...report.warnings].sort(
+		(left, right) =>
+			severityWeight(left.severity) - severityWeight(right.severity) ||
+			left.id.localeCompare(right.id),
+	);
+	const sessions =
+		report.sessions?.filter((session) => session.archived !== true) ??
+		Array.from(new Set(tasks.map((task) => task.session))).map((session) => ({
+			session,
+		}));
+	const summary = summarizeRadar({ ...report, tasks, warnings, sessions });
+	const topWarnings = warnings.slice(0, RADAR_TEXT_WARNING_LIMIT);
+	return {
+		data: {
+			warning_policy: "context-only",
+			generated_at: report.generated_at ?? null,
+			freshness: report.freshness ?? null,
+			summary,
+			sessions: sessions.slice(0, RADAR_JSON_SESSION_LIMIT),
+			tasks: tasks.slice(0, RADAR_JSON_TASK_LIMIT).map(boundRadarTask),
+			warnings: warnings.slice(0, RADAR_JSON_WARNING_LIMIT),
+			truncated: {
+				sessions: sessions.length > RADAR_JSON_SESSION_LIMIT,
+				tasks: tasks.length > RADAR_JSON_TASK_LIMIT,
+				warnings: warnings.length > RADAR_JSON_WARNING_LIMIT,
+			},
+		},
+		lines: [
+			"session radar: warnings are context only, not locks",
+			`summary: sessions=${summary.sessions} open_tasks=${summary.open_tasks} warnings=${summary.warnings} critical=${summary.critical} warning=${summary.warning} info=${summary.info}`,
+			...(topWarnings.length > 0
+				? ["warnings:", ...topWarnings.map(formatRadarWarning)]
+				: ["warnings: none"]),
+			"open tasks:",
+			...(tasks.length > 0 ? tasks.map(formatRadarTask) : ["  (none)"]),
+		],
+		exitCode: 0,
+	};
+}
+
 function bindCurrentSession(
 	projectRoot: string,
 	parsed: ParsedArgs,
@@ -294,6 +577,18 @@ export async function runSessionCommand(
 			io,
 		);
 	}
+	if (action === "radar") {
+		try {
+			return emit(
+				await radarSessions(projectRoot),
+				"session.radar",
+				parsed.json,
+				io,
+			);
+		} catch (error) {
+			return emitRadarError(parsed, io, (error as Error).message);
+		}
+	}
 
 	const message = `afol session: unknown action '${action}'`;
 	if (parsed.json) {
@@ -302,13 +597,13 @@ export async function runSessionCommand(
 				envelopeErr("SESSION_ACTION_UNKNOWN", message, {
 					action: "session",
 					exitCode: 2,
-					hint: "use list, bind, switch, or unbind",
+					hint: "use list, bind, switch, unbind, or radar",
 				}),
 			),
 		);
 	} else {
 		io.stderr(
-			'err session-action-unknown hint="use list, bind, switch, or unbind"',
+			'err session-action-unknown hint="use list, bind, switch, unbind, or radar"',
 		);
 	}
 	return 2;

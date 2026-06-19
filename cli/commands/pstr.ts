@@ -1,10 +1,12 @@
-import { relative } from "node:path";
+import { type FSWatcher, watch } from "node:fs";
+import { relative, resolve } from "node:path";
 import {
 	defaultOperationContext,
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
 import {
+	buildPstrDiff,
 	checkPstrStale,
 	detectPstrAreas,
 	getPstrIndex,
@@ -14,6 +16,7 @@ import {
 	suggestPstrChanges,
 	validatePstrIndex,
 } from "../services/pstr";
+import { getPstrWatchTargets } from "../services/pstr/watch";
 import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
 const jsonOutput = createJsonWriters("pstr");
@@ -24,9 +27,30 @@ type PstrAction =
 	| "validate"
 	| "stale"
 	| "section"
+	| "diff"
+	| "watch"
 	| "detect"
 	| "suggest"
 	| "review-candidates";
+
+type ParsedPathArgs = {
+	json: boolean;
+	paths: string[];
+};
+
+type ParsedWatchArgs = ParsedPathArgs & {
+	once: boolean;
+	debounceMs: number;
+};
+
+type WatchCycleEvent = "once" | "change" | "resync";
+
+type WatchCycleResult = {
+	event: WatchCycleEvent;
+	rebuilt: boolean;
+	diff: ReturnType<typeof buildPstrDiff>;
+	snapshot: ReturnType<typeof rebuildPstrIndex> | null;
+};
 
 function hasJsonFlag(args: string[]): boolean {
 	return args.some((value) => value === "--json" || value === "-j");
@@ -47,6 +71,12 @@ function normalizeAction(value: string | undefined): PstrAction {
 	}
 	if (value === "section" || value === "sec") {
 		return "section";
+	}
+	if (value === "diff") {
+		return "diff";
+	}
+	if (value === "watch") {
+		return "watch";
 	}
 	if (value === "detect" || value === "det") {
 		return "detect";
@@ -94,6 +124,82 @@ function parseSectionArgs(args: string[]): { json: boolean; id: string } {
 	return { json, id };
 }
 
+function parsePathArgs(args: string[]): ParsedPathArgs {
+	let json = false;
+	const paths: string[] = [];
+	for (let index = 0; index < args.length; index += 1) {
+		const value = args[index];
+		if (value === "--json" || value === "-j") {
+			json = true;
+			continue;
+		}
+		if (value === "--path") {
+			const next = args[index + 1];
+			if (!next || next.startsWith("-")) {
+				throw new Error("Missing value for --path.");
+			}
+			paths.push(next);
+			index += 1;
+			continue;
+		}
+		throw new Error(`Unknown pstr argument: ${value}`);
+	}
+	return { json, paths };
+}
+
+function parseWatchArgs(args: string[]): ParsedWatchArgs {
+	let json = false;
+	const paths: string[] = [];
+	let once = false;
+	let debounceMs = 250;
+	for (let index = 0; index < args.length; index += 1) {
+		const value = args[index];
+		if (value === undefined) {
+			continue;
+		}
+		if (value === "--json" || value === "-j") {
+			json = true;
+			continue;
+		}
+		if (value === "--once") {
+			once = true;
+			continue;
+		}
+		if (value === "--path") {
+			const next = args[index + 1];
+			if (!next || next.startsWith("-")) {
+				throw new Error("Missing value for --path.");
+			}
+			paths.push(next);
+			index += 1;
+			continue;
+		}
+		if (value === "--debounce-ms") {
+			const next = args[index + 1];
+			if (!next || next.startsWith("-")) {
+				throw new Error("Missing value for --debounce-ms.");
+			}
+			const parsed = Number.parseInt(next, 10);
+			if (!Number.isFinite(parsed) || parsed < 0) {
+				throw new Error(`Invalid value for --debounce-ms: ${next}`);
+			}
+			debounceMs = parsed;
+			index += 1;
+			continue;
+		}
+		if (value.startsWith("-")) {
+			throw new Error(`Unknown pstr argument: ${value}`);
+		}
+		throw new Error(`Unknown pstr argument: ${value}`);
+	}
+	return {
+		json,
+		paths,
+		once,
+		debounceMs,
+	};
+}
+
 function parseReviewArgs(args: string[]): { json: boolean; apply?: string } {
 	let json = false;
 	let apply = "";
@@ -119,6 +225,7 @@ function parseReviewArgs(args: string[]): { json: boolean; apply?: string } {
 
 function isPstrMutation(action: PstrAction, rawArgs: string[]): boolean {
 	if (action === "rebuild") return true;
+	if (action === "watch") return true;
 	if (action === "review-candidates") {
 		return rawArgs.includes("--apply");
 	}
@@ -155,6 +262,351 @@ function snapshotWithRepoRelativePaths(
 			pstr_dir: relative(root, snapshot.source.pstr_dir) || ".",
 		},
 	};
+}
+
+function normalizeRepoRelativePath(root: string, pathValue: string): string {
+	if (!pathValue) {
+		return "";
+	}
+	const normalized = pathValue.replace(/\\/g, "/");
+	const relativePath = normalized.startsWith("/")
+		? relative(root, normalized)
+		: normalized.replace(/^\.\//, "");
+	return relativePath.replace(/\\/g, "/").replace(/\/+$/g, "");
+}
+
+function uniquePaths(root: string, paths: string[]): string[] {
+	return [
+		...new Set(paths.map((path) => normalizeRepoRelativePath(root, path))),
+	]
+		.filter(Boolean)
+		.sort((left, right) => left.localeCompare(right));
+}
+
+function diffCounts(
+	diff: ReturnType<typeof buildPstrDiff>,
+): Record<string, number> {
+	return {
+		added: diff.added.length,
+		removed: diff.removed.length,
+		changed: diff.changed.length,
+		missing: diff.missing.length,
+		stale: diff.stale.length,
+		unchanged: diff.unchanged.length,
+	};
+}
+
+function hasActionableDiff(diff: ReturnType<typeof buildPstrDiff>): boolean {
+	return (
+		!diff.snapshot_exists ||
+		diff.added.length > 0 ||
+		diff.removed.length > 0 ||
+		diff.changed.length > 0 ||
+		diff.missing.length > 0 ||
+		diff.stale.length > 0
+	);
+}
+
+function normalizeDiffForOutput(
+	diff: ReturnType<typeof buildPstrDiff>,
+	root: string,
+): ReturnType<typeof buildPstrDiff> {
+	const normalizeEntry = (
+		entry: (typeof diff.added)[number],
+	): (typeof diff.added)[number] => ({
+		...entry,
+		section_path: normalizeRepoRelativePath(root, entry.section_path),
+	});
+	return {
+		...diff,
+		added: diff.added.map(normalizeEntry),
+		removed: diff.removed.map(normalizeEntry),
+		changed: diff.changed.map(normalizeEntry),
+		unchanged: diff.unchanged.map(normalizeEntry),
+		missing: diff.missing.map(normalizeEntry),
+		stale: diff.stale.map(normalizeEntry),
+	};
+}
+
+function formatAffectedPaths(diff: ReturnType<typeof buildPstrDiff>): string[] {
+	if (diff.affected_paths.length === 0) {
+		return [];
+	}
+	return [
+		"affected:",
+		...diff.affected_paths.map((entry) => {
+			const areas =
+				entry.area_ids.length > 0 ? entry.area_ids.join(",") : "none";
+			return `  ${entry.path} -> ${areas}`;
+		}),
+	];
+}
+
+function formatDiffSummary(
+	title: string,
+	diff: ReturnType<typeof buildPstrDiff>,
+): string {
+	const counts = diffCounts(diff);
+	return [
+		`${title}: ${hasActionableDiff(diff) ? "changes detected" : "no changes"}`,
+		`counts: added=${counts.added} removed=${counts.removed} changed=${counts.changed} missing=${counts.missing} stale=${counts.stale} unchanged=${counts.unchanged}`,
+		...formatAffectedPaths(diff),
+	].join("\n");
+}
+
+function runWatchCycle(
+	projectRoot: string,
+	event: WatchCycleEvent,
+	changedPaths: string[],
+	forceFullRebuild: boolean,
+): WatchCycleResult {
+	const normalizedPaths = uniquePaths(projectRoot, changedPaths);
+	const diff = normalizeDiffForOutput(
+		buildPstrDiff(
+			projectRoot,
+			normalizedPaths.length > 0 ? { changedPaths: normalizedPaths } : {},
+		),
+		projectRoot,
+	);
+	if (!hasActionableDiff(diff)) {
+		return {
+			event,
+			rebuilt: false,
+			diff,
+			snapshot: null,
+		};
+	}
+	const snapshot = snapshotWithRepoRelativePaths(
+		forceFullRebuild || normalizedPaths.length === 0
+			? rebuildPstrIndex(projectRoot)
+			: rebuildPstrIndex(projectRoot, { changedPaths: normalizedPaths }),
+		projectRoot,
+	);
+	return {
+		event,
+		rebuilt: true,
+		diff,
+		snapshot,
+	};
+}
+
+function emitWatchError(
+	io: CommandIo,
+	json: boolean,
+	projectRoot: string,
+	error: unknown,
+): void {
+	const message = normalizeMessagePath(
+		error instanceof Error ? error.message : String(error),
+		projectRoot,
+	);
+	if (json) {
+		jsonOutput.err(io, "watch", "pstr.watch.failed", message, 2);
+		return;
+	}
+	io.stderr(message);
+}
+
+function emitWatchResult(
+	io: CommandIo,
+	json: boolean,
+	result: WatchCycleResult,
+): void {
+	if (json) {
+		jsonOutput.ok(
+			io,
+			"watch",
+			{
+				event: result.event,
+				rebuilt: result.rebuilt,
+				diff: result.diff,
+				snapshot: result.snapshot,
+			},
+			["event", "rebuilt", "diff", "snapshot"],
+		);
+		return;
+	}
+	const status = result.rebuilt ? "rebuild applied" : "no rebuild needed";
+	const summary = formatDiffSummary(
+		`pstr watch (${result.event}, ${status})`,
+		result.diff,
+	);
+	if (result.snapshot) {
+		io.stdout(`${summary}\nmaps: ${result.snapshot.maps.length}`);
+		return;
+	}
+	io.stdout(summary);
+}
+
+async function runPstrWatch(
+	projectRoot: string,
+	parsed: ParsedWatchArgs,
+	io: CommandIo,
+): Promise<number> {
+	if (parsed.once) {
+		try {
+			emitWatchResult(
+				io,
+				parsed.json,
+				runWatchCycle(projectRoot, "once", parsed.paths, false),
+			);
+			return 0;
+		} catch (error) {
+			emitWatchError(io, parsed.json, projectRoot, error);
+			return 2;
+		}
+	}
+
+	const watchTargets = getPstrWatchTargets(projectRoot, parsed.paths);
+	if (watchTargets.length === 0) {
+		emitWatchError(
+			io,
+			parsed.json,
+			projectRoot,
+			new Error("pstr watch: no watchable paths found."),
+		);
+		return 2;
+	}
+
+	if (!parsed.json) {
+		io.stdout(
+			[
+				`pstr watch: watching ${watchTargets.length} roots`,
+				`debounce_ms: ${parsed.debounceMs}`,
+				...watchTargets.map(
+					(target) =>
+						`  ${normalizeRepoRelativePath(projectRoot, target) || "."}`,
+				),
+			].join("\n"),
+		);
+	}
+
+	return new Promise<number>((resolvePromise) => {
+		const watchers: FSWatcher[] = [];
+		const pendingPaths = new Set<string>();
+		let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+		let unknownState = false;
+		let settled = false;
+
+		const cleanup = (): void => {
+			if (debounceTimer) {
+				clearTimeout(debounceTimer);
+				debounceTimer = null;
+			}
+			for (const watcherHandle of watchers) {
+				watcherHandle.close();
+			}
+			process.off("SIGINT", stop);
+			process.off("SIGTERM", stop);
+		};
+
+		const settle = (exitCode: number): void => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			cleanup();
+			resolvePromise(exitCode);
+		};
+
+		const fail = (error: unknown): void => {
+			if (settled) {
+				return;
+			}
+			emitWatchError(io, parsed.json, projectRoot, error);
+			settle(2);
+		};
+
+		const handleWatchEvent = (target: string) => {
+			return (eventType: string, filename: string | Buffer | null): void => {
+				if (eventType === "rename" || !filename) {
+					unknownState = true;
+					scheduleFlush();
+					return;
+				}
+				const relativePath = normalizeRepoRelativePath(
+					projectRoot,
+					resolve(target, String(filename)),
+				);
+				if (!relativePath) {
+					unknownState = true;
+				} else {
+					pendingPaths.add(relativePath);
+				}
+				scheduleFlush();
+			};
+		};
+
+		const setWatchers = (nextTargets: string[]): void => {
+			const nextWatchers: FSWatcher[] = [];
+			try {
+				for (const target of nextTargets) {
+					const watcherHandle = watch(target, handleWatchEvent(target));
+					watcherHandle.on("error", fail);
+					nextWatchers.push(watcherHandle);
+				}
+			} catch (error) {
+				for (const watcherHandle of nextWatchers) {
+					watcherHandle.close();
+				}
+				throw error;
+			}
+			for (const watcherHandle of watchers) {
+				watcherHandle.close();
+			}
+			watchers.splice(0, watchers.length, ...nextWatchers);
+		};
+
+		const refreshWatchers = (): void => {
+			const watchTargets = getPstrWatchTargets(projectRoot, parsed.paths);
+			if (watchTargets.length === 0) {
+				throw new Error("pstr watch: no watchable paths found.");
+			}
+			setWatchers(watchTargets);
+		};
+
+		const flush = (): void => {
+			debounceTimer = null;
+			const changedPaths = [...pendingPaths];
+			pendingPaths.clear();
+			const event: WatchCycleEvent =
+				unknownState || changedPaths.length === 0 ? "resync" : "change";
+			try {
+				const result = runWatchCycle(
+					projectRoot,
+					event,
+					changedPaths,
+					unknownState || changedPaths.length === 0,
+				);
+				unknownState = false;
+				if (event !== "change") {
+					refreshWatchers();
+				}
+				emitWatchResult(io, parsed.json, result);
+			} catch (error) {
+				fail(error);
+			}
+		};
+
+		const scheduleFlush = (): void => {
+			if (debounceTimer) {
+				clearTimeout(debounceTimer);
+			}
+			debounceTimer = setTimeout(flush, parsed.debounceMs);
+		};
+
+		const stop = (): void => {
+			settle(0);
+		};
+
+		try {
+			refreshWatchers();
+			process.on("SIGINT", stop);
+			process.on("SIGTERM", stop);
+		} catch (error) {
+			fail(error);
+		}
+	});
 }
 
 export async function runPstrCommand(
@@ -233,6 +685,27 @@ export async function runPstrCommand(
 				);
 			}
 			return 0;
+		}
+
+		if (pstrAction === "diff") {
+			const parsed = parsePathArgs(args);
+			const diff = normalizeDiffForOutput(
+				buildPstrDiff(
+					projectRoot,
+					parsed.paths.length > 0 ? { changedPaths: parsed.paths } : {},
+				),
+				projectRoot,
+			);
+			if (parsed.json) {
+				jsonOutput.ok(io, pstrAction, { diff }, ["diff"]);
+			} else {
+				io.stdout(formatDiffSummary("pstr diff", diff));
+			}
+			return 0;
+		}
+
+		if (pstrAction === "watch") {
+			return runPstrWatch(projectRoot, parseWatchArgs(args), io);
 		}
 
 		if (pstrAction === "detect") {

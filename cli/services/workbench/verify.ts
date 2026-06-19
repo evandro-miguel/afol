@@ -70,6 +70,7 @@ export type VerifyIssue = {
 	type:
 		| "missing_evidence"
 		| "failed_evidence"
+		| "invalid_evidence"
 		| "open_checklist_item"
 		| "missing_session"
 		| "missing_tasks";
@@ -102,6 +103,11 @@ type EvidenceEntry = {
 	command?: unknown;
 	result?: unknown;
 	id?: unknown;
+};
+
+type EvidenceLedger = {
+	byTask: Map<string, EvidenceEntry[]>;
+	issues: VerifyIssue[];
 };
 
 function normalizeState(value: string): string {
@@ -293,13 +299,16 @@ function evidenceScopeFor(taskFile: string, sessionPath: string): string {
 	return root;
 }
 
-function loadEvidence(scope: string): Map<string, EvidenceEntry[]> {
+function loadEvidence(scope: string): EvidenceLedger {
 	const ledgerPath = join(scope, ".evidence.jsonl");
 	const byTask = new Map<string, EvidenceEntry[]>();
+	const issues: VerifyIssue[] = [];
 	if (!existsSync(ledgerPath)) {
-		return byTask;
+		return { byTask, issues };
 	}
-	for (const line of readFileSync(ledgerPath, "utf8").split(/\r?\n/)) {
+	const lines = readFileSync(ledgerPath, "utf8").split(/\r?\n/);
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index] ?? "";
 		const trimmed = line.trim();
 		if (!trimmed) {
 			continue;
@@ -314,9 +323,16 @@ function loadEvidence(scope: string): Map<string, EvidenceEntry[]> {
 			const entries = byTask.get(taskId) ?? [];
 			entries.push(entry);
 			byTask.set(taskId, entries);
-		} catch {}
+		} catch (error) {
+			issues.push({
+				type: "invalid_evidence",
+				file: ledgerPath,
+				line: index + 1,
+				message: `Invalid evidence JSONL line: ${(error as Error).message}`,
+			});
+		}
 	}
-	return byTask;
+	return { byTask, issues };
 }
 
 export function evidenceResultIsSuccess(result: unknown): boolean {
@@ -435,7 +451,7 @@ export function verifyWorkbenchTasks(
 		return result;
 	}
 
-	const evidenceByScope = new Map<string, Map<string, EvidenceEntry[]>>();
+	const evidenceByScope = new Map<string, EvidenceLedger>();
 
 	for (const taskFile of taskFiles) {
 		const content = readFileSync(taskFile, "utf8");
@@ -443,11 +459,17 @@ export function verifyWorkbenchTasks(
 		if (strict) {
 			result.issues.push(...findOpenChecklistItems(content, taskFile));
 		}
-		const evidenceScope = evidenceScopeFor(taskFile, scanRoot);
-		if (strict && !evidenceByScope.has(evidenceScope)) {
-			evidenceByScope.set(evidenceScope, loadEvidence(evidenceScope));
+		let scopedEvidence: EvidenceLedger | undefined;
+		if (strict) {
+			const evidenceScope = evidenceScopeFor(taskFile, scanRoot);
+			scopedEvidence = evidenceByScope.get(evidenceScope);
+			if (!scopedEvidence) {
+				const ledger = loadEvidence(evidenceScope);
+				evidenceByScope.set(evidenceScope, ledger);
+				result.issues.push(...ledger.issues);
+				scopedEvidence = ledger;
+			}
 		}
-		const scopedEvidence = evidenceByScope.get(evidenceScope);
 
 		for (const task of tasks) {
 			result.totalTasks += 1;
@@ -458,7 +480,7 @@ export function verifyWorkbenchTasks(
 			if (strict && task.state === "done") {
 				const issue = doneTaskEvidenceIssue(
 					task,
-					scopedEvidence?.get(task.id) ?? [],
+					scopedEvidence?.byTask.get(task.id) ?? [],
 				);
 				if (issue) {
 					result.issues.push(issue);

@@ -89,8 +89,15 @@ function readGitChangedPaths(
 		encoding: "utf8",
 		shell: false,
 	});
-	if (result.error || result.status !== 0) {
-		return [];
+	if (result.error) {
+		throw result.error;
+	}
+	if (result.status !== 0) {
+		const detail =
+			result.stderr.trim() ||
+			result.stdout.trim() ||
+			`git ${args.join(" ")} exited with status ${result.status}`;
+		throw new Error(detail);
 	}
 	return result.stdout
 		.split(/\r?\n/)
@@ -129,8 +136,19 @@ export function checkActiveSessionPointerMutation(
 				"commit only if this is an explicit session-management change",
 			),
 		];
-	} catch {
-		return [];
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		return [
+			makeFinding(
+				"state:git:collection-failed",
+				"fail",
+				"state",
+				"failed to collect git drift for .afol/wb/.active_session",
+				"ensure git is installed and run the command from a valid git worktree",
+				undefined,
+				detail,
+			),
+		];
 	}
 }
 
@@ -434,6 +452,7 @@ export function runDriftCheck(
 		...((opts?.adm ?? true) ? checkAdmDrift(root) : []),
 		...((opts?.pstr ?? true) ? checkPstrDrift(root) : []),
 		...((opts?.state ?? true) ? checkStateDrift(root) : []),
+		...((opts?.state ?? true) ? checkActiveSessionPointerMutation(root) : []),
 		...((opts?.specs ?? true) ? checkSpecDrift(root) : []),
 	];
 	return { ok: findings.length === 0, checked_at: nowIso(), findings };

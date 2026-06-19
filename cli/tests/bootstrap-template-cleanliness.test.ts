@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Buffer } from "node:buffer";
 import {
 	DEFAULT_TEMPLATE_FILES,
 	DEFAULT_TEMPLATE_METADATA,
@@ -33,6 +34,41 @@ describe("generated template cleanliness", () => {
 			false,
 		);
 		expect(paths.some((path) => path.startsWith("docs/agentic/"))).toBe(false);
+	});
+
+	test("generated payload keeps AFOL hooks and project skills in owned roots", () => {
+		const paths = Object.keys(DEFAULT_TEMPLATE_FILES);
+		const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
+		expect(configEntry).toBeDefined();
+		expect(paths).toContain(".afol/adm/hooks/index.json");
+		expect(paths).toContain(".afol/adm/hooks/README.md");
+		expect(paths).toContain(".afol/adm/source/universal-skills/index.json");
+		expect(paths).toContain(".afol/adm/tools.json");
+		expect(paths.some((path) => path.startsWith(".afol/skills/"))).toBe(false);
+		expect(paths).not.toContain(".afol/skills");
+		expect(paths.some((path) => path.startsWith(".agents/hooks/"))).toBe(false);
+		expect(paths.some((path) => path.startsWith(".agents/rules/"))).toBe(false);
+		expect(paths.some((path) => path.startsWith(".agents/source/"))).toBe(
+			false,
+		);
+		expect(paths).not.toContain(".agents/tools.json");
+
+		const config = JSON.parse(
+			Buffer.from(configEntry?.contentBase64 ?? "", "base64").toString("utf8"),
+		) as {
+			paths: {
+				adm_dir: string;
+				hooks_dir: string;
+				rules_dir: string;
+				skills_dir: string;
+			};
+			skills_sync: { project_dir: string };
+		};
+		expect(config.paths.adm_dir).toBe(".afol/adm");
+		expect(config.paths.hooks_dir).toBe(".afol/adm/hooks");
+		expect(config.paths.rules_dir).toBe(".afol/adm/rules");
+		expect(config.paths.skills_dir).toBe(".agents/skills");
+		expect(config.skills_sync.project_dir).toBe(".agents/skills");
 	});
 
 	test("bootstrap planner never emits forbidden operations", () => {

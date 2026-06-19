@@ -288,6 +288,43 @@ export const FLAG_ALIASES = Object.freeze({
 	}),
 } satisfies Record<string, FrozenAliasMap>);
 
+const VALUE_CONSUMING_FLAGS = new Set([
+	"--actor",
+	"--append",
+	"--area",
+	"--artifact",
+	"--body",
+	"--branch",
+	"--claim",
+	"--command",
+	"--feature-id",
+	"--for",
+	"--format",
+	"--id",
+	"--intent",
+	"--limit",
+	"--message",
+	"--note",
+	"--parent-spec",
+	"--path",
+	"--query",
+	"--reason",
+	"--result",
+	"--run",
+	"--scenario",
+	"--session",
+	"--source",
+	"--tags",
+	"--task",
+	"--task-id",
+	"--test",
+	"--title",
+	"--to",
+	"--topic",
+	"--type",
+	"--url",
+]);
+
 export function normalizeSubcommandAction(
 	group: string,
 	action: string | undefined,
@@ -311,5 +348,17 @@ export function normalizeScopedFlags(
 	if (!aliases) {
 		return [...args];
 	}
-	return args.map((arg) => aliases[arg] ?? arg);
+	const normalized: string[] = [];
+	let previousConsumesValue = false;
+	for (const arg of args) {
+		if (previousConsumesValue) {
+			normalized.push(arg);
+			previousConsumesValue = false;
+			continue;
+		}
+		const value = aliases[arg] ?? arg;
+		normalized.push(value);
+		previousConsumesValue = VALUE_CONSUMING_FLAGS.has(value);
+	}
+	return normalized;
 }

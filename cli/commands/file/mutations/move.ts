@@ -199,6 +199,10 @@ export function runMoveMutation(
 	);
 	const mutationId = createMutationId();
 
+	if (!existsSync(source.path)) {
+		throw new Error(`Source file not found: ${source.relativePath}`);
+	}
+
 	if (args.dryRun) {
 		return {
 			command: "mv",
@@ -226,10 +230,6 @@ export function runMoveMutation(
 			destination: destination.relativePath,
 			mutation_id: mutationId,
 		};
-	}
-
-	if (!existsSync(source.path)) {
-		throw new Error(`Source file not found: ${source.relativePath}`);
 	}
 
 	requireWriteContext(args);

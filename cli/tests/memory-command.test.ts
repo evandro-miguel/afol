@@ -292,4 +292,73 @@ describe("memory command", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("memory commands fail on duplicate ids and no-op promote statuses", async () => {
+		const root = createRoot();
+		try {
+			writeFileSync(
+				join(root, ".afol", "memory", "memory.md"),
+				[
+					"---",
+					"doc_type: project_memory",
+					"updated_at: 2026-06-13T00:00:00Z",
+					"entries: 3",
+					"---",
+					"",
+					"# Project Memory",
+					"",
+					"## active",
+					"",
+					"### MEM-ACTIVE: Active",
+					"Active body.",
+					"",
+					"## proposed",
+					"",
+					"### MEM-DUP: Duplicate one",
+					"First body.",
+					"",
+					"### MEM-DUP: Duplicate two",
+					"Second body.",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const show = capture();
+			expect(
+				await runMemoryCommand("show", ["--id", "MEM-DUP"], root, show.io),
+			).toBe(2);
+			expect(show.stderr.join("\n")).toContain(
+				"Duplicate memory entry id: MEM-DUP",
+			);
+
+			const add = capture();
+			expect(
+				await runMemoryCommand(
+					"add",
+					["--id", "MEM-ACTIVE", "--title", "Again", "--body", "Again"],
+					root,
+					add.io,
+				),
+			).toBe(2);
+			expect(add.stderr.join("\n")).toContain(
+				"Memory entry already exists: MEM-ACTIVE",
+			);
+
+			const promote = capture();
+			expect(
+				await runMemoryCommand(
+					"promote",
+					["--id", "MEM-ACTIVE"],
+					root,
+					promote.io,
+				),
+			).toBe(2);
+			expect(promote.stderr.join("\n")).toContain(
+				"Memory entry MEM-ACTIVE cannot be promoted from status active.",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });

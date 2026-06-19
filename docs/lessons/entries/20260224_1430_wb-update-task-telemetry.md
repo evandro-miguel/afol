@@ -3,66 +3,68 @@ doc_type: lesson_entry
 id: lesson_20260224_1430_wb-update-task-telemetry
 status: active
 created_at: '2026-02-24T14:30:00-03:00'
-updated_at: '2026-02-24T14:30:00-03:00'
+updated_at: '2026-06-18T13:15:00-04:00'
 source: execution_review
 related_session: 260224_1030_scripts-lean-efficiency
 ---
 
-# Lesson: wb-update task for Telemetry - Not Optional
+# Lesson: Governed Task Telemetry Is Not Optional
 
 ## Correction
 
-All task state changes were done via direct `edit` tool on markdown files, bypassing `.agents/agents wb-update task`. This means:
+All task state changes were done via direct `edit` tool on markdown files, bypassing the governed task command. In the retired runtime this was `.agents/agents wb-update task`; in current AFOL it is `afol start`, `afol evidence`, `afol done`, and `afol close`. Direct edits mean:
 
 - ❌ No telemetry recorded for task completions
 - ❌ No audit trail in session log
 - ❌ No automatic timeline updates
 
-## What wb-update task Provides
+## What Governed Task Commands Provide
 
-- **Updates checkbox**: Direct Edit (Yes) vs wb-update task (Yes)
-- **Records telemetry event**: Direct Edit (No) vs wb-update task (Yes)
-- **Updates State Board**: Direct Edit (Yes) vs wb-update task (Yes)
-- **Adds timeline entry**: Direct Edit (No) vs wb-update task (Optional)
-- **Validates task ID format**: Direct Edit (No) vs wb-update task (Yes)
-- **Prevents invalid states**: Direct Edit (No) vs wb-update task (Yes)
+- **Updates task state**: Direct Edit (Yes) vs AFOL command (Yes)
+- **Records telemetry/event evidence**: Direct Edit (No) vs AFOL command (Yes)
+- **Updates State Board**: Direct Edit (Yes) vs AFOL command (Yes)
+- **Adds timeline entry**: Direct Edit (No) vs `afol log` (Optional)
+- **Validates task ID format**: Direct Edit (No) vs AFOL command (Yes)
+- **Prevents invalid states**: Direct Edit (No) vs AFOL command (Yes)
 
 ## Prevention Rule
 
-**wb-update task = Fonte oficial de mudança de estado**
-**edit tool = Apenas para conteúdo que wb-update não cobre**
+**AFOL task commands = Fonte oficial de mudança de estado**
+**edit tool = Apenas para conteúdo que AFOL não cobre**
 
 ### When to Use Each
 
-- Mark task done / in_progress / pending: `wb-update task`
+- Mark task done / in_progress / pending: `afol start`, `afol done`
 - Update task description: `edit`
 - Add notes to State Board: `edit`
 - Change acceptance criteria: `edit`
-- Record completion with telemetry: `wb-update task`
+- Record completion with telemetry/evidence: `afol evidence`, then `afol done`
 
 ## Guardrail
 
-### Mandatory wb-update Commands
+### Mandatory AFOL Commands
 
 ```bash
 # Mark task as done (with telemetry and evidence)
-.agents/agents wb-update evidence T-03 --command "make test-scripts" --result passed --artifact .afol/wb/<session>/<session>_report_01.md
-.agents/agents wb-update task T-03 --mark-done --evidence-id E-...
+afol evidence --session <session> --task-id T-03 --command "make test-scripts" --result passed --artifact .afol/wb/<session>/<session>_report_01.md
+afol done --session <session> --task-id T-03
 
 # Mark task as in_progress (with telemetry)
-.agents/agents wb-update task T-04 --mark-in-progress
+afol start --session <session> --task-id T-04
 
-# Mark task as problem (with reason in task notes/report)
-.agents/agents wb-update task T-05 --mark-problem
+# Mark task as problem
+# Record the failed evidence and explain the blocker in the task/report; do not
+# mark the task done until success evidence exists.
+afol evidence --session <session> --task-id T-05 --command "make test-scripts" --result failed
 
 # Add timeline entry for significant milestone
-.agents/agents wb-update timeline --message "Phase 3: All hotspots refactored"
+afol log --session <session> --message "Phase 3: All hotspots refactored"
 ```
 
 ### Telemetry Event Flow
 
 ```text
-User records evidence, then runs: wb-update task T-03 --mark-done --evidence-id E-...
+User records evidence, then runs: afol done --session <session> --task-id T-03
     ↓
 Script updates: task_03.md checkbox - [ ] → - [x] and keeps the evidence id attached
     ↓
@@ -73,19 +75,20 @@ Script records: tool_exec event in telemetry
 Event available for: heat scoring, reports, audits
 ```
 
-**Without wb-update:** No telemetry event → invisible in reports
+**Without governed AFOL task commands:** No telemetry event -> invisible in reports
 
 ## Related Commands
 
 ```bash
 # View task status
-.agents/agents verify-tasks .afol/wb/<session>/
+afol verify-tasks --strict .afol/wb/<session>
 
-# Update task with all state options
-.agents/agents wb-update task --help
+# View command metadata
+afol help start
+afol help done
 
 # View telemetry for task completions
-.agents/agents telemetry query --event-type=task_completed
+afol telemetry query --event-type=task_completed
 ```
 
 ## Related Lessons

@@ -291,6 +291,7 @@ describe("file command dispatcher", () => {
 			).toBe(0);
 			expect(parseJsonLine(patchIo.stdout[0] ?? "").command).toBe("pt");
 
+			writeFileTree(root, DEFAULT_MOVE_SOURCE, "move me");
 			const moveIo = captureIo();
 			expect(await runFileCommand(["mv", "--dry-run"], root, moveIo.io)).toBe(
 				0,
@@ -704,6 +705,52 @@ describe("file mutation handlers", () => {
 						command: "mv",
 						path: "mut/missing.txt",
 						destinationPath: "mut/else.txt",
+						dryRun: false,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "R",
+					},
+					root,
+				),
+			).toThrow("Source file not found: mut/missing.txt");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("move dry-run rejects a missing source before claiming success", () => {
+		const root = mkProjectRoot();
+		try {
+			expect(() =>
+				runMoveMutation(
+					{
+						command: "mv",
+						path: "mut/missing.txt",
+						destinationPath: "mut/else.txt",
+						dryRun: true,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "R",
+					},
+					root,
+				),
+			).toThrow("Source file not found: mut/missing.txt");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("move noop rejects a missing source before claiming success", () => {
+		const root = mkProjectRoot();
+		try {
+			expect(() =>
+				runMoveMutation(
+					{
+						command: "mv",
+						path: "mut/missing.txt",
+						destinationPath: "mut/missing.txt",
 						dryRun: false,
 						json: false,
 						session: "S",

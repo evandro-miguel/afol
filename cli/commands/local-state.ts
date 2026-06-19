@@ -100,7 +100,7 @@ function summarizeRebuild(snapshot: RebuildSnapshot): RebuildSummary {
 			sessions: snapshot.workbench.sessions.length,
 			tasks: snapshot.workbench.tasks.length,
 			open_tasks: snapshot.workbench.tasks.filter(
-				(task) => task.state !== "done",
+				(task) => task.state !== "done" && task.state !== "moved",
 			).length,
 			problem_tasks: snapshot.workbench.tasks.filter(
 				(task) => task.state === "blocked" || task.state === "problem",

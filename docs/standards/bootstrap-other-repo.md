@@ -55,7 +55,7 @@ What it does:
 - prepares current-state map ownership under `.afol/pstr/`
 - creates the workbench/local-state directories under `.afol/` without copying source-repo workbench history
 - validates through the native front door after bootstrap
-- prepares `.agents/source/universal-skills` as the preferred repo-local upstream source checkout
+- prepares `.afol/adm/source/universal-skills` as the preferred repo-local upstream source checkout
 - seeds that checkout from committed scaffold assets, so the default bootstrap path does not require a network clone
 
 Recommended command:

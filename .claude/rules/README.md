@@ -1,9 +1,9 @@
 # Claude Rules
 
-Rules are symlinked from `.agents/rules/` - the mandatory rules folder.
+Rules are symlinked from `.afol/adm/rules/` - the mandatory rules folder.
 
 ```text
-.claude/rules/default -> ../../.agents/rules
+.claude/rules/default -> ../../.afol/adm/rules
 ```
 
 Do not store rules directly in this folder.
