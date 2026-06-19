@@ -63,11 +63,12 @@ Before applying, inventory the receiving project:
 - current static scaffold metadata under `.agents/config.json`,
   `.agents/lock.json`, `.agents/manifest.json`, `.agents/rules/**`, and
   `.agents/source/**`;
-- current mutable AFOL state under `.afol/wb/**`, `.agents/skills/**`,
+- current AFOL state under `.afol/wb/**`, configured `paths.skills_dir`,
   `.afol/data/**`, `.afol/tmp/**`, `.afol/adm/**`, and `.afol/pstr/**`;
 - retired operational files such as `.agents/agents`, `.agents/scripts/**`,
-  `.agents/runtime/**`, `.agents/wb`, `.agents/skills`, `.agents/tmp`,
-  `.agents/data`, `.agents/z-arq`, and `agents.config`.
+  `.agents/runtime/**`, `.agents/wb`, `.agents/tmp`, `.agents/data`,
+  `.agents/z-arq`, and `agents.config`. Treat `.agents/skills` as retired only
+  when it is not the configured `paths.skills_dir`.
 
 Read the dry-run output as an adoption plan:
 
@@ -93,6 +94,8 @@ and `.agents/runtime` when confirmed by the plan. Provider-compatible mutable
 cleanup archives old `.agents/data`, `.agents/skills`, `.agents/tmp`,
 `.agents/wb`, and `.agents/z-arq` into
 `.afol/data/migrations/<stamp>_provider-compatible-mutable-migration`.
+Do not run this cleanup against `.agents/skills` when the active config uses it
+as `paths.skills_dir`.
 
 The final adoption note should distinguish: already present, created, updated,
 preserved project-owned, legacy cleanup pending, and cleanup flags required.
@@ -114,15 +117,16 @@ only after the target paths and conflicts are understood.
 
 ## 5. Maintain Project-Local Skills
 
-Project-local AFOL skills live under `.agents/skills/**`.
+Project-local AFOL skills live under the configured `paths.skills_dir`.
+Current provider-compatible AFOL repos commonly use `.agents/skills/**`.
 
 When updating this skill for a project:
 
-- edit the relevant `.agents/skills/<skill-name>/` files;
+- edit the relevant `<paths.skills_dir>/<skill-name>/` files;
 - keep the global copy under `~/.codex/skills/<skill-name>/` in sync only when
   the change is intended for all projects;
 - do not copy caches, generated mirrors, or universal-skills source checkouts
-  into `.agents/skills`;
+  into the project skill directory;
 - route durable shared skill changes through the universal-skills repo and its
   normal review path.
 
@@ -168,5 +172,6 @@ When delegating AFOL work, include:
 - whether the agent may edit or is read-only;
 - session id and task id when governed workbench state is active.
 
-Tell helpers to read `.agents/config.json` for the path contract and to write
-mutable runtime state only under `.afol/**`.
+Tell helpers to read `.agents/config.json` for the path contract, write runtime
+state only under configured AFOL runtime paths, and edit project-local skills
+only through `paths.skills_dir`.

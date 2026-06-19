@@ -51,7 +51,8 @@ Symptom:
 
 - dry-run or apply reports `provider-compatible-cleanup-pending`.
 - old `.agents/data`, `.agents/skills`, `.agents/tmp`, `.agents/wb`, or
-  `.agents/z-arq` still exists.
+  `.agents/z-arq` still exists, and the path is not the configured current
+  path in `.agents/config.json`.
 
 Cause:
 
@@ -66,7 +67,8 @@ afol init --provider-compatible --cleanup-provider-compatible-mutable \
 
 If the archive plan is correct, rerun without `--dry-run`. The migration
 archives those roots into `.afol/data/migrations/**`; it does not treat them as
-active runtime paths.
+active runtime paths. Do not archive `.agents/skills` when it is the active
+`paths.skills_dir`.
 
 ## 4. Obsolete Legacy Scaffold Files Were Preserved
 

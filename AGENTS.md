@@ -42,6 +42,11 @@ Project-local provider skills live under `.agents/skills/**`.
   - `ragctl project search --project main-dev "<query>" --mode vector --json`
   - `ragctl project file --project main-dev --file <repo-relative-path> --json`
 
+Large AFOL changes must verify that the durable universal
+`agentic-folder-sys` skill in `/home/ozy/apps/universal-skills` is current
+before relying on or propagating project-local AFOL guidance. If the AFOL
+behavior changed, update and sync the universal skill first.
+
 Target governance layout:
 
 - `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and

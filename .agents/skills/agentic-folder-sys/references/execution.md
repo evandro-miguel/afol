@@ -72,7 +72,7 @@ Allowed by default:
 
 - project files directly in scope;
 - `.afol/wb/<session-id>/**` for governed state through `afol`;
-- `.agents/skills/**` when updating project-local skills.
+- the configured `paths.skills_dir` when updating project-local skills.
 
 Avoid unless explicitly scoped:
 
