@@ -34,7 +34,6 @@ docs/
 └── data/
 
 .afol/
-├── skills/
 ├── tmp/
 └── data/
 ```
@@ -54,8 +53,7 @@ docs/
 | `.afol/adm/rules/` | Local rules |
 | `.agents/manifest.json` | Template ownership metadata |
 | `.agents/lock.json` | Scaffold lock metadata |
-| `.agents/skills/` | Baseline skills when `paths.mutable_dir` is `.agents` |
-| `.afol/skills/` | Provider-compatible project skills |
+| `.agents/skills/` | Project-local skills when configured as `paths.skills_dir` |
 | `.afol/tmp/` | Provider-compatible temporary files |
 | `.afol/data/` | Provider-compatible local data |
 

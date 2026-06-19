@@ -17,19 +17,23 @@ describe("help formatter", () => {
 		});
 
 		expect(help).toBe(copy);
-		expect(help.split("\n").length).toBeLessThanOrEqual(30);
+		expect(help.split("\n").length).toBeLessThanOrEqual(70);
 		expect(help).toContain("Usage: afol");
 		expect(help).toContain("Commands");
 		expect(help).toContain("\n  s/status");
 		expect(help).toContain("s/status");
+		expect(help).toContain("s/status[read] - project status");
 		expect(help).toContain("v/validate");
+		expect(help).toContain("v/validate[read] - validation gates");
 		expect(help).toContain("n/new");
 		expect(help).toContain("hk/hook");
 		expect(help).toContain("bench");
 		expect(help).toContain("pb/project-benchmark");
+		expect(help).toContain("pb/project-benchmark[generated] - compare references");
 		expect(help).toContain("Side effects");
 		expect(help).toContain("write=changes files/state");
 		expect(help).toContain("afol help <command>");
+		expect(help).toContain("afol help --verbose");
 		expect(help).toContain("a=afol");
 		expect(help).not.toContain("do/doctor");
 		expect(help).not.toContain("ma/maintenance");
@@ -38,10 +42,40 @@ describe("help formatter", () => {
 	test("keeps compact help lines scan-friendly", () => {
 		const lines = formatHelpText().split("\n");
 
-		expect(lines.length).toBeLessThanOrEqual(30);
+		expect(lines.length).toBeLessThanOrEqual(70);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);
+	});
+
+	test("lists every top-level command with a short compact description", () => {
+		const help = formatHelpText(kernelRegistry);
+
+		for (const spec of kernelRegistry.commands) {
+			const alias = spec.aliases[0];
+			const name = alias ? `${alias}/${spec.command}` : spec.command;
+			expect(help).toContain(`${name}[${spec.sideEffect}] - `);
+		}
+	});
+
+	test("formats verbose help with subcommand detail", () => {
+		const help = formatHelpText(kernelRegistry, { verbose: true });
+		const lines = help.split("\n");
+
+		expect(lines.length).toBeGreaterThan(formatHelpText().split("\n").length);
+		expect(lines.length).toBeLessThanOrEqual(330);
+		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
+			120,
+		);
+		expect(help).toContain("  project-benchmark");
+		expect(help).toContain("    aliases: pb");
+		expect(help).toContain("    effect: generated");
+		expect(help).toContain(
+			"    description: Compare AFOL against curated reference projects",
+		);
+		expect(help).toContain("    subcommands:");
+		expect(help).toContain("      generate --check [read]");
+		expect(help).toContain("  --verbose  Expanded human catalog with subcommands");
 	});
 
 	test("formats per-command help from registry metadata", () => {
@@ -58,6 +92,32 @@ describe("help formatter", () => {
 		expect(help).toContain("Side effect: read");
 		expect(help).toContain("Description: Show current project status");
 		expect(unknown).toBeNull();
+	});
+
+	test("expands per-command help with tool-specific options and guidance", () => {
+		const validateHelp = formatCommandHelp("validate", kernelRegistry);
+		const updateHelp = formatCommandHelp("update", kernelRegistry);
+
+		expect(validateHelp).not.toBeNull();
+		expect(updateHelp).not.toBeNull();
+		if (!validateHelp || !updateHelp) {
+			throw new Error("expected command help");
+		}
+
+		expect(validateHelp).toContain("Guidance:");
+		expect(validateHelp).toContain(
+			"Use project validation for scaffold health before and after edits.",
+		);
+		expect(validateHelp).toContain("Subcommands:");
+		expect(validateHelp).toContain("project --json [read]");
+		expect(validateHelp).toContain("bench --pack <pack-id> --json [read]");
+		expect(updateHelp).toContain("Guidance:");
+		expect(updateHelp).toContain(
+			"Prefer check, then preview, then apply --dry-run before real apply.",
+		);
+		expect(updateHelp).toContain("Subcommands:");
+		expect(updateHelp).toContain("check [read]");
+		expect(updateHelp).toContain("apply --dry-run [read]");
 	});
 
 	test("makes risky file operations explicit in command help", () => {
@@ -165,9 +225,11 @@ describe("help formatter", () => {
 		}
 		expect(help).toContain("Command: local-state");
 		expect(help).toContain("Aliases: ls");
+		expect(help).toContain("Guidance:");
 		expect(help).toContain("Subcommands:");
-		expect(help).toContain("freshness|fs [read]");
-		expect(help).toContain("rebuild|rb [generated]");
+		expect(help).toContain("freshness|fs --json [read]");
+		expect(help).toContain("rebuild|rb --json [generated]");
+		expect(help).toContain("rebuild|rb --json --verbose [generated]");
 	});
 
 	test("builds catalog json without fake aliases", () => {
@@ -212,8 +274,33 @@ describe("help formatter", () => {
 			sideEffect: "read",
 			description: "Show current project status",
 			category: "core",
+			subcommands: [
+				{
+					usage: "--json",
+					sideEffect: "read",
+					description: "Emit machine-readable project status",
+				},
+				{
+					usage: "--session <session-id>",
+					sideEffect: "read",
+					description: "Resolve status around a specific session",
+				},
+			],
 		});
 		expect(buildCommandHelpJson("nope", kernelRegistry)).toBeNull();
+	});
+
+	test("does not advertise unsupported init json output", () => {
+		const help = buildCommandHelpJson("init", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		expect(help?.subcommands).toEqual([
+			{
+				usage: "--dry-run",
+				sideEffect: "read",
+				description: "Preview scaffold install without writing",
+			},
+		]);
 	});
 
 	test("builds project-benchmark json with subcommand metadata", () => {
@@ -310,16 +397,25 @@ describe("help formatter", () => {
 			sideEffect: "generated",
 			description: "Inspect local project indexes",
 			category: "inspect",
+			guidance: [
+				"Run rebuild before validation when indexes may be stale.",
+				"Use --verbose only when the full index snapshot is needed.",
+			],
 			subcommands: [
 				{
-					usage: "freshness|fs",
+					usage: "freshness|fs --json",
 					sideEffect: "read",
-					description: "Validate local-state snapshots without rebuilding",
+					description: "Check whether local-state indexes are fresh",
 				},
 				{
-					usage: "rebuild|rb",
+					usage: "rebuild|rb --json",
 					sideEffect: "generated",
-					description: "Rebuild local-state snapshots",
+					description: "Refresh indexes and emit compact counts",
+				},
+				{
+					usage: "rebuild|rb --json --verbose",
+					sideEffect: "generated",
+					description: "Refresh indexes and include full snapshots",
 				},
 			],
 		});

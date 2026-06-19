@@ -55,8 +55,10 @@ Before finalizing AFOL work, scan [Gotchas](./gotchas.md).
 - Do not use, document, restore, or extend the retired `.agents/agents` Python
   wrapper, `.agents/scripts`, `.agents/runtime`, `.agents/wb` active state,
   `.agents/z-arq`, `agents.config`, `legacy:` routes, or delegate fallback.
-- Keep `.agents/**` as static scaffold metadata.
-- Keep mutable runtime state under configured `.afol/**` paths.
+- Keep `.agents/**` limited to static scaffold metadata and configured
+  provider skill payloads such as `paths.skills_dir`.
+- Keep mutable runtime state under configured AFOL paths, normally `.afol/**`;
+  project-local skills follow `paths.skills_dir`.
 - Pass explicit `--session` and `--task-id` when multiple agents or terminals
   may be active.
 - Prefer compact/default command output. Treat a routine AFOL command emitting

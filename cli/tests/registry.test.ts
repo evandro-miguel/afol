@@ -245,16 +245,25 @@ describe("kernel registry", () => {
 			(entry) => entry.command === "local-state",
 		);
 
+		expect(localState?.guidance).toEqual([
+			"Run rebuild before validation when indexes may be stale.",
+			"Use --verbose only when the full index snapshot is needed.",
+		]);
 		expect(localState?.subcommands).toEqual([
 			{
-				usage: "freshness|fs",
+				usage: "freshness|fs --json",
 				sideEffect: "read",
-				description: "Validate local-state snapshots without rebuilding",
+				description: "Check whether local-state indexes are fresh",
 			},
 			{
-				usage: "rebuild|rb",
+				usage: "rebuild|rb --json",
 				sideEffect: "generated",
-				description: "Rebuild local-state snapshots",
+				description: "Refresh indexes and emit compact counts",
+			},
+			{
+				usage: "rebuild|rb --json --verbose",
+				sideEffect: "generated",
+				description: "Refresh indexes and include full snapshots",
 			},
 		]);
 	});

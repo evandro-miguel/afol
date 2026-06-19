@@ -1,0 +1,6 @@
+{"id":"E-20260617130852017-9e88d5","task_id":"T-01","created_at":"2026-06-17T17:08:52.017Z","command":"bun test cli/tests/help.test.ts cli/tests/kernel.test.ts","result":"passed"}
+{"id":"E-20260617130854587-10c016","task_id":"T-01","created_at":"2026-06-17T17:08:54.587Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260617130857591-971678","task_id":"T-01","created_at":"2026-06-17T17:08:57.591Z","command":"./afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260617130902714-28e3fb","task_id":"T-01","created_at":"2026-06-17T17:09:02.714Z","command":"./afol validate project --json","result":"passed"}
+{"id":"E-20260617130905574-5b17a0","task_id":"T-01","created_at":"2026-06-17T17:09:05.574Z","command":"./afol validate bench --pack cli-kernel-local --json","result":"passed"}
+{"id":"E-20260617130908851-6c89b7","task_id":"T-01","created_at":"2026-06-17T17:09:08.851Z","command":"./afol -h and ./afol help --verbose smoke","result":"passed"}
