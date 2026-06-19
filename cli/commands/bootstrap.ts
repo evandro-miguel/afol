@@ -193,7 +193,7 @@ function mutableConfigPayload(content: Buffer, mutableDir: string): Buffer {
 		...paths,
 		agents_dir: ".agents",
 		mutable_dir: mutableDir,
-		adm_dir: `${mutableDir}/adm`,
+		adm_dir: ".afol/adm",
 		rules_dir: ".afol/adm/rules",
 		hooks_dir: ".afol/adm/hooks",
 		skills_dir: ".agents/skills",

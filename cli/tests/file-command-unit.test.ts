@@ -742,6 +742,29 @@ describe("file mutation handlers", () => {
 		}
 	});
 
+	test("move noop rejects a missing source before claiming success", () => {
+		const root = mkProjectRoot();
+		try {
+			expect(() =>
+				runMoveMutation(
+					{
+						command: "mv",
+						path: "mut/missing.txt",
+						destinationPath: "mut/missing.txt",
+						dryRun: false,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "R",
+					},
+					root,
+				),
+			).toThrow("Source file not found: mut/missing.txt");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("undoMoveMutation restores both paths and validates the mutation kind", () => {
 		const root = mkProjectRoot();
 		try {

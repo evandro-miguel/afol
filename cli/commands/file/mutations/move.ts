@@ -199,10 +199,7 @@ export function runMoveMutation(
 	);
 	const mutationId = createMutationId();
 
-	if (
-		source.relativePath !== destination.relativePath &&
-		!existsSync(source.path)
-	) {
+	if (!existsSync(source.path)) {
 		throw new Error(`Source file not found: ${source.relativePath}`);
 	}
 

@@ -177,6 +177,7 @@ function validateAgentsPayloadClean(
 		".agents/source",
 		".agents/tools",
 		".agents/tools.json",
+		".agents/skills-sync.manifest.json",
 	].filter((path) => existsSync(join(projectRoot, path)));
 
 	if (forbidden.length > 0) {

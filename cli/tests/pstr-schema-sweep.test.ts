@@ -913,6 +913,19 @@ describe("pstr service helpers", () => {
 		}
 	});
 
+	test("watch targets allow project paths whose names start with two dots", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, "..hidden_dir", "nested"), { recursive: true });
+			const targets = getPstrWatchTargets(root, ["..hidden_dir/file.ts"]).map(
+				(path) => relative(root, path),
+			);
+			expect(targets).toEqual(["..hidden_dir", "..hidden_dir/nested"]);
+		} finally {
+			cleanup(root);
+		}
+	});
+
 	test("buildPstrDiff reports added removed changed missing and affected paths", () => {
 		const root = createFixture(false);
 		try {

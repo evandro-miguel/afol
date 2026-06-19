@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import {
 	getRuleResolverConfig,
@@ -267,6 +267,7 @@ function readState(projectRoot: string): RuleInjectionState {
 
 function writeState(projectRoot: string, state: RuleInjectionState): void {
 	const path = statePath(projectRoot).absolute;
+	mkdirSync(dirname(path), { recursive: true });
 	atomicWriteText(path, `${JSON.stringify(state, null, 2)}\n`);
 }
 
@@ -414,16 +415,23 @@ export function resolveContextRules(
 	>,
 ): RuleEntry[] {
 	const context = deriveRuleSelectionContext(options);
-	return resolveRules(projectRoot, {
-		scope: context.scope ?? undefined,
-		domains: context.domains,
-		surfaces: context.surfaces,
-		workType: context.workType,
-		languages: context.languages,
-		filePath: context.filePath ?? undefined,
-		maxCharsPerRule: Number.MAX_SAFE_INTEGER,
-		maxCharsTotal: Number.MAX_SAFE_INTEGER,
-	});
+	try {
+		return resolveRules(projectRoot, {
+			scope: context.scope ?? undefined,
+			domains: context.domains,
+			surfaces: context.surfaces,
+			workType: context.workType,
+			languages: context.languages,
+			filePath: context.filePath ?? undefined,
+			maxCharsPerRule: Number.MAX_SAFE_INTEGER,
+			maxCharsTotal: Number.MAX_SAFE_INTEGER,
+		});
+	} catch (error) {
+		if (error instanceof RuleResolverError) {
+			throw new RuleInjectionError(error.message);
+		}
+		throw error;
+	}
 }
 
 export function resolveAndRecordRuleInjection(

@@ -1,6 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type HookEntry, resolveHooks } from "../catalog/hooks";
+import {
+	type HookEntry,
+	HookResolverError,
+	resolveHooks,
+} from "../catalog/hooks";
 import { listSkills, searchSkills } from "../catalog/skills";
 import { buildLibraryGraph, searchLibrary } from "../library";
 import { recallEntries } from "../memory";
@@ -280,15 +284,22 @@ function selectHooks(
 		...(options.scope ? { scope: options.scope } : {}),
 		...(options.filePath ? { filePath: options.filePath } : {}),
 	});
-	return resolveHooks(root, {
-		event: "context.bundle",
-		roles: [options.role],
-		surfaces: context.surfaces,
-		workType: context.workType,
-		languages: context.languages,
-		...(context.scope ? { scope: context.scope } : {}),
-		...(context.filePath ? { filePath: context.filePath } : {}),
-	}).slice(0, 5);
+	try {
+		return resolveHooks(root, {
+			event: "context.bundle",
+			roles: [options.role],
+			surfaces: context.surfaces,
+			workType: context.workType,
+			languages: context.languages,
+			...(context.scope ? { scope: context.scope } : {}),
+			...(context.filePath ? { filePath: context.filePath } : {}),
+		}).slice(0, 5);
+	} catch (error) {
+		if (error instanceof HookResolverError) {
+			throw new RuleInjectionError(error.message);
+		}
+		throw error;
+	}
 }
 
 function contextHookContribution(hook: HookEntry): ContextHookContribution {

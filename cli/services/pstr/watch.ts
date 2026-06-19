@@ -40,7 +40,8 @@ function resolveWatchAnchor(
 	if (!existsSync(candidate)) {
 		return null;
 	}
-	if (relative(root, candidate).startsWith("..")) {
+	const relativeCandidate = relative(root, candidate).replace(/\\/g, "/");
+	if (relativeCandidate === ".." || relativeCandidate.startsWith("../")) {
 		return null;
 	}
 	return statSync(candidate).isDirectory() ? candidate : dirname(candidate);
