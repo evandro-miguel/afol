@@ -49,8 +49,12 @@ describe("release and toolchain contracts", () => {
 			"bun run validate:security:required",
 		);
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
+		expect(scripts["validate:release"]).toContain("bun run smoke:clean");
 		expect(scripts["validate:release"]).toContain(
 			"bun run release:provenance:release",
+		);
+		expect(scripts["coverage:check"]).toBe(
+			"bun run cli/dev/coverage-check.ts --include cli/dev/coverage-check.ts --include cli/dev/dist-smoke.ts --include cli/dev/generate-version.ts --include cli/dev/release-provenance.ts --include cli/dev/toolchain-smoke.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark",
 		);
 	});
 
