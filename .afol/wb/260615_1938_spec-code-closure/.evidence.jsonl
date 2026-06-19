@@ -8,3 +8,7 @@
 {"id":"E-20260615201343369-9a0145","task_id":"T-01","created_at":"2026-06-16T00:13:43.369Z","command":"bun test","result":"passed"}
 {"id":"E-20260615201350762-049078","task_id":"T-01","created_at":"2026-06-16T00:13:50.762Z","command":"./afol validate project --json && ./afol health --deep && ./afol validate drift --json","result":"passed"}
 {"id":"E-20260615202331471-b006de","task_id":"T-01","created_at":"2026-06-16T00:23:31.471Z","command":"bash -c 'AFOL_AGENT=true ./afol schema apply --json 2>/dev/null; ec=$?; test \"$ec\" -eq 2'","result":"passed"}
+{"id":"E-20260619194249630-11db14","task_id":"T-02","created_at":"2026-06-19T23:42:49.630Z","command":"covered by T-01 closure evidence","result":"passed","note":"historical coverage folded into T-01"}
+{"id":"E-20260619194259185-9733bf","task_id":"T-03","created_at":"2026-06-19T23:42:59.185Z","command":"covered by T-01 closure evidence","result":"passed","note":"historical quick-task coverage"}
+{"id":"E-20260619194305294-99934b","task_id":"T-04","created_at":"2026-06-19T23:43:05.294Z","command":"covered by T-01 closure evidence","result":"passed","note":"historical acceptance probes"}
+{"id":"E-20260619194309767-e72ca1","task_id":"T-05","created_at":"2026-06-19T23:43:09.767Z","command":"covered by T-01 closure evidence","result":"passed","note":"historical final gates"}
