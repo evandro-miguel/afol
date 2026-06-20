@@ -123,6 +123,27 @@ describe("template forbidden-content policy", () => {
 		expect(matches).toEqual([]);
 	});
 
+	test("live src/project-template does not describe workbench lifecycle as checklist marking", async () => {
+		const templateRoot = join(process.cwd(), "src/project-template");
+		const files = [
+			"AGENTS.md",
+			"CLAUDE.md",
+			"docs/templates/task.md",
+		];
+		const forbiddenMatches: string[] = [];
+
+		for (const file of files) {
+			const content = await readFile(join(templateRoot, file), "utf8");
+			for (const forbidden of ["mark `[x]`", "mark [x]", "State marker rules"]) {
+				if (content.includes(forbidden)) {
+					forbiddenMatches.push(`${file}: ${forbidden}`);
+				}
+			}
+		}
+
+		expect(forbiddenMatches).toEqual([]);
+	});
+
 	test("live src/project-template JSON files parse", async () => {
 		const templateRoot = join(process.cwd(), "src/project-template");
 		const jsonFiles = await collectJsonFiles(templateRoot);

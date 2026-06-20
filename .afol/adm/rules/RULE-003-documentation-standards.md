@@ -33,8 +33,10 @@ the Markdown body after frontmatter.
   UTC `Z`.
 - Use explicit links for related plan/task/spec/report/files when an artifact
   depends on them.
-- Use valid task markers: `[ ]`, `[/]`, `[%]`, `[&]`, `[!]`, `[>]`, `[x]`.
-- Use lowercase `[x]` for done and keep task IDs as `T-NN`.
+- Use checklist markers only for ordinary non-lifecycle checklist items.
+- In workbench task files, `T-xx` lifecycle state belongs in `State Board` rows
+  and AFOL commands, not parallel `- [ ]` or `- [x]` checklist rows.
+- Keep task IDs as `T-NN`.
 - Update `updated_at` when changing managed docs.
 
 ## Validation

@@ -117,8 +117,11 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Run the smallest decision-intake lane for ambiguous/product-shaped work.
 - Plans must describe direct execution, not pre-plan research.
 - Keep governed artifact count minimal: default is `plan + task`.
-- Start tasks as `pending`/`in_progress`; mark `[x]` only with valid
-  evidence id.
+- Workbench task state lives in the `State Board` and AFOL lifecycle commands.
+  Do not use `T-xx` checklist markers or checkbox-done language for lifecycle
+  state.
+- Use `afol start`, `afol evidence`, `afol done`, and `afol close`; `done`
+  requires valid task-scoped evidence.
 - Finalize optional artifacts before closure.
 
 ## Verification

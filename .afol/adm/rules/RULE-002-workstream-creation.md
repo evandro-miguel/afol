@@ -19,7 +19,7 @@ decisions.
   replies, or broad context gathering.
 - No sidecar artifacts by habit. Add research, brainstorm, explorer-check,
   report, spec, spec-lite, or postmortem only when requested, required, or
-  blocking execution.
+  blocking.
 - Discover before planning. Plans describe direct execution, not meta-planning.
 - Governed implementation flow: session -> start task -> edit -> verify ->
   evidence -> done -> close.
@@ -41,8 +41,9 @@ afol close --session <session-id>
 ```
 
 Use `afol quick-task "<description>"` only inside an active approved feature.
-Names: session `YYMMDD_HHMM_<theme>`, feature `F-NN`, task `T-NN`, pack
-`packs/<pack-slug>/`. Markers: `[ ]`, `[/]`, `[%]`, `[&]`, `[!]`, `[>]`, `[x]`.
+Names: session `YYMMDD_HHMM_<theme>`, feature `F-NN`, task `T-NN`,
+`packs/<pack-slug>/`. Task state uses `State Board` rows and AFOL commands,
+not checklist markers.
 
 ## Workflow
 

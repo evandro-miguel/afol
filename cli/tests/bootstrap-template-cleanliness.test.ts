@@ -115,4 +115,25 @@ describe("generated template cleanliness", () => {
 			".afol/data/project-benchmarks/validation-report.json",
 		);
 	});
+
+	test("generated payload does not tell agents to mark lifecycle tasks with checkboxes", () => {
+		const forbiddenMatches = Object.entries(DEFAULT_TEMPLATE_FILES)
+			.filter(([path]) =>
+				[
+					"AGENTS.md",
+					"CLAUDE.md",
+					"docs/templates/task.md",
+				].includes(path),
+			)
+			.flatMap(([path, entry]) => {
+				const content = Buffer.from(entry.contentBase64, "base64").toString(
+					"utf8",
+				);
+				return ["mark `[x]`", "mark [x]", "State marker rules"]
+					.filter((forbidden) => content.includes(forbidden))
+					.map((forbidden) => `${path}: ${forbidden}`);
+			});
+
+		expect(forbiddenMatches).toEqual([]);
+	});
 });

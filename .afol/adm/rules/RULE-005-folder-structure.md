@@ -4,7 +4,7 @@ id: RULE-005
 theme: folder-structure
 version: 2.1
 created: 2026-02-23
-updated_at: '2026-06-20T00:00:00Z'
+updated_at: "2026-06-20T00:00:00Z"
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 ---
 
@@ -14,18 +14,18 @@ applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 
 ## Ownership
 
-| Path | Owner |
-| --- | --- |
-| `.afol/adm/` | Static governance: roadmap, specs, hooks, rules, seeds, tools |
-| `.afol/pstr/` | Current project-structure maps only |
-| `.afol/wb/` | Governed sessions, evidence, indexes, benchmark state |
-| `.afol/` | Mutable AFOL runtime state |
-| `.agents/config.json` | Provider-facing static config |
-| `.agents/lock.json` | Provider-facing lock metadata |
-| `.agents/manifest.json` | Provider-facing manifest metadata |
-| `.agents/skills/` | Project-local provider skills |
-| `src/project-template/` | Exportable downstream scaffold |
-| `docs/map/` | Current-state evidence only |
+| Path                    | Owner                                                         |
+| ----------------------- | ------------------------------------------------------------- |
+| `.afol/adm/`            | Static governance: roadmap, specs, hooks, rules, seeds, tools |
+| `.afol/pstr/`           | Current project-structure maps only                           |
+| `.afol/wb/`             | Governed sessions, evidence, indexes, benchmark state         |
+| `.afol/`                | Mutable AFOL runtime state                                    |
+| `.agents/config.json`   | Provider-facing static config                                 |
+| `.agents/lock.json`     | Provider-facing lock metadata                                 |
+| `.agents/manifest.json` | Provider-facing manifest metadata                             |
+| `.agents/skills/`       | Project-local provider skills                                 |
+| `src/project-template/` | Exportable downstream scaffold                                |
+| `docs/map/`             | Current-state evidence only                                   |
 
 ## Rules
 
