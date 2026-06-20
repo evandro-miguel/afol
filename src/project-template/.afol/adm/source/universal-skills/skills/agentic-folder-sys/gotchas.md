@@ -89,7 +89,7 @@ path.
 
 ## 10. Verify Before Closing
 
-Do not mark work `[x]` just because files changed. Record evidence with
+Do not mark work `done` just because files changed. Record evidence with
 `afol evidence`, move to verified only after checks run, and close only after
 closure evidence exists.
 

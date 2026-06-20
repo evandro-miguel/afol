@@ -144,18 +144,19 @@ afol close --session <session-id>
 State lives in the configured `paths.wb_dir`, which defaults to `.afol/wb`.
 Pass `--session` explicitly when multiple agents or terminals are active.
 
-Task markers:
+Task state belongs in the workbench State Board, not in parallel checkbox
+rows:
 
-- `[ ]`: planned.
-- `[/]`: in progress.
-- `[!]`: blocked.
-- `[>]`: deferred.
-- `[%]`: implementation complete, verification pending.
-- `[&]`: verified, closure pending.
-- `[x]`: closed.
+- `pending`: planned.
+- `in_progress`: active execution.
+- `problem`: blocked.
+- `moved`: deferred.
+- `implemented_untested`: implementation complete, verification pending.
+- `tested_needs_spec_validation`: verified, closure pending.
+- `done`: closed.
 
-Move to `[&]` only after evidence exists. Move to `[x]` only after closure
-evidence exists.
+Move to `tested_needs_spec_validation` only after evidence exists. Move to
+`done` only after closure evidence exists.
 
 ## 7. Parallel Agent Handoff
 

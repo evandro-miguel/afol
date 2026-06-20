@@ -2,83 +2,65 @@
 doc_type: rule
 id: RULE-002
 theme: workstream-creation
-version: 1.0
+version: 1.1
 created: 2026-02-23
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
-updated_at: '2026-05-14T20:05:00-03:00'
+updated_at: '2026-06-20T00:00:00Z'
 ---
 
 # Workstream Creation
 
-**Purpose:** Keep governed execution direct and minimal.
+**Purpose:** create governed work only for execution, evidence, or durable
+decisions.
 
-## Artifact Economy Gate
+## Artifact Economy
 
-- Create governed plan artifacts only for active execution/evidence.
-- Default tracked pair: `plan + task`.
-- Do not create artifacts as thinking dumps.
-- Do not add tasks whose only purpose is to make a plan.
+- No workbench session for quick answers, read-only checks, planning-only
+  replies, or broad context gathering.
+- No sidecar artifacts by habit. Add research, brainstorm, explorer-check,
+  report, spec, spec-lite, or postmortem only when requested, required, or
+  blocking.
+- Discover before planning. Plans describe direct execution, not meta-planning.
+- Governed implementation flow: session -> start task -> edit -> verify ->
+  evidence -> done -> close.
+- Use given roadmap feature, parent spec, or child spec directly.
 
-## Standard Workstream
+## Artifact Contract
 
-```bash
-./afol n <theme-name> --feature-id F-01 \
-  --parent-spec <parent-spec-id>
-./afol n <theme-name> --feature-id F-01 \
-  --parent-spec <parent-spec-id> --spec
-./afol n <theme-name> --feature-id F-01 \
-  --parent-spec <parent-spec-id> --spec-lite
-./afol n <theme-name> --feature-id F-01 \
-  --parent-spec <parent-spec-id> --child-spec <child-spec-id>
-```
+Plan/task/report must link primary artifacts, list optional sidecars, and give
+`sidecar_justification`; use `not_required` when skipped.
 
-## Quick Task (active session only)
+## Commands
 
 ```bash
-./afol n "Quick task description" --quick
+afol new <theme> --feature-id F-01 --parent-spec <spec-id>
+afol start --session <session-id> --task-id T-01
+afol evidence --session <session-id> --task-id T-01 --command "<cmd>" --result passed
+afol done --session <session-id> --task-id T-01
+afol close --session <session-id>
 ```
 
-## Naming Conventions
+Use `afol quick-task "<description>"` only inside an active approved feature.
+Names: session `YYMMDD_HHMM_<theme>`, feature `F-NN`, task `T-NN`,
+`packs/<pack-slug>/`. Task state uses `State Board` rows and AFOL commands,
+not checklist markers.
 
-| Element | Pattern |
-| --- | --- |
-| Session folder | `YYMMDD_HHMM_<theme>` |
-| Plan file | `*_plan_NN.md` |
-| Task file | `*_task_NN.md` |
-| Log file | `*_log_NN.md` |
-| Spec file | `*_spec_NN.md` |
-| Roadmap feature | `F-NN` |
-| Task IDs | `T-NN` |
-| Pack folder | `packs/<pack-slug>/` |
+## Workflow
 
-## Task Status Markers
+- Ambiguous/product-shaped/benchmark-heavy work runs the smallest useful
+  decision-intake lane before benchmark/planning.
+- Feature changes update affected local skills/docs and record needed
+  universal-skills propagation follow-up.
+- Optional artifacts that exist must be finalized before closure.
+- No task closes without task-scoped evidence.
 
-```markdown
-- [ ] T-01 # pending
-- [/] T-02 # in_progress
-- [%] T-03 # implemented_untested
-- [&] T-04 # tested_needs_spec_validation
-- [!] T-05 # problem
-- [>] T-06 # moved
-- [x] T-07 # done
-```
+## Validation
 
-## Task State Commands
+Before completion, run the narrowest meaningful check, record evidence, and
+verify tasks strictly when closing governed sessions.
 
-```bash
-./afol st -S <session-id> -T T-01
-./afol d -S <session-id> -T T-01 -x "<verification command>"
-./afol evidence T-01 -S <session-id> \
-  --command "<verification command>" --result passed \
-  --artifact <configured-wb-dir>/<session-id>/<report-or-log>
-./afol done -S <session-id> -T T-01
-```
+## References
 
-## Workflow Rules
-
-- For ambiguous or product-shaped work, run smallest decision-intake lane.
-- Keep plans executable now.
-- Optional artifacts (`brainstorm`, `research`, `explorer-check`,
-  `postmortem`) are sidecars only when requested or blocking.
-- Start task before product edits.
-- Close task only with valid evidence id.
+- RULE-003 - Documentation Standards
+- RULE-004 - Validation and Linting
+- RULE-006 - Applicable Rule Resolution
