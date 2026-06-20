@@ -20,10 +20,12 @@ Replace this section after bootstrap with real product context.
 - Start task before product edits.
 - Close task with evidence.
 - Canonical path:
-  1. `afol n {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `afol st -S {session-id} -T T-01`
+  1. `afol new {theme} --feature-id {F-id} --parent-spec {spec-id}`
+  2. `afol start --session {session-id} --task-id T-01`
   3. Edit and run named verification.
-  4. `afol d -S {session-id} -T T-01 -x "<verification command>"`
+  4. `afol evidence --session {session-id} --task-id T-01 --command "<verification command>" --result passed`
+  5. `afol done --session {session-id} --task-id T-01`
+  6. `afol close --session {session-id}`
 
 ## Stack
 
@@ -84,7 +86,7 @@ work and keep this template focused on the stored data and docs contract.
 
 ## Verification
 
-- Required template gate: `afol ck`.
+- Required template gate: `afol validate project`.
 - Choose focused checks first.
 
 ## Docs And Boundaries

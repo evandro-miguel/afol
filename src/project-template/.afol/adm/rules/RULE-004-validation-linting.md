@@ -2,53 +2,82 @@
 doc_type: rule
 id: RULE-004
 theme: validation-linting
-version: 1.0
+version: 2.0
 created: 2026-02-23
-applies_to: All agents (QWEN, CLAUDE, GEMINI)
-updated_at: '2026-05-14T20:05:00-03:00'
+updated_at: '2026-06-16T00:00:00Z'
+applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 ---
 
-# Validation & Linting
+# Validation And Linting
 
-**Purpose:** No closure without proof.
+**Purpose:** validate code, scaffold state, and documentation before completion.
 
-## Pre-Commit Validation (MANDATORY)
+---
 
-```bash
-./afol validate
-./afol status
-<project-local lint/test command>
-```
+## Completion Validation
 
-Full pass:
+Run the smallest checks that prove the touched surface. For cross-cutting
+scaffold changes, use:
 
 ```bash
-./afol validate
-<project-local full validation command>
+afol local-state rebuild --json
+afol validate project --json
+bun run typecheck
+bun test
+bun run validate:release
 ```
+
+When a governed session is active, also run:
+
+```bash
+afol verify-tasks --strict
+```
+
+---
 
 ## Validation Commands
 
-```bash
-./afol validate
-./afol status
-./afol verify-tasks <configured-wb-dir>/<session>/
-```
+| Scope | Command |
+|-------|---------|
+| Project structure | `afol validate project --json` |
+| Workbench tasks | `afol verify-tasks --strict` |
+| Local state indexes | `afol local-state rebuild --json` |
+| TypeScript | `bun run typecheck` |
+| Tests | `bun test` |
+| Release gate | `bun run validate:release` |
+| Static JSON | `python -m json.tool .afol/adm/tools.json` |
 
-## Exit Codes
+---
 
-- `validate`: `0` pass, non-zero on errors
-- `verify-tasks`: `0` complete, non-zero on pending/invalid tasks
+## Checklist Discipline
 
-## Validation Checklist
+- Closed tasks must not retain open generic checklist items.
+- Evidence must name the command that actually ran.
+- Failed or skipped checks must stay visible in the final report.
+- Do not hard-wrap prose only to satisfy line-length lint.
 
-- [ ] `./afol validate` passes
-- [ ] Project-local lint/test gates pass
-- [ ] Frontmatter valid
-- [ ] Task markers valid
-- [ ] Timestamps include timezone
+---
 
-## Rule
+## Best Practices
 
-- Do not commit with failed required gates.
-- Do not mark task done without evidence-backed validation.
+**DO:**
+
+- Start with focused tests for touched code.
+- Broaden to project/release checks when shared behavior changed.
+- Record AFOL evidence before running `afol done` for governed tasks.
+- Treat excess command output as a bug in AFOL command design.
+
+**DON'T:**
+
+- Run `afol done` without relevant validation or explicit `N/A` evidence.
+- Claim a check passed unless it ran.
+- Hide unresolved task state behind lifecycle closure.
+- Reintroduce retired command surfaces in docs or examples.
+
+---
+
+## References
+
+- `AGENTS.md`
+- RULE-002 - Workstream Creation
+- RULE-005 - Folder Structure

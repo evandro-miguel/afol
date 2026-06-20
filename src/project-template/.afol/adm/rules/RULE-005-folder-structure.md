@@ -2,76 +2,50 @@
 doc_type: rule
 id: RULE-005
 theme: folder-structure
-version: 1.0
+version: 2.1
 created: 2026-02-23
-applies_to: All agents (QWEN, CLAUDE, GEMINI)
-updated_at: '2026-05-14T20:05:00-03:00'
+updated_at: "2026-06-20T00:00:00Z"
+applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 ---
 
 # Folder Structure
 
-**Purpose:** Keep required scaffold layout stable.
+**Purpose:** protect the AFOL-only scaffold layout.
 
-## Required Structure
+## Ownership
 
-```text
-docs/
-├── arc/
-├── map/
-├── standards/
-├── templates/
-├── plans/
-├── lessons/
-└── agentic/
+| Path                    | Owner                                                         |
+| ----------------------- | ------------------------------------------------------------- |
+| `.afol/adm/`            | Static governance: roadmap, specs, hooks, rules, seeds, tools |
+| `.afol/pstr/`           | Current project-structure maps only                           |
+| `.afol/wb/`             | Governed sessions, evidence, indexes, benchmark state         |
+| `.afol/`                | Mutable AFOL runtime state                                    |
+| `.agents/config.json`   | Provider-facing static config                                 |
+| `.agents/lock.json`     | Provider-facing lock metadata                                 |
+| `.agents/manifest.json` | Provider-facing manifest metadata                             |
+| `.agents/skills/`       | Project-local provider skills                                 |
+| `src/project-template/` | Exportable downstream scaffold                                |
+| `docs/map/`             | Current-state evidence only                                   |
 
-.agents/
-├── config.json
-├── lock.json
-├── manifest.json
-├── rules/
-├── skills/
-├── tmp/
-└── data/
+## Rules
 
-.afol/
-├── tmp/
-└── data/
-```
+- Use `.afol/wb/` for governed sessions.
+- Use `.afol/adm/` for durable project direction and static AFOL catalogs.
+- Do not put mutable sessions or runtime state under `.agents/`.
+- Do not create `.afol/skills/`; skills live in configured provider skill root.
+- Do not restore retired `.agents` command wrappers, Python runners, runtime,
+  workbench, archive, YAML fallback, or legacy routing.
+- Keep generated/template changes inside their owned surfaces.
 
-## Required Folders
-
-| Folder | Purpose |
-| --- | --- |
-| `docs/templates/` | Reusable templates |
-| `.afol/wb/` | Durable governed plan sessions |
-| `docs/standards/` | Human standards |
-| `docs/lessons/` | Lessons learned |
-| `docs/agentic/` | Tool docs |
-| `docs/arc/` | Goal-state docs |
-| `docs/map/` | Current-state evidence |
-| `.agents/config.json` | Path contract for thin scaffold and mutable state |
-| `.afol/adm/rules/` | Local rules |
-| `.agents/manifest.json` | Template ownership metadata |
-| `.agents/lock.json` | Scaffold lock metadata |
-| `.agents/skills/` | Project-local skills when configured as `paths.skills_dir` |
-| `.afol/tmp/` | Provider-compatible temporary files |
-| `.afol/data/` | Provider-compatible local data |
-
-## Required Config Files
-
-- `.agents/config.json`
-- `.agents/manifest.json`
-- `.agents/lock.json`
-- configured `paths.wb_dir` and `paths.mutable_dir`
-
-## Validation
+## Validate
 
 ```bash
-./afol validate
+afol local-state rebuild
+afol validate project
 ```
 
-## Rule
+## References
 
-- Keep structure minimal and predictable.
-- Do not add parallel folders for existing contracts.
-- Read `.agents/config.json` before writing mutable state.
+- `AGENTS.md`
+- `src/project-template/`
+- RULE-006 - Applicable Rule Resolution

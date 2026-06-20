@@ -36,11 +36,12 @@ Replace this section after bootstrap with real product purpose and constraints.
   validation, or delivery.
 - Before product edits: create/target a session and move task to `in_progress`.
 - Canonical path:
-  1. `afol n {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `afol st -S {session-id} -T T-01`
+  1. `afol new {theme} --feature-id {F-id} --parent-spec {spec-id}`
+  2. `afol start --session {session-id} --task-id T-01`
   3. Edit and run named verification.
-  4. `afol d -S {session-id} -T T-01 -x "<verification command>"`
-  5. `afol c -S {session-id}`
+  4. `afol evidence --session {session-id} --task-id T-01 --command "<verification command>" --result passed`
+  5. `afol done --session {session-id} --task-id T-01`
+  6. `afol close --session {session-id}`
 - Use `afol` as the only downstream front door.
 - Planning-only or read-only questions stay in chat unless durable artifacts
   are required.
@@ -128,9 +129,9 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 - Never close work without proof.
 - Gate selection:
-  - docs/prompt/process -> `afol validate`
-  - front door/workbench -> `afol ck`
-  - scaffold/release -> `afol validate --json`
+  - docs/prompt/process -> `afol validate project`
+  - front door/workbench -> `afol validate project`
+  - scaffold/release -> `afol validate project --json`
 - Run focused checks first; broaden only when risk requires.
 - If runtime guidance changes, report docs/mirror sync status.
 

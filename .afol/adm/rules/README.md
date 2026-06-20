@@ -4,7 +4,7 @@ id: readme
 theme: rules
 status: active
 created_at: '2026-05-05T11:44:41+00:00'
-updated_at: '2026-06-16T00:00:00Z'
+updated_at: '2026-06-20T00:00:00Z'
 ---
 
 # Rules
@@ -23,7 +23,9 @@ updated_at: '2026-06-16T00:00:00Z'
 | RULE-005 | [folder-structure](./RULE-005-folder-structure.md) | AFOL-only folder ownership |
 | RULE-006 | [applicable-rule-resolution](./RULE-006-applicable-rule-resolution.md) | Rule/spec/skill routing |
 | RULE-007 | [postmortem-governance-review](./RULE-007-postmortem-governance-review.md) | Postmortem promotion review |
+| RULE-008 | [evidence-gated-closure](./RULE-008-evidence-gated-closure.md) | Evidence-backed task closure |
 | RULE-009 | [legacy-surface-retirement](./RULE-009-legacy-surface-retirement.md) | Retirement gates for old surfaces |
+| RULE-010 | [benchmark-quality-contract](./RULE-010-benchmark-quality-contract.md) | Benchmark evidence and resource governance |
 
 ---
 
