@@ -2,94 +2,52 @@
 doc_type: rule
 id: RULE-009
 theme: legacy-surface-retirement
-version: 1.0
+version: 1.1
 created: 2026-06-09
-updated_at: '2026-06-09T07:30:00-03:00'
+updated_at: '2026-06-20T00:00:00Z'
 applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 ---
 
 # Legacy Surface Retirement
 
-**Purpose:** Govern the safe retirement of legacy compatibility surfaces
-(Python/UV wrappers, just command runners, old aliases) while downstream
-paths still exist.
+**Purpose:** retire legacy wrappers only after replacement, parity, and docs are
+proved.
 
----
+## Applies When
 
-## When This Rule Applies
+Use this rule when removing or deprecating old wrappers, scripts, Just targets,
+Python runtime surfaces, compatibility aliases, or legacy command routing.
 
-Apply this rule when removing or deprecating legacy wrappers, scripts,
-justfile targets, Python runtime surfaces, or compatibility aliases.
+## Conditions
 
----
+Remove a legacy surface only when all are true:
 
-## Safe Retirement Conditions
+- TS-native replacement exists and tests pass.
+- Parity tests show no downstream visibility gap.
+- Cleanup targets scaffold-owned paths only.
+- Cleanup has a dry-run or explicit apply flag.
+- Public docs no longer present the retired path as active.
 
-A legacy surface may only be removed when ALL of:
+Until then, keep it as documented compatibility debt.
 
-1. A proven TS-native replacement exists with passing tests.
-2. Parity tests confirm no downstream visibility gap.
-3. The removal targets scaffold-owned paths only — not user-owned files.
-4. A dry-run or explicit flag (`--dry-run`, `--apply`) is available for the
-   cleanup operation.
-5. Documentation no longer references the retired surface as a public entrypoint.
+## Boundaries
 
-Until all conditions are met, the legacy surface stays as compatibility debt
-documented in AGENTS.md or the relevant spec.
-
----
-
-## Cleanup Scope
-
-- Removal must be limited to files the scaffold owns.
-- Do not remove user-created files, configs, or customizations.
-- Generated map/index/docs deltas from cleanup must be reviewed before commit.
-
----
-
-## Declaration Discipline
-
-- Do not declare a runtime "retired" while compatibility paths still need proof.
-- Toolchain/version claims must stay informational until installation evidence
-  exists.
-- Future-version or tooling notes must remain informative unless the upgrade is
-  actually shipped and verified.
-
----
+- Never remove user-owned files, configs, customizations, secrets, or caches.
+- Review generated map/index/docs deltas before commit.
+- Do not declare retirement while compatibility tests still fail.
 
 ## Validation
 
-Before completing legacy retirement:
+```bash
+bun run typecheck
+bun test
+bun run validate:template
+```
 
-- `bun run typecheck` passes.
-- `bun test` passes with no regressions.
-- Template policy tests pass (no retired surface leaked to downstream).
-- `bun run validate:bootstrap` confirms downstream parity.
-
----
-
-## Best Practices
-
-**DO:**
-
-- ✅ Keep removal conservative and scaffold-scoped.
-- ✅ Provide dry-run before destructive cleanup.
-- ✅ Document remaining compatibility debt explicitly.
-
-**DON'T:**
-
-- ❌ Remove surfaces without a proven replacement.
-- ❌ Declare retirement while tests prove otherwise.
-- ❌ Touch user-owned files during scaffold cleanup.
-
----
+Use bootstrap parity checks when downstream scaffold behavior changes.
 
 ## References
 
 - RULE-005 - Folder Structure
 - RULE-006 - Applicable Rule Resolution
-- AGENTS.md - Factory And Template Boundary section
-
----
-
-*Version: 1.0 | Lines: ~85 | Max: 250*
+- `AGENTS.md`

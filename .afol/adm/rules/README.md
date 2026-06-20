@@ -53,6 +53,9 @@ afol verify-tasks --strict
 
 - Use `afol` for supported scaffold, validation, workbench, update, evidence,
   and lifecycle operations.
+- Treat YAML frontmatter as metadata only. Rule budgets and prompt injection use
+  only the Markdown body after frontmatter; write enforceable guidance in the
+  body and keep it compact.
 - Keep `.agents/` limited to provider-facing metadata and project-local skills.
 - Keep AFOL-owned hooks, rules, source seeds, and command catalogs under
   `.afol/adm/`.

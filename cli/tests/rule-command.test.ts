@@ -7,6 +7,7 @@ import {
 	getRuleResolverConfig,
 	listRules,
 	resolveRules,
+	resolveRulesWithDiagnostics,
 } from "../services/catalog/rules";
 
 function mkRoot(config?: {
@@ -186,6 +187,34 @@ describe("rule command", () => {
 		}
 	});
 
+	test("fallback ignores README frontmatter and only loads RULE markdown", async () => {
+		const root = mkRoot();
+		try {
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "index.json"),
+				"{invalid-json",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "README.md"),
+				["---", `summary: ${"x".repeat(120)}`, "---", "", "# Rules"].join(
+					"\n",
+				),
+				"utf8",
+			);
+
+			const rules = listRules(root);
+			expect(rules.map((rule) => rule.id)).toEqual(["RULE-001", "RULE-004"]);
+
+			const list = capture();
+			expect(await runRuleCommand(["list"], root, list.io)).toBe(0);
+			expect(list.stdout.join("\n")).toContain("rules: 2");
+			expect(list.stdout.join("\n")).not.toContain("README");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("resolves extended rule metadata and enforces configured char limits", async () => {
 		const root = mkRoot({ maxCharsPerRule: 20, maxCharsTotal: 30 });
 		try {
@@ -268,6 +297,23 @@ describe("rule command", () => {
 				inject: "always",
 			});
 			expect(resolved.map((rule) => rule.id)).toEqual(["RULE-011"]);
+			const diagnostic = resolveRulesWithDiagnostics(root, {
+				domains: ["cli"],
+				surfaces: ["routing"],
+				workType: "delivery",
+				languages: ["ts"],
+				filePath: "cli/commands/catalog.ts",
+				scope: "catalog",
+				inject: "always",
+			});
+			expect(diagnostic.rules.map((rule) => rule.id)).toEqual(["RULE-011"]);
+			expect(diagnostic.warnings).toEqual([
+				{
+					id: "RULE-012",
+					path: ".afol/adm/rules/RULE-012-big-rule.md",
+					reason: "rule exceeds max_chars_per_rule (25/20)",
+				},
+			]);
 
 			const output = capture();
 			expect(
@@ -288,7 +334,6 @@ describe("rule command", () => {
 						"catalog",
 						"--inject",
 						"always",
-						"--required",
 					],
 					root,
 					output.io,
@@ -296,15 +341,58 @@ describe("rule command", () => {
 			).toBe(0);
 			expect(output.stdout.join("\n")).toContain("resolved rules: 1");
 			expect(output.stdout.join("\n")).toContain("RULE-011");
-			expect(output.stdout.join("\n")).not.toContain("RULE-012");
+			expect(output.stdout.join("\n")).toContain(
+				"warning RULE-012: rule exceeds max_chars_per_rule (25/20)",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("fails loudly when a required rule exceeds max_chars_per_rule", async () => {
-		const root = mkRoot({ maxCharsPerRule: 20, maxCharsTotal: 100 });
+	test("counts rule body without YAML frontmatter", () => {
+		const root = mkRoot({ maxCharsPerRule: 20, maxCharsTotal: 30 });
 		try {
+			const body = "# Body\nsmall\n";
+			writeRuleFixture(root, {
+				id: "RULE-013",
+				name: "frontmatter-heavy",
+				path: "RULE-013-frontmatter-heavy.md",
+				content: [
+					"---",
+					`summary: ${"x".repeat(80)}`,
+					"status: active",
+					"---",
+					"",
+					body,
+				].join("\n"),
+				domains: ["cli"],
+				surfaces: ["routing"],
+				workTypes: ["delivery"],
+				languages: ["ts"],
+				fileGlobs: ["cli/**/*.ts"],
+				inject: "always",
+			});
+
+			const rules = listRules(root);
+			expect(rules[0]?.charCount).toBe(body.length);
+			const diagnostic = resolveRulesWithDiagnostics(root, {
+				domains: ["cli"],
+				surfaces: ["routing"],
+				workType: "delivery",
+				languages: ["ts"],
+				filePath: "cli/commands/catalog.ts",
+				inject: "always",
+			});
+			expect(diagnostic.rules.map((rule) => rule.id)).toEqual(["RULE-013"]);
+			expect(diagnostic.warnings).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+		test("fails loudly when a required rule exceeds max_chars_per_rule", async () => {
+			const root = mkRoot({ maxCharsPerRule: 20, maxCharsTotal: 100 });
+			try {
 			writeRuleFixture(root, {
 				id: "RULE-021",
 				name: "required-too-big",

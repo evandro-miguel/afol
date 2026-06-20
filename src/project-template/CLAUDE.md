@@ -141,6 +141,8 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Do not manually edit managed `updated_at`; use a configured project command
   if this repo adds one.
 - Keep project-local rules/docs minimal: only required operational contracts.
+- In `.afol/adm/rules/**`, YAML frontmatter is metadata only. Rule budgets and
+  prompt injection use only the Markdown body after frontmatter.
 - Do not duplicate long rationale from canonical docs/skills; link to
   canonical source.
 

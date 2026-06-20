@@ -39,7 +39,8 @@ Replace this section after bootstrap with real product context.
 - `.afol/wb/` or configured `paths.wb_dir` governed plan state
 - `.afol/data/` or configured data path for telemetry data and indexes when the downstream CLI exposes them
 - `.afol/adm/hooks/` static provider-neutral hook catalog; no script execution
-- `.afol/adm/rules/` local contracts only
+- `.afol/adm/rules/` local contracts only. YAML frontmatter is metadata-only;
+  rule budgets and prompt injection use the Markdown body after frontmatter.
 - `.agents/skills/` only required project-local behavior; do not create
   `.afol/skills/`
 - `docs/` project docs, `docs/map/` evidence only

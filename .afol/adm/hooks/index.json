@@ -18,6 +18,25 @@
           "afol session radar --json"
         ]
       }
+    },
+    {
+      "id": "RULE-BODY-BUDGET",
+      "name": "rule body budget reminder",
+      "path": "rule-body-budget.md",
+      "enabled": true,
+      "events": ["context.bundle"],
+      "surfaces": ["rules"],
+      "work_types": ["delivery", "implementation", "docs", "all"],
+      "file_globs": [".afol/adm/rules/**/*.md"],
+      "priority": 95,
+      "contributions": {
+        "messages": [
+          "When creating or editing AFOL rules, keep YAML frontmatter metadata-only. Rule char budgets and prompt injection use markdown body only; do not duplicate enforceable guidance in YAML."
+        ],
+        "validation_commands": [
+          "bun test cli/tests/rule-command.test.ts cli/tests/context-system.test.ts"
+        ]
+      }
     }
   ]
 }

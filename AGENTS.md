@@ -71,6 +71,17 @@ Target governance layout:
   small docs/spec direction edits unless the user explicitly asks for governed
   execution evidence.
 
+Workflow/template routing:
+
+- Use `docs/standards/workflow.md` for the canonical workflow sequence.
+- Use `docs/standards/decision-intake.md` for decision intake; it is a
+  standard, not a template.
+- Use `docs/templates/**` for workflow artifact shapes such as roadmap, spec,
+  spec-child, spec-test, plan, task, log, report, postmortem, retrospective,
+  ADR, architecture, pattern, and structure.
+- The local `agentic-folder-sys` skill must point to this template map instead
+  of carrying a stale partial template list.
+
 Canonical commands:
 
 ```bash
@@ -86,6 +97,18 @@ afol update check
 afol update preview
 afol update apply --dry-run
 ```
+
+Task state source of truth:
+
+- In `.afol/wb/**`, the task state source of truth is the `State Board` table.
+- Do not add parallel `Task List` checkboxes for `T-xx` tasks in workbench task
+  files. They are legacy-compatible input and can create duplicate/stale task
+  state.
+- Use `afol start`, `afol evidence`, `afol done`, `afol close`, and
+  `afol verify-tasks --strict` to mutate or verify lifecycle state.
+- If a task file contains both `State Board` rows and `- [ ] T-xx` checklist
+  rows, treat that as drift: reconcile back to the canonical `State Board`
+  before closing.
 
 ## Token Economy (HARD RULE — never abuse tokens)
 
@@ -103,6 +126,16 @@ AFOL is a low-token system by design. Token economy is mandatory, not optional.
   genuinely requires inspecting every changed file.
 - Do **not** pipe large `--json` payloads into your own context. If you need
   one field, target it; otherwise prefer the human-readable compact form.
+- For `.afol/adm/rules/**`, YAML frontmatter is metadata only. Rule character
+  budgets and prompt injection count/use only the Markdown body after
+  frontmatter; put enforceable agent guidance in the body, not duplicated YAML.
+- Prefer the shortest unambiguous AFOL command form for routine lifecycle work,
+  especially in orchestrated handoffs. Use long flags only when clarity,
+  safety, or ambiguous aliases require them.
+- When the global `afol` binary is stale and the local kernel must be used,
+  keep the local prefix but still use compact subcommands where practical, for
+  example `bun run kernel -- vf <session> --strict` instead of a verbose
+  equivalent.
 - Treat any `afol` command that emits >5k tokens by default as a BUG and fix
   the command. The bench guard will already be failing it.
 

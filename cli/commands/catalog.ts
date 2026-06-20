@@ -1,5 +1,9 @@
 import { findHook, listHooks, resolveHooks } from "../services/catalog/hooks";
-import { findRule, listRules, resolveRules } from "../services/catalog/rules";
+import {
+	findRule,
+	listRules,
+	resolveRulesWithDiagnostics,
+} from "../services/catalog/rules";
 import {
 	findSkill,
 	listSkills,
@@ -330,7 +334,7 @@ export async function runRuleCommand(
 				}
 				throw new Error(`Unknown rule resolve argument: ${value}`);
 			}
-			const options: Parameters<typeof resolveRules>[1] = {
+			const options: Parameters<typeof resolveRulesWithDiagnostics>[1] = {
 				domains,
 				surfaces,
 				workType,
@@ -348,11 +352,16 @@ export async function runRuleCommand(
 			if (required) {
 				options.required = true;
 			}
-			const rules = resolveRules(projectRoot, options);
+			const result = resolveRulesWithDiagnostics(projectRoot, options);
 			io.stdout(
-				[`resolved rules: ${rules.length}`, ...rules.map(formatRule)].join(
-					"\n",
-				),
+				[
+					`resolved rules: ${result.rules.length}`,
+					...result.rules.map(formatRule),
+					...result.warnings.map(
+						(warning) =>
+							`warning ${warning.id}: ${warning.reason} ${warning.path}`,
+					),
+				].join("\n"),
 			);
 			return 0;
 		}

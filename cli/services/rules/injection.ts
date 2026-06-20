@@ -6,6 +6,7 @@ import {
 	type RuleEntry,
 	RuleResolverError,
 	resolveRules,
+	stripRuleFrontmatter,
 } from "../catalog/rules";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
@@ -304,7 +305,7 @@ function readRuleContent(projectRoot: string, path: string): string | null {
 	if (!existsSync(absolutePath)) {
 		return null;
 	}
-	return readFileSync(absolutePath, "utf8");
+	return stripRuleFrontmatter(readFileSync(absolutePath, "utf8"));
 }
 
 function contentFingerprint(content: string): string {

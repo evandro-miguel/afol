@@ -133,11 +133,15 @@ Replace this section after bootstrap with real product purpose and constraints.
 - `docs/` is project documentation, not runtime state.
 - Keep runtime state/caches/generated ops artifacts outside `docs/`.
 - `docs/map/` is descriptive evidence only.
-- `docs/arc/` is goal-state governance.
+- `.afol/adm/**` is AFOL administration and goal-state governance.
+- `docs/arc/**`, when present in older downstream installs, is transitional
+  governance content to migrate into `.afol/adm/**`.
 - Use configured `paths.tmp_dir` only for disposable files.
 - Do not manually edit managed `updated_at`; use a configured project command
   if this repo adds one.
 - Keep project-local rules/docs minimal: only required operational contracts.
+- In `.afol/adm/rules/**`, YAML frontmatter is metadata only. Rule budgets and
+  prompt injection use only the Markdown body after frontmatter.
 - Do not duplicate long rationale from canonical docs/skills; link to
   canonical source.
 
