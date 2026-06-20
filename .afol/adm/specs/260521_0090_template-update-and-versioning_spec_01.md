@@ -6,7 +6,7 @@ status: final
 owners:
 - orchestrator
 created_at: '2026-05-21T01:30:00+08:00'
-updated_at: '2026-05-28T21:37:14-03:00'
+updated_at: '2026-06-20T00:00:00+00:00'
 roadmap_feature: F-09
 spec_role: parent
 parent_spec: 260521_0000_total-reformulation-strategy_spec_01
@@ -50,6 +50,15 @@ update check, plan, and apply flows with conflict detection.
   silently overwritten.
 - Real writes in update/apply are gated by session/task context and manifest state.
 
+2026-06-20 versioning addendum:
+
+- Version metadata is checked before update/apply with `bun run version:check`.
+- `afol --version` must match the repo's registered release version before any
+  global update/install. If it diverges and there is no registered release
+  provenance, do not promote or install globally.
+- Release provenance must be generated and validated with
+  `bun run release:provenance:release` before release promotion.
+
 ## 4) Product Boundary
 
 The universal CLI owns reusable behavior. The project-local template owns local
@@ -67,8 +76,10 @@ without confirmation, cloud update service in MVP, arbitrary app-code migration.
 
 ## 6) Acceptance
 
-Project can check and preview updates; user edits are preserved or flagged;
-managed files update safely; validation runs after update.
+Project can check and preview updates; version metadata, registry, and
+provenance are validated first; user edits are preserved or flagged; managed
+files update safely; drifted global update/install is blocked until a release
+is registered; validation runs after update.
 
 ## 7) Review Questions
 

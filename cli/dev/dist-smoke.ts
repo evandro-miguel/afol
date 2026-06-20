@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
+import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const distPath = join(repoRoot, "dist", "afol");
@@ -112,9 +113,25 @@ function bootstrapTarget(sandbox: string, name: string): string {
 	return target;
 }
 
+function writeBinaryProvenance(): void {
+	writeFileSync(
+		join(repoRoot, "dist", "afol.provenance.json"),
+		`${JSON.stringify(
+			{
+				package_name: CLI_PACKAGE_NAME,
+				version: CLI_VERSION,
+			},
+			null,
+			2,
+		)}\n`,
+		"utf8",
+	);
+}
+
 if (!existsSync(distPath)) {
 	throw new Error(`Missing ${distPath}. Run bun run build first.`);
 }
+writeBinaryProvenance();
 
 const sandbox = mkdtempSync(join(tmpdir(), "afol-dist-smoke-"));
 

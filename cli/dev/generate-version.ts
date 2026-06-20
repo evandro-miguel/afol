@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 type PackageMetadata = {
@@ -6,8 +6,23 @@ type PackageMetadata = {
 	version: string;
 };
 
+type VersionRegistry = {
+	packageName: string;
+	currentVersion: string;
+};
+
 const SEMVER_PATTERN =
 	/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const VERSION_REGISTRY_PATH = ".afol/adm/source/release-version.json";
+
+function assertValidVersion(value: string, label: string): void {
+	if (!SEMVER_PATTERN.test(value)) {
+		throw new Error(`${label} must be a valid semver string`);
+	}
+	if (value === "0.0.0") {
+		throw new Error(`${label} must not use placeholder 0.0.0`);
+	}
+}
 
 function readPackageMetadata(): PackageMetadata {
 	const raw = JSON.parse(
@@ -19,13 +34,56 @@ function readPackageMetadata(): PackageMetadata {
 	if (typeof raw.version !== "string" || raw.version.length === 0) {
 		throw new Error("package.json version must be a non-empty string");
 	}
-	if (!SEMVER_PATTERN.test(raw.version)) {
-		throw new Error("package.json version must be a valid semver string");
-	}
-	if (raw.version === "0.0.0") {
-		throw new Error("package.json version must not use placeholder 0.0.0");
-	}
+	assertValidVersion(raw.version, "package.json version");
 	return { name: raw.name, version: raw.version };
+}
+
+function readVersionRegistry(): VersionRegistry | null {
+	if (!existsSync(VERSION_REGISTRY_PATH)) {
+		return null;
+	}
+
+	const raw = JSON.parse(
+		readFileSync(VERSION_REGISTRY_PATH, "utf8"),
+	) as Partial<VersionRegistry>;
+	if (typeof raw.packageName !== "string" || raw.packageName.length === 0) {
+		throw new Error(
+			`${VERSION_REGISTRY_PATH} packageName must be a non-empty string`,
+		);
+	}
+	if (
+		typeof raw.currentVersion !== "string" ||
+		raw.currentVersion.length === 0
+	) {
+		throw new Error(
+			`${VERSION_REGISTRY_PATH} currentVersion must be a non-empty string`,
+		);
+	}
+	assertValidVersion(
+		raw.currentVersion,
+		`${VERSION_REGISTRY_PATH} currentVersion`,
+	);
+	return {
+		packageName: raw.packageName,
+		currentVersion: raw.currentVersion,
+	};
+}
+
+function assertRegisteredVersion(metadata: PackageMetadata): void {
+	const registry = readVersionRegistry();
+	if (!registry) {
+		return;
+	}
+	if (registry.packageName !== metadata.name) {
+		throw new Error(
+			`${VERSION_REGISTRY_PATH} packageName ${JSON.stringify(registry.packageName)} does not match package.json name ${JSON.stringify(metadata.name)}`,
+		);
+	}
+	if (registry.currentVersion !== metadata.version) {
+		throw new Error(
+			`package.json version ${JSON.stringify(metadata.version)} is not the registered release version ${JSON.stringify(registry.currentVersion)} in ${VERSION_REGISTRY_PATH}`,
+		);
+	}
 }
 
 function renderVersionModule(metadata: PackageMetadata): string {
@@ -38,7 +96,9 @@ function renderVersionModule(metadata: PackageMetadata): string {
 }
 
 const outputPath = "cli/generated/version.ts";
-const expected = renderVersionModule(readPackageMetadata());
+const metadata = readPackageMetadata();
+assertRegisteredVersion(metadata);
+const expected = renderVersionModule(metadata);
 
 if (process.argv.includes("--check")) {
 	const actual = readFileSync(outputPath, "utf8");

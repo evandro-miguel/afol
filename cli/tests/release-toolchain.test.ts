@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
@@ -12,10 +13,51 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildReleaseProvenance } from "../dev/release-provenance";
+import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const SEMVER_PATTERN =
 	/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+
+function writeReleaseVersionRegistry(
+	root: string,
+	options: {
+		packageJsonName?: string;
+		packageJsonVersion?: string;
+		registryPackageName?: string;
+		registryVersion?: string;
+	} = {},
+): void {
+	const packageJsonName = options.packageJsonName ?? CLI_PACKAGE_NAME;
+	const packageJsonVersion = options.packageJsonVersion ?? CLI_VERSION;
+	const registryPackageName = options.registryPackageName ?? packageJsonName;
+	const registryVersion = options.registryVersion ?? packageJsonVersion;
+	mkdirSync(join(root, ".afol", "adm", "source"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "source", "release-version.json"),
+		JSON.stringify(
+			{
+				packageName: registryPackageName,
+				currentVersion: registryVersion,
+			},
+			null,
+			2,
+		),
+		"utf8",
+	);
+	writeFileSync(
+		join(root, "package.json"),
+		JSON.stringify(
+			{
+				name: packageJsonName,
+				version: packageJsonVersion,
+			},
+			null,
+			2,
+		),
+		"utf8",
+	);
+}
 
 describe("release and toolchain contracts", () => {
 	test("package scripts keep informative local lanes and strict release gates", () => {
@@ -139,6 +181,7 @@ describe("release and toolchain contracts", () => {
 		const binDir = join(root, "bin");
 		mkdirSync(distDir, { recursive: true });
 		mkdirSync(binDir, { recursive: true });
+		writeReleaseVersionRegistry(root);
 		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 		symlinkSync("/usr/bin/git", join(binDir, "git"));
@@ -223,6 +266,7 @@ describe("release and toolchain contracts", () => {
 		const root = mkdtempSync(join(tmpdir(), "release-provenance-detached-"));
 		const distDir = join(root, "dist");
 		mkdirSync(distDir, { recursive: true });
+		writeReleaseVersionRegistry(root);
 		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
 		writeFileSync(join(root, "bun.lock"), "", "utf8");
 
@@ -285,6 +329,36 @@ describe("release and toolchain contracts", () => {
 		}
 	});
 
+	test("release provenance records version registry path and sha256", () => {
+		const root = mkdtempSync(join(tmpdir(), "release-provenance-registry-"));
+		const distDir = join(root, "dist");
+		mkdirSync(distDir, { recursive: true });
+		writeReleaseVersionRegistry(root);
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+		writeFileSync(join(root, "bun.lock"), "", "utf8");
+
+		try {
+			const provenance = buildReleaseProvenance({ cwd: root });
+			const registryPath = join(
+				root,
+				".afol",
+				"adm",
+				"source",
+				"release-version.json",
+			);
+			const registrySha256 = createHash("sha256")
+				.update(readFileSync(registryPath))
+				.digest("hex");
+
+			expect(provenance.version_registry_path).toBe(
+				".afol/adm/source/release-version.json",
+			);
+			expect(provenance.version_registry_sha256).toBe(registrySha256);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("generate-version rejects the placeholder version", () => {
 		const root = mkdtempSync(join(tmpdir(), "generate-version-invalid-"));
 		writeFileSync(
@@ -316,16 +390,67 @@ describe("release and toolchain contracts", () => {
 		}
 	});
 
+	test("release provenance rejects a registry version that diverges from generated metadata", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "release-provenance-registry-mismatch-"),
+		);
+		const distDir = join(root, "dist");
+		mkdirSync(distDir, { recursive: true });
+		writeReleaseVersionRegistry(root, {
+			packageJsonVersion: "9.9.9",
+			registryVersion: "9.9.9",
+		});
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+
+		try {
+			expect(() => buildReleaseProvenance({ cwd: root })).toThrow(
+				/generated version metadata .* does not match registered release version/,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("release provenance fails release mode when required fields are unknown", () => {
 		const root = mkdtempSync(join(tmpdir(), "release-provenance-"));
 		const distDir = join(root, "dist");
 		mkdirSync(distDir, { recursive: true });
+		writeReleaseVersionRegistry(root);
 		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
 
 		try {
 			expect(() =>
 				buildReleaseProvenance({ cwd: root, releaseMode: true }),
 			).toThrow(/release provenance missing required fields/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("release provenance fails release mode without a version registry", () => {
+		const root = mkdtempSync(
+			join(tmpdir(), "release-provenance-missing-registry-"),
+		);
+		const distDir = join(root, "dist");
+		mkdirSync(distDir, { recursive: true });
+		writeFileSync(
+			join(root, "package.json"),
+			JSON.stringify(
+				{
+					name: CLI_PACKAGE_NAME,
+					version: CLI_VERSION,
+				},
+				null,
+				2,
+			),
+			"utf8",
+		);
+		writeFileSync(join(distDir, "afol"), "artifact", "utf8");
+
+		try {
+			expect(() =>
+				buildReleaseProvenance({ cwd: root, releaseMode: true }),
+			).toThrow(/missing required \.afol\/adm\/source\/release-version\.json/);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
