@@ -503,6 +503,59 @@ describe("health system", () => {
 		}
 	});
 
+	test("afol maintenance review --json records area with configured interval", async () => {
+		const root = createFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify(
+					{
+						version: "0.1.0",
+						maintenance: {
+							review_interval_days: 14,
+						},
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules", "--note", "checked", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				mode: string;
+				area: string;
+				reviewed_areas: string[];
+				note: string;
+				review_interval_days: number;
+				due_areas: string[];
+				data?: {
+					mode?: string;
+					area?: string;
+					reviewed_areas?: string[];
+					review_interval_days?: number;
+					due_areas?: string[];
+				};
+			};
+			expect(payload.mode).toBe("review");
+			expect(payload.area).toBe("rules");
+			expect(payload.reviewed_areas).toEqual(["rules"]);
+			expect(payload.note).toBe("checked");
+			expect(payload.review_interval_days).toBe(14);
+			expect(payload.due_areas).toEqual(["skills", "docs", "commands"]);
+			expect(payload.data?.mode).toBe("review");
+			expect(payload.data?.area).toBe("rules");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol health defaults to human output", async () => {
 		const root = createFixture();
 		try {
@@ -644,6 +697,9 @@ describe("health system", () => {
 				0,
 			);
 			expect(captured.stdout.join("\n")).toContain("maintenance weekly plan:");
+			expect(captured.stdout.join("\n")).toContain(
+				"review maintenance areas: rules, skills, docs, commands",
+			);
 			expect(captured.stdout.join("\n")).not.toContain("applied:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });

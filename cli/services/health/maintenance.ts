@@ -1,15 +1,22 @@
 import { checkHealth } from "./checker";
+import { summarizeMaintenanceReviewDue } from "./maintenance-review";
 
 export function maintenanceWeekly(
 	root: string,
 	dryRun: boolean,
 ): { actions: string[]; planOnly: true } {
 	const report = checkHealth(root, { deep: false, includeAuxiliary: true });
+	const maintenanceReview = summarizeMaintenanceReviewDue(root);
 	const actions = [
 		"check PSTR stale",
 		"rebuild stale indexes",
 		"archive old sessions",
 	];
+	if (maintenanceReview.dueAreas.length > 0) {
+		actions.push(
+			`review maintenance areas: ${maintenanceReview.dueAreas.join(", ")}`,
+		);
+	}
 	if (report.summary.fail > 0) {
 		actions.unshift("review health failures");
 	}

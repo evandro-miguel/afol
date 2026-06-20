@@ -22,6 +22,7 @@ import {
 	recordEvidence,
 	startTask,
 } from "../services/workbench/lifecycle";
+import { buildStartBriefing } from "../services/workbench/start-briefing";
 import { verifyWorkbenchTasks } from "../services/workbench/verify";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -235,6 +236,11 @@ describe("workbench lifecycle service", () => {
 				session: created.session,
 				task: "T-01",
 				status: "in_progress",
+			});
+			expect(
+				(startEnvelope.data as Record<string, unknown>).briefing,
+			).toMatchObject({
+				schema: "afol_start_briefing_v1",
 			});
 
 			const logProc = runKernel(root, [
@@ -483,6 +489,84 @@ describe("workbench lifecycle service", () => {
 			expect(proc.stdout as string).toContain(
 				`multiple pending tasks found in ${created.session}: T-01, T-02`,
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol start human output keeps legacy first line", () => {
+		const root = mkRoot("start-human");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "start-task");
+			const proc = runKernel(root, ["start", "--session", created.session]);
+
+			expect(proc.status).toBe(0);
+			const lines = (proc.stdout as string).trim().split("\n");
+			expect(lines[0]).toBe("task started: T-01");
+			expect(lines.some((line) => line.startsWith("briefing:"))).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing summarizes roadmap and legacy warnings", () => {
+		const root = mkRoot("start-briefing");
+		try {
+			writeCliProjectContract(root);
+			mkdirSync(join(root, "docs"), { recursive: true });
+			mkdirSync(join(root, ".agents", "skills"), { recursive: true });
+			mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+			writeFileSync(
+				join(root, "docs", "readme.md"),
+				"Legacy note: .agents/wb should stay retired.\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+				[
+					"# General Roadmap",
+					"",
+					"### F-01 Briefing",
+					"- Status: final",
+					"",
+					"### F-02 Radar",
+					"- Status: in_progress",
+				].join("\n"),
+				"utf8",
+			);
+			const created = newWorkstream(root, "briefing-service");
+			startTask(root, { session: created.session, taskId: "T-01" });
+
+			const briefing = buildStartBriefing(root, {
+				session: created.session,
+				taskId: "T-01",
+			});
+
+			expect(briefing.roadmap).toEqual({
+				total: 2,
+				fulfilled: 1,
+				by_status: {
+					final: 1,
+					in_progress: 1,
+				},
+			});
+			expect(briefing.tasks.open_total).toBeGreaterThanOrEqual(1);
+			expect(
+				briefing.warnings.some((warning) =>
+					warning.startsWith("maintenance review overdue: rules"),
+				),
+			).toBe(true);
+			expect(
+				briefing.warnings.some((warning) =>
+					warning.startsWith("legacy references in active docs/skills:"),
+				),
+			).toBe(true);
+			expect(
+				briefing.questions.some((question) =>
+					question.includes("Legacy references remain"),
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

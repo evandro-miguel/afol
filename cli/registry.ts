@@ -639,7 +639,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		command: "maintenance",
 		aliases: ["mt"],
 		kind: "maintenance",
-		sideEffect: "read",
+		sideEffect: "write",
 		description: "Run maintenance checks",
 		category: "ops",
 	},

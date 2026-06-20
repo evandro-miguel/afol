@@ -126,7 +126,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("health")?.sideEffect).toBe("read");
 		expect(byCommand.get("db")?.sideEffect).toBe("read");
 		expect(byCommand.get("doctor")?.sideEffect).toBe("read");
-		expect(byCommand.get("maintenance")?.sideEffect).toBe("read");
+		expect(byCommand.get("maintenance")?.sideEffect).toBe("write");
 		expect(byCommand.get("sweep")?.sideEffect).toBe("read");
 		expect(byCommand.get("schema")?.sideEffect).toBe("write");
 		expect(byCommand.get("preflight")?.sideEffect).toBe("read");
