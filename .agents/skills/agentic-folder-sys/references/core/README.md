@@ -40,9 +40,10 @@ Use `--without-claude` when the receiving repo should not get Claude adapter
 files. Use `--mutable-dir <dir>` only when the target repo has a deliberate
 non-default mutable path contract.
 
-## 2. Adoption From Another Checkout
+## 2. Adoption Into An Explicit Target
 
-Use `afol bootstrap` or its `b` alias when operating on an explicit target path.
+Use `afol bootstrap` or its `b` alias when `afol` is available and you need to
+operate on an explicit target path.
 
 Preview:
 
@@ -83,9 +84,8 @@ it to overwrite project-owned docs, app code, secrets, or user data.
 
 Before applying a receiving-project update, produce a compact inventory:
 
-- project-owned guidance and docs: `AGENTS.md`, `CLAUDE.md`, `RTK.md`,
-  root `docs/**`, project runbooks, and local operational files agents already
-  use
+- project-owned guidance and docs: `AGENTS.md`, `RTK.md`, root `docs/**`,
+  project runbooks, and local operational files agents already use
 - present provider-facing scaffold metadata and skills: `.agents/config.json`,
   `.agents/lock.json`, `.agents/manifest.json`, and the configured
   `paths.skills_dir`
@@ -182,19 +182,6 @@ afol s
 afol validate project
 ```
 
-For AFOL source repo scaffold/template changes:
-
-```bash
-bun run validate:bootstrap
-bun run validate:template
-```
-
-For AFOL source repo release readiness:
-
-```bash
-afol local-state rebuild --json
-afol validate project --json
-bun run typecheck
-bun test
-bun run validate:release
-```
+If the receiving project changed application code or config, run its local
+checks from `AGENTS.md`, package scripts, or project docs in addition to
+`afol validate project`.

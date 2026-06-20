@@ -24,8 +24,9 @@ type ActionResult = {
 
 /**
  * Runtime adapter toggle. Lets a downstream project disable optional
- * integration surfaces (currently the Claude adapter: `CLAUDE.md` + `.claude/`)
- * while keeping `AGENTS.md` as the always-on canonical instruction surface.
+ * integration surfaces while keeping `AGENTS.md` as the always-on canonical
+ * instruction surface. The Claude adapter remains as a cleanup/config switch
+ * for legacy installs that still carry `CLAUDE.md` or `.claude/`.
  *
  * Usage:
  *   afol adapter list
@@ -181,7 +182,7 @@ function applyEnable(projectRoot: string, dryRun: boolean): ActionResult {
 			lines: [
 				`adapter enable ${before.id}: dry-run`,
 				`  config: adapters.${before.id}.enabled -> true`,
-				"  restore: CLAUDE.md, .claude/** from embedded template",
+				"  restore: template-owned artifacts when present",
 			],
 			exitCode: 0,
 		};

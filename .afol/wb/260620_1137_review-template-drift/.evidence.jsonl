@@ -1,0 +1,6 @@
+{"id":"E-20260620114254245-8bc0b4","task_id":"T-01","created_at":"2026-06-20T15:42:54.245Z","command":"bun run validate:template","result":"passed"}
+{"id":"E-20260620114254322-124bfc","task_id":"T-01","created_at":"2026-06-20T15:42:54.322Z","command":"bun test cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/validate-command.test.ts","result":"passed"}
+{"id":"E-20260620114254399-5b7c78","task_id":"T-01","created_at":"2026-06-20T15:42:54.399Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260620114254477-34d5b4","task_id":"T-01","created_at":"2026-06-20T15:42:54.477Z","command":"bun run validate:release","result":"passed"}
+{"id":"E-20260620114254555-e91649","task_id":"T-01","created_at":"2026-06-20T15:42:54.555Z","command":"afol local-state rebuild --json && bun run kernel -- validate project --json","result":"passed"}
+{"id":"E-20260620114254627-f770d9","task_id":"T-01","created_at":"2026-06-20T15:42:54.627Z","command":"git diff --check","result":"passed"}

@@ -5,9 +5,9 @@ metadata:
   category: agentic
   tags: "agentic-folder-sys, afol, scaffold, bootstrap, init, provider-compatible, update, skills, workbench, plans, tasks, evidence, validation, lifecycle"
   triggers: "agentic folder sys, agentic-folder-sys, AFOL, afol install, afol init, afol bootstrap, bootstrap repo, install scaffold, update scaffold, upgrade scaffold, provider-compatible, workbench, plan, task, evidence, verify-tasks, skills, validation"
-  references: "tools, planning, execution, delegation, benchmarking, core, patterns, troubleshooting, templates, gotchas"
+  references: "tools, planning, execution, delegation, benchmarking, core, patterns, troubleshooting, templates, template-index, gotchas"
   version: "1.2.0"
-  updated_at: "2026-06-16T00:00:00Z"
+  updated_at: "2026-06-20T00:00:00Z"
   target_provider: universal
 ---
 
@@ -43,7 +43,8 @@ Do not load every reference by default. Pick the smallest route:
 | Delegate to subagents | [Delegation](./references/delegation.md) | benchmark unless delegated task touches it |
 | Install, adopt, or update AFOL in a repo | [Core](./references/core/README.md) | planning templates unless making a plan |
 | Maintain project-local skills | [Patterns](./references/patterns/README.md#5-maintain-project-local-skills) | install cleanup sections |
-| Run benchmark or release-readiness lanes | [Benchmarking](./references/benchmarking.md) | adoption cleanup sections |
+| Map workflow artifacts to templates | [Templates Index](./references/templates/README.md) | individual templates until authoring that artifact |
+| Run benchmark lanes | [Benchmarking](./references/benchmarking.md) | adoption cleanup sections |
 | Recover from drift or failed AFOL commands | [Troubleshooting](./references/troubleshooting/README.md) | benchmark unless failure is benchmark-specific |
 
 Before finalizing AFOL work, scan [Gotchas](./gotchas.md).
@@ -55,8 +56,10 @@ Before finalizing AFOL work, scan [Gotchas](./gotchas.md).
 - Do not use, document, restore, or extend the retired `.agents/agents` Python
   wrapper, `.agents/scripts`, `.agents/runtime`, `.agents/wb` active state,
   `.agents/z-arq`, `agents.config`, `legacy:` routes, or delegate fallback.
-- Keep `.agents/**` as static scaffold metadata.
-- Keep mutable runtime state under configured `.afol/**` paths.
+- Keep `.agents/**` limited to static scaffold metadata and configured
+  provider skill payloads such as `paths.skills_dir`.
+- Keep mutable runtime state under configured AFOL paths, normally `.afol/**`;
+  project-local skills follow `paths.skills_dir`.
 - Pass explicit `--session` and `--task-id` when multiple agents or terminals
   may be active.
 - Prefer compact/default command output. Treat a routine AFOL command emitting
@@ -88,8 +91,7 @@ When reporting AFOL work, include only the relevant facts:
 - commands run and pass/fail status;
 - session/task/evidence ids when governed;
 - remaining dirty files outside your scope;
-- any auxiliary surface intentionally left to `--release`, `--deep`, or targeted
-  commands.
+- any auxiliary surface intentionally left to targeted commands.
 
 Do not paste raw logs when a command, result, and evidence id prove the same
 point.

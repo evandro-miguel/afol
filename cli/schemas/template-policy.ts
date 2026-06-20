@@ -24,17 +24,19 @@ export const TEMPLATE_FORBIDDEN_PATTERNS = [
 	".agents/agents",
 	".agents/agents-mcp",
 	".afol/skills/**",
+	"CLAUDE.md",
+	".claude/**",
+	"docs/arc/**",
 	"tests/**",
 	"docs/standards/**",
 	"docs/agentic/**",
+	"docs/knowledge/**",
 ] as const;
 
 export const TEMPLATE_ALLOWED_PATTERNS = [
 	"afol",
 	"AGENTS.md",
-	"CLAUDE.md",
 	"RTK.md",
-	".claude/**",
 	".agents/config.json",
 	".agents/lock.json",
 	".agents/manifest.json",
@@ -45,12 +47,11 @@ export const TEMPLATE_ALLOWED_PATTERNS = [
 	".afol/adm/source/universal-skills/**",
 	".afol/adm/**",
 	".afol/data/**",
+	".afol/pstr/**",
 	".afol/library/**",
 	".afol/memory/**",
 	".afol/tmp/**",
-	"docs/arc/**",
 	".afol/wb/**",
-	"docs/knowledge/**",
 	"docs/lessons/**",
 	"docs/telemetry/**",
 	"docs/templates/**",
@@ -58,7 +59,6 @@ export const TEMPLATE_ALLOWED_PATTERNS = [
 
 const TEMPLATE_INSTRUCTION_FILES = [
 	"AGENTS.md",
-	"CLAUDE.md",
 	"docs/telemetry/README.md",
 	"docs/templates/AGENTS_TEMPLATE.md",
 ] as const;
@@ -129,7 +129,9 @@ export async function scanTemplateUnknownAllowedPaths(
 		missingRoot: "empty",
 	});
 	return relativeFilePaths.filter(
-		(relativePath) => !matchesTemplateAllowedPattern(relativePath),
+		(relativePath) =>
+			!matchesTemplateForbiddenPattern(relativePath) &&
+			!matchesTemplateAllowedPattern(relativePath),
 	);
 }
 

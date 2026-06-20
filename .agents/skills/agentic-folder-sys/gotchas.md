@@ -32,7 +32,7 @@ project-local skills:
   `paths.skills_dir` points there
 
 AFOL-owned static governance payloads live under `.afol/adm/**`, including
-hooks, rules, command catalogs, and source seeds. Mutable AFOL state also
+hooks, rules, command catalogs, and source payloads. Mutable AFOL state also
 belongs under `.afol/**`, including workbench sessions, events, indexes,
 mutations, temporary files, benchmark data, migration archives, and other
 configured mutable paths. Project-local skills follow `paths.skills_dir`; in
@@ -81,10 +81,10 @@ project-wide overwrite switch.
 
 Read `.agents/config.json` before editing skills. In the current
 provider-compatible layout, project-local skills commonly live under
-`.agents/skills/**`; older or custom installs may differ. Do not copy caches or
-source mirrors into the project skill directory. Keep only the curated skills
-agents should use in that project. Shared durable changes belong in the
-universal-skills repo and then sync outward through the approved flow.
+`.agents/skills/**`; older or custom installs may differ. Keep only the curated
+skills agents should use in that project. If a change is intended for every
+project, update the global skill through the normal skill-maintenance workflow
+outside the project scaffold.
 
 ## 9. Do Not Recreate Legacy Archive Paths
 
@@ -94,7 +94,7 @@ path.
 
 ## 10. Verify Before Closing
 
-Do not mark work `[x]` just because files changed. Record evidence with
+Do not mark work `done` just because files changed. Record evidence with
 `afol evidence`, move to verified only after checks run, and close only after
 closure evidence exists.
 

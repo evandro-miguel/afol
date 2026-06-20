@@ -34,7 +34,7 @@ touch .afol/data/events/events.jsonl
 ## Automated Rotation (Future)
 
 When scaffolding supports it, rotation should be triggered by:
-- `afol validate --json` checking file size/age
+- `afol validate project --json` checking file size/age
 - AFOL-native telemetry write batches checking before append
 - A scheduled project-local AFOL maintenance hook
 

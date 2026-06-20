@@ -37,12 +37,34 @@ async function collectJsonFiles(root: string): Promise<string[]> {
 	return paths.sort();
 }
 
+async function collectFiles(root: string): Promise<string[]> {
+	const paths: string[] = [];
+
+	async function walk(currentDir: string): Promise<void> {
+		const entries = await readdir(currentDir, { withFileTypes: true });
+		for (const entry of entries) {
+			const absolutePath = join(currentDir, entry.name);
+			if (entry.isDirectory()) {
+				await walk(absolutePath);
+				continue;
+			}
+			if (entry.isFile()) {
+				paths.push(toPosixPath(relative(root, absolutePath)));
+			}
+		}
+	}
+
+	await walk(root);
+	return paths.sort();
+}
+
 describe("template forbidden-content policy", () => {
 	test("matches expected forbidden patterns in a small fixture", async () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), "template-policy-fixture-"));
 		try {
 			mkdirSync(join(fixtureRoot, ".agents", "runtime"), { recursive: true });
 			mkdirSync(join(fixtureRoot, "docs", "standards"), { recursive: true });
+			mkdirSync(join(fixtureRoot, "docs", "arc"), { recursive: true });
 			mkdirSync(join(fixtureRoot, "docs", "templates"), { recursive: true });
 			mkdirSync(join(fixtureRoot, "tests"), { recursive: true });
 
@@ -55,6 +77,11 @@ describe("template forbidden-content policy", () => {
 			writeFileSync(join(fixtureRoot, "Justfile"), "validate:\n", "utf8");
 			writeFileSync(
 				join(fixtureRoot, "docs", "standards", "policy.md"),
+				"x\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(fixtureRoot, "docs", "arc", "README.md"),
 				"x\n",
 				"utf8",
 			);
@@ -71,6 +98,7 @@ describe("template forbidden-content policy", () => {
 			expect(matches).toContain("a");
 			expect(matches).toContain("Justfile");
 			expect(matches).toContain("docs/standards/policy.md");
+			expect(matches).toContain("docs/arc/README.md");
 			expect(matches).toContain("tests/sample.txt");
 			expect(matches).not.toContain("docs/templates/ok.md");
 		} finally {
@@ -125,16 +153,16 @@ describe("template forbidden-content policy", () => {
 
 	test("live src/project-template does not describe workbench lifecycle as checklist marking", async () => {
 		const templateRoot = join(process.cwd(), "src/project-template");
-		const files = [
-			"AGENTS.md",
-			"CLAUDE.md",
-			"docs/templates/task.md",
-		];
+		const files = ["AGENTS.md", "docs/templates/task.md"];
 		const forbiddenMatches: string[] = [];
 
 		for (const file of files) {
 			const content = await readFile(join(templateRoot, file), "utf8");
-			for (const forbidden of ["mark `[x]`", "mark [x]", "State marker rules"]) {
+			for (const forbidden of [
+				"mark `[x]`",
+				"mark [x]",
+				"State marker rules",
+			]) {
 				if (content.includes(forbidden)) {
 					forbiddenMatches.push(`${file}: ${forbidden}`);
 				}
@@ -169,6 +197,54 @@ describe("template forbidden-content policy", () => {
 
 		expect(jsonFiles.length).toBeGreaterThan(0);
 		expect(failures).toEqual([]);
+	});
+
+	test("live src/project-template carries current AFOL tools catalog", async () => {
+		const projectRoot = process.cwd();
+		const rootCatalog = JSON.parse(
+			await readFile(join(projectRoot, ".afol/adm/tools.json"), "utf8"),
+		);
+		const templateCatalog = JSON.parse(
+			await readFile(
+				join(projectRoot, "src/project-template/.afol/adm/tools.json"),
+				"utf8",
+			),
+		);
+
+		expect(templateCatalog).toEqual(rootCatalog);
+	});
+
+	test("live src/project-template carries current agentic-folder-sys skill source", async () => {
+		const projectRoot = process.cwd();
+		const activeSkillRoot = join(
+			projectRoot,
+			".agents/skills/agentic-folder-sys",
+		);
+		const templateSkillRoot = join(
+			projectRoot,
+			"src/project-template/.afol/adm/source/universal-skills/skills/agentic-folder-sys",
+		);
+		const activeFiles = await collectFiles(activeSkillRoot);
+		const templateFiles = await collectFiles(templateSkillRoot);
+		const mismatches: string[] = [];
+
+		expect(templateFiles).toEqual(activeFiles);
+
+		for (const relativePath of activeFiles) {
+			const activeContent = await readFile(
+				join(activeSkillRoot, relativePath),
+				"utf8",
+			);
+			const templateContent = await readFile(
+				join(templateSkillRoot, relativePath),
+				"utf8",
+			);
+			if (templateContent !== activeContent) {
+				mismatches.push(relativePath);
+			}
+		}
+
+		expect(mismatches).toEqual([]);
 	});
 });
 

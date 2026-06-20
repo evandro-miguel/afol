@@ -3,7 +3,7 @@
   "scenario_id": "wb-task-start",
   "scenario_version": "1.0.0",
   "pack_id": "workbench-parity",
-  "command": "afol st --session sb-wb --task-id T-01",
+  "command": "afol start --session sb-wb --task-id T-01",
   "sandbox": true,
   "setup": [
     [

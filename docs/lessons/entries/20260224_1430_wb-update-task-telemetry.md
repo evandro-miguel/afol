@@ -66,9 +66,7 @@ afol log --session <session> --message "Phase 3: All hotspots refactored"
 ```text
 User records evidence, then runs: afol done --session <session> --task-id T-03
     ↓
-Script updates: task_03.md checkbox - [ ] → - [x] and keeps the evidence id attached
-    ↓
-Script updates: State Board table State column
+AFOL updates: task_03.md State Board row and keeps closure evidence linked
     ↓
 Script records: tool_exec event in telemetry
     ↓
@@ -94,4 +92,4 @@ afol telemetry query --event-type=task_completed
 ## Related Lessons
 
 - `lesson_20260224_1420_task-execution-integrity` - Mark done only after real work
-- `lesson_20260224_1425_task-list-vs-state-board` - Task List vs State Board purposes
+- `lesson_20260224_1425_task-list-vs-state-board` - superseded Task List vs State Board model

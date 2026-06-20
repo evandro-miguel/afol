@@ -5,7 +5,7 @@ doc_type: lesson_entry
 status: final
 owner: agent
 created_at: '2026-02-27T09:00:00-03:00'
-updated_at: '2026-02-27T12:17:39-03:00'
+updated_at: '2026-06-20T00:00:00-03:00'
 links:
   related:
   - ../../wb/260224_1253_execution-integrity-hardening/260224_1253_execution-integrity-hardening_task_01.md
@@ -51,14 +51,12 @@ Migramos para **apenas o State Board** (tabela), que é mais rico em informaçã
    - Removida seção `## Task List`
    - Mantida apenas `## State Board` com 4 colunas (Task, State, Owner, Notes)
 
-2. **Migration script:** `.agents/scripts/migrate-task-board.py`
-   - Remove seção `## Task List`
-   - Remove coluna `Checklist` da tabela
-   - Atualiza 14 arquivos de task existentes
+2. **Migration path:** current AFOL task files must use the simplified
+   `State Board` format. Historical Python migration scripts are retired.
 
-3. **Script updates:**
-   - `agents-lint-docs.py`: Atualizado `check_state_board()` para ler estado em `cells[1]` (antes era `cells[2]`)
-   - `verify-tasks.py`: Adicionado suporte para extrair tasks do State Board (antes só lia checkboxes)
+3. **Implementation updates:**
+   - Current validation reads task state from the `State Board`.
+   - `afol verify-tasks --strict` is the public lifecycle consistency check.
 
 ## Prevention Rules
 
@@ -81,12 +79,12 @@ Migramos para **apenas o State Board** (tabela), que é mais rico em informaçã
   - Antes: atualizar 2 lugares
   - Depois: atualizar 1 lugar
 
-## Scripts Affected
+## Implementation Notes
 
-- `agents-lint-docs.py`: `check_state_board()` atualizado para ler estado em `cells[1]`
-- `verify-tasks.py`: `extract_tasks()` atualizado para ler State Board + legacy checkboxes
-- `agents-wb-update.py`: `update_task_markers()` atualiza estado na tabela de 4 colunas
-- `migrate-task-board.py`: novo script de migração
+- Retired Python scripts handled the original migration.
+- Current public behavior belongs to the TypeScript AFOL implementation under
+  `cli/**`.
+- Downstream task templates must keep the 4-column State Board format.
 
 ## Tests Updated
 
@@ -100,28 +98,18 @@ Migramos para **apenas o State Board** (tabela), que é mais rico em informaçã
 ## Verification
 
 ```bash
-# Migrate all task files
-python3 .agents/scripts/migrate-task-board.py --all
-
-# Validate structure
-make doctor
-
-# Lint docs
-make lint
-
 # Verify tasks
-make verify
+afol verify-tasks --strict
 
-# Run tests
-make test-scripts
+# Validate project
+afol validate project
 ```
 
 ## References
 
 - Template: `docs/templates/task.md`
-- Migration script: `.agents/scripts/migrate-task-board.py`
-- Lint updater: `.agents/scripts/agents-lint-docs.py`
-- Verify updater: `.agents/scripts/verify-tasks.py`
+- Task verifier: `afol verify-tasks --strict`
+- Project validator: `afol validate project`
 
 ---
 

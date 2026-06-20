@@ -702,9 +702,9 @@ describe("context system", () => {
 		}
 	});
 
-		test("buildContextBundle injects matching rules once per identity and persists state", () => {
-			const root = createBundleFixture();
-			try {
+	test("buildContextBundle injects matching rules once per identity and persists state", () => {
+		const root = createBundleFixture();
+		try {
 			writeInjectableAlphaRule(root);
 
 			const first = buildContextBundle(root, {
@@ -762,140 +762,142 @@ describe("context system", () => {
 			expect(
 				second.rule_injection.already_injected.map((rule) => rule.id),
 			).toEqual(["RULE-ALPHA"]);
-			} finally {
-				rmSync(root, { recursive: true, force: true });
-			}
-		});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
-		test("buildContextBundle injects rule body without YAML frontmatter", () => {
-			const root = createBundleFixture();
-			try {
-				writeFileSync(
-					join(root, ".agents", "config.json"),
-					JSON.stringify({
-						version: "0.1.0",
-						rules: {
-							resolver: {
-								max_chars_per_rule: 20,
-								max_chars_total: 30,
-							},
+	test("buildContextBundle injects rule body without YAML frontmatter", () => {
+		const root = createBundleFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify({
+					version: "0.1.0",
+					rules: {
+						resolver: {
+							max_chars_per_rule: 20,
+							max_chars_total: 30,
 						},
-					}),
-					"utf8",
-				);
-				writeInjectableAlphaRule(root);
-				const body = "# Alpha rule\nBody.\n";
-				writeFileSync(
-					join(root, ".afol", "adm", "rules", "alpha.md"),
-					[
-						"---",
-						`summary: ${"x".repeat(80)}`,
-						"status: active",
-						"---",
-						"",
-						body,
-					].join("\n"),
-					"utf8",
-				);
+					},
+				}),
+				"utf8",
+			);
+			writeInjectableAlphaRule(root);
+			const body = "# Alpha rule\nBody.\n";
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				[
+					"---",
+					`summary: ${"x".repeat(80)}`,
+					"status: active",
+					"---",
+					"",
+					body,
+				].join("\n"),
+				"utf8",
+			);
 
-				const bundle = buildContextBundle(root, {
-					session: "session-1",
-					task: "T-01",
-					role: "designer",
-					surface: "alpha",
-					persistRuleInjection: true,
-				});
-				expect(bundle.rule_injection.injected[0]?.content).toBe(body);
-				expect(bundle.rule_injection.injected[0]?.char_count).toBe(body.length);
-				expect(bundle.rule_injection.omitted).toEqual([]);
+			const bundle = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(bundle.rule_injection.injected[0]?.content).toBe(body);
+			expect(bundle.rule_injection.injected[0]?.char_count).toBe(body.length);
+			expect(bundle.rule_injection.omitted).toEqual([]);
 
-				const state = JSON.parse(
-					readFileSync(ruleInjectionStatePath(root), "utf8"),
-				) as {
-					identities: Record<
-						string,
-						{ rules: Record<string, { char_count?: number }> }
-					>;
-				};
-				const identity = Object.keys(state.identities)[0] ?? "";
-				expect(
-					state.identities[identity]?.rules["RULE-ALPHA"]?.char_count,
-				).toBe(body.length);
-			} finally {
-				rmSync(root, { recursive: true, force: true });
-			}
-		});
+			const state = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			) as {
+				identities: Record<
+					string,
+					{ rules: Record<string, { char_count?: number }> }
+				>;
+			};
+			const identity = Object.keys(state.identities)[0] ?? "";
+			expect(state.identities[identity]?.rules["RULE-ALPHA"]?.char_count).toBe(
+				body.length,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
-		test("buildContextBundle does not reinject when only rule frontmatter changes", () => {
-			const root = createBundleFixture();
-			try {
-				writeInjectableAlphaRule(root);
-				const body = "# Alpha rule\n\nStable governance text.\n";
-				writeFileSync(
-					join(root, ".afol", "adm", "rules", "alpha.md"),
-					["---", "summary: first", "---", "", body].join("\n"),
-					"utf8",
-				);
+	test("buildContextBundle does not reinject when only rule frontmatter changes", () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			const body = "# Alpha rule\n\nStable governance text.\n";
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				["---", "summary: first", "---", "", body].join("\n"),
+				"utf8",
+			);
 
-				const first = buildContextBundle(root, {
-					session: "session-1",
-					task: "T-01",
-					role: "designer",
-					surface: "alpha",
-					persistRuleInjection: true,
-				});
-				expect(first.rule_injection.injected[0]?.content).toBe(body);
-				expect(first.rule_injection.injected[0]?.char_count).toBe(body.length);
+			const first = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(first.rule_injection.injected[0]?.content).toBe(body);
+			expect(first.rule_injection.injected[0]?.char_count).toBe(body.length);
 
-				const initialState = JSON.parse(
-					readFileSync(ruleInjectionStatePath(root), "utf8"),
-				) as {
-					identities: Record<
-						string,
-						{ rules: Record<string, { char_count?: number; content_hash?: string }> }
-					>;
-				};
-				const identity = Object.keys(initialState.identities)[0] ?? "";
-				const initialRuleState =
-					initialState.identities[identity]?.rules["RULE-ALPHA"];
+			const initialState = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			) as {
+				identities: Record<
+					string,
+					{
+						rules: Record<
+							string,
+							{ char_count?: number; content_hash?: string }
+						>;
+					}
+				>;
+			};
+			const identity = Object.keys(initialState.identities)[0] ?? "";
+			const initialRuleState =
+				initialState.identities[identity]?.rules["RULE-ALPHA"];
 
-				writeFileSync(
-					join(root, ".afol", "adm", "rules", "alpha.md"),
-					["---", "summary: second", "status: active", "---", "", body].join(
-						"\n",
-					),
-					"utf8",
-				);
+			writeFileSync(
+				join(root, ".afol", "adm", "rules", "alpha.md"),
+				["---", "summary: second", "status: active", "---", "", body].join(
+					"\n",
+				),
+				"utf8",
+			);
 
-				const second = buildContextBundle(root, {
-					session: "session-1",
-					task: "T-01",
-					role: "designer",
-					surface: "alpha",
-					persistRuleInjection: true,
-				});
-				expect(second.rule_injection.injected).toEqual([]);
-				expect(
-					second.rule_injection.already_injected.map((rule) => rule.id),
-				).toEqual(["RULE-ALPHA"]);
+			const second = buildContextBundle(root, {
+				session: "session-1",
+				task: "T-01",
+				role: "designer",
+				surface: "alpha",
+				persistRuleInjection: true,
+			});
+			expect(second.rule_injection.injected).toEqual([]);
+			expect(
+				second.rule_injection.already_injected.map((rule) => rule.id),
+			).toEqual(["RULE-ALPHA"]);
 
-				const nextState = JSON.parse(
-					readFileSync(ruleInjectionStatePath(root), "utf8"),
-				) as typeof initialState;
-				const nextRuleState =
-					nextState.identities[identity]?.rules["RULE-ALPHA"];
-				expect(nextRuleState?.char_count).toBe(initialRuleState?.char_count);
-				expect(nextRuleState?.content_hash).toBe(
-					initialRuleState?.content_hash,
-				);
-			} finally {
-				rmSync(root, { recursive: true, force: true });
-			}
-		});
+			const nextState = JSON.parse(
+				readFileSync(ruleInjectionStatePath(root), "utf8"),
+			) as typeof initialState;
+			const nextRuleState = nextState.identities[identity]?.rules["RULE-ALPHA"];
+			expect(nextRuleState?.char_count).toBe(initialRuleState?.char_count);
+			expect(nextRuleState?.content_hash).toBe(initialRuleState?.content_hash);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
-		test("buildContextBundle reinjects matching rules when markdown content changes", () => {
-			const root = createBundleFixture();
-			try {
+	test("buildContextBundle reinjects matching rules when markdown content changes", () => {
+		const root = createBundleFixture();
+		try {
 			writeInjectableAlphaRule(root);
 			writeFileSync(
 				join(root, ".afol", "adm", "rules", "alpha.md"),

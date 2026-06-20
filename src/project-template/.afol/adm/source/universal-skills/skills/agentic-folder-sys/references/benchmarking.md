@@ -1,15 +1,14 @@
 ---
-description: AFOL benchmark and release-readiness guidance, loaded only for benchmark or release tasks.
+description: AFOL benchmark guidance, loaded only for benchmark tasks.
 metadata:
-  tags: "agentic-folder-sys, afol, benchmark, release, validation, token-budget"
+  tags: "agentic-folder-sys, afol, benchmark, validation, token-budget"
 ---
 
-# AFOL Benchmarking And Release Readiness
+# AFOL Benchmarking
 
 Use this only when the task touches benchmark catalogs, benchmark results,
-release validation, token budgets, or cross-cutting scaffold/template behavior.
-Planner, executor, and adoption agents should skip this file unless their task
-names a benchmark or release gate.
+token budgets, or benchmarked scaffold behavior. Planner, executor, and
+adoption agents should skip this file unless their task names a benchmark.
 
 ## Benchmark Boundary
 
@@ -27,20 +26,6 @@ AFOL is a low-token system:
 - use verbose or full JSON only when resolving a concrete conflict or measuring
   a specific payload.
 
-## Release-Readiness Checks
-
-For AFOL source repo scaffold/template/release work:
-
-```bash
-afol local-state rebuild --json
-afol validate project --json
-bun run typecheck
-bun test
-bun run validate:release
-```
-
-Run this broader lane only when a narrow check does not prove the change.
-
 ## Benchmark-Agent Output
 
 Report:
@@ -50,6 +35,6 @@ Report:
 - pass/fail/warn counts;
 - token or output-size warning if any;
 - changed benchmark files;
-- whether the result blocks release or is advisory.
+- whether the result blocks the governed task or is advisory.
 
 Do not paste full benchmark JSON into chat unless the user asks for it.

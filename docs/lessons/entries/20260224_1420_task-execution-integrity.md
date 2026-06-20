@@ -3,7 +3,7 @@ doc_type: lesson_entry
 id: lesson_20260224_1420_task-execution-integrity
 status: active
 created_at: '2026-02-24T14:20:00-03:00'
-updated_at: '2026-02-24T14:20:00-03:00'
+updated_at: '2026-06-20T00:00:00-03:00'
 source: execution_review
 related_session: 260224_1030_scripts-lean-efficiency
 ---
@@ -18,11 +18,13 @@ Only T-02 was genuinely completed (refactored `validate_catalog` from C901=24 to
 
 ### What Went Wrong
 
-**Issue 1 - Task List ignored:** Used only State Board table for tracking.
-**Correct approach:** Update BOTH Task List and State Board.
+**Issue 1 - Task detail ignored:** The state table was updated without
+executing the concrete work described by the task.
+**Correct approach:** Keep task detail in the task body/spec notes, but use the
+State Board as the only lifecycle state source.
 
-**Issue 2 - wb-update not used:** Manual edit tool only.
-**Correct approach:** Use wb-update task command plus edit.
+**Issue 2 - Lifecycle CLI not used:** Manual edit tool only.
+**Correct approach:** Use AFOL lifecycle commands for task state and evidence.
 
 **Issue 3 - Premature completion:** Marked done after 1/7 hotspots.
 **Correct approach:** Mark done only after ALL hotspot refactoring complete.
@@ -34,10 +36,11 @@ Only T-02 was genuinely completed (refactored `validate_catalog` from C901=24 to
 
 **Never mark a task as done without:**
 
-1. Executing ALL subtasks listed in ## Task List
+1. Executing all concrete work described by the task body, spec, and notes
 2. Running verification commands specified in ## Verification Commands
 3. Capturing evidence (C901 delta, test results) in the task file itself
-4. Using `wb-update task` for telemetry recording
+4. Recording closure evidence with `afol evidence`
+5. Marking completion with `afol done`
 
 ## Guardrail
 
@@ -46,22 +49,21 @@ Only T-02 was genuinely completed (refactored `validate_catalog` from C901=24 to
 Before marking any task `done`:
 
 ```markdown
-- [ ] All ## Task List items executed (not just State Board updated)
-- [ ] Verification commands run and output captured
-- [ ] Before/after metrics documented in task file
-- [ ] `.agents/agents wb-update evidence T-XX ...` recorded a passing closure evidence id
-- [ ] `.agents/agents wb-update task T-XX --mark-done --evidence-id E-...` executed
-- [ ] Related log entry added with timestamp
-- [ ] Report updated with evidence
+- All concrete task requirements executed, not only the State Board row updated
+- Verification commands run and output captured
+- Before/after metrics documented in task file or report
+- `afol evidence --session <session-id> --task-id T-XX ...` recorded passing closure evidence
+- `afol done --session <session-id> --task-id T-XX` executed
+- Related log/report updated with evidence
 ```
 
-### Dual-Tracking Requirement
+### State Board Requirement
 
-**Task List:** Executable checklist - Mark each item as completes.
-**State Board:** Management view - Update State column AFTER Task List.
-**wb-update:** Telemetry plus audit - Run command for FORMAL state change.
+**State Board:** task lifecycle source of truth.
+**Task body/spec notes:** execution detail.
+**AFOL CLI:** formal state change and evidence path.
 
-**All three must be consistent.**
+Do not add parallel `Task List` checkboxes for `T-xx` lifecycle state.
 
 ### Evidence Requirements by Task Type
 
@@ -81,11 +83,10 @@ Before marking any task `done`:
 
 ```bash
 # Before marking task done, run:
-.agents/agents verify-tasks .afol/wb/<session>/
+afol verify-tasks .afol/wb/<session> --strict
 make doctor && make lint && make test-scripts
 
-# Record task completion with telemetry:
-.agents/agents wb-update evidence T-03 --command "make test-scripts" --result passed --artifact .afol/wb/<session>/<session>_report_01.md
-.agents/agents wb-update task T-03 --mark-done --evidence-id E-...
-.agents/agents wb-update timeline --message "T-03 completed: refactored X, Y, Z"
+# Record task completion:
+afol evidence --session <session> --task-id T-03 --command "make test-scripts" --result passed --artifact .afol/wb/<session>/<session>_report_01.md
+afol done --session <session> --task-id T-03
 ```

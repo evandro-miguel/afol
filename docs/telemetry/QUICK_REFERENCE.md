@@ -22,6 +22,7 @@ document retired compatibility command runners as downstream workflows.
 For governed delivery evidence, use:
 
 ```bash
-afol d -S <session-id> -T <task-id> -x "<verification command>"
-afol c -S <session-id>
+afol evidence --session <session-id> --task-id <task-id> --command "<verification command>" --result passed
+afol done --session <session-id> --task-id <task-id>
+afol close --session <session-id>
 ```

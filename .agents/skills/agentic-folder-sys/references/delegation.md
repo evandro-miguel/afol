@@ -32,17 +32,17 @@ Every handoff should include:
 | Reviewer | `tools`, `troubleshooting` if failures exist | templates, benchmark |
 | Benchmark agent | `benchmarking`, `tools` | install/adoption |
 | Adoption agent | `core`, `patterns`, `troubleshooting` | benchmark |
-| Skill editor | `patterns` section 5, `tools`, local skill files | release benchmark unless exporting |
+| Skill editor | `patterns` section 5, `tools`, local skill files | benchmark details unless needed |
 
 ## Example Handoff
 
 ```markdown
-Goal: Update `afol health` default behavior and prove installed binary output.
-Repo root: `/home/ozy/apps/agentic_start_folder`.
+Goal: Update an adopted project scaffold and prove AFOL validation still passes.
+Repo root: `/path/to/adopted-project`.
 Dirty state: unrelated skill/template files are already modified; do not touch
 them.
-Allowed files: `cli/services/health/**`, `cli/tests/health-system.test.ts`.
-Forbidden: `.agents/runtime`, `.agents/scripts`, unrelated skill docs.
+Allowed files: `AGENTS.md`, `.afol/adm/rules/**`, configured project skill files.
+Forbidden: `.agents/runtime`, `.agents/scripts`, unrelated app code.
 Session/task: `260616_1507_health-core-default`, `T-01`.
 Suggested skills: `agentic-folder-sys` references `execution`, `tools`; no
 benchmarking.

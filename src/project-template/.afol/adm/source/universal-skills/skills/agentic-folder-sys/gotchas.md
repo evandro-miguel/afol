@@ -20,7 +20,7 @@ Do not run, document, restore, or extend:
 
 Use `afol` commands only.
 
-## 2. `.agents` Is Static Metadata, `.afol` Is Mutable State
+## 2. `.agents` Is Metadata Plus Configured Provider Skills
 
 Retained `.agents/**` content is limited to provider-facing metadata and
 project-local skills:
@@ -28,12 +28,15 @@ project-local skills:
 - `.agents/config.json`
 - `.agents/lock.json`
 - `.agents/manifest.json`
-- `.agents/skills/**`
+- configured provider skills such as `.agents/skills/**` when
+  `paths.skills_dir` points there
 
 AFOL-owned static governance payloads live under `.afol/adm/**`, including
-hooks, rules, command catalogs, and source seeds. Mutable AFOL state also
+hooks, rules, command catalogs, and source payloads. Mutable AFOL state also
 belongs under `.afol/**`, including workbench sessions, events, indexes,
-mutations, temporary files, benchmark data, and migration archives.
+mutations, temporary files, benchmark data, migration archives, and other
+configured mutable paths. Project-local skills follow `paths.skills_dir`; in
+the current provider-compatible layout this is commonly `.agents/skills`.
 
 ## 3. Read `.agents/config.json` Before Moving Files
 
@@ -74,12 +77,14 @@ or secrets during adoption cleanup.
 `--force-managed` is for AFOL-managed files proven by the manifest. It is not a
 project-wide overwrite switch.
 
-## 8. Project-Local Skills Live Under `.agents/skills`
+## 8. Project-Local Skills Follow `paths.skills_dir`
 
-Do not copy caches or source mirrors into the project skill directory. Keep only
-the curated skills agents should use in that project. Shared durable changes
-belong in the universal-skills repo and then sync outward through the approved
-flow.
+Read `.agents/config.json` before editing skills. In the current
+provider-compatible layout, project-local skills commonly live under
+`.agents/skills/**`; older or custom installs may differ. Keep only the curated
+skills agents should use in that project. If a change is intended for every
+project, update the global skill through the normal skill-maintenance workflow
+outside the project scaffold.
 
 ## 9. Do Not Recreate Legacy Archive Paths
 

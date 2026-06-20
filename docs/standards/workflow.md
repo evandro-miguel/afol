@@ -103,7 +103,8 @@ Create report using `docs/templates/report.md` only after there is a real delive
 - Include verification evidence
 - Document lessons learned
 - Include a documentation-drift check and the files updated to keep the scaffold documentation current
-- If runtime guidance changed, include a mirror sync status (`AGENTS.md` -> `CLAUDE.md`)
+- If runtime guidance changed, include runtime contract sync status (`AGENTS.md`
+  as canonical, adapter config, and any enabled runtime mirrors).
 - List any optional artifacts that were created for the workstream and whether each one is `final`
 
 #### Step 7: Postmortem (Optional but Recommended)

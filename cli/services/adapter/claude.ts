@@ -14,10 +14,10 @@ import type { TemplateFileMap } from "../template/payload";
 
 /**
  * Runtime adapters are optional integration surfaces that can be toggled off
- * when a downstream project does not want them. The Claude adapter owns
- * `CLAUDE.md` (the Claude Code instruction mirror) and the `.claude/` directory
- * (rules + README). `AGENTS.md` is always canonical and is never touched by the
- * adapter system.
+ * when a downstream project does not want them. The Claude adapter owns any
+ * legacy `CLAUDE.md` and `.claude/` artifacts still present in installed
+ * projects. `AGENTS.md` is always canonical and is never touched by the adapter
+ * system.
  */
 export const CLAUDE_ADAPTER_ID = "claude" as const;
 
@@ -147,10 +147,10 @@ export function archiveClaudeArtifacts(projectRoot: string): {
 }
 
 /**
- * Restore Claude-owned artifacts from the embedded template, recreating
- * `CLAUDE.md` and `.claude/**`. Existing files are overwritten only when they
- * match a known template key; unknown files inside `.claude/` are left in place
- * (project-owned customizations are preserved).
+ * Restore Claude-owned artifacts from the embedded template when a release
+ * still carries adapter files. Current AFOL templates intentionally ship no
+ * Claude artifacts, so this normally only flips configuration and returns an
+ * empty restored list.
  */
 export function restoreClaudeArtifacts(projectRoot: string): string[] {
 	const restored: string[] = [];

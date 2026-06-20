@@ -35,5 +35,10 @@
       "max_chars_per_message": 1000,
       "max_chars_total": 3000
     }
+  },
+  "adapters": {
+    "claude": {
+      "enabled": false
+    }
   }
 }

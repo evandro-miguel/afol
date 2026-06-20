@@ -215,16 +215,16 @@ function fallbackRules(projectPaths: ResolvedProjectPaths): RuleEntry[] {
 				surfaces: [],
 				workTypes: [],
 				languages: [],
-					fileGlobs: [],
-					exactFiles: [],
-					inject: null,
-					priority: 50,
-					charCount: stripRuleFrontmatter(
-						readFileSync(join(rulesRoot, name), "utf8"),
-					).length,
-				};
-			});
-	}
+				fileGlobs: [],
+				exactFiles: [],
+				inject: null,
+				priority: 50,
+				charCount: stripRuleFrontmatter(
+					readFileSync(join(rulesRoot, name), "utf8"),
+				).length,
+			};
+		});
+}
 
 type ParsedRulesIndex =
 	| { ok: true; value: { rules?: RawRule[] } | RawRule[] }

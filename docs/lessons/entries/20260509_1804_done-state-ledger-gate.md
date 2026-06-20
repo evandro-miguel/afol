@@ -3,7 +3,7 @@ doc_type: lesson_entry
 id: lesson_20260509_1804_done-state-ledger-gate
 status: active
 created_at: '2026-05-09T18:04:52-03:00'
-updated_at: '2026-05-09T18:04:52-03:00'
+updated_at: '2026-06-20T00:00:00-03:00'
 source: user_correction
 related_session: 260509_1750_done-state-hardening
 ---
@@ -33,9 +33,11 @@ Never create a new task as `done`. A task may enter `done` only after:
 1. The requested execution work has actually been completed.
 2. A task-scoped `.evidence.jsonl` record exists with a concrete command, a
    passing or explicitly not-applicable result, and an artifact path or note.
-3. The task state is changed through `wb-update task --mark-done --evidence-id
-   E-...`.
-4. `verify-tasks --strict` accepts the linked closure evidence and finds no
+3. The evidence is recorded with `afol evidence --session <session-id>
+   --task-id <task-id> --command "<cmd>" --result passed`.
+4. The task state is changed through `afol done --session <session-id>
+   --task-id <task-id>`.
+5. `afol verify-tasks --strict` accepts the linked closure evidence and finds no
    unresolved blocking failures for that task.
 
 ## Guardrail

@@ -277,7 +277,7 @@ describe("update command", () => {
 		}
 	});
 
-	test("check keeps Claude-owned paths when the adapter is enabled", async () => {
+	test("check does not synthesize removed Claude-owned template paths", async () => {
 		const root = mkRoot();
 		try {
 			writeClaudeAdapterConfig(root, true);
@@ -291,8 +291,9 @@ describe("update command", () => {
 					changes?: { paths?: string[] };
 				};
 			};
-			expect(parsed.data?.changes?.paths ?? []).toEqual(
-				expect.arrayContaining(["CLAUDE.md", ".claude/README.md"]),
+			expect(parsed.data?.changes?.paths ?? []).not.toContain("CLAUDE.md");
+			expect(parsed.data?.changes?.paths ?? []).not.toContain(
+				".claude/README.md",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

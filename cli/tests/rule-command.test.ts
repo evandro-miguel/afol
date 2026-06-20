@@ -197,9 +197,7 @@ describe("rule command", () => {
 			);
 			writeFileSync(
 				join(root, ".afol", "adm", "rules", "README.md"),
-				["---", `summary: ${"x".repeat(120)}`, "---", "", "# Rules"].join(
-					"\n",
-				),
+				["---", `summary: ${"x".repeat(120)}`, "---", "", "# Rules"].join("\n"),
 				"utf8",
 			);
 
@@ -390,9 +388,9 @@ describe("rule command", () => {
 		}
 	});
 
-		test("fails loudly when a required rule exceeds max_chars_per_rule", async () => {
-			const root = mkRoot({ maxCharsPerRule: 20, maxCharsTotal: 100 });
-			try {
+	test("fails loudly when a required rule exceeds max_chars_per_rule", async () => {
+		const root = mkRoot({ maxCharsPerRule: 20, maxCharsTotal: 100 });
+		try {
 			writeRuleFixture(root, {
 				id: "RULE-021",
 				name: "required-too-big",

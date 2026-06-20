@@ -21,6 +21,18 @@ afol validate project
 Use these before edits, commits, pushes, scaffold updates, or when repo state is
 unclear.
 
+When command names or side effects are uncertain, inspect the registry-backed
+surface instead of relying on memory:
+
+```bash
+afol help --json
+afol help <command>
+```
+
+The retained static catalog is `.afol/adm/tools.json`. Treat it as a compact
+discoverability mirror of the live help registry, not as a separate source of
+truth.
+
 ## Workbench Lifecycle
 
 Create or target a governed session:
@@ -53,11 +65,17 @@ afol pstr
 afol ctx build
 afol ctx bundle
 afol ctx explain
+afol hook
+afol rule
+afol skill
+afol state
+afol session
+afol catchup
 ```
 
 Planner agents should usually need `afol preflight`, `afol status`, and focused
 file reads. They do not need benchmark commands unless the planned work is a
-benchmark or release-readiness lane.
+benchmark lane.
 
 ## Install, Bootstrap, And Update
 
@@ -93,26 +111,36 @@ Small docs or skill-only change:
 afol validate project
 ```
 
-Code/config change:
+Project code/config change:
 
 ```bash
-bun run typecheck
-bun test
+<project-local typecheck/test command>
 afol validate project
 ```
 
-Cross-cutting scaffold/template/release change:
+Scaffold state or index drift:
 
 ```bash
 afol local-state rebuild --json
 afol validate project --json
-bun run typecheck
-bun test
-bun run validate:release
 ```
 
 Open [Benchmarking](./benchmarking.md) only when the task actually touches
-benchmarks, release gates, or token budgets.
+benchmarks or token budgets.
+
+## Health, Doctor, And Telemetry
+
+Use these when status or validation reports drift, stale indexes, session
+confusion, or benchmark questions:
+
+```bash
+afol health
+afol doctor
+afol telemetry
+afol project-benchmark
+```
+
+Keep output compact; use command-specific help before adding verbose flags.
 
 ## File And Recovery Helpers
 
