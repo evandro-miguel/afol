@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { atomicWriteText } from "../io/atomic";
@@ -24,6 +25,23 @@ type MaintenanceReviewStore = {
 	areas: Partial<Record<MaintenanceReviewArea, MaintenanceReviewEntry>>;
 };
 
+type StoreReadResult =
+	| {
+			status: "ok";
+			store: MaintenanceReviewStore;
+			error: null;
+	  }
+	| {
+			status: "missing";
+			store: MaintenanceReviewStore;
+			error: null;
+	  }
+	| {
+			status: "malformed";
+			store: MaintenanceReviewStore;
+			error: string;
+	  };
+
 export type MaintenanceReviewAreaStatus = {
 	area: MaintenanceReviewArea;
 	due: boolean;
@@ -35,6 +53,8 @@ export type MaintenanceReviewSummary = {
 	review_interval_days: number;
 	areas: MaintenanceReviewAreaStatus[];
 	due_areas: MaintenanceReviewArea[];
+	store_status: StoreReadResult["status"];
+	store_error: string | null;
 };
 
 export type MaintenanceReviewRecord = {
@@ -107,6 +127,19 @@ function storePath(root: string): string {
 	);
 }
 
+function fallbackStore(): MaintenanceReviewStore {
+	return { version: 1, areas: {} };
+}
+
+function compactError(error: unknown): string {
+	const raw = error instanceof Error ? error.message : String(error);
+	return raw.replace(/\s+/g, " ").trim().slice(0, 160) || "unknown error";
+}
+
+function malformedStoreError(path: string): string {
+	return `Malformed maintenance review store: ${path}. Repair or remove it before recording reviews.`;
+}
+
 function parseStore(value: unknown): MaintenanceReviewStore | null {
 	if (
 		value !== null &&
@@ -122,34 +155,45 @@ function parseStore(value: unknown): MaintenanceReviewStore | null {
 	return null;
 }
 
-function readStore(
+function readStoreResult(
 	root: string,
 	options: { strict?: boolean } = {},
-): MaintenanceReviewStore {
+): StoreReadResult {
 	const path = storePath(root);
 	if (!existsSync(path)) {
-		return { version: 1, areas: {} };
+		return { status: "missing", store: fallbackStore(), error: null };
 	}
 	try {
 		const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
 		const store = parseStore(parsed);
 		if (store !== null) {
-			return store;
+			return { status: "ok", store, error: null };
 		}
-	} catch {
+	} catch (error) {
 		if (options.strict) {
-			throw new Error(
-				`Malformed maintenance review store: ${path}. Repair or remove it before recording reviews.`,
-			);
+			throw new Error(malformedStoreError(path));
 		}
-		return { version: 1, areas: {} };
+		return {
+			status: "malformed",
+			store: fallbackStore(),
+			error: compactError(error),
+		};
 	}
 	if (options.strict) {
-		throw new Error(
-			`Malformed maintenance review store: ${path}. Repair or remove it before recording reviews.`,
-		);
+		throw new Error(malformedStoreError(path));
 	}
-	return { version: 1, areas: {} };
+	return {
+		status: "malformed",
+		store: fallbackStore(),
+		error: "invalid maintenance review store shape",
+	};
+}
+
+function readStore(
+	root: string,
+	options: { strict?: boolean } = {},
+): MaintenanceReviewStore {
+	return readStoreResult(root, options).store;
 }
 
 function writeStore(root: string, store: MaintenanceReviewStore): void {
@@ -176,7 +220,8 @@ export function readMaintenanceReviewSummary(
 	root: string,
 ): MaintenanceReviewSummary {
 	const intervalDays = readReviewIntervalDays(root);
-	const store = readStore(root);
+	const storeResult = readStoreResult(root);
+	const store = storeResult.store;
 	const areas = MAINTENANCE_REVIEW_AREAS.map((area) => {
 		const entry = store.areas[area];
 		const age = entry?.reviewed_at ? ageInDays(entry.reviewed_at) : null;
@@ -192,6 +237,8 @@ export function readMaintenanceReviewSummary(
 		review_interval_days: intervalDays,
 		areas,
 		due_areas: areas.filter((entry) => entry.due).map((entry) => entry.area),
+		store_status: storeResult.status,
+		store_error: storeResult.error,
 	};
 }
 
@@ -229,25 +276,43 @@ export function recordMaintenanceReview(
 export function summarizeMaintenanceReviewDue(root: string): {
 	intervalDays: number;
 	dueAreas: MaintenanceReviewArea[];
+	storeStatus: MaintenanceReviewSummary["store_status"];
+	storeError: string | null;
 } {
 	const summary = readMaintenanceReviewSummary(root);
 	return {
 		intervalDays: summary.review_interval_days,
 		dueAreas: summary.due_areas,
+		storeStatus: summary.store_status,
+		storeError: summary.store_error,
 	};
 }
 
-function collectFiles(root: string, current: string, files: string[]): void {
+function collectFiles(
+	root: string,
+	current: string,
+	files: string[],
+	warnings: string[],
+): void {
 	if (!existsSync(current)) {
 		return;
 	}
-	for (const entry of readdirSync(current, { withFileTypes: true })) {
+	let entries: Dirent[];
+	try {
+		entries = readdirSync(current, { withFileTypes: true });
+	} catch (error) {
+		warnings.push(
+			`legacy reference scan skipped ${relative(root, current).replace(/\\/g, "/")}: ${compactError(error)}`,
+		);
+		return;
+	}
+	for (const entry of entries) {
 		if (EXCLUDED_DIRS.has(entry.name)) {
 			continue;
 		}
 		const absolute = join(current, entry.name);
 		if (entry.isDirectory()) {
-			collectFiles(root, absolute, files);
+			collectFiles(root, absolute, files, warnings);
 			continue;
 		}
 		if (!entry.isFile()) {
@@ -264,8 +329,10 @@ export function scanLegacyReferences(root: string): {
 	count: number;
 	files: string[];
 	patterns: string[];
+	warnings: string[];
 } {
 	const files: string[] = [];
+	const warnings: string[] = [];
 	const scanRoots = [
 		join(root, ".afol", "adm"),
 		join(root, "docs"),
@@ -273,7 +340,7 @@ export function scanLegacyReferences(root: string): {
 	];
 	const seen = new Set<string>();
 	for (const scanRoot of scanRoots) {
-		collectFiles(root, scanRoot, files);
+		collectFiles(root, scanRoot, files, warnings);
 	}
 	const matchedFiles: string[] = [];
 	const matchedPatterns = new Set<string>();
@@ -286,7 +353,10 @@ export function scanLegacyReferences(root: string): {
 		let content = "";
 		try {
 			content = readFileSync(absolute, "utf8");
-		} catch {
+		} catch (error) {
+			warnings.push(
+				`legacy reference scan skipped ${file}: ${compactError(error)}`,
+			);
 			continue;
 		}
 		let matched = false;
@@ -307,5 +377,6 @@ export function scanLegacyReferences(root: string): {
 		patterns: [...matchedPatterns].sort((left, right) =>
 			left.localeCompare(right),
 		),
+		warnings: [...new Set(warnings)],
 	};
 }

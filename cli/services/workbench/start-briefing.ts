@@ -172,11 +172,17 @@ export function buildStartBriefing(
 			(area) =>
 				`maintenance review overdue: ${area} (${maintenance.review_interval_days}d interval)`,
 		),
+		...(maintenance.store_status === "malformed"
+			? [
+					`maintenance review store malformed: ${maintenance.store_error ?? "repair required"}`,
+				]
+			: []),
 		...(legacyRefs.count > 0
 			? [
 					`legacy references in active docs/skills: ${legacyRefs.files.slice(0, 3).join(", ")}${legacyRefs.count > 3 ? " ..." : ""}`,
 				]
 			: []),
+		...legacyRefs.warnings,
 	]);
 	const problemTasks = radar.open_tasks.filter(
 		(task) => task.state === "problem",

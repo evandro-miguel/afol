@@ -17,6 +17,11 @@ export function maintenanceWeekly(
 			`review maintenance areas: ${maintenanceReview.dueAreas.join(", ")}`,
 		);
 	}
+	if (maintenanceReview.storeStatus === "malformed") {
+		actions.push(
+			`repair maintenance review store: ${maintenanceReview.storeError ?? "malformed state"}`,
+		);
+	}
 	if (report.summary.fail > 0) {
 		actions.unshift("review health failures");
 	}

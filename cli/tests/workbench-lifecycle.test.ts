@@ -532,6 +532,67 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("afol start human output reports briefing fallback reason", () => {
+		const root = mkRoot("start-human-briefing-fallback");
+		try {
+			writeCliProjectContract(root);
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			mkdirSync(roadmapPath, { recursive: true });
+			const created = newWorkstream(root, "start-task");
+			const proc = runKernel(root, ["start", "--session", created.session]);
+
+			expect(proc.status).toBe(0);
+			const lines = (proc.stdout as string).trim().split("\n");
+			expect(lines[0]).toBe("task started: T-01");
+			expect(
+				lines.some((line) =>
+					line.startsWith("briefing: briefing_unavailable reason="),
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol start json reports briefing fallback reason", () => {
+		const root = mkRoot("start-json-briefing-fallback");
+		try {
+			writeCliProjectContract(root);
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			mkdirSync(roadmapPath, { recursive: true });
+			const created = newWorkstream(root, "start-task");
+			const proc = runKernel(root, [
+				"start",
+				"--session",
+				created.session,
+				"--json",
+			]);
+
+			expect(proc.status).toBe(0);
+			const envelope = parseEnvelope(proc.stdout as string);
+			const briefing = (envelope.data as Record<string, unknown>).briefing as {
+				status: string;
+				reason: string;
+			};
+			expect(briefing.status).toBe("briefing_unavailable");
+			expect(briefing.reason).not.toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("briefingUnavailableFor emits bounded diagnostic reason", () => {
 		const briefing = briefingUnavailableFor(
 			new Error(`${"stale index\n".repeat(40)}tail`),
@@ -599,6 +660,31 @@ describe("workbench lifecycle service", () => {
 			expect(
 				briefing.questions.some((question) =>
 					question.includes("Legacy references remain"),
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("buildStartBriefing warns when maintenance review store is malformed", () => {
+		const root = mkRoot("start-briefing-malformed-maintenance");
+		try {
+			writeCliProjectContract(root);
+			const reviewDir = join(root, ".afol", "data", "maintenance");
+			mkdirSync(reviewDir, { recursive: true });
+			writeFileSync(join(reviewDir, "reviews.json"), "{bad-json", "utf8");
+			const created = newWorkstream(root, "briefing-malformed-maintenance");
+			startTask(root, { session: created.session, taskId: "T-01" });
+
+			const briefing = buildStartBriefing(root, {
+				session: created.session,
+				taskId: "T-01",
+			});
+
+			expect(
+				briefing.warnings.some((warning) =>
+					warning.startsWith("maintenance review store malformed:"),
 				),
 			).toBe(true);
 		} finally {
