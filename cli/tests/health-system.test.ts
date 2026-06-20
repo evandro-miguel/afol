@@ -561,7 +561,14 @@ describe("health system", () => {
 			expect(payload.reviewed_areas).toEqual(["rules"]);
 			expect(payload.note).toBe("checked");
 			expect(payload.review_interval_days).toBe(14);
-			expect(payload.due_areas).toEqual(["skills", "docs", "commands"]);
+			expect(payload.due_areas).toEqual([
+				"skills",
+				"docs",
+				"commands",
+				"memory",
+				"library",
+				"organization",
+			]);
 			expect(payload.data?.mode).toBe("review");
 			expect(payload.data?.area).toBe("rules");
 		} finally {
@@ -594,6 +601,9 @@ describe("health system", () => {
 				"skills",
 				"docs",
 				"commands",
+				"memory",
+				"library",
+				"organization",
 			]);
 
 			const denied = captureIo();
@@ -627,7 +637,9 @@ describe("health system", () => {
 			).toBe(0);
 			const output = captured.stdout.join("\n");
 			expect(output).toContain("maintenance review recorded: docs");
-			expect(output).toContain("due next: rules, skills, commands");
+			expect(output).toContain(
+				"due next: rules, skills, commands, memory, library, organization",
+			);
 			const summary = readMaintenanceReviewSummary(root);
 			expect(summary.areas.find((entry) => entry.area === "docs")?.note).toBe(
 				"checked",
@@ -727,6 +739,9 @@ describe("health system", () => {
 				"skills",
 				"docs",
 				"commands",
+				"memory",
+				"library",
+				"organization",
 			]);
 			expect(maintenanceWeekly(root, true).actions).toContain(
 				`repair maintenance review store: ${summary.store_error}`,
@@ -767,7 +782,44 @@ describe("health system", () => {
 				"skills",
 				"docs",
 				"commands",
+				"memory",
+				"library",
+				"organization",
 			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("legacy reference scan includes memory and library surfaces", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+			mkdirSync(join(root, ".afol", "library", "topics"), {
+				recursive: true,
+			});
+			writeFileSync(
+				join(root, ".afol", "memory", "memory.md"),
+				"Keep this away from .agents/wb references.\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "library", "topics", "legacy.md"),
+				"Old docs still say legacy:delegate.\n",
+				"utf8",
+			);
+
+			const result = scanLegacyReferences(root);
+
+			expect(result.files).toEqual(
+				expect.arrayContaining([
+					".afol/memory/memory.md",
+					".afol/library/topics/legacy.md",
+				]),
+			);
+			expect(result.patterns).toEqual(
+				expect.arrayContaining([".agents/wb", "legacy:"]),
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -942,7 +994,7 @@ describe("health system", () => {
 			);
 			expect(captured.stdout.join("\n")).toContain("maintenance weekly plan:");
 			expect(captured.stdout.join("\n")).toContain(
-				"review maintenance areas: rules, skills, docs, commands",
+				"review maintenance areas: rules, skills, docs, commands, memory, library, organization",
 			);
 			expect(captured.stdout.join("\n")).not.toContain("applied:");
 		} finally {

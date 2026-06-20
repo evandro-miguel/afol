@@ -654,7 +654,9 @@ describe("workbench lifecycle service", () => {
 			).toBe(true);
 			expect(
 				briefing.warnings.some((warning) =>
-					warning.startsWith("legacy references in active docs/skills:"),
+					warning.startsWith(
+						"legacy references in active docs/skills/memory/library:",
+					),
 				),
 			).toBe(true);
 			expect(

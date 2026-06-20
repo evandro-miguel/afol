@@ -10,6 +10,9 @@ export const MAINTENANCE_REVIEW_AREAS = [
 	"skills",
 	"docs",
 	"commands",
+	"memory",
+	"library",
+	"organization",
 ] as const;
 
 export type MaintenanceReviewArea = (typeof MAINTENANCE_REVIEW_AREAS)[number];
@@ -335,6 +338,8 @@ export function scanLegacyReferences(root: string): {
 	const warnings: string[] = [];
 	const scanRoots = [
 		join(root, ".afol", "adm"),
+		join(root, ".afol", "memory"),
+		join(root, ".afol", "library"),
 		join(root, "docs"),
 		join(root, ".agents", "skills"),
 	];

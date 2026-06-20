@@ -656,7 +656,8 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 			{
 				usage: "review --area <area> --dry-run",
 				sideEffect: "read",
-				description: "Preview rules, skills, docs, or commands review",
+				description:
+					"Preview rules, skills, docs, commands, memory, library, organization",
 			},
 			{
 				usage: "review --area <area> --note <text>",

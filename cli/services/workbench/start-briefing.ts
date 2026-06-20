@@ -179,7 +179,7 @@ export function buildStartBriefing(
 			: []),
 		...(legacyRefs.count > 0
 			? [
-					`legacy references in active docs/skills: ${legacyRefs.files.slice(0, 3).join(", ")}${legacyRefs.count > 3 ? " ..." : ""}`,
+					`legacy references in active docs/skills/memory/library: ${legacyRefs.files.slice(0, 3).join(", ")}${legacyRefs.count > 3 ? " ..." : ""}`,
 				]
 			: []),
 		...legacyRefs.warnings,
