@@ -13,7 +13,8 @@ import {
 	startTask,
 } from "../services/workbench/lifecycle";
 import {
-	briefingUnavailable,
+	type briefingUnavailable,
+	briefingUnavailableFor,
 	buildStartBriefing,
 	formatStartBriefing,
 	type StartBriefing,
@@ -99,8 +100,8 @@ export async function runStartCommand(
 			| ReturnType<typeof briefingUnavailable>;
 		try {
 			briefing = buildStartBriefing(root, parsed);
-		} catch {
-			briefing = briefingUnavailable();
+		} catch (error) {
+			briefing = briefingUnavailableFor(error);
 		}
 		if (parsed.json) {
 			console.log(
@@ -119,7 +120,7 @@ export async function runStartCommand(
 		} else {
 			const lines = [`task started: ${parsed.taskId}`];
 			if (isStartBriefingUnavailable(briefing)) {
-				lines.push("briefing: briefing_unavailable");
+				lines.push(`briefing: briefing_unavailable reason=${briefing.reason}`);
 			} else {
 				lines.push(...formatStartBriefing(briefing));
 			}

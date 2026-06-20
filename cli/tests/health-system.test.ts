@@ -1,17 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDoctorCommand } from "../commands/doctor";
 import { runHealthCommand } from "../commands/health";
 import { runMaintenanceCommand } from "../commands/maintenance";
+import { agentOperationContext } from "../core/operation-context";
 import {
 	checkHealth,
 	maintenanceMonthly,
 	maintenanceWeekly,
 	runDoctor,
 } from "../services/health";
+import { readMaintenanceReviewSummary } from "../services/health/maintenance-review";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { writeMemory as writeProjectMemory } from "../services/memory";
 import { buildPstrSnapshotManifest, rebuildPstrIndex } from "../services/pstr";
@@ -551,6 +560,123 @@ describe("health system", () => {
 			expect(payload.due_areas).toEqual(["skills", "docs", "commands"]);
 			expect(payload.data?.mode).toBe("review");
 			expect(payload.data?.area).toBe("rules");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review dry-run does not persist and restricted writes are denied", async () => {
+		const root = createFixture();
+		try {
+			const reviewPath = join(
+				root,
+				".afol",
+				"data",
+				"maintenance",
+				"reviews.json",
+			);
+			const dryRun = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules", "--dry-run", "--json"],
+					root,
+					dryRun.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			expect(existsSync(reviewPath)).toBe(false);
+			expect(readMaintenanceReviewSummary(root).due_areas).toEqual([
+				"rules",
+				"skills",
+				"docs",
+				"commands",
+			]);
+
+			const denied = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules"],
+					root,
+					denied.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(denied.stderr.join("\n")).toContain(
+				"maintenance review requires local interactive approval",
+			);
+			expect(existsSync(reviewPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review supports positional area and human output", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "docs", "--note", "checked"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const output = captured.stdout.join("\n");
+			expect(output).toContain("maintenance review recorded: docs");
+			expect(output).toContain("due next: rules, skills, commands");
+			const summary = readMaintenanceReviewSummary(root);
+			expect(summary.areas.find((entry) => entry.area === "docs")?.note).toBe(
+				"checked",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review rejects missing note values before json aliases", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules", "--note", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			expect(captured.stdout).toEqual([]);
+			expect(captured.stderr).toEqual(["Missing value for --note."]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review refuses to overwrite malformed review store", async () => {
+		const root = createFixture();
+		try {
+			const reviewDir = join(root, ".afol", "data", "maintenance");
+			const reviewPath = join(reviewDir, "reviews.json");
+			mkdirSync(reviewDir, { recursive: true });
+			writeFileSync(reviewPath, "{bad-json", "utf8");
+
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules"],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			expect(captured.stderr.join("\n")).toContain(
+				"Malformed maintenance review store",
+			);
+			expect(readFileSync(reviewPath, "utf8")).toBe("{bad-json");
+			expect(readMaintenanceReviewSummary(root).due_areas).toEqual([
+				"rules",
+				"skills",
+				"docs",
+				"commands",
+			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

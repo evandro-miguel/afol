@@ -355,6 +355,8 @@ export async function main(argv: string[]): Promise<number> {
 			return runMaintenanceCommand(
 				[resolution.action, ...resolution.args].filter(Boolean),
 				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "pstr") {

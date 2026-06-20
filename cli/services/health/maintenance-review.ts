@@ -107,26 +107,47 @@ function storePath(root: string): string {
 	);
 }
 
-function readStore(root: string): MaintenanceReviewStore {
+function parseStore(value: unknown): MaintenanceReviewStore | null {
+	if (
+		value !== null &&
+		typeof value === "object" &&
+		!Array.isArray(value) &&
+		(value as { version?: unknown }).version === 1 &&
+		(value as { areas?: unknown }).areas !== null &&
+		typeof (value as { areas?: unknown }).areas === "object" &&
+		!Array.isArray((value as { areas?: unknown }).areas)
+	) {
+		return value as MaintenanceReviewStore;
+	}
+	return null;
+}
+
+function readStore(
+	root: string,
+	options: { strict?: boolean } = {},
+): MaintenanceReviewStore {
 	const path = storePath(root);
 	if (!existsSync(path)) {
 		return { version: 1, areas: {} };
 	}
 	try {
 		const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
-		if (
-			parsed !== null &&
-			typeof parsed === "object" &&
-			!Array.isArray(parsed) &&
-			(parsed as { version?: unknown }).version === 1 &&
-			(parsed as { areas?: unknown }).areas !== null &&
-			typeof (parsed as { areas?: unknown }).areas === "object" &&
-			!Array.isArray((parsed as { areas?: unknown }).areas)
-		) {
-			return parsed as MaintenanceReviewStore;
+		const store = parseStore(parsed);
+		if (store !== null) {
+			return store;
 		}
 	} catch {
-		// Ignore malformed state and rebuild from empty.
+		if (options.strict) {
+			throw new Error(
+				`Malformed maintenance review store: ${path}. Repair or remove it before recording reviews.`,
+			);
+		}
+		return { version: 1, areas: {} };
+	}
+	if (options.strict) {
+		throw new Error(
+			`Malformed maintenance review store: ${path}. Repair or remove it before recording reviews.`,
+		);
 	}
 	return { version: 1, areas: {} };
 }
@@ -187,7 +208,7 @@ export function recordMaintenanceReview(
 	const note = input.note?.trim() || null;
 	const dryRun = input.dryRun === true;
 	if (!dryRun) {
-		const store = readStore(root);
+		const store = readStore(root, { strict: true });
 		for (const area of reviewedAreas) {
 			store.areas[area] = note
 				? { reviewed_at: recordedAt, note }

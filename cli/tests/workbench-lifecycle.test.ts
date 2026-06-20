@@ -22,7 +22,10 @@ import {
 	recordEvidence,
 	startTask,
 } from "../services/workbench/lifecycle";
-import { buildStartBriefing } from "../services/workbench/start-briefing";
+import {
+	briefingUnavailableFor,
+	buildStartBriefing,
+} from "../services/workbench/start-briefing";
 import { verifyWorkbenchTasks } from "../services/workbench/verify";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -241,7 +244,22 @@ describe("workbench lifecycle service", () => {
 				(startEnvelope.data as Record<string, unknown>).briefing,
 			).toMatchObject({
 				schema: "afol_start_briefing_v1",
+				project: {
+					session: created.session,
+					task: "T-01",
+				},
+				resume: {
+					session_status: "active",
+				},
+				tasks: {
+					open_total: expect.any(Number),
+					problem_total: expect.any(Number),
+				},
 			});
+			const startBriefing = (startEnvelope.data as Record<string, unknown>)
+				.briefing as Record<string, unknown>;
+			expect(Array.isArray(startBriefing.warnings)).toBe(true);
+			expect(Array.isArray(startBriefing.questions)).toBe(true);
 
 			const logProc = runKernel(root, [
 				"log",
@@ -505,9 +523,25 @@ describe("workbench lifecycle service", () => {
 			const lines = (proc.stdout as string).trim().split("\n");
 			expect(lines[0]).toBe("task started: T-01");
 			expect(lines.some((line) => line.startsWith("briefing:"))).toBe(true);
+			expect(lines.some((line) => line.startsWith("resume:"))).toBe(true);
+			expect(lines.some((line) => line.startsWith("tasks:"))).toBe(true);
+			expect(lines.some((line) => line.startsWith("warnings:"))).toBe(true);
+			expect(lines.some((line) => line.startsWith("questions:"))).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("briefingUnavailableFor emits bounded diagnostic reason", () => {
+		const briefing = briefingUnavailableFor(
+			new Error(`${"stale index\n".repeat(40)}tail`),
+		);
+
+		expect(briefing.schema).toBe("afol_start_briefing_v1");
+		expect(briefing.status).toBe("briefing_unavailable");
+		expect(briefing.reason).toContain("stale index");
+		expect(briefing.reason).not.toContain("\n");
+		expect(briefing.reason.length).toBeLessThanOrEqual(160);
 	});
 
 	test("buildStartBriefing summarizes roadmap and legacy warnings", () => {

@@ -4,6 +4,11 @@ import {
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
 import { maintenanceMonthly, maintenanceWeekly } from "../services/health";
 import {
 	MAINTENANCE_REVIEW_AREAS,
@@ -44,6 +49,9 @@ function parseArgs(args: string[]): {
 	let note: string | undefined;
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
+		if (!value) {
+			continue;
+		}
 		if (value === "weekly" || value === "monthly" || value === "review") {
 			mode = value;
 			continue;
@@ -62,9 +70,17 @@ function parseArgs(args: string[]): {
 			index += 1;
 			continue;
 		}
+		if (value.startsWith("--note=")) {
+			const inlineNote = value.slice("--note=".length);
+			if (!inlineNote) {
+				throw new Error("Missing value for --note.");
+			}
+			note = inlineNote;
+			continue;
+		}
 		if (value === "--note") {
 			const next = args[index + 1];
-			if (!next) {
+			if (!next || next.startsWith("-")) {
 				throw new Error("Missing value for --note.");
 			}
 			note = next;
@@ -98,10 +114,16 @@ export async function runMaintenanceCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
 		const parsed = parseArgs(args);
 		if (parsed.mode === "review") {
+			if (!parsed.dryRun && requiresApproval(ctx)) {
+				throw new Error(
+					"maintenance review requires local interactive approval",
+				);
+			}
 			const result = recordMaintenanceReview(projectRoot, {
 				area: parsed.area,
 				dryRun: parsed.dryRun,

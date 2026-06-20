@@ -582,6 +582,51 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("maintenance review honors approval gate through the kernel front-door", () => {
+		const root = mkProjectRoot("maintenance-agent", "");
+		try {
+			const reviewPath = join(
+				root,
+				".afol",
+				"data",
+				"maintenance",
+				"reviews.json",
+			);
+			const denied = runKernel(root, [
+				"--agent",
+				"maintenance",
+				"review",
+				"--area",
+				"rules",
+			]);
+			expect(denied.status).toBe(2);
+			expect(denied.stderr as string).toContain(
+				"maintenance review requires local interactive approval",
+			);
+			expect(existsSync(reviewPath)).toBe(false);
+
+			const dryRun = runKernel(root, [
+				"--agent",
+				"maintenance",
+				"review",
+				"--area",
+				"rules",
+				"--dry-run",
+				"--json",
+			]);
+			expect(dryRun.status).toBe(0);
+			const payload = JSON.parse(dryRun.stdout as string) as {
+				dry_run: boolean;
+				reviewed_areas: string[];
+			};
+			expect(payload.dry_run).toBe(true);
+			expect(payload.reviewed_areas).toEqual(["rules"]);
+			expect(existsSync(reviewPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("status alias and json shorthands are normalized", () => {
 		const script = "#!/usr/bin/env bash\necho ARGS:$*";
 		const root = mkProjectRoot("aliases", script);

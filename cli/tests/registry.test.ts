@@ -160,6 +160,35 @@ describe("kernel registry", () => {
 		}
 	});
 
+	test("publishes maintenance review subcommand metadata", () => {
+		const maintenance = kernelRegistry.commands.find(
+			(entry) => entry.command === "maintenance",
+		);
+
+		expect(maintenance?.subcommands).toEqual([
+			{
+				usage: "weekly --dry-run",
+				sideEffect: "read",
+				description: "Preview weekly maintenance actions",
+			},
+			{
+				usage: "monthly --dry-run",
+				sideEffect: "read",
+				description: "Preview monthly maintenance actions",
+			},
+			{
+				usage: "review --area <area> --dry-run",
+				sideEffect: "read",
+				description: "Preview rules, skills, docs, or commands review",
+			},
+			{
+				usage: "review --area <area> --note <text>",
+				sideEffect: "write",
+				description: "Record maintenance review freshness",
+			},
+		]);
+	});
+
 	test("publishes project-benchmark subcommand metadata", () => {
 		const projectBenchmark = kernelRegistry.commands.find(
 			(entry) => entry.command === "project-benchmark",

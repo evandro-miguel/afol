@@ -135,10 +135,24 @@ function pickQuestions(input: {
 export function briefingUnavailable(): {
 	schema: "afol_start_briefing_v1";
 	status: "briefing_unavailable";
+	reason: string;
 } {
 	return {
 		schema: "afol_start_briefing_v1",
 		status: "briefing_unavailable",
+		reason: "unknown",
+	};
+}
+
+export function briefingUnavailableFor(
+	error: unknown,
+): ReturnType<typeof briefingUnavailable> {
+	const raw = error instanceof Error ? error.message : String(error);
+	const reason = raw.replace(/\s+/g, " ").trim().slice(0, 160) || "unknown";
+	return {
+		schema: "afol_start_briefing_v1",
+		status: "briefing_unavailable",
+		reason,
 	};
 }
 

@@ -642,6 +642,28 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "write",
 		description: "Run maintenance checks",
 		category: "ops",
+		subcommands: [
+			{
+				usage: "weekly --dry-run",
+				sideEffect: "read",
+				description: "Preview weekly maintenance actions",
+			},
+			{
+				usage: "monthly --dry-run",
+				sideEffect: "read",
+				description: "Preview monthly maintenance actions",
+			},
+			{
+				usage: "review --area <area> --dry-run",
+				sideEffect: "read",
+				description: "Preview rules, skills, docs, or commands review",
+			},
+			{
+				usage: "review --area <area> --note <text>",
+				sideEffect: "write",
+				description: "Record maintenance review freshness",
+			},
+		],
 	},
 	{
 		command: "sweep",

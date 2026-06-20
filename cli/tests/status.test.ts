@@ -10,6 +10,10 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runStatusCommand } from "../commands/status";
+import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
+import { rebuildPstrIndex } from "../services/pstr";
+import { collectGlobalStatusFindings } from "../services/status/global-findings";
 
 type CapturedIo = {
 	stdout: string[];
@@ -323,6 +327,46 @@ describe("status command", () => {
 			expect(text).toContain("project indexes need rebuild");
 			expect(text).toContain("run afol local-state rebuild; afol pstr rebuild");
 			expect(text).not.toContain("BLOCKERS:\n- none");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("global status findings report local-state rebuild when PSTR is current", () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+
+			const findings = collectGlobalStatusFindings(root);
+
+			expect(findings).toHaveLength(1);
+			expect(findings[0]).toMatchObject({
+				validation: "local-state: 5 index snapshots need rebuild",
+				blocker: "local-state: 5 index snapshots need rebuild",
+				next: "run afol local-state rebuild",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("global status findings report PSTR rebuild when local-state is current", () => {
+		const root = createFixture();
+		try {
+			rebuildWorkBenchIndex(root);
+			rebuildProjectIndexes(root);
+
+			const findings = collectGlobalStatusFindings(root);
+
+			expect(
+				findings.some((finding) => finding.validation.startsWith("pstr:")),
+			).toBe(true);
+			expect(
+				findings.some((finding) =>
+					finding.validation.startsWith("local-state:"),
+				),
+			).toBe(false);
+			expect(findings[0]?.next).toBe("run afol pstr rebuild");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

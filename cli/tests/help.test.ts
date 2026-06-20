@@ -142,6 +142,22 @@ describe("help formatter", () => {
 		expect(help).toContain("ud|undo --mutation-id <id> [write]");
 	});
 
+	test("documents maintenance review modes in command help", () => {
+		const help = formatCommandHelp("maintenance", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected maintenance command help");
+		}
+		expect(help).toContain("Command: maintenance");
+		expect(help).toContain("Side effect: write");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("weekly --dry-run [read]");
+		expect(help).toContain("monthly --dry-run [read]");
+		expect(help).toContain("review --area <area> --dry-run [read]");
+		expect(help).toContain("review --area <area> --note <text> [write]");
+	});
+
 	test("publishes write-risk metadata for schema apply flows", () => {
 		const help = buildCommandHelpJson("schema", kernelRegistry);
 
