@@ -727,7 +727,7 @@ describe("scenario benchmark execution", () => {
 				scenario_id: scenarioId,
 				scenario_version: "1.0.0",
 				pack_id: "pstr-integrity",
-				command: `node -e 'process.stdout.write("x".repeat(${bytes}))'`,
+				command: `node -e 'require("node:fs").writeSync(1, "x".repeat(${bytes}))'`,
 				result_schema: "1.0.0",
 				oracle: "project-token-rule",
 				thresholds: {

@@ -207,7 +207,7 @@ describe("release and toolchain contracts", () => {
 			}
 			expect(result.status).toBe(0);
 
-			const addResult = spawnSync("git", ["add", "dist/afol"], {
+			const addResult = spawnSync("git", ["add", "-f", "dist/afol"], {
 				cwd: root,
 				encoding: "utf8",
 				env: gitEnv,
@@ -281,7 +281,7 @@ describe("release and toolchain contracts", () => {
 		try {
 			for (const args of [
 				["init"],
-				["add", "dist/afol", "bun.lock"],
+				["add", "-f", "dist/afol", "bun.lock"],
 				["commit", "--no-verify", "-m", "test release provenance"],
 			]) {
 				const result = spawnSync("git", args, {

@@ -112,12 +112,18 @@ function resolveScenarioInvocation(
 	repoRoot: string,
 	projectRoot: string,
 	command: string,
+	preferLocalWrapper = true,
 ): CommandInvocation {
 	const tokens = tokenizeCommand(command);
 	if (tokens.length === 0) {
 		throw new Error("Empty scenario command");
 	}
-	return resolveCommandInvocation(repoRoot, projectRoot, tokens, true);
+	return resolveCommandInvocation(
+		repoRoot,
+		projectRoot,
+		tokens,
+		preferLocalWrapper,
+	);
 }
 
 function resolveCommandInvocation(
@@ -358,7 +364,7 @@ function runSandboxScenarioCommand(
 				REAL_REPO_ROOT,
 				sandboxRoot,
 				setupCommand,
-				true,
+				false,
 			);
 			const setupSample = runScenarioSample(sandboxRoot, setupInvocation);
 			if (!isCommandSuccess(setupSample)) {
@@ -373,6 +379,7 @@ function runSandboxScenarioCommand(
 			REAL_REPO_ROOT,
 			sandboxRoot,
 			command,
+			false,
 		);
 		const sample = runScenarioSample(sandboxRoot, invocation);
 		const passed = scenarioSamplePassed(sample, expectedExit);
