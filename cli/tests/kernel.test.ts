@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CLI_VERSION } from "../generated/version";
 import { kernelRegistry } from "../registry";
-import { waiveSpecCheck } from "../services/spec-gate";
+import { waiveSpecCheck } from "../services/spec-gate/checker";
 import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;

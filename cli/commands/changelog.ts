@@ -1,7 +1,7 @@
 import {
 	addChangelogEntry,
 	type ChangelogEntryType,
-} from "../services/spec-gate";
+} from "../services/spec-gate/changelog";
 import { type CommandIo, DEFAULT_IO, writeLegacyJsonEnvelope } from "./io";
 
 function parseArgs(args: string[]): {

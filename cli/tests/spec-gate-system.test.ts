@@ -14,13 +14,15 @@ import { runSpecCommand } from "../commands/spec";
 import {
 	abandonAdr,
 	acceptAdr,
-	addChangelogEntry,
-	checkSpecCompatibility,
 	createAdr,
-	getSpecCheck,
 	supersedeAdr,
+} from "../services/spec-gate/adr";
+import { addChangelogEntry } from "../services/spec-gate/changelog";
+import {
+	checkSpecCompatibility,
+	getSpecCheck,
 	waiveSpecCheck,
-} from "../services/spec-gate";
+} from "../services/spec-gate/checker";
 
 type CapturedIo = {
 	stdout: string[];

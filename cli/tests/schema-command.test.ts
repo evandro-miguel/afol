@@ -8,13 +8,12 @@ import {
 	remoteOperationContext,
 } from "../core/operation-context";
 import { buildSchemaCacheKey } from "../core/schema-cache-key";
+import { detectShape, writeShapePack } from "../services/schema/detector";
 import {
 	detectResolver,
-	detectShape,
 	resolverPathForRoot,
 	writeResolver,
-	writeShapePack,
-} from "../services/schema";
+} from "../services/schema/resolver";
 
 function mkRoot(name: string): string {
 	return mkdtempSync(join(tmpdir(), `schema-${name}-`));

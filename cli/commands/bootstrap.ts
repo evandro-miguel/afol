@@ -21,6 +21,11 @@ import { planBootstrapOperations } from "../services/bootstrap/planner";
 import { normalizeProjectRelativePath } from "../services/project/paths";
 import { resolveProjectWritePath } from "../services/project/root";
 import { validateMutationRuntime } from "../services/state/validate";
+import {
+	isTemplatePathMatch,
+	manifestTemplatePatterns,
+	resolveManifestTemplatePath,
+} from "../services/template/manifest-paths";
 import type { TemplateFileMap } from "../services/template/payload";
 
 type BootstrapArgs = {
@@ -460,54 +465,6 @@ function readTargetFiles(
 		}
 	}
 	return files;
-}
-
-function normalizeManifestPath(path: string): string {
-	return path
-		.trim()
-		.replace(/\\/g, "/")
-		.replace(/^\.\/+/, "")
-		.replace(/^\/+/, "")
-		.replace(/\/+/g, "/");
-}
-
-function manifestTemplatePatterns(path: string): string[] {
-	const normalized = normalizeManifestPath(path);
-	if (!normalized) {
-		return [];
-	}
-	if (normalized.startsWith(".agents/") || normalized.startsWith(".afol/")) {
-		return [normalized];
-	}
-
-	const legacyAfolAdmPrefixes = ["hooks/", "rules/", "source/"];
-	for (const prefix of legacyAfolAdmPrefixes) {
-		if (normalized.startsWith(prefix)) {
-			return [`.afol/adm/${normalized}`, normalized, `.agents/${normalized}`];
-		}
-	}
-
-	if (normalized === "tools.json") {
-		return [".afol/adm/tools.json", normalized, `.agents/${normalized}`];
-	}
-	if (normalized.startsWith("data/") || normalized.startsWith("tmp/")) {
-		return [`.afol/${normalized}`, normalized, `.agents/${normalized}`];
-	}
-
-	return [normalized, `.agents/${normalized}`];
-}
-
-function resolveManifestTemplatePath(
-	path: string,
-	templatePathSet: Set<string>,
-): string | undefined {
-	return manifestTemplatePatterns(path).find((candidate) =>
-		templatePathSet.has(candidate),
-	);
-}
-
-function isTemplatePathMatch(pattern: string, path: string): boolean {
-	return path === pattern || path.startsWith(`${pattern}/`);
 }
 
 function hasOwnershipOwner(value: unknown): value is ManagedOwnership {

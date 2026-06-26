@@ -3,7 +3,7 @@ import {
 	envelopeWithLegacyKeys,
 	stringifyEnvelope,
 } from "../core/envelope";
-import { runDoctor } from "../services/health";
+import { runDoctor } from "../services/health/doctor";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 type DoctorJsonData = ReturnType<typeof runDoctor> & {

@@ -3,19 +3,20 @@ import {
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
-import { checkAreaHealth, runDoctor } from "../services/health";
-import type { LibraryClaim, LibrarySource } from "../services/library";
+import { checkAreaHealth } from "../services/health/checker";
+import { runDoctor } from "../services/health/doctor";
 import {
 	addClaim,
 	addSource,
-	buildLibraryGraph,
 	getTopic,
 	invalidateClaim,
 	listTopics,
 	proposeTopic,
 	rebuildLibraryIndex,
 	searchLibrary,
-} from "../services/library";
+} from "../services/library/crud";
+import { buildLibraryGraph } from "../services/library/graph";
+import type { LibraryClaim, LibrarySource } from "../services/library/types";
 import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
 const jsonOutput = createJsonWriters("library");

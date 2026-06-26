@@ -15,7 +15,7 @@ import {
 	reviewPstrCandidates,
 	suggestPstrChanges,
 	validatePstrIndex,
-} from "../services/pstr";
+} from "../services/pstr/builder";
 import { getPstrWatchTargets } from "../services/pstr/watch";
 import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 

@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDbCommand } from "../commands/db";
-import { openDb } from "../services/state";
+import { openDb } from "../services/state/db";
 import { checkDbHealth } from "../services/state/db-health";
 import { hydrateSession } from "../services/state/session-state";
 

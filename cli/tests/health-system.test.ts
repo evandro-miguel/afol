@@ -15,20 +15,23 @@ import { runDoctorCommand } from "../commands/doctor";
 import { runHealthCommand } from "../commands/health";
 import { runMaintenanceCommand } from "../commands/maintenance";
 import { agentOperationContext } from "../core/operation-context";
+import { checkHealth } from "../services/health/checker";
+import { runDoctor } from "../services/health/doctor";
 import {
-	checkHealth,
 	maintenanceMonthly,
 	maintenanceWeekly,
-	runDoctor,
-} from "../services/health";
+} from "../services/health/maintenance";
 import {
 	readMaintenanceReviewSummary,
 	scanLegacyReferences,
 } from "../services/health/maintenance-review";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
-import { writeMemory as writeProjectMemory } from "../services/memory";
-import { buildPstrSnapshotManifest, rebuildPstrIndex } from "../services/pstr";
-import { openDb } from "../services/state";
+import { writeMemory as writeProjectMemory } from "../services/memory/crud";
+import {
+	buildPstrSnapshotManifest,
+	rebuildPstrIndex,
+} from "../services/pstr/builder";
+import { openDb } from "../services/state/db";
 
 type CapturedIo = {
 	stdout: string[];

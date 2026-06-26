@@ -19,8 +19,8 @@ import {
 	buildPstrDiff,
 	getPstrAffectedAreas,
 	PSTR_AREAS,
-} from "../services/pstr";
-import { rebuildPstrIndex } from "../services/pstr/builder";
+	rebuildPstrIndex,
+} from "../services/pstr/builder";
 import { getPstrWatchTargets } from "../services/pstr/watch";
 import {
 	detectShape,

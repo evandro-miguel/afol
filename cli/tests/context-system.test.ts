@@ -22,8 +22,9 @@ import {
 	proposeTopic,
 } from "../services/library/crud";
 import { writeMemory } from "../services/memory/crud";
-import { rebuildPstrIndex, validatePstrIndex } from "../services/pstr";
-import { hydrateSession, validateState } from "../services/state";
+import { rebuildPstrIndex, validatePstrIndex } from "../services/pstr/builder";
+import { hydrateSession } from "../services/state/hydrate";
+import { validateState } from "../services/state/validate";
 
 type IoCapture = {
 	stdout: string[];

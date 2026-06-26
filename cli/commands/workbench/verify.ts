@@ -5,8 +5,8 @@ import { resolveProjectPath } from "../../services/project/root";
 import {
 	checkSpecCompatibility,
 	getSpecCheck,
-	type SpecCheckResult,
-} from "../../services/spec-gate";
+} from "../../services/spec-gate/checker";
+import type { SpecCheckResult } from "../../services/spec-gate/types";
 import {
 	defaultAllowGlobalFallback,
 	isCiMode,

@@ -1,9 +1,9 @@
-import type { SpecCheckResult } from "../services/spec-gate";
 import {
 	checkSpecCompatibility,
 	getSpecCheck,
 	waiveSpecCheck,
-} from "../services/spec-gate";
+} from "../services/spec-gate/checker";
+import type { SpecCheckResult } from "../services/spec-gate/types";
 import { type CommandIo, DEFAULT_IO, writeLegacyJsonEnvelope } from "./io";
 
 type SpecAction = "check" | "conflict" | "waive";

@@ -5,8 +5,8 @@ import {
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
-import type { DriftReport } from "../services/drift";
-import { runDriftCheck } from "../services/drift";
+import { runDriftCheck } from "../services/drift/checker";
+import type { DriftReport } from "../services/drift/types";
 import { validateProjectStructure } from "../services/project/validate";
 import { type CommandIo, DEFAULT_IO } from "./io";
 

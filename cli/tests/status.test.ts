@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { runStatusCommand } from "../commands/status";
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
-import { rebuildPstrIndex } from "../services/pstr";
+import { rebuildPstrIndex } from "../services/pstr/builder";
 import { collectGlobalStatusFindings } from "../services/status/global-findings";
 
 type CapturedIo = {

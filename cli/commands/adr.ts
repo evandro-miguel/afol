@@ -4,7 +4,7 @@ import {
 	archiveAdr,
 	createAdr,
 	supersedeAdr,
-} from "../services/spec-gate";
+} from "../services/spec-gate/adr";
 import { type CommandIo, DEFAULT_IO, writeLegacyJsonEnvelope } from "./io";
 
 type AdrAction = "new" | "accept" | "supersede" | "abandon" | "archive";

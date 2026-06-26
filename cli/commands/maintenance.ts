@@ -9,7 +9,10 @@ import {
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
-import { maintenanceMonthly, maintenanceWeekly } from "../services/health";
+import {
+	maintenanceMonthly,
+	maintenanceWeekly,
+} from "../services/health/maintenance";
 import {
 	MAINTENANCE_REVIEW_AREAS,
 	type MaintenanceReviewAreaSelection,

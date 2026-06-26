@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runSweepCommand } from "../commands/sweep";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
-import { writeMemory as writeProjectMemory } from "../services/memory";
-import { openDb } from "../services/state";
+import { writeMemory as writeProjectMemory } from "../services/memory/crud";
+import { openDb } from "../services/state/db";
 
 function initGitRepo(root: string): void {
 	const git = (args: string[]): void => {

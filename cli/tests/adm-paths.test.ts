@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAdmCommand } from "../commands/adm";
-import { resolveAdmPaths } from "../services/adm";
+import { resolveAdmPaths } from "../services/adm/paths";
 
 type CapturedIo = {
 	stdout: string[];

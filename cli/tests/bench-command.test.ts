@@ -3,8 +3,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runBenchCommand } from "../commands/bench";
-import { classifyCommand, parseEventStream } from "../services/benchmark";
 import { runCliMicroBenchmark } from "../services/benchmark/cli-micro";
+import {
+	classifyCommand,
+	parseEventStream,
+} from "../services/benchmark/metrics";
 
 type CapturedIo = {
 	stdout: string[];

@@ -226,6 +226,24 @@ function buildLiveMapEntries(
 		.filter((entry) => entry.file_count > 0);
 }
 
+function mergePstrMapEntries(
+	previousMaps: PstrMapEntry[],
+	affectedAreaIds: string[],
+	replacementEntries: PstrMapEntry[],
+): PstrMapEntry[] {
+	const affectedIdSet = new Set(affectedAreaIds);
+	const previousById = new Map(previousMaps.map((entry) => [entry.id, entry]));
+	const replacementById = new Map(
+		replacementEntries.map((entry) => [entry.id, entry]),
+	);
+
+	return PSTR_AREAS.map((area) =>
+		affectedIdSet.has(area.id)
+			? replacementById.get(area.id)
+			: previousById.get(area.id),
+	).filter((entry): entry is PstrMapEntry => Boolean(entry));
+}
+
 function buildPstrSnapshot(
 	projectRoot: string,
 	maps: PstrMapEntry[],
@@ -767,26 +785,15 @@ export function rebuildPstrIndex(
 	let snapshot: PstrIndexSnapshot;
 	let rewrittenAreaIds: string[] | null = null;
 
-	if (previousSnapshot && affectedAreaIds && affectedAreaIds.length === 0) {
-		snapshot = buildPstrSnapshot(projectRoot, [...previousSnapshot.maps]);
-	} else if (
-		previousSnapshot &&
-		affectedAreaIds &&
-		affectedAreaIds.length > 0
-	) {
-		const nextMapById = new Map(
-			previousSnapshot.maps.map((entry) => [entry.id, entry] as const),
-		);
-		for (const areaId of affectedAreaIds) {
-			nextMapById.delete(areaId);
-		}
-		for (const entry of buildLiveMapEntries(projectRoot, affectedAreaIds)) {
-			nextMapById.set(entry.id, entry);
-		}
+	if (previousSnapshot && affectedAreaIds) {
 		snapshot = buildPstrSnapshot(
 			projectRoot,
-			PSTR_AREAS.map((area) => nextMapById.get(area.id)).filter(
-				(entry): entry is PstrMapEntry => Boolean(entry),
+			mergePstrMapEntries(
+				previousSnapshot.maps,
+				affectedAreaIds,
+				affectedAreaIds.length > 0
+					? buildLiveMapEntries(projectRoot, affectedAreaIds)
+					: [],
 			),
 		);
 		rewrittenAreaIds = affectedAreaIds;
@@ -805,10 +812,12 @@ export function rebuildPstrIndex(
 		}
 	}
 
+	const rewrittenAreaIdSet =
+		rewrittenAreaIds === null ? null : new Set(rewrittenAreaIds);
 	const entriesToWrite =
-		rewrittenAreaIds === null
+		rewrittenAreaIdSet === null
 			? snapshot.maps
-			: snapshot.maps.filter((entry) => rewrittenAreaIds.includes(entry.id));
+			: snapshot.maps.filter((entry) => rewrittenAreaIdSet.has(entry.id));
 	for (const entry of entriesToWrite) {
 		writeAreaMarkdown(projectRoot, entry);
 	}

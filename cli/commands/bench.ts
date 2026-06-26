@@ -2,16 +2,11 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
-	type BenchResult,
-	DEFAULT_BENCH_PACK_ID,
-	listBenchScenarios,
-	runLiveBenchmark,
-} from "../services/benchmark";
-import {
 	type CliMicroResult,
 	runCliMicroBenchmark,
 	summarizeCliMicro,
 } from "../services/benchmark/cli-micro";
+import { runLiveBenchmark } from "../services/benchmark/live-runner";
 import {
 	buildReport,
 	loadBaseline,
@@ -19,7 +14,9 @@ import {
 	saveBaseline,
 	saveRunArchive,
 } from "../services/benchmark/report";
-import type { BenchScenario } from "../services/benchmark/types";
+import { listBenchScenarios } from "../services/benchmark/scenarios";
+import type { BenchResult, BenchScenario } from "../services/benchmark/types";
+import { DEFAULT_BENCH_PACK_ID } from "../services/benchmark/types";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 type BenchAction =

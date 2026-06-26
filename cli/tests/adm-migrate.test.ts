@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAdmCommand } from "../commands/adm";
-import { validateAdmMigration } from "../services/adm";
+import { validateAdmMigration } from "../services/adm/validate";
 
 type CapturedIo = {
 	stdout: string[];
