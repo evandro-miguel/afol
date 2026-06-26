@@ -1,0 +1,8 @@
+{"id":"E-20260620105756116-2294c7","task_id":"T-01","created_at":"2026-06-20T14:57:56.116Z","command":"afol adapter disable claude --json","result":"passed"}
+{"id":"E-20260620105756182-4c916f","task_id":"T-01","created_at":"2026-06-20T14:57:56.182Z","command":"bun run template:generate","result":"passed"}
+{"id":"E-20260620105756249-499600","task_id":"T-01","created_at":"2026-06-20T14:57:56.249Z","command":"bun run template:check","result":"passed"}
+{"id":"E-20260620105756315-9a35e6","task_id":"T-01","created_at":"2026-06-20T14:57:56.315Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260620105756384-05cfb9","task_id":"T-01","created_at":"2026-06-20T14:57:56.384Z","command":"bun test","result":"passed"}
+{"id":"E-20260620105756453-bbb12a","task_id":"T-01","created_at":"2026-06-20T14:57:56.453Z","command":"bun run validate:release","result":"passed"}
+{"id":"E-20260620105756522-f0bd88","task_id":"T-01","created_at":"2026-06-20T14:57:56.522Z","command":"afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260620105756590-b96850","task_id":"T-01","created_at":"2026-06-20T14:57:56.590Z","command":"afol validate project --json","result":"passed"}

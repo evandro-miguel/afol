@@ -1,108 +1,1136 @@
 {
-  "version": "2.0.0",
-  "updated_at": "2026-06-16T00:00:00Z",
-  "description": "Static AFOL-only command catalog for retained scaffold metadata.",
+  "version": "2.1.0",
+  "updated_at": "2026-06-20T00:00:00Z",
+  "description": "Static AFOL-only command catalog derived from the registry-backed afol help surface.",
+  "generated_from": "afol help --json",
   "tools": [
     {
       "id": "status",
       "name": "AFOL Status",
       "tool": "afol",
       "wrapper_command": "afol status",
-      "type": "inspection",
-      "execution_mode": "on-demand",
-      "description": "Show compact project and session state before governed work."
+      "aliases": [
+        "s"
+      ],
+      "category": "core",
+      "type": "core",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Show current project status",
+      "subcommands": [
+        {
+          "usage": "--json",
+          "side_effect": "read",
+          "description": "Emit machine-readable project status"
+        },
+        {
+          "usage": "--session <session-id>",
+          "side_effect": "read",
+          "description": "Resolve status around a specific session"
+        }
+      ]
     },
     {
-      "id": "new",
-      "name": "AFOL New",
+      "id": "validate",
+      "name": "AFOL Validate",
       "tool": "afol",
-      "wrapper_command": "afol new <theme> --feature-id <feature-id> --parent-spec <spec-id>",
-      "type": "creation",
+      "wrapper_command": "afol validate",
+      "aliases": [
+        "v",
+        "ck",
+        "check"
+      ],
+      "category": "core",
+      "type": "core",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Run validation gates",
+      "subcommands": [
+        {
+          "usage": "project --json",
+          "side_effect": "read",
+          "description": "Validate project structure and AFOL indexes"
+        },
+        {
+          "usage": "project --check-drift --json",
+          "side_effect": "read",
+          "description": "Validate project structure and include drift checks"
+        },
+        {
+          "usage": "drift --json",
+          "side_effect": "read",
+          "description": "Run drift validation only"
+        },
+        {
+          "usage": "bench --pack <pack-id> --json",
+          "side_effect": "read",
+          "description": "Run one benchmark pack with its configured gates"
+        },
+        {
+          "usage": "select --changed-path <path>",
+          "side_effect": "read",
+          "description": "Show which benchmark packs match changed paths"
+        },
+        {
+          "usage": "run --changed-path <path>",
+          "side_effect": "read",
+          "description": "Run benchmark packs selected from changed paths"
+        }
+      ]
+    },
+    {
+      "id": "init",
+      "name": "AFOL Init",
+      "tool": "afol",
+      "wrapper_command": "afol init",
+      "aliases": [
+        "i"
+      ],
+      "category": "core",
+      "type": "core",
+      "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Create a governed session under .afol/wb for implementation or delivery work."
+      "description": "Install scaffold; use --dry-run to preview writes",
+      "subcommands": [
+        {
+          "usage": "--dry-run",
+          "side_effect": "read",
+          "description": "Preview scaffold install without writing"
+        }
+      ]
     },
     {
       "id": "start",
       "name": "AFOL Start",
       "tool": "afol",
-      "wrapper_command": "afol start --session <session-id> --task-id <task-id>",
-      "type": "lifecycle",
+      "wrapper_command": "afol start",
+      "aliases": [
+        "st"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Move a governed task to in_progress before edits."
-    },
-    {
-      "id": "evidence",
-      "name": "AFOL Evidence",
-      "tool": "afol",
-      "wrapper_command": "afol evidence --session <session-id> --task-id <task-id> --command \"<cmd>\" --result passed",
-      "type": "lifecycle",
-      "execution_mode": "on-demand",
-      "description": "Record command evidence for a governed task."
+      "description": "Start a workbench task",
+      "subcommands": [
+        {
+          "usage": "--session <session-id> --task-id <task-id>",
+          "side_effect": "write",
+          "description": "Start a specific task in a specific session"
+        },
+        {
+          "usage": "--task-id <task-id>",
+          "side_effect": "write",
+          "description": "Start a task in the active or context session"
+        },
+        {
+          "usage": "--json",
+          "side_effect": "write",
+          "description": "Emit machine-readable start result"
+        }
+      ]
     },
     {
       "id": "done",
       "name": "AFOL Done",
       "tool": "afol",
-      "wrapper_command": "afol done --session <session-id> --task-id <task-id>",
-      "type": "lifecycle",
+      "wrapper_command": "afol done",
+      "aliases": [
+        "d"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Mark a task complete after relevant validation and evidence."
+      "description": "Complete a task session",
+      "subcommands": [
+        {
+          "usage": "--session <session-id> --task-id <task-id>",
+          "side_effect": "write",
+          "description": "Mark a task complete"
+        },
+        {
+          "usage": "--test \"<cmd>\"",
+          "side_effect": "write",
+          "description": "Run a verification command, record evidence, then complete"
+        },
+        {
+          "usage": "--command \"<cmd>\" --result passed",
+          "side_effect": "write",
+          "description": "Record explicit evidence while completing the task"
+        },
+        {
+          "usage": "--require-spec-check",
+          "side_effect": "write",
+          "description": "Block done when the linked spec check conflicts"
+        }
+      ]
+    },
+    {
+      "id": "new",
+      "name": "AFOL New",
+      "tool": "afol",
+      "wrapper_command": "afol new",
+      "aliases": [
+        "n"
+      ],
+      "category": "core",
+      "type": "core",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Create a workbench session",
+      "subcommands": [
+        {
+          "usage": "<theme> --task <summary>",
+          "side_effect": "write",
+          "description": "Create a session with one or more initial tasks"
+        },
+        {
+          "usage": "<theme> --feature-id <F-id> --parent-spec <spec-id>",
+          "side_effect": "write",
+          "description": "Create a governed session linked to feature/spec"
+        },
+        {
+          "usage": "<theme> --intent <text>",
+          "side_effect": "write",
+          "description": "Attach explicit intent metadata to the session"
+        }
+      ]
+    },
+    {
+      "id": "log",
+      "name": "AFOL Log",
+      "tool": "afol",
+      "wrapper_command": "afol log",
+      "aliases": [
+        "l"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "append",
+      "execution_mode": "append",
+      "description": "Append a session log entry",
+      "subcommands": [
+        {
+          "usage": "--session <session-id> --message <text>",
+          "side_effect": "append",
+          "description": "Append a timeline note to a session"
+        },
+        {
+          "usage": "--json",
+          "side_effect": "append",
+          "description": "Emit machine-readable log result"
+        }
+      ]
+    },
+    {
+      "id": "quick-task",
+      "name": "AFOL Quick Task",
+      "tool": "afol",
+      "wrapper_command": "afol quick-task",
+      "aliases": [
+        "qt"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Run a single-task lifecycle after executing a verification command",
+      "subcommands": [
+        {
+          "usage": "<theme> --task <summary> --command \"<cmd>\"",
+          "side_effect": "write",
+          "description": "Create, start, verify, record evidence, and close one task"
+        },
+        {
+          "usage": "--result passed --artifact <path> --note <text>",
+          "side_effect": "write",
+          "description": "Attach explicit evidence metadata to the quick task"
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "name": "AFOL Evidence",
+      "tool": "afol",
+      "wrapper_command": "afol evidence",
+      "aliases": [
+        "e"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "append",
+      "execution_mode": "append",
+      "description": "Record task evidence",
+      "subcommands": [
+        {
+          "usage": "--session <session-id> --task-id <task-id>",
+          "side_effect": "append",
+          "description": "Target the task that owns the evidence"
+        },
+        {
+          "usage": "--command \"<cmd>\" --result passed",
+          "side_effect": "append",
+          "description": "Record the verification command and result"
+        },
+        {
+          "usage": "--artifact <path> --note <text>",
+          "side_effect": "append",
+          "description": "Attach optional artifact and note metadata"
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "name": "AFOL Hook",
+      "tool": "afol",
+      "wrapper_command": "afol hook",
+      "aliases": [
+        "hk"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect hooks",
+      "subcommands": []
+    },
+    {
+      "id": "rule",
+      "name": "AFOL Rule",
+      "tool": "afol",
+      "wrapper_command": "afol rule",
+      "aliases": [
+        "r"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect rules",
+      "subcommands": []
+    },
+    {
+      "id": "skill",
+      "name": "AFOL Skill",
+      "tool": "afol",
+      "wrapper_command": "afol skill",
+      "aliases": [
+        "sk"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect skills",
+      "subcommands": []
     },
     {
       "id": "close",
       "name": "AFOL Close",
       "tool": "afol",
-      "wrapper_command": "afol close --session <session-id>",
-      "type": "lifecycle",
+      "wrapper_command": "afol close",
+      "aliases": [
+        "c"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Close a governed session after tasks are complete."
+      "description": "Close the active session",
+      "subcommands": [
+        {
+          "usage": "--session <session-id>",
+          "side_effect": "write",
+          "description": "Close a specific session after its tasks are complete"
+        },
+        {
+          "usage": "--json",
+          "side_effect": "write",
+          "description": "Emit machine-readable close result"
+        }
+      ]
     },
     {
-      "id": "verify-tasks",
-      "name": "AFOL Verify Tasks",
+      "id": "file",
+      "name": "AFOL File",
       "tool": "afol",
-      "wrapper_command": "afol verify-tasks --strict",
-      "type": "validation",
+      "wrapper_command": "afol file",
+      "aliases": [
+        "f"
+      ],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Verify workbench task state and evidence consistency."
-    },
-    {
-      "id": "validate-project",
-      "name": "AFOL Validate Project",
-      "tool": "afol",
-      "wrapper_command": "afol validate project --json",
-      "type": "validation",
-      "execution_mode": "on-demand",
-      "description": "Run compact project validation."
-    },
-    {
-      "id": "local-state",
-      "name": "AFOL Local State",
-      "tool": "afol",
-      "wrapper_command": "afol local-state rebuild --json",
-      "type": "indexing",
-      "execution_mode": "on-demand",
-      "description": "Rebuild local AFOL state indexes when scaffold metadata changes."
+      "description": "Safely patch, move, archive, and undo files; supports dry-run",
+      "subcommands": [
+        {
+          "usage": "pt|patch --path <path> --dry-run",
+          "side_effect": "read",
+          "description": "Preview patch diff without writing"
+        },
+        {
+          "usage": "pt|patch --path <path>",
+          "side_effect": "write",
+          "description": "Patch file with backup and mutation journal"
+        },
+        {
+          "usage": "mv|move --from <path> --to <path>",
+          "side_effect": "write",
+          "description": "Move file with backup and mutation journal"
+        },
+        {
+          "usage": "ar|archive --path <path>",
+          "side_effect": "write",
+          "description": "Archive file with undo support"
+        },
+        {
+          "usage": "ud|undo --mutation-id <id>",
+          "side_effect": "write",
+          "description": "Undo a recorded mutation"
+        }
+      ]
     },
     {
       "id": "update",
       "name": "AFOL Update",
       "tool": "afol",
-      "wrapper_command": "afol update check",
-      "type": "maintenance",
+      "wrapper_command": "afol update",
+      "aliases": [
+        "up"
+      ],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Check scaffold updates with compact output."
+      "description": "Run scaffold updates; preview and apply --dry-run are safe checks",
+      "subcommands": [
+        {
+          "usage": "check",
+          "side_effect": "read",
+          "description": "Summarize available scaffold update changes"
+        },
+        {
+          "usage": "preview",
+          "side_effect": "read",
+          "description": "Show the planned update manifest without writing"
+        },
+        {
+          "usage": "apply --dry-run",
+          "side_effect": "read",
+          "description": "Validate apply behavior without writing files"
+        },
+        {
+          "usage": "apply --session <id> --task-id <id> --reason <text>",
+          "side_effect": "write",
+          "description": "Apply managed updates and record mutation metadata"
+        }
+      ]
+    },
+    {
+      "id": "bootstrap",
+      "name": "AFOL Bootstrap",
+      "tool": "afol",
+      "wrapper_command": "afol bootstrap",
+      "aliases": [
+        "b"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Install scaffold into another repo; use --dry-run to preview",
+      "subcommands": [
+        {
+          "usage": "<target-path> --dry-run",
+          "side_effect": "read",
+          "description": "Preview bootstrap into another repository"
+        },
+        {
+          "usage": "<target-path>",
+          "side_effect": "write",
+          "description": "Install the scaffold into the target repository"
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "name": "AFOL Verify",
+      "tool": "afol",
+      "wrapper_command": "afol verify",
+      "aliases": [
+        "vf"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Verify workbench tasks",
+      "subcommands": [
+        {
+          "usage": "[session-path] --strict",
+          "side_effect": "read",
+          "description": "Require all tasks in a session path to be complete"
+        },
+        {
+          "usage": "--session <session-id> --json",
+          "side_effect": "read",
+          "description": "Verify one session and emit machine-readable output"
+        }
+      ]
+    },
+    {
+      "id": "verify-tasks",
+      "name": "AFOL Verify Tasks",
+      "tool": "afol",
+      "wrapper_command": "afol verify-tasks",
+      "aliases": [
+        "vt"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Verify workbench tasks",
+      "subcommands": [
+        {
+          "usage": "[session-path] --strict",
+          "side_effect": "read",
+          "description": "Require all tasks in a session path to be complete"
+        },
+        {
+          "usage": "--session <session-id> --json",
+          "side_effect": "read",
+          "description": "Verify one session and emit machine-readable output"
+        }
+      ]
+    },
+    {
+      "id": "local-state",
+      "name": "AFOL Local State",
+      "tool": "afol",
+      "wrapper_command": "afol local-state",
+      "aliases": [
+        "ls"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "generated",
+      "execution_mode": "generated-output",
+      "description": "Inspect local project indexes",
+      "subcommands": [
+        {
+          "usage": "freshness|fs --json",
+          "side_effect": "read",
+          "description": "Check whether local-state indexes are fresh"
+        },
+        {
+          "usage": "rebuild|rb --json",
+          "side_effect": "generated",
+          "description": "Refresh indexes and emit compact counts"
+        },
+        {
+          "usage": "rebuild|rb --json --verbose",
+          "side_effect": "generated",
+          "description": "Refresh indexes and include full snapshots"
+        }
+      ]
+    },
+    {
+      "id": "pstr",
+      "name": "AFOL Pstr",
+      "tool": "afol",
+      "wrapper_command": "afol pstr",
+      "aliases": [
+        "ps"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect structure maps",
+      "subcommands": []
+    },
+    {
+      "id": "ctx",
+      "name": "AFOL Ctx",
+      "tool": "afol",
+      "wrapper_command": "afol ctx",
+      "aliases": [
+        "cx"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "generated",
+      "execution_mode": "generated-output",
+      "description": "Inspect context bundles",
+      "subcommands": [
+        {
+          "usage": "build",
+          "side_effect": "generated",
+          "description": "Rebuild the section index"
+        },
+        {
+          "usage": "bundle",
+          "side_effect": "generated",
+          "description": "Build a context bundle and refresh sections if needed"
+        },
+        {
+          "usage": "section --ref <ref>",
+          "side_effect": "generated",
+          "description": "Read one section and refresh sections if needed"
+        },
+        {
+          "usage": "explain",
+          "side_effect": "generated",
+          "description": "Explain bundle inputs and refresh sections if needed"
+        },
+        {
+          "usage": "tools",
+          "side_effect": "generated",
+          "description": "List context helpers and refresh sections if needed"
+        }
+      ]
+    },
+    {
+      "id": "state",
+      "name": "AFOL State",
+      "tool": "afol",
+      "wrapper_command": "afol state",
+      "aliases": [
+        "stt"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect state snapshot",
+      "subcommands": []
+    },
+    {
+      "id": "hydrate",
+      "name": "AFOL Hydrate",
+      "tool": "afol",
+      "wrapper_command": "afol hydrate",
+      "aliases": [
+        "hy"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "generated",
+      "execution_mode": "generated-output",
+      "description": "Generate hydrated project state",
+      "subcommands": []
+    },
+    {
+      "id": "render",
+      "name": "AFOL Render",
+      "tool": "afol",
+      "wrapper_command": "afol render",
+      "aliases": [],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "generated",
+      "execution_mode": "generated-output",
+      "description": "Deprecated alias for memory render",
+      "subcommands": []
+    },
+    {
+      "id": "library",
+      "name": "AFOL Library",
+      "tool": "afol",
+      "wrapper_command": "afol library",
+      "aliases": [
+        "lb"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect library entries",
+      "subcommands": []
+    },
+    {
+      "id": "memory",
+      "name": "AFOL Memory",
+      "tool": "afol",
+      "wrapper_command": "afol memory",
+      "aliases": [
+        "mm"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect memory entries",
+      "subcommands": []
+    },
+    {
+      "id": "adm",
+      "name": "AFOL Adm",
+      "tool": "afol",
+      "wrapper_command": "afol adm",
+      "aliases": [
+        "ad"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect adm paths and files",
+      "subcommands": []
+    },
+    {
+      "id": "spec",
+      "name": "AFOL Spec",
+      "tool": "afol",
+      "wrapper_command": "afol spec",
+      "aliases": [
+        "sp"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect specs",
+      "subcommands": []
+    },
+    {
+      "id": "adr",
+      "name": "AFOL Adr",
+      "tool": "afol",
+      "wrapper_command": "afol adr",
+      "aliases": [],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect ADRs",
+      "subcommands": []
+    },
+    {
+      "id": "changelog",
+      "name": "AFOL Changelog",
+      "tool": "afol",
+      "wrapper_command": "afol changelog",
+      "aliases": [
+        "cl"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect changelog entries",
+      "subcommands": []
+    },
+    {
+      "id": "health",
+      "name": "AFOL Health",
+      "tool": "afol",
+      "wrapper_command": "afol health",
+      "aliases": [
+        "ht"
+      ],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect health checks",
+      "subcommands": []
+    },
+    {
+      "id": "db",
+      "name": "AFOL Db",
+      "tool": "afol",
+      "wrapper_command": "afol db",
+      "aliases": [],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect database state",
+      "subcommands": []
+    },
+    {
+      "id": "doctor",
+      "name": "AFOL Doctor",
+      "tool": "afol",
+      "wrapper_command": "afol doctor",
+      "aliases": [
+        "dr"
+      ],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Inspect doctor checks",
+      "subcommands": []
+    },
+    {
+      "id": "maintenance",
+      "name": "AFOL Maintenance",
+      "tool": "afol",
+      "wrapper_command": "afol maintenance",
+      "aliases": [
+        "mt"
+      ],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Run maintenance checks",
+      "subcommands": []
+    },
+    {
+      "id": "sweep",
+      "name": "AFOL Sweep",
+      "tool": "afol",
+      "wrapper_command": "afol sweep",
+      "aliases": [
+        "sw"
+      ],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Run repository sweep checks",
+      "subcommands": []
+    },
+    {
+      "id": "schema",
+      "name": "AFOL Schema",
+      "tool": "afol",
+      "wrapper_command": "afol schema",
+      "aliases": [
+        "sc"
+      ],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Review schema state; apply and resolver --write can write files",
+      "subcommands": [
+        {
+          "usage": "detect",
+          "side_effect": "read",
+          "description": "Detect the project shape without writing"
+        },
+        {
+          "usage": "suggest",
+          "side_effect": "read",
+          "description": "Suggest schema actions without writing"
+        },
+        {
+          "usage": "review",
+          "side_effect": "read",
+          "description": "Compare detected and current schema"
+        },
+        {
+          "usage": "resolver",
+          "side_effect": "read",
+          "description": "Render resolver guidance without writing"
+        },
+        {
+          "usage": "resolver --write",
+          "side_effect": "write",
+          "description": "Write resolver guidance for local callers"
+        },
+        {
+          "usage": "apply --dry-run",
+          "side_effect": "read",
+          "description": "Preview schema apply without writing"
+        },
+        {
+          "usage": "apply",
+          "side_effect": "write",
+          "description": "Write the detected schema pack for local callers"
+        }
+      ]
+    },
+    {
+      "id": "bench",
+      "name": "AFOL Bench",
+      "tool": "afol",
+      "wrapper_command": "afol bench",
+      "aliases": [
+        "be"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Run benchmarks: live metrics, CLI token economy, runtime-live dry-run",
+      "subcommands": [
+        {
+          "usage": "list",
+          "side_effect": "read",
+          "description": "List live benchmark scenarios"
+        },
+        {
+          "usage": "run --scenario <id>",
+          "side_effect": "read",
+          "description": "Run one live benchmark scenario"
+        },
+        {
+          "usage": "cli",
+          "side_effect": "read",
+          "description": "Run CLI micro benchmarks"
+        },
+        {
+          "usage": "report --run <path>",
+          "side_effect": "read",
+          "description": "Summarize a saved benchmark run"
+        },
+        {
+          "usage": "runtime-live",
+          "side_effect": "read",
+          "description": "Show runtime-live dry-run profile and validation command"
+        }
+      ]
+    },
+    {
+      "id": "project-benchmark",
+      "name": "AFOL Project Benchmark",
+      "tool": "afol",
+      "wrapper_command": "afol project-benchmark",
+      "aliases": [
+        "pb"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "generated",
+      "execution_mode": "generated-output",
+      "description": "Compare AFOL against curated reference projects",
+      "subcommands": [
+        {
+          "usage": "list",
+          "side_effect": "read",
+          "description": "List scored reference projects"
+        },
+        {
+          "usage": "show <project-id>",
+          "side_effect": "read",
+          "description": "Inspect one reference project by id or name"
+        },
+        {
+          "usage": "matrix --for <axis>",
+          "side_effect": "read",
+          "description": "Filter the score matrix by axis; omit --for for the full matrix"
+        },
+        {
+          "usage": "recommend --for <axis>",
+          "side_effect": "read",
+          "description": "Rank the best reference projects for one axis"
+        },
+        {
+          "usage": "validate --strict",
+          "side_effect": "read",
+          "description": "Fail validation on warnings; omit --strict for standard validation"
+        },
+        {
+          "usage": "generate --check",
+          "side_effect": "read",
+          "description": "Check generated outputs without writing files"
+        },
+        {
+          "usage": "generate",
+          "side_effect": "generated",
+          "description": "Refresh generated outputs with local approval"
+        }
+      ]
+    },
+    {
+      "id": "catchup",
+      "name": "AFOL Catchup",
+      "tool": "afol",
+      "wrapper_command": "afol catchup",
+      "aliases": [
+        "cu"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Compare active session artifacts against git state and report unsynced context",
+      "subcommands": []
+    },
+    {
+      "id": "preflight",
+      "name": "AFOL Preflight",
+      "tool": "afol",
+      "wrapper_command": "afol preflight",
+      "aliases": [
+        "pf"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Governance preflight: search specs, lessons, systems, and rules before planning",
+      "subcommands": []
+    },
+    {
+      "id": "adapter",
+      "name": "AFOL Adapter",
+      "tool": "afol",
+      "wrapper_command": "afol adapter",
+      "aliases": [
+        "adp"
+      ],
+      "category": "ops",
+      "type": "ops",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Enable or disable runtime adapters; use --dry-run to preview",
+      "subcommands": [
+        {
+          "usage": "list",
+          "side_effect": "read",
+          "description": "List runtime adapter state"
+        },
+        {
+          "usage": "enable <name> --dry-run",
+          "side_effect": "read",
+          "description": "Preview enabling an adapter"
+        },
+        {
+          "usage": "disable <name> --dry-run",
+          "side_effect": "read",
+          "description": "Preview disabling an adapter"
+        }
+      ]
+    },
+    {
+      "id": "telemetry",
+      "name": "AFOL Telemetry",
+      "tool": "afol",
+      "wrapper_command": "afol telemetry",
+      "aliases": [
+        "tel"
+      ],
+      "category": "inspect",
+      "type": "inspect",
+      "side_effect": "read",
+      "execution_mode": "read-only",
+      "description": "Query, report, and export AFOL telemetry events",
+      "subcommands": [
+        {
+          "usage": "query --limit <n>",
+          "side_effect": "read",
+          "description": "Show recent telemetry events; defaults to latest 10"
+        },
+        {
+          "usage": "report --limit <n>",
+          "side_effect": "read",
+          "description": "Summarize telemetry counts by session, type, and outcome"
+        },
+        {
+          "usage": "export --format jsonl",
+          "side_effect": "read",
+          "description": "Export filtered telemetry events"
+        }
+      ]
+    },
+    {
+      "id": "session",
+      "name": "AFOL Session",
+      "tool": "afol",
+      "wrapper_command": "afol session",
+      "aliases": [
+        "ss"
+      ],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "List, bind, switch, and unbind workbench sessions",
+      "subcommands": [
+        {
+          "usage": "list",
+          "side_effect": "read",
+          "description": "Show active session, context session, and bindings"
+        },
+        {
+          "usage": "bind --session <id> --dry-run",
+          "side_effect": "read",
+          "description": "Preview binding a session to current branch/worktree"
+        },
+        {
+          "usage": "bind --session <id> --actor <name>",
+          "side_effect": "write",
+          "description": "Bind a session to current branch/worktree context"
+        },
+        {
+          "usage": "switch <session-id>",
+          "side_effect": "write",
+          "description": "Set active session and bind current context"
+        },
+        {
+          "usage": "unbind <session-id>",
+          "side_effect": "write",
+          "description": "Remove a session context binding"
+        }
+      ]
     }
   ],
   "tool_categories": {
-    "inspection": ["status"],
-    "creation": ["new"],
-    "lifecycle": ["start", "evidence", "done", "close"],
-    "validation": ["verify-tasks", "validate-project"],
-    "indexing": ["local-state"],
-    "maintenance": ["update"]
+    "core": [
+      "status",
+      "validate",
+      "init",
+      "new"
+    ],
+    "workflow": [
+      "start",
+      "done",
+      "log",
+      "quick-task",
+      "evidence",
+      "close",
+      "bootstrap",
+      "verify",
+      "verify-tasks",
+      "session"
+    ],
+    "inspect": [
+      "hook",
+      "rule",
+      "skill",
+      "local-state",
+      "pstr",
+      "ctx",
+      "state",
+      "hydrate",
+      "render",
+      "library",
+      "memory",
+      "adm",
+      "spec",
+      "adr",
+      "changelog",
+      "bench",
+      "project-benchmark",
+      "catchup",
+      "preflight",
+      "telemetry"
+    ],
+    "ops": [
+      "file",
+      "update",
+      "health",
+      "db",
+      "doctor",
+      "maintenance",
+      "sweep",
+      "schema",
+      "adapter"
+    ]
   },
   "execution_modes": {
-    "on-demand": "Run only when the active task needs the command evidence or state transition."
+    "read-only": "Reads project, registry, validation, or telemetry state without mutating files.",
+    "generated-output": "Generates derived state or bundles; inspect command help before assuming no files are written.",
+    "append": "Appends governed lifecycle evidence or logs.",
+    "on-demand": "Can write or mutate project state; prefer dry-run flags when available and use only for the active task."
   }
 }

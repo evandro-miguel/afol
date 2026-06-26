@@ -38,7 +38,7 @@ places mutable AFOL state under `.afol/**`.
 
 ## 2. Install AFOL Into Another Project
 
-From the AFOL source checkout:
+From a shell where `afol` is available:
 
 ```bash
 afol bootstrap /path/to/project --provider-compatible --dry-run
@@ -58,8 +58,8 @@ Do not use `--partial`; current AFOL rejects partial installs.
 
 Before applying, inventory the receiving project:
 
-- project-owned guidance and docs such as `AGENTS.md`, `CLAUDE.md`, `RTK.md`,
-  root `docs/**`, runbooks, and local operational files agents already use;
+- project-owned guidance and docs such as `AGENTS.md`, `RTK.md`, root
+  `docs/**`, runbooks, and local operational files agents already use;
 - current provider-facing metadata and skills under `.agents/config.json`,
   `.agents/lock.json`, `.agents/manifest.json`, and the configured
   `paths.skills_dir`;
@@ -127,10 +127,10 @@ When updating this skill for a project:
 - edit the relevant `<paths.skills_dir>/<skill-name>/` files;
 - keep the global copy under `~/.codex/skills/<skill-name>/` in sync only when
   the change is intended for all projects;
-- do not copy caches, generated mirrors, or universal-skills source checkouts
-  into the project skill directory;
-- route durable shared skill changes through the universal-skills repo and its
-  normal review path.
+- do not copy caches or unrelated repository content into the project skill
+  directory;
+- route durable shared skill changes through the normal global
+  skill-maintenance workflow, not through ad hoc project edits.
 
 ## 6. Governed Workbench Execution
 
@@ -149,18 +149,19 @@ afol close --session <session-id>
 State lives in the configured `paths.wb_dir`, which defaults to `.afol/wb`.
 Pass `--session` explicitly when multiple agents or terminals are active.
 
-Task markers:
+Task state belongs in the workbench State Board, not in parallel checkbox
+rows:
 
-- `[ ]`: planned.
-- `[/]`: in progress.
-- `[!]`: blocked.
-- `[>]`: deferred.
-- `[%]`: implementation complete, verification pending.
-- `[&]`: verified, closure pending.
-- `[x]`: closed.
+- `pending`: planned.
+- `in_progress`: active execution.
+- `problem`: blocked.
+- `moved`: deferred.
+- `implemented_untested`: implementation complete, verification pending.
+- `tested_needs_spec_validation`: verified, closure pending.
+- `done`: closed.
 
-Move to `[&]` only after evidence exists. Move to `[x]` only after closure
-evidence exists.
+Move to `tested_needs_spec_validation` only after evidence exists. Move to
+`done` only after closure evidence exists.
 
 ## 7. Parallel Agent Handoff
 

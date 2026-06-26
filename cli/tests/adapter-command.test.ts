@@ -102,14 +102,13 @@ describe("claude adapter service", () => {
 		}
 	});
 
-	test("restoreClaudeArtifacts recreates template-owned files", () => {
+	test("restoreClaudeArtifacts is a no-op when template ships no Claude files", () => {
 		const root = createRoot(false);
 		try {
 			const restored = restoreClaudeArtifacts(root);
-			expect(restored).toContain("CLAUDE.md");
-			expect(restored.some((p) => p.startsWith(".claude/"))).toBe(true);
-			expect(existsSync(join(root, "CLAUDE.md"))).toBe(true);
-			expect(existsSync(join(root, ".claude", "README.md"))).toBe(true);
+			expect(restored).toEqual([]);
+			expect(existsSync(join(root, "CLAUDE.md"))).toBe(false);
+			expect(existsSync(join(root, ".claude", "README.md"))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -250,7 +249,7 @@ describe("afol adapter command", () => {
 		}
 	});
 
-	test("enable claude restores artifacts from embedded template", async () => {
+	test("enable claude flips config without recreating removed artifacts", async () => {
 		const root = createRoot(false);
 		const out = io();
 		try {
@@ -261,8 +260,9 @@ describe("afol adapter command", () => {
 			});
 			expect(code).toBe(0);
 			expect(readClaudeAdapterEnabled(root)).toBe(true);
-			expect(existsSync(join(root, "CLAUDE.md"))).toBe(true);
-			expect(existsSync(join(root, ".claude", "README.md"))).toBe(true);
+			expect(existsSync(join(root, "CLAUDE.md"))).toBe(false);
+			expect(existsSync(join(root, ".claude", "README.md"))).toBe(false);
+			expect(out.stdout.join("\n")).toContain("template empty");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

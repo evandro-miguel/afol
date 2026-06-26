@@ -1,0 +1,5 @@
+{"id":"E-20260620070234097-7b8ca3","task_id":"T-01","created_at":"2026-06-20T11:02:34.097Z","command":"bun run version:check && bun run release:provenance:release","result":"passed","note":"version registry and release provenance passed"}
+{"id":"E-20260620070234355-3e1efb","task_id":"T-02","created_at":"2026-06-20T11:02:34.355Z","command":"bun test cli/tests/update-command.test.ts cli/tests/bootstrap.test.ts","result":"passed","note":"update/bootstrap guardrail tests passed"}
+{"id":"E-20260620070234614-4d11b7","task_id":"T-03","created_at":"2026-06-20T11:02:34.614Z","command":"bun run kernel -- validate project --json","result":"passed","note":"project validation passed after local-state rebuild"}
+{"id":"E-20260620070234869-c91bd3","task_id":"T-04","created_at":"2026-06-20T11:02:34.869Z","command":"bun run validate:release","result":"passed","note":"full release gate passed"}
+{"id":"E-20260620070402970-ec0aad","task_id":"T-04","created_at":"2026-06-20T11:04:02.970Z","command":"bun run kernel -- verify-tasks --strict .afol/wb/260620_0624_release-version-governance","result":"passed","note":"strict workbench verification passed"}

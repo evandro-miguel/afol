@@ -51,7 +51,8 @@ Symptom:
 
 - dry-run or apply reports `provider-compatible-cleanup-pending`.
 - old `.agents/data`, `.agents/skills`, `.agents/tmp`, `.agents/wb`, or
-  `.agents/z-arq` still exists.
+  `.agents/z-arq` still exists, and the path is not the configured current
+  path in `.agents/config.json`.
 
 Cause:
 
@@ -66,7 +67,8 @@ afol init --provider-compatible --cleanup-provider-compatible-mutable \
 
 If the archive plan is correct, rerun without `--dry-run`. The migration
 archives those roots into `.afol/data/migrations/**`; it does not treat them as
-active runtime paths.
+active runtime paths. Do not archive `.agents/skills` when it is the active
+`paths.skills_dir`.
 
 ## 4. Obsolete Legacy Scaffold Files Were Preserved
 
@@ -138,15 +140,8 @@ afol local-state rebuild --json
 afol validate project --json
 ```
 
-For source-repo scaffold changes, add:
-
-```bash
-bun run validate:bootstrap
-bun run validate:template
-```
-
-Use broader release checks only when the change touches cross-cutting scaffold,
-runtime, or release behavior.
+If application code or config changed, add the project-local checks named by
+`AGENTS.md`, package scripts, or project docs.
 
 ## 8. `agents.config` Or Legacy Runtime Docs Found
 
@@ -162,7 +157,7 @@ Cause:
 Fix:
 
 - do not restore or extend the legacy surface;
-- migrate useful operational content into AFOL-owned docs or TypeScript AFOL
-  implementation;
+- migrate useful operational content into AFOL-owned docs or current scaffold
+  paths;
 - keep `.agents/**` limited to static provider metadata;
 - validate with `afol validate project`.

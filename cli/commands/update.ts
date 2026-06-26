@@ -17,6 +17,7 @@ import {
 	createMutationId,
 	type MutationRecord,
 } from "../services/mutations/journal";
+import { validateMutationRuntime } from "../services/state/validate";
 import {
 	checkTemplateUpdate,
 	formatUpdateCheck,
@@ -163,6 +164,8 @@ function writeAtomically(
 type UpdateApplyRuntime = {
 	failAfterWriteCount?: number | undefined;
 	failBeforeJournalAppend?: boolean | undefined;
+	cliRoot?: string | undefined;
+	invocationPath?: string | undefined;
 };
 
 type StagedUpdateOperation = {
@@ -456,6 +459,14 @@ export async function runUpdateCommand(
 					);
 				}
 				requireApplyContext(parsedArgs);
+				const runtimeValidation = validateMutationRuntime({
+					cliRoot: runtime.cliRoot,
+					invocationPath: runtime.invocationPath,
+					operation: "update apply",
+				});
+				if (!runtimeValidation.ok) {
+					throw new Error(runtimeValidation.message);
+				}
 			}
 			applyUpdateOperations(
 				projectRoot,

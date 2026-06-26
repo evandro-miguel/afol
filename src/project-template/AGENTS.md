@@ -33,14 +33,42 @@ Replace this section after bootstrap with real product purpose and constraints.
   validation, or delivery.
 - Before product edits: create/target a session and move task to `in_progress`.
 - Canonical path:
-  1. `afol n {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `afol st -S {session-id} -T T-01`
+  1. `afol new {theme} --feature-id {F-id} --parent-spec {spec-id}`
+  2. `afol start --session {session-id} --task-id T-01`
   3. Edit and run named verification.
-  4. `afol d -S {session-id} -T T-01 -x "<verification command>"`
-  5. `afol c -S {session-id}`
+  4. `afol evidence --session {session-id} --task-id T-01 --command "<verification command>" --result passed`
+  5. `afol done --session {session-id} --task-id T-01`
+  6. `afol close --session {session-id}`
 - Use `afol` as the only downstream front door.
 - Planning-only or read-only questions stay in chat unless durable artifacts
   are required.
+
+## Delivery Rules
+
+- Meaningful change -> map to the configured roadmap under `.afol/adm/`.
+- Roadmap feature -> map to one governing parent spec under `.afol/adm/specs/`.
+- Implementation decomposition needed -> use child specs.
+- Workbench sessions must carry `roadmap_feature` and `parent_spec`.
+- Plans/tasks execute approved intent. They do not replace roadmap/spec
+  definition.
+- Non-trivial work -> use `.afol/wb/` for durable execution artifacts.
+- Session creation/metadata -> use `afol`.
+- Managed `updated_at` fields -> do not edit manually.
+- Reports -> evidence-based. Done means validated, not merely edited.
+- User correction -> create one lesson entry under `docs/lessons/entries/`.
+
+## Branch And Deploy
+
+- Agent commits/pushes target `main_dev` unless the user explicitly requests a
+  different branch in the current turn.
+- `main` -> never direct-push.
+- Updating `main` -> merge from `main_dev` through normal Git merge or PR path.
+- Production deploy -> forbidden unless the user explicitly asks in the current
+  turn.
+- Forbidden without explicit deploy request -> `bun run deploy`,
+  `wrangler deploy`, and any Cloudflare publish command.
+- Deploy readiness requested -> report exact deploy command and required
+  environment. Leave execution to the user.
 
 ## Stack
 
@@ -66,8 +94,8 @@ Replace this section after bootstrap with real product purpose and constraints.
 - `.afol/`: provider-compatible mutable state when configured; not a skills
   root.
 - `.afol/adm/source/universal-skills/`: local seed, not nested git.
+- `.afol/pstr/`: current-state structure maps only.
 - `docs/`: project docs.
-- `docs/map/`: current-state evidence only.
 
 ## Working Rules
 
@@ -86,8 +114,8 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Use Caveman-style updates by default: concise, no filler, no repeated setup.
   Keep full precise prose when compression could hide risk, order, or evidence.
 - Start narrow: `rg`, `fd`, focused reads, repo-analysis, Project RAG, GitNexus
-  CLI, and existing `docs/map/` before broad scans.
-- Prefer repo-local configured plan state and `docs/knowledge/` records
+  CLI, and existing `.afol/pstr/` maps before broad scans.
+- Prefer repo-local configured plan state and `.afol/memory/` records
   before broad historical reads.
 - Use RTK only for noisy shell output:
   `rtk git status`, `rtk find`, `rtk summary`, bounded `rtk grep`.
@@ -97,8 +125,10 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 ## Tool Routing
 
-- Use MCPs for indexed/structured operations.
-- Exact search: `rg`, `fd`, `jq`.
+- Exact search/config: `rg`, `fd`, `jq`.
+- Current structure: `.afol/pstr/` when present.
+- Indexed/structured: use MCPs only when configured and narrower than local
+  tools.
 - Syntax search: `sg`/`ast-grep`.
 - Repo history/context: `git`/`gh`; indexed graph/callers: GitNexus CLI.
 - Browser/UI: `npx playwright` or `bunx playwright`; lightweight checks:
@@ -114,41 +144,74 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Run the smallest decision-intake lane for ambiguous/product-shaped work.
 - Plans must describe direct execution, not pre-plan research.
 - Keep governed artifact count minimal: default is `plan + task`.
-- Start tasks as `pending`/`in_progress`; mark `[x]` only with valid
-  evidence id.
+- Workbench task state lives in the `State Board` and AFOL lifecycle commands.
+  Do not use `T-xx` checklist markers or checkbox-done language for lifecycle
+  state.
+- Use `afol start`, `afol evidence`, `afol done`, and `afol close`; `done`
+  requires valid task-scoped evidence.
 - Finalize optional artifacts before closure.
 
 ## Verification
 
 - Never close work without proof.
 - Gate selection:
-  - docs/prompt/process -> `afol validate`
-  - front door/workbench -> `afol ck`
-  - scaffold/release -> `afol validate --json`
+  - docs/prompt/process -> `afol validate project`
+  - front door/workbench -> `afol validate project`
+  - scaffold/release -> `afol validate project --json`
 - Run focused checks first; broaden only when risk requires.
-- If runtime guidance changes, report docs/mirror sync status.
+- If runtime guidance changes, report runtime adapter/config sync status.
+
+## Validation And Security
+
+- Normal code change -> minimum gate is the narrowest relevant local check; use
+  `make lint` when the repo exposes it.
+- Use focused validation as appropriate: lint, typecheck, tests,
+  content/schema validation, link validation, browser smoke, build, screenshots.
+- Behavior change -> add or update focused tests when the repo already has an
+  appropriate test surface.
+- Every security check -> include secret scanning and dependency vulnerability
+  scanning.
+- Secrets -> never print secret values in terminal output, reports, docs, or
+  summaries.
+
+## Repository Hygiene
+
+- New versioned root files -> avoid unless project entrypoint, standard config,
+  or explicitly justified.
+- Local `.env` files -> allowed only as ignored, non-versioned files.
+- Screenshots/images -> `.afol/wb/screenshots/` or `tests/screenshots/`.
+- Temp files -> `tmp/` or `.tmp_<name>/`.
+- Build artifacts -> `dist/`.
+- Workbench artifacts -> `.afol/wb/<session>/`.
+- Local auxiliary worktrees -> `.worktree/`, unversioned.
+- Script incidental output -> never root. If it happens, treat as script bug and
+  fix script.
+- User data -> never delete or move vault content, backups, keys, secrets,
+  archives, Windows profile data, or other user data without explicit approval.
 
 ## Docs And Boundaries
 
 - `docs/` is project documentation, not runtime state.
 - Keep runtime state/caches/generated ops artifacts outside `docs/`.
-- `docs/map/` is descriptive evidence only.
-- `docs/arc/` is goal-state governance.
+- `.afol/adm/**` is AFOL administration and goal-state governance.
+- `.afol/pstr/**` is descriptive current-state evidence only.
+- `docs/arc/**`, when present in older downstream installs, is transitional
+  governance content to migrate into `.afol/adm/**`.
 - Use configured `paths.tmp_dir` only for disposable files.
 - Do not manually edit managed `updated_at`; use a configured project command
   if this repo adds one.
 - Keep project-local rules/docs minimal: only required operational contracts.
+- In `.afol/adm/rules/**`, YAML frontmatter is metadata only. Rule budgets and
+  prompt injection use only the Markdown body after frontmatter.
 - Do not duplicate long rationale from canonical docs/skills; link to
   canonical source.
 
 ## Runtime And Skill Sync
 
 - `AGENTS.md` is canonical runtime instructions.
-- `CLAUDE.md` is the committed mirror; keep it compatible and synced.
-- The Claude adapter is optional. Disable it with
-  `afol adapter disable claude` (archives `CLAUDE.md` + `.claude/`) or install
-  without it via `afol init --without-claude`. `AGENTS.md` always remains.
-- Keep committed adapters thin and traceable.
+- Runtime mirrors are adapter-owned, optional, and controlled by config. If an
+  adapter is disabled, do not create or sync its mirror files.
+- Keep enabled adapters thin and traceable.
 - Prefer project-local skills only for project-specific behavior.
 - Project-local skills are optional; use a native downstream sync command only
   when this repo provides one.
@@ -159,6 +222,6 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 ## Optional Memory
 
-- Repo-local `.afol/wb/` and `docs/knowledge/` are canonical.
+- Repo-local `.afol/wb/` and `.afol/memory/` are canonical when present.
 - External memory is auxiliary retrieval only.
 - Use host runtime memory only when it is explicitly configured.

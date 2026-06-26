@@ -5,7 +5,7 @@ The telemetry dashboard is not a public AFOL feature yet.
 Current public validation is:
 
 ```bash
-afol validate --json
+afol validate project --json
 afol local-state freshness
 ```
 

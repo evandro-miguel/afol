@@ -64,14 +64,14 @@ afol verify-tasks --strict
 
 - Start with focused tests for touched code.
 - Broaden to project/release checks when shared behavior changed.
-- Record AFOL evidence before marking governed tasks done.
+- Record AFOL evidence before running `afol done` for governed tasks.
 - Treat excess command output as a bug in AFOL command design.
 
 **DON'T:**
 
-- Mark work complete without relevant validation.
+- Run `afol done` without relevant validation or explicit `N/A` evidence.
 - Claim a check passed unless it ran.
-- Hide unresolved task state behind a completed state board.
+- Hide unresolved task state behind lifecycle closure.
 - Reintroduce retired command surfaces in docs or examples.
 
 ---

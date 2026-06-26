@@ -1,24 +1,37 @@
 import { describe, expect, test } from "bun:test";
 import { Buffer } from "node:buffer";
+import { join } from "node:path";
 import {
 	DEFAULT_TEMPLATE_FILES,
 	DEFAULT_TEMPLATE_METADATA,
 } from "../generated/template";
-import { matchesTemplateForbiddenPattern } from "../schemas/template-policy";
+import {
+	matchesTemplateForbiddenPattern,
+	scanTemplateForbiddenPaths,
+	TEMPLATE_ROOT,
+} from "../schemas/template-policy";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
 
 describe("generated template cleanliness", () => {
-	test("generated payload excludes forbidden paths", () => {
+	test("generated payload excludes forbidden paths", async () => {
+		const sourceForbiddenPaths = await scanTemplateForbiddenPaths(
+			join(process.cwd(), TEMPLATE_ROOT),
+		);
+
 		const paths = Object.keys(DEFAULT_TEMPLATE_FILES);
+		expect(sourceForbiddenPaths).toEqual([]);
 		const forbidden = paths.filter((path) =>
 			matchesTemplateForbiddenPattern(path),
 		);
 
-		expect(DEFAULT_TEMPLATE_METADATA.excludedForbiddenCount).toBe(0);
+		expect(sourceForbiddenPaths.length).toBe(
+			DEFAULT_TEMPLATE_METADATA.excludedForbiddenCount,
+		);
 		expect(DEFAULT_TEMPLATE_METADATA.generatedAt).toBe(
 			"1970-01-01T00:00:00.000Z",
 		);
 		expect(forbidden).toEqual([]);
+		expect(paths.some((path) => path.startsWith("docs/arc/"))).toBe(false);
 		expect(paths.some((path) => path.startsWith(".agents/scripts/"))).toBe(
 			false,
 		);
@@ -27,6 +40,8 @@ describe("generated template cleanliness", () => {
 		);
 		expect(paths).not.toContain(".agents/agents");
 		expect(paths).not.toContain(".agents/agents-mcp");
+		expect(paths).not.toContain("CLAUDE.md");
+		expect(paths.some((path) => path.startsWith(".claude/"))).toBe(false);
 		expect(paths).not.toContain("a");
 		expect(paths).not.toContain("Justfile");
 		expect(paths.some((path) => path.endsWith(".py"))).toBe(false);
@@ -114,5 +129,22 @@ describe("generated template cleanliness", () => {
 		expect(paths).toContain(
 			".afol/data/project-benchmarks/validation-report.json",
 		);
+	});
+
+	test("generated payload does not tell agents to mark lifecycle tasks with checkboxes", () => {
+		const forbiddenMatches = Object.entries(DEFAULT_TEMPLATE_FILES)
+			.filter(([path]) =>
+				["AGENTS.md", "docs/templates/task.md"].includes(path),
+			)
+			.flatMap(([path, entry]) => {
+				const content = Buffer.from(entry.contentBase64, "base64").toString(
+					"utf8",
+				);
+				return ["mark `[x]`", "mark [x]", "State marker rules"]
+					.filter((forbidden) => content.includes(forbidden))
+					.map((forbidden) => `${path}: ${forbidden}`);
+			});
+
+		expect(forbiddenMatches).toEqual([]);
 	});
 });

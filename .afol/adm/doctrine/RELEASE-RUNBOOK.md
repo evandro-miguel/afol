@@ -20,7 +20,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 - Release provenance is generated (`bun run release:provenance:release`)
 
 It does not currently run the AFOL project hygiene gate or the TypeScript
-typecheck. Run those as explicit release preflight commands.
+typecheck, so both are explicit release preflight commands in this runbook.
 
 ## Required Tools on PATH
 
@@ -39,6 +39,23 @@ typecheck. Run those as explicit release preflight commands.
 - A credible public release requires both tools present on PATH
 
 ## Release Flow
+
+Use this order before any global update/install or release promotion:
+
+1. Check the running wrapper version with `afol --version` and compare it to
+   the repo release metadata.
+2. Verify generated version metadata with `bun run version:check`.
+3. Rebuild AFOL local state with `afol local-state rebuild --json`.
+4. Validate the project with `afol validate project --json`.
+5. Run `bun run typecheck`.
+6. Generate release provenance with `bun run release:provenance:release`.
+7. Run the release gate with `bun run validate:release`.
+8. Record AFOL evidence for the gated session/task.
+9. Close the session only after evidence is attached and no tasks remain open.
+
+Do not run global update/install when `afol --version` diverges from the repo
+version and that version has no registered release provenance. Keep the work
+local until the repo release path is proven.
 
 ```bash
 bun install --frozen-lockfile

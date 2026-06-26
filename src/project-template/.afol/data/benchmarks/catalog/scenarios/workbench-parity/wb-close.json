@@ -3,7 +3,7 @@
   "scenario_id": "wb-close",
   "scenario_version": "1.0.0",
   "pack_id": "workbench-parity",
-  "command": "afol c --session sb-wb",
+  "command": "afol close --session sb-wb",
   "sandbox": true,
   "setup": [
     [
@@ -13,7 +13,7 @@
     ],
     [
       "afol",
-      "st",
+      "start",
       "--session",
       "sb-wb",
       "--task-id",
@@ -21,7 +21,7 @@
     ],
     [
       "afol",
-      "d",
+      "evidence",
       "--session",
       "sb-wb",
       "--task-id",
@@ -30,6 +30,14 @@
       "echo ok",
       "--result",
       "passed"
+    ],
+    [
+      "afol",
+      "done",
+      "--session",
+      "sb-wb",
+      "--task-id",
+      "T-01"
     ]
   ],
   "result_schema": "1.0.0",

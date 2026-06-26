@@ -10,6 +10,27 @@ import {
 const DEFAULT_MAX_RULE_CHARS = 2000;
 const DEFAULT_MAX_TOTAL_RULE_CHARS = 4000;
 
+export function stripRuleFrontmatter(content: string): string {
+	const opening = content.match(/^\uFEFF?---[ \t]*\r?\n/);
+	if (!opening) {
+		return content;
+	}
+	let cursor = opening[0].length;
+	while (cursor < content.length) {
+		const lineEnd = content.indexOf("\n", cursor);
+		const rawLine =
+			lineEnd === -1 ? content.slice(cursor) : content.slice(cursor, lineEnd);
+		const line = rawLine.replace(/\r$/, "");
+		const nextCursor = lineEnd === -1 ? content.length : lineEnd + 1;
+		if (line === "---" || line === "...") {
+			const body = content.slice(nextCursor);
+			return body.replace(/^\r?\n/, "");
+		}
+		cursor = nextCursor;
+	}
+	return content;
+}
+
 type RawRule = {
 	id?: unknown;
 	name?: unknown;
@@ -60,6 +81,17 @@ export type ResolveRulesOptions = {
 	maxCharsPerRule?: number | undefined;
 	maxCharsTotal?: number | undefined;
 	strictIndex?: boolean | undefined;
+};
+
+export type RuleResolutionWarning = {
+	id: string;
+	path: string;
+	reason: string;
+};
+
+export type ResolveRulesResult = {
+	rules: RuleEntry[];
+	warnings: RuleResolutionWarning[];
 };
 
 export class RuleResolverError extends Error {}
@@ -127,7 +159,7 @@ function ruleCharCount(projectRoot: string, path: string): number {
 	if (!existsSync(absolutePath)) {
 		return 0;
 	}
-	return readFileSync(absolutePath, "utf8").length;
+	return stripRuleFrontmatter(readFileSync(absolutePath, "utf8")).length;
 }
 
 function normalizeRule(
@@ -187,7 +219,9 @@ function fallbackRules(projectPaths: ResolvedProjectPaths): RuleEntry[] {
 				exactFiles: [],
 				inject: null,
 				priority: 50,
-				charCount: readFileSync(join(rulesRoot, name), "utf8").length,
+				charCount: stripRuleFrontmatter(
+					readFileSync(join(rulesRoot, name), "utf8"),
+				).length,
 			};
 		});
 }
@@ -367,6 +401,13 @@ export function resolveRules(
 	projectRoot: string,
 	options: ResolveRulesOptions,
 ): RuleEntry[] {
+	return resolveRulesWithDiagnostics(projectRoot, options).rules;
+}
+
+export function resolveRulesWithDiagnostics(
+	projectRoot: string,
+	options: ResolveRulesOptions,
+): ResolveRulesResult {
 	const defaults = getRuleResolverConfig(projectRoot);
 	const wantedDomains = new Set(normalizeTextList(options.domains));
 	const wantedSurfaces = new Set(normalizeTextList(options.surfaces));
@@ -414,25 +455,30 @@ export function resolveRules(
 			return b.priority - a.priority || a.id.localeCompare(b.id);
 		});
 	const resolved: RuleEntry[] = [];
+	const warnings: RuleResolutionWarning[] = [];
 	for (const rule of matchingRules) {
 		if (rule.charCount > maxCharsPerRule) {
+			const reason = `rule exceeds max_chars_per_rule (${rule.charCount}/${maxCharsPerRule})`;
 			if (rule.required) {
 				throw new RuleResolverError(
-					`Required rule ${rule.id} cannot be resolved: rule exceeds max_chars_per_rule (${rule.charCount}/${maxCharsPerRule})`,
+					`Required rule ${rule.id} cannot be resolved: ${reason}`,
 				);
 			}
+			warnings.push({ id: rule.id, path: rule.path, reason });
 			continue;
 		}
 		if (totalChars + rule.charCount > maxCharsTotal) {
+			const reason = `rule exceeds max_total_chars (${totalChars + rule.charCount}/${maxCharsTotal})`;
 			if (rule.required) {
 				throw new RuleResolverError(
-					`Required rule ${rule.id} cannot be resolved: rule exceeds max_total_chars (${totalChars + rule.charCount}/${maxCharsTotal})`,
+					`Required rule ${rule.id} cannot be resolved: ${reason}`,
 				);
 			}
+			warnings.push({ id: rule.id, path: rule.path, reason });
 			continue;
 		}
 		totalChars += rule.charCount;
 		resolved.push(rule);
 	}
-	return resolved;
+	return { rules: resolved, warnings };
 }

@@ -40,7 +40,7 @@ Avoid:
 
 - phases whose only purpose is "make another plan";
 - broad research when a focused file read or command can decide the issue;
-- benchmark details unless the work touches benchmark or release-readiness;
+- benchmark details unless the work touches benchmark behavior;
 - generic "run tests" without naming the narrowest useful command.
 
 ## Plan Shape For Delegated Work
@@ -56,16 +56,16 @@ For each task, state:
 Example:
 
 ```markdown
-- T-02 executor: update `cli/services/health/**`.
+- T-02 executor: update `.afol/adm/rules/**`.
   Skills/references: agentic-folder-sys execution, tools.
   Forbidden: `.agents/runtime`, `.agents/scripts`, unrelated skills.
-  Validate: `bun test cli/tests/health-system.test.ts`.
+  Validate: `afol validate project`.
 ```
 
 ## When To Create A Workbench Session
 
-Create a session for non-trivial implementation, migration, validation,
-benchmark, or release work:
+Create a session for non-trivial implementation, migration, validation, or
+benchmark work:
 
 ```bash
 afol new <theme> --task "<direct executable task>"

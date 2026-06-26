@@ -72,17 +72,17 @@ Allowed by default:
 
 - project files directly in scope;
 - `.afol/wb/<session-id>/**` for governed state through `afol`;
-- `.agents/skills/**` when updating project-local skills.
+- the configured `paths.skills_dir` when updating project-local skills.
 
 Avoid unless explicitly scoped:
 
 - retired `.agents` runtime surfaces;
 - unrelated dirty files;
 - global `~/.codex/skills/**`;
-- generated mirrors or template exports.
+- generated output unless the task explicitly owns it.
 
-When template or source mirrors must be updated, say why and keep them byte-for-
-byte synchronized where they represent the same skill payload.
+When generated output must be updated, say why and keep it scoped to the files
+owned by the task.
 
 ## Validation Choice
 
@@ -95,9 +95,8 @@ afol validate project
 Add code checks only when code/config changed:
 
 ```bash
-bun run typecheck
-bun test
+<project-local typecheck/test command>
 ```
 
-Use release or benchmark validation only when the plan explicitly touches those
+Use benchmark validation only when the plan explicitly touches benchmark
 surfaces.

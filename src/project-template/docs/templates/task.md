@@ -48,8 +48,9 @@ ledger evidence and an explicit evidence id.
 
 **Task ID format:** `T-01`, `T-02`, ... (ou `T-001` para boards grandes)
 
-**State marker rules:** Use the checklist formats in `RULE-003` and
-`docs/standards/verification.md`.
+**State source:** lifecycle state belongs only in this `State Board` and AFOL
+commands. Do not add parallel `T-xx` checklist rows or checkbox-done wording as
+a state transition.
 
 ## Governance Context
 
@@ -98,8 +99,10 @@ Before starting work, consult relevant resources:
 
 - Move to `implemented_untested` only after the implementation checkpoint.
 - Move to `tested_needs_spec_validation` only when runtime validation passed but spec/UX validation is still pending.
-- Record the real command or gate, result, artifact path or note, and returned evidence id before marking `done`.
-- If validation does not apply, record `N/A` explicitly in the evidence ledger before marking `done`.
+- Record the real command or gate, result, artifact path or note, and returned
+  evidence id before running `afol done`.
+- If validation does not apply, record `N/A` explicitly in the evidence ledger
+  before running `afol done`.
 
 ### Test Evidence
 

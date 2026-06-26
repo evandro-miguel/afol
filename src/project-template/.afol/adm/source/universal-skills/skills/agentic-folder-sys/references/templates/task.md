@@ -21,38 +21,34 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 
 Each task must be executable by an agent now. Do not create task items whose
 only purpose is to make the plan, research the plan, or gather broad context.
-New tasks must start `[ ]` or `[/]`; do not seed new work as `[x]`.
-
-## Task List
-
-- [ ] T-001 <task description>
-- [ ] T-002 <task description>
+New tasks must start as `pending` in the State Board unless work is already
+active.
 
 ## State Board
 
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
 | T-001 | pending | build | <notes> |
+| T-002 | pending | test | <notes> |
 
-## State Marker Rules
+## State Rules
 
-- `[ ]` pending
-- `[/]` in progress
-- `[!]` problem
-- `[>]` moved; Notes must include destination + reason
-- `[%]` implemented_untested
-- `[&]` tested_needs_spec_validation
-- `[x]` done
-- Set `[/]` when execution starts.
-- Set `[x]` only when task-scoped `.evidence.jsonl` closure evidence exists,
-  the task references the returned evidence id, and validation is complete.
-  Record `N/A` in the evidence ledger when validation does not apply.
-- Use `[>]` only with a concrete destination and reason.
+- `pending`: not started.
+- `in_progress`: active execution.
+- `problem`: real blocker exists.
+- `moved`: deferred; Notes must include destination + reason.
+- `implemented_untested`: implementation checkpoint complete.
+- `tested_needs_spec_validation`: runtime validation passed, acceptance still
+  pending.
+- `done`: closure evidence exists and validation is complete or explicitly N/A.
+- State source of truth is this board plus AFOL lifecycle commands. Do not add
+  parallel `T-xx` checkbox rows.
 
 ## Test Gate
 
-- Move to `[%]` only after the implementation checkpoint.
-- Move to `[&]` only after runtime validation passes.
-- Record command, result, artifact, and evidence id before `[x]`.
-- If validation does not apply, write `N/A` in the evidence ledger before `[x]`.
+- Move to `implemented_untested` only after the implementation checkpoint.
+- Move to `tested_needs_spec_validation` only after runtime validation passes.
+- Record command, result, artifact, and evidence id before `done`.
+- If validation does not apply, write `N/A` in the evidence ledger before
+  `done`.
 ```

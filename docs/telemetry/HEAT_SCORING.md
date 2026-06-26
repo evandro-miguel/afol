@@ -5,7 +5,7 @@ Heat scoring is pending AFOL-native parity.
 Current supported checks:
 
 ```bash
-afol validate --json
+afol validate project --json
 afol local-state freshness
 afol verify-tasks --strict
 ```

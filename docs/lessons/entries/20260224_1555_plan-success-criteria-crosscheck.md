@@ -3,7 +3,7 @@ doc_type: lesson_entry
 id: lesson_20260224_1555_plan-success-criteria-crosscheck
 status: active
 created_at: '2026-02-24T15:52:00-03:00'
-updated_at: '2026-02-24T15:52:09-03:00'
+updated_at: '2026-06-20T00:00:00-03:00'
 source: execution_review
 related_session: 260224_1253_execution-integrity-hardening
 ---
@@ -14,16 +14,16 @@ related_session: 260224_1253_execution-integrity-hardening
 
 The session was reported as complete while one success criterion from the plan remained unimplemented:
 
-- `wb-update evidence` command and `mark-done` evidence-gating in `agents-wb-update.py`
+- evidence-gated task closure
 
-Task checkboxes and report summary were green, but plan-level delivery was incomplete.
+Task state and report summary were green, but plan-level delivery was incomplete.
 
 ## Prevention Rule
 
 Before declaring completion, validate all three layers:
 
 1. Plan success criteria -> implemented in code
-2. Task checklist state -> consistent with code and tests
+2. State Board task state -> consistent with code and tests
 3. Verification evidence -> command output linked to task closure
 
 ## Guardrail
@@ -33,8 +33,8 @@ Before declaring completion, validate all three layers:
 Run all items before final completion:
 
 ```bash
-./.agents/agents verify-tasks .afol/wb/<session> --strict
-python3 -m unittest discover -s .agents/scripts/tests -p "test_*.py" -v
+afol verify-tasks .afol/wb/<session> --strict
+afol validate project
 ```
 
 And explicitly confirm in report:
@@ -44,7 +44,7 @@ And explicitly confirm in report:
 
 ## Operational Standard
 
-For `wb-update task --mark-done`:
+For `afol done`:
 
 - Evidence ID from task-scoped closure evidence is required.
 - Unsafe bypass is not supported.

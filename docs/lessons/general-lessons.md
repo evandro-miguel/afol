@@ -51,9 +51,11 @@ Lessons should be reviewed periodically:
 
 **Lesson:** Lint must prioritize operational artifacts and skip pedagogical documentation by default.
 
-**Prevention rule:** Keep `agents-lint-docs.py` exclusion list covering instructional/orientation paths unless explicitly overridden.
+**Prevention rule:** Keep AFOL/project validation exclusions covering
+instructional/orientation paths unless explicitly overridden.
 
-**Guardrail:** Added `EXCLUDED_PATH_PREFIXES` and `should_skip_file()` in `.agents/scripts/agents-lint-docs.py`.
+**Guardrail:** Maintain path exclusion helpers in the current TypeScript AFOL
+implementation and validate them with focused tests.
 
 ### 2026-02-23 - AGENTS.md must stay generic-first
 
@@ -81,9 +83,11 @@ Lessons should be reviewed periodically:
 
 **Lesson:** Scripts should parse task items by canonical ID format, not only by checkbox markers.
 
-**Prevention rule:** In task files, always write checklist items as `- [ ] T-01 <text>` (or `T-001`).
+**Prevention rule:** In workbench task files, store `T-xx` lifecycle state only in
+the `State Board`; do not add parallel Task List checkboxes for task state.
 
-**Guardrail:** Updated `verify-tasks.py` to parse ID-based tasks and report open tasks with `ID + file + line`.
+**Guardrail:** Use `afol verify-tasks --strict` to report open tasks from the
+canonical State Board.
 
 ### 2026-02-23 - Avoid workbench folder sprawl
 
@@ -91,9 +95,11 @@ Lessons should be reviewed periodically:
 
 **Lesson:** Session lifecycle needs explicit "quick vs significant" intake and a single active session policy.
 
-**Prevention rule:** Use quick mode for small changes; only open new workstream with `--force-new` when change is significant.
+**Prevention rule:** Use the smallest appropriate AFOL lifecycle path for small
+changes; only open a new governed workstream when the change is significant.
 
-**Guardrail:** `agents-new.py` now enforces one active session via `.afol/wb/.active_session` and provides `--quick` mode.
+**Guardrail:** Use AFOL status and validation before creating or closing
+workbench sessions.
 
 ### 2026-02-23 - Centralize tool config in one file
 
@@ -101,9 +107,11 @@ Lessons should be reviewed periodically:
 
 **Lesson:** Operational scripts must share one configuration source for paths/timezone/exclusions/targets.
 
-**Prevention rule:** Never hardcode `.agents` paths or timezone rules in individual scripts when `agents.config` can provide it.
+**Prevention rule:** Never hardcode scaffold paths or timezone rules in
+individual implementation files when AFOL-owned configuration can provide them.
 
-**Guardrail:** Added shared loader (`.agents/scripts/lib/agents_config.py`) and root `agents.config`; migrated core scripts to read from it.
+**Guardrail:** Keep shared configuration in current AFOL-owned config surfaces
+and the TypeScript implementation, not retired Python script loaders.
 
 ### 2026-02-23 - AGENTS.md must remain template-first
 
@@ -121,7 +129,8 @@ Lessons should be reviewed periodically:
 
 **Lesson:** Template AGENTS should avoid long static command inventories that get stale.
 
-**Prevention rule:** Keep only core tool entrypoints in AGENTS templates and direct users/agents to `.agents/agents tools list|info|search`.
+**Prevention rule:** Keep only core AFOL/project tool entrypoints in AGENTS
+templates and direct users/agents to current CLI help or project docs.
 
 **Guardrail:** Use a short `Main Tools` section and a `Discovery-First Rule` block in template AGENTS.
 
@@ -141,7 +150,8 @@ Lessons should be reviewed periodically:
 
 **Lesson:** A task state is not complete just because the task file contains completion text. Completion must be tied to task-scoped ledger evidence.
 
-**Prevention rule:** Never create a new task as `done`; only move to `done` through `wb-update task --mark-done --evidence-id E-...` after valid `.evidence.jsonl` closure evidence exists.
+**Prevention rule:** Never create a new task as `done`; record task-scoped
+closure evidence with `afol evidence`, then move to `done` through `afol done`.
 
 **Guardrail:** Completion commands and strict verification must reject generic evidence labels, missing evidence IDs, unresolved failed evidence, and document-only evidence.
 
@@ -154,17 +164,17 @@ Lessons should be reviewed periodically:
 3. **Verify before done** - Evidence is mandatory
 4. **Small diffs** - Keep changes reviewable
 5. **No secrets** - Never commit credentials
-6. **Consistent markers** - Always use `- [X]` format for task markers
+6. **Consistent task state** - Use State Board rows for workbench task lifecycle state
 7. **Lint signal first** - Exclude teaching/orientation docs from default lint scope
 8. **Generic root contract** - Keep `AGENTS.md` reusable across projects and only specialize where explicitly requested
 9. **Template purity** - Keep root AGENTS placeholders unfilled for template repositories
-10. **Task IDs required** - Every checklist task must include a stable ID (`T-01`/`T-001`)
+10. **Task IDs required** - Every State Board task row must include a stable ID (`T-01`/`T-001`)
 11. **One active session** - Use quick mode for minor work; force new stream only for significant work
-12. **Config single source** - Use `agents.config` for tool paths/time settings and avoid script-local hardcoded project config
+12. **Config single source** - Use AFOL-owned config for tool paths/time settings and avoid hardcoded project config
 13. **Template-first AGENTS** - Keep root AGENTS generic with placeholders and reusable operational rules
 14. **Discovery-first tool docs** - Keep AGENTS tool guidance short and rely on dynamic tools catalog commands
 15. **English by default** - Use English across repo artifacts unless user explicitly requests another language
-16. **Ledger-gated done state** - Never seed tasks as `done`; require `.evidence.jsonl` closure evidence and `--evidence-id` before `done`
+16. **Ledger-gated done state** - Never seed tasks as `done`; require task-scoped closure evidence before `afol done`
 
 ## Guardrails
 
@@ -176,11 +186,11 @@ Lessons should be reviewed periodically:
 - Lint scanner excludes instructional folders via explicit path prefixes
 - Root `AGENTS.md` follows a stable template with project overview/stack/structure/rules/workbench sections
 - Root `AGENTS.md` keeps variable sections as placeholders unless user explicitly requests concrete values
-- `verify-tasks.py` parses only ID-based checklist lines and reports open tasks with location
-- `agents-new.py` blocks parallel new sessions unless `--force-new` and supports `--quick`
-- `agents.config` + `.agents/scripts/lib/agents_config.py` define shared operational configuration
+- `afol verify-tasks --strict` reports open tasks from canonical State Board rows
+- `afol new` and lifecycle commands own session/task creation and closure
+- `.agents/config.json` plus AFOL-owned config define shared operational configuration
 - Root `AGENTS.md` preserves placeholder sections and generic management-tool workflow guidance
-- Root `AGENTS.md` keeps tools guidance concise and delegates details to `.agents/agents tools` discovery commands
+- Root `AGENTS.md` keeps tools guidance concise and delegates lifecycle work to AFOL commands
 - Root `AGENTS.md` includes explicit `Language Policy` enforcing English as default
 - Task `done` state is ledger-gated and cannot rely on document-only evidence
 

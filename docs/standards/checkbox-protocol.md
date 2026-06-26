@@ -9,7 +9,15 @@ title: "Checkbox Protocol Standard"
 
 ## Checkbox Protocol
 
-This document defines the standard checklist markers used across all agent documentation.
+This document defines the standard checklist markers used across agent
+documentation for planning notes, acceptance lists, and non-lifecycle progress
+tracking.
+
+Workbench `T-xx` lifecycle state is not stored in parallel Task List
+checkboxes. In workbench task files, the source of truth is the `State Board`
+table, and lifecycle changes must go through AFOL commands such as
+`afol start`, `afol evidence`, `afol done`, `afol close`, and
+`afol verify-tasks --strict`.
 
 ### State Markers
 

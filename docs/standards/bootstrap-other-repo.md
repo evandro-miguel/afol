@@ -3,7 +3,7 @@ doc_type: standard
 id: 000000_000000_bootstrap-other-repo_standard_01
 status: active
 created_at: '2026-03-23T00:00:00Z'
-updated_at: '2026-05-04T16:08:30-03:00'
+updated_at: '2026-06-20T00:00:00+00:00'
 ---
 
 # Bootstrap Other Repo
@@ -128,6 +128,24 @@ reviewed replacement path before the file can be changed.
 Running the same update twice must not create new diffs after the first safe
 apply. Repeated runs may emit `skip` or `benchmark` results, but they must not
 silently replace additional project content.
+
+### Release-First Update Order
+
+Before any global update/install or downstream promotion:
+
+1. Compare `afol --version` with the repo release metadata.
+2. Verify version metadata with `bun run version:check`.
+3. Rebuild local state with `afol local-state rebuild --json`.
+4. Validate the project with `afol validate project --json`.
+5. Run `bun run typecheck`.
+6. Generate release provenance with `bun run release:provenance:release`.
+7. Run the release gate with `bun run validate:release`.
+8. Record AFOL evidence for the governed session/task.
+9. Close the session only after no tasks remain open.
+
+If `afol --version` diverges from the repo version and there is no registered
+release provenance, do not run a global update/install. Keep the repo-local
+path authoritative until the release is registered.
 
 ## Safe Usage
 

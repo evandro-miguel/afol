@@ -10,13 +10,14 @@ updated_at: '2026-04-13T19:37:00-03:00'
 
 ## Purpose
 
-Define the committed compatibility contract for the three primary runtimes supported by this scaffold:
+Define the committed compatibility contract for the runtimes supported by this
+scaffold:
 
 - OpenCode
 - Codex
 - Qwen
 
-Compatibility runtimes kept in sync for broader reuse:
+Optional runtime adapters kept thin for broader reuse when enabled:
 
 - Claude
 - Gemini
@@ -39,12 +40,10 @@ Primary runtime contract:
 ### Canonical Instructions
 
 - `AGENTS.md`
-- `CLAUDE.md`
-- `.claude/README.md`
 
-OpenCode, Qwen, Gemini, and Codex do not require committed root mirrors or
-project-local adapter folders in this scaffold. They should use `AGENTS.md`
-directly or host-level global runtime configuration.
+OpenCode, Qwen, Gemini, and Codex should use `AGENTS.md` directly or
+host-level global runtime configuration unless a project explicitly enables an
+adapter.
 
 ## Secret Boundary
 
@@ -66,23 +65,25 @@ Committed runtime config must stay safe to review publicly inside the repository
 - Keep user-local or global runtime configuration outside the repository unless
   a future project explicitly justifies a portable, secret-free adapter.
 
-### Claude
-
-- Treat `CLAUDE.md` as the committed mirror of `AGENTS.md`.
-- Keep `.claude/` thin and secret-free.
+- Runtime adapters are optional and controlled by `.agents/config.json`.
+- If the Claude adapter is disabled, do not create or sync `CLAUDE.md` or
+  `.claude/**`.
+- If the Claude adapter is enabled, keep its mirror thin and synchronized with
+  `AGENTS.md`.
 
 ## Drift Control
 
-- Mirror files should be generated or synced from the canonical source where possible.
-- Runtime adapters should stay thin enough that drift is easy to detect in code review.
-- If runtime-specific behavior starts to dominate, revisit the canonical contract instead of layering more mirrors.
-- Bootstrap and tooling must distinguish primary support (OpenCode, Codex, Qwen) from compatibility mirrors (Claude, Gemini).
+- Runtime files should be minimal and drift-resistant.
+- Keep runtime-specific behavior in runtime-local configuration when possible.
+- Bootstrap and tooling must distinguish primary support (OpenCode, Codex, Qwen)
+  from optional adapters (for example, Claude or Gemini) and avoid treating
+  adapter mirrors as independent policy sources.
 
 ## Verification
 
 - `afol validate select --changed-path <adapter-path>`
 - `afol validate select --changed-path AGENTS.md`
-- `afol validate select --changed-path CLAUDE.md`
+- `afol validate select --changed-path docs/standards/primary-runtime-compatibility.md`
 - `afol validate project --json`
 - `bun run validate:release`
 

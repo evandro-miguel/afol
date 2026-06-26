@@ -144,9 +144,10 @@ Gates:
 
 ## 14) References
 
-- `docs/arc/GENERAL-ROADMAP.md`
-- `docs/arc/SPECS/`
-- `docs/arc/DECISIONS/`
+- `.afol/adm/roadmap.md`
+- `.afol/adm/specs/`
+- `.afol/adm/decisions/`
+- `.afol/adm/doctrine.md`
 
 ---
 

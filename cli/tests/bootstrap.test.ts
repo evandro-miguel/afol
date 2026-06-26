@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { runBootstrapCommand } from "../commands/bootstrap";
+import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
 import type { TemplateFileMap } from "../services/template/payload";
 
@@ -30,6 +31,51 @@ function templateFileMap(entries: Record<string, string>): TemplateFileMap {
 		};
 	}
 	return files;
+}
+
+function mkCliRuntimeRoot(
+	options: {
+		packageName?: string;
+		packageVersion?: string;
+		provenanceVersion?: string;
+		provenancePackageName?: string;
+		skipPackageJson?: boolean;
+	} = {},
+): string {
+	const root = mkdtempSync(join(tmpdir(), "bootstrap-cli-runtime-"));
+	if (!options.skipPackageJson) {
+		writeFileSync(
+			join(root, "package.json"),
+			JSON.stringify(
+				{
+					name: options.packageName ?? CLI_PACKAGE_NAME,
+					version: options.packageVersion ?? CLI_VERSION,
+				},
+				null,
+				2,
+			),
+			"utf8",
+		);
+	}
+	if (options.provenanceVersion) {
+		mkdirSync(join(root, "dist"), { recursive: true });
+		writeFileSync(
+			join(root, "dist", "afol.provenance.json"),
+			JSON.stringify(
+				{
+					package_name:
+						options.provenancePackageName ??
+						options.packageName ??
+						CLI_PACKAGE_NAME,
+					version: options.provenanceVersion,
+				},
+				null,
+				2,
+			),
+			"utf8",
+		);
+	}
+	return root;
 }
 
 describe("bootstrap planner ownership policy", () => {
@@ -100,6 +146,52 @@ describe("bootstrap provider-compatible mutable state", () => {
 		} finally {
 			console.error = originalError;
 			rmSync(target, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects unregistered binary before writing", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-unregistered-"));
+		const cliRoot = mkCliRuntimeRoot();
+		const errors: string[] = [];
+		const originalError = console.error;
+		try {
+			console.error = (...values: unknown[]) => {
+				errors.push(values.map(String).join(" "));
+			};
+			expect(
+				await runBootstrapCommand([target], {
+					cliRoot,
+					invocationPath: join(cliRoot, "dist", "afol"),
+				}),
+			).toBe(2);
+			expect(errors.join("\n")).toContain(
+				"Refusing real bootstrap: AFOL binary is not locally registered.",
+			);
+			expect(existsSync(join(target, ".agents", "config.json"))).toBe(false);
+		} finally {
+			console.error = originalError;
+			rmSync(target, { recursive: true, force: true });
+			rmSync(cliRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("accepts registered binary provenance without package.json", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-registered-binary-"));
+		const cliRoot = mkCliRuntimeRoot({
+			provenanceVersion: CLI_VERSION,
+			skipPackageJson: true,
+		});
+		try {
+			expect(existsSync(join(cliRoot, "package.json"))).toBe(false);
+			const exitCode = await runBootstrapCommand([target], {
+				cliRoot,
+				invocationPath: join(cliRoot, "dist", "afol"),
+			});
+			expect(exitCode).toBe(0);
+			expect(existsSync(join(target, ".agents", "config.json"))).toBe(true);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+			rmSync(cliRoot, { recursive: true, force: true });
 		}
 	});
 

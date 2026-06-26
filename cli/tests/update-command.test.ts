@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { runUpdateCommand } from "../commands/update";
 import { agentOperationContext } from "../core/operation-context";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
+import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
 
 type TemplateUpdatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
 
@@ -84,6 +85,51 @@ function capture() {
 			stderr: (message: string) => stderr.push(message),
 		},
 	};
+}
+
+function mkCliRuntimeRoot(
+	options: {
+		packageName?: string;
+		packageVersion?: string;
+		provenanceVersion?: string;
+		provenancePackageName?: string;
+		skipPackageJson?: boolean;
+	} = {},
+): string {
+	const root = mkdtempSync(join(tmpdir(), "update-cli-runtime-"));
+	if (!options.skipPackageJson) {
+		writeFileSync(
+			join(root, "package.json"),
+			JSON.stringify(
+				{
+					name: options.packageName ?? CLI_PACKAGE_NAME,
+					version: options.packageVersion ?? CLI_VERSION,
+				},
+				null,
+				2,
+			),
+			"utf8",
+		);
+	}
+	if (options.provenanceVersion) {
+		mkdirSync(join(root, "dist"), { recursive: true });
+		writeFileSync(
+			join(root, "dist", "afol.provenance.json"),
+			JSON.stringify(
+				{
+					package_name:
+						options.provenancePackageName ??
+						options.packageName ??
+						CLI_PACKAGE_NAME,
+					version: options.provenanceVersion,
+				},
+				null,
+				2,
+			),
+			"utf8",
+		);
+	}
+	return root;
 }
 
 describe("update command", () => {
@@ -231,7 +277,7 @@ describe("update command", () => {
 		}
 	});
 
-	test("check keeps Claude-owned paths when the adapter is enabled", async () => {
+	test("check does not synthesize removed Claude-owned template paths", async () => {
 		const root = mkRoot();
 		try {
 			writeClaudeAdapterConfig(root, true);
@@ -245,8 +291,9 @@ describe("update command", () => {
 					changes?: { paths?: string[] };
 				};
 			};
-			expect(parsed.data?.changes?.paths ?? []).toEqual(
-				expect.arrayContaining(["CLAUDE.md", ".claude/README.md"]),
+			expect(parsed.data?.changes?.paths ?? []).not.toContain("CLAUDE.md");
+			expect(parsed.data?.changes?.paths ?? []).not.toContain(
+				".claude/README.md",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -379,6 +426,105 @@ describe("update command", () => {
 			).not.toContain("validate");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply dry-run bypasses runtime version guardrail", async () => {
+		const root = mkRoot();
+		const cliRoot = mkCliRuntimeRoot({ packageVersion: "9.9.9" });
+		try {
+			const dryRun = capture();
+			expect(
+				await runUpdateCommand(["apply", "--dry-run"], root, dryRun.io, {
+					cliRoot,
+					invocationPath: join(cliRoot, "dist", "afol"),
+				}),
+			).toBe(0);
+			expect(dryRun.stderr).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(cliRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("apply accepts registered binary provenance without package.json", async () => {
+		const root = mkRoot();
+		const cliRoot = mkCliRuntimeRoot({
+			provenanceVersion: CLI_VERSION,
+			skipPackageJson: true,
+		});
+		try {
+			expect(existsSync(join(cliRoot, "package.json"))).toBe(false);
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"apply",
+						"--session",
+						"S-01",
+						"--task-id",
+						"T-01",
+						"--reason",
+						"binary provenance",
+					],
+					root,
+					output.io,
+					{
+						cliRoot,
+						invocationPath: join(cliRoot, "dist", "afol"),
+					},
+				),
+			).toBe(0);
+			expect(output.stderr).toHaveLength(0);
+			const lockAfter = readFileSync(
+				join(root, ".agents", "lock.json"),
+				"utf8",
+			);
+			expect(lockAfter).toContain('"revision":');
+			expect(lockAfter).not.toContain('"revision": "old"');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(cliRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("apply rejects stale runtime version before writing", async () => {
+		const root = mkRoot();
+		const cliRoot = mkCliRuntimeRoot({ packageVersion: "9.9.9" });
+		try {
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"apply",
+						"--session",
+						"S-VERSION",
+						"--task-id",
+						"T-VERSION",
+						"--reason",
+						"version guardrail",
+					],
+					root,
+					output.io,
+					{
+						cliRoot,
+						invocationPath: join(cliRoot, "cli", "main.ts"),
+					},
+				),
+			).toBe(2);
+			expect(output.stderr.join("\n")).toContain(
+				"Refusing real update apply: AFOL runtime version",
+			);
+			expect(output.stderr.join("\n")).toContain("repo package version 9.9.9");
+			expect(
+				readFileSync(join(root, ".agents", "lock.json"), "utf8"),
+			).not.toContain('"revision": "ts-boundary-hardening"');
+			expect(
+				readFileSync(join(root, ".agents", "manifest.json"), "utf8"),
+			).not.toContain("validate");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(cliRoot, { recursive: true, force: true });
 		}
 	});
 

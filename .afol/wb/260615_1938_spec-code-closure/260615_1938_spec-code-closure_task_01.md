@@ -5,10 +5,10 @@
 | Task | State | Owner | Notes |
 |------|-------|-------|-------|
 | T-01 | done | worker | Wire OperationContext into CLI entry with `--agent`/`--remote` flags and `AFOL_AGENT`/`AFOL_REMOTE` env for restricted contexts |
-| T-02 | moved | worker | Covered by T-01 closure evidence: schema cache-key contract verified by detect output and tests |
-| T-03 | moved | worker | Covered by T-01 closure evidence: quick-task coverage verified by test suite |
-| T-04 | moved | worker | Covered by T-01 closure evidence: acceptance-targeted probes recorded on T-01 |
-| T-05 | moved | worker | Covered by T-01 closure evidence: final gates recorded on T-01 |
+| T-02 | done | worker | Covered by T-01 closure evidence: schema cache-key contract verified by detect output and tests |
+| T-03 | done | worker | Covered by T-01 closure evidence: quick-task coverage verified by test suite |
+| T-04 | done | worker | Covered by T-01 closure evidence: acceptance-targeted probes recorded on T-01 |
+| T-05 | done | worker | Covered by T-01 closure evidence: final gates recorded on T-01 |
 
 ## Sub-task Checklist (T-01)
 

@@ -5,7 +5,7 @@ status: active
 owners:
 - orchestrator
 created_at: '2026-05-21T00:00:00+08:00'
-updated_at: '2026-06-16T00:00:00-03:00'
+updated_at: '2026-06-20T00:00:00-04:00'
 ---
 
 # GENERAL ROADMAP
@@ -606,6 +606,46 @@ Follow-on slices under this direction:
   auto-ingest, full graph expansion, and remote schema/admin mutation.
 - Do not combine SQLite, memory, library, context bundle, spec gate, temporal
   health, brain-shape retrieval, and cleanup implementation in one PR.
+
+### F-19 Canonical AFOL Configuration Rehome
+
+- Status: planned
+- Governing spec: TBD
+- Why: AFOL operational configuration should be owned by AFOL, not by the
+  provider-facing `.agents/` metadata surface. The current `.agents/config.json`
+  location still acts as root-detection and path-resolution input, which keeps
+  an AFOL-owned contract in the provider metadata layer.
+- Scope:
+  - Make `.afol/config.json` the canonical AFOL config file.
+  - Keep a temporary read-only compatibility fallback for existing
+    `.agents/config.json` installs.
+  - Keep project-local provider skills under the configured `paths.skills_dir`;
+    do not use this change to move `.agents/skills/**` or create
+    `.afol/skills/**`.
+  - Reassess `.agents/lock.json` and `.agents/manifest.json` separately because
+    update ownership and managed hashes depend on them.
+- Exit criteria:
+  - Project root detection prefers `.afol/config.json` and reports that path in
+    status/diagnostics.
+  - Path resolution, validation, rule/hook catalogs, adapters, bootstrap, and
+    update flows read config through one shared resolver.
+  - `src/project-template` exports `.afol/config.json` for new installs.
+  - Existing installs with only `.agents/config.json` continue to load through a
+    documented compatibility path until an explicit migration removes it.
+  - Docs and template guidance no longer describe `.agents/config.json` as the
+    canonical AFOL config surface.
+- Validation targets:
+  - `bun test cli/tests/project-root.test.ts cli/tests/validate-command.test.ts cli/tests/bootstrap.test.ts`
+  - `bun run template:check`
+  - `bun run typecheck`
+  - `afol validate project`
+- Risks:
+  - Moving root detection without fallback can make existing projects invisible
+    to `afol`.
+  - Updating template payloads without manifest/update alignment can create
+    false conflicts in downstream update flows.
+  - Combining config rehome with skills rehome would blur provider metadata and
+    AFOL runtime ownership; keep those decisions separate.
 
 ## 6) Recommended Delivery Phases
 

@@ -136,12 +136,11 @@ function selectCoverageRows(
 		return [{ functions: allFiles.functions, lines: allFiles.lines }];
 	}
 
-	const selected = rows.filter(
-		(row) =>
-			row.file !== "All files" &&
-			includePrefixes.some(
-				(prefix) => row.file === prefix || row.file?.startsWith(`${prefix}/`),
-			),
+	const fileRows = rows.filter((row) => row.file !== "All files");
+	const selected = fileRows.filter((row) =>
+		includePrefixes.some(
+			(prefix) => row.file === prefix || row.file?.startsWith(`${prefix}/`),
+		),
 	);
 	if (selected.length === 0) {
 		console.error(

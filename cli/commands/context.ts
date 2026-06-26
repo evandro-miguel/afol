@@ -178,6 +178,9 @@ function parseArgs(args: string[]): ParsedArgs {
 }
 
 function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
+	const ruleLimitWarnings = bundle.rule_injection.omitted
+		.filter((rule) => rule.reason.startsWith("rule exceeds max_"))
+		.map((rule) => `${rule.id}: ${rule.reason}`);
 	return [
 		`task: ${bundle.task_id || "none"}`,
 		`role: ${bundle.role}`,
@@ -187,6 +190,9 @@ function formatBundle(bundle: ReturnType<typeof buildContextBundle>): string {
 		`refs: ${bundle.refs.length}`,
 		`rules: ${bundle.rules.join(",") || "none"}`,
 		`rule_injection: first_use=${bundle.rule_injection.first_use ? "yes" : "no"} injected=${bundle.rule_injection.injected.map((rule) => rule.id).join(",") || "none"} already=${bundle.rule_injection.already_injected.map((rule) => rule.id).join(",") || "none"} omitted=${bundle.rule_injection.omitted.map((rule) => rule.id).join(",") || "none"}`,
+		...(ruleLimitWarnings.length > 0
+			? [`warnings: ${ruleLimitWarnings.join("; ")}`]
+			: []),
 		`hooks: ${bundle.hooks.join(",") || "none"}`,
 		`hook_messages: ${bundle.hook_messages.length}`,
 		`skills: ${bundle.skills.join(",") || "none"}`,

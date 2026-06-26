@@ -78,7 +78,7 @@ The following events are captured **automatically** - no manual action needed:
 | Event | Trigger |
 |-------|---------|
 | `tool_exec` | Every front-door command |
-| `session_start` | Running `afol n <theme>` |
+| `session_start` | Running `afol new <theme>` |
 | `session_end` | Closing a workstream through the front door |
 | `task_complete` | Recording task completion evidence |
 

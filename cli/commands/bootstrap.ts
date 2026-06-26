@@ -19,6 +19,7 @@ import type {
 } from "../services/bootstrap/planner";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
 import { normalizeProjectRelativePath } from "../services/project/paths";
+import { validateMutationRuntime } from "../services/state/validate";
 import type { TemplateFileMap } from "../services/template/payload";
 
 type BootstrapArgs = {
@@ -34,6 +35,11 @@ type BootstrapArgs = {
 };
 
 type RawManifest = Record<string, unknown>;
+
+type BootstrapRuntime = {
+	cliRoot?: string | undefined;
+	invocationPath?: string | undefined;
+};
 
 type MutableBaselineOperation = {
 	kind: "create" | "skip-existing";
@@ -598,7 +604,10 @@ function writeTemplateFile(
 	});
 }
 
-export async function runBootstrapCommand(args: string[]): Promise<number> {
+export async function runBootstrapCommand(
+	args: string[],
+	runtime: BootstrapRuntime = {},
+): Promise<number> {
 	let parsed: BootstrapArgs;
 	try {
 		parsed = parseBootstrapArgs(args);
@@ -681,6 +690,26 @@ export async function runBootstrapCommand(args: string[]): Promise<number> {
 			"Bootstrap has conflicts. Re-run with --force-managed to overwrite managed files.",
 		);
 		return 4;
+	}
+
+	const hasRealMutations =
+		writable.length > 0 ||
+		(parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) ||
+		(parsed.forceManaged && conflicts.length > 0) ||
+		mutableBaselinePlan.some((operation) => operation.kind === "create") ||
+		(parsed.cleanupProviderCompatibleMutable &&
+			parsed.confirmProviderMigration &&
+			providerCompatibleCleanupPlan.length > 0);
+	if (hasRealMutations) {
+		const runtimeValidation = validateMutationRuntime({
+			cliRoot: runtime.cliRoot,
+			invocationPath: runtime.invocationPath,
+			operation: "bootstrap",
+		});
+		if (!runtimeValidation.ok) {
+			console.error(runtimeValidation.message);
+			return 2;
+		}
 	}
 
 	for (const operation of writable) {

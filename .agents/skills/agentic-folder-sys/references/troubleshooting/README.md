@@ -140,15 +140,8 @@ afol local-state rebuild --json
 afol validate project --json
 ```
 
-For source-repo scaffold changes, add:
-
-```bash
-bun run validate:bootstrap
-bun run validate:template
-```
-
-Use broader release checks only when the change touches cross-cutting scaffold,
-runtime, or release behavior.
+If application code or config changed, add the project-local checks named by
+`AGENTS.md`, package scripts, or project docs.
 
 ## 8. `agents.config` Or Legacy Runtime Docs Found
 
@@ -164,7 +157,7 @@ Cause:
 Fix:
 
 - do not restore or extend the legacy surface;
-- migrate useful operational content into AFOL-owned docs or TypeScript AFOL
-  implementation;
+- migrate useful operational content into AFOL-owned docs or current scaffold
+  paths;
 - keep `.agents/**` limited to static provider metadata;
 - validate with `afol validate project`.

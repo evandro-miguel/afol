@@ -2,87 +2,53 @@
 doc_type: rule
 id: RULE-003
 theme: documentation-standards
-version: 1.0
+version: 1.1
 created: 2026-02-23
-applies_to: All agents (QWEN, CLAUDE, GEMINI)
-updated_at: '2026-05-14T20:05:00-03:00'
+applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
+updated_at: '2026-06-20T00:00:00Z'
 ---
 
 # Documentation Standards
 
-**Purpose:** Keep docs executable and minimal.
+**Purpose:** keep managed Markdown predictable, valid, and easy to validate.
 
-## Frontmatter (MANDATORY)
+## Frontmatter
 
-Every `.md` file needs YAML frontmatter.
+Project-authored managed Markdown needs YAML frontmatter. This applies to docs,
+rules, workbench artifacts, specs, reports, lessons, and templates.
 
-```yaml
----
-id: T-01
-theme: auth-refactor
-type: task
-status: in_progress
-owner: agent-name
-created_at: 2026-02-23T00:00:00-03:00
-updated_at: 2026-02-23T00:00:00-03:00
-links:
-  plan: 260223_1800_auth-refactor_plan_01.md
-  spec: 260223_1800_auth-refactor_spec_01.md
----
-```
+Do not apply this to vendored packages, dependency caches, third-party
+licenses, generated build artifacts, or external Markdown copied under
+cache/archive folders.
 
-## Required Fields by Type
+Minimum fields depend on artifact type, but managed artifacts normally include:
+`doc_type`, `id`, `theme`, `status`, `created_at`, and `updated_at`.
 
-| Type | Required Fields |
-| --- | --- |
-| `plan` | id, theme, type, status, owner, created_at, updated_at |
-| `task` | id, theme, type, status, owner, created_at, updated_at |
-| `log` | id, theme, type, status, owner, created_at, updated_at |
-| `spec` | id, theme, type, status, owner, created_at, updated_at |
-| `report` | required fields above + files_changed |
+Rule frontmatter is metadata only. Rule budgets and prompt injection use only
+the Markdown body after frontmatter.
 
-## Status Values
+## Values
 
-```yaml
-status: draft
-status: active
-status: review
-status: approved
-status: final
-status: done
-status: blocked
-status: deprecated
-status: superseded
-```
-
-## Timestamp Format
-
-```yaml
-created_at: 2026-02-23T10:00:00-03:00
-updated_at: 2026-02-23T14:30:00-03:00
-```
-
-## Task Markers
-
-```markdown
-- [ ] T-01 # pending
-- [/] T-02 # in_progress
-- [%] T-03 # ready_for_test
-- [!] T-04 # blocked
-- [>] T-05 # skipped
-- [x] T-06 # completed
-```
-
-## Local Minimalism Rule
-
-- Keep local docs/rules as operational contracts.
-- Keep commands, paths, IDs, markers, and gates.
-- Remove long rationale and repeated explanations.
-- Point to canonical docs/skills for deep context.
+- Use ISO 8601 timestamps with timezone, e.g. `2026-02-23T10:00:00-03:00` or
+  UTC `Z`.
+- Use explicit links for related plan/task/spec/report/files when an artifact
+  depends on them.
+- Use checklist markers only for ordinary non-lifecycle checklist items.
+- In workbench task files, `T-xx` lifecycle state belongs in `State Board` rows
+  and AFOL commands, not parallel `- [ ]` or `- [x]` checklist rows.
+- Keep task IDs as `T-NN`.
+- Update `updated_at` when changing managed docs.
 
 ## Validation
 
 ```bash
-./afol validate
-./afol status
+afol validate project
 ```
+
+Use narrower docs or task validation when available. Do not hard-wrap prose just
+to satisfy line-length lint unless the repo makes it blocking.
+
+## References
+
+- RULE-004 - Validation and Linting
+- `.afol/adm/rules/README.md`

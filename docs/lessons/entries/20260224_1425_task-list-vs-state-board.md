@@ -1,98 +1,45 @@
 ---
 doc_type: lesson_entry
 id: lesson_20260224_1425_task-list-vs-state-board
-status: active
+status: superseded
 created_at: '2026-02-24T14:25:00-03:00'
-updated_at: '2026-02-24T14:25:00-03:00'
+updated_at: '2026-06-20T00:00:00-03:00'
 source: execution_review
 related_session: 260224_1030_scripts-lean-efficiency
+superseded_by: afol_state_board_lifecycle
 ---
 
-# Lesson: Task List vs State Board - Different Purposes, Both Required
+# Superseded Lesson: Task List vs State Board
 
-## Correction
+## Current Contract
 
-During execution, the **State Board** (table) was used exclusively while the **Task List** (checklist) was ignored. This caused loss of actionable detail.
+This entry is retained as historical context only. It is not operational
+guidance for current AFOL workbench files.
 
-## What Each Is For
+Current task lifecycle rules:
 
-| Component | Format | Purpose | Level of Detail |
-|-----------|--------|---------|-----------------|
-| **Task List** | `- [ ] T-01 Description` | Executable checklist | **Specific** - exact work items |
-| **State Board** | `\| T-01 \| - [ ] \| pending \|` | Management dashboard | **Summary** - status at a glance |
+- The `State Board` table is the task state source of truth.
+- Do not add parallel `Task List` checkboxes for `T-xx` lifecycle state.
+- Use AFOL lifecycle commands for state transitions and closure evidence.
+- Validate task state with `afol verify-tasks --strict`.
 
-### Example from task_03.md
-
-**Task List (what to execute):**
-`- [ ]` task item:
-
-- [ ] T-03 Refactor `agents-telemetry.py` hotspots (`calculate_heat_scores`, `generate_report`, `main`).
-
-**State Board (status tracking):**
-State row fields:
-
-- Task: `T-03`
-- Checklist: `- [ ]` (for execution record)
-- State: `pending`
-- Owner: `worker`
-- Notes: `Highest ROI area #2.`
-
-### Why Task List Matters
-
-The **Task List** contains:
-
-- ✅ **Specific function names** (`calculate_heat_scores`, `generate_report`, `main`)
-- ✅ **Target script** (`agents-telemetry.py`)
-- ✅ **Action verb** (`Refactor`)
-
-The **State Board** Notes column only said:
-
-- ⚠️ "Highest ROI area #2" - **vago, não executável**
-
-## Prevention Rule
-
-**Task List = Fonte da verdade para execução**
-**State Board = Visão gerencial para acompanhamento**
-
-**Sempre atualizar AMBOS:**
-
-1. Execute task item from Task List
-2. Mark `- [ ]` → `- [x]` in Task List
-3. Update State column in State Board: `pending` → `in_progress` → `done`
-4. Run `wb-update task` for telemetry
-
-## Guardrail
-
-### Task Execution Flow (Mandatory Order)
-
-```text
-1. Read ## Task List for specific work items
-2. Execute the work
-3. Record closure evidence: `.agents/agents wb-update evidence T-XX --command "..." --result passed --artifact <path>`
-4. Update Task List: - [ ] → - [x] with the returned evidence id
-5. Update State Board: pending → in_progress → done
-6. Run: `.agents/agents wb-update task T-XX --mark-done --evidence-id E-...`
-7. Add timeline entry: `.agents/agents wb-update timeline --message "..."`
+```bash
+afol start --session <session-id> --task-id T-01
+afol evidence --session <session-id> --task-id T-01 --command "<cmd>" --result passed
+afol done --session <session-id> --task-id T-01
+afol verify-tasks .afol/wb/<session-id> --strict
+afol close --session <session-id>
 ```
 
-### Template Compliance
+## Historical Context
 
-Both sections must exist and be consistent:
+The original lesson was written when workbench files used both a Task List and
+a State Board. That dual-tracking model is retired because it created duplicate
+state and stale task closures.
 
-**Task List example**
-
-- [x] T-01 Specific actionable item with details.
-
-**State Board example**
-Task row:
-
-- Task: `T-01`
-- Checklist: `- [x]`
-- State: `done`
-- Owner: `worker`
-- Notes: `Details completed`
-
-**Inconsistency = Error** (Task List says `- [ ]` but State Board says `done`)
+If an old workbench task file still contains both `State Board` rows and
+`- [ ] T-xx` checklist rows, treat it as drift and reconcile back to the
+canonical `State Board` before closure.
 
 ## Related Patterns
 

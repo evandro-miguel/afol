@@ -92,9 +92,9 @@ The following events are captured **automatically** - no manual action needed:
 | Event | Trigger |
 |-------|---------|
 | `tool_exec` | AFOL command execution |
-| `session_start` | Running `afol n <theme>` |
-| `session_end` | Running `afol c -S <session-id>` |
-| `task_complete` | Running `afol d -S <session-id> -T <task-id> -x <command>` |
+| `session_start` | Running `afol new <theme>` |
+| `session_end` | Running `afol close --session <session-id>` |
+| `task_complete` | Running `afol done --session <session-id> --task-id <task-id>` |
 
 ## Manual Events (Optional)
 
@@ -138,11 +138,11 @@ Use `afol telemetry report --json` and inspect `by_outcome`.
 
 - Check if `events.jsonl` exists: `ls -la .afol/data/events/`
 - Verify write permissions
-- Validate project state with `afol validate --json`
+- Validate project state with `afol validate project --json`
 
 ### Invalid JSON
 
-- Run validation with `afol validate --json`
+- Run validation with `afol validate project --json`
 - Check for manual edits to `events.jsonl`
 - Restore from backup if needed
 
