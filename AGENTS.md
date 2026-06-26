@@ -6,6 +6,13 @@ Use `afol` for every supported scaffold, workbench, validation, update,
 evidence, and lifecycle operation. The current implementation lives in
 `cli/**`, and the exportable downstream scaffold lives in `src/project-template/`.
 
+Downstream projects must not receive a project-local `afol` executable,
+wrapper, symlink, package bin, or command runner. `afol` is an external
+operator command provided outside the target project; the downstream project
+payload is config, provider metadata, governance docs, and AFOL state/docs only.
+The root `./afol` file is allowed only in this source repository as the
+development/package entrypoint.
+
 The old `.agents` command system is discontinued and must not be used,
 documented, restored, or extended:
 
@@ -49,7 +56,7 @@ not a project-local skills root.
 
 - Project RAG id: `md72gw7nfa3n1dfd12cqzgwa9d88t1q5`
 - Project RAG slug: `main-dev`
-- Indexed root: `/home/ozy/apps/agentic_start_folder/.worktree/main_dev`
+- Indexed root: `/home/ozy/01_projects/dev/agentic-standard-folder/.worktree/main_dev`
 - Indexed include roots: `cli`, `src`, `docs`, `.afol`, `.agents`
 - Critical read-only checks:
   - `ragctl project verify --project main-dev --json`
@@ -57,9 +64,10 @@ not a project-local skills root.
   - `ragctl project file --project main-dev --file <repo-relative-path> --json`
 
 Large AFOL changes must verify that the durable universal
-`agentic-folder-sys` skill in `/home/ozy/apps/universal-skills` is current
-before relying on or propagating project-local AFOL guidance. If the AFOL
-behavior changed, update and sync the universal skill first.
+`agentic-folder-sys` skill in
+`/home/ozy/01_projects/dev/universall-skill-sys-pvt` is current before
+relying on or propagating project-local AFOL guidance. If the AFOL behavior
+changed, update and sync the universal skill first.
 
 Target governance layout:
 

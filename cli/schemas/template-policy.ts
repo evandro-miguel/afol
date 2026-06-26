@@ -8,6 +8,7 @@ export const TEMPLATE_ROOT = "src/project-template";
 
 export const TEMPLATE_FORBIDDEN_PATTERNS = [
 	"a",
+	"afol",
 	"Justfile",
 	"**/*.py",
 	"**/pyproject.toml",
@@ -34,7 +35,6 @@ export const TEMPLATE_FORBIDDEN_PATTERNS = [
 ] as const;
 
 export const TEMPLATE_ALLOWED_PATTERNS = [
-	"afol",
 	"AGENTS.md",
 	"RTK.md",
 	".agents/config.json",
@@ -64,6 +64,8 @@ const TEMPLATE_INSTRUCTION_FILES = [
 ] as const;
 
 const TEMPLATE_FORBIDDEN_TEXT_REFERENCES = [
+	"./afol",
+	"`./afol`",
 	"./a",
 	"`./a`",
 	" or `./a`",

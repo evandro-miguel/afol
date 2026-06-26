@@ -43,6 +43,7 @@ describe("generated template cleanliness", () => {
 		expect(paths).not.toContain("CLAUDE.md");
 		expect(paths.some((path) => path.startsWith(".claude/"))).toBe(false);
 		expect(paths).not.toContain("a");
+		expect(paths).not.toContain("afol");
 		expect(paths).not.toContain("Justfile");
 		expect(paths.some((path) => path.endsWith(".py"))).toBe(false);
 		expect(paths.some((path) => path.startsWith("docs/standards/"))).toBe(
@@ -99,6 +100,9 @@ describe("generated template cleanliness", () => {
 		expect(forbiddenOps).toEqual([]);
 		expect(plan.filteredForbiddenCount).toBe(0);
 		expect(plan.operations.some((operation) => operation.path === "a")).toBe(
+			false,
+		);
+		expect(plan.operations.some((operation) => operation.path === "afol")).toBe(
 			false,
 		);
 		expect(

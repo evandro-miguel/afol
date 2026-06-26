@@ -12,6 +12,10 @@ Replace this section after bootstrap with real product purpose and constraints.
   `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
   `.afol/adm/hooks/`, `.afol/adm/rules/`, `.agents/skills/` baseline,
   `.afol/wb/` baseline, and minimal docs.
+- The template must not include a project-local `afol` executable, shell
+  wrapper, symlink, package bin, shortcut alias, task-runner shim, or command
+  runner.
+  `afol` must resolve from the operator environment outside this project.
 - Some sandbox providers make `.agents/` read-only. When this project was
   initialized with `afol init --provider-compatible` or
   `afol init --mutable-dir .afol`, mutable agent state lives under `.afol/`.
@@ -40,6 +44,7 @@ Replace this section after bootstrap with real product purpose and constraints.
   5. `afol done --session {session-id} --task-id T-01`
   6. `afol close --session {session-id}`
 - Use `afol` as the only downstream front door.
+  It is an external command, not a repository-local file.
 - Planning-only or read-only questions stay in chat unless durable artifacts
   are required.
 

@@ -74,6 +74,7 @@ describe("template forbidden-content policy", () => {
 				"utf8",
 			);
 			writeFileSync(join(fixtureRoot, "a"), "#!/usr/bin/env bash\n", "utf8");
+			writeFileSync(join(fixtureRoot, "afol"), "#!/usr/bin/env bash\n", "utf8");
 			writeFileSync(join(fixtureRoot, "Justfile"), "validate:\n", "utf8");
 			writeFileSync(
 				join(fixtureRoot, "docs", "standards", "policy.md"),
@@ -96,6 +97,7 @@ describe("template forbidden-content policy", () => {
 
 			expect(matches).toContain(".agents/runtime/main.py");
 			expect(matches).toContain("a");
+			expect(matches).toContain("afol");
 			expect(matches).toContain("Justfile");
 			expect(matches).toContain("docs/standards/policy.md");
 			expect(matches).toContain("docs/arc/README.md");

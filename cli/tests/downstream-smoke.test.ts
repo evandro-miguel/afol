@@ -31,12 +31,9 @@ function runAfol(
 	args: string[],
 	env: NodeJS.ProcessEnv = process.env,
 ): ReturnType<typeof spawnSync> {
-	return spawnSync("./afol", args, {
+	return spawnSync("bun", [kernelPath, ...args], {
 		cwd,
-		env: {
-			...env,
-			AGENTIC_CLI_PATH: kernelPath,
-		},
+		env,
 		encoding: "utf8",
 		stdio: ["ignore", "pipe", "pipe"],
 	});
@@ -186,7 +183,7 @@ describe("downstream bootstrap smoke", () => {
 			assertOk(close, "close");
 
 			const allPaths = listFilesRecursive(target);
-			expect(existsSync(join(target, "afol"))).toBe(true);
+			expect(existsSync(join(target, "afol"))).toBe(false);
 			expect(existsSync(join(target, "a"))).toBe(false);
 			expect(existsSync(join(target, "Justfile"))).toBe(false);
 			expect(existsSync(join(target, ".afol", "wb", ".active_session"))).toBe(
