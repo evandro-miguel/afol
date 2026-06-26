@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { toPosixPath } from "../../core/file-paths";
 import type { Result } from "../../core/result";
@@ -132,4 +132,43 @@ export function resolveProjectPath(
 		path: candidate,
 		relativePath: toPosixPath(relative(root, candidate)),
 	});
+}
+
+export function resolveProjectWritePath(
+	projectRoot: string,
+	targetPath: string,
+): Result<ProjectPath, string> {
+	const resolved = resolveProjectPath(projectRoot, targetPath);
+	if (!resolved.ok) {
+		return resolved;
+	}
+
+	const root = realpathSync(projectRoot);
+	let candidate = root;
+	for (const rawPart of resolved.value.relativePath
+		.split("/")
+		.filter((part) => part.length > 0)) {
+		const next = join(candidate, rawPart);
+		try {
+			if (lstatSync(next).isSymbolicLink()) {
+				return err(`Path crosses symlink: ${targetPath}`);
+			}
+		} catch (error) {
+			if (!isMissingPathError(error)) {
+				return err(`Path cannot be inspected: ${targetPath}`);
+			}
+		}
+		candidate = next;
+	}
+
+	return resolved;
+}
+
+function isMissingPathError(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		(error as { code?: unknown }).code === "ENOENT"
+	);
 }

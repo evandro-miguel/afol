@@ -1,0 +1,9 @@
+{"id":"E-20260626170035043-b3ef9b","task_id":"T-01","created_at":"2026-06-26T21:00:35.043Z","command":"afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260626170552658-f6516a","task_id":"T-02","created_at":"2026-06-26T21:05:52.658Z","command":"bun test cli/tests/project-root.test.ts cli/tests/bootstrap.test.ts cli/tests/adapter-command.test.ts cli/tests/template-policy.test.ts","result":"passed"}
+{"id":"E-20260626170636737-f53fde","task_id":"T-03","created_at":"2026-06-26T21:06:36.737Z","command":"bun test cli/tests/template-policy.test.ts","result":"passed"}
+{"id":"E-20260626170902918-a78960","task_id":"T-03","created_at":"2026-06-26T21:09:02.918Z","command":"bun test cli/tests/downstream-smoke.test.ts cli/tests/bootstrap.test.ts cli/tests/project-root.test.ts cli/tests/adapter-command.test.ts cli/tests/template-policy.test.ts","result":"passed"}
+{"id":"E-20260626171216819-3061af","task_id":"T-03","created_at":"2026-06-26T21:12:16.819Z","command":"tokf run bun test","result":"passed"}
+{"id":"E-20260626171216894-e6a37b","task_id":"T-03","created_at":"2026-06-26T21:12:16.894Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260626171216975-d0f9b8","task_id":"T-03","created_at":"2026-06-26T21:12:16.975Z","command":"git diff --check","result":"passed"}
+{"id":"E-20260626171217056-481ab5","task_id":"T-03","created_at":"2026-06-26T21:12:17.056Z","command":"bun run validate:security:release","result":"passed"}
+{"id":"E-20260626171217137-fb2b76","task_id":"T-03","created_at":"2026-06-26T21:12:17.137Z","command":"afol local-state rebuild --json","result":"passed"}

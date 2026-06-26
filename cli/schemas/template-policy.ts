@@ -10,6 +10,12 @@ export const TEMPLATE_FORBIDDEN_PATTERNS = [
 	"a",
 	"afol",
 	"Justfile",
+	"**/.env",
+	"**/.env.*",
+	"**/*.key",
+	"**/*.pem",
+	"**/*.p12",
+	"**/*.pfx",
 	"**/*.py",
 	"**/pyproject.toml",
 	"**/uv.lock",
@@ -105,12 +111,20 @@ const ALLOWED_GLOBS = TEMPLATE_ALLOWED_PATTERNS.map(
 
 export function matchesTemplateForbiddenPattern(relativePath: string): boolean {
 	const normalized = toPosixPath(relativePath);
-	return FORBIDDEN_GLOBS.some((glob) => glob.match(normalized));
+	return (
+		isAllowedSecretExample(normalized) === false &&
+		FORBIDDEN_GLOBS.some((glob) => glob.match(normalized))
+	);
 }
 
 export function matchesTemplateAllowedPattern(relativePath: string): boolean {
 	const normalized = toPosixPath(relativePath);
 	return ALLOWED_GLOBS.some((glob) => glob.match(normalized));
+}
+
+function isAllowedSecretExample(relativePath: string): boolean {
+	const fileName = relativePath.split("/").at(-1);
+	return fileName === ".env.example";
 }
 
 export async function scanTemplateForbiddenPaths(

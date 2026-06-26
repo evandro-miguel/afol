@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 
 import {
+	matchesTemplateForbiddenPattern,
 	scanProjectTemplateForbiddenPaths,
 	scanProjectTemplateForbiddenTextReferences,
 	scanProjectTemplateUnknownAllowedPaths,
@@ -106,6 +107,23 @@ describe("template forbidden-content policy", () => {
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });
 		}
+	});
+
+	test("blocks secret-bearing template payload paths", () => {
+		for (const path of [
+			".env",
+			".env.local",
+			"nested/.env.production",
+			"certs/private.key",
+			"certs/private.pem",
+			"certs/bundle.p12",
+			"certs/bundle.pfx",
+		]) {
+			expect(matchesTemplateForbiddenPattern(path)).toBe(true);
+		}
+
+		expect(matchesTemplateForbiddenPattern(".env.example")).toBe(false);
+		expect(matchesTemplateForbiddenPattern("docs/.env.example")).toBe(false);
 	});
 
 	test("live src/project-template has no forbidden content", async () => {

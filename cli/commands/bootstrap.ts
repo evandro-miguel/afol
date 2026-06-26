@@ -19,6 +19,7 @@ import type {
 } from "../services/bootstrap/planner";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
 import { normalizeProjectRelativePath } from "../services/project/paths";
+import { resolveProjectWritePath } from "../services/project/root";
 import { validateMutationRuntime } from "../services/state/validate";
 import type { TemplateFileMap } from "../services/template/payload";
 
@@ -385,13 +386,16 @@ function cleanupProviderCompatibleAgentsMutable(
 	const archiveRoot = nextProviderCompatibleArchiveRoot(targetRoot);
 	const archived: ProviderCompatibleCleanupArchiveResult[] = [];
 	for (const operation of operations) {
-		const absolutePath = join(targetRoot, operation.path);
+		const absolutePath = resolveBootstrapWritePath(targetRoot, operation.path);
 		if (existsSync(absolutePath)) {
 			const archivePath = join(
 				archiveRoot,
 				operation.path.replace(/^\.agents\//, ""),
 			);
-			const absoluteArchivePath = join(targetRoot, archivePath);
+			const absoluteArchivePath = resolveBootstrapWritePath(
+				targetRoot,
+				archivePath,
+			);
 			mkdirSync(dirname(absoluteArchivePath), { recursive: true });
 			renameSync(absolutePath, absoluteArchivePath);
 			archived.push({
@@ -438,7 +442,7 @@ async function writeMutableBaselines(
 			continue;
 		}
 		const targetPath = operation.path;
-		const absolutePath = join(targetRoot, targetPath);
+		const absolutePath = resolveBootstrapWritePath(targetRoot, targetPath);
 		mkdirSync(dirname(absolutePath), { recursive: true });
 		await Bun.write(absolutePath, Buffer.from(source.contentBase64, "base64"));
 	}
@@ -594,7 +598,7 @@ function writeTemplateFile(
 	if (!entry) {
 		throw new Error(`Missing generated template entry: ${path}`);
 	}
-	const absolutePath = join(targetRoot, path);
+	const absolutePath = resolveBootstrapWritePath(targetRoot, path);
 	mkdirSync(dirname(absolutePath), { recursive: true });
 	const payload = Buffer.from(entry.contentBase64, "base64");
 	return Bun.write(absolutePath, payload).then(() => {
@@ -602,6 +606,14 @@ function writeTemplateFile(
 			chmodSync(absolutePath, 0o755);
 		}
 	});
+}
+
+function resolveBootstrapWritePath(targetRoot: string, path: string): string {
+	const resolved = resolveProjectWritePath(targetRoot, path);
+	if (!resolved.ok) {
+		throw new Error(`bootstrap unsafe target path: ${resolved.error}`);
+	}
+	return resolved.value.path;
 }
 
 export async function runBootstrapCommand(
@@ -712,50 +724,62 @@ export async function runBootstrapCommand(
 		}
 	}
 
-	for (const operation of writable) {
-		await writeTemplateFile(parsed.targetRoot, operation.path, templateFiles);
-	}
-	if (parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) {
-		cleanupBootstrapObsolete(parsed.targetRoot, cleanupPlan.candidates);
-		if (parsed.verbose) {
-			for (const candidate of cleanupPlan.candidates) {
-				console.log(`cleanup-removed ${candidate.path} ${candidate.reason}`);
-			}
+	try {
+		if (hasRealMutations) {
+			mkdirSync(parsed.targetRoot, { recursive: true });
 		}
-	}
-	if (parsed.forceManaged) {
-		for (const operation of conflicts) {
+		for (const operation of writable) {
 			await writeTemplateFile(parsed.targetRoot, operation.path, templateFiles);
 		}
-	}
-	await writeMutableBaselines(parsed.targetRoot, mutableBaselinePlan);
-	if (
-		parsed.cleanupProviderCompatibleMutable &&
-		parsed.confirmProviderMigration
-	) {
-		const archived = cleanupProviderCompatibleAgentsMutable(
-			parsed.targetRoot,
-			providerCompatibleCleanupPlan,
-		);
-		if (parsed.verbose) {
-			for (const operation of archived) {
-				console.log(
-					`provider-compatible-cleanup-archived ${operation.path} archive=${operation.archivePath} ${operation.reason}`,
+		if (parsed.cleanupObsolete && cleanupPlan.candidates.length > 0) {
+			cleanupBootstrapObsolete(parsed.targetRoot, cleanupPlan.candidates);
+			if (parsed.verbose) {
+				for (const candidate of cleanupPlan.candidates) {
+					console.log(`cleanup-removed ${candidate.path} ${candidate.reason}`);
+				}
+			}
+		}
+		if (parsed.forceManaged) {
+			for (const operation of conflicts) {
+				await writeTemplateFile(
+					parsed.targetRoot,
+					operation.path,
+					templateFiles,
 				);
 			}
 		}
-	} else {
-		if (parsed.verbose) {
-			for (const operation of providerCompatibleCleanupPlan) {
-				console.log(
-					`provider-compatible-cleanup-preserved ${operation.path} ${
-						parsed.cleanupProviderCompatibleMutable
-							? "requires-confirm-provider-migration"
-							: "requires-explicit-opt-in"
-					}`,
-				);
+		await writeMutableBaselines(parsed.targetRoot, mutableBaselinePlan);
+		if (
+			parsed.cleanupProviderCompatibleMutable &&
+			parsed.confirmProviderMigration
+		) {
+			const archived = cleanupProviderCompatibleAgentsMutable(
+				parsed.targetRoot,
+				providerCompatibleCleanupPlan,
+			);
+			if (parsed.verbose) {
+				for (const operation of archived) {
+					console.log(
+						`provider-compatible-cleanup-archived ${operation.path} archive=${operation.archivePath} ${operation.reason}`,
+					);
+				}
+			}
+		} else {
+			if (parsed.verbose) {
+				for (const operation of providerCompatibleCleanupPlan) {
+					console.log(
+						`provider-compatible-cleanup-preserved ${operation.path} ${
+							parsed.cleanupProviderCompatibleMutable
+								? "requires-confirm-provider-migration"
+								: "requires-explicit-opt-in"
+						}`,
+					);
+				}
 			}
 		}
+	} catch (error) {
+		console.error((error as Error).message);
+		return 2;
 	}
 
 	return 0;

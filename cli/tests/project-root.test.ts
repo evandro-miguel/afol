@@ -10,7 +10,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveProjectPaths } from "../services/project/paths";
-import { loadProjectRoot, resolveProjectPath } from "../services/project/root";
+import {
+	loadProjectRoot,
+	resolveProjectPath,
+	resolveProjectWritePath,
+} from "../services/project/root";
 
 const templateConfig = JSON.stringify({
 	schema_version: 1,
@@ -179,6 +183,38 @@ describe("project root loader", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 			rmSync(outside, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects write targets that cross symlinks inside root", () => {
+		const root = mkProjectRoot("path-jail-write-dir-symlink");
+		try {
+			mkdirSync(join(root, "real"), { recursive: true });
+			symlinkSync(join(root, "real"), join(root, "link"), "dir");
+
+			const symlinked = resolveProjectWritePath(root, "link/file.txt");
+			expect(symlinked.ok).toBe(false);
+			if (!symlinked.ok) {
+				expect(symlinked.error).toContain("Path crosses symlink");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects write targets when final file is a symlink", () => {
+		const root = mkProjectRoot("path-jail-write-file-symlink");
+		try {
+			writeFileSync(join(root, "real.txt"), "safe\n", "utf8");
+			symlinkSync(join(root, "real.txt"), join(root, "link.txt"));
+
+			const symlinked = resolveProjectWritePath(root, "link.txt");
+			expect(symlinked.ok).toBe(false);
+			if (!symlinked.ok) {
+				expect(symlinked.error).toContain("Path crosses symlink");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 });

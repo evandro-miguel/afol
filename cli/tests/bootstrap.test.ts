@@ -7,6 +7,7 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -192,6 +193,29 @@ describe("bootstrap provider-compatible mutable state", () => {
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 			rmSync(cliRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("does not write template files through symlinked target directories", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-symlink-target-"));
+		const outside = mkdtempSync(join(tmpdir(), "bootstrap-symlink-outside-"));
+		const errors: string[] = [];
+		const originalError = console.error;
+		try {
+			console.error = (...values: unknown[]) => {
+				errors.push(values.map(String).join(" "));
+			};
+			symlinkSync(outside, join(target, ".agents"), "dir");
+
+			const exitCode = await runBootstrapCommand([target]);
+
+			expect(exitCode).toBe(2);
+			expect(errors.join("\n")).toContain("Path crosses symlink");
+			expect(existsSync(join(outside, "config.json"))).toBe(false);
+		} finally {
+			console.error = originalError;
+			rmSync(target, { recursive: true, force: true });
+			rmSync(outside, { recursive: true, force: true });
 		}
 	});
 
