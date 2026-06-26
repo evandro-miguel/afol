@@ -46,7 +46,7 @@ Removed legacy surfaces:
 - `.agents/runtime/**`
 - `.agents/wb/**`
 - `.agents/z-arq/**`
-- `.agents/agents.config`
+- `agents.config`
 - `legacy:` delegate routing
 
 ## Commands

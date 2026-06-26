@@ -64,5 +64,7 @@ Do not use, document as current, restore, or extend:
 - `docs/map/**` as a root current-state map surface
 - `docs/arc/**` as the live governance authority
 
-`.agents/**` remains only static scaffold metadata, rules, source seed, and
-provider skill content. Mutable state belongs under `.afol/**`.
+`.agents/**` remains only static scaffold metadata (`config.json`,
+`lock.json`, `manifest.json`) and provider skill content under
+`.agents/skills/**`. Hooks, rules, source seeds, and mutable state belong under
+`.afol/**`.

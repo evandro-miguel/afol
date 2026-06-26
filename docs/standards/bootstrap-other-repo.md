@@ -13,28 +13,29 @@ updated_at: '2026-06-20T00:00:00+00:00'
 Define how to install the AFOL scaffold into another repository, including:
 
 - full bootstrap for a fresh repo
-- partial installation for an existing repo
+- overlay adoption for an existing repo
 - limitations and safe usage notes
 - the skills baseline that should be prepared for future universal-skills contract evolution
 - the preferred project-local skill model, where each repo carries its own `.agents/skills` subset instead of depending on many global Codex skills
 - the export source boundary, where the reusable baseline lives under `src/project-template/` in this repo instead of the live development root
 - the canonical operator front door `afol`; downstream installs must not depend
-  on legacy aliases or legacy just command runners
+  on project-local wrappers, legacy aliases, or legacy just command runners
 - the static `.agents` metadata boundary and mutable `.afol` runtime boundary
 
 ## Public onboarding requirements
 
-- Command path: `afol bootstrap` from the native Bun/TypeScript CLI.
+- Command path: `afol bootstrap` from the external operator command.
+  Do not copy an `afol` executable or wrapper into the target repository.
 - Repo path requirement:
   - provide a normal target directory path such as `/path/to/target-repo`,
     not a private host path.
 - Mode:
   - `full`: target is empty or new.
-  - `partial`: target already has live content and you want scaffold adoption only.
+  - `overlay`: target already has live content and you want scaffold adoption only.
 - Validation minimum:
-  - `afol` confirms the front-door wrapper is present.
+  - `afol --version` confirms the external front door is available.
   - `afol s` (or `afol status`) confirms onboarding command visibility.
-  - `afol b /path/to/existing-project --partial` confirms the partial install path.
+  - `afol b /path/to/existing-project --dry-run` previews the overlay path.
   - `afol status`
   - `afol validate project`
 
@@ -64,9 +65,9 @@ Recommended command:
 afol bootstrap /path/to/target-repo
 ```
 
-### Partial Installation
+### Existing Repository Adoption
 
-Use partial installation when the target repo already exists and has project content.
+Use overlay adoption when the target repo already exists and has project content.
 
 Behavior:
 
@@ -85,7 +86,8 @@ This is the safe path for adopting the scaffold into a live project without clob
 Recommended command:
 
 ```bash
-afol bootstrap /path/to/existing-project --partial
+afol bootstrap /path/to/existing-project --dry-run
+afol bootstrap /path/to/existing-project
 ```
 
 ## Update Contract
@@ -100,7 +102,9 @@ behavior is an overlay update, not a replacement update.
 - skip existing files unless a managed patch is explicitly required
 - keep target docs, skills, workbench, and local runtime choices intact unless
   the operator explicitly asks for a replacement
-- prefer MCP/runtime planning and validation, with script wrappers as fallback
+- prefer native AFOL planning and validation through the external `afol` command
+  without falling back to retired `.agents/scripts` or `.agents/runtime`
+  surfaces
 
 ### Update Action Taxonomy
 
@@ -111,7 +115,6 @@ one of:
 - `skip` - target already owns the path and no managed change is required
 - `patch-managed` - scaffold-owned file can be updated in place
 - `adapt-config` - target config needs a compatibility translation, not a rewrite
-- `add-wrapper` - a missing adapter file should be added for runtime or MCP
 - `reconcile-skills` - skills manifest/source mismatch needs classification
 - `conflict` - target-owned content differs and must be reviewed before overwrite
 - `benchmark` - record timing, warnings, and validation evidence for the update
@@ -158,7 +161,8 @@ path authoritative until the release is registered.
 - Bootstrap does not generate current-state repository maps; it only provisions the place and rules for them.
 - Bootstrap does not copy source-repo workbench sessions, active-session pointers, or source-repo current-state map artifacts into the target repo.
 - Existing project governance should be reviewed after install before non-trivial work begins.
-- If the target repo already has its own `AGENTS.md` or runtime adapter files, review the merge outcome before accepting the install.
+- If the target repo already has its own `AGENTS.md` or local command wrappers,
+  review the merge outcome before accepting the install.
 - Optional upstream skills sync may emit warnings; those warnings are non-blocking.
 - Bootstrap does not copy scaffold-local skill history; it only prepares the baseline needed for the target repo to own its selection and upgrade path.
 - Bootstrap should reinforce project-local skills, not turn global Codex skills into a second project contract.
@@ -177,11 +181,12 @@ afol status
 afol validate project
 ```
 
-For isolated environments, point `AGENTIC_CLI_PATH` at the source checkout's
-native CLI and confirm the exported front door works:
+For isolated environments, install or expose the native `afol` command on
+`PATH` from outside the target repository. Do not create a repo-local wrapper:
 
 ```bash
-AGENTIC_CLI_PATH=/path/to/source/cli/main.ts afol validate project
+afol --version
+afol validate project
 ```
 
 ---

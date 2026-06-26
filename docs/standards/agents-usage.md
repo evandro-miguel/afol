@@ -13,8 +13,10 @@ updated_at: '2026-06-07T12:30:00-03:00'
 Use `afol` for every supported scaffold, workbench, validation, update,
 evidence, and lifecycle operation.
 
-`.agents/` is static scaffold metadata, rules, source seed, and provider skill
-content. It is not the operational command system.
+`.agents/` is limited to static scaffold metadata (`config.json`,
+`lock.json`, `manifest.json`) and provider skills under `.agents/skills/**`.
+Hooks, rules, source seeds, workbench state, and other mutable state belong
+under `.afol/**`. It is not the operational command system.
 
 ## Quick Start
 

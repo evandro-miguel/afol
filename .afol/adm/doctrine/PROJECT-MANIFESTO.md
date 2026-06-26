@@ -254,15 +254,16 @@ project-local layer
 - .afol/adm, .afol/pstr, .afol/wb, .afol/state, rules, skills, data, tmp
 
 project wrapper
-- afol (local compatibility alias during migration)
+- afol (public local front door)
 ```
 
 The public command entrypoint is `afol`.
-`afol` is the local migration wrapper/compatibility alias.
+Retired `.agents/agents`, `agents.config`, and `legacy:` routes are not
+compatibility front doors.
 
 ## 8) Command Philosophy
 
-The local wrapper is `afol` while migration is active.
+The local wrapper is `afol`.
 
 High-frequency commands should use short names through `afol`:
 
@@ -280,7 +281,7 @@ High-frequency commands should use short names through `afol`:
 - `afol up ck`
 
 Long aliases may exist for humans. Agents should prefer short commands.
-`afol` remains a local compatibility alias where migration requires it.
+Retired aliases do not return as command front doors.
 
 ## 9) Quality Bar
 
