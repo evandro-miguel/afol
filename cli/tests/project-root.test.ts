@@ -15,13 +15,13 @@ import { loadProjectRoot, resolveProjectPath } from "../services/project/root";
 const templateConfig = JSON.stringify({
 	schema_version: 1,
 	project: {
-		name: "agentic-start-folder-dev-refactor-ts",
+		name: "afol",
 	},
 });
 const templateLock = JSON.stringify({
 	schema_version: 1,
 	revision: "e178aaf",
-	project: "agentic-start-folder-dev-refactor-ts",
+	project: "afol",
 	locked: true,
 });
 

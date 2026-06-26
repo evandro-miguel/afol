@@ -10,10 +10,10 @@ owners:
 created_at: '2026-03-06T23:05:00+00:00'
 updated_at: '2026-06-14T00:00:00+00:00'
 links:
-  roadmap: 260223_0000_arc_roadmap_01
+  roadmap: .afol/adm/roadmap/GENERAL-ROADMAP.md
 scope:
   repo_areas:
-    - docs/arc
+    - .afol/adm
     - docs
     - .agents/scripts
     - .afol/wb
@@ -142,4 +142,4 @@ Key design choices:
 
 ---
 
-*Spec: `docs/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md`*
+*Spec: `.afol/adm/specs/260306_execution-intelligence-and-knowledge-system_spec_01.md`*

@@ -22,7 +22,7 @@ scope:
   - .agents/scripts
   - .agents/runtime
   - .agents/skills
-  - docs/arc
+  - .afol/adm
   - docs/standards
   - docs/templates
   packages:
@@ -272,4 +272,4 @@ Open questions:
 
 ---
 
-*Spec: `docs/arc/SPECS/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md`*
+*Spec: `.afol/adm/specs/260423_1605_controlled-runtime-flow-benchmarks_spec_01.md`*

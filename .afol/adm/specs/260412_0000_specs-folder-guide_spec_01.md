@@ -41,7 +41,7 @@ They should not be code-heavy implementation documents.
 - A local workstream `spec` or `spec-child` can refine delivery context.
 - Keep `spec-lite` as a historical compatibility alias while migration remains in progress.
 - Use `spec-test` when a feature needs a durable, journey-first testing strategy artifact.
-- It never replaces the parent strategic spec in `docs/arc/SPECS/`.
+- It never replaces the parent strategic spec in `.afol/adm/specs/`.
 
 ## Required Content
 
@@ -105,4 +105,4 @@ draft -> active -> final -> deprecated
 
 ---
 
-*Specifications folder: `docs/arc/SPECS/`*
+*Specifications folder: `.afol/adm/specs/`*

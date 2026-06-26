@@ -29,6 +29,7 @@ describe("schema command", () => {
 			expect(content).toContain("## Signals");
 			expect(content).toContain("## Rules");
 			expect(content).toContain("## Validation commands");
+			expect(content).not.toContain("docs/arc/");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

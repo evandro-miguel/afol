@@ -39,7 +39,7 @@ Replace this section after bootstrap with real product context.
 
 ## Branch And Deploy
 
-- Agent commits/pushes target `main_dev` unless the user explicitly requests a
+- Agent commits/pushes target `dev` unless the user explicitly requests a
   different branch in the current turn.
 - `main` -> never direct-push.
 - Production deploy -> forbidden unless the user explicitly asks in the current
@@ -57,16 +57,17 @@ Replace this section after bootstrap with real product context.
 ## Repository Map
 
 - `.agents/config.json`, `.agents/lock.json`, and `.agents/manifest.json`
-  static scaffold metadata and adapter settings
+  path contract for mutable state, plan storage, skills, tmp, and data locations
 - `.afol/wb/` or configured `paths.wb_dir` governed plan state
 - `.afol/data/` or configured data path for telemetry data and indexes when the downstream CLI exposes them
 - `.afol/adm/hooks/` static provider-neutral hook catalog; no script execution
-- `.afol/adm/rules/` local contracts only
+- `.afol/adm/rules/` local contracts only. YAML frontmatter is metadata-only;
+  rule budgets and prompt injection use the Markdown body after frontmatter.
 - `.agents/skills/` only required project-local behavior; do not create
   `.afol/skills/`
 - `.afol/adm/` desired-state administration
-- `.afol/pstr/` current-state structure maps
-- `docs/` project docs and reusable standards
+- `.afol/pstr/` current-state structure maps only
+- `docs/` project docs
 
 ## Working Rules
 

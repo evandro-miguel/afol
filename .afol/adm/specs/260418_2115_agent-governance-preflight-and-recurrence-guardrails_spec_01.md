@@ -24,7 +24,7 @@ scope:
   - .agents/scripts
   - .agents/runtime
   - .agents/skills
-  - docs/arc
+  - .afol/adm
   - docs/lessons
   - docs/templates
   packages:
@@ -116,8 +116,8 @@ Failure or friction points:
 
 Expected behavior:
 
-- Before every non-trivial plan, the agent checks `docs/arc/GENERAL-ROADMAP.md`
-  and `docs/arc/SPECS/` for an existing roadmap feature and parent spec.
+- Before every non-trivial plan, the agent checks `.afol/adm/roadmap/GENERAL-ROADMAP.md`
+  and `.afol/adm/specs/` for an existing roadmap feature and parent spec.
 - Workbench plans describe the direct execution path for the requested work.
   They do not include steps whose only deliverable is making the plan, preparing
   a later plan, or doing broad research so a future real plan can exist.
@@ -209,11 +209,11 @@ or extended carefully during implementation:
   workstream creation and brainstorm/explorer-check gates.
 - `.afol/adm/rules/RULE-004-validation-linting.md` already defines validation
   expectations before completion.
-- `docs/arc/SPECS/260306_execution-intelligence-and-knowledge-system_spec_01.md`
+- `.afol/adm/specs/260306_execution-intelligence-and-knowledge-system_spec_01.md`
   already governs exploration, reusable knowledge, and session closure.
-- `docs/arc/SPECS/260306_planning-rigor-and-explorer-gates_spec_01.md`
+- `.afol/adm/specs/260306_planning-rigor-and-explorer-gates_spec_01.md`
   already requires brainstorm and explorer-check artifacts for major plans.
-- `docs/arc/SPECS/260307_persistent-planning-memory_spec_01.md` already covers
+- `.afol/adm/specs/260307_persistent-planning-memory_spec_01.md` already covers
   catchup and durable planning memory.
 - `docs/standards/workflow.md` already defines the roadmap -> spec -> plan ->
   task -> execution -> report sequence that decision intake should strengthen,
@@ -472,4 +472,4 @@ Open questions:
 
 ---
 
-*Spec: `docs/arc/SPECS/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md`*
+*Spec: `.afol/adm/specs/260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01.md`*

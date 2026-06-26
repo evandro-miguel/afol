@@ -19,7 +19,7 @@ links:
   report: ''
 scope:
   repo_areas:
-  - docs/arc
+  - .afol/adm
   - docs
   - .agents/scripts
   - .afol/wb
@@ -82,7 +82,7 @@ Failure or friction points:
 In scope:
 
 - the document taxonomy for current-state vs goal-state artifacts
-- semantic boundaries for `docs/map/` and the rest of `docs/arc/`
+- semantic boundaries for `docs/map/` and the rest of `.afol/adm/`
 - guidance for how workstreams and runtime commands consume map artifacts
 - bootstrap and documentation implications for the new split
 
@@ -105,7 +105,7 @@ Out of scope:
 ## 7) Constraints and Assumptions
 
 - Assumptions:
-  - `docs/arc` remains the canonical home for strategic project context.
+  - `.afol/adm` remains the canonical home for strategic project context.
   - `docs/map/` artifacts may be partially generated, partially curated, and more refreshable than roadmap/spec docs.
 - Constraints:
   - Compatibility: the new split must not break the current roadmap/spec/workbench operating model

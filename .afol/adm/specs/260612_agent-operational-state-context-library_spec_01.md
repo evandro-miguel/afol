@@ -23,7 +23,7 @@ scope:
   - .afol/data/index
   - .afol/library
   - cli
-  - docs/arc
+  - .afol/adm
   packages:
   - agentic-cli
 risk_level: high
@@ -276,7 +276,7 @@ Review questions:
 Rollout approach:
 
 1. Define `.afol/adm` and `.afol/pstr` authority boundaries.
-2. Add SQLite foundation and hydration from current canonical docs.
+2. Add SQLite foundation and hydration from current governed docs.
 3. Add Markdown projection and drift validation.
 4. Add memory, library, context bundles, spec gates, and decision-history
    commands as separate slices.

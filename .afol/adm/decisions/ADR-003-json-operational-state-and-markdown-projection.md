@@ -9,11 +9,11 @@ decision_type: architecture
 supersedes: ""
 superseded_by: ADR-004
 affected_specs:
-- docs/arc/SPECS/260521_0040_governance-workbench-system_spec_01.md
-- docs/arc/SPECS/260521_0050_smart-rules-and-skills-routing_spec_01.md
-- docs/arc/SPECS/260521_0060_file-first-low-token-execution_spec_01.md
-- docs/arc/SPECS/260521_0070_local-state-index-and-event-log_spec_01.md
-- docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md
+- .afol/adm/specs/260521_0040_governance-workbench-system_spec_01.md
+- .afol/adm/specs/260521_0050_smart-rules-and-skills-routing_spec_01.md
+- .afol/adm/specs/260521_0060_file-first-low-token-execution_spec_01.md
+- .afol/adm/specs/260521_0070_local-state-index-and-event-log_spec_01.md
+- .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md
 affected_rules: []
 affected_skills: []
 affected_commands:

@@ -135,9 +135,9 @@ Forbidden dependencies:
 - `src/project-template/` -> only source for downstream template payload.
 - `.afol/adm/` -> target project administration: manifesto, architecture,
   roadmap, specs, ADRs, changelog, archive, and governance policy.
-- `.afol/pstr/` -> target project structure: current-state maps for frontend,
-  backend, API, data, devops, CLI, integrations, flows, tests, critical paths,
-  entrypoints, dependencies, and structural ownership.
+- `.afol/pstr/` -> target project structure: generated current-state maps.
+  Current AFOL emits flat area maps from the PSTR area registry, not empty
+  nested area folders.
 - `.afol/state/` -> target SQLite materialized execution state such as
   `.afol/state/afol.db`.
 - `.afol/wb/` -> governed session execution: plan/task/log/evidence files for
@@ -147,8 +147,7 @@ Forbidden dependencies:
 - `.agents/skills/**` -> project-local AFOL-owned skills.
 - `docs/arc/` -> frozen transitional archive of roadmap, specs, architecture,
   decisions, and execution plans.
-- `docs/map/` -> legacy/transitional current-state map evidence; do not
-  recreate it when `.afol/pstr` becomes available.
+- `docs/map/` -> retired legacy current-state map surface; do not recreate it.
 
 ## 7) Public Interfaces
 
@@ -228,24 +227,15 @@ Target pstr layout:
 
 ```text
 .afol/pstr/
-├── README.md
-├── INDEX.md
-├── overview.md
-├── critical-paths.md
-├── frontend/
-├── backend/
-├── api/
-├── data/
-├── devops/
-├── cli/
-├── integrations/
-├── flows/
-├── tests/
-└── snapshots/
+├── index.json
+├── cli.md
+├── template.md
+├── docs.md
+└── config.md
 ```
 
-The layout is adaptive. Projects without a frontend, backend, API, or other
-area do not create empty area maps.
+The layout is registry-driven and adaptive. Projects do not create empty area
+maps; AFOL emits only the observed areas implemented by the PSTR builder.
 
 Temporal metadata:
 
@@ -258,7 +248,7 @@ status: current
 authority: observed
 source_hash: "<hash>"
 git:
-  branch: main_dev
+  branch: dev
   commit: abc123
 ```
 

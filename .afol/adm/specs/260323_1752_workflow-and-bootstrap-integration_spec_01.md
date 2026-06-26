@@ -19,7 +19,7 @@ links:
   report: ''
 scope:
   repo_areas:
-  - docs/arc
+  - .afol/adm
   - docs
   - .agents/scripts
   - .afol/wb
@@ -108,7 +108,7 @@ Out of scope:
 ## 7) Constraints and Assumptions
 
 - Assumptions:
-  - `docs/arc/GENERAL-ROADMAP.md` and `SPECS/` remain the canonical governance layer.
+  - `.afol/adm/roadmap/GENERAL-ROADMAP.md` and `.afol/adm/specs/` remain the authoritative governance surface.
   - `.afol/wb/` remains the canonical place for execution artifacts.
   - `docs/map/` is evidence-oriented and may be absent in some repos until adopted.
 - Constraints:
@@ -183,7 +183,7 @@ Entities:
 Storage:
 
 - Session folder: `.afol/wb/<session>/` key: session id
-- Governance docs: `docs/arc/` key: roadmap feature and spec id
+- Governance docs: `.afol/adm/` key: roadmap feature and spec id
 - Current-state evidence: `docs/map/` key: repo-specific artifact name
 
 Migrations:

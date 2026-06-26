@@ -164,4 +164,4 @@ workbench plans, research, logs, tasks, reports, or evidence.
 
 ---
 
-*Spec: `docs/arc/SPECS/260307_persistent-planning-memory_spec_01.md`*
+*Spec: `.afol/adm/specs/260307_persistent-planning-memory_spec_01.md`*

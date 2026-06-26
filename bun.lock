@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "agentic-start-folder-ts-kernel",
+      "name": "afol",
       "dependencies": {
         "diff": "^9.0.0",
       },

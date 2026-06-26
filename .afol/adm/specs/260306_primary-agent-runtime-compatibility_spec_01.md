@@ -14,7 +14,7 @@ links:
 scope:
   repo_areas:
     - AGENTS.md
-    - docs/arc
+    - .afol/adm
     - docs
     - .agents/scripts
     - .qwen
@@ -33,7 +33,7 @@ risk_level: medium
 
 ## 2) Problem
 
-- The scaffold already has a strong canonical governance layer, but its runtime-facing layer is uneven.
+- The scaffold already has a strong authoritative governance surface, but its runtime-facing layer is uneven.
 - Codex and Qwen have dedicated folders and mirrored docs, while OpenCode is not yet treated as a first-class runtime.
 - That creates ambiguity about where runtime-specific instructions should live, which files are safe to commit, and how approval/tooling behavior should align with the roadmap-first system.
 
@@ -88,7 +88,7 @@ Use cases:
 
 Summary:
 
-- Keep `AGENTS.md` and `.agents/*` as the canonical governance layer, then add explicit runtime adapters for OpenCode, Codex, and Qwen.
+- Keep `AGENTS.md` and `.agents/*` as the project governance surface, then add explicit runtime adapters for OpenCode, Codex, and Qwen.
 
 Key design choices:
 
@@ -212,7 +212,7 @@ Tracing:
 
 Backout:
 
-- Remove or simplify runtime adapters while preserving the canonical governance layer
+- Remove or simplify runtime adapters while preserving the project governance surface
 
 ## 18) Verification Plan
 
@@ -255,4 +255,4 @@ Evidence required:
 
 ---
 
-*Spec: `docs/arc/SPECS/260306_primary-agent-runtime-compatibility_spec_01.md`*
+*Spec: `.afol/adm/specs/260306_primary-agent-runtime-compatibility_spec_01.md`*

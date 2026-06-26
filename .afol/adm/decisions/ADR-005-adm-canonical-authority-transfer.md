@@ -53,7 +53,7 @@ authority surface.
 
 ## Alternatives Considered
 
-1. Keep `docs/arc/**` canonical until a later cleanup.
+1. Keep `docs/arc/**` as an archive-only surface until a later cleanup.
    - Rejected: migration is already implemented and validated.
 2. Delete `docs/arc/**` after migration.
    - Rejected: reversible archive retention is still valuable.

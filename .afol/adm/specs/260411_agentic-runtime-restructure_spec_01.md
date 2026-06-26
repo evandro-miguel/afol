@@ -79,7 +79,7 @@ Failure or friction points:
 - Boundaries:
   - The restructure does not create a public long-lived backend service.
   - FastAPI/OpenAPI is not required for this feature; MCP is the agent-native interface.
-  - Workbench, roadmap, specs, docs/arc, and docs/map boundaries remain authoritative.
+  - Workbench, roadmap, specs, `.afol/adm`, and `.afol/pstr` boundaries remain authoritative.
 
 ## 5) Scope
 
@@ -118,7 +118,7 @@ Out of scope:
   - Compatibility: preserve `.agents/agents <command>` behavior.
   - Safety: archive rather than delete; journal mutating runtime operations.
   - Dependency hygiene: regenerate lockfiles without private registry URLs.
-  - Documentation: keep goal-state docs under `docs/arc/` and current-state maps under `docs/map/`.
+  - Documentation: keep goal-state docs under `.afol/adm/` and current-state maps under `.afol/pstr/`.
 
 ## 8) Acceptance
 

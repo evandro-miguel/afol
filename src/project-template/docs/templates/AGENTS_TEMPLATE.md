@@ -39,7 +39,7 @@ Replace this section after bootstrap with real product context.
 
 ## Branch And Deploy
 
-- Agent commits/pushes target `main_dev` unless the user explicitly requests a
+- Agent commits/pushes target `dev` unless the user explicitly requests a
   different branch in the current turn.
 - `main` -> never direct-push.
 - Production deploy -> forbidden unless the user explicitly asks in the current

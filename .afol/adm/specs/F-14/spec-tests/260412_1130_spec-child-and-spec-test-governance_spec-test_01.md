@@ -18,7 +18,7 @@ scope:
   repo_areas:
   - .agents/scripts
   - docs/templates
-  - docs/arc/SPECS
+  - .afol/adm/specs
   - docs/standards
   - .agents/skills
 risk_level: medium

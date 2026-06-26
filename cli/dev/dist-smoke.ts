@@ -307,8 +307,8 @@ try {
 	assertOk(updatePreview, "dist update preview");
 	assertContains(updatePreview, "dist update preview", [
 		"preview operations:",
-		"diff previews:",
-		".agents/lock.json [owner=managed] revision changed",
+		"diff previews: omitted in compact preview",
+		"operations: total=",
 	]);
 
 	const updateApplyDryRun = runDist(updateTarget, [
@@ -319,7 +319,7 @@ try {
 	assertOk(updateApplyDryRun, "dist update apply dry-run");
 	assertContains(updateApplyDryRun, "dist update apply dry-run", [
 		"apply details",
-		"update-managed .agents/lock.json revision changed",
+		"operations: total=",
 	]);
 	if (readJson<ManagedLock>(updateLockPath).revision !== "old") {
 		throw new Error("update apply --dry-run mutated lock.json");
@@ -341,7 +341,8 @@ try {
 	assertStatus(conflictApply, "dist update apply conflict", 4);
 	assertContains(conflictApply, "dist update apply conflict", [
 		"apply details",
-		"conflict .agents/manifest.json local-user-edit-or-unsafe",
+		"conflicts:",
+		"- .agents/manifest.json",
 	]);
 
 	const applyTarget = bootstrapTarget(sandbox, "update-apply-target");

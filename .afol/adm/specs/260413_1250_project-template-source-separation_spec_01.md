@@ -92,4 +92,4 @@ Out of scope:
 
 ---
 
-*Spec: `docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md`*
+*Spec: `.afol/adm/specs/260413_1250_project-template-source-separation_spec_01.md`*

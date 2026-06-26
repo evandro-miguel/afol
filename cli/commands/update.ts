@@ -401,12 +401,13 @@ export async function runUpdateCommand(
 		const parsedArgs = parseUpdateArgs(rest);
 		const result = checkTemplateUpdate(projectRoot);
 		const writableOperations = result.operations.filter(isWritableOperation);
-		const blockedCount = result.operations.filter(
+		const conflictCount = result.operations.filter(
+			(operation) => operation.kind === "conflict",
+		).length;
+		const preserveBlockedCount = result.operations.filter(
 			(operation) =>
-				operation.kind === "conflict" ||
-				(operation.kind === "preserve-project-owned" &&
-					(operation.owner === "project-owned" ||
-						operation.owner === "ignored")),
+				operation.kind === "preserve-project-owned" &&
+				(operation.owner === "project-owned" || operation.owner === "ignored"),
 		).length;
 
 		if (command === "apply") {
@@ -428,7 +429,7 @@ export async function runUpdateCommand(
 				}
 				return 1;
 			}
-			if (blockedCount > 0) {
+			if (conflictCount > 0) {
 				if (parsedArgs.json) {
 					writeJsonResult(io, "update.apply", result, 4, parsedArgs.verbose);
 				} else {
@@ -451,6 +452,18 @@ export async function runUpdateCommand(
 					);
 				}
 				return 0;
+			}
+			if (preserveBlockedCount > 0) {
+				if (parsedArgs.json) {
+					writeJsonResult(io, "update.apply", result, 4, parsedArgs.verbose);
+				} else {
+					io.stdout(
+						formatUpdateCheck(result, "apply", {
+							verbose: parsedArgs.verbose,
+						}).trimEnd(),
+					);
+				}
+				return 4;
 			}
 			if (writableOperations.length > 0) {
 				if (requiresApproval(ctx)) {

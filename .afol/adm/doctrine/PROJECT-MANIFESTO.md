@@ -166,9 +166,9 @@ Target project-local administration surfaces:
 
 - `.afol/adm/` owns desired-state administration: manifesto, roadmap, specs,
   ADRs, changelog, archive, and policy.
-- `.afol/pstr/` owns current project-structure maps: frontend, backend, API,
-  data, devops, CLI, integrations, flows, tests, critical paths, entrypoints,
-  dependencies, and structural ownership.
+- `.afol/pstr/` owns generated current project-structure maps. Current AFOL
+  emits flat area maps (`index.json`, `cli.md`, `template.md`, `docs.md`,
+  `config.md`) from the PSTR area registry.
 - `.afol/state/afol.db` owns SQLite materialization and query cache.
 - `.afol/adm/**` is the canonical administration surface; `docs/arc/**` is the
   frozen transitional archive preserved by ADR-005.

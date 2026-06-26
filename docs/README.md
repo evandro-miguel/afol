@@ -62,7 +62,7 @@ Do not use, document as current, restore, or extend:
 - `.agents/z-arq/**`
 - `agents.config`
 - `docs/map/**` as a root current-state map surface
-- `docs/arc/**` as the live governance authority
+- `docs/arc/**` as the frozen transitional archive
 
 `.agents/**` remains only static scaffold metadata (`config.json`,
 `lock.json`, `manifest.json`) and provider skill content under

@@ -26,11 +26,10 @@ risk_level: low
 - Outcome: execute the first bounded simplification batch for
   `.agents/scripts/agents-fix-symlinks.py` by reducing internal control-flow
   duplication while preserving CLI behavior and filesystem semantics.
-- Roadmap feature: `F-15` (`docs/arc/GENERAL-ROADMAP.md#L224` and `#L229`).
+- Roadmap feature: `F-15` (`.afol/adm/roadmap/GENERAL-ROADMAP.md`).
 - Parent spec: `260412_2004_repo-wide-simplification-runtime-parity_spec_01`
   with scope anchors at
-  `docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md#L108`
-  and `#L136`.
+  `.afol/adm/specs/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md`.
 
 ## Canonical Position
 
@@ -77,4 +76,4 @@ risk_level: low
 
 ---
 
-*Child spec: `docs/arc/SPECS/260528_1759_python-command-simplification_spec-child_01.md`*
+*Child spec: `.afol/adm/specs/260528_1759_python-command-simplification_spec-child_01.md`*

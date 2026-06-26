@@ -23,9 +23,9 @@ risk_level: low
 
 ## Intent
 
-- Outcome: `docs/map/` stays the current-state evidence surface,
-  `docs/map/structure/` is treated as current-state evidence, and
-  `docs/arc/structure/` is retired as a live destination.
+- Outcome: this historical cleanup retired `docs/arc/structure/` as a live
+  destination. Current AFOL map authority has since moved to `.afol/pstr/**`;
+  `docs/map/**` must not be recreated as a live current-state surface.
 - Roadmap feature: `F-15`
 - Parent spec: `260412_2004_repo-wide-simplification-runtime-parity_spec_01`
 
@@ -43,19 +43,19 @@ risk_level: low
 
 ## User or Operator Journey
 
-1. An operator reads `docs/map/` as current-state evidence and `docs/arc/` as
-   goal-state governance.
-2. The operator uses `docs/map/structure/` as a current-state layout
-   reference.
-3. No doc points to `docs/arc/structure/` as a live current-state
-   destination.
+1. An operator reads `.afol/pstr/**` as generated current-state map evidence
+   and `.afol/adm/**` as goal-state governance.
+2. The operator treats `docs/map/**` and `docs/arc/structure/` as retired
+   legacy surfaces, not live current-state destinations.
+3. No current doc points to `docs/map/**` or `docs/arc/structure/` as a live
+   current-state destination.
 
 ## Boundaries
 
 - In scope:
   - `docs/arc/README.md`
-  - `docs/arc/SPECS/INDEX.md`
-  - `docs/map/README.md`
+  - `.afol/adm/specs/INDEX.md`
+  - retired `docs/map/**` references touched by the cleanup
   - `docs/standards/repo-map.md`
   - `docs/standards/structure-map.md`
   - linked workbench plan/task artifacts for this session
@@ -77,9 +77,10 @@ risk_level: low
 - [x] Parent spec linkage is explicit
 - [x] Journey is clear without code
 - [x] Delivery evidence target is clear in linked report
-- [x] `docs/map/structure/` is described as current-state evidence
-- [x] `docs/arc/structure/` is described only as retired/deprecated
+- [x] `.afol/pstr/**` is the current-state map surface
+- [x] `docs/map/**` and `docs/arc/structure/` are described only as
+      retired/deprecated
 
 ---
 
-*Child spec: `docs/arc/SPECS/260528_1723_map-boundary-cleanup_spec-child_01.md`*
+*Child spec: `.afol/adm/specs/260528_1723_map-boundary-cleanup_spec-child_01.md`*

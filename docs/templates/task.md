@@ -18,34 +18,9 @@ depends_on:
 links:
   plan: <plan_doc_id>
   roadmap: <roadmap_path>
-output_artifacts:
-  primary:
-    task: YYMMDD_HHMM_<theme>_task_01
-    plan: <plan_doc_id>
-  sidecars:
-    brainstorm: <brainstorm_doc_id_or_empty>
-    research: <research_doc_id_or_empty>
-    explorer_check: <explorer_check_doc_id_or_empty>
-    postmortem: <postmortem_doc_id_or_empty>
-  sidecar_justification:
-    brainstorm: <required|not_required>
-    research: <required|not_required>
-    explorer_check: <required|not_required>
-    postmortem: <required|not_required>
 ---
 
 # Tasks: <theme>
-
-## Output Artifacts (file-first)
-
-- Primary artifact: `task`
-- Sidecars:
-  - brainstorm: `<brainstorm_doc_id_or_empty>`
-  - research: `<research_doc_id_or_empty>`
-  - explorer_check: `<explorer_check_doc_id_or_empty>`
-  - postmortem: `<postmortem_doc_id_or_empty>`
-- Sidecar justification:
-  - Provide one value per optional artifact, or `not_required`.
 
 Each task must be executable by an agent now. Do not create task items whose
 only purpose is to make the plan, research the plan, or gather broad context.
@@ -73,7 +48,9 @@ ledger evidence and an explicit evidence id.
 
 **Task ID format:** `T-01`, `T-02`, ... (ou `T-001` para boards grandes)
 
-**State marker rules:** See [../standards/checkbox-protocol.md](../standards/checkbox-protocol.md)
+**State source:** lifecycle state belongs only in this `State Board` and AFOL
+commands. Do not add parallel `T-xx` checklist rows or checkbox-done wording as
+a state transition.
 
 ## Governance Context
 
@@ -89,7 +66,7 @@ Before starting work, consult relevant resources:
 
 ### Prevention Rules
 
-- [ ] Check [../lessons/entries/README.md](../lessons/entries/README.md)
+- [ ] Check lesson entries in [../lessons/entries/README.md](../lessons/entries/README.md)
 
 ### Useful Resources
 
@@ -122,8 +99,10 @@ Before starting work, consult relevant resources:
 
 - Move to `implemented_untested` only after the implementation checkpoint.
 - Move to `tested_needs_spec_validation` only when runtime validation passed but spec/UX validation is still pending.
-- Record the real command or gate, result, artifact path or note, and returned evidence id before marking `done`.
-- If validation does not apply, record `N/A` explicitly in the evidence ledger before marking `done`.
+- Record the real command or gate, result, artifact path or note, and returned
+  evidence id before running `afol done`.
+- If validation does not apply, record `N/A` explicitly in the evidence ledger
+  before running `afol done`.
 
 ### Test Evidence
 

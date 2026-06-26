@@ -57,7 +57,7 @@ status: current
 authority: observed
 source_hash: "<hash>"
 git:
-  branch: main_dev
+  branch: dev
   commit: abc123
 ```
 

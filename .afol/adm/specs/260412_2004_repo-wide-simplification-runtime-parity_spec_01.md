@@ -17,8 +17,8 @@ links:
   report: ''
 scope:
   repo_areas:
-  - docs/map
-  - docs/arc
+  - .afol/pstr
+  - .afol/adm
   - .agents/runtime
   - .agents/scripts
   - .agents/agents
@@ -46,10 +46,9 @@ risk_level: high
 
 ## 2) Problem
 
-- `docs/map/` is the documented current-state map surface, including the
-  physical layout view under `docs/map/structure/`; any `docs/arc/structure/`
-  references are legacy migration noise and should not be treated as
-  current-state evidence.
+- `.afol/pstr/**` is the current current-state map surface. Earlier
+  `docs/map/**` and `docs/arc/structure/` references are legacy migration noise
+  and should not be treated as live current-state evidence.
 - The runtime registry and wrapper compatibility layer preserve public commands,
   but command metadata/help/catalog behavior can still drift if future changes
   update only one surface.
@@ -70,9 +69,9 @@ User journey:
 
 1. An operator invokes `.agents/agents <command>` or `.agents/agents-mcp`.
 2. The command behavior remains stable while internals become simpler.
-3. Maintainers use `docs/map/` for current-state evidence and `docs/arc/` for
-   goal-state governance without competing generated map surfaces.
-   The structure view lives under `docs/map/structure/`.
+3. Maintainers use `.afol/pstr/**` for current-state evidence and
+   `.afol/adm/**` for goal-state governance without competing generated map
+   surfaces.
 4. Future refactors can target smaller modules with clear tests and coverage
    gates.
 
@@ -80,8 +79,8 @@ Failure or friction points:
 
 - Public command behavior changes accidentally -> keep parity tests before
   changing routing or archiving legacy paths.
-- Documentation surfaces conflict -> make `docs/map/` the durable current-state
-  location and remove or relocate competing generated map output.
+- Documentation surfaces conflict -> make `.afol/pstr/**` the durable
+  current-state location and keep `docs/map/**` retired.
 - Complexity reduction lowers coverage -> require focused tests and keep the
   80% scripts coverage gate.
 
@@ -89,21 +88,21 @@ Failure or friction points:
 
 - Expected behavior:
   - `.agents/agents` and `.agents/agents-mcp` remain stable public launchers.
-  - `docs/map/` is the only durable current-state repository map surface.
+  - `.afol/pstr/**` is the only durable current-state repository map surface.
   - Runtime command metadata is sourced from one registry path where practical.
   - Python simplification happens only when behavior can be verified.
 - Boundaries:
   - Do not create a long-lived backend service.
   - Do not add routes, HTTP clients, SQLite, or web service architecture.
   - Do not delete legacy scripts until parity and archive evidence exist.
-  - Do not move governance docs into `docs/map/`.
+  - Do not move governance docs into `.afol/pstr/**`.
 
 ## 5) Scope
 
 In scope:
 
-- Current-state documentation boundary cleanup between `docs/map/` and legacy
-  `docs/arc/structure/` references.
+- Current-state documentation boundary cleanup between `.afol/pstr/**` and
+  legacy `docs/map/**` / `docs/arc/structure/` references.
 - Runtime registry, wrapper help/catalog alignment, and compatibility tests.
 - Bounded Python command simplification for complexity hotspots.
 - Documentation and index refreshes directly tied to changed behavior.
@@ -128,9 +127,8 @@ Out of scope:
     Python command simplification slices when each begins.
   - Use `spec-test` only when the test strategy is itself part of the risk.
 - Accepted child specs:
-  - Map boundary cleanup: decided and implemented the `docs/map` vs
-    `docs/map/structure` policy while retiring `docs/arc/structure`
-    references.
+  - Map boundary cleanup: retired `docs/map/**` and `docs/arc/structure`
+    references from current-state authority in favor of `.afol/pstr/**`.
   - Runtime registry parity: reduced metadata drift while preserving public
     CLI behavior.
   - Python command simplification: reduced complexity hotspots in batches.
@@ -147,8 +145,8 @@ Out of scope:
   - Compatibility: preserve `.agents/agents <command>` behavior.
   - Operational: use `.afol/wb/` artifacts and `agentic-folder-sys` for
     governed execution.
-  - Documentation: keep current-state evidence in `docs/map/` and goal-state
-    governance in `docs/arc/`.
+  - Documentation: keep current-state evidence in `.afol/pstr/**` and
+    goal-state governance in `.afol/adm/`.
   - Safety: archive before delete under `.agents/z-arq/` and never expose
     secrets.
 
@@ -157,9 +155,9 @@ Out of scope:
 - Success looks like:
   - A governed F-15 workstream links roadmap, parent spec, local specs, plan,
     tasks, log, report, and postmortem.
-  - `docs/map/structure/` is the canonical durable current-state structure
-    index, and `docs/arc/structure/` is no longer treated as a competing
-    current-state map.
+  - `.afol/pstr/**` is the canonical durable current-state structure map
+    surface, and `docs/map/**` / `docs/arc/structure/` are no longer treated as
+    competing current-state maps.
   - Runtime command metadata and wrapper behavior are easier to verify from one
     registry path.
   - Complexity hotspots are reduced only where focused tests prove behavior.
@@ -192,7 +190,7 @@ Out of scope:
 - Workstream linkage:
   - Execution must reference `roadmap_feature: F-15` and this parent spec.
 - Closure note:
-  - The accepted child slices are final in `docs/arc/SPECS/INDEX.md`.
+  - The accepted child slices are final in `.afol/adm/specs/INDEX.md`.
   - The F-15 roadmap entry is final and the current-state map docs are
     reconciled.
 - Backout or deferral:

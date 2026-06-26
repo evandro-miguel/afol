@@ -77,4 +77,4 @@ risk_level: low
 
 ---
 
-*Child spec: `docs/arc/SPECS/260528_1745_runtime-registry-parity_spec-child_01.md`*
+*Child spec: `.afol/adm/specs/260528_1745_runtime-registry-parity_spec-child_01.md`*

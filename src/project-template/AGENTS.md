@@ -64,10 +64,10 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 ## Branch And Deploy
 
-- Agent commits/pushes target `main_dev` unless the user explicitly requests a
+- Agent commits/pushes target `dev` unless the user explicitly requests a
   different branch in the current turn.
 - `main` -> never direct-push.
-- Updating `main` -> merge from `main_dev` through normal Git merge or PR path.
+- Updating `main` -> merge from `dev` through normal Git merge or PR path.
 - Production deploy -> forbidden unless the user explicitly asks in the current
   turn.
 - Forbidden without explicit deploy request -> `bun run deploy`,
@@ -188,7 +188,10 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Temp files -> `tmp/` or `.tmp_<name>/`.
 - Build artifacts -> `dist/`.
 - Workbench artifacts -> `.afol/wb/<session>/`.
-- Local auxiliary worktrees -> `.worktree/`, unversioned.
+- Local auxiliary worktrees -> grouped Worktrunk siblings such as
+  `~/01_projects/dev/<repo>/<repo>.dev`, unversioned.
+- Legacy nested `.worktree/` directories may stay ignored during migration; do
+  not create new nested worktrees.
 - Script incidental output -> never root. If it happens, treat as script bug and
   fix script.
 - User data -> never delete or move vault content, backups, keys, secrets,

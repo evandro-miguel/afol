@@ -9,8 +9,8 @@ decision_type: architecture
 supersedes: ADR-003
 superseded_by: ""
 affected_specs:
-- docs/arc/SPECS/260612_afol-administration-project-structure-onion-architecture_spec_01.md
-- docs/arc/SPECS/260612_agent-operational-state-context-library_spec_01.md
+- .afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md
+- .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md
 affected_rules: []
 affected_skills: []
 affected_commands:
@@ -27,7 +27,8 @@ archive_reason: ""
 
 AFOL has one public front door, `afol`, and mutable project-local runtime state
 has moved under `.afol/**`. The remaining strategic administration surface still
-lives under `docs/arc/**`.
+lived under `docs/arc/**`; it is now frozen transitional archive preserved for
+reversibility.
 
 The next architecture direction is to make AFOL feel like a layered local
 execution OS. That requires a clear split between desired-state administration,
@@ -51,9 +52,8 @@ Adopt these target surfaces:
 - `.afol/wb/**` for governed session execution.
 - `.afol/data/events/**` for append-only audit events.
 
-`docs/arc/**` remains the current canonical administration surface until AFOL
-ships command-managed migration, hydration, drift validation, and index support
-for `.afol/adm/**`.
+`docs/arc/**` is frozen transitional archive; `.afol/adm/**` is the canonical
+administration surface.
 
 SQLite is derived and rebuildable. It must carry source hashes and must not
 overwrite human-authored Markdown/YAML outside AFOL-managed blocks.
@@ -93,8 +93,8 @@ Positive:
 
 Negative:
 
-- The project carries a transitional period where `docs/arc/**` remains active
-  while `.afol/adm/**` is specified as the target.
+- The project carries an archive import path for `docs/arc/**` while
+  `.afol/adm/**` remains the live authority.
 - Existing specs that mention JSON as an operational source need reinterpretation
   or updates under this ADR.
 - Migration and drift tooling become required before the directory move is safe.
@@ -104,7 +104,8 @@ Negative:
 - The roadmap points F-18 to the onion/source-boundary parent spec.
 - Architecture and manifesto name `.afol/adm`, `.afol/pstr`, and
   `.afol/state/afol.db`.
-- Specs describe `docs/arc/**` as transitional until migration support exists.
+- Specs describe `docs/arc/**` as frozen archive content and `.afol/adm/**` as
+  current administration.
 - Future implementation must add migration, hydration, drift, and SQLite tests.
 
 ## Status

@@ -53,4 +53,4 @@ risk_level: medium
 
 ---
 
-*Child Spec: `docs/arc/SPECS/260306_planning-rigor-and-explorer-gates_spec_01.md`*
+*Child Spec: `.afol/adm/specs/260306_planning-rigor-and-explorer-gates_spec_01.md`*

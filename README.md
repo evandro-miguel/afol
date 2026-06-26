@@ -1,4 +1,4 @@
-# Agentic Start Folder
+# AFOL
 
 Canonical AFOL scaffold factory for terminal-first LLM-assisted development.
 
@@ -26,7 +26,7 @@ system has been retired and must not be restored.
 
 ## Documentation Map
 
-- `docs/README.md`: canonical index for repository documentation.
+- `docs/README.md`: documentation index for repository documentation.
 - `docs/afol-runtime-reference.md`: AFOL command groups, runtime state
   ownership, and validation gates.
 - `.afol/adm/doctrine/ARCHITECTURE.md`: architecture authority and boundary
