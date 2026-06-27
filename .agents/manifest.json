@@ -55,6 +55,34 @@
       "sk",
       "skill"
     ],
+    "library": [
+      "lb",
+      "library"
+    ],
+    "memory": [
+      "mm",
+      "memory"
+    ],
+    "health": [
+      "ht",
+      "health"
+    ],
+    "maintenance": [
+      "mt",
+      "maintenance"
+    ],
+    "sweep": [
+      "sw",
+      "sweep"
+    ],
+    "project-benchmark": [
+      "pb",
+      "project-benchmark"
+    ],
+    "session": [
+      "ss",
+      "session"
+    ],
     "update": [
       "up",
       "update"

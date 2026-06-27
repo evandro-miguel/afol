@@ -27,6 +27,10 @@ execution state to `.afol/**`.
 - `bootstrap-other-repo.md`: bootstrap guidance for downstream repositories.
 - `primary-runtime-compatibility.md`: primary runtime compatibility boundary.
 - `file-first-chat-light.md`: lightweight file-first chat workflow.
+- `maintenance-cadence.md`: weekly/monthly maintenance, memory/library review,
+  workbench backlog, and benchmark coverage expectations.
+- `user-journey-registry.md`: UX/user-flow registration, per-tool scenario
+  coverage, expected output, and evidence contract.
 
 ## Review, Metrics, And Evolution
 

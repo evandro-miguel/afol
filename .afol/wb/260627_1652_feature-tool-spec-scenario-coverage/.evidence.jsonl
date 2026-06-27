@@ -1,0 +1,14 @@
+{"id":"E-20260627173112891-04002b","task_id":"T-01","created_at":"2026-06-27T21:31:12.891Z","command":"jq empty .afol/data/benchmarks/catalog/scenarios/governance-history/feature-spec-coverage-matrix.json","result":"passed"}
+{"id":"E-20260627173116625-ed99de","task_id":"T-01","created_at":"2026-06-27T21:31:16.625Z","command":"bunx biome check cli/validate/registry.ts cli/tests/validate-internals.test.ts","result":"passed"}
+{"id":"E-20260627173121320-1e6118","task_id":"T-01","created_at":"2026-06-27T21:31:21.320Z","command":"bun test cli/tests/validate-internals.test.ts","result":"passed"}
+{"id":"E-20260627173124706-5cb0ae","task_id":"T-01","created_at":"2026-06-27T21:31:24.706Z","command":"afol validate bench --pack governance-history --json","result":"passed"}
+{"id":"E-20260627173127976-61b653","task_id":"T-01","created_at":"2026-06-27T21:31:27.976Z","command":"afol validate bench --pack update-safety --json","result":"passed"}
+{"id":"E-20260627173132893-d0368b","task_id":"T-01","created_at":"2026-06-27T21:31:32.893Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260627173138680-7c12e5","task_id":"T-01","created_at":"2026-06-27T21:31:38.680Z","command":"bun run validate:template","result":"passed"}
+{"id":"E-20260627173141999-0a27a9","task_id":"T-01","created_at":"2026-06-27T21:31:41.999Z","command":"bun test","result":"passed"}
+{"id":"E-20260627173146595-c0a50f","task_id":"T-01","created_at":"2026-06-27T21:31:46.595Z","command":"git diff --check","result":"passed"}
+{"id":"E-20260627173149966-ce718c","task_id":"T-01","created_at":"2026-06-27T21:31:49.966Z","command":"afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260627173153306-5d3a3c","task_id":"T-01","created_at":"2026-06-27T21:31:53.306Z","command":"afol validate project --json","result":"passed"}
+{"id":"E-20260627173156846-b19f5f","task_id":"T-01","created_at":"2026-06-27T21:31:56.846Z","command":"bun run validate:security:release","result":"passed"}
+{"id":"E-20260627173200464-e4a6a9","task_id":"T-01","created_at":"2026-06-27T21:32:00.464Z","command":"bun run build:deterministic","result":"passed"}
+{"id":"E-20260627173206556-c85edb","task_id":"T-01","created_at":"2026-06-27T21:32:06.556Z","command":"bun run smoke:dist","result":"passed"}

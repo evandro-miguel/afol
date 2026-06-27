@@ -1,9 +1,11 @@
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 
+import { kernelRegistry } from "../registry";
 import {
 	asNumberRecord,
 	asOptionalNumber,
+	asOptionalObject,
 	asOptionalString,
 	asString,
 	isObject,
@@ -17,12 +19,21 @@ import {
 	REQUIRED_PACKS,
 	type RegistrySnapshot,
 	type Scenario,
+	type ScenarioCoverage,
+	type ToolCoverageExemption,
+	type ToolCoveragePolicy,
+	type ToolSubcommandCoverageExemption,
 	VALIDATION_SCHEMA_VERSION,
 } from "./types";
 
 const REGISTRY_RELATIVE_PATH = ".afol/data/benchmarks/catalog/registry.json";
 const SCENARIOS_RELATIVE_PATH = ".afol/data/benchmarks/catalog/scenarios";
 const BASELINES_RELATIVE_PATH = ".afol/data/benchmarks/catalog/baselines";
+const ROADMAP_RELATIVE_PATHS = [
+	".afol/adm/roadmap/GENERAL-ROADMAP.md",
+	".afol/adm/roadmap.md",
+] as const;
+const SPECS_RELATIVE_PATH = ".afol/adm/specs";
 
 function parsePackId(value: unknown, key: string): PackId {
 	const packId = asString(value, key);
@@ -30,6 +41,79 @@ function parsePackId(value: unknown, key: string): PackId {
 		throw new Error(`Unknown pack id in ${key}: ${packId}`);
 	}
 	return packId as PackId;
+}
+
+function asStringArray(value: unknown, key: string): string[] {
+	if (!Array.isArray(value) || value.length === 0) {
+		throw new Error(`Invalid or missing string array field: ${key}`);
+	}
+	return value.map((entry, index) => asString(entry, `${key}[${index}]`));
+}
+
+function asOptionalStringArray(
+	value: unknown,
+	key: string,
+): string[] | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	return asStringArray(value, key);
+}
+
+function parseScenarioCoverage(
+	value: unknown,
+	sourcePath: string,
+): ScenarioCoverage | undefined {
+	const coverageRaw = asOptionalObject(value, `${sourcePath}.coverage`);
+	if (coverageRaw === undefined) {
+		return undefined;
+	}
+	const coverage: ScenarioCoverage = {};
+	const commands = asOptionalStringArray(
+		coverageRaw.commands,
+		`${sourcePath}.coverage.commands`,
+	);
+	if (commands !== undefined) {
+		coverage.commands = commands;
+	}
+	const subcommands = asOptionalStringArray(
+		coverageRaw.subcommands,
+		`${sourcePath}.coverage.subcommands`,
+	);
+	if (subcommands !== undefined) {
+		coverage.subcommands = subcommands;
+	}
+	const journeys = asOptionalStringArray(
+		coverageRaw.journeys,
+		`${sourcePath}.coverage.journeys`,
+	);
+	if (journeys !== undefined) {
+		coverage.journeys = journeys;
+	}
+	const features = asOptionalStringArray(
+		coverageRaw.features,
+		`${sourcePath}.coverage.features`,
+	);
+	if (features !== undefined) {
+		coverage.features = features;
+	}
+	const specs = asOptionalStringArray(
+		coverageRaw.specs,
+		`${sourcePath}.coverage.specs`,
+	);
+	if (specs !== undefined) {
+		coverage.specs = specs;
+	}
+	if (
+		coverage.commands === undefined &&
+		coverage.subcommands === undefined &&
+		coverage.journeys === undefined &&
+		coverage.features === undefined &&
+		coverage.specs === undefined
+	) {
+		throw new Error(`Invalid empty coverage field: ${sourcePath}.coverage`);
+	}
+	return coverage;
 }
 
 function parseScenario(
@@ -57,6 +141,10 @@ function parseScenario(
 			`${sourcePath}.deterministic_metrics`,
 		),
 	};
+	const coverage = parseScenarioCoverage(data.coverage, sourcePath);
+	if (coverage !== undefined) {
+		scenario.coverage = coverage;
+	}
 	if (typeof data.sandbox === "boolean") {
 		scenario.sandbox = data.sandbox;
 	} else if (data.sandbox !== undefined) {
@@ -134,7 +222,74 @@ function parseBaseline(
 	return baseline;
 }
 
-function loadPackMetadata(registryPath: string): PackMetadata[] {
+function parseToolCoverageExemption(
+	value: unknown,
+	key: string,
+): ToolCoverageExemption {
+	if (!isObject(value)) {
+		throw new Error(`Invalid registry coverage exemption: ${key}`);
+	}
+	return {
+		command: asString(value.command, `${key}.command`),
+		reason: asString(value.reason, `${key}.reason`),
+	};
+}
+
+function parseToolSubcommandCoverageExemption(
+	value: unknown,
+	key: string,
+): ToolSubcommandCoverageExemption {
+	if (!isObject(value)) {
+		throw new Error(`Invalid registry subcommand coverage exemption: ${key}`);
+	}
+	return {
+		subcommand: asString(value.subcommand, `${key}.subcommand`),
+		reason: asString(value.reason, `${key}.reason`),
+	};
+}
+
+function parseToolCoveragePolicy(
+	registry: Record<string, unknown>,
+): ToolCoveragePolicy | undefined {
+	const coverageRaw = asOptionalObject(registry.coverage, "registry.coverage");
+	if (coverageRaw === undefined) {
+		return undefined;
+	}
+	const exemptionsRaw = coverageRaw.exemptions;
+	if (!Array.isArray(exemptionsRaw)) {
+		throw new Error("Invalid registry.coverage.exemptions");
+	}
+	const policy: ToolCoveragePolicy = {
+		schema_version: asString(
+			coverageRaw.schema_version,
+			"registry.coverage.schema_version",
+		),
+		exemptions: exemptionsRaw.map((entry, index) =>
+			parseToolCoverageExemption(
+				entry,
+				`registry.coverage.exemptions[${index}]`,
+			),
+		),
+	};
+	const subcommandExemptionsRaw = coverageRaw.subcommand_exemptions;
+	if (subcommandExemptionsRaw !== undefined) {
+		if (!Array.isArray(subcommandExemptionsRaw)) {
+			throw new Error("Invalid registry.coverage.subcommand_exemptions");
+		}
+		policy.subcommand_exemptions = subcommandExemptionsRaw.map((entry, index) =>
+			parseToolSubcommandCoverageExemption(
+				entry,
+				`registry.coverage.subcommand_exemptions[${index}]`,
+			),
+		);
+	}
+	return policy;
+}
+
+function loadRegistryMetadata(registryPath: string): {
+	packs: PackMetadata[];
+	coverage?: ToolCoveragePolicy;
+} {
 	const registry = loadJsonObject(registryPath);
 	const schemaVersion = asString(
 		registry.schema_version,
@@ -149,7 +304,7 @@ function loadPackMetadata(registryPath: string): PackMetadata[] {
 	if (!Array.isArray(packsRaw)) {
 		throw new Error("Invalid registry: packs must be an array");
 	}
-	return packsRaw.map((entry, index) => {
+	const packs = packsRaw.map((entry, index) => {
 		if (!isObject(entry)) {
 			throw new Error(`Invalid registry.packs[${index}]`);
 		}
@@ -164,11 +319,16 @@ function loadPackMetadata(registryPath: string): PackMetadata[] {
 			selector_tags: selectorTags,
 		};
 	});
+	const coverage = parseToolCoveragePolicy(registry);
+	if (coverage === undefined) {
+		return { packs };
+	}
+	return { packs, coverage };
 }
 
 export function loadRegistry(projectRoot: string): RegistrySnapshot {
 	const registryPath = join(projectRoot, REGISTRY_RELATIVE_PATH);
-	const packs = loadPackMetadata(registryPath);
+	const { packs, coverage } = loadRegistryMetadata(registryPath);
 
 	const scenariosByPack: Record<string, Scenario[]> = {};
 	for (const pack of packs) {
@@ -204,12 +364,473 @@ export function loadRegistry(projectRoot: string): RegistrySnapshot {
 		);
 	}
 
-	return {
+	const snapshot: RegistrySnapshot = {
 		schema_version: VALIDATION_SCHEMA_VERSION,
+		projectRoot,
 		packs,
 		scenariosByPack,
 		baselinesByPack,
 	};
+	if (coverage !== undefined) {
+		snapshot.coverage = coverage;
+	}
+	return snapshot;
+}
+
+function parseCommandToken(command: string | undefined): string | undefined {
+	if (command === undefined) {
+		return undefined;
+	}
+	const [executable, token] = command.trim().split(/\s+/);
+	if (
+		(executable !== "afol" && executable !== "a" && executable !== "./afol") ||
+		token === undefined ||
+		token.startsWith("-")
+	) {
+		return undefined;
+	}
+	return kernelRegistry.canonicalize(token);
+}
+
+function normalizeCoverageCommand(command: string): string {
+	return parseCommandToken(command) ?? kernelRegistry.canonicalize(command);
+}
+
+function registrySubcommands(): string[] {
+	return kernelRegistry.commands.flatMap((command) =>
+		(command.subcommands ?? []).map(
+			(subcommand) => `${command.command} ${subcommand.usage}`,
+		),
+	);
+}
+
+function normalizeCoverageSubcommand(subcommand: string): string {
+	const tokens = subcommand.trim().split(/\s+/);
+	const firstToken = tokens[0];
+	if (firstToken === "afol" || firstToken === "a" || firstToken === "./afol") {
+		tokens.shift();
+	}
+	const command = tokens.shift();
+	if (command === undefined || command.startsWith("-") || tokens.length === 0) {
+		return subcommand.trim();
+	}
+	return `${kernelRegistry.canonicalize(command)} ${tokens.join(" ")}`;
+}
+
+function isProductionProofScenario(scenario: Scenario): boolean {
+	return scenario.implementation_status === "implemented";
+}
+
+function collectCoveredCommands(
+	snapshot: RegistrySnapshot,
+	knownCommands: ReadonlySet<string>,
+	issues: string[],
+): Set<string> {
+	const coveredCommands = new Set<string>();
+	for (const [packId, scenarios] of Object.entries(snapshot.scenariosByPack)) {
+		for (const scenario of scenarios) {
+			const commandFromScenario = parseCommandToken(scenario.command);
+			if (
+				commandFromScenario !== undefined &&
+				knownCommands.has(commandFromScenario) &&
+				isProductionProofScenario(scenario)
+			) {
+				coveredCommands.add(commandFromScenario);
+			}
+			for (const command of scenario.coverage?.commands ?? []) {
+				const canonicalCommand = normalizeCoverageCommand(command);
+				if (!knownCommands.has(canonicalCommand)) {
+					issues.push(
+						`scenario-tool-coverage-unknown:${packId}:${scenario.scenario_id}:${command}`,
+					);
+					continue;
+				}
+				if (isProductionProofScenario(scenario)) {
+					coveredCommands.add(canonicalCommand);
+				}
+			}
+		}
+	}
+	return coveredCommands;
+}
+
+function collectCoveredSubcommands(
+	snapshot: RegistrySnapshot,
+	knownSubcommands: ReadonlySet<string>,
+	issues: string[],
+): Set<string> {
+	const coveredSubcommands = new Set<string>();
+	for (const [packId, scenarios] of Object.entries(snapshot.scenariosByPack)) {
+		for (const scenario of scenarios) {
+			for (const subcommand of scenario.coverage?.subcommands ?? []) {
+				const canonicalSubcommand = normalizeCoverageSubcommand(subcommand);
+				if (!knownSubcommands.has(canonicalSubcommand)) {
+					issues.push(
+						`scenario-tool-subcommand-coverage-unknown:${packId}:${scenario.scenario_id}:${subcommand}`,
+					);
+					continue;
+				}
+				if (isProductionProofScenario(scenario)) {
+					coveredSubcommands.add(canonicalSubcommand);
+				}
+			}
+		}
+	}
+	return coveredSubcommands;
+}
+
+function validateScenarioJourneyCoverage(
+	scenario: Scenario,
+	packId: string,
+	issues: string[],
+): void {
+	const coverage = scenario.coverage;
+	if (coverage === undefined || !isProductionProofScenario(scenario)) {
+		return;
+	}
+	const coversTool =
+		(coverage.commands?.length ?? 0) > 0 ||
+		(coverage.subcommands?.length ?? 0) > 0;
+	if (coversTool && (coverage.journeys?.length ?? 0) === 0) {
+		issues.push(
+			`scenario-journey-coverage-missing:${packId}:${scenario.scenario_id}`,
+		);
+	}
+}
+
+function validateToolCoverage(
+	snapshot: RegistrySnapshot,
+	issues: string[],
+): void {
+	const knownCommands = new Set<string>(
+		kernelRegistry.knownCanonicalCommands(),
+	);
+	const subcommands = registrySubcommands();
+	const knownSubcommands = new Set<string>(subcommands);
+	const coveredCommands = collectCoveredCommands(
+		snapshot,
+		knownCommands,
+		issues,
+	);
+	const coveredSubcommands = collectCoveredSubcommands(
+		snapshot,
+		knownSubcommands,
+		issues,
+	);
+	if (snapshot.coverage === undefined) {
+		issues.push("tool-coverage-policy-missing");
+		return;
+	}
+	if (snapshot.coverage.schema_version !== VALIDATION_SCHEMA_VERSION) {
+		issues.push(
+			`tool-coverage-policy-schema-version-mismatch:${snapshot.coverage.schema_version}`,
+		);
+	}
+	const exemptedCommands = new Set<string>();
+	for (const exemption of snapshot.coverage.exemptions) {
+		const canonicalCommand = normalizeCoverageCommand(exemption.command);
+		if (!knownCommands.has(canonicalCommand)) {
+			issues.push(`tool-coverage-exemption-unknown:${exemption.command}`);
+			continue;
+		}
+		if (exemption.reason.trim() === "") {
+			issues.push(`tool-coverage-exemption-reason-missing:${canonicalCommand}`);
+		}
+		if (exemptedCommands.has(canonicalCommand)) {
+			issues.push(`tool-coverage-exemption-duplicate:${canonicalCommand}`);
+		}
+		exemptedCommands.add(canonicalCommand);
+	}
+	for (const command of kernelRegistry.knownCanonicalCommands()) {
+		if (!coveredCommands.has(command) && !exemptedCommands.has(command)) {
+			issues.push(`tool-coverage-missing:${command}`);
+		}
+	}
+	const subcommandExemptions = snapshot.coverage.subcommand_exemptions;
+	if (subcommandExemptions === undefined) {
+		issues.push("tool-subcommand-coverage-policy-missing");
+		return;
+	}
+	const exemptedSubcommands = new Set<string>();
+	for (const exemption of subcommandExemptions) {
+		const canonicalSubcommand = normalizeCoverageSubcommand(
+			exemption.subcommand,
+		);
+		if (!knownSubcommands.has(canonicalSubcommand)) {
+			issues.push(
+				`tool-subcommand-coverage-exemption-unknown:${exemption.subcommand}`,
+			);
+			continue;
+		}
+		if (exemption.reason.trim() === "") {
+			issues.push(
+				`tool-subcommand-coverage-exemption-reason-missing:${canonicalSubcommand}`,
+			);
+		}
+		if (exemptedSubcommands.has(canonicalSubcommand)) {
+			issues.push(
+				`tool-subcommand-coverage-exemption-duplicate:${canonicalSubcommand}`,
+			);
+		}
+		exemptedSubcommands.add(canonicalSubcommand);
+	}
+	for (const subcommand of subcommands) {
+		if (
+			!coveredSubcommands.has(subcommand) &&
+			!exemptedSubcommands.has(subcommand)
+		) {
+			issues.push(`tool-subcommand-coverage-missing:${subcommand}`);
+		}
+	}
+}
+
+interface RoadmapFeature {
+	id: string;
+	title: string;
+	governingSpec?: string;
+}
+
+interface SpecEntry {
+	id: string;
+	fileName: string;
+	roadmapFeature?: string;
+}
+
+function cleanMarkdownScalar(value: string | undefined): string | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	const cleaned = value
+		.trim()
+		.replace(/^[-\s]+/, "")
+		.trim()
+		.replace(/^["'`]+|["'`]+$/g, "")
+		.trim();
+	return cleaned === "" ? undefined : cleaned;
+}
+
+function parseFrontmatterScalar(
+	source: string,
+	key: string,
+): string | undefined {
+	const lines = source.split(/\r?\n/);
+	if (lines[0]?.trim() !== "---") {
+		return undefined;
+	}
+	for (let index = 1; index < lines.length; index += 1) {
+		const line = lines[index];
+		if (line === undefined) {
+			continue;
+		}
+		if (line.trim() === "---") {
+			return undefined;
+		}
+		const match = line.match(/^([^:#]+):\s*(.*)$/);
+		const matchedKey = match?.[1];
+		const matchedValue = match?.[2];
+		if (
+			matchedKey === undefined ||
+			matchedValue === undefined ||
+			matchedKey.trim() !== key
+		) {
+			continue;
+		}
+		return cleanMarkdownScalar(matchedValue);
+	}
+	return undefined;
+}
+
+function parseRoadmapFeatures(source: string): RoadmapFeature[] {
+	const features: RoadmapFeature[] = [];
+	let current: RoadmapFeature | undefined;
+	let expectingGoverningSpec = false;
+	for (const line of source.split(/\r?\n/)) {
+		const heading = line.match(/^###\s+(F-\d{2})\s+(.+?)\s*$/);
+		if (heading) {
+			const featureId = heading[1];
+			const title = heading[2];
+			if (featureId === undefined || title === undefined) {
+				continue;
+			}
+			const feature: RoadmapFeature = { id: featureId, title: title.trim() };
+			current = feature;
+			features.push(feature);
+			expectingGoverningSpec = false;
+			continue;
+		}
+		if (current === undefined) {
+			continue;
+		}
+		const governingSpec = line.match(/^- Governing spec:\s*(.*)$/);
+		if (governingSpec) {
+			const parsedGoverningSpec = cleanMarkdownScalar(governingSpec[1]);
+			if (parsedGoverningSpec !== undefined) {
+				current.governingSpec = parsedGoverningSpec;
+			}
+			expectingGoverningSpec = parsedGoverningSpec === undefined;
+			continue;
+		}
+		if (expectingGoverningSpec) {
+			const value = cleanMarkdownScalar(line);
+			if (value !== undefined) {
+				current.governingSpec = value;
+				expectingGoverningSpec = false;
+			}
+		}
+	}
+	return features;
+}
+
+function loadRoadmapFeatures(projectRoot: string): RoadmapFeature[] {
+	for (const relativePath of ROADMAP_RELATIVE_PATHS) {
+		const roadmapPath = join(projectRoot, relativePath);
+		if (existsSync(roadmapPath)) {
+			return parseRoadmapFeatures(readFileSync(roadmapPath, "utf8"));
+		}
+	}
+	return [];
+}
+
+function loadSpecEntries(projectRoot: string): Map<string, SpecEntry> {
+	const specsDir = join(projectRoot, SPECS_RELATIVE_PATH);
+	const entries = new Map<string, SpecEntry>();
+	if (!existsSync(specsDir)) {
+		return entries;
+	}
+	for (const entry of readdirSync(specsDir, { withFileTypes: true }).sort(
+		(left, right) => left.name.localeCompare(right.name),
+	)) {
+		if (
+			!entry.isFile() ||
+			!entry.name.endsWith(".md") ||
+			entry.name === "INDEX.md" ||
+			entry.name === "README.md"
+		) {
+			continue;
+		}
+		const source = readFileSync(join(specsDir, entry.name), "utf8");
+		const docType = parseFrontmatterScalar(source, "doc_type");
+		if (docType === "spec-test") {
+			continue;
+		}
+		const fallbackId = entry.name.replace(/\.md$/, "");
+		const id = parseFrontmatterScalar(source, "id") ?? fallbackId;
+		const specEntry: SpecEntry = {
+			id,
+			fileName: entry.name,
+		};
+		const roadmapFeature = parseFrontmatterScalar(source, "roadmap_feature");
+		if (roadmapFeature !== undefined) {
+			specEntry.roadmapFeature = roadmapFeature;
+		}
+		entries.set(id, specEntry);
+	}
+	return entries;
+}
+
+function normalizeSpecReference(value: string): string {
+	const cleaned = cleanMarkdownScalar(value) ?? value.trim();
+	return basename(cleaned).replace(/\.md$/, "");
+}
+
+function collectFeatureAndSpecCoverage(
+	snapshot: RegistrySnapshot,
+	knownFeatures: ReadonlySet<string>,
+	knownSpecs: ReadonlySet<string>,
+	issues: string[],
+): { features: Set<string>; specs: Set<string> } {
+	const features = new Set<string>();
+	const specs = new Set<string>();
+	for (const [packId, scenarios] of Object.entries(snapshot.scenariosByPack)) {
+		for (const scenario of scenarios) {
+			for (const feature of scenario.coverage?.features ?? []) {
+				if (!knownFeatures.has(feature)) {
+					issues.push(
+						`scenario-feature-coverage-unknown:${packId}:${scenario.scenario_id}:${feature}`,
+					);
+					continue;
+				}
+				if (isProductionProofScenario(scenario)) {
+					features.add(feature);
+				}
+			}
+			for (const spec of scenario.coverage?.specs ?? []) {
+				const specId = normalizeSpecReference(spec);
+				if (!knownSpecs.has(specId)) {
+					issues.push(
+						`scenario-spec-coverage-unknown:${packId}:${scenario.scenario_id}:${spec}`,
+					);
+					continue;
+				}
+				if (isProductionProofScenario(scenario)) {
+					specs.add(specId);
+				}
+			}
+		}
+	}
+	return { features, specs };
+}
+
+function validateFeatureSpecCoverage(
+	snapshot: RegistrySnapshot,
+	issues: string[],
+): void {
+	if (snapshot.projectRoot === undefined) {
+		return;
+	}
+	const roadmapFeatures = loadRoadmapFeatures(snapshot.projectRoot);
+	const specs = loadSpecEntries(snapshot.projectRoot);
+	if (roadmapFeatures.length === 0 && specs.size === 0) {
+		return;
+	}
+	const knownFeatures = new Set(roadmapFeatures.map((feature) => feature.id));
+	const knownSpecs = new Set(specs.keys());
+	const coverage = collectFeatureAndSpecCoverage(
+		snapshot,
+		knownFeatures,
+		knownSpecs,
+		issues,
+	);
+	for (const feature of roadmapFeatures) {
+		const rawGoverningSpec = cleanMarkdownScalar(feature.governingSpec);
+		if (
+			rawGoverningSpec === undefined ||
+			rawGoverningSpec.toUpperCase() === "TBD"
+		) {
+			issues.push(`roadmap-feature-governing-spec-missing:${feature.id}`);
+		} else {
+			const governingSpecId = normalizeSpecReference(rawGoverningSpec);
+			const governingSpec = specs.get(governingSpecId);
+			if (governingSpec === undefined) {
+				issues.push(
+					`roadmap-feature-governing-spec-unknown:${feature.id}:${rawGoverningSpec}`,
+				);
+			} else if (
+				governingSpec.roadmapFeature !== undefined &&
+				governingSpec.roadmapFeature !== feature.id
+			) {
+				issues.push(
+					`roadmap-feature-governing-spec-mismatch:${feature.id}:${governingSpec.id}:${governingSpec.roadmapFeature}`,
+				);
+			}
+		}
+		if (!coverage.features.has(feature.id)) {
+			issues.push(`scenario-feature-coverage-missing:${feature.id}`);
+		}
+	}
+	for (const spec of specs.values()) {
+		if (
+			spec.roadmapFeature !== undefined &&
+			!knownFeatures.has(spec.roadmapFeature)
+		) {
+			issues.push(
+				`spec-roadmap-feature-unknown:${spec.id}:${spec.roadmapFeature}`,
+			);
+		}
+		if (!coverage.specs.has(spec.id)) {
+			issues.push(`scenario-spec-coverage-missing:${spec.id}`);
+		}
+	}
 }
 
 export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
@@ -245,6 +866,7 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 					`scenario-contract-missing:${packId}:${scenario.scenario_id}`,
 				);
 			}
+			validateScenarioJourneyCoverage(scenario, packId, issues);
 		}
 		const baseline = snapshot.baselinesByPack[packId];
 		if (!baseline) {
@@ -257,5 +879,7 @@ export function validateRegistryContract(snapshot: RegistrySnapshot): string[] {
 			);
 		}
 	}
+	validateToolCoverage(snapshot, issues);
+	validateFeatureSpecCoverage(snapshot, issues);
 	return issues;
 }

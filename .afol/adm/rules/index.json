@@ -73,6 +73,22 @@
       "surfaces": ["benchmark", "evidence", "quality"],
       "work_types": ["benchmark", "validation"],
       "priority": 80
+    },
+    {
+      "id": "RULE-011",
+      "name": "maintenance-cadence",
+      "path": "RULE-011-maintenance-cadence.md",
+      "surfaces": ["maintenance", "memory", "library", "workbench", "governance"],
+      "work_types": ["maintenance", "cleanup", "validation", "benchmark"],
+      "priority": 85
+    },
+    {
+      "id": "RULE-012",
+      "name": "user-journey-coverage",
+      "path": "RULE-012-user-journey-coverage.md",
+      "surfaces": ["ux", "journey", "benchmark", "tool", "scenario"],
+      "work_types": ["docs", "benchmark", "validation", "implementation"],
+      "priority": 88
     }
   ]
 }

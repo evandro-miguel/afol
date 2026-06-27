@@ -1,6 +1,6 @@
 {
   "version": "2.1.0",
-  "updated_at": "2026-06-20T00:00:00Z",
+  "updated_at": "2026-06-27T00:00:00Z",
   "description": "Static AFOL-only command catalog derived from the registry-backed afol help surface.",
   "generated_from": "afol help --json",
   "tools": [
@@ -694,7 +694,67 @@
       "side_effect": "read",
       "execution_mode": "read-only",
       "description": "Inspect specs",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "list [--json] [--verbose]",
+          "side_effect": "read",
+          "description": "List active project specs"
+        },
+        {
+          "usage": "check --session <session-id> --task <task-id> --json",
+          "side_effect": "read",
+          "description": "Check task/spec compatibility"
+        },
+        {
+          "usage": "conflict --session <session-id> --task <task-id>",
+          "side_effect": "read",
+          "description": "Return success when compatibility is in conflict"
+        },
+        {
+          "usage": "waive --session <session-id> --task <task-id> --reason <text>",
+          "side_effect": "write",
+          "description": "Record a task/spec conflict waiver"
+        }
+      ]
+    },
+    {
+      "id": "ux",
+      "name": "AFOL Ux",
+      "tool": "afol",
+      "wrapper_command": "afol ux",
+      "aliases": [],
+      "category": "workflow",
+      "type": "workflow",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
+      "description": "Register and validate user journey coverage",
+      "subcommands": [
+        {
+          "usage": "list",
+          "side_effect": "read",
+          "description": "List registered and spec-derived UX journeys"
+        },
+        {
+          "usage": "show <journey-id>",
+          "side_effect": "read",
+          "description": "Inspect one registered UX journey"
+        },
+        {
+          "usage": "validate",
+          "side_effect": "read",
+          "description": "Validate UX registry standards and journey docs"
+        },
+        {
+          "usage": "coverage --tool <afol-command>",
+          "side_effect": "read",
+          "description": "Show UX journeys covering one AFOL tool"
+        },
+        {
+          "usage": "register --from-spec <spec-id>",
+          "side_effect": "write",
+          "description": "Create a spec-linked UX journey draft"
+        }
+      ]
     },
     {
       "id": "adr",
@@ -777,10 +837,31 @@
       ],
       "category": "ops",
       "type": "ops",
-      "side_effect": "read",
-      "execution_mode": "read-only",
+      "side_effect": "write",
+      "execution_mode": "on-demand",
       "description": "Run maintenance checks",
-      "subcommands": []
+      "subcommands": [
+        {
+          "usage": "weekly --dry-run",
+          "side_effect": "read",
+          "description": "Preview weekly maintenance actions"
+        },
+        {
+          "usage": "monthly --dry-run",
+          "side_effect": "read",
+          "description": "Preview monthly maintenance actions"
+        },
+        {
+          "usage": "review --area <area> --dry-run",
+          "side_effect": "read",
+          "description": "Preview rules, skills, docs, commands, memory, library, organization"
+        },
+        {
+          "usage": "review --area <area> --note <text>",
+          "side_effect": "write",
+          "description": "Record maintenance review freshness"
+        }
+      ]
     },
     {
       "id": "sweep",
@@ -1091,6 +1172,7 @@
       "bootstrap",
       "verify",
       "verify-tasks",
+      "ux",
       "session"
     ],
     "inspect": [

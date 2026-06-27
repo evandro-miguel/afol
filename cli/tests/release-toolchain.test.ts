@@ -229,6 +229,12 @@ describe("release and toolchain contracts", () => {
 			"bun run validate:security:required",
 		);
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
+		expect(scripts["validate:ux-governance"]).toBe(
+			"bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --json",
+		);
+		expect(scripts["validate:release"]).toContain(
+			"bun run validate:ux-governance",
+		);
 		expect(scripts["validate:release"]).toContain("bun run smoke:clean");
 		expect(scripts["validate:release"]).toContain(
 			"bun run release:provenance:release",
@@ -246,6 +252,12 @@ describe("release and toolchain contracts", () => {
 		}
 		expect(stepIndex("bun run smoke:dist")).toBeLessThan(
 			stepIndex("bun run smoke:clean"),
+		);
+		expect(stepIndex("bun run validate:project-benchmarks")).toBeLessThan(
+			stepIndex("bun run validate:ux-governance"),
+		);
+		expect(stepIndex("bun run validate:ux-governance")).toBeLessThan(
+			stepIndex("bun run coverage:check"),
 		);
 		expect(stepIndex("bun run smoke:clean")).toBeLessThan(
 			stepIndex("bun run validate:security:release"),
@@ -276,6 +288,7 @@ describe("release and toolchain contracts", () => {
 			"validate:template",
 			"validate:bootstrap",
 			"validate:project-benchmarks",
+			"validate:ux-governance",
 			"coverage:check",
 			"build:deterministic",
 			"smoke:dist",

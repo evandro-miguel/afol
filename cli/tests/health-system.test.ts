@@ -387,6 +387,9 @@ describe("health system", () => {
 			expect(result.planOnly).toBe(true);
 			expect(result.actions).toContain("check PSTR stale");
 			expect(result.actions).toContain("archive old sessions");
+			expect(result.actions.join("\n")).toContain(
+				"review maintenance areas: rules, skills, docs, commands, memory, library, organization",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -398,6 +401,13 @@ describe("health system", () => {
 			const result = maintenanceMonthly(root, false);
 			expect(result.planOnly).toBe(true);
 			expect(result.actions).toContain("rotate logs");
+			expect(result.actions).toContain(
+				"review roadmap/spec/manifest alignment",
+			);
+			expect(result.actions).toContain("prune obsolete rules/skills");
+			expect(result.actions).toContain(
+				"archive closed sessions older than 90 days",
+			);
 			expect(result.actions).toContain("rebuild stale indexes");
 		} finally {
 			rmSync(root, { recursive: true, force: true });

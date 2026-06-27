@@ -105,7 +105,15 @@ export const SUBCOMMAND_ACTION_ALIASES = Object.freeze({
 	spec: Object.freeze({
 		cf: "conflict",
 		ck: "check",
+		ls: "list",
 		wv: "waive",
+	}),
+	ux: Object.freeze({
+		cov: "coverage",
+		ls: "list",
+		reg: "register",
+		sh: "show",
+		v: "validate",
 	}),
 	schema: Object.freeze({
 		ap: "apply",
@@ -283,6 +291,11 @@ export const FLAG_ALIASES = Object.freeze({
 		"-T": "--task-id",
 		"-r": "--reason",
 	}),
+	ux: Object.freeze({
+		"-D": "--dry-run",
+		"-s": "--from-spec",
+		"-t": "--tool",
+	}),
 	verifyTasks: Object.freeze({
 		"-S": "--session",
 	}),
@@ -300,6 +313,7 @@ const VALUE_CONSUMING_FLAGS = new Set([
 	"--feature-id",
 	"--for",
 	"--format",
+	"--from-spec",
 	"--id",
 	"--intent",
 	"--limit",

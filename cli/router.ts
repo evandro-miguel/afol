@@ -42,6 +42,7 @@ export const ROUTED_SUBCOMMAND_GROUPS = Object.freeze([
 	"memory",
 	"adm",
 	"spec",
+	"ux",
 	"adr",
 	"changelog",
 	"health",

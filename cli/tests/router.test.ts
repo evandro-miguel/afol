@@ -111,6 +111,20 @@ describe("router alias grammar", () => {
 			args: [],
 		});
 
+		expect(resolveCommand(["sp", "ls", "--json"])).toEqual({
+			kind: "subcommand",
+			group: "spec",
+			action: "list",
+			args: ["--json"],
+		});
+
+		expect(resolveCommand(["ux", "cov", "-t", "maintenance"])).toEqual({
+			kind: "subcommand",
+			group: "ux",
+			action: "coverage",
+			args: ["--tool", "maintenance"],
+		});
+
 		expect(
 			resolveCommand([
 				"new",

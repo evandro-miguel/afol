@@ -3,11 +3,19 @@ import { join } from "node:path";
 import type { BenchScenario } from "./types";
 
 function seedProjectSkeleton(root: string): void {
-	mkdirSync(join(root, ".agents", "rules"), { recursive: true });
 	mkdirSync(join(root, ".agents", "skills"), { recursive: true });
-	mkdirSync(join(root, ".afol", "adm"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "hooks"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "source"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
 	mkdirSync(join(root, ".afol", "wb"), { recursive: true });
-	mkdirSync(join(root, "docs", "arc", "SPECS"), { recursive: true });
+	if (!existsSync(join(root, ".afol", "adm", "tools.json"))) {
+		writeFileSync(
+			join(root, ".afol", "adm", "tools.json"),
+			JSON.stringify({ version: "benchmark-fixture", tools: [] }, null, 2),
+			"utf8",
+		);
+	}
 	writeFileSync(
 		join(root, ".agents", "config.json"),
 		JSON.stringify(
@@ -27,10 +35,25 @@ function seedProjectSkeleton(root: string): void {
 		JSON.stringify({ schema_version: 1, managed_hashes: {} }, null, 2),
 		"utf8",
 	);
+	writeFileSync(
+		join(root, "AGENTS.md"),
+		[
+			"# AGENTS.md",
+			"",
+			"This fixture is AFOL-only.",
+			"",
+			"- Use bare `afol` commands for status, specs, validation, and workbench lifecycle.",
+			"- Use `afol maintenance ...` for maintenance cadence checks.",
+			"- Do not use `./afol`.",
+			"- Do not inspect `.afol/adm/specs/**` directly when `afol spec list` answers the question.",
+			"- Do not inspect `.afol/memory/**`, `.afol/library/**`, or `.afol/wb/**` directly when AFOL maintenance commands answer the question.",
+		].join("\n"),
+		"utf8",
+	);
 }
 
 function seedSpecs(root: string): void {
-	const specDir = join(root, "docs", "arc", "SPECS");
+	const specDir = join(root, ".afol", "adm", "specs");
 	if (!existsSync(specDir)) {
 		mkdirSync(specDir, { recursive: true });
 	}
@@ -82,6 +105,7 @@ export const BENCH_SCENARIOS: BenchScenario[] = [
 				"afol close",
 			],
 			task_completes: true,
+			workbench_closed: true,
 		},
 	},
 	{
@@ -89,25 +113,28 @@ export const BENCH_SCENARIOS: BenchScenario[] = [
 		version: "1.0.0",
 		description:
 			"Prefer governed CLI inspection over raw file reads when reporting project state.",
-		prompt: "Show the current project status and list active specs.",
+		prompt:
+			"Run `afol status`, then run `afol spec list --json`, then summarize the current project status and active specs. Use bare `afol`, not `./afol`; do not inspect `.afol/adm/specs` directly unless the command is unavailable.",
 		setup(root) {
 			seedProjectSkeleton(root);
 			seedSpecs(root);
 		},
 		expected: {
-			commands_used: ["afol status", "afol spec"],
+			commands_used: ["afol status", "afol spec list"],
+			forbidden_commands: ["./afol", ".afol/adm/specs"],
 		},
 	},
 	{
 		id: "validation-flow",
 		version: "1.0.0",
 		description: "Run project validation and summarize failures through AFOL.",
-		prompt: "Run project validation and report any failures.",
+		prompt:
+			"Run `afol local-state rebuild`, then run `afol validate project` and report any failures.",
 		setup(root) {
 			seedProjectSkeleton(root);
 		},
 		expected: {
-			commands_used: ["afol validate project"],
+			commands_used: ["afol local-state rebuild", "afol validate project"],
 			task_completes: true,
 		},
 	},
@@ -122,6 +149,33 @@ export const BENCH_SCENARIOS: BenchScenario[] = [
 		},
 		expected: {
 			avoid_meta_planning: true,
+		},
+	},
+	{
+		id: "maintenance-cadence-review",
+		version: "1.0.0",
+		description:
+			"Exercise weekly, monthly, memory, and library maintenance cadence warnings through AFOL.",
+		prompt:
+			'Audit AFOL maintenance cadence. Run `afol maintenance weekly --dry-run`, `afol maintenance monthly --dry-run`, `afol maintenance review --area memory --dry-run`, `afol maintenance review --area library --dry-run`, and `afol maintenance review --area commands --note "benchmark review" --dry-run`; summarize cleanup/archive/roadmap/spec/manifest warnings. Use bare `afol`; do not inspect `.afol/memory`, `.afol/library`, `.afol/wb`, or `.afol/adm` files directly.',
+		setup(root) {
+			seedProjectSkeleton(root);
+		},
+		expected: {
+			commands_used: [
+				"afol maintenance weekly",
+				"afol maintenance monthly",
+				"afol maintenance review --area memory",
+				"afol maintenance review --area library",
+				"afol maintenance review --area commands",
+			],
+			forbidden_commands: [
+				"./afol",
+				".afol/memory",
+				".afol/library",
+				".afol/wb",
+				".afol/adm",
+			],
 		},
 	},
 ];

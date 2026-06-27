@@ -46,9 +46,7 @@ describe("generated template cleanliness", () => {
 		expect(paths).not.toContain("afol");
 		expect(paths).not.toContain("Justfile");
 		expect(paths.some((path) => path.endsWith(".py"))).toBe(false);
-		expect(paths.some((path) => path.startsWith("docs/standards/"))).toBe(
-			false,
-		);
+		expect(paths).toContain("docs/standards/user-journey-registry.md");
 		expect(paths.some((path) => path.startsWith("docs/agentic/"))).toBe(false);
 	});
 

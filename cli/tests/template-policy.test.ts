@@ -100,7 +100,7 @@ describe("template forbidden-content policy", () => {
 			expect(matches).toContain("a");
 			expect(matches).toContain("afol");
 			expect(matches).toContain("Justfile");
-			expect(matches).toContain("docs/standards/policy.md");
+			expect(matches).not.toContain("docs/standards/policy.md");
 			expect(matches).toContain("docs/arc/README.md");
 			expect(matches).toContain("tests/sample.txt");
 			expect(matches).not.toContain("docs/templates/ok.md");

@@ -11,6 +11,25 @@ and `afol validate bench`.
 - Scenario catalog, tiering, provider profiles, and run commands are documented
   in `docs/afol-runtime-reference.md` and `docs/telemetry/QUICK_REFERENCE.md`
 
+## Tool And Journey Coverage
+
+Every AFOL command and documented subcommand in `cli/registry.ts` must be
+represented by at least one benchmark scenario or by an explicit temporary
+exemption in `registry.json.coverage`.
+
+- Use `scenario.coverage.commands` when a scenario exercises additional AFOL
+  commands indirectly, such as a live agent journey that runs `afol new`,
+  `afol start`, `afol evidence`, `afol done`, and `afol close`.
+- Use `scenario.coverage.subcommands` when a scenario proves an exact
+  documented subcommand usage.
+- Use `scenario.coverage.journeys` to name the user or agent journey proved by
+  the scenario.
+- Keep exemptions specific. An exemption means the command still needs a
+  scenario fixture; it is not permanent coverage. Subcommand gaps belong in
+  `registry.json.coverage.subcommand_exemptions`.
+- `afol validate bench` fails when a registered command or subcommand has
+  neither scenario coverage nor an exemption.
+
 For Gemma/Gemini API tool-driven runs, the repository uses a local
 provider-agent SDK wrapper, not a required ADK/Gemma runtime dependency:
 

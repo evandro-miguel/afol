@@ -40,8 +40,10 @@ export type BenchThresholds = {
 
 export type BenchScenarioExpected = {
 	commands_used?: readonly string[];
+	forbidden_commands?: readonly string[];
 	avoid_meta_planning?: boolean;
 	task_completes?: boolean;
+	workbench_closed?: boolean;
 };
 
 export type BenchScenario = {

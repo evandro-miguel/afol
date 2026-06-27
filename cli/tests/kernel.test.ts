@@ -998,6 +998,69 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("start and close help are native and do not require project state", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-lifecycle-help-"));
+		try {
+			for (const [command, expected] of [
+				["start", "Usage: afol start"],
+				["close", "Usage: afol close"],
+			] as const) {
+				for (const flag of ["-h", "--help"]) {
+					const proc = runKernel(root, [command, flag]);
+					expect(proc.status).toBe(0);
+					expect(proc.stdout as string).toContain(expected);
+					expect(proc.stderr as string).toBe("");
+					expect(proc.stdout as string).not.toContain("task started:");
+					expect(proc.stdout as string).not.toContain("session closed:");
+				}
+			}
+			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("spec list and help route through native handler", () => {
+		const root = mkProjectRoot("spec-list", "");
+		try {
+			const specsDir = join(root, ".afol", "adm", "specs");
+			mkdirSync(specsDir, { recursive: true });
+			writeFileSync(
+				join(specsDir, "spec-001.md"),
+				[
+					"---",
+					"doc_type: spec",
+					'id: "spec-001"',
+					"status: active",
+					"---",
+					"",
+					"# Spec 001",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const list = runKernel(root, ["spec", "list", "--json"]);
+			expect(list.status).toBe(0);
+			expect(list.stderr as string).toBe("");
+			const payload = JSON.parse(list.stdout as string) as {
+				action: string;
+				count: number;
+				data: { specs: { id: string }[] };
+			};
+			expect(payload.action).toBe("list");
+			expect(payload.count).toBe(1);
+			expect(payload.data.specs[0]?.id).toBe("spec-001");
+
+			const help = runKernel(root, ["spec", "--help"]);
+			expect(help.status).toBe(0);
+			expect(help.stdout as string).toContain("Usage: afol spec");
+			expect(help.stderr as string).toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("new accepts governed metadata flags and bypasses legacy wrapper", () => {
 		const script = "#!/usr/bin/env bash\necho LEGACY:$*";
 		const root = mkProjectRoot("new-governed-flags", script);

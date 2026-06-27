@@ -36,6 +36,8 @@ export function maintenanceMonthly(
 	const report = checkHealth(root, { deep: false, includeAuxiliary: true });
 	const actions = [
 		"rotate logs",
+		"review roadmap/spec/manifest alignment",
+		"prune obsolete rules/skills",
 		"archive closed sessions older than 90 days",
 		"rebuild stale indexes",
 	];

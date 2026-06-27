@@ -1,0 +1,118 @@
+{
+  "schema_version": "2.0.0",
+  "run_id": "maintenance-cadence-review-mqwfuw6l",
+  "pack_id": "comprehensive-live",
+  "timestamp": "2026-06-27T14:12:13.780Z",
+  "results": [
+    {
+      "schema_version": "2.0.0",
+      "run_id": "maintenance-cadence-review-mqwfuw6l",
+      "scenario_id": "maintenance-cadence-review",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "fc5cbea1b086",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-06-27T14:12:13.780Z",
+      "tokens": {
+        "input": 75827,
+        "output": 1631,
+        "cached_input": 58880,
+        "reasoning_output": 806,
+        "total": 137144
+      },
+      "timing": {
+        "wall_clock_ms": 29666
+      },
+      "tools": {
+        "total_calls": 10,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 2,
+          "afol_command": 4,
+          "shell": 0,
+          "agent_message": 4
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    }
+  ],
+  "report": {
+    "schema_version": "2.0.0",
+    "run_id": "maintenance-cadence-review-mqwfuw6l",
+    "pack_id": "comprehensive-live",
+    "timestamp": "2026-06-27T14:12:13.780Z",
+    "summary": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "blocked": 0,
+      "total_tokens": 137144,
+      "total_time_ms": 29666,
+      "avg_tool_success_rate": 1
+    },
+    "comparison": {
+      "delta_tokens": null,
+      "delta_time_ms": null,
+      "delta_tool_success_rate": null,
+      "regressions": []
+    },
+    "baseline": null,
+    "results": [
+      {
+        "scenario_id": "maintenance-cadence-review",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 75827,
+          "output": 1631,
+          "cached_input": 58880,
+          "reasoning_output": 806,
+          "total": 137144
+        },
+        "timing": {
+          "wall_clock_ms": 29666
+        },
+        "tools": {
+          "total_calls": 10,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 2,
+            "afol_command": 4,
+            "shell": 0,
+            "agent_message": 4
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      }
+    ],
+    "text": "bench report: comprehensive-live\nrun: maintenance-cadence-review-mqwfuw6l\ntimestamp: 2026-06-27T14:12:13.780Z\nresults: 1 passed=1 failed=0 blocked=0\ntokens: total=137144\ntime_ms: total=29666\ntool_success: 1\npassed maintenance-cadence-review tokens=137144 time_ms=29666 tools=10"
+  },
+  "text": "bench report: comprehensive-live\nrun: maintenance-cadence-review-mqwfuw6l\ntimestamp: 2026-06-27T14:12:13.780Z\nresults: 1 passed=1 failed=0 blocked=0\ntokens: total=137144\ntime_ms: total=29666\ntool_success: 1\npassed maintenance-cadence-review tokens=137144 time_ms=29666 tools=10"
+}

@@ -1,6 +1,9 @@
 import type { BenchToolType, RawMetrics } from "./types";
 
 const FILE_READ_RE = /(^|\s)(sed|cat|head|tail|rg|grep|less|more|bat)\b/;
+const AFOL_COMMAND_RE = /(^|&&|\|\||;|\n)\s*afol\b/;
+const SHELL_LC_RE =
+	/(?:^|\s)(?:[./\w-]+\/)?(?:sh|bash|zsh)\s+-lc\s+(['"])([\s\S]*)\1\s*$/;
 
 const META_PLANNING_PHRASES = [
 	"create the plan",
@@ -19,11 +22,18 @@ function parseInteger(value: unknown): number | null {
 		: null;
 }
 
+export function normalizeCommandForBenchmark(command: string): string {
+	const trimmed = command.trim();
+	const shellMatch = SHELL_LC_RE.exec(trimmed);
+	return shellMatch ? (shellMatch[2] ?? "").trim() : trimmed;
+}
+
 export function classifyCommand(command: string): BenchToolType {
-	if (FILE_READ_RE.test(command) || command.includes("Read")) {
+	const normalizedCommand = normalizeCommandForBenchmark(command);
+	if (FILE_READ_RE.test(normalizedCommand) || command.includes("Read")) {
 		return "file_read";
 	}
-	if (command.includes("afol ")) {
+	if (AFOL_COMMAND_RE.test(normalizedCommand)) {
 		return "afol_command";
 	}
 	return "shell";

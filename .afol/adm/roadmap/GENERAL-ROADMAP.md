@@ -566,7 +566,8 @@ Minimum acceptance:
   - State health checks schema, migrations, source hashes, FTS freshness,
     orphan records, and size/WAL signals.
   - Maintenance commands produce dry-run cleanup reports for weekly and monthly
-    routines.
+    routines, including memory/library review, workbench archive candidates,
+    roadmap/spec/manifest alignment, and rule/skill pruning warnings.
   - Context bundles enforce explicit token budgets and prefer refs before full
     documents.
 
@@ -601,8 +602,9 @@ Follow-on slices under this direction:
 - Implement each feature above as narrow slices.
 - Immediate next slice: Temporal Reliability v1. Implement explicit path
   config, `afol pstr stale --json`, trusted-context stale gates,
-  `afol health --area state|library|memory`, and weekly/monthly maintenance
-  dry-run reports.
+  `afol health --area state|library|memory`, weekly/monthly maintenance dry-run
+  reports, scaffolded AFOL maintenance skills, and live-agent maintenance
+  cadence benchmark coverage.
 - Defer daemon behavior, embeddings, physical archive moves, aggressive
   auto-ingest, full graph expansion, and remote schema/admin mutation.
 - Do not combine SQLite, memory, library, context bundle, spec gate, temporal
@@ -611,7 +613,8 @@ Follow-on slices under this direction:
 ### F-19 Canonical AFOL Configuration Rehome
 
 - Status: planned
-- Governing spec: TBD
+- Governing spec:
+  .afol/adm/specs/260627_1655_canonical-afol-configuration-rehome_spec_01.md
 - Why: AFOL operational configuration should be owned by AFOL, not by the
   provider-facing `.agents/` metadata surface. The current `.agents/config.json`
   location still acts as root-detection and path-resolution input, which keeps
@@ -647,6 +650,37 @@ Follow-on slices under this direction:
     false conflicts in downstream update flows.
   - Combining config rehome with skills rehome would blur provider metadata and
     AFOL runtime ownership; keep those decisions separate.
+
+### F-20 Parallel Session Isolation
+
+- Status: final
+- Governing spec:
+  .afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md
+- Why: concurrent local, remote, and CI agents need isolated workbench session
+  context. A single mutable global active-session pointer is unsafe when
+  several agents produce plans, tasks, evidence, and reviews in parallel.
+- Scope:
+  - Prefer explicit `--session` targeting for governed work.
+  - Support context-local session binding for local and remote agents.
+  - Reject unsafe global active-session fallback in CI and other parallel
+    contexts.
+  - Warn when a PR or remote agent mutates `.afol/wb/.active_session` without
+    an explicit session-management intent.
+- Exit criteria:
+  - Session resolution follows explicit flag, `AFOL_SESSION`, context-local
+    binding, then guarded global fallback.
+  - `afol session list|bind|switch|unbind` supports operator control over
+    session context.
+  - Validation flags accidental `.active_session` drift and keeps remote-agent
+    reviews from corrupting local workbench state.
+- Validation targets:
+  - `afol validate project`
+  - `afol validate bench --pack workbench-parity --json`
+  - `bun test cli/tests/session*.test.ts cli/tests/workbench*.test.ts`
+- Risks:
+  - Overly strict fallback removal can make quick local commands noisy.
+  - Under-strict fallback can let remote/CI agents mutate the wrong session.
+  - Session binding must remain visible and reversible for operators.
 
 ## 6) Recommended Delivery Phases
 

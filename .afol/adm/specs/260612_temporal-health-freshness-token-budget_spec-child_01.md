@@ -153,7 +153,9 @@ Targets:
   memories still being recalled.
 - Add weekly and monthly maintenance dry-run reports that describe cleanup,
   consolidation, rotation, snapshot, and recheck candidates without applying
-  destructive changes.
+  destructive changes. Weekly reports must include memory/library review cadence
+  and workbench archive candidates. Monthly reports must include
+  roadmap/spec/manifest freshness and rule/skill pruning review.
 
 Non-goals for v1:
 
@@ -188,6 +190,10 @@ Expected focused validation:
 - Multi-agent lifecycle commands require explicit session id.
 - Archive is metadata-first before physical moves, preserving stable refs.
 - Maintenance commands report cleanup actions before applying them.
+- Weekly dry-run reports memory, library, and workbench maintenance warnings.
+- Monthly dry-run reports roadmap, spec, manifest, rule, and skill review
+  warnings.
+- Live-agent benchmark coverage includes a maintenance cadence scenario.
 
 ## 7) Non-goals
 

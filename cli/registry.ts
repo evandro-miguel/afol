@@ -25,6 +25,7 @@ export type CommandKind =
 	| "memory"
 	| "adm"
 	| "spec"
+	| "ux"
 	| "adr"
 	| "changelog"
 	| "health"
@@ -594,6 +595,63 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect specs",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list [--json] [--verbose]",
+				sideEffect: "read",
+				description: "List active project specs",
+			},
+			{
+				usage: "check --session <session-id> --task <task-id> --json",
+				sideEffect: "read",
+				description: "Check task/spec compatibility",
+			},
+			{
+				usage: "conflict --session <session-id> --task <task-id>",
+				sideEffect: "read",
+				description: "Return success when compatibility is in conflict",
+			},
+			{
+				usage: "waive --session <session-id> --task <task-id> --reason <text>",
+				sideEffect: "write",
+				description: "Record a task/spec conflict waiver",
+			},
+		],
+	},
+	{
+		command: "ux",
+		aliases: [],
+		kind: "ux",
+		sideEffect: "write",
+		description: "Register and validate user journey coverage",
+		category: "workflow",
+		subcommands: [
+			{
+				usage: "list",
+				sideEffect: "read",
+				description: "List registered and spec-derived UX journeys",
+			},
+			{
+				usage: "show <journey-id>",
+				sideEffect: "read",
+				description: "Inspect one registered UX journey",
+			},
+			{
+				usage: "validate",
+				sideEffect: "read",
+				description: "Validate UX registry standards and journey docs",
+			},
+			{
+				usage: "coverage --tool <afol-command>",
+				sideEffect: "read",
+				description: "Show UX journeys covering one AFOL tool",
+			},
+			{
+				usage: "register --from-spec <spec-id>",
+				sideEffect: "write",
+				description: "Create a spec-linked UX journey draft",
+			},
+		],
 	},
 	{
 		command: "adr",

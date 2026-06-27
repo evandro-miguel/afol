@@ -35,7 +35,6 @@ export const TEMPLATE_FORBIDDEN_PATTERNS = [
 	".claude/**",
 	"docs/arc/**",
 	"tests/**",
-	"docs/standards/**",
 	"docs/agentic/**",
 	"docs/knowledge/**",
 ] as const;
@@ -59,6 +58,7 @@ export const TEMPLATE_ALLOWED_PATTERNS = [
 	".afol/tmp/**",
 	".afol/wb/**",
 	"docs/lessons/**",
+	"docs/standards/**",
 	"docs/telemetry/**",
 	"docs/templates/**",
 ] as const;

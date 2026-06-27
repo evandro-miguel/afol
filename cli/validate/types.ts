@@ -23,12 +23,21 @@ export type PackId = (typeof REQUIRED_PACKS)[number];
 
 export type ValidationScope = "default" | "wb" | "tpl" | "update";
 
+export interface ScenarioCoverage {
+	commands?: string[];
+	subcommands?: string[];
+	journeys?: string[];
+	features?: string[];
+	specs?: string[];
+}
+
 export interface Scenario {
 	schema_version: string;
 	scenario_id: string;
 	scenario_version: string;
 	pack_id: PackId;
 	command?: string;
+	coverage?: ScenarioCoverage;
 	sandbox?: boolean;
 	setup?: string[][];
 	expected_exit?: number;
@@ -41,9 +50,27 @@ export interface Scenario {
 	live_runner_scenario_id?: string;
 }
 
+export interface ToolCoverageExemption {
+	command: string;
+	reason: string;
+}
+
+export interface ToolSubcommandCoverageExemption {
+	subcommand: string;
+	reason: string;
+}
+
+export interface ToolCoveragePolicy {
+	schema_version: string;
+	exemptions: ToolCoverageExemption[];
+	subcommand_exemptions?: ToolSubcommandCoverageExemption[];
+}
+
 export interface RegistrySnapshot {
 	schema_version: string;
+	projectRoot?: string;
 	packs: PackMetadata[];
+	coverage?: ToolCoveragePolicy;
 	scenariosByPack: Record<string, Scenario[]>;
 	baselinesByPack: Record<string, Baseline>;
 }

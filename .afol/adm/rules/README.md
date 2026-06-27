@@ -4,7 +4,7 @@ id: readme
 theme: rules
 status: active
 created_at: '2026-05-05T11:44:41+00:00'
-updated_at: '2026-06-20T00:00:00Z'
+updated_at: '2026-06-27T00:00:00Z'
 ---
 
 # Rules
@@ -26,6 +26,8 @@ updated_at: '2026-06-20T00:00:00Z'
 | RULE-008 | [evidence-gated-closure](./RULE-008-evidence-gated-closure.md) | Evidence-backed task closure |
 | RULE-009 | [legacy-surface-retirement](./RULE-009-legacy-surface-retirement.md) | Retirement gates for old surfaces |
 | RULE-010 | [benchmark-quality-contract](./RULE-010-benchmark-quality-contract.md) | Benchmark evidence and resource governance |
+| RULE-011 | [maintenance-cadence](./RULE-011-maintenance-cadence.md) | Routine cleanup, review, rotation, and freshness warnings |
+| RULE-012 | [user-journey-coverage](./RULE-012-user-journey-coverage.md) | UX journey and per-tool scenario coverage |
 
 ---
 
