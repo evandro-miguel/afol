@@ -1,5 +1,5 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import {
 	envelopeOk,
 	type ResultEnvelope,
@@ -17,6 +17,7 @@ import {
 	createMutationId,
 	type MutationRecord,
 } from "../services/mutations/journal";
+import { resolveProjectWritePath } from "../services/project/root";
 import { validateMutationRuntime } from "../services/state/validate";
 import {
 	checkTemplateUpdate,
@@ -67,7 +68,7 @@ type ParsedUpdateArgs = {
 };
 
 function normalizeSubcommand(value: string | undefined): UpdateSubcommand {
-	if (!value || value === "check" || value === "ck") {
+	if (!value || value.startsWith("-") || value === "check" || value === "ck") {
 		return "check";
 	}
 	if (value === "preview" || value === "plan") {
@@ -272,7 +273,11 @@ function stageUpdateOperations(
 ): StagedUpdateOperation[] {
 	const batchId = createMutationId();
 	return operations.filter(isWritableOperation).flatMap((operation) => {
-		const absolutePath = join(projectRoot, operation.path);
+		const resolved = resolveProjectWritePath(projectRoot, operation.path);
+		if (!resolved.ok) {
+			throw new Error(resolved.error);
+		}
+		const absolutePath = resolved.value.path;
 		const beforeExisted = existsSync(absolutePath);
 		const beforeContent = beforeExisted
 			? readFileSync(absolutePath, "utf8")
@@ -398,7 +403,9 @@ export async function runUpdateCommand(
 	try {
 		const [rawCommand, ...rest] = args;
 		const command = normalizeSubcommand(rawCommand);
-		const parsedArgs = parseUpdateArgs(rest);
+		const parsedArgs = parseUpdateArgs(
+			rawCommand?.startsWith("-") ? args : rest,
+		);
 		const result = checkTemplateUpdate(projectRoot);
 		const writableOperations = result.operations.filter(isWritableOperation);
 		const conflictCount = result.operations.filter(

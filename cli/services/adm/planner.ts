@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
+import { resolveProjectWritePath } from "../project/root";
 
 export type AdmManifestEntry = {
 	source_path: string;
@@ -16,6 +17,14 @@ export type AdmPlanResult = {
 
 function sha256Hex(content: Buffer): string {
 	return createHash("sha256").update(content).digest("hex");
+}
+
+function resolveSafeProjectPath(root: string, path: string): string {
+	const resolved = resolveProjectWritePath(root, path);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
+	}
+	return resolved.value.path;
 }
 
 function walkMarkdownFiles(
@@ -39,7 +48,7 @@ function walkMarkdownFiles(
 }
 
 function listArcDocs(root: string): string[] {
-	const docsArcDir = join(root, "docs", "arc");
+	const docsArcDir = resolveSafeProjectPath(root, "docs/arc");
 	if (!existsSync(docsArcDir)) {
 		return [];
 	}
@@ -82,14 +91,15 @@ function targetPathFor(sourcePath: string): string | null {
 }
 
 export function buildAdmMigrationPlan(root: string): AdmPlanResult {
-	const manifest = listArcDocs(root)
+	const projectRoot = realpathSync(root);
+	const manifest = listArcDocs(projectRoot)
 		.sort((left, right) => left.localeCompare(right))
 		.map((sourcePath) => {
 			const targetPath = targetPathFor(sourcePath);
 			if (!targetPath) {
 				return null;
 			}
-			const absoluteSource = join(root, sourcePath);
+			const absoluteSource = resolveSafeProjectPath(projectRoot, sourcePath);
 			const content = readFileSync(absoluteSource);
 			return {
 				source_path: sourcePath,

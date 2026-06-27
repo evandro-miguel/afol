@@ -95,6 +95,10 @@ export async function runStartCommand(
 			allowAutoTask: true,
 		});
 		startTask(root, parsed);
+		if (parsed.compact && !parsed.json) {
+			console.log(`task started: ${parsed.taskId}`);
+			return 0;
+		}
 		let briefing:
 			| ReturnType<typeof buildStartBriefing>
 			| ReturnType<typeof briefingUnavailable>;

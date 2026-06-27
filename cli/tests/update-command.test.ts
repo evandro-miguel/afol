@@ -164,6 +164,15 @@ describe("update command", () => {
 			expect(verboseOutput.stdout.join("\n")).toContain(
 				".agents/manifest.json [owner=managed] manifest commands changed",
 			);
+
+			const flagOnlyJson = capture();
+			expect(await runUpdateCommand(["--json"], root, flagOnlyJson.io)).toBe(0);
+			const parsed = JSON.parse(flagOnlyJson.stdout[0] ?? "{}") as {
+				action?: string;
+				ok?: boolean;
+			};
+			expect(parsed.ok).toBe(true);
+			expect(parsed.action).toBe("update.check");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

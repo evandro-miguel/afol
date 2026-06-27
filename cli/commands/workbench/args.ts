@@ -120,10 +120,15 @@ export function parseSessionTaskArgs(
 	let session = "";
 	let taskId = "";
 	let json = false;
+	let compact = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
 			json = true;
+			continue;
+		}
+		if (arg === "--compact") {
+			compact = true;
 			continue;
 		}
 		if (arg === "--session") {
@@ -157,7 +162,7 @@ export function parseSessionTaskArgs(
 	if (!taskId) {
 		throw new Error(`Missing --task-id for ${commandName}.`);
 	}
-	return { session: resolvedSession, taskId, json };
+	return { session: resolvedSession, taskId, json, compact };
 }
 
 export function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {

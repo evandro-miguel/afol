@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { resolveProjectPaths } from "../project/paths";
+import { resolveProjectWritePath } from "../project/root";
 
 export type StoredSourceFile = {
 	path: string;
@@ -103,7 +104,12 @@ function ensureFtsSchema(db: Database): void {
 }
 
 export function openDb(root: string): Database {
-	const stateDbPath = resolveProjectPaths(root).abs.stateDb;
+	const projectPaths = resolveProjectPaths(root);
+	const resolved = resolveProjectWritePath(root, projectPaths.stateDb);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
+	}
+	const stateDbPath = resolved.value.path;
 	mkdirSync(dirname(stateDbPath), { recursive: true });
 	const db = new Database(stateDbPath);
 	db.exec("PRAGMA journal_mode=WAL;");

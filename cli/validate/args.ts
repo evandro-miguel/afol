@@ -20,19 +20,26 @@ export type ValidateInvocation =
 	  };
 
 export function resolveValidateInvocation(args: string[]): ValidateInvocation {
-	const explicitProject = args[0] === "project" || args.includes("--project");
-	if (explicitProject) {
+	if (args[0] === "project") {
 		return {
 			kind: "project",
-			args: args.filter((arg) => arg !== "project" && arg !== "--project"),
+			args: args.filter((arg) => arg !== "project"),
 		};
 	}
 
-	const modeArg = args[0];
+	const withoutProjectFlag = args.filter((arg) => arg !== "--project");
+	const modeArg = withoutProjectFlag[0];
 	if (modeArg === "bench" || modeArg === "select" || modeArg === "run") {
 		return {
 			kind: "benchmark",
-			args,
+			args: withoutProjectFlag,
+		};
+	}
+
+	if (args.includes("--project")) {
+		return {
+			kind: "project",
+			args: withoutProjectFlag,
 		};
 	}
 

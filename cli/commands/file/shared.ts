@@ -3,7 +3,10 @@ import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { createPatch } from "diff";
 import { resolveProjectPaths } from "../../services/project/paths";
-import { resolveProjectPath } from "../../services/project/root";
+import {
+	resolveProjectPath,
+	resolveProjectWritePath,
+} from "../../services/project/root";
 import {
 	DEFAULT_IO as SHARED_DEFAULT_IO,
 	type CommandIo as SharedCommandIo,
@@ -170,7 +173,15 @@ export function isBinaryPatchTarget(path: string): boolean {
 }
 
 function ensureBackupDir(projectRoot: string): string {
-	const backups = resolveProjectPaths(projectRoot).abs.mutationBackupsDir;
+	const projectPaths = resolveProjectPaths(projectRoot);
+	const resolved = resolveProjectWritePath(
+		projectRoot,
+		projectPaths.mutationBackupsDir,
+	);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
+	}
+	const backups = resolved.value.path;
 	mkdirSync(backups, { recursive: true });
 	return backups;
 }
@@ -198,7 +209,15 @@ export function resolveJournalBackupPath(
 		return null;
 	}
 
-	const backupsDir = resolveProjectPaths(projectRoot).abs.mutationBackupsDir;
+	const projectPaths = resolveProjectPaths(projectRoot);
+	const resolvedBackups = resolveProjectWritePath(
+		projectRoot,
+		projectPaths.mutationBackupsDir,
+	);
+	if (!resolvedBackups.ok) {
+		throw new Error(resolvedBackups.error);
+	}
+	const backupsDir = resolvedBackups.value.path;
 	const lexicalStoredPath = resolve(storedPath);
 	const lexicalBackupsDir = resolve(backupsDir);
 
@@ -232,11 +251,16 @@ export function archiveDestination(
 	relativePath: string,
 ): { path: string; relativePath: string } {
 	const safe = sanitizeForFilename(relativePath);
+	const projectPaths = resolveProjectPaths(projectRoot);
 	const relative = join(
-		resolveProjectPaths(projectRoot).mutationArchivesDir,
+		projectPaths.mutationArchivesDir,
 		`${mutationId}-${safe}`,
 	);
-	return { path: join(projectRoot, relative), relativePath: relative };
+	const resolved = resolveProjectWritePath(projectRoot, relative);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
+	}
+	return { path: resolved.value.path, relativePath: relative };
 }
 
 function applyProjectMutationDefaultsInternal<T extends CommandArgs>(

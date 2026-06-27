@@ -55,20 +55,54 @@ export function loadProjectRoot(
 				"❌ Could not detect project root: .agents/config.json not found.",
 		});
 	}
+	let projectRoot: string;
+	try {
+		projectRoot = realpathSync(found.root);
+	} catch (error) {
+		return err({
+			code: 2,
+			message: `Cannot resolve project root: ${(error as Error).message}`,
+		});
+	}
 
-	const configResult = loadJsonObject(found.configPath);
+	const configPathResult = resolveProjectPath(
+		projectRoot,
+		".agents/config.json",
+	);
+	if (!configPathResult.ok) {
+		return err({ code: 2, message: configPathResult.error });
+	}
+	const configPath = configPathResult.value.path;
+	const configResult = loadJsonObject(configPath);
 	if (!configResult.ok) {
 		return err({ code: 2, message: configResult.error });
 	}
 
-	const projectPaths = resolveProjectPaths(found.root);
-	const lockPath = projectPaths.abs.lockFile;
+	let projectPaths: ReturnType<typeof resolveProjectPaths>;
+	try {
+		projectPaths = resolveProjectPaths(projectRoot);
+	} catch (error) {
+		return err({ code: 2, message: (error as Error).message });
+	}
+
+	const lockPathResult = resolveProjectPath(projectRoot, projectPaths.lockFile);
+	if (!lockPathResult.ok) {
+		return err({ code: 2, message: lockPathResult.error });
+	}
+	const lockPath = lockPathResult.value.path;
 	const lockResult = loadJsonObject(lockPath);
 	if (!lockResult.ok) {
 		return err({ code: 2, message: lockResult.error });
 	}
 
-	const manifestPath = projectPaths.abs.manifestFile;
+	const manifestPathResult = resolveProjectPath(
+		projectRoot,
+		projectPaths.manifestFile,
+	);
+	if (!manifestPathResult.ok) {
+		return err({ code: 2, message: manifestPathResult.error });
+	}
+	const manifestPath = manifestPathResult.value.path;
 	let manifest: SchemaObject | undefined;
 	if (existsSync(manifestPath)) {
 		const manifestResult = loadJsonObject(manifestPath);
@@ -79,8 +113,8 @@ export function loadProjectRoot(
 	}
 
 	const loaded = {
-		root: found.root,
-		configPath: found.configPath,
+		root: projectRoot,
+		configPath,
 		config: configResult.value,
 		lock: lockResult.value,
 	};

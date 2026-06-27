@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { loadJsonObject, type SchemaObject } from "../../core/schema";
 
@@ -29,9 +29,48 @@ export type ResolvedProjectPaths = ProjectPathConfig & {
 	abs: ProjectPathConfig;
 };
 
+function isMissingPathError(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		(error as { code?: unknown }).code === "ENOENT"
+	);
+}
+
+function assertNoExistingSymlinkComponent(root: string, path: string): void {
+	let candidate = realpathSync(root);
+	for (const rawPart of path
+		.split(/[\\/]+/)
+		.filter((part) => part.length > 0 && part !== ".")) {
+		if (rawPart === "..") {
+			throw new Error(`Path escapes project root: ${path}`);
+		}
+		const next = join(candidate, rawPart);
+		try {
+			if (lstatSync(next).isSymbolicLink()) {
+				throw new Error(`Path crosses symlink: ${path}`);
+			}
+		} catch (error) {
+			if (isMissingPathError(error)) {
+				return;
+			}
+			throw error;
+		}
+		candidate = next;
+	}
+}
+
+function assertProjectPathsSafe(root: string, paths: ProjectPathConfig): void {
+	for (const path of Object.values(paths)) {
+		assertNoExistingSymlinkComponent(root, path);
+	}
+}
+
 function readProjectConfig(root: string): SchemaObject {
 	const jsonPath = join(root, ".agents", "config.json");
 	if (existsSync(jsonPath)) {
+		assertNoExistingSymlinkComponent(root, ".agents/config.json");
 		const loaded = loadJsonObject(jsonPath);
 		return loaded.ok ? loaded.value : {};
 	}
@@ -105,32 +144,34 @@ function fromConfig(
 }
 
 function absolute(root: string, paths: ProjectPathConfig): ProjectPathConfig {
+	const projectRoot = realpathSync(root);
 	return {
-		agentsDir: resolve(root, paths.agentsDir),
-		mutableDir: resolve(root, paths.mutableDir),
-		admDir: resolve(root, paths.admDir),
-		pstrDir: resolve(root, paths.pstrDir),
-		stateDb: resolve(root, paths.stateDb),
-		libraryDir: resolve(root, paths.libraryDir),
-		memoryFile: resolve(root, paths.memoryFile),
-		rulesDir: resolve(root, paths.rulesDir),
-		hooksDir: resolve(root, paths.hooksDir),
-		skillsDir: resolve(root, paths.skillsDir),
-		wbDir: resolve(root, paths.wbDir),
-		activeSessionFile: resolve(root, paths.activeSessionFile),
-		tmpDir: resolve(root, paths.tmpDir),
-		dataIndexDir: resolve(root, paths.dataIndexDir),
-		eventsFile: resolve(root, paths.eventsFile),
-		mutationsDir: resolve(root, paths.mutationsDir),
-		mutationBackupsDir: resolve(root, paths.mutationBackupsDir),
-		mutationArchivesDir: resolve(root, paths.mutationArchivesDir),
-		lockFile: resolve(root, paths.lockFile),
-		manifestFile: resolve(root, paths.manifestFile),
+		agentsDir: resolve(projectRoot, paths.agentsDir),
+		mutableDir: resolve(projectRoot, paths.mutableDir),
+		admDir: resolve(projectRoot, paths.admDir),
+		pstrDir: resolve(projectRoot, paths.pstrDir),
+		stateDb: resolve(projectRoot, paths.stateDb),
+		libraryDir: resolve(projectRoot, paths.libraryDir),
+		memoryFile: resolve(projectRoot, paths.memoryFile),
+		rulesDir: resolve(projectRoot, paths.rulesDir),
+		hooksDir: resolve(projectRoot, paths.hooksDir),
+		skillsDir: resolve(projectRoot, paths.skillsDir),
+		wbDir: resolve(projectRoot, paths.wbDir),
+		activeSessionFile: resolve(projectRoot, paths.activeSessionFile),
+		tmpDir: resolve(projectRoot, paths.tmpDir),
+		dataIndexDir: resolve(projectRoot, paths.dataIndexDir),
+		eventsFile: resolve(projectRoot, paths.eventsFile),
+		mutationsDir: resolve(projectRoot, paths.mutationsDir),
+		mutationBackupsDir: resolve(projectRoot, paths.mutationBackupsDir),
+		mutationArchivesDir: resolve(projectRoot, paths.mutationArchivesDir),
+		lockFile: resolve(projectRoot, paths.lockFile),
+		manifestFile: resolve(projectRoot, paths.manifestFile),
 	};
 }
 
 export function resolveProjectPaths(root: string): ResolvedProjectPaths {
-	const config = readProjectConfig(root);
+	const projectRoot = realpathSync(root);
+	const config = readProjectConfig(projectRoot);
 	const agentsDir = fromConfig(config, ["paths", "agents_dir"], ".agents");
 	const mutableDir = fromConfig(config, ["paths", "mutable_dir"], ".afol");
 	const dataDir = fromConfig(
@@ -214,7 +255,8 @@ export function resolveProjectPaths(root: string): ResolvedProjectPaths {
 		),
 	};
 
-	return { ...paths, abs: absolute(root, paths) };
+	assertProjectPathsSafe(projectRoot, paths);
+	return { ...paths, abs: absolute(projectRoot, paths) };
 }
 
 export function readJsonObjectIfExists(

@@ -599,6 +599,43 @@ describe("validation command family", () => {
 		slowValidationTestTimeoutMs,
 	);
 
+	test(
+		"v bench runs mcp-parity pack without skipped adapter stubs",
+		() => {
+			const proc = runKernel(["v", "bench", "--pack", "mcp-parity", "--json"]);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("benchmark");
+			expect(payload.status).toBe("passed");
+			expect(payload.pass).toBe(true);
+			expect(payload.result_count).toBe(5);
+			expect(payload.summary).toEqual({
+				total: 5,
+				passed: 5,
+				failed: 0,
+				skipped: 0,
+				baseline_missing: 0,
+			});
+			const results = payload.results as Array<Record<string, unknown>>;
+			expect(results.map((entry) => entry.scenario_id).sort()).toEqual([
+				"mcp-error",
+				"mcp-evidence",
+				"mcp-mutation",
+				"mcp-rule",
+				"mcp-status",
+			]);
+			expect(results.every((entry) => entry.status === "passed")).toBe(true);
+			expect(
+				results.some((entry) =>
+					((entry.notes as string[] | undefined) ?? []).includes(
+						"not-implemented-live-runner",
+					),
+				),
+			).toBe(false);
+		},
+		slowValidationTestTimeoutMs,
+	);
+
 	test("v bench --save persists a benchmark result artifact under default results directory", () => {
 		const fixtureRoot = createValidationFixtureRoot();
 		const proc = runKernel(

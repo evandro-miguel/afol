@@ -184,6 +184,13 @@ function commitReleaseFixture(root: string, env: NodeJS.ProcessEnv): void {
 	runGit(root, ["commit", "--no-verify", "-m", "test release provenance"], env);
 }
 
+function splitScriptSteps(script: string | undefined): string[] {
+	return (script ?? "")
+		.split(/\s*&&\s*/)
+		.map((step) => step.trim())
+		.filter((step) => step.length > 0);
+}
+
 describe("release and toolchain contracts", () => {
 	test("package scripts keep informative local lanes and strict release gates", () => {
 		const pkg = JSON.parse(
@@ -212,6 +219,12 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["security:scan:release"]).toBe(
 			"bun run cli/dev/security-scan.ts release",
 		);
+		expect(scripts["toolchain:diff"]).toBe(
+			"bun run cli/dev/toolchain-smoke.ts",
+		);
+		expect(scripts["validate:toolchain"]).toBe(
+			"bun run version:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
+		);
 		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:security:required",
 		);
@@ -220,19 +233,114 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:release"]).toContain(
 			"bun run release:provenance:release",
 		);
-		const releaseSteps = scripts["validate:release"]?.split(" && ") ?? [];
-		expect(
-			releaseSteps.indexOf("bun run validate:security:release"),
-		).toBeGreaterThanOrEqual(0);
-		expect(
-			releaseSteps.indexOf("bun run release:provenance:release"),
-		).toBeGreaterThanOrEqual(0);
-		expect(
-			releaseSteps.indexOf("bun run validate:security:release"),
-		).toBeLessThan(releaseSteps.indexOf("bun run release:provenance:release"));
+		const releaseSteps = splitScriptSteps(scripts["validate:release"]);
+		const stepIndex = (step: string) => releaseSteps.indexOf(step);
+		expect(releaseSteps[0]).toBe("bun run validate:toolchain");
+		for (const step of [
+			"bun run smoke:dist",
+			"bun run smoke:clean",
+			"bun run validate:security:release",
+			"bun run release:provenance:release",
+		]) {
+			expect(stepIndex(step)).toBeGreaterThanOrEqual(0);
+		}
+		expect(stepIndex("bun run smoke:dist")).toBeLessThan(
+			stepIndex("bun run smoke:clean"),
+		);
+		expect(stepIndex("bun run smoke:clean")).toBeLessThan(
+			stepIndex("bun run validate:security:release"),
+		);
+		expect(stepIndex("bun run validate:security:release")).toBeLessThan(
+			stepIndex("bun run release:provenance:release"),
+		);
 		expect(scripts["coverage:check"]).toBe(
 			"bun run cli/dev/coverage-check.ts --include cli/dev/coverage-check.ts --include cli/dev/dist-smoke.ts --include cli/dev/generate-version.ts --include cli/dev/release-provenance.ts --include cli/dev/toolchain-smoke.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark",
 		);
+		expect(scripts["coverage:project-benchmarks"]).toContain(
+			"cli/tests/validation.test.ts",
+		);
+	});
+
+	test("validate:release executes strict gates in order with stubbed steps", () => {
+		const pkg = JSON.parse(
+			readFileSync(join(repoRoot, "package.json"), "utf8"),
+		) as {
+			scripts?: Record<string, string>;
+		};
+		const releaseScript = pkg.scripts?.["validate:release"];
+		if (typeof releaseScript !== "string") {
+			throw new Error("missing validate:release script");
+		}
+		const expectedSteps = [
+			"validate:toolchain",
+			"validate:template",
+			"validate:bootstrap",
+			"validate:project-benchmarks",
+			"coverage:check",
+			"build:deterministic",
+			"smoke:dist",
+			"smoke:clean",
+			"validate:security:release",
+			"release:provenance:release",
+		];
+		const root = mkdtempSync(join(tmpdir(), "validate-release-script-"));
+		try {
+			writeFileSync(
+				join(root, "mark.ts"),
+				[
+					'import { appendFileSync } from "node:fs";',
+					'appendFileSync("order.log", (process.argv[2] ?? "missing") + "\\n");',
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			const scripts: Record<string, string> = {
+				"validate:release": releaseScript,
+			};
+			for (const step of expectedSteps) {
+				scripts[step] = `bun run mark.ts ${step}`;
+			}
+			writeFileSync(
+				join(root, "package.json"),
+				JSON.stringify({ scripts }, null, 2),
+				"utf8",
+			);
+
+			const result = spawnSync("bun", ["run", "validate:release"], {
+				cwd: root,
+				encoding: "utf8",
+				shell: false,
+			});
+			if (result.error) {
+				throw result.error;
+			}
+
+			expect(result.status).toBe(0);
+			expect(
+				readFileSync(join(root, "order.log"), "utf8").trim().split("\n"),
+			).toEqual(expectedSteps);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("toolchain smoke executes parser, schema, and diff dependencies", () => {
+		const result = spawnSync(
+			"bun",
+			[join(repoRoot, "cli/dev/toolchain-smoke.ts")],
+			{
+				cwd: repoRoot,
+				encoding: "utf8",
+				shell: false,
+			},
+		);
+		if (result.error) {
+			throw result.error;
+		}
+
+		expect(result.status).toBe(0);
+		expect(result.stdout).toContain("toolchain smoke: ok");
+		expect(result.stderr).toBe("");
 	});
 
 	test("package metadata keeps the private prerelease posture", () => {

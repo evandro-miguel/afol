@@ -96,7 +96,7 @@ describe("validate command", () => {
 			args: ["--json"],
 		});
 		expect(resolveValidateInvocation(["--project", "bench"])).toEqual({
-			kind: "project",
+			kind: "benchmark",
 			args: ["bench"],
 		});
 		expect(resolveValidateInvocation(["select", "--json"])).toEqual({

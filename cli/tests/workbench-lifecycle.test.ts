@@ -532,6 +532,20 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("afol st keeps task start output compact", () => {
+		const root = mkRoot("start-compact");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "start-task");
+			const proc = runKernel(root, ["st", "-S", created.session]);
+
+			expect(proc.status).toBe(0);
+			expect((proc.stdout as string).trim()).toBe("task started: T-01");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol start human output reports briefing fallback reason", () => {
 		const root = mkRoot("start-human-briefing-fallback");
 		try {
