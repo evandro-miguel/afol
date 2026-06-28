@@ -124,6 +124,13 @@ describe("help formatter", () => {
 		expect(updateHelp).toContain("apply --dry-run [read]");
 	});
 
+	test("lists session radar in per-command help", () => {
+		const help = formatCommandHelp("session", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		expect(help).toContain("radar --json [read]");
+	});
+
 	test("makes risky file operations explicit in command help", () => {
 		const help = formatCommandHelp("file", kernelRegistry);
 

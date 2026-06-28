@@ -2,8 +2,8 @@
 doc_type: spec-child
 id: 260615_1350_recurring-problem-guardrails_spec-child_01
 theme: recurring-problem-guardrails
-status: active
-closure_note: "Read-only governance contract. Defines detection, heavy-verification recommendation, and rule-creation proposal for recurring problems. No blocking enforcement — preflight reports recurrence_detected field but does not fail the command."
+status: final
+closure_note: "Delivered: read-only governance contract, recurrence detection, lesson/rule/spec/similar-system surfacing, recurrence_detected plus recommendations, one-off exception messaging, and non-mutation behavior are covered by preflight command tests."
 owners:
 - orchestrator
 workstream_intent: feature
@@ -120,11 +120,11 @@ Out of scope:
 ## Acceptance
 
 - [x] `afol preflight` output includes `recurrence_detected` field (boolean).
-- [ ] When `recurrence_detected = true`, matching lessons are surfaced.
-- [ ] When `recurrence_detected = false`, the agent treats the problem as a one-off fix unless new evidence emerges.
-- [ ] When recurrence is detected, the agent proposes (does not auto-create) heavy verification and rule/lesson updates on the workbench, waiting for user approval before any mutation.
-- [ ] No CI, validation, or command fails because of recurrence_detected = true.
-- [ ] This spec is the authoritative reference for recurring-problem guardrails behavior.
+- [x] When `recurrence_detected = true`, matching lessons are surfaced.
+- [x] When `recurrence_detected = false`, the agent treats the problem as a one-off fix unless new evidence emerges.
+- [x] When recurrence is detected, the agent proposes (does not auto-create) heavy verification and rule/lesson updates on the workbench, waiting for user approval before any mutation.
+- [x] No CI, validation, or command fails because of recurrence_detected = true.
+- [x] This spec is the authoritative reference for recurring-problem guardrails behavior.
 
 ## Risks and Mitigations
 

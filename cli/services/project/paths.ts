@@ -2,6 +2,25 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { loadJsonObject, type SchemaObject } from "../../core/schema";
 
+export const CANONICAL_PROJECT_CONFIG_PATH = ".afol/config.json";
+export const LEGACY_PROJECT_CONFIG_PATH = ".agents/config.json";
+
+export type ProjectConfigSource = "canonical" | "legacy";
+
+export type ProjectConfigResolution = {
+	source: ProjectConfigSource;
+	relativePath: string;
+	absolutePath: string;
+};
+
+export const PROJECT_CONFIG_PATHS: readonly {
+	source: ProjectConfigSource;
+	relativePath: string;
+}[] = [
+	{ source: "canonical", relativePath: CANONICAL_PROJECT_CONFIG_PATH },
+	{ source: "legacy", relativePath: LEGACY_PROJECT_CONFIG_PATH },
+] as const;
+
 type ProjectPathConfig = {
 	agentsDir: string;
 	mutableDir: string;
@@ -67,14 +86,32 @@ function assertProjectPathsSafe(root: string, paths: ProjectPathConfig): void {
 	}
 }
 
-function readProjectConfig(root: string): SchemaObject {
-	const jsonPath = join(root, ".agents", "config.json");
-	if (existsSync(jsonPath)) {
-		assertNoExistingSymlinkComponent(root, ".agents/config.json");
-		const loaded = loadJsonObject(jsonPath);
-		return loaded.ok ? loaded.value : {};
+export function resolveProjectConfigPath(
+	root: string,
+): ProjectConfigResolution | null {
+	const projectRoot = realpathSync(root);
+	for (const candidate of PROJECT_CONFIG_PATHS) {
+		const jsonPath = join(projectRoot, candidate.relativePath);
+		if (!existsSync(jsonPath)) {
+			continue;
+		}
+		assertNoExistingSymlinkComponent(projectRoot, candidate.relativePath);
+		return {
+			source: candidate.source,
+			relativePath: candidate.relativePath,
+			absolutePath: jsonPath,
+		};
 	}
 
+	return null;
+}
+
+export function readProjectConfig(root: string): SchemaObject {
+	const resolved = resolveProjectConfigPath(root);
+	if (resolved) {
+		const loaded = loadJsonObject(resolved.absolutePath);
+		return loaded.ok ? loaded.value : {};
+	}
 	return {};
 }
 

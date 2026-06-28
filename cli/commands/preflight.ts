@@ -69,6 +69,12 @@ function formatReport(report: PreflightReport): string {
 		"",
 		`recurrence_detected: ${report.recurrence_detected}`,
 		"",
+		"recommendations",
+		formatCollection(
+			report.recommendations,
+			(recommendation) => recommendation,
+		),
+		"",
 		"gaps",
 		formatCollection(report.gaps, (gap) => gap),
 	].join("\n");

@@ -168,7 +168,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(errors.join("\n")).toContain(
 				"Refusing real bootstrap: AFOL binary is not locally registered.",
 			);
-			expect(existsSync(join(target, ".agents", "config.json"))).toBe(false);
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(false);
 		} finally {
 			console.error = originalError;
 			rmSync(target, { recursive: true, force: true });
@@ -189,7 +189,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 				invocationPath: join(cliRoot, "dist", "afol"),
 			});
 			expect(exitCode).toBe(0);
-			expect(existsSync(join(target, ".agents", "config.json"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(true);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 			rmSync(cliRoot, { recursive: true, force: true });
@@ -228,7 +228,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			]);
 
 			expect(exitCode).toBe(0);
-			expect(existsSync(join(target, ".agents", "config.json"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(true);
 			expect(
 				existsSync(join(target, ".afol", "adm", "rules", "index.json")),
 			).toBe(true);
@@ -350,7 +350,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			).toBe(true);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				paths: Record<string, string>;
 				skills_sync: Record<string, string>;
@@ -610,7 +610,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(existsSync(join(target, ".claude", "README.md"))).toBe(false);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				adapters?: { claude?: { enabled?: boolean } };
 			};
@@ -638,7 +638,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				paths: { mutable_dir: string };
 				adapters?: { claude?: { enabled?: boolean } };
@@ -678,7 +678,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				paths: { mutable_dir: string };
 				adapters?: { claude?: { enabled?: boolean } };
@@ -708,7 +708,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				paths: Record<string, string>;
 			};

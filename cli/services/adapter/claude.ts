@@ -10,6 +10,10 @@ import { dirname, join } from "node:path";
 import type { SchemaObject } from "../../core/schema";
 import { loadJsonObject } from "../../core/schema";
 import { DEFAULT_TEMPLATE_FILES } from "../../generated/template";
+import {
+	CANONICAL_PROJECT_CONFIG_PATH,
+	resolveProjectConfigPath,
+} from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
 import type { TemplateFileMap } from "../template/payload";
 
@@ -38,13 +42,18 @@ export type AdapterState = {
 };
 
 /**
- * Read the Claude adapter enabled flag from `.agents/config.json`.
+ * Read the Claude adapter enabled flag from the AFOL project config.
  * Omitted or non-boolean value means enabled (backward compatible with
  * pre-adapter installs that always shipped CLAUDE.md).
  */
 export function readClaudeAdapterEnabled(configRoot: string): boolean {
-	const configPath = join(configRoot, ".agents", "config.json");
-	if (!existsSync(configPath)) {
+	let configPath: string | null = null;
+	try {
+		configPath = resolveProjectConfigPath(configRoot)?.absolutePath ?? null;
+	} catch {
+		return true;
+	}
+	if (!configPath) {
 		return true;
 	}
 	const loaded = loadJsonObject(configPath);
@@ -82,7 +91,7 @@ export function filterClaudeAdapterFiles(
 }
 
 /**
- * Mark the Claude adapter as enabled/disabled in `.agents/config.json`. The
+ * Mark the Claude adapter as enabled/disabled in AFOL project config. The
  * config is read, mutated, and written back atomically. Missing config is an
  * error — adapter commands require an installed project.
  */
@@ -90,10 +99,12 @@ export function writeClaudeAdapterEnabled(
 	configRoot: string,
 	enabled: boolean,
 ): void {
-	const configPath = resolveAdapterWritePath(configRoot, ".agents/config.json");
+	const resolved = resolveProjectConfigPath(configRoot);
+	const targetPath = resolved?.relativePath ?? CANONICAL_PROJECT_CONFIG_PATH;
+	const configPath = resolveAdapterWritePath(configRoot, targetPath);
 	if (!existsSync(configPath)) {
 		throw new Error(
-			"afol adapter: missing .agents/config.json — run `afol init` first",
+			"afol adapter: missing .afol/config.json — run `afol init` first",
 		);
 	}
 	const raw = loadJsonObject(configPath);

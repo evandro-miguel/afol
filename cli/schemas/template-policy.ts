@@ -42,7 +42,7 @@ export const TEMPLATE_FORBIDDEN_PATTERNS = [
 export const TEMPLATE_ALLOWED_PATTERNS = [
 	"AGENTS.md",
 	"RTK.md",
-	".agents/config.json",
+	".afol/config.json",
 	".agents/lock.json",
 	".agents/manifest.json",
 	".agents/skills-sync.manifest.json",

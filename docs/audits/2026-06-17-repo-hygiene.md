@@ -23,9 +23,9 @@ first, keep traceability, and avoid deleting material without multiple signals.
   schema, migrations, and other desired-state administration.
 - `.afol/pstr/**`: generated current project-structure maps only.
 - `.afol/wb/**`: governed execution sessions.
-- `.agents/**`: static scaffold metadata and provider skills only:
-  `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`, and
-  `.agents/skills/**`. It is not the mutable runtime surface.
+- `.agents/**`: static provider metadata and provider skills only:
+  `.agents/lock.json`, `.agents/manifest.json`, and `.agents/skills/**`.
+  Project configuration has since moved to `.afol/config.json`.
 - `docs/**`: operator-facing standards, patterns, templates, lessons,
   telemetry notes, and audits.
 

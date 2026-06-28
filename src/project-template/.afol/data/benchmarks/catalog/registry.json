@@ -444,6 +444,10 @@
       {
         "subcommand": "session unbind <session-id>",
         "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "session radar --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
       }
     ]
   },

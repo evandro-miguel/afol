@@ -24,9 +24,10 @@ import type { TemplateFileMap } from "../services/template/payload";
 
 function createRoot(withClaudeArtifacts = true): string {
 	const root = mkdtempSync(join(tmpdir(), "adapter-cmd-"));
+	mkdirSync(join(root, ".afol"), { recursive: true });
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	writeFileSync(
-		join(root, ".agents", "config.json"),
+		join(root, ".afol", "config.json"),
 		`${JSON.stringify({ schema_version: 1, project: { name: "adapter-test" }, paths: {} }, null, 2)}\n`,
 	);
 	if (withClaudeArtifacts) {
@@ -66,9 +67,30 @@ describe("claude adapter service", () => {
 
 			// other config keys preserved
 			const config = JSON.parse(
-				readFileSync(join(root, ".agents", "config.json"), "utf8"),
+				readFileSync(join(root, ".afol", "config.json"), "utf8"),
 			);
 			expect(config.project.name).toBe("adapter-test");
+			expect(config.adapters.claude.enabled).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("readClaudeAdapterEnabled supports legacy .agents config fallback", () => {
+		const root = mkdtempSync(join(tmpdir(), "adapter-cmd-legacy-"));
+		try {
+			mkdirSync(join(root, ".agents"), { recursive: true });
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				`${JSON.stringify({ schema_version: 1, adapters: { claude: { enabled: false } } }, null, 2)}\n`,
+				"utf8",
+			);
+
+			expect(readClaudeAdapterEnabled(root)).toBe(false);
+			writeClaudeAdapterEnabled(root, true);
+			const config = JSON.parse(
+				readFileSync(join(root, ".agents", "config.json"), "utf8"),
+			);
 			expect(config.adapters.claude.enabled).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -84,7 +106,7 @@ describe("claude adapter service", () => {
 				`${JSON.stringify({ schema_version: 1, adapters: { claude: { enabled: true } } }, null, 2)}\n`,
 				"utf8",
 			);
-			symlinkSync(outside, join(root, ".agents"), "dir");
+			symlinkSync(outside, join(root, ".afol"), "dir");
 
 			expect(() => writeClaudeAdapterEnabled(root, false)).toThrow(
 				/Path crosses symlink/,
@@ -130,6 +152,7 @@ describe("claude adapter service", () => {
 		const root = createRoot(true);
 		const outside = mkdtempSync(join(tmpdir(), "adapter-archive-outside-"));
 		try {
+			rmSync(join(root, ".afol"), { recursive: true, force: true });
 			symlinkSync(outside, join(root, ".afol"), "dir");
 
 			expect(() => archiveClaudeArtifacts(root)).toThrow(

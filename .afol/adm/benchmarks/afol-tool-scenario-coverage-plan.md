@@ -213,7 +213,7 @@ coverage when the command changes or a production incident exposes a weak path:
 | `afol preflight` | Agent searches governance before planning. | scripted preflight plus live research scenario. | Relevant specs, lessons, systems, and rules are returned before plan. |
 | `afol adapter` | Operator toggles runtime adapters safely. | dry-run adapter fixture. | Preview shows config change and avoids runtime mutation until confirmed. |
 | `afol telemetry` | Maintainer queries/export telemetry. | scripted telemetry fixture plus live benchmark scenario. | Output reports events, metrics, export path, and token budget. |
-| `afol session` | Operator lists, binds, switches, and unbinds sessions. | workbench fixture plus live workbench scenario. | Session state changes are explicit and recoverable. |
+| `afol session` | Operator lists, binds, switches, unbinds, and reviews coordination radar. | workbench fixture plus live workbench and radar scenarios. | Session state changes and coordination warnings are explicit and recoverable. |
 
 ## Acceptance Gates
 

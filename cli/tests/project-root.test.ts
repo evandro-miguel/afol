@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-	chmodSync,
 	mkdirSync,
 	mkdtempSync,
 	realpathSync,
@@ -33,16 +32,12 @@ const templateLock = JSON.stringify({
 
 function mkProjectRoot(name: string): string {
 	const root = mkdtempSync(join(tmpdir(), `project-root-${name}-`));
+	const afolDir = join(root, ".afol");
 	const agentsDir = join(root, ".agents");
+	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
-	writeFileSync(join(agentsDir, "config.json"), templateConfig, "utf8");
+	writeFileSync(join(afolDir, "config.json"), templateConfig, "utf8");
 	writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
-	writeFileSync(
-		join(agentsDir, "agents"),
-		"#!/usr/bin/env bash\nexit 0\n",
-		"utf8",
-	);
-	chmodSync(join(agentsDir, "agents"), 0o755);
 	return root;
 }
 
@@ -75,9 +70,9 @@ describe("project root loader", () => {
 				return;
 			}
 			expect(loaded.value.root).toBe(root);
-			expect(loaded.value.configPath.endsWith(".agents/config.json")).toBe(
-				true,
-			);
+			expect(loaded.value.configPath.endsWith(".afol/config.json")).toBe(true);
+			expect(loaded.value.configRelativePath).toBe(".afol/config.json");
+			expect(loaded.value.configSource).toBe("canonical");
 			expect(loaded.value.config.project).toBeDefined();
 			expect(loaded.value.lock.locked).toBe(true);
 		} finally {
@@ -100,8 +95,9 @@ describe("project root loader", () => {
 			}
 			expect(loaded.value.root).toBe(realRoot);
 			expect(loaded.value.configPath).toBe(
-				join(realRoot, ".agents", "config.json"),
+				join(realRoot, ".afol", "config.json"),
 			);
+			expect(loaded.value.configSource).toBe("canonical");
 
 			const paths = resolveProjectPaths(link);
 			expect(paths.abs.stateDb).toBe(join(realRoot, ".afol/state/afol.db"));
@@ -111,7 +107,26 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("returns root-not-found when no .agents config exists", () => {
+	test("falls back to legacy .agents config when canonical config is missing", () => {
+		const root = mkdtempSync(join(tmpdir(), "project-root-legacy-"));
+		const agentsDir = join(root, ".agents");
+		mkdirSync(agentsDir, { recursive: true });
+		writeFileSync(join(agentsDir, "config.json"), templateConfig, "utf8");
+		writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
+		try {
+			const loaded = loadProjectRoot(root);
+			expect(loaded.ok).toBe(true);
+			if (!loaded.ok) {
+				return;
+			}
+			expect(loaded.value.configRelativePath).toBe(".agents/config.json");
+			expect(loaded.value.configSource).toBe("legacy");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("returns root-not-found when no project config exists", () => {
 		const root = mkdtempSync(join(tmpdir(), "project-root-missing-"));
 		try {
 			const loaded = loadProjectRoot(root);
@@ -125,13 +140,13 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("rejects symlinked .agents config roots", () => {
-		const root = mkdtempSync(join(tmpdir(), "project-root-agent-symlink-"));
-		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-agents-"));
+	test("rejects symlinked .afol config roots", () => {
+		const root = mkdtempSync(join(tmpdir(), "project-root-afol-symlink-"));
+		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-afol-"));
 		try {
 			writeFileSync(join(outside, "config.json"), templateConfig, "utf8");
 			writeFileSync(join(outside, "lock.json"), templateLock, "utf8");
-			symlinkSync(outside, join(root, ".agents"), "dir");
+			symlinkSync(outside, join(root, ".afol"), "dir");
 
 			const loaded = loadProjectRoot(root);
 			expect(loaded.ok).toBe(false);
@@ -151,15 +166,15 @@ describe("project root loader", () => {
 		try {
 			writeFileSync(join(outside, "config.json"), templateConfig, "utf8");
 			writeFileSync(join(outside, "shape.yaml"), "ok: true\n", "utf8");
-			symlinkSync(outside, join(root, ".agents"), "dir");
+			symlinkSync(outside, join(root, ".afol"), "dir");
 
-			const json = loadJsonObject(join(root, ".agents", "config.json"));
+			const json = loadJsonObject(join(root, ".afol", "config.json"));
 			expect(json.ok).toBe(false);
 			if (!json.ok) {
 				expect(json.error).toContain("symlink");
 			}
 
-			const yaml = loadYamlObject(join(root, ".agents", "shape.yaml"));
+			const yaml = loadYamlObject(join(root, ".afol", "shape.yaml"));
 			expect(yaml.ok).toBe(false);
 			if (!yaml.ok) {
 				expect(yaml.error).toContain("symlink");
@@ -172,9 +187,11 @@ describe("project root loader", () => {
 
 	test("returns invalid state for malformed config/lock", () => {
 		const root = mkdtempSync(join(tmpdir(), "project-root-invalid-"));
+		const afolDir = join(root, ".afol");
 		const agentsDir = join(root, ".agents");
+		mkdirSync(afolDir, { recursive: true });
 		mkdirSync(agentsDir, { recursive: true });
-		writeFileSync(join(agentsDir, "config.json"), "{invalid", "utf8");
+		writeFileSync(join(afolDir, "config.json"), "{invalid", "utf8");
 		writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
 		try {
 			const loaded = loadProjectRoot(root);
@@ -192,6 +209,7 @@ describe("project root loader", () => {
 		const root = mkProjectRoot("mutable-root-symlink");
 		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-afol-"));
 		try {
+			rmSync(join(root, ".afol"), { recursive: true, force: true });
 			symlinkSync(outside, join(root, ".afol"), "dir");
 			expect(() => resolveProjectPaths(root)).toThrow(/Path crosses symlink/);
 		} finally {
@@ -204,10 +222,10 @@ describe("project root loader", () => {
 		const root = mkProjectRoot("path-jail");
 		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-"));
 		try {
-			const inside = resolveProjectPath(root, ".agents/config.json");
+			const inside = resolveProjectPath(root, ".afol/config.json");
 			expect(inside.ok).toBe(true);
 			if (inside.ok) {
-				expect(inside.value.relativePath).toBe(".agents/config.json");
+				expect(inside.value.relativePath).toBe(".afol/config.json");
 			}
 
 			const escaped = resolveProjectPath(root, "../outside.txt");

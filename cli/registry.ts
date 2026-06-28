@@ -943,6 +943,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Show active session, context session, and bindings",
 			},
 			{
+				usage: "radar --json",
+				sideEffect: "read",
+				description: "Show compact coordination warnings across open sessions",
+			},
+			{
 				usage: "bind --session <id> --dry-run",
 				sideEffect: "read",
 				description: "Preview binding a session to current branch/worktree",

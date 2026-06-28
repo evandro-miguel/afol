@@ -95,7 +95,7 @@ function createHealthyFixture(): string {
 					scope: "config",
 					status: "current",
 					authority: "observed",
-					source_paths: [".agents/config.json"],
+					source_paths: [".afol/config.json"],
 					source_hash: "hash-4",
 					file_count: 1,
 					updated_at: now,

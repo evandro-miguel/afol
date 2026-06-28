@@ -58,8 +58,9 @@ function mkRoot(): string {
 }
 
 function writeClaudeAdapterConfig(root: string, enabled: boolean): void {
+	mkdirSync(join(root, ".afol"), { recursive: true });
 	writeFileSync(
-		join(root, ".agents", "config.json"),
+		join(root, ".afol", "config.json"),
 		`${JSON.stringify(
 			{
 				schema_version: 1,
@@ -472,8 +473,9 @@ describe("update command", () => {
 	test("apply dry-run permits project-owned preserves without writes", async () => {
 		const root = mkRoot();
 		try {
+			mkdirSync(join(root, ".afol"), { recursive: true });
 			writeFileSync(
-				join(root, ".agents", "config.json"),
+				join(root, ".afol", "config.json"),
 				'{"local":true}\n',
 				"utf8",
 			);
@@ -484,7 +486,7 @@ describe("update command", () => {
 						version: 1,
 						commands: { status: ["s", "status"] },
 						ownership: {
-							"project-owned": [".agents/config.json", ".agents/manifest.json"],
+							"project-owned": [".afol/config.json", ".agents/manifest.json"],
 							generated: [],
 							ignored: [],
 							conflict: [],
@@ -501,7 +503,7 @@ describe("update command", () => {
 				await runUpdateCommand(["apply", "--dry-run"], root, dryRun.io),
 			).toBe(0);
 			expect(dryRun.stdout.join("\n")).toContain("preserve=2");
-			expect(readFileSync(join(root, ".agents", "config.json"), "utf8")).toBe(
+			expect(readFileSync(join(root, ".afol", "config.json"), "utf8")).toBe(
 				'{"local":true}\n',
 			);
 

@@ -86,7 +86,7 @@ Before applying a receiving-project update, produce a compact inventory:
 
 - project-owned guidance and docs: `AGENTS.md`, `RTK.md`, root `docs/**`,
   project runbooks, and local operational files agents already use
-- present provider-facing scaffold metadata and skills: `.agents/config.json`,
+- present AFOL config, provider metadata, and skills: `.afol/config.json`,
   `.agents/lock.json`, `.agents/manifest.json`, and the configured
   `paths.skills_dir`
 - present AFOL governance payloads: `.afol/adm/rules/**`,
@@ -149,7 +149,7 @@ Without both flags, AFOL preserves these paths.
 Inspect before cleanup. If a legacy file contains useful project-owned content,
 convert it into `AGENTS.md`, `.afol/adm/**`, the configured
 `paths.skills_dir`, or project docs instead of deleting it. Do not archive
-`.agents/skills` when `.agents/config.json` currently names it as
+`.agents/skills` when `.afol/config.json` currently names it as
 `paths.skills_dir`.
 
 ## 6. Path Contract After Install
@@ -157,7 +157,7 @@ convert it into `AGENTS.md`, `.afol/adm/**`, the configured
 After install, read:
 
 ```bash
-cat .agents/config.json
+cat .afol/config.json
 ```
 
 Use `paths.mutable_dir`, `paths.wb_dir`, `paths.skills_dir`, `paths.tmp_dir`,
@@ -165,7 +165,7 @@ Use `paths.mutable_dir`, `paths.wb_dir`, `paths.skills_dir`, `paths.tmp_dir`,
 
 Default provider-compatible layout:
 
-- provider-facing metadata and skills: `.agents/config.json`,
+- project config, provider metadata, and skills: `.afol/config.json`,
   `.agents/lock.json`, `.agents/manifest.json`, and the configured
   `paths.skills_dir` (commonly `.agents/skills/**`)
 - AFOL governance payloads: `.afol/adm/rules/**`, `.afol/adm/hooks/**`,

@@ -52,8 +52,9 @@ describe("generated template cleanliness", () => {
 
 	test("generated payload keeps AFOL hooks and project skills in owned roots", () => {
 		const paths = Object.keys(DEFAULT_TEMPLATE_FILES);
-		const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
+		const configEntry = DEFAULT_TEMPLATE_FILES[".afol/config.json"];
 		expect(configEntry).toBeDefined();
+		expect(paths).not.toContain(".agents/config.json");
 		expect(paths).toContain(".afol/adm/hooks/index.json");
 		expect(paths).toContain(".afol/adm/hooks/README.md");
 		expect(paths).toContain(".afol/adm/source/universal-skills/index.json");

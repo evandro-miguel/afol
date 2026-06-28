@@ -83,6 +83,7 @@ export const DEFAULT_MOVE_DESTINATION =
 	".afol/data/mutations/move-destination.txt";
 
 const PROTECTED_PREFIXES = Object.freeze([
+	".afol/config.json",
 	".agents/lock.json",
 	".agents/config.json",
 	".agents/manifest.json",

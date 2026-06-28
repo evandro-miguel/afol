@@ -159,7 +159,8 @@
       "session bind --session <id> --dry-run",
       "session bind --session <id> --actor <name>",
       "session switch <session-id>",
-      "session unbind <session-id>"
+      "session unbind <session-id>",
+      "session radar --json"
     ],
     "journeys": [
       "afol-command-user-flow-matrix",

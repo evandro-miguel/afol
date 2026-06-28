@@ -368,6 +368,7 @@ describe("bench command surfaces", () => {
 			data: {
 				mode: string;
 				live_execution: boolean;
+				live_execution_entrypoint: string;
 				benchmark_profile: { model: string; reasoning_effort: string };
 				scenario_count: number;
 				validation_command: string;
@@ -376,6 +377,9 @@ describe("bench command surfaces", () => {
 		expect(payload.action).toBe("bench.runtime-live");
 		expect(payload.data.mode).toBe("dry-run");
 		expect(payload.data.live_execution).toBe(false);
+		expect(payload.data.live_execution_entrypoint).toBe(
+			"afol bench run --all --save",
+		);
 		expect(payload.data.benchmark_profile.model).toBe("gpt-5.4-mini");
 		expect(payload.data.benchmark_profile.reasoning_effort).toBe("medium");
 		expect(payload.data.scenario_count).toBeGreaterThan(0);

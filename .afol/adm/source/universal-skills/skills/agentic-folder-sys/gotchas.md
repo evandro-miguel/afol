@@ -25,11 +25,13 @@ Use `afol` commands only.
 Retained `.agents/**` content is limited to provider-facing metadata and
 project-local skills:
 
-- `.agents/config.json`
 - `.agents/lock.json`
 - `.agents/manifest.json`
 - configured provider skills such as `.agents/skills/**` when
   `paths.skills_dir` points there
+
+Project configuration lives at `.afol/config.json`. Existing
+`.agents/config.json` files are legacy fallback inputs only.
 
 AFOL-owned static governance payloads live under `.afol/adm/**`, including
 hooks, rules, command catalogs, and source payloads. Mutable AFOL state also
@@ -38,7 +40,7 @@ mutations, temporary files, benchmark data, migration archives, and other
 configured mutable paths. Project-local skills follow `paths.skills_dir`; in
 the current provider-compatible layout this is commonly `.agents/skills`.
 
-## 3. Read `.agents/config.json` Before Moving Files
+## 3. Read `.afol/config.json` Before Moving Files
 
 Do not guess paths. Read the path contract and follow fields such as
 `paths.mutable_dir`, `paths.skills_dir`, `paths.wb_dir`, `paths.data_dir`, and
@@ -79,7 +81,7 @@ project-wide overwrite switch.
 
 ## 8. Project-Local Skills Follow `paths.skills_dir`
 
-Read `.agents/config.json` before editing skills. In the current
+Read `.afol/config.json` before editing skills. In the current
 provider-compatible layout, project-local skills commonly live under
 `.agents/skills/**`; older or custom installs may differ. Keep only the curated
 skills agents should use in that project. If a change is intended for every

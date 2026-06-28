@@ -72,17 +72,19 @@ function touch(path: string, isoTime: string): void {
 
 function createFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "status-command-"));
+	const afolDir = join(root, ".afol");
 	const agentsDir = join(root, ".agents");
 	const wbDir = join(root, ".afol", "wb");
 	const activeSessionFile = join(wbDir, ".active_session");
 	const sessionId = "260530_2256_cli-native-command-parity";
 	const sessionDir = join(wbDir, sessionId);
 
+	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
 	mkdirSync(sessionDir, { recursive: true });
 
 	writeFileSync(
-		join(agentsDir, "config.json"),
+		join(afolDir, "config.json"),
 		JSON.stringify({
 			schema_version: 1,
 			project: { name: "status-fixture" },
@@ -134,17 +136,19 @@ function createFreshnessFixture(mode: "fresh" | "stale-log"): {
 } {
 	const root = mkdtempSync(join(tmpdir(), "status-freshness-"));
 	const session = "260530_2257_status-freshness";
+	const afolDir = join(root, ".afol");
 	const agentsDir = join(root, ".agents");
 	const wbDir = join(root, ".afol", "wb");
 	const activeSessionFile = join(wbDir, ".active_session");
 	const sessionDir = join(wbDir, session);
 	const workFile = join(root, "work.txt");
 
+	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
 	mkdirSync(sessionDir, { recursive: true });
 
 	writeFileSync(
-		join(agentsDir, "config.json"),
+		join(afolDir, "config.json"),
 		JSON.stringify({
 			schema_version: 1,
 			project: { name: "status-freshness" },
@@ -203,9 +207,10 @@ function createFreshnessFixture(mode: "fresh" | "stale-log"): {
 
 function createNoSessionFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "status-no-session-"));
+	mkdirSync(join(root, ".afol"), { recursive: true });
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	writeFileSync(
-		join(root, ".agents", "config.json"),
+		join(root, ".afol", "config.json"),
 		JSON.stringify({
 			schema_version: 1,
 			project: { name: "status-no-session" },
@@ -306,6 +311,7 @@ describe("status command", () => {
 			expect(payload.data?.task).toBe("T-01");
 			const paths = payload.paths;
 			expect(typeof paths.config).toBe("string");
+			expect(paths.config_source).toBe("canonical");
 			expect(typeof paths.lock).toBe("string");
 			expect(typeof paths.active_session).toBe("string");
 			expect(typeof paths.task_file).toBe("string");

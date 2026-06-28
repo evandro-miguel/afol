@@ -9,6 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runUxCommand } from "../commands/ux";
+import { agentOperationContext } from "../core/operation-context";
 
 type CapturedIo = {
 	stdout: string[];
@@ -164,6 +165,24 @@ describe("ux command", () => {
 		);
 	});
 
+	test("shows one UX journey by id", async () => {
+		const captured = captureIo();
+		expect(
+			await runUxCommand(
+				"show",
+				["fixture-maintenance_ux-journey_01", "--json"],
+				root,
+				captured.io,
+			),
+		).toBe(0);
+		expect(captured.stderr).toEqual([]);
+		const payload = parsePayload(captured);
+		expect(payload.ok).toBe(true);
+		expect(JSON.stringify(payload)).toContain(
+			"fixture-maintenance_ux-journey_01",
+		);
+	});
+
 	test("normalizes AFOL aliases when showing coverage", async () => {
 		const captured = captureIo();
 		expect(
@@ -197,6 +216,25 @@ describe("ux command", () => {
 		expect(payload.created).toBe(false);
 		expect(payload.dry_run).toBe(true);
 		expect(payload.path).toBe(".afol/adm/ux/fixture-source_ux-journey_01.md");
+		expect(
+			existsSync(join(root, ".afol/adm/ux/fixture-source_ux-journey_01.md")),
+		).toBe(false);
+	});
+
+	test("blocks non-dry-run registration for restricted callers", async () => {
+		const captured = captureIo();
+		expect(
+			await runUxCommand(
+				"register",
+				["--from-spec", "fixture-source_spec-child_01", "--json"],
+				root,
+				captured.io,
+				agentOperationContext(),
+			),
+		).toBe(2);
+		expect(captured.stderr.join("\n")).toContain(
+			"requires local interactive approval",
+		);
 		expect(
 			existsSync(join(root, ".afol/adm/ux/fixture-source_ux-journey_01.md")),
 		).toBe(false);

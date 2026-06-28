@@ -2,7 +2,8 @@
 doc_type: spec-child
 id: 260627_1122_afol-tool-scenario-coverage-and-ux-registry_spec-child_01
 theme: afol-tool-scenario-coverage-and-ux-registry
-status: active
+status: final
+closure_note: "Delivered: command-surface coverage gate, UX journey registry/list/show/validate/coverage/register, alias normalization, saved-result runtime-live validation, and focused tests for show plus restricted non-dry-run registration."
 owners:
 - orchestrator
 workstream_intent: feature

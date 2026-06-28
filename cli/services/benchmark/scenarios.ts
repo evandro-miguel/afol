@@ -17,7 +17,7 @@ function seedProjectSkeleton(root: string): void {
 		);
 	}
 	writeFileSync(
-		join(root, ".agents", "config.json"),
+		join(root, ".afol", "config.json"),
 		JSON.stringify(
 			{ schema_version: 1, project: { name: "benchmark-fixture" } },
 			null,

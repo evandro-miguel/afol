@@ -37,6 +37,7 @@ function createValidationFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "validate-command-"));
 	const agentsDir = join(root, ".agents");
 
+	mkdirSync(join(root, ".afol"), { recursive: true });
 	mkdirSync(join(agentsDir, "skills"), { recursive: true });
 	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
 	mkdirSync(join(root, ".afol", "adm", "hooks"), { recursive: true });
@@ -45,7 +46,7 @@ function createValidationFixture(): string {
 	mkdirSync(join(root, "docs", "arc"), { recursive: true });
 
 	writeFileSync(
-		join(agentsDir, "config.json"),
+		join(root, ".afol", "config.json"),
 		JSON.stringify({
 			schema_version: 1,
 			project: { name: "validate-fixture" },
@@ -228,7 +229,7 @@ describe("validate command", () => {
 		const root = createValidationFixture();
 		try {
 			writeFileSync(
-				join(root, ".agents", "config.json"),
+				join(root, ".afol", "config.json"),
 				JSON.stringify({
 					schema_version: 1,
 					project: { name: "validate-fixture" },

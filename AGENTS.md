@@ -27,10 +27,13 @@ documented, restored, or extended:
 Retained `.agents` content is limited to provider-facing metadata and
 project-local skills:
 
-- `.agents/config.json`
 - `.agents/lock.json`
 - `.agents/manifest.json`
 - `.agents/skills/**`
+
+AFOL project configuration lives at `.afol/config.json`. Existing
+`.agents/config.json` files are legacy fallback inputs only and must not be
+described as the canonical config location.
 
 AFOL-owned static governance payloads live under `.afol/adm/**`, including:
 
@@ -235,8 +238,9 @@ Use the narrowest tool that answers the question.
 
 - `.codex/` and `.claude/` -> keep thin when present.
 - `AGENTS.md` -> canonical runtime contract.
-- Claude adapter -> optional and controlled by `.agents/config.json`; when
-  disabled, do not create or sync `CLAUDE.md` or `.claude/**`.
+- Claude adapter -> optional and controlled by `.afol/config.json` with legacy
+  `.agents/config.json` fallback; when disabled, do not create or sync
+  `CLAUDE.md` or `.claude/**`.
 - Repository artifacts -> English by default.
 - Portuguese -> only when explicitly requested by user.
 - Skills -> prefer repo-local `.agents/skills/`.

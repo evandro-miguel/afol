@@ -47,7 +47,7 @@ command surface.
 
 ## Configuration
 
-Project runtime behavior is described by `AGENTS.md`, `.agents/config.json`,
+Project runtime behavior is described by `AGENTS.md`, `.afol/config.json`,
 `.afol/**`, and the exportable scaffold under `src/project-template/`. Runtime
 caches, active-session pointers, telemetry event streams, and factory evidence
 are not template payload.

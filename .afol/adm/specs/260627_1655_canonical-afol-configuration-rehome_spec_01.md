@@ -2,7 +2,8 @@
 doc_type: spec
 id: 260627_1655_canonical-afol-configuration-rehome_spec_01
 theme: canonical-afol-configuration-rehome
-status: planned
+status: final
+closure_note: Canonical `.afol/config.json` config resolution is implemented with legacy `.agents/config.json` fallback, downstream template export, focused tests, full test suite, and project validation.
 owners:
 - orchestrator
 workstream_intent: feature

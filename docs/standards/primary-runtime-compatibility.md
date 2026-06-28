@@ -66,7 +66,8 @@ Committed runtime config must stay safe to review publicly inside the repository
 - Keep user-local or global runtime configuration outside the repository unless
   a future project explicitly justifies a portable, secret-free adapter.
 
-- Runtime adapters are optional and controlled by `.agents/config.json`.
+- Runtime adapters are optional and controlled by `.afol/config.json`; legacy
+  `.agents/config.json` is fallback only.
 - If the Claude adapter is disabled, do not create or sync `CLAUDE.md` or
   `.claude/**`.
 - If the Claude adapter is enabled, keep its mirror thin and synchronized with

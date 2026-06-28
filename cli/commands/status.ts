@@ -10,7 +10,10 @@ import {
 	collectSessionIds,
 	detectSessionHealth,
 } from "../services/local-state/workbench-index";
-import { resolveProjectPaths } from "../services/project/paths";
+import {
+	type ProjectConfigSource,
+	resolveProjectPaths,
+} from "../services/project/paths";
 import { loadProjectRoot } from "../services/project/root";
 import { collectGlobalStatusFindings } from "../services/status/global-findings";
 import {
@@ -27,6 +30,7 @@ type StatusSnapshot = {
 	blockers: string[];
 	next: string[];
 	configPath: string;
+	configSource: ProjectConfigSource;
 	lockPath: string;
 	activeSessionPath: string;
 	taskFilePath?: string;
@@ -52,6 +56,7 @@ type StatusJsonData = {
 	next: string[];
 	paths: {
 		config: string;
+		config_source: ProjectConfigSource;
 		lock: string;
 		active_session: string;
 		task_file: string | null;
@@ -351,6 +356,7 @@ function readStatusSnapshot(
 				globalFindings.map((entry) => entry.next),
 			),
 			configPath: loaded.value.configPath,
+			configSource: loaded.value.configSource,
 			lockPath,
 			activeSessionPath,
 			...healthInfo,
@@ -377,6 +383,7 @@ function readStatusSnapshot(
 				globalFindings.map((entry) => entry.next),
 			),
 			configPath: loaded.value.configPath,
+			configSource: loaded.value.configSource,
 			lockPath,
 			activeSessionPath,
 			...healthInfo,
@@ -408,6 +415,7 @@ function readStatusSnapshot(
 			globalFindings.map((entry) => entry.next),
 		),
 		configPath: loaded.value.configPath,
+		configSource: loaded.value.configSource,
 		lockPath,
 		activeSessionPath,
 		taskFilePath,
@@ -479,6 +487,7 @@ export function runStatusCommand(
 			next: snapshot.next,
 			paths: {
 				config: snapshot.configPath,
+				config_source: snapshot.configSource,
 				lock: snapshot.lockPath,
 				active_session: snapshot.activeSessionPath,
 				task_file: snapshot.taskFilePath ?? null,

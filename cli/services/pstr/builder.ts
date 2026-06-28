@@ -49,6 +49,7 @@ export const PSTR_AREAS: readonly PstrAreaRegistryEntry[] = [
 		id: "config",
 		scope: "config",
 		source_roots: [
+			".afol/config.json",
 			".agents/config.json",
 			".agents/lock.json",
 			".agents/manifest.json",

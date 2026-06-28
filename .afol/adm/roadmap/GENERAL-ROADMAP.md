@@ -612,7 +612,7 @@ Follow-on slices under this direction:
 
 ### F-19 Canonical AFOL Configuration Rehome
 
-- Status: planned
+- Status: final
 - Governing spec:
   .afol/adm/specs/260627_1655_canonical-afol-configuration-rehome_spec_01.md
 - Why: AFOL operational configuration should be owned by AFOL, not by the
@@ -643,6 +643,10 @@ Follow-on slices under this direction:
   - `bun run template:check`
   - `bun run typecheck`
   - `afol validate project`
+- Closure evidence: implemented in session
+  `260627_1824_open-spec-completion`; validated with `bun test`,
+  `bun run typecheck`, `afol validate project --json`, `afol v bench --pack
+  update-safety --json`, template generation, and security release scan.
 - Risks:
   - Moving root detection without fallback can make existing projects invisible
     to `afol`.

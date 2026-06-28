@@ -66,7 +66,7 @@ Replace this section after bootstrap with real product context.
 
 ## Repository Map
 
-- `.agents/config.json`, `.agents/lock.json`, and `.agents/manifest.json`
+- `.afol/config.json`, `.agents/lock.json`, and `.agents/manifest.json`
   path contract for mutable state, plan storage, skills, tmp, and data locations
 - `.afol/wb/` or configured `paths.wb_dir` governed plan state
 - `.afol/data/` or configured data path for telemetry data and indexes when the downstream CLI exposes them

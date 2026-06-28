@@ -9,7 +9,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 - This repository was created from the minimal scaffold template.
 - The template owns local protocol files only: `AGENTS.md`,
-  `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
+  `.afol/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
   `.afol/adm/hooks/`, `.afol/adm/rules/`, `.agents/skills/` baseline,
   `.afol/wb/` baseline, and minimal docs.
 - The template must not include a project-local `afol` executable, shell
@@ -19,7 +19,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Some sandbox providers make `.agents/` read-only. When this project was
   initialized with `afol init --provider-compatible` or
   `afol init --mutable-dir .afol`, mutable agent state lives under `.afol/`.
-  Always read `.agents/config.json` `paths.*` before hardcoding state paths.
+  Always read `.afol/config.json` `paths.*` before hardcoding state paths.
 - The configured plan directory in a downstream project is that project's
   durable governed plan state. It defaults to `.afol/wb/`. Active-session
   pointers and local runtime state live under the configured mutable directory,
@@ -94,7 +94,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 ## Repository Map
 
-- `.agents/config.json`: path contract. Check `paths.mutable_dir`, `paths.wb_dir`,
+- `.afol/config.json`: path contract. Check `paths.mutable_dir`, `paths.wb_dir`,
   `paths.skills_dir`, `paths.tmp_dir`, and `paths.data_dir` before writing
   agent-owned state.
 - `.afol/adm/hooks/`: static provider-neutral hook catalog. Hooks may contribute

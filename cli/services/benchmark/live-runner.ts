@@ -44,6 +44,7 @@ function copyMinimalWorkspace(root: string, sandboxRoot: string): void {
 		safeCopy(join(root, relativePath), join(sandboxRoot, relativePath));
 	}
 	for (const relativePath of [
+		".afol/config.json",
 		".agents/config.json",
 		".agents/lock.json",
 		".agents/manifest.json",

@@ -188,7 +188,7 @@ closure evidence with `afol evidence`, then move to `done` through `afol done`.
 - Root `AGENTS.md` keeps variable sections as placeholders unless user explicitly requests concrete values
 - `afol verify-tasks --strict` reports open tasks from canonical State Board rows
 - `afol new` and lifecycle commands own session/task creation and closure
-- `.agents/config.json` plus AFOL-owned config define shared operational configuration
+- `.afol/config.json` defines shared operational configuration; `.agents/config.json` is legacy fallback only
 - Root `AGENTS.md` preserves placeholder sections and generic management-tool workflow guidance
 - Root `AGENTS.md` keeps tools guidance concise and delegates lifecycle work to AFOL commands
 - Root `AGENTS.md` includes explicit `Language Policy` enforcing English as default

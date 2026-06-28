@@ -94,7 +94,7 @@
   },
   "ownership": {
     "project-owned": [
-      ".agents/config.json",
+      ".afol/config.json",
       ".agents/lock.json",
       ".agents/manifest.json",
       ".agents/skills",

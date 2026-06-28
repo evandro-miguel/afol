@@ -60,7 +60,7 @@ Before applying, inventory the receiving project:
 
 - project-owned guidance and docs such as `AGENTS.md`, `RTK.md`, root
   `docs/**`, runbooks, and local operational files agents already use;
-- current provider-facing metadata and skills under `.agents/config.json`,
+- current AFOL config, provider metadata, and skills under `.afol/config.json`,
   `.agents/lock.json`, `.agents/manifest.json`, and the configured
   `paths.skills_dir`;
 - current AFOL governance payloads under `.afol/adm/rules/**`,
@@ -175,6 +175,6 @@ When delegating AFOL work, include:
 - whether the agent may edit or is read-only;
 - session id and task id when governed workbench state is active.
 
-Tell helpers to read `.agents/config.json` for the path contract, write runtime
+Tell helpers to read `.afol/config.json` for the path contract, write runtime
 state only under configured AFOL runtime paths, and edit project-local skills
 only through `paths.skills_dir`.

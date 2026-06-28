@@ -1,0 +1,10 @@
+{"id":"E-20260627182816634-396b78","task_id":"T-01","created_at":"2026-06-27T22:28:16.634Z","command":"afol pstr rebuild --json","result":"passed"}
+{"id":"E-20260627182816709-158270","task_id":"T-01","created_at":"2026-06-27T22:28:16.709Z","command":"afol health --json","result":"passed"}
+{"id":"E-20260627185632185-1eac47","task_id":"T-01","created_at":"2026-06-27T22:56:32.185Z","command":"bun run template:generate","result":"passed"}
+{"id":"E-20260627185632320-bf74e6","task_id":"T-01","created_at":"2026-06-27T22:56:32.320Z","command":"bun test cli/tests/project-root.test.ts cli/tests/adapter-command.test.ts cli/tests/status.test.ts cli/tests/kernel.test.ts cli/tests/validate-command.test.ts cli/tests/file-command-unit.test.ts cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/template-policy.test.ts","result":"passed"}
+{"id":"E-20260627185757864-ea9a18","task_id":"T-02","created_at":"2026-06-27T22:57:57.864Z","command":"afol local-state rebuild --json && afol pstr rebuild --json && afol validate project --json","result":"passed"}
+{"id":"E-20260627185817895-ceba69","task_id":"T-03","created_at":"2026-06-27T22:58:17.895Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260627185818002-4caf08","task_id":"T-03","created_at":"2026-06-27T22:58:18.002Z","command":"bun test","result":"passed"}
+{"id":"E-20260627185818111-1f55f5","task_id":"T-03","created_at":"2026-06-27T22:58:18.111Z","command":"bun cli/main.ts v bench --pack update-safety --json","result":"passed"}
+{"id":"E-20260627185818219-d39a57","task_id":"T-03","created_at":"2026-06-27T22:58:18.219Z","command":"bun run validate:security:release","result":"passed"}
+{"id":"E-20260627185818333-9d781a","task_id":"T-03","created_at":"2026-06-27T22:58:18.333Z","command":"git diff --check","result":"passed"}

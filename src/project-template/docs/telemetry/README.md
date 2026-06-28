@@ -54,7 +54,7 @@ jq 'select(.event_type == "tool_exec")' "$AFOL_TELEMETRY_EVENTS"
 
 ## Data Storage
 
-Events are stored under the configured data path from `.agents/config.json`.
+Events are stored under the configured data path from `.afol/config.json`.
 Default projects use:
 
 ```text

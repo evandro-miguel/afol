@@ -4,11 +4,18 @@ import { toPosixPath } from "../../core/file-paths";
 import type { Result } from "../../core/result";
 import { err, ok } from "../../core/result";
 import { loadJsonObject, type SchemaObject } from "../../core/schema";
-import { resolveProjectPaths } from "./paths";
+import {
+	PROJECT_CONFIG_PATHS,
+	type ProjectConfigSource,
+	resolveProjectConfigPath,
+	resolveProjectPaths,
+} from "./paths";
 
 export type LoadedProjectRoot = {
 	root: string;
 	configPath: string;
+	configRelativePath: string;
+	configSource: ProjectConfigSource;
 	config: SchemaObject;
 	lock: SchemaObject;
 	manifest?: SchemaObject;
@@ -32,9 +39,11 @@ function findProjectRoot(
 ): { root: string; configPath: string } | null {
 	let current = resolve(startPath);
 	while (true) {
-		const configPath = join(current, ".agents", "config.json");
-		if (existsSync(configPath)) {
-			return { root: current, configPath };
+		for (const candidate of PROJECT_CONFIG_PATHS) {
+			const configPath = join(current, candidate.relativePath);
+			if (existsSync(configPath)) {
+				return { root: current, configPath };
+			}
 		}
 		const parent = dirname(current);
 		if (parent === current) {
@@ -52,7 +61,7 @@ export function loadProjectRoot(
 		return err({
 			code: 3,
 			message:
-				"❌ Could not detect project root: .agents/config.json not found.",
+				"❌ Could not detect project root: .afol/config.json or .agents/config.json not found.",
 		});
 	}
 	let projectRoot: string;
@@ -65,9 +74,23 @@ export function loadProjectRoot(
 		});
 	}
 
+	let configResolution: ReturnType<typeof resolveProjectConfigPath>;
+	try {
+		configResolution = resolveProjectConfigPath(projectRoot);
+	} catch (error) {
+		return err({ code: 2, message: (error as Error).message });
+	}
+	if (!configResolution) {
+		return err({
+			code: 3,
+			message:
+				"❌ Could not detect project root: .afol/config.json or .agents/config.json not found.",
+		});
+	}
+
 	const configPathResult = resolveProjectPath(
 		projectRoot,
-		".agents/config.json",
+		configResolution.relativePath,
 	);
 	if (!configPathResult.ok) {
 		return err({ code: 2, message: configPathResult.error });
@@ -115,6 +138,8 @@ export function loadProjectRoot(
 	const loaded = {
 		root: projectRoot,
 		configPath,
+		configRelativePath: configResolution.relativePath,
+		configSource: configResolution.source,
 		config: configResult.value,
 		lock: lockResult.value,
 	};

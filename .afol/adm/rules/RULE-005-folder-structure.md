@@ -20,7 +20,7 @@ applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 | `.afol/pstr/`           | Current project-structure maps only                           |
 | `.afol/wb/`             | Governed sessions, evidence, indexes, benchmark state         |
 | `.afol/`                | Mutable AFOL runtime state                                    |
-| `.agents/config.json`   | Provider-facing static config                                 |
+| `.afol/config.json`     | AFOL project configuration                                    |
 | `.agents/lock.json`     | Provider-facing lock metadata                                 |
 | `.agents/manifest.json` | Provider-facing manifest metadata                             |
 | `.agents/skills/`       | Project-local provider skills                                 |

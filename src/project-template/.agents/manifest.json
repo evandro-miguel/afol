@@ -94,6 +94,7 @@
   },
   "ownership": {
     "project-owned": [
+      ".afol/config.json",
       ".agents/skills"
     ],
     "generated": [
@@ -102,9 +103,7 @@
       ".afol/tmp"
     ],
     "ignored": [],
-    "conflict": [
-      ".agents/config.json"
-    ]
+    "conflict": []
   },
   "allowed_payload": {
     "optional_seed": [
@@ -118,7 +117,7 @@
     ]
   },
   "managed_hashes": {
-    ".agents/config.json": "e55c9a6a3cfc5feb9cdd9400a6f240384cd7eb853785177b30db2114a234dcf4",
+    ".afol/config.json": "a079d0ab78c61a70a01da141bdc54b37c7f02359f0e3bf2c0b2ad8e714f2b280",
     ".afol/data/events/README.md": "454454b0465dfb7475ec3a6059ae924385b6591b3e6f8f083372335c2975a7ba",
     ".afol/data/index/README.md": "aa4025b7a7106e269bf56f244360ebaf073d922f6e99a064aa09e18bcb80030d",
     ".afol/data/telemetry/schemas/event.json": "72f24c2ef94c4007587abc4c54b98baa64926690ca2187c7763a74b74e24d0bf",

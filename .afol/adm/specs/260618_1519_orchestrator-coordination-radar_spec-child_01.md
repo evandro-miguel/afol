@@ -2,7 +2,8 @@
 doc_type: spec-child
 id: 260618_1519_orchestrator-coordination-radar_spec-child_01
 theme: orchestrator-coordination-radar
-status: active
+status: final
+closure_note: "Delivered: afol session radar emits compact text/json coordination warnings across open sessions, task templates carry planned/touched file metadata, COORDINATION-RADAR context is registered, and session help lists radar. Warnings remain advisory."
 owners:
 - orchestrator
 created_at: '2026-06-18T15:19:49-03:00'

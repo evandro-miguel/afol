@@ -41,10 +41,12 @@ function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 function mkProjectRoot(name: string, fakeAgentsBody: string): string {
 	void fakeAgentsBody;
 	const root = mkdtempSync(join(tmpdir(), `kernel-${name}-`));
+	const afolDir = join(root, ".afol");
 	const agentsDir = join(root, ".agents");
+	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
 
-	writeFileSync(join(agentsDir, "config.json"), templateConfig, "utf8");
+	writeFileSync(join(afolDir, "config.json"), templateConfig, "utf8");
 	writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
 
 	return root;
@@ -1410,9 +1412,10 @@ describe("kernel front-door", () => {
 			const proc = runKernel(nested, ["s", "--json"]);
 			expect(proc.status).toBe(0);
 			const payload = JSON.parse(proc.stdout as string) as {
-				paths: { config: string };
+				paths: { config: string; config_source: string };
 			};
-			expect(payload.paths.config).toBe(join(root, ".agents", "config.json"));
+			expect(payload.paths.config).toBe(join(root, ".afol", "config.json"));
+			expect(payload.paths.config_source).toBe("canonical");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1420,9 +1423,11 @@ describe("kernel front-door", () => {
 
 	test("returns non-zero when config or lock are missing/invalid", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-missing-"));
+		const afolDir = join(root, ".afol");
 		const agentsDir = join(root, ".agents");
+		mkdirSync(afolDir, { recursive: true });
 		mkdirSync(agentsDir, { recursive: true });
-		writeFileSync(join(agentsDir, "config.json"), "{invalid-json", "utf8");
+		writeFileSync(join(afolDir, "config.json"), "{invalid-json", "utf8");
 		writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
 
 		try {
@@ -1434,13 +1439,11 @@ describe("kernel front-door", () => {
 		}
 
 		const rootMissing = mkdtempSync(join(tmpdir(), "kernel-missing-lock-"));
+		const missingAfolDir = join(rootMissing, ".afol");
 		const missingAgentsDir = join(rootMissing, ".agents");
+		mkdirSync(missingAfolDir, { recursive: true });
 		mkdirSync(missingAgentsDir, { recursive: true });
-		writeFileSync(
-			join(missingAgentsDir, "config.json"),
-			templateConfig,
-			"utf8",
-		);
+		writeFileSync(join(missingAfolDir, "config.json"), templateConfig, "utf8");
 
 		try {
 			const proc = runKernel(rootMissing, ["status"]);

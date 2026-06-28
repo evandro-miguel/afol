@@ -17,7 +17,7 @@ import {
 	validateWorkBenchIndex,
 } from "../local-state/workbench-index";
 import { verifyAllSessions } from "../workbench/verify";
-import { resolveProjectPaths } from "./paths";
+import { resolveProjectConfigPath, resolveProjectPaths } from "./paths";
 
 export type ProjectValidationCheck = {
 	id:
@@ -56,26 +56,34 @@ export type ProjectValidationReport = {
 };
 
 function validateConfig(projectRoot: string): ProjectValidationCheck {
-	const configPath = join(projectRoot, ".agents", "config.json");
-	if (existsSync(configPath)) {
-		const loaded = loadJsonObject(configPath);
-		if (!loaded.ok) {
-			return { id: "config", ok: false, message: loaded.error };
-		}
-		const skillPathError = validateSkillPathConfig(loaded.value);
-		if (skillPathError) {
+	try {
+		const resolved = resolveProjectConfigPath(projectRoot);
+		if (resolved) {
+			const loaded = loadJsonObject(resolved.absolutePath);
+			if (!loaded.ok) {
+				return { id: "config", ok: false, message: loaded.error };
+			}
+			const skillPathError = validateSkillPathConfig(loaded.value);
+			if (skillPathError) {
+				return {
+					id: "config",
+					ok: false,
+					message: `${resolved.absolutePath}: ${skillPathError}`,
+				};
+			}
 			return {
 				id: "config",
-				ok: false,
-				message: `${configPath}: ${skillPathError}`,
+				ok: true,
+				message: `ok ${resolved.absolutePath} source=${resolved.source}`,
 			};
 		}
-		return { id: "config", ok: true, message: `ok ${configPath}` };
+	} catch (error) {
+		return { id: "config", ok: false, message: (error as Error).message };
 	}
 	return {
 		id: "config",
 		ok: false,
-		message: `missing .agents/config.json under ${projectRoot}`,
+		message: `missing .afol/config.json or .agents/config.json under ${projectRoot}`,
 	};
 }
 

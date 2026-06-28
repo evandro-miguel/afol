@@ -28,7 +28,7 @@ When the scaffold already has a canonical archive surface, new noise-reduction o
 # Prevention
 
 - Before proposing a new folder for retention or archiving, search existing
-  archive contracts in `AGENTS.md`, `.agents/config.json`, `.afol/adm/**`, and
+  archive contracts in `AGENTS.md`, `.afol/config.json`, `.afol/adm/**`, and
   `docs/`.
 - Prefer extending the existing archive policy over adding a sibling namespace.
 - If a new archive rule is needed, define how it coexists with the current contract before it lands in a plan.

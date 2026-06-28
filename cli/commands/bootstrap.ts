@@ -18,7 +18,10 @@ import type {
 	ManagedOwnership,
 } from "../services/bootstrap/planner";
 import { planBootstrapOperations } from "../services/bootstrap/planner";
-import { normalizeProjectRelativePath } from "../services/project/paths";
+import {
+	CANONICAL_PROJECT_CONFIG_PATH,
+	normalizeProjectRelativePath,
+} from "../services/project/paths";
 import { resolveProjectWritePath } from "../services/project/root";
 import { validateMutationRuntime } from "../services/state/validate";
 import {
@@ -294,15 +297,15 @@ function buildBootstrapTemplateFiles(
 		}
 	}
 
-	const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
+	const configEntry = DEFAULT_TEMPLATE_FILES[CANONICAL_PROJECT_CONFIG_PATH];
 	if (configEntry && (providerMigration || withoutClaude)) {
 		const basePayload = Buffer.from(configEntry.contentBase64, "base64");
 		const afterMutable = providerMigration
 			? mutableConfigPayload(basePayload, mutableDir)
 			: basePayload;
 		const payload = applyAdapterConfigFlag(afterMutable, withoutClaude);
-		templateFiles[".agents/config.json"] = {
-			path: ".agents/config.json",
+		templateFiles[CANONICAL_PROJECT_CONFIG_PATH] = {
+			path: CANONICAL_PROJECT_CONFIG_PATH,
 			contentBase64: payload.toString("base64"),
 			sha256: sha256Hex(payload),
 			bytes: payload.byteLength,

@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runPreflightCommand } from "../commands/preflight";
@@ -161,6 +168,12 @@ describe("preflight search service", () => {
 		try {
 			const report = runPreflight(root, "session isolation");
 			expect(report.recurrence_detected).toBe(true);
+			expect(report.recommendations.join("\n")).toContain(
+				"run heavier verification",
+			);
+			expect(report.recommendations.join("\n")).toContain(
+				"propose a rule or lesson",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -171,6 +184,9 @@ describe("preflight search service", () => {
 		try {
 			const report = runPreflight(root, "unrelated query");
 			expect(report.recurrence_detected).toBe(false);
+			expect(report.recommendations).toEqual([
+				"no recurrence detected: treat as a one-off fix unless new evidence emerges",
+			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -190,15 +206,21 @@ describe("afol preflight command", () => {
 			const output = out.stdout.join("\n");
 			expect(output).toContain("summary:");
 			expect(output).toContain("recurrence_detected: true");
+			expect(output).toContain("recommendations");
+			expect(output).toContain("run heavier verification");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("--json emits an afol.result envelope with action preflight", async () => {
+	test("--json emits an afol.result envelope and does not mutate governance", async () => {
 		const root = createRoot();
 		const out = capture();
 		try {
+			const lessonCount = readdirSync(
+				join(root, "docs", "lessons", "entries"),
+			).length;
+			const ruleCount = readdirSync(join(root, ".afol", "adm", "rules")).length;
 			const code = await runPreflightCommand(
 				["session", "isolation", "--json"],
 				root,
@@ -218,6 +240,37 @@ describe("afol preflight command", () => {
 			expect((payload.data as { query?: string } | undefined)?.query).toBe(
 				"session isolation",
 			);
+			expect(
+				(
+					payload.data as
+						| { recurrence_detected?: boolean; recommendations?: string[] }
+						| undefined
+				)?.recurrence_detected,
+			).toBe(true);
+			expect(
+				(
+					payload.data as
+						| { recurrence_detected?: boolean; recommendations?: string[] }
+						| undefined
+				)?.recommendations?.join("\n"),
+			).toContain("propose a rule or lesson");
+			expect(readdirSync(join(root, "docs", "lessons", "entries")).length).toBe(
+				lessonCount,
+			);
+			expect(readdirSync(join(root, ".afol", "adm", "rules")).length).toBe(
+				ruleCount,
+			);
+			expect(
+				existsSync(
+					join(
+						root,
+						"docs",
+						"lessons",
+						"entries",
+						"20260614_1200_session-isolation-lesson.md",
+					),
+				),
+			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

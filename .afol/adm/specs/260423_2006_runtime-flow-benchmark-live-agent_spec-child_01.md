@@ -2,7 +2,8 @@
 doc_type: spec-child
 id: 260423_2006_runtime-flow-benchmark-live-agent_spec-child_01
 theme: runtime-flow-benchmark-live-agent
-status: active
+status: final
+closure_note: "Delivered: afol bench run executes live benchmark cases through the live runner; afol bench runtime-live remains a compact dry-run inspector and now reports afol bench run --all --save as the live execution entrypoint."
 owners:
 - orchestrator
 workstream_intent: feature
@@ -104,11 +105,11 @@ risk_level: medium
 
 ## Acceptance
 
-- [ ] The benchmark runner supports a live-agent backend through `codex exec`
-- [ ] The default profile remains `gpt-5.4-mini` with `medium`
-- [ ] The first live scenario pack requires and verifies tool usage
-- [ ] Result JSON includes tool-call metrics in addition to pass/fail and timing
-- [ ] Docs, tests, and template parity reflect the live-agent contract
+- [x] The benchmark runner supports a live-agent backend through `codex exec`
+- [x] The default profile remains `gpt-5.4-mini` with `medium`
+- [x] The first live scenario pack requires and verifies tool usage
+- [x] Result JSON includes tool-call metrics in addition to pass/fail and timing
+- [x] Docs, tests, and template parity reflect the live-agent contract
 
 ---
 
