@@ -7,19 +7,15 @@ import {
 	stringifyEnvelope,
 } from "../core/envelope";
 import {
-	validateFilesIndex,
-	validateRulesIndex,
-	validateSkillsIndex,
-	validateSpecsIndex,
-} from "../services/local-state/project-indexes";
-import {
 	collectSessionIds,
 	detectSessionHealth,
-	validateWorkBenchIndex,
 } from "../services/local-state/workbench-index";
-import { resolveProjectPaths } from "../services/project/paths";
+import {
+	type ProjectConfigSource,
+	resolveProjectPaths,
+} from "../services/project/paths";
 import { loadProjectRoot } from "../services/project/root";
-import { validatePstrIndex } from "../services/pstr/builder";
+import { collectGlobalStatusFindings } from "../services/status/global-findings";
 import {
 	type CatchupReport,
 	computeCatchup,
@@ -34,6 +30,7 @@ type StatusSnapshot = {
 	blockers: string[];
 	next: string[];
 	configPath: string;
+	configSource: ProjectConfigSource;
 	lockPath: string;
 	activeSessionPath: string;
 	taskFilePath?: string;
@@ -59,6 +56,7 @@ type StatusJsonData = {
 	next: string[];
 	paths: {
 		config: string;
+		config_source: ProjectConfigSource;
 		lock: string;
 		active_session: string;
 		task_file: string | null;
@@ -298,77 +296,6 @@ function computeSessionHealth(projectRoot: string): {
 	}
 }
 
-type GlobalStatusFinding = {
-	validation: string;
-	blocker: string;
-	next: string;
-};
-
-function normalizeGlobalMessage(message: string): {
-	validation: string;
-	next: string | null;
-} {
-	const [validation, next] = message.split(/;\s+/, 2);
-	return {
-		validation: (validation?.trim() || message)
-			.replace(/: (?:\.?\/|\/).*$/, "")
-			.trim(),
-		next: next?.trim() || null,
-	};
-}
-
-function collectGlobalStatusFindings(
-	projectRoot: string,
-): GlobalStatusFinding[] {
-	const findings: GlobalStatusFinding[] = [];
-	const addFinding = (
-		scope: string,
-		result: { ok: boolean; message: string },
-		fallbackNext: string | null = null,
-	): void => {
-		if (result.ok) {
-			return;
-		}
-		const normalized = normalizeGlobalMessage(result.message);
-		findings.push({
-			validation: `${scope}: ${normalized.validation}`,
-			blocker: `${scope}: ${normalized.validation}`,
-			next: normalized.next ?? fallbackNext ?? "review failing project checks",
-		});
-	};
-
-	const localStateResults = [
-		validateRulesIndex(projectRoot),
-		validateSkillsIndex(projectRoot),
-		validateSpecsIndex(projectRoot),
-		validateFilesIndex(projectRoot),
-		validateWorkBenchIndex(projectRoot),
-	];
-	const localStateFailureCount = localStateResults.filter(
-		(result) => !result.ok,
-	).length;
-	const pstrResult = validatePstrIndex(projectRoot);
-	if (localStateFailureCount > 0 && !pstrResult.ok) {
-		findings.push({
-			validation: "project indexes need rebuild",
-			blocker: "project indexes need rebuild",
-			next: "run afol local-state rebuild; afol pstr rebuild",
-		});
-		return findings;
-	}
-	if (localStateFailureCount > 0) {
-		const subject =
-			localStateFailureCount === 1 ? "index snapshot" : "index snapshots";
-		addFinding("local-state", {
-			ok: false,
-			message: `${localStateFailureCount} ${subject} need rebuild; run afol local-state rebuild`,
-		});
-	}
-	addFinding("pstr", pstrResult, "run afol pstr rebuild");
-
-	return findings;
-}
-
 function mergeStatusEntries(current: string[], additions: string[]): string[] {
 	return normalizeList([...current, ...additions]);
 }
@@ -429,6 +356,7 @@ function readStatusSnapshot(
 				globalFindings.map((entry) => entry.next),
 			),
 			configPath: loaded.value.configPath,
+			configSource: loaded.value.configSource,
 			lockPath,
 			activeSessionPath,
 			...healthInfo,
@@ -455,6 +383,7 @@ function readStatusSnapshot(
 				globalFindings.map((entry) => entry.next),
 			),
 			configPath: loaded.value.configPath,
+			configSource: loaded.value.configSource,
 			lockPath,
 			activeSessionPath,
 			...healthInfo,
@@ -486,6 +415,7 @@ function readStatusSnapshot(
 			globalFindings.map((entry) => entry.next),
 		),
 		configPath: loaded.value.configPath,
+		configSource: loaded.value.configSource,
 		lockPath,
 		activeSessionPath,
 		taskFilePath,
@@ -557,6 +487,7 @@ export function runStatusCommand(
 			next: snapshot.next,
 			paths: {
 				config: snapshot.configPath,
+				config_source: snapshot.configSource,
 				lock: snapshot.lockPath,
 				active_session: snapshot.activeSessionPath,
 				task_file: snapshot.taskFilePath ?? null,

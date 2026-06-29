@@ -14,13 +14,15 @@ import { runSpecCommand } from "../commands/spec";
 import {
 	abandonAdr,
 	acceptAdr,
-	addChangelogEntry,
-	checkSpecCompatibility,
 	createAdr,
-	getSpecCheck,
 	supersedeAdr,
+} from "../services/spec-gate/adr";
+import { addChangelogEntry } from "../services/spec-gate/changelog";
+import {
+	checkSpecCompatibility,
+	getSpecCheck,
 	waiveSpecCheck,
-} from "../services/spec-gate";
+} from "../services/spec-gate/checker";
 
 type CapturedIo = {
 	stdout: string[];
@@ -407,6 +409,73 @@ describe("spec-gate system", () => {
 				),
 			).toBe(0);
 			expect(captured.stdout.join("\n")).toContain("spec check: compatible");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol spec list --json lists adm specs", async () => {
+		const root = createFixture();
+		try {
+			writeSpec(root, "spec-001", "active");
+			writeSpec(root, "spec-002", "draft");
+			const captured = captureIo();
+			expect(await runSpecCommand("list", ["--json"], root, captured.io)).toBe(
+				0,
+			);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				exit_code: number;
+				action: string;
+				count: number;
+				data: {
+					action: string;
+					count: number;
+					specs: { id: string; status?: string }[];
+				};
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.action).toBe("list");
+			expect(payload.count).toBe(2);
+			expect(payload.data.specs.map((spec) => spec.id)).toEqual([
+				"spec-001",
+				"spec-002",
+			]);
+			expect(payload.data).toMatchObject({
+				action: "list",
+				count: 2,
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol spec list prints compact human output", async () => {
+		const root = createFixture();
+		try {
+			writeSpec(root, "spec-001", "active");
+			const captured = captureIo();
+			expect(await runSpecCommand("list", [], root, captured.io)).toBe(0);
+			expect(captured.stdout.join("\n")).toContain("specs: 1");
+			expect(captured.stdout.join("\n")).toContain(
+				"- spec-001 status=active path=.afol/adm/specs/spec-001.md",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol spec help prints usage without requiring task args", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(await runSpecCommand("", ["--help"], root, captured.io)).toBe(0);
+			expect(captured.stdout.join("\n")).toContain("Usage: afol spec");
+			expect(captured.stdout.join("\n")).toContain("list");
+			expect(captured.stderr.join("\n")).toBe("");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

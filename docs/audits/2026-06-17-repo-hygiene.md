@@ -10,7 +10,7 @@ updated_at: '2026-06-17T00:00:00Z'
 
 ## Scope
 
-This audit covers the AFOL factory repository in `main_dev` after the
+This audit covers the AFOL factory repository in `dev` after the
 documentation-front-door refresh. It is intentionally conservative: measure
 first, keep traceability, and avoid deleting material without multiple signals.
 
@@ -23,8 +23,9 @@ first, keep traceability, and avoid deleting material without multiple signals.
   schema, migrations, and other desired-state administration.
 - `.afol/pstr/**`: generated current project-structure maps only.
 - `.afol/wb/**`: governed execution sessions.
-- `.agents/**`: static scaffold metadata, rules, source seed, and provider
-  skills. It is not the mutable runtime surface.
+- `.agents/**`: static provider metadata and provider skills only:
+  `.agents/lock.json`, `.agents/manifest.json`, and `.agents/skills/**`.
+  Project configuration has since moved to `.afol/config.json`.
 - `docs/**`: operator-facing standards, patterns, templates, lessons,
   telemetry notes, and audits.
 
@@ -48,16 +49,15 @@ covered by `.gitignore` and template policy checks.
 
 Disposition: no deletion performed.
 
-### F3: Template Documentation Is Mid-Migration
+### F3: Template Documentation Migration Is Closed
 
 The root docs now describe `.afol/adm/**` and `.afol/pstr/**` as the live
-authority surfaces. The downstream payload still contains `docs/arc/**` and
-references to `docs/map/**`. That may be an intentional downstream scaffold
-contract, but it is a drift risk until the template migration decision is made
-explicit.
+authority surfaces. The downstream template no longer carries `docs/arc/**` or
+`docs/map/**` payload paths; those names appear only as historical, retired, or
+forbidden-surface references in governance docs and tests.
 
-Disposition: documented as deferred. Do not bulk-edit the payload without a
-template/governance migration slice and release-template validation.
+Disposition: no template payload cleanup remains for this finding. Keep future
+checks focused on active scaffold payload paths, not frozen migration history.
 
 ### F4: Docs-Only Hygiene Has No Dedicated Gate
 

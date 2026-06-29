@@ -5,14 +5,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runValidateCommand } from "../commands/validate";
 import {
+	checkActiveSessionPointerMutation,
 	checkPstrDrift,
 	checkStateDrift,
 	runDriftCheck,
-} from "../services/drift";
-import { checkActiveSessionPointerMutation } from "../services/drift/checker";
-import { rebuildPstrIndex } from "../services/pstr";
+} from "../services/drift/checker";
+import { rebuildPstrIndex } from "../services/pstr/builder";
 import { hydrateSession } from "../services/state/session-state";
-import { sweepDaily } from "../services/sweep";
+import { sweepDaily } from "../services/sweep/runner";
 
 type CapturedIo = {
 	stdout: string[];

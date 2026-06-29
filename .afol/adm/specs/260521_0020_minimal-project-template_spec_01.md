@@ -16,7 +16,7 @@ links:
 scope:
   repo_areas:
   - src/project-template
-  - .agents/scripts/agents-bootstrap.py
+  - cli/schemas/template-policy.ts
   packages:
   - project-template
 risk_level: high
@@ -48,40 +48,57 @@ into downstream projects.
 ## 3) Product Boundary
 
 ```text
-universal CLI = behavior, commands, validation, mutation, update logic
-project template = local state, rules, skills, workbench, specs, evidence
+external `afol` CLI = behavior, commands, validation, mutation, update logic
+project template = config metadata, rules, skills, governance docs, state dirs
 ```
 
-The template must remain usable while legacy Python/Bash compatibility exists,
-but it should converge toward invoking the universal Bun/TypeScript CLI through
-`afol`.
+Downstream projects receive config, governance, provider metadata, skills,
+template docs, and AFOL-owned state directories only. They must not receive a
+project-local `afol` executable, wrapper, symlink, package bin, command runner,
+legacy Python runtime, or Bash compatibility surface.
 
-`afol` remains the canonical command in runtime-facing workflows; `afol` stays as
-the compatibility/local entrypoint where native parity is incomplete.
+`afol` remains the canonical command in runtime-facing workflows, but it is an
+external operator command supplied outside the target project.
 
 ## 4) Required Template Shape
 
 ```text
 src/project-template/
-├── a
 ├── AGENTS.md
+├── RTK.md
 ├── .agents/
 │   ├── config.json
 │   ├── lock.json
 │   ├── manifest.json
-│   ├── wb/
-│   │   └── README.md
-│   ├── rules/
 │   ├── skills/
+│   │   └── README.md
+├── .afol/
+│   ├── adm/
+│   │   ├── architecture.md
+│   │   ├── doctrine.md
+│   │   ├── roadmap.md
+│   │   └── tools.json
 │   ├── data/
-│   │   ├── events/
-│   │   └── index/
-│   └── tmp/
+│   │   └── README.md
+│   ├── library/
+│   │   ├── GRAPH.md
+│   │   ├── INDEX.md
+│   │   └── TAGS.md
+│   ├── memory/
+│   │   └── memory.md
+│   ├── pstr/
+│   │   └── README.md
+│   ├── tmp/
+│   │   └── README.md
+│   └── wb/
+│       └── README.md
 └── docs/
-    └── arc/
-        ├── GENERAL-ROADMAP.md
-        └── SPECS/
-            └── README.md
+    ├── lessons/
+    │   └── README.md
+    ├── telemetry/
+    │   └── README.md
+    └── templates/
+        └── *.md
 ```
 
 ## 5) State Model
@@ -90,16 +107,21 @@ Required local files:
 
 | File | Owner | Purpose |
 | --- | --- | --- |
-| `afol` | managed | local wrapper into CLI/fallback |
-| `.agents/config.json` | project | local feature flags and paths |
-| `.agents/lock.json` | managed | CLI/template version lock |
-| `.agents/manifest.json` | managed | managed file hashes and ownership |
-| `.afol/wb/` | project | sessions, tasks, logs, evidence |
-| `.afol/adm/rules/` | project | local rules and routing metadata |
-| `.agents/skills/` | project | local skills and metadata |
+| `.agents/config.json` | project-owned | local feature flags and paths |
+| `.agents/lock.json` | project-owned | template revision lock and downstream identity |
+| `.agents/manifest.json` | project-owned | ownership contract and allowed payload paths |
+| `.afol/wb/` | project-owned | sessions, tasks, logs, evidence |
+| `.afol/adm/` | project-owned | desired-state governance and static hook/rule metadata |
+| `.agents/skills/` | project-owned | local skills and metadata |
 | `.afol/data/` | generated | indexes, events, benchmark results |
-| `AGENTS.md` | project | runtime instruction front door |
-| `docs/arc/` | project | minimal goal-state governance |
+| `.afol/pstr/` | generated | current-state structure maps only |
+| `.afol/tmp/` | ignored | AFOL temporary runtime state |
+| `.afol/library/` | project-owned | project-local knowledge graph files |
+| `.afol/memory/` | project-owned | project-local memory seed files |
+| `docs/templates/` | project-owned | reusable workflow artifact templates |
+| `docs/lessons/` | project-owned | lessons index and downstream lesson entries |
+| `AGENTS.md` | project-owned | runtime instruction front door |
+| `RTK.md` | project-owned | optional local token-output policy |
 
 Manifest ownership classes:
 
@@ -147,7 +169,6 @@ In scope:
 - Template folder shape.
 - Minimal local docs.
 - Config, lock, and manifest files.
-- Local wrapper.
 - Bootstrap copy rules.
 - Export cleanliness tests.
 - Export policy and diff preview requirements from F-09 (`managed` / `project-owned` / `generated` / `ignored` / `conflict`).

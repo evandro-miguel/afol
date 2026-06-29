@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runSkillCommand } from "../commands/catalog";
@@ -69,6 +75,89 @@ describe("skill command", () => {
 			expect(await runSkillCommand(["search", "bun"], root, search.io)).toBe(0);
 			expect(search.stdout.join("\n")).toContain("skill matches: 1");
 			expect(search.stdout.join("\n")).toContain("bun-development");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("discovers skills nested under grouping directories", async () => {
+		const root = mkRoot();
+		try {
+			const skillDir = join(
+				root,
+				".agents",
+				"skills",
+				"gitnexus",
+				"gitnexus-cli",
+			);
+			mkdirSync(skillDir, { recursive: true });
+			writeFileSync(
+				join(skillDir, "SKILL.md"),
+				"---\nname: gitnexus-cli\ndescription: GitNexus CLI workflows.\n---\n\n# GitNexus\n",
+				"utf8",
+			);
+
+			const list = capture();
+			expect(await runSkillCommand(["list"], root, list.io)).toBe(0);
+			expect(list.stdout.join("\n")).toContain("skills: 3");
+			expect(list.stdout.join("\n")).toContain(
+				"gitnexus-cli .agents/skills/gitnexus/gitnexus-cli/SKILL.md",
+			);
+
+			const show = capture();
+			expect(
+				await runSkillCommand(["show", "gitnexus-cli"], root, show.io),
+			).toBe(0);
+			expect(show.stdout.join("\n")).toContain("GitNexus CLI workflows.");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("ignores non-directory skill entries without aborting discovery", async () => {
+		const root = mkRoot();
+		try {
+			symlinkSync(
+				join(root, ".agents", "skills", "missing-skill"),
+				join(root, ".agents", "skills", "broken-skill-link"),
+				"dir",
+			);
+
+			const list = capture();
+			expect(await runSkillCommand(["list"], root, list.io)).toBe(0);
+			expect(list.stderr).toEqual([]);
+			expect(list.stdout.join("\n")).toContain("skills: 2");
+			expect(list.stdout.join("\n")).toContain("bun-development");
+			expect(list.stdout.join("\n")).toContain("typescript-expert");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects ambiguous skill names", async () => {
+		const root = mkRoot();
+		try {
+			const skillDir = join(root, ".agents", "skills", "group", "bun-copy");
+			mkdirSync(skillDir, { recursive: true });
+			writeFileSync(
+				join(skillDir, "SKILL.md"),
+				"---\nname: bun-development\ndescription: Duplicate Bun skill.\n---\n\n# Bun copy\n",
+				"utf8",
+			);
+
+			const show = capture();
+			expect(
+				await runSkillCommand(["show", "bun-development"], root, show.io),
+			).toBe(2);
+			expect(show.stderr.join("\n")).toContain(
+				"Ambiguous skill name: bun-development.",
+			);
+			expect(show.stderr.join("\n")).toContain(
+				".agents/skills/bun-development/SKILL.md",
+			);
+			expect(show.stderr.join("\n")).toContain(
+				".agents/skills/group/bun-copy/SKILL.md",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -15,7 +15,7 @@ links:
   task: 260306_1815_roadmap-first-governance_task_01
 scope:
   repo_areas:
-  - docs/arc
+  - .afol/adm
   - docs
   - .agents/scripts
   - .afol/wb
@@ -103,7 +103,7 @@ Key design choices:
 
 Touched layers:
 
-- Strategic docs (`docs/arc/`)
+- Strategic docs (`.afol/adm/`)
 - Templates and standards (`docs/`)
 - Workflow rules (`.afol/adm/rules/`)
 - Operational scripts and validators (`.agents/scripts/`)
@@ -111,8 +111,8 @@ Touched layers:
 
 New conceptual components:
 
-- Feature-centric roadmap structure in `docs/arc/GENERAL-ROADMAP.md`
-- Parent spec model in `docs/arc/SPECS/`
+- Feature-centric roadmap structure in `.afol/adm/roadmap/GENERAL-ROADMAP.md`
+- Parent spec model in `.afol/adm/specs/`
 - Child-spec decomposition convention linked to parent specs
 
 Dependency rules:
@@ -282,8 +282,8 @@ Evidence required:
 
 - Q-01 Answered: `spec-lite` remains a discretionary option whenever a lighter local refinement is enough; the mandatory artifact is the governing parent spec, not a specific local spec depth.
 - Q-02 How strict should roadmap/spec gating be for quick tasks in an active session?
-- Q-03 Answered: child specs live in `docs/arc/SPECS/` by default and may also
-  use feature-level subfolders such as `docs/arc/SPECS/F-14/` when a feature
+- Q-03 Answered: child specs live in `.afol/adm/specs/` by default and may also
+  use feature-level subfolders such as `.afol/adm/specs/F-14/` when a feature
   owns multiple strategy artifacts; indexes must keep the stable doc IDs
   discoverable either way.
 
@@ -297,4 +297,4 @@ Evidence required:
 
 ---
 
-*Spec: `docs/arc/SPECS/260306_roadmap-first-delivery-system_spec_01.md`*
+*Spec: `.afol/adm/specs/260306_roadmap-first-delivery-system_spec_01.md`*

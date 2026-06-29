@@ -87,7 +87,21 @@ describe("router alias grammar", () => {
 			kind: "subcommand",
 			group: "ctx",
 			action: "bundle",
-			args: ["--session", "session-1", "--task", "T-01"],
+			args: ["--session", "session-1", "--task", "T-01", "--mode", "compact"],
+		});
+
+		expect(resolveCommand(["ctx", "bundle"])).toEqual({
+			kind: "subcommand",
+			group: "ctx",
+			action: "bundle",
+			args: [],
+		});
+
+		expect(resolveCommand(["cx", "bundle", "--mode", "deep"])).toEqual({
+			kind: "subcommand",
+			group: "ctx",
+			action: "bundle",
+			args: ["--mode", "deep"],
 		});
 
 		expect(resolveCommand(["memory", "ls"])).toEqual({
@@ -95,6 +109,20 @@ describe("router alias grammar", () => {
 			group: "memory",
 			action: "list",
 			args: [],
+		});
+
+		expect(resolveCommand(["sp", "ls", "--json"])).toEqual({
+			kind: "subcommand",
+			group: "spec",
+			action: "list",
+			args: ["--json"],
+		});
+
+		expect(resolveCommand(["ux", "cov", "-t", "maintenance"])).toEqual({
+			kind: "subcommand",
+			group: "ux",
+			action: "coverage",
+			args: ["--tool", "maintenance"],
 		});
 
 		expect(

@@ -18,7 +18,7 @@ links:
   report: ''
 scope:
   repo_areas:
-  - docs/arc
+  - .afol/adm
   - docs
   - .afol/wb
   packages:
@@ -73,7 +73,7 @@ Failure or friction points:
   - `ARCHITECTURE.md` stays the canonical statement of desired system shape, boundaries, and major design rules.
   - `TECH-STACK.md` stays the canonical statement of approved stack choices, supported versions, and platform assumptions.
   - `GENERAL-ROADMAP.md` stays the canonical statement of priorities, sequencing, and goal-state delivery intent.
-  - `docs/arc/SPECS/` stores normative feature contracts that define intended change, not current implementation inventory.
+  - `.afol/adm/specs/` stores normative feature contracts that define intended change, not current implementation inventory.
   - ADRs stay the canonical record of irreversible decisions and rationale.
   - `docs/map/` may be cited as evidence, but not as the authority for these documents.
 - Boundaries:
@@ -105,7 +105,7 @@ Out of scope:
 ## 7) Constraints and Assumptions
 
 - Assumptions:
-  - `docs/arc` remains the canonical home for project strategy and governance.
+  - `.afol/adm` remains the canonical home for project strategy and governance.
   - current-state data is more volatile than goal-state documentation and should therefore be isolated from strategic prose.
 - Constraints:
   - no second governance tree may be introduced

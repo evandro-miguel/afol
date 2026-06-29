@@ -211,6 +211,9 @@ describe("file shared helpers", () => {
 			).toThrow(
 				"Real file mutation requires --session, --task-id, and --reason.",
 			);
+			expect(() => resolveSafePath(root, ".afol/config.json")).toThrow(
+				"protected-path:.afol/config.json",
+			);
 			expect(() => resolveSafePath(root, ".agents/config.json")).toThrow(
 				"protected-path:.agents/config.json",
 			);
@@ -941,7 +944,7 @@ describe("file mutation handlers", () => {
 				runArchiveMutation(
 					{
 						command: "ar",
-						path: ".agents/config.json",
+						path: ".afol/config.json",
 						dryRun: false,
 						json: false,
 						session: "S",
@@ -950,7 +953,7 @@ describe("file mutation handlers", () => {
 					},
 					root,
 				),
-			).toThrow("protected-path:.agents/config.json");
+			).toThrow("protected-path:.afol/config.json");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

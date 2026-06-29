@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { atomicWriteText } from "../io/atomic";
+import { resolveProjectPath, resolveProjectWritePath } from "../project/root";
 import { type AdmManifestEntry, buildAdmMigrationPlan } from "./planner";
 
 export type AdmMigrationArchive = {
@@ -21,6 +22,11 @@ export type AdmMigrationArchive = {
 
 export type AdmMigrationResult = AdmMigrationArchive & {
 	archive_path: string;
+};
+
+type ArchivePath = {
+	relativePath: string;
+	path: string;
 };
 
 function fsyncPath(path: string): void {
@@ -80,41 +86,54 @@ function formatTimestamp(now: Date): string {
 	return `${date}T${time}Z`;
 }
 
-function nextArchivePath(root: string): string {
-	const migrationsDir = join(root, ".afol", "adm", "migrations");
-	const base = `${formatTimestamp(new Date())}_adm-migration`;
-	let candidate = `.afol/adm/migrations/${base}.json`;
-	let suffix = 1;
-	while (existsSync(join(root, candidate))) {
-		candidate = `.afol/adm/migrations/${base}-${suffix}.json`;
-		suffix += 1;
+function resolveReadTarget(root: string, relativePath: string): string {
+	const resolved = resolveProjectPath(root, relativePath);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
 	}
-	mkdirSync(migrationsDir, { recursive: true });
-	return candidate;
+	return resolved.value.path;
 }
 
-export function migrateAdm(root: string): AdmMigrationResult {
+function resolveWriteTarget(root: string, relativePath: string): string {
+	const resolved = resolveProjectWritePath(root, relativePath);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
+	}
+	return resolved.value.path;
+}
+
+function nextArchivePath(root: string, now = new Date()): ArchivePath {
+	const base = `${formatTimestamp(now)}_adm-migration`;
+	let candidate = `.afol/adm/migrations/${base}.json`;
+	let suffix = 1;
+	let resolved = resolveWriteTarget(root, candidate);
+	while (existsSync(resolved)) {
+		candidate = `.afol/adm/migrations/${base}-${suffix}.json`;
+		suffix += 1;
+		resolved = resolveWriteTarget(root, candidate);
+	}
+	mkdirSync(dirname(resolved), { recursive: true });
+	return { relativePath: candidate, path: resolved };
+}
+
+export function migrateAdm(root: string, now = new Date()): AdmMigrationResult {
 	const plan = buildAdmMigrationPlan(root);
 	for (const entry of plan.manifest) {
-		const absoluteTarget = join(root, entry.target_path);
-		mkdirSync(dirname(absoluteTarget), { recursive: true });
-		const absoluteSource = join(root, entry.source_path);
+		const absoluteTarget = resolveWriteTarget(root, entry.target_path);
+		const absoluteSource = resolveReadTarget(root, entry.source_path);
 		atomicWriteBytes(absoluteTarget, readFileSync(absoluteSource));
 	}
 
-	const archive_path = nextArchivePath(root);
+	const archivePath = nextArchivePath(root, now);
 	const archive: AdmMigrationArchive = {
-		generated_at: new Date().toISOString(),
+		generated_at: now.toISOString(),
 		count: plan.manifest.length,
 		manifest: plan.manifest,
 	};
-	atomicWriteText(
-		join(root, archive_path),
-		`${JSON.stringify(archive, null, 2)}\n`,
-	);
+	atomicWriteText(archivePath.path, `${JSON.stringify(archive, null, 2)}\n`);
 
 	return {
 		...archive,
-		archive_path,
+		archive_path: archivePath.relativePath,
 	};
 }

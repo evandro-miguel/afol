@@ -2,20 +2,20 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
 	buildContextBundle,
-	getSectionIndex,
-	rebuildSectionIndex,
-	resolveSection,
-} from "../services/context";
-import {
 	ContextTrustError,
 	RuleInjectionError,
 } from "../services/context/bundler";
+import {
+	getSectionIndex,
+	rebuildSectionIndex,
+	resolveSection,
+} from "../services/context/section-index";
 import type { ContextRetrievalMode } from "../services/context/types";
-import { checkHealth } from "../services/health";
-import { listTopics } from "../services/library";
-import { readMemory } from "../services/memory";
+import { checkHealth } from "../services/health/checker";
+import { listTopics } from "../services/library/crud";
+import { readMemory } from "../services/memory/crud";
 import { resolveProjectPaths } from "../services/project/paths";
-import { checkPstrStale, validatePstrIndex } from "../services/pstr";
+import { checkPstrStale, validatePstrIndex } from "../services/pstr/builder";
 import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
 const jsonOutput = createJsonWriters("ctx");

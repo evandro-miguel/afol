@@ -1,21 +1,37 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDoctorCommand } from "../commands/doctor";
 import { runHealthCommand } from "../commands/health";
 import { runMaintenanceCommand } from "../commands/maintenance";
+import { agentOperationContext } from "../core/operation-context";
+import { checkHealth } from "../services/health/checker";
+import { runDoctor } from "../services/health/doctor";
 import {
-	checkHealth,
 	maintenanceMonthly,
 	maintenanceWeekly,
-	runDoctor,
-} from "../services/health";
+} from "../services/health/maintenance";
+import {
+	readMaintenanceReviewSummary,
+	scanLegacyReferences,
+} from "../services/health/maintenance-review";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
-import { writeMemory as writeProjectMemory } from "../services/memory";
-import { buildPstrSnapshotManifest, rebuildPstrIndex } from "../services/pstr";
-import { openDb } from "../services/state";
+import { writeMemory as writeProjectMemory } from "../services/memory/crud";
+import {
+	buildPstrSnapshotManifest,
+	rebuildPstrIndex,
+} from "../services/pstr/builder";
+import { openDb } from "../services/state/db";
 
 type CapturedIo = {
 	stdout: string[];
@@ -371,6 +387,9 @@ describe("health system", () => {
 			expect(result.planOnly).toBe(true);
 			expect(result.actions).toContain("check PSTR stale");
 			expect(result.actions).toContain("archive old sessions");
+			expect(result.actions.join("\n")).toContain(
+				"review maintenance areas: rules, skills, docs, commands, memory, library, organization",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -382,6 +401,13 @@ describe("health system", () => {
 			const result = maintenanceMonthly(root, false);
 			expect(result.planOnly).toBe(true);
 			expect(result.actions).toContain("rotate logs");
+			expect(result.actions).toContain(
+				"review roadmap/spec/manifest alignment",
+			);
+			expect(result.actions).toContain("prune obsolete rules/skills");
+			expect(result.actions).toContain(
+				"archive closed sessions older than 90 days",
+			);
 			expect(result.actions).toContain("rebuild stale indexes");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -499,6 +525,342 @@ describe("health system", () => {
 			expect(payload.data?.dry_run).toBe(true);
 			expect(payload.data?.plan_only).toBe(true);
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review --json records area with configured interval", async () => {
+		const root = createFixture();
+		try {
+			writeFileSync(
+				join(root, ".agents", "config.json"),
+				JSON.stringify(
+					{
+						version: "0.1.0",
+						maintenance: {
+							review_interval_days: 14,
+						},
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules", "--note", "checked", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				mode: string;
+				area: string;
+				reviewed_areas: string[];
+				note: string;
+				review_interval_days: number;
+				due_areas: string[];
+				data?: {
+					mode?: string;
+					area?: string;
+					reviewed_areas?: string[];
+					review_interval_days?: number;
+					due_areas?: string[];
+				};
+			};
+			expect(payload.mode).toBe("review");
+			expect(payload.area).toBe("rules");
+			expect(payload.reviewed_areas).toEqual(["rules"]);
+			expect(payload.note).toBe("checked");
+			expect(payload.review_interval_days).toBe(14);
+			expect(payload.due_areas).toEqual([
+				"skills",
+				"docs",
+				"commands",
+				"memory",
+				"library",
+				"organization",
+			]);
+			expect(payload.data?.mode).toBe("review");
+			expect(payload.data?.area).toBe("rules");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review dry-run does not persist and restricted writes are denied", async () => {
+		const root = createFixture();
+		try {
+			const reviewPath = join(
+				root,
+				".afol",
+				"data",
+				"maintenance",
+				"reviews.json",
+			);
+			const dryRun = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules", "--dry-run", "--json"],
+					root,
+					dryRun.io,
+					agentOperationContext(),
+				),
+			).toBe(0);
+			expect(existsSync(reviewPath)).toBe(false);
+			expect(readMaintenanceReviewSummary(root).due_areas).toEqual([
+				"rules",
+				"skills",
+				"docs",
+				"commands",
+				"memory",
+				"library",
+				"organization",
+			]);
+
+			const denied = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules"],
+					root,
+					denied.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			expect(denied.stderr.join("\n")).toContain(
+				"maintenance review requires local interactive approval",
+			);
+			expect(existsSync(reviewPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review supports positional area and human output", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "docs", "--note", "checked"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const output = captured.stdout.join("\n");
+			expect(output).toContain("maintenance review recorded: docs");
+			expect(output).toContain(
+				"due next: rules, skills, commands, memory, library, organization",
+			);
+			const summary = readMaintenanceReviewSummary(root);
+			expect(summary.areas.find((entry) => entry.area === "docs")?.note).toBe(
+				"checked",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review supports inline note values", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "docs", "--note=inline-note", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout.join("\n")) as {
+				note: string;
+				reviewed_areas: string[];
+			};
+			expect(payload.note).toBe("inline-note");
+			expect(payload.reviewed_areas).toEqual(["docs"]);
+			const summary = readMaintenanceReviewSummary(root);
+			expect(summary.areas.find((entry) => entry.area === "docs")?.note).toBe(
+				"inline-note",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review rejects missing note values before json aliases", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules", "--note", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			expect(captured.stdout).toEqual([]);
+			expect(captured.stderr).toEqual(["Missing value for --note."]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review rejects empty inline note values", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules", "--note="],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			expect(captured.stdout).toEqual([]);
+			expect(captured.stderr).toEqual(["Missing value for --note."]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review refuses to overwrite malformed review store", async () => {
+		const root = createFixture();
+		try {
+			const reviewDir = join(root, ".afol", "data", "maintenance");
+			const reviewPath = join(reviewDir, "reviews.json");
+			mkdirSync(reviewDir, { recursive: true });
+			writeFileSync(reviewPath, "{bad-json", "utf8");
+
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules"],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			expect(captured.stderr.join("\n")).toContain(
+				"Malformed maintenance review store",
+			);
+			expect(readFileSync(reviewPath, "utf8")).toBe("{bad-json");
+			const summary = readMaintenanceReviewSummary(root);
+			expect(summary.store_status).toBe("malformed");
+			expect(summary.store_error).toContain("JSON");
+			expect(summary.due_areas).toEqual([
+				"rules",
+				"skills",
+				"docs",
+				"commands",
+				"memory",
+				"library",
+				"organization",
+			]);
+			expect(maintenanceWeekly(root, true).actions).toContain(
+				`repair maintenance review store: ${summary.store_error}`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol maintenance review refuses to overwrite invalid review store shape", async () => {
+		const root = createFixture();
+		try {
+			const reviewDir = join(root, ".afol", "data", "maintenance");
+			const reviewPath = join(reviewDir, "reviews.json");
+			const original = JSON.stringify({ version: 2, areas: [] });
+			mkdirSync(reviewDir, { recursive: true });
+			writeFileSync(reviewPath, original, "utf8");
+
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules"],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			expect(captured.stderr.join("\n")).toContain(
+				"Malformed maintenance review store",
+			);
+			expect(readFileSync(reviewPath, "utf8")).toBe(original);
+			const summary = readMaintenanceReviewSummary(root);
+			expect(summary.store_status).toBe("malformed");
+			expect(summary.store_error).toBe(
+				"invalid maintenance review store shape",
+			);
+			expect(summary.due_areas).toEqual([
+				"rules",
+				"skills",
+				"docs",
+				"commands",
+				"memory",
+				"library",
+				"organization",
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("legacy reference scan includes memory and library surfaces", () => {
+		const root = createFixture();
+		try {
+			mkdirSync(join(root, ".afol", "memory"), { recursive: true });
+			mkdirSync(join(root, ".afol", "library", "topics"), {
+				recursive: true,
+			});
+			writeFileSync(
+				join(root, ".afol", "memory", "memory.md"),
+				"Keep this away from .agents/wb references.\n",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".afol", "library", "topics", "legacy.md"),
+				"Old docs still say legacy:delegate.\n",
+				"utf8",
+			);
+
+			const result = scanLegacyReferences(root);
+
+			expect(result.files).toEqual(
+				expect.arrayContaining([
+					".afol/memory/memory.md",
+					".afol/library/topics/legacy.md",
+				]),
+			);
+			expect(result.patterns).toEqual(
+				expect.arrayContaining([".agents/wb", "legacy:"]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("legacy reference scan reports unreadable files instead of hiding them", () => {
+		const root = createFixture();
+		const unreadablePath = join(root, "docs", "unreadable.md");
+		try {
+			mkdirSync(join(root, "docs"), { recursive: true });
+			writeFileSync(unreadablePath, "legacy: maybe\n", "utf8");
+			chmodSync(unreadablePath, 0);
+
+			const result = scanLegacyReferences(root);
+
+			if (result.warnings.length === 0) {
+				// Some privileged runtimes can still read mode 000 files.
+				expect(result.files).toContain("docs/unreadable.md");
+			} else {
+				expect(result.warnings.join("\n")).toContain(
+					"legacy reference scan skipped docs/unreadable.md",
+				);
+				expect(result.files).not.toContain("docs/unreadable.md");
+			}
+		} finally {
+			if (existsSync(unreadablePath)) {
+				chmodSync(unreadablePath, 0o600);
+			}
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
@@ -644,6 +1006,9 @@ describe("health system", () => {
 				0,
 			);
 			expect(captured.stdout.join("\n")).toContain("maintenance weekly plan:");
+			expect(captured.stdout.join("\n")).toContain(
+				"review maintenance areas: rules, skills, docs, commands, memory, library, organization",
+			);
 			expect(captured.stdout.join("\n")).not.toContain("applied:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });

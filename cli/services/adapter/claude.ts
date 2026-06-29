@@ -6,10 +6,15 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, join } from "node:path";
 import type { SchemaObject } from "../../core/schema";
 import { loadJsonObject } from "../../core/schema";
 import { DEFAULT_TEMPLATE_FILES } from "../../generated/template";
+import {
+	CANONICAL_PROJECT_CONFIG_PATH,
+	resolveProjectConfigPath,
+} from "../project/paths";
+import { resolveProjectWritePath } from "../project/root";
 import type { TemplateFileMap } from "../template/payload";
 
 /**
@@ -37,13 +42,18 @@ export type AdapterState = {
 };
 
 /**
- * Read the Claude adapter enabled flag from `.agents/config.json`.
+ * Read the Claude adapter enabled flag from the AFOL project config.
  * Omitted or non-boolean value means enabled (backward compatible with
  * pre-adapter installs that always shipped CLAUDE.md).
  */
 export function readClaudeAdapterEnabled(configRoot: string): boolean {
-	const configPath = join(configRoot, ".agents", "config.json");
-	if (!existsSync(configPath)) {
+	let configPath: string | null = null;
+	try {
+		configPath = resolveProjectConfigPath(configRoot)?.absolutePath ?? null;
+	} catch {
+		return true;
+	}
+	if (!configPath) {
 		return true;
 	}
 	const loaded = loadJsonObject(configPath);
@@ -81,7 +91,7 @@ export function filterClaudeAdapterFiles(
 }
 
 /**
- * Mark the Claude adapter as enabled/disabled in `.agents/config.json`. The
+ * Mark the Claude adapter as enabled/disabled in AFOL project config. The
  * config is read, mutated, and written back atomically. Missing config is an
  * error — adapter commands require an installed project.
  */
@@ -89,10 +99,12 @@ export function writeClaudeAdapterEnabled(
 	configRoot: string,
 	enabled: boolean,
 ): void {
-	const configPath = join(configRoot, ".agents", "config.json");
+	const resolved = resolveProjectConfigPath(configRoot);
+	const targetPath = resolved?.relativePath ?? CANONICAL_PROJECT_CONFIG_PATH;
+	const configPath = resolveAdapterWritePath(configRoot, targetPath);
 	if (!existsSync(configPath)) {
 		throw new Error(
-			"afol adapter: missing .agents/config.json — run `afol init` first",
+			"afol adapter: missing .afol/config.json — run `afol init` first",
 		);
 	}
 	const raw = loadJsonObject(configPath);
@@ -134,11 +146,11 @@ export function archiveClaudeArtifacts(projectRoot: string): {
 	const archiveRoot = nextAdapterArchiveRoot(projectRoot, "claude-disabled");
 	const archived: string[] = [];
 	for (const rel of CLAUDE_ADAPTER_PATHS) {
-		const absolute = join(projectRoot, rel);
+		const absolute = resolveAdapterWritePath(projectRoot, rel);
 		if (!existsSync(absolute)) {
 			continue;
 		}
-		const dest = join(projectRoot, archiveRoot, rel);
+		const dest = resolveAdapterWritePath(projectRoot, join(archiveRoot, rel));
 		mkdirSync(dirname(dest), { recursive: true });
 		renameSync(absolute, dest);
 		archived.push(rel);
@@ -159,7 +171,7 @@ export function restoreClaudeArtifacts(projectRoot: string): string[] {
 		if (!entry) {
 			continue;
 		}
-		const absolute = join(projectRoot, key);
+		const absolute = resolveAdapterWritePath(projectRoot, key);
 		mkdirSync(dirname(absolute), { recursive: true });
 		writeFileSync(absolute, Buffer.from(entry.contentBase64, "base64"), "utf8");
 		restored.push(key);
@@ -194,6 +206,14 @@ export function describeClaudeAdapter(projectRoot: string): AdapterState {
 	};
 }
 
+function resolveAdapterWritePath(projectRoot: string, path: string): string {
+	const resolved = resolveProjectWritePath(projectRoot, path);
+	if (!resolved.ok) {
+		throw new Error(`afol adapter: unsafe target path: ${resolved.error}`);
+	}
+	return resolved.value.path;
+}
+
 function objectAt(value: unknown, key: string): Record<string, unknown> | null {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) {
 		return null;
@@ -219,11 +239,11 @@ function nextAdapterArchiveRoot(projectRoot: string, label: string): string {
 	const base = `.afol/data/migrations/${stamp}_${time}_${label}`;
 	let candidate = base;
 	let suffix = 1;
-	while (existsSync(join(projectRoot, candidate))) {
+	while (existsSync(resolveAdapterWritePath(projectRoot, candidate))) {
 		suffix += 1;
 		candidate = `${base}-${suffix}`;
 	}
-	const absolute = join(projectRoot, candidate);
+	const absolute = resolveAdapterWritePath(projectRoot, candidate);
 	mkdirSync(absolute, { recursive: true });
-	return relative(projectRoot, absolute);
+	return candidate;
 }

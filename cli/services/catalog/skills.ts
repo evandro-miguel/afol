@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import {
 	type ResolvedProjectPaths,
 	resolveProjectPaths,
@@ -41,7 +41,7 @@ function skillFromDir(
 		name:
 			typeof metadata.name === "string" && metadata.name.trim()
 				? metadata.name.trim()
-				: dirName,
+				: dirName.split(/[\\/]/).pop() || dirName,
 		path: `${projectPaths.skillsDir}/${dirName}/SKILL.md`,
 		description:
 			typeof metadata.description === "string" && metadata.description.trim()
@@ -50,20 +50,39 @@ function skillFromDir(
 	};
 }
 
+function safeSkillDirEntries(dir: string) {
+	try {
+		return readdirSync(dir, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+}
+
+function listSkillDirs(skillsRoot: string, dir: string = skillsRoot): string[] {
+	const entries = safeSkillDirEntries(dir);
+	return entries
+		.filter((entry) => entry.isDirectory())
+		.flatMap((entry) => {
+			const child = join(dir, entry.name);
+			if (existsSync(join(child, "SKILL.md"))) {
+				return [relative(skillsRoot, child).replaceAll("\\", "/")];
+			}
+			return listSkillDirs(skillsRoot, child);
+		});
+}
+
 export function listSkills(projectRoot: string): SkillEntry[] {
 	const projectPaths = resolveProjectPaths(projectRoot);
 	const skillsRoot = projectPaths.abs.skillsDir;
 	if (!existsSync(skillsRoot)) {
 		return [];
 	}
-	return readdirSync(skillsRoot)
-		.filter((name) => {
-			const path = join(skillsRoot, name);
-			return statSync(path).isDirectory();
-		})
-		.map((name) => skillFromDir(projectPaths, name))
+	return listSkillDirs(skillsRoot)
+		.map((dirName) => skillFromDir(projectPaths, dirName))
 		.filter((entry): entry is SkillEntry => entry !== null)
-		.sort((a, b) => a.name.localeCompare(b.name));
+		.sort(
+			(a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path),
+		);
 }
 
 export function findSkill(
@@ -74,11 +93,15 @@ export function findSkill(
 	if (!needle) {
 		return null;
 	}
-	return (
-		listSkills(projectRoot).find(
-			(skill) => skill.name.toLowerCase() === needle,
-		) ?? null
+	const matches = listSkills(projectRoot).filter(
+		(skill) => skill.name.toLowerCase() === needle,
 	);
+	if (matches.length > 1) {
+		throw new Error(
+			`Ambiguous skill name: ${identifier}. Matches: ${matches.map((skill) => skill.path).join(", ")}`,
+		);
+	}
+	return matches[0] ?? null;
 }
 
 export function searchSkills(projectRoot: string, query: string): SkillEntry[] {

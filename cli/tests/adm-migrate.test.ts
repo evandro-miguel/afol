@@ -5,12 +5,14 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAdmCommand } from "../commands/adm";
-import { validateAdmMigration } from "../services/adm";
+import { migrateAdm } from "../services/adm/migrator";
+import { validateAdmMigration } from "../services/adm/validate";
 
 type CapturedIo = {
 	stdout: string[];
@@ -90,6 +92,25 @@ describe("adm migrate", () => {
 			).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("planner rejects symlinked docs/arc sources before reading outside project", () => {
+		const root = mkdtempSync(join(tmpdir(), "adm-migrate-symlink-source-"));
+		const outside = mkdtempSync(join(tmpdir(), "adm-migrate-outside-source-"));
+		try {
+			mkdirSync(join(root, "docs"), { recursive: true });
+			writeFileSync(
+				join(outside, "GENERAL-ROADMAP.md"),
+				"outside roadmap",
+				"utf8",
+			);
+			symlinkSync(outside, join(root, "docs", "arc"), "dir");
+
+			expect(() => validateAdmMigration(root)).toThrow(/symlink/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(outside, { recursive: true, force: true });
 		}
 	});
 
@@ -175,6 +196,29 @@ describe("adm migrate", () => {
 					Buffer.compare(readFileSync(join(root, entry.target_path)), previous),
 				).toBe(0);
 			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("uses suffixed archive path when migration timestamp collides", () => {
+		const root = createFixture();
+		const fixedDate = new Date("2026-06-20T01:02:03.004Z");
+		try {
+			const archiveDir = join(root, ".afol", "adm", "migrations");
+			const existingArchive = join(
+				archiveDir,
+				"20260620T010203004Z_adm-migration.json",
+			);
+			mkdirSync(archiveDir, { recursive: true });
+			writeFileSync(existingArchive, "existing archive", "utf8");
+
+			const result = migrateAdm(root, fixedDate);
+			expect(result.archive_path).toBe(
+				".afol/adm/migrations/20260620T010203004Z_adm-migration-1.json",
+			);
+			expect(readFileSync(existingArchive, "utf8")).toBe("existing archive");
+			expect(existsSync(join(root, result.archive_path))).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

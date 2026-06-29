@@ -37,9 +37,19 @@ Replace this section after bootstrap with real product context.
 - Reports -> evidence-based. Done means validated, not merely edited.
 - User correction -> create one lesson entry under `docs/lessons/entries/`.
 
+## User Journeys
+
+- Critical user or agent flows must be registered through roadmap, spec,
+  spec-test, and evidence.
+- Use `docs/templates/ux-journey.md` for complex multi-step flows.
+- Command changes must document expected output, failure/recovery behavior, and
+  validation path before claiming the flow works.
+- Do not claim a journey is production-tested without saved validation,
+  benchmark, or workbench evidence.
+
 ## Branch And Deploy
 
-- Agent commits/pushes target `main_dev` unless the user explicitly requests a
+- Agent commits/pushes target `dev` unless the user explicitly requests a
   different branch in the current turn.
 - `main` -> never direct-push.
 - Production deploy -> forbidden unless the user explicitly asks in the current
@@ -56,7 +66,7 @@ Replace this section after bootstrap with real product context.
 
 ## Repository Map
 
-- `.agents/config.json`, `.agents/lock.json`, and `.agents/manifest.json`
+- `.afol/config.json`, `.agents/lock.json`, and `.agents/manifest.json`
   path contract for mutable state, plan storage, skills, tmp, and data locations
 - `.afol/wb/` or configured `paths.wb_dir` governed plan state
 - `.afol/data/` or configured data path for telemetry data and indexes when the downstream CLI exposes them

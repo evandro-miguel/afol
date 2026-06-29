@@ -55,6 +55,34 @@
       "sk",
       "skill"
     ],
+    "library": [
+      "lb",
+      "library"
+    ],
+    "memory": [
+      "mm",
+      "memory"
+    ],
+    "health": [
+      "ht",
+      "health"
+    ],
+    "maintenance": [
+      "mt",
+      "maintenance"
+    ],
+    "sweep": [
+      "sw",
+      "sweep"
+    ],
+    "project-benchmark": [
+      "pb",
+      "project-benchmark"
+    ],
+    "session": [
+      "ss",
+      "session"
+    ],
     "update": [
       "up",
       "update"
@@ -62,6 +90,42 @@
     "close": [
       "c",
       "close"
+    ]
+  },
+  "ownership": {
+    "project-owned": [
+      ".afol/config.json",
+      ".agents/lock.json",
+      ".agents/manifest.json",
+      ".agents/skills",
+      ".afol/adm",
+      ".afol/data/benchmarks",
+      ".afol/data/telemetry",
+      ".afol/memory",
+      "AGENTS.md",
+      "docs/lessons",
+      "docs/telemetry",
+      "docs/templates"
+    ],
+    "generated": [],
+    "ignored": [
+      ".afol/data/README.md",
+      ".afol/data/events",
+      ".afol/data/index",
+      ".afol/pstr/README.md",
+      ".afol/tmp"
+    ],
+    "conflict": []
+  },
+  "allowed_payload": {
+    "optional_seed": [
+      ".afol/adm/source/universal-skills"
+    ],
+    "optional_adapters": [
+      ".claude"
+    ],
+    "project_templates": [
+      "docs/templates"
     ]
   }
 }

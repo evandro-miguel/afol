@@ -3,17 +3,19 @@ import {
 	type OperationContext,
 } from "../core/operation-context";
 import { buildSchemaCacheKey } from "../core/schema-cache-key";
-import type { ShapePack } from "../services/schema";
 import {
-	detectResolver,
 	detectShape,
 	readShapePack,
-	resolverPathForRoot,
 	shapePackPathForRoot,
 	suggestShape,
-	writeResolver,
 	writeShapePack,
-} from "../services/schema";
+} from "../services/schema/detector";
+import {
+	detectResolver,
+	resolverPathForRoot,
+	writeResolver,
+} from "../services/schema/resolver";
+import type { ShapePack } from "../services/schema/types";
 import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
 const jsonOutput = createJsonWriters("schema");

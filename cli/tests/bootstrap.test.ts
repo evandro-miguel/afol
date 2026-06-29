@@ -7,6 +7,7 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -167,7 +168,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(errors.join("\n")).toContain(
 				"Refusing real bootstrap: AFOL binary is not locally registered.",
 			);
-			expect(existsSync(join(target, ".agents", "config.json"))).toBe(false);
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(false);
 		} finally {
 			console.error = originalError;
 			rmSync(target, { recursive: true, force: true });
@@ -188,10 +189,33 @@ describe("bootstrap provider-compatible mutable state", () => {
 				invocationPath: join(cliRoot, "dist", "afol"),
 			});
 			expect(exitCode).toBe(0);
-			expect(existsSync(join(target, ".agents", "config.json"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(true);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 			rmSync(cliRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("does not write template files through symlinked target directories", async () => {
+		const target = mkdtempSync(join(tmpdir(), "bootstrap-symlink-target-"));
+		const outside = mkdtempSync(join(tmpdir(), "bootstrap-symlink-outside-"));
+		const errors: string[] = [];
+		const originalError = console.error;
+		try {
+			console.error = (...values: unknown[]) => {
+				errors.push(values.map(String).join(" "));
+			};
+			symlinkSync(outside, join(target, ".agents"), "dir");
+
+			const exitCode = await runBootstrapCommand([target]);
+
+			expect(exitCode).toBe(2);
+			expect(errors.join("\n")).toContain("Path crosses symlink");
+			expect(existsSync(join(outside, "config.json"))).toBe(false);
+		} finally {
+			console.error = originalError;
+			rmSync(target, { recursive: true, force: true });
+			rmSync(outside, { recursive: true, force: true });
 		}
 	});
 
@@ -204,7 +228,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			]);
 
 			expect(exitCode).toBe(0);
-			expect(existsSync(join(target, ".agents", "config.json"))).toBe(true);
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(true);
 			expect(
 				existsSync(join(target, ".afol", "adm", "rules", "index.json")),
 			).toBe(true);
@@ -326,7 +350,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			).toBe(true);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				paths: Record<string, string>;
 				skills_sync: Record<string, string>;
@@ -586,7 +610,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(existsSync(join(target, ".claude", "README.md"))).toBe(false);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				adapters?: { claude?: { enabled?: boolean } };
 			};
@@ -614,7 +638,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				paths: { mutable_dir: string };
 				adapters?: { claude?: { enabled?: boolean } };
@@ -654,7 +678,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			expect(existsSync(join(target, ".afol", "tmp", "README.md"))).toBe(true);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				paths: { mutable_dir: string };
 				adapters?: { claude?: { enabled?: boolean } };
@@ -684,7 +708,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			);
 
 			const config = JSON.parse(
-				readFileSync(join(target, ".agents", "config.json"), "utf8"),
+				readFileSync(join(target, ".afol", "config.json"), "utf8"),
 			) as {
 				paths: Record<string, string>;
 			};

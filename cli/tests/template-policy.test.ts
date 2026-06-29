@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 
 import {
+	matchesTemplateForbiddenPattern,
 	scanProjectTemplateForbiddenPaths,
 	scanProjectTemplateForbiddenTextReferences,
 	scanProjectTemplateUnknownAllowedPaths,
@@ -74,6 +75,7 @@ describe("template forbidden-content policy", () => {
 				"utf8",
 			);
 			writeFileSync(join(fixtureRoot, "a"), "#!/usr/bin/env bash\n", "utf8");
+			writeFileSync(join(fixtureRoot, "afol"), "#!/usr/bin/env bash\n", "utf8");
 			writeFileSync(join(fixtureRoot, "Justfile"), "validate:\n", "utf8");
 			writeFileSync(
 				join(fixtureRoot, "docs", "standards", "policy.md"),
@@ -96,14 +98,32 @@ describe("template forbidden-content policy", () => {
 
 			expect(matches).toContain(".agents/runtime/main.py");
 			expect(matches).toContain("a");
+			expect(matches).toContain("afol");
 			expect(matches).toContain("Justfile");
-			expect(matches).toContain("docs/standards/policy.md");
+			expect(matches).not.toContain("docs/standards/policy.md");
 			expect(matches).toContain("docs/arc/README.md");
 			expect(matches).toContain("tests/sample.txt");
 			expect(matches).not.toContain("docs/templates/ok.md");
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });
 		}
+	});
+
+	test("blocks secret-bearing template payload paths", () => {
+		for (const path of [
+			".env",
+			".env.local",
+			"nested/.env.production",
+			"certs/private.key",
+			"certs/private.pem",
+			"certs/bundle.p12",
+			"certs/bundle.pfx",
+		]) {
+			expect(matchesTemplateForbiddenPattern(path)).toBe(true);
+		}
+
+		expect(matchesTemplateForbiddenPattern(".env.example")).toBe(false);
+		expect(matchesTemplateForbiddenPattern("docs/.env.example")).toBe(false);
 	});
 
 	test("live src/project-template has no forbidden content", async () => {

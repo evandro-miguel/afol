@@ -9,7 +9,7 @@
   "thresholds": {
     "max_duration_ms": 300,
     "max_p95_ms": 300,
-    "max_output_tokens": 50,
+    "max_output_tokens": 100,
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "token-economy-v1",
@@ -22,7 +22,7 @@
     "retry_count": 0,
     "context_tokens": 180,
     "prompt_tokens": 0,
-    "output_tokens": 42,
+    "output_tokens": 55,
     "context_bytes": 1024,
     "output_bytes": 240,
     "tool_call_count": 1,

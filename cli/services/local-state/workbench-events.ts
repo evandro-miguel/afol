@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
+import { resolveProjectWritePath } from "../project/root";
 
 export type WorkbenchEventKind =
 	| "workbench.new"
@@ -24,7 +25,16 @@ export type WorkbenchEvent = {
 };
 
 export function resolveWorkbenchEventLogPath(root: string): string {
-	return resolveProjectPaths(resolve(root)).abs.eventsFile;
+	const projectRoot = resolve(root);
+	const projectPaths = resolveProjectPaths(projectRoot);
+	const resolved = resolveProjectWritePath(
+		projectRoot,
+		projectPaths.eventsFile,
+	);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
+	}
+	return resolved.value.path;
 }
 
 const WORKBENCH_EVENT_ID_PREFIX = "WSE-";

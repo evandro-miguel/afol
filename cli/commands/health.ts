@@ -7,7 +7,8 @@ import {
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
-import { checkHealth, type HealthArea } from "../services/health";
+import { checkHealth } from "../services/health/checker";
+import type { HealthArea } from "../services/health/types";
 import { resolveProjectPaths } from "../services/project/paths";
 import { type CommandIo, DEFAULT_IO } from "./io";
 

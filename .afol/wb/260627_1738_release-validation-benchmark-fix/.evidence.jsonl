@@ -1,0 +1,10 @@
+{"id":"E-20260627174105569-636420","task_id":"T-01","created_at":"2026-06-27T21:41:05.569Z","command":"bun run validate:release","result":"failed"}
+{"id":"E-20260627174105684-02e7df","task_id":"T-01","created_at":"2026-06-27T21:41:05.684Z","command":"bun run kernel -- v bench --pack mcp-parity --json","result":"failed"}
+{"id":"E-20260627174515062-1f2c2a","task_id":"T-01","created_at":"2026-06-27T21:45:15.062Z","command":"bun run kernel -- v bench --pack mcp-parity --json","result":"passed"}
+{"id":"E-20260627174515495-fa3dfc","task_id":"T-02","created_at":"2026-06-27T21:45:15.495Z","command":"bun test cli/tests/validate-internals.test.ts","result":"passed"}
+{"id":"E-20260627174515597-745a54","task_id":"T-02","created_at":"2026-06-27T21:45:15.597Z","command":"bun test cli/tests/validation.test.ts","result":"passed"}
+{"id":"E-20260627174516042-71751e","task_id":"T-03","created_at":"2026-06-27T21:45:16.042Z","command":"bun run validate:project-benchmarks","result":"passed"}
+{"id":"E-20260627174516157-762c89","task_id":"T-03","created_at":"2026-06-27T21:45:16.157Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260627174516274-7ab8cb","task_id":"T-03","created_at":"2026-06-27T21:45:16.274Z","command":"bun run validate:release","result":"failed"}
+{"id":"E-20260627181000380-400ef1","task_id":"T-01","created_at":"2026-06-27T22:10:00.380Z","command":"bun run validate:release","result":"passed"}
+{"id":"E-20260627181000455-53e3f9","task_id":"T-03","created_at":"2026-06-27T22:10:00.455Z","command":"bun run validate:release","result":"passed"}

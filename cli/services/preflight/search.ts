@@ -34,6 +34,7 @@ export type PreflightReport = {
 	rules: PreflightRuleResult[];
 	gaps: string[];
 	summary: string;
+	recommendations: string[];
 	/** True when the query matched one or more lesson entries, suggesting this may be a recurring problem. Read-only advisory flag — never causes command failure. */
 	recurrence_detected: boolean;
 };
@@ -84,12 +85,33 @@ const MAX_RULES = 5;
 function tokenize(value: string): string[] {
 	const tokens = new Set<string>();
 	for (const token of value.toLowerCase().split(/\W+/)) {
-		if (!token || token.length < 2 || STOP_WORDS.has(token)) {
-			continue;
+		for (const variant of expandToken(token)) {
+			tokens.add(variant);
 		}
-		tokens.add(token);
 	}
 	return [...tokens];
+}
+
+function expandToken(token: string): string[] {
+	if (!token || token.length < 2 || STOP_WORDS.has(token)) {
+		return [];
+	}
+	const variants = new Set([token]);
+	if (token.length > 4 && token.endsWith("s")) {
+		variants.add(token.slice(0, -1));
+	}
+	if (token.length > 5 && token.endsWith("ed")) {
+		variants.add(token.slice(0, -2));
+	}
+	if (token.length > 6 && token.endsWith("ing")) {
+		variants.add(token.slice(0, -3));
+	}
+	if (token.length > 5 && token.endsWith("ies")) {
+		variants.add(`${token.slice(0, -3)}y`);
+	}
+	return [...variants].filter(
+		(variant) => variant.length >= 2 && !STOP_WORDS.has(variant),
+	);
 }
 
 function escapeRegex(value: string): string {
@@ -438,6 +460,18 @@ function formatSummary(
 	].join(", ")} found`;
 }
 
+function buildRecommendations(recurrenceDetected: boolean): string[] {
+	if (!recurrenceDetected) {
+		return [
+			"no recurrence detected: treat as a one-off fix unless new evidence emerges",
+		];
+	}
+	return [
+		"recurrence detected: run heavier verification before implementation",
+		"propose a rule or lesson only after evidence confirms recurrence, then ask for approval before writing governance",
+	];
+}
+
 export function runPreflight(root: string, query: string): PreflightReport {
 	const tokens = tokenize(query);
 	const specs = searchSpecs(root, tokens);
@@ -469,7 +503,10 @@ export function runPreflight(root: string, query: string): PreflightReport {
 		gaps.push("no applicable rules found");
 	}
 
-	const report: Omit<PreflightReport, "summary" | "recurrence_detected"> = {
+	const report: Omit<
+		PreflightReport,
+		"summary" | "recurrence_detected" | "recommendations"
+	> = {
 		query,
 		specs,
 		lessons,
@@ -482,6 +519,7 @@ export function runPreflight(root: string, query: string): PreflightReport {
 	return {
 		...report,
 		summary: formatSummary(report),
+		recommendations: buildRecommendations(recurrence_detected),
 		recurrence_detected,
 	};
 }

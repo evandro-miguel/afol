@@ -42,6 +42,7 @@ export const ROUTED_SUBCOMMAND_GROUPS = Object.freeze([
 	"memory",
 	"adm",
 	"spec",
+	"ux",
 	"adr",
 	"changelog",
 	"health",
@@ -91,6 +92,17 @@ function normalizeStatusInvocation(values: string[]): string[] {
 	const rest = values.slice(1);
 	const hasJson = rest.some((value) => kernelRegistry.isJsonAlias(value));
 	return ["status", ...removeJsonAliases(rest), ...(hasJson ? ["--json"] : [])];
+}
+
+function maybeCompactCtxAliasArgs(
+	originalTopLevel: string | undefined,
+	action: string,
+	args: string[],
+): string[] {
+	if (originalTopLevel !== "cx" || action !== "bundle") {
+		return args;
+	}
+	return args.includes("--mode") ? args : [...args, "--mode", "compact"];
 }
 
 function normalizeArguments(values: string[]): string[] {
@@ -199,7 +211,11 @@ export function resolveCommand(args: string[]): CommandResolution {
 	}
 
 	if (topLevelKind === "start") {
-		return { kind: "start", args: normalizeScopedFlags("start", rest) };
+		const startArgs = normalizeScopedFlags("start", rest);
+		return {
+			kind: "start",
+			args: firstArg === "st" ? ["--compact", ...startArgs] : startArgs,
+		};
 	}
 
 	if (topLevelKind === "evidence") {
@@ -301,7 +317,7 @@ export function resolveCommand(args: string[]): CommandResolution {
 			kind: "subcommand",
 			group: topLevelKind,
 			action,
-			args: scopedArgs,
+			args: maybeCompactCtxAliasArgs(firstArg, action, scopedArgs),
 		};
 	}
 

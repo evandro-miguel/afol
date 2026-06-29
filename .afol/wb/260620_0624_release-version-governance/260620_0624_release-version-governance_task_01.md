@@ -1,12 +1,5 @@
 # Tasks: release-version-governance
 
-## Task List
-
-- [x] T-01 Version/provenance.
-- [x] T-02 Update/install guardrails.
-- [x] T-03 Docs/runbook.
-- [x] T-04 Tests/validation/closure.
-
 ## State Board
 
 | Task | State | Owner | Write scope | Validate | Evidence |

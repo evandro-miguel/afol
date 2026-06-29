@@ -1,9 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAdmCommand } from "../commands/adm";
-import { resolveAdmPaths } from "../services/adm";
+import { migrateAdm } from "../services/adm/migrator";
+import { resolveAdmPaths } from "../services/adm/paths";
 
 type CapturedIo = {
 	stdout: string[];
@@ -119,6 +127,29 @@ describe("adm command", () => {
 			expect(paths.routingDir).toBe(join(root, ".afol", "adm", "routing"));
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("migrate rejects symlinked .afol before writing archive or targets", () => {
+		const root = createFixture(false);
+		const outside = mkdtempSync(join(tmpdir(), "adm-command-outside-"));
+		try {
+			mkdirSync(join(root, "docs", "arc"), { recursive: true });
+			writeFileSync(
+				join(root, "docs", "arc", "GENERAL-ROADMAP.md"),
+				"# Roadmap\n",
+				"utf8",
+			);
+			symlinkSync(outside, join(root, ".afol"), "dir");
+
+			expect(() => migrateAdm(root)).toThrow(/symlink/);
+			expect(
+				existsSync(join(outside, "adm", "roadmap", "GENERAL-ROADMAP.md")),
+			).toBe(false);
+			expect(existsSync(join(outside, "adm", "migrations"))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(outside, { recursive: true, force: true });
 		}
 	});
 });

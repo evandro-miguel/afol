@@ -17,7 +17,7 @@ links:
   report: ''
 scope:
   repo_areas:
-  - docs/arc
+  - .afol/adm
   - docs/templates
   - docs/standards
   - .afol/wb
@@ -151,7 +151,7 @@ Out of scope for this planning record:
     feature strategy rather than becoming the only source of test intent.
 - Constraints:
   - Repository artifacts are written in English by default.
-  - Project-owned governance belongs under `docs/arc/`, not `.agents/`, unless
+  - Project-owned governance belongs under `.afol/adm/`, not `.agents/`, unless
     the artifact is runtime state.
   - Validation must be introduced after templates and docs are usable.
 

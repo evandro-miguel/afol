@@ -1,0 +1,6 @@
+{"id":"E-20260627192517884-b1154d","task_id":"T-01","created_at":"2026-06-27T23:25:17.884Z","command":"afol validate bench --pack governance-history --json","result":"passed"}
+{"id":"E-20260627192521403-d92794","task_id":"T-01","created_at":"2026-06-27T23:25:21.403Z","command":"bun test cli/tests/validation.test.ts cli/tests/validate-internals.test.ts","result":"passed"}
+{"id":"E-20260627192529570-eff01f","task_id":"T-01","created_at":"2026-06-27T23:25:29.570Z","command":"afol validate project --json","result":"passed"}
+{"id":"E-20260627192529624-64e72f","task_id":"T-01","created_at":"2026-06-27T23:25:29.624Z","command":"bun test","result":"passed"}
+{"id":"E-20260627192529673-772c18","task_id":"T-01","created_at":"2026-06-27T23:25:29.673Z","command":"afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260627192529745-2831cd","task_id":"T-01","created_at":"2026-06-27T23:25:29.745Z","command":"bun run typecheck","result":"passed"}

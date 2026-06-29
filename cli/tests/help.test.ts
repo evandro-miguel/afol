@@ -124,6 +124,13 @@ describe("help formatter", () => {
 		expect(updateHelp).toContain("apply --dry-run [read]");
 	});
 
+	test("lists session radar in per-command help", () => {
+		const help = formatCommandHelp("session", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		expect(help).toContain("radar --json [read]");
+	});
+
 	test("makes risky file operations explicit in command help", () => {
 		const help = formatCommandHelp("file", kernelRegistry);
 
@@ -140,6 +147,22 @@ describe("help formatter", () => {
 		expect(help).toContain("pt|patch --path <path> --dry-run [read]");
 		expect(help).toContain("pt|patch --path <path> [write]");
 		expect(help).toContain("ud|undo --mutation-id <id> [write]");
+	});
+
+	test("documents maintenance review modes in command help", () => {
+		const help = formatCommandHelp("maintenance", kernelRegistry);
+
+		expect(help).not.toBeNull();
+		if (!help) {
+			throw new Error("expected maintenance command help");
+		}
+		expect(help).toContain("Command: maintenance");
+		expect(help).toContain("Side effect: write");
+		expect(help).toContain("Subcommands:");
+		expect(help).toContain("weekly --dry-run [read]");
+		expect(help).toContain("monthly --dry-run [read]");
+		expect(help).toContain("review --area <area> --dry-run [read]");
+		expect(help).toContain("review --area <area> --note <text> [write]");
 	});
 
 	test("publishes write-risk metadata for schema apply flows", () => {

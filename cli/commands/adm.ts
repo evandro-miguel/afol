@@ -1,11 +1,8 @@
 import { relative } from "node:path";
-import {
-	buildAdmMigrationPlan,
-	listAdmFiles,
-	migrateAdm,
-	resolveAdmPaths,
-	validateAdmMigration,
-} from "../services/adm";
+import { migrateAdm } from "../services/adm/migrator";
+import { listAdmFiles, resolveAdmPaths } from "../services/adm/paths";
+import { buildAdmMigrationPlan } from "../services/adm/planner";
+import { validateAdmMigration } from "../services/adm/validate";
 import { type CommandIo, DEFAULT_IO, writeLegacyJsonEnvelope } from "./io";
 
 type AdmAction = "paths" | "show" | "plan" | "migrate" | "validate";

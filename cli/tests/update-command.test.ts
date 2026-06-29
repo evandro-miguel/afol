@@ -58,8 +58,9 @@ function mkRoot(): string {
 }
 
 function writeClaudeAdapterConfig(root: string, enabled: boolean): void {
+	mkdirSync(join(root, ".afol"), { recursive: true });
 	writeFileSync(
-		join(root, ".agents", "config.json"),
+		join(root, ".afol", "config.json"),
 		`${JSON.stringify(
 			{
 				schema_version: 1,
@@ -164,6 +165,15 @@ describe("update command", () => {
 			expect(verboseOutput.stdout.join("\n")).toContain(
 				".agents/manifest.json [owner=managed] manifest commands changed",
 			);
+
+			const flagOnlyJson = capture();
+			expect(await runUpdateCommand(["--json"], root, flagOnlyJson.io)).toBe(0);
+			const parsed = JSON.parse(flagOnlyJson.stdout[0] ?? "{}") as {
+				action?: string;
+				ok?: boolean;
+			};
+			expect(parsed.ok).toBe(true);
+			expect(parsed.action).toBe("update.check");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -308,9 +318,24 @@ describe("update command", () => {
 			expect(preview.stdout.join("\n")).toContain("preview operations:");
 			expect(preview.stdout.join("\n")).toContain("diff previews:");
 			expect(preview.stdout.join("\n")).toContain(
+				"diff previews: omitted in compact preview",
+			);
+			expect(preview.stdout.join("\n")).toContain("operations: total=");
+			expect(preview.stdout.join("\n")).not.toContain("@@");
+
+			const verbosePreview = capture();
+			expect(
+				await runUpdateCommand(
+					["preview", "--verbose"],
+					root,
+					verbosePreview.io,
+				),
+			).toBe(0);
+			expect(verbosePreview.stdout.join("\n")).toContain("diff previews:");
+			expect(verbosePreview.stdout.join("\n")).toContain(
 				".agents/lock.json [owner=managed] revision changed",
 			);
-			expect(preview.stdout.join("\n")).toContain("@@");
+			expect(verbosePreview.stdout.join("\n")).toContain("@@");
 
 			const json = capture();
 			expect(await runUpdateCommand(["ck", "--json"], root, json.io)).toBe(0);
@@ -415,9 +440,7 @@ describe("update command", () => {
 				await runUpdateCommand(["apply", "--dry-run"], root, dryRun.io),
 			).toBe(0);
 			expect(dryRun.stdout.join("\n")).toContain("apply details");
-			expect(dryRun.stdout.join("\n")).toContain(
-				"update-managed .agents/lock.json revision changed",
-			);
+			expect(dryRun.stdout.join("\n")).toContain("operations: total=");
 			expect(
 				readFileSync(join(root, ".agents", "lock.json"), "utf8"),
 			).not.toContain("new");
@@ -444,6 +467,50 @@ describe("update command", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 			rmSync(cliRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("apply dry-run permits project-owned preserves without writes", async () => {
+		const root = mkRoot();
+		try {
+			mkdirSync(join(root, ".afol"), { recursive: true });
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				'{"local":true}\n',
+				"utf8",
+			);
+			writeFileSync(
+				join(root, ".agents", "manifest.json"),
+				JSON.stringify(
+					{
+						version: 1,
+						commands: { status: ["s", "status"] },
+						ownership: {
+							"project-owned": [".afol/config.json", ".agents/manifest.json"],
+							generated: [],
+							ignored: [],
+							conflict: [],
+						},
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const dryRun = capture();
+			expect(
+				await runUpdateCommand(["apply", "--dry-run"], root, dryRun.io),
+			).toBe(0);
+			expect(dryRun.stdout.join("\n")).toContain("preserve=2");
+			expect(readFileSync(join(root, ".afol", "config.json"), "utf8")).toBe(
+				'{"local":true}\n',
+			);
+
+			const realApply = capture();
+			expect(await runUpdateCommand(["apply"], root, realApply.io)).toBe(4);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
@@ -720,9 +787,8 @@ describe("update command", () => {
 			expect(manifestAfter.commands.validate).toEqual(["changed"]);
 			expect(manifestAfter.custom).toBe("touch");
 			expect(blocked.stdout.join("\n")).toContain("apply details");
-			expect(blocked.stdout.join("\n")).toContain(
-				"conflict .agents/manifest.json local-user-edit-or-unsafe",
-			);
+			expect(blocked.stdout.join("\n")).toContain("conflicts:");
+			expect(blocked.stdout.join("\n")).toContain("- .agents/manifest.json");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -770,12 +836,60 @@ describe("update command", () => {
 			);
 			const journalPath = join(
 				root,
-				".agents",
+				".afol",
 				"data",
 				"mutations",
 				"mutations.jsonl",
 			);
 			expect(existsSync(journalPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply rolls back files written before an injected mid-batch failure", async () => {
+		const root = mkRoot();
+		const originalLock = readFileSync(
+			join(root, ".agents", "lock.json"),
+			"utf8",
+		);
+		const originalManifest = readFileSync(
+			join(root, ".agents", "manifest.json"),
+			"utf8",
+		);
+		try {
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"apply",
+						"--session",
+						"S-03",
+						"--task-id",
+						"T-04",
+						"--reason",
+						"rollback on partial batch failure",
+					],
+					root,
+					output.io,
+					{ failAfterWriteCount: 2 },
+				),
+			).toBe(2);
+			expect(output.stderr.join("\n")).toContain(
+				"Injected update apply failure after write",
+			);
+			expect(readFileSync(join(root, ".agents", "lock.json"), "utf8")).toBe(
+				originalLock,
+			);
+			expect(readFileSync(join(root, ".agents", "manifest.json"), "utf8")).toBe(
+				originalManifest,
+			);
+			expect(existsSync(join(root, ".afol", "adm", "rules", "README.md"))).toBe(
+				false,
+			);
+			expect(
+				existsSync(join(root, ".afol", "data", "mutations", "mutations.jsonl")),
+			).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

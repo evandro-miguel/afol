@@ -125,6 +125,14 @@ export function collectSessionIds(root: string): string[] {
 		.sort();
 }
 
+function sessionDirExists(root: string, session: string): boolean {
+	try {
+		return statSync(resolve(resolveWorkbenchRoot(root), session)).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
 function sessionTaskFiles(sessionDir: string): string[] {
 	try {
 		return readdirSync(sessionDir, { withFileTypes: true })
@@ -148,6 +156,35 @@ function emptyTaskClaims(): ParsedTaskClaims {
 		planned_files: [],
 		touched_files: [],
 	};
+}
+
+function mergeBySession<T extends { session: string }>(
+	entries: T[],
+	replacement: T[],
+	session: string,
+): T[] {
+	if (entries.length === 0) {
+		return replacement.length > 0 ? [...replacement] : [];
+	}
+
+	const merged: T[] = [];
+	let inserted = false;
+
+	for (const entry of entries) {
+		if (!inserted && entry.session.localeCompare(session) > 0) {
+			merged.push(...replacement);
+			inserted = true;
+		}
+		if (entry.session !== session) {
+			merged.push(entry);
+		}
+	}
+
+	if (!inserted) {
+		merged.push(...replacement);
+	}
+
+	return merged;
 }
 
 function sortClaims(
@@ -636,8 +673,7 @@ export function rebuildWorkBenchIndex(
 
 	if (sessionScope) {
 		const targetSnapshot = buildSessionsSnapshot(root, [sessionScope]);
-		const allSessions = collectSessionIds(root);
-		const hasSession = allSessions.includes(sessionScope);
+		const hasSession = sessionDirExists(root, sessionScope);
 
 		const existingTasks = current?.tasks ?? [];
 		const existingSessions = current?.sessions ?? [];
@@ -654,6 +690,17 @@ export function rebuildWorkBenchIndex(
 			return writeSnapshot(root, filtered);
 		}
 
+		const nextSessions = mergeBySession(
+			existingSessions,
+			targetSnapshot.sessions,
+			sessionScope,
+		);
+		const nextTasks = mergeBySession(
+			existingTasks,
+			targetSnapshot.tasks,
+			sessionScope,
+		);
+
 		const next: WorkbenchIndexSnapshot = {
 			kind: "workbench_index_v1",
 			version: 1,
@@ -661,14 +708,8 @@ export function rebuildWorkBenchIndex(
 			source: {
 				...workbenchSource(root),
 			},
-			sessions: [
-				...existingSessions.filter((entry) => entry.session !== sessionScope),
-				...targetSnapshot.sessions,
-			].sort(sortSessions),
-			tasks: [
-				...existingTasks.filter((task) => task.session !== sessionScope),
-				...targetSnapshot.tasks,
-			].sort(sortTasks),
+			sessions: nextSessions,
+			tasks: nextTasks,
 		};
 		return writeSnapshot(root, next);
 	}

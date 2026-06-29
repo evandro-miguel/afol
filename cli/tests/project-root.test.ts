@@ -1,42 +1,43 @@
 import { describe, expect, test } from "bun:test";
 import {
-	chmodSync,
 	mkdirSync,
 	mkdtempSync,
+	realpathSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadJsonObject, loadYamlObject } from "../core/schema";
 import { resolveProjectPaths } from "../services/project/paths";
-import { loadProjectRoot, resolveProjectPath } from "../services/project/root";
+import {
+	loadProjectRoot,
+	resolveProjectPath,
+	resolveProjectWritePath,
+} from "../services/project/root";
 
 const templateConfig = JSON.stringify({
 	schema_version: 1,
 	project: {
-		name: "agentic-start-folder-dev-refactor-ts",
+		name: "afol",
 	},
 });
 const templateLock = JSON.stringify({
 	schema_version: 1,
 	revision: "e178aaf",
-	project: "agentic-start-folder-dev-refactor-ts",
+	project: "afol",
 	locked: true,
 });
 
 function mkProjectRoot(name: string): string {
 	const root = mkdtempSync(join(tmpdir(), `project-root-${name}-`));
+	const afolDir = join(root, ".afol");
 	const agentsDir = join(root, ".agents");
+	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
-	writeFileSync(join(agentsDir, "config.json"), templateConfig, "utf8");
+	writeFileSync(join(afolDir, "config.json"), templateConfig, "utf8");
 	writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
-	writeFileSync(
-		join(agentsDir, "agents"),
-		"#!/usr/bin/env bash\nexit 0\n",
-		"utf8",
-	);
-	chmodSync(join(agentsDir, "agents"), 0o755);
 	return root;
 }
 
@@ -69,9 +70,9 @@ describe("project root loader", () => {
 				return;
 			}
 			expect(loaded.value.root).toBe(root);
-			expect(loaded.value.configPath.endsWith(".agents/config.json")).toBe(
-				true,
-			);
+			expect(loaded.value.configPath.endsWith(".afol/config.json")).toBe(true);
+			expect(loaded.value.configRelativePath).toBe(".afol/config.json");
+			expect(loaded.value.configSource).toBe("canonical");
 			expect(loaded.value.config.project).toBeDefined();
 			expect(loaded.value.lock.locked).toBe(true);
 		} finally {
@@ -79,7 +80,53 @@ describe("project root loader", () => {
 		}
 	});
 
-	test("returns root-not-found when no .agents config exists", () => {
+	test("canonicalizes symlinked project roots before resolving paths", () => {
+		const root = mkProjectRoot("root-symlink-target");
+		const linkParent = mkdtempSync(join(tmpdir(), "project-root-link-parent-"));
+		const link = join(linkParent, "linked-project");
+		try {
+			symlinkSync(root, link, "dir");
+			const realRoot = realpathSync(root);
+
+			const loaded = loadProjectRoot(link);
+			expect(loaded.ok).toBe(true);
+			if (!loaded.ok) {
+				return;
+			}
+			expect(loaded.value.root).toBe(realRoot);
+			expect(loaded.value.configPath).toBe(
+				join(realRoot, ".afol", "config.json"),
+			);
+			expect(loaded.value.configSource).toBe("canonical");
+
+			const paths = resolveProjectPaths(link);
+			expect(paths.abs.stateDb).toBe(join(realRoot, ".afol/state/afol.db"));
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(linkParent, { recursive: true, force: true });
+		}
+	});
+
+	test("falls back to legacy .agents config when canonical config is missing", () => {
+		const root = mkdtempSync(join(tmpdir(), "project-root-legacy-"));
+		const agentsDir = join(root, ".agents");
+		mkdirSync(agentsDir, { recursive: true });
+		writeFileSync(join(agentsDir, "config.json"), templateConfig, "utf8");
+		writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
+		try {
+			const loaded = loadProjectRoot(root);
+			expect(loaded.ok).toBe(true);
+			if (!loaded.ok) {
+				return;
+			}
+			expect(loaded.value.configRelativePath).toBe(".agents/config.json");
+			expect(loaded.value.configSource).toBe("legacy");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("returns root-not-found when no project config exists", () => {
 		const root = mkdtempSync(join(tmpdir(), "project-root-missing-"));
 		try {
 			const loaded = loadProjectRoot(root);
@@ -93,11 +140,58 @@ describe("project root loader", () => {
 		}
 	});
 
+	test("rejects symlinked .afol config roots", () => {
+		const root = mkdtempSync(join(tmpdir(), "project-root-afol-symlink-"));
+		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-afol-"));
+		try {
+			writeFileSync(join(outside, "config.json"), templateConfig, "utf8");
+			writeFileSync(join(outside, "lock.json"), templateLock, "utf8");
+			symlinkSync(outside, join(root, ".afol"), "dir");
+
+			const loaded = loadProjectRoot(root);
+			expect(loaded.ok).toBe(false);
+			if (!loaded.ok) {
+				expect(loaded.error.code).toBe(2);
+				expect(loaded.error.message).toContain("symlink");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(outside, { recursive: true, force: true });
+		}
+	});
+
+	test("schema readers reject symlinked parent directories", () => {
+		const root = mkdtempSync(join(tmpdir(), "project-root-schema-symlink-"));
+		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-schema-"));
+		try {
+			writeFileSync(join(outside, "config.json"), templateConfig, "utf8");
+			writeFileSync(join(outside, "shape.yaml"), "ok: true\n", "utf8");
+			symlinkSync(outside, join(root, ".afol"), "dir");
+
+			const json = loadJsonObject(join(root, ".afol", "config.json"));
+			expect(json.ok).toBe(false);
+			if (!json.ok) {
+				expect(json.error).toContain("symlink");
+			}
+
+			const yaml = loadYamlObject(join(root, ".afol", "shape.yaml"));
+			expect(yaml.ok).toBe(false);
+			if (!yaml.ok) {
+				expect(yaml.error).toContain("symlink");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(outside, { recursive: true, force: true });
+		}
+	});
+
 	test("returns invalid state for malformed config/lock", () => {
 		const root = mkdtempSync(join(tmpdir(), "project-root-invalid-"));
+		const afolDir = join(root, ".afol");
 		const agentsDir = join(root, ".agents");
+		mkdirSync(afolDir, { recursive: true });
 		mkdirSync(agentsDir, { recursive: true });
-		writeFileSync(join(agentsDir, "config.json"), "{invalid", "utf8");
+		writeFileSync(join(afolDir, "config.json"), "{invalid", "utf8");
 		writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
 		try {
 			const loaded = loadProjectRoot(root);
@@ -111,14 +205,53 @@ describe("project root loader", () => {
 		}
 	});
 
+	test("rejects AFOL paths that cross symlinked mutable roots", () => {
+		const root = mkProjectRoot("mutable-root-symlink");
+		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-afol-"));
+		try {
+			rmSync(join(root, ".afol"), { recursive: true, force: true });
+			symlinkSync(outside, join(root, ".afol"), "dir");
+			expect(() => resolveProjectPaths(root)).toThrow(/Path crosses symlink/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+			rmSync(outside, { recursive: true, force: true });
+		}
+	});
+
+	test("falls back when config declares absolute project paths", () => {
+		const root = mkProjectRoot("absolute-config-paths");
+		try {
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				JSON.stringify({
+					schema_version: 1,
+					project: { name: "afol" },
+					paths: {
+						mutable_dir: join(tmpdir(), "outside-afol"),
+						skills_dir: join(tmpdir(), "outside-skills"),
+					},
+				}),
+				"utf8",
+			);
+
+			const paths = resolveProjectPaths(root);
+			expect(paths.mutableDir).toBe(".afol");
+			expect(paths.skillsDir).toBe(".agents/skills");
+			expect(paths.abs.mutableDir).toBe(join(root, ".afol"));
+			expect(paths.abs.skillsDir).toBe(join(root, ".agents/skills"));
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("resolves project paths only inside the real project root", () => {
 		const root = mkProjectRoot("path-jail");
 		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-"));
 		try {
-			const inside = resolveProjectPath(root, ".agents/config.json");
+			const inside = resolveProjectPath(root, ".afol/config.json");
 			expect(inside.ok).toBe(true);
 			if (inside.ok) {
-				expect(inside.value.relativePath).toBe(".agents/config.json");
+				expect(inside.value.relativePath).toBe(".afol/config.json");
 			}
 
 			const escaped = resolveProjectPath(root, "../outside.txt");
@@ -179,6 +312,38 @@ describe("project root loader", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 			rmSync(outside, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects write targets that cross symlinks inside root", () => {
+		const root = mkProjectRoot("path-jail-write-dir-symlink");
+		try {
+			mkdirSync(join(root, "real"), { recursive: true });
+			symlinkSync(join(root, "real"), join(root, "link"), "dir");
+
+			const symlinked = resolveProjectWritePath(root, "link/file.txt");
+			expect(symlinked.ok).toBe(false);
+			if (!symlinked.ok) {
+				expect(symlinked.error).toContain("Path crosses symlink");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects write targets when final file is a symlink", () => {
+		const root = mkProjectRoot("path-jail-write-file-symlink");
+		try {
+			writeFileSync(join(root, "real.txt"), "safe\n", "utf8");
+			symlinkSync(join(root, "real.txt"), join(root, "link.txt"));
+
+			const symlinked = resolveProjectWritePath(root, "link.txt");
+			expect(symlinked.ok).toBe(false);
+			if (!symlinked.ok) {
+				expect(symlinked.error).toContain("Path crosses symlink");
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 });

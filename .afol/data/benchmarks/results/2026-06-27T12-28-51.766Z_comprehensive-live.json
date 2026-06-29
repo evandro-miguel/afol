@@ -1,0 +1,370 @@
+{
+  "schema_version": "2.0.0",
+  "run_id": "governed-task-lifecycle-mqwc5b77",
+  "pack_id": "comprehensive-live",
+  "timestamp": "2026-06-27T12:28:51.766Z",
+  "results": [
+    {
+      "schema_version": "2.0.0",
+      "run_id": "governed-task-lifecycle-mqwc5b77",
+      "scenario_id": "governed-task-lifecycle",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "fc5cbea1b086",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-06-27T12:28:51.766Z",
+      "tokens": {
+        "input": 257102,
+        "output": 2777,
+        "cached_input": 244736,
+        "reasoning_output": 1349,
+        "total": 505964
+      },
+      "timing": {
+        "wall_clock_ms": 59973
+      },
+      "tools": {
+        "total_calls": 25,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 5,
+          "afol_command": 9,
+          "shell": 2,
+          "agent_message": 9
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    },
+    {
+      "schema_version": "2.0.0",
+      "run_id": "file-inspection-vs-command-mqwc6lko",
+      "scenario_id": "file-inspection-vs-command",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "fc5cbea1b086",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-06-27T12:29:04.952Z",
+      "tokens": {
+        "input": 52522,
+        "output": 480,
+        "cached_input": 46720,
+        "reasoning_output": 185,
+        "total": 99907
+      },
+      "timing": {
+        "wall_clock_ms": 13181
+      },
+      "tools": {
+        "total_calls": 5,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 2,
+          "shell": 0,
+          "agent_message": 3
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    },
+    {
+      "schema_version": "2.0.0",
+      "run_id": "validation-flow-mqwc6vqy",
+      "scenario_id": "validation-flow",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "fc5cbea1b086",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-06-27T12:29:13.549Z",
+      "tokens": {
+        "input": 35076,
+        "output": 310,
+        "cached_input": 20736,
+        "reasoning_output": 152,
+        "total": 56274
+      },
+      "timing": {
+        "wall_clock_ms": 8591
+      },
+      "tools": {
+        "total_calls": 3,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 1,
+          "shell": 0,
+          "agent_message": 2
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    },
+    {
+      "schema_version": "2.0.0",
+      "run_id": "plan-quality-check-mqwc72ds",
+      "scenario_id": "plan-quality-check",
+      "pack_id": "comprehensive-live",
+      "status": "passed",
+      "mode": "live",
+      "git_commit": "fc5cbea1b086",
+      "model": "gpt-5.4-mini/medium",
+      "timestamp": "2026-06-27T12:29:24.632Z",
+      "tokens": {
+        "input": 17181,
+        "output": 593,
+        "cached_input": 12160,
+        "reasoning_output": 358,
+        "total": 30292
+      },
+      "timing": {
+        "wall_clock_ms": 11076
+      },
+      "tools": {
+        "total_calls": 1,
+        "success_rate": 1,
+        "by_type": {
+          "file_read": 0,
+          "afol_command": 0,
+          "shell": 0,
+          "agent_message": 1
+        },
+        "error_count": 0
+      },
+      "effectiveness": {
+        "task_completed": true,
+        "error_count": 0,
+        "retry_count": 0
+      },
+      "plan_quality": {
+        "meta_planning_detected": false,
+        "direct_execution": true
+      },
+      "thresholds": {
+        "max_output_tokens": 4000,
+        "max_duration_ms": 120000,
+        "min_tool_success_rate": 0.8
+      },
+      "pass": true,
+      "notes": []
+    }
+  ],
+  "report": {
+    "schema_version": "2.0.0",
+    "run_id": "governed-task-lifecycle-mqwc5b77",
+    "pack_id": "comprehensive-live",
+    "timestamp": "2026-06-27T12:28:51.766Z",
+    "summary": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0,
+      "blocked": 0,
+      "total_tokens": 692437,
+      "total_time_ms": 92821,
+      "avg_tool_success_rate": 1
+    },
+    "comparison": {
+      "delta_tokens": null,
+      "delta_time_ms": null,
+      "delta_tool_success_rate": null,
+      "regressions": []
+    },
+    "baseline": null,
+    "results": [
+      {
+        "scenario_id": "governed-task-lifecycle",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 257102,
+          "output": 2777,
+          "cached_input": 244736,
+          "reasoning_output": 1349,
+          "total": 505964
+        },
+        "timing": {
+          "wall_clock_ms": 59973
+        },
+        "tools": {
+          "total_calls": 25,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 5,
+            "afol_command": 9,
+            "shell": 2,
+            "agent_message": 9
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      },
+      {
+        "scenario_id": "file-inspection-vs-command",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 52522,
+          "output": 480,
+          "cached_input": 46720,
+          "reasoning_output": 185,
+          "total": 99907
+        },
+        "timing": {
+          "wall_clock_ms": 13181
+        },
+        "tools": {
+          "total_calls": 5,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 2,
+            "shell": 0,
+            "agent_message": 3
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      },
+      {
+        "scenario_id": "validation-flow",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 35076,
+          "output": 310,
+          "cached_input": 20736,
+          "reasoning_output": 152,
+          "total": 56274
+        },
+        "timing": {
+          "wall_clock_ms": 8591
+        },
+        "tools": {
+          "total_calls": 3,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 1,
+            "shell": 0,
+            "agent_message": 2
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      },
+      {
+        "scenario_id": "plan-quality-check",
+        "status": "passed",
+        "pass": true,
+        "tokens": {
+          "input": 17181,
+          "output": 593,
+          "cached_input": 12160,
+          "reasoning_output": 358,
+          "total": 30292
+        },
+        "timing": {
+          "wall_clock_ms": 11076
+        },
+        "tools": {
+          "total_calls": 1,
+          "success_rate": 1,
+          "by_type": {
+            "file_read": 0,
+            "afol_command": 0,
+            "shell": 0,
+            "agent_message": 1
+          },
+          "error_count": 0
+        },
+        "effectiveness": {
+          "task_completed": true,
+          "error_count": 0,
+          "retry_count": 0
+        },
+        "plan_quality": {
+          "meta_planning_detected": false,
+          "direct_execution": true
+        },
+        "notes": []
+      }
+    ],
+    "text": "bench report: comprehensive-live\nrun: governed-task-lifecycle-mqwc5b77\ntimestamp: 2026-06-27T12:28:51.766Z\nresults: 4 passed=4 failed=0 blocked=0\ntokens: total=692437\ntime_ms: total=92821\ntool_success: 1\npassed governed-task-lifecycle tokens=505964 time_ms=59973 tools=25\npassed file-inspection-vs-command tokens=99907 time_ms=13181 tools=5\npassed validation-flow tokens=56274 time_ms=8591 tools=3\npassed plan-quality-check tokens=30292 time_ms=11076 tools=1"
+  },
+  "text": "bench report: comprehensive-live\nrun: governed-task-lifecycle-mqwc5b77\ntimestamp: 2026-06-27T12:28:51.766Z\nresults: 4 passed=4 failed=0 blocked=0\ntokens: total=692437\ntime_ms: total=92821\ntool_success: 1\npassed governed-task-lifecycle tokens=505964 time_ms=59973 tools=25\npassed file-inspection-vs-command tokens=99907 time_ms=13181 tools=5\npassed validation-flow tokens=56274 time_ms=8591 tools=3\npassed plan-quality-check tokens=30292 time_ms=11076 tools=1"
+}

@@ -19,7 +19,7 @@ scope:
   repo_areas:
   - .afol/wb
   - .afol/adm
-  - docs/arc/DECISIONS
+  - .afol/adm/decisions
   - cli/commands
   packages:
   - agentic-cli
@@ -39,7 +39,7 @@ risk_level: high
 - Role of this spec: child delivery contract for closure gates and decision
   history.
 - ADR-004 note: once `.afol/adm/**` migration lands, spec and ADR checks should
-  use `.afol/adm` as the authority. Until then, `docs/arc/**` remains canonical.
+  use `.afol/adm` as the authority. Until then, `docs/arc/**` remains archive-only.
 
 ## 2) Problem
 
@@ -95,7 +95,7 @@ Expected behavior:
 - Waiver requires a reason and should reference an ADR or spec update for major
   conflicts.
 - Current transitional decision history paths:
-  - `docs/arc/DECISIONS/`
+  - `.afol/adm/decisions/`
 - Target decision history paths after adm migration:
   - `.afol/adm/decisions/`
   - `.afol/adm/changelog.md`

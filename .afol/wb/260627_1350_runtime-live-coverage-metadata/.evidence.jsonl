@@ -1,0 +1,8 @@
+{"id":"E-20260627141538823-6d90a6","task_id":"T-01","created_at":"2026-06-27T18:15:38.823Z","command":"bun run template:generate","result":"passed"}
+{"id":"E-20260627141542127-c6bdd1","task_id":"T-01","created_at":"2026-06-27T18:15:42.127Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260627141546149-75b125","task_id":"T-01","created_at":"2026-06-27T18:15:46.149Z","command":"bun test cli/tests/validate-internals.test.ts cli/tests/validation.test.ts cli/tests/bench-command.test.ts cli/tests/ux-command.test.ts cli/tests/registry.test.ts cli/tests/template-policy.test.ts cli/tests/bootstrap-template-cleanliness.test.ts","result":"passed"}
+{"id":"E-20260627141549378-0388b9","task_id":"T-01","created_at":"2026-06-27T18:15:49.378Z","command":"afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260627141552625-784f97","task_id":"T-01","created_at":"2026-06-27T18:15:52.625Z","command":"bun run kernel -- ux validate --json","result":"passed"}
+{"id":"E-20260627141556085-c0445a","task_id":"T-01","created_at":"2026-06-27T18:15:56.085Z","command":"all AFOL tools have ux coverage via tools.json loop","result":"passed"}
+{"id":"E-20260627141559547-8da0a0","task_id":"T-01","created_at":"2026-06-27T18:15:59.547Z","command":"bun run kernel -- v bench --pack runtime-live-agent --json","result":"passed"}
+{"id":"E-20260627141604839-fb103d","task_id":"T-01","created_at":"2026-06-27T18:16:04.839Z","command":"afol validate project --json","result":"passed"}

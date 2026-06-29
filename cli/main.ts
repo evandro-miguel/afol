@@ -35,6 +35,7 @@ import { runStatusCommand } from "./commands/status";
 import { runSweepCommand } from "./commands/sweep";
 import { runTelemetryCommand } from "./commands/telemetry";
 import { runUpdateCommand } from "./commands/update";
+import { runUxCommand } from "./commands/ux";
 import { runValidateCommand } from "./commands/validate";
 import {
 	runCloseCommand,
@@ -73,6 +74,24 @@ const NEW_COMMAND_HELP = [
 	"  --feature-id <id>        Governing roadmap feature ID",
 	"  --parent-spec <spec-id>  Parent spec identifier",
 	"  --task <text>            Initial task summary; repeat for multiple tasks",
+].join("\n");
+
+const START_COMMAND_HELP = [
+	"Usage: afol start --session <session-id> --task-id <task-id> [options]",
+	"",
+	"Options",
+	"  --session <session-id>  Workbench session to start from",
+	"  --task-id <task-id>    Task identifier to mark in progress",
+	"  --json                 Emit machine-readable start result",
+	"  --compact              Emit compact human output",
+].join("\n");
+
+const CLOSE_COMMAND_HELP = [
+	"Usage: afol close --session <session-id> [options]",
+	"",
+	"Options",
+	"  --session <session-id>  Workbench session to close",
+	"  --json                 Emit machine-readable close result",
 ].join("\n");
 
 const exit = (code: number): never => {
@@ -115,6 +134,7 @@ export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
 	"projectBenchmark",
 	"sweep",
 	"spec",
+	"ux",
 	"adr",
 	"changelog",
 	"ctx",
@@ -211,6 +231,24 @@ export async function main(argv: string[]): Promise<number> {
 		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
 	) {
 		console.log(NEW_COMMAND_HELP);
+		return 0;
+	}
+
+	if (
+		resolution.kind === "start" &&
+		resolution.args.length === 1 &&
+		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
+	) {
+		console.log(START_COMMAND_HELP);
+		return 0;
+	}
+
+	if (
+		resolution.kind === "close" &&
+		resolution.args.length === 1 &&
+		(resolution.args[0] === "-h" || resolution.args[0] === "--help")
+	) {
+		console.log(CLOSE_COMMAND_HELP);
 		return 0;
 	}
 
@@ -355,6 +393,8 @@ export async function main(argv: string[]): Promise<number> {
 			return runMaintenanceCommand(
 				[resolution.action, ...resolution.args].filter(Boolean),
 				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "pstr") {
@@ -416,6 +456,15 @@ export async function main(argv: string[]): Promise<number> {
 				resolution.action,
 				resolution.args,
 				project.value.root,
+			);
+		}
+		if (resolution.group === "ux") {
+			return runUxCommand(
+				resolution.action,
+				resolution.args,
+				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "adr") {

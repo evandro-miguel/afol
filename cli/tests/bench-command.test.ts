@@ -3,8 +3,17 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runBenchCommand } from "../commands/bench";
-import { classifyCommand, parseEventStream } from "../services/benchmark";
 import { runCliMicroBenchmark } from "../services/benchmark/cli-micro";
+import {
+	collectExpectationNotes,
+	commandMatchesExpected,
+} from "../services/benchmark/live-runner";
+import {
+	classifyCommand,
+	parseEventStream,
+} from "../services/benchmark/metrics";
+import { listBenchScenarios } from "../services/benchmark/scenarios";
+import type { BenchScenario } from "../services/benchmark/types";
 
 type CapturedIo = {
 	stdout: string[];
@@ -101,6 +110,14 @@ describe("benchmark metrics", () => {
 		expect(classifyCommand("cat docs/arc/spec.md")).toBe("file_read");
 		expect(classifyCommand("rg test-feature docs")).toBe("file_read");
 		expect(classifyCommand("afol status")).toBe("afol_command");
+		expect(classifyCommand("command -v afol && afol status")).toBe(
+			"afol_command",
+		);
+		expect(classifyCommand("/usr/bin/zsh -lc 'afol spec list --json'")).toBe(
+			"afol_command",
+		);
+		expect(classifyCommand("./afol status")).toBe("shell");
+		expect(classifyCommand("/usr/bin/zsh -lc './afol status'")).toBe("shell");
 		expect(classifyCommand("echo hello")).toBe("shell");
 		expect(classifyCommand("git status --short")).toBe("shell");
 	});
@@ -171,6 +188,108 @@ describe("benchmark metrics", () => {
 	});
 });
 
+describe("live benchmark expectation policy", () => {
+	function metricsForCommands(commands: string[]) {
+		return parseEventStream(
+			commands.map((command, index) =>
+				JSON.stringify({
+					type: "item.completed",
+					item: {
+						id: `item_${index}`,
+						type: "command_execution",
+						command,
+						exit_code: 0,
+						status: "completed",
+					},
+				}),
+			),
+		);
+	}
+
+	test("matches expected afol commands by shell segment", () => {
+		expect(commandMatchesExpected("afol status --json", "afol status")).toBe(
+			true,
+		);
+		expect(
+			commandMatchesExpected(
+				"command -v afol && afol spec list --json",
+				"afol spec list",
+			),
+		).toBe(true);
+		expect(
+			commandMatchesExpected(
+				"/usr/bin/zsh -lc 'afol spec list --json'",
+				"afol spec list",
+			),
+		).toBe(true);
+		expect(commandMatchesExpected("./afol status --json", "afol status")).toBe(
+			false,
+		);
+	});
+
+	test("rejects local wrapper and direct spec file inspection", () => {
+		const scenario: BenchScenario = {
+			id: "file-inspection-vs-command",
+			version: "test",
+			description: "test",
+			prompt: "test",
+			expected: {
+				commands_used: ["afol status", "afol spec list"],
+				forbidden_commands: ["./afol", ".afol/adm/specs"],
+			},
+		};
+		const metrics = metricsForCommands([
+			"/usr/bin/zsh -lc './afol status --json'",
+			"sed -n '1,20p' .afol/adm/specs/active-runtime.md",
+			"/usr/bin/zsh -lc 'afol spec list --json'",
+		]);
+
+		expect(collectExpectationNotes(scenario, metrics)).toEqual([
+			"expected-command-missing:afol status",
+			"forbidden-command:./afol",
+			"forbidden-command:.afol/adm/specs",
+		]);
+	});
+
+	test("maintenance cadence scenario requires maintenance commands and rejects direct state reads", () => {
+		const scenario = listBenchScenarios().find(
+			(candidate) => candidate.id === "maintenance-cadence-review",
+		);
+		expect(scenario).toBeDefined();
+		if (!scenario) {
+			throw new Error("Expected maintenance-cadence-review scenario");
+		}
+		expect(scenario?.expected?.commands_used).toEqual([
+			"afol maintenance weekly",
+			"afol maintenance monthly",
+			"afol maintenance review --area memory",
+			"afol maintenance review --area library",
+			"afol maintenance review --area commands",
+		]);
+
+		const passingMetrics = metricsForCommands([
+			"afol maintenance weekly --dry-run",
+			"afol maintenance monthly --dry-run",
+			"afol maintenance review --area memory --dry-run",
+			"afol maintenance review --area library --dry-run",
+			'afol maintenance review --area commands --note "benchmark review" --dry-run',
+		]);
+		expect(collectExpectationNotes(scenario, passingMetrics)).toEqual([]);
+
+		const failingMetrics = metricsForCommands([
+			"sed -n '1,80p' .afol/memory/memory.md",
+			"afol maintenance weekly --dry-run",
+			"afol maintenance monthly --dry-run",
+		]);
+		expect(collectExpectationNotes(scenario, failingMetrics)).toEqual([
+			"expected-command-missing:afol maintenance review --area memory",
+			"expected-command-missing:afol maintenance review --area library",
+			"expected-command-missing:afol maintenance review --area commands",
+			"forbidden-command:.afol/memory",
+		]);
+	});
+});
+
 describe("bench command surfaces", () => {
 	test("list renders text and json", async () => {
 		const root = createProjectRoot();
@@ -178,8 +297,9 @@ describe("bench command surfaces", () => {
 			const text = captureIo();
 			const textCode = await runBenchCommand("list", [], root, text.io);
 			expect(textCode).toBe(0);
-			expect(text.stdout.join("\n")).toContain("bench scenarios: 4");
+			expect(text.stdout.join("\n")).toContain("bench scenarios: 5");
 			expect(text.stdout.join("\n")).toContain("governed-task-lifecycle");
+			expect(text.stdout.join("\n")).toContain("maintenance-cadence-review");
 
 			const json = captureIo();
 			const jsonCode = await runBenchCommand("list", ["--json"], root, json.io);
@@ -196,6 +316,9 @@ describe("bench command surfaces", () => {
 			expect(payload.data.pack_id).toBe("comprehensive-live");
 			expect(payload.data.scenarios.map((scenario) => scenario.id)).toContain(
 				"validation-flow",
+			);
+			expect(payload.data.scenarios.map((scenario) => scenario.id)).toContain(
+				"maintenance-cadence-review",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -245,6 +368,7 @@ describe("bench command surfaces", () => {
 			data: {
 				mode: string;
 				live_execution: boolean;
+				live_execution_entrypoint: string;
 				benchmark_profile: { model: string; reasoning_effort: string };
 				scenario_count: number;
 				validation_command: string;
@@ -253,6 +377,9 @@ describe("bench command surfaces", () => {
 		expect(payload.action).toBe("bench.runtime-live");
 		expect(payload.data.mode).toBe("dry-run");
 		expect(payload.data.live_execution).toBe(false);
+		expect(payload.data.live_execution_entrypoint).toBe(
+			"afol bench run --all --save",
+		);
 		expect(payload.data.benchmark_profile.model).toBe("gpt-5.4-mini");
 		expect(payload.data.benchmark_profile.reasoning_effort).toBe("medium");
 		expect(payload.data.scenario_count).toBeGreaterThan(0);

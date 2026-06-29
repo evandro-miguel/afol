@@ -10,6 +10,10 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runStatusCommand } from "../commands/status";
+import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
+import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
+import { rebuildPstrIndex } from "../services/pstr/builder";
+import { collectGlobalStatusFindings } from "../services/status/global-findings";
 
 type CapturedIo = {
 	stdout: string[];
@@ -68,17 +72,19 @@ function touch(path: string, isoTime: string): void {
 
 function createFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "status-command-"));
+	const afolDir = join(root, ".afol");
 	const agentsDir = join(root, ".agents");
 	const wbDir = join(root, ".afol", "wb");
 	const activeSessionFile = join(wbDir, ".active_session");
 	const sessionId = "260530_2256_cli-native-command-parity";
 	const sessionDir = join(wbDir, sessionId);
 
+	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
 	mkdirSync(sessionDir, { recursive: true });
 
 	writeFileSync(
-		join(agentsDir, "config.json"),
+		join(afolDir, "config.json"),
 		JSON.stringify({
 			schema_version: 1,
 			project: { name: "status-fixture" },
@@ -130,17 +136,19 @@ function createFreshnessFixture(mode: "fresh" | "stale-log"): {
 } {
 	const root = mkdtempSync(join(tmpdir(), "status-freshness-"));
 	const session = "260530_2257_status-freshness";
+	const afolDir = join(root, ".afol");
 	const agentsDir = join(root, ".agents");
 	const wbDir = join(root, ".afol", "wb");
 	const activeSessionFile = join(wbDir, ".active_session");
 	const sessionDir = join(wbDir, session);
 	const workFile = join(root, "work.txt");
 
+	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
 	mkdirSync(sessionDir, { recursive: true });
 
 	writeFileSync(
-		join(agentsDir, "config.json"),
+		join(afolDir, "config.json"),
 		JSON.stringify({
 			schema_version: 1,
 			project: { name: "status-freshness" },
@@ -199,9 +207,10 @@ function createFreshnessFixture(mode: "fresh" | "stale-log"): {
 
 function createNoSessionFixture(): string {
 	const root = mkdtempSync(join(tmpdir(), "status-no-session-"));
+	mkdirSync(join(root, ".afol"), { recursive: true });
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	writeFileSync(
-		join(root, ".agents", "config.json"),
+		join(root, ".afol", "config.json"),
 		JSON.stringify({
 			schema_version: 1,
 			project: { name: "status-no-session" },
@@ -302,6 +311,7 @@ describe("status command", () => {
 			expect(payload.data?.task).toBe("T-01");
 			const paths = payload.paths;
 			expect(typeof paths.config).toBe("string");
+			expect(paths.config_source).toBe("canonical");
 			expect(typeof paths.lock).toBe("string");
 			expect(typeof paths.active_session).toBe("string");
 			expect(typeof paths.task_file).toBe("string");
@@ -323,6 +333,46 @@ describe("status command", () => {
 			expect(text).toContain("project indexes need rebuild");
 			expect(text).toContain("run afol local-state rebuild; afol pstr rebuild");
 			expect(text).not.toContain("BLOCKERS:\n- none");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("global status findings report local-state rebuild when PSTR is current", () => {
+		const root = createFixture();
+		try {
+			rebuildPstrIndex(root);
+
+			const findings = collectGlobalStatusFindings(root);
+
+			expect(findings).toHaveLength(1);
+			expect(findings[0]).toMatchObject({
+				validation: "local-state: 5 index snapshots need rebuild",
+				blocker: "local-state: 5 index snapshots need rebuild",
+				next: "run afol local-state rebuild",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("global status findings report PSTR rebuild when local-state is current", () => {
+		const root = createFixture();
+		try {
+			rebuildWorkBenchIndex(root);
+			rebuildProjectIndexes(root);
+
+			const findings = collectGlobalStatusFindings(root);
+
+			expect(
+				findings.some((finding) => finding.validation.startsWith("pstr:")),
+			).toBe(true);
+			expect(
+				findings.some((finding) =>
+					finding.validation.startsWith("local-state:"),
+				),
+			).toBe(false);
+			expect(findings[0]?.next).toBe("run afol pstr rebuild");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

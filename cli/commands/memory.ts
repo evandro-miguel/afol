@@ -3,11 +3,11 @@ import {
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
-import type { MemoryEntry, MemoryRecallEntry } from "../services/memory";
 import {
 	addEntry,
 	archiveEntry,
 	getEntry,
+	type MemoryRecallEntry,
 	promoteEntry,
 	proposeEntry,
 	readMemory,
@@ -16,7 +16,8 @@ import {
 	renderMemory,
 	searchEntries,
 	updateEntry,
-} from "../services/memory";
+} from "../services/memory/crud";
+import type { MemoryEntry } from "../services/memory/types";
 import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
 const jsonOutput = createJsonWriters("memory");

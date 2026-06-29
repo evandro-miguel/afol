@@ -43,12 +43,13 @@ In scope:
   roadmap, specs, ADRs, changelog, archive, and desired-state policy.
 - `docs/arc/**`: frozen transitional archive retained for reversibility and
   historical reference; see ADR-005.
-- `.afol/pstr/**`: target project-structure map surface for how the project is
-  organized today. It stores maps only, not scripts, tasks, automations, specs,
-  roadmaps, or future-state governance.
-- `.agents/**`: retained static metadata only — `config.json`, `lock.json`,
-  `manifest.json`, `rules/`, `source/`. Factory workbench, skills, and
-  validation have moved to `.afol/**`.
+- `.afol/pstr/**`: generated, rebuildable project-structure map surface for how
+  the project is observed today. It stores maps only, not scripts, tasks,
+  automations, specs, roadmaps, or future-state governance.
+- `.agents/**`: retained static provider-facing metadata and skills only:
+  `lock.json`, `manifest.json`, and `.agents/skills/**`. Hooks, rules, source
+  seeds, factory workbench, validation, and mutable runtime state live under
+  `.afol/**`.
 
 Out of scope:
 
@@ -66,21 +67,21 @@ Modules:
   state loading, result envelopes, validation, and AFOL-native command
   execution.
 - Template baseline at `src/project-template/**`: config, lock, manifest,
-  rules, skills, workbench baseline, docs, and local governance state.
-- Factory runtime: development-only compatibility surfaces retained under
-  `.agents/` as static metadata (`config.json`, `lock.json`, `manifest.json`,
-  `rules/`, `source/`). Active workbench, skills, validation, and experiments
-  live under `.afol/**`.
+  AFOL adm payloads, provider skills, workbench baseline, docs, and local
+  governance state.
+- Factory runtime: development-only state retained under `.afol/**`.
+  `.agents/` remains static provider-facing metadata plus project-local skills
+  (`lock.json`, `manifest.json`, `.agents/skills/**`).
 - Goal-state docs at `.afol/adm/**`: roadmap, specs, decisions, architecture,
   and execution plans.
 - `docs/arc/**` is frozen transitional archive content; ADR-005 records the
   authority transfer.
-- Project structure at `.afol/pstr/**`: target canonical current project
+- Project structure at `.afol/pstr/**`: generated, rebuildable observed project
   structure map surface after migration.
 
 Data flow:
 
-1. Operator or agent calls `afol` or compatibility `afol`.
+1. Operator or agent calls `afol`.
 2. CLI loads project config, lock, manifest, and targeted local state.
 3. Registry resolves the command to an action contract.
 4. Guards validate root, path, env, secrets, mode, and side-effect class.
@@ -134,9 +135,9 @@ Forbidden dependencies:
 - `src/project-template/` -> only source for downstream template payload.
 - `.afol/adm/` -> target project administration: manifesto, architecture,
   roadmap, specs, ADRs, changelog, archive, and governance policy.
-- `.afol/pstr/` -> target project structure: current-state maps for frontend,
-  backend, API, data, devops, CLI, integrations, flows, tests, critical paths,
-  entrypoints, dependencies, and structural ownership.
+- `.afol/pstr/` -> target project structure: generated observed maps.
+  Current AFOL emits flat area maps from the PSTR area registry, not empty
+  nested area folders.
 - `.afol/state/` -> target SQLite materialized execution state such as
   `.afol/state/afol.db`.
 - `.afol/wb/` -> governed session execution: plan/task/log/evidence files for
@@ -146,14 +147,14 @@ Forbidden dependencies:
 - `.agents/skills/**` -> project-local AFOL-owned skills.
 - `docs/arc/` -> frozen transitional archive of roadmap, specs, architecture,
   decisions, and execution plans.
-- `docs/map/` -> legacy/transitional current-state map evidence; do not
-  recreate it when `.afol/pstr` becomes available.
+- `docs/map/` -> retired legacy current-state map surface; do not recreate it.
 
 ## 7) Public Interfaces
 
 - CLI:
-  - `afol`: stable project-local front door.
-  - `afol`: compatibility alias during migration.
+  - `afol`: stable public/project-local front door.
+  - Retired `.agents/agents`, `agents.config`, and `legacy:` routes have no
+    compatibility alias.
   - Compact text output by default.
   - JSON output through explicit JSON mode.
 
@@ -171,11 +172,12 @@ Forbidden dependencies:
 
 Primary stores:
 
-- `.agents/config.json`: project-local configuration.
+- `.afol/config.json`: canonical project-local configuration.
+- `.agents/config.json`: legacy configuration fallback input only.
 - `.agents/lock.json`: scaffold version and compatibility lock.
 - `.agents/manifest.json`: managed-file ownership and provenance.
 - `.afol/adm/`: target desired-state administration and project direction.
-- `.afol/pstr/`: target current project-structure maps.
+- `.afol/pstr/`: generated observed project-structure maps.
 - `.afol/wb/`: governed session execution, including plan/task/log files,
   evidence ledgers, reports, and sidecars.
 - `.afol/state/afol.db`: target SQLite execution cache and materialized query
@@ -226,24 +228,15 @@ Target pstr layout:
 
 ```text
 .afol/pstr/
-├── README.md
-├── INDEX.md
-├── overview.md
-├── critical-paths.md
-├── frontend/
-├── backend/
-├── api/
-├── data/
-├── devops/
-├── cli/
-├── integrations/
-├── flows/
-├── tests/
-└── snapshots/
+├── index.json
+├── cli.md
+├── template.md
+├── docs.md
+└── config.md
 ```
 
-The layout is adaptive. Projects without a frontend, backend, API, or other
-area do not create empty area maps.
+The layout is registry-driven and adaptive. Projects do not create empty area
+maps; AFOL emits only the observed areas implemented by the PSTR builder.
 
 Temporal metadata:
 
@@ -256,7 +249,7 @@ status: current
 authority: observed
 source_hash: "<hash>"
 git:
-  branch: main_dev
+  branch: dev
   commit: abc123
 ```
 
@@ -294,8 +287,9 @@ Source of truth:
   contracts.
 - Target after migration: `.afol/adm/roadmap/GENERAL-ROADMAP.md` and
   `.afol/adm/specs/**`.
-- `.agents/config.json`, `.agents/lock.json`, and `.agents/manifest.json` for
-  local project state.
+- `.afol/config.json` for canonical local project configuration.
+- `.agents/config.json` as legacy configuration fallback only.
+- `.agents/lock.json` and `.agents/manifest.json` for local scaffold metadata.
 
 Target path contract after migration:
 
@@ -494,11 +488,13 @@ Confidence checks:
 Gates:
 
 - What must pass before merge:
-  - docs/prompt/process changes: `just lint`
+  - docs/prompt/process changes: `afol validate project`
   - CLI changes: `bun run typecheck` and focused `bun test`
   - template/export changes: `bun run validate:template` and
     `bun run validate:bootstrap`
-  - cross-cutting scaffold/release changes: `just agents-all`
+  - cross-cutting scaffold/release changes: `afol local-state rebuild --json`,
+    `afol validate project --json`, `bun run typecheck`, `bun test`, and
+    `bun run validate:release`
 
 ## 13) Change Policy
 

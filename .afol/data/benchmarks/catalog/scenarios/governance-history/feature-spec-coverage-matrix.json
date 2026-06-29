@@ -1,0 +1,279 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "feature-spec-coverage-matrix",
+  "scenario_version": "1.0.0",
+  "pack_id": "governance-history",
+  "command": "afol bench list",
+  "sandbox": true,
+  "objective": "Prove every roadmap feature has a governing spec and every root spec has an implemented benchmark scenario coverage lane before AFOL claims production readiness.",
+  "expected_result": "The benchmark catalog lists the feature/spec coverage scenario, and validate bench fails when any F-xx roadmap item has no governing spec, when a governing spec path is stale, when a feature is not covered by an implemented scenario, or when a root spec has no scenario coverage.",
+  "use_cases": [
+    "maintainer verifies that each project feature has a spec before execution",
+    "agent researches feature, spec, tool, and UX coverage before producing changes",
+    "release reviewer blocks all-tools-tested claims when a roadmap/spec/scenario link is missing"
+  ],
+  "coverage": {
+    "commands": [
+      "validate",
+      "spec",
+      "ux",
+      "bench"
+    ],
+    "subcommands": [
+      "validate bench --pack <pack-id> --json",
+      "spec list [--json] [--verbose]",
+      "ux validate",
+      "bench list"
+    ],
+    "journeys": [
+      "feature-spec-scenario-coverage",
+      "afol-command-user-flow-matrix",
+      "ux-journey-registry-control",
+      "maintenance-warning-coverage-review"
+    ],
+    "features": [
+      "F-00",
+      "F-01",
+      "F-02",
+      "F-03",
+      "F-04",
+      "F-05",
+      "F-06",
+      "F-07",
+      "F-08",
+      "F-09",
+      "F-10",
+      "F-11",
+      "F-12",
+      "F-13",
+      "F-14",
+      "F-15",
+      "F-16",
+      "F-17",
+      "F-18",
+      "F-19",
+      "F-20"
+    ],
+    "specs": [
+      "260306_artifact-resolution-layer_spec_01",
+      "260306_context-driven-execution-commands_spec_01",
+      "260306_execution-intelligence-and-knowledge-system_spec_01",
+      "260306_guided-status-and-implementation_spec_01",
+      "260306_knowledge-reuse-and-token-efficiency_spec_01",
+      "260306_planning-rigor-and-explorer-gates_spec_01",
+      "260306_primary-agent-runtime-compatibility_spec_01",
+      "260306_project-context-canon-and-setup_spec_01",
+      "260306_review-and-logical-revert_spec_01",
+      "260306_roadmap-first-delivery-system_spec_01",
+      "260306_runtime-command-parity_spec_01",
+      "260306_session-pack-structure-and-postmortem_spec_01",
+      "260307_persistent-planning-memory_spec_01",
+      "260323_1704_universal-skills-runtime-integration_spec_01",
+      "260323_1741_current-state-maps-and-goal-state-governance_spec_01",
+      "260323_1750_current-state-map-contract_spec_01",
+      "260323_1751_goal-state-canon_spec_01",
+      "260323_1752_workflow-and-bootstrap-integration_spec_01",
+      "260323_1815_execplan-native-planning-system_spec_01",
+      "260411_agentic-runtime-restructure_spec_01",
+      "260412_0000_specs-folder-guide_spec_01",
+      "260412_1110_spec-child-and-spec-test-governance_spec_01",
+      "260412_2004_repo-wide-simplification-runtime-parity_spec_01",
+      "260413_1250_project-template-source-separation_spec-child_01",
+      "260413_1250_project-template-source-separation_spec_01",
+      "260413_1849_just-command-runner-migration_spec_01",
+      "260415_2121_scripts-cleanup-optimization_spec-child_01",
+      "260418_2115_agent-governance-preflight-and-recurrence-guardrails_spec_01",
+      "260423_1605_controlled-runtime-flow-benchmarks_spec_01",
+      "260423_1821_runtime-flow-benchmark-runner_spec-child_01",
+      "260423_2006_runtime-flow-benchmark-live-agent_spec-child_01",
+      "260423_2120_runtime-flow-benchmark-scenarios_spec-child_01",
+      "260426_1215_parallel-session-isolation_spec_01",
+      "260509_1453_plan-task-execution-integrity-state-model_spec-child_01",
+      "260521_0000_total-reformulation-strategy_spec_01",
+      "260521_0010_universal-agent-cli_spec_01",
+      "260521_0020_minimal-project-template_spec_01",
+      "260521_0030_agent-command-design-system_spec_01",
+      "260521_0040_governance-workbench-system_spec_01",
+      "260521_0050_smart-rules-and-skills-routing_spec_01",
+      "260521_0060_file-first-low-token-execution_spec_01",
+      "260521_0070_local-state-index-and-event-log_spec_01",
+      "260521_0080_safe-file-mutation-and-undo_spec_01",
+      "260521_0090_template-update-and-versioning_spec_01",
+      "260521_0100_runtime-adapters-and-mcp_spec_01",
+      "260521_0110_validation-ci-and-benchmarks_spec_01",
+      "260521_0120_public-distribution-and-onboarding_spec_01",
+      "260528_1723_map-boundary-cleanup_spec-child_01",
+      "260528_1745_runtime-registry-parity_spec-child_01",
+      "260528_1759_python-command-simplification_spec-child_01",
+      "260528_1913_command-parity-gate-hardening_spec-child_01",
+      "260528_1946_bootstrap-template-justfile-wiring_spec-child_01",
+      "260528_2022_runtime-mirror-cleanup_spec-child_01",
+      "260531_0000_template-cli-boundary-hardening_spec_01",
+      "260612_afol-administration-project-structure-onion-architecture_spec_01",
+      "260612_afol-brain-shape-retrieval-doctor-trust_spec-child_01",
+      "260612_agent-operational-state-context-library_spec_01",
+      "260612_context-routing-bundles-and-section-index_spec-child_01",
+      "260612_global-project-research-library_spec-child_01",
+      "260612_spec-compatibility-and-decision-history_spec-child_01",
+      "260612_temporal-health-freshness-token-budget_spec-child_01",
+      "260612_workbench-hydration-and-markdown-projection_spec-child_01",
+      "260615_1350_recurring-problem-guardrails_spec-child_01",
+      "260618_1519_orchestrator-coordination-radar_spec-child_01",
+      "260627_1122_afol-tool-scenario-coverage-and-ux-registry_spec-child_01",
+      "260627_1655_canonical-afol-configuration-rehome_spec_01"
+    ]
+  },
+  "feature_scenarios": [
+    {
+      "feature": "F-00",
+      "governing_spec": ".afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md",
+      "expected_lane": "governance-history",
+      "validation": "Roadmap strategy artifacts exist before feature execution."
+    },
+    {
+      "feature": "F-01",
+      "governing_spec": ".afol/adm/specs/260521_0010_universal-agent-cli_spec_01.md",
+      "expected_lane": "cli-kernel-local",
+      "validation": "CLI front door, status, routing, and command registry behavior are covered."
+    },
+    {
+      "feature": "F-02",
+      "governing_spec": ".afol/adm/specs/260521_0020_minimal-project-template_spec_01.md",
+      "expected_lane": "template-validation",
+      "validation": "Template export and bootstrap stay clean and minimal."
+    },
+    {
+      "feature": "F-03",
+      "governing_spec": ".afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md",
+      "expected_lane": "tool-surface",
+      "validation": "Every command and documented subcommand has scenario coverage."
+    },
+    {
+      "feature": "F-04",
+      "governing_spec": ".afol/adm/specs/260521_0040_governance-workbench-system_spec_01.md",
+      "expected_lane": "workbench-parity",
+      "validation": "Session, plan, task, log, evidence, done, verify, and close flows are covered."
+    },
+    {
+      "feature": "F-05",
+      "governing_spec": ".afol/adm/specs/260521_0050_smart-rules-and-skills-routing_spec_01.md",
+      "expected_lane": "routing-accuracy",
+      "validation": "Rules and skills are selected with compact rationale."
+    },
+    {
+      "feature": "F-06",
+      "governing_spec": ".afol/adm/specs/260521_0060_file-first-low-token-execution_spec_01.md",
+      "expected_lane": "token-economy",
+      "validation": "Command output stays bounded and evidence is file-first."
+    },
+    {
+      "feature": "F-07",
+      "governing_spec": ".afol/adm/specs/260521_0070_local-state-index-and-event-log_spec_01.md",
+      "expected_lane": "state-projection",
+      "validation": "Local state rebuild and freshness contracts are covered."
+    },
+    {
+      "feature": "F-08",
+      "governing_spec": ".afol/adm/specs/260521_0080_safe-file-mutation-and-undo_spec_01.md",
+      "expected_lane": "mutation-safety",
+      "validation": "Mutation dry-run, journal, protected path, and undo flows are covered."
+    },
+    {
+      "feature": "F-09",
+      "governing_spec": ".afol/adm/specs/260521_0090_template-update-and-versioning_spec_01.md",
+      "expected_lane": "update-safety",
+      "validation": "Update check, preview, dry-run, and conflict classification are covered."
+    },
+    {
+      "feature": "F-10",
+      "governing_spec": ".afol/adm/specs/260521_0100_runtime-adapters-and-mcp_spec_01.md",
+      "expected_lane": "mcp-parity",
+      "validation": "Runtime adapter and MCP catalog behavior stays behind explicit gates."
+    },
+    {
+      "feature": "F-11",
+      "governing_spec": ".afol/adm/specs/260521_0110_validation-ci-and-benchmarks_spec_01.md",
+      "expected_lane": "benchmark-registry",
+      "validation": "Bench registry, baselines, scenario contracts, and result schema are covered."
+    },
+    {
+      "feature": "F-12",
+      "governing_spec": ".afol/adm/specs/260521_0120_public-distribution-and-onboarding_spec_01.md",
+      "expected_lane": "release-validation",
+      "validation": "Release readiness remains gated by reproducible local validation."
+    },
+    {
+      "feature": "F-13",
+      "governing_spec": ".afol/adm/specs/260411_agentic-runtime-restructure_spec_01.md",
+      "expected_lane": "runtime-parity",
+      "validation": "Runtime registry, command help, and parity checks remain aligned."
+    },
+    {
+      "feature": "F-14",
+      "governing_spec": ".afol/adm/specs/260412_1110_spec-child-and-spec-test-governance_spec_01.md",
+      "expected_lane": "governance-history",
+      "validation": "Spec-child and spec-test conventions are documented and discoverable."
+    },
+    {
+      "feature": "F-15",
+      "governing_spec": ".afol/adm/specs/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md",
+      "expected_lane": "runtime-parity",
+      "validation": "Simplification slices preserve observable runtime behavior."
+    },
+    {
+      "feature": "F-16",
+      "governing_spec": ".afol/adm/specs/260413_1250_project-template-source-separation_spec_01.md",
+      "expected_lane": "template-validation",
+      "validation": "Exported template excludes factory-only runtime and history."
+    },
+    {
+      "feature": "F-17",
+      "governing_spec": ".afol/adm/specs/260413_1849_just-command-runner-migration_spec_01.md",
+      "expected_lane": "command-parity",
+      "validation": "Just runner retirement does not break documented AFOL entrypoints."
+    },
+    {
+      "feature": "F-18",
+      "governing_spec": ".afol/adm/specs/260612_afol-administration-project-structure-onion-architecture_spec_01.md",
+      "expected_lane": "adm-governance",
+      "validation": "ADM, PSTR, memory, library, context, state, maintenance, and health flows stay separated and validated."
+    },
+    {
+      "feature": "F-19",
+      "governing_spec": ".afol/adm/specs/260627_1655_canonical-afol-configuration-rehome_spec_01.md",
+      "expected_lane": "configuration-rehome",
+      "validation": "Config rehome work must keep `.afol/config.json` canonical and `.agents/skills/**` provider-local."
+    },
+    {
+      "feature": "F-20",
+      "governing_spec": ".afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md",
+      "expected_lane": "workbench-parity",
+      "validation": "Parallel local, remote, and CI agents use explicit or context-local session selection without corrupting the global workbench pointer."
+    }
+  ],
+  "result_schema": "1.0.0",
+  "oracle": "feature-spec-coverage-contract",
+  "thresholds": {
+    "max_duration_ms": 1000,
+    "max_p95_ms": 1000,
+    "max_output_tokens": 1200,
+    "min_tool_success_rate": 0.98
+  },
+  "baseline_id": "governance-history-v1",
+  "expected_exit": 0,
+  "deterministic_metrics": {
+    "duration_ms": 180,
+    "timing_p50_ms": 160,
+    "timing_p95_ms": 260,
+    "error_count": 0,
+    "retry_count": 0,
+    "context_tokens": 900,
+    "prompt_tokens": 0,
+    "output_tokens": 260,
+    "context_bytes": 4200,
+    "output_bytes": 1300,
+    "tool_call_count": 4,
+    "tool_success_rate": 1
+  },
+  "implementation_status": "implemented"
+}

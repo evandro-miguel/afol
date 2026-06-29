@@ -19,7 +19,7 @@ links:
 scope:
   repo_areas:
   - .agents/scripts
-  - docs/arc
+  - .afol/adm
   - .afol/wb
   - runtime mirrors
   packages:
@@ -127,7 +127,7 @@ Out of scope:
 
 ## 9) Risks and Tradeoffs
 
-- Risk: a second governance system emerges by accident -> Mitigation: keep `docs/arc`, `.afol/wb`, and runtime mirrors canonical; forbid parallel track trees.
+- Risk: a second governance system emerges by accident -> Mitigation: keep `.afol/adm`, `.afol/wb`, and runtime mirrors authoritative; forbid parallel track trees.
 - Risk: command UX becomes runtime-specific -> Mitigation: define semantics in canonical specs first and adapters second.
 - Tradeoff: introducing a canonical project-context layer adds more docs -> Why accepted: it reduces repeated prompt context and gives commands a stable contract.
 
@@ -147,7 +147,7 @@ Out of scope:
   - Workbench plans/tasks/reports prove the new command flows can run without duplicating state.
   - Runtime mirrors and adapters remain consistent with canonical guidance.
 - Open questions:
-  - Q-01 Which parts of project context should live in `docs/arc/` versus runtime-facing mirrors only?
+  - Q-01 Which parts of project context should live in `.afol/adm/` versus runtime-facing mirrors only?
   - Q-02 How much git dependence is acceptable for logical revert before it weakens workbench authority?
 
 ## 12) Acceptance Checklist

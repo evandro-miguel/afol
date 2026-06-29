@@ -1,0 +1,18 @@
+{"id":"E-20260626105652499-bdf866","task_id":"T-01","created_at":"2026-06-26T14:56:52.499Z","command":"git worktree list --porcelain","result":"passed"}
+{"id":"E-20260626105652563-7cf6fb","task_id":"T-01","created_at":"2026-06-26T14:56:52.563Z","command":"wt list","result":"passed"}
+{"id":"E-20260626105652632-aba02f","task_id":"T-01","created_at":"2026-06-26T14:56:52.632Z","command":"git ls-remote --heads origin main main_dev dev","result":"passed"}
+{"id":"E-20260626105652700-7461ab","task_id":"T-01","created_at":"2026-06-26T14:56:52.700Z","command":"gh repo view evandro-miguel/afol --json nameWithOwner,url,defaultBranchRef,visibility","result":"passed"}
+{"id":"E-20260626105652768-0ebc03","task_id":"T-01","created_at":"2026-06-26T14:56:52.768Z","command":"git diff --check","result":"passed"}
+{"id":"E-20260626105652837-954ec8","task_id":"T-01","created_at":"2026-06-26T14:56:52.837Z","command":"bun install --frozen-lockfile","result":"passed"}
+{"id":"E-20260626105652909-961bc0","task_id":"T-01","created_at":"2026-06-26T14:56:52.909Z","command":"bun run version:check","result":"passed"}
+{"id":"E-20260626105652981-a2cf6a","task_id":"T-01","created_at":"2026-06-26T14:56:52.981Z","command":"bun run template:check","result":"passed"}
+{"id":"E-20260626105653049-e77a7d","task_id":"T-01","created_at":"2026-06-26T14:56:53.049Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260626105653116-5acd21","task_id":"T-01","created_at":"2026-06-26T14:56:53.116Z","command":"bun test --bail=1","result":"passed"}
+{"id":"E-20260626105653182-a1627c","task_id":"T-01","created_at":"2026-06-26T14:56:53.182Z","command":"bun run validate:release","result":"passed"}
+{"id":"E-20260626105653248-1fc929","task_id":"T-01","created_at":"2026-06-26T14:56:53.248Z","command":"afol local-state rebuild --json","result":"passed"}
+{"id":"E-20260626105653313-3ce31c","task_id":"T-01","created_at":"2026-06-26T14:56:53.313Z","command":"afol pstr rebuild","result":"passed"}
+{"id":"E-20260626105653379-bc158a","task_id":"T-01","created_at":"2026-06-26T14:56:53.379Z","command":"afol validate project --json","result":"passed"}
+{"id":"E-20260626105653452-7f7d16","task_id":"T-01","created_at":"2026-06-26T14:56:53.452Z","command":"git -C /home/ozy/00_sys/os diff --check","result":"passed"}
+{"id":"E-20260626105653523-753ab4","task_id":"T-01","created_at":"2026-06-26T14:56:53.523Z","command":"cmp -s /home/ozy/.codex/AGENTS.md /home/ozy/00_sys/os/home-base/dot_codex/AGENTS.md","result":"passed"}
+{"id":"E-20260626130405147-66ad35","task_id":"T-01","created_at":"2026-06-26T17:04:05.147Z","command":"afol update check","result":"passed","note":"Captured update availability during continuation audit; unresolved conflicts tracked separately."}
+{"id":"E-20260626130410456-e3a212","task_id":"T-01","created_at":"2026-06-26T17:04:10.456Z","command":"afol update apply --dry-run","result":"passed","note":"Diagnostic inventory captured: dry-run exits 4 with operations total=40 create=8 update=2 conflict=30 preserve=0; no files applied."}

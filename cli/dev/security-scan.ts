@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 export type ScanMode = "deps" | "secrets";
 type ScanRequirement = "informative" | "required" | "release";
@@ -18,8 +20,25 @@ export type SecurityScanOutcome = {
 	kind: ScanMode;
 	mode: ScanRequirement;
 	status: SecurityScanStatus;
+	version?: string;
 	reason?: string;
 	waiver_required?: boolean;
+};
+
+export type SecurityScanTarget = {
+	artifact: string;
+	artifact_sha256: string;
+	commit_sha: string;
+	lockfile: string;
+	lock_sha256: string;
+};
+
+export type SecurityScanReport = {
+	generated_at: string;
+	mode: "release";
+	target: SecurityScanTarget;
+	target_errors?: string[];
+	scans: SecurityScanOutcome[];
 };
 
 type ScanRunResult = {
@@ -29,14 +48,26 @@ type ScanRunResult = {
 	stderr?: string;
 };
 
+export const RELEASE_SECURITY_EVIDENCE_PATH = "dist/security-scan.release.json";
+export const DEFAULT_RELEASE_ARTIFACT = "dist/afol";
+
 const KIND_LABELS: Record<ScanMode, string> = {
 	deps: "dependency",
 	secrets: "secret",
 };
 
 const SCAN_TOOLS: Record<ScanMode, string[]> = {
-	deps: ["osv-scanner", "osv"],
+	deps: ["osv-scanner"],
 	secrets: ["gitleaks"],
+};
+
+const MISSING_LOCKFILE_MESSAGES: Record<ScanRequirement, string> = {
+	informative:
+		"No OSV-supported dependency lockfile found; skipping dependency scan (informative).",
+	required:
+		"No OSV-supported dependency lockfile found; required dependency scan cannot run.",
+	release:
+		"No OSV-supported dependency lockfile found; release dependency scan cannot run.",
 };
 
 export const RELEASE_SECURITY_SCANNERS: Array<{
@@ -58,6 +89,58 @@ export function supportedDependencyLockfile(
 		"pnpm-lock.yaml",
 	];
 	return lockfiles.find((path) => existsSync(`${cwd}/${path}`)) ?? null;
+}
+
+function sha256Hex(bytes: Uint8Array | string): string {
+	return createHash("sha256").update(bytes).digest("hex");
+}
+
+function runGitCommand(cwd: string, args: string[]): string {
+	const result = spawnSync("git", args, {
+		cwd,
+		encoding: "utf8",
+		shell: false,
+	});
+	if (result.error || result.status !== 0) {
+		return "unknown";
+	}
+	const value = `${result.stdout ?? ""}`.trim();
+	return value.length > 0 ? value : "unknown";
+}
+
+function buildReleaseSecurityTarget(
+	cwd: string,
+	artifact = DEFAULT_RELEASE_ARTIFACT,
+): { target: SecurityScanTarget; errors: string[] } {
+	const errors: string[] = [];
+	const artifactPath = join(cwd, artifact);
+	const lockfile = supportedDependencyLockfile(cwd);
+	const commitSha = runGitCommand(cwd, ["rev-parse", "HEAD"]);
+	const target: SecurityScanTarget = {
+		artifact,
+		artifact_sha256: "unknown",
+		commit_sha: commitSha,
+		lockfile: lockfile ?? "unknown",
+		lock_sha256: "unknown",
+	};
+
+	if (!existsSync(artifactPath)) {
+		errors.push(`missing release artifact: ${artifact}`);
+	} else {
+		target.artifact_sha256 = sha256Hex(readFileSync(artifactPath));
+	}
+
+	if (commitSha === "unknown") {
+		errors.push("release commit_sha is unknown");
+	}
+
+	if (!lockfile) {
+		errors.push("release dependency lockfile is unknown");
+	} else {
+		target.lock_sha256 = sha256Hex(readFileSync(join(cwd, lockfile)));
+	}
+
+	return { target, errors };
 }
 
 function parseRequirement(args: string[]): ScanRequirement {
@@ -83,14 +166,23 @@ function buildMissingToolOutcome(opts: {
 		required: "failed",
 		release: "waived",
 	};
+	const status = statusByMode[opts.mode];
+	const waiverRequired = shouldRequireWaiver(opts.mode, status);
 	return {
 		tool: opts.tool,
 		kind: opts.kind,
 		mode: opts.mode,
-		status: statusByMode[opts.mode],
+		status,
 		reason: reasonByMode[opts.mode],
-		waiver_required: opts.mode !== "informative",
+		...(waiverRequired ? { waiver_required: true } : {}),
 	};
+}
+
+function shouldRequireWaiver(
+	mode: ScanRequirement,
+	status: SecurityScanStatus,
+): boolean {
+	return mode !== "informative" && status !== "passed";
 }
 
 function buildCommandOutcome(opts: {
@@ -98,18 +190,52 @@ function buildCommandOutcome(opts: {
 	kind: ScanMode;
 	mode: ScanRequirement;
 	status: number;
+	version?: string;
+	failureDetail?: string;
 }): SecurityScanOutcome {
-	const waiver_required = opts.mode !== "informative";
+	const status = opts.status === 0 ? "passed" : "failed";
+	const waiverRequired = shouldRequireWaiver(opts.mode, status);
+	const failureReason = opts.failureDetail
+		? `${opts.tool} exited with status ${opts.status}: ${opts.failureDetail}`
+		: `${opts.tool} exited with status ${opts.status}.`;
 	return {
 		tool: opts.tool,
 		kind: opts.kind,
 		mode: opts.mode,
-		status: opts.status === 0 ? "passed" : "failed",
-		...(opts.status === 0
-			? {}
-			: { reason: `${opts.tool} exited with status ${opts.status}.` }),
-		...(waiver_required ? { waiver_required } : {}),
+		status,
+		...(opts.version ? { version: opts.version } : {}),
+		...(opts.status === 0 ? {} : { reason: failureReason }),
+		...(waiverRequired ? { waiver_required: true } : {}),
 	};
+}
+
+function summarizeFailureOutput(output: string): string | undefined {
+	const summary = output
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.join(" ");
+	if (!summary) {
+		return undefined;
+	}
+	return summary.length > 500 ? `${summary.slice(0, 497)}...` : summary;
+}
+
+function probeToolVersion(
+	tool: string,
+	env?: NodeJS.ProcessEnv,
+): string | undefined {
+	const probe = spawnSync(tool, ["--version"], {
+		encoding: "utf8",
+		...(env ? { env } : {}),
+		shell: false,
+		stdio: "pipe",
+	});
+	if (probe.error || (probe.status ?? 0) !== 0) {
+		return undefined;
+	}
+	const version = `${probe.stdout || probe.stderr || ""}`.trim();
+	return version.length > 0 ? version : undefined;
 }
 
 function buildProbeErrorOutcome(opts: {
@@ -118,15 +244,16 @@ function buildProbeErrorOutcome(opts: {
 	mode: ScanRequirement;
 	error: Error & { code?: string };
 }): SecurityScanOutcome {
-	const waiver_required = opts.mode !== "informative";
+	const status: SecurityScanStatus = "errored";
+	const waiverRequired = shouldRequireWaiver(opts.mode, status);
 	const code = opts.error.code ?? "unknown";
 	return {
 		tool: opts.tool,
 		kind: opts.kind,
 		mode: opts.mode,
-		status: "errored",
+		status,
 		reason: `${opts.tool} probe failed with ${code}: ${opts.error.message}`,
-		...(waiver_required ? { waiver_required } : {}),
+		...(waiverRequired ? { waiver_required: true } : {}),
 	};
 }
 
@@ -140,7 +267,7 @@ function buildReleaseScannerOutcome(opts: {
 		encoding: "utf8",
 		env: opts.env,
 		shell: false,
-		stdio: "ignore",
+		stdio: "pipe",
 	});
 
 	if (probe.error) {
@@ -164,12 +291,18 @@ function buildReleaseScannerOutcome(opts: {
 		});
 	}
 
+	const status: SecurityScanStatus = "skipped";
+	const version = `${probe.stdout || probe.stderr || ""}`.trim();
 	return {
 		tool: opts.tool,
 		kind: opts.kind,
 		mode: opts.mode,
-		status: "skipped",
+		status,
+		...(version ? { version } : {}),
 		reason: `${opts.tool} available; scan not executed during provenance generation.`,
+		...(shouldRequireWaiver(opts.mode, status)
+			? { waiver_required: true }
+			: {}),
 	};
 }
 
@@ -187,7 +320,10 @@ export function buildReleaseSecurityScanOutcomes(
 
 function runOptionalScan(opts: {
 	binaries: string[];
-	args: string[];
+	args?: string[];
+	commands?: string[][];
+	cwd?: string;
+	env?: NodeJS.ProcessEnv;
 	kind: ScanMode;
 	mode: ScanRequirement;
 	missingMessage: string;
@@ -199,53 +335,72 @@ function runOptionalScan(opts: {
 	if (!primaryTool) {
 		throw new Error("No scan binaries configured.");
 	}
+	const commands = opts.commands ?? [opts.args ?? []];
 
 	for (const binary of opts.binaries) {
-		const result = spawnSync(binary, opts.args, {
-			encoding: opts.json ? "utf8" : undefined,
-			shell: false,
-			stdio: opts.json ? "pipe" : "inherit",
-		});
+		let binaryMissing = false;
+		const version = probeToolVersion(binary, opts.env);
 
-		if (result.error) {
-			const error = result.error as Error & { code?: string };
-			if (String(error.code) === "ENOENT") {
-				continue;
+		for (const commandArgs of commands) {
+			const result = spawnSync(binary, commandArgs, {
+				encoding: opts.json ? "utf8" : undefined,
+				...(opts.cwd ? { cwd: opts.cwd } : {}),
+				...(opts.env ? { env: opts.env } : {}),
+				shell: false,
+				stdio: opts.json ? "pipe" : "inherit",
+			});
+
+			if (result.error) {
+				const error = result.error as Error & { code?: string };
+				if (String(error.code) === "ENOENT") {
+					binaryMissing = true;
+					break;
+				}
+
+				const stderr = `${binary} failed to start: ${error.message}`;
+				return {
+					outcome: buildProbeErrorOutcome({
+						tool: binary,
+						kind: opts.kind,
+						mode: opts.mode,
+						error,
+					}),
+					exitCode: 1,
+					stderr,
+				};
 			}
 
-			const stderr = `${binary} failed to start: ${error.message}`;
-			return {
-				outcome: buildProbeErrorOutcome({
-					tool: binary,
-					kind: opts.kind,
-					mode: opts.mode,
-					error,
-				}),
-				exitCode: 1,
-				stderr,
-			};
+			if (result.status !== 0) {
+				const stderr = opts.json ? `${result.stderr ?? ""}`.trim() : "";
+				const stdout = opts.json ? `${result.stdout ?? ""}`.trim() : "";
+				const failureDetail = opts.json
+					? summarizeFailureOutput(stderr || stdout)
+					: undefined;
+				return {
+					outcome: buildCommandOutcome({
+						tool: binary,
+						kind: opts.kind,
+						mode: opts.mode,
+						status: result.status ?? 1,
+						...(version ? { version } : {}),
+						...(failureDetail ? { failureDetail } : {}),
+					}),
+					exitCode: result.status ?? 1,
+					...(opts.json && stderr ? { stderr } : {}),
+				};
+			}
 		}
 
-		if (result.status !== 0) {
-			const stderr = opts.json ? `${result.stderr ?? ""}`.trim() : "";
-			return {
-				outcome: buildCommandOutcome({
-					tool: binary,
-					kind: opts.kind,
-					mode: opts.mode,
-					status: result.status ?? 1,
-				}),
-				exitCode: result.status ?? 1,
-				...(opts.json && stderr ? { stderr } : {}),
-			};
+		if (binaryMissing) {
+			continue;
 		}
-
 		return {
 			outcome: buildCommandOutcome({
 				tool: binary,
 				kind: opts.kind,
 				mode: opts.mode,
 				status: 0,
+				...(version ? { version } : {}),
 			}),
 			exitCode: 0,
 		};
@@ -269,7 +424,7 @@ function runOptionalScan(opts: {
 			kind: opts.kind,
 			mode: opts.mode,
 		}),
-		exitCode: 0,
+		exitCode: opts.mode === "release" ? 1 : 0,
 		stdout:
 			opts.mode === "release"
 				? opts.missingReleaseMessage
@@ -277,103 +432,168 @@ function runOptionalScan(opts: {
 	};
 }
 
+function missingLockfileResult(mode: ScanRequirement): ScanRunResult {
+	const outcome = buildMissingToolOutcome({
+		tool: "dependency-lockfile",
+		kind: "deps",
+		mode,
+	});
+	return {
+		outcome: {
+			...outcome,
+			tool: "dependency-lockfile",
+			reason: MISSING_LOCKFILE_MESSAGES[mode],
+		},
+		exitCode: mode === "informative" ? 0 : 1,
+		...(mode === "required"
+			? { stderr: MISSING_LOCKFILE_MESSAGES[mode] }
+			: { stdout: MISSING_LOCKFILE_MESSAGES[mode] }),
+	};
+}
+
+function runDependencyScan(opts: {
+	mode: ScanRequirement;
+	json: boolean;
+	cwd?: string;
+	env?: NodeJS.ProcessEnv;
+}): ScanRunResult {
+	const cwd = opts.cwd ?? process.cwd();
+	const lockfile = supportedDependencyLockfile(cwd);
+	if (!lockfile) {
+		return missingLockfileResult(opts.mode);
+	}
+
+	return runOptionalScan({
+		binaries: SCAN_TOOLS.deps,
+		args: ["scan", "--lockfile", lockfile],
+		cwd,
+		...(opts.env ? { env: opts.env } : {}),
+		kind: "deps",
+		mode: opts.mode,
+		missingMessage:
+			"osv-scanner not installed; skipping dependency scan (informative).",
+		missingRequiredMessage:
+			"osv-scanner not installed; required dependency scan cannot run.",
+		missingReleaseMessage:
+			"osv-scanner not installed; release dependency scan cannot run.",
+		json: opts.json,
+	});
+}
+
+function runSecretsScan(opts: {
+	mode: ScanRequirement;
+	json: boolean;
+	cwd?: string;
+	env?: NodeJS.ProcessEnv;
+}): ScanRunResult {
+	return runOptionalScan({
+		binaries: SCAN_TOOLS.secrets,
+		commands: [
+			["git", "-v", "--redact", "--exit-code", "1", "."],
+			["dir", "-v", "--redact", "--exit-code", "1", "."],
+		],
+		...(opts.cwd ? { cwd: opts.cwd } : {}),
+		...(opts.env ? { env: opts.env } : {}),
+		kind: "secrets",
+		mode: opts.mode,
+		missingMessage:
+			"gitleaks not installed; skipping secret scan (informative).",
+		missingRequiredMessage:
+			"gitleaks not installed; required secret scan cannot run.",
+		missingReleaseMessage:
+			"gitleaks not installed; release secret scan cannot run.",
+		json: opts.json,
+	});
+}
+
+export function runReleaseSecurityScans(
+	opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+): { report: SecurityScanReport; exitCode: number } {
+	const cwd = opts.cwd ?? process.cwd();
+	const target = buildReleaseSecurityTarget(cwd);
+	const scans = [
+		runDependencyScan({
+			mode: "release",
+			json: true,
+			cwd,
+			...(opts.env ? { env: opts.env } : {}),
+		}),
+		runSecretsScan({
+			mode: "release",
+			json: true,
+			cwd,
+			...(opts.env ? { env: opts.env } : {}),
+		}),
+	];
+	const report: SecurityScanReport = {
+		generated_at: new Date().toISOString(),
+		mode: "release",
+		target: target.target,
+		...(target.errors.length > 0 ? { target_errors: target.errors } : {}),
+		scans: scans.map((scan) => scan.outcome),
+	};
+	return {
+		report,
+		exitCode:
+			target.errors.length === 0 && scans.every((scan) => scan.exitCode === 0)
+				? 0
+				: 1,
+	};
+}
+
+export function writeReleaseSecurityScanReport(
+	report: SecurityScanReport,
+	cwd = process.cwd(),
+): string {
+	const outputPath = join(cwd, RELEASE_SECURITY_EVIDENCE_PATH);
+	mkdirSync(dirname(outputPath), { recursive: true });
+	writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+	return outputPath;
+}
+
+function writeScanResult(result: ScanRunResult, json: boolean): void {
+	if (json) {
+		console.log(JSON.stringify(result.outcome));
+	} else if (result.stdout) {
+		console.log(result.stdout);
+	}
+	if (result.stderr) {
+		console.error(result.stderr);
+	}
+}
+
 function main(args: string[]): void {
-	const mode = args[0] as ScanMode | undefined;
+	const mode = args[0] as ScanMode | "release" | undefined;
 	const requirement = parseRequirement(args.slice(1));
 	const json = args.includes("--json") || args.includes("-j");
 
-	if (mode === "deps") {
-		const lockfile = supportedDependencyLockfile();
-		if (!lockfile) {
-			const outcome = buildMissingToolOutcome({
-				tool: "dependency-lockfile",
-				kind: "deps",
-				mode: requirement,
-			});
-			const messageByMode: Record<ScanRequirement, string> = {
-				informative:
-					"No OSV-supported dependency lockfile found; skipping dependency scan (informative).",
-				required:
-					"No OSV-supported dependency lockfile found; required dependency scan cannot run.",
-				release:
-					"No OSV-supported dependency lockfile found; release dependency scan cannot run.",
-			};
-			if (json) {
-				console.log(
-					JSON.stringify({
-						...outcome,
-						tool: "dependency-lockfile",
-						reason: messageByMode[requirement],
-					}),
-				);
-			} else if (requirement === "required") {
-				console.error(messageByMode[requirement]);
-			} else {
-				console.log(messageByMode[requirement]);
-			}
-			process.exit(requirement === "required" ? 1 : 0);
-		}
+	if (mode === "release") {
+		const { report, exitCode } = runReleaseSecurityScans();
+		const outputPath = writeReleaseSecurityScanReport(report);
+		console.log(`release security scan: ${outputPath}`);
+		process.exit(exitCode);
+	}
 
-		const result = runOptionalScan({
-			binaries: SCAN_TOOLS.deps,
-			args: ["scan", "--lockfile", lockfile],
-			kind: "deps",
+	if (mode === "deps") {
+		const result = runDependencyScan({
 			mode: requirement,
-			missingMessage:
-				"osv-scanner not installed; skipping dependency scan (informative).",
-			missingRequiredMessage:
-				"osv-scanner not installed; required dependency scan cannot run.",
-			missingReleaseMessage:
-				"osv-scanner not installed; release dependency scan cannot run.",
 			json,
 		});
-		if (json) {
-			console.log(JSON.stringify(result.outcome));
-		} else if (result.stdout) {
-			console.log(result.stdout);
-		}
-		if (result.stderr) {
-			console.error(result.stderr);
-		}
+		writeScanResult(result, json);
 		process.exit(result.exitCode);
 	}
 
 	if (mode === "secrets") {
-		const result = runOptionalScan({
-			binaries: SCAN_TOOLS.secrets,
-			args: [
-				"detect",
-				"--no-git",
-				"-v",
-				"--redact",
-				"--exit-code",
-				"1",
-				"--source",
-				".",
-			],
-			kind: "secrets",
+		const result = runSecretsScan({
 			mode: requirement,
-			missingMessage:
-				"gitleaks not installed; skipping secret scan (informative).",
-			missingRequiredMessage:
-				"gitleaks not installed; required secret scan cannot run.",
-			missingReleaseMessage:
-				"gitleaks not installed; release secret scan cannot run.",
 			json,
 		});
-		if (json) {
-			console.log(JSON.stringify(result.outcome));
-		} else if (result.stdout) {
-			console.log(result.stdout);
-		}
-		if (result.stderr) {
-			console.error(result.stderr);
-		}
+		writeScanResult(result, json);
 		process.exit(result.exitCode);
 	}
 
 	console.error(
-		"Usage: bun run cli/dev/security-scan.ts <deps|secrets> [--required|--release] [--json]",
+		"Usage: bun run cli/dev/security-scan.ts <deps|secrets|release> [--required|--release] [--json]",
 	);
 	process.exit(1);
 }

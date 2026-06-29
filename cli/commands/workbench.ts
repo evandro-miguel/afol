@@ -13,6 +13,13 @@ import {
 	startTask,
 } from "../services/workbench/lifecycle";
 import {
+	type briefingUnavailable,
+	briefingUnavailableFor,
+	buildStartBriefing,
+	formatStartBriefing,
+	type StartBriefing,
+} from "../services/workbench/start-briefing";
+import {
 	formatVerifyReport,
 	verifyWorkbenchTasks,
 } from "../services/workbench/verify";
@@ -71,6 +78,12 @@ export async function runNewCommand(
 	}
 }
 
+function isStartBriefingUnavailable(
+	briefing: StartBriefing | ReturnType<typeof briefingUnavailable>,
+): briefing is ReturnType<typeof briefingUnavailable> {
+	return "status" in briefing && briefing.status === "briefing_unavailable";
+}
+
 export async function runStartCommand(
 	args: string[],
 	root: string = process.cwd(),
@@ -82,6 +95,18 @@ export async function runStartCommand(
 			allowAutoTask: true,
 		});
 		startTask(root, parsed);
+		if (parsed.compact && !parsed.json) {
+			console.log(`task started: ${parsed.taskId}`);
+			return 0;
+		}
+		let briefing:
+			| ReturnType<typeof buildStartBriefing>
+			| ReturnType<typeof briefingUnavailable>;
+		try {
+			briefing = buildStartBriefing(root, parsed);
+		} catch (error) {
+			briefing = briefingUnavailableFor(error);
+		}
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
@@ -90,13 +115,20 @@ export async function runStartCommand(
 							session: parsed.session,
 							task: parsed.taskId,
 							status: "in_progress",
+							briefing,
 						},
 						{ action: "workbench.start" },
 					),
 				),
 			);
 		} else {
-			console.log(`task started: ${parsed.taskId}`);
+			const lines = [`task started: ${parsed.taskId}`];
+			if (isStartBriefingUnavailable(briefing)) {
+				lines.push(`briefing: briefing_unavailable reason=${briefing.reason}`);
+			} else {
+				lines.push(...formatStartBriefing(briefing));
+			}
+			console.log(lines.join("\n"));
 		}
 		return 0;
 	} catch (error) {

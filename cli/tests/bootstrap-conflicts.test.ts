@@ -67,7 +67,7 @@ describe("bootstrap planner conflict handling", () => {
 	test("filters forbidden paths even if input map is contaminated", () => {
 		const templateFiles = templateFileMap({
 			".agents/runtime/server.py": "print('x')",
-			"docs/standards/policy.md": "x",
+			"docs/arc/policy.md": "x",
 			"safe/readme.md": "ok",
 		});
 		const plan = planBootstrapOperations({

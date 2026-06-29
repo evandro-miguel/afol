@@ -26,20 +26,23 @@ Agents MUST search the repo to discover the actual commands. Do not guess.
 
 ## Evidence requirements
 
-A task is complete only with evidence:
+A task is complete only with evidence for the smallest relevant gate that proves
+the change. Record:
 
-1. **Test output** - Full test run showing pass/fail
-2. **Lint output** - Linter showing no errors
-3. **Build output** - Successful build log
-4. **Manual verification** - Screenshot or log excerpt
+1. **Command or check** - Exact command, manual check, or explicit `N/A`.
+2. **Result** - Pass/fail/blocked plus a short relevant excerpt.
+3. **Scope** - Why this gate is enough, or why broader gates are required.
+
+Broaden to typecheck, focused tests, full tests, build, release, manual
+verification, security scans, or browser checks when the touched surface or risk
+requires it.
 
 ## Verification checklist
 
-- [ ] All tests pass
-- [ ] Lint passes
-- [ ] Typecheck passes (if applicable)
-- [ ] Build succeeds (if applicable)
-- [ ] Manual verification done (if needed)
+- [ ] Relevant command/check selected from live repo evidence
+- [ ] Result recorded with pass/fail/blocked
+- [ ] Broader gate run when behavior, release, security, or UI risk requires it
+- [ ] Manual verification done or marked `N/A`
 
 ## Blocked verification
 

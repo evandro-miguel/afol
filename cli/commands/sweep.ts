@@ -4,7 +4,11 @@ import {
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
-import { sweepDaily, sweepMonthly, sweepWeekly } from "../services/sweep";
+import {
+	sweepDaily,
+	sweepMonthly,
+	sweepWeekly,
+} from "../services/sweep/runner";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 type SweepAction = "daily" | "weekly" | "monthly";

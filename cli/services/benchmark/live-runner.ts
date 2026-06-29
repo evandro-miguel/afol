@@ -1,8 +1,15 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { parseEventStream } from "./metrics";
+import { normalizeCommandForBenchmark, parseEventStream } from "./metrics";
 import {
 	BENCH_SCHEMA_VERSION,
 	type BenchResult,
@@ -18,7 +25,6 @@ type LiveBenchOptions = {
 };
 
 const MINIMAL_FIXTURES = [
-	"afol",
 	"cli",
 	"package.json",
 	"bun.lock",
@@ -38,17 +44,19 @@ function copyMinimalWorkspace(root: string, sandboxRoot: string): void {
 		safeCopy(join(root, relativePath), join(sandboxRoot, relativePath));
 	}
 	for (const relativePath of [
+		".afol/config.json",
 		".agents/config.json",
 		".agents/lock.json",
 		".agents/manifest.json",
 	]) {
 		safeCopy(join(root, relativePath), join(sandboxRoot, relativePath));
 	}
-	mkdirSync(join(sandboxRoot, ".agents", "rules"), { recursive: true });
+	safeCopy(
+		join(root, "src", "project-template", ".afol", "adm"),
+		join(sandboxRoot, ".afol", "adm"),
+	);
 	mkdirSync(join(sandboxRoot, ".agents", "skills"), { recursive: true });
-	mkdirSync(join(sandboxRoot, ".afol", "adm"), { recursive: true });
 	mkdirSync(join(sandboxRoot, ".afol", "wb"), { recursive: true });
-	mkdirSync(join(sandboxRoot, "docs", "arc", "SPECS"), { recursive: true });
 }
 
 function gitCommit(root: string): string {
@@ -78,21 +86,172 @@ function tail(text: string, limit = 24): string {
 	return lines.slice(Math.max(0, lines.length - limit)).join("\n");
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseJson(text: string): Record<string, unknown> | null {
+	try {
+		const parsed: unknown = JSON.parse(text);
+		return isRecord(parsed) ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
+function commandTail(stdout: string, stderr: string): string {
+	const combined = [stdout, stderr].filter(Boolean).join("\n");
+	return tail(combined, 8);
+}
+
+function verifyWorkbenchClosed(root: string): {
+	completed: boolean;
+	notes: string[];
+} {
+	const status = spawnSync("bun", ["run", "cli/main.ts", "status", "--json"], {
+		cwd: root,
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "pipe"],
+		maxBuffer: 2 * 1024 * 1024,
+	});
+	if (status.status !== 0) {
+		return {
+			completed: false,
+			notes: [
+				`workbench-status-exit:${status.status}:${commandTail(status.stdout ?? "", status.stderr ?? "")}`,
+			],
+		};
+	}
+
+	const statusPayload = parseJson(status.stdout ?? "");
+	const statusData = isRecord(statusPayload?.data) ? statusPayload.data : null;
+	const statusClosed =
+		statusData?.status === "none" &&
+		(!Object.hasOwn(statusData, "active_session") ||
+			statusData.active_session === null ||
+			statusData.active_session === "" ||
+			statusData.active_session === "none");
+	if (!statusClosed) {
+		return {
+			completed: false,
+			notes: ["workbench-status-not-closed"],
+		};
+	}
+
+	const verify = spawnSync(
+		"bun",
+		["run", "cli/main.ts", "verify-tasks", "--strict", "--json"],
+		{
+			cwd: root,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+			maxBuffer: 2 * 1024 * 1024,
+		},
+	);
+	if (verify.status !== 0) {
+		return {
+			completed: false,
+			notes: [
+				`workbench-verify-exit:${verify.status}:${commandTail(verify.stdout ?? "", verify.stderr ?? "")}`,
+			],
+		};
+	}
+
+	const verifyPayload = parseJson(verify.stdout ?? "");
+	if (verifyPayload?.ok !== true) {
+		return {
+			completed: false,
+			notes: ["workbench-verify-not-ok"],
+		};
+	}
+
+	return { completed: true, notes: [] };
+}
+
+function applyScriptedCompletionProbe(
+	scenario: BenchScenario,
+	sandboxRoot: string,
+	metrics: ReturnType<typeof parseEventStream>,
+): string[] {
+	if (scenario.expected?.workbench_closed !== true) {
+		return [];
+	}
+	const probe = verifyWorkbenchClosed(sandboxRoot);
+	if (probe.completed) {
+		metrics.effectiveness.task_completed = true;
+		return [];
+	}
+	return probe.notes;
+}
+
+function writeTraceArtifacts(
+	sandboxRoot: string,
+	stdout: string,
+	stderr: string,
+): void {
+	const traceDir = join(sandboxRoot, ".afol", "data", "benchmarks");
+	mkdirSync(traceDir, { recursive: true });
+	writeFileSync(join(traceDir, "codex-stdout.jsonl"), stdout, "utf8");
+	writeFileSync(join(traceDir, "codex-stderr.log"), stderr, "utf8");
+}
+
 function observedCommands(
 	metrics: ReturnType<typeof parseEventStream>,
 ): string[] {
 	return metrics.tools.calls.map((call) => call.command);
 }
 
-function collectExpectationNotes(
+function commandSegments(command: string): string[] {
+	return normalizeCommandForBenchmark(command)
+		.split(/&&|\|\||;|\r?\n/g)
+		.map((segment) => segment.trim());
+}
+
+export function commandMatchesExpected(
+	command: string,
+	expected: string,
+): boolean {
+	const normalizedExpected = expected.trim().replace(/\s+/g, " ");
+	if (!normalizedExpected) {
+		return true;
+	}
+	return commandSegments(command).some((segment) => {
+		const normalizedSegment = segment.replace(/\s+/g, " ");
+		return (
+			normalizedSegment === normalizedExpected ||
+			normalizedSegment.startsWith(`${normalizedExpected} `)
+		);
+	});
+}
+
+function commandIncludesForbidden(command: string, forbidden: string): boolean {
+	const normalizedForbidden = forbidden.trim().replace(/\s+/g, " ");
+	if (!normalizedForbidden) {
+		return false;
+	}
+	return normalizeCommandForBenchmark(command)
+		.replace(/\s+/g, " ")
+		.includes(normalizedForbidden);
+}
+
+export function collectExpectationNotes(
 	scenario: BenchScenario,
 	metrics: ReturnType<typeof parseEventStream>,
 ): string[] {
 	const notes: string[] = [];
 	const commands = observedCommands(metrics);
 	for (const expected of scenario.expected?.commands_used ?? []) {
-		if (!commands.some((command) => command.includes(expected))) {
+		if (
+			!commands.some((command) => commandMatchesExpected(command, expected))
+		) {
 			notes.push(`expected-command-missing:${expected}`);
+		}
+	}
+	for (const forbidden of scenario.expected?.forbidden_commands ?? []) {
+		if (
+			commands.some((command) => commandIncludesForbidden(command, forbidden))
+		) {
+			notes.push(`forbidden-command:${forbidden}`);
 		}
 	}
 	return notes;
@@ -237,8 +396,16 @@ export function runLiveBenchmark(
 
 		const stdout = codex.stdout ?? "";
 		const stderr = codex.stderr ?? "";
+		if (opts.keepArtifacts) {
+			writeTraceArtifacts(sandboxRoot, stdout, stderr);
+		}
 		const metrics = parseEventStream(stdout.split(/\r?\n/));
 		metrics.timing.wall_clock_ms = wallClockMs;
+		const scriptedNotes = applyScriptedCompletionProbe(
+			scenario,
+			sandboxRoot,
+			metrics,
+		);
 		const classification = classifyStatus(
 			metrics,
 			thresholds,
@@ -246,9 +413,18 @@ export function runLiveBenchmark(
 			wallClockMs,
 		);
 		const expectationNotes = collectExpectationNotes(scenario, metrics);
-		const notes = [...classification.notes, ...expectationNotes];
+		const blockingNotes = [
+			...classification.notes,
+			...expectationNotes,
+			...scriptedNotes,
+		];
+		const notes = [...blockingNotes];
 		let status: BenchResult["status"];
-		if (codex.status === 0 && classification.status === "passed") {
+		if (
+			codex.status === 0 &&
+			classification.status === "passed" &&
+			blockingNotes.length === 0
+		) {
 			status = "passed";
 		} else if (codex.status === null) {
 			status = "blocked";

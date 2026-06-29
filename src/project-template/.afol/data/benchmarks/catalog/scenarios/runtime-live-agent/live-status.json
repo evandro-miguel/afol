@@ -15,6 +15,18 @@
   "baseline_id": "runtime-live-agent-v1",
   "implementation_status": "implemented",
   "live_runner_scenario_id": "live-implement-next-governance-preflight",
+  "coverage": {
+    "commands": [
+      "status",
+      "spec"
+    ],
+    "subcommands": [
+      "spec list [--json] [--verbose]"
+    ],
+    "journeys": [
+      "file-inspection-vs-command"
+    ]
+  },
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,

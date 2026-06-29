@@ -2,16 +2,11 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
-	type BenchResult,
-	DEFAULT_BENCH_PACK_ID,
-	listBenchScenarios,
-	runLiveBenchmark,
-} from "../services/benchmark";
-import {
 	type CliMicroResult,
 	runCliMicroBenchmark,
 	summarizeCliMicro,
 } from "../services/benchmark/cli-micro";
+import { runLiveBenchmark } from "../services/benchmark/live-runner";
 import {
 	buildReport,
 	loadBaseline,
@@ -19,7 +14,9 @@ import {
 	saveBaseline,
 	saveRunArchive,
 } from "../services/benchmark/report";
-import type { BenchScenario } from "../services/benchmark/types";
+import { listBenchScenarios } from "../services/benchmark/scenarios";
+import type { BenchResult, BenchScenario } from "../services/benchmark/types";
+import { DEFAULT_BENCH_PACK_ID } from "../services/benchmark/types";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 type BenchAction =
@@ -34,6 +31,7 @@ const RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH =
 	".afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json";
 const RUNTIME_LIVE_VALIDATE_COMMAND =
 	"afol validate bench --pack runtime-live-agent --json";
+const RUNTIME_LIVE_EXECUTION_COMMAND = "afol bench run --all --save";
 
 type ParsedArgs = {
 	json: boolean;
@@ -167,6 +165,7 @@ function runtimeLiveDryRun(projectRoot: string): Record<string, unknown> {
 		live_pack_id: snapshot?.pack_id ?? "runtime-flow-live-agent-v4",
 		mode: "dry-run",
 		live_execution: false,
+		live_execution_entrypoint: RUNTIME_LIVE_EXECUTION_COMMAND,
 		snapshot_path: RUNTIME_LIVE_SNAPSHOT_RELATIVE_PATH,
 		snapshot_exists: snapshotExists,
 		saved_result_path: snapshot?.saved_result_path ?? null,
@@ -184,6 +183,7 @@ function formatRuntimeLiveDryRun(data: Record<string, unknown>): string {
 	return [
 		`bench runtime-live: ${data.mode}`,
 		`live_execution: ${data.live_execution}`,
+		`live_entrypoint: ${data.live_execution_entrypoint}`,
 		`snapshot: ${data.snapshot_path} exists=${data.snapshot_exists}`,
 		`profile: ${profile.model}/${profile.reasoning_effort}`,
 		`scenarios: ${data.scenario_count}`,

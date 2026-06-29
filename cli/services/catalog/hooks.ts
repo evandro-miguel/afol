@@ -3,6 +3,7 @@ import { basename, join } from "node:path";
 import { loadJsonObject, type SchemaObject } from "../../core/schema";
 import {
 	normalizeProjectRelativePath,
+	resolveProjectConfigPath,
 	resolveProjectPaths,
 } from "../project/paths";
 
@@ -245,11 +246,11 @@ function parseHooksIndex(indexPath: string): ParsedHooksIndex {
 }
 
 function readHooksConfig(projectRoot: string): SchemaObject {
-	const configPath = join(projectRoot, ".agents", "config.json");
-	if (!existsSync(configPath)) {
+	const resolved = resolveProjectConfigPath(projectRoot);
+	if (!resolved) {
 		return {};
 	}
-	const loaded = loadJsonObject(configPath);
+	const loaded = loadJsonObject(resolved.absolutePath);
 	return loaded.ok ? loaded.value : {};
 }
 

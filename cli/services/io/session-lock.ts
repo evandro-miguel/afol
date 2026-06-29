@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { resolveProjectPaths } from "../project/paths";
+import { resolveProjectWritePath } from "../project/root";
 
 const SESSION_LOCK_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const LOCK_RETRY_MS = 25;
@@ -52,8 +53,13 @@ function assertSessionLockName(session: string): string {
 
 export function resolveSessionLockPath(root: string, session: string): string {
 	const normalized = assertSessionLockName(session);
-	const wbRoot = resolveProjectPaths(root).abs.wbDir;
-	return join(wbRoot, ".locks", `${normalized}.lock`);
+	const projectPaths = resolveProjectPaths(root);
+	const lockPath = join(projectPaths.wbDir, ".locks", `${normalized}.lock`);
+	const resolved = resolveProjectWritePath(root, lockPath);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
+	}
+	return resolved.value.path;
 }
 
 function releaseHeldLock(lockPath: string): void {

@@ -12,6 +12,11 @@ import {
 	type ManagedOwnership,
 	planBootstrapOperations,
 } from "../bootstrap/planner";
+import {
+	isTemplatePathMatch,
+	manifestTemplatePatterns,
+	resolveManifestTemplatePath,
+} from "../template/manifest-paths";
 import type { TemplateFileMap } from "../template/payload";
 
 type RawManifest = Record<string, unknown>;
@@ -136,54 +141,6 @@ function isManagedOwnership(value: unknown): value is ManagedOwnership {
 		typeof value === "string" &&
 		(MANAGED_OWNERSHIP as readonly string[]).includes(value)
 	);
-}
-
-function normalizeManifestPath(value: string): string {
-	return value
-		.trim()
-		.replace(/\\/g, "/")
-		.replace(/^\.\/+/, "")
-		.replace(/^\/+/, "")
-		.replace(/\/+/g, "/");
-}
-
-function manifestTemplatePatterns(path: string): string[] {
-	const normalized = normalizeManifestPath(path);
-	if (!normalized) {
-		return [];
-	}
-	if (normalized.startsWith(".agents/") || normalized.startsWith(".afol/")) {
-		return [normalized];
-	}
-
-	const legacyAfolAdmPrefixes = ["hooks/", "rules/", "source/"];
-	for (const prefix of legacyAfolAdmPrefixes) {
-		if (normalized.startsWith(prefix)) {
-			return [`.afol/adm/${normalized}`, normalized, `.agents/${normalized}`];
-		}
-	}
-
-	if (normalized === "tools.json") {
-		return [".afol/adm/tools.json", normalized, `.agents/${normalized}`];
-	}
-	if (normalized.startsWith("data/") || normalized.startsWith("tmp/")) {
-		return [`.afol/${normalized}`, normalized, `.agents/${normalized}`];
-	}
-
-	return [normalized, `.agents/${normalized}`];
-}
-
-function resolveManifestTemplatePath(
-	path: string,
-	templatePathSet: Set<string>,
-): string | undefined {
-	return manifestTemplatePatterns(path).find((candidate) =>
-		templatePathSet.has(candidate),
-	);
-}
-
-function isTemplatePathMatch(pattern: string, path: string): boolean {
-	return path === pattern || path.startsWith(`${pattern}/`);
 }
 
 function collectOwnershipFromManifest(
@@ -892,6 +849,15 @@ function limitedPathLines(paths: string[], limit: number): string[] {
 	return lines;
 }
 
+function limitedChangeLines(changes: string[], limit: number): string[] {
+	const lines = changes.slice(0, limit).map((change) => `- ${change}`);
+	const remaining = changes.length - lines.length;
+	if (remaining > 0) {
+		lines.push(`... ${remaining} more`);
+	}
+	return lines;
+}
+
 export function formatUpdateCheck(
 	result: UpdateCheckResult,
 	mode: UpdateMode,
@@ -916,10 +882,21 @@ export function formatUpdateCheck(
 		}
 		if (summary.total > 0) {
 			lines.push(
-				"hint: run afol update preview for diff previews or afol update check --verbose for full details",
+				"hint: run afol update preview --verbose for diff previews or afol update check --verbose for full details",
 			);
 		}
 		return `${lines.join("\n")}\n`;
+	}
+
+	if ((mode === "preview" || mode === "apply") && !options.verbose) {
+		const summary = operationSummary(result);
+		lines.push(
+			`operations: total=${summary.total} create=${summary.create} update=${summary.update} conflict=${summary.conflict} preserve=${summary.preserve}`,
+		);
+		if (summary.conflictPaths.length > 0) {
+			lines.push("conflicts:");
+			lines.push(...limitedPathLines(summary.conflictPaths, 20));
+		}
 	}
 
 	if (result.changes.length > 0) {
@@ -930,23 +907,46 @@ export function formatUpdateCheck(
 					? "apply operations:"
 					: "changes:";
 		lines.push(label);
-		for (const change of result.changes) {
-			lines.push(`- ${change}`);
-		}
+		lines.push(
+			...limitedChangeLines(
+				result.changes,
+				options.verbose ? Number.MAX_SAFE_INTEGER : 80,
+			),
+		);
 	}
 
 	if (result.filePreviews.length > 0) {
-		lines.push("diff previews:");
-		for (const preview of result.filePreviews) {
-			lines.push(`${preview.path} [owner=${preview.owner}] ${preview.reason}`);
-			lines.push(preview.diff.trimEnd());
+		if (options.verbose) {
+			lines.push("diff previews:");
+			for (const preview of result.filePreviews) {
+				lines.push(
+					`${preview.path} [owner=${preview.owner}] ${preview.reason}`,
+				);
+				lines.push(preview.diff.trimEnd());
+			}
+		} else {
+			lines.push(
+				`diff previews: omitted in compact ${mode}; run afol update ${mode} --verbose for full diffs`,
+			);
 		}
 	}
 
 	if (mode === "apply") {
-		lines.push(`apply details (${result.operations.length} operations):`);
-		for (const operation of result.operations) {
+		const operations = options.verbose
+			? result.operations
+			: result.operations.filter(
+					(operation) => operation.kind !== "skip-identical",
+				);
+		lines.push(`apply details (${operations.length} operations):`);
+		const visibleOperations = options.verbose
+			? operations
+			: operations.slice(0, 80);
+		for (const operation of visibleOperations) {
 			lines.push(`${operation.kind} ${operation.path} ${operation.reason}`);
+		}
+		const remaining = operations.length - visibleOperations.length;
+		if (remaining > 0) {
+			lines.push(`... ${remaining} more`);
 		}
 	}
 

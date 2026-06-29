@@ -1,7 +1,8 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
+import { resolveProjectWritePath } from "../project/root";
 
 export type MutationKind = "patch" | "move" | "archive";
 export type MutationStatus = "applied" | "noop";
@@ -52,7 +53,16 @@ export type MutationRecord = MutationBase | MutationUndoRecord;
 let mutationCounter = 0;
 
 function resolveJournalPath(projectRoot: string): string {
-	return `${resolveProjectPaths(resolve(projectRoot)).abs.mutationsDir}/mutations.jsonl`;
+	const root = resolve(projectRoot);
+	const projectPaths = resolveProjectPaths(root);
+	const resolved = resolveProjectWritePath(
+		root,
+		join(projectPaths.mutationsDir, "mutations.jsonl"),
+	);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
+	}
+	return resolved.value.path;
 }
 
 function generateMutationId(now = new Date()): string {

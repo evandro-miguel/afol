@@ -1,12 +1,22 @@
-import type { SpecCheckResult } from "../services/spec-gate";
+import {
+	rebuildSpecsIndex,
+	type SpecIndexEntry,
+	type SpecsIndexSnapshot,
+} from "../services/local-state/project-indexes";
 import {
 	checkSpecCompatibility,
 	getSpecCheck,
 	waiveSpecCheck,
-} from "../services/spec-gate";
-import { type CommandIo, DEFAULT_IO, writeLegacyJsonEnvelope } from "./io";
+} from "../services/spec-gate/checker";
+import type { SpecCheckResult } from "../services/spec-gate/types";
+import {
+	type CommandIo,
+	createJsonWriters,
+	DEFAULT_IO,
+	writeLegacyJsonEnvelope,
+} from "./io";
 
-type SpecAction = "check" | "conflict" | "waive";
+type SpecAction = "check" | "conflict" | "waive" | "list";
 
 type ParsedArgs = {
 	json: boolean;
@@ -16,9 +26,44 @@ type ParsedArgs = {
 	adr: string;
 };
 
+type ParsedListArgs = {
+	json: boolean;
+	verbose: boolean;
+};
+
+type CompactSpecListEntry = Pick<SpecIndexEntry, "id"> &
+	Partial<Pick<SpecIndexEntry, "status" | "theme">>;
+
+const SPEC_JSON = createJsonWriters("spec");
+
+const SPEC_COMMAND_HELP = [
+	"Usage: afol spec <action> [options]",
+	"",
+	"Actions",
+	"  list                 List indexed specs from .afol/adm/specs",
+	"  check                Check task/spec compatibility",
+	"  conflict             Exit 0 when task/spec compatibility conflicts",
+	"  waive                Waive a spec conflict",
+	"",
+	"Options",
+	"  --session <id>       Workbench session for check/conflict/waive",
+	"  --task <id>          Workbench task for check/conflict/waive",
+	"  --reason <text>      Waiver reason",
+	"  --adr <id>           ADR reference for waiver",
+	"  --json               Emit machine-readable result",
+	"  --verbose            Include paths and timestamps in spec list JSON",
+].join("\n");
+
+function isHelpArg(value: string | undefined): boolean {
+	return value === "help" || value === "-h" || value === "--help";
+}
+
 function normalizeAction(value: string | undefined): SpecAction {
 	if (!value || value === "check" || value === "ck") {
 		return "check";
+	}
+	if (value === "list" || value === "ls") {
+		return "list";
 	}
 	if (value === "conflict" || value === "cf") {
 		return "conflict";
@@ -90,6 +135,22 @@ function parseArgs(args: string[]): ParsedArgs {
 	return parsed;
 }
 
+function parseListArgs(args: string[]): ParsedListArgs {
+	const parsed: ParsedListArgs = { json: false, verbose: false };
+	for (const value of args) {
+		if (value === "--json" || value === "-j") {
+			parsed.json = true;
+			continue;
+		}
+		if (value === "--verbose" || value === "-v") {
+			parsed.verbose = true;
+			continue;
+		}
+		throw new Error(`Unknown spec list argument: ${value}`);
+	}
+	return parsed;
+}
+
 function formatResult(action: SpecAction, result: SpecCheckResult): string {
 	const base = [
 		`spec ${action}: ${result.status}`,
@@ -124,6 +185,46 @@ function writeJsonResult(
 	});
 }
 
+function formatSpecList(snapshot: SpecsIndexSnapshot): string {
+	if (snapshot.specs.length === 0) {
+		return "specs: 0";
+	}
+	return [
+		`specs: ${snapshot.specs.length}`,
+		...snapshot.specs.map((spec) => {
+			const status = spec.status ? ` status=${spec.status}` : "";
+			const theme = spec.theme ? ` theme=${spec.theme}` : "";
+			return `- ${spec.id}${status}${theme} path=${spec.path}`;
+		}),
+	].join("\n");
+}
+
+function writeSpecListJson(
+	io: CommandIo,
+	snapshot: SpecsIndexSnapshot,
+	verbose: boolean,
+): void {
+	const specs = verbose
+		? snapshot.specs
+		: snapshot.specs.map(
+				(spec): CompactSpecListEntry => ({
+					id: spec.id,
+					...(spec.status ? { status: spec.status } : {}),
+					...(spec.theme ? { theme: spec.theme } : {}),
+				}),
+			);
+	SPEC_JSON.ok(
+		io,
+		"list",
+		{
+			action: "list",
+			count: snapshot.specs.length,
+			specs,
+		},
+		["action", "count"],
+	);
+}
+
 export async function runSpecCommand(
 	action: string,
 	args: string[],
@@ -131,7 +232,28 @@ export async function runSpecCommand(
 	io: CommandIo = DEFAULT_IO,
 ): Promise<number> {
 	try {
+		if (
+			isHelpArg(action) ||
+			(!action && args.length === 1 && isHelpArg(args[0]))
+		) {
+			io.stdout(SPEC_COMMAND_HELP);
+			return 0;
+		}
 		const specAction = normalizeAction(action);
+		if (specAction === "list") {
+			if (args.length === 1 && isHelpArg(args[0])) {
+				io.stdout(SPEC_COMMAND_HELP);
+				return 0;
+			}
+			const parsed = parseListArgs(args);
+			const snapshot = rebuildSpecsIndex(projectRoot);
+			if (parsed.json) {
+				writeSpecListJson(io, snapshot, parsed.verbose);
+			} else {
+				io.stdout(formatSpecList(snapshot));
+			}
+			return 0;
+		}
 		const parsed = parseArgs(args);
 		if (specAction === "waive" && !parsed.reason.trim()) {
 			throw new Error("Missing --reason for spec waive.");

@@ -15,7 +15,7 @@ links:
   manifesto: .afol/adm/doctrine/PROJECT-MANIFESTO.md
 scope:
   repo_areas:
-  - docs/arc docs/arc/SPECS src/project-template
+  - .afol/adm .afol/adm/specs src/project-template
   - .agents
   packages:
   - agentic-cli
@@ -64,8 +64,8 @@ established as the future core.
 
 ## 7) Closure
 
-Accepted: the strategy package exists in `docs/arc/PROJECT-MANIFESTO.md`,
-`docs/arc/GENERAL-ROADMAP.md`, and the F-01 through F-17 feature specs. The
+Accepted: the strategy package exists in `.afol/adm/doctrine/PROJECT-MANIFESTO.md`,
+`.afol/adm/roadmap/GENERAL-ROADMAP.md`, and the F-01 through F-17 feature specs. The
 implementation phase proceeded as staged compatibility-first slices with `afol`
 as the Bun/TypeScript front door and the Python/Bash runtime retained as the
 compatibility contract where native parity is not yet justified.

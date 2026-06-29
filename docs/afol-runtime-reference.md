@@ -71,8 +71,8 @@ agent context.
 
 ## State Ownership
 
-- `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`: static
-  scaffold metadata and root detection inputs.
+- `.afol/config.json`: static AFOL project configuration and root detection input.
+- `.agents/lock.json`, `.agents/manifest.json`: static scaffold metadata.
 - `.afol/adm/hooks/**`: static provider-neutral hook catalog.
 - `.afol/adm/rules/**`: static local contracts.
 - `.afol/adm/source/**`: static source seed content.
@@ -101,9 +101,10 @@ agent context.
 - Rule metadata can target `domains`, `surfaces`, `work_types`, `languages`,
   `file_globs`, and `exact_files`; only rules marked `inject: "always"` are
   eligible for injection.
-- Resolver limits come from `.agents/config.json` under
+- Resolver limits come from `.afol/config.json` under
   `rules.resolver.max_chars_per_rule` and `rules.resolver.max_chars_total`;
-  defaults are `2000` and `4000`.
+  `.agents/config.json` is accepted only as a legacy fallback. Defaults are
+  `2000` and `4000`.
 - Persistent state lives at `.afol/data/rules/injection-state.json`, is
   serialized under the rule-injection lock, and is written atomically.
 - Missing optional rule markdown is omitted with a reason; missing required
@@ -127,9 +128,10 @@ They are provider-neutral metadata, not executable plugins.
 - Contributions may add `messages`, `tools`, `validation_commands`,
   `pstr_refs`, `memory_refs`, `library_refs`, and `do_not_load` guidance to the
   context bundle.
-- Resolver limits come from `.agents/config.json` under
+- Resolver limits come from `.afol/config.json` under
   `hooks.resolver.max_chars_per_message` and `hooks.resolver.max_chars_total`;
-  defaults are `1000` and `3000`.
+  `.agents/config.json` is accepted only as a legacy fallback. Defaults are
+  `1000` and `3000`.
 - Missing `.afol/adm/hooks/index.json` means no hooks. Invalid JSON is ignored by
   default listing but fails in strict resolver paths.
 - Hooks do not execute scripts, install skills/plugins, write lifecycle state,

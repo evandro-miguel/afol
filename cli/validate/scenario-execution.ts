@@ -1,9 +1,14 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	accessSync,
 	existsSync,
 	constants as fsConstants,
+	lstatSync,
 	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	readlinkSync,
 	rmSync,
 	symlinkSync,
 } from "node:fs";
@@ -50,6 +55,12 @@ interface ScenarioExecutionResult {
 	metrics: ScenarioExecutionMetrics;
 	notes: string[];
 	passed: boolean;
+}
+
+interface PorcelainStateEntry {
+	status: string;
+	path: string;
+	fingerprint: string;
 }
 
 function scenarioSamplePassed(
@@ -112,12 +123,18 @@ function resolveScenarioInvocation(
 	repoRoot: string,
 	projectRoot: string,
 	command: string,
+	preferLocalWrapper = true,
 ): CommandInvocation {
 	const tokens = tokenizeCommand(command);
 	if (tokens.length === 0) {
 		throw new Error("Empty scenario command");
 	}
-	return resolveCommandInvocation(repoRoot, projectRoot, tokens, true);
+	return resolveCommandInvocation(
+		repoRoot,
+		projectRoot,
+		tokens,
+		preferLocalWrapper,
+	);
 }
 
 function resolveCommandInvocation(
@@ -196,23 +213,6 @@ function gitStatusPorcelain(projectRoot: string): {
 	};
 }
 
-function porcelainPaths(porcelain: string): string[] {
-	const paths: string[] = [];
-	for (const line of porcelain.split(/\r?\n/)) {
-		if (!line.trim()) {
-			continue;
-		}
-		const pathPart = line.length > 3 ? line.slice(3).trim() : line.trim();
-		const renamed = pathPart.includes(" -> ")
-			? pathPart.slice(pathPart.lastIndexOf(" -> ") + 4)
-			: pathPart;
-		if (renamed.length > 0) {
-			paths.push(renamed);
-		}
-	}
-	return [...new Set(paths)];
-}
-
 function porcelainEntries(
 	porcelain: string,
 ): Array<{ status: string; path: string }> {
@@ -233,16 +233,114 @@ function porcelainEntries(
 	return entries;
 }
 
+function porcelainEntryKey(entry: { status: string; path: string }): string {
+	return `${entry.status} ${entry.path}`;
+}
+
+function errorCode(error: unknown): string {
+	return typeof error === "object" && error !== null && "code" in error
+		? String((error as { code?: unknown }).code ?? "unknown")
+		: "unknown";
+}
+
+function hashFile(path: string): string {
+	return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function hashPath(path: string): string {
+	try {
+		const stat = lstatSync(path);
+		if (stat.isSymbolicLink()) {
+			return `symlink:${readlinkSync(path)}`;
+		}
+		if (stat.isFile()) {
+			return `file:${hashFile(path)}`;
+		}
+		if (stat.isDirectory()) {
+			const hash = createHash("sha256");
+			hash.update("dir");
+			for (const name of readdirSync(path).sort()) {
+				if (name === ".git") {
+					continue;
+				}
+				hash.update("\0");
+				hash.update(name);
+				hash.update("\0");
+				hash.update(hashPath(join(path, name)));
+			}
+			return `dir:${hash.digest("hex")}`;
+		}
+		return `other:${stat.mode}:${stat.size}:${Math.trunc(stat.mtimeMs)}`;
+	} catch (error) {
+		return `unavailable:${errorCode(error)}`;
+	}
+}
+
+function porcelainState(
+	projectRoot: string,
+	porcelain: string,
+): PorcelainStateEntry[] {
+	return porcelainEntries(porcelain).map((entry) => ({
+		...entry,
+		fingerprint: hashPath(join(projectRoot, entry.path)),
+	}));
+}
+
+function equivalentPorcelainState(
+	before: PorcelainStateEntry[],
+	after: PorcelainStateEntry[],
+): boolean {
+	const beforeByKey = new Map(
+		before.map((entry) => [porcelainEntryKey(entry), entry]),
+	);
+	const afterByKey = new Map(
+		after.map((entry) => [porcelainEntryKey(entry), entry]),
+	);
+	if (beforeByKey.size !== afterByKey.size) {
+		return false;
+	}
+	for (const [key, beforeEntry] of beforeByKey) {
+		const afterEntry = afterByKey.get(key);
+		if (!afterEntry || afterEntry.fingerprint !== beforeEntry.fingerprint) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function porcelainChangedPaths(
+	before: PorcelainStateEntry[],
+	after: PorcelainStateEntry[],
+): string[] {
+	const beforeByKey = new Map(
+		before.map((entry) => [porcelainEntryKey(entry), entry]),
+	);
+	const afterByKey = new Map(
+		after.map((entry) => [porcelainEntryKey(entry), entry]),
+	);
+	const changedPaths = new Set<string>();
+	for (const [key, afterEntry] of afterByKey) {
+		const beforeEntry = beforeByKey.get(key);
+		if (!beforeEntry || beforeEntry.fingerprint !== afterEntry.fingerprint) {
+			changedPaths.add(afterEntry.path);
+		}
+	}
+	for (const [key, beforeEntry] of beforeByKey) {
+		if (!afterByKey.has(key)) {
+			changedPaths.add(beforeEntry.path);
+		}
+	}
+	return [...changedPaths];
+}
+
 function cleanupGitStatusDiff(
 	projectRoot: string,
 	before: string,
 	after: string,
 ): void {
-	const beforeLines = new Set(
-		before.split(/\r?\n/).filter((line) => line.trim()),
-	);
+	const beforeLines = new Set(porcelainEntries(before).map(porcelainEntryKey));
 	for (const entry of porcelainEntries(after)) {
-		const line = `${entry.status} ${entry.path}`;
+		const line = porcelainEntryKey(entry);
 		if (beforeLines.has(line)) {
 			continue;
 		}
@@ -358,7 +456,7 @@ function runSandboxScenarioCommand(
 				REAL_REPO_ROOT,
 				sandboxRoot,
 				setupCommand,
-				true,
+				false,
 			);
 			const setupSample = runScenarioSample(sandboxRoot, setupInvocation);
 			if (!isCommandSuccess(setupSample)) {
@@ -373,6 +471,7 @@ function runSandboxScenarioCommand(
 			REAL_REPO_ROOT,
 			sandboxRoot,
 			command,
+			false,
 		);
 		const sample = runScenarioSample(sandboxRoot, invocation);
 		const passed = scenarioSamplePassed(sample, expectedExit);
@@ -425,6 +524,9 @@ export function runScenarioCommand(
 		command,
 	);
 	const gitStatusBefore = gitStatusPorcelain(projectRoot);
+	const gitStateBefore = gitStatusBefore.ok
+		? porcelainState(projectRoot, gitStatusBefore.output)
+		: null;
 	let warmup = runScenarioSample(projectRoot, invocation);
 	for (let index = 1; index < BENCH_WARMUP_SAMPLES; index += 1) {
 		warmup = runScenarioSample(projectRoot, invocation);
@@ -440,11 +542,19 @@ export function runScenarioCommand(
 		samples.push(runScenarioSample(projectRoot, invocation));
 	}
 	const gitStatusAfter = gitStatusPorcelain(projectRoot);
+	const gitStateAfter = gitStatusAfter.ok
+		? porcelainState(projectRoot, gitStatusAfter.output)
+		: null;
 	const sideEffectNotes: string[] = [];
-	if (!gitStatusBefore.ok || !gitStatusAfter.ok) {
+	if (
+		!gitStatusBefore.ok ||
+		!gitStatusAfter.ok ||
+		!gitStateBefore ||
+		!gitStateAfter
+	) {
 		sideEffectNotes.push("side-effect-guard-unavailable");
-	} else if (gitStatusBefore.output !== gitStatusAfter.output) {
-		const changedFiles = porcelainPaths(gitStatusAfter.output);
+	} else if (!equivalentPorcelainState(gitStateBefore, gitStateAfter)) {
+		const changedFiles = porcelainChangedPaths(gitStateBefore, gitStateAfter);
 		if (changedFiles.length > 0) {
 			sideEffectNotes.push(`side-effect-leak:${changedFiles.join(",")}`);
 		} else {

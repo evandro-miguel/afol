@@ -46,8 +46,8 @@ function createValidationFixtureRoot(mutate?: (root: string) => void): string {
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "data", "benchmarks"), { recursive: true });
 	cpSync(
-		join(process.cwd(), ".agents", "config.json"),
-		join(root, ".agents", "config.json"),
+		join(process.cwd(), ".afol", "config.json"),
+		join(root, ".afol", "config.json"),
 	);
 	cpSync(
 		join(process.cwd(), ".agents", "lock.json"),
@@ -599,6 +599,43 @@ describe("validation command family", () => {
 		slowValidationTestTimeoutMs,
 	);
 
+	test(
+		"v bench runs mcp-parity pack without skipped adapter stubs",
+		() => {
+			const proc = runKernel(["v", "bench", "--pack", "mcp-parity", "--json"]);
+			expect(proc.status).toBe(0);
+			const payload = parseJsonOutput(proc.stdout as string);
+			expect(payload.mode).toBe("benchmark");
+			expect(payload.status).toBe("passed");
+			expect(payload.pass).toBe(true);
+			expect(payload.result_count).toBe(5);
+			expect(payload.summary).toEqual({
+				total: 5,
+				passed: 5,
+				failed: 0,
+				skipped: 0,
+				baseline_missing: 0,
+			});
+			const results = payload.results as Array<Record<string, unknown>>;
+			expect(results.map((entry) => entry.scenario_id).sort()).toEqual([
+				"mcp-error",
+				"mcp-evidence",
+				"mcp-mutation",
+				"mcp-rule",
+				"mcp-status",
+			]);
+			expect(results.every((entry) => entry.status === "passed")).toBe(true);
+			expect(
+				results.some((entry) =>
+					((entry.notes as string[] | undefined) ?? []).includes(
+						"not-implemented-live-runner",
+					),
+				),
+			).toBe(false);
+		},
+		slowValidationTestTimeoutMs,
+	);
+
 	test("v bench --save persists a benchmark result artifact under default results directory", () => {
 		const fixtureRoot = createValidationFixtureRoot();
 		const proc = runKernel(
@@ -774,7 +811,7 @@ describe("validation command family", () => {
 			),
 		).toBe(true);
 		const results = payload.results as Array<Record<string, unknown>>;
-		expect(results.length).toBe(3);
+		expect(results.length).toBe(4);
 		expect(results.some((result) => result.status === "failed")).toBe(true);
 		expect(results.some((result) => result.status === "passed")).toBe(true);
 		expect(
@@ -790,9 +827,9 @@ describe("validation command family", () => {
 				.some((entry) => entry.startsWith("live-runner-mapping-fallback:")),
 		).toBe(false);
 		const summary = payload.summary as Record<string, unknown>;
-		expect(summary.total).toBe(3);
+		expect(summary.total).toBe(4);
 		expect(summary.passed).toBe(1);
-		expect(summary.failed).toBe(2);
+		expect(summary.failed).toBe(3);
 		expect(summary.skipped).toBe(0);
 		expect(summary.baseline_missing).toBe(0);
 	});
@@ -835,14 +872,33 @@ describe("validation command family", () => {
 					context_bytes: 1024,
 					prompt_bytes: 240,
 				},
+				{
+					id: "maintenance-cadence-review",
+					pass: true,
+					duration_ms: 120,
+					tool_call_count: 4,
+					tool_success_rate: 1,
+					error_count: 0,
+					retry_count: 0,
+					context_bytes: 1240,
+					prompt_bytes: 240,
+					token_usage: {
+						available: true,
+						input_tokens: 220,
+						output_tokens: 80,
+						total_tokens: 300,
+						cached_input_tokens: 0,
+						reasoning_output_tokens: 0,
+					},
+				},
 			];
 			savedResult.pass = true;
-			savedResult.duration_ms = 420;
-			savedResult.tool_call_count = 3;
+			savedResult.duration_ms = 540;
+			savedResult.tool_call_count = 7;
 			savedResult.error_count = 0;
 			savedResult.retry_count = 0;
-			savedResult.context_bytes_total = 3072;
-			savedResult.prompt_bytes_total = 720;
+			savedResult.context_bytes_total = 4312;
+			savedResult.prompt_bytes_total = 960;
 			writeFileSync(
 				savedResultPath,
 				`${JSON.stringify(savedResult, null, 2)}\n`,
@@ -877,8 +933,15 @@ describe("validation command family", () => {
 			`runtime-live-agent-refresh-note:${runtimeLiveBenchmarkRefreshNote}`,
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
-		expect(results.length).toBe(3);
+		expect(results.length).toBe(4);
 		expect(results.every((result) => result.status === "passed")).toBe(true);
+		const maintenanceResult = results.find(
+			(entry) => entry.scenario_id === "live-maintenance-cadence",
+		);
+		expect(maintenanceResult?.status).toBe("passed");
+		expect(maintenanceResult?.pass).toBe(true);
+		expect(maintenanceResult?.output_tokens).toBe(80);
+		expect(maintenanceResult?.tool_success_rate).toBe(1);
 		expect(
 			results
 				.flatMap((result) => result.notes as string[])
@@ -895,14 +958,112 @@ describe("validation command family", () => {
 			}),
 		).toBe(true);
 		const summary = payload.summary as Record<string, unknown>;
-		expect(summary.total).toBe(3);
-		expect(summary.passed).toBe(3);
+		expect(summary.total).toBe(4);
+		expect(summary.passed).toBe(4);
 		expect(summary.failed).toBe(0);
 		expect(summary.skipped).toBe(0);
 		expect(summary.baseline_missing).toBe(0);
 	});
 
-	test("v bench runtime-live-agent passes from tracked snapshot when ignored result artifact is absent", () => {
+	test("v bench runtime-live-agent pins maintenance cadence thresholds", () => {
+		const fixtureRoot = createValidationFixtureRoot((root) => {
+			const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
+			const savedResult = readJson(savedResultPath);
+			savedResult.scenarios = [
+				{
+					id: "live-implement-start-complete-evidence",
+					pass: true,
+					duration_ms: 120,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+					error_count: 0,
+					retry_count: 0,
+					context_bytes: 1024,
+					prompt_bytes: 240,
+				},
+				{
+					id: "live-tools-benchmark-discovery",
+					pass: true,
+					duration_ms: 140,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+					error_count: 0,
+					retry_count: 0,
+					context_bytes: 1024,
+					prompt_bytes: 240,
+				},
+				{
+					id: "live-implement-next-governance-preflight",
+					pass: true,
+					duration_ms: 160,
+					tool_call_count: 1,
+					tool_success_rate: 1,
+					error_count: 0,
+					retry_count: 0,
+					context_bytes: 1024,
+					prompt_bytes: 240,
+				},
+				{
+					id: "maintenance-cadence-review",
+					pass: true,
+					duration_ms: 120,
+					tool_call_count: 4,
+					tool_success_rate: 0.97,
+					error_count: 0,
+					retry_count: 0,
+					context_bytes: 1240,
+					prompt_bytes: 240,
+					token_usage: {
+						available: true,
+						input_tokens: 220,
+						output_tokens: 401,
+						total_tokens: 621,
+						cached_input_tokens: 0,
+						reasoning_output_tokens: 0,
+					},
+				},
+			];
+			savedResult.pass = true;
+			savedResult.duration_ms = 540;
+			savedResult.tool_call_count = 7;
+			savedResult.error_count = 0;
+			savedResult.retry_count = 0;
+			savedResult.context_bytes_total = 4312;
+			savedResult.prompt_bytes_total = 960;
+			writeFileSync(
+				savedResultPath,
+				`${JSON.stringify(savedResult, null, 2)}\n`,
+			);
+		});
+
+		const proc = runKernel(
+			["v", "bench", "--pack", "runtime-live-agent", "--json"],
+			fixtureRoot,
+		);
+		expect(proc.status).toBe(2);
+		const payload = parseJsonOutput(proc.stdout as string);
+		expect(payload.status).toBe("failed");
+		expect(payload.pass).toBe(false);
+		const results = payload.results as Array<Record<string, unknown>>;
+		const target = results.find(
+			(entry) => entry.scenario_id === "live-maintenance-cadence",
+		);
+		expect(target?.status).toBe("failed");
+		expect(target?.pass).toBe(false);
+		expect(target?.tool_success_rate).toBe(0.97);
+		expect(target?.output_tokens).toBe(401);
+		const notes = target?.notes as string[];
+		expect(notes).toContain(
+			"threshold-below-min:min_tool_success_rate:0.97<0.98",
+		);
+		expect(notes).toContain("threshold-exceeded:max_output_tokens:401>400");
+		const summary = payload.summary as Record<string, unknown>;
+		expect(summary.passed).toBe(3);
+		expect(summary.failed).toBe(1);
+		expect(summary.skipped).toBe(0);
+	});
+
+	test("v bench runtime-live-agent fails when saved result artifact is absent", () => {
 		const fixtureRoot = createValidationFixtureRoot((root) => {
 			const { savedResultPath } = getRuntimeLiveArtifactPaths(root);
 			if (existsSync(savedResultPath)) {
@@ -914,20 +1075,20 @@ describe("validation command family", () => {
 			["v", "bench", "--pack", "runtime-live-agent", "--json"],
 			fixtureRoot,
 		);
-		expect(proc.status).toBe(0);
+		expect(proc.status).toBe(2);
 		const payload = parseJsonOutput(proc.stdout as string);
-		expect(payload.status).toBe("passed");
-		expect(payload.pass).toBe(true);
+		expect(payload.status).toBe("failed");
+		expect(payload.pass).toBe(false);
 		expect(payload.notes).toContain(
-			"runtime-live-agent-evidence-source:snapshot",
+			`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
-		expect(results.length).toBe(3);
-		expect(results.every((result) => result.status === "passed")).toBe(true);
+		expect(results.length).toBe(4);
+		expect(results.every((result) => result.status === "failed")).toBe(true);
 		expect(
 			results.every((result) =>
 				(result.notes as string[]).includes(
-					"live-runner-evidence-source:snapshot",
+					`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
 				),
 			),
 		).toBe(true);
@@ -979,14 +1140,33 @@ describe("validation command family", () => {
 						reasoning_output_tokens: 0,
 					},
 				},
+				{
+					id: "maintenance-cadence-review",
+					pass: true,
+					duration_ms: 120,
+					tool_call_count: 4,
+					tool_success_rate: 1,
+					error_count: 0,
+					retry_count: 0,
+					context_bytes: 1240,
+					prompt_bytes: 240,
+					token_usage: {
+						available: true,
+						input_tokens: 220,
+						output_tokens: 80,
+						total_tokens: 300,
+						cached_input_tokens: 0,
+						reasoning_output_tokens: 0,
+					},
+				},
 			];
 			savedResult.pass = true;
-			savedResult.duration_ms = 420;
-			savedResult.tool_call_count = 6;
+			savedResult.duration_ms = 540;
+			savedResult.tool_call_count = 10;
 			savedResult.error_count = 1;
 			savedResult.retry_count = 0;
-			savedResult.context_bytes_total = 3072;
-			savedResult.prompt_bytes_total = 720;
+			savedResult.context_bytes_total = 4312;
+			savedResult.prompt_bytes_total = 960;
 			writeFileSync(
 				savedResultPath,
 				`${JSON.stringify(savedResult, null, 2)}\n`,
@@ -1012,7 +1192,7 @@ describe("validation command family", () => {
 		);
 		expect(notes).toContain("threshold-exceeded:max_output_tokens:401>400");
 		const summary = payload.summary as Record<string, unknown>;
-		expect(summary.passed).toBe(2);
+		expect(summary.passed).toBe(3);
 		expect(summary.failed).toBe(1);
 		expect(summary.skipped).toBe(0);
 	});
@@ -1043,7 +1223,7 @@ describe("validation command family", () => {
 			`runtime-live-artifact-missing:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:${runtimeLiveBenchmarkRefreshCommand}`,
 		);
 		const results = payload.results as Array<Record<string, unknown>>;
-		expect(results.length).toBe(3);
+		expect(results.length).toBe(4);
 		expect(results.every((entry) => entry.status === "failed")).toBe(true);
 		expect(
 			results.every((entry) =>
@@ -1053,9 +1233,9 @@ describe("validation command family", () => {
 			),
 		).toBe(true);
 		expect(payload.summary).toEqual({
-			total: 3,
+			total: 4,
 			passed: 0,
-			failed: 3,
+			failed: 4,
 			skipped: 0,
 			baseline_missing: 0,
 		});

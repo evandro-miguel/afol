@@ -13,20 +13,20 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { CLI_VERSION } from "../generated/version";
 import { kernelRegistry } from "../registry";
-import { waiveSpecCheck } from "../services/spec-gate";
+import { waiveSpecCheck } from "../services/spec-gate/checker";
 import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 const templateConfig = JSON.stringify({
 	schema_version: 1,
 	project: {
-		name: "agentic-start-folder-dev-refactor-ts",
+		name: "afol",
 	},
 });
 const templateLock = JSON.stringify({
 	schema_version: 1,
 	revision: "e178aaf",
-	project: "agentic-start-folder-dev-refactor-ts",
+	project: "afol",
 	locked: true,
 });
 
@@ -41,10 +41,12 @@ function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 function mkProjectRoot(name: string, fakeAgentsBody: string): string {
 	void fakeAgentsBody;
 	const root = mkdtempSync(join(tmpdir(), `kernel-${name}-`));
+	const afolDir = join(root, ".afol");
 	const agentsDir = join(root, ".agents");
+	mkdirSync(afolDir, { recursive: true });
 	mkdirSync(agentsDir, { recursive: true });
 
-	writeFileSync(join(agentsDir, "config.json"), templateConfig, "utf8");
+	writeFileSync(join(afolDir, "config.json"), templateConfig, "utf8");
 	writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
 
 	return root;
@@ -582,6 +584,51 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("maintenance review honors approval gate through the kernel front-door", () => {
+		const root = mkProjectRoot("maintenance-agent", "");
+		try {
+			const reviewPath = join(
+				root,
+				".afol",
+				"data",
+				"maintenance",
+				"reviews.json",
+			);
+			const denied = runKernel(root, [
+				"--agent",
+				"maintenance",
+				"review",
+				"--area",
+				"rules",
+			]);
+			expect(denied.status).toBe(2);
+			expect(denied.stderr as string).toContain(
+				"maintenance review requires local interactive approval",
+			);
+			expect(existsSync(reviewPath)).toBe(false);
+
+			const dryRun = runKernel(root, [
+				"--agent",
+				"maintenance",
+				"review",
+				"--area",
+				"rules",
+				"--dry-run",
+				"--json",
+			]);
+			expect(dryRun.status).toBe(0);
+			const payload = JSON.parse(dryRun.stdout as string) as {
+				dry_run: boolean;
+				reviewed_areas: string[];
+			};
+			expect(payload.dry_run).toBe(true);
+			expect(payload.reviewed_areas).toEqual(["rules"]);
+			expect(existsSync(reviewPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("status alias and json shorthands are normalized", () => {
 		const script = "#!/usr/bin/env bash\necho ARGS:$*";
 		const root = mkProjectRoot("aliases", script);
@@ -953,6 +1000,69 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("start and close help are native and do not require project state", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-lifecycle-help-"));
+		try {
+			for (const [command, expected] of [
+				["start", "Usage: afol start"],
+				["close", "Usage: afol close"],
+			] as const) {
+				for (const flag of ["-h", "--help"]) {
+					const proc = runKernel(root, [command, flag]);
+					expect(proc.status).toBe(0);
+					expect(proc.stdout as string).toContain(expected);
+					expect(proc.stderr as string).toBe("");
+					expect(proc.stdout as string).not.toContain("task started:");
+					expect(proc.stdout as string).not.toContain("session closed:");
+				}
+			}
+			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("spec list and help route through native handler", () => {
+		const root = mkProjectRoot("spec-list", "");
+		try {
+			const specsDir = join(root, ".afol", "adm", "specs");
+			mkdirSync(specsDir, { recursive: true });
+			writeFileSync(
+				join(specsDir, "spec-001.md"),
+				[
+					"---",
+					"doc_type: spec",
+					'id: "spec-001"',
+					"status: active",
+					"---",
+					"",
+					"# Spec 001",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const list = runKernel(root, ["spec", "list", "--json"]);
+			expect(list.status).toBe(0);
+			expect(list.stderr as string).toBe("");
+			const payload = JSON.parse(list.stdout as string) as {
+				action: string;
+				count: number;
+				data: { specs: { id: string }[] };
+			};
+			expect(payload.action).toBe("list");
+			expect(payload.count).toBe(1);
+			expect(payload.data.specs[0]?.id).toBe("spec-001");
+
+			const help = runKernel(root, ["spec", "--help"]);
+			expect(help.status).toBe(0);
+			expect(help.stdout as string).toContain("Usage: afol spec");
+			expect(help.stderr as string).toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("new accepts governed metadata flags and bypasses legacy wrapper", () => {
 		const script = "#!/usr/bin/env bash\necho LEGACY:$*";
 		const root = mkProjectRoot("new-governed-flags", script);
@@ -1302,9 +1412,10 @@ describe("kernel front-door", () => {
 			const proc = runKernel(nested, ["s", "--json"]);
 			expect(proc.status).toBe(0);
 			const payload = JSON.parse(proc.stdout as string) as {
-				paths: { config: string };
+				paths: { config: string; config_source: string };
 			};
-			expect(payload.paths.config).toBe(join(root, ".agents", "config.json"));
+			expect(payload.paths.config).toBe(join(root, ".afol", "config.json"));
+			expect(payload.paths.config_source).toBe("canonical");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1312,9 +1423,11 @@ describe("kernel front-door", () => {
 
 	test("returns non-zero when config or lock are missing/invalid", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-missing-"));
+		const afolDir = join(root, ".afol");
 		const agentsDir = join(root, ".agents");
+		mkdirSync(afolDir, { recursive: true });
 		mkdirSync(agentsDir, { recursive: true });
-		writeFileSync(join(agentsDir, "config.json"), "{invalid-json", "utf8");
+		writeFileSync(join(afolDir, "config.json"), "{invalid-json", "utf8");
 		writeFileSync(join(agentsDir, "lock.json"), templateLock, "utf8");
 
 		try {
@@ -1326,13 +1439,11 @@ describe("kernel front-door", () => {
 		}
 
 		const rootMissing = mkdtempSync(join(tmpdir(), "kernel-missing-lock-"));
+		const missingAfolDir = join(rootMissing, ".afol");
 		const missingAgentsDir = join(rootMissing, ".agents");
+		mkdirSync(missingAfolDir, { recursive: true });
 		mkdirSync(missingAgentsDir, { recursive: true });
-		writeFileSync(
-			join(missingAgentsDir, "config.json"),
-			templateConfig,
-			"utf8",
-		);
+		writeFileSync(join(missingAfolDir, "config.json"), templateConfig, "utf8");
 
 		try {
 			const proc = runKernel(rootMissing, ["status"]);

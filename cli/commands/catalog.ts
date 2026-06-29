@@ -15,6 +15,13 @@ function formatRule(rule: ReturnType<typeof listRules>[number]): string {
 	return `${rule.id} ${rule.name} ${rule.path}`;
 }
 
+function optionalMetadataLine(
+	label: string,
+	values: readonly string[],
+): string[] {
+	return values.length > 0 ? [`${label}: ${values.join(",")}`] : [];
+}
+
 function formatHook(hook: ReturnType<typeof listHooks>[number]): string {
 	return `${hook.id} ${hook.name} ${hook.path}`;
 }
@@ -237,18 +244,17 @@ export async function runRuleCommand(
 			}
 			io.stdout(
 				[
-					`rule: ${rule.id}`,
-					`name: ${rule.name}`,
+					`rule: ${rule.id} ${rule.name}`,
 					`path: ${rule.path}`,
-					`scope: ${rule.scope ?? "none"}`,
+					...(rule.scope ? [`scope: ${rule.scope}`] : []),
 					`required: ${rule.required ? "true" : "false"}`,
-					`domains: ${rule.domains.join(",") || "none"}`,
-					`surfaces: ${rule.surfaces.join(",") || "none"}`,
-					`work_types: ${rule.workTypes.join(",") || "none"}`,
-					`languages: ${rule.languages.join(",") || "none"}`,
-					`file_globs: ${rule.fileGlobs.join(",") || "none"}`,
-					`exact_files: ${rule.exactFiles.join(",") || "none"}`,
-					`inject: ${rule.inject ?? "none"}`,
+					...optionalMetadataLine("domains", rule.domains),
+					...optionalMetadataLine("surfaces", rule.surfaces),
+					...optionalMetadataLine("work_types", rule.workTypes),
+					...optionalMetadataLine("languages", rule.languages),
+					...optionalMetadataLine("file_globs", rule.fileGlobs),
+					...optionalMetadataLine("exact_files", rule.exactFiles),
+					...(rule.inject ? [`inject: ${rule.inject}`] : []),
 					`char_count: ${rule.charCount}`,
 				].join("\n"),
 			);

@@ -9,13 +9,17 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 - This repository was created from the minimal scaffold template.
 - The template owns local protocol files only: `AGENTS.md`,
-  `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
+  `.afol/config.json`, `.agents/lock.json`, `.agents/manifest.json`,
   `.afol/adm/hooks/`, `.afol/adm/rules/`, `.agents/skills/` baseline,
   `.afol/wb/` baseline, and minimal docs.
+- The template must not include a project-local `afol` executable, shell
+  wrapper, symlink, package bin, shortcut alias, task-runner shim, or command
+  runner.
+  `afol` must resolve from the operator environment outside this project.
 - Some sandbox providers make `.agents/` read-only. When this project was
   initialized with `afol init --provider-compatible` or
   `afol init --mutable-dir .afol`, mutable agent state lives under `.afol/`.
-  Always read `.agents/config.json` `paths.*` before hardcoding state paths.
+  Always read `.afol/config.json` `paths.*` before hardcoding state paths.
 - The configured plan directory in a downstream project is that project's
   durable governed plan state. It defaults to `.afol/wb/`. Active-session
   pointers and local runtime state live under the configured mutable directory,
@@ -40,6 +44,7 @@ Replace this section after bootstrap with real product purpose and constraints.
   5. `afol done --session {session-id} --task-id T-01`
   6. `afol close --session {session-id}`
 - Use `afol` as the only downstream front door.
+  It is an external command, not a repository-local file.
 - Planning-only or read-only questions stay in chat unless durable artifacts
   are required.
 
@@ -57,12 +62,22 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Reports -> evidence-based. Done means validated, not merely edited.
 - User correction -> create one lesson entry under `docs/lessons/entries/`.
 
+## User Journeys
+
+- Critical user or agent flows must be registered through roadmap, spec,
+  spec-test, and evidence.
+- Use `docs/templates/ux-journey.md` for complex multi-step flows.
+- Command changes must document expected output, failure/recovery behavior, and
+  validation path before claiming the flow works.
+- Do not claim a journey is production-tested without saved validation,
+  benchmark, or workbench evidence.
+
 ## Branch And Deploy
 
-- Agent commits/pushes target `main_dev` unless the user explicitly requests a
+- Agent commits/pushes target `dev` unless the user explicitly requests a
   different branch in the current turn.
 - `main` -> never direct-push.
-- Updating `main` -> merge from `main_dev` through normal Git merge or PR path.
+- Updating `main` -> merge from `dev` through normal Git merge or PR path.
 - Production deploy -> forbidden unless the user explicitly asks in the current
   turn.
 - Forbidden without explicit deploy request -> `bun run deploy`,
@@ -79,7 +94,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 
 ## Repository Map
 
-- `.agents/config.json`: path contract. Check `paths.mutable_dir`, `paths.wb_dir`,
+- `.afol/config.json`: path contract. Check `paths.mutable_dir`, `paths.wb_dir`,
   `paths.skills_dir`, `paths.tmp_dir`, and `paths.data_dir` before writing
   agent-owned state.
 - `.afol/adm/hooks/`: static provider-neutral hook catalog. Hooks may contribute
@@ -183,7 +198,10 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Temp files -> `tmp/` or `.tmp_<name>/`.
 - Build artifacts -> `dist/`.
 - Workbench artifacts -> `.afol/wb/<session>/`.
-- Local auxiliary worktrees -> `.worktree/`, unversioned.
+- Local auxiliary worktrees -> grouped Worktrunk siblings such as
+  `~/01_projects/dev/<repo>/<repo>.dev`, unversioned.
+- Legacy nested `.worktree/` directories may stay ignored during migration; do
+  not create new nested worktrees.
 - Script incidental output -> never root. If it happens, treat as script bug and
   fix script.
 - User data -> never delete or move vault content, backups, keys, secrets,

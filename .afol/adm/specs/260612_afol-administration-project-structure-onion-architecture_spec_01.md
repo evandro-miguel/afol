@@ -175,24 +175,15 @@ Project structure:
 
 ```text
 .afol/pstr/
-├── README.md
-├── INDEX.md
-├── overview.md
-├── critical-paths.md
-├── frontend/
-├── backend/
-├── api/
-├── data/
-├── devops/
-├── cli/
-├── integrations/
-├── flows/
-├── tests/
-└── snapshots/
+├── index.json
+├── cli.md
+├── template.md
+├── docs.md
+└── config.md
 ```
 
-PSTR is adaptive. Projects do not create empty area maps for surfaces they do
-not have.
+PSTR is registry-driven and adaptive. Projects do not create empty area maps
+for surfaces they do not have.
 
 PSTR map files must be observed and source-backed:
 
@@ -213,7 +204,7 @@ updated_at: 2026-06-12T00:00:00Z
 reviewed_at: 2026-06-12T00:00:00Z
 stale_after: 2026-07-12T00:00:00Z
 git:
-  branch: main_dev
+  branch: dev
   commit: abc123
 tags:
   - pstr

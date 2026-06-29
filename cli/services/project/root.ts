@@ -1,14 +1,21 @@
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { toPosixPath } from "../../core/file-paths";
 import type { Result } from "../../core/result";
 import { err, ok } from "../../core/result";
 import { loadJsonObject, type SchemaObject } from "../../core/schema";
-import { resolveProjectPaths } from "./paths";
+import {
+	PROJECT_CONFIG_PATHS,
+	type ProjectConfigSource,
+	resolveProjectConfigPath,
+	resolveProjectPaths,
+} from "./paths";
 
 export type LoadedProjectRoot = {
 	root: string;
 	configPath: string;
+	configRelativePath: string;
+	configSource: ProjectConfigSource;
 	config: SchemaObject;
 	lock: SchemaObject;
 	manifest?: SchemaObject;
@@ -32,9 +39,11 @@ function findProjectRoot(
 ): { root: string; configPath: string } | null {
 	let current = resolve(startPath);
 	while (true) {
-		const configPath = join(current, ".agents", "config.json");
-		if (existsSync(configPath)) {
-			return { root: current, configPath };
+		for (const candidate of PROJECT_CONFIG_PATHS) {
+			const configPath = join(current, candidate.relativePath);
+			if (existsSync(configPath)) {
+				return { root: current, configPath };
+			}
 		}
 		const parent = dirname(current);
 		if (parent === current) {
@@ -52,23 +61,71 @@ export function loadProjectRoot(
 		return err({
 			code: 3,
 			message:
-				"❌ Could not detect project root: .agents/config.json not found.",
+				"❌ Could not detect project root: .afol/config.json or .agents/config.json not found.",
+		});
+	}
+	let projectRoot: string;
+	try {
+		projectRoot = realpathSync(found.root);
+	} catch (error) {
+		return err({
+			code: 2,
+			message: `Cannot resolve project root: ${(error as Error).message}`,
 		});
 	}
 
-	const configResult = loadJsonObject(found.configPath);
+	let configResolution: ReturnType<typeof resolveProjectConfigPath>;
+	try {
+		configResolution = resolveProjectConfigPath(projectRoot);
+	} catch (error) {
+		return err({ code: 2, message: (error as Error).message });
+	}
+	if (!configResolution) {
+		return err({
+			code: 3,
+			message:
+				"❌ Could not detect project root: .afol/config.json or .agents/config.json not found.",
+		});
+	}
+
+	const configPathResult = resolveProjectPath(
+		projectRoot,
+		configResolution.relativePath,
+	);
+	if (!configPathResult.ok) {
+		return err({ code: 2, message: configPathResult.error });
+	}
+	const configPath = configPathResult.value.path;
+	const configResult = loadJsonObject(configPath);
 	if (!configResult.ok) {
 		return err({ code: 2, message: configResult.error });
 	}
 
-	const projectPaths = resolveProjectPaths(found.root);
-	const lockPath = projectPaths.abs.lockFile;
+	let projectPaths: ReturnType<typeof resolveProjectPaths>;
+	try {
+		projectPaths = resolveProjectPaths(projectRoot);
+	} catch (error) {
+		return err({ code: 2, message: (error as Error).message });
+	}
+
+	const lockPathResult = resolveProjectPath(projectRoot, projectPaths.lockFile);
+	if (!lockPathResult.ok) {
+		return err({ code: 2, message: lockPathResult.error });
+	}
+	const lockPath = lockPathResult.value.path;
 	const lockResult = loadJsonObject(lockPath);
 	if (!lockResult.ok) {
 		return err({ code: 2, message: lockResult.error });
 	}
 
-	const manifestPath = projectPaths.abs.manifestFile;
+	const manifestPathResult = resolveProjectPath(
+		projectRoot,
+		projectPaths.manifestFile,
+	);
+	if (!manifestPathResult.ok) {
+		return err({ code: 2, message: manifestPathResult.error });
+	}
+	const manifestPath = manifestPathResult.value.path;
 	let manifest: SchemaObject | undefined;
 	if (existsSync(manifestPath)) {
 		const manifestResult = loadJsonObject(manifestPath);
@@ -79,8 +136,10 @@ export function loadProjectRoot(
 	}
 
 	const loaded = {
-		root: found.root,
-		configPath: found.configPath,
+		root: projectRoot,
+		configPath,
+		configRelativePath: configResolution.relativePath,
+		configSource: configResolution.source,
 		config: configResult.value,
 		lock: lockResult.value,
 	};
@@ -132,4 +191,43 @@ export function resolveProjectPath(
 		path: candidate,
 		relativePath: toPosixPath(relative(root, candidate)),
 	});
+}
+
+export function resolveProjectWritePath(
+	projectRoot: string,
+	targetPath: string,
+): Result<ProjectPath, string> {
+	const resolved = resolveProjectPath(projectRoot, targetPath);
+	if (!resolved.ok) {
+		return resolved;
+	}
+
+	const root = realpathSync(projectRoot);
+	let candidate = root;
+	for (const rawPart of resolved.value.relativePath
+		.split("/")
+		.filter((part) => part.length > 0)) {
+		const next = join(candidate, rawPart);
+		try {
+			if (lstatSync(next).isSymbolicLink()) {
+				return err(`Path crosses symlink: ${targetPath}`);
+			}
+		} catch (error) {
+			if (!isMissingPathError(error)) {
+				return err(`Path cannot be inspected: ${targetPath}`);
+			}
+		}
+		candidate = next;
+	}
+
+	return resolved;
+}
+
+function isMissingPathError(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		(error as { code?: unknown }).code === "ENOENT"
+	);
 }

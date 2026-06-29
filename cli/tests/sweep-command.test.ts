@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runSweepCommand } from "../commands/sweep";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
-import { writeMemory as writeProjectMemory } from "../services/memory";
-import { openDb } from "../services/state";
+import { writeMemory as writeProjectMemory } from "../services/memory/crud";
+import { openDb } from "../services/state/db";
 
 function initGitRepo(root: string): void {
 	const git = (args: string[]): void => {
@@ -95,7 +95,7 @@ function createHealthyFixture(): string {
 					scope: "config",
 					status: "current",
 					authority: "observed",
-					source_paths: [".agents/config.json"],
+					source_paths: [".afol/config.json"],
 					source_hash: "hash-4",
 					file_count: 1,
 					updated_at: now,

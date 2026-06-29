@@ -19,8 +19,8 @@ import {
 	buildPstrDiff,
 	getPstrAffectedAreas,
 	PSTR_AREAS,
-} from "../services/pstr";
-import { rebuildPstrIndex } from "../services/pstr/builder";
+	rebuildPstrIndex,
+} from "../services/pstr/builder";
 import { getPstrWatchTargets } from "../services/pstr/watch";
 import {
 	detectShape,
@@ -103,6 +103,21 @@ function expectEnvelope(
 ): void {
 	expect(payload.schema).toBe("afol.result/v1");
 	expect(payload.action).toBe(action);
+}
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForOutput(
+	stdout: string[],
+	timeoutMs = 1500,
+): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (stdout.length === 0 && Date.now() < deadline) {
+		await delay(20);
+	}
+	expect(stdout.length).toBeGreaterThan(0);
 }
 
 function currentIso(): string {
@@ -198,11 +213,42 @@ describe("pstr command", () => {
 		}
 	});
 
-	test("rebuild --json returns snapshot", async () => {
+	test("rebuild --json returns compact summary", async () => {
 		const root = createFixture();
 		try {
 			const io = captureIo();
 			expect(await runPstrCommand("rebuild", ["--json"], root, io.io)).toBe(0);
+			const output = io.stdout[0] ?? "{}";
+			expect(output.length).toBeLessThan(2000);
+			const payload = JSON.parse(output) as Record<string, unknown>;
+			expectEnvelope(payload, "pstr.rebuild");
+			expect(payload.ok).toBe(true);
+			expect(payload.exit_code).toBe(0);
+			expect(payload.snapshot).toBeUndefined();
+			expect(payload.output).toBe("compact");
+			expect(payload.hint).toContain("--verbose");
+			expect((payload.summary as { kind: string }).kind).toBe("pstr_index_v1");
+			const data = payload.data as {
+				output: string;
+				summary: { kind: string; maps: { count: number } };
+				snapshot?: unknown;
+			};
+			expect(data.output).toBe("compact");
+			expect(data.summary.kind).toBe("pstr_index_v1");
+			expect(data.summary.maps.count).toBeGreaterThan(0);
+			expect(data.snapshot).toBeUndefined();
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("rebuild --json --verbose returns snapshot", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(
+				await runPstrCommand("rebuild", ["--json", "--verbose"], root, io.io),
+			).toBe(0);
 			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<
 				string,
 				unknown
@@ -210,6 +256,7 @@ describe("pstr command", () => {
 			expectEnvelope(payload, "pstr.rebuild");
 			expect(payload.ok).toBe(true);
 			expect(payload.exit_code).toBe(0);
+			expect(payload.output).toBe("verbose");
 			expect((payload.snapshot as { kind: string }).kind).toBe("pstr_index_v1");
 			expect(
 				(payload.data as { snapshot: { kind: string } }).snapshot.kind,
@@ -454,6 +501,40 @@ describe("pstr command", () => {
 				snapshot.maps.find((entry) => entry.id === "docs")?.updated_at,
 			).toBe(initialDocs?.updated_at);
 		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("watch --json observes live file changes and exits on SIGINT", async () => {
+		const root = createFixture();
+		let running: Promise<number> | null = null;
+		try {
+			rebuildPstrIndex(root);
+			const io = captureIo();
+			running = runPstrCommand(
+				"watch",
+				["--json", "--debounce-ms", "20", "--path", "cli"],
+				root,
+				io.io,
+			);
+			await delay(50);
+			writeFileSync(join(root, "cli", "test.ts"), "export const x = 4;\n");
+			await waitForOutput(io.stdout);
+			process.emit("SIGINT");
+			expect(await Promise.race([running, delay(1000).then(() => -1)])).toBe(0);
+			const payload = JSON.parse(io.stdout.at(-1) ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expectEnvelope(payload, "pstr.watch");
+			expect(payload.ok).toBe(true);
+			expect(["change", "resync"]).toContain(payload.event as string);
+			expect(payload.rebuilt).toBe(true);
+		} finally {
+			process.emit("SIGINT");
+			if (running) {
+				await Promise.race([running, delay(1000)]);
+			}
 			cleanup(root);
 		}
 	});
@@ -718,6 +799,34 @@ describe("pstr command", () => {
 			expect(io.stderr[0] ?? "").toContain(
 				"Invalid value for --debounce-ms: nope",
 			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	test("watch --json rejects invalid debounce value with error envelope", async () => {
+		const root = createFixture();
+		try {
+			const io = captureIo();
+			expect(
+				await runPstrCommand(
+					"watch",
+					["--json", "--debounce-ms", "nope"],
+					root,
+					io.io,
+				),
+			).toBe(2);
+			expect(io.stderr).toHaveLength(0);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as Record<
+				string,
+				unknown
+			>;
+			expectEnvelope(payload, "pstr.watch");
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(2);
+			expect(
+				(payload.error as { code: string; message: string }).message,
+			).toContain("Invalid value for --debounce-ms: nope");
 		} finally {
 			cleanup(root);
 		}

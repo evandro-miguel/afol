@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { computeSourceHash } from "../../core/source-hash";
 import type { DriftFinding } from "../drift";
+import { resolveProjectWritePath } from "../project/root";
 import { buildAdmMigrationPlan } from "./planner";
 
 export type AdmValidationReport = {
@@ -34,13 +34,21 @@ function makeFinding(
 	};
 }
 
+function resolveSafeProjectPath(root: string, path: string): string {
+	const resolved = resolveProjectWritePath(root, path);
+	if (!resolved.ok) {
+		throw new Error(resolved.error);
+	}
+	return resolved.value.path;
+}
+
 export function validateAdmMigration(root: string): AdmValidationReport {
 	const plan = buildAdmMigrationPlan(root);
 	const findings: DriftFinding[] = [];
 
 	for (const entry of plan.manifest) {
-		const sourcePath = join(root, entry.source_path);
-		const targetPath = join(root, entry.target_path);
+		const sourcePath = resolveSafeProjectPath(root, entry.source_path);
+		const targetPath = resolveSafeProjectPath(root, entry.target_path);
 		if (!existsSync(targetPath)) {
 			findings.push(
 				makeFinding(

@@ -43,18 +43,18 @@ describe("generated template cleanliness", () => {
 		expect(paths).not.toContain("CLAUDE.md");
 		expect(paths.some((path) => path.startsWith(".claude/"))).toBe(false);
 		expect(paths).not.toContain("a");
+		expect(paths).not.toContain("afol");
 		expect(paths).not.toContain("Justfile");
 		expect(paths.some((path) => path.endsWith(".py"))).toBe(false);
-		expect(paths.some((path) => path.startsWith("docs/standards/"))).toBe(
-			false,
-		);
+		expect(paths).toContain("docs/standards/user-journey-registry.md");
 		expect(paths.some((path) => path.startsWith("docs/agentic/"))).toBe(false);
 	});
 
 	test("generated payload keeps AFOL hooks and project skills in owned roots", () => {
 		const paths = Object.keys(DEFAULT_TEMPLATE_FILES);
-		const configEntry = DEFAULT_TEMPLATE_FILES[".agents/config.json"];
+		const configEntry = DEFAULT_TEMPLATE_FILES[".afol/config.json"];
 		expect(configEntry).toBeDefined();
+		expect(paths).not.toContain(".agents/config.json");
 		expect(paths).toContain(".afol/adm/hooks/index.json");
 		expect(paths).toContain(".afol/adm/hooks/README.md");
 		expect(paths).toContain(".afol/adm/source/universal-skills/index.json");
@@ -99,6 +99,9 @@ describe("generated template cleanliness", () => {
 		expect(forbiddenOps).toEqual([]);
 		expect(plan.filteredForbiddenCount).toBe(0);
 		expect(plan.operations.some((operation) => operation.path === "a")).toBe(
+			false,
+		);
+		expect(plan.operations.some((operation) => operation.path === "afol")).toBe(
 			false,
 		);
 		expect(

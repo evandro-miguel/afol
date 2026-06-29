@@ -26,10 +26,12 @@ Optional runtime adapters kept thin for broader reuse when enabled:
 
 - `AGENTS.md` is the canonical instruction source.
 - `.afol/adm/` is the canonical strategic and governance layer.
-- `.afol/pstr/` is the canonical current project-structure map layer.
+- `.afol/pstr/` is the canonical observed project-structure map layer; validate
+  or rebuild before trusting stale output.
 - `.afol/wb/` remains the canonical execution layer.
-- `.agents/` is static scaffold metadata, rules, source seed, and provider skill
-  content only.
+- `.agents/` is limited to static scaffold metadata and provider skills:
+  `lock.json`, `manifest.json`, and `.agents/skills/**`. Hooks, rules, source
+  seeds, and mutable state belong under `.afol/**`.
 
 Runtime-specific files must adapt this canonical layer, not redefine it.
 
@@ -65,7 +67,8 @@ Committed runtime config must stay safe to review publicly inside the repository
 - Keep user-local or global runtime configuration outside the repository unless
   a future project explicitly justifies a portable, secret-free adapter.
 
-- Runtime adapters are optional and controlled by `.agents/config.json`.
+- Runtime adapters are optional and controlled by `.afol/config.json`; legacy
+  `.agents/config.json` is fallback only.
 - If the Claude adapter is disabled, do not create or sync `CLAUDE.md` or
   `.claude/**`.
 - If the Claude adapter is enabled, keep its mirror thin and synchronized with

@@ -3,7 +3,8 @@
   "scenario_id": "mcp-error",
   "scenario_version": "1.0.0",
   "pack_id": "mcp-parity",
-  "command": "a mcp error",
+  "command": "a unknown-mcp-parity-command --json",
+  "expected_exit": 2,
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {
@@ -13,8 +14,7 @@
     "min_tool_success_rate": 0.98
   },
   "baseline_id": "mcp-parity-v1",
-  "implementation_status": "skipped",
-  "note": "no CLI mcp command; MCP parity pending adapter; covered by mcp unit tests",
+  "implementation_status": "implemented",
   "deterministic_metrics": {
     "duration_ms": 120,
     "timing_p50_ms": 110,

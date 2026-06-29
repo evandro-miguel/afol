@@ -155,21 +155,22 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0000_total-reformulation-strategy_spec_01.md
+  .afol/adm/specs/260521_0000_total-reformulation-strategy_spec_01.md
 - Why: The project needs one coherent strategy before architecture, command
   design, and migration work begin.
 - Exit criteria: manifesto exists; roadmap exists; feature specs exist;
   product/factory boundary is explicit; Bun/TS migration direction is explicit.
 - Closure note: accepted strategy artifacts are
-  `docs/arc/PROJECT-MANIFESTO.md`,
-  `docs/arc/GENERAL-ROADMAP.md`, and the F-01 through F-17 parent specs. The
+  `.afol/adm/doctrine/PROJECT-MANIFESTO.md`,
+  `.afol/adm/roadmap/GENERAL-ROADMAP.md`, and the F-01 through F-17 parent
+  specs. `docs/arc/**` remains the frozen transitional archive. The
   implementation closed through governed slices while preserving Python/Bash as
   the compatibility runtime until each command family earns native parity.
 
 ### F-01 Universal Agent CLI
 
 - Status: final
-- Governing spec: docs/arc/SPECS/260521_0010_universal-agent-cli_spec_01.md
+- Governing spec: .afol/adm/specs/260521_0010_universal-agent-cli_spec_01.md
 - Why: Logic should live in one updateable CLI instead of being copied into
   every project.
 - Exit criteria: Bun/TypeScript CLI architecture is defined; CLI runs from
@@ -183,7 +184,7 @@ Minimum acceptance:
 ### F-02 Minimal Project Template
 
 - Status: final
-- Governing spec: docs/arc/SPECS/260521_0020_minimal-project-template_spec_01.md
+- Governing spec: .afol/adm/specs/260521_0020_minimal-project-template_spec_01.md
 - Why: Downstream projects need only the local state and minimal docs required
   for agents to operate.
 - Exit criteria: src/project-template becomes minimal; template contains
@@ -198,7 +199,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0030_agent-command-design-system_spec_01.md
+  .afol/adm/specs/260521_0030_agent-command-design-system_spec_01.md
 - Why: Agents should use short, predictable commands to reduce repeated token
   cost.
 - Exit criteria: short grammar exists; long aliases exist; high-frequency
@@ -213,7 +214,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0040_governance-workbench-system_spec_01.md
+  .afol/adm/specs/260521_0040_governance-workbench-system_spec_01.md
 - Why: Plans, tasks, evidence, logs, specs, and reports need a durable local
   execution model.
 - Exit criteria: typed workbench model; command-managed
@@ -226,7 +227,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0050_smart-rules-and-skills-routing_spec_01.md
+  .afol/adm/specs/260521_0050_smart-rules-and-skills-routing_spec_01.md
 - Why: Agents should receive only relevant rules and skills for the current
   work.
 - Exit criteria: rule router; skill router; surface detection; compact
@@ -238,7 +239,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0060_file-first-low-token-execution_spec_01.md
+  .afol/adm/specs/260521_0060_file-first-low-token-execution_spec_01.md
 - Why: Agents should save detailed work into files and return compact handoffs
   instead of flooding context.
 - Exit criteria: research save flow; log append flow; compact handoff format;
@@ -250,7 +251,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0070_local-state-index-and-event-log_spec_01.md
+  .afol/adm/specs/260521_0070_local-state-index-and-event-log_spec_01.md
 - Why: Agents should query compact state instead of repeatedly scanning raw
   files.
 - Exit criteria: local indexes for workbench, rules, skills, specs, and files;
@@ -263,7 +264,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0080_safe-file-mutation-and-undo_spec_01.md
+  .afol/adm/specs/260521_0080_safe-file-mutation-and-undo_spec_01.md
 - Why: Agents need safe tools to move, patch, write, archive, and undo files.
 - Exit criteria: mutation journal; session/task context; dry-run; undo where
   feasible; protected dangerous paths.
@@ -275,7 +276,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0090_template-update-and-versioning_spec_01.md
+  .afol/adm/specs/260521_0090_template-update-and-versioning_spec_01.md
 - Why: Downstream projects must receive updates when the core system improves.
 - Exit criteria: project lock; managed manifest; update check; update preview;
   conflict detection; preserved local edits.
@@ -286,7 +287,7 @@ Minimum acceptance:
 ### F-10 Runtime Adapters and MCP
 
 - Status: final
-- Governing spec: docs/arc/SPECS/260521_0100_runtime-adapters-and-mcp_spec_01.md
+- Governing spec: .afol/adm/specs/260521_0100_runtime-adapters-and-mcp_spec_01.md
 - Why: The system should support Codex, OpenCode, Claude Code, Gemini CLI,
   Qwen, and future runtimes.
 - Exit criteria: thin adapters; MCP exposes safe tools; CLI and MCP share core
@@ -299,7 +300,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0110_validation-ci-and-benchmarks_spec_01.md
+  .afol/adm/specs/260521_0110_validation-ci-and-benchmarks_spec_01.md
 - Why: The system needs trust gates before work is marked complete or releases
   are published.
 - Closure note: the accepted F-11 closeout is complete. Accepted evidence is
@@ -322,7 +323,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260521_0120_public-distribution-and-onboarding_spec_01.md
+  .afol/adm/specs/260521_0120_public-distribution-and-onboarding_spec_01.md
 - Why: The system should eventually be usable by other people.
 - Exit criteria: public install path; simple first-run onboarding; minimal
   docs; examples; private assumptions removed; standalone binary smoke and
@@ -335,7 +336,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260411_agentic-runtime-restructure_spec_01.md
+  .afol/adm/specs/260411_agentic-runtime-restructure_spec_01.md
 - Why: Runtime command/help surfaces, MCP parity, and tool catalog alignment
   must remain consistent while runtime code is restructured.
 - Closure note: the parent spec is final and the accepted native-port slices
@@ -349,13 +350,13 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260412_1110_spec-child-and-spec-test-governance_spec_01.md
+  .afol/adm/specs/260412_1110_spec-child-and-spec-test-governance_spec_01.md
 - Why: Child-spec naming, spec-test strategy docs, and legacy spec-lite
   compatibility need a clear governance anchor before any executable follow-up.
 - Exit criteria: spec-child is documented as the canonical child/local spec
   artifact; spec-test is documented as the pre-test strategy artifact;
   spec-lite remains a legacy compatibility alias; the F-14 folder convention
-  `docs/arc/SPECS/F-14/spec-tests/` is explicit.
+  `.afol/adm/specs/F-14/spec-tests/` is explicit.
 - Closure note: accepted governance evidence is
   `E-20260528153442093351`; verified outcome summarized in
   `.afol/wb/260528_1528_spec-child-and-spec-test-governance/`
@@ -365,10 +366,10 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md
+  .afol/adm/specs/260412_2004_repo-wide-simplification-runtime-parity_spec_01.md
 - Why: bounded simplification slices reduced runtime/script complexity and
   map drift without changing the public CLI behavior.
-- Closure note: accepted child slices are final in `docs/arc/SPECS/INDEX.md`:
+- Closure note: accepted child slices are final in `.afol/adm/specs/INDEX.md`:
   scripts cleanup, map boundary cleanup, runtime registry parity, and python
   command simplification.
 - Exit criteria: satisfied; strict governed evidence exists for the accepted
@@ -378,11 +379,11 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260413_1250_project-template-source-separation_spec_01.md
+  .afol/adm/specs/260413_1250_project-template-source-separation_spec_01.md
 - Why: enforce a strict export contract so bootstrap/export dry-run copies only
   sanctioned `src/project-template` content and keeps history/noise out.
 - Closure note: accepted implementation evidence `b520f23` and `75cf349` is
-  complete; `docs/arc/SPECS/INDEX.md` now marks the parent spec as `final` and
+  complete; `.afol/adm/specs/INDEX.md` now marks the parent spec as `final` and
   the current-state map docs reflect the closeout.
 - Exit criteria: satisfied; the accepted export-contract and source-root helper
   slices are complete and the docs/governance surfaces are reconciled.
@@ -391,7 +392,7 @@ Minimum acceptance:
 
 - Status: final
 - Governing spec:
-  docs/arc/SPECS/260413_1849_just-command-runner-migration_spec_01.md
+  .afol/adm/specs/260413_1849_just-command-runner-migration_spec_01.md
 - Why: retire `just` from the documented downstream path while preserving
   factory-only compatibility long enough to prove command parity and predictable
   validation behavior.
@@ -565,7 +566,8 @@ Minimum acceptance:
   - State health checks schema, migrations, source hashes, FTS freshness,
     orphan records, and size/WAL signals.
   - Maintenance commands produce dry-run cleanup reports for weekly and monthly
-    routines.
+    routines, including memory/library review, workbench archive candidates,
+    roadmap/spec/manifest alignment, and rule/skill pruning warnings.
   - Context bundles enforce explicit token budgets and prefer refs before full
     documents.
 
@@ -600,8 +602,9 @@ Follow-on slices under this direction:
 - Implement each feature above as narrow slices.
 - Immediate next slice: Temporal Reliability v1. Implement explicit path
   config, `afol pstr stale --json`, trusted-context stale gates,
-  `afol health --area state|library|memory`, and weekly/monthly maintenance
-  dry-run reports.
+  `afol health --area state|library|memory`, weekly/monthly maintenance dry-run
+  reports, scaffolded AFOL maintenance skills, and live-agent maintenance
+  cadence benchmark coverage.
 - Defer daemon behavior, embeddings, physical archive moves, aggressive
   auto-ingest, full graph expansion, and remote schema/admin mutation.
 - Do not combine SQLite, memory, library, context bundle, spec gate, temporal
@@ -609,8 +612,9 @@ Follow-on slices under this direction:
 
 ### F-19 Canonical AFOL Configuration Rehome
 
-- Status: planned
-- Governing spec: TBD
+- Status: final
+- Governing spec:
+  .afol/adm/specs/260627_1655_canonical-afol-configuration-rehome_spec_01.md
 - Why: AFOL operational configuration should be owned by AFOL, not by the
   provider-facing `.agents/` metadata surface. The current `.agents/config.json`
   location still acts as root-detection and path-resolution input, which keeps
@@ -639,6 +643,10 @@ Follow-on slices under this direction:
   - `bun run template:check`
   - `bun run typecheck`
   - `afol validate project`
+- Closure evidence: implemented in session
+  `260627_1824_open-spec-completion`; validated with `bun test`,
+  `bun run typecheck`, `afol validate project --json`, `afol v bench --pack
+  update-safety --json`, template generation, and security release scan.
 - Risks:
   - Moving root detection without fallback can make existing projects invisible
     to `afol`.
@@ -646,6 +654,37 @@ Follow-on slices under this direction:
     false conflicts in downstream update flows.
   - Combining config rehome with skills rehome would blur provider metadata and
     AFOL runtime ownership; keep those decisions separate.
+
+### F-20 Parallel Session Isolation
+
+- Status: final
+- Governing spec:
+  .afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md
+- Why: concurrent local, remote, and CI agents need isolated workbench session
+  context. A single mutable global active-session pointer is unsafe when
+  several agents produce plans, tasks, evidence, and reviews in parallel.
+- Scope:
+  - Prefer explicit `--session` targeting for governed work.
+  - Support context-local session binding for local and remote agents.
+  - Reject unsafe global active-session fallback in CI and other parallel
+    contexts.
+  - Warn when a PR or remote agent mutates `.afol/wb/.active_session` without
+    an explicit session-management intent.
+- Exit criteria:
+  - Session resolution follows explicit flag, `AFOL_SESSION`, context-local
+    binding, then guarded global fallback.
+  - `afol session list|bind|switch|unbind` supports operator control over
+    session context.
+  - Validation flags accidental `.active_session` drift and keeps remote-agent
+    reviews from corrupting local workbench state.
+- Validation targets:
+  - `afol validate project`
+  - `afol validate bench --pack workbench-parity --json`
+  - `bun test cli/tests/session*.test.ts cli/tests/workbench*.test.ts`
+- Risks:
+  - Overly strict fallback removal can make quick local commands noisy.
+  - Under-strict fallback can let remote/CI agents mutate the wrong session.
+  - Session binding must remain visible and reversible for operators.
 
 ## 6) Recommended Delivery Phases
 

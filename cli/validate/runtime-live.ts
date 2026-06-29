@@ -258,11 +258,14 @@ function loadRuntimeLiveEvidence(projectRoot: string): RuntimeLiveEvidence {
 		`${snapshotPath}.saved_result_path`,
 	);
 	const savedResultPath = resolve(projectRoot, savedResultPathRaw);
-	const payloadSource = existsSync(savedResultPath) ? "result" : "snapshot";
-	const payloadPath =
-		payloadSource === "result" ? savedResultPath : snapshotPath;
-	const payloadRaw =
-		payloadSource === "result" ? loadJsonObject(savedResultPath) : snapshot;
+	if (!existsSync(savedResultPath)) {
+		throw new Error(
+			`runtime-live-result-missing:${resolveRelativePath(projectRoot, savedResultPathRaw)};snapshot:${LIVE_BENCHMARK_SNAPSHOT_RELATIVE_PATH};run:${LIVE_BENCHMARK_REFRESH_COMMAND}`,
+		);
+	}
+	const payloadSource = "result";
+	const payloadPath = savedResultPath;
+	const payloadRaw = loadJsonObject(savedResultPath);
 	const payload = parseLiveRunnerPayload(payloadRaw, payloadPath);
 	if (payload.pack_id !== LIVE_BENCHMARK_EXPECTED_PACK_ID) {
 		throw new Error(

@@ -20,12 +20,12 @@ applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 | `.afol/pstr/`           | Current project-structure maps only                           |
 | `.afol/wb/`             | Governed sessions, evidence, indexes, benchmark state         |
 | `.afol/`                | Mutable AFOL runtime state                                    |
-| `.agents/config.json`   | Provider-facing static config                                 |
+| `.afol/config.json`     | AFOL project configuration                                    |
 | `.agents/lock.json`     | Provider-facing lock metadata                                 |
 | `.agents/manifest.json` | Provider-facing manifest metadata                             |
 | `.agents/skills/`       | Project-local provider skills                                 |
 | `src/project-template/` | Exportable downstream scaffold                                |
-| `docs/map/`             | Current-state evidence only                                   |
+| `docs/map/`             | Retired legacy map surface; do not create as current state     |
 
 ## Rules
 
@@ -33,6 +33,8 @@ applies_to: All agents (Codex, OpenCode, Qwen, Gemini, Claude)
 - Use `.afol/adm/` for durable project direction and static AFOL catalogs.
 - Do not put mutable sessions or runtime state under `.agents/`.
 - Do not create `.afol/skills/`; skills live in configured provider skill root.
+- Do not recreate `docs/map/**`; current project-structure maps live under
+  `.afol/pstr/**`.
 - Do not restore retired `.agents` command wrappers, Python runners, runtime,
   workbench, archive, YAML fallback, or legacy routing.
 - Keep generated/template changes inside their owned surfaces.

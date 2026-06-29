@@ -366,6 +366,114 @@ describe("local-state project indexer", () => {
 		}
 	});
 
+	test("rebuildWorkBenchIndex(sessionScope) updates only scoped session", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-scope-update-"));
+		try {
+			const sessionA = join(root, ".afol", "wb", "260618_alpha");
+			const sessionB = join(root, ".afol", "wb", "260618_beta");
+			mkdirSync(sessionA, { recursive: true });
+			mkdirSync(sessionB, { recursive: true });
+
+			writeFileSync(
+				join(sessionA, "260618_alpha_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | alice | baseline |",
+				].join("\n"),
+				"utf8",
+			);
+
+			writeFileSync(
+				join(sessionB, "260618_beta_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress | bob | before |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const first = rebuildWorkBenchIndex(root);
+			expect(first.sessions.map((session) => session.session)).toEqual([
+				"260618_alpha",
+				"260618_beta",
+			]);
+
+			writeFileSync(
+				join(sessionB, "260618_beta_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | bob | after |",
+					"| T-02 | in_progress | bob | added |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const second = rebuildWorkBenchIndex(root, "260618_beta");
+			const alphaTasks = second.tasks.filter(
+				(task) => task.session === "260618_alpha",
+			);
+			const betaTasks = second.tasks.filter(
+				(task) => task.session === "260618_beta",
+			);
+
+			expect(second.sessions).toHaveLength(2);
+			expect(
+				second.sessions.find((session) => session.session === "260618_alpha")
+					?.task_count,
+			).toBe(1);
+			expect(
+				second.sessions.find((session) => session.session === "260618_beta")
+					?.task_count,
+			).toBe(2);
+			expect(alphaTasks).toHaveLength(1);
+			expect(betaTasks.map((task) => task.task_id)).toEqual(["T-01", "T-02"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rebuildWorkBenchIndex(sessionScope) drops removed session from snapshot", () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-scope-removed-"));
+		try {
+			const sessionA = join(root, ".afol", "wb", "260618_alpha");
+			const sessionB = join(root, ".afol", "wb", "260618_beta");
+			mkdirSync(sessionA, { recursive: true });
+			mkdirSync(sessionB, { recursive: true });
+
+			writeFileSync(
+				join(sessionA, "260618_alpha_task_01.md"),
+				"| Task | State | Owner | Notes |\n|------|-------|-------|-------|\n| T-01 | done | alice | done |",
+				"utf8",
+			);
+			writeFileSync(
+				join(sessionB, "260618_beta_task_01.md"),
+				"| Task | State | Owner | Notes |\n|------|-------|-------|-------|\n| T-01 | in_progress | bob | working |",
+				"utf8",
+			);
+
+			rebuildWorkBenchIndex(root);
+			rmSync(sessionB, { recursive: true, force: true });
+			const snapshot = rebuildWorkBenchIndex(root, "260618_beta");
+
+			expect(snapshot.sessions).toHaveLength(1);
+			expect(snapshot.sessions[0]?.session).toBe("260618_alpha");
+			expect(
+				snapshot.tasks.some((task) => task.session === "260618_beta"),
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("loadCoordinationRadar derives open tasks, mutation touches, and warning ids", () => {
 		const root = mkdtempSync(join(tmpdir(), "coordination-radar-"));
 		try {

@@ -52,7 +52,7 @@ Symptom:
 - dry-run or apply reports `provider-compatible-cleanup-pending`.
 - old `.agents/data`, `.agents/skills`, `.agents/tmp`, `.agents/wb`, or
   `.agents/z-arq` still exists, and the path is not the configured current
-  path in `.agents/config.json`.
+  path in `.afol/config.json`.
 
 Cause:
 
@@ -101,7 +101,7 @@ Cause:
 
 Fix:
 
-- read `.agents/config.json`;
+- read `.afol/config.json`;
 - use `paths.wb_dir`, which should point at `.afol/wb`;
 - move only deliberately reviewed runtime artifacts into AFOL-owned paths;
 - update stale instructions that mention `.agents/wb` as active state.

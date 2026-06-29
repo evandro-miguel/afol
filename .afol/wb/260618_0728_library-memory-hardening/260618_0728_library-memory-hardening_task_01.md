@@ -10,13 +10,6 @@ updated_at: "2026-06-18T11:33:55Z"
 
 # Tasks: library-memory-hardening
 
-## Task List
-
-- [x] T-01 Plan and coordinate library/memory hardening
-- [x] T-02 Fix agent-facing library/memory retrieval and data integrity
-- [x] T-03 Update docs/template coverage for library/memory flows
-- [x] T-04 Validate library/memory flows and close evidence
-
 ## State Board
 
 | Task | State | Owner | Notes |

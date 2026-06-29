@@ -8,7 +8,14 @@ export const TEMPLATE_ROOT = "src/project-template";
 
 export const TEMPLATE_FORBIDDEN_PATTERNS = [
 	"a",
+	"afol",
 	"Justfile",
+	"**/.env",
+	"**/.env.*",
+	"**/*.key",
+	"**/*.pem",
+	"**/*.p12",
+	"**/*.pfx",
 	"**/*.py",
 	"**/pyproject.toml",
 	"**/uv.lock",
@@ -28,16 +35,14 @@ export const TEMPLATE_FORBIDDEN_PATTERNS = [
 	".claude/**",
 	"docs/arc/**",
 	"tests/**",
-	"docs/standards/**",
 	"docs/agentic/**",
 	"docs/knowledge/**",
 ] as const;
 
 export const TEMPLATE_ALLOWED_PATTERNS = [
-	"afol",
 	"AGENTS.md",
 	"RTK.md",
-	".agents/config.json",
+	".afol/config.json",
 	".agents/lock.json",
 	".agents/manifest.json",
 	".agents/skills-sync.manifest.json",
@@ -53,6 +58,7 @@ export const TEMPLATE_ALLOWED_PATTERNS = [
 	".afol/tmp/**",
 	".afol/wb/**",
 	"docs/lessons/**",
+	"docs/standards/**",
 	"docs/telemetry/**",
 	"docs/templates/**",
 ] as const;
@@ -64,6 +70,8 @@ const TEMPLATE_INSTRUCTION_FILES = [
 ] as const;
 
 const TEMPLATE_FORBIDDEN_TEXT_REFERENCES = [
+	"./afol",
+	"`./afol`",
 	"./a",
 	"`./a`",
 	" or `./a`",
@@ -103,12 +111,20 @@ const ALLOWED_GLOBS = TEMPLATE_ALLOWED_PATTERNS.map(
 
 export function matchesTemplateForbiddenPattern(relativePath: string): boolean {
 	const normalized = toPosixPath(relativePath);
-	return FORBIDDEN_GLOBS.some((glob) => glob.match(normalized));
+	return (
+		isAllowedSecretExample(normalized) === false &&
+		FORBIDDEN_GLOBS.some((glob) => glob.match(normalized))
+	);
 }
 
 export function matchesTemplateAllowedPattern(relativePath: string): boolean {
 	const normalized = toPosixPath(relativePath);
 	return ALLOWED_GLOBS.some((glob) => glob.match(normalized));
+}
+
+function isAllowedSecretExample(relativePath: string): boolean {
+	const fileName = relativePath.split("/").at(-1);
+	return fileName === ".env.example";
 }
 
 export async function scanTemplateForbiddenPaths(

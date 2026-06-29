@@ -18,7 +18,7 @@ links:
   report: ''
 scope:
   repo_areas:
-  - docs/arc
+  - .afol/adm
   - .afol/wb
   packages:
   - agents-bootstrap
@@ -85,7 +85,7 @@ Out of scope:
 ## 7) Constraints and Assumptions
 
 - Assumptions:
-  - `docs/arc` and `.afol/wb` remain canonical.
+  - `.afol/adm` and `.afol/wb` remain authoritative.
 - Constraints:
   - Runtime adapters remain thin and should render these definitions without extending semantics.
 

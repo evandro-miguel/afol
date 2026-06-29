@@ -126,7 +126,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("health")?.sideEffect).toBe("read");
 		expect(byCommand.get("db")?.sideEffect).toBe("read");
 		expect(byCommand.get("doctor")?.sideEffect).toBe("read");
-		expect(byCommand.get("maintenance")?.sideEffect).toBe("read");
+		expect(byCommand.get("maintenance")?.sideEffect).toBe("write");
 		expect(byCommand.get("sweep")?.sideEffect).toBe("read");
 		expect(byCommand.get("schema")?.sideEffect).toBe("write");
 		expect(byCommand.get("preflight")?.sideEffect).toBe("read");
@@ -158,6 +158,36 @@ describe("kernel registry", () => {
 				seen.set(token, spec.command);
 			}
 		}
+	});
+
+	test("publishes maintenance review subcommand metadata", () => {
+		const maintenance = kernelRegistry.commands.find(
+			(entry) => entry.command === "maintenance",
+		);
+
+		expect(maintenance?.subcommands).toEqual([
+			{
+				usage: "weekly --dry-run",
+				sideEffect: "read",
+				description: "Preview weekly maintenance actions",
+			},
+			{
+				usage: "monthly --dry-run",
+				sideEffect: "read",
+				description: "Preview monthly maintenance actions",
+			},
+			{
+				usage: "review --area <area> --dry-run",
+				sideEffect: "read",
+				description:
+					"Preview rules, skills, docs, commands, memory, library, organization",
+			},
+			{
+				usage: "review --area <area> --note <text>",
+				sideEffect: "write",
+				description: "Record maintenance review freshness",
+			},
+		]);
 	});
 
 	test("publishes project-benchmark subcommand metadata", () => {

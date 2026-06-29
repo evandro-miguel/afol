@@ -18,7 +18,7 @@ about the scaffold's skill surface.
 ## Prevention Rule
 
 - Before rewriting scaffold operating prompts, inspect the current repo-local
-  `AGENTS.md`, `.agents/config.json`, `.agents/skills/`, and relevant AFOL CLI
+  `AGENTS.md`, `.afol/config.json`, `.agents/skills/`, and relevant AFOL CLI
   help.
 - Treat `.agents/skills/` as the primary project-local skill surface, and do not
   present globally available Codex skills as scaffold-local core skills unless

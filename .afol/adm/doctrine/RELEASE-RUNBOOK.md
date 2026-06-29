@@ -16,7 +16,7 @@ updated_at: "2026-06-14T00:00:00+00:00"
 - All tests pass with coverage ≥80% lines and functions (`bun run coverage:check`)
 - Deterministic build succeeds (`bun run build:deterministic`)
 - Distribution binary smokes (`bun run smoke:dist`)
-- Security scans execute (or are explicitly waived) (`bun run validate:security:release`)
+- Security scans execute and pass (`bun run validate:security:release`)
 - Release provenance is generated (`bun run release:provenance:release`)
 
 It does not currently run the AFOL project hygiene gate or the TypeScript
@@ -35,8 +35,10 @@ typecheck, so both are explicit release preflight commands in this runbook.
 
 - If `osv-scanner` is absent, the dependency scan status is `waived` with `waiver_required: true`
 - If `gitleaks` is absent, the secret scan status is `waived` with `waiver_required: true`
-- The release gate **passes** but security scans are **WAIVED, not executed**
-- A credible public release requires both tools present on PATH
+- The release gate **fails** when a required release scanner is absent, cannot
+  start, reports findings, or when no supported dependency lockfile exists
+- A credible public release requires both tools present on PATH and a passing
+  dependency scan result
 
 ## Release Flow
 

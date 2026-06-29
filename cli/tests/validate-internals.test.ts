@@ -66,6 +66,17 @@ function createFixtureRoot(): string {
 		join(root, ".afol", "data", "benchmarks", "snapshots"),
 		{ recursive: true },
 	);
+	mkdirSync(join(root, ".afol", "adm"), { recursive: true });
+	cpSync(
+		join(process.cwd(), ".afol", "adm", "roadmap"),
+		join(root, ".afol", "adm", "roadmap"),
+		{ recursive: true },
+	);
+	cpSync(
+		join(process.cwd(), ".afol", "adm", "specs"),
+		join(root, ".afol", "adm", "specs"),
+		{ recursive: true },
+	);
 	const runtimeLiveSnapshotPath = join(
 		root,
 		".afol",
@@ -415,16 +426,54 @@ describe("validate registry", () => {
 			const snapshot = loadRegistry(root);
 			expect(snapshot.schema_version).toBe("1.0.0");
 			expect(snapshot.packs).toHaveLength(15);
-			expect(snapshot.scenariosByPack["runtime-live-agent"]).toHaveLength(3);
+			expect(snapshot.scenariosByPack["runtime-live-agent"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["pstr-integrity"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["context-bundles"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["state-projection"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["memory-governance"]).toHaveLength(4);
 			expect(snapshot.scenariosByPack["library-knowledge"]).toHaveLength(4);
-			expect(snapshot.scenariosByPack["governance-history"]).toHaveLength(4);
+			expect(snapshot.scenariosByPack["governance-history"]).toHaveLength(7);
 			expect(snapshot.scenariosByPack["adm-governance"]).toHaveLength(4);
+			expect(snapshot.coverage?.exemptions).toHaveLength(0);
+			expect(snapshot.coverage?.subcommand_exemptions).toHaveLength(0);
+			expect(
+				snapshot.scenariosByPack["runtime-live-agent"]?.find(
+					(scenario) => scenario.scenario_id === "live-governed-task",
+				)?.coverage?.commands,
+			).toEqual(["new", "start", "evidence", "done", "close"]);
+			const featureSpecScenario = snapshot.scenariosByPack[
+				"governance-history"
+			]?.find(
+				(scenario) => scenario.scenario_id === "feature-spec-coverage-matrix",
+			);
+			expect(featureSpecScenario?.coverage?.features).toContain("F-20");
+			expect(featureSpecScenario?.coverage?.specs).toContain(
+				"260426_1215_parallel-session-isolation_spec_01",
+			);
+			expect(featureSpecScenario?.coverage?.features).toContain("F-19");
+			expect(featureSpecScenario?.coverage?.specs).toContain(
+				"260627_1655_canonical-afol-configuration-rehome_spec_01",
+			);
+			const uxRegistryScenario = snapshot.scenariosByPack[
+				"governance-history"
+			]?.find((scenario) => scenario.scenario_id === "ux-registry-lifecycle");
+			expect(uxRegistryScenario?.thresholds).toMatchObject({
+				max_duration_ms: 300,
+				max_p95_ms: 300,
+				max_output_tokens: 500,
+				min_tool_success_rate: 0.98,
+			});
+			expect(uxRegistryScenario?.coverage?.commands).toEqual(
+				expect.arrayContaining(["ux", "maintenance"]),
+			);
+			expect(uxRegistryScenario?.coverage?.subcommands).toContain(
+				"ux validate",
+			);
+			expect(uxRegistryScenario?.coverage?.journeys).toContain(
+				"ux-journey-registry-control",
+			);
 			expect(snapshot.baselinesByPack["cli-kernel-local"]?.timing_p50_ms).toBe(
-				120,
+				200,
 			);
 			expect(validateRegistryContract(snapshot)).toEqual([]);
 
@@ -510,6 +559,305 @@ describe("validate registry", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("enforces tool and journey coverage metadata", () => {
+		const root = createFixtureRoot();
+		try {
+			const snapshot = loadRegistry(root);
+			if (!snapshot.coverage) {
+				throw new Error("Expected benchmark coverage policy fixture");
+			}
+			const subcommandExemptions = snapshot.coverage.subcommand_exemptions;
+			if (subcommandExemptions === undefined) {
+				throw new Error("Expected benchmark subcommand coverage fixture");
+			}
+			const { coverage: _coverage, ...withoutCoverage } = snapshot;
+			expect(validateRegistryContract(withoutCoverage)).toContain(
+				"tool-coverage-policy-missing",
+			);
+
+			const withoutSurfaceCoverageFor = (
+				command: string,
+				subcommand: string,
+			): RegistrySnapshot => {
+				const governanceScenarios =
+					snapshot.scenariosByPack["governance-history"];
+				if (!governanceScenarios) {
+					throw new Error("Expected governance-history scenarios fixture");
+				}
+				const surfaceScenario = governanceScenarios.find(
+					(scenario) => scenario.scenario_id === "tool-surface-coverage-matrix",
+				);
+				if (!surfaceScenario) {
+					throw new Error("Expected tool surface coverage scenario fixture");
+				}
+				return {
+					...snapshot,
+					scenariosByPack: {
+						...snapshot.scenariosByPack,
+						"governance-history": governanceScenarios.map((scenario) =>
+							scenario.scenario_id === surfaceScenario.scenario_id
+								? {
+										...scenario,
+										coverage: {
+											commands: (scenario.coverage?.commands ?? []).filter(
+												(entry) => entry !== command,
+											),
+											subcommands: (
+												scenario.coverage?.subcommands ?? []
+											).filter((entry) => entry !== subcommand),
+											journeys: scenario.coverage?.journeys ?? [],
+										},
+									}
+								: scenario,
+						),
+					},
+				};
+			};
+			const withoutInitCoverage = withoutSurfaceCoverageFor(
+				"init",
+				"init --dry-run",
+			);
+			expect(validateRegistryContract(withoutInitCoverage)).toContain(
+				"tool-coverage-missing:init",
+			);
+			const withoutSubcommandPolicy: RegistrySnapshot = {
+				...snapshot,
+				coverage: {
+					schema_version: snapshot.coverage.schema_version,
+					exemptions: snapshot.coverage.exemptions,
+				},
+			};
+			expect(validateRegistryContract(withoutSubcommandPolicy)).toContain(
+				"tool-subcommand-coverage-policy-missing",
+			);
+			expect(validateRegistryContract(withoutInitCoverage)).toContain(
+				"tool-subcommand-coverage-missing:init --dry-run",
+			);
+			const governanceScenarios =
+				snapshot.scenariosByPack["governance-history"];
+			if (!governanceScenarios) {
+				throw new Error("Expected governance-history scenarios fixture");
+			}
+			const featureSpecScenario = governanceScenarios.find(
+				(scenario) => scenario.scenario_id === "feature-spec-coverage-matrix",
+			);
+			if (!featureSpecScenario?.coverage?.features?.length) {
+				throw new Error("Expected feature coverage scenario fixture");
+			}
+			if (!featureSpecScenario.coverage.specs?.length) {
+				throw new Error("Expected spec coverage scenario fixture");
+			}
+			const withoutF20FeatureCoverage: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"governance-history": governanceScenarios.map((scenario) =>
+						scenario.scenario_id === featureSpecScenario.scenario_id
+							? {
+									...scenario,
+									coverage: {
+										commands: scenario.coverage?.commands ?? [],
+										subcommands: scenario.coverage?.subcommands ?? [],
+										journeys: scenario.coverage?.journeys ?? [],
+										features: (scenario.coverage?.features ?? []).filter(
+											(entry) => entry !== "F-20",
+										),
+										specs: scenario.coverage?.specs ?? [],
+									},
+								}
+							: scenario,
+					),
+				},
+			};
+			expect(validateRegistryContract(withoutF20FeatureCoverage)).toContain(
+				"scenario-feature-coverage-missing:F-20",
+			);
+			const f19SpecId =
+				"260627_1655_canonical-afol-configuration-rehome_spec_01";
+			const withoutF19SpecCoverage: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"governance-history": governanceScenarios.map((scenario) =>
+						scenario.scenario_id === featureSpecScenario.scenario_id
+							? {
+									...scenario,
+									coverage: {
+										commands: scenario.coverage?.commands ?? [],
+										subcommands: scenario.coverage?.subcommands ?? [],
+										journeys: scenario.coverage?.journeys ?? [],
+										features: scenario.coverage?.features ?? [],
+										specs: (scenario.coverage?.specs ?? []).filter(
+											(entry) => entry !== f19SpecId,
+										),
+									},
+								}
+							: scenario,
+					),
+				},
+			};
+			expect(validateRegistryContract(withoutF19SpecCoverage)).toContain(
+				`scenario-spec-coverage-missing:${f19SpecId}`,
+			);
+			const roadmapPath = join(
+				root,
+				".afol",
+				"adm",
+				"roadmap",
+				"GENERAL-ROADMAP.md",
+			);
+			const originalRoadmap = readFileSync(roadmapPath, "utf8");
+			writeFileSync(
+				roadmapPath,
+				originalRoadmap.replace(
+					"  .afol/adm/specs/260627_1655_canonical-afol-configuration-rehome_spec_01.md",
+					"  TBD",
+				),
+				"utf8",
+			);
+			expect(validateRegistryContract(snapshot)).toContain(
+				"roadmap-feature-governing-spec-missing:F-19",
+			);
+			writeFileSync(roadmapPath, originalRoadmap, "utf8");
+			const f20SpecPath = join(
+				root,
+				".afol",
+				"adm",
+				"specs",
+				"260426_1215_parallel-session-isolation_spec_01.md",
+			);
+			const originalF20Spec = readFileSync(f20SpecPath, "utf8");
+			writeFileSync(
+				f20SpecPath,
+				originalF20Spec.replace(
+					"roadmap_feature: F-20",
+					"roadmap_feature: F-99",
+				),
+				"utf8",
+			);
+			expect(validateRegistryContract(snapshot)).toContain(
+				"spec-roadmap-feature-unknown:260426_1215_parallel-session-isolation_spec_01:F-99",
+			);
+			writeFileSync(f20SpecPath, originalF20Spec, "utf8");
+
+			const cliKernelScenarios = snapshot.scenariosByPack["cli-kernel-local"];
+			const cliKernelScenario = cliKernelScenarios?.[0];
+			if (!cliKernelScenarios || !cliKernelScenario) {
+				throw new Error("Expected cli-kernel-local scenarios fixture");
+			}
+			const unknownScenarioCoverage: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"cli-kernel-local": [
+						{
+							...cliKernelScenario,
+							coverage: { commands: ["not-a-command"] },
+						},
+						...cliKernelScenarios.slice(1),
+					],
+				},
+			};
+			expect(validateRegistryContract(unknownScenarioCoverage)).toContain(
+				`scenario-tool-coverage-unknown:cli-kernel-local:${cliKernelScenario.scenario_id}:not-a-command`,
+			);
+			const unknownScenarioSubcommandCoverage: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"cli-kernel-local": [
+						{
+							...cliKernelScenario,
+							coverage: { subcommands: ["status --definitely-nope"] },
+						},
+						...cliKernelScenarios.slice(1),
+					],
+				},
+			};
+			expect(
+				validateRegistryContract(unknownScenarioSubcommandCoverage),
+			).toContain(
+				`scenario-tool-subcommand-coverage-unknown:cli-kernel-local:${cliKernelScenario.scenario_id}:status --definitely-nope`,
+			);
+
+			const unknownExemption: RegistrySnapshot = {
+				...snapshot,
+				coverage: {
+					...snapshot.coverage,
+					exemptions: [
+						...snapshot.coverage.exemptions,
+						{ command: "not-a-command", reason: "fixture" },
+					],
+				},
+			};
+			expect(validateRegistryContract(unknownExemption)).toContain(
+				"tool-coverage-exemption-unknown:not-a-command",
+			);
+			const unknownSubcommandExemption: RegistrySnapshot = {
+				...snapshot,
+				coverage: {
+					...snapshot.coverage,
+					subcommand_exemptions: [
+						...subcommandExemptions,
+						{ subcommand: "status --definitely-nope", reason: "fixture" },
+					],
+				},
+			};
+			expect(validateRegistryContract(unknownSubcommandExemption)).toContain(
+				"tool-subcommand-coverage-exemption-unknown:status --definitely-nope",
+			);
+
+			const skippedScenarioDoesNotCover: RegistrySnapshot = {
+				...withoutInitCoverage,
+				scenariosByPack: {
+					...withoutInitCoverage.scenariosByPack,
+					"cli-kernel-local": [
+						{
+							...cliKernelScenario,
+							scenario_id: "skipped-init-coverage",
+							coverage: {
+								commands: ["init"],
+								subcommands: ["init --dry-run"],
+								journeys: ["fixture-journey"],
+							},
+							implementation_status: "skipped",
+						},
+						...cliKernelScenarios.slice(1),
+					],
+				},
+			};
+			const skippedCoverageIssues = validateRegistryContract(
+				skippedScenarioDoesNotCover,
+			);
+			expect(skippedCoverageIssues).toContain("tool-coverage-missing:init");
+			expect(skippedCoverageIssues).toContain(
+				"tool-subcommand-coverage-missing:init --dry-run",
+			);
+
+			const implementedScenarioWithoutJourney: RegistrySnapshot = {
+				...snapshot,
+				scenariosByPack: {
+					...snapshot.scenariosByPack,
+					"cli-kernel-local": [
+						{
+							...cliKernelScenario,
+							coverage: { commands: ["status"] },
+							implementation_status: "implemented",
+						},
+						...cliKernelScenarios.slice(1),
+					],
+				},
+			};
+			expect(
+				validateRegistryContract(implementedScenarioWithoutJourney),
+			).toContain(
+				`scenario-journey-coverage-missing:cli-kernel-local:${cliKernelScenario.scenario_id}`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("scenario benchmark execution", () => {
@@ -580,6 +928,42 @@ describe("scenario benchmark execution", () => {
 			expect(success.result.tool_success_rate).toBe(1);
 			expect(success.result.error_count).toBe(0);
 
+			writeFileSync(join(root, "preexisting-dirty.txt"), "dirty\n", "utf8");
+			const dirtySuccess = withCapturedConsoleError(() =>
+				buildResult(
+					root,
+					{
+						...successScenario,
+						scenario_id: "bench-success-dirty-worktree",
+					},
+					baselinePath,
+					baseline,
+				),
+			);
+			expect(dirtySuccess.result.status).toBe("passed");
+			expect(
+				dirtySuccess.result.notes.some((note) =>
+					note.startsWith("side-effect-leak:"),
+				),
+			).toBe(false);
+
+			const dirtyMutationScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-dirty-worktree-mutation",
+				command: `node -e 'require("node:fs").appendFileSync("preexisting-dirty.txt","mutated\\n")'`,
+			};
+			const dirtyMutation = withCapturedConsoleError(() =>
+				buildResult(root, dirtyMutationScenario, baselinePath, baseline),
+			);
+			expect(dirtyMutation.result.status).toBe("failed");
+			expect(
+				dirtyMutation.result.notes.find((note) =>
+					note.startsWith("side-effect-leak:"),
+				),
+			).toBe("side-effect-leak:preexisting-dirty.txt");
+			writeFileSync(join(root, "preexisting-dirty.txt"), "dirty\n", "utf8");
+			unlinkSync(join(root, "preexisting-dirty.txt"));
+
 			const expectedExitScenario: Scenario = {
 				...successScenario,
 				scenario_id: "bench-expected-exit",
@@ -619,10 +1003,10 @@ describe("scenario benchmark execution", () => {
 			);
 			expect(sideEffect.result.status).toBe("failed");
 			expect(
-				sideEffect.result.notes.some((note) =>
+				sideEffect.result.notes.find((note) =>
 					note.startsWith("side-effect-leak:"),
 				),
-			).toBe(true);
+			).toBe("side-effect-leak:tracked.txt");
 
 			const sandboxScenario: Scenario = {
 				...successScenario,
@@ -727,7 +1111,7 @@ describe("scenario benchmark execution", () => {
 				scenario_id: scenarioId,
 				scenario_version: "1.0.0",
 				pack_id: "pstr-integrity",
-				command: `node -e 'process.stdout.write("x".repeat(${bytes}))'`,
+				command: `node -e 'require("node:fs").writeSync(1, "x".repeat(${bytes}))'`,
 				result_schema: "1.0.0",
 				oracle: "project-token-rule",
 				thresholds: {
@@ -879,7 +1263,7 @@ describe("runtime live validation helpers", () => {
 		);
 	});
 
-	test("builds runtime live results from direct evidence and fallback snapshots", () => {
+	test("builds runtime live results from saved result evidence", () => {
 		const root = createFixtureRoot();
 		try {
 			const snapshot = loadRegistry(root);
@@ -910,7 +1294,7 @@ describe("runtime live validation helpers", () => {
 				scenarios,
 				baselinePath,
 			);
-			expect(fallback.results).toHaveLength(3);
+			expect(fallback.results).toHaveLength(4);
 			expect(fallback.results.every((entry) => entry.status === "passed")).toBe(
 				true,
 			);
@@ -919,22 +1303,22 @@ describe("runtime live validation helpers", () => {
 			);
 
 			unlinkSync(savedResultPath);
-			const snapshotFallback = buildRuntimeLiveAgentResults(
+			const missingSavedResult = buildRuntimeLiveAgentResults(
 				root,
 				scenarios,
 				baselinePath,
 			);
-			expect(snapshotFallback.results).toHaveLength(3);
+			expect(missingSavedResult.results).toHaveLength(4);
 			expect(
-				snapshotFallback.results.every((entry) => entry.status === "passed"),
+				missingSavedResult.results.every((entry) => entry.status === "failed"),
 			).toBe(true);
-			expect(snapshotFallback.notes).toContain(
-				"runtime-live-agent-evidence-source:snapshot",
+			expect(missingSavedResult.notes).toContain(
+				`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol validate bench --pack runtime-live-agent --json`,
 			);
 			expect(
-				snapshotFallback.results.every((entry) =>
-					entry.notes.some((note) =>
-						note.includes("live-runner-evidence-source:snapshot"),
+				missingSavedResult.results.every((entry) =>
+					entry.notes.includes(
+						`runtime-live-result-missing:.afol/data/benchmarks/catalog/results/20260607_132956_runtime-flow-live-agent-v4.json;snapshot:.afol/data/benchmarks/snapshots/runtime-flow-live-agent-v4-latest.json;run:afol validate bench --pack runtime-live-agent --json`,
 					),
 				),
 			).toBe(true);
@@ -953,24 +1337,21 @@ describe("runtime live validation helpers", () => {
 		// the constant so any future drift is caught at typecheck+test time.
 	});
 
-	test("runtime-live-agent catalog scenarios map to all 3 spec child scenario IDs", () => {
+	test("runtime-live-agent catalog scenarios map to all live-runner scenario IDs", () => {
 		const root = createFixtureRoot();
 		try {
 			const snapshot = loadRegistry(root);
 			const scenarios = snapshot.scenariosByPack["runtime-live-agent"] ?? [];
-			expect(scenarios.length).toBe(3);
+			expect(scenarios.length).toBe(4);
 
 			const mappedIds = scenarios
 				.map((s) => s.live_runner_scenario_id)
 				.filter(Boolean);
-			// Spec child "First Live Scenario Pack":
-			//   live-tools-benchmark-discovery
-			//   live-implement-next-governance-preflight
-			//   live-implement-start-complete-evidence
 			expect(mappedIds.sort()).toEqual([
 				"live-implement-next-governance-preflight",
 				"live-implement-start-complete-evidence",
 				"live-tools-benchmark-discovery",
+				"maintenance-cadence-review",
 			]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1046,7 +1427,7 @@ describe("runtime live validation helpers", () => {
 				scenarios,
 				baselinePath,
 			);
-			expect(result.results).toHaveLength(3);
+			expect(result.results).toHaveLength(4);
 			expect(result.results.some((entry) => entry.status === "failed")).toBe(
 				true,
 			);

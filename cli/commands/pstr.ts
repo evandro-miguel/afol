@@ -15,7 +15,7 @@ import {
 	reviewPstrCandidates,
 	suggestPstrChanges,
 	validatePstrIndex,
-} from "../services/pstr";
+} from "../services/pstr/builder";
 import { getPstrWatchTargets } from "../services/pstr/watch";
 import { type CommandIo, createJsonWriters, DEFAULT_IO } from "./io";
 
@@ -38,6 +38,11 @@ type ParsedPathArgs = {
 	paths: string[];
 };
 
+type ParsedRebuildArgs = {
+	json: boolean;
+	verbose: boolean;
+};
+
 type ParsedWatchArgs = ParsedPathArgs & {
 	once: boolean;
 	debounceMs: number;
@@ -50,6 +55,18 @@ type WatchCycleResult = {
 	rebuilt: boolean;
 	diff: ReturnType<typeof buildPstrDiff>;
 	snapshot: ReturnType<typeof rebuildPstrIndex> | null;
+};
+
+type PstrRebuildSummary = {
+	kind: ReturnType<typeof rebuildPstrIndex>["kind"];
+	version: ReturnType<typeof rebuildPstrIndex>["version"];
+	generated_at: string;
+	source: ReturnType<typeof rebuildPstrIndex>["source"];
+	maps: {
+		count: number;
+		total_files: number;
+		ids: string[];
+	};
 };
 
 function hasJsonFlag(args: string[]): boolean {
@@ -100,6 +117,22 @@ function parseJsonFlag(args: string[]): boolean {
 		throw new Error(`Unknown pstr argument: ${value}`);
 	}
 	return json;
+}
+
+function parseRebuildArgs(args: string[]): ParsedRebuildArgs {
+	const parsed: ParsedRebuildArgs = { json: false, verbose: false };
+	for (const value of args) {
+		if (value === "--json" || value === "-j") {
+			parsed.json = true;
+			continue;
+		}
+		if (value === "--verbose" || value === "-v") {
+			parsed.verbose = true;
+			continue;
+		}
+		throw new Error(`Unknown pstr argument: ${value}`);
+	}
+	return parsed;
 }
 
 function parseSectionArgs(args: string[]): { json: boolean; id: string } {
@@ -260,6 +293,22 @@ function snapshotWithRepoRelativePaths(
 		source: {
 			project_root: relative(root, snapshot.source.project_root) || ".",
 			pstr_dir: relative(root, snapshot.source.pstr_dir) || ".",
+		},
+	};
+}
+
+function summarizePstrSnapshot(
+	snapshot: ReturnType<typeof rebuildPstrIndex>,
+): PstrRebuildSummary {
+	return {
+		kind: snapshot.kind,
+		version: snapshot.version,
+		generated_at: snapshot.generated_at,
+		source: snapshot.source,
+		maps: {
+			count: snapshot.maps.length,
+			total_files: snapshot.maps.reduce((sum, map) => sum + map.file_count, 0),
+			ids: snapshot.maps.map((map) => map.id),
 		},
 	};
 }
@@ -621,17 +670,38 @@ export async function runPstrCommand(
 		assertMutationAllowed(pstrAction, args, ctx);
 
 		if (pstrAction === "rebuild") {
-			const json = parseJsonFlag(args);
-			const snapshot = rebuildPstrIndex(projectRoot);
-			if (json) {
-				jsonOutput.ok(
-					io,
-					pstrAction,
-					{
-						snapshot: snapshotWithRepoRelativePaths(snapshot, projectRoot),
-					},
-					["snapshot"],
-				);
+			const parsed = parseRebuildArgs(args);
+			const snapshot = snapshotWithRepoRelativePaths(
+				rebuildPstrIndex(projectRoot),
+				projectRoot,
+			);
+			if (parsed.json) {
+				const summary = summarizePstrSnapshot(snapshot);
+				if (parsed.verbose) {
+					jsonOutput.ok(
+						io,
+						pstrAction,
+						{
+							command: pstrAction,
+							summary,
+							output: "verbose",
+							snapshot,
+						},
+						["command", "summary", "output", "snapshot"],
+					);
+				} else {
+					jsonOutput.ok(
+						io,
+						pstrAction,
+						{
+							command: pstrAction,
+							summary,
+							output: "compact",
+							hint: "Use `afol pstr rebuild --json --verbose` for full index snapshots.",
+						},
+						["command", "summary", "output", "hint"],
+					);
+				}
 			} else {
 				io.stdout(
 					[

@@ -6,6 +6,13 @@ Use `afol` for every supported scaffold, workbench, validation, update,
 evidence, and lifecycle operation. The current implementation lives in
 `cli/**`, and the exportable downstream scaffold lives in `src/project-template/`.
 
+Downstream projects must not receive a project-local `afol` executable,
+wrapper, symlink, package bin, or command runner. `afol` is an external
+operator command provided outside the target project; the downstream project
+payload is config, provider metadata, governance docs, and AFOL state/docs only.
+The root `./afol` file is allowed only in this source repository as the
+development/package entrypoint.
+
 The old `.agents` command system is discontinued and must not be used,
 documented, restored, or extended:
 
@@ -20,10 +27,13 @@ documented, restored, or extended:
 Retained `.agents` content is limited to provider-facing metadata and
 project-local skills:
 
-- `.agents/config.json`
 - `.agents/lock.json`
 - `.agents/manifest.json`
 - `.agents/skills/**`
+
+AFOL project configuration lives at `.afol/config.json`. Existing
+`.agents/config.json` files are legacy fallback inputs only and must not be
+described as the canonical config location.
 
 AFOL-owned static governance payloads live under `.afol/adm/**`, including:
 
@@ -47,19 +57,21 @@ not a project-local skills root.
 
 ## Project RAG
 
-- Project RAG id: `md72gw7nfa3n1dfd12cqzgwa9d88t1q5`
-- Project RAG slug: `main-dev`
-- Indexed root: `/home/ozy/apps/agentic_start_folder/.worktree/main_dev`
-- Indexed include roots: `cli`, `src`, `docs`, `.afol`, `.agents`
-- Critical read-only checks:
-  - `ragctl project verify --project main-dev --json`
-  - `ragctl project search --project main-dev "<query>" --mode vector --json`
-  - `ragctl project file --project main-dev --file <repo-relative-path> --json`
+- Status: stale after repo/path/branch rename on 2026-06-26. Do not rely on
+  Project RAG until reindexed and verified.
+- Intended Project RAG slug: `afol-dev`.
+- Intended indexed root: `/home/ozy/01_projects/dev/afol/afol.dev`.
+- Indexed include roots: `cli`, `src`, `docs`, `.afol`, `.agents`.
+- Critical read-only checks after reindex:
+  - `ragctl project verify --project afol-dev --json`
+  - `ragctl project search --project afol-dev "<query>" --mode vector --json`
+  - `ragctl project file --project afol-dev --file <repo-relative-path> --json`
 
 Large AFOL changes must verify that the durable universal
-`agentic-folder-sys` skill in `/home/ozy/apps/universal-skills` is current
-before relying on or propagating project-local AFOL guidance. If the AFOL
-behavior changed, update and sync the universal skill first.
+`agentic-folder-sys` skill in
+`/home/ozy/01_projects/dev/universall-skill-sys-pvt` is current before
+relying on or propagating project-local AFOL guidance. If the AFOL behavior
+changed, update and sync the universal skill first.
 
 Target governance layout:
 
@@ -126,10 +138,10 @@ Task state source of truth:
 
 ## Branch And Deploy
 
-- Agent commits/pushes target `main_dev` unless the user explicitly requests a
+- Agent commits/pushes target `dev` unless the user explicitly requests a
   different branch in the current turn.
 - `main` -> never direct-push.
-- Updating `main` -> merge from `main_dev` through normal Git merge or PR path.
+- Updating `main` -> merge from `dev` through normal Git merge or PR path.
 - Production deploy -> forbidden unless the user explicitly asks in the current
   turn.
 - Forbidden without explicit deploy request -> `bun run deploy`,
@@ -208,7 +220,10 @@ Use the narrowest tool that answers the question.
 - Temp files -> `tmp/` or `.tmp_<name>/`.
 - Build artifacts -> `dist/`.
 - Workbench artifacts -> `.afol/wb/<session>/`.
-- Local auxiliary worktrees -> `.worktree/`, unversioned.
+- Local auxiliary worktrees -> grouped Worktrunk siblings such as
+  `~/01_projects/dev/<repo>/<repo>.dev`, unversioned.
+- Legacy nested `.worktree/` directories may stay ignored during migration; do
+  not create new nested worktrees.
 - Script incidental output -> never root. If it happens, treat as script bug and
   fix script.
 - Root pollution check -> use AFOL validation, such as
@@ -223,8 +238,9 @@ Use the narrowest tool that answers the question.
 
 - `.codex/` and `.claude/` -> keep thin when present.
 - `AGENTS.md` -> canonical runtime contract.
-- Claude adapter -> optional and controlled by `.agents/config.json`; when
-  disabled, do not create or sync `CLAUDE.md` or `.claude/**`.
+- Claude adapter -> optional and controlled by `.afol/config.json` with legacy
+  `.agents/config.json` fallback; when disabled, do not create or sync
+  `CLAUDE.md` or `.claude/**`.
 - Repository artifacts -> English by default.
 - Portuguese -> only when explicitly requested by user.
 - Skills -> prefer repo-local `.agents/skills/`.

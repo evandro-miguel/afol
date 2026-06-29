@@ -7,6 +7,7 @@ export type SessionTaskArgs = {
 
 export type SessionTaskJsonArgs = SessionTaskArgs & {
 	json: boolean;
+	compact: boolean;
 };
 
 export type EvidenceArgs = SessionTaskArgs & {

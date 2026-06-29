@@ -1,4 +1,4 @@
-# Agentic Start Folder
+# AFOL
 
 Canonical AFOL scaffold factory for terminal-first LLM-assisted development.
 
@@ -10,8 +10,9 @@ system has been retired and must not be restored.
 - `afol`: public CLI entrypoint.
 - `cli/**`: Bun/TypeScript implementation.
 - `src/project-template/**`: exportable downstream scaffold payload.
-- `.agents/config.json`, `.agents/lock.json`, `.agents/manifest.json`: static
-  provider-facing scaffold metadata.
+- `.afol/config.json`: canonical AFOL project configuration.
+- `.agents/lock.json`, `.agents/manifest.json`: static provider-facing
+  scaffold metadata.
 - `.agents/skills/**`: project-local provider skills.
 - `.afol/adm/hooks/**`, `.afol/adm/rules/**`,
   `.afol/adm/source/**`, `.afol/adm/tools.json`: AFOL-owned static governance
@@ -21,12 +22,12 @@ system has been retired and must not be restored.
   archives.
 - Target `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy,
   and desired-state administration.
-- Target `.afol/pstr/**`: current project-structure maps only; commands live in
-  `cli/**`, and pstr contains map outputs.
+- Target `.afol/pstr/**`: generated, rebuildable project-structure map
+  snapshots only; stale maps are not authoritative.
 
 ## Documentation Map
 
-- `docs/README.md`: canonical index for repository documentation.
+- `docs/README.md`: documentation index for repository documentation.
 - `docs/afol-runtime-reference.md`: AFOL command groups, runtime state
   ownership, and validation gates.
 - `.afol/adm/doctrine/ARCHITECTURE.md`: architecture authority and boundary
@@ -46,7 +47,7 @@ Removed legacy surfaces:
 - `.agents/runtime/**`
 - `.agents/wb/**`
 - `.agents/z-arq/**`
-- `.agents/agents.config`
+- `agents.config`
 - `legacy:` delegate routing
 
 ## Commands
@@ -113,7 +114,8 @@ afol adapter enable claude
 ```
 
 Both subcommands accept `--dry-run` and `--json`. The state is persisted in
-`.agents/config.json` under `adapters.claude.enabled` (omitted = enabled).
+`.afol/config.json` under `adapters.claude.enabled` (omitted = enabled);
+`.agents/config.json` is legacy fallback only.
 
 ## Legacy Policy
 

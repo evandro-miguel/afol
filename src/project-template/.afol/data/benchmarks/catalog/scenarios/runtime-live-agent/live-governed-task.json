@@ -4,6 +4,10 @@
   "scenario_version": "1.0.0",
   "pack_id": "runtime-live-agent",
   "command": "a runtime governed-task",
+  "coverage": {
+    "commands": ["new", "start", "evidence", "done", "close"],
+    "journeys": ["governed-task-lifecycle", "afol-agent-experience-map", "260627_1611_afol-agent-experience-map_ux-journey_01"]
+  },
   "result_schema": "1.0.0",
   "oracle": "normalized-envelope-and-threshold-check",
   "thresholds": {

@@ -1,80 +1,596 @@
 {
   "schema_version": "1.0.0",
+  "coverage": {
+    "schema_version": "1.0.0",
+    "exemptions": [
+      {
+        "command": "validate",
+        "reason": "Validation-flow live runner exists but current snapshot has no registered direct scenario evidence yet."
+      },
+      {
+        "command": "init",
+        "reason": "Needs isolated downstream scaffold fixture with dry-run and conflict assertions."
+      },
+      {
+        "command": "quick-task",
+        "reason": "Needs disposable workbench lifecycle fixture before enabling as required journey."
+      },
+      {
+        "command": "hook",
+        "reason": "Needs static hook metadata fixture and routing assertion."
+      },
+      {
+        "command": "skill",
+        "reason": "Needs project-local skill fixture and routing assertion."
+      },
+      {
+        "command": "bootstrap",
+        "reason": "Needs isolated downstream bootstrap fixture with template drift assertions."
+      },
+      {
+        "command": "verify",
+        "reason": "Covered indirectly by verify-tasks; exact verify command journey is pending."
+      },
+      {
+        "command": "local-state",
+        "reason": "Validation-flow live runner exists but current snapshot has no registered direct scenario evidence yet."
+      },
+      {
+        "command": "render",
+        "reason": "Covered indirectly by memory render; exact alias journey or deprecation decision is pending."
+      },
+      {
+        "command": "health",
+        "reason": "Needs stale-state ops fixture before enabling as required journey."
+      },
+      {
+        "command": "db",
+        "reason": "Needs database state fixture before enabling as required journey."
+      },
+      {
+        "command": "doctor",
+        "reason": "Needs host-safe diagnostic fixture before enabling as required journey."
+      },
+      {
+        "command": "sweep",
+        "reason": "Needs stale workbench cleanup fixture before enabling as required journey."
+      },
+      {
+        "command": "schema",
+        "reason": "Needs schema inspection fixture before enabling as required journey."
+      },
+      {
+        "command": "bench",
+        "reason": "Needs recursive benchmark fixture that stays bounded below token limits."
+      },
+      {
+        "command": "project-benchmark",
+        "reason": "Needs project comparison fixture before enabling as required journey."
+      },
+      {
+        "command": "catchup",
+        "reason": "Needs stale session catchup fixture before enabling as required journey."
+      },
+      {
+        "command": "preflight",
+        "reason": "Needs workbench preflight fixture before enabling as required journey."
+      },
+      {
+        "command": "adapter",
+        "reason": "Needs adapter-state dry-run fixture before enabling as required journey."
+      },
+      {
+        "command": "telemetry",
+        "reason": "Needs telemetry event fixture before enabling as required journey."
+      },
+      {
+        "command": "session",
+        "reason": "Needs session context fixture before enabling as required journey."
+      }
+    ],
+    "subcommand_exemptions": [
+      {
+        "subcommand": "status --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "status --session <session-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "validate project --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "validate project --check-drift --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "validate drift --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "validate bench --pack <pack-id> --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "validate select --changed-path <path>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "validate run --changed-path <path>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "init --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "start --session <session-id> --task-id <task-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "start --task-id <task-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "start --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "done --session <session-id> --task-id <task-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "done --test \"<cmd>\"",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "done --command \"<cmd>\" --result passed",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "done --require-spec-check",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "new <theme> --task <summary>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "new <theme> --feature-id <F-id> --parent-spec <spec-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "new <theme> --intent <text>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "log --session <session-id> --message <text>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "log --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "quick-task <theme> --task <summary> --command \"<cmd>\"",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "quick-task --result passed --artifact <path> --note <text>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "evidence --session <session-id> --task-id <task-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "evidence --command \"<cmd>\" --result passed",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "evidence --artifact <path> --note <text>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "close --session <session-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "close --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "file pt|patch --path <path> --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "file pt|patch --path <path>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "file mv|move --from <path> --to <path>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "file ar|archive --path <path>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "file ud|undo --mutation-id <id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "update check",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "update preview",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "update apply --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "update apply --session <id> --task-id <id> --reason <text>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "bootstrap <target-path> --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "bootstrap <target-path>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "verify [session-path] --strict",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "verify --session <session-id> --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "verify-tasks [session-path] --strict",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "verify-tasks --session <session-id> --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "local-state freshness|fs --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "local-state rebuild|rb --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "local-state rebuild|rb --json --verbose",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "ctx build",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "ctx bundle",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "ctx section --ref <ref>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "ctx explain",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "ctx tools",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "spec list [--json] [--verbose]",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "spec check --session <session-id> --task <task-id> --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "spec conflict --session <session-id> --task <task-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "spec waive --session <session-id> --task <task-id> --reason <text>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "maintenance weekly --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "maintenance monthly --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "maintenance review --area <area> --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "maintenance review --area <area> --note <text>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "schema detect",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "schema suggest",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "schema review",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "schema resolver",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "schema resolver --write",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "schema apply --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "schema apply",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "bench list",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "bench run --scenario <id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "bench cli",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "bench report --run <path>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "bench runtime-live",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "project-benchmark list",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "project-benchmark show <project-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "project-benchmark matrix --for <axis>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "project-benchmark recommend --for <axis>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "project-benchmark validate --strict",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "project-benchmark generate --check",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "project-benchmark generate",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "adapter list",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "adapter enable <name> --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "adapter disable <name> --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "telemetry query --limit <n>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "telemetry report --limit <n>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "telemetry export --format jsonl",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "session list",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "session bind --session <id> --dry-run",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "session bind --session <id> --actor <name>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "session switch <session-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "session unbind <session-id>",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      },
+      {
+        "subcommand": "session radar --json",
+        "reason": "Scripted subcommand journey pending; command-level coverage is enforced first."
+      }
+    ]
+  },
   "packs": [
     {
       "pack_id": "cli-kernel-local",
       "min_scenarios": 6,
-      "selector_tags": ["cli", "kernel", "local"]
+      "selector_tags": [
+        "cli",
+        "kernel",
+        "local"
+      ]
     },
     {
       "pack_id": "routing-accuracy",
       "min_scenarios": 4,
-      "selector_tags": ["routing", "rules", "skills"]
+      "selector_tags": [
+        "routing",
+        "rules",
+        "skills"
+      ]
     },
     {
       "pack_id": "mutation-safety",
       "min_scenarios": 5,
-      "selector_tags": ["mutation", "files", "undo", "safety"]
+      "selector_tags": [
+        "mutation",
+        "files",
+        "undo",
+        "safety"
+      ]
     },
     {
       "pack_id": "update-safety",
       "min_scenarios": 4,
-      "selector_tags": ["update", "safety", "template"]
+      "selector_tags": [
+        "update",
+        "safety",
+        "template"
+      ]
     },
     {
       "pack_id": "workbench-parity",
       "min_scenarios": 5,
-      "selector_tags": ["workbench", "parity"]
+      "selector_tags": [
+        "workbench",
+        "parity"
+      ]
     },
     {
       "pack_id": "mcp-parity",
       "min_scenarios": 5,
-      "selector_tags": ["mcp", "runtime", "parity"]
+      "selector_tags": [
+        "mcp",
+        "runtime",
+        "parity"
+      ]
     },
     {
       "pack_id": "runtime-live-agent",
-      "min_scenarios": 3,
-      "selector_tags": ["runtime", "live", "risky"]
+      "min_scenarios": 4,
+      "selector_tags": [
+        "runtime",
+        "live",
+        "risky"
+      ]
     },
     {
       "pack_id": "token-economy",
       "min_scenarios": 4,
-      "selector_tags": ["token", "prompt", "context"]
+      "selector_tags": [
+        "token",
+        "prompt",
+        "context"
+      ]
     },
     {
       "pack_id": "pstr-integrity",
       "min_scenarios": 4,
-      "selector_tags": ["pstr", "structure", "index", "stale"]
+      "selector_tags": [
+        "pstr",
+        "structure",
+        "index",
+        "stale"
+      ]
     },
     {
       "pack_id": "context-bundles",
       "min_scenarios": 4,
-      "selector_tags": ["ctx", "context", "bundle", "token-budget"]
+      "selector_tags": [
+        "ctx",
+        "context",
+        "bundle",
+        "token-budget"
+      ]
     },
     {
       "pack_id": "state-projection",
       "min_scenarios": 4,
-      "selector_tags": ["state", "hydrate", "session"]
+      "selector_tags": [
+        "state",
+        "hydrate",
+        "session"
+      ]
     },
     {
       "pack_id": "memory-governance",
       "min_scenarios": 4,
-      "selector_tags": ["memory", "knowledge", "continuity"]
+      "selector_tags": [
+        "memory",
+        "knowledge",
+        "continuity"
+      ]
     },
     {
       "pack_id": "library-knowledge",
       "min_scenarios": 4,
-      "selector_tags": ["library", "sources", "claims", "research"]
+      "selector_tags": [
+        "library",
+        "sources",
+        "claims",
+        "research"
+      ]
     },
     {
       "pack_id": "governance-history",
       "min_scenarios": 4,
-      "selector_tags": ["spec", "adr", "changelog", "governance"]
+      "selector_tags": [
+        "spec",
+        "adr",
+        "changelog",
+        "governance"
+      ]
     },
     {
       "pack_id": "adm-governance",
       "min_scenarios": 3,
-      "selector_tags": ["adm", "migration", "paths", "validation"]
+      "selector_tags": [
+        "adm",
+        "migration",
+        "paths",
+        "validation"
+      ]
     }
   ]
 }
