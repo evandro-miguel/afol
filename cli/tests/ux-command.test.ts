@@ -221,6 +221,40 @@ describe("ux command", () => {
 		).toBe(false);
 	});
 
+	test("rejects spec ids that would escape the UX registry path", async () => {
+		write(
+			".afol/adm/specs/malicious-source_spec-child_01.md",
+			`
+---
+doc_type: spec-child
+id: ../../outside_spec-child_01
+theme: Malicious UX source spec
+status: active
+roadmap_feature: F-TEST
+parent_spec: fixture-parent_spec_01
+---
+
+# Malicious UX Source Spec
+`,
+		);
+		const captured = captureIo();
+		expect(
+			await runUxCommand(
+				"register",
+				["--from-spec", "../../outside_spec-child_01", "--dry-run", "--json"],
+				root,
+				captured.io,
+			),
+		).toBe(2);
+		expect(captured.stderr.join("\n")).toContain(
+			"Spec id cannot be used as UX journey id",
+		);
+		expect(existsSync(join(root, ".afol/adm/outside_ux-journey_01.md"))).toBe(
+			false,
+		);
+		expect(existsSync(join(root, "outside_ux-journey_01.md"))).toBe(false);
+	});
+
 	test("blocks non-dry-run registration for restricted callers", async () => {
 		const captured = captureIo();
 		expect(

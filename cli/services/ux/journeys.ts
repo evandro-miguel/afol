@@ -367,8 +367,18 @@ function findSpecDocument(
 	return null;
 }
 
-function renderRegisteredJourney(spec: UxJourneyEntry): string {
-	const id = `${spec.id.replace(/_spec(?:-child|-test)?_01$/, "")}_ux-journey_01`;
+function generatedJourneyIdForSpec(specId: string): string {
+	const id = `${specId.replace(/_spec(?:-child|-test)?_01$/, "")}_ux-journey_01`;
+	if (id.includes("/") || id.includes("\\")) {
+		throw new Error(`Spec id cannot be used as UX journey id: ${specId}`);
+	}
+	return id;
+}
+
+function renderRegisteredJourney(
+	spec: UxJourneyEntry,
+	id = generatedJourneyIdForSpec(spec.id),
+): string {
 	const title = spec.title || spec.id;
 	return [
 		"---",
@@ -460,8 +470,8 @@ export function registerUxJourneyFromSpec(
 	if (!specEntry) {
 		throw new Error(`Spec cannot be registered as UX journey: ${specId}`);
 	}
-	const content = renderRegisteredJourney(specEntry);
-	const journeyId = `${specEntry.id.replace(/_spec(?:-child|-test)?_01$/, "")}_ux-journey_01`;
+	const journeyId = generatedJourneyIdForSpec(specEntry.id);
+	const content = renderRegisteredJourney(specEntry, journeyId);
 	const targetPath = unixPath(join(".afol", "adm", "ux", `${journeyId}.md`));
 	const targetAbsolutePath = join(root, targetPath);
 	const exists = existsSync(targetAbsolutePath);
