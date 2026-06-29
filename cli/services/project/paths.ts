@@ -58,6 +58,9 @@ function isMissingPathError(error: unknown): boolean {
 }
 
 function assertNoExistingSymlinkComponent(root: string, path: string): void {
+	if (isAbsolute(path)) {
+		throw new Error(`Path escapes project root: ${path}`);
+	}
 	let candidate = realpathSync(root);
 	for (const rawPart of path
 		.split(/[\\/]+/)

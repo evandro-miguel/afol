@@ -218,6 +218,32 @@ describe("project root loader", () => {
 		}
 	});
 
+	test("falls back when config declares absolute project paths", () => {
+		const root = mkProjectRoot("absolute-config-paths");
+		try {
+			writeFileSync(
+				join(root, ".afol", "config.json"),
+				JSON.stringify({
+					schema_version: 1,
+					project: { name: "afol" },
+					paths: {
+						mutable_dir: join(tmpdir(), "outside-afol"),
+						skills_dir: join(tmpdir(), "outside-skills"),
+					},
+				}),
+				"utf8",
+			);
+
+			const paths = resolveProjectPaths(root);
+			expect(paths.mutableDir).toBe(".afol");
+			expect(paths.skillsDir).toBe(".agents/skills");
+			expect(paths.abs.mutableDir).toBe(join(root, ".afol"));
+			expect(paths.abs.skillsDir).toBe(join(root, ".agents/skills"));
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("resolves project paths only inside the real project root", () => {
 		const root = mkProjectRoot("path-jail");
 		const outside = mkdtempSync(join(tmpdir(), "project-root-outside-"));

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import {
 	type ResolvedProjectPaths,
@@ -50,11 +50,20 @@ function skillFromDir(
 	};
 }
 
+function safeSkillDirEntries(dir: string) {
+	try {
+		return readdirSync(dir, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+}
+
 function listSkillDirs(skillsRoot: string, dir: string = skillsRoot): string[] {
-	return readdirSync(dir)
-		.filter((name) => statSync(join(dir, name)).isDirectory())
-		.flatMap((name) => {
-			const child = join(dir, name);
+	const entries = safeSkillDirEntries(dir);
+	return entries
+		.filter((entry) => entry.isDirectory())
+		.flatMap((entry) => {
+			const child = join(dir, entry.name);
 			if (existsSync(join(child, "SKILL.md"))) {
 				return [relative(skillsRoot, child).replaceAll("\\", "/")];
 			}
