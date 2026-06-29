@@ -13,6 +13,19 @@ payload is config, provider metadata, governance docs, and AFOL state/docs only.
 The root `./afol` file is allowed only in this source repository as the
 development/package entrypoint.
 
+When installing AFOL into the current system, install the compiled CLI binary
+globally at `$HOME/.local/bin/afol`. Do not satisfy an install request by
+syncing a worktree, changing a wrapper, or pointing a symlink/script at this
+repository. The installed command must be a real executable in the system bin
+folder; validate with `command -v afol`, `test ! -L "$(command -v afol)"`,
+`afol --version`, and a smoke command outside the repository.
+
+Development and test workflows may still call AFOL from this source repository,
+for example through `./afol`, `bun run kernel`, `bun run build && ./dist/afol`,
+or a differently named local helper. Label that as repo-local development
+usage, not as a system/global install, and never let it replace the global
+`afol` command contract above.
+
 The old `.agents` command system is discontinued and must not be used,
 documented, restored, or extended:
 
