@@ -7,6 +7,7 @@ import {
 } from "node:fs";
 import { join, relative } from "node:path";
 import { kernelRegistry } from "../../registry";
+import { resolveProjectPaths } from "../project/paths";
 
 const UX_DOC_TYPES = new Set(["ux-journey"]);
 const SPEC_DOC_TYPES = new Set(["spec", "spec-child", "spec-test"]);
@@ -100,9 +101,10 @@ function walkMarkdownFiles(
 }
 
 function candidateMarkdownPaths(root: string): string[] {
+	const admDir = resolveProjectPaths(root).abs.admDir;
 	const candidates = [
-		join(root, ".afol", "adm", "ux"),
-		join(root, ".afol", "adm", "specs"),
+		join(admDir, "ux"),
+		join(admDir, "specs"),
 		join(root, "docs", "ux"),
 	];
 	const files: string[] = [];
@@ -288,7 +290,13 @@ function standardIssues(root: string): UxRegistryIssue[] {
 			});
 		}
 	}
-	for (const path of RECOMMENDED_STANDARD_PATHS) {
+	const recommendedPaths = [
+		...RECOMMENDED_STANDARD_PATHS.filter(
+			(path) => !path.startsWith(".afol/adm/"),
+		),
+		`${resolveProjectPaths(root).admDir}/benchmarks/afol-tool-scenario-coverage-plan.md`,
+	];
+	for (const path of recommendedPaths) {
 		if (!existsSync(join(root, path))) {
 			issues.push({
 				path,
@@ -427,7 +435,7 @@ function renderRegisteredJourney(
 		"## Expected Result",
 		"",
 		"- Output: compact registry status with journey count, issues, and matching tools.",
-		"- Durable state change: only `afol ux register --from-spec <spec-id>` writes a draft under `.afol/adm/ux/`.",
+		"- Durable state change: only `afol ux register --from-spec <spec-id>` writes a draft under the configured `adm_dir` UX registry.",
 		"- Warning or review prompt: missing scenario, stale session, or maintenance review remains visible before claiming coverage.",
 		"- Token/output budget: default output stays below 5k tokens.",
 		"",
@@ -472,11 +480,12 @@ export function registerUxJourneyFromSpec(
 	}
 	const journeyId = generatedJourneyIdForSpec(specEntry.id);
 	const content = renderRegisteredJourney(specEntry, journeyId);
-	const targetPath = unixPath(join(".afol", "adm", "ux", `${journeyId}.md`));
-	const targetAbsolutePath = join(root, targetPath);
+	const targetDir = join(resolveProjectPaths(root).abs.admDir, "ux");
+	const targetAbsolutePath = join(targetDir, `${journeyId}.md`);
+	const targetPath = unixPath(relative(root, targetAbsolutePath));
 	const exists = existsSync(targetAbsolutePath);
 	if (!options.dryRun && !exists) {
-		mkdirSync(join(root, ".afol", "adm", "ux"), { recursive: true });
+		mkdirSync(targetDir, { recursive: true });
 		writeFileSync(targetAbsolutePath, `${content}\n`, "utf8");
 	}
 	const entry = toEntry({

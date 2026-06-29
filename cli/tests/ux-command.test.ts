@@ -221,6 +221,89 @@ describe("ux command", () => {
 		).toBe(false);
 	});
 
+	test("respects configured adm_dir for registry reads and registration", async () => {
+		write(
+			".afol/config.json",
+			JSON.stringify({ paths: { adm_dir: "governance/adm" } }),
+		);
+		write(
+			"governance/adm/specs/custom-source_spec-child_01.md",
+			`
+---
+doc_type: spec-child
+id: custom-source_spec-child_01
+theme: Custom UX source spec
+status: active
+roadmap_feature: F-TEST
+parent_spec: fixture-parent_spec_01
+---
+
+# Custom UX Source Spec
+
+This spec requires afol ux coverage.
+`,
+		);
+		write(
+			"governance/adm/ux/custom-journey_ux-journey_01.md",
+			`
+---
+doc_type: ux-journey
+id: custom-journey_ux-journey_01
+theme: Custom UX journey
+status: active
+roadmap_feature: F-TEST
+parent_spec: fixture-parent_spec_01
+---
+
+# UX Journey: Custom
+
+## Purpose
+Configured adm_dir is scanned.
+
+## Entry And Exit
+Entry is list. Exit is registry entry.
+
+## Flow
+1. Run \`afol ux list\`.
+
+## Expected Result
+The custom journey appears.
+
+## Evidence
+Use this test.
+
+## Metrics
+Default output remains compact.
+
+## Acceptance
+- [x] Primary actor and goal are explicit
+- [x] Steps, states, failures, and recovery are explicit
+- [x] Expected AFOL tools are named
+- [x] Expected output and durable state change are explicit
+- [x] Evidence path is explicit
+`,
+		);
+
+		const list = captureIo();
+		expect(await runUxCommand("list", ["--json"], root, list.io)).toBe(0);
+		expect(JSON.stringify(parsePayload(list))).toContain(
+			"custom-journey_ux-journey_01",
+		);
+
+		const register = captureIo();
+		expect(
+			await runUxCommand(
+				"register",
+				["--from-spec", "custom-source_spec-child_01", "--dry-run", "--json"],
+				root,
+				register.io,
+			),
+		).toBe(0);
+		expect(parsePayload(register).path).toBe(
+			"governance/adm/ux/custom-source_ux-journey_01.md",
+		);
+	});
+
 	test("rejects spec ids that would escape the UX registry path", async () => {
 		write(
 			".afol/adm/specs/malicious-source_spec-child_01.md",
