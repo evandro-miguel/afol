@@ -74,6 +74,69 @@ describe("skill command", () => {
 		}
 	});
 
+	test("discovers skills nested under grouping directories", async () => {
+		const root = mkRoot();
+		try {
+			const skillDir = join(
+				root,
+				".agents",
+				"skills",
+				"gitnexus",
+				"gitnexus-cli",
+			);
+			mkdirSync(skillDir, { recursive: true });
+			writeFileSync(
+				join(skillDir, "SKILL.md"),
+				"---\nname: gitnexus-cli\ndescription: GitNexus CLI workflows.\n---\n\n# GitNexus\n",
+				"utf8",
+			);
+
+			const list = capture();
+			expect(await runSkillCommand(["list"], root, list.io)).toBe(0);
+			expect(list.stdout.join("\n")).toContain("skills: 3");
+			expect(list.stdout.join("\n")).toContain(
+				"gitnexus-cli .agents/skills/gitnexus/gitnexus-cli/SKILL.md",
+			);
+
+			const show = capture();
+			expect(
+				await runSkillCommand(["show", "gitnexus-cli"], root, show.io),
+			).toBe(0);
+			expect(show.stdout.join("\n")).toContain("GitNexus CLI workflows.");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects ambiguous skill names", async () => {
+		const root = mkRoot();
+		try {
+			const skillDir = join(root, ".agents", "skills", "group", "bun-copy");
+			mkdirSync(skillDir, { recursive: true });
+			writeFileSync(
+				join(skillDir, "SKILL.md"),
+				"---\nname: bun-development\ndescription: Duplicate Bun skill.\n---\n\n# Bun copy\n",
+				"utf8",
+			);
+
+			const show = capture();
+			expect(
+				await runSkillCommand(["show", "bun-development"], root, show.io),
+			).toBe(2);
+			expect(show.stderr.join("\n")).toContain(
+				"Ambiguous skill name: bun-development.",
+			);
+			expect(show.stderr.join("\n")).toContain(
+				".agents/skills/bun-development/SKILL.md",
+			);
+			expect(show.stderr.join("\n")).toContain(
+				".agents/skills/group/bun-copy/SKILL.md",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("falls back to directory metadata when frontmatter YAML is invalid", async () => {
 		const root = mkRoot();
 		try {

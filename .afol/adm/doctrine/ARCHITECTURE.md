@@ -43,13 +43,13 @@ In scope:
   roadmap, specs, ADRs, changelog, archive, and desired-state policy.
 - `docs/arc/**`: frozen transitional archive retained for reversibility and
   historical reference; see ADR-005.
-- `.afol/pstr/**`: target project-structure map surface for how the project is
-  organized today. It stores maps only, not scripts, tasks, automations, specs,
-  roadmaps, or future-state governance.
+- `.afol/pstr/**`: generated, rebuildable project-structure map surface for how
+  the project is observed today. It stores maps only, not scripts, tasks,
+  automations, specs, roadmaps, or future-state governance.
 - `.agents/**`: retained static provider-facing metadata and skills only:
-  `config.json`, `lock.json`, `manifest.json`, and `.agents/skills/**`.
-  Hooks, rules, source seeds, factory workbench, validation, and mutable
-  runtime state live under `.afol/**`.
+  `lock.json`, `manifest.json`, and `.agents/skills/**`. Hooks, rules, source
+  seeds, factory workbench, validation, and mutable runtime state live under
+  `.afol/**`.
 
 Out of scope:
 
@@ -71,12 +71,12 @@ Modules:
   governance state.
 - Factory runtime: development-only state retained under `.afol/**`.
   `.agents/` remains static provider-facing metadata plus project-local skills
-  (`config.json`, `lock.json`, `manifest.json`, `.agents/skills/**`).
+  (`lock.json`, `manifest.json`, `.agents/skills/**`).
 - Goal-state docs at `.afol/adm/**`: roadmap, specs, decisions, architecture,
   and execution plans.
 - `docs/arc/**` is frozen transitional archive content; ADR-005 records the
   authority transfer.
-- Project structure at `.afol/pstr/**`: target canonical current project
+- Project structure at `.afol/pstr/**`: generated, rebuildable observed project
   structure map surface after migration.
 
 Data flow:
@@ -135,7 +135,7 @@ Forbidden dependencies:
 - `src/project-template/` -> only source for downstream template payload.
 - `.afol/adm/` -> target project administration: manifesto, architecture,
   roadmap, specs, ADRs, changelog, archive, and governance policy.
-- `.afol/pstr/` -> target project structure: generated current-state maps.
+- `.afol/pstr/` -> target project structure: generated observed maps.
   Current AFOL emits flat area maps from the PSTR area registry, not empty
   nested area folders.
 - `.afol/state/` -> target SQLite materialized execution state such as
@@ -172,11 +172,12 @@ Forbidden dependencies:
 
 Primary stores:
 
-- `.agents/config.json`: project-local configuration.
+- `.afol/config.json`: canonical project-local configuration.
+- `.agents/config.json`: legacy configuration fallback input only.
 - `.agents/lock.json`: scaffold version and compatibility lock.
 - `.agents/manifest.json`: managed-file ownership and provenance.
 - `.afol/adm/`: target desired-state administration and project direction.
-- `.afol/pstr/`: target current project-structure maps.
+- `.afol/pstr/`: generated observed project-structure maps.
 - `.afol/wb/`: governed session execution, including plan/task/log files,
   evidence ledgers, reports, and sidecars.
 - `.afol/state/afol.db`: target SQLite execution cache and materialized query
@@ -286,8 +287,9 @@ Source of truth:
   contracts.
 - Target after migration: `.afol/adm/roadmap/GENERAL-ROADMAP.md` and
   `.afol/adm/specs/**`.
-- `.agents/config.json`, `.agents/lock.json`, and `.agents/manifest.json` for
-  local project state.
+- `.afol/config.json` for canonical local project configuration.
+- `.agents/config.json` as legacy configuration fallback only.
+- `.agents/lock.json` and `.agents/manifest.json` for local scaffold metadata.
 
 Target path contract after migration:
 

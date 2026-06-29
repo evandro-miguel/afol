@@ -1,3 +1,8 @@
+---
+name: afol-memory
+description: Use when work involves AFOL Memory, continuity notes, stale memories, memory cleanup, consolidation, or retention review.
+---
+
 # AFOL Memory
 
 Use when work involves AFOL Memory, continuity notes, stale memories, memory

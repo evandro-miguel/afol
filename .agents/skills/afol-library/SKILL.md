@@ -1,3 +1,8 @@
+---
+name: afol-library
+description: Use when work involves AFOL Library, sourced claims, knowledge notes, library cleanup, source freshness, or claim validation.
+---
+
 # AFOL Library
 
 Use when work involves AFOL Library, sourced claims, knowledge notes, library

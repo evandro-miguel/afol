@@ -1,3 +1,8 @@
+---
+name: afol-maintenance
+description: Use when work involves AFOL maintenance cadence, health warnings, weekly or monthly reviews, workbench backlog, cleanup, rotation, roadmap/spec/manifest freshness, or rule/skill pruning.
+---
+
 # AFOL Maintenance
 
 Use when work involves AFOL maintenance cadence, health warnings, weekly or

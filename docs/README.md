@@ -23,14 +23,14 @@ documentation surface without falling back to retired `.agents` runtime paths.
 
 ## Current Project Structure
 
-- `.afol/pstr/index.json`: generated index of current project-structure maps.
-- `.afol/pstr/cli.md`: current CLI structure map.
-- `.afol/pstr/template.md`: current export-template structure map.
-- `.afol/pstr/docs.md`: current documentation structure map.
-- `.afol/pstr/config.md`: current config and metadata structure map.
+- `.afol/pstr/index.json`: generated index of observed project-structure maps.
+- `.afol/pstr/cli.md`: generated CLI structure map.
+- `.afol/pstr/template.md`: generated export-template structure map.
+- `.afol/pstr/docs.md`: generated documentation structure map.
+- `.afol/pstr/config.md`: generated config and metadata structure map.
 
 Do not edit `.afol/pstr/**` by hand. Regenerate it through AFOL when the
-observed structure changes.
+observed structure changes, and rebuild before trusting stale or missing maps.
 
 ## Runtime And Execution
 
