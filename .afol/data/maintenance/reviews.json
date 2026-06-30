@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "areas": {
+    "rules": {
+      "reviewed_at": "2026-06-29T23:13:28.997Z",
+      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+    },
+    "skills": {
+      "reviewed_at": "2026-06-29T23:13:28.997Z",
+      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+    },
+    "docs": {
+      "reviewed_at": "2026-06-29T23:13:28.997Z",
+      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+    },
+    "commands": {
+      "reviewed_at": "2026-06-29T23:13:28.997Z",
+      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+    },
+    "memory": {
+      "reviewed_at": "2026-06-29T23:13:28.997Z",
+      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+    },
+    "library": {
+      "reviewed_at": "2026-06-29T23:13:28.997Z",
+      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+    },
+    "organization": {
+      "reviewed_at": "2026-06-29T23:13:28.997Z",
+      "note": "checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed"
+    }
+  }
+}

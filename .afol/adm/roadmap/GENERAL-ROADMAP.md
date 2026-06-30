@@ -597,9 +597,47 @@ Minimum acceptance:
   - OperationContext distinguishes local, agent, and remote callers and applies
     stricter mutation rules for lower-trust contexts.
 
+#### F-18.S10 Memory and Library Adoption Loop
+
+- Status: planned follow-on
+- Governing specs:
+  .afol/adm/specs/260612_agent-operational-state-context-library_spec_01.md
+  and
+  .afol/adm/specs/260612_global-project-research-library_spec-child_01.md
+- Why: health-green memory/library systems can still remain empty after real
+  project work when agents never run the explicit proposal/promotion flows.
+  Empty stores are valid when there is no reusable material, but AFOL should
+  distinguish "nothing worth retaining" from "workflow never asked".
+- Scope:
+  - Add a compact post-session or maintenance review path that inspects
+    workbench reports, evidence, lessons, decisions, and sourced research for
+    memory/library candidates.
+  - Produce reviewable candidates only; promotion stays explicit and
+    human-auditable.
+  - Keep memory for durable project continuity and library for sourced claims;
+    do not merge them into hidden prompt memory, raw transcript storage, or
+    automatic research ingest.
+  - Ensure context bundles consume only promoted, current memory/library refs.
+- Exit criteria:
+  - After governed work, an operator can run one compact command to see whether
+    memory or library candidates exist for the session.
+  - Useful decisions, repeated corrections, continuity notes, and project
+    operating preferences can become memory proposals with explicit ids, tags,
+    provenance, and review status.
+  - Sourced research can become library draft/proposal material only when
+    claims have sources, purpose, provenance, and freshness metadata.
+  - Health or maintenance output can report "unused/adoption gap" separately
+    from broken schema, stale state, unsupported claims, or missing sources.
+  - Empty memory/library state remains acceptable when the review finds no
+    reusable candidates.
+
 Follow-on slices under this direction:
 
 - Implement each feature above as narrow slices.
+- Immediate adoption gap: Memory and Library Adoption Loop v1. Connect
+  workbench closeout or maintenance review to explicit candidate generation so
+  real project usage can feed reviewed memory/library proposals instead of
+  leaving those stores empty by default.
 - Immediate next slice: Temporal Reliability v1. Implement explicit path
   config, `afol pstr stale --json`, trusted-context stale gates,
   `afol health --area state|library|memory`, weekly/monthly maintenance dry-run

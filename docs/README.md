@@ -21,7 +21,7 @@ documentation surface without falling back to retired `.agents` runtime paths.
 - `.afol/adm/specs/`: desired behavior, constraints, and acceptance.
 - `.afol/adm/decisions/`: ADRs and durable decisions.
 
-## Current Project Structure
+## Generated Project Structure Maps
 
 - `.afol/pstr/index.json`: generated index of observed project-structure maps.
 - `.afol/pstr/cli.md`: generated CLI structure map.
@@ -30,7 +30,8 @@ documentation surface without falling back to retired `.agents` runtime paths.
 - `.afol/pstr/config.md`: generated config and metadata structure map.
 
 Do not edit `.afol/pstr/**` by hand. Regenerate it through AFOL when the
-observed structure changes, and rebuild before trusting stale or missing maps.
+observed structure changes. This checkout may have no `.afol/pstr/**` tree until
+those maps are rebuilt, and stale or missing maps are not authoritative.
 
 ## Runtime And Execution
 

@@ -1022,7 +1022,7 @@ describe("kernel front-door", () => {
 		}
 	});
 
-	test("spec list and help route through native handler", () => {
+	test("spec list routes through native handler and group help uses registry", () => {
 		const root = mkProjectRoot("spec-list", "");
 		try {
 			const specsDir = join(root, ".afol", "adm", "specs");
@@ -1056,7 +1056,7 @@ describe("kernel front-door", () => {
 
 			const help = runKernel(root, ["spec", "--help"]);
 			expect(help.status).toBe(0);
-			expect(help.stdout as string).toContain("Usage: afol spec");
+			expect(help.stdout as string).toContain("Command: spec");
 			expect(help.stderr as string).toBe("");
 		} finally {
 			rmSync(root, { recursive: true, force: true });

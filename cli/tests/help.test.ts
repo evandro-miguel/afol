@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
 	buildCommandCatalog,
 	buildCommandHelpJson,
@@ -6,7 +10,10 @@ import {
 	formatCommandHelp,
 	formatHelpText,
 } from "../help";
+import { SUBCOMMAND_DISPATCH_GROUPS } from "../main";
 import { kernelRegistry } from "../registry";
+
+const repoRoot = join(import.meta.dir, "..", "..");
 
 describe("help formatter", () => {
 	test("formats compact deterministic help text", () => {
@@ -96,6 +103,74 @@ describe("help formatter", () => {
 		expect(help).toContain("Side effect: read");
 		expect(help).toContain("Description: Show current project status");
 		expect(unknown).toBeNull();
+	});
+
+	test("routes command group help before subcommand parsers", () => {
+		const helpGroups = SUBCOMMAND_DISPATCH_GROUPS.map((group) => ({
+			group,
+			spec:
+				kernelRegistry.commands.find((spec) => spec.command === group) ??
+				kernelRegistry.commands.find((spec) => spec.kind === group),
+		}));
+		expect(
+			helpGroups
+				.filter(({ spec }) => spec === undefined)
+				.map(({ group }) => group),
+		).toEqual([]);
+		const tempRoot = mkdtempSync(join(tmpdir(), "afol-help-"));
+		const cliPath = join(repoRoot, "cli/main.ts");
+
+		try {
+			for (const { spec } of helpGroups) {
+				if (!spec) {
+					continue;
+				}
+				const result = spawnSync("bun", [cliPath, spec.command, "--help"], {
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				});
+
+				expect(result.status).toBe(0);
+				expect(result.stderr).toBe("");
+				expect(result.stdout).toContain(`Command: ${spec.command}`);
+			}
+			for (const [args, expectedCommand] of [
+				[["adr", "-h"], "adr"],
+				[["adr", "--help", "--verbose"], "adr"],
+				[["adr", "new", "--help"], "adr"],
+				[["render", "--help"], "render"],
+				[["render", "-h"], "render"],
+				[["memory", "render", "--help"], "render"],
+			] as const) {
+				const result = spawnSync("bun", [cliPath, ...args], {
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				});
+
+				expect(result.status).toBe(0);
+				expect(result.stderr).toBe("");
+				expect(result.stdout).toContain(`Command: ${expectedCommand}`);
+			}
+			for (const args of [
+				["help", "--help"],
+				["help", "-h"],
+			] as const) {
+				const result = spawnSync("bun", [cliPath, ...args], {
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				});
+
+				expect(result.status).toBe(0);
+				expect(result.stderr).toBe("");
+				expect(result.stdout).toContain("Usage: afol");
+			}
+			expect(existsSync(join(tempRoot, ".afol"))).toBe(false);
+		} finally {
+			rmSync(tempRoot, { recursive: true, force: true });
+		}
 	});
 
 	test("expands per-command help with tool-specific options and guidance", () => {

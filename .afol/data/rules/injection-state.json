@@ -1,0 +1,23 @@
+{
+  "kind": "rule_injection_state_v1",
+  "version": 1,
+  "identities": {
+    "session:260629_1908_feature-health-sweep|task:T-01|role:orchestrator|surface:rules|file:.afol/adm/rules/RULE-011-maintenance-cadence.md": {
+      "session": "260629_1908_feature-health-sweep",
+      "task": "T-01",
+      "role": "orchestrator",
+      "surface": "rules",
+      "file_path": ".afol/adm/rules/RULE-011-maintenance-cadence.md",
+      "first_seen_at": "2026-06-29T23:12:09.357Z",
+      "last_seen_at": "2026-06-29T23:12:09.357Z",
+      "rules": {
+        "RULE-006": {
+          "path": ".afol/adm/rules/RULE-006-applicable-rule-resolution.md",
+          "char_count": 1933,
+          "content_hash": "95a3edbe530dec97f0542b1151dd258c6d55fb93e4e718de59edfac4a4d91c7a",
+          "injected_at": "2026-06-29T23:12:09.357Z"
+        }
+      }
+    }
+  }
+}

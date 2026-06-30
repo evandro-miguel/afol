@@ -37,7 +37,7 @@ afol start --session <session-id> --task-id <task-id>
 afol evidence --session <session-id> --task-id <task-id> --command "<cmd>" --result passed
 afol done --session <session-id> --task-id <task-id>
 afol close --session <session-id>
-afol verify --session <session-id>
+afol verify-tasks .afol/wb/<session-id> --strict
 ```
 
 Inspection:
@@ -80,7 +80,7 @@ agent context.
   stay here or in a child path; `.afol/skills/**` is not an active skills root.
 - `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and
   desired-state administration.
-- `.afol/pstr/**`: generated current project-structure maps.
+- `.afol/pstr/**`: generated project-structure maps when present.
 - `.afol/wb/**`: governed execution sessions.
 - `.afol/data/events/**`: append-only runtime event data.
 - `.afol/data/index/**`: local indexes.
