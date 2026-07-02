@@ -249,8 +249,14 @@ describe("kernel registry", () => {
 			},
 			{
 				usage: "bundle",
+				sideEffect: "read",
+				description: "Build a context bundle without persisting rule state",
+			},
+			{
+				usage: "bundle --persist-rule-injection",
 				sideEffect: "generated",
-				description: "Build a context bundle and refresh sections if needed",
+				description:
+					"Persist first-use rule injection state with local approval",
 			},
 			{
 				usage: "section --ref <ref>",
@@ -258,9 +264,10 @@ describe("kernel registry", () => {
 				description: "Read one section and refresh sections if needed",
 			},
 			{
-				usage: "explain",
-				sideEffect: "generated",
-				description: "Explain bundle inputs and refresh sections if needed",
+				usage: "explain [--full]",
+				sideEffect: "read",
+				description:
+					"Explain bundle inputs; pass --full to include the complete bundle",
 			},
 			{
 				usage: "tools",

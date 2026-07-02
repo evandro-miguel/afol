@@ -13,6 +13,7 @@ import { runContextCommand } from "../commands/context";
 import { agentOperationContext } from "../core/operation-context";
 import { buildContextBundle } from "../services/context/bundler";
 import {
+	buildSectionIndexSnapshot,
 	getSectionIndex,
 	rebuildSectionIndex,
 	resolveSection,
@@ -55,6 +56,10 @@ function captureIo(): IoCapture {
 
 function ruleInjectionStatePath(root: string): string {
 	return join(root, ".afol", "data", "rules", "injection-state.json");
+}
+
+function sectionIndexPath(root: string): string {
+	return join(root, ".afol", "data", "index", "sections.json");
 }
 
 function writeInjectableAlphaRule(root: string): void {
@@ -526,6 +531,17 @@ describe("context system", () => {
 		}
 	});
 
+	test("buildSectionIndexSnapshot does not persist index", () => {
+		const root = createSectionFixture();
+		try {
+			const snapshot = buildSectionIndexSnapshot(root);
+			expect(snapshot.sections.length).toBe(4);
+			expect(getSectionIndex(root)).toBeNull();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("resolveSection finds section by ref", () => {
 		const root = createSectionFixture();
 		try {
@@ -535,6 +551,17 @@ describe("context system", () => {
 			expect(section?.level).toBe(2);
 			expect(section?.line_start).toBe(9);
 			expect(section?.line_end).toBe(16);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("resolveSection does not persist missing index", () => {
+		const root = createSectionFixture();
+		try {
+			const section = resolveSection(root, "spec:alpha#overview");
+			expect(section?.title).toBe("Overview");
+			expect(getSectionIndex(root)).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1567,6 +1594,72 @@ describe("context system", () => {
 		}
 	});
 
+	test("afol ctx section reads section without rebuilding sections", async () => {
+		const root = createSectionFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"section",
+					["--ref", "spec:alpha#overview"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			expect(getSectionIndex(root)).toBeNull();
+			expect(existsSync(sectionIndexPath(root))).toBe(false);
+			expect(captured.stdout[0]).toContain('"title":"Overview"');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle reads sections without rebuilding sections", async () => {
+		const root = createSectionFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					["--json", "--mode", "deep"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			expect(getSectionIndex(root)).toBeNull();
+			expect(existsSync(sectionIndexPath(root))).toBe(false);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				data: { expanded_sections?: unknown[] };
+			};
+			expect(payload.data.expanded_sections?.length).toBeGreaterThan(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx explain reads sections without rebuilding sections", async () => {
+		const root = createSectionFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"explain",
+					["--mode", "deep"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			expect(getSectionIndex(root)).toBeNull();
+			expect(existsSync(sectionIndexPath(root))).toBe(false);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				bundle_size?: { expanded_sections: number };
+			};
+			expect(payload.bundle_size?.expanded_sections).toBeGreaterThan(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol ctx parses leading --json as summary flag", async () => {
 		const root = createSectionFixture();
 		try {
@@ -2233,7 +2326,130 @@ describe("context system", () => {
 			expect(Array.isArray(payload.data.library_refs)).toBe(true);
 			expect(Array.isArray(payload.memory_refs)).toBe(true);
 			expect(Array.isArray(payload.library_refs)).toBe(true);
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle persists rule injection state only with explicit flag", async () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--persist-rule-injection",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				data: {
+					rule_injection: {
+						first_use: boolean;
+						injected: Array<{ id: string }>;
+					};
+				};
+			};
+			expect(payload.data.rule_injection.first_use).toBe(true);
+			expect(
+				payload.data.rule_injection.injected.map((rule) => rule.id),
+			).toEqual(["RULE-ALPHA"]);
 			expect(existsSync(ruleInjectionStatePath(root))).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle rejects rule injection persistence in compact mode", async () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--mode",
+						"compact",
+						"--persist-rule-injection",
+						"--json",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(2);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: { code: string; message: string };
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.error.code).toBe("CTX_USAGE_ERROR");
+			expect(payload.error.message).toContain(
+				"requires ctx bundle mode balanced, deep, or tokenmax",
+			);
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx bundle rejects explicit rule injection persistence for restricted callers", async () => {
+		const root = createBundleFixture();
+		try {
+			writeInjectableAlphaRule(root);
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--persist-rule-injection",
+						"--json",
+					],
+					root,
+					captured.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: { code: string; message: string };
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.error.code).toBe("approval-required");
+			expect(payload.error.message).toContain(
+				"requires local interactive approval",
+			);
+			expect(existsSync(ruleInjectionStatePath(root))).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2569,22 +2785,58 @@ describe("context system", () => {
 				gaps: string[];
 				project_health: string[];
 				freshness: unknown;
+				budget: { used_tokens: number; total_tokens: number };
+				bundle_size: { refs: number; injected_rules: number };
 				evidence_tags: string[];
 				create_safety_hints: string[];
 				do_not_load: string[];
-				bundle: unknown;
+				bundle?: unknown;
 			};
 			expect(payload.ok).toBe(true);
 			expect(payload.why).toBeDefined();
 			expect(payload.gaps).toEqual(expect.any(Array));
 			expect(payload.project_health).toEqual(expect.any(Array));
 			expect(payload.freshness).toBeDefined();
+			expect(payload.budget.total_tokens).toBeGreaterThan(0);
+			expect(payload.bundle_size.refs).toBeGreaterThanOrEqual(0);
+			expect(payload.bundle_size.injected_rules).toBeGreaterThanOrEqual(0);
 			expect(payload.evidence_tags).toEqual(expect.any(Array));
 			expect(payload.create_safety_hints).toEqual(expect.any(Array));
 			expect(payload.do_not_load).toContain("raw .afol/state/afol.db");
-			expect(payload.bundle).toBeDefined();
+			expect(payload.bundle).toBeUndefined();
 			expect(Array.isArray(payload.gaps)).toBe(true);
 			expect(Array.isArray(payload.project_health)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx explain --full includes the complete bundle", async () => {
+		const root = createBundleFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"explain",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--full",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				bundle?: { task_id: string };
+			};
+			expect(payload.bundle?.task_id).toBe("T-01");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2622,19 +2874,23 @@ describe("context system", () => {
 					gaps: string[];
 					project_health: string[];
 					freshness: unknown;
+					budget: { used_tokens: number; total_tokens: number };
+					bundle_size: { refs: number; injected_rules: number };
 					evidence_tags: string[];
 					create_safety_hints: string[];
 					do_not_load: string[];
-					bundle: unknown;
+					bundle?: unknown;
 				};
 				why: unknown;
 				gaps: string[];
 				project_health: string[];
 				freshness: unknown;
+				budget: { used_tokens: number; total_tokens: number };
+				bundle_size: { refs: number; injected_rules: number };
 				evidence_tags: string[];
 				create_safety_hints: string[];
 				do_not_load: string[];
-				bundle: unknown;
+				bundle?: unknown;
 			};
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
@@ -2647,10 +2903,49 @@ describe("context system", () => {
 			expect(payload.project_health).toEqual(expect.any(Array));
 			expect(payload.data.project_health).toEqual(expect.any(Array));
 			expect(payload.freshness).toBeDefined();
+			expect(payload.budget.total_tokens).toBeGreaterThan(0);
+			expect(payload.data.budget.total_tokens).toBeGreaterThan(0);
+			expect(payload.bundle_size.refs).toBeGreaterThanOrEqual(0);
+			expect(payload.data.bundle_size.injected_rules).toBeGreaterThanOrEqual(0);
 			expect(payload.evidence_tags).toEqual(expect.any(Array));
 			expect(payload.create_safety_hints).toEqual(expect.any(Array));
 			expect(payload.do_not_load).toContain("raw .afol/state/afol.db");
-			expect(payload.bundle).toBeDefined();
+			expect(payload.bundle).toBeUndefined();
+			expect(payload.data.bundle).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx explain --json --full returns bundle in the envelope", async () => {
+		const root = createBundleFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"explain",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+						"--full",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				data: { bundle?: { task_id: string } };
+				bundle?: { task_id: string };
+			};
+			expect(payload.data.bundle?.task_id).toBe("T-01");
+			expect(payload.bundle?.task_id).toBe("T-01");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

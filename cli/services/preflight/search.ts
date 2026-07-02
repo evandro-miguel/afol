@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
+import { loadUxRegistry } from "../ux/journeys";
 
 export type PreflightSpecResult = {
 	id: string;
@@ -26,12 +27,22 @@ export type PreflightRuleResult = {
 	title: string;
 };
 
+export type PreflightUxJourneyResult = {
+	id: string;
+	path: string;
+	title: string;
+	status: string;
+	commands: string[];
+	score: number;
+};
+
 export type PreflightReport = {
 	query: string;
 	specs: PreflightSpecResult[];
 	lessons: PreflightLessonResult[];
 	similar_systems: PreflightSystemResult[];
 	rules: PreflightRuleResult[];
+	ux_journeys: PreflightUxJourneyResult[];
 	gaps: string[];
 	summary: string;
 	recommendations: string[];
@@ -81,6 +92,7 @@ const MAX_SPECS = 8;
 const MAX_LESSONS = 5;
 const MAX_SIMILAR = 8;
 const MAX_RULES = 5;
+const MAX_UX_JOURNEYS = 5;
 
 function tokenize(value: string): string[] {
 	const tokens = new Set<string>();
@@ -443,10 +455,46 @@ function searchRules(
 		.map((entry) => ({ path: entry.path, title: entry.title }));
 }
 
+function searchUxJourneys(
+	root: string,
+	tokens: readonly string[],
+): PreflightUxJourneyResult[] {
+	if (tokens.length === 0) {
+		return [];
+	}
+	return loadUxRegistry(root)
+		.entries.map((entry) => {
+			const score = scoreParts(
+				[
+					entry.id,
+					entry.path,
+					entry.title,
+					entry.status,
+					entry.commands.join(" "),
+				],
+				tokens,
+			);
+			return {
+				id: entry.id,
+				path: entry.path,
+				title: entry.title,
+				status: entry.status,
+				commands: entry.commands,
+				score,
+			};
+		})
+		.filter((entry) => entry.score > 0)
+		.sort(
+			(left, right) =>
+				right.score - left.score || left.id.localeCompare(right.id),
+		)
+		.slice(0, MAX_UX_JOURNEYS);
+}
+
 function formatSummary(
 	report: Pick<
 		PreflightReport,
-		"specs" | "lessons" | "similar_systems" | "rules"
+		"specs" | "lessons" | "similar_systems" | "rules" | "ux_journeys"
 	>,
 ): string {
 	if (report.specs.length === 0) {
@@ -457,6 +505,7 @@ function formatSummary(
 		`${report.lessons.length} lesson${report.lessons.length === 1 ? "" : "s"}`,
 		`${report.similar_systems.length} similar system${report.similar_systems.length === 1 ? "" : "s"}`,
 		`${report.rules.length} rule${report.rules.length === 1 ? "" : "s"}`,
+		`${report.ux_journeys.length} ux journey${report.ux_journeys.length === 1 ? "" : "s"}`,
 	].join(", ")} found`;
 }
 
@@ -478,6 +527,7 @@ export function runPreflight(root: string, query: string): PreflightReport {
 	const lessons = searchLessons(root, tokens);
 	const similar_systems = searchSimilarSystems(root, tokens);
 	const rules = searchRules(root, tokens);
+	const ux_journeys = searchUxJourneys(root, tokens);
 	const gaps: string[] = [];
 
 	if (specs.length === 0) {
@@ -502,6 +552,9 @@ export function runPreflight(root: string, query: string): PreflightReport {
 	if (rules.length === 0) {
 		gaps.push("no applicable rules found");
 	}
+	if (ux_journeys.length === 0) {
+		gaps.push("no relevant UX journey found");
+	}
 
 	const report: Omit<
 		PreflightReport,
@@ -512,6 +565,7 @@ export function runPreflight(root: string, query: string): PreflightReport {
 		lessons,
 		similar_systems,
 		rules,
+		ux_journeys,
 		gaps,
 	};
 	const recurrence_detected = lessons.length > 0;

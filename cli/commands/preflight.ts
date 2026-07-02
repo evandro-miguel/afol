@@ -67,6 +67,13 @@ function formatReport(report: PreflightReport): string {
 		"rules",
 		formatCollection(report.rules, (rule) => `${rule.path} | ${rule.title}`),
 		"",
+		"ux journeys",
+		formatCollection(
+			report.ux_journeys,
+			(journey) =>
+				`${journey.score} | ${journey.id} | ${journey.status || "unknown"} | ${journey.path}`,
+		),
+		"",
 		`recurrence_detected: ${report.recurrence_detected}`,
 		"",
 		"recommendations",

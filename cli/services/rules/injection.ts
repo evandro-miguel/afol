@@ -408,6 +408,83 @@ export function resolveRuleInjectionShape(
 	};
 }
 
+export function resolveRuleInjection(
+	projectRoot: string,
+	options: ResolveRuleInjectionOptions,
+): RuleInjectionResult {
+	const { context, identity, relativeStatePath, resolverConfig } =
+		injectionMetadata(projectRoot, options);
+	const state = readState(projectRoot);
+	const existing = state.identities[identity];
+	const injected: RuleInjectionPayload[] = [];
+	const alreadyInjected: RuleInjectionReference[] = [];
+	const omitted: RuleInjectionOmission[] = [];
+	let usedChars = usedCharsForIdentity(existing);
+
+	for (const rule of matchingInjectableRules(projectRoot, context)) {
+		const reference = ruleRef(rule);
+		const existingRecord = existing?.rules[rule.id];
+		const content = readRuleContent(projectRoot, rule.path);
+		if (content === null) {
+			if (existingRecord) {
+				usedChars = Math.max(0, usedChars - existingRecord.char_count);
+			}
+			const reason = `rule markdown file missing (${rule.path})`;
+			if (rule.required) {
+				throw new RuleInjectionError(`${rule.id}: ${reason}`);
+			}
+			omitted.push({ ...reference, reason });
+			continue;
+		}
+		const charCount = content.length;
+		const contentHash = contentFingerprint(content);
+		if (
+			existingRecord &&
+			existingRecord.path === rule.path &&
+			existingRecord.char_count === charCount &&
+			existingRecord.content_hash === contentHash
+		) {
+			alreadyInjected.push(reference);
+			continue;
+		}
+		if (existingRecord) {
+			usedChars = Math.max(0, usedChars - existingRecord.char_count);
+		}
+		if (charCount > resolverConfig.maxCharsPerRule) {
+			const reason = `rule exceeds max_chars_per_rule (${charCount}/${resolverConfig.maxCharsPerRule})`;
+			if (rule.required) {
+				throw new RuleInjectionError(`${rule.id}: ${reason}`);
+			}
+			omitted.push({ ...reference, char_count: charCount, reason });
+			continue;
+		}
+		if (usedChars + charCount > resolverConfig.maxCharsTotal) {
+			const reason = `rule exceeds max_total_chars (${usedChars + charCount}/${resolverConfig.maxCharsTotal})`;
+			if (rule.required) {
+				throw new RuleInjectionError(`${rule.id}: ${reason}`);
+			}
+			omitted.push({ ...reference, char_count: charCount, reason });
+			continue;
+		}
+		usedChars += charCount;
+		injected.push({ ...reference, char_count: charCount, content });
+	}
+
+	return {
+		identity,
+		state_path: relativeStatePath,
+		first_use: !existing,
+		injected,
+		already_injected: alreadyInjected,
+		omitted: omitted,
+		budget: {
+			max_chars_per_rule: resolverConfig.maxCharsPerRule,
+			max_total_chars: resolverConfig.maxCharsTotal,
+			used_chars: usedChars,
+		},
+	};
+}
+
 export function resolveContextRules(
 	projectRoot: string,
 	options: Pick<

@@ -234,6 +234,29 @@ describe("template forbidden-content policy", () => {
 		expect(templateCatalog).toEqual(rootCatalog);
 	});
 
+	test("live src/project-template carries current benchmark registry", async () => {
+		const projectRoot = process.cwd();
+		const rootRegistry = JSON.parse(
+			await readFile(
+				join(projectRoot, ".afol/data/benchmarks/catalog/registry.json"),
+				"utf8",
+			),
+		);
+		const templateRegistry = JSON.parse(
+			await readFile(
+				join(
+					projectRoot,
+					"src/project-template/.afol/data/benchmarks/catalog/registry.json",
+				),
+				"utf8",
+			),
+		);
+
+		expect(templateRegistry).toEqual(rootRegistry);
+		expect(templateRegistry.coverage?.exemptions).toEqual([]);
+		expect(templateRegistry.coverage?.subcommand_exemptions).toEqual([]);
+	});
+
 	test("live src/project-template carries current agentic-folder-sys skill source", async () => {
 		const projectRoot = process.cwd();
 		const activeSkillRoot = join(

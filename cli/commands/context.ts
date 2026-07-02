@@ -36,6 +36,8 @@ type ContextAction =
 type ParsedArgs = {
 	json: boolean;
 	trusted: boolean;
+	full: boolean;
+	persistRuleInjection: boolean;
 	session?: string;
 	task?: string;
 	role?: string;
@@ -87,7 +89,13 @@ function formatSummary(root: string): string {
 }
 
 function parseArgs(args: string[]): ParsedArgs {
-	const parsed: ParsedArgs = { json: false, trusted: false, explain: false };
+	const parsed: ParsedArgs = {
+		json: false,
+		trusted: false,
+		full: false,
+		persistRuleInjection: false,
+		explain: false,
+	};
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
 		if (value === "--json" || value === "-j") {
@@ -100,6 +108,14 @@ function parseArgs(args: string[]): ParsedArgs {
 		}
 		if (value === "--explain") {
 			parsed.explain = true;
+			continue;
+		}
+		if (value === "--full") {
+			parsed.full = true;
+			continue;
+		}
+		if (value === "--persist-rule-injection") {
+			parsed.persistRuleInjection = true;
 			continue;
 		}
 		if (value === "--session" || value === "-S") {
@@ -233,6 +249,7 @@ function libraryFreshness(root: string): "fresh" | "stale" | "missing" {
 function formatExplanation(
 	root: string,
 	bundle: ReturnType<typeof buildContextBundle>,
+	options: { full?: boolean } = {},
 ) {
 	const healthFindings = checkHealth(root, {
 		deep: false,
@@ -252,7 +269,7 @@ function formatExplanation(
 			...(bundle.library_refs.length > 0 ? ["library"] : []),
 		]),
 	);
-	return {
+	const explanation = {
 		ok: true,
 		why: {
 			included: [
@@ -279,6 +296,21 @@ function formatExplanation(
 				? "missing"
 				: "fresh",
 		},
+		budget: bundle.budget,
+		bundle_size: {
+			mode: bundle.mode,
+			refs: bundle.refs.length,
+			rules: bundle.rules.length,
+			hooks: bundle.hooks.length,
+			skills: bundle.skills.length,
+			tools: bundle.tools.length,
+			pstr_refs: bundle.pstr_refs.length,
+			memory_refs: bundle.memory_refs.length,
+			library_refs: bundle.library_refs.length,
+			expanded_sections: bundle.expanded_sections?.length ?? 0,
+			injected_rules: bundle.rule_injection.injected.length,
+			omitted_rules: bundle.rule_injection.omitted.length,
+		},
 		evidence_tags: evidenceTags,
 		create_safety_hints: [
 			"load only cited refs",
@@ -286,8 +318,8 @@ function formatExplanation(
 			"prefer current memory and library refs",
 		],
 		do_not_load: bundle.do_not_load,
-		bundle,
 	};
+	return options.full ? { ...explanation, bundle } : explanation;
 }
 
 function emitTrustError(
@@ -390,7 +422,30 @@ export async function runContextCommand(
 			const persistRuleInjection =
 				ctxAction === "bundle" &&
 				!parsed.explain &&
-				(parsed.mode ?? "balanced") !== "compact";
+				parsed.persistRuleInjection;
+			if (
+				parsed.persistRuleInjection &&
+				(ctxAction !== "bundle" || parsed.explain)
+			) {
+				throw new Error(
+					"--persist-rule-injection is only valid for ctx bundle without --explain.",
+				);
+			}
+			if (persistRuleInjection && parsed.mode === "compact") {
+				throw new Error(
+					"--persist-rule-injection requires ctx bundle mode balanced, deep, or tokenmax.",
+				);
+			}
+			if (persistRuleInjection && requiresApproval(ctx)) {
+				const message =
+					"ctx bundle --persist-rule-injection requires local interactive approval";
+				if (parsed.json) {
+					jsonOutput.err(io, "bundle", "approval-required", message, 2);
+				} else {
+					io.stderr(`err approval-required ${message}`);
+				}
+				return 2;
+			}
 			bundle = buildContextBundle(projectRoot, {
 				...(parsed.session ? { session: parsed.session } : {}),
 				...(parsed.task ? { task: parsed.task } : {}),
@@ -435,7 +490,9 @@ export async function runContextCommand(
 
 		if (ctxAction === "bundle") {
 			if (parsed.explain) {
-				const explanation = formatExplanation(projectRoot, bundle);
+				const explanation = formatExplanation(projectRoot, bundle, {
+					full: parsed.full,
+				});
 				if (parsed.json) {
 					jsonOutput.ok(
 						io,
@@ -462,7 +519,9 @@ export async function runContextCommand(
 		}
 
 		if (ctxAction === "explain") {
-			const explanation = formatExplanation(projectRoot, bundle);
+			const explanation = formatExplanation(projectRoot, bundle, {
+				full: parsed.full,
+			});
 			if (parsed.json) {
 				jsonOutput.ok(
 					io,

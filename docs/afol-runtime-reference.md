@@ -91,13 +91,14 @@ agent context.
 
 ## Rule Injection
 
-- `afol ctx bundle` is the only context command that can persist first-use rule
-  injection state for an identity.
+- `afol ctx bundle --persist-rule-injection` is the only context command that
+  can persist first-use rule injection state for an identity. Plain
+  `afol ctx bundle` is read-only.
 - Identity dimensions are `session`, `task`, `role`, `surface`, and optional
   `file`; missing session/task collapse to `none`, and the file dimension is
   omitted when no file is present.
-- `afol ctx explain`, `afol ctx tools`, and `afol ctx bundle --mode compact`
-  resolve context without consuming first-use injection state.
+- `afol ctx explain`, `afol ctx tools`, and plain `afol ctx bundle` resolve
+  context without consuming first-use injection state.
 - Rule metadata can target `domains`, `surfaces`, `work_types`, `languages`,
   `file_globs`, and `exact_files`; only rules marked `inject: "always"` are
   eligible for injection.
