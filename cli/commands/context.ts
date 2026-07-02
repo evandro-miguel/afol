@@ -1,6 +1,11 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
+import {
 	buildContextBundle,
 	ContextTrustError,
 	RuleInjectionError,
@@ -303,6 +308,7 @@ export async function runContextCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	const ctxArgs = action?.startsWith("-") ? [action, ...args] : args;
 	const wantsJson = ctxArgs.some(
@@ -334,6 +340,15 @@ export async function runContextCommand(
 		}
 
 		if (ctxAction === "build") {
+			if (requiresApproval(ctx)) {
+				const message = "ctx build requires local interactive approval";
+				if (parsed.json) {
+					jsonOutput.err(io, "build", "approval-required", message, 2);
+				} else {
+					io.stderr(`err approval-required ${message}`);
+				}
+				return 2;
+			}
 			const snapshot = rebuildSectionIndex(projectRoot);
 			if (parsed.json) {
 				jsonOutput.ok(io, ctxAction, { snapshot }, ["snapshot"]);

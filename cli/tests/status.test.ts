@@ -254,6 +254,62 @@ describe("status command", () => {
 		}
 	});
 
+	test("selects active state-board task before first task id", () => {
+		const root = createFixture();
+		try {
+			const sessionId = "260530_2256_cli-native-command-parity";
+			const taskFile = join(
+				root,
+				".afol",
+				"wb",
+				sessionId,
+				`${sessionId}_task_01.md`,
+			);
+			writeFileSync(
+				taskFile,
+				[
+					"---",
+					"task_id: T-01",
+					"status: pending",
+					"---",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | first id is not active |",
+					"| T-02 | in_progress | worker | real active task |",
+					"| T-03 | done | worker | complete |",
+					"",
+					"NEXT:",
+					"- continue T-02",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const captured = captureIo();
+			const code = runStatusCommand(root, [], captured.io);
+			const text = captured.stdout[0] ?? "";
+			expect(code).toBe(0);
+			expect(text).toContain("TASK: T-02");
+			expect(text).toContain("STATUS: in_progress");
+
+			const override = captureIo();
+			const overrideCode = runStatusCommand(
+				root,
+				["--task-id", "T-01"],
+				override.io,
+			);
+			const overrideText = override.stdout[0] ?? "";
+			expect(overrideCode).toBe(0);
+			expect(overrideText).toContain("TASK: T-01");
+			expect(overrideText).toContain("STATUS: pending");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("active session + stale log shows log_behind_diff=yes", () => {
 		const { root } = createFreshnessFixture("stale-log");
 		try {
@@ -330,9 +386,66 @@ describe("status command", () => {
 			const text = captured.stdout[0] ?? "";
 			expect(text).toContain("VALIDATION_OR_CHECKS:");
 			expect(text).toContain("BLOCKERS:");
+			expect(text).toContain("- none");
+			expect(text).not.toContain("project indexes need rebuild");
+			expect(text).not.toContain("run afol local-state rebuild");
+			expect(text).not.toContain("run afol pstr rebuild");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("surfaces global index findings with --health", () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			const code = runStatusCommand(root, ["--health"], captured.io);
+			expect(code).toBe(0);
+
+			const text = captured.stdout[0] ?? "";
+			expect(text).toContain("VALIDATION_OR_CHECKS:");
+			expect(text).toContain("BLOCKERS:");
 			expect(text).toContain("project indexes need rebuild");
 			expect(text).toContain("run afol local-state rebuild; afol pstr rebuild");
 			expect(text).not.toContain("BLOCKERS:\n- none");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("supports --task-id status override", () => {
+		const root = createFixture();
+		try {
+			const sessionId = "260530_2256_cli-native-command-parity";
+			const sessionDir = join(root, ".afol", "wb", sessionId);
+			writeFileSync(
+				join(sessionDir, `${sessionId}_task_02.md`),
+				[
+					"---",
+					"task_id: T-02",
+					"status: done",
+					"---",
+					"",
+					"FILES_WRITTEN:",
+					"- cli/commands/other.ts",
+					"VALIDATION_OR_CHECKS:",
+					"- none",
+					"BLOCKERS:",
+					"- none",
+					"NEXT:",
+					"- none",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const captured = captureIo();
+			const code = runStatusCommand(root, ["--task-id", "T-02"], captured.io);
+			expect(code).toBe(0);
+			const text = captured.stdout[0] ?? "";
+			expect(text).toContain("TASK: T-02");
+			expect(text).toContain("STATUS: done");
+			expect(text).not.toContain("TASK: T-01");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

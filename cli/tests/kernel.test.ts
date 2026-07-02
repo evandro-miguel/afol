@@ -337,9 +337,19 @@ describe("kernel front-door", () => {
 						description: "Emit machine-readable project status",
 					},
 					{
+						usage: "--health",
+						sideEffect: "read",
+						description: "Include global health findings",
+					},
+					{
 						usage: "--session <session-id>",
 						sideEffect: "read",
 						description: "Resolve status around a specific session",
+					},
+					{
+						usage: "--task-id <task-id>",
+						sideEffect: "read",
+						description: "Resolve a specific task in the selected session",
 					},
 				],
 			});
@@ -619,11 +629,49 @@ describe("kernel front-door", () => {
 			expect(dryRun.status).toBe(0);
 			const payload = JSON.parse(dryRun.stdout as string) as {
 				dry_run: boolean;
+				applied: boolean;
 				reviewed_areas: string[];
 			};
 			expect(payload.dry_run).toBe(true);
+			expect(payload.applied).toBe(false);
 			expect(payload.reviewed_areas).toEqual(["rules"]);
 			expect(existsSync(reviewPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("ctx and local-state write commands honor approval gate through the kernel front-door", () => {
+		const root = mkProjectRoot("guarded-writes-agent", "");
+		try {
+			const ctxDenied = runKernel(root, ["--agent", "ctx", "build", "--json"]);
+			expect(ctxDenied.status).toBe(2);
+			const ctxPayload = JSON.parse(ctxDenied.stdout as string) as {
+				ok: boolean;
+				action: string;
+				error: { code: string };
+			};
+			expect(ctxPayload.ok).toBe(false);
+			expect(ctxPayload.action).toBe("ctx.build");
+			expect(ctxPayload.error.code).toBe("approval-required");
+
+			const localStateDenied = runKernel(root, [
+				"--remote",
+				"local-state",
+				"rebuild",
+				"--json",
+			]);
+			expect(localStateDenied.status).toBe(2);
+			const localStatePayload = JSON.parse(
+				localStateDenied.stdout as string,
+			) as {
+				ok: boolean;
+				action: string;
+				error: { code: string };
+			};
+			expect(localStatePayload.ok).toBe(false);
+			expect(localStatePayload.action).toBe("local-state.rebuild");
+			expect(localStatePayload.error.code).toBe("approval-required");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

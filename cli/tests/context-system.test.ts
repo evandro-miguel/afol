@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runContextCommand } from "../commands/context";
+import { agentOperationContext } from "../core/operation-context";
 import { buildContextBundle } from "../services/context/bundler";
 import {
 	getSectionIndex,
@@ -1603,6 +1604,34 @@ describe("context system", () => {
 			expect(payload.exit_code).toBe(0);
 			expect(payload.data.snapshot.sections).toHaveLength(4);
 			expect(payload.snapshot.sections).toHaveLength(4);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol ctx build --json is denied in restricted context", async () => {
+		const root = createSectionFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"build",
+					["--json"],
+					root,
+					captured.io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok: boolean;
+				action: string;
+				error: { code: string };
+				exit_code: number;
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.action).toBe("ctx.build");
+			expect(payload.exit_code).toBe(2);
+			expect(payload.error.code).toBe("approval-required");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

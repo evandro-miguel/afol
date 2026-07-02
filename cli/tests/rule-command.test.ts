@@ -138,11 +138,31 @@ describe("rule command", () => {
 			expect(await runRuleCommand(["list"], root, list.io)).toBe(0);
 			expect(list.stdout.join("\n")).toContain("rules: 2");
 			expect(list.stdout.join("\n")).toContain("RULE-004 validation-linting");
+			const jsonList = capture();
+			expect(await runRuleCommand(["list", "--json"], root, jsonList.io)).toBe(
+				0,
+			);
+			const jsonListPayload = JSON.parse(jsonList.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { count: number };
+			};
+			expect(jsonListPayload.ok).toBe(true);
+			expect(jsonListPayload.data.count).toBe(2);
 
 			const show = capture();
 			expect(await runRuleCommand(["show", "RULE-004"], root, show.io)).toBe(0);
 			expect(show.stdout.join("\n")).toContain("rule: RULE-004");
 			expect(show.stdout.join("\n")).toContain("surfaces: testing,validation");
+			const jsonShow = capture();
+			expect(
+				await runRuleCommand(["show", "RULE-004", "--json"], root, jsonShow.io),
+			).toBe(0);
+			const jsonShowPayload = JSON.parse(jsonShow.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { rule: { id: string } };
+			};
+			expect(jsonShowPayload.ok).toBe(true);
+			expect(jsonShowPayload.data.rule.id).toBe("RULE-004");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -162,6 +182,27 @@ describe("rule command", () => {
 			expect(output.stdout.join("\n")).toContain("resolved rules: 1");
 			expect(output.stdout.join("\n")).toContain("RULE-004");
 			expect(output.stdout.join("\n")).not.toContain("RULE-001");
+			const jsonOutput = capture();
+			expect(
+				await runRuleCommand(
+					[
+						"resolve",
+						"--json",
+						"--surface",
+						"testing",
+						"--work-type",
+						"validation",
+					],
+					root,
+					jsonOutput.io,
+				),
+			).toBe(0);
+			const jsonResolvePayload = JSON.parse(jsonOutput.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { count: number };
+			};
+			expect(jsonResolvePayload.ok).toBe(true);
+			expect(jsonResolvePayload.data.count).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -74,13 +74,29 @@ const FIELD_HEADERS = [
 ];
 const TASK_ROW_RE =
 	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
+const TASK_STATE_PRIORITY: Record<string, number> = {
+	in_progress: 0,
+	problem: 1,
+	pending: 2,
+	done: 50,
+	moved: 60,
+};
+
+type TaskBoardRow = {
+	taskId: string;
+	state: string;
+};
 
 function parseStatusArgs(args: string[]): {
 	json: boolean;
 	session: string | null;
+	health: boolean;
+	taskId: string | null;
 } {
 	let json = false;
 	let session: string | null = null;
+	let health = false;
+	let taskId: string | null = null;
 	const values = [...args];
 	if (values[0] === "status") {
 		values.shift();
@@ -104,13 +120,30 @@ function parseStatusArgs(args: string[]): {
 			index += 1;
 			continue;
 		}
+		if (value === "--health") {
+			health = true;
+			continue;
+		}
+		if (value === "--task-id") {
+			const next = values[index + 1];
+			if (!next || next.startsWith("-")) {
+				throw new Error("Missing value for --task-id in status.");
+			}
+			taskId = next;
+			index += 1;
+			continue;
+		}
 		if (value.startsWith("-")) {
 			throw new Error(`Unknown status argument: ${value}`);
+		}
+		if (!taskId) {
+			taskId = value;
+			continue;
 		}
 		throw new Error(`Unexpected status argument: ${value}`);
 	}
 
-	return { json, session };
+	return { json, session, health, taskId };
 }
 
 function resultEnvelope<T extends Record<string, unknown>>(
@@ -247,9 +280,57 @@ function extractTaskState(content: string, taskId: string): string | null {
 	return null;
 }
 
+function parseTaskBoardRows(content: string): TaskBoardRow[] {
+	const rows: TaskBoardRow[] = [];
+	for (const line of content.split(/\r?\n/)) {
+		const match = line.trim().match(TASK_ROW_RE);
+		if (!match?.[1]) {
+			continue;
+		}
+		rows.push({
+			taskId: match[1],
+			state: (match[2] ?? "").trim(),
+		});
+	}
+	return rows;
+}
+
+function taskStatePriority(state: string): number {
+	const normalized = state.trim().toLowerCase();
+	return TASK_STATE_PRIORITY[normalized] ?? 10;
+}
+
+function selectTaskId(
+	content: string,
+	frontmatter: Record<string, string>,
+	fileName: string,
+	requestedTaskId?: string | null,
+): string {
+	if (requestedTaskId) {
+		return requestedTaskId;
+	}
+
+	const taskRows = parseTaskBoardRows(content);
+	const selected = [...taskRows]
+		.sort((left, right) => {
+			const priorityDelta =
+				taskStatePriority(left.state) - taskStatePriority(right.state);
+			return priorityDelta !== 0
+				? priorityDelta
+				: left.taskId.localeCompare(right.taskId);
+		})
+		.at(0);
+	if (selected) {
+		return selected.taskId;
+	}
+
+	return extractTaskId(content, frontmatter, fileName);
+}
+
 function pickTaskFile(
 	projectRoot: string,
 	activeSession: string,
+	taskId?: string | null,
 ): string | null {
 	const sessionDir = join(
 		resolveProjectPaths(projectRoot).abs.wbDir,
@@ -264,6 +345,26 @@ function pickTaskFile(
 		.sort();
 
 	if (taskFiles.length === 0) {
+		return null;
+	}
+
+	if (taskId) {
+		const targetTaskId = taskId.toLowerCase();
+		for (const name of taskFiles) {
+			const path = join(sessionDir, name);
+			const content = readFileSync(path, "utf8");
+			const fileTaskId = extractTaskId(
+				content,
+				parseFrontmatter(content),
+				name,
+			).toLowerCase();
+			const hasTaskRow = parseTaskBoardRows(content).some(
+				(row) => row.taskId.toLowerCase() === targetTaskId,
+			);
+			if (fileTaskId === targetTaskId || hasTaskRow) {
+				return path;
+			}
+		}
 		return null;
 	}
 
@@ -316,6 +417,8 @@ function formatFreshness(report: CatchupReport): string {
 function readStatusSnapshot(
 	projectRoot: string,
 	freshnessSession: string | null,
+	taskId: string | null,
+	includeHealthFindings: boolean,
 ): StatusSnapshot {
 	const loaded = loadProjectRoot(projectRoot);
 	if (!loaded.ok) {
@@ -329,16 +432,19 @@ function readStatusSnapshot(
 	const activeSessionPath = projectPaths.abs.activeSessionFile;
 
 	const healthInfo = computeSessionHealth(loaded.value.root);
-	const globalFindings = collectGlobalStatusFindings(loaded.value.root);
+	const globalFindings = includeHealthFindings
+		? collectGlobalStatusFindings(loaded.value.root)
+		: [];
 	const activeSession = existsSync(activeSessionPath)
 		? readFileSync(activeSessionPath, "utf8").trim() || null
 		: null;
 	const catchupSession = freshnessSession ?? activeSession;
+	const selectedSession = freshnessSession ?? activeSession;
 	const catchupReport = catchupSession
 		? computeCatchup(loaded.value.root, { session: catchupSession })
 		: undefined;
 
-	if (!activeSession) {
+	if (!selectedSession) {
 		return {
 			status: "none",
 			task: "none",
@@ -364,7 +470,7 @@ function readStatusSnapshot(
 		};
 	}
 
-	const taskFilePath = pickTaskFile(loaded.value.root, activeSession);
+	const taskFilePath = pickTaskFile(loaded.value.root, selectedSession, taskId);
 	if (!taskFilePath) {
 		return {
 			status: "none",
@@ -394,7 +500,7 @@ function readStatusSnapshot(
 	const content = readFileSync(taskFilePath, "utf8");
 	const frontmatter = parseFrontmatter(content);
 	const fileName = taskFilePath.split("/").at(-1) ?? "";
-	const task = extractTaskId(content, frontmatter, fileName);
+	const task = selectTaskId(content, frontmatter, fileName, taskId);
 	const status =
 		extractTaskState(content, task) ?? frontmatter.status?.trim() ?? "none";
 
@@ -460,7 +566,12 @@ export function runStatusCommand(
 	args: string[],
 	io: CommandIo = DEFAULT_IO,
 ): number {
-	let parsed: { json: boolean; session: string | null };
+	let parsed: {
+		json: boolean;
+		session: string | null;
+		health: boolean;
+		taskId: string | null;
+	};
 	try {
 		parsed = parseStatusArgs(args);
 	} catch (error) {
@@ -470,7 +581,12 @@ export function runStatusCommand(
 
 	let snapshot: StatusSnapshot;
 	try {
-		snapshot = readStatusSnapshot(projectRoot, parsed.session);
+		snapshot = readStatusSnapshot(
+			projectRoot,
+			parsed.session,
+			parsed.taskId,
+			parsed.health,
+		);
 	} catch (error) {
 		const commandError = error as Error & { code?: number };
 		io.stderr(commandError.message);

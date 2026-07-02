@@ -1,9 +1,15 @@
 import {
+	envelopeErr,
 	envelopeOk,
 	envelopeWithLegacyKeys,
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
 import {
 	rebuildProjectIndexes,
 	validateFilesIndex,
@@ -134,6 +140,7 @@ export async function runLocalStateCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
 		const [rawCommand, ...rest] = args;
@@ -141,6 +148,23 @@ export async function runLocalStateCommand(
 		const parsed = parseArgs(rest);
 
 		if (command === "rebuild") {
+			if (requiresApproval(ctx)) {
+				const message =
+					"local-state rebuild requires local interactive approval";
+				if (parsed.json) {
+					io.stdout(
+						stringifyEnvelope(
+							envelopeErr("approval-required", message, {
+								action: "local-state.rebuild",
+								exitCode: 2,
+							}),
+						),
+					);
+				} else {
+					io.stderr(`err approval-required ${message}`);
+				}
+				return 2;
+			}
 			const workbench = rebuildWorkBenchIndex(projectRoot);
 			const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
 			const summary = summarizeRebuild(snapshot);

@@ -8,6 +8,8 @@ export type SessionTaskArgs = {
 export type SessionTaskJsonArgs = SessionTaskArgs & {
 	json: boolean;
 	compact: boolean;
+	brief: boolean;
+	briefMode: "compact" | "full" | null;
 };
 
 export type EvidenceArgs = SessionTaskArgs & {
@@ -15,10 +17,12 @@ export type EvidenceArgs = SessionTaskArgs & {
 	result: string;
 	artifact?: string;
 	note?: string;
+	json?: boolean;
 };
 
 export type DoneArgs = SessionTaskArgs & {
 	testCommand: string | null;
+	testShellCommand: string | null;
 	evidenceCommand: string | null;
 	evidenceResult: string | null;
 	requireSpecCheck: boolean;

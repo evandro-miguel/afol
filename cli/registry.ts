@@ -77,9 +77,19 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Emit machine-readable project status",
 			},
 			{
+				usage: "--health",
+				sideEffect: "read",
+				description: "Include global health findings",
+			},
+			{
 				usage: "--session <session-id>",
 				sideEffect: "read",
 				description: "Resolve status around a specific session",
+			},
+			{
+				usage: "--task-id <task-id>",
+				sideEffect: "read",
+				description: "Resolve a specific task in the selected session",
 			},
 		],
 	},
@@ -164,6 +174,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--json",
 				sideEffect: "write",
 				description: "Emit machine-readable start result",
+			},
+			{
+				usage: "--brief [full]",
+				sideEffect: "write",
+				description: "Emit project start briefing",
 			},
 		],
 	},
@@ -291,6 +306,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				sideEffect: "append",
 				description: "Attach optional artifact and note metadata",
 			},
+			{
+				usage: "--json",
+				sideEffect: "append",
+				description: "Emit machine-readable evidence result",
+			},
 		],
 	},
 	{
@@ -300,6 +320,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect hooks",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list [--json]",
+				sideEffect: "read",
+				description: "List configured hooks",
+			},
+			{
+				usage: "show <id> [--json]",
+				sideEffect: "read",
+				description: "Inspect one hook",
+			},
+			{
+				usage: "resolve --event <event> [--json]",
+				sideEffect: "read",
+				description: "Resolve hooks for a context/event profile",
+			},
+		],
 	},
 	{
 		command: "rule",
@@ -308,6 +345,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect rules",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list [--json]",
+				sideEffect: "read",
+				description: "List configured rules",
+			},
+			{
+				usage: "show <id> [--json]",
+				sideEffect: "read",
+				description: "Inspect one rule",
+			},
+			{
+				usage: "resolve --surface <surface> --work-type <work-type> [--json]",
+				sideEffect: "read",
+				description: "Resolve matching rules for a context profile",
+			},
+		],
 	},
 	{
 		command: "skill",
@@ -316,6 +370,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect skills",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list [--json] [--verbose]",
+				sideEffect: "read",
+				description: "List local skills",
+			},
+			{
+				usage: "show <name> [--json]",
+				sideEffect: "read",
+				description: "Inspect one skill",
+			},
+			{
+				usage: "search <query> [--json]",
+				sideEffect: "read",
+				description: "Search local skills by name",
+			},
+		],
 	},
 	{
 		command: "close",
@@ -623,7 +694,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: [],
 		kind: "ux",
 		sideEffect: "write",
-		description: "Register and validate user journey coverage",
+		description: "journey coverage",
 		category: "workflow",
 		subcommands: [
 			{

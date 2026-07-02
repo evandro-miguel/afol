@@ -53,6 +53,16 @@ describe("skill command", () => {
 			expect(list.stdout.join("\n")).not.toContain(
 				"Fast Bun TypeScript workflows.",
 			);
+			const jsonList = capture();
+			expect(await runSkillCommand(["list", "--json"], root, jsonList.io)).toBe(
+				0,
+			);
+			const jsonListPayload = JSON.parse(jsonList.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { count: number };
+			};
+			expect(jsonListPayload.ok).toBe(true);
+			expect(jsonListPayload.data.count).toBe(2);
 
 			const verboseList = capture();
 			expect(
@@ -70,11 +80,36 @@ describe("skill command", () => {
 			expect(show.stdout.join("\n")).toContain(
 				"TypeScript migration guidance.",
 			);
+			const jsonShow = capture();
+			expect(
+				await runSkillCommand(
+					["show", "typescript-expert", "--json"],
+					root,
+					jsonShow.io,
+				),
+			).toBe(0);
+			const jsonShowPayload = JSON.parse(jsonShow.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { name: string };
+			};
+			expect(jsonShowPayload.ok).toBe(true);
+			expect(jsonShowPayload.data.name).toBe("typescript-expert");
 
 			const search = capture();
 			expect(await runSkillCommand(["search", "bun"], root, search.io)).toBe(0);
 			expect(search.stdout.join("\n")).toContain("skill matches: 1");
 			expect(search.stdout.join("\n")).toContain("bun-development");
+			const jsonSearch = capture();
+			expect(
+				await runSkillCommand(["search", "bun", "--json"], root, jsonSearch.io),
+			).toBe(0);
+			const jsonSearchPayload = JSON.parse(jsonSearch.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { count: number; query: string };
+			};
+			expect(jsonSearchPayload.ok).toBe(true);
+			expect(jsonSearchPayload.data.query).toBe("bun");
+			expect(jsonSearchPayload.data.count).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -1,3 +1,9 @@
+import {
+	envelopeErr,
+	envelopeOk,
+	type ResultEnvelope,
+	stringifyEnvelope,
+} from "../core/envelope";
 import { findHook, listHooks, resolveHooks } from "../services/catalog/hooks";
 import {
 	findRule,
@@ -35,6 +41,26 @@ function formatSkillBrief(
 	skill: ReturnType<typeof listSkills>[number],
 ): string {
 	return `${skill.name} ${skill.path}`;
+}
+
+function parseJson(values: string[]): { json: boolean; args: string[] } {
+	let json = false;
+	const args = values.filter((value) => {
+		if (value === "--json" || value === "-j") {
+			json = true;
+			return false;
+		}
+		return true;
+	});
+	return { json, args };
+}
+
+function writeJson<T>(
+	io: CommandIo,
+	_action: string,
+	result: ResultEnvelope<T>,
+): void {
+	io.stdout(stringifyEnvelope(result));
 }
 
 function contributionSummary(
@@ -77,22 +103,79 @@ export async function runHookCommand(
 ): Promise<number> {
 	try {
 		const [command = "list", ...rest] = args;
+		const { json, args: options } = parseJson(rest);
 		if (command === "list" || command === "ls") {
 			const hooks = listHooks(projectRoot);
+			if (json) {
+				writeJson(
+					io,
+					"hook.list",
+					envelopeOk(
+						{
+							count: hooks.length,
+							hooks: hooks.map((entry) => ({
+								id: entry.id,
+								name: entry.name,
+								path: entry.path,
+							})),
+						},
+						{ action: "hook.list" },
+					),
+				);
+				return 0;
+			}
 			io.stdout(
 				[`hooks: ${hooks.length}`, ...hooks.map(formatHook)].join("\n"),
 			);
 			return 0;
 		}
 		if (command === "show" || command === "get") {
-			const identifier = rest[0];
+			const identifier = options[0];
 			if (!identifier) {
 				throw new Error("Missing hook id for hook show.");
 			}
 			const hook = findHook(projectRoot, identifier);
 			if (!hook) {
+				if (json) {
+					writeJson(
+						io,
+						"hook.show",
+						envelopeErr("hook-not-found", `Hook not found: ${identifier}`, {
+							action: "hook.show",
+							exitCode: 1,
+						}),
+					);
+					return 1;
+				}
 				io.stderr(`Hook not found: ${identifier}`);
 				return 1;
+			}
+			if (json) {
+				writeJson(
+					io,
+					"hook.show",
+					envelopeOk(
+						{
+							hook: {
+								id: hook.id,
+								name: hook.name,
+								path: hook.path,
+								enabled: hook.enabled,
+								scope: hook.scope,
+								events: hook.events,
+								roles: hook.roles,
+								surfaces: hook.surfaces,
+								work_types: hook.workTypes,
+								languages: hook.languages,
+								file_globs: hook.fileGlobs,
+								exact_files: hook.exactFiles,
+								priority: hook.priority,
+							},
+						},
+						{ action: "hook.show" },
+					),
+				);
+				return 0;
 			}
 			io.stdout(
 				[
@@ -116,6 +199,8 @@ export async function runHookCommand(
 			return 0;
 		}
 		if (command === "resolve") {
+			const { json: jsonFlag, args: resolveArgs } = parseJson(options);
+			const wantsJson = json || jsonFlag;
 			const roles: string[] = [];
 			const surfaces: string[] = [];
 			const languages: string[] = [];
@@ -123,10 +208,10 @@ export async function runHookCommand(
 			let workType = "delivery";
 			let filePath: string | undefined;
 			let scope: string | undefined;
-			for (let index = 0; index < rest.length; index += 1) {
-				const value = rest[index];
+			for (let index = 0; index < resolveArgs.length; index += 1) {
+				const value = resolveArgs[index];
 				if (value === "--event") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error("Missing value for --event.");
 					}
@@ -135,7 +220,7 @@ export async function runHookCommand(
 					continue;
 				}
 				if (value === "--role" || value === "--roles") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error(`Missing value for ${value}.`);
 					}
@@ -144,7 +229,7 @@ export async function runHookCommand(
 					continue;
 				}
 				if (value === "--surface" || value === "--surfaces") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error(`Missing value for ${value}.`);
 					}
@@ -153,7 +238,7 @@ export async function runHookCommand(
 					continue;
 				}
 				if (value === "--work-type") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error("Missing value for --work-type.");
 					}
@@ -162,7 +247,7 @@ export async function runHookCommand(
 					continue;
 				}
 				if (value === "--language" || value === "--languages") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error(`Missing value for ${value}.`);
 					}
@@ -171,7 +256,7 @@ export async function runHookCommand(
 					continue;
 				}
 				if (value === "--file") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error("Missing value for --file.");
 					}
@@ -180,7 +265,7 @@ export async function runHookCommand(
 					continue;
 				}
 				if (value === "--scope") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error("Missing value for --scope.");
 					}
@@ -190,7 +275,7 @@ export async function runHookCommand(
 				}
 				throw new Error(`Unknown hook resolve argument: ${value}`);
 			}
-			const options: Parameters<typeof resolveHooks>[1] = {
+			const resolveOptions: Parameters<typeof resolveHooks>[1] = {
 				event,
 				roles,
 				surfaces,
@@ -198,12 +283,26 @@ export async function runHookCommand(
 				languages,
 			};
 			if (filePath) {
-				options.filePath = filePath;
+				resolveOptions.filePath = filePath;
 			}
 			if (scope) {
-				options.scope = scope;
+				resolveOptions.scope = scope;
 			}
-			const hooks = resolveHooks(projectRoot, options);
+			const hooks = resolveHooks(projectRoot, resolveOptions);
+			if (wantsJson) {
+				writeJson(
+					io,
+					"hook.resolve",
+					envelopeOk(
+						{
+							count: hooks.length,
+							hooks: hooks.map((entry) => ({ id: entry.id, name: entry.name })),
+						},
+						{ action: "hook.resolve" },
+					),
+				);
+				return 0;
+			}
 			io.stdout(
 				[`resolved hooks: ${hooks.length}`, ...hooks.map(formatHook)].join(
 					"\n",
@@ -225,22 +324,77 @@ export async function runRuleCommand(
 ): Promise<number> {
 	try {
 		const [command = "list", ...rest] = args;
+		const { json, args: options } = parseJson(rest);
 		if (command === "list" || command === "ls") {
 			const rules = listRules(projectRoot);
+			if (json) {
+				writeJson(
+					io,
+					"rule.list",
+					envelopeOk(
+						{
+							count: rules.length,
+							rules: rules.map((entry) => ({
+								id: entry.id,
+								name: entry.name,
+								path: entry.path,
+							})),
+						},
+						{ action: "rule.list" },
+					),
+				);
+				return 0;
+			}
 			io.stdout(
 				[`rules: ${rules.length}`, ...rules.map(formatRule)].join("\n"),
 			);
 			return 0;
 		}
 		if (command === "show" || command === "get") {
-			const identifier = rest[0];
+			const identifier = options[0];
 			if (!identifier) {
 				throw new Error("Missing rule id for rule show.");
 			}
 			const rule = findRule(projectRoot, identifier);
 			if (!rule) {
+				if (json) {
+					writeJson(
+						io,
+						"rule.show",
+						envelopeErr("rule-not-found", `Rule not found: ${identifier}`, {
+							action: "rule.show",
+							exitCode: 1,
+						}),
+					);
+					return 1;
+				}
 				io.stderr(`Rule not found: ${identifier}`);
 				return 1;
+			}
+			if (json) {
+				writeJson(
+					io,
+					"rule.show",
+					envelopeOk(
+						{
+							rule: {
+								id: rule.id,
+								name: rule.name,
+								path: rule.path,
+								required: rule.required,
+								domains: rule.domains,
+								surfaces: rule.surfaces,
+								work_types: rule.workTypes,
+								languages: rule.languages,
+								file_globs: rule.fileGlobs,
+								exact_files: rule.exactFiles,
+								priority: rule.priority,
+							},
+						},
+						{ action: "rule.show" },
+					),
+				);
+				return 0;
 			}
 			io.stdout(
 				[
@@ -261,6 +415,7 @@ export async function runRuleCommand(
 			return 0;
 		}
 		if (command === "resolve") {
+			const { json: jsonFlag, args: resolveArgs } = parseJson(rest);
 			const domains: string[] = [];
 			const surfaces: string[] = [];
 			const languages: string[] = [];
@@ -269,10 +424,10 @@ export async function runRuleCommand(
 			let scope: string | undefined;
 			let inject: string | undefined;
 			let required = false;
-			for (let index = 0; index < rest.length; index += 1) {
-				const value = rest[index];
+			for (let index = 0; index < resolveArgs.length; index += 1) {
+				const value = resolveArgs[index];
 				if (value === "--domain" || value === "--domains") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error(`Missing value for ${value}.`);
 					}
@@ -281,7 +436,7 @@ export async function runRuleCommand(
 					continue;
 				}
 				if (value === "--surface" || value === "--surfaces") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error(`Missing value for ${value}.`);
 					}
@@ -290,7 +445,7 @@ export async function runRuleCommand(
 					continue;
 				}
 				if (value === "--work-type") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error("Missing value for --work-type.");
 					}
@@ -299,7 +454,7 @@ export async function runRuleCommand(
 					continue;
 				}
 				if (value === "--language" || value === "--languages") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error(`Missing value for ${value}.`);
 					}
@@ -308,7 +463,7 @@ export async function runRuleCommand(
 					continue;
 				}
 				if (value === "--file") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error("Missing value for --file.");
 					}
@@ -317,7 +472,7 @@ export async function runRuleCommand(
 					continue;
 				}
 				if (value === "--scope") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error("Missing value for --scope.");
 					}
@@ -326,7 +481,7 @@ export async function runRuleCommand(
 					continue;
 				}
 				if (value === "--inject") {
-					const next = rest[index + 1];
+					const next = resolveArgs[index + 1];
 					if (!next) {
 						throw new Error("Missing value for --inject.");
 					}
@@ -359,6 +514,25 @@ export async function runRuleCommand(
 				options.required = true;
 			}
 			const result = resolveRulesWithDiagnostics(projectRoot, options);
+			if (jsonFlag) {
+				writeJson(
+					io,
+					"rule.resolve",
+					envelopeOk(
+						{
+							count: result.rules.length,
+							rules: result.rules.map((entry) => ({
+								id: entry.id,
+								name: entry.name,
+								path: entry.path,
+							})),
+							warnings: result.warnings,
+						},
+						{ action: "rule.resolve" },
+					),
+				);
+				return 0;
+			}
 			io.stdout(
 				[
 					`resolved rules: ${result.rules.length}`,
@@ -385,9 +559,28 @@ export async function runSkillCommand(
 ): Promise<number> {
 	try {
 		const [command = "list", ...rest] = args;
+		const { json, args: options } = parseJson(rest);
 		if (command === "list" || command === "ls") {
-			const verbose = parseVerboseListArgs(rest);
+			const verbose = parseVerboseListArgs(options);
 			const skills = listSkills(projectRoot);
+			if (json) {
+				writeJson(
+					io,
+					"skill.list",
+					envelopeOk(
+						{
+							count: skills.length,
+							skills: skills.map((entry) => ({
+								name: entry.name,
+								path: entry.path,
+								description: entry.description ?? undefined,
+							})),
+						},
+						{ action: "skill.list" },
+					),
+				);
+				return 0;
+			}
 			io.stdout(
 				[
 					`skills: ${skills.length}${verbose ? "" : " (use skill show <name> or skill list --verbose for descriptions)"}`,
@@ -397,14 +590,40 @@ export async function runSkillCommand(
 			return 0;
 		}
 		if (command === "show" || command === "get") {
-			const identifier = rest[0];
+			const identifier = options[0];
 			if (!identifier) {
 				throw new Error("Missing skill name for skill show.");
 			}
 			const skill = findSkill(projectRoot, identifier);
 			if (!skill) {
+				if (json) {
+					writeJson(
+						io,
+						"skill.show",
+						envelopeErr("skill-not-found", `Skill not found: ${identifier}`, {
+							action: "skill.show",
+							exitCode: 1,
+						}),
+					);
+					return 1;
+				}
 				io.stderr(`Skill not found: ${identifier}`);
 				return 1;
+			}
+			if (json) {
+				writeJson(
+					io,
+					"skill.show",
+					envelopeOk(
+						{
+							name: skill.name,
+							path: skill.path,
+							description: skill.description ?? "none",
+						},
+						{ action: "skill.show" },
+					),
+				);
+				return 0;
 			}
 			io.stdout(
 				[
@@ -416,11 +635,29 @@ export async function runSkillCommand(
 			return 0;
 		}
 		if (command === "search") {
-			const query = rest.join(" ").trim();
+			const query = options.join(" ").trim();
 			if (!query) {
 				throw new Error("Missing query for skill search.");
 			}
 			const matches = searchSkills(projectRoot, query);
+			if (json) {
+				writeJson(
+					io,
+					"skill.search",
+					envelopeOk(
+						{
+							query,
+							count: matches.length,
+							skills: matches.map((entry) => ({
+								name: entry.name,
+								path: entry.path,
+							})),
+						},
+						{ action: "skill.search" },
+					),
+				);
+				return 0;
+			}
 			io.stdout(
 				[`skill matches: ${matches.length}`, ...matches.map(formatSkill)].join(
 					"\n",

@@ -57,6 +57,8 @@ import {
 	formatCatalogJson,
 	formatCommandHelp,
 	formatHelpText,
+	type HelpIntent,
+	isHelpIntent,
 } from "./help";
 import { kernelRegistry } from "./registry";
 import { resolveCommand } from "./router";
@@ -83,6 +85,8 @@ const START_COMMAND_HELP = [
 	"  --session <session-id>  Workbench session to start from",
 	"  --task-id <task-id>    Task identifier to mark in progress",
 	"  --json                 Emit machine-readable start result",
+	"  --brief                Emit concise start briefing",
+	"  --brief full           Emit full start briefing",
 	"  --compact              Emit compact human output",
 ].join("\n");
 
@@ -174,6 +178,42 @@ function subcommandGroupHelpCommand(
 	return registryHelpCommandForGroup(resolution.group);
 }
 
+function parseHelpArgs(args: readonly string[]): {
+	remaining: string[];
+	intent?: HelpIntent;
+	error?: string;
+} {
+	const remaining: string[] = [];
+	let intent: HelpIntent | undefined;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (!arg) {
+			continue;
+		}
+		if (arg !== "--for") {
+			remaining.push(arg);
+			continue;
+		}
+		const value = args[index + 1];
+		if (!value) {
+			return {
+				remaining,
+				error:
+					'err missing-help-intent hint="use planning, execution, or maintenance"',
+			};
+		}
+		if (!isHelpIntent(value)) {
+			return {
+				remaining,
+				error: `err unknown-help-intent intent=${value} hint="use planning, execution, or maintenance"`,
+			};
+		}
+		intent = value;
+		index += 1;
+	}
+	return intent ? { remaining, intent } : { remaining };
+}
+
 export async function main(argv: string[]): Promise<number> {
 	let args = argv.slice(2);
 
@@ -195,17 +235,23 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (args[0] === "help") {
-		const jsonRequested = args.some((arg) => kernelRegistry.isJsonAlias(arg));
+		const parsedHelp = parseHelpArgs(args.slice(1));
+		if (parsedHelp.error) {
+			console.error(parsedHelp.error);
+			return 2;
+		}
+		const helpArgs = parsedHelp.remaining;
+		const jsonRequested = helpArgs.some((arg) =>
+			kernelRegistry.isJsonAlias(arg),
+		);
 		const helpTarget =
-			args
-				.slice(1)
-				.find(
-					(arg) =>
-						!kernelRegistry.isJsonAlias(arg) &&
-						!isVerboseHelpArg(arg) &&
-						!kernelRegistry.isHelpAlias(arg),
-				) ?? "";
-		const verboseRequested = args.some(isVerboseHelpArg);
+			helpArgs.find(
+				(arg) =>
+					!kernelRegistry.isJsonAlias(arg) &&
+					!isVerboseHelpArg(arg) &&
+					!kernelRegistry.isHelpAlias(arg),
+			) ?? "";
+		const verboseRequested = helpArgs.some(isVerboseHelpArg);
 		if (jsonRequested) {
 			if (helpTarget && !kernelRegistry.isJsonAlias(helpTarget)) {
 				const help = buildCommandHelpJson(helpTarget, kernelRegistry);
@@ -218,12 +264,20 @@ export async function main(argv: string[]): Promise<number> {
 				);
 				return 2;
 			}
-			console.log(formatCatalogJson(kernelRegistry));
+			console.log(
+				formatCatalogJson(
+					kernelRegistry,
+					parsedHelp.intent ? { intent: parsedHelp.intent } : {},
+				),
+			);
 			return 0;
 		}
 		if (!helpTarget) {
 			console.log(
-				formatHelpText(kernelRegistry, { verbose: verboseRequested }),
+				formatHelpText(kernelRegistry, {
+					verbose: verboseRequested,
+					...(parsedHelp.intent ? { intent: parsedHelp.intent } : {}),
+				}),
 			);
 			return 0;
 		}
@@ -386,7 +440,12 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "localState") {
-		return runLocalStateCommand(resolution.args, project.value.root);
+		return runLocalStateCommand(
+			resolution.args,
+			project.value.root,
+			undefined,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "catchup") {
@@ -522,6 +581,8 @@ export async function main(argv: string[]): Promise<number> {
 				resolution.action,
 				resolution.args,
 				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "library") {

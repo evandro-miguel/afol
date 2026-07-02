@@ -21,6 +21,7 @@ const TASK_ROW_RE =
 	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
 const BLOCKING_STATES = new Set(["pending", "in_progress", "problem"]);
 const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
+const NEW_SESSION_LOCK_SESSION = "__workbench-new-session__";
 
 export type WorkbenchTaskRef = {
 	session: string;
@@ -116,6 +117,10 @@ function twoDigits(value: number): string {
 	return value.toString().padStart(2, "0");
 }
 
+function shortSessionSuffix(): string {
+	return randomBytes(2).toString("hex");
+}
+
 function buildSessionPrefix(now: Date): string {
 	const year = now.getFullYear() % 100;
 	const month = now.getMonth() + 1;
@@ -129,6 +134,13 @@ function uniqueSessionId(wbRoot: string, base: string): string {
 	if (!existsSync(join(wbRoot, base))) {
 		return base;
 	}
+	for (let i = 0; i < 32; i += 1) {
+		const candidate = `${base}_${shortSessionSuffix()}`;
+		if (!existsSync(join(wbRoot, candidate))) {
+			return candidate;
+		}
+	}
+
 	let counter = 2;
 	while (true) {
 		const candidate = `${base}_${twoDigits(counter)}`;
@@ -137,6 +149,24 @@ function uniqueSessionId(wbRoot: string, base: string): string {
 		}
 		counter += 1;
 	}
+}
+
+function evaluateCloseWarnings(session: string, sessionDir: string): string[] {
+	const warnings: string[] = [];
+	const reportPath = join(sessionDir, `${session}_report_01.md`);
+	const logPath = join(sessionDir, `${session}_log_01.md`);
+	if (!existsSync(reportPath)) {
+		warnings.push("final report artifact is missing");
+	}
+	if (!existsSync(logPath)) {
+		warnings.push("log artifact is missing");
+		return warnings;
+	}
+	const logContent = readFileSync(logPath, "utf8");
+	if (!/^##\s*Summary/m.test(logContent)) {
+		warnings.push("log summary section is missing");
+	}
+	return warnings;
 }
 
 function explicitTaskSummaries(metadata?: NewWorkstreamMetadata): string[] {
@@ -201,6 +231,27 @@ export function readActiveSession(root: string): string | null {
 	}
 	const active = readFileSync(activeSessionPath, "utf8").trim();
 	return active.length > 0 ? active : null;
+}
+
+export function assertTaskInProgress(
+	root: string,
+	session: string,
+	taskId: string,
+): void {
+	withSessionLock(root, session, () => {
+		const paths = sessionPaths(root, session);
+		if (!existsSync(paths.sessionDir)) {
+			throw new Error(`Session folder not found: ${paths.sessionDir}`);
+		}
+		const rows = readTaskRows(paths.taskPath);
+		const row = rows.find((entry) => entry.taskId === taskId);
+		if (!row) {
+			throw new Error(`Task ${taskId} not found in ${session}.`);
+		}
+		if (row.state !== "in_progress") {
+			throw new Error(`Task ${taskId} is ${row.state}, expected in_progress.`);
+		}
+	});
 }
 
 function parseTaskRow(line: string): TaskRow | null {
@@ -382,117 +433,121 @@ export function newWorkstream(
 	theme: string,
 	metadata?: NewWorkstreamMetadata,
 ): NewWorkstreamResult {
-	const wbRoot = resolveProjectPaths(root).abs.wbDir;
-	mkdirSync(wbRoot, { recursive: true });
+	return withSessionLock(root, NEW_SESSION_LOCK_SESSION, () => {
+		const wbRoot = resolveProjectPaths(root).abs.wbDir;
+		mkdirSync(wbRoot, { recursive: true });
 
-	const baseSession = `${buildSessionPrefix(new Date())}_${sanitizeTheme(theme)}`;
-	const session = uniqueSessionId(wbRoot, baseSession);
-	const paths = sessionPaths(root, session);
-	mkdirSync(paths.sessionDir, { recursive: true });
+		const baseSession = `${buildSessionPrefix(new Date())}_${sanitizeTheme(
+			theme,
+		)}`;
+		const session = uniqueSessionId(wbRoot, baseSession);
+		const paths = sessionPaths(root, session);
+		mkdirSync(paths.sessionDir, { recursive: true });
 
-	const metadataLines: string[] = [];
-	if (metadata?.intent) {
-		metadataLines.push(`- intent: ${metadata.intent}`);
-	}
-	if (metadata?.featureId) {
-		metadataLines.push(`- feature_id: ${metadata.featureId}`);
-	}
-	if (metadata?.parentSpec) {
-		metadataLines.push(`- parent_spec: ${metadata.parentSpec}`);
-	}
-	for (const task of explicitTaskSummaries(metadata)) {
-		metadataLines.push(`- task: ${task}`);
-	}
-	const metadataSection =
-		metadataLines.length > 0
-			? ["", "## Native command metadata", ...metadataLines]
-			: [];
-	const taskSummaries = taskSummariesFromMetadata(metadata);
-	const planTaskLines = taskSummaries.map(
-		(task, index) => `- T-${twoDigits(index + 1)}: ${task}`,
-	);
-	const stateBoardRows = taskSummaries.map(
-		(task, index) =>
-			`| T-${twoDigits(index + 1)} | pending | worker | ${escapeTaskNote(task)} |`,
-	);
+		const metadataLines: string[] = [];
+		if (metadata?.intent) {
+			metadataLines.push(`- intent: ${metadata.intent}`);
+		}
+		if (metadata?.featureId) {
+			metadataLines.push(`- feature_id: ${metadata.featureId}`);
+		}
+		if (metadata?.parentSpec) {
+			metadataLines.push(`- parent_spec: ${metadata.parentSpec}`);
+		}
+		for (const task of explicitTaskSummaries(metadata)) {
+			metadataLines.push(`- task: ${task}`);
+		}
+		const metadataSection =
+			metadataLines.length > 0
+				? ["", "## Native command metadata", ...metadataLines]
+				: [];
+		const taskSummaries = taskSummariesFromMetadata(metadata);
+		const planTaskLines = taskSummaries.map(
+			(task, index) => `- T-${twoDigits(index + 1)}: ${task}`,
+		);
+		const stateBoardRows = taskSummaries.map(
+			(task, index) =>
+				`| T-${twoDigits(index + 1)} | pending | worker | ${escapeTaskNote(task)} |`,
+		);
 
-	atomicWriteText(
-		paths.planPath,
-		[
-			`# Plan: ${theme.trim()}`,
-			"",
-			"- Created by native CLI workbench lifecycle.",
-			...metadataSection,
-			"",
-			"## Execution Plan",
-			"",
-			...planTaskLines,
-			"- Keep edits scoped to the task and repository rules.",
-			"- Record evidence before marking the task done.",
-			"",
-			"## Validation",
-			"",
-			"- Run the command named in the task or governing brief.",
-			"- Capture the validation result in the evidence ledger.",
-			"",
-			"## Closure Criteria",
-			"",
-			"- Every task is marked done only after passed evidence exists.",
-			"- Delivery notes identify the changed files and verification result.",
-			"",
-		].join("\n"),
-	);
-	atomicWriteText(
-		paths.taskPath,
-		[
-			`# Tasks: ${theme.trim()}`,
-			"",
-			"## State Board",
-			"",
-			"| Task | State | Owner | Notes |",
-			"|------|-------|-------|-------|",
-			...stateBoardRows,
-			"",
-		].join("\n"),
-	);
-	atomicWriteText(
-		paths.logPath,
-		[
-			"# Log",
-			"",
-			"## Timeline",
-			"",
-			`- ${new Date().toISOString()} - session created ${session}`,
-			"",
-		].join("\n"),
-	);
-	atomicWriteText(paths.evidencePath, "");
-	mkdirSync(dirname(paths.activeSessionPath), { recursive: true });
-	atomicWriteText(paths.activeSessionPath, `${session}\n`);
-	appendWorkbenchEvent(root, {
-		type: "workbench.new",
-		session,
-		detail: {
-			theme: theme.trim(),
-		},
+		atomicWriteText(
+			paths.planPath,
+			[
+				`# Plan: ${theme.trim()}`,
+				"",
+				"- Created by native CLI workbench lifecycle.",
+				...metadataSection,
+				"",
+				"## Execution Plan",
+				"",
+				...planTaskLines,
+				"- Keep edits scoped to the task and repository rules.",
+				"- Record evidence before marking the task done.",
+				"",
+				"## Validation",
+				"",
+				"- Run the command named in the task or governing brief.",
+				"- Capture the validation result in the evidence ledger.",
+				"",
+				"## Closure Criteria",
+				"",
+				"- Every task is marked done only after passed evidence exists.",
+				"- Delivery notes identify the changed files and verification result.",
+				"",
+			].join("\n"),
+		);
+		atomicWriteText(
+			paths.taskPath,
+			[
+				`# Tasks: ${theme.trim()}`,
+				"",
+				"## State Board",
+				"",
+				"| Task | State | Owner | Notes |",
+				"|------|-------|-------|-------|",
+				...stateBoardRows,
+				"",
+			].join("\n"),
+		);
+		atomicWriteText(
+			paths.logPath,
+			[
+				"# Log",
+				"",
+				"## Timeline",
+				"",
+				`- ${new Date().toISOString()} - session created ${session}`,
+				"",
+			].join("\n"),
+		);
+		atomicWriteText(paths.evidencePath, "");
+		mkdirSync(dirname(paths.activeSessionPath), { recursive: true });
+		atomicWriteText(paths.activeSessionPath, `${session}\n`);
+		appendWorkbenchEvent(root, {
+			type: "workbench.new",
+			session,
+			detail: {
+				theme: theme.trim(),
+			},
+		});
+		appendTelemetryEvent(root, {
+			event_type: "session_start",
+			session_id: session,
+			cmd_type: "new",
+			outcome: "success",
+		});
+		refreshWorkbenchLocalState(root, session);
+
+		return {
+			session,
+			sessionDir: paths.sessionDir,
+			planPath: paths.planPath,
+			taskPath: paths.taskPath,
+			logPath: paths.logPath,
+			evidencePath: paths.evidencePath,
+			activeSessionPath: paths.activeSessionPath,
+		};
 	});
-	appendTelemetryEvent(root, {
-		event_type: "session_start",
-		session_id: session,
-		cmd_type: "new",
-		outcome: "success",
-	});
-	refreshWorkbenchLocalState(root, session);
-
-	return {
-		session,
-		sessionDir: paths.sessionDir,
-		planPath: paths.planPath,
-		taskPath: paths.taskPath,
-		logPath: paths.logPath,
-		evidencePath: paths.evidencePath,
-		activeSessionPath: paths.activeSessionPath,
-	};
 }
 
 export function startTask(root: string, input: WorkbenchTaskRef): void {
@@ -623,8 +678,8 @@ export function doneTask(root: string, input: WorkbenchTaskRef): void {
 	});
 }
 
-export function closeSession(root: string, session: string): void {
-	withSessionLock(root, session, () => {
+export function closeSession(root: string, session: string): string[] {
+	return withSessionLock(root, session, () => {
 		const paths = sessionPaths(root, session);
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${session}`);
@@ -665,5 +720,6 @@ export function closeSession(root: string, session: string): void {
 			outcome: "success",
 		});
 		refreshWorkbenchLocalState(root, session);
+		return evaluateCloseWarnings(session, paths.sessionDir);
 	});
 }

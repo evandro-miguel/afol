@@ -121,6 +121,8 @@ export function parseSessionTaskArgs(
 	let taskId = "";
 	let json = false;
 	let compact = false;
+	let brief = false;
+	let briefMode: "compact" | "full" | null = null;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
@@ -129,6 +131,17 @@ export function parseSessionTaskArgs(
 		}
 		if (arg === "--compact") {
 			compact = true;
+			continue;
+		}
+		if (arg === "--brief") {
+			const next = args[i + 1];
+			if (next === "full") {
+				briefMode = "full";
+				i += 1;
+			} else {
+				briefMode = "compact";
+			}
+			brief = true;
 			continue;
 		}
 		if (arg === "--session") {
@@ -162,7 +175,7 @@ export function parseSessionTaskArgs(
 	if (!taskId) {
 		throw new Error(`Missing --task-id for ${commandName}.`);
 	}
-	return { session: resolvedSession, taskId, json, compact };
+	return { session: resolvedSession, taskId, json, compact, brief, briefMode };
 }
 
 export function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
@@ -172,11 +185,13 @@ export function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
 	let result = "";
 	let artifact = "";
 	let note = "";
+	let json = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		const value = args[i + 1];
 		if (arg === "--json" || arg === "-j") {
-			throw new Error("JSON output is not supported for evidence.");
+			json = true;
+			continue;
 		}
 		if (arg === "--session") {
 			if (!value) {
@@ -248,6 +263,7 @@ export function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
 		taskId,
 		command,
 		result,
+		json,
 		...(artifact ? { artifact } : {}),
 		...(note ? { note } : {}),
 	};
@@ -257,6 +273,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	let session = "";
 	let taskId = "";
 	let testCommand: string | null = null;
+	let testShellCommand: string | null = null;
 	let evidenceCommand: string | null = null;
 	let evidenceResult: string | null = null;
 	let requireSpecCheck = false;
@@ -290,7 +307,21 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 			if (!value) {
 				throw new Error("Missing value for --test in done.");
 			}
+			if (testShellCommand) {
+				throw new Error("Cannot use both --test and --test-shell in done.");
+			}
 			testCommand = value;
+			i += 1;
+			continue;
+		}
+		if (arg === "--test-shell") {
+			if (!value) {
+				throw new Error("Missing value for --test-shell in done.");
+			}
+			if (testCommand) {
+				throw new Error("Cannot use both --test and --test-shell in done.");
+			}
+			testShellCommand = value;
 			i += 1;
 			continue;
 		}
@@ -351,6 +382,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		session: resolveSession(root, session, "done"),
 		taskId,
 		testCommand,
+		testShellCommand,
 		evidenceCommand,
 		evidenceResult,
 		...(artifact ? { artifact } : {}),

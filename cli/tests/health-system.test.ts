@@ -432,6 +432,8 @@ describe("health system", () => {
 				warn: expect.any(Number),
 				info: expect.any(Number),
 			});
+			expect(payload.scope).toBe("release");
+			expect(payload.checked_areas).toContain("pstr");
 			expect(payload.release).toBe(true);
 			expect(payload.data.checked_at).toBe(payload.checked_at);
 		} finally {
@@ -452,6 +454,7 @@ describe("health system", () => {
 			expect(Array.isArray(payload.scores)).toBe(true);
 			expect(Array.isArray(payload.remediation)).toBe(true);
 			expect(payload.remediation_plan).toBe(false);
+			expect(payload.scope).toBe("full");
 			expect(payload.data.scores).toHaveLength(payload.scores.length);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -838,6 +841,68 @@ describe("health system", () => {
 		}
 	});
 
+	test("legacy reference scan skips files with allowlist frontmatter", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(
+				join(root, "docs", "migration-notes.md"),
+				[
+					"---",
+					"legacy_reference_allowed: true",
+					"---",
+					"legacy: .agents/wb is documented here on purpose.",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(root, "docs", "migration-warning.md"),
+				"legacy:\n",
+				"utf8",
+			);
+			const result = scanLegacyReferences(root);
+
+			expect(result.files).toContain("docs/migration-warning.md");
+			expect(result.files).not.toContain("docs/migration-notes.md");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("legacy reference scan skips gotchas/migration/retirement docs by filename", () => {
+		const root = createFixture();
+		try {
+			writeFileSync(join(root, "docs", "gotchas.md"), "legacy:\n", "utf8");
+			writeFileSync(
+				join(root, "docs", "migration.md"),
+				".agents/runtime is retired.",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, "docs", "retirement.md"),
+				".agents/scripts was moved.",
+				"utf8",
+			);
+			writeFileSync(
+				join(root, "docs", "migration-guide.md"),
+				"agents.config should be removed.",
+				"utf8",
+			);
+
+			const result = scanLegacyReferences(root);
+
+			expect(result.files).toEqual(
+				expect.not.arrayContaining([
+					"docs/gotchas.md",
+					"docs/migration.md",
+					"docs/retirement.md",
+				]),
+			);
+			expect(result.files).toContain("docs/migration-guide.md");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("legacy reference scan reports unreadable files instead of hiding them", () => {
 		const root = createFixture();
 		const unreadablePath = join(root, "docs", "unreadable.md");
@@ -873,7 +938,8 @@ describe("health system", () => {
 			rebuildWorkBenchIndex(root);
 			const captured = captureIo();
 			expect(await runHealthCommand([], root, captured.io)).toBe(0);
-			expect(captured.stdout.join("\n")).toContain("health: ok");
+			expect(captured.stdout.join("\n")).toContain("health core: ok");
+			expect(captured.stdout.join("\n")).toContain("checked: wb only");
 			expect(captured.stdout.join("\n")).not.toContain("pstr");
 			expect(captured.stdout.join("\n")).not.toContain("memory");
 		} finally {
@@ -881,14 +947,21 @@ describe("health system", () => {
 		}
 	});
 
-	test("afol health default run still checks non-wb areas", async () => {
+	test("afol health default run stays core-only when auxiliary state exists", async () => {
 		const root = createFixture();
 		try {
 			seedHealthyRoot(root);
 			writePstrIndex(root, hoursAgo(24 * 45));
 			const captured = captureIo();
-			expect(await runHealthCommand([], root, captured.io)).toBe(1);
-			expect(captured.stdout.join("\n")).toContain("FAIL pstr: stale pstr map");
+			expect(await runHealthCommand([], root, captured.io)).toBe(0);
+			expect(captured.stdout.join("\n")).toContain("health core: ok");
+			expect(captured.stdout.join("\n")).toContain("checked: wb only");
+			expect(captured.stdout.join("\n")).not.toContain("FAIL pstr");
+
+			const full = captureIo();
+			expect(await runHealthCommand(["full"], root, full.io)).toBe(1);
+			expect(full.stdout.join("\n")).toContain("health full: issues found");
+			expect(full.stdout.join("\n")).toContain("FAIL pstr: stale pstr map");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -905,6 +978,8 @@ describe("health system", () => {
 			expect(payload.exit_code).toBe(0);
 			expect(payload.ok).toBe(true);
 			expect(payload.summary).toEqual({ fail: 0, warn: 0, info: 0 });
+			expect(payload.scope).toBe("core");
+			expect(payload.checked_areas).toEqual(["wb"]);
 			expect(payload.release).toBe(false);
 			expect(payload.data.summary).toEqual({ fail: 0, warn: 0, info: 0 });
 		} finally {
@@ -960,6 +1035,7 @@ describe("health system", () => {
 			writePstrIndex(root, hoursAgo(24 * 45));
 			const captured = captureIo();
 			expect(await runDoctorCommand([], root, captured.io)).toBe(0);
+			expect(captured.stdout.join("\n")).toContain("doctor scope: full");
 			expect(captured.stdout.join("\n")).toContain("doctor scores:");
 			expect(captured.stdout.join("\n")).toContain("pstr:");
 			expect(captured.stdout.join("\n")).toContain(
@@ -978,6 +1054,7 @@ describe("health system", () => {
 			expect(
 				await runDoctorCommand(["--remediation-plan"], root, captured.io),
 			).toBe(0);
+			expect(captured.stdout.join("\n")).toContain("doctor scope: full");
 			expect(captured.stdout.join("\n")).toContain("doctor remediation plan:");
 		} finally {
 			rmSync(root, { recursive: true, force: true });

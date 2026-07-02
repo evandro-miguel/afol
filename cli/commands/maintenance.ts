@@ -141,8 +141,10 @@ export async function runMaintenanceCommand(
 									ok: true,
 									mode: parsed.mode,
 									area: result.area,
+									dry_run: parsed.dryRun,
 									reviewed_areas: result.reviewed_areas,
-									dry_run: result.dry_run,
+									preview: result.preview,
+									applied: result.applied,
 									recorded_at: result.recorded_at,
 									note: result.note,
 									review_interval_days: result.summary.review_interval_days,
@@ -155,8 +157,10 @@ export async function runMaintenanceCommand(
 								"ok",
 								"mode",
 								"area",
-								"reviewed_areas",
 								"dry_run",
+								"reviewed_areas",
+								"preview",
+								"applied",
 								"recorded_at",
 								"note",
 								"review_interval_days",
@@ -168,7 +172,7 @@ export async function runMaintenanceCommand(
 			} else {
 				io.stdout(
 					[
-						`maintenance review recorded${parsed.dryRun ? " (dry-run)" : ""}: ${result.reviewed_areas.join(", ")}`,
+						`maintenance review ${parsed.dryRun ? "preview" : "recorded"}: ${result.reviewed_areas.join(", ")}`,
 						`  due next: ${result.summary.due_areas.join(", ") || "none"}`,
 					].join("\n"),
 				);

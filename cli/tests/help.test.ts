@@ -57,6 +57,27 @@ describe("help formatter", () => {
 		);
 	});
 
+	test("formats intent-filtered help", () => {
+		const planning = formatHelpText(kernelRegistry, { intent: "planning" });
+		const execution = formatHelpText(kernelRegistry, { intent: "execution" });
+		const maintenance = formatHelpText(kernelRegistry, {
+			intent: "maintenance",
+		});
+
+		expect(planning).toContain("Commands for planning");
+		expect(planning).toContain("pf/preflight");
+		expect(planning).toContain("pb/project-benchmark");
+		expect(planning).not.toContain("qt/quick-task");
+		expect(execution).toContain("Commands for execution");
+		expect(execution).toContain("n/new");
+		expect(execution).toContain("qt/quick-task");
+		expect(execution).not.toContain("ma/maintenance");
+		expect(maintenance).toContain("Commands for maintenance");
+		expect(maintenance).toContain("ht/health");
+		expect(maintenance).toContain("mt/maintenance");
+		expect(maintenance).not.toContain("n/new");
+	});
+
 	test("lists every top-level command with a short compact description", () => {
 		const help = formatHelpText(kernelRegistry);
 
@@ -72,7 +93,7 @@ describe("help formatter", () => {
 		const lines = help.split("\n");
 
 		expect(lines.length).toBeGreaterThan(formatHelpText().split("\n").length);
-		expect(lines.length).toBeLessThanOrEqual(330);
+		expect(lines.length).toBeLessThanOrEqual(360);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);
@@ -167,6 +188,31 @@ describe("help formatter", () => {
 				expect(result.stderr).toBe("");
 				expect(result.stdout).toContain("Usage: afol");
 			}
+			const intentResult = spawnSync(
+				"bun",
+				[cliPath, "help", "--for", "planning"],
+				{
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				},
+			);
+			expect(intentResult.status).toBe(0);
+			expect(intentResult.stderr).toBe("");
+			expect(intentResult.stdout).toContain("Commands for planning");
+			expect(intentResult.stdout).toContain("pf/preflight");
+
+			const invalidIntent = spawnSync(
+				"bun",
+				[cliPath, "help", "--for", "unknown"],
+				{
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				},
+			);
+			expect(invalidIntent.status).toBe(2);
+			expect(invalidIntent.stderr).toContain("err unknown-help-intent");
 			expect(existsSync(join(tempRoot, ".afol"))).toBe(false);
 		} finally {
 			rmSync(tempRoot, { recursive: true, force: true });
@@ -366,6 +412,17 @@ describe("help formatter", () => {
 		).toBe(true);
 	});
 
+	test("builds intent-filtered catalog json", () => {
+		const parsed = JSON.parse(
+			formatCatalogJson(kernelRegistry, { intent: "maintenance" }),
+		) as Array<{ command: string }>;
+		const commands = parsed.map((entry) => entry.command);
+
+		expect(commands).toContain("maintenance");
+		expect(commands).toContain("health");
+		expect(commands).not.toContain("new");
+	});
+
 	test("builds single command json from registry metadata", () => {
 		const help = buildCommandHelpJson("status", kernelRegistry);
 		expect(help).not.toBeNull();
@@ -383,9 +440,19 @@ describe("help formatter", () => {
 					description: "Emit machine-readable project status",
 				},
 				{
+					usage: "--health",
+					sideEffect: "read",
+					description: "Include global health findings",
+				},
+				{
 					usage: "--session <session-id>",
 					sideEffect: "read",
 					description: "Resolve status around a specific session",
+				},
+				{
+					usage: "--task-id <task-id>",
+					sideEffect: "read",
+					description: "Resolve a specific task in the selected session",
 				},
 			],
 		});

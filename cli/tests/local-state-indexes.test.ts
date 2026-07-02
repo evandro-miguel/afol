@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runLocalStateCommand } from "../commands/local-state";
+import { agentOperationContext } from "../core/operation-context";
 import {
 	buildCoordinationRadar,
 	type CoordinationWarningId,
@@ -1091,6 +1092,36 @@ describe("local-state project indexer", () => {
 			expect(stdout.at(-1)).toContain("local-state freshness: ok");
 			expect(stdout.at(-1)).toContain("ok workbench");
 			expect(stderr).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("local-state rebuild --json is denied in restricted context", async () => {
+		const root = buildFixture();
+		try {
+			const stdout: string[] = [];
+			const io = {
+				stdout: (message: string) => stdout.push(message),
+				stderr: () => undefined,
+			};
+
+			expect(
+				await runLocalStateCommand(
+					["rebuild", "--json"],
+					root,
+					io,
+					agentOperationContext(),
+				),
+			).toBe(2);
+			const payload = JSON.parse(stdout.at(-1) ?? "{}") as {
+				ok: boolean;
+				action: string;
+				error: { code: string };
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.action).toBe("local-state.rebuild");
+			expect(payload.error.code).toBe("approval-required");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

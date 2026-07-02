@@ -95,10 +95,31 @@ export async function runStartCommand(
 			allowAutoTask: true,
 		});
 		startTask(root, parsed);
-		if (parsed.compact && !parsed.json) {
+		if (parsed.compact && !parsed.brief && !parsed.json) {
 			console.log(`task started: ${parsed.taskId}`);
 			return 0;
 		}
+		if (!parsed.brief) {
+			if (!parsed.json) {
+				console.log(`task started: ${parsed.taskId}`);
+			}
+			if (parsed.json) {
+				console.log(
+					stringifyEnvelope(
+						envelopeOk(
+							{
+								session: parsed.session,
+								task: parsed.taskId,
+								status: "in_progress",
+							},
+							{ action: "workbench.start" },
+						),
+					),
+				);
+			}
+			return 0;
+		}
+
 		let briefing:
 			| ReturnType<typeof buildStartBriefing>
 			| ReturnType<typeof briefingUnavailable>;
@@ -125,6 +146,8 @@ export async function runStartCommand(
 			const lines = [`task started: ${parsed.taskId}`];
 			if (isStartBriefingUnavailable(briefing)) {
 				lines.push(`briefing: briefing_unavailable reason=${briefing.reason}`);
+			} else if (parsed.briefMode === "full") {
+				lines.push(JSON.stringify(briefing, null, 2));
 			} else {
 				lines.push(...formatStartBriefing(briefing));
 			}
@@ -148,11 +171,32 @@ export async function runEvidenceCommand(
 ): Promise<number> {
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.evidence");
-		const record = recordEvidence(root, parseEvidenceArgs(args, root));
-		console.log(`evidence recorded: ${record.id}`);
+		const parsed = parseEvidenceArgs(args, root);
+		const record = recordEvidence(root, parsed);
+		if (parsed.json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(
+						{
+							evidence_id: record.id,
+							session: parsed.session,
+							task: parsed.taskId,
+							result: record.result,
+						},
+						{ action: "workbench.evidence" },
+					),
+				),
+			);
+		} else {
+			console.log(`evidence recorded: ${record.id}`);
+		}
 		return 0;
 	} catch (error) {
-		console.error((error as Error).message);
+		if (hasJsonFlag(args)) {
+			writeJsonError("workbench.evidence", error);
+		} else {
+			console.error((error as Error).message);
+		}
 		return 2;
 	}
 }
@@ -189,7 +233,9 @@ export async function runDoneCommand(
 			}
 		}
 		if (parsed.testCommand) {
-			const verification = runVerification(root, parsed.testCommand);
+			const verification = runVerification(root, parsed.testCommand, {
+				shell: false,
+			});
 			recordEvidence(root, {
 				session: parsed.session,
 				taskId: parsed.taskId,
@@ -209,6 +255,36 @@ export async function runDoneCommand(
 				} else {
 					console.error(
 						`--test failed with exit code ${verification.exitCode}`,
+					);
+				}
+				return 1;
+			}
+		}
+		if (parsed.testShellCommand) {
+			const verification = runVerification(root, parsed.testShellCommand, {
+				shell: true,
+			});
+			recordEvidence(root, {
+				session: parsed.session,
+				taskId: parsed.taskId,
+				command: parsed.testShellCommand,
+				result: verification.exitCode === 0 ? "passed" : "failed",
+				exitCode: verification.exitCode,
+				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
+				...(parsed.note ? { note: parsed.note } : {}),
+			});
+			if (verification.exitCode !== 0) {
+				if (parsed.json) {
+					writeJsonError(
+						"workbench.done",
+						new Error(
+							`--test-shell failed with exit code ${verification.exitCode}`,
+						),
+						1,
+					);
+				} else {
+					console.error(
+						`--test-shell failed with exit code ${verification.exitCode}`,
 					);
 				}
 				return 1;
@@ -346,18 +422,24 @@ export async function runCloseCommand(
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.close");
 		const parsed = parseSessionOnlyArgs(args, "close", root);
-		closeSession(root, parsed.session);
+		const closeWarnings = closeSession(root, parsed.session);
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
 					envelopeOk(
 						{ session: parsed.session, status: "closed" },
-						{ action: "workbench.close" },
+						{
+							action: "workbench.close",
+							...(closeWarnings.length > 0 ? { warnings: closeWarnings } : {}),
+						},
 					),
 				),
 			);
 		} else {
 			console.log(`session closed: ${parsed.session}`);
+			for (const warning of closeWarnings) {
+				console.warn(`warning: ${warning}`);
+			}
 		}
 		return 0;
 	} catch (error) {

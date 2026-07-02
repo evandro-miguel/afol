@@ -64,6 +64,57 @@ const COMPACT_DESCRIPTIONS: Record<string, string> = {
 	adapter: "manage adapters",
 };
 
+export type HelpIntent = "planning" | "execution" | "maintenance";
+
+const HELP_INTENT_COMMANDS: Record<HelpIntent, readonly string[]> = {
+	planning: [
+		"status",
+		"preflight",
+		"ctx",
+		"pstr",
+		"spec",
+		"adr",
+		"changelog",
+		"project-benchmark",
+		"library",
+		"memory",
+		"rule",
+		"skill",
+		"hook",
+	],
+	execution: [
+		"new",
+		"start",
+		"evidence",
+		"done",
+		"log",
+		"close",
+		"quick-task",
+		"verify-tasks",
+		"file",
+		"validate",
+		"session",
+	],
+	maintenance: [
+		"health",
+		"doctor",
+		"maintenance",
+		"local-state",
+		"validate",
+		"bench",
+		"sweep",
+		"update",
+		"schema",
+		"telemetry",
+	],
+};
+
+export function isHelpIntent(value: string): value is HelpIntent {
+	return (
+		value === "planning" || value === "execution" || value === "maintenance"
+	);
+}
+
 function formatCommandName(spec: CommandSpec): string {
 	const alias = spec.aliases[0];
 	return alias ? `${alias}/${spec.command}` : spec.command;
@@ -110,28 +161,50 @@ export type CommandCatalogEntry = {
 	subcommands?: CommandSubcommandSpec[];
 };
 
-export function buildCommandCatalog(
-	registry = kernelRegistry,
-): CommandCatalogEntry[] {
-	return registry.commands.map((spec) => {
-		const entry: CommandCatalogEntry = {
-			command: spec.command,
-			aliases: [...spec.aliases],
-			kind: spec.kind,
-			sideEffect: spec.sideEffect,
-			description: spec.description,
-			category: spec.category ?? "uncategorized",
-		};
-		const subcommands = spec.subcommands?.map((entry) => ({ ...entry }));
-		if (subcommands !== undefined) {
-			entry.subcommands = subcommands;
-		}
-		return entry;
-	});
+type HelpFormatOptions = {
+	verbose?: boolean;
+	intent?: HelpIntent;
+};
+
+function filterCommandsByIntent(
+	commands: readonly CommandSpec[],
+	intent?: HelpIntent,
+): readonly CommandSpec[] {
+	if (!intent) {
+		return commands;
+	}
+	const allowed = new Set(HELP_INTENT_COMMANDS[intent]);
+	return commands.filter((spec) => allowed.has(spec.command));
 }
 
-export function formatCatalogJson(registry = kernelRegistry): string {
-	return `${JSON.stringify(buildCommandCatalog(registry), null, 2)}\n`;
+export function buildCommandCatalog(
+	registry = kernelRegistry,
+	options: { intent?: HelpIntent } = {},
+): CommandCatalogEntry[] {
+	return filterCommandsByIntent(registry.commands, options.intent).map(
+		(spec) => {
+			const entry: CommandCatalogEntry = {
+				command: spec.command,
+				aliases: [...spec.aliases],
+				kind: spec.kind,
+				sideEffect: spec.sideEffect,
+				description: spec.description,
+				category: spec.category ?? "uncategorized",
+			};
+			const subcommands = spec.subcommands?.map((entry) => ({ ...entry }));
+			if (subcommands !== undefined) {
+				entry.subcommands = subcommands;
+			}
+			return entry;
+		},
+	);
+}
+
+export function formatCatalogJson(
+	registry = kernelRegistry,
+	options: { intent?: HelpIntent } = {},
+): string {
+	return `${JSON.stringify(buildCommandCatalog(registry, options), null, 2)}\n`;
 }
 
 export function buildCommandHelpJson(
@@ -195,7 +268,7 @@ export function formatCommandHelp(
 
 export function formatHelpText(
 	registry = kernelRegistry,
-	options: { verbose?: boolean } = {},
+	options: HelpFormatOptions = {},
 ): string {
 	const grouped = new Map<CommandCategory | "uncategorized", CommandSpec[]>();
 	for (const category of CATEGORY_ORDER) {
@@ -203,14 +276,23 @@ export function formatHelpText(
 	}
 	grouped.set("uncategorized", []);
 
-	for (const spec of registry.commands) {
+	for (const spec of filterCommandsByIntent(
+		registry.commands,
+		options.intent,
+	)) {
 		const bucket = spec.category ?? "uncategorized";
 		const entries = grouped.get(bucket) ?? [];
 		entries.push(spec);
 		grouped.set(bucket, entries);
 	}
 
-	const lines = ["Usage: afol [command] [options]", "", "Commands"];
+	const lines = [
+		options.intent
+			? `Usage: afol help --for ${options.intent}`
+			: "Usage: afol [command] [options]",
+		"",
+		options.intent ? `Commands for ${options.intent}` : "Commands",
+	];
 	for (const category of CATEGORY_ORDER) {
 		const entries = grouped.get(category);
 		if (!entries?.length) {
@@ -239,14 +321,13 @@ export function formatHelpText(
 		"",
 		"Flags",
 		"  -j, --json  JSON output when supported",
+		"  --for <intent>  Filter help: planning, execution, maintenance",
 		"  --verbose  Expanded human catalog with subcommands",
-		"Details",
 		"  afol help <command>",
 		"  afol help --verbose",
-		"Side effects",
-		"  read=no writes; generated=refreshes derived state; append=adds rows; write=changes files/state",
-		"Aliases",
 		"  a=afol",
+		"Side effects",
+		"  read=no writes; generated=derived; append=adds rows; write=changes files/state",
 	);
 	return lines.join("\n");
 }
