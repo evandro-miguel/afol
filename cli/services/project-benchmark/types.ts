@@ -82,6 +82,7 @@ export type ProjectBenchmarkPaths = {
 };
 
 export type ProjectBenchmarkCatalog = {
+	source: "project" | "builtin";
 	paths: ProjectBenchmarkPaths;
 	axes: ProjectBenchmarkAxesFile | null;
 	projects: Array<{

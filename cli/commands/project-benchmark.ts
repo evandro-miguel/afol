@@ -157,101 +157,6 @@ function findProjectByIdOrName(
 	);
 }
 
-function inferMissingSourceRefAxes(
-	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
-): ReturnType<typeof loadProjectBenchmarkCatalog> {
-	for (const entry of catalog.projects) {
-		const project = entry.project as Record<string, unknown>;
-		const sourceRefs = Array.isArray(project.source_refs)
-			? project.source_refs
-			: [];
-		const inferred = new Map<string, Set<string>>();
-		const addAxis = (sourceId: unknown, axisId: unknown): void => {
-			if (typeof sourceId !== "string" || typeof axisId !== "string") {
-				return;
-			}
-			const supportedAxes = inferred.get(sourceId) ?? new Set<string>();
-			supportedAxes.add(axisId);
-			inferred.set(sourceId, supportedAxes);
-		};
-
-		const similarityAxes =
-			project.similarity_axes &&
-			typeof project.similarity_axes === "object" &&
-			!Array.isArray(project.similarity_axes)
-				? (project.similarity_axes as Record<string, unknown>)
-				: {};
-		for (const [axisId, scoreValue] of Object.entries(similarityAxes)) {
-			const evidenceRefs =
-				scoreValue &&
-				typeof scoreValue === "object" &&
-				!Array.isArray(scoreValue)
-					? (scoreValue as { evidence_refs?: unknown }).evidence_refs
-					: [];
-			if (!Array.isArray(evidenceRefs)) {
-				continue;
-			}
-			for (const evidenceRef of evidenceRefs) {
-				addAxis(evidenceRef, axisId);
-			}
-		}
-
-		const similarities = Array.isArray(project.similarities)
-			? project.similarities
-			: [];
-		for (const similarityValue of similarities) {
-			if (
-				!similarityValue ||
-				typeof similarityValue !== "object" ||
-				Array.isArray(similarityValue)
-			) {
-				continue;
-			}
-			const similarity = similarityValue as {
-				axis?: unknown;
-				evidence_refs?: unknown;
-			};
-			if (!Array.isArray(similarity.evidence_refs)) {
-				continue;
-			}
-			for (const evidenceRef of similarity.evidence_refs) {
-				addAxis(evidenceRef, similarity.axis);
-			}
-		}
-
-		for (const sourceRefValue of sourceRefs) {
-			if (
-				!sourceRefValue ||
-				typeof sourceRefValue !== "object" ||
-				Array.isArray(sourceRefValue)
-			) {
-				continue;
-			}
-			const sourceRef = sourceRefValue as {
-				id?: unknown;
-				axes?: unknown;
-			};
-			if (
-				Array.isArray(sourceRef.axes) &&
-				sourceRef.axes.some(
-					(axis) => typeof axis === "string" && axis.length > 0,
-				)
-			) {
-				continue;
-			}
-			const inferredAxes = inferred.get(sourceRef.id as string);
-			if (!inferredAxes || inferredAxes.size === 0) {
-				continue;
-			}
-			sourceRef.axes = [...inferredAxes].sort((left, right) =>
-				left.localeCompare(right),
-			);
-		}
-	}
-
-	return catalog;
-}
-
 function requireValidCatalog(
 	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
 ): ProjectBenchmarkCatalogResolution {
@@ -281,20 +186,6 @@ function requireValidCatalog(
 		projects: projectList(catalog.projects.map((entry) => entry.project)),
 		validation,
 	};
-}
-
-function isProjectBenchmarkCatalogUnavailable(
-	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
-): boolean {
-	const codes = new Set(catalog.loadIssues.map((issue) => issue.code));
-	return (
-		catalog.axes === null &&
-		catalog.projects.length === 0 &&
-		catalog.loadIssues.length === 3 &&
-		codes.has("missing-axes") &&
-		codes.has("missing-schema") &&
-		codes.has("missing-projects-dir")
-	);
 }
 
 function writeValidationJson(
@@ -347,35 +238,6 @@ function writeGenerateJson(
 		};
 	}
 	io.stdout(stringifyEnvelope(envelope));
-}
-
-function writeUnavailableError(
-	io: CommandIo,
-	action: string,
-	projectRoot: string,
-	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>,
-	json: boolean,
-): void {
-	const message = "project-benchmark catalog is not installed in this repo";
-	if (json) {
-		writeActionError(
-			io,
-			action,
-			"project-benchmark-not-available",
-			message,
-			1,
-			{
-				catalog_dir: catalog.paths.admDir.replace(`${projectRoot}/`, ""),
-			},
-		);
-		return;
-	}
-	io.stderr(
-		`err project-benchmark-not-available catalog=${catalog.paths.admDir.replace(
-			`${projectRoot}/`,
-			"",
-		)}`,
-	);
 }
 
 function projectBenchmarkGenerateFailureData(
@@ -443,10 +305,7 @@ export async function runProjectBenchmarkCommand(
 	}
 
 	const rawCatalog = loadProjectBenchmarkCatalog(projectRoot);
-	if (isProjectBenchmarkCatalogUnavailable(rawCatalog)) {
-		writeUnavailableError(io, action, projectRoot, rawCatalog, parsed.json);
-		return 1;
-	}
+	const sourceCatalog = rawCatalog;
 
 	if (action === "validate") {
 		const validation = validateProjectBenchmarkCatalog(rawCatalog);
@@ -480,8 +339,6 @@ export async function runProjectBenchmarkCommand(
 		}
 		return ok ? 0 : 1;
 	}
-
-	const sourceCatalog = inferMissingSourceRefAxes(rawCatalog);
 
 	if (action === "generate") {
 		if (!parsed.check && requiresApproval(ctx)) {
@@ -669,32 +526,31 @@ export async function runProjectBenchmarkCommand(
 					`project-benchmark generate: check ok projects=${result.project_count} files=${result.files.length}`,
 				);
 			} else if (result.misplaced_files.length > 0) {
-				io.stdout(
-					[
-						`project-benchmark generate: check failed misplaced=${result.misplaced_files.length}`,
-						...result.misplaced_files.map(
-							(file) => `${file.location}: ${file.path}`,
-						),
-					].join("\n"),
-				);
+				const lines = [
+					`project-benchmark generate: check failed misplaced=${result.misplaced_files.length}`,
+				];
+				for (const file of result.misplaced_files) {
+					lines.push(`${file.location}: ${file.path}`);
+				}
+				io.stdout(lines.join("\n"));
 			} else {
-				io.stdout(
-					[
-						`project-benchmark generate: check failed projects=${result.project_count} changed=${result.changed_files.length}`,
-						...result.changed_files.map((file) => `${file.kind}: ${file.path}`),
-					].join("\n"),
-				);
+				const lines = [
+					`project-benchmark generate: check failed projects=${result.project_count} changed=${result.changed_files.length}`,
+				];
+				for (const file of result.changed_files) {
+					lines.push(`${file.kind}: ${file.path}`);
+				}
+				io.stdout(lines.join("\n"));
 			}
 		} else {
 			if (!result.ok) {
-				io.stderr(
-					[
-						`err generated-output-misplaced count=${result.misplaced_files.length}`,
-						...result.misplaced_files.map(
-							(file) => `${file.location}: ${file.path}`,
-						),
-					].join("\n"),
-				);
+				const lines = [
+					`err generated-output-misplaced count=${result.misplaced_files.length}`,
+				];
+				for (const file of result.misplaced_files) {
+					lines.push(`${file.location}: ${file.path}`);
+				}
+				io.stderr(lines.join("\n"));
 				return 1;
 			}
 			io.stdout(
@@ -724,15 +580,19 @@ export async function runProjectBenchmarkCommand(
 			axis,
 			catalog.projects,
 		).slice(0, 5);
+		const recommendations: string[] = [];
+		for (const entry of references) {
+			if (entry.lesson) {
+				recommendations.push(entry.lesson);
+			}
+		}
 		const data = {
 			schema_version: "1.0.0",
 			command: "project-benchmark.recommend",
 			axis,
 			description: catalog.axes.axes[axis].description,
 			top_references: references,
-			recommendations: references
-				.map((entry) => entry.lesson)
-				.filter((lesson): lesson is string => Boolean(lesson)),
+			recommendations,
 		};
 		if (parsed.json) {
 			jsonWriters.ok(io, "recommend", data);

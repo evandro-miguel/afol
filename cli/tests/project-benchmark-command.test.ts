@@ -820,7 +820,7 @@ describe("project-benchmark command", () => {
 		}
 	});
 
-	test("strict validate rejects missing source-ref axes before operational inference", async () => {
+	test("strict validate rejects missing source-ref axes and matrix command fails", async () => {
 		const root = createProjectRoot();
 		try {
 			const raw = readProject(root);
@@ -856,12 +856,19 @@ describe("project-benchmark command", () => {
 					root,
 					matrix.io,
 				),
-			).toBe(0);
+			).toBe(1);
+			const matrixPayload = JSON.parse(matrix.stdout[0] ?? "{}") as {
+				ok: boolean;
+				error: { code: string };
+				data: { issues: { code: string }[] };
+			};
+			expect(matrixPayload.ok).toBe(false);
+			expect(matrixPayload.error.code).toBe(
+				"invalid-project-benchmark-catalog",
+			);
 			expect(
-				JSON.parse(matrix.stdout[0] ?? "{}").data.projects.map(
-					(project: { id: string }) => project.id,
-				),
-			).toEqual(["aider", "bbb"]);
+				matrixPayload.data.issues.map((issue: { code: string }) => issue.code),
+			).toContain("missing-source-ref-axes");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1151,6 +1158,22 @@ describe("project-benchmark command", () => {
 				"zzz",
 			]);
 
+			const filteredMatrix = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"matrix",
+					["--for", "repo_context_map", "--json"],
+					root,
+					filteredMatrix.io,
+				),
+			).toBe(0);
+			const filteredPayload = JSON.parse(filteredMatrix.stdout[0] ?? "{}") as {
+				data: { projects: Array<{ id: string }> };
+			};
+			expect(
+				filteredPayload.data.projects.map((project) => project.id),
+			).toEqual(["aider", "bbb", "zzz"]);
+
 			const list = captureIo();
 			expect(
 				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
@@ -1422,6 +1445,32 @@ describe("project-benchmark command", () => {
 			expect(JSON.parse(unknownAction.stdout[0] ?? "{}").error.code).toBe(
 				"unknown-action",
 			);
+
+			const humanInvalidArg = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"list",
+					["--bad"],
+					root,
+					humanInvalidArg.io,
+				),
+			).toBe(2);
+			expect(humanInvalidArg.stderr.join("\n")).toContain(
+				"err invalid-arguments",
+			);
+
+			const humanUnknownAction = captureIo();
+			expect(
+				await runProjectBenchmarkCommand(
+					"unknown",
+					[],
+					root,
+					humanUnknownAction.io,
+				),
+			).toBe(2);
+			expect(humanUnknownAction.stderr.join("\n")).toContain(
+				"err unknown-action",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1520,7 +1569,7 @@ describe("project-benchmark command", () => {
 		}
 	});
 
-	test("returns not-available when downstream repo has no project-benchmark catalog", async () => {
+	test("uses builtin catalog when downstream repo has no project-benchmark catalog", async () => {
 		const root = createProjectRoot();
 		try {
 			rmSync(join(root, ".afol", "adm", "project-benchmarks"), {
@@ -1536,24 +1585,23 @@ describe("project-benchmark command", () => {
 					root,
 					validate.io,
 				),
-			).toBe(1);
+			).toBe(0);
 			const validatePayload = JSON.parse(validate.stdout[0] ?? "{}") as {
-				error: { code: string };
-				data: { catalog_dir: string };
+				data: { ok: boolean; project_count: number };
 			};
-			expect(validatePayload.error.code).toBe(
-				"project-benchmark-not-available",
-			);
-			expect(validatePayload.data.catalog_dir).toBe(
-				".afol/adm/project-benchmarks",
-			);
+			expect(validatePayload.data.ok).toBe(true);
+			expect(validatePayload.data.project_count).toBeGreaterThan(1);
 
 			const list = captureIo();
 			expect(
 				await runProjectBenchmarkCommand("list", ["--json"], root, list.io),
-			).toBe(1);
-			expect(JSON.parse(list.stdout[0] ?? "{}").error.code).toBe(
-				"project-benchmark-not-available",
+			).toBe(0);
+			const listPayload = JSON.parse(list.stdout[0] ?? "{}") as {
+				data: { projects: Array<{ id: string }> };
+			};
+			expect(listPayload.data.projects.length).toBeGreaterThan(1);
+			expect(listPayload.data.projects.map((project) => project.id)).toContain(
+				"aider",
 			);
 
 			const generate = captureIo();
@@ -1566,15 +1614,15 @@ describe("project-benchmark command", () => {
 				),
 			).toBe(1);
 			expect(JSON.parse(generate.stdout[0] ?? "{}").error.code).toBe(
-				"project-benchmark-not-available",
+				"generated-output-stale",
 			);
 
 			const validateText = captureIo();
 			expect(
 				await runProjectBenchmarkCommand("validate", [], root, validateText.io),
-			).toBe(1);
-			expect(validateText.stderr.join("\n")).toContain(
-				"err project-benchmark-not-available",
+			).toBe(0);
+			expect(validateText.stdout.join("\n")).toContain(
+				"project-benchmark validate: ok",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
