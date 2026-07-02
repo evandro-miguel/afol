@@ -14,6 +14,7 @@ import { runUpdateCommand } from "../commands/update";
 import { agentOperationContext } from "../core/operation-context";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import { newWorkstream, startTask } from "../services/workbench/lifecycle";
 
 type TemplateUpdatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
 
@@ -131,6 +132,14 @@ function mkCliRuntimeRoot(
 		);
 	}
 	return root;
+}
+
+function mkBoundUpdateContext(root: string): {
+	session: string;
+	taskId: string;
+} {
+	const stream = newWorkstream(root, "update governance");
+	return { session: stream.session, taskId: "T-01" };
 }
 
 describe("update command", () => {
@@ -274,6 +283,7 @@ describe("update command", () => {
 						"T-CLAUDE",
 						"--reason",
 						"verify disabled adapter update",
+						"--allow-unbound-context",
 					],
 					root,
 					output.io,
@@ -533,6 +543,7 @@ describe("update command", () => {
 						"T-01",
 						"--reason",
 						"binary provenance",
+						"--allow-unbound-context",
 					],
 					root,
 					output.io,
@@ -570,6 +581,7 @@ describe("update command", () => {
 						"T-VERSION",
 						"--reason",
 						"version guardrail",
+						"--allow-unbound-context",
 					],
 					root,
 					output.io,
@@ -597,6 +609,8 @@ describe("update command", () => {
 
 	test("apply updates managed files when no conflicts", async () => {
 		const root = mkRoot();
+		const { session, taskId } = mkBoundUpdateContext(root);
+		startTask(root, { session, taskId });
 		const sourceLock = templateJson<{ revision: string; project: string }>(
 			".agents/lock.json",
 		);
@@ -635,9 +649,9 @@ describe("update command", () => {
 					[
 						"apply",
 						"--session",
-						"S-01",
+						session,
 						"--task-id",
-						"T-01",
+						taskId,
 						"--reason",
 						"test update apply",
 					],
@@ -726,6 +740,34 @@ describe("update command", () => {
 		}
 	});
 
+	test("apply requires in-progress task when context is bound", async () => {
+		const root = mkRoot();
+		const { session } = mkBoundUpdateContext(root);
+		try {
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"apply",
+						"--session",
+						session,
+						"--task-id",
+						"T-01",
+						"--reason",
+						"blocked by pending state",
+					],
+					root,
+					output.io,
+				),
+			).toBe(2);
+			expect(output.stderr.join("\n")).toContain(
+				"Task T-01 is pending, expected in_progress.",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("apply blocks restricted operation contexts before writing", async () => {
 		const root = mkRoot();
 		try {
@@ -779,7 +821,11 @@ describe("update command", () => {
 			);
 
 			const blocked = capture();
-			const code = await runUpdateCommand(["apply"], root, blocked.io);
+			const code = await runUpdateCommand(
+				["apply", "--allow-unbound-context"],
+				root,
+				blocked.io,
+			);
 			expect(code).toBe(4);
 			const manifestAfter = JSON.parse(
 				readFileSync(join(root, ".agents", "manifest.json"), "utf8"),
@@ -816,6 +862,7 @@ describe("update command", () => {
 						"T-03",
 						"--reason",
 						"rollback on journal failure",
+						"--allow-unbound-context",
 					],
 					root,
 					output.io,
@@ -869,6 +916,7 @@ describe("update command", () => {
 						"T-04",
 						"--reason",
 						"rollback on partial batch failure",
+						"--allow-unbound-context",
 					],
 					root,
 					output.io,

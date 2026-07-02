@@ -362,6 +362,7 @@ try {
 	const realApply = runDist(applyTarget, [
 		"update",
 		"apply",
+		"--allow-unbound-context",
 		"--session",
 		"S-01",
 		"--task-id",

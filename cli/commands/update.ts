@@ -26,6 +26,7 @@ import {
 	type UpdateCheckResult,
 	type UpdateOperation,
 } from "../services/update/check";
+import { assertTaskInProgress } from "../services/workbench/lifecycle";
 import { backupPath as makeBackupPath, normalizeHash } from "./file/shared";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
@@ -65,6 +66,7 @@ type ParsedUpdateArgs = {
 	session: string;
 	taskId: string;
 	reason: string;
+	allowUnboundContext: boolean;
 };
 
 function normalizeSubcommand(value: string | undefined): UpdateSubcommand {
@@ -94,6 +96,7 @@ function parseUpdateArgs(values: string[]): ParsedUpdateArgs {
 		session: "",
 		taskId: "",
 		reason: "",
+		allowUnboundContext: false,
 	};
 
 	for (let index = 0; index < values.length; index += 1) {
@@ -108,6 +111,10 @@ function parseUpdateArgs(values: string[]): ParsedUpdateArgs {
 		}
 		if (value === "--dry-run") {
 			parsed.dryRun = true;
+			continue;
+		}
+		if (value === "--allow-unbound-context") {
+			parsed.allowUnboundContext = true;
 			continue;
 		}
 		if (value === "--session" || value === "-S") {
@@ -298,7 +305,7 @@ function stageUpdateOperations(
 				record: {
 					id: mutationId,
 					ts: new Date().toISOString(),
-					kind: "patch",
+					kind: "update",
 					status: "applied",
 					dryRun: false,
 					session: context.session,
@@ -478,7 +485,14 @@ export async function runUpdateCommand(
 						"Real update apply requires local interactive approval.",
 					);
 				}
-				requireApplyContext(parsedArgs);
+				if (!parsedArgs.allowUnboundContext) {
+					requireApplyContext(parsedArgs);
+					assertTaskInProgress(
+						projectRoot,
+						parsedArgs.session,
+						parsedArgs.taskId,
+					);
+				}
 				const runtimeValidation = validateMutationRuntime({
 					cliRoot: runtime.cliRoot,
 					invocationPath: runtime.invocationPath,
