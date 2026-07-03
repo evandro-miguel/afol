@@ -14,6 +14,9 @@ type CoverageTotals = {
 
 const parsedArgs = parseArgs(process.argv.slice(2));
 const coverageDir = parsedArgs.coverageDir ?? ".coverage";
+const coverageDirArgs = parsedArgs.coverageDir
+	? []
+	: ["--coverage-dir", coverageDir];
 const lcovPath = resolve(
 	process.cwd(),
 	parsedArgs.lcovPath ?? `${coverageDir}/lcov.info`,
@@ -23,6 +26,7 @@ const result = spawnSync(
 	[
 		"test",
 		...parsedArgs.testArgs,
+		...coverageDirArgs,
 		"--coverage",
 		"--coverage-reporter=lcov",
 		"--coverage-reporter=text",
