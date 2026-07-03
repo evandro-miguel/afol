@@ -4,7 +4,7 @@ import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
 
-export type MutationKind = "patch" | "move" | "archive";
+export type MutationKind = "patch" | "move" | "archive" | "update";
 export type MutationStatus = "applied" | "noop";
 export type MutationSource = "afol-update";
 
@@ -143,7 +143,10 @@ function parseRecord(raw: string): MutationRecord | null {
 		}
 
 		if (
-			(kind === "patch" || kind === "move" || kind === "archive") &&
+			(kind === "patch" ||
+				kind === "move" ||
+				kind === "archive" ||
+				kind === "update") &&
 			(statusValue === "applied" || statusValue === "noop")
 		) {
 			return {

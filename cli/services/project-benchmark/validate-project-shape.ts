@@ -1,4 +1,8 @@
 import {
+	PROJECT_ID_PATTERN,
+	validateProjectBenchmarkProjectSchema,
+} from "./schema";
+import {
 	PROJECT_BENCHMARK_SCHEMA_VERSION,
 	type ProjectBenchmarkIssue,
 } from "./types";
@@ -37,7 +41,6 @@ export type ProjectBenchmarkCollections = {
 	doNotCopy: unknown[];
 };
 
-const PROJECT_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const PROJECT_KEYS = [
 	"schema_version",
 	"id",
@@ -61,6 +64,7 @@ export function validateProjectShape(
 	file: string,
 	issues: ProjectBenchmarkIssue[],
 ): ProjectBenchmarkProjectRecord | null {
+	const startingIssueCount = issues.length;
 	if (!isRecord(project)) {
 		push(issues, "error", "invalid-project", file, "Project must be an object");
 		return null;
@@ -217,6 +221,16 @@ export function validateProjectShape(
 			"missing-do-not-copy",
 			file,
 			"Project must include do_not_copy",
+		);
+	}
+	const schemaResult = validateProjectBenchmarkProjectSchema(project);
+	if (!schemaResult.success && issues.length === startingIssueCount) {
+		push(
+			issues,
+			"error",
+			"invalid-project-schema",
+			file,
+			"Project does not match project-benchmark schema",
 		);
 	}
 	return project;

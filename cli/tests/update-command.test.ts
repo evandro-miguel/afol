@@ -14,6 +14,7 @@ import { runUpdateCommand } from "../commands/update";
 import { agentOperationContext } from "../core/operation-context";
 import { DEFAULT_TEMPLATE_FILES } from "../generated/template";
 import { CLI_PACKAGE_NAME, CLI_VERSION } from "../generated/version";
+import { newWorkstream, startTask } from "../services/workbench/lifecycle";
 
 type TemplateUpdatePath = keyof typeof DEFAULT_TEMPLATE_FILES & string;
 
@@ -88,6 +89,44 @@ function capture() {
 	};
 }
 
+function restoreEnv(key: string, value: string | undefined): void {
+	if (value === undefined) {
+		delete process.env[key];
+		return;
+	}
+	process.env[key] = value;
+}
+
+async function withAfolTestEnv<T>(fn: () => Promise<T>): Promise<T> {
+	const saved = {
+		AFOL_TEST: process.env.AFOL_TEST,
+		AFOL_CI: process.env.AFOL_CI,
+	};
+	try {
+		process.env.AFOL_TEST = "1";
+		delete process.env.AFOL_CI;
+		return await fn();
+	} finally {
+		restoreEnv("AFOL_TEST", saved.AFOL_TEST);
+		restoreEnv("AFOL_CI", saved.AFOL_CI);
+	}
+}
+
+async function withoutUnboundContextEnv<T>(fn: () => Promise<T>): Promise<T> {
+	const saved = {
+		AFOL_TEST: process.env.AFOL_TEST,
+		AFOL_CI: process.env.AFOL_CI,
+	};
+	try {
+		delete process.env.AFOL_TEST;
+		delete process.env.AFOL_CI;
+		return await fn();
+	} finally {
+		restoreEnv("AFOL_TEST", saved.AFOL_TEST);
+		restoreEnv("AFOL_CI", saved.AFOL_CI);
+	}
+}
+
 function mkCliRuntimeRoot(
 	options: {
 		packageName?: string;
@@ -131,6 +170,14 @@ function mkCliRuntimeRoot(
 		);
 	}
 	return root;
+}
+
+function mkBoundUpdateContext(root: string): {
+	session: string;
+	taskId: string;
+} {
+	const stream = newWorkstream(root, "update governance");
+	return { session: stream.session, taskId: "T-01" };
 }
 
 describe("update command", () => {
@@ -264,24 +311,85 @@ describe("update command", () => {
 				"utf8",
 			);
 			const output = capture();
-			expect(
-				await runUpdateCommand(
-					[
-						"apply",
-						"--session",
-						"S-CLAUDE",
-						"--task-id",
-						"T-CLAUDE",
-						"--reason",
-						"verify disabled adapter update",
-					],
-					root,
-					output.io,
-				),
-			).toBe(0);
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--session",
+							"S-CLAUDE",
+							"--task-id",
+							"T-CLAUDE",
+							"--reason",
+							"verify disabled adapter update",
+							"--allow-unbound-context",
+						],
+						root,
+						output.io,
+					),
+				).toBe(0);
+			});
 
 			expect(existsSync(join(root, "CLAUDE.md"))).toBe(false);
 			expect(existsSync(join(root, ".claude"))).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply restricts --allow-unbound-context to AFOL CI or tests", async () => {
+		const root = mkRoot();
+		try {
+			const output = capture();
+			await withoutUnboundContextEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						["apply", "--allow-unbound-context"],
+						root,
+						output.io,
+					),
+				).toBe(2);
+			});
+			expect(output.stderr.join("\n")).toContain(
+				"--allow-unbound-context requires AFOL_CI=1 or AFOL_TEST=1.",
+			);
+			expect(
+				readFileSync(join(root, ".agents", "lock.json"), "utf8"),
+			).toContain('"revision": "old"');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("apply requires reason with --allow-unbound-context in AFOL tests", async () => {
+		const root = mkRoot();
+		try {
+			const output = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--session",
+							"S-UNBOUND",
+							"--task-id",
+							"T-UNBOUND",
+							"--allow-unbound-context",
+						],
+						root,
+						output.io,
+					),
+				).toBe(2);
+			});
+			expect(output.stderr.join("\n")).toContain(
+				"Real update apply requires --reason.",
+			);
+			expect(
+				readFileSync(join(root, ".agents", "lock.json"), "utf8"),
+			).toContain('"revision": "old"');
+			expect(
+				readFileSync(join(root, ".agents", "manifest.json"), "utf8"),
+			).not.toContain("validate");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -523,25 +631,28 @@ describe("update command", () => {
 		try {
 			expect(existsSync(join(cliRoot, "package.json"))).toBe(false);
 			const output = capture();
-			expect(
-				await runUpdateCommand(
-					[
-						"apply",
-						"--session",
-						"S-01",
-						"--task-id",
-						"T-01",
-						"--reason",
-						"binary provenance",
-					],
-					root,
-					output.io,
-					{
-						cliRoot,
-						invocationPath: join(cliRoot, "dist", "afol"),
-					},
-				),
-			).toBe(0);
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--session",
+							"S-01",
+							"--task-id",
+							"T-01",
+							"--reason",
+							"binary provenance",
+							"--allow-unbound-context",
+						],
+						root,
+						output.io,
+						{
+							cliRoot,
+							invocationPath: join(cliRoot, "dist", "afol"),
+						},
+					),
+				).toBe(0);
+			});
 			expect(output.stderr).toHaveLength(0);
 			const lockAfter = readFileSync(
 				join(root, ".agents", "lock.json"),
@@ -560,25 +671,28 @@ describe("update command", () => {
 		const cliRoot = mkCliRuntimeRoot({ packageVersion: "9.9.9" });
 		try {
 			const output = capture();
-			expect(
-				await runUpdateCommand(
-					[
-						"apply",
-						"--session",
-						"S-VERSION",
-						"--task-id",
-						"T-VERSION",
-						"--reason",
-						"version guardrail",
-					],
-					root,
-					output.io,
-					{
-						cliRoot,
-						invocationPath: join(cliRoot, "cli", "main.ts"),
-					},
-				),
-			).toBe(2);
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--session",
+							"S-VERSION",
+							"--task-id",
+							"T-VERSION",
+							"--reason",
+							"version guardrail",
+							"--allow-unbound-context",
+						],
+						root,
+						output.io,
+						{
+							cliRoot,
+							invocationPath: join(cliRoot, "cli", "main.ts"),
+						},
+					),
+				).toBe(2);
+			});
 			expect(output.stderr.join("\n")).toContain(
 				"Refusing real update apply: AFOL runtime version",
 			);
@@ -597,6 +711,8 @@ describe("update command", () => {
 
 	test("apply updates managed files when no conflicts", async () => {
 		const root = mkRoot();
+		const { session, taskId } = mkBoundUpdateContext(root);
+		startTask(root, { session, taskId });
 		const sourceLock = templateJson<{ revision: string; project: string }>(
 			".agents/lock.json",
 		);
@@ -635,9 +751,9 @@ describe("update command", () => {
 					[
 						"apply",
 						"--session",
-						"S-01",
+						session,
 						"--task-id",
-						"T-01",
+						taskId,
 						"--reason",
 						"test update apply",
 					],
@@ -726,6 +842,34 @@ describe("update command", () => {
 		}
 	});
 
+	test("apply requires in-progress task when context is bound", async () => {
+		const root = mkRoot();
+		const { session } = mkBoundUpdateContext(root);
+		try {
+			const output = capture();
+			expect(
+				await runUpdateCommand(
+					[
+						"apply",
+						"--session",
+						session,
+						"--task-id",
+						"T-01",
+						"--reason",
+						"blocked by pending state",
+					],
+					root,
+					output.io,
+				),
+			).toBe(2);
+			expect(output.stderr.join("\n")).toContain(
+				"Task T-01 is pending, expected in_progress.",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("apply blocks restricted operation contexts before writing", async () => {
 		const root = mkRoot();
 		try {
@@ -779,7 +923,13 @@ describe("update command", () => {
 			);
 
 			const blocked = capture();
-			const code = await runUpdateCommand(["apply"], root, blocked.io);
+			const code = await withAfolTestEnv(() =>
+				runUpdateCommand(
+					["apply", "--allow-unbound-context"],
+					root,
+					blocked.io,
+				),
+			);
 			expect(code).toBe(4);
 			const manifestAfter = JSON.parse(
 				readFileSync(join(root, ".agents", "manifest.json"), "utf8"),
@@ -806,22 +956,25 @@ describe("update command", () => {
 		);
 		try {
 			const output = capture();
-			expect(
-				await runUpdateCommand(
-					[
-						"apply",
-						"--session",
-						"S-02",
-						"--task-id",
-						"T-03",
-						"--reason",
-						"rollback on journal failure",
-					],
-					root,
-					output.io,
-					{ failBeforeJournalAppend: true },
-				),
-			).toBe(2);
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--session",
+							"S-02",
+							"--task-id",
+							"T-03",
+							"--reason",
+							"rollback on journal failure",
+							"--allow-unbound-context",
+						],
+						root,
+						output.io,
+						{ failBeforeJournalAppend: true },
+					),
+				).toBe(2);
+			});
 			expect(output.stderr.join("\n")).toContain(
 				"Injected update apply failure before journal append",
 			);
@@ -859,22 +1012,25 @@ describe("update command", () => {
 		);
 		try {
 			const output = capture();
-			expect(
-				await runUpdateCommand(
-					[
-						"apply",
-						"--session",
-						"S-03",
-						"--task-id",
-						"T-04",
-						"--reason",
-						"rollback on partial batch failure",
-					],
-					root,
-					output.io,
-					{ failAfterWriteCount: 2 },
-				),
-			).toBe(2);
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--session",
+							"S-03",
+							"--task-id",
+							"T-04",
+							"--reason",
+							"rollback on partial batch failure",
+							"--allow-unbound-context",
+						],
+						root,
+						output.io,
+						{ failAfterWriteCount: 2 },
+					),
+				).toBe(2);
+			});
 			expect(output.stderr.join("\n")).toContain(
 				"Injected update apply failure after write",
 			);

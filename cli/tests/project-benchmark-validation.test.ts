@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadProjectBenchmarkCatalog } from "../services/project-benchmark/catalog";
+import { PROJECT_BENCHMARK_JSON_SCHEMA } from "../services/project-benchmark/schema";
 import { validateProjectBenchmarkCatalog } from "../services/project-benchmark/validate";
 
 function writeJson(path: string, value: unknown): void {
@@ -74,9 +75,10 @@ function createProjectRoot(
 		schema_version: 1,
 		managed_hashes: {},
 	});
-	writeJson(join(root, ".afol", "adm", "project-benchmarks", "schema.json"), {
-		schema_version: "1.0.0",
-	});
+	writeJson(
+		join(root, ".afol", "adm", "project-benchmarks", "schema.json"),
+		PROJECT_BENCHMARK_JSON_SCHEMA,
+	);
 	writeJson(join(root, ".afol", "adm", "project-benchmarks", "axes.json"), {
 		schema_version: "1.0.0",
 		axes: {
@@ -241,6 +243,33 @@ describe("project-benchmark validation hardening", () => {
 				expect.arrayContaining([
 					".afol/adm/project-benchmarks/generated-summary.md",
 					".afol/data/benchmarks/catalog/scenarios/similarity-matrix.json",
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps validating partial local benchmark catalogs", () => {
+		const root = createProjectRoot();
+		try {
+			rmSync(join(root, ".afol", "adm", "project-benchmarks", "axes.json"), {
+				force: true,
+			});
+			rmSync(join(root, ".afol", "adm", "project-benchmarks", "projects"), {
+				recursive: true,
+				force: true,
+			});
+
+			const catalog = loadProjectBenchmarkCatalog(root);
+			const validation = validateProjectBenchmarkCatalog(catalog);
+			expect(catalog.source).toBe("project");
+			expect(validation.ok).toBe(false);
+			expect(validation.issues.map((issue) => issue.code)).toEqual(
+				expect.arrayContaining([
+					"missing-axes",
+					"missing-projects-dir",
+					"invalid-axes-schema-version",
 				]),
 			);
 		} finally {

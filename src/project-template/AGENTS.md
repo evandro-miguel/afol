@@ -38,7 +38,7 @@ Replace this section after bootstrap with real product purpose and constraints.
 - Before product edits: create/target a session and move task to `in_progress`.
 - Canonical path:
   1. `afol new {theme} --feature-id {F-id} --parent-spec {spec-id}`
-  2. `afol start --session {session-id} --task-id T-01`
+  2. `afol start --session {session-id} --task-id T-01 --brief --json`
   3. Edit and run named verification.
   4. `afol evidence --session {session-id} --task-id T-01 --command "<verification command>" --result passed`
   5. `afol done --session {session-id} --task-id T-01`
@@ -47,6 +47,29 @@ Replace this section after bootstrap with real product purpose and constraints.
   It is an external command, not a repository-local file.
 - Planning-only or read-only questions stay in chat unless durable artifacts
   are required.
+
+## Agent-Facing Commands
+
+Use compact output by default. Use JSON only when a tool needs fields.
+
+```bash
+afol status --json
+afol status --task-id <task-id> --json
+afol status --health --json
+afol health --json
+afol health full --json
+afol health --area <adm|pstr|wb|memory|library|state|ctx|token_budget> --json
+afol ctx bundle --json --summary
+afol project-benchmark validate --json
+afol local-state rebuild --json
+```
+
+- `afol status --task-id <task-id> --json` exits `1` with
+  `task-not-found` when the explicit task id is absent.
+- `afol new ... --json` includes `governance_status` with value
+  `"governed"` or `"unbound"`.
+- `afol project-benchmark ... --json` includes `catalog_source` with value
+  `"project"` or `"builtin"`.
 
 ## Delivery Rules
 

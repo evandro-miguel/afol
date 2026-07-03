@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import {
 	envelopeErr,
 	envelopeOk,
@@ -9,10 +7,15 @@ import {
 } from "../core/envelope";
 import { checkHealth } from "../services/health/checker";
 import type { HealthArea } from "../services/health/types";
-import { resolveProjectPaths } from "../services/project/paths";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
-type HealthJsonData = ReturnType<typeof checkHealth> & { release: boolean };
+type HealthScope = "core" | "full" | "release";
+
+type HealthJsonData = ReturnType<typeof checkHealth> & {
+	checked_areas: readonly HealthArea[];
+	release: boolean;
+	scope: HealthScope;
+};
 
 const AREAS = new Set<HealthArea>([
 	"adm",
@@ -24,18 +27,37 @@ const AREAS = new Set<HealthArea>([
 	"ctx",
 	"token_budget",
 ]);
+const ALL_AREAS: readonly HealthArea[] = [
+	"adm",
+	"pstr",
+	"wb",
+	"memory",
+	"library",
+	"state",
+	"ctx",
+	"token_budget",
+];
+const CORE_AREAS: readonly HealthArea[] = ["wb"];
+const SCOPES = new Set<HealthScope>(["core", "full", "release"]);
 
 function parseArgs(args: string[]): {
 	area?: HealthArea;
 	deep: boolean;
 	json: boolean;
 	release: boolean;
+	scope: HealthScope;
 } {
-	const parsed = { deep: false, json: false, release: false } as {
+	const parsed = {
+		deep: false,
+		json: false,
+		release: false,
+		scope: "core",
+	} as {
 		area?: HealthArea;
 		deep: boolean;
 		json: boolean;
 		release: boolean;
+		scope: HealthScope;
 	};
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
@@ -49,6 +71,12 @@ function parseArgs(args: string[]): {
 		}
 		if (value === "--release") {
 			parsed.release = true;
+			parsed.scope = "release";
+			continue;
+		}
+		if (SCOPES.has(value as HealthScope)) {
+			parsed.scope = value as HealthScope;
+			parsed.release = parsed.release || value === "release";
 			continue;
 		}
 		if (value === "--area") {
@@ -62,7 +90,41 @@ function parseArgs(args: string[]): {
 		}
 		throw new Error(`Unknown health argument: ${value}`);
 	}
+	if (parsed.release) {
+		parsed.scope = "release";
+	}
 	return parsed;
+}
+
+function checkedAreasFor(
+	parsed: ReturnType<typeof parseArgs>,
+): readonly HealthArea[] {
+	if (parsed.area) {
+		return [parsed.area];
+	}
+	if (
+		parsed.deep ||
+		parsed.release ||
+		parsed.scope === "full" ||
+		parsed.scope === "release"
+	) {
+		return ALL_AREAS;
+	}
+	return CORE_AREAS;
+}
+
+function checkedLine(
+	checkedAreas: readonly HealthArea[],
+	scope: HealthScope,
+): string {
+	if (
+		checkedAreas.length === 1 &&
+		checkedAreas[0] === "wb" &&
+		scope === "core"
+	) {
+		return "checked: wb only";
+	}
+	return `checked: ${checkedAreas.join(", ")}`;
 }
 
 function formatFinding(finding: {
@@ -82,9 +144,15 @@ function formatFinding(finding: {
 function writeJsonReport(
 	io: CommandIo,
 	report: ReturnType<typeof checkHealth>,
-	release: boolean,
+	parsed: ReturnType<typeof parseArgs>,
+	checkedAreas: readonly HealthArea[],
 ): void {
-	const data: HealthJsonData = { ...report, release };
+	const data: HealthJsonData = {
+		...report,
+		checked_areas: checkedAreas,
+		release: parsed.release || parsed.scope === "release",
+		scope: parsed.scope,
+	};
 	const envelope = report.ok
 		? envelopeOk(data, { action: "health", exitCode: 0 })
 		: (envelopeErr("HEALTH_FAILED", "health check failed", {
@@ -99,18 +167,11 @@ function writeJsonReport(
 				"checked_at",
 				"findings",
 				"summary",
+				"scope",
+				"checked_areas",
 				"release",
 			]),
 		),
-	);
-}
-
-function hasHydratedAuxiliaryState(projectRoot: string): boolean {
-	const paths = resolveProjectPaths(projectRoot).abs;
-	return (
-		existsSync(paths.stateDb) &&
-		existsSync(paths.memoryFile) &&
-		existsSync(join(paths.dataIndexDir, "sections.json"))
 	);
 }
 
@@ -121,26 +182,36 @@ export async function runHealthCommand(
 ): Promise<number> {
 	try {
 		const parsed = parseArgs(args);
-		const includeAuxiliary =
-			!parsed.area &&
-			!parsed.deep &&
-			!parsed.release &&
-			hasHydratedAuxiliaryState(projectRoot);
+		const checkedAreas = checkedAreasFor(parsed);
 		const report = checkHealth(
 			projectRoot,
 			parsed.area
-				? { area: parsed.area, deep: parsed.deep || parsed.release }
+				? {
+						area: parsed.area,
+						deep:
+							parsed.deep ||
+							parsed.release ||
+							parsed.scope === "full" ||
+							parsed.scope === "release",
+					}
 				: {
-						deep: parsed.deep || parsed.release,
-						includeAuxiliary,
+						deep: parsed.deep || parsed.release || parsed.scope === "release",
+						includeAuxiliary:
+							parsed.scope === "full" || parsed.scope === "release",
 					},
 		);
 		if (parsed.json) {
-			writeJsonReport(io, report, parsed.release);
+			writeJsonReport(io, report, parsed, checkedAreas);
 		} else {
+			const healthLabel =
+				parsed.area || parsed.deep ? "health" : `health ${parsed.scope}`;
 			io.stdout(
 				[
-					`health: ${report.ok ? "ok" : "issues found"}`,
+					`${healthLabel}: ${report.ok ? "ok" : "issues found"}`,
+					checkedLine(checkedAreas, parsed.scope),
+					...(parsed.scope === "core" && !parsed.area && !parsed.deep
+						? ["hint: run afol health --release for full project health"]
+						: []),
 					`summary: fail=${report.summary.fail} warn=${report.summary.warn} info=${report.summary.info}`,
 					...report.findings.map(formatFinding),
 				].join("\n"),

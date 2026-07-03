@@ -16,10 +16,11 @@ import {
 	RuleInjectionError,
 	resolveAndRecordRuleInjection,
 	resolveContextRules,
+	resolveRuleInjection,
 	resolveRuleInjectionShape,
 } from "../rules/injection";
 import { loadSessionState, validateState } from "../state";
-import { getSectionIndex, rebuildSectionIndex } from "./section-index";
+import { buildSectionIndexSnapshot, getSectionIndex } from "./section-index";
 import type {
 	ContextBundle,
 	ContextExpandedSection,
@@ -202,7 +203,7 @@ function selectSections(
 	task: TaskRecord | null,
 	surface: string,
 ): SectionEntry[] {
-	const index = getSectionIndex(root) ?? rebuildSectionIndex(root);
+	const index = getSectionIndex(root) ?? buildSectionIndexSnapshot(root);
 	if (task?.featureId) {
 		const needle = `spec:${task.featureId.trim().toLowerCase()}`;
 		const matches = index.sections.filter((section) =>
@@ -626,10 +627,11 @@ export function buildContextBundle(
 		...(scope ? { scope } : {}),
 		...(filePath ? { filePath } : {}),
 	};
-	const ruleInjection =
-		opts.persistRuleInjection === true && !compact
+	const ruleInjection = compact
+		? resolveRuleInjectionShape(root, ruleInjectionOptions)
+		: opts.persistRuleInjection === true
 			? resolveAndRecordRuleInjection(root, ruleInjectionOptions)
-			: resolveRuleInjectionShape(root, ruleInjectionOptions);
+			: resolveRuleInjection(root, ruleInjectionOptions);
 	const hookEntries = compact
 		? []
 		: selectHooks(root, {

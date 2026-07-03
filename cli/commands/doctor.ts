@@ -9,6 +9,7 @@ import { type CommandIo, DEFAULT_IO } from "./io";
 type DoctorJsonData = ReturnType<typeof runDoctor> & {
 	ok: boolean;
 	remediation_plan: boolean;
+	scope: "full";
 };
 
 function parseArgs(args: string[]): {
@@ -43,12 +44,13 @@ export async function runDoctorCommand(
 				...report,
 				ok: true,
 				remediation_plan: parsed.remediationPlan,
+				scope: "full",
 			};
 			io.stdout(
 				stringifyEnvelope(
 					envelopeWithLegacyKeys(
 						envelopeOk(data, { action: "doctor", exitCode: 0 }),
-						["ok", "scores", "remediation", "remediation_plan"],
+						["ok", "scores", "remediation", "remediation_plan", "scope"],
 					),
 				),
 			);
@@ -57,6 +59,7 @@ export async function runDoctorCommand(
 		if (parsed.remediationPlan) {
 			io.stdout(
 				[
+					"doctor scope: full",
 					"doctor remediation plan:",
 					...report.remediation.map(
 						(step) =>
@@ -68,6 +71,7 @@ export async function runDoctorCommand(
 		}
 		io.stdout(
 			[
+				"doctor scope: full",
 				"doctor scores:",
 				...report.scores.map(
 					(score) => `  ${score.area}: ${score.score}/${score.max}`,

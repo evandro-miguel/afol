@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 
 import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 const THRESHOLD = 80;
 
@@ -11,9 +13,24 @@ type CoverageTotals = {
 };
 
 const parsedArgs = parseArgs(process.argv.slice(2));
+const coverageDir = parsedArgs.coverageDir ?? ".coverage";
+const coverageDirArgs = parsedArgs.coverageDir
+	? []
+	: ["--coverage-dir", coverageDir];
+const lcovPath = resolve(
+	process.cwd(),
+	parsedArgs.lcovPath ?? `${coverageDir}/lcov.info`,
+);
 const result = spawnSync(
 	"bun",
-	["test", ...parsedArgs.testArgs, "--coverage", "--coverage-reporter=text"],
+	[
+		"test",
+		...parsedArgs.testArgs,
+		...coverageDirArgs,
+		"--coverage",
+		"--coverage-reporter=lcov",
+		"--coverage-reporter=text",
+	],
 	{
 		cwd: process.cwd(),
 		encoding: "utf8",
@@ -40,8 +57,9 @@ if (result.status !== 0) {
 	process.exit(result.status ?? 1);
 }
 
-const report = parseBunTextCoverage(
+const report = parseCoverageFromLcovOrText(
 	`${result.stdout ?? ""}\n${result.stderr ?? ""}`,
+	lcovPath,
 );
 const totals = selectCoverageRows(report, parsedArgs.includePrefixes);
 const failedRows = totals.filter(
@@ -70,10 +88,14 @@ function parseArgs(args: string[]): {
 	includePrefixes: string[];
 	testArgs: string[];
 	verbose: boolean;
+	coverageDir?: string;
+	lcovPath?: string;
 } {
 	const includePrefixes: string[] = [];
 	const testArgs: string[] = [];
 	let verbose = false;
+	let coverageDir: string | undefined;
+	let lcovPath: string | undefined;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		if (!arg) {
@@ -93,9 +115,61 @@ function parseArgs(args: string[]): {
 			index += 1;
 			continue;
 		}
+		if (arg === "--coverage-dir") {
+			const value = args[index + 1];
+			if (!value) {
+				console.error("coverage: --coverage-dir requires a value");
+				process.exit(1);
+			}
+			coverageDir = value;
+			testArgs.push(arg, value);
+			index += 1;
+			continue;
+		}
+		if (arg.startsWith("--coverage-dir=")) {
+			coverageDir = arg.slice("--coverage-dir=".length);
+			testArgs.push(arg);
+			continue;
+		}
+		if (arg === "--lcov-path") {
+			const value = args[index + 1];
+			if (!value) {
+				console.error("coverage: --lcov-path requires a file path");
+				process.exit(1);
+			}
+			lcovPath = value;
+			index += 1;
+			continue;
+		}
+		if (arg.startsWith("--lcov-path=")) {
+			lcovPath = arg.slice("--lcov-path=".length);
+			continue;
+		}
 		testArgs.push(arg);
 	}
-	return { includePrefixes, testArgs, verbose };
+	const parsed: {
+		includePrefixes: string[];
+		testArgs: string[];
+		verbose: boolean;
+		coverageDir?: string;
+		lcovPath?: string;
+	} = { includePrefixes, testArgs, verbose };
+	if (coverageDir !== undefined) parsed.coverageDir = coverageDir;
+	if (lcovPath !== undefined) parsed.lcovPath = lcovPath;
+	return parsed;
+}
+
+function parseCoverageFromLcovOrText(
+	output: string,
+	lcovPath: string,
+): CoverageTotals[] {
+	if (existsSync(lcovPath)) {
+		const rows = parseLcovCoverage(readFileSync(lcovPath, "utf8"));
+		if (rows.length > 0) {
+			return rows;
+		}
+	}
+	return parseBunTextCoverage(output);
 }
 
 function parseBunTextCoverage(output: string): CoverageTotals[] {
@@ -121,6 +195,108 @@ function parseBunTextCoverage(output: string): CoverageTotals[] {
 	}
 
 	return rows;
+}
+
+function parseLcovCoverage(output: string): CoverageTotals[] {
+	let file = "";
+	let fileLinesCovered = 0;
+	let fileLinesTotal = 0;
+	let fileFunctionsCovered = 0;
+	let fileFunctionsTotal = 0;
+	let allLinesCovered = 0;
+	let allLinesTotal = 0;
+	let allFunctionsCovered = 0;
+	let allFunctionsTotal = 0;
+	const rows: CoverageTotals[] = [];
+
+	const flush = () => {
+		if (!file) {
+			return;
+		}
+		const normalizedFile = normalizeCoverageFile(file);
+		rows.push({
+			file: normalizedFile,
+			lines: percent(fileLinesCovered, fileLinesTotal),
+			functions: percent(fileFunctionsCovered, fileFunctionsTotal),
+		});
+		allLinesCovered += fileLinesCovered;
+		allLinesTotal += fileLinesTotal;
+		allFunctionsCovered += fileFunctionsCovered;
+		allFunctionsTotal += fileFunctionsTotal;
+		file = "";
+		fileLinesCovered = 0;
+		fileLinesTotal = 0;
+		fileFunctionsCovered = 0;
+		fileFunctionsTotal = 0;
+	};
+
+	for (const value of output.split(/\r?\n/)) {
+		const line = value.trim();
+		if (line === "end_of_record") {
+			flush();
+			continue;
+		}
+		if (line.startsWith("SF:")) {
+			flush();
+			file = line.slice("SF:".length).trim();
+			continue;
+		}
+		if (line.startsWith("LF:")) {
+			fileLinesTotal = Number(line.slice("LF:".length));
+			continue;
+		}
+		if (line.startsWith("LH:")) {
+			fileLinesCovered = Number(line.slice("LH:".length));
+			continue;
+		}
+		if (line.startsWith("FNF:")) {
+			fileFunctionsTotal = Number(line.slice("FNF:".length));
+			continue;
+		}
+		if (line.startsWith("FNH:")) {
+			fileFunctionsCovered = Number(line.slice("FNH:".length));
+		}
+	}
+
+	flush();
+
+	if (!rows.length) {
+		return rows;
+	}
+
+	return [
+		{
+			file: "All files",
+			lines: percent(allLinesCovered, allLinesTotal),
+			functions: percent(allFunctionsCovered, allFunctionsTotal),
+		},
+		...rows,
+	];
+}
+
+function percent(covered: number, total: number): number {
+	if (!Number.isFinite(covered) || !Number.isFinite(total)) {
+		return 0;
+	}
+	if (total === 0) {
+		return 100;
+	}
+	return (covered / total) * 100;
+}
+
+function normalizeCoverageFile(file: string): string {
+	if (!isAbsolute(file)) {
+		return file;
+	}
+	const relativeFile = relative(process.cwd(), file);
+	if (
+		relativeFile.startsWith(`.${sep}`) ||
+		relativeFile.startsWith("..") ||
+		isAbsolute(relativeFile)
+	) {
+		return file;
+	}
+	return relativeFile;
 }
 
 function selectCoverageRows(

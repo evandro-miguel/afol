@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
 	buildCommandCatalog,
 	buildCommandHelpJson,
@@ -6,7 +10,10 @@ import {
 	formatCommandHelp,
 	formatHelpText,
 } from "../help";
-import { kernelRegistry } from "../registry";
+import { SUBCOMMAND_DISPATCH_GROUPS } from "../main";
+import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
+
+const repoRoot = join(import.meta.dir, "..", "..");
 
 describe("help formatter", () => {
 	test("formats compact deterministic help text", () => {
@@ -50,6 +57,27 @@ describe("help formatter", () => {
 		);
 	});
 
+	test("formats intent-filtered help", () => {
+		const planning = formatHelpText(kernelRegistry, { intent: "planning" });
+		const execution = formatHelpText(kernelRegistry, { intent: "execution" });
+		const maintenance = formatHelpText(kernelRegistry, {
+			intent: "maintenance",
+		});
+
+		expect(planning).toContain("Commands for planning");
+		expect(planning).toContain("pf/preflight");
+		expect(planning).toContain("pb/project-benchmark");
+		expect(planning).not.toContain("qt/quick-task");
+		expect(execution).toContain("Commands for execution");
+		expect(execution).toContain("n/new");
+		expect(execution).toContain("qt/quick-task");
+		expect(execution).not.toContain("ma/maintenance");
+		expect(maintenance).toContain("Commands for maintenance");
+		expect(maintenance).toContain("ht/health");
+		expect(maintenance).toContain("mt/maintenance");
+		expect(maintenance).not.toContain("n/new");
+	});
+
 	test("lists every top-level command with a short compact description", () => {
 		const help = formatHelpText(kernelRegistry);
 
@@ -65,7 +93,7 @@ describe("help formatter", () => {
 		const lines = help.split("\n");
 
 		expect(lines.length).toBeGreaterThan(formatHelpText().split("\n").length);
-		expect(lines.length).toBeLessThanOrEqual(330);
+		expect(lines.length).toBeLessThanOrEqual(360);
 		expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
 			120,
 		);
@@ -96,6 +124,99 @@ describe("help formatter", () => {
 		expect(help).toContain("Side effect: read");
 		expect(help).toContain("Description: Show current project status");
 		expect(unknown).toBeNull();
+	});
+
+	test("routes command group help before subcommand parsers", () => {
+		const helpGroups = SUBCOMMAND_DISPATCH_GROUPS.map((group) => ({
+			group,
+			spec:
+				kernelRegistry.commands.find((spec) => spec.command === group) ??
+				kernelRegistry.commands.find((spec) => spec.kind === group),
+		}));
+		expect(
+			helpGroups
+				.filter(({ spec }) => spec === undefined)
+				.map(({ group }) => group),
+		).toEqual([]);
+		const tempRoot = mkdtempSync(join(tmpdir(), "afol-help-"));
+		const cliPath = join(repoRoot, "cli/main.ts");
+
+		try {
+			for (const { spec } of helpGroups) {
+				if (!spec) {
+					continue;
+				}
+				const result = spawnSync("bun", [cliPath, spec.command, "--help"], {
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				});
+
+				expect(result.status).toBe(0);
+				expect(result.stderr).toBe("");
+				expect(result.stdout).toContain(`Command: ${spec.command}`);
+			}
+			for (const [args, expectedCommand] of [
+				[["adr", "-h"], "adr"],
+				[["adr", "--help", "--verbose"], "adr"],
+				[["adr", "new", "--help"], "adr"],
+				[["render", "--help"], "render"],
+				[["render", "-h"], "render"],
+				[["memory", "render", "--help"], "render"],
+			] as const) {
+				const result = spawnSync("bun", [cliPath, ...args], {
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				});
+
+				expect(result.status).toBe(0);
+				expect(result.stderr).toBe("");
+				expect(result.stdout).toContain(`Command: ${expectedCommand}`);
+			}
+			for (const args of [
+				["help", "--help"],
+				["help", "-h"],
+			] as const) {
+				const result = spawnSync("bun", [cliPath, ...args], {
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				});
+
+				expect(result.status).toBe(0);
+				expect(result.stderr).toBe("");
+				expect(result.stdout).toContain("Usage: afol");
+			}
+			const intentResult = spawnSync(
+				"bun",
+				[cliPath, "help", "--for", "planning"],
+				{
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				},
+			);
+			expect(intentResult.status).toBe(0);
+			expect(intentResult.stderr).toBe("");
+			expect(intentResult.stdout).toContain("Commands for planning");
+			expect(intentResult.stdout).toContain("pf/preflight");
+
+			const invalidIntent = spawnSync(
+				"bun",
+				[cliPath, "help", "--for", "unknown"],
+				{
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				},
+			);
+			expect(invalidIntent.status).toBe(2);
+			expect(invalidIntent.stderr).toContain("err unknown-help-intent");
+			expect(existsSync(join(tempRoot, ".afol"))).toBe(false);
+		} finally {
+			rmSync(tempRoot, { recursive: true, force: true });
+		}
 	});
 
 	test("expands per-command help with tool-specific options and guidance", () => {
@@ -172,22 +293,25 @@ describe("help formatter", () => {
 		expect(help).toMatchObject({
 			command: "schema",
 			sideEffect: "write",
+			requires_approval: true,
 			description:
 				"Review schema state; apply and resolver --write can write files",
 			category: "ops",
 		});
 		expect(help?.subcommands).toEqual(
 			expect.arrayContaining([
-				{
+				expect.objectContaining({
 					usage: "apply --dry-run",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Preview schema apply without writing",
-				},
-				{
+				}),
+				expect.objectContaining({
 					usage: "apply",
 					sideEffect: "write",
+					requires_approval: true,
 					description: "Write the detected schema pack for local callers",
-				},
+				}),
 			]),
 		);
 	});
@@ -223,9 +347,10 @@ describe("help formatter", () => {
 		expect(help).toContain("Side effect: generated");
 		expect(help).toContain("Subcommands:");
 		expect(help).toContain("build [generated]");
-		expect(help).toContain("bundle [generated]");
+		expect(help).toContain("bundle [read]");
+		expect(help).toContain("bundle --persist-rule-injection [generated]");
 		expect(help).toContain("section --ref <ref> [generated]");
-		expect(help).toContain("explain [generated]");
+		expect(help).toContain("explain [--full] [read]");
 		expect(help).toContain("tools [generated]");
 	});
 
@@ -266,6 +391,7 @@ describe("help formatter", () => {
 			aliases: string[];
 			kind: string;
 			sideEffect: string;
+			requires_approval: boolean;
 			description: string;
 			category?: string;
 		}>;
@@ -287,8 +413,29 @@ describe("help formatter", () => {
 			"ad",
 		]);
 		expect(
+			parsed.find((entry) => entry.command === "status")?.requires_approval,
+		).toBe(false);
+		expect(
+			parsed.find((entry) => entry.command === "maintenance")
+				?.requires_approval,
+		).toBe(true);
+		expect(
+			parsed.every((entry) => typeof entry.requires_approval === "boolean"),
+		).toBe(true);
+		expect(
 			parsed.every((entry) => !entry.aliases.includes(entry.command)),
 		).toBe(true);
+	});
+
+	test("builds intent-filtered catalog json", () => {
+		const parsed = JSON.parse(
+			formatCatalogJson(kernelRegistry, { intent: "maintenance" }),
+		) as Array<{ command: string }>;
+		const commands = parsed.map((entry) => entry.command);
+
+		expect(commands).toContain("maintenance");
+		expect(commands).toContain("health");
+		expect(commands).not.toContain("new");
 	});
 
 	test("builds single command json from registry metadata", () => {
@@ -299,18 +446,33 @@ describe("help formatter", () => {
 			aliases: ["s"],
 			kind: "status",
 			sideEffect: "read",
+			requires_approval: false,
 			description: "Show current project status",
 			category: "core",
 			subcommands: [
 				{
 					usage: "--json",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Emit machine-readable project status",
+				},
+				{
+					usage: "--health",
+					sideEffect: "read",
+					requires_approval: false,
+					description: "Include global health findings",
 				},
 				{
 					usage: "--session <session-id>",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Resolve status around a specific session",
+				},
+				{
+					usage: "--task-id <task-id>",
+					sideEffect: "read",
+					requires_approval: false,
+					description: "Resolve a specific task in the selected session",
 				},
 			],
 		});
@@ -325,6 +487,7 @@ describe("help formatter", () => {
 			{
 				usage: "--dry-run",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Preview scaffold install without writing",
 			},
 		]);
@@ -337,38 +500,45 @@ describe("help formatter", () => {
 			{
 				usage: "list",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "List scored reference projects",
 			},
 			{
 				usage: "show <project-id>",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Inspect one reference project by id or name",
 			},
 			{
 				usage: "matrix --for <axis>",
 				sideEffect: "read",
+				requires_approval: false,
 				description:
 					"Filter the score matrix by axis; omit --for for the full matrix",
 			},
 			{
 				usage: "recommend --for <axis>",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Rank the best reference projects for one axis",
 			},
 			{
 				usage: "validate --strict",
 				sideEffect: "read",
+				requires_approval: false,
 				description:
 					"Fail validation on warnings; omit --strict for standard validation",
 			},
 			{
 				usage: "generate --check",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Check generated outputs without writing files",
 			},
 			{
 				usage: "generate",
 				sideEffect: "generated",
+				requires_approval: true,
 				description: "Refresh generated outputs with local approval",
 			},
 		]);
@@ -382,36 +552,84 @@ describe("help formatter", () => {
 			aliases: ["cx"],
 			kind: "ctx",
 			sideEffect: "generated",
+			requires_approval: true,
 			description: "Inspect context bundles",
 			category: "inspect",
 			subcommands: [
 				{
 					usage: "build",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "Rebuild the section index",
 				},
 				{
 					usage: "bundle",
+					sideEffect: "read",
+					requires_approval: false,
+					description:
+						"Build a context bundle; --json for compact output, --json --full for complete payload",
+				},
+				{
+					usage: "bundle --json [--full]",
+					sideEffect: "read",
+					requires_approval: false,
+					description:
+						"Return compact JSON; pass --full to include the complete bundle",
+				},
+				{
+					usage: "bundle --persist-rule-injection",
 					sideEffect: "generated",
-					description: "Build a context bundle and refresh sections if needed",
+					requires_approval: true,
+					description:
+						"Persist first-use rule injection state with local approval",
 				},
 				{
 					usage: "section --ref <ref>",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "Read one section and refresh sections if needed",
 				},
 				{
-					usage: "explain",
-					sideEffect: "generated",
-					description: "Explain bundle inputs and refresh sections if needed",
+					usage: "explain [--full]",
+					sideEffect: "read",
+					requires_approval: false,
+					description:
+						"Explain bundle inputs; pass --full to include the complete bundle",
 				},
 				{
 					usage: "tools",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "List context helpers and refresh sections if needed",
 				},
 			],
 		});
+	});
+
+	test("every subcommand in catalog json has correct requires_approval per sideEffect", () => {
+		const catalog = buildCommandCatalog(kernelRegistry);
+		for (const entry of catalog) {
+			if (!entry.subcommands?.length) continue;
+			for (const sub of entry.subcommands) {
+				expect(typeof sub.requires_approval).toBe("boolean");
+				expect(sub.requires_approval).toBe(
+					requiresApprovalForSideEffect(sub.sideEffect),
+				);
+			}
+		}
+	});
+
+	test("every per-command json subcommand has correct requires_approval", () => {
+		for (const spec of kernelRegistry.commands) {
+			const help = buildCommandHelpJson(spec.command, kernelRegistry);
+			if (!help?.subcommands?.length) continue;
+			for (const sub of help.subcommands) {
+				expect(typeof sub.requires_approval).toBe("boolean");
+				expect(sub.requires_approval).toBe(
+					requiresApprovalForSideEffect(sub.sideEffect),
+				);
+			}
+		}
 	});
 
 	test("builds local-state json with subcommand metadata", () => {
@@ -422,6 +640,7 @@ describe("help formatter", () => {
 			aliases: ["ls"],
 			kind: "localState",
 			sideEffect: "generated",
+			requires_approval: true,
 			description: "Inspect local project indexes",
 			category: "inspect",
 			guidance: [
@@ -432,16 +651,19 @@ describe("help formatter", () => {
 				{
 					usage: "freshness|fs --json",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Check whether local-state indexes are fresh",
 				},
 				{
 					usage: "rebuild|rb --json",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "Refresh indexes and emit compact counts",
 				},
 				{
 					usage: "rebuild|rb --json --verbose",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "Refresh indexes and include full snapshots",
 				},
 			],

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
 	mkdirSync,
@@ -9,11 +9,15 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runStatusCommand } from "../commands/status";
+import {
+	runStatusCommand,
+	setCatchupComputerForTests,
+} from "../commands/status";
 import { rebuildProjectIndexes } from "../services/local-state/project-indexes";
 import { rebuildWorkBenchIndex } from "../services/local-state/workbench-index";
 import { rebuildPstrIndex } from "../services/pstr/builder";
 import { collectGlobalStatusFindings } from "../services/status/global-findings";
+import type { CatchupReport } from "../services/workbench/catchup";
 
 type CapturedIo = {
 	stdout: string[];
@@ -40,6 +44,10 @@ function captureIo(): CapturedIo {
 		},
 	};
 }
+
+afterEach(() => {
+	setCatchupComputerForTests(null);
+});
 
 function runGit(root: string, args: string[]): void {
 	const result = spawnSync("git", args, {
@@ -254,11 +262,67 @@ describe("status command", () => {
 		}
 	});
 
+	test("selects active state-board task before first task id", () => {
+		const root = createFixture();
+		try {
+			const sessionId = "260530_2256_cli-native-command-parity";
+			const taskFile = join(
+				root,
+				".afol",
+				"wb",
+				sessionId,
+				`${sessionId}_task_01.md`,
+			);
+			writeFileSync(
+				taskFile,
+				[
+					"---",
+					"task_id: T-01",
+					"status: pending",
+					"---",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | first id is not active |",
+					"| T-02 | in_progress | worker | real active task |",
+					"| T-03 | done | worker | complete |",
+					"",
+					"NEXT:",
+					"- continue T-02",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const captured = captureIo();
+			const code = runStatusCommand(root, [], captured.io);
+			const text = captured.stdout[0] ?? "";
+			expect(code).toBe(0);
+			expect(text).toContain("TASK: T-02");
+			expect(text).toContain("STATUS: in_progress");
+
+			const override = captureIo();
+			const overrideCode = runStatusCommand(
+				root,
+				["--task-id", "T-01"],
+				override.io,
+			);
+			const overrideText = override.stdout[0] ?? "";
+			expect(overrideCode).toBe(0);
+			expect(overrideText).toContain("TASK: T-01");
+			expect(overrideText).toContain("STATUS: pending");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("active session + stale log shows log_behind_diff=yes", () => {
 		const { root } = createFreshnessFixture("stale-log");
 		try {
 			const captured = captureIo();
-			const code = runStatusCommand(root, [], captured.io);
+			const code = runStatusCommand(root, ["--catchup"], captured.io);
 			expect(code).toBe(0);
 			const text = captured.stdout[0] ?? "";
 			expect(text).toContain("freshness:");
@@ -272,7 +336,7 @@ describe("status command", () => {
 		const { root } = createFreshnessFixture("fresh");
 		try {
 			const captured = captureIo();
-			const code = runStatusCommand(root, [], captured.io);
+			const code = runStatusCommand(root, ["--catchup"], captured.io);
 			expect(code).toBe(0);
 			expect(captured.stdout[0] ?? "").toContain("freshness: ok");
 		} finally {
@@ -330,9 +394,107 @@ describe("status command", () => {
 			const text = captured.stdout[0] ?? "";
 			expect(text).toContain("VALIDATION_OR_CHECKS:");
 			expect(text).toContain("BLOCKERS:");
+			expect(text).toContain("- none");
+			expect(text).not.toContain("project indexes need rebuild");
+			expect(text).not.toContain("run afol local-state rebuild");
+			expect(text).not.toContain("run afol pstr rebuild");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("surfaces global index findings with --health", () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			const code = runStatusCommand(root, ["--health"], captured.io);
+			expect(code).toBe(0);
+
+			const text = captured.stdout[0] ?? "";
+			expect(text).toContain("VALIDATION_OR_CHECKS:");
+			expect(text).toContain("BLOCKERS:");
 			expect(text).toContain("project indexes need rebuild");
 			expect(text).toContain("run afol local-state rebuild; afol pstr rebuild");
 			expect(text).not.toContain("BLOCKERS:\n- none");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("supports --task-id status override", () => {
+		const root = createFixture();
+		try {
+			const sessionId = "260530_2256_cli-native-command-parity";
+			const sessionDir = join(root, ".afol", "wb", sessionId);
+			writeFileSync(
+				join(sessionDir, `${sessionId}_task_02.md`),
+				[
+					"---",
+					"task_id: T-02",
+					"status: done",
+					"---",
+					"",
+					"FILES_WRITTEN:",
+					"- cli/commands/other.ts",
+					"VALIDATION_OR_CHECKS:",
+					"- none",
+					"BLOCKERS:",
+					"- none",
+					"NEXT:",
+					"- none",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const captured = captureIo();
+			const code = runStatusCommand(root, ["--task-id", "T-02"], captured.io);
+			expect(code).toBe(0);
+			const text = captured.stdout[0] ?? "";
+			expect(text).toContain("TASK: T-02");
+			expect(text).toContain("STATUS: done");
+			expect(text).not.toContain("TASK: T-01");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("fails explicit --task-id when the task does not exist", () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			const code = runStatusCommand(root, ["--task-id", "T-99"], captured.io);
+
+			expect(code).toBe(1);
+			expect(captured.stdout).toEqual([]);
+			expect(captured.stderr.join("\n")).toContain("error: task-not-found");
+			expect(captured.stderr.join("\n")).toContain("T-99");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("returns JSON error for explicit --task-id misses", () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			const code = runStatusCommand(
+				root,
+				["--task-id", "T-99", "--json"],
+				captured.io,
+			);
+
+			expect(code).toBe(1);
+			expect(captured.stderr).toEqual([]);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				ok?: boolean;
+				exit_code?: number;
+				error?: { code?: string; message?: string };
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(1);
+			expect(payload.error?.code).toBe("task-not-found");
+			expect(payload.error?.message).toContain("T-99");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -378,11 +540,85 @@ describe("status command", () => {
 		}
 	});
 
-	test("--json includes freshness under session when active", () => {
+	test("default status skips catchup for active session and --catchup enables it", () => {
+		const { root, session } = createFreshnessFixture("fresh");
+		try {
+			let catchupCalls = 0;
+			const report: CatchupReport = {
+				session,
+				session_status: "active",
+				git_changed_files: [],
+				git_changed_files_overflow: false,
+				git_branch: "main",
+				artifacts: {
+					plan: { present: true, mtime: null, lines: 1 },
+					task: { present: true, mtime: null, lines: 1 },
+					log: { present: true, mtime: null, lines: 1 },
+					report: { present: true, mtime: null, lines: 1 },
+				},
+				freshness: {
+					findings_stale: false,
+					log_behind_diff: false,
+					notes: [],
+				},
+				next_step: "next",
+			};
+			setCatchupComputerForTests((() => {
+				catchupCalls += 1;
+				return report;
+			}) as Parameters<typeof setCatchupComputerForTests>[0]);
+
+			const textCaptured = captureIo();
+			const textCode = runStatusCommand(root, [], textCaptured.io);
+			expect(textCode).toBe(0);
+			expect(catchupCalls).toBe(0);
+			expect(textCaptured.stdout.join("\n")).not.toContain("freshness:");
+
+			const jsonCaptured = captureIo();
+			const jsonCode = runStatusCommand(root, ["--json"], jsonCaptured.io);
+			expect(jsonCode).toBe(0);
+			const jsonPayload = JSON.parse(jsonCaptured.stdout[0] ?? "{}") as {
+				data?: { session?: unknown };
+			};
+			expect(jsonPayload.data?.session).toBeUndefined();
+
+			const catchupText = captureIo();
+			const catchupTextCode = runStatusCommand(
+				root,
+				["--catchup"],
+				catchupText.io,
+			);
+			expect(catchupTextCode).toBe(0);
+			expect(catchupCalls).toBe(1);
+			expect(catchupText.stdout.join("\n")).toContain("freshness: ok");
+
+			const catchupJson = captureIo();
+			const catchupJsonCode = runStatusCommand(
+				root,
+				["--json", "--catchup"],
+				catchupJson.io,
+			);
+			expect(catchupJsonCode).toBe(0);
+			const catchupPayload = JSON.parse(catchupJson.stdout[0] ?? "{}") as {
+				data?: {
+					session?: {
+						id?: string;
+						freshness?: unknown;
+					};
+				};
+			};
+			expect(catchupPayload.data?.session?.id).toBe(session);
+			expect(catchupPayload.data?.session?.freshness).toBeDefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("--json includes freshness under session when catchup is requested", () => {
 		const { root, session } = createFreshnessFixture("fresh");
 		try {
 			const captured = captureIo();
-			const code = runStatusCommand(root, ["--json"], captured.io);
+			const code = runStatusCommand(root, ["--json", "--catchup"], captured.io);
 			expect(code).toBe(0);
 			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
 				data?: {

@@ -26,8 +26,8 @@ Optional runtime adapters kept thin for broader reuse when enabled:
 
 - `AGENTS.md` is the canonical instruction source.
 - `.afol/adm/` is the canonical strategic and governance layer.
-- `.afol/pstr/` is the canonical observed project-structure map layer; validate
-  or rebuild before trusting stale output.
+- `.afol/pstr/` is the generated observed project-structure map layer when
+  present; missing or stale maps are not authoritative.
 - `.afol/wb/` remains the canonical execution layer.
 - `.agents/` is limited to static scaffold metadata and provider skills:
   `lock.json`, `manifest.json`, and `.agents/skills/**`. Hooks, rules, source

@@ -95,6 +95,16 @@ describe("hook command", () => {
 			expect(await runHookCommand(["list"], root, list.io)).toBe(0);
 			expect(list.stdout.join("\n")).toContain("hooks: 2");
 			expect(list.stdout.join("\n")).toContain("HOOK-ALPHA alpha bundle");
+			const jsonList = capture();
+			expect(await runHookCommand(["list", "--json"], root, jsonList.io)).toBe(
+				0,
+			);
+			const jsonListPayload = JSON.parse(jsonList.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { count: number };
+			};
+			expect(jsonListPayload.ok).toBe(true);
+			expect(jsonListPayload.data.count).toBe(2);
 
 			const show = capture();
 			expect(await runHookCommand(["show", "HOOK-ALPHA"], root, show.io)).toBe(
@@ -104,6 +114,20 @@ describe("hook command", () => {
 			expect(show.stdout.join("\n")).toContain("events: context.bundle");
 			expect(show.stdout.join("\n")).toContain("messages: 1");
 			expect(show.stdout.join("\n")).toContain("validation_commands: 1");
+			const jsonShow = capture();
+			expect(
+				await runHookCommand(
+					["show", "HOOK-ALPHA", "--json"],
+					root,
+					jsonShow.io,
+				),
+			).toBe(0);
+			const jsonShowPayload = JSON.parse(jsonShow.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { hook: { id: string } };
+			};
+			expect(jsonShowPayload.ok).toBe(true);
+			expect(jsonShowPayload.data.hook.id).toBe("HOOK-ALPHA");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -137,6 +161,35 @@ describe("hook command", () => {
 			expect(output.stdout.join("\n")).toContain("resolved hooks: 1");
 			expect(output.stdout.join("\n")).toContain("HOOK-ALPHA");
 			expect(output.stdout.join("\n")).not.toContain("HOOK-BETA");
+			const jsonOutput = capture();
+			expect(
+				await runHookCommand(
+					[
+						"resolve",
+						"--json",
+						"--event",
+						"context.bundle",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--work-type",
+						"delivery",
+						"--language",
+						"ts",
+						"--file",
+						"cli/commands/catalog.ts",
+					],
+					root,
+					jsonOutput.io,
+				),
+			).toBe(0);
+			const jsonResolvePayload = JSON.parse(jsonOutput.stdout[0] ?? "{}") as {
+				ok: boolean;
+				data: { count: number };
+			};
+			expect(jsonResolvePayload.ok).toBe(true);
+			expect(jsonResolvePayload.data.count).toBe(1);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

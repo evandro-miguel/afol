@@ -141,12 +141,17 @@ export async function runMaintenanceCommand(
 									ok: true,
 									mode: parsed.mode,
 									area: result.area,
+									dry_run: parsed.dryRun,
 									reviewed_areas: result.reviewed_areas,
-									dry_run: result.dry_run,
+									preview: result.preview,
+									applied: result.applied,
 									recorded_at: result.recorded_at,
 									note: result.note,
-									review_interval_days: result.summary.review_interval_days,
-									due_areas: result.summary.due_areas,
+									review_interval_days:
+										result.current_summary.review_interval_days,
+									due_areas: result.current_summary.due_areas,
+									current_summary: result.current_summary,
+									preview_summary: result.preview_summary,
 								},
 								"maintenance.review",
 								0,
@@ -155,22 +160,34 @@ export async function runMaintenanceCommand(
 								"ok",
 								"mode",
 								"area",
-								"reviewed_areas",
 								"dry_run",
+								"reviewed_areas",
+								"preview",
+								"applied",
 								"recorded_at",
 								"note",
 								"review_interval_days",
 								"due_areas",
+								"current_summary",
+								"preview_summary",
 							],
 						),
 					),
 				);
 			} else {
+				const displaySummary = parsed.dryRun
+					? result.preview_summary
+					: result.summary;
 				io.stdout(
 					[
-						`maintenance review recorded${parsed.dryRun ? " (dry-run)" : ""}: ${result.reviewed_areas.join(", ")}`,
-						`  due next: ${result.summary.due_areas.join(", ") || "none"}`,
-					].join("\n"),
+						`maintenance review ${parsed.dryRun ? "preview" : "recorded"}: ${result.reviewed_areas.join(", ")}`,
+						parsed.dryRun
+							? `  current due: ${result.current_summary.due_areas.join(", ") || "none"}`
+							: "",
+						`  due next: ${displaySummary.due_areas.join(", ") || "none"}`,
+					]
+						.filter(Boolean)
+						.join("\n"),
 				);
 			}
 			return 0;

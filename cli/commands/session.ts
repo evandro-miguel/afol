@@ -1,14 +1,25 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { relative } from "node:path";
 import {
 	envelopeErr,
 	envelopeOk,
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
 import { atomicWriteText } from "../services/io/atomic";
 import { loadCoordinationRadar } from "../services/local-state/coordination-radar";
 import { resolveProjectPaths } from "../services/project/paths";
-import { readActiveSession } from "../services/workbench/lifecycle";
+import {
+	isSessionClosed,
+	readActiveSession,
+	sessionPaths,
+} from "../services/workbench/lifecycle";
 import {
 	bindSession,
 	listBindings,
@@ -104,6 +115,8 @@ let radarReaderOverride: CoordinationRadarReader | null = null;
 type ParsedArgs = {
 	json: boolean;
 	dryRun: boolean;
+	debug: boolean;
+	strict: boolean;
 	branch: string | null;
 	actor: string | null;
 	session: string | null;
@@ -239,10 +252,13 @@ function getCoordinationRadarReader(): CoordinationRadarReader {
 	return radarReaderOverride ?? loadCoordinationRadar;
 }
 
-async function radarSessions(projectRoot: string): Promise<ActionResult> {
+async function radarSessions(
+	projectRoot: string,
+	strict: boolean,
+): Promise<ActionResult> {
 	const reader = getCoordinationRadarReader();
 	const report = await reader(projectRoot);
-	return prepareRadarResult(normalizeRadarReport(report));
+	return prepareRadarResult(normalizeRadarReport(report), strict);
 }
 
 function emitRadarError(
@@ -301,6 +317,8 @@ function currentGitWorktree(root: string): string | null {
 function parseArgs(args: string[]): ParsedArgs {
 	let json = false;
 	let dryRun = false;
+	let debug = false;
+	let strict = false;
 	let branch: string | null = null;
 	let actor: string | null = null;
 	let session: string | null = null;
@@ -316,6 +334,14 @@ function parseArgs(args: string[]): ParsedArgs {
 		}
 		if (arg === "--dry-run") {
 			dryRun = true;
+			continue;
+		}
+		if (arg === "--debug") {
+			debug = true;
+			continue;
+		}
+		if (arg === "--strict") {
+			strict = true;
 			continue;
 		}
 		if (arg === "--session") {
@@ -347,7 +373,7 @@ function parseArgs(args: string[]): ParsedArgs {
 		}
 		positional.push(arg);
 	}
-	return { json, dryRun, branch, actor, session, positional };
+	return { json, dryRun, debug, strict, branch, actor, session, positional };
 }
 
 function emit(
@@ -370,13 +396,56 @@ function emit(
 	return result.exitCode;
 }
 
-function listSessions(projectRoot: string): ActionResult {
+function assertSessionExists(projectRoot: string, session: string): void {
+	const paths = sessionPaths(projectRoot, session);
+	if (!existsSync(paths.sessionDir)) {
+		throw new Error(
+			`session not found: ${session} (missing folder ${paths.sessionDir})`,
+		);
+	}
+	if (!existsSync(paths.taskPath)) {
+		throw new Error(
+			`session not found: ${session} (missing task file ${paths.taskPath})`,
+		);
+	}
+}
+
+function assertSessionNotArchivedOrClosed(
+	projectRoot: string,
+	session: string,
+): void {
+	if (isSessionClosed(projectRoot, session)) {
+		throw new Error(`session closed: ${session} (all tasks done)`);
+	}
+}
+
+function displayWorktreePath(
+	projectRoot: string,
+	worktree: string | null,
+	debug: boolean,
+): string | null {
+	if (worktree === null) {
+		return null;
+	}
+	if (debug) {
+		return worktree;
+	}
+	return relative(projectRoot, worktree).replace(/\\/g, "/") || ".";
+}
+
+function listSessions(projectRoot: string, debug: boolean): ActionResult {
 	const currentBranch = currentGitBranch(projectRoot);
 	const currentWorktree = currentGitWorktree(projectRoot);
 	const globalActiveSession = readActiveSession(projectRoot);
 	const contextSession = resolveContextSession(projectRoot);
+	const displayedCurrentWorktree = displayWorktreePath(
+		projectRoot,
+		currentWorktree,
+		debug,
+	);
 	const bindings = listBindings(projectRoot).map((binding) => ({
 		...binding,
+		worktree: displayWorktreePath(projectRoot, binding.worktree, debug),
 		matches_context:
 			(currentBranch !== null && binding.branch === currentBranch) ||
 			(currentWorktree !== null && binding.worktree === currentWorktree),
@@ -385,7 +454,7 @@ function listSessions(projectRoot: string): ActionResult {
 	return {
 		data: {
 			current_branch: currentBranch,
-			current_worktree: currentWorktree,
+			current_worktree: displayedCurrentWorktree,
 			global_active_session: globalActiveSession,
 			context_session: contextSession,
 			bindings,
@@ -393,7 +462,7 @@ function listSessions(projectRoot: string): ActionResult {
 		lines: [
 			"session list:",
 			`  current branch: ${currentBranch ?? "(none)"}`,
-			`  current worktree: ${currentWorktree ?? "(none)"}`,
+			`  current worktree: ${displayedCurrentWorktree ?? "(none)"}`,
 			`  global active: ${globalActiveSession ?? "(none)"}`,
 			`  context session: ${contextSession ?? "(none)"}`,
 			...(bindings.length > 0
@@ -412,7 +481,10 @@ function listSessions(projectRoot: string): ActionResult {
 	};
 }
 
-function prepareRadarResult(report: CoordinationRadarReport): ActionResult {
+function prepareRadarResult(
+	report: CoordinationRadarReport,
+	strict: boolean,
+): ActionResult {
 	const tasks = report.tasks.filter(isOpenTask);
 	const warnings = [...report.warnings].sort(
 		(left, right) =>
@@ -426,6 +498,7 @@ function prepareRadarResult(report: CoordinationRadarReport): ActionResult {
 		}));
 	const summary = summarizeRadar({ ...report, tasks, warnings, sessions });
 	const topWarnings = warnings.slice(0, RADAR_TEXT_WARNING_LIMIT);
+	const exitCode = strict && summary.critical > 0 ? 1 : 0;
 	return {
 		data: {
 			warning_policy: "context-only",
@@ -450,18 +523,21 @@ function prepareRadarResult(report: CoordinationRadarReport): ActionResult {
 			"open tasks:",
 			...(tasks.length > 0 ? tasks.map(formatRadarTask) : ["  (none)"]),
 		],
-		exitCode: 0,
+		exitCode,
 	};
 }
 
 function bindCurrentSession(
 	projectRoot: string,
 	parsed: ParsedArgs,
+	ctx: OperationContext,
 ): ActionResult {
 	const session = parsed.session ?? parsed.positional[0] ?? "";
 	if (!session) {
 		throw new Error("Missing --session for session bind.");
 	}
+	assertSessionExists(projectRoot, session);
+	assertSessionNotArchivedOrClosed(projectRoot, session);
 	const branch = parsed.branch ?? currentGitBranch(projectRoot);
 	const worktree = currentGitWorktree(projectRoot) ?? projectRoot;
 	if (parsed.dryRun) {
@@ -481,6 +557,9 @@ function bindCurrentSession(
 			exitCode: 0,
 		};
 	}
+	if (requiresApproval(ctx)) {
+		throw new Error("session bind requires local interactive approval");
+	}
 	const binding = bindSession(projectRoot, {
 		session,
 		branch,
@@ -499,7 +578,16 @@ function bindCurrentSession(
 	};
 }
 
-function switchSession(projectRoot: string, session: string): ActionResult {
+function switchSession(
+	projectRoot: string,
+	session: string,
+	ctx: OperationContext,
+): ActionResult {
+	assertSessionExists(projectRoot, session);
+	assertSessionNotArchivedOrClosed(projectRoot, session);
+	if (requiresApproval(ctx)) {
+		throw new Error("session switch requires local interactive approval");
+	}
 	const branch = currentGitBranch(projectRoot);
 	const worktree = currentGitWorktree(projectRoot) ?? projectRoot;
 	atomicWriteText(
@@ -524,7 +612,14 @@ function switchSession(projectRoot: string, session: string): ActionResult {
 	};
 }
 
-function unbindSession(projectRoot: string, session: string): ActionResult {
+function unbindSession(
+	projectRoot: string,
+	session: string,
+	ctx: OperationContext,
+): ActionResult {
+	if (requiresApproval(ctx)) {
+		throw new Error("session unbind requires local interactive approval");
+	}
 	const removed = removeBinding(projectRoot, session);
 	return {
 		data: { action: "unbind", session, removed },
@@ -535,76 +630,139 @@ function unbindSession(projectRoot: string, session: string): ActionResult {
 	};
 }
 
+function writeSessionError(
+	error: unknown,
+	parsed: ParsedArgs,
+	io: CommandIo,
+): number {
+	const message = (error as Error).message ?? String(error);
+	const exitCode = 2;
+	let errorCode = "SESSION_ERROR";
+	if (
+		message.includes("Missing --session") ||
+		message.includes("Missing session identifier")
+	) {
+		errorCode = "SESSION_MISSING_ARG";
+	} else if (message.includes("session not found")) {
+		errorCode = "SESSION_NOT_FOUND";
+	} else if (message.includes("requires local interactive approval")) {
+		errorCode = "SESSION_APPROVAL_REQUIRED";
+	} else if (message.includes("Missing value for")) {
+		errorCode = "SESSION_PARSE_ERROR";
+	}
+	if (parsed.json) {
+		io.stdout(
+			stringifyEnvelope(
+				envelopeErr(errorCode, message, {
+					action: "session",
+					exitCode,
+				}),
+			),
+		);
+	} else {
+		io.stderr(`for session command: ${message}`);
+	}
+	return exitCode;
+}
+
 export async function runSessionCommand(
 	action: string,
 	args: string[],
 	projectRoot: string,
 	io: CommandIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
-	const parsed = parseArgs(args);
-	if (action === "" || action === "list") {
-		return emit(listSessions(projectRoot), "session.list", parsed.json, io);
-	}
-	if (action === "bind") {
-		return emit(
-			bindCurrentSession(projectRoot, parsed),
-			"session.bind",
-			parsed.json,
+	let parsed: ParsedArgs;
+	try {
+		parsed = parseArgs(args);
+	} catch (error) {
+		return writeSessionError(
+			error,
+			{
+				json: args.includes("--json") || args.includes("-j"),
+				dryRun: false,
+				debug: false,
+				strict: false,
+				branch: null,
+				actor: null,
+				session: null,
+				positional: [],
+			},
 			io,
 		);
 	}
-	if (action === "switch") {
-		const session = parsed.positional[0] ?? parsed.session ?? "";
-		if (!session) {
-			throw new Error("Missing session identifier for session switch.");
-		}
-		return emit(
-			switchSession(projectRoot, session),
-			"session.switch",
-			parsed.json,
-			io,
-		);
-	}
-	if (action === "unbind") {
-		const session = parsed.session ?? parsed.positional[0] ?? "";
-		if (!session) {
-			throw new Error("Missing --session for session unbind.");
-		}
-		return emit(
-			unbindSession(projectRoot, session),
-			"session.unbind",
-			parsed.json,
-			io,
-		);
-	}
-	if (action === "radar") {
-		try {
+	try {
+		if (action === "" || action === "list") {
 			return emit(
-				await radarSessions(projectRoot),
-				"session.radar",
+				listSessions(projectRoot, parsed.debug),
+				"session.list",
 				parsed.json,
 				io,
 			);
-		} catch (error) {
-			return emitRadarError(parsed, io, (error as Error).message);
 		}
-	}
+		if (action === "bind") {
+			return emit(
+				bindCurrentSession(projectRoot, parsed, ctx),
+				"session.bind",
+				parsed.json,
+				io,
+			);
+		}
+		if (action === "switch") {
+			const session = parsed.positional[0] ?? parsed.session ?? "";
+			if (!session) {
+				throw new Error("Missing session identifier for session switch.");
+			}
+			return emit(
+				switchSession(projectRoot, session, ctx),
+				"session.switch",
+				parsed.json,
+				io,
+			);
+		}
+		if (action === "unbind") {
+			const session = parsed.session ?? parsed.positional[0] ?? "";
+			if (!session) {
+				throw new Error("Missing --session for session unbind.");
+			}
+			return emit(
+				unbindSession(projectRoot, session, ctx),
+				"session.unbind",
+				parsed.json,
+				io,
+			);
+		}
+		if (action === "radar") {
+			try {
+				return emit(
+					await radarSessions(projectRoot, parsed.strict),
+					"session.radar",
+					parsed.json,
+					io,
+				);
+			} catch (error) {
+				return emitRadarError(parsed, io, (error as Error).message);
+			}
+		}
 
-	const message = `afol session: unknown action '${action}'`;
-	if (parsed.json) {
-		io.stdout(
-			stringifyEnvelope(
-				envelopeErr("SESSION_ACTION_UNKNOWN", message, {
-					action: "session",
-					exitCode: 2,
-					hint: "use list, bind, switch, unbind, or radar",
-				}),
-			),
-		);
-	} else {
-		io.stderr(
-			'err session-action-unknown hint="use list, bind, switch, unbind, or radar"',
-		);
+		const message = `afol session: unknown action '${action}'`;
+		if (parsed.json) {
+			io.stdout(
+				stringifyEnvelope(
+					envelopeErr("SESSION_ACTION_UNKNOWN", message, {
+						action: "session",
+						exitCode: 2,
+						hint: "use list, bind, switch, unbind, or radar",
+					}),
+				),
+			);
+		} else {
+			io.stderr(
+				'err session-action-unknown hint="use list, bind, switch, unbind, or radar"',
+			);
+		}
+		return 2;
+	} catch (error) {
+		return writeSessionError(error, parsed, io);
 	}
-	return 2;
 }

@@ -24,10 +24,15 @@ type ManagedLock = {
 	[key: string]: unknown;
 };
 
-function runDist(cwd: string, args: string[]): SpawnResult {
+function runDist(
+	cwd: string,
+	args: string[],
+	env: Record<string, string | undefined> = {},
+): SpawnResult {
 	return spawnSync(distPath, args, {
 		cwd,
 		encoding: "utf8",
+		env: { ...process.env, ...env },
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 }
@@ -359,16 +364,21 @@ try {
 	writeJson(applyLockPath, applyLock);
 	writeFileSync(applyRulePath, downstreamRuleReadme, "utf8");
 
-	const realApply = runDist(applyTarget, [
-		"update",
-		"apply",
-		"--session",
-		"S-01",
-		"--task-id",
-		"T-01",
-		"--reason",
-		"dist smoke update apply",
-	]);
+	const realApply = runDist(
+		applyTarget,
+		[
+			"update",
+			"apply",
+			"--allow-unbound-context",
+			"--session",
+			"S-01",
+			"--task-id",
+			"T-01",
+			"--reason",
+			"dist smoke update apply",
+		],
+		{ AFOL_TEST: "1" },
+	);
 	assertOk(realApply, "dist update apply");
 	assertContains(realApply, "dist update apply", [
 		"update apply: changes available",

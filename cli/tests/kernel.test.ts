@@ -15,6 +15,7 @@ import { CLI_VERSION } from "../generated/version";
 import { kernelRegistry } from "../registry";
 import { waiveSpecCheck } from "../services/spec-gate/checker";
 import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
+import { readSessionContext } from "../services/workbench/session-context";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
 const templateConfig = JSON.stringify({
@@ -316,11 +317,13 @@ describe("kernel front-door", () => {
 				kind: string;
 				sideEffect: string;
 				description: string;
+				requires_approval: boolean;
 				category?: string;
 				subcommands?: Array<{
 					usage: string;
 					sideEffect: string;
 					description: string;
+					requires_approval: boolean;
 				}>;
 			};
 			expect(singlePayload).toEqual({
@@ -329,17 +332,32 @@ describe("kernel front-door", () => {
 				kind: "status",
 				sideEffect: "read",
 				description: "Show current project status",
+				requires_approval: false,
 				category: "core",
 				subcommands: [
 					{
 						usage: "--json",
 						sideEffect: "read",
 						description: "Emit machine-readable project status",
+						requires_approval: false,
+					},
+					{
+						usage: "--health",
+						sideEffect: "read",
+						description: "Include global health findings",
+						requires_approval: false,
 					},
 					{
 						usage: "--session <session-id>",
 						sideEffect: "read",
 						description: "Resolve status around a specific session",
+						requires_approval: false,
+					},
+					{
+						usage: "--task-id <task-id>",
+						sideEffect: "read",
+						description: "Resolve a specific task in the selected session",
+						requires_approval: false,
 					},
 				],
 			});
@@ -619,11 +637,78 @@ describe("kernel front-door", () => {
 			expect(dryRun.status).toBe(0);
 			const payload = JSON.parse(dryRun.stdout as string) as {
 				dry_run: boolean;
+				applied: boolean;
 				reviewed_areas: string[];
 			};
 			expect(payload.dry_run).toBe(true);
+			expect(payload.applied).toBe(false);
 			expect(payload.reviewed_areas).toEqual(["rules"]);
 			expect(existsSync(reviewPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("ctx and local-state write commands honor approval gate through the kernel front-door", () => {
+		const root = mkProjectRoot("guarded-writes-agent", "");
+		try {
+			const ctxDenied = runKernel(root, ["--agent", "ctx", "build", "--json"]);
+			expect(ctxDenied.status).toBe(2);
+			const ctxPayload = JSON.parse(ctxDenied.stdout as string) as {
+				ok: boolean;
+				action: string;
+				error: { code: string };
+			};
+			expect(ctxPayload.ok).toBe(false);
+			expect(ctxPayload.action).toBe("ctx.build");
+			expect(ctxPayload.error.code).toBe("approval-required");
+
+			const localStateDenied = runKernel(root, [
+				"--remote",
+				"local-state",
+				"rebuild",
+				"--json",
+			]);
+			expect(localStateDenied.status).toBe(2);
+			const localStatePayload = JSON.parse(
+				localStateDenied.stdout as string,
+			) as {
+				ok: boolean;
+				action: string;
+				error: { code: string };
+			};
+			expect(localStatePayload.ok).toBe(false);
+			expect(localStatePayload.action).toBe("local-state.rebuild");
+			expect(localStatePayload.error.code).toBe("approval-required");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("session bind honors restricted context through the kernel front-door", () => {
+		const root = mkProjectRoot("session-bind-agent", "");
+		try {
+			writeWorkbenchSession(root, "BOUND");
+			writeFileSync(
+				join(root, ".afol", "wb", "BOUND", "BOUND_task_01.md"),
+				"# task\n",
+				"utf8",
+			);
+
+			const denied = runKernel(root, [
+				"--agent",
+				"session",
+				"bind",
+				"--session",
+				"BOUND",
+			]);
+
+			expect(denied.status).toBe(2);
+			expect(denied.stdout as string).toBe("");
+			expect(denied.stderr as string).toContain(
+				"session bind requires local interactive approval",
+			);
+			expect(readSessionContext(root).bindings).toHaveLength(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1022,7 +1107,7 @@ describe("kernel front-door", () => {
 		}
 	});
 
-	test("spec list and help route through native handler", () => {
+	test("spec list routes through native handler and group help uses registry", () => {
 		const root = mkProjectRoot("spec-list", "");
 		try {
 			const specsDir = join(root, ".afol", "adm", "specs");
@@ -1056,7 +1141,7 @@ describe("kernel front-door", () => {
 
 			const help = runKernel(root, ["spec", "--help"]);
 			expect(help.status).toBe(0);
-			expect(help.stdout as string).toContain("Usage: afol spec");
+			expect(help.stdout as string).toContain("Command: spec");
 			expect(help.stderr as string).toBe("");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1082,6 +1167,7 @@ describe("kernel front-door", () => {
 
 			expect(proc.status).toBe(0);
 			expect(proc.stdout as string).toContain("session created:");
+			expect(proc.stdout as string).toContain("governance_status: governed");
 			expect(proc.stderr as string).toBe("");
 			expect(proc.stdout as string).not.toContain("LEGACY:");
 			const match = /session created:\s*(.*)/.exec(proc.stdout as string);

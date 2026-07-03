@@ -49,6 +49,7 @@ export type CommandSubcommandSpec = {
 	usage: string;
 	sideEffect: CommandSideEffect;
 	description: string;
+	requires_approval?: boolean;
 };
 
 export type CommandSpec = {
@@ -60,6 +61,7 @@ export type CommandSpec = {
 	category?: CommandCategory;
 	guidance?: readonly string[];
 	subcommands?: readonly CommandSubcommandSpec[];
+	requires_approval?: boolean;
 };
 
 const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
@@ -77,9 +79,19 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Emit machine-readable project status",
 			},
 			{
+				usage: "--health",
+				sideEffect: "read",
+				description: "Include global health findings",
+			},
+			{
 				usage: "--session <session-id>",
 				sideEffect: "read",
 				description: "Resolve status around a specific session",
+			},
+			{
+				usage: "--task-id <task-id>",
+				sideEffect: "read",
+				description: "Resolve a specific task in the selected session",
 			},
 		],
 	},
@@ -164,6 +176,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--json",
 				sideEffect: "write",
 				description: "Emit machine-readable start result",
+			},
+			{
+				usage: "--brief [full]",
+				sideEffect: "write",
+				description: "Emit project start briefing",
 			},
 		],
 	},
@@ -291,6 +308,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				sideEffect: "append",
 				description: "Attach optional artifact and note metadata",
 			},
+			{
+				usage: "--json",
+				sideEffect: "append",
+				description: "Emit machine-readable evidence result",
+			},
 		],
 	},
 	{
@@ -300,6 +322,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect hooks",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list [--json]",
+				sideEffect: "read",
+				description: "List configured hooks",
+			},
+			{
+				usage: "show <id> [--json]",
+				sideEffect: "read",
+				description: "Inspect one hook",
+			},
+			{
+				usage: "resolve --event <event> [--json]",
+				sideEffect: "read",
+				description: "Resolve hooks for a context/event profile",
+			},
+		],
 	},
 	{
 		command: "rule",
@@ -308,6 +347,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect rules",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list [--json]",
+				sideEffect: "read",
+				description: "List configured rules",
+			},
+			{
+				usage: "show <id> [--json]",
+				sideEffect: "read",
+				description: "Inspect one rule",
+			},
+			{
+				usage: "resolve --surface <surface> --work-type <work-type> [--json]",
+				sideEffect: "read",
+				description: "Resolve matching rules for a context profile",
+			},
+		],
 	},
 	{
 		command: "skill",
@@ -316,6 +372,23 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		sideEffect: "read",
 		description: "Inspect skills",
 		category: "inspect",
+		subcommands: [
+			{
+				usage: "list [--json] [--verbose]",
+				sideEffect: "read",
+				description: "List local skills",
+			},
+			{
+				usage: "show <name> [--json]",
+				sideEffect: "read",
+				description: "Inspect one skill",
+			},
+			{
+				usage: "search <query> [--json]",
+				sideEffect: "read",
+				description: "Search local skills by name",
+			},
+		],
 	},
 	{
 		command: "close",
@@ -520,8 +593,21 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 			},
 			{
 				usage: "bundle",
+				sideEffect: "read",
+				description:
+					"Build a context bundle; --json for compact output, --json --full for complete payload",
+			},
+			{
+				usage: "bundle --json [--full]",
+				sideEffect: "read",
+				description:
+					"Return compact JSON; pass --full to include the complete bundle",
+			},
+			{
+				usage: "bundle --persist-rule-injection",
 				sideEffect: "generated",
-				description: "Build a context bundle and refresh sections if needed",
+				description:
+					"Persist first-use rule injection state with local approval",
 			},
 			{
 				usage: "section --ref <ref>",
@@ -529,9 +615,10 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Read one section and refresh sections if needed",
 			},
 			{
-				usage: "explain",
-				sideEffect: "generated",
-				description: "Explain bundle inputs and refresh sections if needed",
+				usage: "explain [--full]",
+				sideEffect: "read",
+				description:
+					"Explain bundle inputs; pass --full to include the complete bundle",
 			},
 			{
 				usage: "tools",
@@ -623,7 +710,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: [],
 		kind: "ux",
 		sideEffect: "write",
-		description: "Register and validate user journey coverage",
+		description: "journey coverage",
 		category: "workflow",
 		subcommands: [
 			{
@@ -875,8 +962,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		aliases: ["pf"],
 		kind: "preflight",
 		sideEffect: "read",
-		description:
-			"Governance preflight: search specs, lessons, systems, and rules before planning",
+		description: "Search governance context before planning",
 		category: "inspect",
 	},
 	{
@@ -971,6 +1057,30 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 ]);
 
+export function requiresApprovalForSideEffect(
+	sideEffect: CommandSideEffect,
+): boolean {
+	return sideEffect !== "read";
+}
+
+function withApprovalMetadata(spec: CommandSpec): CommandSpec {
+	const withMetadata: CommandSpec = {
+		...spec,
+		requires_approval: requiresApprovalForSideEffect(spec.sideEffect),
+	};
+	if (spec.subcommands) {
+		withMetadata.subcommands = spec.subcommands.map((subcommand) => ({
+			...subcommand,
+			requires_approval: requiresApprovalForSideEffect(subcommand.sideEffect),
+		}));
+	}
+	return withMetadata;
+}
+
+const COMMAND_SPECS_WITH_APPROVAL: readonly CommandSpec[] = Object.freeze(
+	COMMAND_SPECS.map(withApprovalMetadata),
+);
+
 const HELP_ALIASES = Object.freeze(["-h", "--help"] as const);
 const JSON_ALIASES = Object.freeze(["-j", "--json"] as const);
 
@@ -978,7 +1088,7 @@ const aliasToCommand = new Map<string, string>();
 const commandToSpec = new Map<string, CommandSpec>();
 const knownTokens = new Set<string>();
 
-for (const spec of COMMAND_SPECS) {
+for (const spec of COMMAND_SPECS_WITH_APPROVAL) {
 	commandToSpec.set(spec.command, spec);
 	aliasToCommand.set(spec.command, spec.command);
 	knownTokens.add(spec.command);
@@ -999,7 +1109,7 @@ function canonicalize(token: string): string {
 }
 
 export const kernelRegistry = {
-	commands: COMMAND_SPECS,
+	commands: COMMAND_SPECS_WITH_APPROVAL,
 	flags: {
 		help: HELP_ALIASES,
 		json: JSON_ALIASES,

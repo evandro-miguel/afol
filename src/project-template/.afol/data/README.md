@@ -1,3 +1,3 @@
 # Data
 
-Local mutable data lives here when configured by `.agents/config.json`.
+Local mutable data lives here when configured by `.afol/config.json`.

@@ -1,5 +1,6 @@
 export { buildContextBundle } from "./bundler";
 export {
+	buildSectionIndexSnapshot,
 	getSectionIndex,
 	rebuildSectionIndex,
 	resolveSection,

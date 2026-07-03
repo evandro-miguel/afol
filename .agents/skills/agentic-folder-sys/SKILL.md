@@ -22,7 +22,8 @@ Before writing:
 
 1. Identify the repo root.
 2. Read local `AGENTS.md`.
-3. Read `.agents/config.json` when it exists.
+3. Read `.afol/config.json` for the path contract; check `.agents/config.json`
+   only as legacy fallback when `.afol/config.json` is absent.
 4. Use configured `paths.*`; do not hardcode workbench, skill, temp, data, or
    event paths.
 

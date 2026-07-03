@@ -12,7 +12,7 @@ Planner-only agents should not need this file.
 ## Execution Setup
 
 1. Read local `AGENTS.md`.
-2. Read `.agents/config.json`.
+2. Read `.afol/config.json` (`.agents/config.json` as legacy fallback only).
 3. Check branch and dirty state.
 4. Identify unrelated dirty files and leave them alone.
 5. Start the assigned task before editing:

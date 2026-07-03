@@ -17,6 +17,7 @@ function createRoot(): string {
 	mkdirSync(join(root, ".agents"), { recursive: true });
 	mkdirSync(join(root, ".afol", "adm", "rules"), { recursive: true });
 	mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+	mkdirSync(join(root, ".afol", "adm", "ux"), { recursive: true });
 	mkdirSync(join(root, "docs", "lessons", "entries"), { recursive: true });
 	mkdirSync(join(root, "cli", "services"), { recursive: true });
 	writeFileSync(
@@ -76,6 +77,57 @@ function createRoot(): string {
 	writeFileSync(
 		join(root, ".afol", "adm", "rules", "RULE-123-session-isolation.md"),
 		"# Session Isolation Rule\n\nPrefer session isolation over shared state.\n",
+		"utf8",
+	);
+	writeFileSync(
+		join(
+			root,
+			".afol",
+			"adm",
+			"ux",
+			"260701_session-isolation-preflight_ux-journey_01.md",
+		),
+		[
+			"---",
+			"doc_type: ux-journey",
+			"id: 260701_session-isolation-preflight_ux-journey_01",
+			"theme: session-isolation",
+			"status: active",
+			"roadmap_feature: F-TEST",
+			"parent_spec: 260418_test-session-isolation_spec_01",
+			"---",
+			"",
+			"# Session isolation preflight journey",
+			"",
+			"## Purpose",
+			"",
+			"Check session isolation before implementation.",
+			"",
+			"## Entry And Exit",
+			"",
+			"Entry: `afol preflight session isolation`. Exit: relevant governance is visible.",
+			"",
+			"## Flow",
+			"",
+			"Run `afol preflight` for session isolation.",
+			"",
+			"## Expected Result",
+			"",
+			"Matching UX journey is listed.",
+			"",
+			"## Evidence",
+			"",
+			"Preflight command output.",
+			"",
+			"## Metrics",
+			"",
+			"One matching journey.",
+			"",
+			"## Acceptance",
+			"",
+			"- [ ] Journey appears in preflight.",
+			"",
+		].join("\n"),
 		"utf8",
 	);
 	writeFileSync(
@@ -150,6 +202,19 @@ describe("preflight search service", () => {
 		}
 	});
 
+	test("finds a matching UX journey", () => {
+		const root = createRoot();
+		try {
+			const report = runPreflight(root, "session isolation");
+			expect(report.ux_journeys[0]?.id).toBe(
+				"260701_session-isolation-preflight_ux-journey_01",
+			);
+			expect(report.ux_journeys[0]?.commands).toContain("afol preflight");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("reports gaps when nothing matches", () => {
 		const root = createRoot();
 		try {
@@ -158,6 +223,7 @@ describe("preflight search service", () => {
 			expect(report.gaps).toContain("no prior lessons found");
 			expect(report.gaps).toContain("no similar system detected");
 			expect(report.gaps).toContain("no applicable rules found");
+			expect(report.gaps).toContain("no relevant UX journey found");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -206,6 +272,10 @@ describe("afol preflight command", () => {
 			const output = out.stdout.join("\n");
 			expect(output).toContain("summary:");
 			expect(output).toContain("recurrence_detected: true");
+			expect(output).toContain("ux journeys");
+			expect(output).toContain(
+				"260701_session-isolation-preflight_ux-journey_01",
+			);
 			expect(output).toContain("recommendations");
 			expect(output).toContain("run heavier verification");
 		} finally {
@@ -234,26 +304,26 @@ describe("afol preflight command", () => {
 				string,
 				unknown
 			>;
+			const data = payload.data as
+				| {
+						query?: string;
+						recurrence_detected?: boolean;
+						recommendations?: string[];
+						ux_journeys?: Array<{ id?: string; commands?: string[] }>;
+				  }
+				| undefined;
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
 			expect(payload.action).toBe("preflight");
-			expect((payload.data as { query?: string } | undefined)?.query).toBe(
-				"session isolation",
+			expect(data?.query).toBe("session isolation");
+			expect(data?.recurrence_detected).toBe(true);
+			expect(data?.recommendations?.join("\n")).toContain(
+				"propose a rule or lesson",
 			);
-			expect(
-				(
-					payload.data as
-						| { recurrence_detected?: boolean; recommendations?: string[] }
-						| undefined
-				)?.recurrence_detected,
-			).toBe(true);
-			expect(
-				(
-					payload.data as
-						| { recurrence_detected?: boolean; recommendations?: string[] }
-						| undefined
-				)?.recommendations?.join("\n"),
-			).toContain("propose a rule or lesson");
+			expect(data?.ux_journeys?.[0]?.id).toBe(
+				"260701_session-isolation-preflight_ux-journey_01",
+			);
+			expect(data?.ux_journeys?.[0]?.commands).toContain("afol preflight");
 			expect(readdirSync(join(root, "docs", "lessons", "entries")).length).toBe(
 				lessonCount,
 			);

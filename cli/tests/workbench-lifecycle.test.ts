@@ -119,7 +119,7 @@ describe("workbench lifecycle service", () => {
 			const created = newWorkstream(root, "cli native command parity");
 
 			expect(created.session).toMatch(
-				/^\d{6}_\d{4}_cli-native-command-parity(?:_\d{2})?$/,
+				/^\d{6}_\d{4}_cli-native-command-parity(?:_[0-9a-f]{4}|_\d{2})?$/,
 			);
 			expect(existsSync(created.sessionDir)).toBe(true);
 			expect(existsSync(created.planPath)).toBe(true);
@@ -204,10 +204,26 @@ describe("workbench lifecycle service", () => {
 				action: "workbench.new",
 			});
 			expect((newEnvelope.data as Record<string, unknown>).session).toMatch(
-				/^\d{6}_\d{4}_cli-json(?:_\d{2})?$/,
+				/^\d{6}_\d{4}_cli-json(?:_[0-9a-f]{4}|_\d{2})?$/,
 			);
 			expect((newEnvelope.data as Record<string, unknown>).status).toBe(
 				"created",
+			);
+			expect(
+				(newEnvelope.data as Record<string, unknown>).governance_status,
+			).toBe("unbound");
+
+			const humanNewProc = runKernel(root, [
+				"new",
+				"cli governed",
+				"--feature-id",
+				"F-01",
+				"--parent-spec",
+				"spec-01",
+			]);
+			expect(humanNewProc.status).toBe(0);
+			expect(humanNewProc.stdout as string).toContain(
+				"governance_status: governed",
 			);
 
 			const deniedAgentNew = runKernel(root, [
@@ -242,6 +258,26 @@ describe("workbench lifecycle service", () => {
 			});
 			expect(
 				(startEnvelope.data as Record<string, unknown>).briefing,
+			).toBeUndefined();
+
+			const startBriefProc = runKernel(root, [
+				"start",
+				"--session",
+				created.session,
+				"--json",
+				"--task-id",
+				"T-01",
+				"--brief",
+			]);
+			expect(startBriefProc.status).toBe(0);
+			const startBriefEnvelope = parseEnvelope(startBriefProc.stdout as string);
+			expect(startBriefEnvelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.start",
+			});
+			expect(
+				(startBriefEnvelope.data as Record<string, unknown>).briefing,
 			).toMatchObject({
 				schema: "afol_start_briefing_v1",
 				project: {
@@ -256,8 +292,9 @@ describe("workbench lifecycle service", () => {
 					problem_total: expect.any(Number),
 				},
 			});
-			const startBriefing = (startEnvelope.data as Record<string, unknown>)
+			const startBriefing = (startBriefEnvelope.data as Record<string, unknown>)
 				.briefing as Record<string, unknown>;
+			expect((startBriefing.project as Record<string, unknown>).root).toBe(".");
 			expect(Array.isArray(startBriefing.warnings)).toBe(true);
 			expect(Array.isArray(startBriefing.questions)).toBe(true);
 
@@ -335,6 +372,9 @@ describe("workbench lifecycle service", () => {
 				"close",
 				"--session",
 				created.session,
+				"--allow-no-report",
+				"--reason",
+				"research-only session",
 				"--json",
 			]);
 			expect(closeProc.status).toBe(0);
@@ -365,7 +405,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("rejects json for evidence command", () => {
+	test("emits json for evidence command", () => {
 		const root = mkRoot("evidence-json");
 		try {
 			writeCliProjectContract(root);
@@ -383,10 +423,21 @@ describe("workbench lifecycle service", () => {
 				"--json",
 			]);
 
-			expect(proc.status).toBe(2);
-			expect(proc.stdout as string).toBe("");
-			expect(proc.stderr as string).toContain(
-				"JSON output is not supported for evidence.",
+			expect(proc.status).toBe(0);
+			expect(proc.stderr as string).toBe("");
+			const envelope = parseEnvelope(proc.stdout as string);
+			expect(envelope).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.evidence",
+			});
+			expect(envelope.data).toMatchObject({
+				session: created.session,
+				task: "T-01",
+				result: "passed",
+			});
+			expect((envelope.data as Record<string, unknown>).evidence_id).toMatch(
+				/^E-/,
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -476,6 +527,66 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("done uses shell execution when --test-shell is set", () => {
+		const root = mkRoot("done-test-shell");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done-test-shell");
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test-shell",
+				"true && false",
+				"--json",
+			]);
+
+			expect(proc.status).toBe(1);
+			const payload = parseEnvelope(proc.stdout as string);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "workbench.done",
+				exit_code: 1,
+			});
+			expect((payload.error as Record<string, unknown>).message).toContain(
+				"--test-shell failed",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done keeps --test non-shell", () => {
+		const root = mkRoot("done-test-non-shell");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done-test-non-shell");
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test",
+				"true && false",
+				"--json",
+			]);
+
+			expect(proc.status).toBe(0);
+			const payload = parseEnvelope(proc.stdout as string);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.done",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("startTask marks row in_progress", () => {
 		const root = mkRoot("start");
 		try {
@@ -512,12 +623,31 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("afol start human output keeps legacy first line", () => {
+	test("afol start defaults to compact output", () => {
 		const root = mkRoot("start-human");
 		try {
 			writeCliProjectContract(root);
 			const created = newWorkstream(root, "start-task");
 			const proc = runKernel(root, ["start", "--session", created.session]);
+
+			expect(proc.status).toBe(0);
+			expect((proc.stdout as string).trim()).toBe("task started: T-01");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol start --brief shows human briefing", () => {
+		const root = mkRoot("start-human-brief");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "start-task");
+			const proc = runKernel(root, [
+				"start",
+				"--session",
+				created.session,
+				"--brief",
+			]);
 
 			expect(proc.status).toBe(0);
 			const lines = (proc.stdout as string).trim().split("\n");
@@ -527,6 +657,35 @@ describe("workbench lifecycle service", () => {
 			expect(lines.some((line) => line.startsWith("tasks:"))).toBe(true);
 			expect(lines.some((line) => line.startsWith("warnings:"))).toBe(true);
 			expect(lines.some((line) => line.startsWith("questions:"))).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol start --brief full shows full human briefing payload", () => {
+		const root = mkRoot("start-human-brief-full");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "start-task");
+			const proc = runKernel(root, [
+				"start",
+				"--session",
+				created.session,
+				"--brief",
+				"full",
+			]);
+
+			expect(proc.status).toBe(0);
+			const lines = (proc.stdout as string).trim().split("\n");
+			expect(lines[0]).toBe("task started: T-01");
+			const briefing = JSON.parse(lines.slice(1).join("\n")) as {
+				schema: string;
+				warnings: unknown[];
+				questions: unknown[];
+			};
+			expect(briefing.schema).toBe("afol_start_briefing_v1");
+			expect(Array.isArray(briefing.warnings)).toBe(true);
+			expect(Array.isArray(briefing.questions)).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -559,7 +718,12 @@ describe("workbench lifecycle service", () => {
 			);
 			mkdirSync(roadmapPath, { recursive: true });
 			const created = newWorkstream(root, "start-task");
-			const proc = runKernel(root, ["start", "--session", created.session]);
+			const proc = runKernel(root, [
+				"start",
+				"--session",
+				created.session,
+				"--brief",
+			]);
 
 			expect(proc.status).toBe(0);
 			const lines = (proc.stdout as string).trim().split("\n");
@@ -591,6 +755,7 @@ describe("workbench lifecycle service", () => {
 				"start",
 				"--session",
 				created.session,
+				"--brief",
 				"--json",
 			]);
 
@@ -734,6 +899,30 @@ describe("workbench lifecycle service", () => {
 			expect(parsed.task_id).toBe("T-01");
 			expect(parsed.command).toBe("bun test");
 			expect(parsed.result).toBe("passed");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("recordEvidence rejects missing tasks without appending evidence", () => {
+		const root = mkRoot("evidence-missing-task");
+		try {
+			const created = newWorkstream(root, "record-evidence-missing-task");
+
+			expect(() =>
+				recordEvidence(root, {
+					session: created.session,
+					taskId: "T-02",
+					command: "bun test",
+					result: "passed",
+				}),
+			).toThrow("Task T-02 not found in");
+			expect(readFileSync(created.evidencePath, "utf8")).toBe("");
+			expect(
+				readLocalStateEvents(root).filter(
+					(event) => event.type === "workbench.record_evidence",
+				),
+			).toHaveLength(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1076,6 +1265,128 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("closeSession blocks missing final report unless override is provided", () => {
+		const root = mkRoot("close-warnings");
+		try {
+			const created = newWorkstream(root, "close-session-warnings", {
+				tasks: ["first task", "second task"],
+			});
+
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-02",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-02" });
+
+			expect(() => closeSession(root, created.session)).toThrow(
+				"requires a final report artifact",
+			);
+			expect(() =>
+				closeSession(root, created.session, { allowNoReport: true }),
+			).toThrow("Missing --reason for close allow-no-report override.");
+
+			const warnings = closeSession(root, created.session, {
+				allowNoReport: true,
+				reason: "research-only session",
+			});
+			expect(warnings).toContain("final report artifact is missing");
+			expect(warnings).toContain("log summary section is missing");
+			expect(existsSync(created.activeSessionPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession accepts a log summary section after the title", () => {
+		const root = mkRoot("close-summary-section");
+		try {
+			const created = newWorkstream(root, "close-session-summary");
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_log_01.md`,
+				),
+				"# Log\n\n## Summary\n\n- done\n",
+			);
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+				"# Report\n",
+			);
+
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			expect(closeSession(root, created.session)).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("close command includes close warnings in json envelope with override", () => {
+		const root = mkRoot("close-warnings-json");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "close-command-warnings-json");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			const proc = runKernel(root, [
+				"close",
+				"--session",
+				created.session,
+				"--allow-no-report",
+				"--reason",
+				"research-only session",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const payload = parseEnvelope(proc.stdout as string);
+			expect(payload).toMatchObject({
+				schema: "afol.result/v1",
+				ok: true,
+				action: "workbench.close",
+				warnings: [
+					"final report artifact is missing",
+					"log summary section is missing",
+				],
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("closeSession blocks multi-task sessions until every task is done", () => {
 		const root = mkRoot("close-multi-task");
 		try {
@@ -1101,6 +1412,16 @@ describe("workbench lifecycle service", () => {
 				result: "passed",
 			});
 			doneTask(root, { session: created.session, taskId: "T-02" });
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+				"# Report\n",
+			);
 			closeSession(root, created.session);
 			expect(existsSync(created.activeSessionPath)).toBe(false);
 		} finally {

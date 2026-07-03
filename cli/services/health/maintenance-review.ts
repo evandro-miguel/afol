@@ -2,6 +2,7 @@ import type { Dirent } from "node:fs";
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { atomicWriteText } from "../io/atomic";
+import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
 import { loadProjectRoot } from "../project/root";
 
@@ -65,9 +66,14 @@ export type MaintenanceReviewRecord = {
 	reviewed_areas: MaintenanceReviewArea[];
 	recorded_at: string;
 	note: string | null;
-	dry_run: boolean;
+	preview: boolean;
+	applied: boolean;
 	summary: MaintenanceReviewSummary;
+	current_summary: MaintenanceReviewSummary;
+	preview_summary: MaintenanceReviewSummary;
 };
+
+const MAINTENANCE_REVIEW_LOCK = "__maintenance-review-lock__";
 
 const DEFAULT_REVIEW_INTERVAL_DAYS = 7;
 const MIN_REVIEW_INTERVAL_DAYS = 1;
@@ -81,6 +87,11 @@ const EXCLUDED_DIRS = new Set([
 	"cache",
 	".cache",
 ]);
+const LEGACY_REFERENCE_ALLOWED_FILENAMES = new Set([
+	"gotchas.md",
+	"migration.md",
+	"retirement.md",
+]);
 const LEGACY_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
 	{ label: ".agents/wb", pattern: /\.agents\/wb\b/ },
 	{ label: ".agents/scripts", pattern: /\.agents\/scripts\b/ },
@@ -88,6 +99,37 @@ const LEGACY_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
 	{ label: "agents.config", pattern: /\bagents\.config\b/ },
 	{ label: "legacy:", pattern: /\blegacy:/ },
 ];
+const FRONTMATTER_BLOCK = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+
+type FrontmatterDictionary = Record<string, unknown>;
+
+function parseLegacyFrontmatter(content: string): FrontmatterDictionary {
+	const match = content.match(FRONTMATTER_BLOCK);
+	if (!match?.[1]) {
+		return {};
+	}
+	try {
+		const parsed = Bun.YAML.parse(match[1]) as unknown;
+		return parsed !== null &&
+			typeof parsed === "object" &&
+			!Array.isArray(parsed)
+			? (parsed as FrontmatterDictionary)
+			: {};
+	} catch {
+		return {};
+	}
+}
+
+function isLegacyReferenceAllowed(file: string, content: string): boolean {
+	if (
+		LEGACY_REFERENCE_ALLOWED_FILENAMES.has(
+			file.toLowerCase().split("/").pop() ?? "",
+		)
+	) {
+		return true;
+	}
+	return parseLegacyFrontmatter(content).legacy_reference_allowed === true;
+}
 
 function normalizeInterval(value: unknown): number {
 	if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -199,6 +241,34 @@ function readStore(
 	return readStoreResult(root, options).store;
 }
 
+function buildMaintenanceReviewSummary(
+	root: string,
+	storeResult: StoreReadResult,
+	store: MaintenanceReviewStore = storeResult.store,
+	storeStatus: StoreReadResult["status"] = storeResult.status,
+	storeError: string | null = storeResult.error,
+): MaintenanceReviewSummary {
+	const intervalDays = readReviewIntervalDays(root);
+	const areas = MAINTENANCE_REVIEW_AREAS.map((area) => {
+		const entry = store.areas[area];
+		const age = entry?.reviewed_at ? ageInDays(entry.reviewed_at) : null;
+		const due = age === null || age >= intervalDays;
+		return {
+			area,
+			due,
+			reviewed_at: entry?.reviewed_at ?? null,
+			note: entry?.note ?? null,
+		};
+	});
+	return {
+		review_interval_days: intervalDays,
+		areas,
+		due_areas: areas.filter((entry) => entry.due).map((entry) => entry.area),
+		store_status: storeStatus,
+		store_error: storeError,
+	};
+}
+
 function writeStore(root: string, store: MaintenanceReviewStore): void {
 	const path = storePath(root);
 	mkdirSync(dirname(path), { recursive: true });
@@ -222,27 +292,7 @@ function selectedAreas(
 export function readMaintenanceReviewSummary(
 	root: string,
 ): MaintenanceReviewSummary {
-	const intervalDays = readReviewIntervalDays(root);
-	const storeResult = readStoreResult(root);
-	const store = storeResult.store;
-	const areas = MAINTENANCE_REVIEW_AREAS.map((area) => {
-		const entry = store.areas[area];
-		const age = entry?.reviewed_at ? ageInDays(entry.reviewed_at) : null;
-		const due = age === null || age >= intervalDays;
-		return {
-			area,
-			due,
-			reviewed_at: entry?.reviewed_at ?? null,
-			note: entry?.note ?? null,
-		};
-	});
-	return {
-		review_interval_days: intervalDays,
-		areas,
-		due_areas: areas.filter((entry) => entry.due).map((entry) => entry.area),
-		store_status: storeResult.status,
-		store_error: storeResult.error,
-	};
+	return buildMaintenanceReviewSummary(root, readStoreResult(root));
 }
 
 export function recordMaintenanceReview(
@@ -257,23 +307,67 @@ export function recordMaintenanceReview(
 	const recordedAt = new Date().toISOString();
 	const note = input.note?.trim() || null;
 	const dryRun = input.dryRun === true;
-	if (!dryRun) {
-		const store = readStore(root, { strict: true });
+	return withSessionLock(root, MAINTENANCE_REVIEW_LOCK, () => {
+		const currentStoreResult = readStoreResult(root);
+		if (!dryRun) {
+			const store = readStore(root, { strict: true });
+			for (const area of reviewedAreas) {
+				store.areas[area] = note
+					? { reviewed_at: recordedAt, note }
+					: { reviewed_at: recordedAt };
+			}
+			writeStore(root, store);
+			const summary = buildMaintenanceReviewSummary(
+				root,
+				{ status: "ok", store, error: null },
+				store,
+				"ok",
+				null,
+			);
+			return {
+				area: input.area,
+				reviewed_areas: reviewedAreas,
+				recorded_at: recordedAt,
+				note,
+				preview: dryRun,
+				applied: !dryRun,
+				summary,
+				current_summary: summary,
+				preview_summary: summary,
+			};
+		}
+		const currentSummary = buildMaintenanceReviewSummary(
+			root,
+			currentStoreResult,
+		);
+		const previewStore: MaintenanceReviewStore = {
+			version: currentStoreResult.store.version,
+			areas: { ...currentStoreResult.store.areas },
+		};
 		for (const area of reviewedAreas) {
-			store.areas[area] = note
+			previewStore.areas[area] = note
 				? { reviewed_at: recordedAt, note }
 				: { reviewed_at: recordedAt };
 		}
-		writeStore(root, store);
-	}
-	return {
-		area: input.area,
-		reviewed_areas: reviewedAreas,
-		recorded_at: recordedAt,
-		note,
-		dry_run: dryRun,
-		summary: readMaintenanceReviewSummary(root),
-	};
+		const previewSummary = buildMaintenanceReviewSummary(
+			root,
+			{ status: "ok", store: previewStore, error: null },
+			previewStore,
+			"ok",
+			null,
+		);
+		return {
+			area: input.area,
+			reviewed_areas: reviewedAreas,
+			recorded_at: recordedAt,
+			note,
+			preview: dryRun,
+			applied: !dryRun,
+			summary: currentSummary,
+			current_summary: currentSummary,
+			preview_summary: previewSummary,
+		};
+	});
 }
 
 export function summarizeMaintenanceReviewDue(root: string): {
@@ -362,6 +456,9 @@ export function scanLegacyReferences(root: string): {
 			warnings.push(
 				`legacy reference scan skipped ${file}: ${compactError(error)}`,
 			);
+			continue;
+		}
+		if (isLegacyReferenceAllowed(file, content)) {
 			continue;
 		}
 		let matched = false;

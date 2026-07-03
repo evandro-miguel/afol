@@ -22,8 +22,8 @@ system has been retired and must not be restored.
   archives.
 - Target `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy,
   and desired-state administration.
-- Target `.afol/pstr/**`: generated, rebuildable project-structure map
-  snapshots only; stale maps are not authoritative.
+- Optional `.afol/pstr/**`: generated, rebuildable project-structure map
+  snapshots when present; missing or stale maps are not authoritative.
 
 ## Documentation Map
 
@@ -35,7 +35,7 @@ system has been retired and must not be restored.
 - `.afol/adm/roadmap/GENERAL-ROADMAP.md`: feature inventory and roadmap status.
 - `.afol/adm/specs/**`: governing specs.
 - `.afol/adm/decisions/**`: ADRs and durable decisions.
-- `.afol/pstr/**`: generated current project-structure maps.
+- `.afol/pstr/**`: generated project-structure maps when present.
 - `PLANS.md`: ExecPlan requirements for governed workbench sessions.
 - `.afol/adm/doctrine/RELEASE-RUNBOOK.md`: release readiness checklist.
 

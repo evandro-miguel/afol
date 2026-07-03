@@ -1,5 +1,5 @@
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { cpSync, existsSync, rmSync } from "node:fs";
+import { atomicWriteText } from "../../../services/io/atomic";
 import {
 	appendMutationRecord,
 	createMutationId,
@@ -131,7 +131,8 @@ export function runPatchMutation(
 			message: `Patch blocked: binary target: ${resolved.relativePath}`,
 		};
 	}
-	const before = readTextOrEmpty(resolved.path);
+	const fileExisted = existsSync(resolved.path);
+	const before = fileExisted ? readTextOrEmpty(resolved.path) : "";
 	const appendText = args.appendText;
 	const after = `${before}${appendText}`;
 	const mutationId = createMutationId();
@@ -171,10 +172,9 @@ export function runPatchMutation(
 	}
 
 	requireWriteContext(args);
-	mkdirSync(dirname(resolved.path), { recursive: true });
 
 	let backupPathValue: string | undefined;
-	if (existsSync(resolved.path)) {
+	if (fileExisted) {
 		backupPathValue = backupPath(
 			projectRoot,
 			mutationId,
@@ -183,7 +183,7 @@ export function runPatchMutation(
 		cpSync(resolved.path, backupPathValue);
 	}
 
-	writeFileSync(resolved.path, after, "utf8");
+	atomicWriteText(resolved.path, after);
 
 	appendMutationRecord(projectRoot, {
 		id: mutationId,
@@ -198,7 +198,7 @@ export function runPatchMutation(
 		beforeHash,
 		afterHash,
 		backupPath: backupPathValue ?? null,
-		beforeExisted: before.length > 0,
+		beforeExisted: fileExisted,
 		...(diffPreview ? { diffPreview } : {}),
 	});
 

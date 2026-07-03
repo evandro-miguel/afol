@@ -60,6 +60,29 @@ function mkProjectRoot(): string {
 	return root;
 }
 
+function createMutationSession(
+	root: string,
+	session: string,
+	taskId: string,
+): void {
+	const sessionDir = join(root, ".afol", "wb", session);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(
+		join(sessionDir, `${session}_task_01.md`),
+		[
+			`# Tasks: mutation-safety`,
+			"",
+			"## State Board",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			`| ${taskId} | in_progress | worker | mutation-safety test |`,
+			"",
+		].join("\n"),
+		"utf8",
+	);
+}
+
 function readMutationJournal(root: string): Array<Record<string, unknown>> {
 	const path = join(
 		resolveProjectPaths(root).abs.mutationsDir,
@@ -122,6 +145,7 @@ describe("mutation safety command family", () => {
 			const target = join(root, "notes", "with-backup.txt");
 			mkdirSync(join(root, "notes"), { recursive: true });
 			writeFileSync(target, "v1", "utf8");
+			createMutationSession(root, "S-02", "T-02");
 
 			const proc = runKernel(root, [
 				"f",
@@ -166,6 +190,7 @@ describe("mutation safety command family", () => {
 			mkdirSync(join(root, "mut"), { recursive: true });
 			writeFileSync(source, "from", "utf8");
 			writeFileSync(destination, "existing", "utf8");
+			createMutationSession(root, "S-03", "T-03");
 
 			const moveProc = runKernel(root, [
 				"f",
@@ -218,6 +243,7 @@ describe("mutation safety command family", () => {
 	test("mv missing source fails instead of reporting success", () => {
 		const root = mkProjectRoot();
 		try {
+			createMutationSession(root, "S-07", "T-07");
 			const proc = runKernel(root, [
 				"f",
 				"mv",
@@ -282,6 +308,7 @@ describe("mutation safety command family", () => {
 			const target = join(root, "notes", "to-archive.txt");
 			mkdirSync(join(root, "notes"), { recursive: true });
 			writeFileSync(target, "for-archive", "utf8");
+			createMutationSession(root, "S-06", "T-06");
 
 			const archiveProc = runKernel(root, [
 				"f",
@@ -414,6 +441,7 @@ describe("mutation safety command family", () => {
 			const payload = Buffer.from([0, 254, 31, 65, 66]);
 			mkdirSync(join(root, "assets"), { recursive: true });
 			writeFileSync(target, payload);
+			createMutationSession(root, "S-09", "T-09");
 
 			const proc = runKernel(root, [
 				"f",
@@ -457,6 +485,7 @@ describe("mutation safety command family", () => {
 			mkdirSync(join(root, "mut"), { recursive: true });
 			writeFileSync(source, "from", "utf8");
 			writeFileSync(destination, "existing", "utf8");
+			createMutationSession(root, "S-08", "T-08");
 
 			const moveProc = runKernel(root, [
 				"f",
@@ -511,6 +540,7 @@ describe("mutation safety command family", () => {
 			const target = join(root, "notes", "guard.txt");
 			mkdirSync(join(root, "notes"), { recursive: true });
 			writeFileSync(target, "orig", "utf8");
+			createMutationSession(root, "S-05", "T-05");
 
 			const writeProc = runKernel(root, [
 				"f",
@@ -563,6 +593,7 @@ describe("mutation safety command family", () => {
 			const target = join(root, "notes", "loader.txt");
 			mkdirSync(join(root, "notes"), { recursive: true });
 			writeFileSync(target, "base", "utf8");
+			createMutationSession(root, "S-10", "T-10");
 
 			const proc = runKernel(root, [
 				"f",

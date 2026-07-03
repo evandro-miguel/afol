@@ -44,7 +44,8 @@ Template = Markdown + JSON config, rules, skills, workbench,
 
 Direction update: project administration now lives under `.afol/adm/**` and
 `docs/arc/**` is a frozen transitional archive preserved for reversibility.
-See ADR-005. Current project structure maps remain under `.afol/pstr/**`.
+See ADR-005. Project structure maps, when generated, remain under
+`.afol/pstr/**`.
 
 AFOL separates project direction from project structure.
 
@@ -166,9 +167,10 @@ Target project-local administration surfaces:
 
 - `.afol/adm/` owns desired-state administration: manifesto, roadmap, specs,
   ADRs, changelog, archive, and policy.
-- `.afol/pstr/` owns generated current project-structure maps. Current AFOL
-  emits flat area maps (`index.json`, `cli.md`, `template.md`, `docs.md`,
-  `config.md`) from the PSTR area registry.
+- `.afol/pstr/` owns generated observed project-structure map outputs when
+  present. Current AFOL emits flat area maps (`index.json`, `cli.md`,
+  `template.md`, `docs.md`, `config.md`) from the PSTR area registry. Missing
+  or stale maps are descriptive state, not authority.
 - `.afol/state/afol.db` owns SQLite materialization and query cache.
 - `.afol/adm/**` is the canonical administration surface; `docs/arc/**` is the
   frozen transitional archive preserved by ADR-005.

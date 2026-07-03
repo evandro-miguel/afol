@@ -1,9 +1,16 @@
 import {
+	envelopeErr,
 	envelopeOk,
 	envelopeWithLegacyKeys,
 	type ResultEnvelope,
 	stringifyEnvelope,
 } from "../core/envelope";
+import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
+import { withSessionLock } from "../services/io/session-lock";
 import {
 	rebuildProjectIndexes,
 	validateFilesIndex,
@@ -134,6 +141,7 @@ export async function runLocalStateCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	try {
 		const [rawCommand, ...rest] = args;
@@ -141,45 +149,64 @@ export async function runLocalStateCommand(
 		const parsed = parseArgs(rest);
 
 		if (command === "rebuild") {
-			const workbench = rebuildWorkBenchIndex(projectRoot);
-			const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
-			const summary = summarizeRebuild(snapshot);
-
-			if (parsed.json) {
-				const compactPayload: RebuildPayload = {
-					ok: true,
-					command,
-					summary,
-					output: parsed.verbose ? "verbose" : "compact",
-					...(parsed.verbose
-						? { snapshot }
-						: {
-								hint: "Use `afol local-state rebuild --json --verbose` for full index snapshots.",
+			if (requiresApproval(ctx)) {
+				const message =
+					"local-state rebuild requires local interactive approval";
+				if (parsed.json) {
+					io.stdout(
+						stringifyEnvelope(
+							envelopeErr("approval-required", message, {
+								action: "local-state.rebuild",
+								exitCode: 2,
 							}),
-				};
-				io.stdout(
-					stringifyEnvelope(
-						envelopeWithLegacyKeys(
-							resultEnvelope(compactPayload, `local-state.${command}`, 0),
-							parsed.verbose
-								? ["ok", "command", "summary", "output", "snapshot"]
-								: ["ok", "command", "summary", "output", "hint"],
 						),
-					),
-				);
-			} else {
-				io.stdout(
-					[
-						"local-state rebuild: ok",
-						`workbench: ${summary.workbench.sessions} sessions, ${summary.workbench.tasks} tasks`,
-						`rules: ${summary.rules.count}`,
-						`skills: ${summary.skills.count}`,
-						`specs: ${summary.specs.count}`,
-						`files: ${summary.files.count}`,
-					].join("\n"),
-				);
+					);
+				} else {
+					io.stderr(`err approval-required ${message}`);
+				}
+				return 2;
 			}
-			return 0;
+			return withSessionLock(projectRoot, "local-state.rebuild", () => {
+				const workbench = rebuildWorkBenchIndex(projectRoot);
+				const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
+				const summary = summarizeRebuild(snapshot);
+
+				if (parsed.json) {
+					const compactPayload: RebuildPayload = {
+						ok: true,
+						command,
+						summary,
+						output: parsed.verbose ? "verbose" : "compact",
+						...(parsed.verbose
+							? { snapshot }
+							: {
+									hint: "Use `afol local-state rebuild --json --verbose` for full index snapshots.",
+								}),
+					};
+					io.stdout(
+						stringifyEnvelope(
+							envelopeWithLegacyKeys(
+								resultEnvelope(compactPayload, `local-state.${command}`, 0),
+								parsed.verbose
+									? ["ok", "command", "summary", "output", "snapshot"]
+									: ["ok", "command", "summary", "output", "hint"],
+							),
+						),
+					);
+				} else {
+					io.stdout(
+						[
+							"local-state rebuild: ok",
+							`workbench: ${summary.workbench.sessions} sessions, ${summary.workbench.tasks} tasks`,
+							`rules: ${summary.rules.count}`,
+							`skills: ${summary.skills.count}`,
+							`specs: ${summary.specs.count}`,
+							`files: ${summary.files.count}`,
+						].join("\n"),
+					);
+				}
+				return 0;
+			});
 		}
 
 		const result = formatFreshness(projectRoot);

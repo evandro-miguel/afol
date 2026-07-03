@@ -179,13 +179,7 @@ function isValidIndex(value: unknown): value is SectionIndex {
 	);
 }
 
-function writeIndex(root: string, snapshot: SectionIndex): SectionIndex {
-	mkdirSync(resolveProjectPaths(root).abs.dataIndexDir, { recursive: true });
-	atomicWriteText(indexPath(root), `${JSON.stringify(snapshot)}\n`);
-	return snapshot;
-}
-
-export function rebuildSectionIndex(root: string): SectionIndex {
+export function buildSectionIndexSnapshot(root: string): SectionIndex {
 	const sections = collectDocs(root)
 		.flatMap((filePath) => sectionsForDoc(root, filePath))
 		.sort(
@@ -193,12 +187,22 @@ export function rebuildSectionIndex(root: string): SectionIndex {
 				a.source_path.localeCompare(b.source_path) ||
 				a.line_start - b.line_start,
 		);
-	return writeIndex(root, {
+	return {
 		kind: "sections_index_v1",
 		version: 1,
 		generated_at: now(),
 		sections,
-	});
+	};
+}
+
+function writeIndex(root: string, snapshot: SectionIndex): SectionIndex {
+	mkdirSync(resolveProjectPaths(root).abs.dataIndexDir, { recursive: true });
+	atomicWriteText(indexPath(root), `${JSON.stringify(snapshot)}\n`);
+	return snapshot;
+}
+
+export function rebuildSectionIndex(root: string): SectionIndex {
+	return writeIndex(root, buildSectionIndexSnapshot(root));
 }
 
 export function getSectionIndex(root: string): SectionIndex | null {
@@ -215,7 +219,7 @@ export function resolveSection(root: string, ref: string): SectionEntry | null {
 	if (!needle) {
 		return null;
 	}
-	const index = getSectionIndex(root) ?? rebuildSectionIndex(root);
+	const index = getSectionIndex(root) ?? buildSectionIndexSnapshot(root);
 	return (
 		index.sections.find((entry) => entry.ref.toLowerCase() === needle) ??
 		index.sections.find((entry) =>

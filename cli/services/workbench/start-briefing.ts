@@ -62,6 +62,18 @@ function projectName(root: string): string {
 	return basename(root);
 }
 
+type BuildStartBriefingOptions = {
+	showProjectRoot?: boolean;
+};
+
+function shouldShowProjectRoot(): boolean {
+	const debugFlag = process.env.AFOL_DEBUG;
+	if (!debugFlag) {
+		return false;
+	}
+	return ["1", "true", "yes", "on"].includes(debugFlag.toLowerCase());
+}
+
 function summarizeRoadmap(root: string): RoadmapSummary {
 	const roadmapPath = join(
 		resolveAdmPaths(root).roadmapDir,
@@ -159,6 +171,7 @@ export function briefingUnavailableFor(
 export function buildStartBriefing(
 	root: string,
 	input: { session: string; taskId: string },
+	options: BuildStartBriefingOptions = {},
 ): StartBriefing {
 	const catchup = computeCatchup(root, { session: input.session });
 	const radar = loadCoordinationRadar(root);
@@ -191,7 +204,7 @@ export function buildStartBriefing(
 		schema: "afol_start_briefing_v1",
 		project: {
 			name: projectName(root),
-			root,
+			root: options.showProjectRoot || shouldShowProjectRoot() ? root : ".",
 			branch: catchup.git_branch,
 			session: input.session,
 			task: input.taskId,

@@ -2,11 +2,11 @@ import { resolveProjectPaths } from "../../services/project/paths";
 import type { NewWorkstreamMetadata } from "../../services/workbench/lifecycle";
 import { selectSingleOpenTask } from "../../services/workbench/lifecycle";
 import type {
+	CloseArgs,
 	DoneArgs,
 	EvidenceArgs,
 	LogArgs,
 	NewCommandArgs,
-	SessionArgs,
 	SessionTaskJsonArgs,
 	VerifyArgs,
 } from "./types";
@@ -34,6 +34,11 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 		if (arg === "--json" || arg === "-j") {
 			json = true;
 			continue;
+		}
+		if (arg === "--research" || arg === "--no-plan") {
+			throw new Error(
+				"`afol new` does not support research-only or no-plan sessions; use a normal workstream instead.",
+			);
 		}
 		if (!theme && arg && !arg.startsWith("-")) {
 			theme = arg;
@@ -84,13 +89,11 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 	return { theme, metadata, json };
 }
 
-export function parseSessionOnlyArgs(
-	args: string[],
-	commandName: string,
-	root: string,
-): SessionArgs {
+export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	let session = "";
 	let json = false;
+	let allowNoReport = false;
+	let reason = "";
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
@@ -100,15 +103,39 @@ export function parseSessionOnlyArgs(
 		if (arg === "--session") {
 			const value = args[i + 1];
 			if (!value) {
-				throw new Error(`Missing value for --session in ${commandName}.`);
+				throw new Error("Missing value for --session in close.");
 			}
 			session = value;
 			i += 1;
 			continue;
 		}
-		throw new Error(`Unknown ${commandName} argument: ${arg}`);
+		if (arg === "--allow-no-report") {
+			allowNoReport = true;
+			continue;
+		}
+		if (arg === "--reason") {
+			const value = args[i + 1];
+			if (!value) {
+				throw new Error("Missing value for --reason in close.");
+			}
+			reason = value;
+			i += 1;
+			continue;
+		}
+		throw new Error(`Unknown close argument: ${arg}`);
 	}
-	return { session: resolveSession(root, session, commandName), json };
+	if (reason.trim() && !allowNoReport) {
+		throw new Error("Missing --allow-no-report for close reason.");
+	}
+	if (allowNoReport && !reason.trim()) {
+		throw new Error("Missing --reason for close allow-no-report.");
+	}
+	return {
+		session: resolveSession(root, session, "close"),
+		json,
+		allowNoReport,
+		reason,
+	};
 }
 
 export function parseSessionTaskArgs(
@@ -121,6 +148,8 @@ export function parseSessionTaskArgs(
 	let taskId = "";
 	let json = false;
 	let compact = false;
+	let brief = false;
+	let briefMode: "compact" | "full" | null = null;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
@@ -129,6 +158,17 @@ export function parseSessionTaskArgs(
 		}
 		if (arg === "--compact") {
 			compact = true;
+			continue;
+		}
+		if (arg === "--brief") {
+			const next = args[i + 1];
+			if (next === "full") {
+				briefMode = "full";
+				i += 1;
+			} else {
+				briefMode = "compact";
+			}
+			brief = true;
 			continue;
 		}
 		if (arg === "--session") {
@@ -162,7 +202,7 @@ export function parseSessionTaskArgs(
 	if (!taskId) {
 		throw new Error(`Missing --task-id for ${commandName}.`);
 	}
-	return { session: resolvedSession, taskId, json, compact };
+	return { session: resolvedSession, taskId, json, compact, brief, briefMode };
 }
 
 export function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
@@ -172,11 +212,13 @@ export function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
 	let result = "";
 	let artifact = "";
 	let note = "";
+	let json = false;
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		const value = args[i + 1];
 		if (arg === "--json" || arg === "-j") {
-			throw new Error("JSON output is not supported for evidence.");
+			json = true;
+			continue;
 		}
 		if (arg === "--session") {
 			if (!value) {
@@ -248,6 +290,7 @@ export function parseEvidenceArgs(args: string[], root: string): EvidenceArgs {
 		taskId,
 		command,
 		result,
+		json,
 		...(artifact ? { artifact } : {}),
 		...(note ? { note } : {}),
 	};
@@ -257,6 +300,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 	let session = "";
 	let taskId = "";
 	let testCommand: string | null = null;
+	let testShellCommand: string | null = null;
 	let evidenceCommand: string | null = null;
 	let evidenceResult: string | null = null;
 	let requireSpecCheck = false;
@@ -290,7 +334,21 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 			if (!value) {
 				throw new Error("Missing value for --test in done.");
 			}
+			if (testShellCommand) {
+				throw new Error("Cannot use both --test and --test-shell in done.");
+			}
 			testCommand = value;
+			i += 1;
+			continue;
+		}
+		if (arg === "--test-shell") {
+			if (!value) {
+				throw new Error("Missing value for --test-shell in done.");
+			}
+			if (testCommand) {
+				throw new Error("Cannot use both --test and --test-shell in done.");
+			}
+			testShellCommand = value;
 			i += 1;
 			continue;
 		}
@@ -351,6 +409,7 @@ export function parseDoneArgs(args: string[], root: string): DoneArgs {
 		session: resolveSession(root, session, "done"),
 		taskId,
 		testCommand,
+		testShellCommand,
 		evidenceCommand,
 		evidenceResult,
 		...(artifact ? { artifact } : {}),

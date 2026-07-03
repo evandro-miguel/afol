@@ -24,7 +24,7 @@ Use this skill to author AFOL rules that are short, current, and enforceable.
 
 ## Before Writing
 
-- Read `AGENTS.md`, `.agents/config.json`, and nearby rules.
+- Read `AGENTS.md`, `.afol/config.json` (canonical), and nearby rules; treat `.agents/config.json` only as a legacy fallback when present.
 - Search by surface, trigger, noun, and failure mode.
 - Prefer editing, splitting, deleting, or deprecating stale rules before adding
   a new one.

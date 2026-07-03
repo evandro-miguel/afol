@@ -175,6 +175,7 @@ When delegating AFOL work, include:
 - whether the agent may edit or is read-only;
 - session id and task id when governed workbench state is active.
 
-Tell helpers to read `.agents/config.json` for the path contract, write runtime
-state only under configured AFOL runtime paths, and edit project-local skills
-only through `paths.skills_dir`.
+Tell helpers to read `.afol/config.json` for the path contract
+(`.agents/config.json` is legacy fallback only), write runtime state only under
+configured AFOL runtime paths, and edit project-local skills only through
+`paths.skills_dir`.

@@ -1,0 +1,12 @@
+{"id":"E-20260629191503211-92e294","task_id":"T-01","created_at":"2026-06-29T23:15:03.211Z","command":"afol memory list --json","result":"passed"}
+{"id":"E-20260629191508243-bc6be1","task_id":"T-01","created_at":"2026-06-29T23:15:08.243Z","command":"afol library health --json","result":"passed"}
+{"id":"E-20260629191513580-f3595f","task_id":"T-01","created_at":"2026-06-29T23:15:13.580Z","command":"afol hook resolve --event context.bundle --role worker --surface rules --work-type delivery --file .afol/adm/rules/RULE-011-maintenance-cadence.md","result":"passed"}
+{"id":"E-20260629191519195-1f7f7d","task_id":"T-01","created_at":"2026-06-29T23:15:19.195Z","command":"afol ctx bundle -S 260629_1908_feature-health-sweep -T T-01 --role orchestrator --surface rules --file .afol/adm/rules/RULE-011-maintenance-cadence.md --json","result":"passed"}
+{"id":"E-20260629191525609-b0f9f7","task_id":"T-01","created_at":"2026-06-29T23:15:25.609Z","command":"afol maintenance review --area all --note \"checked rules/hooks/context, skills/help/registry, docs, commands, memory, library, organization; validate drift/typecheck/focused tests passed\" --json","result":"passed"}
+{"id":"E-20260629191530431-7de4a9","task_id":"T-01","created_at":"2026-06-29T23:15:30.431Z","command":"afol health --json","result":"passed"}
+{"id":"E-20260629191537199-1b9d3a","task_id":"T-01","created_at":"2026-06-29T23:15:37.199Z","command":"afol doctor --json","result":"passed"}
+{"id":"E-20260629191542576-2f6873","task_id":"T-01","created_at":"2026-06-29T23:15:42.576Z","command":"afol validate project --check-drift --json","result":"passed"}
+{"id":"E-20260629191547362-ce34b6","task_id":"T-01","created_at":"2026-06-29T23:15:47.362Z","command":"bun run typecheck","result":"passed"}
+{"id":"E-20260629191552473-20435f","task_id":"T-01","created_at":"2026-06-29T23:15:52.473Z","command":"bun test","result":"passed"}
+{"id":"E-20260629191556900-d745a3","task_id":"T-01","created_at":"2026-06-29T23:15:56.900Z","command":"git diff --check","result":"passed"}
+{"id":"E-20260629191615892-faf87d","task_id":"T-01","created_at":"2026-06-29T23:16:15.892Z","command":"afol verify-tasks .afol/wb/260629_1908_feature-health-sweep --strict","result":"passed"}

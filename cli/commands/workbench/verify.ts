@@ -141,18 +141,34 @@ export type RunVerificationResult = {
 export function runVerification(
 	root: string,
 	command: string,
+	options: { shell?: boolean } = {},
 ): RunVerificationResult {
-	const argv = splitCommandLine(command);
-	const executable = argv[0];
-	if (!executable) {
+	if (command.trim().length === 0) {
 		return { exitCode: 1, error: "Empty --test command." };
 	}
-	const result = spawnSync(executable, argv.slice(1), {
-		cwd: root,
-		encoding: "utf8",
-		maxBuffer: 1024 * 1024,
-		timeout: 120_000,
-	});
+	let result: ReturnType<typeof spawnSync>;
+	if (options.shell) {
+		result = spawnSync(command, {
+			cwd: root,
+			encoding: "utf8",
+			maxBuffer: 1024 * 1024,
+			timeout: 120_000,
+			shell: true,
+		});
+	} else {
+		const argv = splitCommandLine(command);
+		const executable = argv[0];
+		if (!executable) {
+			return { exitCode: 1, error: "Empty --test command." };
+		}
+		result = spawnSync(executable, argv.slice(1), {
+			cwd: root,
+			encoding: "utf8",
+			maxBuffer: 1024 * 1024,
+			timeout: 120_000,
+		});
+	}
+
 	if (result.error) {
 		return {
 			exitCode: 1,

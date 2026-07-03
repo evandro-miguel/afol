@@ -100,8 +100,10 @@ describe("kernel registry", () => {
 			kernelRegistry.commands.map((entry) => [entry.command, entry]),
 		);
 		expect(byCommand.get("status")?.sideEffect).toBe("read");
+		expect(byCommand.get("status")?.requires_approval).toBe(false);
 		expect(byCommand.get("validate")?.sideEffect).toBe("read");
 		expect(byCommand.get("init")?.sideEffect).toBe("write");
+		expect(byCommand.get("init")?.requires_approval).toBe(true);
 		expect(byCommand.get("bootstrap")?.sideEffect).toBe("write");
 		expect(byCommand.get("log")?.sideEffect).toBe("append");
 		expect(byCommand.get("verify-tasks")?.sideEffect).toBe("read");
@@ -127,6 +129,7 @@ describe("kernel registry", () => {
 		expect(byCommand.get("db")?.sideEffect).toBe("read");
 		expect(byCommand.get("doctor")?.sideEffect).toBe("read");
 		expect(byCommand.get("maintenance")?.sideEffect).toBe("write");
+		expect(byCommand.get("maintenance")?.requires_approval).toBe(true);
 		expect(byCommand.get("sweep")?.sideEffect).toBe("read");
 		expect(byCommand.get("schema")?.sideEffect).toBe("write");
 		expect(byCommand.get("preflight")?.sideEffect).toBe("read");
@@ -169,22 +172,26 @@ describe("kernel registry", () => {
 			{
 				usage: "weekly --dry-run",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Preview weekly maintenance actions",
 			},
 			{
 				usage: "monthly --dry-run",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Preview monthly maintenance actions",
 			},
 			{
 				usage: "review --area <area> --dry-run",
 				sideEffect: "read",
+				requires_approval: false,
 				description:
 					"Preview rules, skills, docs, commands, memory, library, organization",
 			},
 			{
 				usage: "review --area <area> --note <text>",
 				sideEffect: "write",
+				requires_approval: true,
 				description: "Record maintenance review freshness",
 			},
 		]);
@@ -199,38 +206,45 @@ describe("kernel registry", () => {
 			{
 				usage: "list",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "List scored reference projects",
 			},
 			{
 				usage: "show <project-id>",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Inspect one reference project by id or name",
 			},
 			{
 				usage: "matrix --for <axis>",
 				sideEffect: "read",
+				requires_approval: false,
 				description:
 					"Filter the score matrix by axis; omit --for for the full matrix",
 			},
 			{
 				usage: "recommend --for <axis>",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Rank the best reference projects for one axis",
 			},
 			{
 				usage: "validate --strict",
 				sideEffect: "read",
+				requires_approval: false,
 				description:
 					"Fail validation on warnings; omit --strict for standard validation",
 			},
 			{
 				usage: "generate --check",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Check generated outputs without writing files",
 			},
 			{
 				usage: "generate",
 				sideEffect: "generated",
+				requires_approval: true,
 				description: "Refresh generated outputs with local approval",
 			},
 		]);
@@ -245,26 +259,47 @@ describe("kernel registry", () => {
 			{
 				usage: "build",
 				sideEffect: "generated",
+				requires_approval: true,
 				description: "Rebuild the section index",
 			},
 			{
 				usage: "bundle",
+				sideEffect: "read",
+				requires_approval: false,
+				description:
+					"Build a context bundle; --json for compact output, --json --full for complete payload",
+			},
+			{
+				usage: "bundle --json [--full]",
+				sideEffect: "read",
+				requires_approval: false,
+				description:
+					"Return compact JSON; pass --full to include the complete bundle",
+			},
+			{
+				usage: "bundle --persist-rule-injection",
 				sideEffect: "generated",
-				description: "Build a context bundle and refresh sections if needed",
+				requires_approval: true,
+				description:
+					"Persist first-use rule injection state with local approval",
 			},
 			{
 				usage: "section --ref <ref>",
 				sideEffect: "generated",
+				requires_approval: true,
 				description: "Read one section and refresh sections if needed",
 			},
 			{
-				usage: "explain",
-				sideEffect: "generated",
-				description: "Explain bundle inputs and refresh sections if needed",
+				usage: "explain [--full]",
+				sideEffect: "read",
+				requires_approval: false,
+				description:
+					"Explain bundle inputs; pass --full to include the complete bundle",
 			},
 			{
 				usage: "tools",
 				sideEffect: "generated",
+				requires_approval: true,
 				description: "List context helpers and refresh sections if needed",
 			},
 		]);
@@ -283,16 +318,19 @@ describe("kernel registry", () => {
 			{
 				usage: "freshness|fs --json",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Check whether local-state indexes are fresh",
 			},
 			{
 				usage: "rebuild|rb --json",
 				sideEffect: "generated",
+				requires_approval: true,
 				description: "Refresh indexes and emit compact counts",
 			},
 			{
 				usage: "rebuild|rb --json --verbose",
 				sideEffect: "generated",
+				requires_approval: true,
 				description: "Refresh indexes and include full snapshots",
 			},
 		]);
@@ -307,16 +345,19 @@ describe("kernel registry", () => {
 			{
 				usage: "query --limit <n>",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Show recent telemetry events; defaults to latest 10",
 			},
 			{
 				usage: "report --limit <n>",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Summarize telemetry counts by session, type, and outcome",
 			},
 			{
 				usage: "export --format jsonl",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Export filtered telemetry events",
 			},
 		]);

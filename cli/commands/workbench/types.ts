@@ -8,6 +8,8 @@ export type SessionTaskArgs = {
 export type SessionTaskJsonArgs = SessionTaskArgs & {
 	json: boolean;
 	compact: boolean;
+	brief: boolean;
+	briefMode: "compact" | "full" | null;
 };
 
 export type EvidenceArgs = SessionTaskArgs & {
@@ -15,10 +17,12 @@ export type EvidenceArgs = SessionTaskArgs & {
 	result: string;
 	artifact?: string;
 	note?: string;
+	json?: boolean;
 };
 
 export type DoneArgs = SessionTaskArgs & {
 	testCommand: string | null;
+	testShellCommand: string | null;
 	evidenceCommand: string | null;
 	evidenceResult: string | null;
 	requireSpecCheck: boolean;
@@ -33,6 +37,13 @@ export type NewCommandArgs = {
 	json: boolean;
 };
 
+export type CloseArgs = {
+	session: string;
+	json: boolean;
+	allowNoReport: boolean;
+	reason: string;
+};
+
 export type LogArgs = {
 	session: string;
 	message: string;
@@ -42,10 +53,5 @@ export type LogArgs = {
 export type VerifyArgs = {
 	sessionPath: string;
 	strict: boolean;
-	json: boolean;
-};
-
-export type SessionArgs = {
-	session: string;
 	json: boolean;
 };

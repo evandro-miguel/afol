@@ -37,7 +37,7 @@ afol start --session <session-id> --task-id <task-id>
 afol evidence --session <session-id> --task-id <task-id> --command "<cmd>" --result passed
 afol done --session <session-id> --task-id <task-id>
 afol close --session <session-id>
-afol verify --session <session-id>
+afol verify-tasks .afol/wb/<session-id> --strict
 ```
 
 Inspection:
@@ -80,7 +80,7 @@ agent context.
   stay here or in a child path; `.afol/skills/**` is not an active skills root.
 - `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and
   desired-state administration.
-- `.afol/pstr/**`: generated current project-structure maps.
+- `.afol/pstr/**`: generated project-structure maps when present.
 - `.afol/wb/**`: governed execution sessions.
 - `.afol/data/events/**`: append-only runtime event data.
 - `.afol/data/index/**`: local indexes.
@@ -91,13 +91,14 @@ agent context.
 
 ## Rule Injection
 
-- `afol ctx bundle` is the only context command that can persist first-use rule
-  injection state for an identity.
+- `afol ctx bundle --persist-rule-injection` is the only context command that
+  can persist first-use rule injection state for an identity. Plain
+  `afol ctx bundle` is read-only.
 - Identity dimensions are `session`, `task`, `role`, `surface`, and optional
   `file`; missing session/task collapse to `none`, and the file dimension is
   omitted when no file is present.
-- `afol ctx explain`, `afol ctx tools`, and `afol ctx bundle --mode compact`
-  resolve context without consuming first-use injection state.
+- `afol ctx explain`, `afol ctx tools`, and plain `afol ctx bundle` resolve
+  context without consuming first-use injection state.
 - Rule metadata can target `domains`, `surfaces`, `work_types`, `languages`,
   `file_globs`, and `exact_files`; only rules marked `inject: "always"` are
   eligible for injection.

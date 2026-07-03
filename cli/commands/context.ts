@@ -1,6 +1,11 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
+import {
 	buildContextBundle,
 	ContextTrustError,
 	RuleInjectionError,
@@ -31,6 +36,9 @@ type ContextAction =
 type ParsedArgs = {
 	json: boolean;
 	trusted: boolean;
+	full: boolean;
+	refsOnly: boolean;
+	persistRuleInjection: boolean;
 	session?: string;
 	task?: string;
 	role?: string;
@@ -40,6 +48,7 @@ type ParsedArgs = {
 	mode?: ContextRetrievalMode;
 	ref?: string;
 	explain: boolean;
+	summary: boolean;
 };
 
 const MODES: readonly ContextRetrievalMode[] = [
@@ -82,7 +91,15 @@ function formatSummary(root: string): string {
 }
 
 function parseArgs(args: string[]): ParsedArgs {
-	const parsed: ParsedArgs = { json: false, trusted: false, explain: false };
+	const parsed: ParsedArgs = {
+		json: false,
+		trusted: false,
+		full: false,
+		refsOnly: false,
+		persistRuleInjection: false,
+		explain: false,
+		summary: false,
+	};
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
 		if (value === "--json" || value === "-j") {
@@ -95,6 +112,22 @@ function parseArgs(args: string[]): ParsedArgs {
 		}
 		if (value === "--explain") {
 			parsed.explain = true;
+			continue;
+		}
+		if (value === "--summary") {
+			parsed.summary = true;
+			continue;
+		}
+		if (value === "--refs-only") {
+			parsed.refsOnly = true;
+			continue;
+		}
+		if (value === "--full") {
+			parsed.full = true;
+			continue;
+		}
+		if (value === "--persist-rule-injection") {
+			parsed.persistRuleInjection = true;
 			continue;
 		}
 		if (value === "--session" || value === "-S") {
@@ -228,6 +261,7 @@ function libraryFreshness(root: string): "fresh" | "stale" | "missing" {
 function formatExplanation(
 	root: string,
 	bundle: ReturnType<typeof buildContextBundle>,
+	options: { full?: boolean } = {},
 ) {
 	const healthFindings = checkHealth(root, {
 		deep: false,
@@ -247,7 +281,7 @@ function formatExplanation(
 			...(bundle.library_refs.length > 0 ? ["library"] : []),
 		]),
 	);
-	return {
+	const explanation = {
 		ok: true,
 		why: {
 			included: [
@@ -274,6 +308,21 @@ function formatExplanation(
 				? "missing"
 				: "fresh",
 		},
+		budget: bundle.budget,
+		bundle_size: {
+			mode: bundle.mode,
+			refs: bundle.refs.length,
+			rules: bundle.rules.length,
+			hooks: bundle.hooks.length,
+			skills: bundle.skills.length,
+			tools: bundle.tools.length,
+			pstr_refs: bundle.pstr_refs.length,
+			memory_refs: bundle.memory_refs.length,
+			library_refs: bundle.library_refs.length,
+			expanded_sections: bundle.expanded_sections?.length ?? 0,
+			injected_rules: bundle.rule_injection.injected.length,
+			omitted_rules: bundle.rule_injection.omitted.length,
+		},
 		evidence_tags: evidenceTags,
 		create_safety_hints: [
 			"load only cited refs",
@@ -281,8 +330,8 @@ function formatExplanation(
 			"prefer current memory and library refs",
 		],
 		do_not_load: bundle.do_not_load,
-		bundle,
 	};
+	return options.full ? { ...explanation, bundle } : explanation;
 }
 
 function emitTrustError(
@@ -303,6 +352,7 @@ export async function runContextCommand(
 	args: string[],
 	projectRoot: string = process.cwd(),
 	io: CommandIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): Promise<number> {
 	const ctxArgs = action?.startsWith("-") ? [action, ...args] : args;
 	const wantsJson = ctxArgs.some(
@@ -312,6 +362,15 @@ export async function runContextCommand(
 		const ctxAction =
 			action && !action.startsWith("-") ? normalizeAction(action) : "summary";
 		const parsed = parseArgs(ctxArgs);
+		if (parsed.summary && (ctxAction !== "bundle" || !parsed.json)) {
+			throw new Error("--summary is only valid for ctx bundle --json.");
+		}
+		if (parsed.refsOnly && (ctxAction !== "bundle" || !parsed.json)) {
+			throw new Error("--refs-only is only valid for ctx bundle --json.");
+		}
+		if (parsed.full && ctxAction !== "bundle" && ctxAction !== "explain") {
+			throw new Error("--full is only valid for ctx bundle or ctx explain.");
+		}
 
 		if (ctxAction === "summary") {
 			if (parsed.json) {
@@ -334,6 +393,15 @@ export async function runContextCommand(
 		}
 
 		if (ctxAction === "build") {
+			if (requiresApproval(ctx)) {
+				const message = "ctx build requires local interactive approval";
+				if (parsed.json) {
+					jsonOutput.err(io, "build", "approval-required", message, 2);
+				} else {
+					io.stderr(`err approval-required ${message}`);
+				}
+				return 2;
+			}
 			const snapshot = rebuildSectionIndex(projectRoot);
 			if (parsed.json) {
 				jsonOutput.ok(io, ctxAction, { snapshot }, ["snapshot"]);
@@ -375,7 +443,31 @@ export async function runContextCommand(
 			const persistRuleInjection =
 				ctxAction === "bundle" &&
 				!parsed.explain &&
-				(parsed.mode ?? "balanced") !== "compact";
+				!parsed.summary &&
+				parsed.persistRuleInjection;
+			if (
+				parsed.persistRuleInjection &&
+				(ctxAction !== "bundle" || parsed.explain || parsed.summary)
+			) {
+				throw new Error(
+					"--persist-rule-injection is only valid for ctx bundle without --explain or --summary.",
+				);
+			}
+			if (persistRuleInjection && parsed.mode === "compact") {
+				throw new Error(
+					"--persist-rule-injection requires ctx bundle mode balanced, deep, or tokenmax.",
+				);
+			}
+			if (persistRuleInjection && requiresApproval(ctx)) {
+				const message =
+					"ctx bundle --persist-rule-injection requires local interactive approval";
+				if (parsed.json) {
+					jsonOutput.err(io, "bundle", "approval-required", message, 2);
+				} else {
+					io.stderr(`err approval-required ${message}`);
+				}
+				return 2;
+			}
 			bundle = buildContextBundle(projectRoot, {
 				...(parsed.session ? { session: parsed.session } : {}),
 				...(parsed.task ? { task: parsed.task } : {}),
@@ -419,8 +511,10 @@ export async function runContextCommand(
 		}
 
 		if (ctxAction === "bundle") {
-			if (parsed.explain) {
-				const explanation = formatExplanation(projectRoot, bundle);
+			if (parsed.explain || parsed.summary) {
+				const explanation = formatExplanation(projectRoot, bundle, {
+					full: parsed.explain && parsed.full,
+				});
 				if (parsed.json) {
 					jsonOutput.ok(
 						io,
@@ -433,13 +527,49 @@ export async function runContextCommand(
 				}
 				return 0;
 			}
+			if (parsed.refsOnly) {
+				if (parsed.json) {
+					jsonOutput.ok(io, ctxAction, { refs: bundle.refs }, ["refs"]);
+				} else {
+					io.stdout(JSON.stringify(bundle.refs, null, 2));
+				}
+				return 0;
+			}
 			if (parsed.json) {
-				jsonOutput.ok(
-					io,
-					ctxAction,
-					bundle,
-					Object.keys(bundle) as (keyof typeof bundle)[],
-				);
+				if (parsed.full) {
+					jsonOutput.ok(
+						io,
+						ctxAction,
+						bundle,
+						Object.keys(bundle) as (keyof typeof bundle)[],
+					);
+				} else {
+					const compact = {
+						task_id: bundle.task_id,
+						role: bundle.role,
+						surface: bundle.surface,
+						file_path: bundle.file_path,
+						mode: bundle.mode,
+						refs: bundle.refs.length,
+						rules: bundle.rules,
+						hooks: bundle.hooks.length,
+						hook_messages: bundle.hook_messages.length,
+						skills: bundle.skills,
+						tools: bundle.tools.length,
+						pstr_refs: bundle.pstr_refs,
+						memory_refs: bundle.memory_refs,
+						library_refs: bundle.library_refs,
+						rule_injection: bundle.rule_injection,
+						budget: bundle.budget,
+						gaps: bundle.gaps,
+					};
+					jsonOutput.ok(
+						io,
+						ctxAction,
+						compact,
+						Object.keys(compact) as (keyof typeof compact)[],
+					);
+				}
 			} else {
 				io.stdout(formatBundle(bundle));
 			}
@@ -447,7 +577,9 @@ export async function runContextCommand(
 		}
 
 		if (ctxAction === "explain") {
-			const explanation = formatExplanation(projectRoot, bundle);
+			const explanation = formatExplanation(projectRoot, bundle, {
+				full: parsed.full,
+			});
 			if (parsed.json) {
 				jsonOutput.ok(
 					io,

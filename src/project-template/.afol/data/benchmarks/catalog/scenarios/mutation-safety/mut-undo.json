@@ -9,7 +9,7 @@
     [
       "node",
       "-e",
-      "const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='sb-undo'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'), session+'\\n','utf8'); writeFileSync(join(dir,`${session}_task_01.md`), ['---','feature_id: F-sb','---','','# Tasks','','| Task | State | Owner | Notes |','|------|-------|-------|-------|','| T-01 | pending | worker | seed |',''].join('\\n'),'utf8');"
+      "const {mkdirSync,writeFileSync}=require('node:fs'); const {join}=require('node:path'); const root=process.cwd(); const session='sb-undo'; const dir=join(root,'.afol','wb',session); mkdirSync(dir,{recursive:true}); writeFileSync(join(root,'.afol','wb','.active_session'), session+'\\n','utf8'); writeFileSync(join(dir,`${session}_task_01.md`), ['---','feature_id: F-sb','---','','# Tasks','','| Task | State | Owner | Notes |','|------|-------|-------|-------|','| T-01 | in_progress | worker | seed |',''].join('\\n'),'utf8');"
     ],
     [
       "afol",
