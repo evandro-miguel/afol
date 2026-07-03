@@ -704,6 +704,28 @@ describe("health system", () => {
 		}
 	});
 
+	test("afol maintenance review dry-run human output shows preview_summary", async () => {
+		const root = createFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runMaintenanceCommand(
+					["review", "--area", "rules", "--dry-run"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const output = captured.stdout.join("\n");
+			expect(output).toContain("maintenance review preview: rules");
+			expect(output).toContain("current due: rules");
+			expect(output).toContain(
+				"due next: skills, docs, commands, memory, library, organization",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol maintenance review supports inline note values", async () => {
 		const root = createFixture();
 		try {

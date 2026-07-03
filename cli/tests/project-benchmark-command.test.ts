@@ -1515,9 +1515,12 @@ describe("project-benchmark command", () => {
 					unknownAxis.io,
 				),
 			).toBe(1);
-			expect(JSON.parse(unknownAxis.stdout[0] ?? "{}").error.code).toBe(
-				"unknown-axis",
-			);
+			const unknownAxisPayload = JSON.parse(unknownAxis.stdout[0] ?? "{}") as {
+				error: { code: string };
+				data: { catalog_source: string };
+			};
+			expect(unknownAxisPayload.error.code).toBe("unknown-axis");
+			expect(unknownAxisPayload.data.catalog_source).toBe("project");
 
 			const unknownMatrixAxis = captureIo();
 			expect(
@@ -1528,9 +1531,11 @@ describe("project-benchmark command", () => {
 					unknownMatrixAxis.io,
 				),
 			).toBe(1);
-			expect(JSON.parse(unknownMatrixAxis.stdout[0] ?? "{}").error.code).toBe(
-				"unknown-axis",
-			);
+			const unknownMatrixPayload = JSON.parse(
+				unknownMatrixAxis.stdout[0] ?? "{}",
+			) as { error: { code: string }; data: { catalog_source: string } };
+			expect(unknownMatrixPayload.error.code).toBe("unknown-axis");
+			expect(unknownMatrixPayload.data.catalog_source).toBe("project");
 
 			const raw = readProject(root);
 			raw.source_refs = [];

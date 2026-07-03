@@ -594,7 +594,14 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 			{
 				usage: "bundle",
 				sideEffect: "read",
-				description: "Build a context bundle without persisting rule state",
+				description:
+					"Build a context bundle; --json for compact output, --json --full for complete payload",
+			},
+			{
+				usage: "bundle --json [--full]",
+				sideEffect: "read",
+				description:
+					"Return compact JSON; pass --full to include the complete bundle",
 			},
 			{
 				usage: "bundle --persist-rule-injection",

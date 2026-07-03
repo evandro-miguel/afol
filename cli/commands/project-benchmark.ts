@@ -488,6 +488,7 @@ export async function runProjectBenchmarkCommand(
 					"unknown-axis",
 					`Unknown axis: ${parsed.axis}`,
 					1,
+					{ catalog_source: catalog.catalog.source },
 				);
 			} else {
 				io.stderr(`err unknown-axis axis=${parsed.axis}`);
@@ -594,6 +595,7 @@ export async function runProjectBenchmarkCommand(
 					"unknown-axis",
 					`Unknown axis: ${axis}`,
 					1,
+					{ catalog_source: catalog.catalog.source },
 				);
 			} else {
 				io.stderr(`err unknown-axis axis=${axis}`);

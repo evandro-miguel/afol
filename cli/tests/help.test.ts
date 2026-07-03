@@ -11,7 +11,7 @@ import {
 	formatHelpText,
 } from "../help";
 import { SUBCOMMAND_DISPATCH_GROUPS } from "../main";
-import { kernelRegistry } from "../registry";
+import { kernelRegistry, requiresApprovalForSideEffect } from "../registry";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 
@@ -566,7 +566,15 @@ describe("help formatter", () => {
 					usage: "bundle",
 					sideEffect: "read",
 					requires_approval: false,
-					description: "Build a context bundle without persisting rule state",
+					description:
+						"Build a context bundle; --json for compact output, --json --full for complete payload",
+				},
+				{
+					usage: "bundle --json [--full]",
+					sideEffect: "read",
+					requires_approval: false,
+					description:
+						"Return compact JSON; pass --full to include the complete bundle",
 				},
 				{
 					usage: "bundle --persist-rule-injection",
@@ -596,6 +604,32 @@ describe("help formatter", () => {
 				},
 			],
 		});
+	});
+
+	test("every subcommand in catalog json has correct requires_approval per sideEffect", () => {
+		const catalog = buildCommandCatalog(kernelRegistry);
+		for (const entry of catalog) {
+			if (!entry.subcommands?.length) continue;
+			for (const sub of entry.subcommands) {
+				expect(typeof sub.requires_approval).toBe("boolean");
+				expect(sub.requires_approval).toBe(
+					requiresApprovalForSideEffect(sub.sideEffect),
+				);
+			}
+		}
+	});
+
+	test("every per-command json subcommand has correct requires_approval", () => {
+		for (const spec of kernelRegistry.commands) {
+			const help = buildCommandHelpJson(spec.command, kernelRegistry);
+			if (!help?.subcommands?.length) continue;
+			for (const sub of help.subcommands) {
+				expect(typeof sub.requires_approval).toBe("boolean");
+				expect(sub.requires_approval).toBe(
+					requiresApprovalForSideEffect(sub.sideEffect),
+				);
+			}
+		}
 	});
 
 	test("builds local-state json with subcommand metadata", () => {

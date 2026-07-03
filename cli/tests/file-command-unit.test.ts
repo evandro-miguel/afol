@@ -366,6 +366,61 @@ describe("file command dispatcher", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	test("rejects non-dry-run mutations with closed session task and does not write or journal", async () => {
+		const root = mkProjectRoot();
+		try {
+			const target = writeFileTree(root, "notes/doc.txt", "original");
+
+			// Create a session with a done (closed) task
+			const sessionDir = join(root, ".afol", "wb", "CLOSED");
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, "CLOSED_task_01.md"),
+				[
+					"# Tasks: closed",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | already done |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const journalDir = resolveProjectPaths(root).abs.mutationsDir;
+			expect(existsSync(journalDir)).toBe(false);
+
+			const io = captureIo();
+			const code = await runFileCommand(
+				[
+					"pt",
+					"--path",
+					"notes/doc.txt",
+					"--append",
+					"should-not-write",
+					"--session",
+					"CLOSED",
+					"--task-id",
+					"T-01",
+					"--reason",
+					"should fail",
+				],
+				root,
+				io.io,
+			);
+
+			expect(code).toBe(2);
+			expect(io.stderr[0]).toContain("T-01 is done");
+			expect(readFileSync(target, "utf8")).toBe("original");
+			// Journal must not have been created
+			expect(existsSync(journalDir)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("file mutation handlers", () => {
@@ -568,6 +623,120 @@ describe("file mutation handlers", () => {
 					root,
 				),
 			).toThrow("Expected patch mutation for undo, got move");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("patch on empty file sets beforeExisted true and creates backup_path", () => {
+		const root = mkProjectRoot();
+		try {
+			const file = writeFileTree(root, "notes/empty.txt", "");
+			const write = runPatchMutation(
+				{
+					command: "pt",
+					path: "notes/empty.txt",
+					appendText: "+content",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "R",
+				},
+				root,
+			);
+			expect(write.status).toBe("write");
+			expect(write.backup_path).toBeTruthy();
+			expect(readFileSync(file, "utf8")).toBe("+content");
+
+			const mutation: MutationRecord = {
+				id: write.mutation_id ?? "M-empty-patch",
+				ts: new Date().toISOString(),
+				kind: "patch",
+				status: "applied",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "R",
+				sourcePath: "notes/empty.txt",
+				beforeHash: write.before_hash ?? null,
+				afterHash: write.after_hash ?? null,
+				backupPath: write.backup_path ?? null,
+				beforeExisted: true,
+			};
+
+			const undone = undoPatchMutation(
+				{
+					command: "ud",
+					path: "",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "R",
+				},
+				mutation,
+				root,
+			);
+			expect(undone.status).toBe("write");
+			expect(readFileSync(file, "utf8")).toBe("");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("patch on new file sets beforeExisted false and no backup_path", () => {
+		const root = mkProjectRoot();
+		try {
+			const filePath = join(root, "notes/new.txt");
+			const write = runPatchMutation(
+				{
+					command: "pt",
+					path: "notes/new.txt",
+					appendText: "fresh",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "R",
+				},
+				root,
+			);
+			expect(write.status).toBe("write");
+			expect(write.backup_path).toBeNull();
+			expect(readFileSync(filePath, "utf8")).toBe("fresh");
+
+			const mutation: MutationRecord = {
+				id: write.mutation_id ?? "M-new-patch",
+				ts: new Date().toISOString(),
+				kind: "patch",
+				status: "applied",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "R",
+				sourcePath: "notes/new.txt",
+				beforeHash: write.before_hash ?? null,
+				afterHash: write.after_hash ?? null,
+				backupPath: null,
+				beforeExisted: false,
+			};
+
+			const undone = undoPatchMutation(
+				{
+					command: "ud",
+					path: "",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "R",
+				},
+				mutation,
+				root,
+			);
+			expect(undone.status).toBe("write");
+			expect(existsSync(filePath)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

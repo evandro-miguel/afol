@@ -37,6 +37,7 @@ type ParsedArgs = {
 	json: boolean;
 	trusted: boolean;
 	full: boolean;
+	refsOnly: boolean;
 	persistRuleInjection: boolean;
 	session?: string;
 	task?: string;
@@ -94,6 +95,7 @@ function parseArgs(args: string[]): ParsedArgs {
 		json: false,
 		trusted: false,
 		full: false,
+		refsOnly: false,
 		persistRuleInjection: false,
 		explain: false,
 		summary: false,
@@ -114,6 +116,10 @@ function parseArgs(args: string[]): ParsedArgs {
 		}
 		if (value === "--summary") {
 			parsed.summary = true;
+			continue;
+		}
+		if (value === "--refs-only") {
+			parsed.refsOnly = true;
 			continue;
 		}
 		if (value === "--full") {
@@ -359,6 +365,12 @@ export async function runContextCommand(
 		if (parsed.summary && (ctxAction !== "bundle" || !parsed.json)) {
 			throw new Error("--summary is only valid for ctx bundle --json.");
 		}
+		if (parsed.refsOnly && (ctxAction !== "bundle" || !parsed.json)) {
+			throw new Error("--refs-only is only valid for ctx bundle --json.");
+		}
+		if (parsed.full && ctxAction !== "bundle" && ctxAction !== "explain") {
+			throw new Error("--full is only valid for ctx bundle or ctx explain.");
+		}
 
 		if (ctxAction === "summary") {
 			if (parsed.json) {
@@ -515,13 +527,49 @@ export async function runContextCommand(
 				}
 				return 0;
 			}
+			if (parsed.refsOnly) {
+				if (parsed.json) {
+					jsonOutput.ok(io, ctxAction, { refs: bundle.refs }, ["refs"]);
+				} else {
+					io.stdout(JSON.stringify(bundle.refs, null, 2));
+				}
+				return 0;
+			}
 			if (parsed.json) {
-				jsonOutput.ok(
-					io,
-					ctxAction,
-					bundle,
-					Object.keys(bundle) as (keyof typeof bundle)[],
-				);
+				if (parsed.full) {
+					jsonOutput.ok(
+						io,
+						ctxAction,
+						bundle,
+						Object.keys(bundle) as (keyof typeof bundle)[],
+					);
+				} else {
+					const compact = {
+						task_id: bundle.task_id,
+						role: bundle.role,
+						surface: bundle.surface,
+						file_path: bundle.file_path,
+						mode: bundle.mode,
+						refs: bundle.refs.length,
+						rules: bundle.rules,
+						hooks: bundle.hooks.length,
+						hook_messages: bundle.hook_messages.length,
+						skills: bundle.skills,
+						tools: bundle.tools.length,
+						pstr_refs: bundle.pstr_refs,
+						memory_refs: bundle.memory_refs,
+						library_refs: bundle.library_refs,
+						rule_injection: bundle.rule_injection,
+						budget: bundle.budget,
+						gaps: bundle.gaps,
+					};
+					jsonOutput.ok(
+						io,
+						ctxAction,
+						compact,
+						Object.keys(compact) as (keyof typeof compact)[],
+					);
+				}
 			} else {
 				io.stdout(formatBundle(bundle));
 			}

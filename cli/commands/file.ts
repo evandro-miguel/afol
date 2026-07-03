@@ -3,6 +3,7 @@ import {
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
+import { assertTaskInProgress } from "../services/workbench/lifecycle";
 import {
 	parseArchiveArgs,
 	parseMoveArgs,
@@ -48,6 +49,10 @@ export async function runFileCommand(
 			if (!parsed.dryRun && requiresApproval(ctx)) {
 				throw new Error("file patch requires local interactive approval");
 			}
+			if (!parsed.dryRun) {
+				requireWriteContext(parsed);
+				assertTaskInProgress(projectRoot, parsed.session, parsed.taskId);
+			}
 			asJson = parsed.json;
 			result = runPatchMutation(parsed, projectRoot);
 		} else if (rawCommand === "mv" || rawCommand === "move") {
@@ -57,6 +62,10 @@ export async function runFileCommand(
 			);
 			if (!parsed.dryRun && requiresApproval(ctx)) {
 				throw new Error("file move requires local interactive approval");
+			}
+			if (!parsed.dryRun) {
+				requireWriteContext(parsed);
+				assertTaskInProgress(projectRoot, parsed.session, parsed.taskId);
 			}
 			asJson = parsed.json;
 			result = runMoveMutation(parsed, projectRoot);
@@ -68,6 +77,7 @@ export async function runFileCommand(
 			asJson = parsed.json;
 			if (!parsed.dryRun) {
 				requireWriteContext(parsed);
+				assertTaskInProgress(projectRoot, parsed.session, parsed.taskId);
 			}
 			result = runUndoMutation(parsed, projectRoot);
 		} else if (rawCommand === "ar" || rawCommand === "archive") {
@@ -77,6 +87,10 @@ export async function runFileCommand(
 			);
 			if (!parsed.dryRun && requiresApproval(ctx)) {
 				throw new Error("file archive requires local interactive approval");
+			}
+			if (!parsed.dryRun) {
+				requireWriteContext(parsed);
+				assertTaskInProgress(projectRoot, parsed.session, parsed.taskId);
 			}
 			asJson = parsed.json;
 			result = runArchiveMutation(parsed, projectRoot);

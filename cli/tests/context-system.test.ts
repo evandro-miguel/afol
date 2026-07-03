@@ -1614,14 +1614,14 @@ describe("context system", () => {
 		}
 	});
 
-	test("afol ctx bundle reads sections without rebuilding sections", async () => {
+	test("afol ctx bundle --full reads sections without rebuilding sections", async () => {
 		const root = createSectionFixture();
 		try {
 			const captured = captureIo();
 			expect(
 				await runContextCommand(
 					"bundle",
-					["--json", "--mode", "deep"],
+					["--json", "--full", "--mode", "deep"],
 					root,
 					captured.io,
 				),
@@ -1825,7 +1825,7 @@ describe("context system", () => {
 		}
 	});
 
-	test("afol ctx bundle works without trusted when pstr is missing", async () => {
+	test("afol ctx bundle --full works without trusted when pstr is missing", async () => {
 		const root = createBundleFixture({ pstr: "missing" });
 		try {
 			const captured = captureIo();
@@ -1833,6 +1833,7 @@ describe("context system", () => {
 				await runContextCommand(
 					"bundle",
 					[
+						"--full",
 						"-S",
 						"session-1",
 						"-T",
@@ -1971,7 +1972,7 @@ describe("context system", () => {
 		}
 	});
 
-	test("afol ctx bundle --json returns JSON", async () => {
+	test("afol ctx bundle --json returns compact JSON", async () => {
 		const root = createBundleFixture();
 		try {
 			const captured = captureIo();
@@ -2001,13 +2002,16 @@ describe("context system", () => {
 				data: {
 					task_id: string;
 					mode: string;
-					refs: Array<{ section?: string }>;
+					refs: number;
+					hooks: number;
 					pstr_refs: string[];
 				};
 				task_id: string;
 				mode: string;
-				refs: Array<{ section?: string }>;
+				refs: number;
+				hooks: number;
 				pstr_refs: string[];
+				rules: string[];
 			};
 			expect(payload.schema).toBe("afol.result/v1");
 			expect(payload.ok).toBe(true);
@@ -2016,8 +2020,12 @@ describe("context system", () => {
 			expect(payload.data.task_id).toBe("T-01");
 			expect(payload.task_id).toBe("T-01");
 			expect(payload.mode).toBe("balanced");
-			expect(payload.refs.length).toBeGreaterThan(0);
+			expect(payload.refs).toBeGreaterThan(0);
+			expect(payload.data.refs).toBe(payload.refs);
 			expect(payload.pstr_refs).toEqual(["pstr:alpha-map"]);
+			expect(Array.isArray(payload.rules)).toBe(true);
+			expect(typeof payload.hooks).toBe("number");
+			expect(typeof payload.data.hooks).toBe("number");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2356,14 +2364,14 @@ describe("context system", () => {
 				data: {
 					task_id: string;
 					mode: string;
-					refs: Array<{ section?: string }>;
+					refs: number;
 					pstr_refs: string[];
 					memory_refs: string[];
 					library_refs: string[];
 				};
 				task_id: string;
 				mode: string;
-				refs: Array<{ section?: string }>;
+				refs: number;
 				pstr_refs: string[];
 				memory_refs: string[];
 				library_refs: string[];
@@ -2375,7 +2383,8 @@ describe("context system", () => {
 			expect(payload.data.task_id).toBe("T-01");
 			expect(payload.task_id).toBe("T-01");
 			expect(payload.mode).toBe("balanced");
-			expect(payload.refs.length).toBeGreaterThan(0);
+			expect(payload.refs).toBeGreaterThan(0);
+			expect(payload.data.refs).toBe(payload.refs);
 			expect(payload.pstr_refs).toEqual(["pstr:alpha-map"]);
 			expect(Array.isArray(payload.data.memory_refs)).toBe(true);
 			expect(Array.isArray(payload.data.library_refs)).toBe(true);

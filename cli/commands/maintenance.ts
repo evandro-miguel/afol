@@ -175,11 +175,19 @@ export async function runMaintenanceCommand(
 					),
 				);
 			} else {
+				const displaySummary = parsed.dryRun
+					? result.preview_summary
+					: result.summary;
 				io.stdout(
 					[
 						`maintenance review ${parsed.dryRun ? "preview" : "recorded"}: ${result.reviewed_areas.join(", ")}`,
-						`  due next: ${result.summary.due_areas.join(", ") || "none"}`,
-					].join("\n"),
+						parsed.dryRun
+							? `  current due: ${result.current_summary.due_areas.join(", ") || "none"}`
+							: "",
+						`  due next: ${displaySummary.due_areas.join(", ") || "none"}`,
+					]
+						.filter(Boolean)
+						.join("\n"),
 				);
 			}
 			return 0;
