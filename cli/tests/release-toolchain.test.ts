@@ -379,7 +379,8 @@ describe("release and toolchain contracts", () => {
 			'go install "github.com/google/osv-scanner/v2/cmd/osv-scanner@v$' +
 			'{OSV_SCANNER_VERSION}"';
 		const gitleaksInstallCommand =
-			'go install "github.com/gitleaks/gitleaks/v8@v$' + '{GITLEAKS_VERSION}"';
+			'go install "github.com/zricethezav/gitleaks/v8@v$' +
+			'{GITLEAKS_VERSION}"';
 
 		expect(workflow).toContain('OSV_SCANNER_VERSION: "2.3.8"');
 		expect(workflow).toContain('GITLEAKS_VERSION: "8.24.2"');

@@ -39,7 +39,7 @@ jobs:
           export GOPROXY="https://proxy.golang.org,direct"
           export GOSUMDB="sum.golang.org"
           go install "github.com/google/osv-scanner/v2/cmd/osv-scanner@v${OSV_SCANNER_VERSION}"
-          go install "github.com/gitleaks/gitleaks/v8@v${GITLEAKS_VERSION}"
+          go install "github.com/zricethezav/gitleaks/v8@v${GITLEAKS_VERSION}"
           "$tool_dir/osv-scanner" --version
           "$tool_dir/gitleaks" version
 
