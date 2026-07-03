@@ -19,7 +19,13 @@ import { evidenceResultIsSuccess, verifyWorkbenchTasks } from "./verify";
 
 const TASK_ROW_RE =
 	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
-const BLOCKING_STATES = new Set(["pending", "in_progress", "problem"]);
+const BLOCKING_STATES = new Set([
+	"pending",
+	"in_progress",
+	"implemented_untested",
+	"tested_needs_spec_validation",
+	"problem",
+]);
 const SESSION_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const NEW_SESSION_LOCK_SESSION = "__workbench-new-session__";
 
@@ -286,6 +292,18 @@ function readTaskRows(taskPath: string): TaskRow[] {
 		}
 	}
 	return rows;
+}
+
+export function isSessionClosed(root: string, session: string): boolean {
+	const paths = sessionPaths(root, session);
+	if (!existsSync(paths.taskPath)) {
+		return true;
+	}
+	const rows = readTaskRows(paths.taskPath);
+	if (rows.length === 0) {
+		return false;
+	}
+	return rows.every((row) => !BLOCKING_STATES.has(row.state));
 }
 
 function ensureTaskExists(

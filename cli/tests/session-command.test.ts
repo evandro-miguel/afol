@@ -70,6 +70,33 @@ function createSessionFixture(root: string, session: string): void {
 	writeFileSync(join(sessionDir, `${session}_task_01.md`), "# task\n", "utf8");
 }
 
+function createStateBoardSession(
+	root: string,
+	session: string,
+	state: string,
+): void {
+	const sessionDir = join(root, ".afol", "wb", session);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(
+		join(sessionDir, `${session}_task_01.md`),
+		[
+			"# Tasks",
+			"",
+			"## State Board",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			`| T-01 | ${state} | worker | task state fixture |`,
+			"",
+		].join("\n"),
+		"utf8",
+	);
+}
+
+function createClosedSession(root: string, session: string): void {
+	createStateBoardSession(root, session, "done");
+}
+
 function initGitRepo(root: string, branch = "parallel-session-test"): void {
 	const git = (args: string[]): void => {
 		const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
@@ -390,6 +417,115 @@ describe("afol session command", () => {
 			expect(readActiveSession(root)).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("bind rejects a closed session with all tasks done", async () => {
+		const root = createProjectRoot("bind-closed");
+		initGitRepo(root);
+		try {
+			createClosedSession(root, "DONE");
+			const io = captureIo();
+			const code = await runSessionCommand(
+				"bind",
+				["--session", "DONE"],
+				root,
+				io.io,
+			);
+			expect(code).toBe(2);
+			expect(io.stderr.join("\n")).toContain("session closed: DONE");
+			expect(readSessionContext(root).bindings).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("bind --json --session DONE returns closed session error envelope", async () => {
+		const root = createProjectRoot("bind-json-closed");
+		initGitRepo(root);
+		try {
+			createClosedSession(root, "DONE");
+			const io = captureIo();
+			const code = await runSessionCommand(
+				"bind",
+				["--json", "--session", "DONE"],
+				root,
+				io.io,
+			);
+			expect(code).toBe(2);
+			expect(io.stderr).toEqual([]);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
+				ok: boolean;
+				exit_code: number;
+				error: { code: string; message: string };
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(2);
+			expect(payload.error?.code).toBe("SESSION_ERROR");
+			expect(payload.error?.message).toContain("session closed: DONE");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("bind accepts sessions awaiting validation", async () => {
+		for (const state of [
+			"implemented_untested",
+			"tested_needs_spec_validation",
+		] as const) {
+			const root = createProjectRoot(`bind-${state}`);
+			initGitRepo(root);
+			try {
+				createStateBoardSession(root, "ACTIVE", state);
+				const io = captureIo();
+				const code = await runSessionCommand(
+					"bind",
+					["--session", "ACTIVE"],
+					root,
+					io.io,
+				);
+				expect(code).toBe(0);
+				expect(readSessionContext(root).bindings[0]?.session).toBe("ACTIVE");
+				expect(io.stdout.join("\n")).toContain("session bound: ACTIVE");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("switch rejects a closed session with all tasks done", async () => {
+		const root = createProjectRoot("switch-closed");
+		initGitRepo(root);
+		try {
+			createClosedSession(root, "DONE");
+			const io = captureIo();
+			const code = await runSessionCommand("switch", ["DONE"], root, io.io);
+			expect(code).toBe(2);
+			expect(io.stderr.join("\n")).toContain("session closed: DONE");
+			expect(readActiveSession(root)).toBeNull();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("switch accepts sessions awaiting validation", async () => {
+		for (const state of [
+			"implemented_untested",
+			"tested_needs_spec_validation",
+		] as const) {
+			const root = createProjectRoot(`switch-${state}`);
+			initGitRepo(root);
+			try {
+				createStateBoardSession(root, "ACTIVE", state);
+				const io = captureIo();
+				const code = await runSessionCommand("switch", ["ACTIVE"], root, io.io);
+				expect(code).toBe(0);
+				expect(readActiveSession(root)).toBe("ACTIVE");
+				expect(resolveContextSession(root)).toBe("ACTIVE");
+				expect(io.stdout.join("\n")).toContain("session switched: ACTIVE");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 		}
 	});
 

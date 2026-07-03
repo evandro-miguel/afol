@@ -16,6 +16,7 @@ import { atomicWriteText } from "../services/io/atomic";
 import { loadCoordinationRadar } from "../services/local-state/coordination-radar";
 import { resolveProjectPaths } from "../services/project/paths";
 import {
+	isSessionClosed,
 	readActiveSession,
 	sessionPaths,
 } from "../services/workbench/lifecycle";
@@ -409,6 +410,15 @@ function assertSessionExists(projectRoot: string, session: string): void {
 	}
 }
 
+function assertSessionNotArchivedOrClosed(
+	projectRoot: string,
+	session: string,
+): void {
+	if (isSessionClosed(projectRoot, session)) {
+		throw new Error(`session closed: ${session} (all tasks done)`);
+	}
+}
+
 function displayWorktreePath(
 	projectRoot: string,
 	worktree: string | null,
@@ -527,6 +537,7 @@ function bindCurrentSession(
 		throw new Error("Missing --session for session bind.");
 	}
 	assertSessionExists(projectRoot, session);
+	assertSessionNotArchivedOrClosed(projectRoot, session);
 	const branch = parsed.branch ?? currentGitBranch(projectRoot);
 	const worktree = currentGitWorktree(projectRoot) ?? projectRoot;
 	if (parsed.dryRun) {
@@ -573,6 +584,7 @@ function switchSession(
 	ctx: OperationContext,
 ): ActionResult {
 	assertSessionExists(projectRoot, session);
+	assertSessionNotArchivedOrClosed(projectRoot, session);
 	if (requiresApproval(ctx)) {
 		throw new Error("session switch requires local interactive approval");
 	}
