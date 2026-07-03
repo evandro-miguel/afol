@@ -15,7 +15,8 @@ requires them.
 Before writing a plan:
 
 1. Read local `AGENTS.md`.
-2. Read `.agents/config.json` for AFOL paths.
+2. Read `.afol/config.json` for AFOL paths; `.agents/config.json` is legacy
+   fallback only.
 3. Check `git status --short --branch`.
 4. Gather only the files, commands, errors, and constraints needed to make the
    plan executable.

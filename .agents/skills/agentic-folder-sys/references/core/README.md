@@ -154,11 +154,14 @@ convert it into `AGENTS.md`, `.afol/adm/**`, the configured
 
 ## 6. Path Contract After Install
 
-After install, read:
+After install, read the canonical path contract:
 
 ```bash
-cat .agents/config.json
+cat .afol/config.json
 ```
+
+`.agents/config.json` is legacy fallback only, preserved for provider-facing
+scaffold metadata.
 
 Use `paths.mutable_dir`, `paths.wb_dir`, `paths.skills_dir`, `paths.tmp_dir`,
 `paths.data_dir`, and `paths.events_file` for all AFOL-owned writes.

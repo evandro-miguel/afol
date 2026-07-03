@@ -38,11 +38,12 @@ mutations, temporary files, benchmark data, migration archives, and other
 configured mutable paths. Project-local skills follow `paths.skills_dir`; in
 the current provider-compatible layout this is commonly `.agents/skills`.
 
-## 3. Read `.agents/config.json` Before Moving Files
+## 3. Read `.afol/config.json` Before Moving Files
 
-Do not guess paths. Read the path contract and follow fields such as
-`paths.mutable_dir`, `paths.skills_dir`, `paths.wb_dir`, `paths.data_dir`, and
-`paths.tmp_dir`.
+Do not guess paths. Read `.afol/config.json` first for the path contract
+(`paths.mutable_dir`, `paths.skills_dir`, `paths.wb_dir`, `paths.data_dir`,
+`paths.tmp_dir`). Fall back to `.agents/config.json` only when
+`.afol/config.json` is absent (legacy install).
 
 ## 4. `--partial` Is Stale
 
@@ -79,12 +80,12 @@ project-wide overwrite switch.
 
 ## 8. Project-Local Skills Follow `paths.skills_dir`
 
-Read `.agents/config.json` before editing skills. In the current
-provider-compatible layout, project-local skills commonly live under
-`.agents/skills/**`; older or custom installs may differ. Keep only the curated
-skills agents should use in that project. If a change is intended for every
-project, update the global skill through the normal skill-maintenance workflow
-outside the project scaffold.
+Read `.afol/config.json` (or `.agents/config.json` as legacy fallback) before
+editing skills. In the current provider-compatible layout, project-local skills
+commonly live under `.agents/skills/**`; older or custom installs may differ.
+Keep only the curated skills agents should use in that project. If a change is
+intended for every project, update the global skill through the normal
+skill-maintenance workflow outside the project scaffold.
 
 ## 9. Do Not Recreate Legacy Archive Paths
 

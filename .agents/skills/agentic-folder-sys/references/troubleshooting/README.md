@@ -101,7 +101,7 @@ Cause:
 
 Fix:
 
-- read `.agents/config.json`;
+- read `.afol/config.json` (`.agents/config.json` as legacy fallback only);
 - use `paths.wb_dir`, which should point at `.afol/wb`;
 - move only deliberately reviewed runtime artifacts into AFOL-owned paths;
 - update stale instructions that mention `.agents/wb` as active state.
