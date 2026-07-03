@@ -24,7 +24,7 @@ function runCoverageCheck(
 	mkdirSync(binDir, { recursive: true });
 	const lcovPath = join(
 		root,
-		options.lcovPath ?? join("coverage", "lcov.info"),
+		options.lcovPath ?? join(".coverage", "lcov.info"),
 	);
 	if (options.lcovOutput) {
 		mkdirSync(dirname(lcovPath), { recursive: true });

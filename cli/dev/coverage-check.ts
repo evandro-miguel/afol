@@ -13,7 +13,7 @@ type CoverageTotals = {
 };
 
 const parsedArgs = parseArgs(process.argv.slice(2));
-const coverageDir = parsedArgs.coverageDir ?? "coverage";
+const coverageDir = parsedArgs.coverageDir ?? ".coverage";
 const lcovPath = resolve(
 	process.cwd(),
 	parsedArgs.lcovPath ?? `${coverageDir}/lcov.info`,
