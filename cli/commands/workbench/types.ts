@@ -37,6 +37,13 @@ export type NewCommandArgs = {
 	json: boolean;
 };
 
+export type CloseArgs = {
+	session: string;
+	json: boolean;
+	allowNoReport: boolean;
+	reason: string;
+};
+
 export type LogArgs = {
 	session: string;
 	message: string;
@@ -46,10 +53,5 @@ export type LogArgs = {
 export type VerifyArgs = {
 	sessionPath: string;
 	strict: boolean;
-	json: boolean;
-};
-
-export type SessionArgs = {
-	session: string;
 	json: boolean;
 };

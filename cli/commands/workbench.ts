@@ -25,11 +25,11 @@ import {
 } from "../services/workbench/verify";
 import {
 	hasJsonFlag,
+	parseCloseArgs,
 	parseDoneArgs,
 	parseEvidenceArgs,
 	parseLogArgs,
 	parseNewArgs,
-	parseSessionOnlyArgs,
 	parseSessionTaskArgs,
 	parseVerifyArgs,
 } from "./workbench/args";
@@ -55,17 +55,27 @@ export async function runNewCommand(
 		assertWorkbenchMutationAllowed(ctx, "workbench.new");
 		const parsed = parseNewArgs(args);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
+		const governanceStatus =
+			parsed.metadata.featureId && parsed.metadata.parentSpec
+				? "governed"
+				: "unbound";
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
 					envelopeOk(
-						{ ...created, status: "created" },
+						{
+							...created,
+							status: "created",
+							governance_status: governanceStatus,
+						},
 						{ action: "workbench.new" },
 					),
 				),
 			);
 		} else {
-			console.log(`session created: ${created.session}`);
+			console.log(
+				`session created: ${created.session}\ngovernance_status: ${governanceStatus}`,
+			);
 		}
 		return 0;
 	} catch (error) {
@@ -421,8 +431,11 @@ export async function runCloseCommand(
 ): Promise<number> {
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.close");
-		const parsed = parseSessionOnlyArgs(args, "close", root);
-		const closeWarnings = closeSession(root, parsed.session);
+		const parsed = parseCloseArgs(args, root);
+		const closeWarnings = closeSession(root, parsed.session, {
+			allowNoReport: parsed.allowNoReport,
+			reason: parsed.reason,
+		});
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(

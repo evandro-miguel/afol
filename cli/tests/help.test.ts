@@ -293,22 +293,25 @@ describe("help formatter", () => {
 		expect(help).toMatchObject({
 			command: "schema",
 			sideEffect: "write",
+			requires_approval: true,
 			description:
 				"Review schema state; apply and resolver --write can write files",
 			category: "ops",
 		});
 		expect(help?.subcommands).toEqual(
 			expect.arrayContaining([
-				{
+				expect.objectContaining({
 					usage: "apply --dry-run",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Preview schema apply without writing",
-				},
-				{
+				}),
+				expect.objectContaining({
 					usage: "apply",
 					sideEffect: "write",
+					requires_approval: true,
 					description: "Write the detected schema pack for local callers",
-				},
+				}),
 			]),
 		);
 	});
@@ -388,6 +391,7 @@ describe("help formatter", () => {
 			aliases: string[];
 			kind: string;
 			sideEffect: string;
+			requires_approval: boolean;
 			description: string;
 			category?: string;
 		}>;
@@ -408,6 +412,16 @@ describe("help formatter", () => {
 		expect(parsed.find((entry) => entry.command === "adm")?.aliases).toEqual([
 			"ad",
 		]);
+		expect(
+			parsed.find((entry) => entry.command === "status")?.requires_approval,
+		).toBe(false);
+		expect(
+			parsed.find((entry) => entry.command === "maintenance")
+				?.requires_approval,
+		).toBe(true);
+		expect(
+			parsed.every((entry) => typeof entry.requires_approval === "boolean"),
+		).toBe(true);
 		expect(
 			parsed.every((entry) => !entry.aliases.includes(entry.command)),
 		).toBe(true);
@@ -432,27 +446,32 @@ describe("help formatter", () => {
 			aliases: ["s"],
 			kind: "status",
 			sideEffect: "read",
+			requires_approval: false,
 			description: "Show current project status",
 			category: "core",
 			subcommands: [
 				{
 					usage: "--json",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Emit machine-readable project status",
 				},
 				{
 					usage: "--health",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Include global health findings",
 				},
 				{
 					usage: "--session <session-id>",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Resolve status around a specific session",
 				},
 				{
 					usage: "--task-id <task-id>",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Resolve a specific task in the selected session",
 				},
 			],
@@ -468,6 +487,7 @@ describe("help formatter", () => {
 			{
 				usage: "--dry-run",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Preview scaffold install without writing",
 			},
 		]);
@@ -480,38 +500,45 @@ describe("help formatter", () => {
 			{
 				usage: "list",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "List scored reference projects",
 			},
 			{
 				usage: "show <project-id>",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Inspect one reference project by id or name",
 			},
 			{
 				usage: "matrix --for <axis>",
 				sideEffect: "read",
+				requires_approval: false,
 				description:
 					"Filter the score matrix by axis; omit --for for the full matrix",
 			},
 			{
 				usage: "recommend --for <axis>",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Rank the best reference projects for one axis",
 			},
 			{
 				usage: "validate --strict",
 				sideEffect: "read",
+				requires_approval: false,
 				description:
 					"Fail validation on warnings; omit --strict for standard validation",
 			},
 			{
 				usage: "generate --check",
 				sideEffect: "read",
+				requires_approval: false,
 				description: "Check generated outputs without writing files",
 			},
 			{
 				usage: "generate",
 				sideEffect: "generated",
+				requires_approval: true,
 				description: "Refresh generated outputs with local approval",
 			},
 		]);
@@ -525,39 +552,46 @@ describe("help formatter", () => {
 			aliases: ["cx"],
 			kind: "ctx",
 			sideEffect: "generated",
+			requires_approval: true,
 			description: "Inspect context bundles",
 			category: "inspect",
 			subcommands: [
 				{
 					usage: "build",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "Rebuild the section index",
 				},
 				{
 					usage: "bundle",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Build a context bundle without persisting rule state",
 				},
 				{
 					usage: "bundle --persist-rule-injection",
 					sideEffect: "generated",
+					requires_approval: true,
 					description:
 						"Persist first-use rule injection state with local approval",
 				},
 				{
 					usage: "section --ref <ref>",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "Read one section and refresh sections if needed",
 				},
 				{
 					usage: "explain [--full]",
 					sideEffect: "read",
+					requires_approval: false,
 					description:
 						"Explain bundle inputs; pass --full to include the complete bundle",
 				},
 				{
 					usage: "tools",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "List context helpers and refresh sections if needed",
 				},
 			],
@@ -572,6 +606,7 @@ describe("help formatter", () => {
 			aliases: ["ls"],
 			kind: "localState",
 			sideEffect: "generated",
+			requires_approval: true,
 			description: "Inspect local project indexes",
 			category: "inspect",
 			guidance: [
@@ -582,16 +617,19 @@ describe("help formatter", () => {
 				{
 					usage: "freshness|fs --json",
 					sideEffect: "read",
+					requires_approval: false,
 					description: "Check whether local-state indexes are fresh",
 				},
 				{
 					usage: "rebuild|rb --json",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "Refresh indexes and emit compact counts",
 				},
 				{
 					usage: "rebuild|rb --json --verbose",
 					sideEffect: "generated",
+					requires_approval: true,
 					description: "Refresh indexes and include full snapshots",
 				},
 			],

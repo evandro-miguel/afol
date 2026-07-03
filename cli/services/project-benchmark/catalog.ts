@@ -89,7 +89,6 @@ function hasProjectBenchmarkCatalog(
 	paths: ReturnType<typeof resolveProjectBenchmarkPaths>,
 ) {
 	return (
-		existsSync(paths.admDir) ||
 		existsSync(paths.axesFile) ||
 		existsSync(paths.schemaFile) ||
 		existsSync(paths.projectsDir)

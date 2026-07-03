@@ -69,6 +69,8 @@ export type MaintenanceReviewRecord = {
 	preview: boolean;
 	applied: boolean;
 	summary: MaintenanceReviewSummary;
+	current_summary: MaintenanceReviewSummary;
+	preview_summary: MaintenanceReviewSummary;
 };
 
 const MAINTENANCE_REVIEW_LOCK = "__maintenance-review-lock__";
@@ -239,6 +241,34 @@ function readStore(
 	return readStoreResult(root, options).store;
 }
 
+function buildMaintenanceReviewSummary(
+	root: string,
+	storeResult: StoreReadResult,
+	store: MaintenanceReviewStore = storeResult.store,
+	storeStatus: StoreReadResult["status"] = storeResult.status,
+	storeError: string | null = storeResult.error,
+): MaintenanceReviewSummary {
+	const intervalDays = readReviewIntervalDays(root);
+	const areas = MAINTENANCE_REVIEW_AREAS.map((area) => {
+		const entry = store.areas[area];
+		const age = entry?.reviewed_at ? ageInDays(entry.reviewed_at) : null;
+		const due = age === null || age >= intervalDays;
+		return {
+			area,
+			due,
+			reviewed_at: entry?.reviewed_at ?? null,
+			note: entry?.note ?? null,
+		};
+	});
+	return {
+		review_interval_days: intervalDays,
+		areas,
+		due_areas: areas.filter((entry) => entry.due).map((entry) => entry.area),
+		store_status: storeStatus,
+		store_error: storeError,
+	};
+}
+
 function writeStore(root: string, store: MaintenanceReviewStore): void {
 	const path = storePath(root);
 	mkdirSync(dirname(path), { recursive: true });
@@ -262,27 +292,7 @@ function selectedAreas(
 export function readMaintenanceReviewSummary(
 	root: string,
 ): MaintenanceReviewSummary {
-	const intervalDays = readReviewIntervalDays(root);
-	const storeResult = readStoreResult(root);
-	const store = storeResult.store;
-	const areas = MAINTENANCE_REVIEW_AREAS.map((area) => {
-		const entry = store.areas[area];
-		const age = entry?.reviewed_at ? ageInDays(entry.reviewed_at) : null;
-		const due = age === null || age >= intervalDays;
-		return {
-			area,
-			due,
-			reviewed_at: entry?.reviewed_at ?? null,
-			note: entry?.note ?? null,
-		};
-	});
-	return {
-		review_interval_days: intervalDays,
-		areas,
-		due_areas: areas.filter((entry) => entry.due).map((entry) => entry.area),
-		store_status: storeResult.status,
-		store_error: storeResult.error,
-	};
+	return buildMaintenanceReviewSummary(root, readStoreResult(root));
 }
 
 export function recordMaintenanceReview(
@@ -298,6 +308,7 @@ export function recordMaintenanceReview(
 	const note = input.note?.trim() || null;
 	const dryRun = input.dryRun === true;
 	return withSessionLock(root, MAINTENANCE_REVIEW_LOCK, () => {
+		const currentStoreResult = readStoreResult(root);
 		if (!dryRun) {
 			const store = readStore(root, { strict: true });
 			for (const area of reviewedAreas) {
@@ -306,7 +317,45 @@ export function recordMaintenanceReview(
 					: { reviewed_at: recordedAt };
 			}
 			writeStore(root, store);
+			const summary = buildMaintenanceReviewSummary(
+				root,
+				{ status: "ok", store, error: null },
+				store,
+				"ok",
+				null,
+			);
+			return {
+				area: input.area,
+				reviewed_areas: reviewedAreas,
+				recorded_at: recordedAt,
+				note,
+				preview: dryRun,
+				applied: !dryRun,
+				summary,
+				current_summary: summary,
+				preview_summary: summary,
+			};
 		}
+		const currentSummary = buildMaintenanceReviewSummary(
+			root,
+			currentStoreResult,
+		);
+		const previewStore: MaintenanceReviewStore = {
+			version: currentStoreResult.store.version,
+			areas: { ...currentStoreResult.store.areas },
+		};
+		for (const area of reviewedAreas) {
+			previewStore.areas[area] = note
+				? { reviewed_at: recordedAt, note }
+				: { reviewed_at: recordedAt };
+		}
+		const previewSummary = buildMaintenanceReviewSummary(
+			root,
+			{ status: "ok", store: previewStore, error: null },
+			previewStore,
+			"ok",
+			null,
+		);
 		return {
 			area: input.area,
 			reviewed_areas: reviewedAreas,
@@ -314,7 +363,9 @@ export function recordMaintenanceReview(
 			note,
 			preview: dryRun,
 			applied: !dryRun,
-			summary: readMaintenanceReviewSummary(root),
+			summary: currentSummary,
+			current_summary: currentSummary,
+			preview_summary: previewSummary,
 		};
 	});
 }

@@ -2023,6 +2023,61 @@ describe("context system", () => {
 		}
 	});
 
+	test("afol ctx bundle --json --summary returns compact explanation JSON", async () => {
+		const root = createBundleFixture();
+		try {
+			const captured = captureIo();
+			expect(
+				await runContextCommand(
+					"bundle",
+					[
+						"-S",
+						"session-1",
+						"-T",
+						"T-01",
+						"--role",
+						"designer",
+						"--surface",
+						"alpha",
+						"--json",
+						"--summary",
+					],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				schema: string;
+				ok: boolean;
+				action: string;
+				exit_code: number;
+				data: {
+					why: { included: string[]; excluded: string[] };
+					bundle_size: { refs: number; pstr_refs: number };
+					bundle?: unknown;
+					refs?: unknown;
+				};
+				bundle?: unknown;
+				bundle_size?: { refs: number };
+				refs?: unknown;
+			};
+			expect(payload.schema).toBe("afol.result/v1");
+			expect(payload.ok).toBe(true);
+			expect(payload.action).toBe("ctx.bundle");
+			expect(payload.exit_code).toBe(0);
+			expect(payload.data.why.included.length).toBeGreaterThan(0);
+			expect(payload.data.bundle_size.refs).toBeGreaterThan(0);
+			expect(payload.data.bundle_size.pstr_refs).toBe(1);
+			expect(payload.bundle_size?.refs).toBe(payload.data.bundle_size.refs);
+			expect(payload.data.bundle).toBeUndefined();
+			expect(payload.bundle).toBeUndefined();
+			expect(payload.data.refs).toBeUndefined();
+			expect(payload.refs).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("afol ctx bundle --json returns injection error when a required rule exceeds budget", async () => {
 		const root = createBundleFixture();
 		try {

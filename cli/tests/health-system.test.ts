@@ -611,6 +611,45 @@ describe("health system", () => {
 					agentOperationContext(),
 				),
 			).toBe(0);
+			const payload = JSON.parse(dryRun.stdout[0] ?? "{}") as {
+				area: string;
+				due_areas: string[];
+				current_summary: { due_areas: string[]; review_interval_days: number };
+				preview_summary: { due_areas: string[]; review_interval_days: number };
+				data?: {
+					area?: string;
+					due_areas?: string[];
+					current_summary?: { due_areas?: string[] };
+					preview_summary?: { due_areas?: string[] };
+				};
+			};
+			expect(payload.area).toBe("rules");
+			expect(payload.due_areas).toEqual([
+				"rules",
+				"skills",
+				"docs",
+				"commands",
+				"memory",
+				"library",
+				"organization",
+			]);
+			expect(payload.current_summary.due_areas).toEqual([
+				"rules",
+				"skills",
+				"docs",
+				"commands",
+				"memory",
+				"library",
+				"organization",
+			]);
+			expect(payload.preview_summary.due_areas).toEqual([
+				"skills",
+				"docs",
+				"commands",
+				"memory",
+				"library",
+				"organization",
+			]);
 			expect(existsSync(reviewPath)).toBe(false);
 			expect(readMaintenanceReviewSummary(root).due_areas).toEqual([
 				"rules",

@@ -114,7 +114,7 @@ afol status
 afol validate project
 afol validate bench --pack <pack-id> --json
 afol new <theme> --feature-id <F-id> --parent-spec <spec-id>
-afol start --session <session-id> --task-id <task-id>
+afol start --session <session-id> --task-id <task-id> --brief --json
 afol evidence --session <session-id> --task-id <task-id> --command "<cmd>" --result passed
 afol done --session <session-id> --task-id <task-id>
 afol close --session <session-id>
@@ -122,6 +122,27 @@ afol update check
 afol update preview
 afol update apply --dry-run
 ```
+
+Agent-facing JSON commands:
+
+```bash
+afol status --json
+afol status --task-id <task-id> --json
+afol status --health --json
+afol health --json
+afol health full --json
+afol health --area <adm|pstr|wb|memory|library|state|ctx|token_budget> --json
+afol ctx bundle --json --summary
+afol project-benchmark validate --json
+afol local-state rebuild --json
+```
+
+- `afol status --task-id <task-id> --json` exits `1` with
+  `task-not-found` when the explicit task id is absent.
+- `afol new ... --json` includes `governance_status` with value
+  `"governed"` or `"unbound"`.
+- `afol project-benchmark ... --json` includes `catalog_source` with value
+  `"project"` or `"builtin"`.
 
 Task state source of truth:
 

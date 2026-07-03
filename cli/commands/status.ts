@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+	envelopeErr,
 	envelopeOk,
 	envelopeWithLegacyKeys,
 	type ResultEnvelope,
@@ -87,15 +88,65 @@ type TaskBoardRow = {
 	state: string;
 };
 
+type StatusCommandError = Error & {
+	code?: number;
+	errorCode?: string;
+};
+
+let computeCatchupImpl = computeCatchup;
+
+export function setCatchupComputerForTests(
+	computer: typeof computeCatchup | null,
+): void {
+	computeCatchupImpl = computer ?? computeCatchup;
+}
+
+function taskNotFoundError(taskId: string, session: string | null): Error {
+	const error = new Error(
+		`error: task-not-found task_id=${taskId}${
+			session ? ` session=${session}` : ""
+		}`,
+	) as StatusCommandError;
+	error.code = 1;
+	error.errorCode = "task-not-found";
+	return error;
+}
+
+function writeStatusError(
+	error: unknown,
+	json: boolean,
+	io: CommandIo,
+): number {
+	const commandError = error as StatusCommandError;
+	const exitCode =
+		typeof commandError.code === "number" ? commandError.code : 2;
+	const message = commandError.message ?? String(error);
+	if (json) {
+		io.stdout(
+			stringifyEnvelope(
+				envelopeErr(commandError.errorCode ?? "status.error", message, {
+					action: "status",
+					exitCode,
+				}),
+			),
+		);
+	} else {
+		io.stderr(message);
+	}
+	return exitCode;
+}
+
 function parseStatusArgs(args: string[]): {
 	json: boolean;
 	session: string | null;
 	health: boolean;
+	catchup: boolean;
 	taskId: string | null;
 } {
 	let json = false;
 	let session: string | null = null;
 	let health = false;
+	let catchup = false;
 	let taskId: string | null = null;
 	const values = [...args];
 	if (values[0] === "status") {
@@ -124,6 +175,10 @@ function parseStatusArgs(args: string[]): {
 			health = true;
 			continue;
 		}
+		if (value === "--catchup") {
+			catchup = true;
+			continue;
+		}
 		if (value === "--task-id") {
 			const next = values[index + 1];
 			if (!next || next.startsWith("-")) {
@@ -143,7 +198,7 @@ function parseStatusArgs(args: string[]): {
 		throw new Error(`Unexpected status argument: ${value}`);
 	}
 
-	return { json, session, health, taskId };
+	return { json, session, health, catchup, taskId };
 }
 
 function resultEnvelope<T extends Record<string, unknown>>(
@@ -419,6 +474,7 @@ function readStatusSnapshot(
 	freshnessSession: string | null,
 	taskId: string | null,
 	includeHealthFindings: boolean,
+	includeCatchup: boolean,
 ): StatusSnapshot {
 	const loaded = loadProjectRoot(projectRoot);
 	if (!loaded.ok) {
@@ -440,11 +496,15 @@ function readStatusSnapshot(
 		: null;
 	const catchupSession = freshnessSession ?? activeSession;
 	const selectedSession = freshnessSession ?? activeSession;
-	const catchupReport = catchupSession
-		? computeCatchup(loaded.value.root, { session: catchupSession })
-		: undefined;
+	const catchupReport =
+		includeCatchup && catchupSession
+			? computeCatchupImpl(loaded.value.root, { session: catchupSession })
+			: undefined;
 
 	if (!selectedSession) {
+		if (taskId) {
+			throw taskNotFoundError(taskId, null);
+		}
 		return {
 			status: "none",
 			task: "none",
@@ -472,6 +532,9 @@ function readStatusSnapshot(
 
 	const taskFilePath = pickTaskFile(loaded.value.root, selectedSession, taskId);
 	if (!taskFilePath) {
+		if (taskId) {
+			throw taskNotFoundError(taskId, selectedSession);
+		}
 		return {
 			status: "none",
 			task: "none",
@@ -570,13 +633,17 @@ export function runStatusCommand(
 		json: boolean;
 		session: string | null;
 		health: boolean;
+		catchup: boolean;
 		taskId: string | null;
 	};
 	try {
 		parsed = parseStatusArgs(args);
 	} catch (error) {
-		io.stderr((error as Error).message);
-		return 2;
+		return writeStatusError(
+			error,
+			args.includes("--json") || args.includes("-j"),
+			io,
+		);
 	}
 
 	let snapshot: StatusSnapshot;
@@ -586,11 +653,10 @@ export function runStatusCommand(
 			parsed.session,
 			parsed.taskId,
 			parsed.health,
+			parsed.catchup,
 		);
 	} catch (error) {
-		const commandError = error as Error & { code?: number };
-		io.stderr(commandError.message);
-		return commandError.code ?? 2;
+		return writeStatusError(error, parsed.json, io);
 	}
 
 	if (parsed.json) {

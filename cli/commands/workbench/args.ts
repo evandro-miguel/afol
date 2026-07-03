@@ -2,11 +2,11 @@ import { resolveProjectPaths } from "../../services/project/paths";
 import type { NewWorkstreamMetadata } from "../../services/workbench/lifecycle";
 import { selectSingleOpenTask } from "../../services/workbench/lifecycle";
 import type {
+	CloseArgs,
 	DoneArgs,
 	EvidenceArgs,
 	LogArgs,
 	NewCommandArgs,
-	SessionArgs,
 	SessionTaskJsonArgs,
 	VerifyArgs,
 } from "./types";
@@ -34,6 +34,11 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 		if (arg === "--json" || arg === "-j") {
 			json = true;
 			continue;
+		}
+		if (arg === "--research" || arg === "--no-plan") {
+			throw new Error(
+				"`afol new` does not support research-only or no-plan sessions; use a normal workstream instead.",
+			);
 		}
 		if (!theme && arg && !arg.startsWith("-")) {
 			theme = arg;
@@ -84,13 +89,11 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 	return { theme, metadata, json };
 }
 
-export function parseSessionOnlyArgs(
-	args: string[],
-	commandName: string,
-	root: string,
-): SessionArgs {
+export function parseCloseArgs(args: string[], root: string): CloseArgs {
 	let session = "";
 	let json = false;
+	let allowNoReport = false;
+	let reason = "";
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
 		if (arg === "--json" || arg === "-j") {
@@ -100,15 +103,39 @@ export function parseSessionOnlyArgs(
 		if (arg === "--session") {
 			const value = args[i + 1];
 			if (!value) {
-				throw new Error(`Missing value for --session in ${commandName}.`);
+				throw new Error("Missing value for --session in close.");
 			}
 			session = value;
 			i += 1;
 			continue;
 		}
-		throw new Error(`Unknown ${commandName} argument: ${arg}`);
+		if (arg === "--allow-no-report") {
+			allowNoReport = true;
+			continue;
+		}
+		if (arg === "--reason") {
+			const value = args[i + 1];
+			if (!value) {
+				throw new Error("Missing value for --reason in close.");
+			}
+			reason = value;
+			i += 1;
+			continue;
+		}
+		throw new Error(`Unknown close argument: ${arg}`);
 	}
-	return { session: resolveSession(root, session, commandName), json };
+	if (reason.trim() && !allowNoReport) {
+		throw new Error("Missing --allow-no-report for close reason.");
+	}
+	if (allowNoReport && !reason.trim()) {
+		throw new Error("Missing --reason for close allow-no-report.");
+	}
+	return {
+		session: resolveSession(root, session, "close"),
+		json,
+		allowNoReport,
+		reason,
+	};
 }
 
 export function parseSessionTaskArgs(

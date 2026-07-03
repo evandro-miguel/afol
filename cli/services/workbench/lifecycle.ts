@@ -55,6 +55,11 @@ export type NewWorkstreamMetadata = {
 	tasks?: string[];
 };
 
+export type CloseSessionOptions = {
+	allowNoReport?: boolean;
+	reason?: string;
+};
+
 export type TimelineEntryResult = {
 	logPath: string;
 	message: string;
@@ -243,11 +248,7 @@ export function assertTaskInProgress(
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${paths.sessionDir}`);
 		}
-		const rows = readTaskRows(paths.taskPath);
-		const row = rows.find((entry) => entry.taskId === taskId);
-		if (!row) {
-			throw new Error(`Task ${taskId} not found in ${session}.`);
-		}
+		const row = ensureTaskExists(paths.taskPath, session, taskId);
 		if (row.state !== "in_progress") {
 			throw new Error(`Task ${taskId} is ${row.state}, expected in_progress.`);
 		}
@@ -285,6 +286,18 @@ function readTaskRows(taskPath: string): TaskRow[] {
 		}
 	}
 	return rows;
+}
+
+function ensureTaskExists(
+	taskPath: string,
+	session: string,
+	taskId: string,
+): TaskRow {
+	const row = readTaskRows(taskPath).find((entry) => entry.taskId === taskId);
+	if (!row) {
+		throw new Error(`Task ${taskId} not found in ${session}.`);
+	}
+	return row;
 }
 
 function updateTaskState(
@@ -579,6 +592,7 @@ export function recordEvidence(
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${paths.sessionDir}`);
 		}
+		ensureTaskExists(paths.taskPath, input.session, input.taskId);
 		const now = new Date();
 		const evidence: EvidenceEntry = {
 			id: evidenceId(now),
@@ -678,7 +692,11 @@ export function doneTask(root: string, input: WorkbenchTaskRef): void {
 	});
 }
 
-export function closeSession(root: string, session: string): string[] {
+export function closeSession(
+	root: string,
+	session: string,
+	options: CloseSessionOptions = {},
+): string[] {
 	return withSessionLock(root, session, () => {
 		const paths = sessionPaths(root, session);
 		if (!existsSync(paths.sessionDir)) {
@@ -701,6 +719,17 @@ export function closeSession(root: string, session: string): string[] {
 			throw new Error(
 				`Session ${session} failed strict verification: ${message}`,
 			);
+		}
+		const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
+		if (verification.totalTasks > 1 && !existsSync(reportPath)) {
+			if (!options.allowNoReport) {
+				throw new Error(
+					`Session ${session} requires a final report artifact. Rerun close with --allow-no-report --reason <text>.`,
+				);
+			}
+			if (!options.reason?.trim()) {
+				throw new Error("Missing --reason for close allow-no-report override.");
+			}
 		}
 
 		if (existsSync(paths.activeSessionPath)) {

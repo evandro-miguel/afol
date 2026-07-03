@@ -150,10 +150,33 @@ function parseUpdateArgs(values: string[]): ParsedUpdateArgs {
 	return parsed;
 }
 
-function requireApplyContext(args: ParsedUpdateArgs): void {
+function requireApplyContext(
+	args: ParsedUpdateArgs,
+	allowUnboundContext = false,
+): void {
+	if (allowUnboundContext) {
+		if (!args.reason.trim()) {
+			throw new Error("Real update apply requires --reason.");
+		}
+		return;
+	}
 	if (!args.session.trim() || !args.taskId.trim() || !args.reason.trim()) {
 		throw new Error(
 			"Real update apply requires --session, --task-id, and --reason.",
+		);
+	}
+}
+
+function allowUnboundContextEnabled(
+	env: Record<string, string | undefined> = process.env,
+): boolean {
+	return env.AFOL_CI === "1" || env.AFOL_TEST === "1";
+}
+
+function requireAllowedUnboundContext(): void {
+	if (!allowUnboundContextEnabled()) {
+		throw new Error(
+			"--allow-unbound-context requires AFOL_CI=1 or AFOL_TEST=1.",
 		);
 	}
 }
@@ -413,6 +436,9 @@ export async function runUpdateCommand(
 		const parsedArgs = parseUpdateArgs(
 			rawCommand?.startsWith("-") ? args : rest,
 		);
+		if (parsedArgs.allowUnboundContext) {
+			requireAllowedUnboundContext();
+		}
 		const result = checkTemplateUpdate(projectRoot);
 		const writableOperations = result.operations.filter(isWritableOperation);
 		const conflictCount = result.operations.filter(
@@ -485,8 +511,8 @@ export async function runUpdateCommand(
 						"Real update apply requires local interactive approval.",
 					);
 				}
+				requireApplyContext(parsedArgs, parsedArgs.allowUnboundContext);
 				if (!parsedArgs.allowUnboundContext) {
-					requireApplyContext(parsedArgs);
 					assertTaskInProgress(
 						projectRoot,
 						parsedArgs.session,

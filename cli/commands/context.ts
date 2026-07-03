@@ -47,6 +47,7 @@ type ParsedArgs = {
 	mode?: ContextRetrievalMode;
 	ref?: string;
 	explain: boolean;
+	summary: boolean;
 };
 
 const MODES: readonly ContextRetrievalMode[] = [
@@ -95,6 +96,7 @@ function parseArgs(args: string[]): ParsedArgs {
 		full: false,
 		persistRuleInjection: false,
 		explain: false,
+		summary: false,
 	};
 	for (let index = 0; index < args.length; index += 1) {
 		const value = args[index];
@@ -108,6 +110,10 @@ function parseArgs(args: string[]): ParsedArgs {
 		}
 		if (value === "--explain") {
 			parsed.explain = true;
+			continue;
+		}
+		if (value === "--summary") {
+			parsed.summary = true;
 			continue;
 		}
 		if (value === "--full") {
@@ -350,6 +356,9 @@ export async function runContextCommand(
 		const ctxAction =
 			action && !action.startsWith("-") ? normalizeAction(action) : "summary";
 		const parsed = parseArgs(ctxArgs);
+		if (parsed.summary && (ctxAction !== "bundle" || !parsed.json)) {
+			throw new Error("--summary is only valid for ctx bundle --json.");
+		}
 
 		if (ctxAction === "summary") {
 			if (parsed.json) {
@@ -422,13 +431,14 @@ export async function runContextCommand(
 			const persistRuleInjection =
 				ctxAction === "bundle" &&
 				!parsed.explain &&
+				!parsed.summary &&
 				parsed.persistRuleInjection;
 			if (
 				parsed.persistRuleInjection &&
-				(ctxAction !== "bundle" || parsed.explain)
+				(ctxAction !== "bundle" || parsed.explain || parsed.summary)
 			) {
 				throw new Error(
-					"--persist-rule-injection is only valid for ctx bundle without --explain.",
+					"--persist-rule-injection is only valid for ctx bundle without --explain or --summary.",
 				);
 			}
 			if (persistRuleInjection && parsed.mode === "compact") {
@@ -489,9 +499,9 @@ export async function runContextCommand(
 		}
 
 		if (ctxAction === "bundle") {
-			if (parsed.explain) {
+			if (parsed.explain || parsed.summary) {
 				const explanation = formatExplanation(projectRoot, bundle, {
-					full: parsed.full,
+					full: parsed.explain && parsed.full,
 				});
 				if (parsed.json) {
 					jsonOutput.ok(

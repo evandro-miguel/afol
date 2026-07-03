@@ -250,6 +250,33 @@ describe("project-benchmark validation hardening", () => {
 		}
 	});
 
+	test("keeps validating partial local benchmark catalogs", () => {
+		const root = createProjectRoot();
+		try {
+			rmSync(join(root, ".afol", "adm", "project-benchmarks", "axes.json"), {
+				force: true,
+			});
+			rmSync(join(root, ".afol", "adm", "project-benchmarks", "projects"), {
+				recursive: true,
+				force: true,
+			});
+
+			const catalog = loadProjectBenchmarkCatalog(root);
+			const validation = validateProjectBenchmarkCatalog(catalog);
+			expect(catalog.source).toBe("project");
+			expect(validation.ok).toBe(false);
+			expect(validation.issues.map((issue) => issue.code)).toEqual(
+				expect.arrayContaining([
+					"missing-axes",
+					"missing-projects-dir",
+					"invalid-axes-schema-version",
+				]),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects unexpected properties across project-benchmark records", () => {
 		const root = createProjectRoot({
 			...createValidProject(),

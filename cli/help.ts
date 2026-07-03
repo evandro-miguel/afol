@@ -3,6 +3,7 @@ import {
 	type CommandSpec,
 	type CommandSubcommandSpec,
 	kernelRegistry,
+	requiresApprovalForSideEffect,
 } from "./registry";
 
 const CATEGORY_ORDER: readonly CommandCategory[] = [
@@ -155,10 +156,11 @@ export type CommandCatalogEntry = {
 	aliases: string[];
 	kind: CommandSpec["kind"];
 	sideEffect: CommandSpec["sideEffect"];
+	requires_approval: boolean;
 	description: string;
 	category: CommandCategory | "uncategorized";
 	guidance?: readonly string[];
-	subcommands?: CommandSubcommandSpec[];
+	subcommands?: (CommandSubcommandSpec & { requires_approval: boolean })[];
 };
 
 type HelpFormatOptions = {
@@ -177,26 +179,38 @@ function filterCommandsByIntent(
 	return commands.filter((spec) => allowed.has(spec.command));
 }
 
+function withApprovalMetadata(spec: CommandSpec): CommandCatalogEntry & {
+	subcommands?: (CommandSubcommandSpec & { requires_approval: boolean })[];
+} {
+	return {
+		command: spec.command,
+		aliases: [...spec.aliases],
+		kind: spec.kind,
+		sideEffect: spec.sideEffect,
+		requires_approval:
+			spec.requires_approval ?? requiresApprovalForSideEffect(spec.sideEffect),
+		description: spec.description,
+		category: spec.category ?? "uncategorized",
+		...(spec.guidance !== undefined ? { guidance: [...spec.guidance] } : {}),
+		...(spec.subcommands !== undefined
+			? {
+					subcommands: spec.subcommands.map((entry) => ({
+						...entry,
+						requires_approval:
+							entry.requires_approval ??
+							requiresApprovalForSideEffect(entry.sideEffect),
+					})),
+				}
+			: {}),
+	};
+}
+
 export function buildCommandCatalog(
 	registry = kernelRegistry,
 	options: { intent?: HelpIntent } = {},
 ): CommandCatalogEntry[] {
 	return filterCommandsByIntent(registry.commands, options.intent).map(
-		(spec) => {
-			const entry: CommandCatalogEntry = {
-				command: spec.command,
-				aliases: [...spec.aliases],
-				kind: spec.kind,
-				sideEffect: spec.sideEffect,
-				description: spec.description,
-				category: spec.category ?? "uncategorized",
-			};
-			const subcommands = spec.subcommands?.map((entry) => ({ ...entry }));
-			if (subcommands !== undefined) {
-				entry.subcommands = subcommands;
-			}
-			return entry;
-		},
+		withApprovalMetadata,
 	);
 }
 
@@ -223,13 +237,20 @@ export function buildCommandHelpJson(
 		aliases: [...spec.aliases],
 		kind: spec.kind,
 		sideEffect: spec.sideEffect,
+		requires_approval:
+			spec.requires_approval ?? requiresApprovalForSideEffect(spec.sideEffect),
 		description: spec.description,
 		category: spec.category ?? "uncategorized",
 	};
 	if (spec.guidance !== undefined) {
 		entry.guidance = [...spec.guidance];
 	}
-	const subcommands = spec.subcommands?.map((entry) => ({ ...entry }));
+	const subcommands = spec.subcommands?.map((entry) => ({
+		...entry,
+		requires_approval:
+			entry.requires_approval ??
+			requiresApprovalForSideEffect(entry.sideEffect),
+	}));
 	if (subcommands !== undefined) {
 		entry.subcommands = subcommands;
 	}

@@ -44,6 +44,10 @@ type ParsedArgs = {
 	strict: boolean;
 };
 
+type ProjectBenchmarkCatalogSource = ReturnType<
+	typeof loadProjectBenchmarkCatalog
+>["source"];
+
 type ValidProjectBenchmarkCatalog = {
 	ok: true;
 	catalog: ReturnType<typeof loadProjectBenchmarkCatalog>;
@@ -210,6 +214,16 @@ function writeValidationJson(
 	io.stdout(stringifyEnvelope(envelope));
 }
 
+function withCatalogSource<T extends Record<string, unknown>>(
+	data: T,
+	catalogSource: ProjectBenchmarkCatalogSource,
+): T & { catalog_source: ProjectBenchmarkCatalogSource } {
+	return {
+		...data,
+		catalog_source: catalogSource,
+	};
+}
+
 function writeGenerateJson(
 	io: CommandIo,
 	data: Record<string, unknown>,
@@ -325,6 +339,7 @@ export async function runProjectBenchmarkCommand(
 		const data = {
 			schema_version: "1.0.0",
 			command: "project-benchmark.validate",
+			catalog_source: rawCatalog.source,
 			ok,
 			strict: parsed.strict,
 			issues: validation.issues,
@@ -361,12 +376,15 @@ export async function runProjectBenchmarkCommand(
 			if (parsed.json) {
 				writeGenerateJson(
 					io,
-					projectBenchmarkGenerateFailureData(
-						projectRoot,
-						sourceCatalog.paths.dataDir,
-						parsed.check,
-						misplacedFiles,
-						sourceCatalog.projects.length,
+					withCatalogSource(
+						projectBenchmarkGenerateFailureData(
+							projectRoot,
+							sourceCatalog.paths.dataDir,
+							parsed.check,
+							misplacedFiles,
+							sourceCatalog.projects.length,
+						),
+						sourceCatalog.source,
 					),
 					false,
 				);
@@ -399,7 +417,9 @@ export async function runProjectBenchmarkCommand(
 				"invalid-project-benchmark-catalog",
 				error.message,
 				1,
-				error.issues.length > 0 ? { issues: error.issues } : undefined,
+				error.issues.length > 0
+					? { catalog_source: sourceCatalog.source, issues: error.issues }
+					: { catalog_source: sourceCatalog.source },
 			);
 		} else {
 			io.stderr(`err invalid-project-benchmark-catalog ${error.message}`);
@@ -412,6 +432,7 @@ export async function runProjectBenchmarkCommand(
 		const data = {
 			schema_version: "1.0.0",
 			command: "project-benchmark.list",
+			catalog_source: catalog.catalog.source,
 			projects: scores,
 		};
 		if (parsed.json) {
@@ -446,6 +467,7 @@ export async function runProjectBenchmarkCommand(
 		const data = {
 			schema_version: "1.0.0",
 			command: "project-benchmark.show",
+			catalog_source: catalog.catalog.source,
 			project,
 			score,
 		};
@@ -486,6 +508,7 @@ export async function runProjectBenchmarkCommand(
 		const data = {
 			command: "project-benchmark.matrix",
 			schema_version: matrix.schema_version,
+			catalog_source: catalog.catalog.source,
 			generated_by: matrix.generated_by,
 			axis: parsed.axis,
 			projects,
@@ -515,10 +538,11 @@ export async function runProjectBenchmarkCommand(
 			{ check: parsed.check },
 		);
 		if (parsed.json) {
+			const jsonResult = withCatalogSource(result, catalog.catalog.source);
 			if (parsed.check || !result.ok) {
-				writeGenerateJson(io, result, result.ok);
+				writeGenerateJson(io, jsonResult, result.ok);
 			} else {
-				jsonWriters.ok(io, "generate", result);
+				jsonWriters.ok(io, "generate", jsonResult);
 			}
 		} else if (parsed.check) {
 			if (result.ok) {
@@ -589,6 +613,7 @@ export async function runProjectBenchmarkCommand(
 		const data = {
 			schema_version: "1.0.0",
 			command: "project-benchmark.recommend",
+			catalog_source: catalog.catalog.source,
 			axis,
 			description: catalog.axes.axes[axis].description,
 			top_references: references,

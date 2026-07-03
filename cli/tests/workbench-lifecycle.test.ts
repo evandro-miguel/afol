@@ -209,6 +209,22 @@ describe("workbench lifecycle service", () => {
 			expect((newEnvelope.data as Record<string, unknown>).status).toBe(
 				"created",
 			);
+			expect(
+				(newEnvelope.data as Record<string, unknown>).governance_status,
+			).toBe("unbound");
+
+			const humanNewProc = runKernel(root, [
+				"new",
+				"cli governed",
+				"--feature-id",
+				"F-01",
+				"--parent-spec",
+				"spec-01",
+			]);
+			expect(humanNewProc.status).toBe(0);
+			expect(humanNewProc.stdout as string).toContain(
+				"governance_status: governed",
+			);
 
 			const deniedAgentNew = runKernel(root, [
 				"--agent",
@@ -356,6 +372,9 @@ describe("workbench lifecycle service", () => {
 				"close",
 				"--session",
 				created.session,
+				"--allow-no-report",
+				"--reason",
+				"research-only session",
 				"--json",
 			]);
 			expect(closeProc.status).toBe(0);
@@ -885,6 +904,30 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("recordEvidence rejects missing tasks without appending evidence", () => {
+		const root = mkRoot("evidence-missing-task");
+		try {
+			const created = newWorkstream(root, "record-evidence-missing-task");
+
+			expect(() =>
+				recordEvidence(root, {
+					session: created.session,
+					taskId: "T-02",
+					command: "bun test",
+					result: "passed",
+				}),
+			).toThrow("Task T-02 not found in");
+			expect(readFileSync(created.evidencePath, "utf8")).toBe("");
+			expect(
+				readLocalStateEvents(root).filter(
+					(event) => event.type === "workbench.record_evidence",
+				),
+			).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("quick-task command runs lifecycle end to end", () => {
 		const root = mkRoot("quick-task");
 		try {
@@ -1222,10 +1265,12 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("closeSession emits warning when final report/log summary is missing", () => {
+	test("closeSession blocks missing final report unless override is provided", () => {
 		const root = mkRoot("close-warnings");
 		try {
-			const created = newWorkstream(root, "close-session-warnings");
+			const created = newWorkstream(root, "close-session-warnings", {
+				tasks: ["first task", "second task"],
+			});
 
 			startTask(root, { session: created.session, taskId: "T-01" });
 			recordEvidence(root, {
@@ -1235,10 +1280,29 @@ describe("workbench lifecycle service", () => {
 				result: "passed",
 			});
 			doneTask(root, { session: created.session, taskId: "T-01" });
+			startTask(root, { session: created.session, taskId: "T-02" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-02",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-02" });
 
-			const warnings = closeSession(root, created.session);
+			expect(() => closeSession(root, created.session)).toThrow(
+				"requires a final report artifact",
+			);
+			expect(() =>
+				closeSession(root, created.session, { allowNoReport: true }),
+			).toThrow("Missing --reason for close allow-no-report override.");
+
+			const warnings = closeSession(root, created.session, {
+				allowNoReport: true,
+				reason: "research-only session",
+			});
 			expect(warnings).toContain("final report artifact is missing");
 			expect(warnings).toContain("log summary section is missing");
+			expect(existsSync(created.activeSessionPath)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1284,7 +1348,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("close command includes close warnings in json envelope", () => {
+	test("close command includes close warnings in json envelope with override", () => {
 		const root = mkRoot("close-warnings-json");
 		try {
 			writeCliProjectContract(root);
@@ -1302,6 +1366,9 @@ describe("workbench lifecycle service", () => {
 				"close",
 				"--session",
 				created.session,
+				"--allow-no-report",
+				"--reason",
+				"research-only session",
 				"--json",
 			]);
 			expect(proc.status).toBe(0);
@@ -1345,6 +1412,16 @@ describe("workbench lifecycle service", () => {
 				result: "passed",
 			});
 			doneTask(root, { session: created.session, taskId: "T-02" });
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+				"# Report\n",
+			);
 			closeSession(root, created.session);
 			expect(existsSync(created.activeSessionPath)).toBe(false);
 		} finally {

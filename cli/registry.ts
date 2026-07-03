@@ -49,6 +49,7 @@ export type CommandSubcommandSpec = {
 	usage: string;
 	sideEffect: CommandSideEffect;
 	description: string;
+	requires_approval?: boolean;
 };
 
 export type CommandSpec = {
@@ -60,6 +61,7 @@ export type CommandSpec = {
 	category?: CommandCategory;
 	guidance?: readonly string[];
 	subcommands?: readonly CommandSubcommandSpec[];
+	requires_approval?: boolean;
 };
 
 const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
@@ -1048,6 +1050,30 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 	},
 ]);
 
+export function requiresApprovalForSideEffect(
+	sideEffect: CommandSideEffect,
+): boolean {
+	return sideEffect !== "read";
+}
+
+function withApprovalMetadata(spec: CommandSpec): CommandSpec {
+	const withMetadata: CommandSpec = {
+		...spec,
+		requires_approval: requiresApprovalForSideEffect(spec.sideEffect),
+	};
+	if (spec.subcommands) {
+		withMetadata.subcommands = spec.subcommands.map((subcommand) => ({
+			...subcommand,
+			requires_approval: requiresApprovalForSideEffect(subcommand.sideEffect),
+		}));
+	}
+	return withMetadata;
+}
+
+const COMMAND_SPECS_WITH_APPROVAL: readonly CommandSpec[] = Object.freeze(
+	COMMAND_SPECS.map(withApprovalMetadata),
+);
+
 const HELP_ALIASES = Object.freeze(["-h", "--help"] as const);
 const JSON_ALIASES = Object.freeze(["-j", "--json"] as const);
 
@@ -1055,7 +1081,7 @@ const aliasToCommand = new Map<string, string>();
 const commandToSpec = new Map<string, CommandSpec>();
 const knownTokens = new Set<string>();
 
-for (const spec of COMMAND_SPECS) {
+for (const spec of COMMAND_SPECS_WITH_APPROVAL) {
 	commandToSpec.set(spec.command, spec);
 	aliasToCommand.set(spec.command, spec.command);
 	knownTokens.add(spec.command);
@@ -1076,7 +1102,7 @@ function canonicalize(token: string): string {
 }
 
 export const kernelRegistry = {
-	commands: COMMAND_SPECS,
+	commands: COMMAND_SPECS_WITH_APPROVAL,
 	flags: {
 		help: HELP_ALIASES,
 		json: JSON_ALIASES,

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	parseCloseArgs,
 	parseDoneArgs,
 	parseNewArgs,
 	parseSessionTaskArgs,
@@ -18,6 +19,48 @@ describe("workbench parseNewArgs", () => {
 		expect(parsed.theme).toBe("alpha");
 		expect(parsed.metadata.task).toBe("first task");
 		expect(parsed.metadata.tasks).toEqual(["first task", "second task"]);
+		expect(parsed.json).toBe(false);
+	});
+
+	test("rejects research-only and no-plan modes", () => {
+		expect(() => parseNewArgs(["alpha", "--research"])).toThrow(
+			"does not support research-only or no-plan sessions",
+		);
+		expect(() => parseNewArgs(["alpha", "--no-plan"])).toThrow(
+			"does not support research-only or no-plan sessions",
+		);
+	});
+});
+
+describe("workbench parseCloseArgs", () => {
+	test("requires allow-no-report to carry a reason", () => {
+		expect(() =>
+			parseCloseArgs(
+				["--session", "260530_2256_cli-native", "--reason", "why"],
+				process.cwd(),
+			),
+		).toThrow("Missing --allow-no-report for close reason.");
+		expect(() =>
+			parseCloseArgs(
+				["--session", "260530_2256_cli-native", "--allow-no-report"],
+				process.cwd(),
+			),
+		).toThrow("Missing --reason for close allow-no-report.");
+
+		const parsed = parseCloseArgs(
+			[
+				"--session",
+				"260530_2256_cli-native",
+				"--allow-no-report",
+				"--reason",
+				"research-only session",
+			],
+			process.cwd(),
+		);
+
+		expect(parsed.session).toBe("260530_2256_cli-native");
+		expect(parsed.allowNoReport).toBe(true);
+		expect(parsed.reason).toBe("research-only session");
 		expect(parsed.json).toBe(false);
 	});
 });

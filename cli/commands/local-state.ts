@@ -10,6 +10,7 @@ import {
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
+import { withSessionLock } from "../services/io/session-lock";
 import {
 	rebuildProjectIndexes,
 	validateFilesIndex,
@@ -165,45 +166,47 @@ export async function runLocalStateCommand(
 				}
 				return 2;
 			}
-			const workbench = rebuildWorkBenchIndex(projectRoot);
-			const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
-			const summary = summarizeRebuild(snapshot);
+			return withSessionLock(projectRoot, "local-state.rebuild", () => {
+				const workbench = rebuildWorkBenchIndex(projectRoot);
+				const snapshot = { workbench, ...rebuildProjectIndexes(projectRoot) };
+				const summary = summarizeRebuild(snapshot);
 
-			if (parsed.json) {
-				const compactPayload: RebuildPayload = {
-					ok: true,
-					command,
-					summary,
-					output: parsed.verbose ? "verbose" : "compact",
-					...(parsed.verbose
-						? { snapshot }
-						: {
-								hint: "Use `afol local-state rebuild --json --verbose` for full index snapshots.",
-							}),
-				};
-				io.stdout(
-					stringifyEnvelope(
-						envelopeWithLegacyKeys(
-							resultEnvelope(compactPayload, `local-state.${command}`, 0),
-							parsed.verbose
-								? ["ok", "command", "summary", "output", "snapshot"]
-								: ["ok", "command", "summary", "output", "hint"],
+				if (parsed.json) {
+					const compactPayload: RebuildPayload = {
+						ok: true,
+						command,
+						summary,
+						output: parsed.verbose ? "verbose" : "compact",
+						...(parsed.verbose
+							? { snapshot }
+							: {
+									hint: "Use `afol local-state rebuild --json --verbose` for full index snapshots.",
+								}),
+					};
+					io.stdout(
+						stringifyEnvelope(
+							envelopeWithLegacyKeys(
+								resultEnvelope(compactPayload, `local-state.${command}`, 0),
+								parsed.verbose
+									? ["ok", "command", "summary", "output", "snapshot"]
+									: ["ok", "command", "summary", "output", "hint"],
+							),
 						),
-					),
-				);
-			} else {
-				io.stdout(
-					[
-						"local-state rebuild: ok",
-						`workbench: ${summary.workbench.sessions} sessions, ${summary.workbench.tasks} tasks`,
-						`rules: ${summary.rules.count}`,
-						`skills: ${summary.skills.count}`,
-						`specs: ${summary.specs.count}`,
-						`files: ${summary.files.count}`,
-					].join("\n"),
-				);
-			}
-			return 0;
+					);
+				} else {
+					io.stdout(
+						[
+							"local-state rebuild: ok",
+							`workbench: ${summary.workbench.sessions} sessions, ${summary.workbench.tasks} tasks`,
+							`rules: ${summary.rules.count}`,
+							`skills: ${summary.skills.count}`,
+							`specs: ${summary.specs.count}`,
+							`files: ${summary.files.count}`,
+						].join("\n"),
+					);
+				}
+				return 0;
+			});
 		}
 
 		const result = formatFreshness(projectRoot);

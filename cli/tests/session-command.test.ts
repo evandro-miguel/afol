@@ -7,6 +7,7 @@ import {
 	runSessionCommand,
 	setCoordinationRadarReaderForTests,
 } from "../commands/session";
+import { remoteOperationContext } from "../core/operation-context";
 import { readActiveSession } from "../services/workbench/lifecycle";
 import {
 	bindSession,
@@ -61,6 +62,12 @@ function createProjectRoot(name: string): string {
 		"utf8",
 	);
 	return root;
+}
+
+function createSessionFixture(root: string, session: string): void {
+	const sessionDir = join(root, ".afol", "wb", session);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(join(sessionDir, `${session}_task_01.md`), "# task\n", "utf8");
 }
 
 function initGitRepo(root: string, branch = "parallel-session-test"): void {
@@ -219,6 +226,7 @@ describe("afol session command", () => {
 			expect(text.stdout.join("\n")).toContain("session list:");
 			expect(text.stdout.join("\n")).toContain("global active: LISTED");
 			expect(text.stdout.join("\n")).toContain("LISTED");
+			expect(text.stdout.join("\n")).not.toContain(root);
 
 			const json = captureIo();
 			const jsonCode = await runSessionCommand(
@@ -234,14 +242,48 @@ describe("afol session command", () => {
 				action: string;
 				data: {
 					global_active_session: string;
-					bindings: Array<{ session: string; matches_context: boolean }>;
+					current_worktree: string;
+					bindings: Array<{
+						session: string;
+						matches_context: boolean;
+						worktree: string;
+					}>;
 				};
 			};
 			expect(parsed.schema).toBe("afol.result/v1");
 			expect(parsed.ok).toBe(true);
 			expect(parsed.action).toBe("session.list");
 			expect(parsed.data.global_active_session).toBe("LISTED");
+			expect(parsed.data.current_worktree).toBe(".");
+			expect(parsed.data.bindings[0]?.worktree).toBe(".");
 			expect(parsed.data.bindings[0]?.matches_context).toBe(true);
+
+			const debugText = captureIo();
+			const debugTextCode = await runSessionCommand(
+				"list",
+				["--debug"],
+				root,
+				debugText.io,
+			);
+			expect(debugTextCode).toBe(0);
+			expect(debugText.stdout.join("\n")).toContain(root);
+
+			const debugJson = captureIo();
+			const debugJsonCode = await runSessionCommand(
+				"list",
+				["--json", "--debug"],
+				root,
+				debugJson.io,
+			);
+			expect(debugJsonCode).toBe(0);
+			const debugParsed = JSON.parse(debugJson.stdout.join("\n")) as {
+				data: {
+					current_worktree: string;
+					bindings: Array<{ worktree: string }>;
+				};
+			};
+			expect(debugParsed.data.current_worktree).toBe(root);
+			expect(debugParsed.data.bindings[0]?.worktree).toBe(root);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -251,6 +293,7 @@ describe("afol session command", () => {
 		const root = createProjectRoot("bind");
 		initGitRepo(root);
 		try {
+			createSessionFixture(root, "BOUND");
 			const io = captureIo();
 			const code = await runSessionCommand(
 				"bind",
@@ -270,6 +313,7 @@ describe("afol session command", () => {
 		const root = createProjectRoot("switch");
 		initGitRepo(root);
 		try {
+			createSessionFixture(root, "SWITCHED");
 			const io = captureIo();
 			const code = await runSessionCommand("switch", ["SWITCHED"], root, io.io);
 			expect(code).toBe(0);
@@ -278,6 +322,141 @@ describe("afol session command", () => {
 			expect(io.stdout.join("\n")).toContain("session switched: SWITCHED");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("bind rejects a missing session folder", async () => {
+		const root = createProjectRoot("bind-missing");
+		initGitRepo(root);
+		try {
+			const io = captureIo();
+			const code = await runSessionCommand(
+				"bind",
+				["--session", "MISSING"],
+				root,
+				io.io,
+			);
+			expect(code).toBe(2);
+			expect(io.stderr.join("\n")).toContain(
+				"session not found: MISSING (missing folder",
+			);
+			expect(io.stdout).toEqual([]);
+			expect(readSessionContext(root).bindings).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("bind --json --session MISSING returns JSON error envelope", async () => {
+		const root = createProjectRoot("bind-json-missing");
+		initGitRepo(root);
+		try {
+			const io = captureIo();
+			const code = await runSessionCommand(
+				"bind",
+				["--json", "--session", "MISSING"],
+				root,
+				io.io,
+			);
+			expect(code).toBe(2);
+			expect(io.stderr).toEqual([]);
+			expect(io.stdout).toHaveLength(1);
+			const payload = JSON.parse(io.stdout[0] ?? "{}") as {
+				ok: boolean;
+				exit_code: number;
+				action: string;
+				error?: { code: string; message: string };
+			};
+			expect(payload.ok).toBe(false);
+			expect(payload.exit_code).toBe(2);
+			expect(payload.error?.code).toBe("SESSION_NOT_FOUND");
+			expect(payload.error?.message).toContain("session not found: MISSING");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("switch rejects a session missing its task file", async () => {
+		const root = createProjectRoot("switch-missing-task");
+		initGitRepo(root);
+		try {
+			mkdirSync(join(root, ".afol", "wb", "BROKEN"), { recursive: true });
+			const io = captureIo();
+			const code = await runSessionCommand("switch", ["BROKEN"], root, io.io);
+			expect(code).toBe(2);
+			expect(io.stderr.join("\n")).toContain(
+				"session not found: BROKEN (missing task file",
+			);
+			expect(readActiveSession(root)).toBeNull();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("mutating session commands require approval in restricted contexts", async () => {
+		const bindRoot = createProjectRoot("bind-approval");
+		const switchRoot = createProjectRoot("switch-approval");
+		const unbindRoot = createProjectRoot("unbind-approval");
+		initGitRepo(bindRoot);
+		initGitRepo(switchRoot);
+		initGitRepo(unbindRoot);
+		try {
+			createSessionFixture(bindRoot, "BOUND");
+			createSessionFixture(switchRoot, "SWITCHED");
+			bindSession(unbindRoot, {
+				session: "UNBOUND",
+				branch: currentGitBranch(unbindRoot),
+				worktree: unbindRoot,
+			});
+
+			const bindIo = captureIo();
+			expect(
+				await runSessionCommand(
+					"bind",
+					["--session", "BOUND"],
+					bindRoot,
+					bindIo.io,
+					remoteOperationContext(),
+				),
+			).toBe(2);
+			expect(readSessionContext(bindRoot).bindings).toHaveLength(0);
+			expect(bindIo.stderr.join("\n")).toContain(
+				"session bind requires local interactive approval",
+			);
+
+			const switchIo = captureIo();
+			expect(
+				await runSessionCommand(
+					"switch",
+					["SWITCHED"],
+					switchRoot,
+					switchIo.io,
+					remoteOperationContext(),
+				),
+			).toBe(2);
+			expect(readActiveSession(switchRoot)).toBeNull();
+			expect(switchIo.stderr.join("\n")).toContain(
+				"session switch requires local interactive approval",
+			);
+
+			const unbindIo = captureIo();
+			expect(
+				await runSessionCommand(
+					"unbind",
+					["--session", "UNBOUND"],
+					unbindRoot,
+					unbindIo.io,
+					remoteOperationContext(),
+				),
+			).toBe(2);
+			expect(readSessionContext(unbindRoot).bindings).toHaveLength(1);
+			expect(unbindIo.stderr.join("\n")).toContain(
+				"session unbind requires local interactive approval",
+			);
+		} finally {
+			rmSync(bindRoot, { recursive: true, force: true });
+			rmSync(switchRoot, { recursive: true, force: true });
+			rmSync(unbindRoot, { recursive: true, force: true });
 		}
 	});
 
@@ -378,6 +557,38 @@ describe("afol session command", () => {
 			expect(text).toContain("260618_1420_orchestrator T-02 in_progress");
 			expect(text).toContain("260618_1421_other T-01 pending");
 			expect(text).not.toContain("T-99");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("radar strict exits 1 on critical warnings", async () => {
+		const root = createProjectRoot("radar-strict");
+		try {
+			setCoordinationRadarReaderForTests(() => ({
+				generated_at: "2026-06-18T18:30:00.000Z",
+				freshness: { stale: false },
+				tasks: [
+					{
+						session: "260618_1420_orchestrator",
+						task_id: "T-02",
+						state: "in_progress",
+						owner: "codex",
+						warning_ids: ["path_overlap_touched"],
+					},
+				],
+				warnings: [
+					{
+						id: "path_overlap_touched",
+						severity: "critical",
+						message: "planned and touched paths overlap",
+					},
+				],
+			}));
+			const io = captureIo();
+			const code = await runSessionCommand("radar", ["--strict"], root, io.io);
+			expect(code).toBe(1);
+			expect(io.stdout.join("\n")).toContain("critical path_overlap_touched");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
