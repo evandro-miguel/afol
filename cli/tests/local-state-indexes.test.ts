@@ -805,7 +805,11 @@ describe("local-state project indexer", () => {
 	test("files index excludes generated version source", () => {
 		const root = buildFixture();
 		try {
-			writeFileSync(join(root, ".git"), "gitdir: ../.git/worktrees/example\n", "utf8");
+			writeFileSync(
+				join(root, ".git"),
+				"gitdir: ../.git/worktrees/example\n",
+				"utf8",
+			);
 			const generatedDir = join(root, "cli", "generated");
 			mkdirSync(generatedDir, { recursive: true });
 			const templatePath = join(generatedDir, "template.ts");
@@ -864,6 +868,41 @@ describe("local-state project indexer", () => {
 			const future = new Date(Date.now() + 60_000);
 			utimesSync(join(root, ".tools", "uv-cache", "archive"), future, future);
 			expect(validateFilesIndex(root).ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index excludes private and sensitive named paths", () => {
+		const root = buildFixture();
+		try {
+			const excludedPaths = [
+				"anotacoes_ozy_d_v2/20_areas/21-Evandro-Miguel/private/Chave Caixa.md",
+				"anotacoes_ozy_d_v2/20_areas/21-Evandro-Miguel/private/Endereco Casa.md",
+				"anotacoes_ozy_d_v2/90_archive/93-Legacy/Xurupita - Archive.md",
+				"docs/Private/client.md",
+				"docs/PRIVATE/upper.md",
+				"docs/Chave/client.md",
+				"docs/Endereco/data.md",
+				"archive/Xurupita/note.md",
+				"docs/credentials.prod.md",
+				"src/agent_memory_system.egg-info/PKG-INFO",
+			];
+			const safePath = "docs/security/secret-scan-runbook.md";
+
+			for (const relativePath of [...excludedPaths, safePath]) {
+				const fullPath = join(root, ...relativePath.split("/"));
+				mkdirSync(dirname(fullPath), { recursive: true });
+				writeFileSync(fullPath, "content", "utf8");
+			}
+
+			const snapshot = rebuildFilesIndex(root);
+			const indexedPaths = snapshot.files.map((entry) => entry.path);
+
+			for (const relativePath of excludedPaths) {
+				expect(indexedPaths).not.toContain(relativePath);
+			}
+			expect(indexedPaths).toContain(safePath);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

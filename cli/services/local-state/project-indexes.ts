@@ -115,6 +115,7 @@ const FILE_INDEX_EXCLUDED_DIR_SEGMENTS = new Set([
 	".venv",
 	"__pycache__",
 	"node_modules",
+	"private",
 ]);
 
 const FILE_INDEX_ROOT_EXCLUDED_DIR_SEGMENTS = new Set([
@@ -128,6 +129,24 @@ const FILE_INDEX_ROOT_EXCLUDED_DIR_SEGMENTS = new Set([
 ]);
 
 const FILE_INDEX_EXCLUDED_PATHS = new Set([".git", "cli/generated/version.ts"]);
+
+const FILE_INDEX_SENSITIVE_FILE_PATTERNS = [
+	/^\.env(?:\.|$)/,
+	/(?:^|[-_\s.])chaves?(?:[-_\s.]|$)/,
+	/(?:^|[-_\s.])credentials?(?:[-_\s.]|$)/,
+	/(?:^|[-_\s.])enderecos?(?:[-_\s.]|$)/,
+	/(?:^|[-_\s.])keys?(?:[-_\s.]|$)/,
+	/^secrets?(?:\.|$)/,
+	/(?:^|[-_\s.])senhas?(?:[-_\s.]|$)/,
+	/xurupita/,
+];
+
+function isSensitiveFileIndexSegment(segment: string): boolean {
+	const normalizedSegment = segment.toLowerCase();
+	return FILE_INDEX_SENSITIVE_FILE_PATTERNS.some((pattern) =>
+		pattern.test(normalizedSegment),
+	);
+}
 
 const ZERO_TIME = new Date(0).toISOString();
 const FRESHNESS_CLOCK_SKEW_MS = 1_000;
@@ -253,14 +272,21 @@ function isDirectoryExcluded(
 	) {
 		return true;
 	}
-	return segments.some((segment) =>
-		FILE_INDEX_EXCLUDED_DIR_SEGMENTS.has(segment),
+	return segments.some(
+		(segment) =>
+			FILE_INDEX_EXCLUDED_DIR_SEGMENTS.has(segment.toLowerCase()) ||
+			segment.toLowerCase().endsWith(".egg-info") ||
+			isSensitiveFileIndexSegment(segment),
 	);
 }
 
 function isFileExcluded(projectRoot: string, filePath: string): boolean {
 	const normalizedPath = toRelativeProjectPath(projectRoot, filePath);
-	return FILE_INDEX_EXCLUDED_PATHS.has(normalizedPath);
+	const segments = normalizedPath.split("/");
+	return (
+		FILE_INDEX_EXCLUDED_PATHS.has(normalizedPath) ||
+		segments.some((segment) => isSensitiveFileIndexSegment(segment))
+	);
 }
 
 function collectFilesUnder(
