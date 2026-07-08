@@ -8,7 +8,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { runLocalStateCommand } from "../commands/local-state";
 import { agentOperationContext } from "../core/operation-context";
 import {
@@ -827,6 +827,60 @@ describe("local-state project indexer", () => {
 			const future = new Date(Date.now() + 60_000);
 			utimesSync(versionPath, future, future);
 			expect(validateFilesIndex(root).ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index excludes local runtime cache and scratch directories", () => {
+		const root = buildFixture();
+		try {
+			const excludedPaths = [
+				".codex/session.json",
+				".coverage-trace/agent_memory_system.cover",
+				".memory/graph-cache/cache.json",
+				".qwen/history.json",
+				".tools/uv-cache/archive",
+				".venv/lib/site-packages/pkg.py",
+				"tmp/repo-canibalize/snapshot.md",
+				"src/__pycache__/module.pyc",
+			];
+
+			for (const relativePath of excludedPaths) {
+				const fullPath = join(root, ...relativePath.split("/"));
+				mkdirSync(dirname(fullPath), { recursive: true });
+				writeFileSync(fullPath, "runtime", "utf8");
+			}
+
+			const snapshot = rebuildFilesIndex(root);
+			const indexedPaths = snapshot.files.map((entry) => entry.path);
+
+			for (const relativePath of excludedPaths) {
+				expect(indexedPaths).not.toContain(relativePath);
+			}
+
+			const future = new Date(Date.now() + 60_000);
+			utimesSync(join(root, ".tools", "uv-cache", "archive"), future, future);
+			expect(validateFilesIndex(root).ok).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("files index keeps authored files under ambiguous directory names", () => {
+		const root = buildFixture();
+		try {
+			const authoredPath = join(root, "docs", "logs", "decision.md");
+			mkdirSync(dirname(authoredPath), { recursive: true });
+			writeFileSync(authoredPath, "# Decision\n", "utf8");
+
+			const snapshot = rebuildFilesIndex(root);
+			const indexedPaths = snapshot.files.map((entry) => entry.path);
+			expect(indexedPaths).toContain("docs/logs/decision.md");
+
+			const future = new Date(Date.now() + 60_000);
+			utimesSync(authoredPath, future, future);
+			expect(validateFilesIndex(root).ok).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

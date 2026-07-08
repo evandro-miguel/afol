@@ -104,10 +104,27 @@ export type ProjectIndexSnapshot = {
 const FILE_INDEX_EXCLUDED_DIR_SEGMENTS = new Set([
 	".git",
 	".gitnexus",
+	".codex",
+	".coverage-trace",
+	".memory",
+	".pytest_cache",
+	".qwen",
 	".ruff_cache",
+	".tmp",
+	".tools",
+	".venv",
+	"__pycache__",
 	"node_modules",
+]);
+
+const FILE_INDEX_ROOT_EXCLUDED_DIR_SEGMENTS = new Set([
+	"build",
 	"coverage",
 	"dist",
+	"env",
+	"logs",
+	"tmp",
+	"venv",
 ]);
 
 const FILE_INDEX_EXCLUDED_PATHS = new Set(["cli/generated/version.ts"]);
@@ -228,6 +245,14 @@ function isDirectoryExcluded(
 	}
 
 	const segments = normalizedPath.split("/");
+	const rootSegment = segments[0];
+	if (
+		segments.length === 1 &&
+		rootSegment !== undefined &&
+		FILE_INDEX_ROOT_EXCLUDED_DIR_SEGMENTS.has(rootSegment)
+	) {
+		return true;
+	}
 	return segments.some((segment) =>
 		FILE_INDEX_EXCLUDED_DIR_SEGMENTS.has(segment),
 	);
