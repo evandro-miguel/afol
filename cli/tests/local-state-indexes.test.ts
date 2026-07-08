@@ -805,6 +805,7 @@ describe("local-state project indexer", () => {
 	test("files index excludes generated version source", () => {
 		const root = buildFixture();
 		try {
+			writeFileSync(join(root, ".git"), "gitdir: ../.git/worktrees/example\n", "utf8");
 			const generatedDir = join(root, "cli", "generated");
 			mkdirSync(generatedDir, { recursive: true });
 			const templatePath = join(generatedDir, "template.ts");
@@ -823,6 +824,7 @@ describe("local-state project indexer", () => {
 					(entry) => entry.path === "cli/generated/version.ts",
 				),
 			).toBe(false);
+			expect(snapshot.files.some((entry) => entry.path === ".git")).toBe(false);
 
 			const future = new Date(Date.now() + 60_000);
 			utimesSync(versionPath, future, future);

@@ -127,7 +127,7 @@ const FILE_INDEX_ROOT_EXCLUDED_DIR_SEGMENTS = new Set([
 	"venv",
 ]);
 
-const FILE_INDEX_EXCLUDED_PATHS = new Set(["cli/generated/version.ts"]);
+const FILE_INDEX_EXCLUDED_PATHS = new Set([".git", "cli/generated/version.ts"]);
 
 const ZERO_TIME = new Date(0).toISOString();
 const FRESHNESS_CLOCK_SKEW_MS = 1_000;
