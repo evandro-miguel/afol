@@ -13,10 +13,15 @@ system has been retired and must not be restored.
 - `.afol/config.json`: canonical AFOL project configuration.
 - `.agents/lock.json`, `.agents/manifest.json`: static provider-facing
   scaffold metadata.
-- `.agents/skills/**`: project-local provider skills.
+- `.agents/skills/**`: optional project-local provider skills. Universal AFOL
+  behavior uses global Codex skills such as `agentic-folder-sys`; do not vendor
+  that skill in this repo/template.
 - `.afol/adm/hooks/**`, `.afol/adm/rules/**`,
   `.afol/adm/source/**`, `.afol/adm/tools.json`: AFOL-owned static governance
   payloads, hook/rule catalogs, and skill seed content.
+- `.afol/state/afol.db`: SQLite v1 materialization for workbench sessions,
+  task rows, source hashes, and evidence only; broader `adm/pstr/memory/library/ctx`
+  materialization is State DB v2/future.
 - `.afol/**`: mutable AFOL-owned state, including workbench sessions, indexes,
   events, mutations, temporary files, benchmark catalog/results, and migration
   archives.
@@ -50,6 +55,11 @@ Removed legacy surfaces:
 - `agents.config`
 - `legacy:` delegate routing
 
+Governed sessions may enter `pending_spec`, but new sessions are blocked while
+open pending specs exist until they are resolved or waived. The current session
+can continue with lifecycle warnings so the user can finish the work and then
+link or waive the missing spec.
+
 ## Commands
 
 ```bash
@@ -57,10 +67,13 @@ afol status
 afol validate project
 afol validate bench --pack <pack-id> --json
 afol new <theme> --feature-id <F-id> --parent-spec <spec-id>
+afol new <theme> --no-spec-required --reason "<reason>"
 afol start --session <session-id> --task-id <task-id>
 afol evidence --session <session-id> --task-id <task-id> --command "<cmd>" --result passed
 afol done --session <session-id> --task-id <task-id>
 afol close --session <session-id>
+afol governance pending --json
+afol governance resolve-spec --session <session-id> --feature-id <F-id> --parent-spec <spec-id>
 afol update check
 afol update preview
 afol update apply --dry-run
@@ -72,8 +85,10 @@ afol update apply --dry-run
 bun install --frozen-lockfile
 bun run typecheck
 bun test
+bun run manifest:check
 afol local-state rebuild --json
 afol validate project --json
+afol health --release --json
 bun run validate:release
 ```
 

@@ -9,10 +9,6 @@
       "path": "skills/agentic-scaffold-mcp"
     },
     {
-      "name": "agentic-folder-sys",
-      "path": "skills/agentic-folder-sys"
-    },
-    {
       "name": "afol-rules",
       "path": "skills/afol-rules"
     }

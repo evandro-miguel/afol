@@ -655,12 +655,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 			join(tmpdir(), "bootstrap-without-claude-agents-"),
 		);
 		try {
-			const exitCode = await runBootstrapCommand([
-				target,
-				"--mutable-dir",
-				".agents",
-				"--without-claude",
-			]);
+			const exitCode = await runBootstrapCommand([target, "--without-claude"]);
 
 			expect(exitCode).toBe(0);
 			// Claude artifacts absent
@@ -690,7 +685,7 @@ describe("bootstrap provider-compatible mutable state", () => {
 		}
 	});
 
-	test("custom mutable dir keeps governance paths on .afol payload", async () => {
+	test("custom mutable dir is rejected to avoid split state contracts", async () => {
 		const target = mkdtempSync(join(tmpdir(), "bootstrap-custom-mutable-"));
 		try {
 			const exitCode = await runBootstrapCommand([
@@ -699,24 +694,8 @@ describe("bootstrap provider-compatible mutable state", () => {
 				".state",
 			]);
 
-			expect(exitCode).toBe(0);
-			expect(
-				existsSync(join(target, ".afol", "adm", "rules", "README.md")),
-			).toBe(true);
-			expect(existsSync(join(target, ".state", "adm", "README.md"))).toBe(
-				false,
-			);
-
-			const config = JSON.parse(
-				readFileSync(join(target, ".afol", "config.json"), "utf8"),
-			) as {
-				paths: Record<string, string>;
-			};
-			expect(config.paths.mutable_dir).toBe(".state");
-			expect(config.paths.adm_dir).toBe(".afol/adm");
-			expect(config.paths.rules_dir).toBe(".afol/adm/rules");
-			expect(config.paths.hooks_dir).toBe(".afol/adm/hooks");
-			expect(config.paths.data_dir).toBe(".state/data");
+			expect(exitCode).toBe(2);
+			expect(existsSync(join(target, ".afol", "config.json"))).toBe(false);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}

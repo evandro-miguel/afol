@@ -181,7 +181,7 @@ coverage when the command changes or a production incident exposes a weak path:
 | `afol evidence` | Agent records task-scoped proof. | append fixture and strict verify. | Evidence ledger contains command, result, task id, and timestamp. |
 | `afol hook` | Agent inspects static hook metadata. | scripted inspect. | Output resolves hooks without executing scripts. |
 | `afol rule` | Agent resolves relevant rules. | scripted routing plus live research scenario. | Expected rules are selected with compact rationale. |
-| `afol skill` | Agent resolves local skills. | scripted skill list/show plus live routing scenario. | Project-local skills are preferred over global duplicates. |
+| `afol skill` | Agent resolves local skills. | scripted skill list/show plus live routing scenario. | Project-local domain skills resolve separately from global operator skills; universal AFOL operator skills such as `agentic-folder-sys` stay global and are not vendored. |
 | `afol close` | Agent closes a session after verification. | workbench fixture and missing-proof failure path. | Close fails without complete tasks/evidence and passes after proof. |
 | `afol file` | Mutation agent patches, moves, archives, and undoes safely. | isolated mutation fixture. | Dry-run, journal, protected-path block, and undo are proven. |
 | `afol update` | Operator checks, previews, and dry-runs scaffold update. | update fixture with clean and conflict cases. | Local edits are preserved or surfaced as conflicts. |

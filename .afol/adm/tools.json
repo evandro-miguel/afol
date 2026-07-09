@@ -363,17 +363,17 @@
       "type": "ops",
       "side_effect": "write",
       "execution_mode": "on-demand",
-      "description": "Safely patch, move, archive, and undo files; supports dry-run",
+      "description": "Safely append, move, archive, and undo files; supports dry-run",
       "subcommands": [
         {
-          "usage": "pt|patch --path <path> --dry-run",
+          "usage": "append|patch --path <path> --dry-run",
           "side_effect": "read",
-          "description": "Preview patch diff without writing"
+          "description": "Preview appended text diff without writing"
         },
         {
-          "usage": "pt|patch --path <path>",
+          "usage": "append|patch --path <path>",
           "side_effect": "write",
-          "description": "Patch file with backup and mutation journal"
+          "description": "Append text with backup and mutation journal"
         },
         {
           "usage": "mv|move --from <path> --to <path>",

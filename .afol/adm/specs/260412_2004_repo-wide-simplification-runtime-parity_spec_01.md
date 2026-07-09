@@ -136,15 +136,16 @@ Out of scope:
 ## 7) Constraints and Assumptions
 
 - Assumptions:
-  - The repo-local universal-skills source contains only `agentic-folder-sys` and
-    `agentic-scaffold-mcp`; Python validation comes from repo tests and lint.
+  - The repo-local universal-skills source contains only skills that are safe to
+    vendor into repo/template payloads; universal AFOL operator skills such as
+    `agentic-folder-sys` stay in the global Codex skill layer.
   - `just test-scripts-all` currently enforces the 80% coverage gate.
   - Current route, fetch, and SQLite surfaces are absent and should remain out of
     scope.
 - Constraints:
   - Compatibility: preserve `.agents/agents <command>` behavior.
-  - Operational: use `.afol/wb/` artifacts and `agentic-folder-sys` for
-    governed execution.
+  - Operational: use `.afol/wb/` artifacts and global Codex
+    `agentic-folder-sys` for governed execution.
   - Documentation: keep current-state evidence in `.afol/pstr/**` and
     goal-state governance in `.afol/adm/`.
   - Safety: archive before delete under `.agents/z-arq/` and never expose

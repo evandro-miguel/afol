@@ -1,4 +1,11 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	statSync,
+} from "node:fs";
 import { dirname } from "node:path";
 import {
 	envelopeOk,
@@ -34,13 +41,14 @@ type UpdateSubcommand = "check" | "preview" | "apply";
 
 type WritableUpdateOperation = Extract<
 	UpdateOperation,
-	{ kind: "create" | "update-managed" }
+	{ kind: "create" | "update-managed" | "remove-stale" }
 >;
 
 type UpdateChangeSummary = {
 	total: number;
 	create: number;
 	update: number;
+	remove: number;
 	conflict: number;
 	preserve: number;
 	paths: string[];
@@ -85,7 +93,11 @@ function normalizeSubcommand(value: string | undefined): UpdateSubcommand {
 function isWritableOperation(
 	operation: UpdateOperation,
 ): operation is WritableUpdateOperation {
-	return operation.kind === "create" || operation.kind === "update-managed";
+	return (
+		operation.kind === "create" ||
+		operation.kind === "update-managed" ||
+		operation.kind === "remove-stale"
+	);
 }
 
 function parseUpdateArgs(values: string[]): ParsedUpdateArgs {
@@ -204,6 +216,7 @@ type StagedUpdateOperation = {
 	absolutePath: string;
 	beforeExisted: boolean;
 	beforeContent: string;
+	beforeIsDirectory: boolean;
 	backupPath: string | null;
 	mutationId: string;
 	record: MutationRecord;
@@ -232,6 +245,7 @@ function summarizeUpdateChanges(
 		total: 0,
 		create: 0,
 		update: 0,
+		remove: 0,
 		conflict: 0,
 		preserve: 0,
 		paths: [],
@@ -250,6 +264,10 @@ function summarizeUpdateChanges(
 		}
 		if (operation.kind === "update-managed") {
 			counts.update += 1;
+			continue;
+		}
+		if (operation.kind === "remove-stale") {
+			counts.remove += 1;
 			continue;
 		}
 		if (operation.kind === "preserve-project-owned") {
@@ -309,9 +327,13 @@ function stageUpdateOperations(
 		}
 		const absolutePath = resolved.value.path;
 		const beforeExisted = existsSync(absolutePath);
-		const beforeContent = beforeExisted
-			? readFileSync(absolutePath, "utf8")
-			: "";
+		const beforeIsDirectory = beforeExisted
+			? statSync(absolutePath).isDirectory()
+			: false;
+		const beforeContent =
+			beforeExisted && !beforeIsDirectory
+				? readFileSync(absolutePath, "utf8")
+				: "";
 		const mutationId = createMutationId();
 		const backupPath = beforeExisted
 			? makeBackupPath(projectRoot, mutationId, operation.path)
@@ -323,6 +345,7 @@ function stageUpdateOperations(
 				absolutePath,
 				beforeExisted,
 				beforeContent,
+				beforeIsDirectory,
 				backupPath,
 				mutationId,
 				record: {
@@ -335,8 +358,14 @@ function stageUpdateOperations(
 					taskId: context.taskId,
 					reason: context.reason,
 					sourcePath: operation.path,
-					beforeHash: beforeExisted ? normalizeHash(beforeContent) : null,
-					afterHash: normalizeHash(operation.nextContent),
+					beforeHash:
+						beforeExisted && !beforeIsDirectory
+							? normalizeHash(beforeContent)
+							: null,
+					afterHash:
+						operation.kind === "remove-stale"
+							? null
+							: normalizeHash(operation.nextContent),
 					backupPath,
 					beforeExisted,
 					source: "afol-update",
@@ -355,6 +384,13 @@ function restoreAppliedOperations(staged: StagedUpdateOperation[]): void {
 			continue;
 		}
 		if (entry.beforeExisted) {
+			if (entry.beforeIsDirectory) {
+				rmSync(entry.absolutePath, { recursive: true, force: true });
+				if (entry.backupPath) {
+					cpSync(entry.backupPath, entry.absolutePath, { recursive: true });
+				}
+				continue;
+			}
 			writeAtomically(
 				entry.absolutePath,
 				entry.operation.path,
@@ -363,7 +399,7 @@ function restoreAppliedOperations(staged: StagedUpdateOperation[]): void {
 			);
 			continue;
 		}
-		rmSync(entry.absolutePath, { force: true });
+		rmSync(entry.absolutePath, { recursive: true, force: true });
 	}
 }
 
@@ -373,7 +409,8 @@ function applyUpdateOperations(
 	context: Pick<ParsedUpdateArgs, "session" | "taskId" | "reason">,
 	runtime: UpdateApplyRuntime = {},
 ): void {
-	withSessionLock(projectRoot, context.session, () => {
+	const lockSession = context.session.trim() || "unbound-update";
+	withSessionLock(projectRoot, lockSession, () => {
 		const staged = stageUpdateOperations(projectRoot, operations, context);
 		if (staged.length === 0) {
 			return;
@@ -383,12 +420,23 @@ function applyUpdateOperations(
 			if (!entry.backupPath) {
 				continue;
 			}
-			cpSync(entry.absolutePath, entry.backupPath);
+			cpSync(entry.absolutePath, entry.backupPath, { recursive: true });
 		}
 
 		const applied: StagedUpdateOperation[] = [];
 		try {
 			for (const entry of staged) {
+				if (entry.operation.kind === "remove-stale") {
+					rmSync(entry.absolutePath, { recursive: true, force: true });
+					applied.push(entry);
+					if (
+						typeof runtime.failAfterWriteCount === "number" &&
+						applied.length >= runtime.failAfterWriteCount
+					) {
+						throw new Error("Injected update apply failure after write");
+					}
+					continue;
+				}
 				const dir = dirname(entry.absolutePath);
 				if (!existsSync(dir)) {
 					mkdirSync(dir, { recursive: true });

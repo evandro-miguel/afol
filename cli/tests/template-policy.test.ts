@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
@@ -29,27 +35,6 @@ async function collectJsonFiles(root: string): Promise<string[]> {
 				continue;
 			}
 			if (entry.isFile() && entry.name.endsWith(".json")) {
-				paths.push(toPosixPath(relative(root, absolutePath)));
-			}
-		}
-	}
-
-	await walk(root);
-	return paths.sort();
-}
-
-async function collectFiles(root: string): Promise<string[]> {
-	const paths: string[] = [];
-
-	async function walk(currentDir: string): Promise<void> {
-		const entries = await readdir(currentDir, { withFileTypes: true });
-		for (const entry of entries) {
-			const absolutePath = join(currentDir, entry.name);
-			if (entry.isDirectory()) {
-				await walk(absolutePath);
-				continue;
-			}
-			if (entry.isFile()) {
 				paths.push(toPosixPath(relative(root, absolutePath)));
 			}
 		}
@@ -219,6 +204,41 @@ describe("template forbidden-content policy", () => {
 		expect(failures).toEqual([]);
 	});
 
+	test("live src/project-template manifest covers documented payload roots", async () => {
+		const manifest = JSON.parse(
+			await readFile(
+				join(process.cwd(), "src/project-template/.agents/manifest.json"),
+				"utf8",
+			),
+		);
+		const projectOwned = manifest.ownership?.["project-owned"] ?? [];
+		const ignored = manifest.ownership?.ignored ?? [];
+
+		for (const path of [
+			".afol/config.json",
+			".agents/lock.json",
+			".agents/manifest.json",
+			".agents/skills",
+			".afol/adm",
+			".afol/data/benchmarks",
+			".afol/data/telemetry",
+			".afol/library",
+			".afol/memory",
+			".afol/wb",
+			"AGENTS.md",
+			"docs/lessons",
+			"docs/standards",
+			"docs/telemetry",
+			"docs/templates",
+		]) {
+			expect(projectOwned).toContain(path);
+		}
+
+		for (const path of [".afol/data/README.md", ".afol/pstr/README.md"]) {
+			expect(ignored).toContain(path);
+		}
+	});
+
 	test("live src/project-template carries current AFOL tools catalog", async () => {
 		const projectRoot = process.cwd();
 		const rootCatalog = JSON.parse(
@@ -257,37 +277,57 @@ describe("template forbidden-content policy", () => {
 		expect(templateRegistry.coverage?.subcommand_exemptions).toEqual([]);
 	});
 
-	test("live src/project-template carries current agentic-folder-sys skill source", async () => {
+	test("live repo and src/project-template do not vendor global agentic-folder-sys skill", async () => {
 		const projectRoot = process.cwd();
-		const activeSkillRoot = join(
-			projectRoot,
+		const forbiddenPaths = [
 			".agents/skills/agentic-folder-sys",
-		);
-		const templateSkillRoot = join(
-			projectRoot,
+			".afol/adm/source/universal-skills/skills/agentic-folder-sys",
+			"src/project-template/.agents/skills/agentic-folder-sys",
 			"src/project-template/.afol/adm/source/universal-skills/skills/agentic-folder-sys",
+		];
+		const existingForbiddenPaths = forbiddenPaths.filter((path) =>
+			existsSync(join(projectRoot, path)),
 		);
-		const activeFiles = await collectFiles(activeSkillRoot);
-		const templateFiles = await collectFiles(templateSkillRoot);
-		const mismatches: string[] = [];
 
-		expect(templateFiles).toEqual(activeFiles);
-
-		for (const relativePath of activeFiles) {
-			const activeContent = await readFile(
-				join(activeSkillRoot, relativePath),
-				"utf8",
-			);
-			const templateContent = await readFile(
-				join(templateSkillRoot, relativePath),
-				"utf8",
-			);
-			if (templateContent !== activeContent) {
-				mismatches.push(relativePath);
+		const metadataFiles = [
+			".agents/manifest.json",
+			".agents/lock.json",
+			".afol/adm/source/universal-skills/index.json",
+			".afol/adm/source/universal-skills/profiles/core.json",
+			"src/project-template/.afol/adm/source/universal-skills/index.json",
+			"src/project-template/.afol/adm/source/universal-skills/profiles/core.json",
+		];
+		const metadataMatches: string[] = [];
+		for (const relativePath of metadataFiles) {
+			const content = await readFile(join(projectRoot, relativePath), "utf8");
+			if (content.includes("agentic-folder-sys")) {
+				metadataMatches.push(relativePath);
 			}
 		}
 
-		expect(mismatches).toEqual([]);
+		const manifest = JSON.parse(
+			await readFile(
+				join(projectRoot, "src/project-template/.agents/manifest.json"),
+				"utf8",
+			),
+		);
+		const managedHashes = Object.keys(manifest.managed_hashes ?? {}).filter(
+			(path) => path.includes("agentic-folder-sys"),
+		);
+		const lock = JSON.parse(
+			await readFile(
+				join(projectRoot, "src/project-template/.agents/lock.json"),
+				"utf8",
+			),
+		);
+		const lockManagedHashes = Object.keys(lock.managed_hashes ?? {}).filter(
+			(path) => path.includes("agentic-folder-sys"),
+		);
+
+		expect(existingForbiddenPaths).toEqual([]);
+		expect(metadataMatches).toEqual([]);
+		expect(managedHashes).toEqual([]);
+		expect(lockManagedHashes).toEqual([]);
 	});
 });
 

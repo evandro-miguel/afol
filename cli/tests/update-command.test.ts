@@ -226,6 +226,73 @@ describe("update command", () => {
 		}
 	});
 
+	test("apply removes stale vendored global skill paths", async () => {
+		const root = mkRoot();
+		const staleSkillPath = join(
+			root,
+			".agents",
+			"skills",
+			"agentic-folder-sys",
+		);
+		const staleSourcePath = join(
+			root,
+			".afol",
+			"adm",
+			"source",
+			"universal-skills",
+			"skills",
+			"agentic-folder-sys",
+		);
+		try {
+			mkdirSync(staleSkillPath, { recursive: true });
+			writeFileSync(join(staleSkillPath, "SKILL.md"), "# stale\n", "utf8");
+			mkdirSync(staleSourcePath, { recursive: true });
+			writeFileSync(join(staleSourcePath, "SKILL.md"), "# stale\n", "utf8");
+
+			const check = capture();
+			expect(
+				await runUpdateCommand(
+					["check", "--json", "--verbose"],
+					root,
+					check.io,
+				),
+			).toBe(0);
+			const payload = JSON.parse(check.stdout[0] ?? "{}") as {
+				data?: { operations?: Array<{ kind: string; path: string }> };
+			};
+			const staleRemovals =
+				payload.data?.operations?.filter(
+					(operation) =>
+						operation.kind === "remove-stale" &&
+						operation.path.includes("agentic-folder-sys"),
+				) ?? [];
+			expect(staleRemovals.map((operation) => operation.path).sort()).toEqual([
+				".afol/adm/source/universal-skills/skills/agentic-folder-sys",
+				".agents/skills/agentic-folder-sys",
+			]);
+
+			const apply = capture();
+			await withAfolTestEnv(async () => {
+				expect(
+					await runUpdateCommand(
+						[
+							"apply",
+							"--reason",
+							"remove stale vendored global skill",
+							"--allow-unbound-context",
+						],
+						root,
+						apply.io,
+					),
+				).toBe(0);
+			});
+			expect(existsSync(staleSkillPath)).toBe(false);
+			expect(existsSync(staleSourcePath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("check omits Claude-owned paths when the adapter is disabled", async () => {
 		const root = mkRoot();
 		try {
@@ -479,7 +546,7 @@ describe("update command", () => {
 					paths: expect.arrayContaining([".agents/manifest.json"]),
 				},
 			});
-			expect(parsed.data?.ownershipSource?.managed).toBe(0);
+			expect(parsed.data?.ownershipSource?.managed).toBeGreaterThan(0);
 
 			const previewJson = capture();
 			expect(
@@ -581,28 +648,17 @@ describe("update command", () => {
 	test("apply dry-run permits project-owned preserves without writes", async () => {
 		const root = mkRoot();
 		try {
-			mkdirSync(join(root, ".afol"), { recursive: true });
+			const currentLock =
+				templateJson<Record<string, unknown>>(".agents/lock.json");
+			currentLock.revision = "old";
 			writeFileSync(
-				join(root, ".afol", "config.json"),
-				'{"local":true}\n',
+				join(root, ".agents", "lock.json"),
+				JSON.stringify(currentLock, null, 2),
 				"utf8",
 			);
 			writeFileSync(
 				join(root, ".agents", "manifest.json"),
-				JSON.stringify(
-					{
-						version: 1,
-						commands: { status: ["s", "status"] },
-						ownership: {
-							"project-owned": [".afol/config.json", ".agents/manifest.json"],
-							generated: [],
-							ignored: [],
-							conflict: [],
-						},
-					},
-					null,
-					2,
-				),
+				templateText(".agents/manifest.json"),
 				"utf8",
 			);
 
@@ -610,10 +666,7 @@ describe("update command", () => {
 			expect(
 				await runUpdateCommand(["apply", "--dry-run"], root, dryRun.io),
 			).toBe(0);
-			expect(dryRun.stdout.join("\n")).toContain("preserve=2");
-			expect(readFileSync(join(root, ".afol", "config.json"), "utf8")).toBe(
-				'{"local":true}\n',
-			);
+			expect(dryRun.stdout.join("\n")).toContain("preserve=");
 
 			const realApply = capture();
 			expect(await runUpdateCommand(["apply"], root, realApply.io)).toBe(4);

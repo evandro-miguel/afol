@@ -8,7 +8,7 @@ related_workstream_id: none
 updated_at: '2026-06-20T00:00:00-03:00'
 ---
 
-# Lesson: Prompt Alignment Must Use Project-Local Skills
+# Lesson: Prompt Alignment Must Classify Skill Ownership
 
 ## Correction
 
@@ -20,12 +20,14 @@ about the scaffold's skill surface.
 - Before rewriting scaffold operating prompts, inspect the current repo-local
   `AGENTS.md`, `.afol/config.json`, `.agents/skills/`, and relevant AFOL CLI
   help.
-- Treat `.agents/skills/` as the primary project-local skill surface, and do not
-  present globally available Codex skills as scaffold-local core skills unless
-  the repo-local config or user request explicitly calls for them.
+- Treat `.agents/skills/` as the primary surface only for project-specific
+  skills. Do not present global Codex skills as scaffold-local core skills, and
+  do not vendor universal AFOL operator skills such as `agentic-folder-sys`
+  into `.agents/skills/`.
 
 ## Guardrail
 
 - For this repository, route governed scaffold/workbench operations through
-  `agentic-folder-sys` guidance and AFOL CLI commands; do not reintroduce the
-  older split between `agentic-system-workflow` and `workbench-agent-teams`.
+  global Codex `agentic-folder-sys` guidance and AFOL CLI commands; do not
+  reintroduce the older split between `agentic-system-workflow` and
+  `workbench-agent-teams`.

@@ -76,8 +76,10 @@ agent context.
 - `.afol/adm/hooks/**`: static provider-neutral hook catalog.
 - `.afol/adm/rules/**`: static local contracts.
 - `.afol/adm/source/**`: static source seed content.
-- `.agents/skills/**`: project-local provider skills. `paths.skills_dir` must
-  stay here or in a child path; `.afol/skills/**` is not an active skills root.
+- `.agents/skills/**`: optional project-local provider skills. `paths.skills_dir`
+  must stay here or in a child path; `.afol/skills/**` is not an active skills
+  root. Universal AFOL behavior uses global Codex skills such as
+  `agentic-folder-sys`, not a vendored project-local copy.
 - `.afol/adm/**`: project direction, roadmap, specs, ADRs, strategy, and
   desired-state administration.
 - `.afol/pstr/**`: generated project-structure maps when present.
@@ -85,9 +87,29 @@ agent context.
 - `.afol/data/events/**`: append-only runtime event data.
 - `.afol/data/index/**`: local indexes.
 - `.afol/data/mutations/**`: mutation and update records.
-- `.afol/state/afol.db`: local state database.
+- `.afol/state/afol.db`: SQLite v1 local state database.
 - `.afol/tmp/**`: temporary AFOL-owned files.
 - `.afol/library/**` and `.afol/memory/**`: local knowledge and memory surfaces.
+
+`.afol/state/afol.db` is the SQLite v1 surface. It materializes workbench
+sessions, task rows, source hashes, and evidence only. Broader
+`adm/pstr/memory/library/ctx` materialization is State DB v2/future.
+
+## Governance
+
+- Governed sessions may enter `pending_spec` when roadmap feature or parent
+  spec linkage is missing.
+- The current `pending_spec` session can continue through `start`, `evidence`,
+  `done`, and `close`; lifecycle commands emit warnings until the pending spec
+  is resolved or waived.
+- Open `pending_spec` entries block new session creation until they are
+  resolved or waived.
+
+```bash
+afol governance pending --json
+afol governance resolve-spec --session <session-id> --feature-id <F-id> --parent-spec <spec-id>
+afol governance resolve-spec --session <session-id> --no-spec-required --reason "<reason>"
+```
 
 ## Rule Injection
 
@@ -148,6 +170,7 @@ afol validate project
 bun run typecheck
 bun test
 bun run validate
+bun run manifest:check
 bun run validate:project-benchmarks
 bun run validate:release
 ```

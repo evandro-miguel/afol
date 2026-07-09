@@ -139,7 +139,13 @@ function parseBootstrapArgs(args: string[]): BootstrapArgs {
 			if (!value) {
 				throw new Error("Missing value for --mutable-dir");
 			}
-			mutableDir = normalizeProjectRelativePath(value, ".agents");
+			const normalized = normalizeProjectRelativePath(value, ".afol");
+			if (normalized !== ".afol") {
+				throw new Error(
+					"Unsupported bootstrap argument: --mutable-dir only accepts .afol. Custom mutable roots are not supported.",
+				);
+			}
+			mutableDir = normalized;
 			index += 1;
 			continue;
 		}

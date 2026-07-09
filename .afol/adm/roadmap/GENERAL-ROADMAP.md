@@ -52,19 +52,21 @@ universal CLI plus minimal local project state.
 
 ## 4) Current-State Reconciliation
 
-This repository already has useful Python, Bash, uv, Just, workbench, MCP, safe
-mutation, and validation behavior. That behavior is compatibility contract, not
-disposable history.
+This section is superseded by the current AFOL-only runtime policy.
 
-The Bun/TypeScript reformulation must be staged:
+The active contract is:
 
-1. Keep `afol` as the project-local and downstream front door.
-2. Keep legacy `.agents/agents`, Python, Bash, uv, and just surfaces
-   factory-only until parity tests prove safe retirement.
-3. Implement one typed Bun/TypeScript command family at a time.
-4. Keep Python/Bash paths until parity tests prove the replacement.
-5. Shrink src/project-template only after bootstrap/export validation proves
-   downstream installs still work.
+1. `afol` is the only supported public CLI surface.
+2. Legacy `.agents/agents`, `.agents/scripts`, `.agents/runtime`,
+   `.agents/wb`, `.agents/z-arq`, `agents.config`, and `legacy:` routing must
+   not be restored or extended.
+3. Retained `.agents/**` content is limited to static provider metadata and
+   optional project-local skills. Universal AFOL skills such as
+   `agentic-folder-sys` are global Codex skills, not vendored template payload.
+4. Python, Bash, uv, and Just references are historical migration context, not
+   active runtime surfaces.
+5. `src/project-template` must export the AFOL config/governance/state payload
+   without reintroducing legacy runtime files.
 
 ## 4.1) DR 2026-05-31 Consolidation (incremental)
 
@@ -485,9 +487,11 @@ Minimum acceptance:
 - Why: AFOL needs fast local execution state, FTS, source hashes, and bundle
   generation without making JSON files or SQLite the human authoring surface.
 - Exit criteria:
-  - `.afol/state/afol.db` materializes adm, pstr, wb, memory, library,
-    evidence, events, sections, tools, and context bundle state.
-  - Source hashes and stale checks fail closed before trusted bundle generation.
+  - SQLite v1 materializes workbench sessions, task rows, source hashes, and
+    evidence.
+  - Adm, pstr, memory, library, events, sections, tools, and context bundle
+    state remain file-backed unless and until a State DB v2 feature implements
+    their tables and migrations.
   - SQLite is rebuildable from canonical Markdown/YAML/evidence sources.
   - JSON output remains command/export/debug format, not a live competing
     source of truth.

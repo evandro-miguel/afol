@@ -43,7 +43,7 @@ export function detectResolver(root: string): string {
 			"- `.afol/adm/rules/RULE-005-folder-structure.md`",
 		]),
 		...section("Skills", [
-			"- `.agents/skills/agentic-folder-sys/`",
+			"- global Codex `agentic-folder-sys` skill when available",
 			"- `.agents/skills/afol-integration-test/`",
 			"- `.agents/skills/typescript-expert/`",
 			"- `.agents/skills/javascript-testing-patterns/`",

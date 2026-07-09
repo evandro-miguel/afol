@@ -36,7 +36,7 @@ those maps are rebuilt, and stale or missing maps are not authoritative.
 ## Runtime And Execution
 
 - `docs/afol-runtime-reference.md`: command groups, runtime state ownership,
-  and validation gates.
+  SQLite v1 materialization scope, pending_spec gating, and validation gates.
 - `PLANS.md`: ExecPlan requirements for governed workbench sessions.
 - `.afol/wb/**`: active and historical execution sessions.
 - `.afol/adm/doctrine/RELEASE-RUNBOOK.md`: release readiness and publish gates.
