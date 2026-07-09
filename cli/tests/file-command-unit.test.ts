@@ -214,6 +214,9 @@ describe("file shared helpers", () => {
 			expect(() => resolveSafePath(root, ".afol/config.json")).toThrow(
 				"protected-path:.afol/config.json",
 			);
+			expect(() =>
+				resolveSafePath(root, ".afol/config.json.example"),
+			).not.toThrow();
 			expect(() => resolveSafePath(root, ".agents/config.json")).toThrow(
 				"protected-path:.agents/config.json",
 			);
@@ -293,6 +296,16 @@ describe("file command dispatcher", () => {
 				),
 			).toBe(0);
 			expect(parseJsonLine(patchIo.stdout[0] ?? "").command).toBe("pt");
+
+			const appendIo = captureIo();
+			expect(
+				await runFileCommand(
+					["append", "--path", "notes/doc.txt", "--dry-run", "--json"],
+					root,
+					appendIo.io,
+				),
+			).toBe(0);
+			expect(parseJsonLine(appendIo.stdout[0] ?? "").command).toBe("pt");
 
 			writeFileTree(root, DEFAULT_MOVE_SOURCE, "move me");
 			const moveIo = captureIo();
@@ -424,6 +437,82 @@ describe("file command dispatcher", () => {
 });
 
 describe("file mutation handlers", () => {
+	test("move and archive use binary-safe hashes and suppress binary diffs", () => {
+		const root = mkProjectRoot();
+		try {
+			const movePayload = Buffer.from([0, 255, 16, 32, 64]);
+			const moveSource = join(root, "bin", "move.bin");
+			mkdirSync(dirname(moveSource), { recursive: true });
+			writeFileSync(moveSource, movePayload);
+			const moveWrite = runMoveMutation(
+				{
+					command: "mv",
+					path: "bin/move.bin",
+					destinationPath: "bin/moved.bin",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "R",
+				},
+				root,
+			);
+			const moveHash = normalizeHash(movePayload);
+			expect(moveWrite.before_hash).toBe(moveHash);
+			expect(moveWrite.after_hash).toBe(moveHash);
+
+			const archivePayload = Buffer.from([9, 8, 7, 0, 6]);
+			const archiveSource = join(root, "bin", "archive.bin");
+			writeFileSync(archiveSource, archivePayload);
+			const archiveWrite = runArchiveMutation(
+				{
+					command: "ar",
+					path: "bin/archive.bin",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "R",
+				},
+				root,
+			);
+			const archiveHash = normalizeHash(archivePayload);
+			expect(archiveWrite.before_hash).toBe(archiveHash);
+			expect(archiveWrite.after_hash).toBe(archiveHash);
+
+			const undoPreview = undoArchiveMutation(
+				{
+					command: "ud",
+					path: "",
+					dryRun: true,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "R",
+				},
+				{
+					id: archiveWrite.mutation_id ?? "M-archive",
+					ts: new Date().toISOString(),
+					kind: "archive",
+					status: "applied",
+					dryRun: false,
+					session: "S",
+					taskId: "T",
+					reason: "R",
+					sourcePath: "bin/archive.bin",
+					destinationPath: archiveWrite.destination ?? "",
+					backupPath: archiveWrite.backup_path ?? null,
+					beforeHash: archiveWrite.before_hash ?? null,
+					afterHash: archiveWrite.after_hash ?? null,
+				},
+				root,
+			);
+			expect(undoPreview.diff_preview).toBeUndefined();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("patch covers dry-run, noop, write, block, and undo", () => {
 		const root = mkProjectRoot();
 		try {
@@ -973,20 +1062,20 @@ describe("file mutation handlers", () => {
 				overwrittenBackupPath: write.overwritten_backup_path ?? null,
 			};
 
-			expect(
-				undoMoveMutation(
-					{ dryRun: true, session: "S", taskId: "T", reason: "R" },
-					mutation,
-					root,
-				).status,
-			).toBe("dry-run");
-			expect(
-				undoMoveMutation(
-					{ dryRun: false, session: "S", taskId: "T", reason: "R" },
-					mutation,
-					root,
-				).status,
-			).toBe("write");
+			const dryRunUndo = undoMoveMutation(
+				{ dryRun: true, session: "S", taskId: "T", reason: "R" },
+				mutation,
+				root,
+			);
+			expect(dryRunUndo.status).toBe("dry-run");
+			expect(dryRunUndo.before_hash).toBeNull();
+			const writeUndo = undoMoveMutation(
+				{ dryRun: false, session: "S", taskId: "T", reason: "R" },
+				mutation,
+				root,
+			);
+			expect(writeUndo.status).toBe("write");
+			expect(writeUndo.before_hash).toBeNull();
 			expect(readFileSync(source, "utf8")).toBe("from");
 			expect(readFileSync(destination, "utf8")).toBe("existing");
 			expect(() =>

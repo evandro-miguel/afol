@@ -91,9 +91,12 @@ const PROTECTED_PREFIXES = Object.freeze([
 
 function isProtectedPath(relativePath: string): boolean {
 	const normalized = relativePath.replaceAll("\\", "/");
-	return PROTECTED_PREFIXES.some(
-		(prefix) => normalized === prefix || normalized.startsWith(prefix),
-	);
+	return PROTECTED_PREFIXES.some((protectedPath) => {
+		if (normalized === protectedPath) {
+			return true;
+		}
+		return normalized.startsWith(`${protectedPath}/`);
+	});
 }
 
 type ResolvedSafePath = { path: string; relativePath: string };
@@ -122,7 +125,7 @@ export function requireWriteContext(args: CommandArgs): void {
 	}
 }
 
-export function normalizeHash(value: string): string {
+export function normalizeHash(value: string | Uint8Array): string {
 	return createHash("sha256").update(value).digest("hex");
 }
 

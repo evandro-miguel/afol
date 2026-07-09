@@ -386,6 +386,30 @@ describe("mutation safety command family", () => {
 
 			expect(proc.status).toBe(2);
 			expect(proc.stderr as string).toContain("protected-path");
+
+			const boundaryProc = runKernel(root, [
+				"f",
+				"pt",
+				"--session",
+				"S-04",
+				"--task-id",
+				"T-04",
+				"--reason",
+				"boundary target",
+				"--path",
+				".afol/config.json.example",
+				"--append",
+				"safe",
+				"--dry-run",
+				"--json",
+			]);
+
+			expect(boundaryProc.status).toBe(0);
+			const boundaryResult = expectFileEnvelope(
+				parseJsonOutput(boundaryProc.stdout as string),
+			);
+			expect(boundaryResult.status).toBe("dry-run");
+			expect(boundaryResult.path).toBe(".afol/config.json.example");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

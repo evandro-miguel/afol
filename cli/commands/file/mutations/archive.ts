@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { dirname } from "node:path";
 import {
 	appendMutationRecord,
@@ -9,27 +9,36 @@ import {
 	archiveDestination,
 	type CommandArgs,
 	type CommandResult,
+	looksBinary,
 	makeDiffPreview,
 	makeMovePreview,
 	normalizeHash,
-	readTextOrEmpty,
 	requireWriteContext,
 	resolveSafePath,
 } from "../shared";
+
+function readFileBytes(path: string): Buffer {
+	return existsSync(path) ? readFileSync(path) : Buffer.alloc(0);
+}
+
+function textPreview(bytes: Buffer): string | undefined {
+	return looksBinary(bytes) ? undefined : bytes.toString("utf8");
+}
 
 export function runArchiveMutation(
 	args: CommandArgs,
 	projectRoot: string,
 ): CommandResult {
 	const source = resolveSafePath(projectRoot, args.path);
+	const sourceExists = existsSync(source.path);
 	const mutationId = createMutationId();
 	const destination = archiveDestination(
 		projectRoot,
 		mutationId,
 		source.relativePath,
 	);
-	const before = existsSync(source.path) ? readTextOrEmpty(source.path) : "";
-	const beforeHash = before.length > 0 ? normalizeHash(before) : null;
+	const beforeBytes = readFileBytes(source.path);
+	const beforeHash = sourceExists ? normalizeHash(beforeBytes) : null;
 	const diffPreview = makeMovePreview(
 		source.relativePath,
 		destination.relativePath,
@@ -124,12 +133,12 @@ export function undoArchiveMutation(
 	const destination = resolveSafePath(projectRoot, mutation.destinationPath);
 
 	if (args.dryRun) {
-		const beforeSource = existsSync(source.path)
-			? readTextOrEmpty(source.path)
-			: "";
-		const beforeDestination = existsSync(destination.path)
-			? readTextOrEmpty(destination.path)
-			: "";
+		const beforeSourceBytes = readFileBytes(source.path);
+		const beforeDestinationBytes = readFileBytes(destination.path);
+		const sourceExists = existsSync(source.path);
+		const destinationExists = existsSync(destination.path);
+		const beforeSourceText = textPreview(beforeSourceBytes);
+		const beforeDestinationText = textPreview(beforeDestinationBytes);
 
 		return {
 			command: "ud",
@@ -141,14 +150,18 @@ export function undoArchiveMutation(
 			path: mutation.sourcePath,
 			destination: mutation.destinationPath,
 			target_mutation_id: mutation.id,
-			before_hash:
-				beforeDestination.length > 0 ? normalizeHash(beforeDestination) : null,
-			after_hash: beforeSource.length > 0 ? normalizeHash(beforeSource) : null,
-			diff_preview: makeDiffPreview(
-				beforeDestination,
-				beforeSource,
-				mutation.sourcePath,
-			),
+			before_hash: destinationExists
+				? normalizeHash(beforeDestinationBytes)
+				: null,
+			after_hash: sourceExists ? normalizeHash(beforeSourceBytes) : null,
+			diff_preview:
+				beforeDestinationText !== undefined && beforeSourceText !== undefined
+					? makeDiffPreview(
+							beforeDestinationText,
+							beforeSourceText,
+							mutation.sourcePath,
+						)
+					: undefined,
 		};
 	}
 
@@ -182,16 +195,15 @@ export function undoArchiveMutation(
 		};
 	}
 
-	const beforeDestination = readTextOrEmpty(destination.path);
-	const beforeDestinationHash =
-		beforeDestination.length > 0 ? normalizeHash(beforeDestination) : null;
+	const beforeDestinationBytes = readFileBytes(destination.path);
+	const beforeDestinationText = textPreview(beforeDestinationBytes);
+	const beforeDestinationHash = normalizeHash(beforeDestinationBytes);
 
 	mkdirSync(dirname(source.path), { recursive: true });
 	renameSync(destination.path, source.path);
 
-	const afterSource = existsSync(source.path)
-		? readTextOrEmpty(source.path)
-		: "";
+	const afterSourceBytes = readFileBytes(source.path);
+	const afterSourceText = textPreview(afterSourceBytes);
 	const mutationId = createMutationId();
 
 	appendMutationRecord(projectRoot, {
@@ -219,11 +231,14 @@ export function undoArchiveMutation(
 		destination: mutation.destinationPath,
 		target_mutation_id: mutation.id,
 		before_hash: beforeDestinationHash,
-		after_hash: afterSource.length > 0 ? normalizeHash(afterSource) : null,
-		diff_preview: makeDiffPreview(
-			beforeDestination,
-			afterSource,
-			mutation.sourcePath,
-		),
+		after_hash: normalizeHash(afterSourceBytes),
+		diff_preview:
+			beforeDestinationText !== undefined && afterSourceText !== undefined
+				? makeDiffPreview(
+						beforeDestinationText,
+						afterSourceText,
+						mutation.sourcePath,
+					)
+				: undefined,
 	};
 }

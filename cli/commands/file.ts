@@ -34,13 +34,17 @@ export async function runFileCommand(
 	try {
 		const [rawCommand, ...rest] = args;
 		if (!rawCommand) {
-			throw new Error("Missing file subcommand: pt|mv|ud|ar");
+			throw new Error("Missing file subcommand: pt|append|mv|ud|ar");
 		}
 
 		let asJson = false;
 		let result: CommandResult;
 
-		if (rawCommand === "pt" || rawCommand === "patch") {
+		if (
+			rawCommand === "pt" ||
+			rawCommand === "patch" ||
+			rawCommand === "append"
+		) {
 			const parsed = applyProjectMutationDefaults(
 				parsePatchArgs(rest),
 				projectRoot,

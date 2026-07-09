@@ -14,15 +14,23 @@ import {
 import {
 	backupPath,
 	type CommandResult,
+	looksBinary,
 	type MoveArgs,
 	makeDiffPreview,
 	makeMovePreview,
 	normalizeHash,
-	readTextOrEmpty,
 	requireWriteContext,
 	resolveJournalBackupPath,
 	resolveSafePath,
 } from "../shared";
+
+function readFileBytes(path: string): Buffer {
+	return existsSync(path) ? readFileSync(path) : Buffer.alloc(0);
+}
+
+function textPreview(bytes: Buffer): string | undefined {
+	return looksBinary(bytes) ? undefined : bytes.toString("utf8");
+}
 
 type MoveUndoMutation = MutationRecord & {
 	kind: "move";
@@ -43,23 +51,20 @@ function buildUndoMoveDryRunResult(
 		projectRoot,
 		moveMutation.destinationPath,
 	);
-	const beforeSource = existsSync(source.path)
-		? readTextOrEmpty(source.path)
-		: "";
-	const beforeDestination = existsSync(destination.path)
-		? readTextOrEmpty(destination.path)
-		: "";
-	const afterSource = existsSync(destination.path)
-		? readTextOrEmpty(destination.path)
-		: "";
+	const sourceExists = existsSync(source.path);
+	const destinationExists = existsSync(destination.path);
+	const beforeSourceBytes = readFileBytes(source.path);
+	const beforeDestinationBytes = readFileBytes(destination.path);
+	const afterSourceBytes = readFileBytes(destination.path);
 	const overwrittenBackupPath = resolveJournalBackupPath(
 		projectRoot,
 		moveMutation.overwrittenBackupPath,
 	);
-	const afterDestination =
-		overwrittenBackupPath && existsSync(overwrittenBackupPath)
-			? readTextOrEmpty(overwrittenBackupPath)
-			: "";
+	const afterDestinationBytes = overwrittenBackupPath
+		? readFileBytes(overwrittenBackupPath)
+		: Buffer.alloc(0);
+	const beforeDestinationText = textPreview(beforeDestinationBytes);
+	const afterDestinationText = textPreview(afterDestinationBytes);
 
 	return {
 		command: "ud",
@@ -71,13 +76,16 @@ function buildUndoMoveDryRunResult(
 		path: moveMutation.sourcePath,
 		destination: moveMutation.destinationPath,
 		target_mutation_id: moveMutation.id,
-		before_hash: beforeSource.length > 0 ? normalizeHash(beforeSource) : null,
-		after_hash: afterSource.length > 0 ? normalizeHash(afterSource) : null,
-		diff_preview: makeDiffPreview(
-			beforeDestination,
-			afterDestination,
-			moveMutation.destinationPath,
-		),
+		before_hash: sourceExists ? normalizeHash(beforeSourceBytes) : null,
+		after_hash: destinationExists ? normalizeHash(afterSourceBytes) : null,
+		diff_preview:
+			beforeDestinationText !== undefined && afterDestinationText !== undefined
+				? makeDiffPreview(
+						beforeDestinationText,
+						afterDestinationText,
+						moveMutation.destinationPath,
+					)
+				: undefined,
 	};
 }
 
@@ -94,20 +102,18 @@ function applyUndoMoveMutation(
 		moveMutation.destinationPath,
 	);
 
-	const beforeSource = existsSync(source.path)
-		? readTextOrEmpty(source.path)
-		: "";
-	const beforeDestination = existsSync(destination.path)
-		? readTextOrEmpty(destination.path)
-		: "";
-	const beforeSourceHash =
-		beforeSource.length > 0 ? normalizeHash(beforeSource) : null;
+	const sourceExists = existsSync(source.path);
+	const beforeSourceBytes = readFileBytes(source.path);
+	const beforeDestinationBytes = readFileBytes(destination.path);
+	const beforeSourceHash = sourceExists
+		? normalizeHash(beforeSourceBytes)
+		: null;
 	const overwrittenBackupPath = resolveJournalBackupPath(
 		projectRoot,
 		moveMutation.overwrittenBackupPath,
 	);
 
-	if (existsSync(source.path)) {
+	if (sourceExists) {
 		return {
 			command: "ud",
 			status: "blocked",
@@ -145,13 +151,11 @@ function applyUndoMoveMutation(
 		cpSync(overwrittenBackupPath, destination.path);
 	}
 
-	const afterSource = existsSync(source.path)
-		? readTextOrEmpty(source.path)
-		: "";
-	const afterDestination = existsSync(destination.path)
-		? readTextOrEmpty(destination.path)
-		: "";
+	const afterSourceBytes = readFileBytes(source.path);
+	const afterDestinationBytes = readFileBytes(destination.path);
 	const mutationId = createMutationId();
+	const beforeDestinationText = textPreview(beforeDestinationBytes);
+	const afterDestinationText = textPreview(afterDestinationBytes);
 
 	appendMutationRecord(projectRoot, {
 		id: mutationId,
@@ -178,12 +182,15 @@ function applyUndoMoveMutation(
 		destination: moveMutation.destinationPath,
 		target_mutation_id: moveMutation.id,
 		before_hash: beforeSourceHash,
-		after_hash: afterSource.length > 0 ? normalizeHash(afterSource) : null,
-		diff_preview: makeDiffPreview(
-			beforeDestination,
-			afterDestination,
-			moveMutation.destinationPath,
-		),
+		after_hash: normalizeHash(afterSourceBytes),
+		diff_preview:
+			beforeDestinationText !== undefined && afterDestinationText !== undefined
+				? makeDiffPreview(
+						beforeDestinationText,
+						afterDestinationText,
+						moveMutation.destinationPath,
+					)
+				: undefined,
 	};
 }
 
@@ -234,7 +241,7 @@ export function runMoveMutation(
 
 	requireWriteContext(args);
 
-	const beforeSource = readFileSync(source.path, "utf8");
+	const beforeSource = readFileSync(source.path);
 	const destinationExisted = existsSync(destination.path);
 	const beforeHash = normalizeHash(beforeSource);
 	let overwrittenBackupPath: string | undefined;
@@ -249,7 +256,7 @@ export function runMoveMutation(
 
 	mkdirSync(dirname(destination.path), { recursive: true });
 	renameSync(source.path, destination.path);
-	const after = readTextOrEmpty(destination.path);
+	const after = readFileSync(destination.path);
 
 	appendMutationRecord(projectRoot, {
 		id: mutationId,
