@@ -8,3 +8,6 @@
 {"id":"E-20260709173026180-5d02f1","task_id":"T-05","created_at":"2026-07-09T21:30:26.180Z","command":"bun test cli/tests/bench-command.test.ts cli/tests/help.test.ts","result":"passed"}
 {"id":"E-20260709173026275-d409f7","task_id":"T-05","created_at":"2026-07-09T21:30:26.275Z","command":"bun run typecheck","result":"passed"}
 {"id":"E-20260709173026368-75ce0a","task_id":"T-05","created_at":"2026-07-09T21:30:26.368Z","command":"bun test","result":"passed"}
+{"id":"E-20260709174214121-7d7f7f","task_id":"T-06","created_at":"2026-07-09T21:42:14.121Z","command":"bun run validate:release","result":"passed"}
+{"id":"E-20260709174214277-90f5bd","task_id":"T-06","created_at":"2026-07-09T21:42:14.277Z","command":"gitnexus detect-changes --scope all --repo afol-dev","result":"passed"}
+{"id":"E-20260709174214434-798ac4","task_id":"T-06","created_at":"2026-07-09T21:42:14.434Z","command":"final critic review and governed follow-up mapping","result":"passed"}

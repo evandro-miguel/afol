@@ -30,4 +30,4 @@ spec_waiver_reason: ""
 | T-03 | done | worker | Audit agent lifecycle, AFOL command usage, and telemetry |
 | T-04 | done | worker | Run live integration and reliability probes |
 | T-05 | done | worker | Apply verified low-risk fixes and validate regressions |
-| T-06 | in_progress | worker | Synthesize evidence, run final council, and close the session |
+| T-06 | done | worker | Synthesize evidence, run final council, and close the session |

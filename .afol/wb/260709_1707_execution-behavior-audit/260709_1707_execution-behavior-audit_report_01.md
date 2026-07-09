@@ -140,8 +140,9 @@ live result above.
 
 - Build and dist smoke: executed successfully inside `bun run validate:release`.
 - Release security scan: executed successfully inside `bun run validate:release`.
-- Release provenance is pending a clean checkout. The first run correctly
-  rejected the uncommitted audit patch.
+- Release validation: `bun run validate:release` -> passed from a clean
+  checkout, including build, dist smoke, isolated build, security scan, and
+  release provenance.
 - Diff hygiene: `git diff --check` -> passed.
 - GitNexus patch scope: 5 files, 3 symbols, 1 execution flow, medium risk.
 - Final critic review found no blocking regression in the tracked patch. It
