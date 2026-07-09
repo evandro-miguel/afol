@@ -6,3 +6,4 @@
 {"id":"E-20260709165152178-f34c77","task_id":"T-03","created_at":"2026-07-09T20:51:52.178Z","command":"bun run manifest:check","result":"passed"}
 {"id":"E-20260709165152338-a00b14","task_id":"T-03","created_at":"2026-07-09T20:51:52.338Z","command":"bun run typecheck","result":"passed"}
 {"id":"E-20260709165152494-34b32e","task_id":"T-03","created_at":"2026-07-09T20:51:52.494Z","command":"bun test","result":"passed"}
+{"id":"E-20260709165430758-383f8e","task_id":"T-03","created_at":"2026-07-09T20:54:30.758Z","command":"bun run validate:release","result":"passed"}

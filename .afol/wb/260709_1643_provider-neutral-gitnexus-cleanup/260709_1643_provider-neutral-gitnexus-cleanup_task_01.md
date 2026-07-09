@@ -27,4 +27,4 @@ spec_waiver_reason: "Maintenance follow-up to final F-19: align repository conte
 |------|-------|-------|-------|
 | T-01 | done | worker | Archive disabled Claude adapter artifacts and replace the generated GitNexus block in AGENTS.md with provider-neutral guidance. |
 | T-02 | done | worker | Verify the adapter contract, GitNexus change scope, and absence of provider-specific residue. |
-| T-03 | in_progress | worker | Run AFOL and release validation, close the session, and version the verified result on dev. |
+| T-03 | done | worker | Run AFOL and release validation, close the session, and version the verified result on dev. |
