@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## Prioridade Da Proxima Execucao
+
+- Prioridade maxima na proxima execucao: migrar totalmente este repo para o novo sistema AFOL.
+- Nao use como fluxo ativo: `.agents/agents`, `.agents/scripts`, `.agents/runtime`, `.agents/wb`, `.agents/z-arq`, `agents.config` ou rotas `legacy:`.
+- Use `afol` e mantenha estado mutavel em `.afol/**`, especialmente `.afol/wb/**`; trate `.agents/**` apenas como metadados estaticos e skills/provider config quando ainda forem necessarios.
+- Antes de implementar produto, inventarie referencias legadas e substitua docs, scripts e runbooks pelo fluxo AFOL atual.
+
 This repository is AFOL-only.
 
 Use `afol` for every supported scaffold, workbench, validation, update,
@@ -37,7 +44,7 @@ documented, restored, or extended:
 - no `agents.config` YAML fallback
 - no `legacy:` command routing or delegate fallback
 
-Retained `.agents` content is limited to provider-facing metadata and
+Retained `.agents` content is limited to provider-facing metadata and optional
 project-local skills:
 
 - `.agents/lock.json`
@@ -47,6 +54,10 @@ project-local skills:
 AFOL project configuration lives at `.afol/config.json`. Existing
 `.agents/config.json` files are legacy fallback inputs only and must not be
 described as the canonical config location.
+
+`.afol/state/afol.db` is SQLite v1 and materializes workbench sessions, task
+rows, source hashes, and evidence only. Broader `adm/pstr/memory/library/ctx`
+materialization belongs to State DB v2/future.
 
 AFOL-owned static governance payloads live under `.afol/adm/**`, including:
 
@@ -64,7 +75,9 @@ Mutable AFOL state belongs under `.afol/`, including workbench sessions,
 events, indexes, mutations, temporary files, benchmark catalog/results, and
 migration archives.
 
-Project-local provider skills live under `.agents/skills/**`.
+Project-local provider skills may live under `.agents/skills/**` when they are
+specific to this repo. Do not vendor `agentic-folder-sys` there; use the global
+Codex skill when available.
 Do not create or use `.afol/skills/**`; `.afol/**` is mutable runtime state,
 not a project-local skills root.
 
@@ -80,11 +93,10 @@ not a project-local skills root.
   - `ragctl project search --project afol-dev "<query>" --mode vector --json`
   - `ragctl project file --project afol-dev --file <repo-relative-path> --json`
 
-Large AFOL changes must verify that the durable universal
-`agentic-folder-sys` skill in
-`/home/ozy/01_projects/dev/universall-skill-sys-pvt` is current before
-relying on or propagating project-local AFOL guidance. If the AFOL behavior
-changed, update and sync the universal skill first.
+Large AFOL changes should use the global Codex `agentic-folder-sys` skill when
+available. Do not require or restore a project-local
+`.agents/skills/agentic-folder-sys` copy; stale local copies have caused
+version drift.
 
 Target governance layout:
 
@@ -104,8 +116,8 @@ Workflow/template routing:
 - Use `docs/templates/**` for workflow artifact shapes such as roadmap, spec,
   spec-child, spec-test, plan, task, log, report, postmortem, retrospective,
   ADR, architecture, pattern, and structure.
-- The local `agentic-folder-sys` skill must point to this template map instead
-  of carrying a stale partial template list.
+- Global skill guidance may reference this template map, but the repo/template
+  must not carry a project-local `agentic-folder-sys` skill copy.
 
 Canonical commands:
 
@@ -140,7 +152,7 @@ afol local-state rebuild --json
 - `afol status --task-id <task-id> --json` exits `1` with
   `task-not-found` when the explicit task id is absent.
 - `afol new ... --json` includes `governance_status` with value
-  `"governed"` or `"unbound"`.
+  `"governed"`, `"pending_spec"`, or `"unbound"`.
 - `afol project-benchmark ... --json` includes `catalog_source` with value
   `"project"` or `"builtin"`.
 
@@ -162,6 +174,11 @@ Task state source of truth:
 - Roadmap feature -> map to one governing parent spec in `.afol/adm/specs/`.
 - Implementation decomposition needed -> use child specs.
 - Workbench sessions must carry `roadmap_feature` and `parent_spec`.
+- Governed sessions may enter `pending_spec`, but new sessions are blocked
+  while open pending specs exist until they are resolved or waived.
+- Current `pending_spec` sessions may continue with warnings; resolve with
+  `afol governance resolve-spec --session <id> --feature-id <F-id> --parent-spec <spec-id>`
+  or waive with `--no-spec-required --reason "<reason>"`.
 - Plans/tasks execute approved intent. They do not replace roadmap/spec
   definition.
 - Non-trivial work -> use `.afol/wb/` for durable execution artifacts.
@@ -277,10 +294,11 @@ Use the narrowest tool that answers the question.
   `CLAUDE.md` or `.claude/**`.
 - Repository artifacts -> English by default.
 - Portuguese -> only when explicitly requested by user.
-- Skills -> prefer repo-local `.agents/skills/`.
-- Machine-global skills -> secondary to repo-local guidance.
-- Project-local skills -> do not delete only because a global/universal version
-  exists.
+- Skills -> prefer repo-local `.agents/skills/` only for project-specific
+  behavior.
+- Machine-global skills -> preferred for universal AFOL/workbench behavior.
+- Project-local skills are optional; do not keep stale local copies of global
+  AFOL skills.
 - Skill drift -> classify first, then ask explicit confirmation before removal.
 - AFOL/workbench operations -> use global `agentic-folder-sys` when available.
 - External memory -> auxiliary retrieval only.
@@ -321,6 +339,7 @@ validation that proves the change. For cross-cutting scaffold/release work, run:
 ```bash
 afol local-state rebuild --json
 afol validate project --json
+bun run manifest:check
 bun run typecheck
 bun test
 bun run validate:release
@@ -329,3 +348,15 @@ bun run validate:release
 Do not reintroduce legacy fallback files or docs. If a useful old artifact is
 found, move it into an AFOL-owned path under `.afol/` or convert it into the
 TypeScript AFOL implementation.
+
+<!-- gitnexus:start -->
+## GitNexus Code Intelligence
+
+- Repository index: `afol-dev`.
+- Use the globally installed `gitnexus` skill as the operating guide.
+- Check index freshness before graph queries.
+- Before editing a function, class, or method, run upstream impact analysis and report any HIGH or CRITICAL risk.
+- After meaningful edits and before committing, run change detection against `main`.
+- Confirm graph findings in source. Do not depend on provider-specific files, local provider skill mirrors, or MCP-only routing.
+
+<!-- gitnexus:end -->
