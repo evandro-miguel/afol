@@ -357,29 +357,14 @@ function hasRunnableSuccessEvidence(entry: EvidenceEntry): boolean {
 	);
 }
 
-function evidenceText(entry: EvidenceEntry): string {
-	return JSON.stringify(entry);
-}
-
 function unresolvedFailedEvidence(entries: EvidenceEntry[]): EvidenceEntry[] {
 	const unresolved: EvidenceEntry[] = [];
 	entries.forEach((entry, index) => {
 		if (!evidenceIsFailure(entry)) {
 			return;
 		}
-		const command =
-			typeof entry.command === "string" ? entry.command.trim() : "";
-		const evidenceId = typeof entry.id === "string" ? entry.id.trim() : "";
 		const superseded = entries.slice(index + 1).some((later) => {
-			if (!evidenceIsSuccess(later)) {
-				return false;
-			}
-			const laterCommand =
-				typeof later.command === "string" ? later.command.trim() : "";
-			return (
-				laterCommand === command ||
-				(Boolean(evidenceId) && evidenceText(later).includes(evidenceId))
-			);
+			return hasRunnableSuccessEvidence(later);
 		});
 		if (!superseded) {
 			unresolved.push(entry);

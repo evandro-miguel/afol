@@ -258,6 +258,109 @@ describe("verifyWorkbenchTasks", () => {
 		}
 	});
 
+	test("strict verification accepts failed evidence superseded by later success with a different command", () => {
+		const root = mkRoot("superseded-failure-different-command");
+		try {
+			const session = "260531_1202_verify_diff";
+			const sessionDir = join(root, ".afol", "wb", session);
+			write(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"# Tasks",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | fixed after retry |",
+					"",
+				].join("\n"),
+			);
+			write(
+				join(sessionDir, ".evidence.jsonl"),
+				[
+					JSON.stringify({
+						id: "E-fail",
+						task_id: "T-01",
+						command: "bun test --watch",
+						result: "failed: transient fixture",
+					}),
+					JSON.stringify({
+						id: "E-pass",
+						task_id: "T-01",
+						command: "bun test",
+						result: "passed",
+					}),
+					"",
+				].join("\n"),
+			);
+
+			const result = verifyWorkbenchTasks(root, true);
+
+			expect(result.allCompleted).toBe(true);
+			expect(result.issues).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("strict verification rejects failed evidence followed only by non-runnable success", () => {
+		const root = mkRoot("failed-evidence-non-runnable-success");
+		try {
+			const session = "260531_1202_verify_non_runnable";
+			const sessionDir = join(root, ".afol", "wb", session);
+			write(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"# Tasks",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | later non-runnable marker |",
+					"",
+				].join("\n"),
+			);
+			write(
+				join(sessionDir, ".evidence.jsonl"),
+				[
+					JSON.stringify({
+						id: "E-old-pass",
+						task_id: "T-01",
+						command: "bun test",
+						result: "passed",
+					}),
+					JSON.stringify({
+						id: "E-fail",
+						task_id: "T-01",
+						command: "bun test --watch",
+						result: "failed: regression",
+					}),
+					JSON.stringify({
+						id: "E-marker",
+						task_id: "T-01",
+						result: "passed",
+						note: "manual marker without command",
+					}),
+					"",
+				].join("\n"),
+			);
+
+			const result = verifyWorkbenchTasks(root, true);
+
+			expect(result.allCompleted).toBe(false);
+			expect(result.issues).toContainEqual(
+				expect.objectContaining({
+					taskId: "T-01",
+					type: "failed_evidence",
+				}),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("strict verification accepts success aliases used by lifecycle closure", () => {
 		const root = mkRoot("success-alias");
 		try {
