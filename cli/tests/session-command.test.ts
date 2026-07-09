@@ -94,7 +94,32 @@ function createStateBoardSession(
 }
 
 function createClosedSession(root: string, session: string): void {
-	createStateBoardSession(root, session, "done");
+	const sessionDir = join(root, ".afol", "wb", session);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(
+		join(sessionDir, `${session}_task_01.md`),
+		[
+			"---",
+			'doc_type: "workbench_task"',
+			`id: "${session}_task_01"`,
+			`session_id: "${session}"`,
+			'status: "closed"',
+			'created_at: "2026-07-09T22:30:00.000Z"',
+			'updated_at: "2026-07-09T22:30:00.000Z"',
+			'closed_at: "2026-07-09T22:30:00.000Z"',
+			"---",
+			"",
+			"# Tasks",
+			"",
+			"## State Board",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			"| T-01 | done | worker | task state fixture |",
+			"",
+		].join("\n"),
+		"utf8",
+	);
 }
 
 function initGitRepo(root: string, branch = "parallel-session-test"): void {
@@ -420,7 +445,7 @@ describe("afol session command", () => {
 		}
 	});
 
-	test("bind rejects a closed session with all tasks done", async () => {
+	test("bind rejects a session with durable close metadata", async () => {
 		const root = createProjectRoot("bind-closed");
 		initGitRepo(root);
 		try {
@@ -433,7 +458,9 @@ describe("afol session command", () => {
 				io.io,
 			);
 			expect(code).toBe(2);
-			expect(io.stderr.join("\n")).toContain("session closed: DONE");
+			expect(io.stderr.join("\n")).toContain(
+				"session closed: DONE (durable close metadata present)",
+			);
 			expect(readSessionContext(root).bindings).toHaveLength(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -462,16 +489,19 @@ describe("afol session command", () => {
 			expect(payload.ok).toBe(false);
 			expect(payload.exit_code).toBe(2);
 			expect(payload.error?.code).toBe("SESSION_ERROR");
-			expect(payload.error?.message).toContain("session closed: DONE");
+			expect(payload.error?.message).toContain(
+				"session closed: DONE (durable close metadata present)",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("bind accepts sessions awaiting validation", async () => {
+	test("bind accepts sessions without durable close metadata", async () => {
 		for (const state of [
 			"implemented_untested",
 			"tested_needs_spec_validation",
+			"done",
 		] as const) {
 			const root = createProjectRoot(`bind-${state}`);
 			initGitRepo(root);
@@ -493,7 +523,7 @@ describe("afol session command", () => {
 		}
 	});
 
-	test("switch rejects a closed session with all tasks done", async () => {
+	test("switch rejects a session with durable close metadata", async () => {
 		const root = createProjectRoot("switch-closed");
 		initGitRepo(root);
 		try {
@@ -501,17 +531,20 @@ describe("afol session command", () => {
 			const io = captureIo();
 			const code = await runSessionCommand("switch", ["DONE"], root, io.io);
 			expect(code).toBe(2);
-			expect(io.stderr.join("\n")).toContain("session closed: DONE");
+			expect(io.stderr.join("\n")).toContain(
+				"session closed: DONE (durable close metadata present)",
+			);
 			expect(readActiveSession(root)).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	test("switch accepts sessions awaiting validation", async () => {
+	test("switch accepts sessions without durable close metadata", async () => {
 		for (const state of [
 			"implemented_untested",
 			"tested_needs_spec_validation",
+			"done",
 		] as const) {
 			const root = createProjectRoot(`switch-${state}`);
 			initGitRepo(root);

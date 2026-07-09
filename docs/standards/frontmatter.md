@@ -20,8 +20,8 @@ All documents MUST include the following fields:
 doc_type: <document_type>
 id: "YYMMDD_HHMM_<theme>_<document_type>_NN"
 status: draft
-created_at: "YYYY-MM-DDTHH:MM:SSZ"
-updated_at: "YYYY-MM-DDTHH:MM:SSZ"
+created_at: "YYYY-MM-DDTHH:MM:SS.SSSZ"
+updated_at: "YYYY-MM-DDTHH:MM:SS.SSSZ"
 title: "<short title>"
 ---
 ```
@@ -30,11 +30,11 @@ title: "<short title>"
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `doc_type` | string | Document type (plan, task, report, log, brainstorm, explorer-check, research, postmortem, blocks, spec, spec-child, spec-test, spec-lite [legacy], adr, architecture, roadmap, retrospective) |
+| `doc_type` | string | Canonical document type listed below |
 | `id` | string | Unique identifier in format `YYMMDD_HHMM_<theme>_<doc_type>_NN` |
-| `status` | string | Current status (draft, active, done, blocked) |
-| `created_at` | string | Creation timestamp in ISO 8601 UTC format |
-| `updated_at` | string | Last update timestamp in ISO 8601 UTC format |
+| `status` | string | Current status (draft, active, done, blocked, closed) |
+| `created_at` | string | Creation timestamp in canonical ISO 8601 UTC format |
+| `updated_at` | string | Last update timestamp in canonical ISO 8601 UTC format |
 
 #### Recommended Fields
 
@@ -53,13 +53,32 @@ title: "<short title>"
 |-------|------|-------------|
 | `repo` | string | Repository name |
 | `branch` | string | Branch or worktree name |
+| `closed_at` | string | Durable close timestamp for a closed workbench task |
+
+#### Timestamp Contract
+
+Readers MUST accept canonical UTC ISO 8601 timestamps with or without three-digit fractional seconds, such as `2026-07-09T22:06:33Z` and `2026-07-09T22:06:33.081Z`. Writers MUST emit the JavaScript `Date.toISOString()` form in UTC with milliseconds. Lifecycle writers MUST use the same emitted value for `closed_at` and `updated_at` when closing a session.
+
+#### Workbench Close Invariant
+
+The canonical task Markdown is the durable authority for session closure. A closed task document MUST use `doc_type: workbench_task`, `status: closed`, and canonical ISO 8601 UTC timestamps in `closed_at` and `updated_at`. The close writer MUST initially set both fields to the same value. A later supported metadata update MAY advance `updated_at`, but it MUST NOT make `updated_at` earlier than `closed_at`. An active task document MUST omit `closed_at`. Missing frontmatter remains a legacy open state until an explicit close prepends canonical metadata. Task rows that are all terminal mean ready to close. They do not prove that close was committed.
 
 ### Document Types
 
-#### Workbench Types (wb)
+#### Canonical Workbench Lifecycle Types (wb)
 
-- `plan` - Planning document
-- `task` - Task checklist
+- `workbench_plan` - AFOL-owned session plan projection
+- `workbench_task` - AFOL-owned session task and lifecycle projection
+
+| Legacy lifecycle input | Canonical emitted value |
+|------------------------|-------------------------|
+| `plan` | `workbench_plan` |
+| `task` | `workbench_task` |
+
+Lifecycle writers MUST emit the prefixed values. Readers MAY accept the unprefixed values only as legacy inputs. Writers MUST NOT emit those aliases.
+
+#### Workflow Artifact Types
+
 - `log` - Execution log
 - `report` - Execution report
 - `brainstorm` - Options exploration

@@ -415,7 +415,9 @@ function assertSessionNotArchivedOrClosed(
 	session: string,
 ): void {
 	if (isSessionClosed(projectRoot, session)) {
-		throw new Error(`session closed: ${session} (all tasks done)`);
+		throw new Error(
+			`session closed: ${session} (durable close metadata present)`,
+		);
 	}
 }
 

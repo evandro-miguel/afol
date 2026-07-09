@@ -19,7 +19,7 @@ import { appendWorkbenchEvent } from "../local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
 import { resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
-import { evidenceResultIsSuccess, verifyWorkbenchTasks } from "./verify";
+import { evidenceCompletionStatus, verifyWorkbenchTasks } from "./verify";
 
 const TASK_ROW_RE =
 	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
@@ -299,16 +299,255 @@ function readTaskRows(taskPath: string): TaskRow[] {
 	return rows;
 }
 
+type TaskDocument =
+	| { kind: "legacy"; content: string }
+	| {
+			kind: "frontmatter";
+			lines: string[];
+			newline: "\n" | "\r\n";
+			suffix: string;
+	  };
+
+type TaskLifecycleState =
+	| { kind: "open"; document: TaskDocument }
+	| { kind: "closed"; closedAt: string; document: TaskDocument };
+
+function parseTaskDocument(content: string, taskPath: string): TaskDocument {
+	const opening = content.match(/^---(\r?\n)/);
+	if (!opening?.[1]) {
+		return { kind: "legacy", content };
+	}
+	const newline = opening[1] as "\n" | "\r\n";
+	const frontmatterStart = opening[0].length;
+	const closingMarker = `${newline}---`;
+	let closingStart = content.indexOf(closingMarker, frontmatterStart);
+	while (closingStart >= 0) {
+		const closingEnd = closingStart + closingMarker.length;
+		if (
+			closingEnd === content.length ||
+			content.startsWith(newline, closingEnd)
+		) {
+			return {
+				kind: "frontmatter",
+				lines: content.slice(frontmatterStart, closingStart).split(/\r?\n/),
+				newline,
+				suffix: content.slice(closingEnd),
+			};
+		}
+		closingStart = content.indexOf(closingMarker, closingStart + 1);
+	}
+	throw new Error(`Task file has malformed canonical frontmatter: ${taskPath}`);
+}
+
+function scalarValue(line: string, key: string): string | null | undefined {
+	const match = line.match(new RegExp(`^\\s*${key}\\s*:\\s*(.*?)\\s*$`));
+	if (!match) {
+		return undefined;
+	}
+	const value = match[1] ?? "";
+	if (!value || value === "null" || value === "~") {
+		return null;
+	}
+	if (
+		(value.startsWith('"') && value.endsWith('"')) ||
+		(value.startsWith("'") && value.endsWith("'"))
+	) {
+		return value.slice(1, -1) || null;
+	}
+	return value;
+}
+
+function taskFrontmatterValue(
+	document: TaskDocument,
+	key: string,
+	taskPath: string,
+): string | null {
+	if (document.kind === "legacy") {
+		return null;
+	}
+	const values = document.lines
+		.map((line) => scalarValue(line, key))
+		.filter((value) => value !== undefined);
+	if (values.length > 1) {
+		throw new Error(`Task file has duplicate ${key} frontmatter: ${taskPath}`);
+	}
+	return values[0] ?? null;
+}
+
+function isCanonicalIsoTimestamp(value: string): boolean {
+	if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) {
+		return false;
+	}
+	const parsed = new Date(value);
+	if (Number.isNaN(parsed.getTime())) {
+		return false;
+	}
+	const rendered = parsed.toISOString();
+	return rendered === value || rendered.replace(/\.000Z$/, "Z") === value;
+}
+
+function readTaskLifecycleState(
+	taskPath: string,
+	session: string,
+): TaskLifecycleState {
+	const document = parseTaskDocument(readFileSync(taskPath, "utf8"), taskPath);
+	if (document.kind === "legacy") {
+		return { kind: "open", document };
+	}
+	const docType = taskFrontmatterValue(document, "doc_type", taskPath);
+	const id = taskFrontmatterValue(document, "id", taskPath);
+	const sessionId = taskFrontmatterValue(document, "session_id", taskPath);
+	const status = taskFrontmatterValue(
+		document,
+		"status",
+		taskPath,
+	)?.toLowerCase();
+	const updatedAt = taskFrontmatterValue(document, "updated_at", taskPath);
+	const closedAt = taskFrontmatterValue(document, "closed_at", taskPath);
+	const expectedId = `${session}_task_01`;
+
+	if (docType && docType !== "workbench_task" && docType !== "task") {
+		throw new Error(
+			`Session ${session} has corrupt lifecycle metadata: expected a workbench task document.`,
+		);
+	}
+	if (id && id !== expectedId) {
+		throw new Error(
+			`Session ${session} has corrupt lifecycle metadata: task id does not match the session.`,
+		);
+	}
+	if (sessionId && sessionId !== session) {
+		throw new Error(
+			`Session ${session} has corrupt lifecycle metadata: session_id does not match the session.`,
+		);
+	}
+
+	if (status !== "closed" && closedAt === null) {
+		return { kind: "open", document };
+	}
+	if (
+		docType !== "workbench_task" ||
+		id !== expectedId ||
+		sessionId !== session ||
+		status !== "closed" ||
+		closedAt === null ||
+		updatedAt === null ||
+		!isCanonicalIsoTimestamp(closedAt) ||
+		!isCanonicalIsoTimestamp(updatedAt) ||
+		new Date(updatedAt).getTime() < new Date(closedAt).getTime()
+	) {
+		throw new Error(
+			`Session ${session} has corrupt lifecycle metadata: status, closed_at, and updated_at must form one canonical close record with updated_at at or after closed_at. Repair the task frontmatter before continuing.`,
+		);
+	}
+	return { kind: "closed", closedAt, document };
+}
+
+function setFrontmatterValue(
+	lines: string[],
+	key: string,
+	value: string,
+): void {
+	const index = lines.findIndex((line) => scalarValue(line, key) !== undefined);
+	const rendered = `${key}: ${JSON.stringify(value)}`;
+	if (index >= 0) {
+		lines[index] = rendered;
+		return;
+	}
+	lines.push(rendered);
+}
+
+function markTaskMetadataClosed(
+	taskPath: string,
+	session: string,
+	closedAt: string,
+): void {
+	const state = readTaskLifecycleState(taskPath, session);
+	if (state.kind === "closed") {
+		return;
+	}
+	const document = state.document;
+	const lines =
+		document.kind === "frontmatter"
+			? [...document.lines]
+			: [
+					'doc_type: "workbench_task"',
+					`id: ${JSON.stringify(`${session}_task_01`)}`,
+					`session_id: ${JSON.stringify(session)}`,
+					`created_at: ${JSON.stringify(closedAt)}`,
+				];
+	setFrontmatterValue(lines, "doc_type", "workbench_task");
+	setFrontmatterValue(lines, "id", `${session}_task_01`);
+	setFrontmatterValue(lines, "session_id", session);
+	setFrontmatterValue(lines, "status", "closed");
+	setFrontmatterValue(lines, "updated_at", closedAt);
+	setFrontmatterValue(lines, "closed_at", closedAt);
+
+	const newline = document.kind === "frontmatter" ? document.newline : "\n";
+	const suffix =
+		document.kind === "frontmatter"
+			? document.suffix
+			: `${newline}${document.content}`;
+	atomicWriteText(
+		taskPath,
+		`---${newline}${lines.join(newline)}${newline}---${suffix}`,
+	);
+}
+
 export function isSessionClosed(root: string, session: string): boolean {
 	const paths = sessionPaths(root, session);
 	if (!existsSync(paths.taskPath)) {
 		return true;
 	}
-	const rows = readTaskRows(paths.taskPath);
-	if (rows.length === 0) {
-		return false;
+	return readTaskLifecycleState(paths.taskPath, session).kind === "closed";
+}
+
+function ensureSessionOpenForMutation(root: string, session: string): void {
+	const paths = sessionPaths(root, session);
+	if (!existsSync(paths.sessionDir)) {
+		throw new Error(`Session folder not found: ${paths.sessionDir}`);
 	}
-	return rows.every((row) => !BLOCKING_STATES.has(row.state));
+	if (!existsSync(paths.taskPath)) {
+		throw new Error(
+			`Session ${session} is missing its canonical task file: ${paths.taskPath}`,
+		);
+	}
+	if (readTaskLifecycleState(paths.taskPath, session).kind === "closed") {
+		throw new Error(`Session ${session} is closed.`);
+	}
+}
+
+function closeDiagnosticState(
+	root: string,
+	session: string,
+): { workbench: boolean; telemetry: boolean } {
+	const eventPath = resolveProjectPaths(root).abs.eventsFile;
+	if (!existsSync(eventPath)) {
+		return { workbench: false, telemetry: false };
+	}
+	let workbench = false;
+	let telemetry = false;
+	let lines: string[];
+	try {
+		lines = readFileSync(eventPath, "utf8").split(/\r?\n/);
+	} catch {
+		return { workbench: false, telemetry: false };
+	}
+	for (const line of lines) {
+		if (!line.trim()) {
+			continue;
+		}
+		try {
+			const event = JSON.parse(line) as Record<string, unknown>;
+			workbench ||=
+				event.type === "workbench.close" && event.session === session;
+			telemetry ||=
+				event.event_type === "session_end" && event.session_id === session;
+		} catch {
+			// Malformed diagnostic lines are handled by validation, not close recovery.
+		}
+	}
+	return { workbench, telemetry };
 }
 
 function ensureTaskExists(
@@ -643,6 +882,7 @@ export function newWorkstream(
 export function startTask(root: string, input: WorkbenchTaskRef): void {
 	withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
+		ensureSessionOpenForMutation(root, input.session);
 		updateTaskState(paths.taskPath, input.taskId, "in_progress");
 		appendWorkbenchEvent(root, {
 			type: "workbench.start_task",
@@ -666,6 +906,7 @@ export function recordEvidence(
 ): EvidenceEntry {
 	const entry = withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
+		ensureSessionOpenForMutation(root, input.session);
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${paths.sessionDir}`);
 		}
@@ -703,7 +944,10 @@ export function recordEvidence(
 			session_id: input.session,
 			task_id: input.taskId,
 			cmd_type: firstToken(input.command),
-			outcome: evidenceResultIsSuccess(input.result) ? "success" : "failure",
+			outcome:
+				evidenceCompletionStatus([evidence]) === "passed"
+					? "success"
+					: "failure",
 		});
 		refreshWorkbenchLocalState(root, input.session);
 		return evidence;
@@ -718,6 +962,7 @@ export function appendTimelineEntry(
 ): TimelineEntryResult {
 	return withSessionLock(root, session, () => {
 		const paths = sessionPaths(root, session);
+		ensureSessionOpenForMutation(root, session);
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${paths.sessionDir}`);
 		}
@@ -743,11 +988,11 @@ export function appendTimelineEntry(
 export function doneTask(root: string, input: WorkbenchTaskRef): void {
 	withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
-		const hasSuccessEvidence = loadEvidenceEntries(paths.evidencePath).some(
-			(entry) =>
-				entry.task_id === input.taskId && evidenceResultIsSuccess(entry.result),
+		ensureSessionOpenForMutation(root, input.session);
+		const entries = loadEvidenceEntries(paths.evidencePath).filter(
+			(entry) => entry.task_id === input.taskId,
 		);
-		if (!hasSuccessEvidence) {
+		if (evidenceCompletionStatus(entries) !== "passed") {
 			throw new Error(
 				`Task ${input.taskId} requires passed evidence before done.`,
 			);
@@ -779,53 +1024,95 @@ export function closeSession(
 		if (!existsSync(paths.sessionDir)) {
 			throw new Error(`Session folder not found: ${session}`);
 		}
-		const blockingRows = readTaskRows(paths.taskPath).filter((row) =>
-			BLOCKING_STATES.has(row.state),
-		);
-		if (blockingRows.length > 0) {
-			const labels = blockingRows
-				.map((row) => `${row.taskId}:${row.state}`)
-				.join(", ");
-			throw new Error(`Session ${session} has blocking tasks: ${labels}`);
-		}
-		const verification = verifyWorkbenchTasks(paths.sessionDir, true);
-		if (!verification.allCompleted) {
-			const message =
-				verification.issues.map((issue) => issue.message).join("; ") ||
-				"strict verification failed";
-			throw new Error(
-				`Session ${session} failed strict verification: ${message}`,
+		const state = readTaskLifecycleState(paths.taskPath, session);
+
+		const warnings = evaluateCloseWarnings(session, paths.sessionDir);
+		if (state.kind === "open") {
+			const blockingRows = readTaskRows(paths.taskPath).filter((row) =>
+				BLOCKING_STATES.has(row.state),
 			);
-		}
-		const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
-		if (verification.totalTasks > 1 && !existsSync(reportPath)) {
-			if (!options.allowNoReport) {
+			if (blockingRows.length > 0) {
+				const labels = blockingRows
+					.map((row) => `${row.taskId}:${row.state}`)
+					.join(", ");
+				throw new Error(`Session ${session} has blocking tasks: ${labels}`);
+			}
+			const verification = verifyWorkbenchTasks(paths.sessionDir, true);
+			if (!verification.allCompleted) {
+				const message =
+					verification.issues.map((issue) => issue.message).join("; ") ||
+					"strict verification failed";
 				throw new Error(
-					`Session ${session} requires a final report artifact. Rerun close with --allow-no-report --reason <text>.`,
+					`Session ${session} failed strict verification: ${message}`,
 				);
 			}
-			if (!options.reason?.trim()) {
-				throw new Error("Missing --reason for close allow-no-report override.");
+			const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
+			if (verification.totalTasks > 1 && !existsSync(reportPath)) {
+				if (!options.allowNoReport) {
+					throw new Error(
+						`Session ${session} requires a final report artifact. Rerun close with --allow-no-report --reason <text>.`,
+					);
+				}
+				if (!options.reason?.trim()) {
+					throw new Error(
+						"Missing --reason for close allow-no-report override.",
+					);
+				}
+			}
+			markTaskMetadataClosed(paths.taskPath, session, new Date().toISOString());
+		}
+
+		const diagnostics = closeDiagnosticState(root, session);
+		for (const [alreadyRecorded, label, writeDiagnostic] of [
+			[
+				diagnostics.workbench,
+				"workbench close event",
+				() => appendWorkbenchEvent(root, { type: "workbench.close", session }),
+			],
+			[
+				diagnostics.telemetry,
+				"session-end telemetry",
+				() =>
+					appendTelemetryEvent(root, {
+						event_type: "session_end",
+						session_id: session,
+						cmd_type: "close",
+						outcome: "success",
+					}),
+			],
+		] as const) {
+			if (alreadyRecorded) {
+				continue;
+			}
+			try {
+				writeDiagnostic();
+			} catch {
+				warnings.push(
+					`${label} failed after the durable close commit; the durable task metadata remains authoritative.`,
+				);
 			}
 		}
 
 		if (existsSync(paths.activeSessionPath)) {
-			const active = readFileSync(paths.activeSessionPath, "utf8").trim();
-			if (active === session) {
-				unlinkSync(paths.activeSessionPath);
+			try {
+				const active = readFileSync(paths.activeSessionPath, "utf8").trim();
+				if (active === session) {
+					unlinkSync(paths.activeSessionPath);
+				}
+			} catch {
+				warnings.push(
+					`active session cleanup failed after the durable close commit; rerun close for ${session}.`,
+				);
 			}
 		}
-		appendWorkbenchEvent(root, {
-			type: "workbench.close",
-			session,
-		});
-		appendTelemetryEvent(root, {
-			event_type: "session_end",
-			session_id: session,
-			cmd_type: "close",
-			outcome: "success",
-		});
-		refreshWorkbenchLocalState(root, session);
-		return evaluateCloseWarnings(session, paths.sessionDir);
+
+		try {
+			refreshWorkbenchLocalState(root, session);
+		} catch {
+			warnings.push(
+				"local-state refresh failed after the durable close commit; run afol local-state rebuild.",
+			);
+		}
+		return warnings;
 	});
 }

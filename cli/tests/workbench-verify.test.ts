@@ -135,6 +135,43 @@ describe("verifyWorkbenchTasks", () => {
 		}
 	});
 
+	test("strict verification rejects unknown task states", () => {
+		const root = mkRoot("unknown-task-state");
+		try {
+			const session = "260701_0800_unknown_state";
+			const sessionDir = join(root, ".afol", "wb", session);
+			const taskPath = join(sessionDir, `${session}_task_01.md`);
+			write(
+				taskPath,
+				[
+					"# Tasks",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | frozen | worker | unsupported state in current policy |",
+					"",
+				].join("\n"),
+			);
+
+			const result = verifyWorkbenchTasks(root, true);
+
+			expect(result.allCompleted).toBe(false);
+			expect(result.issues).toEqual([
+				{
+					type: "invalid_task_state",
+					taskId: "T-01",
+					file: taskPath,
+					line: 7,
+					message: "Task T-01 has invalid state: frozen",
+				},
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("project-root verification ignores legacy .agents/wb history when .afol/wb exists", () => {
 		const root = mkRoot("legacy-root-ignore");
 		try {
@@ -299,6 +336,49 @@ describe("verifyWorkbenchTasks", () => {
 
 			expect(result.allCompleted).toBe(true);
 			expect(result.issues).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("strict verification rejects passed evidence with a nonzero exit code", () => {
+		const root = mkRoot("passed-nonzero-exit");
+		try {
+			const session = "260531_1202_verify_nonzero";
+			const sessionDir = join(root, ".afol", "wb", session);
+			write(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"# Tasks",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | command exited nonzero |",
+					"",
+				].join("\n"),
+			);
+			write(
+				join(sessionDir, ".evidence.jsonl"),
+				`${JSON.stringify({
+					id: "E-nonzero",
+					task_id: "T-01",
+					command: "bun test",
+					result: "passed",
+					exit_code: 1,
+				})}\n`,
+			);
+
+			const result = verifyWorkbenchTasks(root, true);
+
+			expect(result.allCompleted).toBe(false);
+			expect(result.issues).toContainEqual(
+				expect.objectContaining({
+					taskId: "T-01",
+					type: "failed_evidence",
+				}),
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

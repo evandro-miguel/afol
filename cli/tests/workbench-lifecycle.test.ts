@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readTelemetryEvents } from "../services/events/telemetry";
+import { resolvePendingSpec } from "../services/governance/pending-specs";
 import { validateFilesIndex } from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
@@ -18,6 +19,7 @@ import {
 	appendTimelineEntry,
 	closeSession,
 	doneTask,
+	isSessionClosed,
 	newWorkstream,
 	recordEvidence,
 	startTask,
@@ -1352,6 +1354,82 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("doneTask rejects latest-failed evidence after successful evidence", () => {
+		const root = mkRoot("done-latest-failed");
+		try {
+			const created = newWorkstream(root, "done-task-latest-failed");
+
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test --flag flaky",
+				result: "failed",
+			});
+
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("requires passed evidence");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("doneTask rejects passed evidence with failing exit code", () => {
+		const root = mkRoot("done-exit-code");
+		try {
+			const created = newWorkstream(root, "done-task-exit-code");
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: 'bun -e "process.exit(1)"',
+				result: "passed",
+				exitCode: 1,
+			});
+			expect(
+				readTelemetryEvents(root)
+					.filter((event) => event.event_type === "tool_exec")
+					.at(-1)?.outcome,
+			).toBe("failure");
+
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("requires passed evidence");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("doneTask rejects descriptive results that only contain success words", () => {
+		for (const [index, result] of [
+			"not passed",
+			"test did not pass",
+			"passed with warnings",
+		].entries()) {
+			const root = mkRoot(`done-descriptive-result-${index}`);
+			try {
+				const created = newWorkstream(root, "done descriptive result");
+				recordEvidence(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test",
+					result,
+				});
+
+				expect(() =>
+					doneTask(root, { session: created.session, taskId: "T-01" }),
+				).toThrow("requires passed evidence");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
 	test("doneTask reports malformed evidence ledger lines", () => {
 		const root = mkRoot("done-malformed-evidence");
 		try {
@@ -1395,21 +1473,632 @@ describe("workbench lifecycle service", () => {
 
 			writeFileSync(
 				created.taskPath,
-				[
-					"# Tasks: close-session",
-					"",
-					"## State Board",
-					"",
-					"| Task | State | Owner | Notes |",
-					"|------|-------|-------|-------|",
-					"| T-01 | problem | worker | blocked |",
-					"",
-				].join("\n"),
+				readFileSync(created.taskPath, "utf8").replace(
+					"| T-01 | done |",
+					"| T-01 | problem |",
+				),
 				"utf8",
 			);
-			expect(() => closeSession(root, created.session)).toThrow(
-				"blocking tasks",
+			expect(() => closeSession(root, created.session)).not.toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closed sessions reject additional lifecycle mutations", () => {
+		const root = mkRoot("closed-mutation");
+		try {
+			const created = newWorkstream(root, "closed-session-mutation");
+
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					created.session,
+					`${created.session}_report_01.md`,
+				),
+				"# Report\n",
 			);
+			closeSession(root, created.session);
+			const closedMessage = `Session ${created.session} is closed.`;
+			const stateAfterClose = {
+				task: readFileSync(created.taskPath, "utf8"),
+				log: readFileSync(created.logPath, "utf8"),
+				evidence: readFileSync(created.evidencePath, "utf8"),
+				events: readFileSync(resolveWorkbenchEventLogPath(root), "utf8"),
+			};
+			const closeEventCountAfterClose = readLocalStateEvents(root).filter(
+				(event) =>
+					event.type === "workbench.close" && event.session === created.session,
+			).length;
+			const sessionEndCountAfterClose = readTelemetryEvents(root).filter(
+				(event) =>
+					event.event_type === "session_end" &&
+					event.session_id === created.session,
+			).length;
+			const closedAt = stateAfterClose.task.match(
+				/^closed_at: "([^"]+)"$/m,
+			)?.[1];
+			expect(stateAfterClose.task).toContain('status: "closed"');
+			expect(closedAt).toBeTruthy();
+			expect(stateAfterClose.task).toContain(
+				`updated_at: ${JSON.stringify(closedAt)}`,
+			);
+
+			expect(() =>
+				startTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow(closedMessage);
+			expect(() =>
+				recordEvidence(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test",
+					result: "passed",
+				}),
+			).toThrow(closedMessage);
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow(closedMessage);
+			expect(() =>
+				appendTimelineEntry(root, created.session, "post-close mutation"),
+			).toThrow(closedMessage);
+			expect(() => closeSession(root, created.session)).not.toThrow();
+
+			expect(readFileSync(created.taskPath, "utf8")).toBe(stateAfterClose.task);
+			expect(readFileSync(created.logPath, "utf8")).toBe(stateAfterClose.log);
+			expect(readFileSync(created.evidencePath, "utf8")).toBe(
+				stateAfterClose.evidence,
+			);
+			expect(readFileSync(resolveWorkbenchEventLogPath(root), "utf8")).toBe(
+				stateAfterClose.events,
+			);
+			expect(closeEventCountAfterClose).toBe(1);
+			expect(
+				readLocalStateEvents(root).filter(
+					(event) =>
+						event.type === "workbench.close" &&
+						event.session === created.session,
+				).length,
+			).toBe(closeEventCountAfterClose);
+			expect(sessionEndCountAfterClose).toBe(1);
+			expect(
+				readTelemetryEvents(root).filter(
+					(event) =>
+						event.event_type === "session_end" &&
+						event.session_id === created.session,
+				).length,
+			).toBe(sessionEndCountAfterClose);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("durable task metadata keeps a closed session immutable without event files", () => {
+		const root = mkRoot("closed-without-events");
+		try {
+			const created = newWorkstream(root, "closed without events");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			closeSession(root, created.session);
+			rmSync(join(root, ".afol", "data", "events"), {
+				recursive: true,
+				force: true,
+			});
+
+			const closedMessage = `Session ${created.session} is closed.`;
+			expect(() =>
+				startTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow(closedMessage);
+			expect(() =>
+				recordEvidence(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test --rerun",
+					result: "passed",
+				}),
+			).toThrow(closedMessage);
+			expect(() => closeSession(root, created.session)).not.toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession reconciles a committed close after interruption", () => {
+		const root = mkRoot("close-recovery");
+		try {
+			const created = newWorkstream(root, "close recovery");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			const closedAt = "2026-07-09T22:30:00.000Z";
+			const interrupted = readFileSync(created.taskPath, "utf8")
+				.replace('status: "active"', 'status: "closed"')
+				.replace(
+					/^updated_at: .*$/m,
+					`updated_at: ${JSON.stringify(closedAt)}\nclosed_at: ${JSON.stringify(closedAt)}`,
+				);
+			writeFileSync(created.taskPath, interrupted, "utf8");
+			expect(existsSync(created.activeSessionPath)).toBe(true);
+
+			expect(closeSession(root, created.session)).toEqual(
+				expect.arrayContaining(["log summary section is missing"]),
+			);
+			expect(existsSync(created.activeSessionPath)).toBe(false);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				`closed_at: ${JSON.stringify(closedAt)}`,
+			);
+			expect(() => closeSession(root, created.session)).not.toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession is idempotent without an active pointer and preserves closed_at", () => {
+		const root = mkRoot("close-idempotent-no-pointer");
+		try {
+			const created = newWorkstream(root, "close idempotent no pointer");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			closeSession(root, created.session);
+
+			const firstClosedTask = readFileSync(created.taskPath, "utf8");
+			const closedAt =
+				firstClosedTask.match(/^closed_at: "([^"]+)"$/m)?.[1] ?? "";
+			expect(closedAt).not.toBe("");
+			expect(existsSync(created.activeSessionPath)).toBe(false);
+
+			expect(() => closeSession(root, created.session)).not.toThrow();
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				`closed_at: ${JSON.stringify(closedAt)}`,
+			);
+			expect(existsSync(created.activeSessionPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession idempotence preserves another active session pointer", () => {
+		const root = mkRoot("close-idempotent-other-active");
+		try {
+			const closed = newWorkstream(root, "closed session");
+			startTask(root, { session: closed.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: closed.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: closed.session, taskId: "T-01" });
+			closeSession(root, closed.session);
+			const closedAt =
+				readFileSync(closed.taskPath, "utf8").match(
+					/^closed_at: "([^"]+)"$/m,
+				)?.[1] ?? "";
+			expect(closedAt).not.toBe("");
+
+			const active = newWorkstream(root, "active session");
+			expect(readFileSync(active.activeSessionPath, "utf8")).toBe(
+				`${active.session}\n`,
+			);
+
+			expect(() => closeSession(root, closed.session)).not.toThrow();
+			expect(readFileSync(active.activeSessionPath, "utf8")).toBe(
+				`${active.session}\n`,
+			);
+			expect(readFileSync(closed.taskPath, "utf8")).toContain(
+				`closed_at: ${JSON.stringify(closedAt)}`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession recovery reconciles stale local-state indexes", () => {
+		const root = mkRoot("close-recovery-local-state");
+		try {
+			const created = newWorkstream(root, "close recovery local state");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			const closedAt = "2026-07-09T22:30:00.000Z";
+			writeFileSync(
+				created.taskPath,
+				readFileSync(created.taskPath, "utf8")
+					.replace('status: "active"', 'status: "closed"')
+					.replace(
+						/^updated_at: .*$/m,
+						`updated_at: ${JSON.stringify(closedAt)}\nclosed_at: ${JSON.stringify(closedAt)}`,
+					),
+				"utf8",
+			);
+			const workbenchIndexPath = join(
+				root,
+				".afol",
+				"data",
+				"index",
+				"workbench.json",
+			);
+			const staleIndex = JSON.parse(
+				readFileSync(workbenchIndexPath, "utf8"),
+			) as Record<string, unknown>;
+			staleIndex.generated_at = new Date(0).toISOString();
+			writeFileSync(
+				workbenchIndexPath,
+				`${JSON.stringify(staleIndex)}\n`,
+				"utf8",
+			);
+			expect(validateWorkBenchIndex(root).ok).toBe(false);
+
+			expect(() => closeSession(root, created.session)).not.toThrow();
+			expect(validateWorkBenchIndex(root).ok).toBe(true);
+			expect(validateFilesIndex(root).ok).toBe(true);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				`closed_at: ${JSON.stringify(closedAt)}`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("missing canonical task file blocks every lifecycle mutation", () => {
+		const root = mkRoot("missing-task-lifecycle-guard");
+		try {
+			const created = newWorkstream(root, "missing task lifecycle guard");
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			rmSync(created.taskPath);
+			const before = {
+				evidence: readFileSync(created.evidencePath, "utf8"),
+				log: readFileSync(created.logPath, "utf8"),
+				events: readFileSync(resolveWorkbenchEventLogPath(root), "utf8"),
+			};
+
+			expect(() =>
+				startTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow();
+			expect(() =>
+				recordEvidence(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test --rerun",
+					result: "passed",
+				}),
+			).toThrow();
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow();
+			expect(() =>
+				appendTimelineEntry(root, created.session, "must not be appended"),
+			).toThrow();
+
+			expect(readFileSync(created.evidencePath, "utf8")).toBe(before.evidence);
+			expect(readFileSync(created.logPath, "utf8")).toBe(before.log);
+			expect(readFileSync(resolveWorkbenchEventLogPath(root), "utf8")).toBe(
+				before.events,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closed lifecycle metadata accepts an ISO timestamp without milliseconds", () => {
+		const root = mkRoot("close-timestamp-no-milliseconds");
+		try {
+			const created = newWorkstream(root, "close timestamp no milliseconds");
+			const closedAt = "2026-07-09T22:30:00Z";
+			writeFileSync(
+				created.taskPath,
+				readFileSync(created.taskPath, "utf8")
+					.replace('status: "active"', 'status: "closed"')
+					.replace(
+						/^updated_at: .*$/m,
+						`updated_at: ${JSON.stringify(closedAt)}\nclosed_at: ${JSON.stringify(closedAt)}`,
+					),
+				"utf8",
+			);
+
+			expect(isSessionClosed(root, created.session)).toBe(true);
+			expect(() => closeSession(root, created.session)).not.toThrow();
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				`closed_at: ${JSON.stringify(closedAt)}`,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closed sessions remain durable after post-close governance resolution", () => {
+		for (const resolution of ["resolved", "waived"] as const) {
+			const root = mkRoot(`closed-governance-${resolution}`);
+			try {
+				const created = newWorkstream(root, `closed governance ${resolution}`);
+				startTask(root, { session: created.session, taskId: "T-01" });
+				recordEvidence(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test",
+					result: "passed",
+				});
+				doneTask(root, { session: created.session, taskId: "T-01" });
+				writeFileSync(
+					join(
+						root,
+						".afol",
+						"wb",
+						created.session,
+						`${created.session}_report_01.md`,
+					),
+					"# Report\n",
+					"utf8",
+				);
+				closeSession(root, created.session);
+
+				const closedBefore = readFileSync(created.taskPath, "utf8");
+				const closedAt =
+					closedBefore.match(/^closed_at: "([^"]+)"$/m)?.[1] ?? "";
+				expect(closedAt).not.toBe("");
+				expect(isSessionClosed(root, created.session)).toBe(true);
+
+				Bun.sleepSync(5);
+				const entry = resolvePendingSpec(
+					root,
+					resolution === "resolved"
+						? {
+								session: created.session,
+								featureId: "F-01",
+								parentSpec: "spec-01",
+							}
+						: {
+								session: created.session,
+								noSpecRequiredReason: "post-close governance waiver",
+							},
+				);
+				expect(entry.status).toBe(resolution);
+
+				const closedAfter = readFileSync(created.taskPath, "utf8");
+				const updatedAt =
+					closedAfter.match(/^updated_at: "([^"]+)"$/m)?.[1] ?? "";
+				expect(closedAfter).not.toBe(closedBefore);
+				expect(closedAfter).toContain(
+					resolution === "resolved"
+						? 'governance_status: "governed"'
+						: 'governance_status: "unbound"',
+				);
+				expect(closedAfter).toContain(`closed_at: ${JSON.stringify(closedAt)}`);
+				expect(Date.parse(updatedAt)).toBeGreaterThan(Date.parse(closedAt));
+				expect(isSessionClosed(root, created.session)).toBe(true);
+				expect(() => closeSession(root, created.session)).not.toThrow();
+				expect(() =>
+					recordEvidence(root, {
+						session: created.session,
+						taskId: "T-01",
+						command: "bun test --rerun",
+						result: "passed",
+					}),
+				).toThrow(`Session ${created.session} is closed.`);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("closeSession stays committed when diagnostic writes fail", () => {
+		const root = mkRoot("close-diagnostic-failure");
+		try {
+			const created = newWorkstream(root, "close diagnostic failure");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			const eventPath = resolveWorkbenchEventLogPath(root);
+			rmSync(eventPath, { force: true });
+			mkdirSync(eventPath, { recursive: true });
+
+			const warnings = closeSession(root, created.session);
+			expect(warnings).toContain(
+				"workbench close event failed after the durable close commit; the durable task metadata remains authoritative.",
+			);
+			expect(warnings).toContain(
+				"session-end telemetry failed after the durable close commit; the durable task metadata remains authoritative.",
+			);
+			expect(existsSync(created.activeSessionPath)).toBe(false);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				'status: "closed"',
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("closeSession prepends canonical metadata to a legacy task without changing its body", () => {
+		const root = mkRoot("close-legacy-task");
+		try {
+			const created = newWorkstream(root, "close legacy task");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			const task = readFileSync(created.taskPath, "utf8");
+			const legacyBody = task.slice(task.indexOf("# Tasks:"));
+			writeFileSync(created.taskPath, legacyBody, "utf8");
+
+			closeSession(root, created.session);
+			const closedTask = readFileSync(created.taskPath, "utf8");
+			expect(closedTask).toContain('doc_type: "workbench_task"');
+			expect(closedTask).toContain('status: "closed"');
+			expect(closedTask.endsWith(legacyBody)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("corrupt close metadata blocks lifecycle mutation before commit", () => {
+		const root = mkRoot("corrupt-close-metadata");
+		try {
+			const created = newWorkstream(root, "corrupt close metadata");
+			writeFileSync(
+				created.taskPath,
+				readFileSync(created.taskPath, "utf8").replace(
+					'status: "active"',
+					'status: "closed"',
+				),
+				"utf8",
+			);
+
+			expect(() =>
+				startTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("corrupt lifecycle metadata");
+			expect(() => closeSession(root, created.session)).toThrow(
+				"corrupt lifecycle metadata",
+			);
+			expect(existsSync(created.activeSessionPath)).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("terminal task state does not imply an explicit session close", () => {
+		const root = mkRoot("terminal-before-close");
+		try {
+			const created = newWorkstream(root, "terminal-before-close");
+
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+
+			expect(() =>
+				recordEvidence(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test --rerun",
+					result: "passed",
+				}),
+			).not.toThrow();
+			expect(() =>
+				appendTimelineEntry(root, created.session, "pre-close report note"),
+			).not.toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("terminal task rows without durable close metadata remain bindable", () => {
+		for (const state of ["done", "moved", "completed", "skipped"] as const) {
+			const root = mkRoot(`legacy-close-${state}`);
+			try {
+				writeCliProjectContract(root);
+				const created = newWorkstream(root, `legacy close ${state}`);
+				writeFileSync(
+					created.taskPath,
+					readFileSync(created.taskPath, "utf8").replace(
+						"| T-01 | pending |",
+						`| T-01 | ${state} |`,
+					),
+					"utf8",
+				);
+
+				expect(isSessionClosed(root, created.session)).toBe(false);
+				const bind = runKernel(root, [
+					"session",
+					"bind",
+					"--session",
+					created.session,
+					"--dry-run",
+					"--json",
+				]);
+				expect(bind.status).toBe(0);
+				expect(parseEnvelope(bind.stdout as string)).toMatchObject({
+					ok: true,
+					action: "session.bind",
+					data: {
+						dry_run: true,
+						session: created.session,
+					},
+				});
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("a close event for another session does not block lifecycle mutations", () => {
+		const root = mkRoot("unrelated-close-event");
+		try {
+			const closed = newWorkstream(root, "closed event owner");
+			startTask(root, { session: closed.session, taskId: "T-01" });
+			recordEvidence(root, {
+				session: closed.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: closed.session, taskId: "T-01" });
+			writeFileSync(
+				join(
+					root,
+					".afol",
+					"wb",
+					closed.session,
+					`${closed.session}_report_01.md`,
+				),
+				"# Report\n",
+			);
+			closeSession(root, closed.session);
+
+			const open = newWorkstream(root, "open event peer");
+			expect(() =>
+				startTask(root, { session: open.session, taskId: "T-01" }),
+			).not.toThrow();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
