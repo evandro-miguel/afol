@@ -19,8 +19,8 @@ efficiency.
 ## Prerequisites
 
 - `afol` installed globally and pointing at current build
-- Project validated: `afol validate project` passes 16/16
-- Clean git working tree
+- Project validated: `afol validate project` passes
+- Baseline git state captured, with pre-existing changes identified and preserved
 
 ## Test Fixture
 
@@ -28,13 +28,21 @@ For each test run:
 
 1. Record `TELEMETRY_START=$(date +%s%N)` before first afol command
 2. Create session: `afol new "<theme>" --intent "<scope>" --task "<acceptance>"`
-3. Start task: `afol start -S <session> -T T-01`
-4. Log plan: `afol log -S <session> "<execution plan>"`
-5. Delegate to agent(s)
-6. Record evidence: `afol evidence -S <session> -T T-01 --command "<what>" --result passed`
-7. Done: `afol done -S <session> -T T-01`
-8. Close: `afol close -S <session>`
-9. Record `TELEMETRY_END=$(date +%s%N)`
+3. Add more `--task "<acceptance>"` arguments when the run needs multiple tasks
+4. Start task: `afol start --session <session> --task-id T-01`
+5. Log plan: `afol log --session <session> --message "<execution plan>"`
+6. Delegate bounded read-only analysis to agent(s)
+7. Record returned evidence with this command:
+
+   ```bash
+   afol evidence --session <session> --task-id T-01 \
+     --command "<what>" --result passed
+   ```
+
+8. Mark the task done: `afol done --session <session> --task-id T-01`
+9. Create the required report for a multi-task session
+10. Close: `afol close --session <session>`
+11. Record `TELEMETRY_END=$(date +%s%N)`
 
 ## Telemetry Capture
 
@@ -59,16 +67,17 @@ tokens_estimated: <count if available>
 
 When testing agent orchestration:
 
-1. **Orchestrator** creates session and task via afol CLI
-2. **Planner agent** (explore type) reads project state via afol commands
-   and writes plan to `afol log`
-3. **Executor agent** (build type) performs work and records evidence via
-   `afol evidence`
-4. **Orchestrator** validates results: `afol validate project`, `bun test`,
+1. **Orchestrator** is the single writer for AFOL lifecycle state
+2. **Orchestrator** creates the session, starts tasks, writes logs, records
+   evidence, marks tasks done, and closes the session through the AFOL CLI
+3. **Planner and specialist agents** inspect bounded scope and return findings;
+   they do not mutate shared lifecycle state
+4. **Executor agent** changes product files only within its assigned scope
+5. **Orchestrator** validates results: `afol validate project`, `bun test`,
    `bun run typecheck`
 
-Each agent must use afol CLI for lifecycle operations. File editing is only
-for product changes, never for plan/task/log files.
+Lifecycle state has one writer. File editing is only for product changes,
+never for plan, task, or log files.
 
 ## Quality Scoring
 
@@ -88,17 +97,17 @@ report_exec | XX | yes/no | criteria name | evidence line
 
 ## Known Limitations
 
-- `afol new --task` accepts only ONE task (T-01). Multi-task sessions
-  require manual file editing or a future `afol task add` command.
 - Token counts are estimated unless the provider reports usage.
-- Telemetry is shell-based (date +%s%N), not nanosecond-precise.
+- Wall-clock duration uses shell timestamps. AFOL lifecycle and command events
+  use the native telemetry stream under `.afol/data/events/events.jsonl`.
 
 ## Failure Protocol
 
 If a run scores below threshold:
 
 1. Record the failure with evidence
-2. `git reset --hard` to before the failed run
-3. Rebuild: `afol local-state rebuild`
-4. Re-run with corrected parameters
-5. Compare Run N vs Run N+1 telemetry
+2. Inspect `git status` and preserve all unrelated user changes
+3. Apply the smallest reversible correction
+4. Run `afol local-state rebuild --json` only when the local index is stale
+5. Re-run with corrected parameters
+6. Compare Run N vs Run N+1 telemetry
