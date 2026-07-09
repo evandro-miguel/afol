@@ -186,6 +186,17 @@ describe("help formatter", () => {
 				expect(result.stderr).toBe("");
 				expect(result.stdout).toContain("Usage: afol");
 			}
+			for (const command of ["status", "evidence", "done", "log"] as const) {
+				const result = spawnSync("bun", [cliPath, command, "--help"], {
+					cwd: tempRoot,
+					encoding: "utf8",
+					shell: false,
+				});
+
+				expect(result.status).toBe(0);
+				expect(result.stderr).toBe("");
+				expect(result.stdout).toContain(`Command: ${command}`);
+			}
 			const intentResult = spawnSync(
 				"bun",
 				[cliPath, "help", "--for", "planning"],

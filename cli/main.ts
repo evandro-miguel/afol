@@ -337,6 +337,25 @@ export async function main(argv: string[]): Promise<number> {
 		return 0;
 	}
 
+	const topLevelHelpArgs =
+		resolution.kind === "status"
+			? resolution.args.filter((arg) => arg !== "status")
+			: resolution.args;
+	if (
+		(resolution.kind === "status" ||
+			resolution.kind === "evidence" ||
+			resolution.kind === "done" ||
+			resolution.kind === "log") &&
+		topLevelHelpArgs.length === 1 &&
+		kernelRegistry.isHelpAlias(topLevelHelpArgs[0] ?? "")
+	) {
+		const help = formatCommandHelp(resolution.kind, kernelRegistry);
+		if (help) {
+			console.log(help);
+			return 0;
+		}
+	}
+
 	const helpCommand = subcommandGroupHelpCommand(resolution);
 	if (helpCommand) {
 		const help = formatCommandHelp(helpCommand, kernelRegistry);

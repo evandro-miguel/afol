@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { envelopeOk, stringifyEnvelope } from "../core/envelope";
+import { envelopeErr, envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
 	type CliMicroResult,
 	runCliMicroBenchmark,
@@ -275,11 +275,20 @@ function emitJson(
 
 function emitFailure(
 	io: CommandIo,
-	_action: string,
+	action: string,
 	message: string,
+	json: boolean,
 	exitCode = 2,
 ): number {
-	io.stderr(message);
+	if (json) {
+		io.stdout(
+			stringifyEnvelope(
+				envelopeErr("bench.error", message, { action, exitCode }),
+			),
+		);
+	} else {
+		io.stderr(message);
+	}
 	return exitCode;
 }
 
@@ -335,6 +344,7 @@ export async function runBenchCommand(
 						io,
 						"bench.report",
 						"No saved benchmark run found.",
+						parsed.json,
 					);
 				}
 				const loaded = loadSavedRun(runPath);
@@ -343,6 +353,7 @@ export async function runBenchCommand(
 						io,
 						"bench.report",
 						`Unable to read benchmark run: ${runPath}`,
+						parsed.json,
 					);
 				}
 				const baseline = loadBaseline(projectRoot, loaded.pack_id);
@@ -392,6 +403,7 @@ export async function runBenchCommand(
 						io,
 						"bench.baseline",
 						"No baseline found for comprehensive-live.",
+						parsed.json,
 					);
 				}
 				if (parsed.json) {
@@ -435,9 +447,19 @@ export async function runBenchCommand(
 				return results.some((result) => result.status !== "passed") ? 1 : 0;
 			}
 			default:
-				return emitFailure(io, "bench", `Unknown bench action: ${action}`);
+				return emitFailure(
+					io,
+					"bench",
+					`Unknown bench action: ${action}`,
+					parsed.json,
+				);
 		}
 	} catch (error) {
-		return emitFailure(io, `bench.${action}`, (error as Error).message);
+		return emitFailure(
+			io,
+			`bench.${action}`,
+			(error as Error).message,
+			args.includes("--json") || args.includes("-j"),
+		);
 	}
 }

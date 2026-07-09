@@ -485,6 +485,90 @@ describe("bench command surfaces", () => {
 		}
 	});
 
+	test("report emits a JSON error envelope for a missing run", async () => {
+		const root = createProjectRoot();
+		try {
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["--json", "--run", "missing-run.json"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stderr).toHaveLength(0);
+			expect(captured.stdout).toHaveLength(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "bench.report",
+				exit_code: 2,
+				error: {
+					code: "bench.error",
+					message: expect.stringContaining("missing-run.json"),
+				},
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("report emits a JSON error envelope for a missing run argument", async () => {
+		const root = createProjectRoot();
+		try {
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["--json", "--run"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stderr).toHaveLength(0);
+			expect(captured.stdout).toHaveLength(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "bench.report",
+				exit_code: 2,
+				error: {
+					code: "bench.error",
+					message: "Missing value for --run in bench report.",
+				},
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("report recognizes the short JSON alias on parser failures", async () => {
+		const root = createProjectRoot();
+		try {
+			const captured = captureIo();
+			const code = await runBenchCommand(
+				"report",
+				["-j", "--unknown"],
+				root,
+				captured.io,
+			);
+			expect(code).toBe(2);
+			expect(captured.stderr).toHaveLength(0);
+			expect(captured.stdout).toHaveLength(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "bench.report",
+				exit_code: 2,
+				error: {
+					code: "bench.error",
+					message: "Unknown bench argument: --unknown",
+				},
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("baseline rejects malformed baseline JSON", async () => {
 		const root = createProjectRoot();
 		try {
@@ -507,10 +591,19 @@ describe("bench command surfaces", () => {
 				captured.io,
 			);
 			expect(code).toBe(2);
-			expect(captured.stdout).toHaveLength(0);
-			expect(captured.stderr).toHaveLength(1);
-			expect(captured.stderr[0]).toContain("Malformed benchmark JSON");
-			expect(captured.stderr[0]).toContain("baseline-v1.json");
+			expect(captured.stderr).toHaveLength(0);
+			expect(captured.stdout).toHaveLength(1);
+			expect(JSON.parse(captured.stdout[0] ?? "{}")).toMatchObject({
+				schema: "afol.result/v1",
+				ok: false,
+				action: "bench.baseline",
+				exit_code: 2,
+				error: {
+					code: "bench.error",
+					message: expect.stringContaining("Malformed benchmark JSON"),
+				},
+			});
+			expect(captured.stdout[0]).toContain("baseline-v1.json");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
