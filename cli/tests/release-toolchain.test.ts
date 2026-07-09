@@ -223,7 +223,7 @@ describe("release and toolchain contracts", () => {
 			"bun run cli/dev/toolchain-smoke.ts",
 		);
 		expect(scripts["validate:toolchain"]).toBe(
-			"bun run version:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
+			"bun run version:check && bun run manifest:check && bun run lint:biome && bun run lint:oxlint && bun run lint:knip && bun run toolchain:diff",
 		);
 		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:security:required",

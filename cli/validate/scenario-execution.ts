@@ -21,6 +21,15 @@ const BENCH_SAMPLES = 3;
 const BENCH_WARMUP_SAMPLES = 1;
 const REAL_REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const SANDBOX_COPY_EXCLUDES = [".git", "node_modules", "dist", ".bun-build*"];
+const RUNTIME_STATE_GUARD_PATHS = [
+	".afol/state",
+	".afol/data/events",
+	".afol/data/index",
+	".afol/data/mutations",
+	".afol/pstr",
+	".afol/wb/.active_session",
+	".afol/wb/session-context.json",
+] as const;
 
 interface CommandInvocation {
 	command: string;
@@ -59,6 +68,11 @@ interface ScenarioExecutionResult {
 
 interface PorcelainStateEntry {
 	status: string;
+	path: string;
+	fingerprint: string;
+}
+
+interface RuntimeStateEntry {
 	path: string;
 	fingerprint: string;
 }
@@ -284,6 +298,52 @@ function porcelainState(
 		...entry,
 		fingerprint: hashPath(join(projectRoot, entry.path)),
 	}));
+}
+
+function runtimeStateSnapshot(projectRoot: string): RuntimeStateEntry[] {
+	return RUNTIME_STATE_GUARD_PATHS.map((path) => ({
+		path,
+		fingerprint: hashPath(join(projectRoot, path)),
+	}));
+}
+
+function equivalentRuntimeState(
+	before: RuntimeStateEntry[],
+	after: RuntimeStateEntry[],
+): boolean {
+	const beforeByPath = new Map(before.map((entry) => [entry.path, entry]));
+	const afterByPath = new Map(after.map((entry) => [entry.path, entry]));
+	if (beforeByPath.size !== afterByPath.size) {
+		return false;
+	}
+	for (const [path, beforeEntry] of beforeByPath) {
+		const afterEntry = afterByPath.get(path);
+		if (!afterEntry || afterEntry.fingerprint !== beforeEntry.fingerprint) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function runtimeChangedPaths(
+	before: RuntimeStateEntry[],
+	after: RuntimeStateEntry[],
+): string[] {
+	const beforeByPath = new Map(before.map((entry) => [entry.path, entry]));
+	const afterByPath = new Map(after.map((entry) => [entry.path, entry]));
+	const changedPaths = new Set<string>();
+	for (const [path, afterEntry] of afterByPath) {
+		const beforeEntry = beforeByPath.get(path);
+		if (!beforeEntry || beforeEntry.fingerprint !== afterEntry.fingerprint) {
+			changedPaths.add(path);
+		}
+	}
+	for (const path of beforeByPath.keys()) {
+		if (!afterByPath.has(path)) {
+			changedPaths.add(path);
+		}
+	}
+	return [...changedPaths];
 }
 
 function equivalentPorcelainState(
@@ -527,6 +587,7 @@ export function runScenarioCommand(
 	const gitStateBefore = gitStatusBefore.ok
 		? porcelainState(projectRoot, gitStatusBefore.output)
 		: null;
+	const runtimeStateBefore = runtimeStateSnapshot(projectRoot);
 	let warmup = runScenarioSample(projectRoot, invocation);
 	for (let index = 1; index < BENCH_WARMUP_SAMPLES; index += 1) {
 		warmup = runScenarioSample(projectRoot, invocation);
@@ -545,26 +606,40 @@ export function runScenarioCommand(
 	const gitStateAfter = gitStatusAfter.ok
 		? porcelainState(projectRoot, gitStatusAfter.output)
 		: null;
+	const runtimeStateAfter = runtimeStateSnapshot(projectRoot);
 	const sideEffectNotes: string[] = [];
-	if (
+	const leakedPaths = new Set<string>();
+	const gitGuardUnavailable =
 		!gitStatusBefore.ok ||
 		!gitStatusAfter.ok ||
 		!gitStateBefore ||
-		!gitStateAfter
+		!gitStateAfter;
+	if (
+		!gitGuardUnavailable &&
+		!equivalentPorcelainState(gitStateBefore, gitStateAfter)
 	) {
-		sideEffectNotes.push("side-effect-guard-unavailable");
-	} else if (!equivalentPorcelainState(gitStateBefore, gitStateAfter)) {
 		const changedFiles = porcelainChangedPaths(gitStateBefore, gitStateAfter);
-		if (changedFiles.length > 0) {
-			sideEffectNotes.push(`side-effect-leak:${changedFiles.join(",")}`);
-		} else {
-			sideEffectNotes.push("side-effect-leak:unknown");
+		for (const path of changedFiles) {
+			leakedPaths.add(path);
 		}
 		cleanupGitStatusDiff(
 			projectRoot,
 			gitStatusBefore.output,
 			gitStatusAfter.output,
 		);
+	}
+	if (!equivalentRuntimeState(runtimeStateBefore, runtimeStateAfter)) {
+		for (const path of runtimeChangedPaths(
+			runtimeStateBefore,
+			runtimeStateAfter,
+		)) {
+			leakedPaths.add(path);
+		}
+	}
+	if (leakedPaths.size > 0) {
+		sideEffectNotes.push(`side-effect-leak:${[...leakedPaths].join(",")}`);
+	} else if (gitGuardUnavailable) {
+		sideEffectNotes.push("side-effect-guard-unavailable");
 	}
 	const sampleFailureNotes = samples.flatMap((sample, index) => {
 		if (scenarioSamplePassed(sample, expectedExit)) {

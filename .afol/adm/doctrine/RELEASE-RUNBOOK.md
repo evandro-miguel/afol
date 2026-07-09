@@ -19,8 +19,10 @@ updated_at: "2026-06-14T00:00:00+00:00"
 - Security scans execute and pass (`bun run validate:security:release`)
 - Release provenance is generated (`bun run release:provenance:release`)
 
-It does not currently run the AFOL project hygiene gate or the TypeScript
-typecheck, so both are explicit release preflight commands in this runbook.
+It does not currently run the AFOL project hygiene gate, the AFOL release
+health check, or the TypeScript typecheck as standalone preflights, so those
+are explicit release preflight commands in this runbook. The manifest check is
+also run explicitly so command registry drift is caught before release.
 
 ## Required Tools on PATH
 
@@ -47,13 +49,17 @@ Use this order before any global update/install or release promotion:
 1. Check the running wrapper version with `afol --version` and compare it to
    the repo release metadata.
 2. Verify generated version metadata with `bun run version:check`.
-3. Rebuild AFOL local state with `afol local-state rebuild --json`.
-4. Validate the project with `afol validate project --json`.
-5. Run `bun run typecheck`.
-6. Generate release provenance with `bun run release:provenance:release`.
-7. Run the release gate with `bun run validate:release`.
-8. Record AFOL evidence for the gated session/task.
-9. Close the session only after evidence is attached and no tasks remain open.
+3. Install dependencies with `bun install --frozen-lockfile`.
+4. Run `bun run typecheck`.
+5. Check CLI manifest drift with `bun run manifest:check`.
+6. Rebuild AFOL local state with `afol local-state rebuild --json`.
+7. Validate the project with `afol validate project --json`.
+8. Check release health with `afol health --release --json`.
+9. Generate release provenance with `bun run release:provenance:release`.
+10. Run the release gate with `bun run validate:release`.
+11. Run the clean checkout smoke with `bun run smoke:clean`.
+12. Record AFOL evidence for the gated session/task.
+13. Close the session only after evidence is attached and no tasks remain open.
 
 Do not run global update/install when `afol --version` diverges from the repo
 version and that version has no registered release provenance. Keep the work
@@ -61,10 +67,13 @@ local until the repo release path is proven.
 
 ```bash
 bun install --frozen-lockfile
+bun run typecheck
+bun run manifest:check
 afol local-state rebuild --json
 afol validate project --json
-bun run typecheck
+afol health --release --json
 bun run validate:release
+bun run smoke:clean
 ```
 
 ### Artifacts Produced

@@ -29,6 +29,18 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Rebuild local state
+        run: ./afol local-state rebuild --json
+
+      - name: Validate project
+        run: ./afol validate project --json
+
+      - name: Release health
+        run: ./afol health --release --json
+
       - name: Install pinned security scanners
         run: |
           set -euo pipefail

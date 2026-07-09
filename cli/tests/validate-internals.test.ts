@@ -5,6 +5,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	symlinkSync,
@@ -138,6 +139,21 @@ function createFixtureRoot(): string {
 function createBenchExecutionFixtureRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), "validate-bench-exec-"));
 	mkdirSync(root, { recursive: true });
+	mkdirSync(join(root, ".afol"), { recursive: true });
+	writeFileSync(join(root, ".afol", ".keep"), "\n", "utf8");
+	writeFileSync(
+		join(root, ".gitignore"),
+		`${[
+			".afol/state/",
+			".afol/data/events/",
+			".afol/data/index/",
+			".afol/data/mutations/",
+			".afol/pstr/",
+			".afol/wb/.active_session",
+			".afol/wb/session-context.json",
+		].join("\n")}\n`,
+		"utf8",
+	);
 	writeFileSync(join(root, "tracked.txt"), "initial\n", "utf8");
 	writeFileSync(
 		join(root, "mutate.js"),
@@ -157,7 +173,15 @@ function createBenchExecutionFixtureRoot(): string {
 		["init"],
 		["config", "user.email", "bench@example.com"],
 		["config", "user.name", "Bench User"],
-		["add", "tracked.txt", "mutate.js", "afol", "cli"],
+		[
+			"add",
+			".gitignore",
+			".afol/.keep",
+			"tracked.txt",
+			"mutate.js",
+			"afol",
+			"cli",
+		],
 		["commit", "-m", "fixture"],
 	] as const;
 	for (const args of gitSteps) {
@@ -1008,6 +1032,21 @@ describe("scenario benchmark execution", () => {
 				),
 			).toBe("side-effect-leak:tracked.txt");
 
+			const ignoredRuntimeScenario: Scenario = {
+				...successScenario,
+				scenario_id: "bench-ignored-runtime-mutation",
+				command: `node -e 'const fs=require("node:fs"); fs.mkdirSync(".afol/wb",{recursive:true}); fs.writeFileSync(".afol/wb/session-context.json", JSON.stringify({session:"mutated"}) + "\\n", "utf8");'`,
+			};
+			const ignoredRuntime = withCapturedConsoleError(() =>
+				buildResult(root, ignoredRuntimeScenario, baselinePath, baseline),
+			);
+			expect(ignoredRuntime.result.status).toBe("failed");
+			expect(
+				ignoredRuntime.result.notes.find((note) =>
+					note.startsWith("side-effect-leak:"),
+				),
+			).toBe("side-effect-leak:.afol/wb/session-context.json");
+
 			const sandboxScenario: Scenario = {
 				...successScenario,
 				scenario_id: "bench-sandbox",
@@ -1720,16 +1759,25 @@ describe("validation command entrypoint", () => {
 		const root = createFixtureRoot();
 		try {
 			const cliKernelPaths = getCliKernelPaths(root);
-			const originalScenario = readJson(cliKernelPaths.scenarioPath);
-			const skippedScenario = {
-				...originalScenario,
-				implementation_status: "skipped",
-			};
-			writeFileSync(
-				cliKernelPaths.scenarioPath,
-				`${JSON.stringify(skippedScenario, null, 2)}\n`,
-				"utf8",
-			);
+			const scenarioDir = dirname(cliKernelPaths.scenarioPath);
+			const originalScenarios = new Map<string, string>();
+			for (const name of readdirSync(scenarioDir)) {
+				if (!name.endsWith(".json")) {
+					continue;
+				}
+				const scenarioPath = join(scenarioDir, name);
+				originalScenarios.set(scenarioPath, readFileSync(scenarioPath, "utf8"));
+				const scenario = readJson(scenarioPath);
+				writeFileSync(
+					scenarioPath,
+					`${JSON.stringify(
+						{ ...scenario, implementation_status: "skipped" },
+						null,
+						2,
+					)}\n`,
+					"utf8",
+				);
+			}
 
 			const skipped = withCapturedStdout(() =>
 				runValidationCommand(root, [
@@ -1739,19 +1787,20 @@ describe("validation command entrypoint", () => {
 					"--json",
 				]),
 			);
-			expect(skipped.result).toBe(0);
+			expect(skipped.result).toBe(2);
 			const skippedPayload = JSON.parse(skipped.stdout[0] ?? "{}") as {
+				pass: boolean;
+				status: string;
 				results: Array<{ status: string }>;
 			};
+			expect(skippedPayload.status).toBe("skipped");
+			expect(skippedPayload.pass).toBe(false);
 			expect(
 				skippedPayload.results.some((entry) => entry.status === "skipped"),
 			).toBe(true);
-
-			writeFileSync(
-				cliKernelPaths.scenarioPath,
-				`${JSON.stringify(originalScenario, null, 2)}\n`,
-				"utf8",
-			);
+			for (const [scenarioPath, originalScenario] of originalScenarios) {
+				writeFileSync(scenarioPath, originalScenario, "utf8");
+			}
 
 			const baseline = readJson(cliKernelPaths.baselinePath);
 			baseline.timing_p50_ms = 1;
