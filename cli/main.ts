@@ -16,6 +16,7 @@ import { runContextCommand } from "./commands/context";
 import { runDbCommand } from "./commands/db";
 import { runDoctorCommand } from "./commands/doctor";
 import { runFileCommand } from "./commands/file";
+import { runGovernanceCommand } from "./commands/governance";
 import { runHealthCommand } from "./commands/health";
 import { runHydrateCommand } from "./commands/hydrate";
 import { runInitCommand } from "./commands/init";
@@ -75,6 +76,8 @@ const NEW_COMMAND_HELP = [
 	"  --intent <intent>        Delivery or planning intent",
 	"  --feature-id <id>        Governing roadmap feature ID",
 	"  --parent-spec <spec-id>  Parent spec identifier",
+	"  --no-spec-required      Waive spec requirement for this session",
+	"  --reason <reason>       Required with --no-spec-required",
 	"  --task <text>            Initial task summary; repeat for multiple tasks",
 ].join("\n");
 
@@ -127,6 +130,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 
 export const SUBCOMMAND_DISPATCH_GROUPS = Object.freeze([
 	"adm",
+	"governance",
 	"health",
 	"db",
 	"doctor",
@@ -468,6 +472,13 @@ export async function main(argv: string[]): Promise<number> {
 		if (resolution.group === "health") {
 			return runHealthCommand(
 				[resolution.action, ...resolution.args].filter(Boolean),
+				project.value.root,
+			);
+		}
+		if (resolution.group === "governance") {
+			return runGovernanceCommand(
+				resolution.action,
+				resolution.args,
 				project.value.root,
 			);
 		}

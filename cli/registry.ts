@@ -24,6 +24,7 @@ export type CommandKind =
 	| "library"
 	| "memory"
 	| "adm"
+	| "governance"
 	| "spec"
 	| "ux"
 	| "adr"
@@ -237,6 +238,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				description: "Create a governed session linked to feature/spec",
 			},
 			{
+				usage: "<theme> --no-spec-required --reason <text>",
+				sideEffect: "write",
+				description: "Create a waived unbound session",
+			},
+			{
 				usage: "<theme> --intent <text>",
 				sideEffect: "write",
 				description: "Attach explicit intent metadata to the session",
@@ -282,6 +288,37 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "--result passed --artifact <path> --note <text>",
 				sideEffect: "write",
 				description: "Attach explicit evidence metadata to the quick task",
+			},
+			{
+				usage: "--feature-id <F-id> --parent-spec <spec-id>",
+				sideEffect: "write",
+				description: "Create the quick task as a governed session",
+			},
+		],
+	},
+	{
+		command: "governance",
+		aliases: ["gov"],
+		kind: "governance",
+		sideEffect: "write",
+		description: "Resolve governance metadata gaps",
+		category: "workflow",
+		subcommands: [
+			{
+				usage: "pending [--all] [--json]",
+				sideEffect: "read",
+				description: "List open pending_spec entries",
+			},
+			{
+				usage:
+					"resolve-spec --session <id> --feature-id <F-id> --parent-spec <id>",
+				sideEffect: "write",
+				description: "Link roadmap feature/spec",
+			},
+			{
+				usage: "resolve-spec --session <id> --no-spec-required --reason <text>",
+				sideEffect: "write",
+				description: "Waive with an explicit reason",
 			},
 		],
 	},
@@ -416,18 +453,18 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		kind: "file",
 		sideEffect: "write",
 		description:
-			"Safely patch, move, archive, and undo files; supports dry-run",
+			"Safely append, move, archive, and undo files; supports dry-run",
 		category: "ops",
 		subcommands: [
 			{
-				usage: "pt|patch --path <path> --dry-run",
+				usage: "append|patch --path <path> --dry-run",
 				sideEffect: "read",
-				description: "Preview patch diff without writing",
+				description: "Preview appended text diff without writing",
 			},
 			{
-				usage: "pt|patch --path <path>",
+				usage: "append|patch --path <path>",
 				sideEffect: "write",
-				description: "Patch file with backup and mutation journal",
+				description: "Append text with backup and mutation journal",
 			},
 			{
 				usage: "mv|move --from <path> --to <path>",

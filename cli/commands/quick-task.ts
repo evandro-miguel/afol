@@ -4,6 +4,12 @@ import {
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
+import {
+	assertNoOpenPendingSpecs,
+	formatSessionPendingSpecWarning,
+	getSessionPendingSpecNotice,
+	resolveGovernance,
+} from "../services/governance/pending-specs";
 import type { NewWorkstreamMetadata } from "../services/workbench/lifecycle";
 import {
 	closeSession,
@@ -38,6 +44,7 @@ export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 	let artifact = "";
 	let note = "";
 	const metadata: NewWorkstreamMetadata = {};
+	let noSpecRequired = false;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		const value = args[index + 1];
@@ -63,6 +70,16 @@ export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 			if (!value)
 				throw new Error("Missing value for --parent-spec in quick-task.");
 			metadata.parentSpec = value;
+			index += 1;
+			continue;
+		}
+		if (arg === "--no-spec-required") {
+			noSpecRequired = true;
+			continue;
+		}
+		if (arg === "--reason") {
+			if (!value) throw new Error("Missing value for --reason in quick-task.");
+			metadata.noSpecRequiredReason = value;
 			index += 1;
 			continue;
 		}
@@ -105,6 +122,12 @@ export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 	if (result !== "passed") {
 		throw new Error("quick-task requires --result passed.");
 	}
+	if (metadata.noSpecRequiredReason && !noSpecRequired) {
+		throw new Error("Missing --no-spec-required for quick-task reason.");
+	}
+	if (noSpecRequired && !metadata.noSpecRequiredReason?.trim()) {
+		throw new Error("Missing --reason for --no-spec-required in quick-task.");
+	}
 	return {
 		theme,
 		json,
@@ -116,8 +139,12 @@ export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 	};
 }
 
-function renderSuccess(message: string, hint: string): string {
-	return `${message}\n${formatHintLine(hint)}`;
+function renderSuccess(
+	message: string,
+	hint: string,
+	warnings: string[] = [],
+): string {
+	return [message, ...warnings, formatHintLine(hint)].join("\n");
 }
 
 export async function runQuickTaskCommand(
@@ -136,6 +163,8 @@ export async function runQuickTaskCommand(
 			);
 		}
 		parsed = parseQuickTaskArgs(args);
+		assertNoOpenPendingSpecs(root);
+		const governance = resolveGovernance(parsed.metadata);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
 		session = created.session;
 		failedStep = "start";
@@ -171,11 +200,27 @@ export async function runQuickTaskCommand(
 		failedStep = "close";
 		closeSession(root, created.session);
 		const hint = nextCommandHint("quick-task", { session: created.session });
+		const pendingNotice = getSessionPendingSpecNotice(
+			root,
+			created.session,
+			taskId,
+		);
 		const payload = {
 			session: created.session,
 			task: taskId,
 			evidence_id: evidence.id,
 			status: "closed",
+			governance_status: governance.governanceStatus,
+			pending_spec: Boolean(pendingNotice) || governance.pendingSpec,
+			...(pendingNotice
+				? {
+						pending_spec_missing: pendingNotice.missing,
+						pending_spec_resolution_hint: pendingNotice.resolutionHint.replace(
+							"<session>",
+							pendingNotice.session,
+						),
+					}
+				: {}),
 			next_command: hint,
 		};
 		if (parsed.json) {
@@ -184,7 +229,11 @@ export async function runQuickTaskCommand(
 			);
 		} else {
 			console.log(
-				renderSuccess(`quick-task complete: ${created.session}`, hint),
+				renderSuccess(
+					`quick-task complete: ${created.session}`,
+					hint,
+					formatSessionPendingSpecWarning(pendingNotice),
+				),
 			);
 		}
 		return 0;

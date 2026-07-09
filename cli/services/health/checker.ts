@@ -2,6 +2,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { getSectionIndex } from "../context";
 import { runDriftCheck } from "../drift";
+import { listOpenPendingSpecs } from "../governance/pending-specs";
 import { getTopic, listTopics } from "../library";
 import {
 	collectSessionIds,
@@ -506,7 +507,12 @@ export function checkAreaHealth(
 
 export function checkHealth(
 	root: string,
-	opts?: { area?: HealthArea; deep?: boolean; includeAuxiliary?: boolean },
+	opts?: {
+		area?: HealthArea;
+		deep?: boolean;
+		includeAuxiliary?: boolean;
+		release?: boolean;
+	},
 ): HealthReport {
 	const areas = opts?.area
 		? [opts.area]
@@ -516,6 +522,19 @@ export function checkHealth(
 	const findings = areas.flatMap((area) =>
 		checkAreaHealth(root, area, opts?.deep ?? false),
 	);
+	if (areas.includes("wb")) {
+		const openPendingSpecs = listOpenPendingSpecs(root);
+		if (openPendingSpecs.length > 0) {
+			findings.push(
+				makeFinding(
+					"wb",
+					opts?.release ? "fail" : "warn",
+					`open pending_spec entries: ${openPendingSpecs.length}`,
+					"run afol governance pending and resolve or waive each entry",
+				),
+			);
+		}
+	}
 	return {
 		ok: findings.every((finding) => finding.severity !== "fail"),
 		checked_at: nowIso(),

@@ -158,6 +158,97 @@ describe("spec-gate system", () => {
 		}
 	});
 
+	test("checkSpecCompatibility returns conflict for open pending_spec", () => {
+		const root = createFixture();
+		try {
+			const sessionDir = join(root, ".afol", "wb", "session-pending");
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, "session-pending_task_01.md"),
+				[
+					"---",
+					'feature_id: ""',
+					'parent_spec: ""',
+					"governance_status: pending_spec",
+					"pending_spec: true",
+					"pending_spec_status: open",
+					"---",
+					"",
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | missing governing spec |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			const result = checkSpecCompatibility(root, "session-pending", "T-01");
+			expect(result.status).toBe("conflict");
+			expect(result.spec_id).toBe("pending_spec");
+			expect(getSpecCheck(root, "session-pending", "T-01")).toEqual(result);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("checkSpecCompatibility reads open pending_spec from governance index", () => {
+		const root = createFixture();
+		try {
+			const sessionDir = join(root, ".afol", "wb", "session-index-pending");
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, "session-index-pending_task_01.md"),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | missing governing spec |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			mkdirSync(join(root, ".afol", "data", "governance"), {
+				recursive: true,
+			});
+			writeFileSync(
+				join(root, ".afol", "data", "governance", "pending-specs.json"),
+				JSON.stringify(
+					{
+						schema_version: 1,
+						entries: [
+							{
+								session_id: "session-index-pending",
+								created_at: "2026-07-05T00:00:00.000Z",
+								updated_at: "2026-07-05T00:00:00.000Z",
+								status: "open",
+								theme: "index pending",
+								task_ids: ["T-01"],
+								missing: ["roadmap_feature", "parent_spec"],
+								resolution_hint:
+									"run afol governance resolve-spec --session <session>",
+							},
+						],
+					},
+					null,
+					2,
+				),
+				"utf8",
+			);
+
+			const result = checkSpecCompatibility(
+				root,
+				"session-index-pending",
+				"T-01",
+			);
+			expect(result.status).toBe("conflict");
+			expect(result.spec_id).toBe("pending_spec");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("checkSpecCompatibility returns compatible when spec exists and active", () => {
 		const root = createFixture();
 		try {

@@ -8,6 +8,10 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { appendTelemetryEvent, firstToken } from "../events/telemetry";
+import {
+	buildGovernanceFrontmatter,
+	recordPendingSpecForSession,
+} from "../governance/pending-specs";
 import { atomicWriteText } from "../io/atomic";
 import { withSessionLock } from "../io/session-lock";
 import { rebuildFilesIndex } from "../local-state/project-indexes";
@@ -57,6 +61,7 @@ export type NewWorkstreamMetadata = {
 	intent?: string;
 	featureId?: string;
 	parentSpec?: string;
+	noSpecRequiredReason?: string;
 	task?: string;
 	tasks?: string[];
 };
@@ -485,6 +490,11 @@ export function newWorkstream(
 		if (metadata?.parentSpec) {
 			metadataLines.push(`- parent_spec: ${metadata.parentSpec}`);
 		}
+		if (metadata?.noSpecRequiredReason) {
+			metadataLines.push(
+				`- no_spec_required_reason: ${metadata.noSpecRequiredReason}`,
+			);
+		}
 		for (const task of explicitTaskSummaries(metadata)) {
 			metadataLines.push(`- task: ${task}`);
 		}
@@ -500,10 +510,42 @@ export function newWorkstream(
 			(task, index) =>
 				`| T-${twoDigits(index + 1)} | pending | worker | ${escapeTaskNote(task)} |`,
 		);
+		const taskIds = taskSummaries.map(
+			(_task, index) => `T-${twoDigits(index + 1)}`,
+		);
+		const createdAt = new Date().toISOString();
+		const planFrontmatter = buildGovernanceFrontmatter({
+			docType: "workbench_plan",
+			id: `${session}_plan_01`,
+			session,
+			theme,
+			taskIds,
+			createdAt,
+			...(metadata ? { metadata } : {}),
+		});
+		const taskFrontmatter = buildGovernanceFrontmatter({
+			docType: "workbench_task",
+			id: `${session}_task_01`,
+			session,
+			theme,
+			taskIds,
+			createdAt,
+			...(metadata ? { metadata } : {}),
+		});
 
 		atomicWriteText(
 			paths.planPath,
 			[
+				"---",
+				...Object.entries(planFrontmatter).map(([key, value]) =>
+					Array.isArray(value)
+						? `${key}: ${JSON.stringify(value.join(","))}`
+						: typeof value === "boolean"
+							? `${key}: ${value ? "true" : "false"}`
+							: `${key}: ${JSON.stringify(String(value ?? ""))}`,
+				),
+				"---",
+				"",
 				`# Plan: ${theme.trim()}`,
 				"",
 				"- Created by native CLI workbench lifecycle.",
@@ -530,6 +572,16 @@ export function newWorkstream(
 		atomicWriteText(
 			paths.taskPath,
 			[
+				"---",
+				...Object.entries(taskFrontmatter).map(([key, value]) =>
+					Array.isArray(value)
+						? `${key}: ${JSON.stringify(value.join(","))}`
+						: typeof value === "boolean"
+							? `${key}: ${value ? "true" : "false"}`
+							: `${key}: ${JSON.stringify(String(value ?? ""))}`,
+				),
+				"---",
+				"",
 				`# Tasks: ${theme.trim()}`,
 				"",
 				"## State Board",
@@ -566,6 +618,13 @@ export function newWorkstream(
 			session_id: session,
 			cmd_type: "new",
 			outcome: "success",
+		});
+		recordPendingSpecForSession(root, {
+			session,
+			theme,
+			taskIds,
+			createdAt,
+			...(metadata ? { metadata } : {}),
 		});
 		refreshWorkbenchLocalState(root, session);
 

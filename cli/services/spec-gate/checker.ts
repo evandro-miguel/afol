@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { resolveAdmPaths } from "../adm";
+import { readSessionGovernanceMetadata } from "../governance/pending-specs";
 import { atomicWriteText } from "../io/atomic";
 import { resolveProjectPaths } from "../project/paths";
 import type { SpecCheckResult } from "./types";
@@ -15,6 +16,7 @@ type SpecStore = {
 type TaskMetadata = {
 	featureId: string;
 	parentSpec: string;
+	pendingSpec: boolean;
 };
 
 type TaskFrontmatter = {
@@ -126,14 +128,22 @@ function findTaskMetadata(
 	}
 	const parsed = parseFrontmatter(content);
 	if (!parsed) {
-		throw new Error(`Missing task frontmatter: ${taskPath}`);
+		const metadata = readSessionGovernanceMetadata(root, sessionId, taskId);
+		return {
+			featureId: metadata.featureId,
+			parentSpec: metadata.parentSpec,
+			pendingSpec: metadata.pendingSpec,
+		};
 	}
 	const frontmatter = parsed as TaskFrontmatter;
+	const metadata = readSessionGovernanceMetadata(root, sessionId, taskId);
 	return {
 		featureId:
 			readString(frontmatter.feature_id) ||
-			readString(frontmatter.roadmap_feature),
-		parentSpec: readString(frontmatter.parent_spec),
+			readString(frontmatter.roadmap_feature) ||
+			metadata.featureId,
+		parentSpec: readString(frontmatter.parent_spec) || metadata.parentSpec,
+		pendingSpec: metadata.pendingSpec,
 	};
 }
 
@@ -258,6 +268,18 @@ export function checkSpecCompatibility(
 ): SpecCheckResult {
 	const metadata = findTaskMetadata(root, sessionId, taskId);
 	const checkedAt = now();
+	if (metadata.pendingSpec) {
+		return saveResult(
+			root,
+			buildResult({
+				session_id: sessionId,
+				task_id: taskId,
+				spec_id: metadata.parentSpec || "pending_spec",
+				checked_at: checkedAt,
+				status: "conflict",
+			}),
+		);
+	}
 	if (!metadata.parentSpec) {
 		return saveResult(
 			root,

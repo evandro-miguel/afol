@@ -6,6 +6,7 @@ import {
 	scanTemplateToolchainClaims,
 	TEMPLATE_ROOT,
 } from "../../schemas/template-policy";
+import { listOpenPendingSpecs } from "../governance/pending-specs";
 import {
 	validateFilesIndex,
 	validateRulesIndex,
@@ -38,6 +39,7 @@ export type ProjectValidationCheck = {
 		| "specs_local_state_index"
 		| "files_local_state_index"
 		| "wb_local_state_index"
+		| "governance_pending_specs"
 		| "session_evidence"
 		| "session_health"
 		| "index_drift"
@@ -185,6 +187,8 @@ function validateAgentsPayloadClean(
 		".agents/source",
 		".agents/tools",
 		".agents/tools.json",
+		".agents/skills/agentic-folder-sys",
+		".afol/adm/source/universal-skills/skills/agentic-folder-sys",
 		".agents/skills-sync.manifest.json",
 	].filter((path) => existsSync(join(projectRoot, path)));
 
@@ -339,6 +343,17 @@ export async function validateProjectStructure(
 				id: "files_local_state_index",
 				ok: result.ok,
 				message: result.message,
+			};
+		})(),
+		(() => {
+			const open = listOpenPendingSpecs(projectRoot);
+			return {
+				id: "governance_pending_specs" as const,
+				ok: true,
+				message:
+					open.length === 0
+						? "no open pending_spec entries"
+						: `warning: ${open.length} open pending_spec entr${open.length === 1 ? "y" : "ies"}`,
 			};
 		})(),
 		await validateTemplateForbidden(projectRoot),

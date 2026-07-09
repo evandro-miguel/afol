@@ -195,7 +195,14 @@ describe("workbench lifecycle service", () => {
 		try {
 			writeCliProjectContract(root);
 
-			const newProc = runKernel(root, ["new", "cli json", "--json"]);
+			const newProc = runKernel(root, [
+				"new",
+				"cli json",
+				"--no-spec-required",
+				"--reason",
+				"test waiver",
+				"--json",
+			]);
 			expect(newProc.status).toBe(0);
 			const newEnvelope = parseEnvelope(newProc.stdout as string);
 			expect(newEnvelope).toMatchObject({
@@ -399,6 +406,143 @@ describe("workbench lifecycle service", () => {
 			});
 			expect((missingEnvelope.error as Record<string, unknown>).message).toBe(
 				"Missing theme for new workstream.",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("cli pending_spec blocks new sessions until resolved", () => {
+		const root = mkRoot("pending-spec");
+		try {
+			writeCliProjectContract(root);
+
+			const first = runKernel(root, ["new", "missing spec", "--json"]);
+			expect(first.status).toBe(0);
+			const firstEnvelope = parseEnvelope(first.stdout as string);
+			const firstData = firstEnvelope.data as Record<string, unknown>;
+			expect(firstData.governance_status).toBe("pending_spec");
+			expect(firstData.pending_spec).toBe(true);
+			const session = String(firstData.session);
+
+			const start = runKernel(root, [
+				"start",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+			]);
+			expect(start.status).toBe(0);
+			expect(start.stdout as string).toContain("warning: pending_spec");
+
+			const evidence = runKernel(root, [
+				"evidence",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+				"--command",
+				"bun test",
+				"--result",
+				"passed",
+			]);
+			expect(evidence.status).toBe(0);
+			expect(evidence.stdout as string).toContain("warning: pending_spec");
+
+			const done = runKernel(root, [
+				"done",
+				"--session",
+				session,
+				"--task-id",
+				"T-01",
+			]);
+			expect(done.status).toBe(0);
+			expect(done.stdout as string).toContain("warning: pending_spec");
+
+			writeFileSync(
+				join(root, ".afol", "data", "governance", "pending-specs.json"),
+				"{not valid json",
+				"utf8",
+			);
+
+			const blocked = runKernel(root, ["new", "blocked next", "--json"]);
+			expect(blocked.status).toBe(2);
+			expect(blocked.stdout as string).toContain(
+				"open pending_spec blocks new sessions",
+			);
+
+			const pending = runKernel(root, ["governance", "pending", "--json"]);
+			expect(pending.status).toBe(0);
+			const pendingEnvelope = parseEnvelope(pending.stdout as string);
+			const pendingData = pendingEnvelope.data as {
+				total: number;
+				entries: Array<{ session_id: string; status: string }>;
+			};
+			expect(pendingData.total).toBe(1);
+			expect(pendingData.entries[0]?.session_id).toBe(session);
+			expect(pendingData.entries[0]?.status).toBe("open");
+
+			const resolved = runKernel(root, [
+				"governance",
+				"resolve-spec",
+				"--session",
+				session,
+				"--feature-id",
+				"F-01",
+				"--parent-spec",
+				"spec-01",
+				"--json",
+			]);
+			expect(resolved.status).toBe(0);
+			const resolvedEnvelope = parseEnvelope(resolved.stdout as string);
+			expect((resolvedEnvelope.data as Record<string, unknown>).status).toBe(
+				"resolved",
+			);
+
+			const next = runKernel(root, [
+				"new",
+				"after resolve",
+				"--feature-id",
+				"F-02",
+				"--parent-spec",
+				"spec-02",
+				"--json",
+			]);
+			expect(next.status).toBe(0);
+			const nextEnvelope = parseEnvelope(next.stdout as string);
+			expect((nextEnvelope.data as Record<string, unknown>).status).toBe(
+				"created",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("quick-task records pending_spec and blocks the next session", () => {
+		const root = mkRoot("quick-task-pending-spec");
+		try {
+			writeCliProjectContract(root);
+
+			const quickTask = runKernel(root, [
+				"quick-task",
+				"quick missing spec",
+				"--command",
+				"true",
+				"--json",
+			]);
+			expect(quickTask.status).toBe(0);
+			const quickTaskEnvelope = parseEnvelope(quickTask.stdout as string);
+			const quickTaskData = quickTaskEnvelope.data as Record<string, unknown>;
+			expect(quickTaskData.governance_status).toBe("pending_spec");
+			expect(quickTaskData.pending_spec).toBe(true);
+			expect(quickTaskData.pending_spec_resolution_hint).toContain(
+				"afol governance resolve-spec",
+			);
+
+			const blocked = runKernel(root, ["new", "blocked after quick-task"]);
+			expect(blocked.status).toBe(2);
+			expect(blocked.stderr as string).toContain(
+				"open pending_spec blocks new sessions",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -627,7 +771,9 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("start-human");
 		try {
 			writeCliProjectContract(root);
-			const created = newWorkstream(root, "start-task");
+			const created = newWorkstream(root, "start-task", {
+				noSpecRequiredReason: "compact output fixture",
+			});
 			const proc = runKernel(root, ["start", "--session", created.session]);
 
 			expect(proc.status).toBe(0);
@@ -666,7 +812,9 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("start-human-brief-full");
 		try {
 			writeCliProjectContract(root);
-			const created = newWorkstream(root, "start-task");
+			const created = newWorkstream(root, "start-task", {
+				noSpecRequiredReason: "full briefing fixture",
+			});
 			const proc = runKernel(root, [
 				"start",
 				"--session",
@@ -695,7 +843,9 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("start-compact");
 		try {
 			writeCliProjectContract(root);
-			const created = newWorkstream(root, "start-task");
+			const created = newWorkstream(root, "start-task", {
+				noSpecRequiredReason: "compact alias fixture",
+			});
 			const proc = runKernel(root, ["st", "-S", created.session]);
 
 			expect(proc.status).toBe(0);

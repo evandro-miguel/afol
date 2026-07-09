@@ -1318,9 +1318,9 @@ describe("kernel front-door", () => {
 		);
 		try {
 			const created = newWorkstream(root, "compatible done", {
+				featureId: "feature-done",
 				parentSpec: "spec-001",
 			});
-			writeTaskWithSpecMetadata(created.taskPath, "spec-001");
 			writeSpec(root, "spec-001", "active");
 			recordEvidence(root, {
 				session: created.session,
@@ -1352,8 +1352,9 @@ describe("kernel front-door", () => {
 			"#!/usr/bin/env bash\necho LEGACY:$*",
 		);
 		try {
-			const created = newWorkstream(root, "no spec done");
-			writeTaskWithSpecMetadata(created.taskPath, null);
+			const created = newWorkstream(root, "no spec done", {
+				noSpecRequiredReason: "test waiver",
+			});
 			recordEvidence(root, {
 				session: created.session,
 				taskId: "T-01",
@@ -1385,9 +1386,9 @@ describe("kernel front-door", () => {
 		);
 		try {
 			const created = newWorkstream(root, "missing spec done", {
+				featureId: "feature-missing",
 				parentSpec: "spec-missing",
 			});
-			writeTaskWithSpecMetadata(created.taskPath, "spec-missing");
 
 			const proc = runKernel(root, [
 				"done",

@@ -193,11 +193,13 @@ export async function runHealthCommand(
 							parsed.release ||
 							parsed.scope === "full" ||
 							parsed.scope === "release",
+						release: parsed.release || parsed.scope === "release",
 					}
 				: {
 						deep: parsed.deep || parsed.release || parsed.scope === "release",
 						includeAuxiliary:
 							parsed.scope === "full" || parsed.scope === "release",
+						release: parsed.release || parsed.scope === "release",
 					},
 		);
 		if (parsed.json) {

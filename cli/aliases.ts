@@ -39,6 +39,12 @@ export const SUBCOMMAND_ACTION_ALIASES = Object.freeze({
 		pt: "patch",
 		ud: "undo",
 	}),
+	governance: Object.freeze({
+		ls: "pending",
+		p: "pending",
+		resolve: "resolve-spec",
+		rs: "resolve-spec",
+	}),
 	ctx: Object.freeze({
 		b: "build",
 		bn: "bundle",
@@ -204,6 +210,12 @@ export const FLAG_ALIASES = Object.freeze({
 		"-a": "--area",
 		"-d": "--deep",
 		"-r": "--release",
+	}),
+	governance: Object.freeze({
+		"-F": "--feature-id",
+		"-P": "--parent-spec",
+		"-S": "--session",
+		"-r": "--reason",
 	}),
 	hydrate: Object.freeze({
 		"-S": "--session",

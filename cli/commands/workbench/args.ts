@@ -25,6 +25,7 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 	const rest: string[] = [];
 	const metadata: NewWorkstreamMetadata = {};
 	let json = false;
+	let noSpecRequired = false;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
 		const value = args[index + 1];
@@ -68,6 +69,18 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 			index += 1;
 			continue;
 		}
+		if (arg === "--no-spec-required") {
+			noSpecRequired = true;
+			continue;
+		}
+		if (arg === "--reason") {
+			if (!value) {
+				throw new Error("Missing value for --reason in new.");
+			}
+			metadata.noSpecRequiredReason = value;
+			index += 1;
+			continue;
+		}
 		if (arg === "--task") {
 			if (!value) {
 				throw new Error("Missing value for --task in new.");
@@ -85,6 +98,14 @@ export function parseNewArgs(args: string[]): NewCommandArgs {
 	}
 	if (rest.length > 0) {
 		throw new Error(`Unknown new argument: ${rest[0]}`);
+	}
+	if (metadata.noSpecRequiredReason && !noSpecRequired) {
+		throw new Error("Missing --no-spec-required for new reason.");
+	}
+	if (noSpecRequired && !metadata.noSpecRequiredReason?.trim()) {
+		throw new Error(
+			"Missing --reason for --no-spec-required in new workstream.",
+		);
 	}
 	return { theme, metadata, json };
 }

@@ -242,9 +242,12 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 				).run(snapshot.sessionId, file.path, file.kind, file.hash.hash);
 			}
 
-			const taskPath = join(snapshot.sessionPath, "task.md");
-			if (existsSync(taskPath)) {
-				for (const line of readText(taskPath).split(/\r?\n/)) {
+			for (const file of snapshot.sourceFiles.filter(
+				(sourceFile) => sourceFile.kind === "task",
+			)) {
+				for (const line of readText(
+					join(snapshot.sessionPath, file.path),
+				).split(/\r?\n/)) {
 					const match = line.trim().match(TASK_ROW_RE);
 					if (!match?.[1] || !match[2] || !match[3]) {
 						continue;

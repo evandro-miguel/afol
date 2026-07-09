@@ -53,6 +53,42 @@ function createFixture(): string {
 	return root;
 }
 
+function seedGeneratedTaskFiles(
+	root: string,
+	sessionId = "test-session",
+): void {
+	const sessionDir = join(root, ".afol", "wb", sessionId);
+	rmSync(join(sessionDir, "task.md"), { force: true });
+	writeFileSync(
+		join(sessionDir, `${sessionId}_task_01.md`),
+		[
+			"# Tasks",
+			"",
+			"## State Board",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			"| T-01 | pending | worker | first generated task |",
+			"",
+		].join("\n"),
+		"utf8",
+	);
+	writeFileSync(
+		join(sessionDir, `${sessionId}_task_02.md`),
+		[
+			"# Tasks",
+			"",
+			"## State Board",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			"| T-02 | done | worker | second generated task |",
+			"",
+		].join("\n"),
+		"utf8",
+	);
+}
+
 function captureIo() {
 	const stdout: string[] = [];
 	const stderr: string[] = [];
@@ -258,6 +294,70 @@ describe("state commands", () => {
 					}
 				).snapshot.summary.evidenceEntries,
 			).toBe(1);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("afol state show -S test-session --json includes generated task files", async () => {
+		const root = createFixture();
+		try {
+			seedGeneratedTaskFiles(root);
+			const hydrated = captureIo();
+			expect(
+				await runHydrateCommand(
+					"hydrate",
+					["-S", "test-session"],
+					root,
+					hydrated.io,
+				),
+			).toBe(0);
+			const captured = captureIo();
+			expect(
+				await runStateCommand(
+					"show",
+					["-S", "test-session", "--json"],
+					root,
+					captured.io,
+				),
+			).toBe(0);
+			const payload = parseEnvelope(captured.stdout);
+			expect(
+				(
+					payload.snapshot as {
+						sessionId: string;
+						sourceFiles: unknown[];
+						summary: { taskFiles: number; taskRows: number };
+					}
+				).sessionId,
+			).toBe("test-session");
+			expect(
+				(
+					payload.data as {
+						snapshot: {
+							sessionId: string;
+							sourceFiles: unknown[];
+							summary: { taskFiles: number; taskRows: number };
+						};
+						session: string;
+					}
+				).snapshot.sourceFiles,
+			).toHaveLength(4);
+			expect(
+				(
+					payload.data as {
+						snapshot: {
+							sessionId: string;
+							sourceFiles: unknown[];
+							summary: { taskFiles: number; taskRows: number };
+						};
+						session: string;
+					}
+				).snapshot.summary,
+			).toMatchObject({
+				taskFiles: 2,
+				taskRows: 2,
+			});
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

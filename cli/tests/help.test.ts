@@ -105,9 +105,7 @@ describe("help formatter", () => {
 		);
 		expect(help).toContain("    subcommands:");
 		expect(help).toContain("      generate --check [read]");
-		expect(help).toContain(
-			"  --verbose  Expanded human catalog with subcommands",
-		);
+		expect(help).toContain("  --verbose  Show subcommands");
 	});
 
 	test("formats per-command help from registry metadata", () => {
@@ -263,10 +261,10 @@ describe("help formatter", () => {
 		expect(help).toContain("Category: ops");
 		expect(help).toContain("Side effect: write");
 		expect(help).toContain(
-			"Description: Safely patch, move, archive, and undo files; supports dry-run",
+			"Description: Safely append, move, archive, and undo files; supports dry-run",
 		);
-		expect(help).toContain("pt|patch --path <path> --dry-run [read]");
-		expect(help).toContain("pt|patch --path <path> [write]");
+		expect(help).toContain("append|patch --path <path> --dry-run [read]");
+		expect(help).toContain("append|patch --path <path> [write]");
 		expect(help).toContain("ud|undo --mutation-id <id> [write]");
 	});
 

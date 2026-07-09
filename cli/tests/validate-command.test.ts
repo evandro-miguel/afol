@@ -225,6 +225,35 @@ describe("validate command", () => {
 		}
 	});
 
+	test("rejects vendored global agentic-folder-sys skill", async () => {
+		const root = createValidationFixture();
+		try {
+			const staleSkillPath = join(
+				root,
+				".agents",
+				"skills",
+				"agentic-folder-sys",
+			);
+			mkdirSync(staleSkillPath, { recursive: true });
+			writeFileSync(join(staleSkillPath, "SKILL.md"), "# stale\n", "utf8");
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean; message: string }>;
+			};
+			const check = payload.checks?.find(
+				(entry) => entry.id === "agents_payload_clean",
+			);
+
+			expect(code).toBe(1);
+			expect(check?.ok).toBe(false);
+			expect(check?.message).toContain(".agents/skills/agentic-folder-sys");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects skills_dir outside .agents/skills", async () => {
 		const root = createValidationFixture();
 		try {

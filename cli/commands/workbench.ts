@@ -5,6 +5,12 @@ import {
 	requiresApproval,
 } from "../core/operation-context";
 import {
+	assertNoOpenPendingSpecs,
+	formatSessionPendingSpecWarning,
+	getSessionPendingSpecNotice,
+	resolveGovernance,
+} from "../services/governance/pending-specs";
+import {
 	appendTimelineEntry,
 	closeSession,
 	doneTask,
@@ -46,6 +52,38 @@ function assertWorkbenchMutationAllowed(
 	);
 }
 
+function pendingSpecFields(
+	root: string,
+	session: string,
+	taskId?: string,
+): Record<string, unknown> {
+	const notice = getSessionPendingSpecNotice(root, session, taskId);
+	if (!notice) {
+		return { pending_spec: false };
+	}
+	return {
+		pending_spec: true,
+		pending_spec_missing: notice.missing,
+		pending_spec_resolution_hint: notice.resolutionHint.replace(
+			"<session>",
+			notice.session,
+		),
+	};
+}
+
+function appendPendingSpecWarning(
+	lines: string[],
+	root: string,
+	session: string,
+	taskId?: string,
+): void {
+	lines.push(
+		...formatSessionPendingSpecWarning(
+			getSessionPendingSpecNotice(root, session, taskId),
+		),
+	);
+}
+
 export async function runNewCommand(
 	args: string[],
 	root: string = process.cwd(),
@@ -54,11 +92,9 @@ export async function runNewCommand(
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.new");
 		const parsed = parseNewArgs(args);
+		assertNoOpenPendingSpecs(root);
+		const governance = resolveGovernance(parsed.metadata);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
-		const governanceStatus =
-			parsed.metadata.featureId && parsed.metadata.parentSpec
-				? "governed"
-				: "unbound";
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
@@ -66,16 +102,29 @@ export async function runNewCommand(
 						{
 							...created,
 							status: "created",
-							governance_status: governanceStatus,
+							governance_status: governance.governanceStatus,
+							pending_spec: governance.pendingSpec,
+							pending_spec_missing: governance.missing,
+							pending_spec_resolution_hint: governance.pendingSpec
+								? governance.resolutionHint
+								: "",
 						},
 						{ action: "workbench.new" },
 					),
 				),
 			);
 		} else {
-			console.log(
-				`session created: ${created.session}\ngovernance_status: ${governanceStatus}`,
-			);
+			const lines = [
+				`session created: ${created.session}`,
+				`governance_status: ${governance.governanceStatus}`,
+			];
+			if (governance.pendingSpec) {
+				lines.push(
+					`warning: pending_spec missing=${governance.missing.join(",")}`,
+					`hint: ${governance.resolutionHint.replace("<session>", created.session)}`,
+				);
+			}
+			console.log(lines.join("\n"));
 		}
 		return 0;
 	} catch (error) {
@@ -106,12 +155,16 @@ export async function runStartCommand(
 		});
 		startTask(root, parsed);
 		if (parsed.compact && !parsed.brief && !parsed.json) {
-			console.log(`task started: ${parsed.taskId}`);
+			const lines = [`task started: ${parsed.taskId}`];
+			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+			console.log(lines.join("\n"));
 			return 0;
 		}
 		if (!parsed.brief) {
 			if (!parsed.json) {
-				console.log(`task started: ${parsed.taskId}`);
+				const lines = [`task started: ${parsed.taskId}`];
+				appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+				console.log(lines.join("\n"));
 			}
 			if (parsed.json) {
 				console.log(
@@ -121,6 +174,7 @@ export async function runStartCommand(
 								session: parsed.session,
 								task: parsed.taskId,
 								status: "in_progress",
+								...pendingSpecFields(root, parsed.session, parsed.taskId),
 							},
 							{ action: "workbench.start" },
 						),
@@ -147,6 +201,7 @@ export async function runStartCommand(
 							task: parsed.taskId,
 							status: "in_progress",
 							briefing,
+							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
 						{ action: "workbench.start" },
 					),
@@ -154,6 +209,7 @@ export async function runStartCommand(
 			);
 		} else {
 			const lines = [`task started: ${parsed.taskId}`];
+			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
 			if (isStartBriefingUnavailable(briefing)) {
 				lines.push(`briefing: briefing_unavailable reason=${briefing.reason}`);
 			} else if (parsed.briefMode === "full") {
@@ -192,13 +248,16 @@ export async function runEvidenceCommand(
 							session: parsed.session,
 							task: parsed.taskId,
 							result: record.result,
+							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
 						{ action: "workbench.evidence" },
 					),
 				),
 			);
 		} else {
-			console.log(`evidence recorded: ${record.id}`);
+			const lines = [`evidence recorded: ${record.id}`];
+			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+			console.log(lines.join("\n"));
 		}
 		return 0;
 	} catch (error) {
@@ -319,13 +378,16 @@ export async function runDoneCommand(
 							session: parsed.session,
 							task: parsed.taskId,
 							status: "done",
+							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
 						{ action: "workbench.done" },
 					),
 				),
 			);
 		} else {
-			console.log(`task done: ${parsed.taskId}`);
+			const lines = [`task done: ${parsed.taskId}`];
+			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
+			console.log(lines.join("\n"));
 		}
 		return 0;
 	} catch (error) {
