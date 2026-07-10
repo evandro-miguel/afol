@@ -1,4 +1,5 @@
 import {
+	type Dirent,
 	existsSync,
 	mkdirSync,
 	readdirSync,
@@ -6,7 +7,8 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
 import { resolveWorkbenchEventLogPath } from "./workbench-events";
 
@@ -72,6 +74,7 @@ const CHECKPOINT_HEADING_RE = /^#{2,6}\s+.+checkpoint\b/i;
 const FILE_CLAIM_LABEL_RE = /^\s*-\s*Files\s+(planned|touched)\s*:\s*$/i;
 const NESTED_LIST_ITEM_RE = /^\s{2,}[-*]\s+(.+?)\s*$/;
 const GLOB_TOKEN_RE = /[*?[\]{}]/;
+const WORKBENCH_INDEX_LOCK_SESSION = "workbench-index";
 
 const ZERO_TIME = new Date(0).toISOString();
 
@@ -144,9 +147,164 @@ function sessionTaskFiles(sessionDir: string): string[] {
 	}
 }
 
+function escapeRegex(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function sessionTokenBoundaryRegExp(session: string): RegExp {
+	const escaped = escapeRegex(session);
+	return new RegExp(`(?:^|[^A-Za-z0-9_-])${escaped}(?:$|[^A-Za-z0-9_-])`);
+}
+
+function hasMigrationRecord(root: string, session: string): boolean {
+	const trimmed = session.trim();
+	if (!trimmed) {
+		return false;
+	}
+	const projectPaths = resolveProjectPaths(root);
+	const migrationRoot = join(projectPaths.abs.mutableDir, "data", "migrations");
+	if (!existsSync(migrationRoot)) {
+		return false;
+	}
+
+	const matcher = sessionTokenBoundaryRegExp(trimmed);
+	const stack = [migrationRoot];
+	const seen = new Set<string>();
+
+	while (stack.length > 0) {
+		const current = stack.pop();
+		if (!current || seen.has(current)) {
+			continue;
+		}
+		seen.add(current);
+		let entries: Dirent[];
+		try {
+			entries = readdirSync(current, { withFileTypes: true });
+		} catch {
+			continue;
+		}
+
+		for (const entry of entries) {
+			const child = join(current, entry.name);
+			const relative = child
+				.slice(migrationRoot.length + 1)
+				.replace(/\\/g, "/");
+			const candidate = `/${relative}`;
+			if (matcher.test(candidate)) {
+				return true;
+			}
+			if (entry.isDirectory()) {
+				stack.push(child);
+				continue;
+			}
+			if (!entry.isFile()) {
+				continue;
+			}
+			if (!/\.(?:json|md|txt|yml|yaml)$/i.test(entry.name)) {
+				continue;
+			}
+			try {
+				if (readFileSync(child, "utf8").includes(trimmed)) {
+					return true;
+				}
+			} catch {
+				// ignore unreadable migration payloads for warning detection
+			}
+		}
+	}
+	return false;
+}
+
+function sessionHasArchiveDir(root: string, session: string): boolean {
+	const trimmed = session.trim();
+	if (!trimmed) {
+		return false;
+	}
+	const archiveDir = join(resolveWorkbenchRoot(root), "_archive", trimmed);
+	try {
+		return statSync(archiveDir).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
+function collectSessionLifecycleEvents(
+	root: string,
+): Map<string, { started: boolean; closed: boolean }> {
+	const eventLog = resolveWorkbenchEventLogPath(root);
+	const lifecycle = new Map<string, { started: boolean; closed: boolean }>();
+	if (!existsSync(eventLog)) {
+		return lifecycle;
+	}
+
+	let lines: string[];
+	try {
+		lines = readFileSync(eventLog, "utf8").split(/\r?\n/);
+	} catch {
+		return lifecycle;
+	}
+
+	for (const line of lines) {
+		if (!line.trim()) {
+			continue;
+		}
+		let raw: Record<string, unknown>;
+		try {
+			raw = JSON.parse(line) as Record<string, unknown>;
+		} catch {
+			continue;
+		}
+		if (!raw || typeof raw !== "object") {
+			continue;
+		}
+
+		const workbenchType = typeof raw.type === "string" ? raw.type : "";
+		const telemetryType =
+			typeof raw.event_type === "string" ? raw.event_type : "";
+		const workbenchSession = typeof raw.session === "string" ? raw.session : "";
+		const telemetrySession =
+			typeof raw.session_id === "string" ? raw.session_id : "";
+
+		if (workbenchSession) {
+			const state = lifecycle.get(workbenchSession) ?? {
+				started: false,
+				closed: false,
+			};
+			if (workbenchType === "workbench.new") {
+				state.started = true;
+				state.closed = false;
+			}
+			if (workbenchType === "workbench.close") {
+				state.closed = true;
+			}
+			lifecycle.set(workbenchSession, state);
+		}
+
+		if (telemetrySession) {
+			const state = lifecycle.get(telemetrySession) ?? {
+				started: false,
+				closed: false,
+			};
+			if (telemetryType === "session_start") {
+				state.started = true;
+				state.closed = false;
+			}
+			if (telemetryType === "session_end") {
+				state.closed = true;
+			}
+			lifecycle.set(telemetrySession, state);
+		}
+	}
+	return lifecycle;
+}
+
 type ParsedTaskClaims = {
 	planned_files: WorkbenchIndexFileClaim[];
 	touched_files: WorkbenchIndexFileClaim[];
+};
+
+type WorkbenchIndexRebuildOptions = {
+	beforeWrite?: (sessionScope?: string) => void;
 };
 
 type FileClaimField = keyof ParsedTaskClaims;
@@ -668,53 +826,57 @@ function isIsoDate(value: unknown): boolean {
 export function rebuildWorkBenchIndex(
 	root: string,
 	sessionScope?: string,
+	options: WorkbenchIndexRebuildOptions = {},
 ): WorkbenchIndexSnapshot {
-	const current = loadWorkBenchIndexSnapshot(root);
+	options.beforeWrite?.(sessionScope);
+	return withSessionLock(root, WORKBENCH_INDEX_LOCK_SESSION, () => {
+		const current = loadWorkBenchIndexSnapshot(root);
 
-	if (sessionScope) {
-		const targetSnapshot = buildSessionsSnapshot(root, [sessionScope]);
-		const hasSession = sessionDirExists(root, sessionScope);
+		if (sessionScope) {
+			const targetSnapshot = buildSessionsSnapshot(root, [sessionScope]);
+			const hasSession = sessionDirExists(root, sessionScope);
 
-		const existingTasks = current?.tasks ?? [];
-		const existingSessions = current?.sessions ?? [];
+			const existingTasks = current?.tasks ?? [];
+			const existingSessions = current?.sessions ?? [];
 
-		if (!hasSession) {
-			const filtered = {
-				...(current ?? emptySnapshot(root)),
+			if (!hasSession) {
+				const filtered = {
+					...(current ?? emptySnapshot(root)),
+					generated_at: formatFreshTimestamp(root),
+					sessions: existingSessions.filter(
+						(entry) => entry.session !== sessionScope,
+					),
+					tasks: existingTasks.filter((task) => task.session !== sessionScope),
+				};
+				return writeSnapshot(root, filtered);
+			}
+
+			const nextSessions = mergeBySession(
+				existingSessions,
+				targetSnapshot.sessions,
+				sessionScope,
+			);
+			const nextTasks = mergeBySession(
+				existingTasks,
+				targetSnapshot.tasks,
+				sessionScope,
+			);
+
+			const next: WorkbenchIndexSnapshot = {
+				kind: "workbench_index_v1",
+				version: 1,
 				generated_at: formatFreshTimestamp(root),
-				sessions: existingSessions.filter(
-					(entry) => entry.session !== sessionScope,
-				),
-				tasks: existingTasks.filter((task) => task.session !== sessionScope),
+				source: {
+					...workbenchSource(root),
+				},
+				sessions: nextSessions,
+				tasks: nextTasks,
 			};
-			return writeSnapshot(root, filtered);
+			return writeSnapshot(root, next);
 		}
 
-		const nextSessions = mergeBySession(
-			existingSessions,
-			targetSnapshot.sessions,
-			sessionScope,
-		);
-		const nextTasks = mergeBySession(
-			existingTasks,
-			targetSnapshot.tasks,
-			sessionScope,
-		);
-
-		const next: WorkbenchIndexSnapshot = {
-			kind: "workbench_index_v1",
-			version: 1,
-			generated_at: formatFreshTimestamp(root),
-			source: {
-				...workbenchSource(root),
-			},
-			sessions: nextSessions,
-			tasks: nextTasks,
-		};
-		return writeSnapshot(root, next);
-	}
-
-	return writeSnapshot(root, collectWorkBenchSnapshot(root));
+		return writeSnapshot(root, collectWorkBenchSnapshot(root));
+	});
 }
 
 export function validateWorkBenchIndex(root: string): {
@@ -759,7 +921,7 @@ export function validateWorkBenchIndex(root: string): {
 }
 
 export type SessionHealthWarning = {
-	type: "duplicate_theme" | "stale_open_tasks";
+	type: "duplicate_theme" | "stale_open_tasks" | "missing_session_directory";
 	session: string;
 	message: string;
 };
@@ -767,6 +929,7 @@ export type SessionHealthWarning = {
 export function detectSessionHealth(root: string): SessionHealthWarning[] {
 	const warnings: SessionHealthWarning[] = [];
 	const allSessionIds = collectSessionIds(root);
+	const lifecycle = collectSessionLifecycleEvents(root);
 	const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 	const now = Date.now();
 
@@ -823,6 +986,26 @@ export function detectSessionHealth(root: string): SessionHealthWarning[] {
 				message: `Session "${session}" has open tasks untouched for >7 days`,
 			});
 		}
+	}
+
+	for (const [session, state] of lifecycle) {
+		if (!state.started || state.closed) {
+			continue;
+		}
+		if (sessionDirExists(root, session)) {
+			continue;
+		}
+		if (sessionHasArchiveDir(root, session)) {
+			continue;
+		}
+		if (hasMigrationRecord(root, session)) {
+			continue;
+		}
+		warnings.push({
+			type: "missing_session_directory",
+			session,
+			message: `Session "${session}" has start event but no active workbench directory and no migration/archive fallback.`,
+		});
 	}
 
 	return warnings;

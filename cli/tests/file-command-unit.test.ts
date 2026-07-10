@@ -66,6 +66,30 @@ function mkProjectRoot(): string {
 	return root;
 }
 
+function setTaskState(
+	root: string,
+	session: string,
+	taskId: string,
+	state: "in_progress" | "done",
+): void {
+	const taskPath = join(root, ".afol", "wb", session, `${session}_task_01.md`);
+	const taskRow = new RegExp(
+		`^\\|\\s*${taskId}\\s*\\|\\s*([^|]+?)\\s*\\|\\s*([^|]*?)\\s*\\|\\s*(.*?)\\s*\\|$`,
+	);
+	const lines = readFileSync(taskPath, "utf8")
+		.split(/\r?\n/)
+		.map((line) => {
+			const match = line.match(taskRow);
+			if (!match) {
+				return line;
+			}
+			const owner = (match[2] ?? "").trim();
+			const notes = (match[3] ?? "").trim();
+			return `| ${taskId} | ${state} | ${owner} | ${notes} |`;
+		});
+	writeFileSync(taskPath, `${lines.join("\n").replace(/\n*$/g, "")}\n`, "utf8");
+}
+
 function captureIo(): { io: CommandIo; stdout: string[]; stderr: string[] } {
 	const stdout: string[] = [];
 	const stderr: string[] = [];
@@ -344,6 +368,64 @@ describe("file command dispatcher", () => {
 			const undoIo = captureIo();
 			expect(await runFileCommand(["ud"], root, undoIo.io)).toBe(2);
 			expect(undoIo.stderr[0]).toContain("Real file mutation requires");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects non-dry-run mutation if task exits in_progress before write under atomic lock", async () => {
+		const root = mkProjectRoot();
+		try {
+			const target = writeFileTree(root, "notes/doc.txt", "alpha");
+			const session = "ATOMIC";
+			const taskId = "T-01";
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"# Tasks: active",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					`| ${taskId} | in_progress | worker | doing file change |`,
+					"",
+				].join("\n"),
+				"utf8",
+			);
+
+			const journalDir = resolveProjectPaths(root).abs.mutationsDir;
+			const io = captureIo();
+			const code = await runFileCommand(
+				[
+					"pt",
+					"--path",
+					"notes/doc.txt",
+					"--append",
+					"beta",
+					"--session",
+					session,
+					"--task-id",
+					taskId,
+					"--reason",
+					"lock test",
+				],
+				root,
+				io.io,
+				undefined,
+				{
+					beforeMutation: () => {
+						setTaskState(root, session, taskId, "done");
+					},
+				},
+			);
+
+			expect(code).toBe(2);
+			expect(io.stderr[0]).toContain(`Task ${taskId} is done`);
+			expect(readFileSync(target, "utf8")).toBe("alpha");
+			expect(existsSync(journalDir)).toBe(false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -220,6 +220,17 @@ function checkWorkbenchHealth(root: string, deep: boolean): HealthFinding[] {
 			);
 			continue;
 		}
+		if (warning.type === "missing_session_directory") {
+			findings.push(
+				makeFinding(
+					"wb",
+					"warn",
+					warning.message,
+					"restore from archive, migration pack, or recreate the session directory",
+				),
+			);
+			continue;
+		}
 		findings.push(
 			makeFinding(
 				"wb",

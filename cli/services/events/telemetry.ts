@@ -46,6 +46,8 @@ export type TelemetryEvent = {
 	outcome?: "success" | "failure";
 	/** Human-readable note (no secrets) */
 	note?: string;
+	/** Evidence provenance for workflow-origin classification */
+	provenance?: "declared" | "observed";
 	/** Error/blocker type when event_type is error or blocker */
 	error_type?: string;
 };

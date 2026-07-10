@@ -3,7 +3,7 @@ import {
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
-import { assertTaskInProgress } from "../services/workbench/lifecycle";
+import { withTaskInProgressMutation } from "../services/workbench/lifecycle";
 import {
 	parseArchiveArgs,
 	parseMoveArgs,
@@ -25,11 +25,16 @@ import {
 	requireWriteContext,
 } from "./file/shared";
 
+export type FileCommandOptions = {
+	beforeMutation?: () => void;
+};
+
 export async function runFileCommand(
 	args: string[],
 	projectRoot: string,
 	io: CommandIo = DEFAULT_IO,
 	ctx: OperationContext = defaultOperationContext(),
+	options: FileCommandOptions = {},
 ): Promise<number> {
 	try {
 		const [rawCommand, ...rest] = args;
@@ -39,6 +44,9 @@ export async function runFileCommand(
 
 		let asJson = false;
 		let result: CommandResult;
+		const mutationOptions = options.beforeMutation
+			? { beforeMutation: options.beforeMutation }
+			: undefined;
 
 		if (
 			rawCommand === "pt" ||
@@ -55,10 +63,17 @@ export async function runFileCommand(
 			}
 			if (!parsed.dryRun) {
 				requireWriteContext(parsed);
-				assertTaskInProgress(projectRoot, parsed.session, parsed.taskId);
+				result = withTaskInProgressMutation(
+					projectRoot,
+					parsed.session,
+					parsed.taskId,
+					() => runPatchMutation(parsed, projectRoot),
+					mutationOptions,
+				);
+			} else {
+				result = runPatchMutation(parsed, projectRoot);
 			}
 			asJson = parsed.json;
-			result = runPatchMutation(parsed, projectRoot);
 		} else if (rawCommand === "mv" || rawCommand === "move") {
 			const parsed = applyProjectMutationDefaults(
 				parseMoveArgs(rest),
@@ -69,10 +84,17 @@ export async function runFileCommand(
 			}
 			if (!parsed.dryRun) {
 				requireWriteContext(parsed);
-				assertTaskInProgress(projectRoot, parsed.session, parsed.taskId);
+				result = withTaskInProgressMutation(
+					projectRoot,
+					parsed.session,
+					parsed.taskId,
+					() => runMoveMutation(parsed, projectRoot),
+					mutationOptions,
+				);
+			} else {
+				result = runMoveMutation(parsed, projectRoot);
 			}
 			asJson = parsed.json;
-			result = runMoveMutation(parsed, projectRoot);
 		} else if (rawCommand === "ud" || rawCommand === "undo") {
 			const parsed = parseUndoArgs(rest);
 			if (!parsed.dryRun && requiresApproval(ctx)) {
@@ -81,9 +103,16 @@ export async function runFileCommand(
 			asJson = parsed.json;
 			if (!parsed.dryRun) {
 				requireWriteContext(parsed);
-				assertTaskInProgress(projectRoot, parsed.session, parsed.taskId);
+				result = withTaskInProgressMutation(
+					projectRoot,
+					parsed.session,
+					parsed.taskId,
+					() => runUndoMutation(parsed, projectRoot),
+					mutationOptions,
+				);
+			} else {
+				result = runUndoMutation(parsed, projectRoot);
 			}
-			result = runUndoMutation(parsed, projectRoot);
 		} else if (rawCommand === "ar" || rawCommand === "archive") {
 			const parsed = applyProjectMutationDefaults(
 				parseArchiveArgs(rest),
@@ -94,10 +123,17 @@ export async function runFileCommand(
 			}
 			if (!parsed.dryRun) {
 				requireWriteContext(parsed);
-				assertTaskInProgress(projectRoot, parsed.session, parsed.taskId);
+				result = withTaskInProgressMutation(
+					projectRoot,
+					parsed.session,
+					parsed.taskId,
+					() => runArchiveMutation(parsed, projectRoot),
+					mutationOptions,
+				);
+			} else {
+				result = runArchiveMutation(parsed, projectRoot);
 			}
 			asJson = parsed.json;
-			result = runArchiveMutation(parsed, projectRoot);
 		} else {
 			throw new Error(`Unknown file command: ${rawCommand}`);
 		}

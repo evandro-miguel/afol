@@ -44,7 +44,10 @@ export type RecordEvidenceInput = WorkbenchTaskRef & {
 	exitCode?: number;
 	artifact?: string;
 	note?: string;
+	provenance?: EvidenceProvenance;
 };
+
+export type EvidenceProvenance = "declared" | "observed";
 
 export type EvidenceEntry = {
 	id: string;
@@ -52,6 +55,7 @@ export type EvidenceEntry = {
 	created_at: string;
 	command: string;
 	result: string;
+	provenance?: EvidenceProvenance;
 	exit_code?: number;
 	artifact?: string;
 	note?: string;
@@ -255,15 +259,42 @@ export function assertTaskInProgress(
 	taskId: string,
 ): void {
 	withSessionLock(root, session, () => {
-		const paths = sessionPaths(root, session);
-		if (!existsSync(paths.sessionDir)) {
-			throw new Error(`Session folder not found: ${paths.sessionDir}`);
-		}
-		const row = ensureTaskExists(paths.taskPath, session, taskId);
-		if (row.state !== "in_progress") {
-			throw new Error(`Task ${taskId} is ${row.state}, expected in_progress.`);
-		}
+		assertTaskInProgressLocked(root, session, taskId);
 	});
+}
+
+type TaskMutationOptions = {
+	beforeMutation?: () => void;
+};
+
+export function withTaskInProgressMutation<T>(
+	root: string,
+	session: string,
+	taskId: string,
+	mutation: () => T,
+	options?: TaskMutationOptions,
+): T {
+	return withSessionLock(root, session, () => {
+		assertTaskInProgressLocked(root, session, taskId);
+		options?.beforeMutation?.();
+		assertTaskInProgressLocked(root, session, taskId);
+		return mutation();
+	});
+}
+
+function assertTaskInProgressLocked(
+	root: string,
+	session: string,
+	taskId: string,
+): void {
+	const paths = sessionPaths(root, session);
+	if (!existsSync(paths.sessionDir)) {
+		throw new Error(`Session folder not found: ${paths.sessionDir}`);
+	}
+	const row = ensureTaskExists(paths.taskPath, session, taskId);
+	if (row.state !== "in_progress") {
+		throw new Error(`Task ${taskId} is ${row.state}, expected in_progress.`);
+	}
 }
 
 function parseTaskRow(line: string): TaskRow | null {
@@ -638,6 +669,12 @@ function loadEvidenceEntries(evidencePath: string): EvidenceEntry[] {
 				if (typeof parsed.note === "string") {
 					entry.note = parsed.note;
 				}
+				if (
+					parsed.provenance === "declared" ||
+					parsed.provenance === "observed"
+				) {
+					entry.provenance = parsed.provenance;
+				}
 				entries.push(entry);
 			}
 		} catch (error) {
@@ -912,12 +949,14 @@ export function recordEvidence(
 		}
 		ensureTaskExists(paths.taskPath, input.session, input.taskId);
 		const now = new Date();
+		const provenance: EvidenceProvenance = input.provenance ?? "declared";
 		const evidence: EvidenceEntry = {
 			id: evidenceId(now),
 			task_id: input.taskId,
 			created_at: now.toISOString(),
 			command: input.command,
 			result: input.result,
+			provenance,
 		};
 		if (input.exitCode !== undefined) {
 			evidence.exit_code = input.exitCode;
@@ -938,17 +977,23 @@ export function recordEvidence(
 			taskId: input.taskId,
 			command: input.command,
 			result: input.result,
+			detail: {
+				provenance,
+			},
 		});
-		appendTelemetryEvent(root, {
-			event_type: "tool_exec",
-			session_id: input.session,
-			task_id: input.taskId,
-			cmd_type: firstToken(input.command),
-			outcome:
-				evidenceCompletionStatus([evidence]) === "passed"
-					? "success"
-					: "failure",
-		});
+		if (provenance === "observed") {
+			appendTelemetryEvent(root, {
+				event_type: "tool_exec",
+				session_id: input.session,
+				task_id: input.taskId,
+				cmd_type: firstToken(input.command),
+				provenance,
+				outcome:
+					evidenceCompletionStatus([evidence]) === "passed"
+						? "success"
+						: "failure",
+			});
+		}
 		refreshWorkbenchLocalState(root, input.session);
 		return evidence;
 	});

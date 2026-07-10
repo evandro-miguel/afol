@@ -238,7 +238,10 @@ export async function runEvidenceCommand(
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.evidence");
 		const parsed = parseEvidenceArgs(args, root);
-		const record = recordEvidence(root, parsed);
+		const record = recordEvidence(root, {
+			...parsed,
+			provenance: "declared",
+		});
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
@@ -311,6 +314,7 @@ export async function runDoneCommand(
 				command: parsed.testCommand,
 				result: verification.exitCode === 0 ? "passed" : "failed",
 				exitCode: verification.exitCode,
+				provenance: "observed",
 				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 				...(parsed.note ? { note: parsed.note } : {}),
 			});
@@ -339,6 +343,7 @@ export async function runDoneCommand(
 				command: parsed.testShellCommand,
 				result: verification.exitCode === 0 ? "passed" : "failed",
 				exitCode: verification.exitCode,
+				provenance: "observed",
 				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 				...(parsed.note ? { note: parsed.note } : {}),
 			});
@@ -365,6 +370,7 @@ export async function runDoneCommand(
 				taskId: parsed.taskId,
 				command: parsed.evidenceCommand,
 				result: parsed.evidenceResult,
+				provenance: "declared",
 				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 				...(parsed.note ? { note: parsed.note } : {}),
 			});

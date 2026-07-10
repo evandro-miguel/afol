@@ -733,6 +733,50 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
+	test("done command records observed provenance for test evidence", () => {
+		const root = mkRoot("done-test-provenance");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done-test-provenance");
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test",
+				"bun -e \"console.log('ok')\"",
+				"--json",
+			]);
+
+			expect(proc.status).toBe(0);
+			const evidence = readFileSync(
+				join(root, ".afol", "wb", created.session, ".evidence.jsonl"),
+				"utf8",
+			)
+				.trim()
+				.split("\n")
+				.at(-1);
+			expect(evidence).toBeTruthy();
+			const entry = JSON.parse(evidence as string) as {
+				provenance?: string;
+			};
+			expect(entry.provenance).toBe("observed");
+			const toolEvents = readTelemetryEvents(root).filter(
+				(event) => event.event_type === "tool_exec",
+			);
+			expect(toolEvents).toHaveLength(1);
+			expect(toolEvents[0]).toMatchObject({
+				task_id: "T-01",
+				cmd_type: "bun",
+				provenance: "observed",
+				outcome: "success",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("startTask marks row in_progress", () => {
 		const root = mkRoot("start");
 		try {
@@ -1047,10 +1091,49 @@ describe("workbench lifecycle service", () => {
 				task_id: string;
 				command: string;
 				result: string;
+				provenance?: string;
 			};
 			expect(parsed.task_id).toBe("T-01");
 			expect(parsed.command).toBe("bun test");
 			expect(parsed.result).toBe("passed");
+			expect(parsed.provenance).toBe("declared");
+			expect(
+				readLocalStateEvents(root).find(
+					(event) => event.type === "workbench.record_evidence",
+				),
+			).toMatchObject({ detail: { provenance: "declared" } });
+			expect(
+				readTelemetryEvents(root).filter(
+					(event) => event.event_type === "tool_exec",
+				),
+			).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("doneTask reads legacy evidence without provenance", () => {
+		const root = mkRoot("legacy-evidence-provenance");
+		try {
+			const created = newWorkstream(root, "legacy-evidence-provenance");
+			writeFileSync(
+				created.evidencePath,
+				`${JSON.stringify({
+					id: "E-legacy",
+					task_id: "T-01",
+					created_at: new Date().toISOString(),
+					command: "bun test",
+					result: "passed",
+				})}\n`,
+				"utf8",
+			);
+
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).not.toThrow();
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | done | worker |",
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1129,9 +1212,14 @@ describe("workbench lifecycle service", () => {
 				join(root, ".afol", "wb", session as string, ".evidence.jsonl"),
 				"utf8",
 			).trim();
-			const entry = JSON.parse(evidence) as Record<string, unknown>;
+			const entry = JSON.parse(evidence) as {
+				result: string;
+				exit_code: number;
+				provenance?: string;
+			};
 			expect(entry.result).toBe("failed");
 			expect(entry.exit_code).not.toBe(0);
+			expect(entry.provenance).toBe("observed");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -1175,6 +1263,10 @@ describe("workbench lifecycle service", () => {
 				.split("\n")
 				.map((line) => JSON.parse(line) as Record<string, unknown>);
 			expect(evidenceRows).toHaveLength(8);
+			expect(new Set(evidenceRows.map((row) => row.id)).size).toBe(8);
+			expect(evidenceRows.every((row) => row.provenance === "declared")).toBe(
+				true,
+			);
 			expect(
 				new Set(
 					evidenceRows.map(
@@ -1184,8 +1276,8 @@ describe("workbench lifecycle service", () => {
 			).toBe(8);
 
 			const eventRows = readLocalStateEvents(root);
-			// 9 workbench events + telemetry events (session_start + 8 tool_exec)
-			expect(eventRows).toHaveLength(18);
+			// 9 workbench events + session_start telemetry; declared evidence is not execution.
+			expect(eventRows).toHaveLength(10);
 			expect(
 				eventRows.filter((row) => row.type === "workbench.record_evidence"),
 			).toHaveLength(8);
@@ -1193,7 +1285,7 @@ describe("workbench lifecycle service", () => {
 				eventRows.filter(
 					(row) => row.source === "afol-cli" && row.event_type === "tool_exec",
 				),
-			).toHaveLength(8);
+			).toHaveLength(0);
 			expect(
 				existsSync(
 					join(root, ".afol", "wb", ".locks", `${created.session}.lock`),
@@ -1392,10 +1484,10 @@ describe("workbench lifecycle service", () => {
 				exitCode: 1,
 			});
 			expect(
-				readTelemetryEvents(root)
-					.filter((event) => event.event_type === "tool_exec")
-					.at(-1)?.outcome,
-			).toBe("failure");
+				readTelemetryEvents(root).filter(
+					(event) => event.event_type === "tool_exec",
+				),
+			).toHaveLength(0);
 
 			expect(() =>
 				doneTask(root, { session: created.session, taskId: "T-01" }),
@@ -2309,6 +2401,7 @@ describe("workbench lifecycle service", () => {
 				taskId: "T-01",
 				command: "bun test --filter foo",
 				result: "passed",
+				provenance: "observed",
 			});
 
 			doneTask(root, { session: created.session, taskId: "T-01" });
@@ -2339,6 +2432,7 @@ describe("workbench lifecycle service", () => {
 			expect(toolEvent?.cmd_type).toBe("bun");
 			expect(toolEvent?.task_id).toBe("T-01");
 			expect(toolEvent?.outcome).toBe("success");
+			expect(toolEvent?.provenance).toBe("observed");
 
 			// Task events carry correct task_id
 			expect(eventMap.get("task_start")?.task_id).toBe("T-01");

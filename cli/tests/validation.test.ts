@@ -576,7 +576,14 @@ describe("validation command family", () => {
 				"mutation-safety",
 				"--json",
 			]);
-			expect(proc.status).toBe(0);
+			const failureContext =
+				proc.status === 0
+					? undefined
+					: [
+							`stdout tail:\n${String(proc.stdout ?? "").slice(-2_048)}`,
+							`stderr tail:\n${String(proc.stderr ?? "").slice(-2_048)}`,
+						].join("\n");
+			expect(proc.status, failureContext).toBe(0);
 			const payload = parseJsonOutput(proc.stdout as string);
 			expect(payload.mode).toBe("benchmark");
 			expect(payload.result_count).toBe(5);

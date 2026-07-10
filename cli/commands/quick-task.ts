@@ -180,6 +180,7 @@ export async function runQuickTaskCommand(
 			command: parsed.command,
 			result: verificationPassed ? parsed.result : "failed",
 			exitCode: verification.exitCode,
+			provenance: "observed",
 			...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 			...(parsed.note ? { note: parsed.note } : {}),
 		});

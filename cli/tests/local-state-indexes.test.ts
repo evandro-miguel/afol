@@ -9,6 +9,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import {
+	isMainThread,
+	parentPort,
+	Worker,
+	workerData,
+} from "node:worker_threads";
 import { runLocalStateCommand } from "../commands/local-state";
 import { agentOperationContext } from "../core/operation-context";
 import {
@@ -36,6 +42,7 @@ import {
 	validateSpecsIndex,
 } from "../services/local-state/project-indexes";
 import {
+	loadWorkBenchIndexSnapshot,
 	rebuildWorkBenchIndex,
 	validateWorkBenchIndex,
 } from "../services/local-state/workbench-index";
@@ -43,6 +50,55 @@ import {
 	appendMutationRecord,
 	type MutationRecord,
 } from "../services/mutations/journal";
+
+if (!isMainThread) {
+	const { root, sessionScope, coordination } = workerData as {
+		root: string;
+		sessionScope: string;
+		coordination: SharedArrayBuffer;
+	};
+	const signals = new Int32Array(coordination);
+	const arrival = Atomics.add(signals, 0, 1) + 1;
+	if (arrival === 1) {
+		const waitStatus = Atomics.wait(signals, 1, 0, 5_000);
+		if (waitStatus === "timed-out") {
+			throw new Error(
+				"rebuildWorkBenchIndex concurrency test barrier timed out waiting for peer",
+			);
+		}
+	} else {
+		Atomics.store(signals, 1, 1);
+		Atomics.notify(signals, 1, 1);
+	}
+
+	rebuildWorkBenchIndex(root, sessionScope);
+	parentPort?.postMessage("done");
+	process.exit(0);
+}
+
+function runRebuildInWorker(
+	root: string,
+	sessionScope: string,
+	coordination: SharedArrayBuffer,
+) {
+	return new Promise<void>((resolve, reject) => {
+		const worker = new Worker(new URL(import.meta.url), {
+			workerData: {
+				root,
+				sessionScope,
+				coordination,
+			},
+		});
+		worker.on("error", reject);
+		worker.on("exit", (code) => {
+			if (code === 0) {
+				resolve();
+			} else {
+				reject(new Error(`Worker exited with code ${code}`));
+			}
+		});
+	});
+}
 
 function buildFixture() {
 	const root = mkdtempSync(join(tmpdir(), "proj-indexes-"));
@@ -470,6 +526,103 @@ describe("local-state project indexer", () => {
 			expect(
 				snapshot.tasks.some((task) => task.session === "260618_beta"),
 			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rebuildWorkBenchIndex(sessionScope) preserves concurrent scoped updates", async () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-scope-concurrent-"));
+		try {
+			const sessionA = join(root, ".afol", "wb", "260618_alpha");
+			const sessionB = join(root, ".afol", "wb", "260618_beta");
+			mkdirSync(sessionA, { recursive: true });
+			mkdirSync(sessionB, { recursive: true });
+
+			writeFileSync(
+				join(sessionA, "260618_alpha_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | alice | baseline |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(sessionB, "260618_beta_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress | bob | baseline |",
+				].join("\n"),
+				"utf8",
+			);
+			rebuildWorkBenchIndex(root);
+
+			writeFileSync(
+				join(sessionA, "260618_alpha_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | alice | baseline |",
+					"| T-02 | implemented_untested | alice | concurrent |",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(sessionB, "260618_beta_task_01.md"),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | in_progress | bob | baseline |",
+					"| T-02 | implemented_untested | bob | concurrent |",
+				].join("\n"),
+				"utf8",
+			);
+
+			const coordination = new SharedArrayBuffer(
+				Int32Array.BYTES_PER_ELEMENT * 2,
+			);
+			const alphaRunner = runRebuildInWorker(
+				root,
+				"260618_alpha",
+				coordination,
+			);
+			const betaRunner = runRebuildInWorker(root, "260618_beta", coordination);
+
+			await Promise.all([alphaRunner, betaRunner]);
+
+			const snapshot = loadWorkBenchIndexSnapshot(root);
+			if (!snapshot) {
+				throw new Error("Expected persisted workbench index snapshot");
+			}
+			const alphaSession = snapshot.sessions.find(
+				(session) => session.session === "260618_alpha",
+			);
+			const betaSession = snapshot.sessions.find(
+				(session) => session.session === "260618_beta",
+			);
+			expect(alphaSession?.task_count).toBe(2);
+			expect(betaSession?.task_count).toBe(2);
+
+			const alphaTasks = snapshot.tasks
+				.filter((task) => task.session === "260618_alpha")
+				.map((task) => task.task_id)
+				.sort();
+			const betaTasks = snapshot.tasks
+				.filter((task) => task.session === "260618_beta")
+				.map((task) => task.task_id)
+				.sort();
+			expect(alphaTasks).toEqual(["T-01", "T-02"]);
+			expect(betaTasks).toEqual(["T-01", "T-02"]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
