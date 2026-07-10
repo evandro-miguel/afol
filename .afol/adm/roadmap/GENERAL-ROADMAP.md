@@ -728,6 +728,57 @@ Follow-on slices under this direction:
   - Under-strict fallback can let remote/CI agents mutate the wrong session.
   - Session binding must remain visible and reversible for operators.
 
+### F-21 TypeScript 7 Toolchain Adoption
+
+- Status: final
+- Governing spec:
+  .afol/adm/specs/260710_1256_typescript-7-toolchain-adoption_spec_01.md
+- Why: the repository already uses a blocking local typecheck, but its
+  `typecheck:ts7:informative` lane hides compiler failures and resolves
+  `typescript@next`, which now tracks TypeScript 7.1 nightlies instead of the
+  stable TypeScript 7 release. Adopting an exact stable compiler makes the
+  release contract deterministic and removes a false-positive validation path.
+- Scope:
+  - Pin the local development compiler to exact TypeScript `7.0.2` and update
+    the Bun lockfile without changing Bun runtime or bundling behavior.
+  - Remove the masked informative TS7 lane.
+  - Keep `bun run typecheck` as a standalone release preflight and a blocking CI
+    step after dependency installation and before release validation.
+  - Add a focused CI contract test for that ordering and blocking behavior.
+  - Preserve the current `tsconfig.json` unless the stable compiler proves that
+    a configuration change is required.
+- Exit criteria:
+  - `package.json` and `bun.lock` resolve exact TypeScript `7.0.2`.
+  - No script catches or converts TypeScript compiler failures into success.
+  - CI installs from the frozen lockfile, runs the blocking typecheck, and only
+    then enters release validation.
+  - Focused toolchain tests, the full test suite, build, clean smoke, AFOL
+    validation, and required security scans pass.
+- Validation targets:
+  - `bun install --frozen-lockfile`
+  - `bun run typecheck`
+  - `bunx tsc --noEmit -p tsconfig.json --skipLibCheck false`
+  - `bun test cli/tests/release-toolchain.test.ts cli/tests/validate-internals.test.ts`
+  - `bun test`
+  - `bun run build`
+  - `bun run validate:release`
+  - `bun run smoke:clean`
+  - `afol local-state rebuild --json`
+  - `afol validate project --json`
+  - `bun run validate:security:required`
+- Rollback:
+  - Restore the local compiler to exact TypeScript `6.0.3` and regenerate only
+    the dependency lockfile.
+  - Keep the blocking typecheck and CI contract test.
+  - Do not restore the masked informative lane.
+- Risks:
+  - TypeScript 7 has no stable programmatic compiler API; AFOL must continue to
+    avoid compiler API dependencies until a later version provides one.
+  - Faster typechecking does not improve Bun runtime or standalone binary
+    performance because Bun remains the runtime, transpiler, and bundler.
+  - Editor `tsgo` activation is a separate host configuration change and is not
+    part of this repository feature.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command

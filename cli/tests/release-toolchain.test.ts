@@ -192,14 +192,18 @@ function splitScriptSteps(script: string | undefined): string[] {
 }
 
 describe("release and toolchain contracts", () => {
-	test("package scripts keep informative local lanes and strict release gates", () => {
+	test("package scripts pin stable TypeScript and keep strict release gates", () => {
 		const pkg = JSON.parse(
 			readFileSync(join(repoRoot, "package.json"), "utf8"),
 		) as {
 			scripts?: Record<string, string>;
+			devDependencies?: Record<string, string>;
 		};
 		const scripts = pkg.scripts ?? {};
 
+		expect(pkg.devDependencies?.typescript).toBe("7.0.2");
+		expect(scripts.typecheck).toBe("tsc --noEmit -p tsconfig.json");
+		expect(scripts["typecheck:ts7:informative"]).toBeUndefined();
 		expect(scripts["lint:biome"]).toBe("biome check cli");
 		expect(scripts["lint:knip"]).toBe(
 			"knip --dependencies --use-tsconfig-files --max-issues 0",
@@ -228,6 +232,7 @@ describe("release and toolchain contracts", () => {
 		expect(scripts["validate:release"]).not.toContain(
 			"bun run validate:security:required",
 		);
+		expect(scripts["validate:release"]).not.toContain("bun run typecheck");
 		expect(scripts["validate:release"]).toContain("bun run coverage:check");
 		expect(scripts["validate:ux-governance"]).toBe(
 			"bun run kernel -- ux validate --json && bun run kernel -- v bench --pack governance-history --json",
@@ -270,6 +275,75 @@ describe("release and toolchain contracts", () => {
 		);
 		expect(scripts["coverage:project-benchmarks"]).toContain(
 			"cli/tests/validation.test.ts",
+		);
+	});
+
+	test("CI keeps frozen install and blocking typecheck before release validation", () => {
+		const workflow = readFileSync(
+			join(repoRoot, ".github", "workflows", "agents-scaffold-ci.yml"),
+			"utf8",
+		);
+		type RunDefaults = {
+			shell?: string;
+			"working-directory"?: string;
+		};
+		type WorkflowStep = {
+			name?: string;
+			run?: string;
+			shell?: string;
+			"working-directory"?: string;
+			env?: Record<string, unknown>;
+			if?: unknown;
+			"continue-on-error"?: unknown;
+		};
+		type ValidationJob = {
+			"runs-on"?: string;
+			defaults?: { run?: RunDefaults };
+			steps?: WorkflowStep[];
+			env?: Record<string, unknown>;
+			if?: unknown;
+			"continue-on-error"?: unknown;
+		};
+		const parsedWorkflow = Bun.YAML.parse(workflow) as {
+			defaults?: { run?: RunDefaults };
+			env?: Record<string, unknown>;
+			jobs?: Record<string, ValidationJob>;
+		};
+		const validationJob = parsedWorkflow.jobs?.validate ?? {};
+		const validationSteps = validationJob.steps ?? [];
+		const workflowStep = (name: string): WorkflowStep =>
+			validationSteps.find((step) => step.name === name) ?? {};
+		const stepIndex = (name: string): number =>
+			validationSteps.findIndex((step) => step.name === name);
+		const installStep = workflowStep("Install dependencies");
+		const typecheckStep = workflowStep("Typecheck");
+		const releaseStep = workflowStep("Release validation");
+
+		expect(validationJob["runs-on"]).toBe("ubuntu-latest");
+		expect(validationJob).not.toHaveProperty("continue-on-error");
+		expect(validationJob).not.toHaveProperty("if");
+		expect(parsedWorkflow).not.toHaveProperty("env");
+		expect(validationJob.env).toEqual({
+			OSV_SCANNER_VERSION: "2.3.8",
+			GITLEAKS_VERSION: "8.24.2",
+		});
+		expect(parsedWorkflow.defaults?.run?.shell).toBeUndefined();
+		expect(parsedWorkflow.defaults?.run?.["working-directory"]).toBeUndefined();
+		expect(validationJob.defaults?.run?.shell).toBeUndefined();
+		expect(validationJob.defaults?.run?.["working-directory"]).toBeUndefined();
+		expect(installStep.run).toBe("bun install --frozen-lockfile");
+		expect(typecheckStep.run).toBe("bun run typecheck");
+		expect(typecheckStep).not.toHaveProperty("continue-on-error");
+		expect(typecheckStep).not.toHaveProperty("if");
+		expect(typecheckStep).not.toHaveProperty("shell");
+		expect(typecheckStep).not.toHaveProperty("working-directory");
+		expect(typecheckStep).not.toHaveProperty("env");
+		expect(releaseStep.run).toBe("bun run validate:release");
+		expect(stepIndex("Install dependencies")).toBeLessThan(
+			stepIndex("Typecheck"),
+		);
+		expect(stepIndex("Typecheck")).toBeLessThan(
+			stepIndex("Release validation"),
 		);
 	});
 

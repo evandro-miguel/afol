@@ -478,6 +478,10 @@ describe("validate registry", () => {
 			expect(featureSpecScenario?.coverage?.specs).toContain(
 				"260627_1655_canonical-afol-configuration-rehome_spec_01",
 			);
+			expect(featureSpecScenario?.coverage?.features).toContain("F-21");
+			expect(featureSpecScenario?.coverage?.specs).toContain(
+				"260710_1256_typescript-7-toolchain-adoption_spec_01",
+			);
 			const uxRegistryScenario = snapshot.scenariosByPack[
 				"governance-history"
 			]?.find((scenario) => scenario.scenario_id === "ux-registry-lifecycle");
@@ -672,7 +676,7 @@ describe("validate registry", () => {
 			if (!featureSpecScenario.coverage.specs?.length) {
 				throw new Error("Expected spec coverage scenario fixture");
 			}
-			const withoutF20FeatureCoverage: RegistrySnapshot = {
+			const withoutF21FeatureCoverage: RegistrySnapshot = {
 				...snapshot,
 				scenariosByPack: {
 					...snapshot.scenariosByPack,
@@ -685,7 +689,7 @@ describe("validate registry", () => {
 										subcommands: scenario.coverage?.subcommands ?? [],
 										journeys: scenario.coverage?.journeys ?? [],
 										features: (scenario.coverage?.features ?? []).filter(
-											(entry) => entry !== "F-20",
+											(entry) => entry !== "F-21",
 										),
 										specs: scenario.coverage?.specs ?? [],
 									},
@@ -694,12 +698,11 @@ describe("validate registry", () => {
 					),
 				},
 			};
-			expect(validateRegistryContract(withoutF20FeatureCoverage)).toContain(
-				"scenario-feature-coverage-missing:F-20",
+			expect(validateRegistryContract(withoutF21FeatureCoverage)).toContain(
+				"scenario-feature-coverage-missing:F-21",
 			);
-			const f19SpecId =
-				"260627_1655_canonical-afol-configuration-rehome_spec_01";
-			const withoutF19SpecCoverage: RegistrySnapshot = {
+			const f21SpecId = "260710_1256_typescript-7-toolchain-adoption_spec_01";
+			const withoutF21SpecCoverage: RegistrySnapshot = {
 				...snapshot,
 				scenariosByPack: {
 					...snapshot.scenariosByPack,
@@ -713,7 +716,7 @@ describe("validate registry", () => {
 										journeys: scenario.coverage?.journeys ?? [],
 										features: scenario.coverage?.features ?? [],
 										specs: (scenario.coverage?.specs ?? []).filter(
-											(entry) => entry !== f19SpecId,
+											(entry) => entry !== f21SpecId,
 										),
 									},
 								}
@@ -721,8 +724,8 @@ describe("validate registry", () => {
 					),
 				},
 			};
-			expect(validateRegistryContract(withoutF19SpecCoverage)).toContain(
-				`scenario-spec-coverage-missing:${f19SpecId}`,
+			expect(validateRegistryContract(withoutF21SpecCoverage)).toContain(
+				`scenario-spec-coverage-missing:${f21SpecId}`,
 			);
 			const roadmapPath = join(
 				root,

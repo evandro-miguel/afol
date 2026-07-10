@@ -52,7 +52,8 @@
       "F-17",
       "F-18",
       "F-19",
-      "F-20"
+      "F-20",
+      "F-21"
     ],
     "specs": [
       "260306_artifact-resolution-layer_spec_01",
@@ -120,7 +121,8 @@
       "260615_1350_recurring-problem-guardrails_spec-child_01",
       "260618_1519_orchestrator-coordination-radar_spec-child_01",
       "260627_1122_afol-tool-scenario-coverage-and-ux-registry_spec-child_01",
-      "260627_1655_canonical-afol-configuration-rehome_spec_01"
+      "260627_1655_canonical-afol-configuration-rehome_spec_01",
+      "260710_1256_typescript-7-toolchain-adoption_spec_01"
     ]
   },
   "feature_scenarios": [
@@ -249,6 +251,12 @@
       "governing_spec": ".afol/adm/specs/260426_1215_parallel-session-isolation_spec_01.md",
       "expected_lane": "workbench-parity",
       "validation": "Parallel local, remote, and CI agents use explicit or context-local session selection without corrupting the global workbench pointer."
+    },
+    {
+      "feature": "F-21",
+      "governing_spec": ".afol/adm/specs/260710_1256_typescript-7-toolchain-adoption_spec_01.md",
+      "expected_lane": "release-validation",
+      "validation": "Stable TypeScript 7 adoption keeps typecheck blocking, removes the masked nightly lane, and preserves the release toolchain contract."
     }
   ],
   "result_schema": "1.0.0",

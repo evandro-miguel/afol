@@ -31,7 +31,6 @@
 		"coverage:check": "bun run cli/dev/coverage-check.ts --include cli/dev/coverage-check.ts --include cli/dev/dist-smoke.ts --include cli/dev/generate-version.ts --include cli/dev/release-provenance.ts --include cli/dev/toolchain-smoke.ts --include cli/commands/bootstrap.ts --include cli/commands/project-benchmark.ts --include cli/commands/validate.ts --include cli/services/project-benchmark",
 		"coverage:project-benchmarks": "bun run cli/dev/coverage-check.ts --include cli/commands/project-benchmark.ts --include cli/services/project-benchmark --max-concurrency 1 cli/tests/project-benchmark-command.test.ts cli/tests/project-benchmark-validation.test.ts cli/tests/registry.test.ts cli/tests/help.test.ts cli/tests/kernel.test.ts cli/tests/operation-context.test.ts cli/tests/validation.test.ts",
 		"validate": "bun run typecheck && bun test",
-		"typecheck:ts7:informative": "if bunx --bun -p typescript@next tsc --noEmit --project tsconfig.json; then exit 0; else echo 'TypeScript 7 lane not available or not safe to run locally'; fi",
 		"validate:template": "bun run template:check",
 		"validate:bootstrap": "bun test cli/tests/bootstrap-template-cleanliness.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts",
 		"kernel": "bun run cli/main.ts",
@@ -66,7 +65,7 @@
 		"citty": "^0.2.2",
 		"knip": "^6.15.0",
 		"oxlint": "^1.67.0",
-		"typescript": "^6.0.3",
+		"typescript": "7.0.2",
 		"valibot": "^1.4.1"
 	}
 }
