@@ -2,10 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
 	existsSync,
+	linkSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	renameSync,
 	rmSync,
+	statSync,
+	unlinkSync,
 	utimesSync,
 	writeFileSync,
 } from "node:fs";
@@ -28,12 +32,22 @@ const RECLAIM_ACTIVE = 2;
 const RECLAIM_OVERLAP = 3;
 const RECLAIM_ENTERED = 4;
 const RECLAIM_HOLD = 5;
+const REPLACE_READY = 0;
+const REPLACE_DONE = 1;
 
 interface ReclaimWorkerData {
 	kind: "stale-reclaim";
 	participants: number;
 	root: string;
 	session: string;
+	signals: SharedArrayBuffer;
+}
+
+interface ReplaceAfterReclaimWorkerData {
+	kind: "replace-after-reclaim";
+	lockPath: string;
+	reclaimPath: string;
+	replacementPath: string;
 	signals: SharedArrayBuffer;
 }
 
@@ -65,6 +79,30 @@ if (!isMainThread && workerData?.kind === "stale-reclaim") {
 	process.exit(0);
 }
 
+if (!isMainThread && workerData?.kind === "replace-after-reclaim") {
+	const {
+		lockPath,
+		reclaimPath,
+		replacementPath,
+		signals: buffer,
+	} = workerData as ReplaceAfterReclaimWorkerData;
+	const signals = new Int32Array(buffer);
+	Atomics.store(signals, REPLACE_READY, 1);
+	Atomics.notify(signals, REPLACE_READY);
+	const deadline = Date.now() + 5_000;
+	while (!existsSync(reclaimPath)) {
+		if (Date.now() >= deadline) {
+			throw new Error("replacement worker timed out waiting for reclaim claim");
+		}
+		Atomics.wait(signals, REPLACE_DONE, 0, 1);
+	}
+	renameSync(replacementPath, lockPath);
+	Atomics.store(signals, REPLACE_DONE, 1);
+	Atomics.notify(signals, REPLACE_DONE);
+	parentPort?.postMessage("done");
+	process.exit(0);
+}
+
 function runStaleReclaimWorker(
 	root: string,
 	session: string,
@@ -90,6 +128,43 @@ function runStaleReclaimWorker(
 			}
 		});
 	});
+}
+
+function runReplaceAfterReclaimWorker(
+	lockPath: string,
+	replacementPath: string,
+	signals: SharedArrayBuffer,
+): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const worker = new Worker(new URL(import.meta.url), {
+			workerData: {
+				kind: "replace-after-reclaim",
+				lockPath,
+				reclaimPath: `${lockPath}.reclaim`,
+				replacementPath,
+				signals,
+			} satisfies ReplaceAfterReclaimWorkerData,
+		});
+		worker.on("error", reject);
+		worker.on("exit", (code) => {
+			if (code === 0) {
+				resolve();
+			} else {
+				reject(new Error(`replacement worker exited with code ${code}`));
+			}
+		});
+	});
+}
+
+function waitForSignal(
+	signals: Int32Array,
+	index: number,
+	timeoutMs = 5_000,
+): void {
+	const result = Atomics.wait(signals, index, 0, timeoutMs);
+	if (result === "timed-out") {
+		throw new Error(`timed out waiting for worker signal ${index}`);
+	}
 }
 
 function mkProjectRoot(name: string): string {
@@ -177,6 +252,57 @@ function writeRawLock(
 }
 
 describe("session-lock", () => {
+	test("does not reclaim a replacement inode with identical metadata", async () => {
+		const root = mkProjectRoot("reclaim-replacement");
+		try {
+			const session = "reclaim-replacement-session";
+			const stableMtimeMs = Date.now() - 240_000;
+			const raw = `{ not valid json ${"x".repeat(32 * 1024 * 1024)}`;
+			const lockPath = writeRawLock(root, session, raw, stableMtimeMs);
+			const replacementPath = `${lockPath}.replacement`;
+			const witnessPath = `${lockPath}.witness`;
+			writeFileSync(replacementPath, raw, "utf8");
+			utimesSync(replacementPath, stableMtimeMs / 1000, stableMtimeMs / 1000);
+			linkSync(replacementPath, witnessPath);
+			const replacementIno = statSync(witnessPath).ino;
+			const buffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2);
+			const signals = new Int32Array(buffer);
+			const worker = runReplaceAfterReclaimWorker(
+				lockPath,
+				replacementPath,
+				buffer,
+			);
+			waitForSignal(signals, REPLACE_READY);
+
+			let acquired = false;
+			let thrown: unknown;
+			try {
+				withPatchedDateNow(
+					Date.now(),
+					() =>
+						withSessionLock(root, session, () => {
+							acquired = true;
+						}),
+					31_000,
+				);
+			} catch (error) {
+				thrown = error;
+			}
+			await worker;
+
+			expect(Atomics.load(signals, REPLACE_DONE)).toBe(1);
+			expect(acquired).toBe(false);
+			expect(thrown).toBeInstanceOf(Error);
+			expect((thrown as Error).message).toMatch(
+				/Timed out waiting for session lock:/,
+			);
+			expect(statSync(lockPath).ino).toBe(replacementIno);
+			expect(statSync(witnessPath).nlink).toBe(2);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 10_000);
+
 	test("serializes simultaneous reclaimers of the same stale lock", async () => {
 		const root = mkProjectRoot("simultaneous-reclaim");
 		try {
@@ -320,6 +446,21 @@ describe("session-lock", () => {
 				}),
 			).toThrow("callback failure");
 			expect(existsSync(lockPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("does not remove a replacement lock during final cleanup", () => {
+		const root = mkProjectRoot("cleanup-replacement");
+		try {
+			const session = "cleanup-replacement-session";
+			const lockPath = resolveSessionLockPath(root, session);
+			withSessionLock(root, session, () => {
+				unlinkSync(lockPath);
+				writeFileSync(lockPath, "replacement lock\n", "utf8");
+			});
+			expect(readFileSync(lockPath, "utf8")).toBe("replacement lock\n");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

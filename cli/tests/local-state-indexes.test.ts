@@ -52,7 +52,12 @@ import {
 } from "../services/mutations/journal";
 
 if (!isMainThread) {
+	if (workerData?.kind !== "workbench-rebuild") {
+		process.exit(0);
+	}
+
 	const { root, sessionScope, coordination } = workerData as {
+		kind: string;
 		root: string;
 		sessionScope: string;
 		coordination: SharedArrayBuffer;
@@ -80,10 +85,12 @@ function runRebuildInWorker(
 	root: string,
 	sessionScope: string,
 	coordination: SharedArrayBuffer,
+	kind = "workbench-rebuild",
 ) {
 	return new Promise<void>((resolve, reject) => {
 		const worker = new Worker(new URL(import.meta.url), {
 			workerData: {
+				kind,
 				root,
 				sessionScope,
 				coordination,
@@ -93,6 +100,36 @@ function runRebuildInWorker(
 		worker.on("exit", (code) => {
 			if (code === 0) {
 				resolve();
+			} else {
+				reject(new Error(`Worker exited with code ${code}`));
+			}
+		});
+	});
+}
+
+function runRebuildInWorkerForKind(
+	root: string,
+	sessionScope: string,
+	coordination: SharedArrayBuffer,
+	kind: string,
+) {
+	return new Promise<{ message: unknown }>((resolve, reject) => {
+		const worker = new Worker(new URL(import.meta.url), {
+			workerData: {
+				kind,
+				root,
+				sessionScope,
+				coordination,
+			},
+		});
+		let message: unknown;
+		worker.on("message", (value) => {
+			message = value;
+		});
+		worker.on("error", reject);
+		worker.on("exit", (code) => {
+			if (code === 0) {
+				resolve({ message });
 			} else {
 				reject(new Error(`Worker exited with code ${code}`));
 			}
@@ -623,6 +660,26 @@ describe("local-state project indexer", () => {
 				.sort();
 			expect(alphaTasks).toEqual(["T-01", "T-02"]);
 			expect(betaTasks).toEqual(["T-01", "T-02"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("worker harness ignores non-workbench-rebuild worker kinds", async () => {
+		const root = mkdtempSync(join(tmpdir(), "wb-scope-worker-kind-"));
+		try {
+			const coordination = new SharedArrayBuffer(
+				Int32Array.BYTES_PER_ELEMENT * 2,
+			);
+			const result = await runRebuildInWorkerForKind(
+				root,
+				"260618_alpha",
+				coordination,
+				"unrelated-worker",
+			);
+
+			expect(result).toEqual({ message: undefined });
+			expect(loadWorkBenchIndexSnapshot(root)).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

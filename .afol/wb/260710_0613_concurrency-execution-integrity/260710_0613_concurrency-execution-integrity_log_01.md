@@ -9,3 +9,10 @@
 - 2026-07-10T10:48:38.305Z - T-07 historical benchmark alias flake was not reproduced in 10 isolated runs and also passed inside coverage. Coverage exposed a different blocker: validation changed-path test returned subprocess status 2; route to T-08 release diagnosis.
 - 2026-07-10T11:12:50.046Z - 2026-07-10T11:25:00Z: Final independent review returned NO-GO with two HIGH findings: simultaneous stale-lock reclaimers could delete a replacement live lock, and the scoped-index concurrency test masked lost writes by rebuilding the full index before assertion. Dedicated non-overlapping lanes were assigned for root-cause fixes and proving regressions.
 - 2026-07-10T11:13:09.002Z - 2026-07-10T11:13:01Z: Correction: the preceding review entry carried an incorrect manually supplied timestamp (11:25:00Z). This timestamp is the command-verified UTC time; the findings and remediation assignments are unchanged.
+
+## Summary
+
+- Session `260710_0613_concurrency-execution-integrity` completed T-01 through T-08 with final report in `260710_0613_concurrency-execution-integrity_report_01.md`.
+- High-value continuity and concurrency defects were fixed, with T-05 telemetry evidence correction and final validation path documented in ledger-backed entries.
+- The benchmark flake was not reproduced in isolated runs; the two HIGH findings were resolved before final release validation.
+- This edit supplies the missing canonical `## Summary` section while preserving all timeline entries verbatim.

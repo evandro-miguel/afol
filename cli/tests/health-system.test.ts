@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import * as nodeFs from "node:fs";
 import {
 	chmodSync,
 	existsSync,
@@ -367,6 +368,45 @@ describe("health system", () => {
 				),
 			).toBe(false);
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("detectSessionHealth scans migration evidence once for multiple missing sessions", () => {
+		const root = createFixture();
+		const firstSession = "260709_1751_first-migrated-session";
+		const secondSession = "260709_1752_second-migrated-session";
+		const migrationRoot = join(root, ".afol", "data", "migrations");
+		mkdirSync(migrationRoot, { recursive: true });
+		writeFileSync(
+			join(migrationRoot, "batch.md"),
+			`${firstSession}\n${secondSession}\n`,
+			"utf8",
+		);
+		writeSessionLifecycleEvents(root, [
+			{ type: "workbench.new", session: firstSession },
+			{ type: "workbench.new", session: secondSession },
+		]);
+		const readdirSpy = spyOn(nodeFs, "readdirSync");
+		const readFileSpy = spyOn(nodeFs, "readFileSync");
+		try {
+			const warnings = detectSessionHealth(root);
+			const migrationRootReads = readdirSpy.mock.calls.filter(
+				([path]) => String(path) === migrationRoot,
+			).length;
+			const migrationFileReads = readFileSpy.mock.calls.filter(
+				([path]) => String(path) === join(migrationRoot, "batch.md"),
+			).length;
+			expect(migrationRootReads).toBe(1);
+			expect(migrationFileReads).toBe(1);
+			expect(
+				warnings.some(
+					(warning) => warning.type === "missing_session_directory",
+				),
+			).toBe(false);
+		} finally {
+			readFileSpy.mockRestore();
+			readdirSpy.mockRestore();
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

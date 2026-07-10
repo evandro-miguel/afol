@@ -156,22 +156,36 @@ function sessionTokenBoundaryRegExp(session: string): RegExp {
 	return new RegExp(`(?:^|[^A-Za-z0-9_-])${escaped}(?:$|[^A-Za-z0-9_-])`);
 }
 
-function hasMigrationRecord(root: string, session: string): boolean {
-	const trimmed = session.trim();
-	if (!trimmed) {
-		return false;
+function collectSessionsWithMigrationEvidence(
+	root: string,
+	sessions: readonly string[],
+): Set<string> {
+	const matched = new Set<string>();
+	const pending = new Map<string, { needle: string; pathMatcher: RegExp }>();
+	for (const session of sessions) {
+		const needle = session.trim();
+		if (!needle) {
+			continue;
+		}
+		pending.set(session, {
+			needle,
+			pathMatcher: sessionTokenBoundaryRegExp(needle),
+		});
 	}
+	if (pending.size === 0) {
+		return matched;
+	}
+
 	const projectPaths = resolveProjectPaths(root);
 	const migrationRoot = join(projectPaths.abs.mutableDir, "data", "migrations");
 	if (!existsSync(migrationRoot)) {
-		return false;
+		return matched;
 	}
 
-	const matcher = sessionTokenBoundaryRegExp(trimmed);
 	const stack = [migrationRoot];
 	const seen = new Set<string>();
 
-	while (stack.length > 0) {
+	while (stack.length > 0 && pending.size > 0) {
 		const current = stack.pop();
 		if (!current || seen.has(current)) {
 			continue;
@@ -190,8 +204,14 @@ function hasMigrationRecord(root: string, session: string): boolean {
 				.slice(migrationRoot.length + 1)
 				.replace(/\\/g, "/");
 			const candidate = `/${relative}`;
-			if (matcher.test(candidate)) {
-				return true;
+			for (const [session, evidence] of pending) {
+				if (evidence.pathMatcher.test(candidate)) {
+					matched.add(session);
+					pending.delete(session);
+				}
+			}
+			if (pending.size === 0) {
+				return matched;
 			}
 			if (entry.isDirectory()) {
 				stack.push(child);
@@ -204,15 +224,22 @@ function hasMigrationRecord(root: string, session: string): boolean {
 				continue;
 			}
 			try {
-				if (readFileSync(child, "utf8").includes(trimmed)) {
-					return true;
+				const content = readFileSync(child, "utf8");
+				for (const [session, evidence] of pending) {
+					if (content.includes(evidence.needle)) {
+						matched.add(session);
+						pending.delete(session);
+					}
 				}
 			} catch {
 				// ignore unreadable migration payloads for warning detection
 			}
+			if (pending.size === 0) {
+				return matched;
+			}
 		}
 	}
-	return false;
+	return matched;
 }
 
 function sessionHasArchiveDir(root: string, session: string): boolean {
@@ -988,6 +1015,7 @@ export function detectSessionHealth(root: string): SessionHealthWarning[] {
 		}
 	}
 
+	const missingSessionCandidates: string[] = [];
 	for (const [session, state] of lifecycle) {
 		if (!state.started || state.closed) {
 			continue;
@@ -998,7 +1026,15 @@ export function detectSessionHealth(root: string): SessionHealthWarning[] {
 		if (sessionHasArchiveDir(root, session)) {
 			continue;
 		}
-		if (hasMigrationRecord(root, session)) {
+		missingSessionCandidates.push(session);
+	}
+
+	const migratedSessions = collectSessionsWithMigrationEvidence(
+		root,
+		missingSessionCandidates,
+	);
+	for (const session of missingSessionCandidates) {
+		if (migratedSessions.has(session)) {
 			continue;
 		}
 		warnings.push({

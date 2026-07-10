@@ -1,12 +1,12 @@
 import {
 	closeSync,
 	existsSync,
+	fstatSync,
 	fsyncSync,
 	linkSync,
 	mkdirSync,
 	openSync,
 	readFileSync,
-	statSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -24,7 +24,12 @@ const LOCK_WAIT_BUFFER = new Int32Array(new SharedArrayBuffer(4));
 const heldLocks = new Map<string, number>();
 const HOSTNAME = hostname().toLowerCase();
 
-interface SessionLockMetadata {
+interface LockIdentity {
+	dev: bigint;
+	ino: bigint;
+}
+
+interface SessionLockMetadata extends LockIdentity {
 	isParsed: boolean;
 	pid?: number;
 	acquiredAtMs: number | null;
@@ -126,11 +131,45 @@ function parseLockMetadataText(raw: string): unknown {
 	}
 }
 
-function readLockMetadata(lockPath: string): SessionLockMetadata | null {
+function readFdIdentity(fd: number): LockIdentity {
+	const stats = fstatSync(fd, { bigint: true });
+	return { dev: stats.dev, ino: stats.ino };
+}
+
+function identitiesMatch(left: LockIdentity, right: LockIdentity): boolean {
+	return left.dev === right.dev && left.ino === right.ino;
+}
+
+function unlinkIfIdentityMatches(
+	lockPath: string,
+	expected: LockIdentity,
+): boolean {
+	let fd: number | null = null;
 	try {
-		const raw = readFileSync(lockPath, "utf8");
+		fd = openSync(lockPath, "r");
+		if (!identitiesMatch(readFdIdentity(fd), expected)) {
+			return false;
+		}
+		unlinkSync(lockPath);
+		return true;
+	} catch {
+		return false;
+	} finally {
+		if (fd !== null) {
+			closeSync(fd);
+		}
+	}
+}
+
+function readLockMetadata(lockPath: string): SessionLockMetadata | null {
+	let fd: number | null = null;
+	try {
+		fd = openSync(lockPath, "r");
+		const raw = readFileSync(fd, "utf8");
 		const parsed = parseLockMetadataText(raw);
-		const mtimeMs = statSync(lockPath).mtimeMs;
+		const stats = fstatSync(fd, { bigint: true });
+		const identity = { dev: stats.dev, ino: stats.ino };
+		const mtimeMs = Number(stats.mtimeMs);
 		if (
 			typeof parsed !== "object" ||
 			parsed === null ||
@@ -138,6 +177,7 @@ function readLockMetadata(lockPath: string): SessionLockMetadata | null {
 		) {
 			return {
 				acquiredAtMs: null,
+				...identity,
 				isParsed: false,
 				raw: raw.trim().length > 0 ? raw : null,
 				mtimeMs,
@@ -165,6 +205,7 @@ function readLockMetadata(lockPath: string): SessionLockMetadata | null {
 				: undefined;
 		return {
 			acquiredAtMs,
+			...identity,
 			...(host?.length ? { host } : {}),
 			isParsed: true,
 			...(pid !== undefined ? { pid } : {}),
@@ -173,13 +214,17 @@ function readLockMetadata(lockPath: string): SessionLockMetadata | null {
 		};
 	} catch {
 		return null;
+	} finally {
+		if (fd !== null) {
+			closeSync(fd);
+		}
 	}
 }
 
 function metadataSignature(metadata: SessionLockMetadata): string {
 	return `${metadata.pid ?? ""}|${metadata.host ?? ""}|${
 		metadata.acquiredAtMs ?? ""
-	}|${metadata.raw ?? ""}|${metadata.mtimeMs}`;
+	}|${metadata.raw ?? ""}|${metadata.mtimeMs}|${metadata.dev}|${metadata.ino}`;
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -255,12 +300,7 @@ function tryReclaimStaleLock(
 		) {
 			return false;
 		}
-		try {
-			unlinkSync(lockPath);
-			return true;
-		} catch {
-			return false;
-		}
+		return unlinkIfIdentityMatches(lockPath, claimed);
 	} finally {
 		try {
 			unlinkSync(reclaimPath);
@@ -313,7 +353,9 @@ export function withSessionLock<T>(
 	}
 
 	heldLocks.set(lockPath, 1);
+	let ownedIdentity: LockIdentity | null = null;
 	try {
+		ownedIdentity = readFdIdentity(fd);
 		writeFileSync(
 			fd,
 			`${JSON.stringify({
@@ -328,11 +370,11 @@ export function withSessionLock<T>(
 		return action();
 	} finally {
 		releaseHeldLock(lockPath);
+		if (ownedIdentity !== null) {
+			unlinkIfIdentityMatches(lockPath, ownedIdentity);
+		}
 		if (fd !== null) {
 			closeSync(fd);
 		}
-		try {
-			unlinkSync(lockPath);
-		} catch {}
 	}
 }
