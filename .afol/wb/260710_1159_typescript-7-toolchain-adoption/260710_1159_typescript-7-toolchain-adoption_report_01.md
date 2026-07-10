@@ -53,7 +53,13 @@ output_artifacts:
 - CI ordering remains frozen install, blocking typecheck, then release
   validation, with a focused regression test protecting that contract.
 - All 16 session evidence records have result `passed`.
-- No commit or push was created.
+- Commit `ee3a0d9` records the TypeScript 7 migration and its governed artifacts.
+
+## Post-Commit Erratum
+
+- The 16 original ledger records predate the final CI contract-test hardening for `validate` job scope, effective shell, working directory, and environment.
+- Those records remain valid for the commands and repository state they captured, but they are not final post-commit evidence for the four hardened CI guards.
+- Final post-commit checks and evidence IDs belong to follow-up session `260710_1427_typescript-7-post-commit-errata`.
 
 ## Delivered Changes
 
@@ -65,6 +71,7 @@ output_artifacts:
   absence of the masked script, and blocking CI step order.
 - Finalized the canonical specs-index entry and its internally consistent
   summary counts.
+- Recorded the CI contract-test correction in the governed lesson entry.
 
 ## Files Changed
 
@@ -76,6 +83,7 @@ output_artifacts:
 - `bun.lock`
 - `cli/tests/release-toolchain.test.ts`
 - `cli/tests/validate-internals.test.ts`
+- `docs/lessons/entries/20260710_1442_ci-contract-tests-must-parse-effective-configuration.md`
 - `.afol/wb/260710_1159_typescript-7-toolchain-adoption/`
 
 ## Optional Artifacts
@@ -126,12 +134,7 @@ All command results below come from the session evidence ledger.
 
 ### Clean-Snapshot Provenance Caveat
 
-The release evidence identifies the run as an exact clean disposable snapshot.
-The ledger does not retain a snapshot path, base commit, patch digest, or
-snapshot manifest. No commit or push exists for this work. The result therefore
-proves the release gate for the clean reconstructed session state, but it is not
-immutable commit provenance and it is not an in-place run from the dirty shared
-worktree.
+The original release evidence identifies its run as an exact clean disposable snapshot. The ledger does not retain a snapshot path, base commit, patch digest, or snapshot manifest. Commit `ee3a0d9` was created after those 16 records and includes the final CI contract-test hardening. The original result therefore proves the release gate for the clean reconstructed pre-hardening session state, but it is not immutable commit provenance or final post-commit proof for the hardened CI guards. Follow-up session `260710_1427_typescript-7-post-commit-errata` owns that final evidence.
 
 ## Council Review
 
@@ -155,7 +158,7 @@ worktree.
   governance-maintenance change.
 - TypeScript 7.0 still lacks the stable programmatic compiler API expected in a
   later compiler release. AFOL continues to avoid compiler API dependencies.
-- No deployment, commit, or push was performed.
+- Commit `ee3a0d9` records the migration. No deployment or push was performed by the original session.
 
 ## Output Artifacts (file-first)
 
