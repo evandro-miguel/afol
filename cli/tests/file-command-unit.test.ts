@@ -43,8 +43,8 @@ import {
 	makeDiffPreview,
 	makeMovePreview,
 	normalizeHash,
-	readTextOrEmpty,
 	readJournalBackupBytes,
+	readTextOrEmpty,
 	requireWriteContext,
 	resolveSafePath,
 } from "../commands/file/shared";

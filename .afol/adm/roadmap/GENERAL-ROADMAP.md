@@ -779,6 +779,65 @@ Follow-on slices under this direction:
   - Editor `tsgo` activation is a separate host configuration change and is not
     part of this repository feature.
 
+### F-22 Core Integrity and Transaction Safety
+
+- Status: active
+- Governing spec:
+  .afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md
+- Why: AFOL must fail closed when agents complete tasks, mutate shared files,
+  update scaffolds, bootstrap projects, or resolve governance. Current gaps can
+  admit declared-only completion, stale concurrent writes, destructive undo,
+  partial commits, and nominal governance bindings.
+- Scope:
+  - Enforce a formal task-state transition model and authorize completion only
+    through observed successful execution or an explicit typed artifact or
+    waiver policy.
+  - Serialize shared-resource mutation by canonical path, revalidate hashes at
+    commit time, make journal state auditable, and block destructive undo on
+    drift, missing backups, duplicate undo, or journal corruption.
+  - Replan scaffold updates inside one global lock, preserve project-owned
+    content, constrain stale-path removal by ownership and hash, and support
+    guarded rollback by update batch.
+  - Make bootstrap/init approval-gated, target-locked, staged, and recoverable.
+  - Validate real roadmap feature/spec bindings and protect governance,
+    pending-spec, session-context, hydration, and verification state against
+    partial failure or silent corruption.
+  - Require explicit safe inputs for quick tasks and produce consistent JSON
+    errors and collision-resistant cross-process identifiers.
+- Exit criteria:
+  - An executable task cannot reach `done` from declared-only evidence, stale
+    evidence, `n/a`, or an illegal prior state; the result identifies the
+    evidence or typed policy that authorized completion.
+  - Concurrent processes cannot lose a file mutation or scaffold update because
+    locks and hash preconditions cover the actual shared resources.
+  - Mutation, undo, update, bootstrap, governance, and session-context flows
+    either commit coherently or return a structured recoverable failure without
+    destroying newer state.
+  - Governance resolution proves that feature and active parent spec exist and
+    are linked; pending governance blocks the affected session at `start`, not
+    unrelated future work.
+  - Corrupt journal, workbench, evidence, or materialization inputs are reported
+    as integrity failures instead of being silently skipped or classified as
+    closed/fresh.
+  - Focused multi-process concurrency, fault-injection, lifecycle, update,
+    bootstrap, state hydration, strict verification, typecheck, full tests,
+    release validation, and required security scans pass.
+- Delivery phases:
+  1. Lifecycle transitions and completion authorization.
+  2. Resource locks, hash preconditions, mutation transactions, and safe undo.
+  3. Update locking, internal replan, ownership safety, and batch rollback.
+  4. Bootstrap approval, staging, target locking, and rollback.
+  5. Governance validation and transactional state integrity.
+  6. Quick-task, hydration, verifier, JSON error, and identifier hardening.
+- Risks:
+  - Tightening completion can expose historical evidence that never met the new
+    policy; compatibility must remain explicit and must not weaken new writes.
+  - Cross-cutting transaction work can become a framework rewrite; delivery
+    should share only the smallest proven lock, hash, journal, and rollback
+    primitives.
+  - Locks without deterministic ordering can deadlock; multi-resource locks
+    must use canonical paths and stable ordering.
+
 ## 6) Recommended Delivery Phases
 
 1. Strategy and design: manifesto, roadmap, specs, architecture, command
