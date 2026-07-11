@@ -14,7 +14,12 @@ import { dirname, join } from "node:path";
 import { CLI_VERSION } from "../generated/version";
 import { kernelRegistry } from "../registry";
 import { waiveSpecCheck } from "../services/spec-gate/checker";
-import { newWorkstream, recordEvidence } from "../services/workbench/lifecycle";
+import {
+	newWorkstream,
+	recordEvidence,
+	startTask,
+	transitionTask,
+} from "../services/workbench/lifecycle";
 import { readSessionContext } from "../services/workbench/session-context";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -30,6 +35,28 @@ const templateLock = JSON.stringify({
 	project: "afol",
 	locked: true,
 });
+
+function prepareDone(root: string, session: string): void {
+	startTask(root, { session, taskId: "T-01" });
+	recordEvidence(root, {
+		session,
+		taskId: "T-01",
+		command: "bun test",
+		result: "passed",
+		exitCode: 0,
+		provenance: "observed",
+	});
+	transitionTask(root, {
+		session,
+		taskId: "T-01",
+		state: "implemented_untested",
+	});
+	transitionTask(root, {
+		session,
+		taskId: "T-01",
+		state: "tested_needs_spec_validation",
+	});
+}
 
 function runKernel(cwd: string, args: string[]): ReturnType<typeof spawnSync> {
 	return spawnSync("bun", [kernelPath, ...args], {
@@ -933,6 +960,36 @@ describe("kernel front-door", () => {
 		}
 	});
 
+	test("bootstrap and init pass restricted operation context while preserving dry-run", () => {
+		const root = mkdtempSync(join(tmpdir(), "kernel-bootstrap-approval-"));
+		const bootstrapTarget = join(root, "bootstrap-target");
+		const initTarget = join(root, "init-target");
+		mkdirSync(bootstrapTarget);
+		mkdirSync(initTarget);
+		try {
+			for (const [command, target] of [
+				["bootstrap", bootstrapTarget],
+				["init", initTarget],
+			] as const) {
+				const dryRun = runKernel(root, [
+					"--agent",
+					command,
+					target,
+					"--dry-run",
+				]);
+				expect(dryRun.status).toBe(0);
+				const apply = runKernel(root, ["--agent", command, target]);
+				expect(apply.status).toBe(2);
+				expect(apply.stderr as string).toContain(
+					"requires local interactive approval",
+				);
+				expect(readdirSync(target)).toEqual([]);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("init dry-run uses current directory without requiring project files", () => {
 		const root = mkdtempSync(join(tmpdir(), "kernel-init-no-project-"));
 		try {
@@ -1289,12 +1346,7 @@ describe("kernel front-door", () => {
 		);
 		try {
 			const created = newWorkstream(root, "plain done");
-			recordEvidence(root, {
-				session: created.session,
-				taskId: "T-01",
-				command: "bun test",
-				result: "passed",
-			});
+			prepareDone(root, created.session);
 
 			const proc = runKernel(root, [
 				"done",
@@ -1322,12 +1374,7 @@ describe("kernel front-door", () => {
 				parentSpec: "spec-001",
 			});
 			writeSpec(root, "spec-001", "active");
-			recordEvidence(root, {
-				session: created.session,
-				taskId: "T-01",
-				command: "bun test",
-				result: "passed",
-			});
+			prepareDone(root, created.session);
 
 			const proc = runKernel(root, [
 				"done",
@@ -1355,12 +1402,7 @@ describe("kernel front-door", () => {
 			const created = newWorkstream(root, "no spec done", {
 				noSpecRequiredReason: "test waiver",
 			});
-			recordEvidence(root, {
-				session: created.session,
-				taskId: "T-01",
-				command: "bun test",
-				result: "passed",
-			});
+			prepareDone(root, created.session);
 
 			const proc = runKernel(root, [
 				"done",
@@ -1418,12 +1460,7 @@ describe("kernel front-door", () => {
 			});
 			writeTaskWithSpecMetadata(created.taskPath, "spec-missing");
 			waiveSpecCheck(root, created.session, "T-01", "needs override");
-			recordEvidence(root, {
-				session: created.session,
-				taskId: "T-01",
-				command: "bun test",
-				result: "passed",
-			});
+			prepareDone(root, created.session);
 
 			const proc = runKernel(root, [
 				"done",

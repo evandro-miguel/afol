@@ -1,7 +1,13 @@
 import { envelopeOk, stringifyEnvelope } from "../core/envelope";
 import {
+	defaultOperationContext,
+	type OperationContext,
+	requiresApproval,
+} from "../core/operation-context";
+import {
 	formatPendingSpecBlocker,
 	readPendingSpecIndex,
+	repairPendingSpecIndex,
 	resolvePendingSpec,
 } from "../services/governance/pending-specs";
 import { writeJsonError } from "./workbench/shared";
@@ -197,6 +203,7 @@ export function runGovernanceCommand(
 	args: string[],
 	root: string = process.cwd(),
 	io: GovernanceIo = DEFAULT_IO,
+	ctx: OperationContext = defaultOperationContext(),
 ): number {
 	try {
 		const resolvedAction = action || "pending";
@@ -204,7 +211,20 @@ export function runGovernanceCommand(
 			return runPendingCommand(args, root, io);
 		}
 		if (resolvedAction === "resolve-spec") {
+			if (requiresApproval(ctx))
+				throw new Error(
+					"governance resolve-spec requires local interactive approval",
+				);
 			return runResolveSpecCommand(args, root, io);
+		}
+		if (resolvedAction === "repair-index") {
+			if (requiresApproval(ctx))
+				throw new Error(
+					"governance repair-index requires local interactive approval",
+				);
+			const index = repairPendingSpecIndex(root);
+			io.stdout(`pending_spec index repaired: ${index.entries.length} entries`);
+			return 0;
 		}
 		throw new Error(`Unknown governance action: ${resolvedAction}`);
 	} catch (error) {

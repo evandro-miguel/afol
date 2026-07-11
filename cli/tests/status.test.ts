@@ -318,6 +318,33 @@ describe("status command", () => {
 		}
 	});
 
+	test("prioritizes intermediate validation states over pending tasks", () => {
+		const root = createFixture();
+		try {
+			const sessionId = "260530_2256_cli-native-command-parity";
+			writeFileSync(
+				join(root, ".afol", "wb", sessionId, `${sessionId}_task_01.md`),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | later work |",
+					"| T-02 | tested_needs_spec_validation | worker | validate now |",
+					"",
+				].join("\n"),
+			);
+			const captured = captureIo();
+			expect(runStatusCommand(root, [], captured.io)).toBe(0);
+			expect(captured.stdout[0]).toContain("TASK: T-02");
+			expect(captured.stdout[0]).toContain(
+				"STATUS: tested_needs_spec_validation",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("active session + stale log shows log_behind_diff=yes", () => {
 		const { root } = createFreshnessFixture("stale-log");
 		try {
@@ -692,7 +719,8 @@ describe("status command", () => {
 				string,
 				unknown
 			>;
-			expect(payload.status).toBe("none");
+			expect(payload.status).toBe("corrupt");
+			expect(payload.blockers).toContain("missing canonical task file");
 			expect(payload.task).toBe("none");
 			expect((payload.paths as Record<string, unknown>).task_file).toBeNull();
 		} finally {

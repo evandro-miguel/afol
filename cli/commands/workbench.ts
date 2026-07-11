@@ -5,18 +5,21 @@ import {
 	requiresApproval,
 } from "../core/operation-context";
 import {
-	assertNoOpenPendingSpecs,
 	formatSessionPendingSpecWarning,
 	getSessionPendingSpecNotice,
 	resolveGovernance,
 } from "../services/governance/pending-specs";
 import {
+	advanceTaskAfterObservedTest,
 	appendTimelineEntry,
 	closeSession,
 	doneTask,
+	type LifecycleAuxiliaryRuntime,
 	newWorkstream,
 	recordEvidence,
 	startTask,
+	type TaskState,
+	transitionTask,
 } from "../services/workbench/lifecycle";
 import {
 	type briefingUnavailable,
@@ -25,6 +28,7 @@ import {
 	formatStartBriefing,
 	type StartBriefing,
 } from "../services/workbench/start-briefing";
+import type { CompletionPolicy } from "../services/workbench/verify";
 import {
 	formatVerifyReport,
 	verifyWorkbenchTasks,
@@ -92,16 +96,17 @@ export async function runNewCommand(
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.new");
 		const parsed = parseNewArgs(args);
-		assertNoOpenPendingSpecs(root);
 		const governance = resolveGovernance(parsed.metadata);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
+		const creationStatus =
+			created.warnings.length > 0 ? "created_with_warnings" : "created";
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
 					envelopeOk(
 						{
 							...created,
-							status: "created",
+							status: creationStatus,
 							governance_status: governance.governanceStatus,
 							pending_spec: governance.pendingSpec,
 							pending_spec_missing: governance.missing,
@@ -116,8 +121,10 @@ export async function runNewCommand(
 		} else {
 			const lines = [
 				`session created: ${created.session}`,
+				`status: ${creationStatus}`,
 				`governance_status: ${governance.governanceStatus}`,
 			];
+			lines.push(...created.warnings.map((warning) => `warning: ${warning}`));
 			if (governance.pendingSpec) {
 				lines.push(
 					`warning: pending_spec missing=${governance.missing.join(",")}`,
@@ -147,22 +154,39 @@ export async function runStartCommand(
 	args: string[],
 	root: string = process.cwd(),
 	ctx: OperationContext = defaultOperationContext(),
+	runtime: LifecycleAuxiliaryRuntime = {},
 ): Promise<number> {
 	try {
 		assertWorkbenchMutationAllowed(ctx, "workbench.start");
 		const parsed = parseSessionTaskArgs(args, "start", root, {
 			allowAutoTask: true,
 		});
-		startTask(root, parsed);
+		const pending = getSessionPendingSpecNotice(
+			root,
+			parsed.session,
+			parsed.taskId,
+		);
+		if (pending) {
+			throw new Error(
+				`pending_spec blocks start for session ${parsed.session}; ${pending.resolutionHint.replace("<session>", parsed.session)}`,
+			);
+		}
+		const warnings = startTask(root, parsed, runtime);
 		if (parsed.compact && !parsed.brief && !parsed.json) {
-			const lines = [`task started: ${parsed.taskId}`];
+			const lines = [
+				`task started: ${parsed.taskId}`,
+				...warnings.map((warning) => `warning: ${warning}`),
+			];
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
 			console.log(lines.join("\n"));
 			return 0;
 		}
 		if (!parsed.brief) {
 			if (!parsed.json) {
-				const lines = [`task started: ${parsed.taskId}`];
+				const lines = [
+					`task started: ${parsed.taskId}`,
+					...warnings.map((warning) => `warning: ${warning}`),
+				];
 				appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
 				console.log(lines.join("\n"));
 			}
@@ -174,6 +198,7 @@ export async function runStartCommand(
 								session: parsed.session,
 								task: parsed.taskId,
 								status: "in_progress",
+								warnings,
 								...pendingSpecFields(root, parsed.session, parsed.taskId),
 							},
 							{ action: "workbench.start" },
@@ -200,6 +225,7 @@ export async function runStartCommand(
 							session: parsed.session,
 							task: parsed.taskId,
 							status: "in_progress",
+							warnings,
 							briefing,
 							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
@@ -208,7 +234,10 @@ export async function runStartCommand(
 				),
 			);
 		} else {
-			const lines = [`task started: ${parsed.taskId}`];
+			const lines = [
+				`task started: ${parsed.taskId}`,
+				...warnings.map((warning) => `warning: ${warning}`),
+			];
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
 			if (isStartBriefingUnavailable(briefing)) {
 				lines.push(`briefing: briefing_unavailable reason=${briefing.reason}`);
@@ -241,6 +270,7 @@ export async function runEvidenceCommand(
 		const record = recordEvidence(root, {
 			...parsed,
 			provenance: "declared",
+			approvalContext: ctx,
 		});
 		if (parsed.json) {
 			console.log(
@@ -251,6 +281,10 @@ export async function runEvidenceCommand(
 							session: parsed.session,
 							task: parsed.taskId,
 							result: record.result,
+							status: record.warnings?.length
+								? "committed_with_warnings"
+								: "committed",
+							warnings: record.warnings ?? [],
 							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
 						{ action: "workbench.evidence" },
@@ -259,6 +293,9 @@ export async function runEvidenceCommand(
 			);
 		} else {
 			const lines = [`evidence recorded: ${record.id}`];
+			lines.push(
+				...(record.warnings ?? []).map((warning) => `warning: ${warning}`),
+			);
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
 			console.log(lines.join("\n"));
 		}
@@ -269,6 +306,81 @@ export async function runEvidenceCommand(
 		} else {
 			console.error((error as Error).message);
 		}
+		return 2;
+	}
+}
+
+const TRANSITION_STATES = new Set<TaskState>([
+	"in_progress",
+	"implemented_untested",
+	"tested_needs_spec_validation",
+	"problem",
+	"moved",
+]);
+
+export async function runTransitionCommand(
+	args: string[],
+	root: string = process.cwd(),
+	ctx: OperationContext = defaultOperationContext(),
+	runtime: LifecycleAuxiliaryRuntime = {},
+): Promise<number> {
+	try {
+		assertWorkbenchMutationAllowed(ctx, "workbench.transition");
+		const policyIndex = args.indexOf("--completion-policy");
+		const policy = policyIndex >= 0 ? args[policyIndex + 1] : undefined;
+		if (policyIndex >= 0 && (!policy || policy.startsWith("--"))) {
+			throw new Error("Missing value for --completion-policy");
+		}
+		if (policy && !["execution", "artifact", "waiver"].includes(policy)) {
+			throw new Error(`Invalid --completion-policy: ${policy}`);
+		}
+		const policyArgs =
+			policyIndex >= 0
+				? args.filter(
+						(_, index) => index !== policyIndex && index !== policyIndex + 1,
+					)
+				: args;
+		const stateIndex = policyArgs.indexOf("--state");
+		const state = stateIndex >= 0 ? policyArgs[stateIndex + 1] : undefined;
+		if (!state || !TRANSITION_STATES.has(state as TaskState)) {
+			throw new Error(
+				`Missing or invalid --state for transition: ${state ?? ""}`,
+			);
+		}
+		const sessionArgs = policyArgs.filter(
+			(_, index) => index !== stateIndex && index !== stateIndex + 1,
+		);
+		const parsed = parseSessionTaskArgs(sessionArgs, "transition", root);
+		const warnings = transitionTask(
+			root,
+			{
+				...parsed,
+				state: state as TaskState,
+				...(policy ? { completionPolicy: policy as CompletionPolicy } : {}),
+			},
+			runtime,
+		);
+		if (parsed.json) {
+			console.log(
+				stringifyEnvelope(
+					envelopeOk(
+						{ session: parsed.session, task: parsed.taskId, state, warnings },
+						{ action: "workbench.transition" },
+					),
+				),
+			);
+		} else {
+			console.log(
+				[
+					`task transitioned: ${parsed.taskId} -> ${state}`,
+					...warnings.map((warning) => `warning: ${warning}`),
+				].join("\n"),
+			);
+		}
+		return 0;
+	} catch (error) {
+		if (hasJsonFlag(args)) writeJsonError("workbench.transition", error);
+		else console.error((error as Error).message);
 		return 2;
 	}
 }
@@ -304,6 +416,7 @@ export async function runDoneCommand(
 				return 1;
 			}
 		}
+		let observedTestPassed = false;
 		if (parsed.testCommand) {
 			const verification = runVerification(root, parsed.testCommand, {
 				shell: false,
@@ -332,6 +445,7 @@ export async function runDoneCommand(
 				}
 				return 1;
 			}
+			observedTestPassed = true;
 		}
 		if (parsed.testShellCommand) {
 			const verification = runVerification(root, parsed.testShellCommand, {
@@ -363,6 +477,7 @@ export async function runDoneCommand(
 				}
 				return 1;
 			}
+			observedTestPassed = true;
 		}
 		if (parsed.evidenceCommand && parsed.evidenceResult) {
 			recordEvidence(root, {
@@ -371,11 +486,15 @@ export async function runDoneCommand(
 				command: parsed.evidenceCommand,
 				result: parsed.evidenceResult,
 				provenance: "declared",
+				approvalContext: ctx,
 				...(parsed.artifact ? { artifact: parsed.artifact } : {}),
 				...(parsed.note ? { note: parsed.note } : {}),
 			});
 		}
-		doneTask(root, parsed);
+		if (observedTestPassed) {
+			advanceTaskAfterObservedTest(root, parsed);
+		}
+		const done = doneTask(root, parsed);
 		if (parsed.json) {
 			console.log(
 				stringifyEnvelope(
@@ -383,7 +502,11 @@ export async function runDoneCommand(
 						{
 							session: parsed.session,
 							task: parsed.taskId,
-							status: "done",
+							status: done.warnings?.length
+								? "committed_with_warnings"
+								: "done",
+							warnings: done.warnings ?? [],
+							authorizing_evidence_id: done.authorizingEvidenceId,
 							...pendingSpecFields(root, parsed.session, parsed.taskId),
 						},
 						{ action: "workbench.done" },
@@ -391,7 +514,13 @@ export async function runDoneCommand(
 				),
 			);
 		} else {
-			const lines = [`task done: ${parsed.taskId}`];
+			const lines = [
+				`task done: ${parsed.taskId}`,
+				`authorizing evidence: ${done.authorizingEvidenceId}`,
+			];
+			lines.push(
+				...(done.warnings ?? []).map((warning) => `warning: ${warning}`),
+			);
 			appendPendingSpecWarning(lines, root, parsed.session, parsed.taskId);
 			console.log(lines.join("\n"));
 		}

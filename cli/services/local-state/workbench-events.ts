@@ -7,6 +7,7 @@ import { resolveProjectWritePath } from "../project/root";
 export type WorkbenchEventKind =
 	| "workbench.new"
 	| "workbench.start_task"
+	| "workbench.transition_task"
 	| "workbench.record_evidence"
 	| "workbench.mark_done"
 	| "workbench.append_log"
@@ -38,11 +39,8 @@ export function resolveWorkbenchEventLogPath(root: string): string {
 }
 
 const WORKBENCH_EVENT_ID_PREFIX = "WSE-";
-let eventCounter = 0;
-
 function nextEventId(now: Date): string {
-	eventCounter = (eventCounter + 1) % 1_000_000;
-	return `${WORKBENCH_EVENT_ID_PREFIX}${now.getTime()}-${eventCounter.toString().padStart(6, "0")}`;
+	return `${WORKBENCH_EVENT_ID_PREFIX}${now.getTime()}-${randomUUID()}`;
 }
 
 export function appendWorkbenchEvent(
@@ -72,3 +70,5 @@ export function appendWorkbenchEvent(
 export function hasEventLog(root: string): boolean {
 	return existsSync(resolveWorkbenchEventLogPath(root));
 }
+
+import { randomUUID } from "node:crypto";

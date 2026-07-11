@@ -7,6 +7,7 @@ export type CommandKind =
 	| "start"
 	| "evidence"
 	| "done"
+	| "transition"
 	| "close"
 	| "log"
 	| "quickTask"
@@ -193,7 +194,7 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 		description: "Complete a task session",
 		category: "workflow",
 		guidance: [
-			"Record evidence before done, or use --test/--command to record evidence while closing.",
+			"Record authorizing evidence before done, or use --test to execute verification while closing.",
 		],
 		subcommands: [
 			{
@@ -208,14 +209,29 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 					"Run a verification command, record evidence, then complete",
 			},
 			{
-				usage: '--command "<cmd>" --result passed',
-				sideEffect: "write",
-				description: "Record explicit evidence while completing the task",
-			},
-			{
 				usage: "--require-spec-check",
 				sideEffect: "write",
 				description: "Block done when the linked spec check conflicts",
+			},
+		],
+	},
+	{
+		command: "transition",
+		aliases: [],
+		kind: "transition",
+		sideEffect: "write",
+		description: "Transition a task through the lifecycle state machine",
+		category: "workflow",
+		subcommands: [
+			{
+				usage: "--session <session-id> --task-id <task-id> --state <state>",
+				sideEffect: "write",
+				description: "Apply one validated task-state transition",
+			},
+			{
+				usage: "--completion-policy execution|artifact|waiver",
+				sideEffect: "write",
+				description: "Set typed completion authority in State Board Notes",
 			},
 		],
 	},
@@ -285,11 +301,6 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 					"Create, start, verify, record evidence, and close one task",
 			},
 			{
-				usage: "--result passed --artifact <path> --note <text>",
-				sideEffect: "write",
-				description: "Attach explicit evidence metadata to the quick task",
-			},
-			{
 				usage: "--feature-id <F-id> --parent-spec <spec-id>",
 				sideEffect: "write",
 				description: "Create the quick task as a governed session",
@@ -319,6 +330,11 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "resolve-spec --session <id> --no-spec-required --reason <text>",
 				sideEffect: "write",
 				description: "Waive with an explicit reason",
+			},
+			{
+				usage: "repair-index",
+				sideEffect: "write",
+				description: "Rebuild the pending_spec index explicitly",
 			},
 		],
 	},
@@ -515,6 +531,12 @@ const COMMAND_SPECS: readonly CommandSpec[] = Object.freeze([
 				usage: "apply --session <id> --task-id <id> --reason <text>",
 				sideEffect: "write",
 				description: "Apply managed updates and record mutation metadata",
+			},
+			{
+				usage: "rollback --batch-id <id> --reason <text>",
+				sideEffect: "write",
+				description:
+					"Rollback a committed update batch after hash verification",
 			},
 		],
 	},

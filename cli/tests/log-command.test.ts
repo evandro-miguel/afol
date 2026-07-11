@@ -197,7 +197,9 @@ describe("workbench command parity", () => {
 	test("compact workflow aliases preserve evidence and done metadata", () => {
 		const root = mkProjectRoot("command-parity");
 		try {
-			const created = newWorkstream(root, "command-parity");
+			const created = newWorkstream(root, "command-parity", {
+				noSpecRequiredReason: "command parity fixture",
+			});
 
 			const startProc = runKernel(root, ["st", "-S", created.session]);
 			expect(startProc.status).toBe(0);
@@ -225,14 +227,8 @@ describe("workbench command parity", () => {
 				created.session,
 				"-T",
 				"T-01",
-				"-c",
-				"bun run validate",
-				"-o",
-				"passed",
-				"--artifact",
-				"reports/validate.md",
-				"--note",
-				"closure gate",
+				"--test",
+				"true",
 			]);
 			expect(doneProc.status).toBe(0);
 
@@ -250,10 +246,9 @@ describe("workbench command parity", () => {
 			});
 			expect(evidence[1]).toMatchObject({
 				task_id: "T-01",
-				command: "bun run validate",
+				command: "true",
 				result: "passed",
-				artifact: "reports/validate.md",
-				note: "closure gate",
+				provenance: "observed",
 			});
 			expect(readFileSync(created.taskPath, "utf8")).toContain(
 				"| T-01 | done | worker |",

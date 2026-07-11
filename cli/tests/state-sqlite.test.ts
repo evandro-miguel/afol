@@ -109,6 +109,39 @@ function seedGeneratedTaskFiles(
 }
 
 describe("state sqlite", () => {
+	test("duplicate task ids abort hydration before replacing the snapshot", () => {
+		const root = createFixture();
+		try {
+			hydrateSession(root, "test-session");
+			writeFileSync(
+				join(root, ".afol", "wb", "test-session", "duplicate_task_02.md"),
+				[
+					"# Tasks",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | duplicate |",
+					"",
+				].join("\n"),
+			);
+			expect(() => hydrateSession(root, "test-session")).toThrow(
+				"Duplicate task id T-01",
+			);
+			const db = openDb(root);
+			try {
+				const rows = db
+					.query(
+						"SELECT task_id FROM tasks WHERE session_id = ? ORDER BY task_id",
+					)
+					.all("test-session") as Array<{ task_id: string }>;
+				expect(rows.map((row) => row.task_id)).toEqual(["T-01", "T-02"]);
+			} finally {
+				db.close();
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	test("openDb creates DB and tables on first open", () => {
 		const root = createFixture();
 		try {
@@ -362,6 +395,24 @@ describe("state sqlite", () => {
 				join(root, ".afol", "wb", "test-session", "plan.md"),
 				["# Plan", "", "updated plan"].join("\n"),
 				"utf8",
+			);
+			expect(isStale(root, "test-session")).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("malformed evidence aborts hydration and leaves prior snapshot stale", () => {
+		const root = createFixture();
+		try {
+			hydrateSession(root, "test-session");
+			writeFileSync(
+				join(root, ".afol", "wb", "test-session", ".evidence.jsonl"),
+				"{broken\n",
+				"utf8",
+			);
+			expect(() => hydrateSession(root, "test-session")).toThrow(
+				"Invalid evidence JSON",
 			);
 			expect(isStale(root, "test-session")).toBe(true);
 		} finally {

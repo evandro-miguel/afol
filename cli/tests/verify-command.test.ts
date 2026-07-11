@@ -159,6 +159,8 @@ describe("verify-tasks command", () => {
 				taskId: "T-01",
 				command: "bun test",
 				result: "passed",
+				exitCode: 0,
+				provenance: "observed",
 			});
 
 			const proc = runKernel(root, [
@@ -231,6 +233,8 @@ describe("verify-tasks command", () => {
 				taskId: "T-01",
 				command: "bun test",
 				result: "passed",
+				exitCode: 0,
+				provenance: "observed",
 			});
 
 			const proc = runKernel(root, [

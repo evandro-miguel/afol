@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { atomicWriteText } from "../io/atomic";
+import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
 import { readActiveSession } from "./lifecycle";
 
@@ -35,6 +36,7 @@ type SessionBindingInput = {
 };
 
 const EMPTY_CONTEXT: SessionContext = { bindings: [] };
+const SESSION_CONTEXT_LOCK = "__session-context__";
 
 function contextPath(root: string): string {
 	return join(resolveProjectPaths(root).abs.wbDir, "session-context.json");
@@ -70,19 +72,18 @@ function parseBinding(input: unknown): SessionBinding | null {
 
 function parseContext(input: unknown): SessionContext {
 	if (input === null || typeof input !== "object" || Array.isArray(input)) {
-		return EMPTY_CONTEXT;
+		throw new Error("Invalid session context: expected object");
 	}
 	const record = input as Record<string, unknown>;
 	const bindingsRaw = record.bindings;
 	if (!Array.isArray(bindingsRaw)) {
-		return EMPTY_CONTEXT;
+		throw new Error("Invalid session context: bindings must be an array");
 	}
 	const bindings: SessionBinding[] = [];
 	for (const entry of bindingsRaw) {
 		const parsed = parseBinding(entry);
-		if (parsed) {
-			bindings.push(parsed);
-		}
+		if (!parsed) throw new Error("Invalid session context binding");
+		bindings.push(parsed);
 	}
 	return { bindings };
 }
@@ -205,12 +206,18 @@ export function readSessionContext(root: string): SessionContext {
 	if (!existsSync(path)) {
 		return EMPTY_CONTEXT;
 	}
+	const raw = readFileSync(path, "utf8");
 	try {
-		const raw = readFileSync(path, "utf8");
 		return parseContext(JSON.parse(raw) as unknown);
-	} catch {
-		return EMPTY_CONTEXT;
+	} catch (error) {
+		throw new Error(
+			`Invalid session context ${path}: ${(error as Error).message}`,
+		);
 	}
+}
+
+export function withSessionContextLock<T>(root: string, action: () => T): T {
+	return withSessionLock(root, SESSION_CONTEXT_LOCK, action);
 }
 
 export function writeSessionContext(root: string, ctx: SessionContext): void {
@@ -221,18 +228,20 @@ export function bindSession(
 	root: string,
 	input: SessionBindingInput,
 ): SessionBinding {
-	const context = readSessionContext(root);
-	const nextContext = upsertBinding(context, input);
-	writeContext(root, nextContext);
-	const session = normalizeText(input.session);
-	if (!session) {
-		throw new Error("Missing session identifier for binding.");
-	}
-	const binding = nextContext.bindings[nextContext.bindings.length - 1];
-	if (!binding) {
-		throw new Error("Failed to persist session binding.");
-	}
-	return binding;
+	return withSessionContextLock(root, () => {
+		const context = readSessionContext(root);
+		const nextContext = upsertBinding(context, input);
+		writeContext(root, nextContext);
+		const session = normalizeText(input.session);
+		if (!session) {
+			throw new Error("Missing session identifier for binding.");
+		}
+		const binding = nextContext.bindings[nextContext.bindings.length - 1];
+		if (!binding) {
+			throw new Error("Failed to persist session binding.");
+		}
+		return binding;
+	});
 }
 
 export function resolveContextSession(root: string): string | null {
@@ -264,19 +273,21 @@ export function listBindings(root: string): SessionBinding[] {
 }
 
 export function removeBinding(root: string, session: string): boolean {
-	const targetSession = normalizeText(session);
-	if (!targetSession) {
-		return false;
-	}
-	const context = readSessionContext(root);
-	const nextBindings = context.bindings.filter(
-		(binding) => binding.session !== targetSession,
-	);
-	if (nextBindings.length === context.bindings.length) {
-		return false;
-	}
-	writeContext(root, { bindings: nextBindings });
-	return true;
+	return withSessionContextLock(root, () => {
+		const targetSession = normalizeText(session);
+		if (!targetSession) {
+			return false;
+		}
+		const context = readSessionContext(root);
+		const nextBindings = context.bindings.filter(
+			(binding) => binding.session !== targetSession,
+		);
+		if (nextBindings.length === context.bindings.length) {
+			return false;
+		}
+		writeContext(root, { bindings: nextBindings });
+		return true;
+	});
 }
 
 export function resolveSession(

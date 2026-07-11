@@ -10,19 +10,28 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runStartCommand, runTransitionCommand } from "../commands/workbench";
+import {
+	agentOperationContext,
+	defaultOperationContext,
+} from "../core/operation-context";
 import { readTelemetryEvents } from "../services/events/telemetry";
 import { resolvePendingSpec } from "../services/governance/pending-specs";
 import { validateFilesIndex } from "../services/local-state/project-indexes";
 import { resolveWorkbenchEventLogPath } from "../services/local-state/workbench-events";
 import { validateWorkBenchIndex } from "../services/local-state/workbench-index";
+import { resolveProjectPaths } from "../services/project/paths";
 import {
+	advanceTaskAfterObservedTest,
 	appendTimelineEntry,
 	closeSession,
 	doneTask,
 	isSessionClosed,
 	newWorkstream,
-	recordEvidence,
+	type RecordEvidenceInput,
+	recordEvidence as recordEvidenceRaw,
 	startTask,
+	transitionTask,
 } from "../services/workbench/lifecycle";
 import {
 	briefingUnavailableFor,
@@ -34,6 +43,45 @@ const kernelPath = `${process.cwd()}/cli/main.ts`;
 
 function mkRoot(name: string): string {
 	return mkdtempSync(join(tmpdir(), `wb-lifecycle-${name}-`));
+}
+
+function recordRawEvidence(root: string, input: RecordEvidenceInput) {
+	return recordEvidenceRaw(root, input);
+}
+
+function recordObservedSuccess(root: string, input: RecordEvidenceInput) {
+	return recordEvidenceRaw(root, {
+		...input,
+		exitCode: input.exitCode ?? 0,
+		provenance: "observed",
+	});
+}
+
+function recordObservedCompletion(root: string, input: RecordEvidenceInput) {
+	const taskPath = join(
+		resolveProjectPaths(root).abs.wbDir,
+		input.session,
+		`${input.session}_task_01.md`,
+	);
+	const state = (): string => {
+		const match = readFileSync(taskPath, "utf8").match(
+			new RegExp(`^\\|\\s*${input.taskId}\\s*\\|\\s*([^|]+)\\|`, "m"),
+		);
+		return match?.[1]?.trim() ?? "";
+	};
+	if (state() === "pending") {
+		startTask(root, input);
+	}
+	if (state() === "in_progress") {
+		transitionTask(root, { ...input, state: "implemented_untested" });
+	}
+	if (state() === "implemented_untested") {
+		transitionTask(root, {
+			...input,
+			state: "tested_needs_spec_validation",
+		});
+	}
+	return recordObservedSuccess(root, input);
 }
 
 function waitForExit(
@@ -166,13 +214,13 @@ describe("workbench lifecycle service", () => {
 				tasks: ["Investigate parser state", "Patch lifecycle renderer"],
 			});
 
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
 				result: "passed",
 			});
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-02",
 				command: "bun test",
@@ -246,7 +294,9 @@ describe("workbench lifecycle service", () => {
 				"workbench.new denied for agent callers",
 			);
 
-			const created = newWorkstream(root, "cli done json");
+			const created = newWorkstream(root, "cli done json", {
+				noSpecRequiredReason: "json lifecycle fixture",
+			});
 			const startProc = runKernel(root, [
 				"start",
 				"--session",
@@ -269,10 +319,13 @@ describe("workbench lifecycle service", () => {
 				(startEnvelope.data as Record<string, unknown>).briefing,
 			).toBeUndefined();
 
+			const briefCreated = newWorkstream(root, "cli start brief json", {
+				noSpecRequiredReason: "briefing fixture",
+			});
 			const startBriefProc = runKernel(root, [
 				"start",
 				"--session",
-				created.session,
+				briefCreated.session,
 				"--json",
 				"--task-id",
 				"T-01",
@@ -290,7 +343,7 @@ describe("workbench lifecycle service", () => {
 			).toMatchObject({
 				schema: "afol_start_briefing_v1",
 				project: {
-					session: created.session,
+					session: briefCreated.session,
 					task: "T-01",
 				},
 				resume: {
@@ -345,7 +398,7 @@ describe("workbench lifecycle service", () => {
 				"Verification failed.",
 			);
 
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -414,7 +467,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("cli pending_spec blocks new sessions until resolved", () => {
+	test("cli pending_spec blocks its own start while unrelated new remains allowed", () => {
 		const root = mkRoot("pending-spec");
 		try {
 			writeCliProjectContract(root);
@@ -434,8 +487,8 @@ describe("workbench lifecycle service", () => {
 				"--task-id",
 				"T-01",
 			]);
-			expect(start.status).toBe(0);
-			expect(start.stdout as string).toContain("warning: pending_spec");
+			expect(start.status).toBe(2);
+			expect(start.stderr as string).toContain("pending_spec blocks start");
 
 			const evidence = runKernel(root, [
 				"evidence",
@@ -449,7 +502,6 @@ describe("workbench lifecycle service", () => {
 				"passed",
 			]);
 			expect(evidence.status).toBe(0);
-			expect(evidence.stdout as string).toContain("warning: pending_spec");
 
 			const done = runKernel(root, [
 				"done",
@@ -457,21 +509,20 @@ describe("workbench lifecycle service", () => {
 				session,
 				"--task-id",
 				"T-01",
+				"--test",
+				"true",
 			]);
-			expect(done.status).toBe(0);
-			expect(done.stdout as string).toContain("warning: pending_spec");
+			expect(done.status).toBe(2);
 
-			writeFileSync(
-				join(root, ".afol", "data", "governance", "pending-specs.json"),
-				"{not valid json",
-				"utf8",
-			);
-
-			const blocked = runKernel(root, ["new", "blocked next", "--json"]);
-			expect(blocked.status).toBe(2);
-			expect(blocked.stdout as string).toContain(
-				"open pending_spec blocks new sessions",
-			);
+			const unrelated = runKernel(root, [
+				"new",
+				"unrelated",
+				"--no-spec-required",
+				"--reason",
+				"independent fixture",
+				"--json",
+			]);
+			expect(unrelated.status).toBe(0);
 
 			const pending = runKernel(root, ["governance", "pending", "--json"]);
 			expect(pending.status).toBe(0);
@@ -489,16 +540,15 @@ describe("workbench lifecycle service", () => {
 				"resolve-spec",
 				"--session",
 				session,
-				"--feature-id",
-				"F-01",
-				"--parent-spec",
-				"spec-01",
+				"--no-spec-required",
+				"--reason",
+				"pending fixture waiver",
 				"--json",
 			]);
 			expect(resolved.status).toBe(0);
 			const resolvedEnvelope = parseEnvelope(resolved.stdout as string);
 			expect((resolvedEnvelope.data as Record<string, unknown>).status).toBe(
-				"resolved",
+				"waived",
 			);
 
 			const next = runKernel(root, [
@@ -520,32 +570,44 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("quick-task records pending_spec and blocks the next session", () => {
+	test("quick-task requires explicit governance and never creates pending_spec", () => {
 		const root = mkRoot("quick-task-pending-spec");
 		try {
 			writeCliProjectContract(root);
+			const missingCommand = runKernel(root, [
+				"quick-task",
+				"missing command",
+				"--no-spec-required",
+				"--reason",
+				"test",
+			]);
+			expect(missingCommand.status).toBe(2);
+			expect(existsSync(join(root, ".afol", "wb"))).toBe(false);
 
 			const quickTask = runKernel(root, [
 				"quick-task",
 				"quick missing spec",
 				"--command",
 				"true",
+				"--no-spec-required",
+				"--reason",
+				"quick fixture waiver",
 				"--json",
 			]);
 			expect(quickTask.status).toBe(0);
 			const quickTaskEnvelope = parseEnvelope(quickTask.stdout as string);
 			const quickTaskData = quickTaskEnvelope.data as Record<string, unknown>;
-			expect(quickTaskData.governance_status).toBe("pending_spec");
-			expect(quickTaskData.pending_spec).toBe(true);
-			expect(quickTaskData.pending_spec_resolution_hint).toContain(
-				"afol governance resolve-spec",
-			);
+			expect(quickTaskData.governance_status).toBe("unbound");
+			expect(quickTaskData.pending_spec).toBe(false);
 
-			const blocked = runKernel(root, ["new", "blocked after quick-task"]);
-			expect(blocked.status).toBe(2);
-			expect(blocked.stderr as string).toContain(
-				"open pending_spec blocks new sessions",
-			);
+			const next = runKernel(root, [
+				"new",
+				"after quick-task",
+				"--no-spec-required",
+				"--reason",
+				"independent fixture",
+			]);
+			expect(next.status).toBe(0);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -710,6 +772,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			writeCliProjectContract(root);
 			const created = newWorkstream(root, "done-test-non-shell");
+			startTask(root, { session: created.session, taskId: "T-01" });
 			const proc = runKernel(root, [
 				"done",
 				"--session",
@@ -738,6 +801,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			writeCliProjectContract(root);
 			const created = newWorkstream(root, "done-test-provenance");
+			startTask(root, { session: created.session, taskId: "T-01" });
 			const proc = runKernel(root, [
 				"done",
 				"--session",
@@ -780,7 +844,9 @@ describe("workbench lifecycle service", () => {
 	test("startTask marks row in_progress", () => {
 		const root = mkRoot("start");
 		try {
-			const created = newWorkstream(root, "start-task");
+			const created = newWorkstream(root, "start-task", {
+				noSpecRequiredReason: "briefing fixture",
+			});
 			startTask(root, { session: created.session, taskId: "T-01" });
 
 			const taskDoc = readFileSync(created.taskPath, "utf8");
@@ -833,7 +899,9 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("start-human-brief");
 		try {
 			writeCliProjectContract(root);
-			const created = newWorkstream(root, "start-task");
+			const created = newWorkstream(root, "start-task", {
+				noSpecRequiredReason: "briefing fixture",
+			});
 			const proc = runKernel(root, [
 				"start",
 				"--session",
@@ -913,7 +981,9 @@ describe("workbench lifecycle service", () => {
 				"GENERAL-ROADMAP.md",
 			);
 			mkdirSync(roadmapPath, { recursive: true });
-			const created = newWorkstream(root, "start-task");
+			const created = newWorkstream(root, "start-task", {
+				noSpecRequiredReason: "briefing fallback fixture",
+			});
 			const proc = runKernel(root, [
 				"start",
 				"--session",
@@ -946,7 +1016,9 @@ describe("workbench lifecycle service", () => {
 				"GENERAL-ROADMAP.md",
 			);
 			mkdirSync(roadmapPath, { recursive: true });
-			const created = newWorkstream(root, "start-task");
+			const created = newWorkstream(root, "start-task", {
+				noSpecRequiredReason: "briefing fallback fixture",
+			});
 			const proc = runKernel(root, [
 				"start",
 				"--session",
@@ -1073,7 +1145,7 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("evidence");
 		try {
 			const created = newWorkstream(root, "record-evidence");
-			const entry = recordEvidence(root, {
+			const entry = recordEvidenceRaw(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1112,7 +1184,7 @@ describe("workbench lifecycle service", () => {
 		}
 	});
 
-	test("doneTask reads legacy evidence without provenance", () => {
+	test("doneTask rejects legacy evidence without provenance", () => {
 		const root = mkRoot("legacy-evidence-provenance");
 		try {
 			const created = newWorkstream(root, "legacy-evidence-provenance");
@@ -1130,9 +1202,9 @@ describe("workbench lifecycle service", () => {
 
 			expect(() =>
 				doneTask(root, { session: created.session, taskId: "T-01" }),
-			).not.toThrow();
+			).toThrow("authorization must be observed with exit_code 0");
 			expect(readFileSync(created.taskPath, "utf8")).toContain(
-				"| T-01 | done | worker |",
+				"| T-01 | pending | worker |",
 			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1145,7 +1217,7 @@ describe("workbench lifecycle service", () => {
 			const created = newWorkstream(root, "record-evidence-missing-task");
 
 			expect(() =>
-				recordEvidence(root, {
+				recordObservedCompletion(root, {
 					session: created.session,
 					taskId: "T-02",
 					command: "bun test",
@@ -1172,6 +1244,9 @@ describe("workbench lifecycle service", () => {
 				"quick task parity",
 				"--command",
 				"bun --version",
+				"--no-spec-required",
+				"--reason",
+				"quick task fixture",
 				"--json",
 			]);
 			expect(proc.status).toBe(0);
@@ -1196,6 +1271,9 @@ describe("workbench lifecycle service", () => {
 				"quick task failed",
 				"--command",
 				"false",
+				"--no-spec-required",
+				"--reason",
+				"quick task failure fixture",
 				"--json",
 			]);
 			expect(proc.status).toBe(1);
@@ -1204,7 +1282,7 @@ describe("workbench lifecycle service", () => {
 			};
 			expect(payload.error.message).toContain("failed_step=verification");
 			expect(payload.error.message).toContain(
-				"--result passed was downgraded to failed",
+				"--command failed with exit code",
 			);
 			const session = payload.error.message.match(/session=([^ ]+)/)?.[1];
 			expect(session).toBeTruthy();
@@ -1321,7 +1399,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			const created = newWorkstream(root, "local-state");
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1371,7 +1449,7 @@ describe("workbench lifecycle service", () => {
 
 			const second = newWorkstream(root, "local-state-second");
 			startTask(root, { session: second.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: second.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1421,21 +1499,25 @@ describe("workbench lifecycle service", () => {
 				doneTask(root, { session: created.session, taskId: "T-01" }),
 			).toThrow("requires passed evidence");
 
-			recordEvidence(root, {
+			recordRawEvidence(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
 				result: "failed",
+				exitCode: 1,
+				provenance: "observed",
 			});
 			expect(() =>
 				doneTask(root, { session: created.session, taskId: "T-01" }),
 			).toThrow("requires passed evidence");
 
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
 				result: "green",
+				exitCode: 0,
+				provenance: "observed",
 			});
 			doneTask(root, { session: created.session, taskId: "T-01" });
 
@@ -1451,17 +1533,19 @@ describe("workbench lifecycle service", () => {
 		try {
 			const created = newWorkstream(root, "done-task-latest-failed");
 
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
 				result: "passed",
 			});
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test --flag flaky",
 				result: "failed",
+				exitCode: 1,
+				provenance: "observed",
 			});
 
 			expect(() =>
@@ -1476,7 +1560,7 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("done-exit-code");
 		try {
 			const created = newWorkstream(root, "done-task-exit-code");
-			recordEvidence(root, {
+			recordEvidenceRaw(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: 'bun -e "process.exit(1)"',
@@ -1506,11 +1590,13 @@ describe("workbench lifecycle service", () => {
 			const root = mkRoot(`done-descriptive-result-${index}`);
 			try {
 				const created = newWorkstream(root, "done descriptive result");
-				recordEvidence(root, {
+				recordRawEvidence(root, {
 					session: created.session,
 					taskId: "T-01",
 					command: "bun test",
 					result,
+					exitCode: 0,
+					provenance: "observed",
 				});
 
 				expect(() =>
@@ -1553,7 +1639,7 @@ describe("workbench lifecycle service", () => {
 				"blocking tasks",
 			);
 
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1583,7 +1669,7 @@ describe("workbench lifecycle service", () => {
 			const created = newWorkstream(root, "closed-session-mutation");
 
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1630,7 +1716,7 @@ describe("workbench lifecycle service", () => {
 				startTask(root, { session: created.session, taskId: "T-01" }),
 			).toThrow(closedMessage);
 			expect(() =>
-				recordEvidence(root, {
+				recordObservedCompletion(root, {
 					session: created.session,
 					taskId: "T-01",
 					command: "bun test",
@@ -1679,7 +1765,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			const created = newWorkstream(root, "closed without events");
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1697,7 +1783,7 @@ describe("workbench lifecycle service", () => {
 				startTask(root, { session: created.session, taskId: "T-01" }),
 			).toThrow(closedMessage);
 			expect(() =>
-				recordEvidence(root, {
+				recordObservedCompletion(root, {
 					session: created.session,
 					taskId: "T-01",
 					command: "bun test --rerun",
@@ -1715,7 +1801,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			const created = newWorkstream(root, "close recovery");
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1751,7 +1837,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			const created = newWorkstream(root, "close idempotent no pointer");
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1781,7 +1867,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			const closed = newWorkstream(root, "closed session");
 			startTask(root, { session: closed.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: closed.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1817,7 +1903,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			const created = newWorkstream(root, "close recovery local state");
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -1869,13 +1955,14 @@ describe("workbench lifecycle service", () => {
 		const root = mkRoot("missing-task-lifecycle-guard");
 		try {
 			const created = newWorkstream(root, "missing task lifecycle guard");
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
 				result: "passed",
 			});
 			rmSync(created.taskPath);
+			expect(isSessionClosed(root, created.session)).toBe(false);
 			const before = {
 				evidence: readFileSync(created.evidencePath, "utf8"),
 				log: readFileSync(created.logPath, "utf8"),
@@ -1886,7 +1973,7 @@ describe("workbench lifecycle service", () => {
 				startTask(root, { session: created.session, taskId: "T-01" }),
 			).toThrow();
 			expect(() =>
-				recordEvidence(root, {
+				recordObservedCompletion(root, {
 					session: created.session,
 					taskId: "T-01",
 					command: "bun test --rerun",
@@ -1942,7 +2029,7 @@ describe("workbench lifecycle service", () => {
 			try {
 				const created = newWorkstream(root, `closed governance ${resolution}`);
 				startTask(root, { session: created.session, taskId: "T-01" });
-				recordEvidence(root, {
+				recordObservedCompletion(root, {
 					session: created.session,
 					taskId: "T-01",
 					command: "bun test",
@@ -1967,6 +2054,20 @@ describe("workbench lifecycle service", () => {
 					closedBefore.match(/^closed_at: "([^"]+)"$/m)?.[1] ?? "";
 				expect(closedAt).not.toBe("");
 				expect(isSessionClosed(root, created.session)).toBe(true);
+				if (resolution === "resolved") {
+					mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+					mkdirSync(join(root, ".afol", "adm", "specs"), { recursive: true });
+					writeFileSync(
+						join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+						"# Roadmap\n\n### F-01 Test feature\n\n- Status: active\n- Governing spec: .afol/adm/specs/spec-01.md\n",
+						"utf8",
+					);
+					writeFileSync(
+						join(root, ".afol", "adm", "specs", "spec-01.md"),
+						"---\nid: spec-01\nstatus: active\nroadmap_feature: F-01\n---\n\n# Spec\n",
+						"utf8",
+					);
+				}
 
 				Bun.sleepSync(5);
 				const entry = resolvePendingSpec(
@@ -1998,7 +2099,7 @@ describe("workbench lifecycle service", () => {
 				expect(isSessionClosed(root, created.session)).toBe(true);
 				expect(() => closeSession(root, created.session)).not.toThrow();
 				expect(() =>
-					recordEvidence(root, {
+					recordEvidenceRaw(root, {
 						session: created.session,
 						taskId: "T-01",
 						command: "bun test --rerun",
@@ -2016,7 +2117,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			const created = newWorkstream(root, "close diagnostic failure");
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -2048,7 +2149,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			const created = newWorkstream(root, "close legacy task");
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -2100,7 +2201,7 @@ describe("workbench lifecycle service", () => {
 			const created = newWorkstream(root, "terminal-before-close");
 
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -2109,7 +2210,7 @@ describe("workbench lifecycle service", () => {
 			doneTask(root, { session: created.session, taskId: "T-01" });
 
 			expect(() =>
-				recordEvidence(root, {
+				recordObservedCompletion(root, {
 					session: created.session,
 					taskId: "T-01",
 					command: "bun test --rerun",
@@ -2168,7 +2269,7 @@ describe("workbench lifecycle service", () => {
 		try {
 			const closed = newWorkstream(root, "closed event owner");
 			startTask(root, { session: closed.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: closed.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -2204,7 +2305,7 @@ describe("workbench lifecycle service", () => {
 			});
 
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -2212,7 +2313,7 @@ describe("workbench lifecycle service", () => {
 			});
 			doneTask(root, { session: created.session, taskId: "T-01" });
 			startTask(root, { session: created.session, taskId: "T-02" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-02",
 				command: "bun test",
@@ -2234,6 +2335,43 @@ describe("workbench lifecycle service", () => {
 			expect(warnings).toContain("final report artifact is missing");
 			expect(warnings).toContain("log summary section is missing");
 			expect(existsSync(created.activeSessionPath)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("single high-impact task requires report while typed trivial task does not", () => {
+		const root = mkRoot("impact-report");
+		try {
+			const created = newWorkstream(root, "impact report", {
+				noSpecRequiredReason: "fixture",
+			});
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			const original = readFileSync(created.taskPath, "utf8");
+			writeFileSync(
+				created.taskPath,
+				original.replace(
+					/^(\| T-01 \| done \| [^|]+ \|)(.*)$/m,
+					"$1 impact=high $2",
+				),
+			);
+			expect(() => closeSession(root, created.session)).toThrow(
+				"requires a final report artifact",
+			);
+			writeFileSync(
+				created.taskPath,
+				readFileSync(created.taskPath, "utf8").replace(
+					"impact=high",
+					"impact=trivial",
+				),
+			);
+			expect(closeSession(root, created.session)).toEqual(expect.any(Array));
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -2265,7 +2403,7 @@ describe("workbench lifecycle service", () => {
 			);
 
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -2285,7 +2423,7 @@ describe("workbench lifecycle service", () => {
 			writeCliProjectContract(root);
 			const created = newWorkstream(root, "close-command-warnings-json");
 			startTask(root, { session: created.session, taskId: "T-01" });
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -2325,7 +2463,7 @@ describe("workbench lifecycle service", () => {
 				tasks: ["Patch lifecycle renderer", "Verify multi-task closure"],
 			});
 
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test",
@@ -2336,7 +2474,7 @@ describe("workbench lifecycle service", () => {
 				"blocking tasks",
 			);
 
-			recordEvidence(root, {
+			recordObservedCompletion(root, {
 				session: created.session,
 				taskId: "T-02",
 				command: "bun test",
@@ -2396,12 +2534,23 @@ describe("workbench lifecycle service", () => {
 
 			startTask(root, { session: created.session, taskId: "T-01" });
 
-			recordEvidence(root, {
+			recordObservedSuccess(root, {
 				session: created.session,
 				taskId: "T-01",
 				command: "bun test --filter foo",
 				result: "passed",
 				provenance: "observed",
+				exitCode: 0,
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
 			});
 
 			doneTask(root, { session: created.session, taskId: "T-01" });
@@ -2457,6 +2606,817 @@ describe("workbench lifecycle service", () => {
 			expect(wbTypes.has("workbench.close")).toBe(true);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("task completion authorization and transitions", () => {
+	test("observed success before problem and restart cannot authorize done", () => {
+		const root = mkRoot("stale-after-restart");
+		try {
+			const created = newWorkstream(root, "stale evidence", {
+				noSpecRequiredReason: "test fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidenceRaw(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+				exitCode: 0,
+				provenance: "observed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "problem",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "in_progress",
+			});
+			advanceTaskAfterObservedTest(root, {
+				session: created.session,
+				taskId: "T-01",
+			});
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("after the latest problem/restart");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("observed test advancement follows only the remaining legal edges", () => {
+		for (const initial of [
+			"in_progress",
+			"implemented_untested",
+			"tested_needs_spec_validation",
+		] as const) {
+			const root = mkRoot(`test-advance-${initial}`);
+			try {
+				const created = newWorkstream(root, initial, {
+					noSpecRequiredReason: "fixture",
+				});
+				startTask(root, { session: created.session, taskId: "T-01" });
+				if (initial !== "in_progress")
+					transitionTask(root, {
+						session: created.session,
+						taskId: "T-01",
+						state: "implemented_untested",
+					});
+				if (initial === "tested_needs_spec_validation")
+					transitionTask(root, {
+						session: created.session,
+						taskId: "T-01",
+						state: "tested_needs_spec_validation",
+					});
+				advanceTaskAfterObservedTest(root, {
+					session: created.session,
+					taskId: "T-01",
+				});
+				const task = readFileSync(created.taskPath, "utf8");
+				expect(task).toContain("| T-01 | tested_needs_spec_validation |");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+	test("artifact policy stores a hash and blocks completion after artifact drift", () => {
+		const root = mkRoot("artifact-policy");
+		try {
+			const created = newWorkstream(root, "artifact policy", {
+				noSpecRequiredReason: "test fixture",
+			});
+			const artifactPath = join(root, "result.txt");
+			writeFileSync(artifactPath, "v1\n");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+				completionPolicy: "artifact",
+			});
+			const evidence = recordEvidenceRaw(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "artifact review",
+				result: "passed",
+				artifact: "result.txt",
+				provenance: "declared",
+			});
+			expect(evidence.artifact_sha256).toMatch(/^[a-f0-9]{64}$/);
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			writeFileSync(artifactPath, "v2\n");
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("changed after evidence");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("waiver policy requires reason and explicit local approval audit metadata", () => {
+		const root = mkRoot("waiver-policy");
+		try {
+			const created = newWorkstream(root, "waiver policy", {
+				noSpecRequiredReason: "test fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+				completionPolicy: "waiver",
+			});
+			expect(() =>
+				recordEvidenceRaw(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "waiver",
+					result: "passed",
+					note: "not executable",
+				}),
+			).toThrow("trusted local context");
+			const evidence = recordEvidenceRaw(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "waiver",
+				result: "passed",
+				note: "not executable",
+				approvalContext: defaultOperationContext(),
+			});
+			expect(evidence.waiver_reason).toBe("not executable");
+			expect(evidence.approved_by).toBe("local:interactive");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("restricted callers cannot self-approve waiver evidence", () => {
+		const root = mkRoot("waiver-restricted");
+		try {
+			const created = newWorkstream(root, "waiver restricted", {
+				noSpecRequiredReason: "test fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+				completionPolicy: "waiver",
+			});
+			expect(() =>
+				recordEvidenceRaw(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "waiver",
+					result: "passed",
+					note: "not executable",
+					approvalContext: agentOperationContext(),
+				}),
+			).toThrow("trusted local context");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("committed problem transition invalidates evidence when its event fails", () => {
+		const root = mkRoot("attempt-event-failure");
+		try {
+			const created = newWorkstream(root, "attempt event failure", {
+				noSpecRequiredReason: "test fixture",
+			});
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			const warnings = transitionTask(
+				root,
+				{ session: created.session, taskId: "T-01", state: "problem" },
+				{
+					beforeAuxiliary(label) {
+						if (label === "workbench transition event")
+							throw new Error("disk full");
+					},
+				},
+			);
+			expect(warnings.join("\n")).toContain("disk full");
+			transitionTask(
+				root,
+				{ session: created.session, taskId: "T-01", state: "in_progress" },
+				{
+					beforeAuxiliary(label) {
+						if (label === "workbench transition event")
+							throw new Error("disk full");
+					},
+				},
+			);
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("latest problem/restart transition");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+	test("transition command emits JSON and uses the formal boundary", () => {
+		const root = mkRoot("transition-json");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "transition json");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const proc = runKernel(root, [
+				"transition",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--state",
+				"implemented_untested",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			expect(parseEnvelope(proc.stdout as string)).toMatchObject({
+				ok: true,
+				action: "workbench.transition",
+				data: {
+					session: created.session,
+					task: "T-01",
+					state: "implemented_untested",
+				},
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition preserves explicit session without a completion policy", async () => {
+		const root = mkRoot("transition-explicit-session");
+		try {
+			const first = newWorkstream(root, "first transition session", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: first.session, taskId: "T-01" });
+			newWorkstream(root, "active transition session", {
+				noSpecRequiredReason: "fixture",
+			});
+			expect(
+				await runTransitionCommand(
+					[
+						"--session",
+						first.session,
+						"--task-id",
+						"T-01",
+						"--state",
+						"implemented_untested",
+					],
+					root,
+				),
+			).toBe(0);
+			expect(readFileSync(first.taskPath, "utf8")).toContain(
+				"| T-01 | implemented_untested |",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("transition rejects completion-policy without a value", async () => {
+		const root = mkRoot("transition-missing-policy");
+		try {
+			const created = newWorkstream(root, "missing transition policy", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			expect(
+				await runTransitionCommand(
+					[
+						"--session",
+						created.session,
+						"--task-id",
+						"T-01",
+						"--state",
+						"implemented_untested",
+						"--completion-policy",
+					],
+					root,
+				),
+			).toBe(2);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | in_progress |",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("start command surfaces durable warnings in every output mode", async () => {
+		for (const mode of ["default", "compact", "json", "brief"] as const) {
+			const root = mkRoot(`start-warning-${mode}`);
+			const output: string[] = [];
+			const originalLog = console.log;
+			try {
+				const created = newWorkstream(root, `start warning ${mode}`, {
+					noSpecRequiredReason: "fixture",
+				});
+				console.log = (...values: unknown[]) => output.push(values.join(" "));
+				const args = ["--session", created.session, "--task-id", "T-01"];
+				if (mode === "compact") args.push("--compact");
+				if (mode === "json") args.push("--json");
+				if (mode === "brief") args.push("--brief");
+				expect(
+					await runStartCommand(args, root, undefined, {
+						beforeAuxiliary: (label) => {
+							if (label === "workbench start event")
+								throw new Error("injected");
+						},
+					}),
+				).toBe(0);
+				expect(output.join("\n")).toContain(
+					"workbench start event failed after durable commit: injected",
+				);
+			} finally {
+				console.log = originalLog;
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("transition reports auxiliary failure as a committed warning", async () => {
+		const root = mkRoot("transition-aux-warning");
+		const output: string[] = [];
+		const originalLog = console.log;
+		try {
+			const created = newWorkstream(root, "transition aux warning", {
+				noSpecRequiredReason: "fixture",
+			});
+			startTask(root, { session: created.session, taskId: "T-01" });
+			console.log = (...values: unknown[]) => output.push(values.join(" "));
+			expect(
+				await runTransitionCommand(
+					[
+						"--session",
+						created.session,
+						"--task-id",
+						"T-01",
+						"--state",
+						"implemented_untested",
+					],
+					root,
+					undefined,
+					{
+						beforeAuxiliary: (label) => {
+							if (label === "workbench transition event")
+								throw new Error("injected");
+						},
+					},
+				),
+			).toBe(0);
+			expect(output.join("\n")).toContain(
+				"workbench transition event failed after durable commit: injected",
+			);
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | implemented_untested |",
+			);
+		} finally {
+			console.log = originalLog;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("forbids shortcut transitions in a table", () => {
+		for (const [source, target] of [
+			["pending", "tested_needs_spec_validation"],
+			["in_progress", "tested_needs_spec_validation"],
+			["implemented_untested", "moved"],
+		] as const) {
+			const root = mkRoot(`forbidden-${source}-${target}`);
+			try {
+				const created = newWorkstream(root, `forbidden ${source} ${target}`);
+				if (source !== "pending")
+					startTask(root, { session: created.session, taskId: "T-01" });
+				if (source === "implemented_untested")
+					transitionTask(root, {
+						session: created.session,
+						taskId: "T-01",
+						state: "implemented_untested",
+					});
+				expect(() =>
+					transitionTask(root, {
+						session: created.session,
+						taskId: "T-01",
+						state: target,
+					}),
+				).toThrow(`${source} -> ${target}`);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("allows every non-done edge in a table", () => {
+		const edges = [
+			["pending", "in_progress"],
+			["pending", "moved"],
+			["in_progress", "implemented_untested"],
+			["in_progress", "problem"],
+			["in_progress", "moved"],
+			["implemented_untested", "tested_needs_spec_validation"],
+			["implemented_untested", "problem"],
+			["tested_needs_spec_validation", "problem"],
+			["problem", "in_progress"],
+			["problem", "moved"],
+		] as const;
+		for (const [index, [source, target]] of edges.entries()) {
+			const root = mkRoot(`allowed-edge-${index}`);
+			try {
+				const created = newWorkstream(root, `allowed edge ${index}`);
+				if (source !== "pending")
+					startTask(root, { session: created.session, taskId: "T-01" });
+				if (
+					source === "implemented_untested" ||
+					source === "tested_needs_spec_validation"
+				)
+					transitionTask(root, {
+						session: created.session,
+						taskId: "T-01",
+						state: "implemented_untested",
+					});
+				if (source === "tested_needs_spec_validation")
+					transitionTask(root, {
+						session: created.session,
+						taskId: "T-01",
+						state: "tested_needs_spec_validation",
+					});
+				if (source === "problem")
+					transitionTask(root, {
+						session: created.session,
+						taskId: "T-01",
+						state: "problem",
+					});
+				expect(() =>
+					transitionTask(root, {
+						session: created.session,
+						taskId: "T-01",
+						state: target,
+					}),
+				).not.toThrow();
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("done JSON identifies the authorizing evidence", () => {
+		const root = mkRoot("done-authorization-json");
+		try {
+			writeCliProjectContract(root);
+			const created = newWorkstream(root, "done authorization json");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			const proc = runKernel(root, [
+				"done",
+				"--session",
+				created.session,
+				"--task-id",
+				"T-01",
+				"--test",
+				"true",
+				"--json",
+			]);
+			expect(proc.status).toBe(0);
+			const envelope = parseEnvelope(proc.stdout as string) as {
+				data?: { authorizing_evidence_id?: string };
+			};
+			expect(envelope.data?.authorizing_evidence_id).toMatch(/^E-/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("done retry is idempotent after the durable state commit", () => {
+		const root = mkRoot("done-idempotent-retry");
+		try {
+			const created = newWorkstream(root, "done retry");
+			recordObservedCompletion(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			const first = doneTask(root, {
+				session: created.session,
+				taskId: "T-01",
+			});
+			const retried = doneTask(root, {
+				session: created.session,
+				taskId: "T-01",
+			});
+			expect(retried.authorizingEvidenceId).toBe(first.authorizingEvidenceId);
+			expect(() =>
+				advanceTaskAfterObservedTest(root, {
+					session: created.session,
+					taskId: "T-01",
+				}),
+			).not.toThrow();
+			expect(readFileSync(created.taskPath, "utf8")).toContain(
+				"| T-01 | done |",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("requires an observed zero-exit success and returns its evidence id", () => {
+		const root = mkRoot("observed-completion-authorization");
+		try {
+			const created = newWorkstream(root, "observed completion authorization");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordEvidenceRaw(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+			});
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("authorization must be observed with exit_code 0");
+
+			const observed = recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+				exitCode: 0,
+				provenance: "observed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			expect(
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toEqual({ authorizingEvidenceId: observed.id });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("later observed success supersedes a failure", () => {
+		const root = mkRoot("later-observed-success");
+		try {
+			const created = newWorkstream(root, "later observed success");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "failed",
+				exitCode: 1,
+				provenance: "observed",
+			});
+			const observed = recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+				exitCode: 0,
+				provenance: "observed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			expect(
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toEqual({ authorizingEvidenceId: observed.id });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects direct done and terminal restart transitions", () => {
+		const root = mkRoot("formal-transitions");
+		try {
+			const created = newWorkstream(root, "formal transitions");
+			recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test",
+				result: "passed",
+				exitCode: 0,
+				provenance: "observed",
+			});
+			expect(() =>
+				doneTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("pending -> done");
+			startTask(root, { session: created.session, taskId: "T-01" });
+			recordObservedSuccess(root, {
+				session: created.session,
+				taskId: "T-01",
+				command: "bun test after start",
+				result: "passed",
+				exitCode: 0,
+				provenance: "observed",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "implemented_untested",
+			});
+			transitionTask(root, {
+				session: created.session,
+				taskId: "T-01",
+				state: "tested_needs_spec_validation",
+			});
+			doneTask(root, { session: created.session, taskId: "T-01" });
+			expect(() =>
+				startTask(root, { session: created.session, taskId: "T-01" }),
+			).toThrow("done -> in_progress");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("durable lifecycle auxiliary failures", () => {
+	const failAuxiliary = (target: string) => ({
+		beforeAuxiliary: (label: string) => {
+			if (label === target) throw new Error(`injected ${label}`);
+		},
+	});
+	const expectWarning = (warnings: string[] | undefined, label: string) => {
+		expect(warnings).toEqual([
+			expect.stringContaining(`${label} failed after durable commit`),
+		]);
+	};
+
+	test("new preserves created artifacts when auxiliary writes fail", () => {
+		for (const label of [
+			"workbench new event",
+			"session-start telemetry",
+			"pending-spec registration",
+			"local-state refresh",
+		]) {
+			const root = mkRoot(`new-aux-${label.replaceAll(" ", "-")}`);
+			try {
+				const created = newWorkstream(
+					root,
+					"durable new",
+					{ noSpecRequiredReason: "fixture" },
+					failAuxiliary(label),
+				);
+				expectWarning(created.warnings, label);
+				expect(existsSync(created.planPath)).toBe(true);
+				expect(existsSync(created.taskPath)).toBe(true);
+				expect(readFileSync(created.activeSessionPath, "utf8").trim()).toBe(
+					created.session,
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("start preserves in_progress and rejects a duplicate retry", () => {
+		for (const label of [
+			"workbench start event",
+			"task-start telemetry",
+			"local-state refresh",
+		]) {
+			const root = mkRoot(`start-aux-${label.replaceAll(" ", "-")}`);
+			try {
+				const created = newWorkstream(root, "durable start", {
+					noSpecRequiredReason: "fixture",
+				});
+				const warnings = startTask(
+					root,
+					{ session: created.session, taskId: "T-01" },
+					failAuxiliary(label),
+				);
+				expectWarning(warnings, label);
+				expect(readFileSync(created.taskPath, "utf8")).toContain(
+					"| T-01 | in_progress |",
+				);
+				expect(() =>
+					startTask(root, { session: created.session, taskId: "T-01" }),
+				).toThrow("in_progress -> in_progress");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("evidence preserves exactly one ledger row when auxiliary writes fail", () => {
+		for (const label of [
+			"workbench evidence event",
+			"tool-exec telemetry",
+			"local-state refresh",
+		]) {
+			const root = mkRoot(`evidence-aux-${label.replaceAll(" ", "-")}`);
+			try {
+				const created = newWorkstream(root, "durable evidence", {
+					noSpecRequiredReason: "fixture",
+				});
+				startTask(root, { session: created.session, taskId: "T-01" });
+				const evidence = recordEvidenceRaw(
+					root,
+					{
+						session: created.session,
+						taskId: "T-01",
+						command: "bun test",
+						result: "passed",
+						provenance: "observed",
+						exitCode: 0,
+					},
+					failAuxiliary(label),
+				);
+				expectWarning(evidence.warnings, label);
+				const rows = readFileSync(created.evidencePath, "utf8")
+					.trim()
+					.split("\n");
+				expect(rows).toHaveLength(1);
+				expect(JSON.parse(rows[0] ?? "{}").id).toBe(evidence.id);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("done preserves completion and accepts an idempotent retry", () => {
+		for (const label of [
+			"workbench done event",
+			"task-complete telemetry",
+			"local-state refresh",
+		]) {
+			const root = mkRoot(`done-aux-${label.replaceAll(" ", "-")}`);
+			try {
+				const created = newWorkstream(root, "durable done", {
+					noSpecRequiredReason: "fixture",
+				});
+				startTask(root, { session: created.session, taskId: "T-01" });
+				const evidence = recordObservedSuccess(root, {
+					session: created.session,
+					taskId: "T-01",
+					command: "bun test",
+					result: "passed",
+				});
+				transitionTask(root, {
+					session: created.session,
+					taskId: "T-01",
+					state: "implemented_untested",
+				});
+				transitionTask(root, {
+					session: created.session,
+					taskId: "T-01",
+					state: "tested_needs_spec_validation",
+				});
+				const result = doneTask(
+					root,
+					{ session: created.session, taskId: "T-01" },
+					failAuxiliary(label),
+				);
+				expect(result.authorizingEvidenceId).toBe(evidence.id);
+				expectWarning(result.warnings, label);
+				expect(readFileSync(created.taskPath, "utf8")).toContain(
+					"| T-01 | done |",
+				);
+				const retried = doneTask(root, {
+					session: created.session,
+					taskId: "T-01",
+				});
+				expect(retried.authorizingEvidenceId).toBe(evidence.id);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 		}
 	});
 });

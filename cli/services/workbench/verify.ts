@@ -43,7 +43,6 @@ const SUCCESS_RESULTS = new Set([
 	"green",
 	"valid",
 	"resolved",
-	"n/a",
 ]);
 const FAILURE_RESULT_RE =
 	/\b(?:fail|failed|failure|error|fatal|blocked|exit code [1-9])\b/i;
@@ -73,7 +72,11 @@ export type VerifyTask = {
 	state: string;
 	file: string;
 	line: number;
+	completionPolicy: CompletionPolicy;
+	attempt: number;
 };
+
+export type CompletionPolicy = "execution" | "artifact" | "waiver";
 
 export type VerifyIssue = {
 	type:
@@ -83,7 +86,8 @@ export type VerifyIssue = {
 		| "invalid_task_state"
 		| "open_checklist_item"
 		| "missing_session"
-		| "missing_tasks";
+		| "missing_tasks"
+		| "duplicate_task_id";
 	taskId?: string;
 	file?: string;
 	line?: number;
@@ -114,6 +118,13 @@ export type EvidenceVerificationEntry = {
 	result?: unknown;
 	exit_code?: unknown;
 	id?: unknown;
+	provenance?: unknown;
+	authorization_type?: unknown;
+	artifact?: unknown;
+	artifact_sha256?: unknown;
+	waiver_reason?: unknown;
+	approved_by?: unknown;
+	attempt?: unknown;
 };
 
 type EvidenceLedger = {
@@ -124,6 +135,18 @@ type EvidenceLedger = {
 function normalizeState(value: string): string {
 	const state = value.trim().toLowerCase();
 	return LEGACY_STATE_ALIASES[state] ?? state;
+}
+
+export function completionPolicyFromNotes(notes: string): CompletionPolicy {
+	const match = notes.match(
+		/(?:^|\s)completion_policy=(execution|artifact|waiver)(?:\s|$)/,
+	);
+	return (match?.[1] as CompletionPolicy | undefined) ?? "execution";
+}
+
+function attemptFromNotes(notes: string): number {
+	const match = notes.match(/(?:^|\s)attempt=(\d+)(?=\s|$)/);
+	return Number.parseInt(match?.[1] ?? "0", 10);
 }
 
 function emptyResult(sessionPath: string, strict: boolean): VerifyResult {
@@ -233,12 +256,15 @@ function parseTasks(content: string, file: string): VerifyTask[] {
 			}
 			const stateMatch = line.match(STATE_BOARD_TASK_RE);
 			if (stateMatch?.[1] && stateMatch[2]) {
+				const notes = (stateMatch[4] ?? "").trim();
 				tasks.push({
 					id: stateMatch[1],
 					state: normalizeState(stateMatch[2]),
-					description: (stateMatch[4] ?? "").trim(),
+					description: notes,
 					file,
 					line: lineNumber,
+					completionPolicy: completionPolicyFromNotes(notes),
+					attempt: attemptFromNotes(notes),
 				});
 				continue;
 			}
@@ -252,6 +278,8 @@ function parseTasks(content: string, file: string): VerifyTask[] {
 				description: legacyMatch[3] ?? "",
 				file,
 				line: lineNumber,
+				completionPolicy: "execution",
+				attempt: 0,
 			});
 		}
 	}
@@ -364,7 +392,35 @@ function evidenceIsFailure(entry: EvidenceVerificationEntry): boolean {
 function evidenceEntryIsSuccess(entry: EvidenceVerificationEntry): boolean {
 	return (
 		evidenceResultIsSuccess(entry.result) &&
-		(entry.exit_code === undefined || entry.exit_code === 0)
+		entry.provenance === "observed" &&
+		entry.exit_code === 0 &&
+		typeof entry.id === "string" &&
+		entry.id.trim().length > 0
+	);
+}
+
+function typedNonExecutionSuccessEvidence(
+	entry: EvidenceVerificationEntry,
+	policy: CompletionPolicy,
+): boolean {
+	if (!evidenceResultIsSuccess(entry.result) || typeof entry.id !== "string")
+		return false;
+	if (policy === "artifact") {
+		return (
+			entry.authorization_type === "artifact" &&
+			typeof entry.artifact === "string" &&
+			entry.artifact.length > 0 &&
+			typeof entry.artifact_sha256 === "string" &&
+			/^[a-f0-9]{64}$/.test(entry.artifact_sha256)
+		);
+	}
+	return (
+		policy === "waiver" &&
+		entry.authorization_type === "waiver" &&
+		typeof entry.waiver_reason === "string" &&
+		entry.waiver_reason.trim().length > 0 &&
+		typeof entry.approved_by === "string" &&
+		entry.approved_by.trim().length > 0
 	);
 }
 
@@ -378,27 +434,45 @@ function hasRunnableSuccessEvidence(entry: EvidenceVerificationEntry): boolean {
 
 export type EvidenceCompletionStatus = "missing" | "passed" | "failed";
 
+export type EvidenceCompletionAuthorization = {
+	status: EvidenceCompletionStatus;
+	evidenceId?: string;
+};
+
+export function evidenceCompletionAuthorization(
+	entries: EvidenceVerificationEntry[],
+	policy: CompletionPolicy = "execution",
+): EvidenceCompletionAuthorization {
+	let authorization: EvidenceCompletionAuthorization = { status: "missing" };
+	for (const entry of entries) {
+		if (evidenceIsFailure(entry)) {
+			authorization = { status: "failed" };
+			continue;
+		}
+		if (
+			(policy === "execution" && hasRunnableSuccessEvidence(entry)) ||
+			typedNonExecutionSuccessEvidence(entry, policy)
+		) {
+			authorization = { status: "passed", evidenceId: entry.id as string };
+		}
+	}
+	return authorization;
+}
+
 export function evidenceCompletionStatus(
 	entries: EvidenceVerificationEntry[],
 ): EvidenceCompletionStatus {
-	let status: EvidenceCompletionStatus = "missing";
-	for (const entry of entries) {
-		if (evidenceIsFailure(entry)) {
-			status = "failed";
-			continue;
-		}
-		if (hasRunnableSuccessEvidence(entry)) {
-			status = "passed";
-		}
-	}
-	return status;
+	return evidenceCompletionAuthorization(entries).status;
 }
 
 function doneTaskEvidenceIssue(
 	task: VerifyTask,
 	entries: EvidenceVerificationEntry[],
 ): VerifyIssue | null {
-	const status = evidenceCompletionStatus(entries);
+	const status = evidenceCompletionAuthorization(
+		entries.filter((entry) => (entry.attempt ?? 0) === task.attempt),
+		task.completionPolicy,
+	).status;
 	if (status === "failed") {
 		return {
 			type: "failed_evidence",
@@ -469,6 +543,7 @@ export function verifyWorkbenchTasks(
 	}
 
 	const evidenceByScope = new Map<string, EvidenceLedger>();
+	const seenTaskIdsByScope = new Map<string, Map<string, VerifyTask>>();
 
 	for (const taskFile of taskFiles) {
 		const content = readFileSync(taskFile, "utf8");
@@ -477,8 +552,8 @@ export function verifyWorkbenchTasks(
 			result.issues.push(...findOpenChecklistItems(content, taskFile));
 		}
 		let scopedEvidence: EvidenceLedger | undefined;
+		const evidenceScope = evidenceScopeFor(taskFile, scanRoot);
 		if (strict) {
-			const evidenceScope = evidenceScopeFor(taskFile, scanRoot);
 			scopedEvidence = evidenceByScope.get(evidenceScope);
 			if (!scopedEvidence) {
 				const ledger = loadEvidence(evidenceScope);
@@ -489,6 +564,21 @@ export function verifyWorkbenchTasks(
 		}
 
 		for (const task of tasks) {
+			let seenTaskIds = seenTaskIdsByScope.get(evidenceScope);
+			if (!seenTaskIds) {
+				seenTaskIds = new Map<string, VerifyTask>();
+				seenTaskIdsByScope.set(evidenceScope, seenTaskIds);
+			}
+			const previous = seenTaskIds.get(task.id);
+			if (previous) {
+				result.issues.push({
+					type: "duplicate_task_id",
+					taskId: task.id,
+					file: task.file,
+					line: task.line,
+					message: `Duplicate task id ${task.id}; first declared at ${previous.file}:${previous.line}`,
+				});
+			} else seenTaskIds.set(task.id, task);
 			result.totalTasks += 1;
 			if (!isCountedTaskState(task.state)) {
 				result.issues.push(invalidTaskStateIssue(task));

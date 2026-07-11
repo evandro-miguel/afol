@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
@@ -6,7 +6,8 @@ import {
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
+import type { OperationContext } from "../../core/operation-context";
 import { appendTelemetryEvent, firstToken } from "../events/telemetry";
 import {
 	buildGovernanceFrontmatter,
@@ -19,7 +20,13 @@ import { appendWorkbenchEvent } from "../local-state/workbench-events";
 import { rebuildWorkBenchIndex } from "../local-state/workbench-index";
 import { resolveProjectPaths } from "../project/paths";
 import { resolveProjectPath } from "../project/root";
-import { evidenceCompletionStatus, verifyWorkbenchTasks } from "./verify";
+import {
+	type CompletionPolicy,
+	completionPolicyFromNotes,
+	evidenceCompletionAuthorization,
+	evidenceCompletionStatus,
+	verifyWorkbenchTasks,
+} from "./verify";
 
 const TASK_ROW_RE =
 	/^\|\s*(T-\d{2,3})\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.*?)\s*\|$/;
@@ -45,6 +52,7 @@ export type RecordEvidenceInput = WorkbenchTaskRef & {
 	artifact?: string;
 	note?: string;
 	provenance?: EvidenceProvenance;
+	approvalContext?: OperationContext;
 };
 
 export type EvidenceProvenance = "declared" | "observed";
@@ -59,6 +67,14 @@ export type EvidenceEntry = {
 	exit_code?: number;
 	artifact?: string;
 	note?: string;
+	task_state?: TaskState;
+	purpose?: "completion";
+	authorization_type?: CompletionPolicy;
+	artifact_sha256?: string;
+	waiver_reason?: string;
+	approved_by?: string;
+	attempt?: number;
+	warnings?: string[];
 };
 
 export type NewWorkstreamMetadata = {
@@ -75,6 +91,10 @@ export type CloseSessionOptions = {
 	reason?: string;
 };
 
+export type LifecycleAuxiliaryRuntime = {
+	beforeAuxiliary?: (label: string) => void;
+};
+
 export type TimelineEntryResult = {
 	logPath: string;
 	message: string;
@@ -88,6 +108,7 @@ export type NewWorkstreamResult = {
 	logPath: string;
 	evidencePath: string;
 	activeSessionPath: string;
+	warnings: string[];
 };
 
 type TaskRow = {
@@ -96,7 +117,33 @@ type TaskRow = {
 	state: string;
 	owner: string;
 	notes: string;
+	attempt: number;
 };
+
+export type TaskState =
+	| "pending"
+	| "in_progress"
+	| "implemented_untested"
+	| "tested_needs_spec_validation"
+	| "problem"
+	| "done"
+	| "moved";
+
+const TASK_STATE_TRANSITIONS: Readonly<
+	Record<TaskState, readonly TaskState[]>
+> = {
+	pending: ["in_progress", "moved"],
+	in_progress: ["implemented_untested", "problem", "moved"],
+	implemented_untested: ["tested_needs_spec_validation", "problem"],
+	tested_needs_spec_validation: ["done", "problem"],
+	problem: ["in_progress", "moved"],
+	done: [],
+	moved: [],
+};
+
+function isTaskState(value: string): value is TaskState {
+	return value in TASK_STATE_TRANSITIONS;
+}
 
 function sanitizeTheme(theme: string): string {
 	const cleaned = theme
@@ -135,6 +182,22 @@ function resolveSafeSessionPath(root: string, session: string): string {
 
 function twoDigits(value: number): string {
 	return value.toString().padStart(2, "0");
+}
+
+function auxiliaryWarning(
+	warnings: string[],
+	label: string,
+	action: () => void,
+	runtime: LifecycleAuxiliaryRuntime = {},
+): void {
+	try {
+		runtime.beforeAuxiliary?.(label);
+		action();
+	} catch (error) {
+		warnings.push(
+			`${label} failed after durable commit: ${(error as Error).message}`,
+		);
+	}
 }
 
 function shortSessionSuffix(): string {
@@ -302,12 +365,15 @@ function parseTaskRow(line: string): TaskRow | null {
 	if (!match?.[1] || !match[2]) {
 		return null;
 	}
+	const notes = (match[4] ?? "").trim();
+	const attemptMatch = notes.match(/(?:^|\s)attempt=(\d+)(?=\s|$)/);
 	return {
 		line,
 		taskId: match[1],
 		state: match[2].trim(),
 		owner: (match[3] ?? "").trim(),
-		notes: (match[4] ?? "").trim(),
+		notes,
+		attempt: Number.parseInt(attemptMatch?.[1] ?? "0", 10),
 	};
 }
 
@@ -525,12 +591,23 @@ function markTaskMetadataClosed(
 	);
 }
 
-export function isSessionClosed(root: string, session: string): boolean {
+export type SessionLifecycleState = "open" | "closed" | "corrupt";
+
+export function sessionLifecycleState(
+	root: string,
+	session: string,
+): SessionLifecycleState {
 	const paths = sessionPaths(root, session);
 	if (!existsSync(paths.taskPath)) {
-		return true;
+		return "corrupt";
 	}
-	return readTaskLifecycleState(paths.taskPath, session).kind === "closed";
+	const state = readTaskLifecycleState(paths.taskPath, session);
+	return state.kind === "closed" ? "closed" : "open";
+}
+
+/** Compatibility predicate. New callers should use sessionLifecycleState. */
+export function isSessionClosed(root: string, session: string): boolean {
+	return sessionLifecycleState(root, session) === "closed";
 }
 
 function ensureSessionOpenForMutation(root: string, session: string): void {
@@ -593,10 +670,11 @@ function ensureTaskExists(
 	return row;
 }
 
-function updateTaskState(
+function transitionTaskState(
 	taskPath: string,
 	taskId: string,
-	state: string,
+	nextState: TaskState,
+	completionPolicy?: CompletionPolicy,
 ): void {
 	const lines = readFileSync(taskPath, "utf8").split("\n");
 	let changed = false;
@@ -605,8 +683,44 @@ function updateTaskState(
 		if (!row || row.taskId !== taskId) {
 			return line;
 		}
+		if (!isTaskState(row.state)) {
+			throw new Error(`Task ${taskId} has invalid state: ${row.state}.`);
+		}
+		if (!TASK_STATE_TRANSITIONS[row.state].includes(nextState)) {
+			throw new Error(
+				`Invalid task transition for ${taskId}: ${row.state} -> ${nextState}.`,
+			);
+		}
 		changed = true;
-		return renderTaskRow({ ...row, state });
+		const nextAttempt =
+			nextState === "in_progress" || nextState === "problem"
+				? row.attempt + 1
+				: row.attempt;
+		const baseNotes = row.notes
+			.replace(/(?:^|\s)attempt=\d+(?=\s|$)/g, " ")
+			.trim();
+		const policyNotes = completionPolicy
+			? [
+					baseNotes
+						.replace(
+							/(?:^|\s)completion_policy=(?:execution|artifact|waiver)(?=\s|$)/g,
+							" ",
+						)
+						.trim(),
+					`completion_policy=${completionPolicy}`,
+				]
+					.filter(Boolean)
+					.join(" ")
+			: baseNotes;
+		const notes = [policyNotes, `attempt=${nextAttempt}`]
+			.filter(Boolean)
+			.join(" ");
+		return renderTaskRow({
+			...row,
+			state: nextState,
+			notes,
+			attempt: nextAttempt,
+		});
 	});
 	if (!changed) {
 		throw new Error(`Task ${taskId} not found in ${taskPath}`);
@@ -669,6 +783,24 @@ function loadEvidenceEntries(evidencePath: string): EvidenceEntry[] {
 				if (typeof parsed.note === "string") {
 					entry.note = parsed.note;
 				}
+				if (
+					parsed.authorization_type === "execution" ||
+					parsed.authorization_type === "artifact" ||
+					parsed.authorization_type === "waiver"
+				)
+					entry.authorization_type = parsed.authorization_type;
+				if (typeof parsed.artifact_sha256 === "string")
+					entry.artifact_sha256 = parsed.artifact_sha256;
+				if (typeof parsed.waiver_reason === "string")
+					entry.waiver_reason = parsed.waiver_reason;
+				if (typeof parsed.approved_by === "string")
+					entry.approved_by = parsed.approved_by;
+				if (
+					typeof parsed.attempt === "number" &&
+					Number.isSafeInteger(parsed.attempt) &&
+					parsed.attempt >= 0
+				)
+					entry.attempt = parsed.attempt;
 				if (
 					parsed.provenance === "declared" ||
 					parsed.provenance === "observed"
@@ -744,6 +876,7 @@ export function newWorkstream(
 	root: string,
 	theme: string,
 	metadata?: NewWorkstreamMetadata,
+	runtime: LifecycleAuxiliaryRuntime = {},
 ): NewWorkstreamResult {
 	return withSessionLock(root, NEW_SESSION_LOCK_SESSION, () => {
 		const wbRoot = resolveProjectPaths(root).abs.wbDir;
@@ -882,27 +1015,51 @@ export function newWorkstream(
 		atomicWriteText(paths.evidencePath, "");
 		mkdirSync(dirname(paths.activeSessionPath), { recursive: true });
 		atomicWriteText(paths.activeSessionPath, `${session}\n`);
-		appendWorkbenchEvent(root, {
-			type: "workbench.new",
-			session,
-			detail: {
-				theme: theme.trim(),
-			},
-		});
-		appendTelemetryEvent(root, {
-			event_type: "session_start",
-			session_id: session,
-			cmd_type: "new",
-			outcome: "success",
-		});
-		recordPendingSpecForSession(root, {
-			session,
-			theme,
-			taskIds,
-			createdAt,
-			...(metadata ? { metadata } : {}),
-		});
-		refreshWorkbenchLocalState(root, session);
+		const warnings: string[] = [];
+		auxiliaryWarning(
+			warnings,
+			"workbench new event",
+			() =>
+				appendWorkbenchEvent(root, {
+					type: "workbench.new",
+					session,
+					detail: {
+						theme: theme.trim(),
+					},
+				}),
+			runtime,
+		);
+		auxiliaryWarning(
+			warnings,
+			"session-start telemetry",
+			() =>
+				appendTelemetryEvent(root, {
+					event_type: "session_start",
+					session_id: session,
+					cmd_type: "new",
+					outcome: "success",
+				}),
+			runtime,
+		);
+		auxiliaryWarning(
+			warnings,
+			"pending-spec registration",
+			() =>
+				recordPendingSpecForSession(root, {
+					session,
+					theme,
+					taskIds,
+					createdAt,
+					...(metadata ? { metadata } : {}),
+				}),
+			runtime,
+		);
+		auxiliaryWarning(
+			warnings,
+			"local-state refresh",
+			() => refreshWorkbenchLocalState(root, session),
+			runtime,
+		);
 
 		return {
 			session,
@@ -912,34 +1069,139 @@ export function newWorkstream(
 			logPath: paths.logPath,
 			evidencePath: paths.evidencePath,
 			activeSessionPath: paths.activeSessionPath,
+			warnings,
 		};
 	});
 }
 
-export function startTask(root: string, input: WorkbenchTaskRef): void {
-	withSessionLock(root, input.session, () => {
+export function startTask(
+	root: string,
+	input: WorkbenchTaskRef,
+	runtime: LifecycleAuxiliaryRuntime = {},
+): string[] {
+	return withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
 		ensureSessionOpenForMutation(root, input.session);
-		updateTaskState(paths.taskPath, input.taskId, "in_progress");
-		appendWorkbenchEvent(root, {
-			type: "workbench.start_task",
-			session: input.session,
-			taskId: input.taskId,
-		});
-		appendTelemetryEvent(root, {
-			event_type: "task_start",
-			session_id: input.session,
-			task_id: input.taskId,
-			cmd_type: "start",
-			outcome: "success",
-		});
-		refreshWorkbenchLocalState(root, input.session);
+		transitionTaskState(paths.taskPath, input.taskId, "in_progress");
+		const warnings: string[] = [];
+		auxiliaryWarning(
+			warnings,
+			"workbench start event",
+			() =>
+				appendWorkbenchEvent(root, {
+					type: "workbench.start_task",
+					session: input.session,
+					taskId: input.taskId,
+				}),
+			runtime,
+		);
+		auxiliaryWarning(
+			warnings,
+			"task-start telemetry",
+			() =>
+				appendTelemetryEvent(root, {
+					event_type: "task_start",
+					session_id: input.session,
+					task_id: input.taskId,
+					cmd_type: "start",
+					outcome: "success",
+				}),
+			runtime,
+		);
+		auxiliaryWarning(
+			warnings,
+			"local-state refresh",
+			() => refreshWorkbenchLocalState(root, input.session),
+			runtime,
+		);
+		return warnings;
 	});
+}
+
+export function transitionTask(
+	root: string,
+	input: WorkbenchTaskRef & {
+		state: TaskState;
+		completionPolicy?: CompletionPolicy;
+	},
+	runtime: LifecycleAuxiliaryRuntime = {},
+): string[] {
+	if (input.state === "done") {
+		throw new Error(
+			"Use done to enter the done state with evidence authorization.",
+		);
+	}
+	return withSessionLock(root, input.session, () => {
+		const warnings: string[] = [];
+		const paths = sessionPaths(root, input.session);
+		ensureSessionOpenForMutation(root, input.session);
+		const from =
+			readTaskRows(paths.taskPath).find((row) => row.taskId === input.taskId)
+				?.state ?? "unknown";
+		transitionTaskState(
+			paths.taskPath,
+			input.taskId,
+			input.state,
+			input.completionPolicy,
+		);
+		auxiliaryWarning(
+			warnings,
+			"workbench transition event",
+			() =>
+				appendWorkbenchEvent(root, {
+					type: "workbench.transition_task",
+					session: input.session,
+					taskId: input.taskId,
+					detail: {
+						from,
+						to: input.state,
+						...(input.completionPolicy
+							? { completion_policy: input.completionPolicy }
+							: {}),
+					},
+				}),
+			runtime,
+		);
+		auxiliaryWarning(
+			warnings,
+			"local-state refresh",
+			() => refreshWorkbenchLocalState(root, input.session),
+			runtime,
+		);
+		return warnings;
+	});
+}
+
+export function advanceTaskAfterObservedTest(
+	root: string,
+	input: WorkbenchTaskRef,
+): void {
+	const paths = sessionPaths(root, input.session);
+	ensureSessionOpenForMutation(root, input.session);
+	const state = ensureTaskExists(
+		paths.taskPath,
+		input.session,
+		input.taskId,
+	).state;
+	if (state === "in_progress") {
+		transitionTask(root, { ...input, state: "implemented_untested" });
+		transitionTask(root, { ...input, state: "tested_needs_spec_validation" });
+		return;
+	}
+	if (state === "implemented_untested") {
+		transitionTask(root, { ...input, state: "tested_needs_spec_validation" });
+		return;
+	}
+	if (state === "tested_needs_spec_validation" || state === "done") return;
+	throw new Error(
+		`Observed test cannot advance ${input.taskId} from ${state}; start or recover the task first.`,
+	);
 }
 
 export function recordEvidence(
 	root: string,
 	input: RecordEvidenceInput,
+	runtime: LifecycleAuxiliaryRuntime = {},
 ): EvidenceEntry {
 	const entry = withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
@@ -950,6 +1212,15 @@ export function recordEvidence(
 		ensureTaskExists(paths.taskPath, input.session, input.taskId);
 		const now = new Date();
 		const provenance: EvidenceProvenance = input.provenance ?? "declared";
+		const taskState = readTaskRows(paths.taskPath).find(
+			(row) => row.taskId === input.taskId,
+		)?.state;
+		const taskRow = ensureTaskExists(
+			paths.taskPath,
+			input.session,
+			input.taskId,
+		);
+		const completionPolicy = completionPolicyFromNotes(taskRow.notes);
 		const evidence: EvidenceEntry = {
 			id: evidenceId(now),
 			task_id: input.taskId,
@@ -957,44 +1228,103 @@ export function recordEvidence(
 			command: input.command,
 			result: input.result,
 			provenance,
+			...(isTaskState(taskState ?? "")
+				? { task_state: taskState as TaskState }
+				: {}),
+			purpose: "completion",
+			authorization_type: completionPolicy,
+			attempt: taskRow.attempt,
 		};
 		if (input.exitCode !== undefined) {
 			evidence.exit_code = input.exitCode;
 		}
-		if (input.artifact) {
+		if (completionPolicy === "artifact") {
+			if (!input.artifact?.trim())
+				throw new Error("Artifact completion policy requires --artifact.");
+			const resolved = resolveProjectPath(root, input.artifact);
+			if (!resolved.ok || !existsSync(resolved.value.path)) {
+				throw new Error(
+					`Artifact must be an existing repo-safe file: ${input.artifact}`,
+				);
+			}
+			evidence.artifact = relative(root, resolved.value.path).replaceAll(
+				"\\",
+				"/",
+			);
+			evidence.artifact_sha256 = createHash("sha256")
+				.update(readFileSync(resolved.value.path))
+				.digest("hex");
+		} else if (input.artifact) {
 			evidence.artifact = input.artifact;
 		}
 		if (input.note) {
 			evidence.note = input.note;
 		}
+		if (completionPolicy === "waiver") {
+			const approval = input.approvalContext;
+			if (
+				approval?.callerType !== "local" ||
+				!approval.interactive ||
+				approval.trustLevel !== "trusted"
+			)
+				throw new Error(
+					"Waiver completion policy requires a trusted local context.",
+				);
+			if (!input.note?.trim())
+				throw new Error(
+					"Waiver completion policy requires a nonempty reason in --note.",
+				);
+			evidence.waiver_reason = input.note.trim();
+			evidence.approved_by = "local:interactive";
+		}
 		writeFileSync(paths.evidencePath, `${JSON.stringify(evidence)}\n`, {
 			encoding: "utf8",
 			flag: "a",
 		});
-		appendWorkbenchEvent(root, {
-			type: "workbench.record_evidence",
-			session: input.session,
-			taskId: input.taskId,
-			command: input.command,
-			result: input.result,
-			detail: {
-				provenance,
-			},
-		});
+		const warnings: string[] = [];
+		auxiliaryWarning(
+			warnings,
+			"workbench evidence event",
+			() =>
+				appendWorkbenchEvent(root, {
+					type: "workbench.record_evidence",
+					session: input.session,
+					taskId: input.taskId,
+					command: input.command,
+					result: input.result,
+					detail: {
+						provenance,
+						evidence_id: evidence.id,
+					},
+				}),
+			runtime,
+		);
 		if (provenance === "observed") {
-			appendTelemetryEvent(root, {
-				event_type: "tool_exec",
-				session_id: input.session,
-				task_id: input.taskId,
-				cmd_type: firstToken(input.command),
-				provenance,
-				outcome:
-					evidenceCompletionStatus([evidence]) === "passed"
-						? "success"
-						: "failure",
-			});
+			auxiliaryWarning(
+				warnings,
+				"tool-exec telemetry",
+				() =>
+					appendTelemetryEvent(root, {
+						event_type: "tool_exec",
+						session_id: input.session,
+						task_id: input.taskId,
+						cmd_type: firstToken(input.command),
+						provenance,
+						outcome:
+							evidenceCompletionStatus([evidence]) === "passed"
+								? "success"
+								: "failure",
+					}),
+				runtime,
+			);
 		}
-		refreshWorkbenchLocalState(root, input.session);
+		auxiliaryWarning(
+			warnings,
+			"local-state refresh",
+			() => refreshWorkbenchLocalState(root, input.session),
+			runtime,
+		);
+		evidence.warnings = warnings;
 		return evidence;
 	});
 	return entry;
@@ -1030,32 +1360,105 @@ export function appendTimelineEntry(
 	});
 }
 
-export function doneTask(root: string, input: WorkbenchTaskRef): void {
-	withSessionLock(root, input.session, () => {
+export type DoneTaskResult = {
+	authorizingEvidenceId: string;
+	warnings?: string[];
+};
+
+export function doneTask(
+	root: string,
+	input: WorkbenchTaskRef,
+	runtime: LifecycleAuxiliaryRuntime = {},
+): DoneTaskResult {
+	return withSessionLock(root, input.session, () => {
 		const paths = sessionPaths(root, input.session);
 		ensureSessionOpenForMutation(root, input.session);
-		const entries = loadEvidenceEntries(paths.evidencePath).filter(
+		const allEntries = loadEvidenceEntries(paths.evidencePath).filter(
 			(entry) => entry.task_id === input.taskId,
 		);
-		if (evidenceCompletionStatus(entries) !== "passed") {
+		const taskRow = ensureTaskExists(
+			paths.taskPath,
+			input.session,
+			input.taskId,
+		);
+		const completionPolicy = completionPolicyFromNotes(taskRow.notes);
+		const entries = allEntries.filter(
+			(entry) => (entry.attempt ?? 0) === taskRow.attempt,
+		);
+		const authorization = evidenceCompletionAuthorization(
+			entries,
+			completionPolicy,
+		);
+		if (authorization.status !== "passed" || !authorization.evidenceId) {
+			if (allEntries.length > entries.length) {
+				throw new Error(
+					`Task ${input.taskId} requires evidence recorded after the latest problem/restart transition.`,
+				);
+			}
 			throw new Error(
-				`Task ${input.taskId} requires passed evidence before done.`,
+				`Task ${input.taskId} requires passed evidence; authorization must be observed with exit_code 0.`,
 			);
 		}
-		updateTaskState(paths.taskPath, input.taskId, "done");
-		appendWorkbenchEvent(root, {
-			type: "workbench.mark_done",
-			session: input.session,
-			taskId: input.taskId,
-		});
-		appendTelemetryEvent(root, {
-			event_type: "task_complete",
-			session_id: input.session,
-			task_id: input.taskId,
-			cmd_type: "done",
-			outcome: "success",
-		});
-		refreshWorkbenchLocalState(root, input.session);
+		const authorizingEntry = entries.find(
+			(entry) => entry.id === authorization.evidenceId,
+		);
+		if (
+			completionPolicy === "artifact" &&
+			authorizingEntry?.artifact &&
+			authorizingEntry.artifact_sha256
+		) {
+			const resolved = resolveProjectPath(root, authorizingEntry.artifact);
+			if (!resolved.ok || !existsSync(resolved.value.path))
+				throw new Error(
+					`Authorizing artifact is missing: ${authorizingEntry.artifact}`,
+				);
+			const currentHash = createHash("sha256")
+				.update(readFileSync(resolved.value.path))
+				.digest("hex");
+			if (currentHash !== authorizingEntry.artifact_sha256)
+				throw new Error(
+					`Authorizing artifact changed after evidence: ${authorizingEntry.artifact}`,
+				);
+		}
+		if (taskRow.state === "done") {
+			return { authorizingEvidenceId: authorization.evidenceId };
+		}
+		transitionTaskState(paths.taskPath, input.taskId, "done");
+		const warnings: string[] = [];
+		auxiliaryWarning(
+			warnings,
+			"workbench done event",
+			() =>
+				appendWorkbenchEvent(root, {
+					type: "workbench.mark_done",
+					session: input.session,
+					taskId: input.taskId,
+				}),
+			runtime,
+		);
+		auxiliaryWarning(
+			warnings,
+			"task-complete telemetry",
+			() =>
+				appendTelemetryEvent(root, {
+					event_type: "task_complete",
+					session_id: input.session,
+					task_id: input.taskId,
+					cmd_type: "done",
+					outcome: "success",
+				}),
+			runtime,
+		);
+		auxiliaryWarning(
+			warnings,
+			"local-state refresh",
+			() => refreshWorkbenchLocalState(root, input.session),
+			runtime,
+		);
+		return {
+			authorizingEvidenceId: authorization.evidenceId,
+			...(warnings.length > 0 ? { warnings } : {}),
+		};
 	});
 }
 
@@ -1092,7 +1495,13 @@ export function closeSession(
 				);
 			}
 			const reportPath = join(paths.sessionDir, `${session}_report_01.md`);
-			if (verification.totalTasks > 1 && !existsSync(reportPath)) {
+			const taskRows = readTaskRows(paths.taskPath);
+			const reportRequired =
+				verification.totalTasks > 1 ||
+				taskRows.some((row) =>
+					/(?:^|\s)(?:impact=high|side_effects=true)(?:\s|$)/.test(row.notes),
+				);
+			if (reportRequired && !existsSync(reportPath)) {
 				if (!options.allowNoReport) {
 					throw new Error(
 						`Session ${session} requires a final report artifact. Rerun close with --allow-no-report --reason <text>.`,

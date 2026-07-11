@@ -1,12 +1,9 @@
-import {
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	writeFileSync,
-} from "node:fs";
-import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { resolveAdmPaths } from "../adm/paths";
 import { atomicWriteText } from "../io/atomic";
+import { withSessionLock } from "../io/session-lock";
 import { resolveProjectPaths } from "../project/paths";
 
 export type GovernanceStatus = "governed" | "pending_spec" | "unbound";
@@ -44,6 +41,10 @@ export type PendingSpecEntry = {
 	parent_spec?: string;
 	reason?: string;
 	resolved_at?: string;
+	parent_spec_path?: string;
+	parent_spec_sha256?: string;
+	roadmap_path?: string;
+	roadmap_sha256?: string;
 };
 
 export type PendingSpecIndex = {
@@ -69,6 +70,7 @@ export type SessionPendingSpecNotice = {
 };
 
 const INDEX_FILE = "pending-specs.json";
+const GOVERNANCE_LOCK = "__governance-pending-specs__";
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?/;
 const DEFAULT_PENDING_SPEC_RESOLUTION_HINT =
 	'run afol governance resolve-spec --session <session> --feature-id <F-id> --parent-spec <spec-id> or waive with --no-spec-required --reason "<reason>"';
@@ -145,7 +147,16 @@ function readIndexFile(path: string): PendingSpecIndex | null {
 			typeof parsed === "object" &&
 			!Array.isArray(parsed) &&
 			(parsed as { schema_version?: unknown }).schema_version === 1 &&
-			Array.isArray((parsed as { entries?: unknown }).entries)
+			Array.isArray((parsed as { entries?: unknown }).entries) &&
+			(parsed as PendingSpecIndex).entries.every(
+				(entry) =>
+					entry !== null &&
+					typeof entry === "object" &&
+					typeof entry.session_id === "string" &&
+					isPendingSpecStatus(entry.status) &&
+					Array.isArray(entry.task_ids) &&
+					Array.isArray(entry.missing),
+			)
 		) {
 			return parsed as PendingSpecIndex;
 		}
@@ -166,12 +177,8 @@ export function pendingSpecsPath(root: string): string {
 
 export function readPendingSpecIndex(root: string): PendingSpecIndex {
 	const index = readIndexFile(pendingSpecsPath(root));
-	if (index) {
-		return index;
-	}
-	const rebuilt = rebuildPendingSpecIndexFromWorkbench(root);
-	writePendingSpecIndex(root, rebuilt);
-	return rebuilt;
+	if (index) return index;
+	throw new Error(`Invalid pending spec index: ${pendingSpecsPath(root)}`);
 }
 
 export function writePendingSpecIndex(
@@ -179,8 +186,15 @@ export function writePendingSpecIndex(
 	index: PendingSpecIndex,
 ): void {
 	const path = pendingSpecsPath(root);
-	mkdirSync(dirname(path), { recursive: true });
-	writeFileSync(path, `${JSON.stringify(index, null, 2)}\n`, "utf8");
+	atomicWriteText(path, `${JSON.stringify(index, null, 2)}\n`);
+}
+
+export function repairPendingSpecIndex(root: string): PendingSpecIndex {
+	return withSessionLock(root, GOVERNANCE_LOCK, () => {
+		const rebuilt = rebuildPendingSpecIndexFromWorkbench(root);
+		writePendingSpecIndex(root, rebuilt);
+		return rebuilt;
+	});
 }
 
 function parseStringList(value: unknown): string[] {
@@ -406,38 +420,40 @@ export function recordPendingSpecForSession(
 		createdAt?: string;
 	},
 ): PendingSpecEntry | null {
-	const governance = resolveGovernance(input.metadata);
-	if (!governance.pendingSpec) {
-		return null;
-	}
-	const createdAt = input.createdAt ?? nowIso();
-	const index = readPendingSpecIndex(root);
-	const existing = index.entries.find(
-		(entry) => entry.session_id === input.session,
-	);
-	const entry: PendingSpecEntry = {
-		session_id: input.session,
-		created_at: existing?.created_at ?? createdAt,
-		updated_at: createdAt,
-		status: "open",
-		theme: input.theme.trim(),
-		task_ids: input.taskIds,
-		missing: governance.missing,
-		resolution_hint: governance.resolutionHint,
-		...(input.metadata?.featureId?.trim()
-			? { feature_id: input.metadata.featureId.trim() }
-			: {}),
-		...(input.metadata?.parentSpec?.trim()
-			? { parent_spec: input.metadata.parentSpec.trim() }
-			: {}),
-	};
-	if (existing) {
-		Object.assign(existing, entry);
-	} else {
-		index.entries.push(entry);
-	}
-	writePendingSpecIndex(root, index);
-	return entry;
+	return withSessionLock(root, GOVERNANCE_LOCK, () => {
+		const governance = resolveGovernance(input.metadata);
+		if (!governance.pendingSpec) {
+			return null;
+		}
+		const createdAt = input.createdAt ?? nowIso();
+		const index = readPendingSpecIndex(root);
+		const existing = index.entries.find(
+			(entry) => entry.session_id === input.session,
+		);
+		const entry: PendingSpecEntry = {
+			session_id: input.session,
+			created_at: existing?.created_at ?? createdAt,
+			updated_at: createdAt,
+			status: "open",
+			theme: input.theme.trim(),
+			task_ids: input.taskIds,
+			missing: governance.missing,
+			resolution_hint: governance.resolutionHint,
+			...(input.metadata?.featureId?.trim()
+				? { feature_id: input.metadata.featureId.trim() }
+				: {}),
+			...(input.metadata?.parentSpec?.trim()
+				? { parent_spec: input.metadata.parentSpec.trim() }
+				: {}),
+		};
+		if (existing) {
+			Object.assign(existing, entry);
+		} else {
+			index.entries.push(entry);
+		}
+		writePendingSpecIndex(root, index);
+		return entry;
+	});
 }
 
 export function listOpenPendingSpecs(root: string): PendingSpecEntry[] {
@@ -706,6 +722,134 @@ function updateSessionFrontmatter(
 	}
 }
 
+function withGovernanceRollback<T>(
+	root: string,
+	session: string,
+	action: () => T,
+): T {
+	const files = findMarkdownFiles(root, session).filter((file) =>
+		/_(plan|task)_\d+\.md$/.test(file),
+	);
+	const originals = new Map(
+		files.map((file) => [file, readFileSync(file, "utf8")]),
+	);
+	const indexPath = pendingSpecsPath(root);
+	const indexExisted = existsSync(indexPath);
+	const indexBefore = indexExisted ? readFileSync(indexPath, "utf8") : "";
+	try {
+		return action();
+	} catch (error) {
+		for (const [file, content] of originals) atomicWriteText(file, content);
+		if (indexExisted) atomicWriteText(indexPath, indexBefore);
+		else if (existsSync(indexPath)) rmSync(indexPath, { force: true });
+		throw error;
+	}
+}
+
+function sha256(content: string): string {
+	return createHash("sha256").update(content).digest("hex");
+}
+
+function roadmapFeatureSection(roadmap: string, featureId: string): string {
+	const lines = roadmap.split(/\r?\n/);
+	const escaped = featureId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const headingPattern = new RegExp(`^(#{2,6})\\s+${escaped}\\b`);
+	const start = lines.findIndex((line) => headingPattern.test(line));
+	if (start < 0) throw new Error(`Roadmap feature not found: ${featureId}`);
+	const level = lines[start]?.match(/^(#+)/)?.[1]?.length ?? 6;
+	let end = lines.length;
+	for (let index = start + 1; index < lines.length; index += 1) {
+		const nextLevel = lines[index]?.match(/^(#{2,6})\s+/)?.[1]?.length;
+		if (nextLevel && nextLevel <= level) {
+			end = index;
+			break;
+		}
+	}
+	const section = lines.slice(start, end).join("\n");
+	if (!/^-\s*Status:\s*active\s*$/im.test(section))
+		throw new Error(`Roadmap feature is not active: ${featureId}`);
+	return section;
+}
+
+function parseGoverningSpecsFromSection(
+	root: string,
+	section: string,
+): string[] {
+	const lines = section.split(/\r?\n/);
+	const specPaths = new Set<string>();
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index] ?? "";
+		const match = /^\s*-\s*Governing\s+spec:\s*(.*)\s*$/i.exec(line);
+		if (!match) {
+			continue;
+		}
+		let candidate = (match[1] ?? "").trim();
+		if (!candidate) {
+			const next = lines[index + 1]?.trim();
+			if (next && !next.startsWith("-") && !/^#+\s/.test(next)) {
+				candidate = next;
+			}
+		}
+		const cleaned = candidate.replace(/^`+|`+$/g, "").trim();
+		if (!cleaned) continue;
+		const absolute = resolve(root, cleaned);
+		const canonicalRoot = resolve(root);
+		if (!absolute.startsWith(`${canonicalRoot}/`) && absolute !== canonicalRoot)
+			continue;
+		const relative = absolute.slice(canonicalRoot.length + 1);
+		if (relative) {
+			specPaths.add(relative.replaceAll("\\", "/"));
+		}
+	}
+	return [...specPaths];
+}
+
+export function resolveGovernanceCatalog(
+	root: string,
+	featureId: string,
+	parentSpec: string,
+) {
+	const adm = resolveAdmPaths(root);
+	const roadmapPath = join(adm.roadmapDir, "GENERAL-ROADMAP.md");
+	if (!existsSync(roadmapPath)) throw new Error("Governance roadmap not found");
+	const roadmap = readFileSync(roadmapPath, "utf8");
+	const featureSection = roadmapFeatureSection(roadmap, featureId);
+	const matches = readdirSync(adm.specsDir, { withFileTypes: true })
+		.filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+		.map((entry) => join(adm.specsDir, entry.name))
+		.filter((path) => {
+			const fm = parseFrontmatter(readFileSync(path, "utf8"));
+			return (
+				trimString(fm?.id) === parentSpec || path.endsWith(`/${parentSpec}.md`)
+			);
+		});
+	if (matches.length !== 1)
+		throw new Error(`Parent spec must resolve uniquely: ${parentSpec}`);
+	const specPath = matches[0] as string;
+	const spec = readFileSync(specPath, "utf8");
+	const fm = parseFrontmatter(spec);
+	if (!fm || trimString(fm.status) !== "active")
+		throw new Error(`Parent spec is not active: ${parentSpec}`);
+	if (trimString(fm.roadmap_feature) !== featureId)
+		throw new Error(`Parent spec roadmap_feature mismatch: ${parentSpec}`);
+	const relative = (path: string) =>
+		path.slice(resolve(root).length + 1).replaceAll("\\", "/");
+	const governingSpecs = parseGoverningSpecsFromSection(root, featureSection);
+	const specPathCandidate = relative(specPath);
+	if (
+		!governingSpecs.includes(specPathCandidate) &&
+		!governingSpecs.includes(specPathCandidate.replaceAll("\\", "/"))
+	) {
+		throw new Error(`Roadmap feature governing spec mismatch: ${parentSpec}`);
+	}
+	return {
+		roadmapPath: relative(roadmapPath),
+		roadmapHash: sha256(roadmap),
+		specPath: relative(specPath),
+		specHash: sha256(spec),
+	};
+}
+
 export function resolvePendingSpec(
 	root: string,
 	input: {
@@ -714,64 +858,82 @@ export function resolvePendingSpec(
 		parentSpec?: string;
 		noSpecRequiredReason?: string;
 	},
+	runtime: { failAfterFrontmatter?: boolean } = {},
 ): PendingSpecEntry {
-	const index = readPendingSpecIndex(root);
-	const entry = index.entries.find(
-		(candidate) => candidate.session_id === input.session,
-	);
-	if (!entry) {
-		throw new Error(
-			`pending_spec entry not found for session ${input.session}`,
+	return withSessionLock(root, GOVERNANCE_LOCK, () => {
+		const index = readPendingSpecIndex(root);
+		const entry = index.entries.find(
+			(candidate) => candidate.session_id === input.session,
 		);
-	}
-	const resolvedAt = nowIso();
-	const reason = input.noSpecRequiredReason?.trim() ?? "";
-	if (reason) {
-		entry.status = "waived";
-		entry.updated_at = resolvedAt;
-		entry.resolved_at = resolvedAt;
-		entry.reason = reason;
-		entry.missing = [];
-		entry.resolution_hint = "spec requirement waived with explicit reason";
-		updateSessionFrontmatter(root, input.session, {
-			governance_status: "unbound",
-			spec_required: false,
-			pending_spec: false,
-			pending_spec_status: "waived",
-			pending_spec_missing: [],
-			spec_waiver_reason: reason,
-			updated_at: resolvedAt,
+		if (!entry) {
+			throw new Error(
+				`pending_spec entry not found for session ${input.session}`,
+			);
+		}
+		return withGovernanceRollback(root, input.session, () => {
+			const resolvedAt = nowIso();
+			const reason = input.noSpecRequiredReason?.trim() ?? "";
+			if (reason) {
+				entry.status = "waived";
+				entry.updated_at = resolvedAt;
+				entry.resolved_at = resolvedAt;
+				entry.reason = reason;
+				entry.missing = [];
+				entry.resolution_hint = "spec requirement waived with explicit reason";
+				updateSessionFrontmatter(root, input.session, {
+					governance_status: "unbound",
+					spec_required: false,
+					pending_spec: false,
+					pending_spec_status: "waived",
+					pending_spec_missing: [],
+					spec_waiver_reason: reason,
+					updated_at: resolvedAt,
+				});
+				if (runtime.failAfterFrontmatter)
+					throw new Error("Injected governance failure after frontmatter");
+				writePendingSpecIndex(root, index);
+				return entry;
+			}
+			const featureId = input.featureId?.trim() || entry.feature_id || "";
+			const parentSpec = input.parentSpec?.trim() || entry.parent_spec || "";
+			if (!featureId || !parentSpec) {
+				throw new Error(
+					"resolve-spec requires --feature-id and --parent-spec unless --no-spec-required --reason is used",
+				);
+			}
+			const catalog = resolveGovernanceCatalog(root, featureId, parentSpec);
+			entry.status = "resolved";
+			entry.updated_at = resolvedAt;
+			entry.resolved_at = resolvedAt;
+			entry.feature_id = featureId;
+			entry.parent_spec = parentSpec;
+			entry.missing = [];
+			entry.resolution_hint = "linked to roadmap feature and parent spec";
+			entry.parent_spec_path = catalog.specPath;
+			entry.parent_spec_sha256 = catalog.specHash;
+			entry.roadmap_path = catalog.roadmapPath;
+			entry.roadmap_sha256 = catalog.roadmapHash;
+			updateSessionFrontmatter(root, input.session, {
+				roadmap_feature: featureId,
+				feature_id: featureId,
+				parent_spec: parentSpec,
+				parent_spec_path: catalog.specPath,
+				parent_spec_sha256: catalog.specHash,
+				roadmap_path: catalog.roadmapPath,
+				roadmap_sha256: catalog.roadmapHash,
+				governance_status: "governed",
+				spec_required: true,
+				pending_spec: false,
+				pending_spec_status: "resolved",
+				pending_spec_missing: [],
+				pending_spec_resolution_hint: entry.resolution_hint,
+				spec_waiver_reason: "",
+				updated_at: resolvedAt,
+			});
+			if (runtime.failAfterFrontmatter)
+				throw new Error("Injected governance failure after frontmatter");
+			writePendingSpecIndex(root, index);
+			return entry;
 		});
-		writePendingSpecIndex(root, index);
-		return entry;
-	}
-	const featureId = input.featureId?.trim() || entry.feature_id || "";
-	const parentSpec = input.parentSpec?.trim() || entry.parent_spec || "";
-	if (!featureId || !parentSpec) {
-		throw new Error(
-			"resolve-spec requires --feature-id and --parent-spec unless --no-spec-required --reason is used",
-		);
-	}
-	entry.status = "resolved";
-	entry.updated_at = resolvedAt;
-	entry.resolved_at = resolvedAt;
-	entry.feature_id = featureId;
-	entry.parent_spec = parentSpec;
-	entry.missing = [];
-	entry.resolution_hint = "linked to roadmap feature and parent spec";
-	updateSessionFrontmatter(root, input.session, {
-		roadmap_feature: featureId,
-		feature_id: featureId,
-		parent_spec: parentSpec,
-		governance_status: "governed",
-		spec_required: true,
-		pending_spec: false,
-		pending_spec_status: "resolved",
-		pending_spec_missing: [],
-		pending_spec_resolution_hint: entry.resolution_hint,
-		spec_waiver_reason: "",
-		updated_at: resolvedAt,
 	});
-	writePendingSpecIndex(root, index);
-	return entry;
 }

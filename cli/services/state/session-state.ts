@@ -208,6 +208,28 @@ function buildSnapshotFromFiles(
 }
 
 function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
+	const seenTaskIds = new Map<string, string>();
+	for (const file of snapshot.sourceFiles.filter(
+		(sourceFile) => sourceFile.kind === "task",
+	)) {
+		for (const [lineIndex, line] of readText(
+			join(snapshot.sessionPath, file.path),
+		)
+			.split(/\r?\n/)
+			.entries()) {
+			const match = line.trim().match(TASK_ROW_RE);
+			const taskId = match?.[1];
+			if (!taskId) continue;
+			const location = `${file.path}:${lineIndex + 1}`;
+			const previous = seenTaskIds.get(taskId);
+			if (previous) {
+				throw new Error(
+					`Duplicate task id ${taskId} in session ${snapshot.sessionId}: ${previous} and ${location}`,
+				);
+			}
+			seenTaskIds.set(taskId, location);
+		}
+	}
 	const db = openDb(root);
 	try {
 		db.exec("BEGIN");
@@ -266,7 +288,9 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 
 			const evidencePath = join(snapshot.sessionPath, ".evidence.jsonl");
 			if (existsSync(evidencePath)) {
-				for (const line of readText(evidencePath).split(/\r?\n/)) {
+				for (const [lineIndex, line] of readText(evidencePath)
+					.split(/\r?\n/)
+					.entries()) {
 					const trimmed = line.trim();
 					if (!trimmed) {
 						continue;
@@ -275,7 +299,9 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 					try {
 						parsed = JSON.parse(trimmed) as Record<string, unknown>;
 					} catch {
-						continue;
+						throw new Error(
+							`Invalid evidence JSON at ${evidencePath}:${lineIndex + 1}`,
+						);
 					}
 					const evidenceId = typeof parsed.id === "string" ? parsed.id : null;
 					const taskId =
@@ -295,7 +321,9 @@ function storeSnapshot(root: string, snapshot: SessionStateSnapshot): void {
 					const result =
 						typeof parsed.result === "string" ? parsed.result : null;
 					if (!evidenceId || !taskId || !createdAt || !command || !result) {
-						continue;
+						throw new Error(
+							`Incomplete evidence at ${evidencePath}:${lineIndex + 1}`,
+						);
 					}
 					db.prepare(
 						`INSERT INTO evidence (session_id, evidence_id, task_id, created_at, command, result, exit_code, artifact, note, raw_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

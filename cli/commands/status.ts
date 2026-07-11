@@ -21,6 +21,7 @@ import {
 	type CatchupReport,
 	computeCatchup,
 } from "../services/workbench/catchup";
+import { sessionLifecycleState } from "../services/workbench/lifecycle";
 import { type CommandIo, DEFAULT_IO } from "./io";
 
 type StatusSnapshot = {
@@ -78,7 +79,9 @@ const TASK_ROW_RE =
 const TASK_STATE_PRIORITY: Record<string, number> = {
 	in_progress: 0,
 	problem: 1,
-	pending: 2,
+	implemented_untested: 2,
+	tested_needs_spec_validation: 3,
+	pending: 4,
 	done: 50,
 	moved: 60,
 };
@@ -536,7 +539,10 @@ function readStatusSnapshot(
 			throw taskNotFoundError(taskId, selectedSession);
 		}
 		return {
-			status: "none",
+			status:
+				sessionLifecycleState(loaded.value.root, selectedSession) === "corrupt"
+					? "corrupt"
+					: "none",
 			task: "none",
 			filesWritten: ["none"],
 			validationOrChecks: mergeStatusEntries(
@@ -544,7 +550,7 @@ function readStatusSnapshot(
 				globalFindings.map((entry) => entry.validation),
 			),
 			blockers: mergeStatusEntries(
-				["none"],
+				["missing canonical task file"],
 				globalFindings.map((entry) => entry.blocker),
 			),
 			next: mergeStatusEntries(

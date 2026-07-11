@@ -1,13 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	runSessionCommand,
 	setCoordinationRadarReaderForTests,
 } from "../commands/session";
-import { remoteOperationContext } from "../core/operation-context";
+import {
+	defaultOperationContext,
+	remoteOperationContext,
+} from "../core/operation-context";
 import { readActiveSession } from "../services/workbench/lifecycle";
 import {
 	bindSession,
@@ -166,6 +175,34 @@ afterEach(() => {
 });
 
 describe("session context service", () => {
+	test("malformed context fails closed and is not overwritten", () => {
+		const root = createProjectRoot("malformed-context");
+		const path = join(root, ".afol", "wb", "session-context.json");
+		try {
+			writeFileSync(path, "{broken", "utf8");
+			expect(() => bindSession(root, { session: "S-01" })).toThrow(
+				"Invalid session context",
+			);
+			expect(readFileSync(path, "utf8")).toBe("{broken");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("serialized independent binds preserve both bindings", () => {
+		const root = createProjectRoot("serialized-binds");
+		try {
+			bindSession(root, { session: "S-01", branch: "one" });
+			bindSession(root, { session: "S-02", branch: "two" });
+			expect(
+				readSessionContext(root)
+					.bindings.map((item) => item.session)
+					.sort(),
+			).toEqual(["S-01", "S-02"]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	test("readSessionContext returns empty when file is missing", () => {
 		const root = createProjectRoot("missing");
 		try {
@@ -377,6 +414,41 @@ describe("afol session command", () => {
 		}
 	});
 
+	test("switch restores active pointer and context when binding fails", async () => {
+		const root = createProjectRoot("switch-rollback");
+		createSessionFixture(root, "OLD");
+		createSessionFixture(root, "NEXT");
+		writeFileSync(
+			join(root, ".afol", "wb", ".active_session"),
+			"OLD\n",
+			"utf8",
+		);
+		bindSession(root, { session: "OLD", branch: "old" });
+		const contextPath = join(root, ".afol", "wb", "session-context.json");
+		const before = readFileSync(contextPath, "utf8");
+		const captured = captureIo();
+		try {
+			expect(
+				await runSessionCommand(
+					"switch",
+					["NEXT"],
+					root,
+					captured.io,
+					defaultOperationContext(),
+					{
+						beforeSwitchBinding: () => {
+							throw new Error("injected binding failure");
+						},
+					},
+				),
+			).toBe(2);
+			expect(readActiveSession(root)).toBe("OLD");
+			expect(readFileSync(contextPath, "utf8")).toBe(before);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("bind rejects a missing session folder", async () => {
 		const root = createProjectRoot("bind-missing");
 		initGitRepo(root);
@@ -437,7 +509,7 @@ describe("afol session command", () => {
 			const code = await runSessionCommand("switch", ["BROKEN"], root, io.io);
 			expect(code).toBe(2);
 			expect(io.stderr.join("\n")).toContain(
-				"session not found: BROKEN (missing task file",
+				"session corrupt: BROKEN (missing canonical task file)",
 			);
 			expect(readActiveSession(root)).toBeNull();
 		} finally {

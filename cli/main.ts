@@ -45,6 +45,7 @@ import {
 	runLogCommand,
 	runNewCommand,
 	runStartCommand,
+	runTransitionCommand,
 	runVerifyTasksCommand,
 } from "./commands/workbench";
 import {
@@ -114,6 +115,7 @@ export const DIRECT_DISPATCH_KINDS = Object.freeze([
 	"start",
 	"evidence",
 	"done",
+	"transition",
 	"log",
 	"quickTask",
 	"verifyTasks",
@@ -366,11 +368,11 @@ export async function main(argv: string[]): Promise<number> {
 	}
 
 	if (resolution.kind === "bootstrap") {
-		return runBootstrapCommand(resolution.args);
+		return runBootstrapCommand(resolution.args, {}, operationCtx);
 	}
 
 	if (resolution.kind === "init") {
-		return runInitCommand(resolution.args);
+		return runInitCommand(resolution.args, operationCtx);
 	}
 
 	const project = loadProjectRoot(process.cwd());
@@ -409,6 +411,14 @@ export async function main(argv: string[]): Promise<number> {
 
 	if (resolution.kind === "done") {
 		return runDoneCommand(resolution.args, project.value.root, operationCtx);
+	}
+
+	if (resolution.kind === "transition") {
+		return runTransitionCommand(
+			resolution.args,
+			project.value.root,
+			operationCtx,
+		);
 	}
 
 	if (resolution.kind === "log") {
@@ -499,6 +509,8 @@ export async function main(argv: string[]): Promise<number> {
 				resolution.action,
 				resolution.args,
 				project.value.root,
+				undefined,
+				operationCtx,
 			);
 		}
 		if (resolution.group === "db") {

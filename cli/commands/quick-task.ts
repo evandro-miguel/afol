@@ -5,10 +5,10 @@ import {
 	requiresApproval,
 } from "../core/operation-context";
 import {
-	assertNoOpenPendingSpecs,
 	formatSessionPendingSpecWarning,
 	getSessionPendingSpecNotice,
 	resolveGovernance,
+	resolveGovernanceCatalog,
 } from "../services/governance/pending-specs";
 import type { NewWorkstreamMetadata } from "../services/workbench/lifecycle";
 import {
@@ -17,6 +17,7 @@ import {
 	newWorkstream,
 	recordEvidence,
 	startTask,
+	transitionTask,
 } from "../services/workbench/lifecycle";
 import {
 	formatHintLine,
@@ -31,7 +32,6 @@ export type ParsedQuickTaskArgs = {
 	json: boolean;
 	metadata: NewWorkstreamMetadata;
 	command: string;
-	result: string;
 	artifact?: string;
 	note?: string;
 };
@@ -39,8 +39,7 @@ export type ParsedQuickTaskArgs = {
 export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 	let theme = "";
 	let json = false;
-	let command = "quick-task";
-	let result = "passed";
+	let command = "";
 	let artifact = "";
 	let note = "";
 	const metadata: NewWorkstreamMetadata = {};
@@ -95,12 +94,6 @@ export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 			index += 1;
 			continue;
 		}
-		if (arg === "--result") {
-			if (!value) throw new Error("Missing value for --result in quick-task.");
-			result = value;
-			index += 1;
-			continue;
-		}
 		if (arg === "--artifact") {
 			if (!value)
 				throw new Error("Missing value for --artifact in quick-task.");
@@ -119,21 +112,30 @@ export function parseQuickTaskArgs(args: string[]): ParsedQuickTaskArgs {
 	if (!theme) {
 		throw new Error("Missing theme for quick-task.");
 	}
-	if (result !== "passed") {
-		throw new Error("quick-task requires --result passed.");
-	}
+	if (!command.trim()) throw new Error("quick-task requires --command.");
 	if (metadata.noSpecRequiredReason && !noSpecRequired) {
 		throw new Error("Missing --no-spec-required for quick-task reason.");
 	}
 	if (noSpecRequired && !metadata.noSpecRequiredReason?.trim()) {
 		throw new Error("Missing --reason for --no-spec-required in quick-task.");
 	}
+	const hasBinding = Boolean(
+		metadata.featureId?.trim() && metadata.parentSpec?.trim(),
+	);
+	if (!hasBinding && !metadata.noSpecRequiredReason?.trim()) {
+		throw new Error(
+			"quick-task requires --feature-id and --parent-spec or --no-spec-required --reason.",
+		);
+	}
+	if (hasBinding && noSpecRequired)
+		throw new Error(
+			"quick-task governance binding and waiver are mutually exclusive.",
+		);
 	return {
 		theme,
 		json,
 		metadata,
 		command,
-		result,
 		...(artifact ? { artifact } : {}),
 		...(note ? { note } : {}),
 	};
@@ -163,7 +165,13 @@ export async function runQuickTaskCommand(
 			);
 		}
 		parsed = parseQuickTaskArgs(args);
-		assertNoOpenPendingSpecs(root);
+		if (parsed.metadata.featureId && parsed.metadata.parentSpec) {
+			resolveGovernanceCatalog(
+				root,
+				parsed.metadata.featureId,
+				parsed.metadata.parentSpec,
+			);
+		}
 		const governance = resolveGovernance(parsed.metadata);
 		const created = newWorkstream(root, parsed.theme, parsed.metadata);
 		session = created.session;
@@ -178,7 +186,7 @@ export async function runQuickTaskCommand(
 			session: created.session,
 			taskId,
 			command: parsed.command,
-			result: verificationPassed ? parsed.result : "failed",
+			result: verificationPassed ? "passed" : "failed",
 			exitCode: verification.exitCode,
 			provenance: "observed",
 			...(parsed.artifact ? { artifact: parsed.artifact } : {}),
@@ -193,10 +201,20 @@ export async function runQuickTaskCommand(
 					? `; signal: ${verification.signal}`
 					: "";
 			throw new Error(
-				`--command failed with exit code ${verification.exitCode}${details}; --result passed was downgraded to failed`,
+				`--command failed with exit code ${verification.exitCode}${details}`,
 			);
 		}
 		failedStep = "done";
+		transitionTask(root, {
+			session: created.session,
+			taskId,
+			state: "implemented_untested",
+		});
+		transitionTask(root, {
+			session: created.session,
+			taskId,
+			state: "tested_needs_spec_validation",
+		});
 		doneTask(root, { session: created.session, taskId });
 		failedStep = "close";
 		closeSession(root, created.session);

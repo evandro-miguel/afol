@@ -12,6 +12,10 @@ import { runAdrCommand } from "../commands/adr";
 import { runChangelogCommand } from "../commands/changelog";
 import { runSpecCommand } from "../commands/spec";
 import {
+	resolveGovernanceCatalog,
+	resolvePendingSpec,
+} from "../services/governance/pending-specs";
+import {
 	abandonAdr,
 	acceptAdr,
 	createAdr,
@@ -126,6 +130,39 @@ function writeSpec(root: string, id: string, status: string): string {
 	return path;
 }
 
+function writePendingGovernanceFixture(
+	root: string,
+	specStatus = "active",
+	specFeature = "F-22",
+) {
+	mkdirSync(join(root, ".afol", "adm", "roadmap"), { recursive: true });
+	writeFileSync(
+		join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+		"# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Governing spec: .afol/adm/specs/spec-22.md\n",
+		"utf8",
+	);
+	const taskPath = writeTask(root, "S-GOV", "T-01");
+	writeFileSync(
+		join(root, ".afol", "adm", "specs", "spec-22.md"),
+		`---\nid: spec-22\nstatus: ${specStatus}\nroadmap_feature: ${specFeature}\n---\n\n# Spec\n`,
+		"utf8",
+	);
+	const indexPath = join(
+		root,
+		".afol",
+		"data",
+		"governance",
+		"pending-specs.json",
+	);
+	mkdirSync(join(root, ".afol", "data", "governance"), { recursive: true });
+	writeFileSync(
+		indexPath,
+		`${JSON.stringify({ schema_version: 1, entries: [{ session_id: "S-GOV", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", status: "open", theme: "test", task_ids: ["T-01"], missing: ["roadmap_feature", "parent_spec"], resolution_hint: "resolve" }] }, null, 2)}\n`,
+		"utf8",
+	);
+	return { taskPath, indexPath };
+}
+
 function writeLegacySpec(root: string, id: string, status: string): string {
 	const path = join(root, "docs", "arc", "SPECS", `${id}.md`);
 	writeFileSync(
@@ -145,6 +182,88 @@ function writeLegacySpec(root: string, id: string, status: string): string {
 }
 
 describe("spec-gate system", () => {
+	test("governance catalog requires an active canonical roadmap feature section", () => {
+		for (const roadmap of [
+			"# Roadmap\n\nF-22 appears only in prose.\n",
+			"# Roadmap\n\n### F-22 Integrity\n\n- Status: final\n- Governing spec: .afol/adm/specs/spec-22.md\n",
+		]) {
+			const root = createFixture();
+			try {
+				writePendingGovernanceFixture(root);
+				writeFileSync(
+					join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+					roadmap,
+					"utf8",
+				);
+				expect(() =>
+					resolveGovernanceCatalog(root, "F-22", "spec-22"),
+				).toThrow();
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("governance catalog requires explicit Governing spec for the feature", () => {
+		const root = createFixture();
+		try {
+			writePendingGovernanceFixture(root);
+			writeFileSync(
+				join(root, ".afol", "adm", "roadmap", "GENERAL-ROADMAP.md"),
+				"# Roadmap\n\n### F-22 Integrity\n\n- Status: active\n- Why this feature mentions spec-22 in prose only.\n",
+				"utf8",
+			);
+			expect(() => resolveGovernanceCatalog(root, "F-22", "spec-22")).toThrow();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("governance resolution rejects fake, inactive, and mismatched catalog bindings", () => {
+		for (const variant of [
+			"fake-feature",
+			"fake-spec",
+			"inactive",
+			"mismatch",
+		] as const) {
+			const root = createFixture();
+			try {
+				writePendingGovernanceFixture(
+					root,
+					variant === "inactive" ? "archived" : "active",
+					variant === "mismatch" ? "F-99" : "F-22",
+				);
+				const input = {
+					session: "S-GOV",
+					featureId: variant === "fake-feature" ? "F-404" : "F-22",
+					parentSpec: variant === "fake-spec" ? "missing" : "spec-22",
+				};
+				expect(() => resolvePendingSpec(root, input)).toThrow();
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("governance resolution rolls back frontmatter and index after an injected failure", () => {
+		const root = createFixture();
+		try {
+			const { taskPath, indexPath } = writePendingGovernanceFixture(root);
+			const taskBefore = readFileSync(taskPath, "utf8");
+			const indexBefore = readFileSync(indexPath, "utf8");
+			expect(() =>
+				resolvePendingSpec(
+					root,
+					{ session: "S-GOV", featureId: "F-22", parentSpec: "spec-22" },
+					{ failAfterFrontmatter: true },
+				),
+			).toThrow("Injected governance failure");
+			expect(readFileSync(taskPath, "utf8")).toBe(taskBefore);
+			expect(readFileSync(indexPath, "utf8")).toBe(indexBefore);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	test("checkSpecCompatibility returns not_applicable when no spec linked", () => {
 		const root = createFixture();
 		try {

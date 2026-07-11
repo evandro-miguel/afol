@@ -10,10 +10,116 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { detectSessionHealth } from "../services/local-state/workbench-index";
 import {
+	evidenceCompletionAuthorization,
 	formatVerifyReport,
 	verifyAllSessions,
 	verifyWorkbenchTasks,
 } from "../services/workbench/verify";
+
+describe("evidence completion authorization", () => {
+	test("fails closed for declared, legacy, missing-exit, and n/a evidence", () => {
+		for (const entry of [
+			{
+				id: "E-declared",
+				command: "bun test",
+				result: "passed",
+				exit_code: 0,
+				provenance: "declared",
+			},
+			{ id: "E-legacy", command: "bun test", result: "passed", exit_code: 0 },
+			{
+				id: "E-missing-exit",
+				command: "bun test",
+				result: "passed",
+				provenance: "observed",
+			},
+			{
+				id: "E-na",
+				command: "review docs",
+				result: "n/a",
+				exit_code: 0,
+				provenance: "observed",
+			},
+		]) {
+			expect(evidenceCompletionAuthorization([entry]).status).toBe("missing");
+		}
+	});
+
+	test("returns the later applicable observed success after a failure", () => {
+		expect(
+			evidenceCompletionAuthorization([
+				{
+					id: "E-failed",
+					command: "bun test",
+					result: "failed",
+					exit_code: 1,
+					provenance: "observed",
+				},
+				{
+					id: "E-passed",
+					command: "bun test",
+					result: "passed",
+					exit_code: 0,
+					provenance: "observed",
+				},
+			]),
+		).toEqual({ status: "passed", evidenceId: "E-passed" });
+	});
+});
+
+test("strict verification rejects duplicate task ids across task files", () => {
+	const root = mkRoot("duplicate-task-id");
+	try {
+		for (const suffix of ["01", "02"])
+			write(
+				join(root, `session_task_${suffix}.md`),
+				`# Tasks\n\n| Task | State | Owner | Notes |\n|------|-------|-------|-------|\n| T-01 | pending | worker | duplicate |\n`,
+			);
+		const result = verifyWorkbenchTasks(root, true);
+		expect(
+			result.issues.some((issue) => issue.type === "duplicate_task_id"),
+		).toBe(true);
+		expect(result.allCompleted).toBe(false);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("strict verification rejects duplicate task ids in one task file", () => {
+	const root = mkRoot("duplicate-task-id-same-file");
+	try {
+		write(
+			join(root, "session_task_01.md"),
+			`# Tasks\n\n| Task | State | Owner | Notes |\n|------|-------|-------|-------|\n| T-01 | pending | worker | first |\n| T-01 | pending | worker | duplicate |\n`,
+		);
+		const result = verifyWorkbenchTasks(root, true);
+		expect(result.issues.map((issue) => issue.type)).toContain(
+			"duplicate_task_id",
+		);
+		expect(result.allCompleted).toBe(false);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("repository verification allows the same task id in different sessions", () => {
+	const root = mkRoot("duplicate-task-id-different-sessions");
+	try {
+		for (const session of ["session-a", "session-b"]) {
+			write(
+				join(root, session, `${session}_task_01.md`),
+				`# Tasks\n\n| Task | State | Owner | Notes |\n|------|-------|-------|-------|\n| T-01 | pending | worker | valid per-session id |\n`,
+			);
+			write(join(root, session, ".evidence.jsonl"), "");
+		}
+		const result = verifyWorkbenchTasks(root, true);
+		expect(result.issues.map((issue) => issue.type)).not.toContain(
+			"duplicate_task_id",
+		);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
 
 function mkRoot(name: string): string {
 	return mkdtempSync(join(tmpdir(), `wb-verify-${name}-`));
@@ -21,6 +127,41 @@ function mkRoot(name: string): string {
 
 function write(path: string, content: string): void {
 	mkdirSync(dirname(path), { recursive: true });
+	if (path.endsWith(".evidence.jsonl")) {
+		const lines = content.split("\n").map((line, index) => {
+			if (!line.trim()) {
+				return line;
+			}
+			try {
+				const entry = JSON.parse(line) as Record<string, unknown>;
+				if (
+					typeof entry.result === "string" &&
+					[
+						"pass",
+						"passed",
+						"success",
+						"successful",
+						"ok",
+						"green",
+						"valid",
+						"resolved",
+					].includes(entry.result.toLowerCase())
+				) {
+					return JSON.stringify({
+						id: entry.id ?? `E-fixture-${index}`,
+						...entry,
+						exit_code: entry.exit_code ?? 0,
+						provenance: entry.provenance ?? "observed",
+					});
+				}
+			} catch {
+				return line;
+			}
+			return line;
+		});
+		writeFileSync(path, lines.join("\n"), "utf8");
+		return;
+	}
 	writeFileSync(path, content, "utf8");
 }
 
