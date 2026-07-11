@@ -1,4 +1,8 @@
 import { resolve } from "node:path";
+import {
+	defaultOperationContext,
+	type OperationContext,
+} from "../core/operation-context";
 import { runBootstrapCommand } from "./bootstrap";
 
 type InitArgs = {
@@ -58,7 +62,10 @@ function parseInitArgs(args: string[]): InitArgs {
 	};
 }
 
-export async function runInitCommand(args: string[]): Promise<number> {
+export async function runInitCommand(
+	args: string[],
+	ctx: OperationContext = defaultOperationContext(),
+): Promise<number> {
 	let parsed: InitArgs;
 	try {
 		parsed = parseInitArgs(args);
@@ -67,5 +74,5 @@ export async function runInitCommand(args: string[]): Promise<number> {
 		return 2;
 	}
 
-	return runBootstrapCommand([parsed.targetRoot, ...parsed.forwarded]);
+	return runBootstrapCommand([parsed.targetRoot, ...parsed.forwarded], {}, ctx);
 }

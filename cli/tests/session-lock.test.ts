@@ -9,6 +9,7 @@ import {
 	renameSync,
 	rmSync,
 	statSync,
+	symlinkSync,
 	unlinkSync,
 	utimesSync,
 	writeFileSync,
@@ -256,6 +257,20 @@ function writeRawLock(
 }
 
 describe("session-lock", () => {
+	test("external path lock keys physical roots identically through symlinks", () => {
+		const root = mkProjectRoot("external-lock-realpath");
+		const link = `${root}-link`;
+		try {
+			symlinkSync(root, link, "dir");
+			expect(resolveExternalPathLockPath(link)).toBe(
+				resolveExternalPathLockPath(root),
+			);
+		} finally {
+			rmSync(link, { force: true });
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("external path lock reclaims dead stale owners", async () => {
 		const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
 		const lockPath = resolveExternalPathLockPath(resource);

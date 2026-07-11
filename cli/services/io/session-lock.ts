@@ -8,6 +8,7 @@ import {
 	mkdirSync,
 	openSync,
 	readFileSync,
+	realpathSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -381,7 +382,11 @@ export function withSessionLock<T>(
 }
 
 export function resolveExternalPathLockPath(canonicalPath: string): string {
-	const key = createHash("sha256").update(resolve(canonicalPath)).digest("hex");
+	const resolvedPath = resolve(canonicalPath);
+	const physicalPath = existsSync(resolvedPath)
+		? realpathSync(resolvedPath)
+		: resolvedPath;
+	const key = createHash("sha256").update(physicalPath).digest("hex");
 	return join(tmpdir(), "afol-external-locks", `${key}.lock`);
 }
 

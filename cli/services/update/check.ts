@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createPatch } from "diff";
 import { DEFAULT_TEMPLATE_FILES } from "../../generated/template";
@@ -375,6 +375,9 @@ function hasUnsafeManifestEdits(
 	for (const [key, currentValue] of Object.entries(current)) {
 		if (!(key in source)) {
 			return true;
+		}
+		if (key === "managed_hashes") {
+			continue;
 		}
 		if (key === "commands") {
 			if (!isObject(currentValue)) {
@@ -786,16 +789,58 @@ function planUpdateOperations(
 
 function collectRemovedTemplateOperations(
 	projectRoot: string,
+	removedPaths: readonly UpdateFilePath[],
 ): UpdateOperation[] {
-	return REMOVED_TEMPLATE_PATHS.filter((path) =>
-		existsSync(join(projectRoot, path)),
-	).map((path) => ({
-		kind: "remove-stale",
-		path,
-		owner: "managed",
-		reason: "removed-from-template",
-		diff: `remove stale template path: ${path}\n`,
-	}));
+	const manifest = readJsonText(
+		readText(join(projectRoot, ".agents/manifest.json")),
+	);
+	const entries = collectCurrentManifestEntries(manifest, null, [
+		...removedPaths,
+	]);
+	return removedPaths
+		.filter((path) => existsSync(join(projectRoot, path)))
+		.map((path) => {
+			const entry = entries[path];
+			const managedHashes = manifest?.managed_hashes;
+			const directHash =
+				managedHashes &&
+				typeof managedHashes === "object" &&
+				!Array.isArray(managedHashes) &&
+				typeof (managedHashes as RawManifest)[path] === "string"
+					? ((managedHashes as RawManifest)[path] as string)
+					: undefined;
+			if (entry?.owner === "project-owned" || entry?.owner === "ignored") {
+				return {
+					kind: "preserve-project-owned",
+					path,
+					owner: entry.owner,
+					reason: "removed-template-project-owned",
+				};
+			}
+			const absolutePath = join(projectRoot, path);
+			if (
+				(entry?.owner === "managed" || (!entry && directHash !== undefined)) &&
+				(entry?.hash ?? directHash) !== undefined &&
+				!statSync(absolutePath).isDirectory() &&
+				sha256Hex(readFileSync(absolutePath, "utf8")) ===
+					(entry?.hash ?? directHash)
+			) {
+				return {
+					kind: "remove-stale",
+					path,
+					owner: "managed",
+					reason: "removed-from-template-managed-hash-match",
+					diff: `remove stale managed template file: ${path}\n`,
+				};
+			}
+			return {
+				kind: "conflict",
+				path,
+				owner: "conflict",
+				reason: "removed-template-missing-managed-hash",
+				diff: `cannot safely remove stale template path without last managed hash: ${path}\n`,
+			};
+		});
 }
 
 function serializeOwnership(counts: OwnershipCounts): string {
@@ -804,7 +849,10 @@ function serializeOwnership(counts: OwnershipCounts): string {
 	);
 }
 
-export function checkTemplateUpdate(projectRoot: string): UpdateCheckResult {
+export function checkTemplateUpdate(
+	projectRoot: string,
+	removedPaths: readonly UpdateFilePath[] = REMOVED_TEMPLATE_PATHS,
+): UpdateCheckResult {
 	const claudeEnabled = readClaudeAdapterEnabled(projectRoot);
 	const updateTargets = claudeEnabled
 		? UPDATE_TARGETS
@@ -835,7 +883,7 @@ export function checkTemplateUpdate(projectRoot: string): UpdateCheckResult {
 		sourceManifestContent,
 		currentFiles,
 		updateTargets,
-	).concat(collectRemovedTemplateOperations(projectRoot));
+	).concat(collectRemovedTemplateOperations(projectRoot, removedPaths));
 
 	const hasSource = updateTargets.length > 0;
 	const currentRevision = revisionOf(currentLock);

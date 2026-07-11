@@ -5,6 +5,7 @@ import {
 	requiresApproval,
 } from "../core/operation-context";
 import { validateMutationRuntime } from "../services/state/validate";
+import { withExternalPathLock } from "../services/io/session-lock";
 import { withTaskInProgressMutation } from "../services/workbench/lifecycle";
 import {
 	parseArchiveArgs,
@@ -77,12 +78,14 @@ export async function runFileCommand(
 			if (!parsed.dryRun) {
 				assertFileRuntime(options);
 				requireWriteContext(parsed);
-				result = withTaskInProgressMutation(
-					projectRoot,
-					parsed.session,
-					parsed.taskId,
-					() => runPatchMutation(parsed, projectRoot),
-					mutationOptions,
+				result = await withExternalPathLock(projectRoot, async () =>
+					withTaskInProgressMutation(
+						projectRoot,
+						parsed.session,
+						parsed.taskId,
+						() => runPatchMutation(parsed, projectRoot),
+						mutationOptions,
+					),
 				);
 			} else {
 				result = runPatchMutation(parsed, projectRoot);
@@ -99,12 +102,14 @@ export async function runFileCommand(
 			if (!parsed.dryRun) {
 				assertFileRuntime(options);
 				requireWriteContext(parsed);
-				result = withTaskInProgressMutation(
-					projectRoot,
-					parsed.session,
-					parsed.taskId,
-					() => runMoveMutation(parsed, projectRoot),
-					mutationOptions,
+				result = await withExternalPathLock(projectRoot, async () =>
+					withTaskInProgressMutation(
+						projectRoot,
+						parsed.session,
+						parsed.taskId,
+						() => runMoveMutation(parsed, projectRoot),
+						mutationOptions,
+					),
 				);
 			} else {
 				result = runMoveMutation(parsed, projectRoot);
@@ -119,12 +124,14 @@ export async function runFileCommand(
 			if (!parsed.dryRun) {
 				assertFileRuntime(options);
 				requireWriteContext(parsed);
-				result = withTaskInProgressMutation(
-					projectRoot,
-					parsed.session,
-					parsed.taskId,
-					() => runUndoMutation(parsed, projectRoot),
-					mutationOptions,
+				result = await withExternalPathLock(projectRoot, async () =>
+					withTaskInProgressMutation(
+						projectRoot,
+						parsed.session,
+						parsed.taskId,
+						() => runUndoMutation(parsed, projectRoot),
+						mutationOptions,
+					),
 				);
 			} else {
 				result = runUndoMutation(parsed, projectRoot);
@@ -140,12 +147,14 @@ export async function runFileCommand(
 			if (!parsed.dryRun) {
 				assertFileRuntime(options);
 				requireWriteContext(parsed);
-				result = withTaskInProgressMutation(
-					projectRoot,
-					parsed.session,
-					parsed.taskId,
-					() => runArchiveMutation(parsed, projectRoot),
-					mutationOptions,
+				result = await withExternalPathLock(projectRoot, async () =>
+					withTaskInProgressMutation(
+						projectRoot,
+						parsed.session,
+						parsed.taskId,
+						() => runArchiveMutation(parsed, projectRoot),
+						mutationOptions,
+					),
 				);
 			} else {
 				result = runArchiveMutation(parsed, projectRoot);

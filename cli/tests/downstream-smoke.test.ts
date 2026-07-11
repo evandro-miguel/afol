@@ -106,6 +106,9 @@ describe("downstream bootstrap smoke", () => {
 				"smoke",
 				"--task",
 				"Dist smoke proof",
+				"--no-spec-required",
+				"--reason",
+				"downstream smoke fixture",
 			]);
 			assertOk(created, "new");
 			const session = sessionFrom(created.stdout as string);
@@ -152,31 +155,29 @@ describe("downstream bootstrap smoke", () => {
 			const start = runAfol(target, ["start", "--task-id", "T-01"]);
 			assertOk(start, "start");
 
-			const evidence = runAfol(target, [
-				"evidence",
+			const done = runAfol(target, [
+				"done",
+				"--task-id",
 				"T-01",
-				"--command",
-				"smoke",
-				"--result",
-				"passed",
+				"--test",
+				"true",
 			]);
-			assertOk(evidence, "evidence");
-
-			const done = runAfol(target, ["done", "--task-id", "T-01"]);
 			assertOk(done, "done");
 
 			const taskDoc = readFileSync(
 				join(target, ".afol", "wb", session, `${session}_task_01.md`),
 				"utf8",
 			);
-			expect(taskDoc).toContain("| T-01 | done | worker | Dist smoke proof |");
+			expect(taskDoc).toContain(
+				"| T-01 | done | worker | Dist smoke proof attempt=1 |",
+			);
 
 			const evidenceDoc = readFileSync(
 				join(target, ".afol", "wb", session, ".evidence.jsonl"),
 				"utf8",
 			).trim();
 			expect(evidenceDoc).toContain('"task_id":"T-01"');
-			expect(evidenceDoc).toContain('"command":"smoke"');
+			expect(evidenceDoc).toContain('"command":"true"');
 			expect(evidenceDoc).toContain('"result":"passed"');
 
 			const close = runAfol(target, ["close"]);
