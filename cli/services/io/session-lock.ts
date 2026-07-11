@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
 	closeSync,
 	existsSync,
@@ -10,8 +11,8 @@ import {
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { hostname } from "node:os";
-import { dirname, join } from "node:path";
+import { hostname, tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { resolveProjectPaths } from "../project/paths";
 import { resolveProjectWritePath } from "../project/root";
 
@@ -377,4 +378,79 @@ export function withSessionLock<T>(
 			closeSync(fd);
 		}
 	}
+}
+
+export function resolveExternalPathLockPath(canonicalPath: string): string {
+	const key = createHash("sha256").update(resolve(canonicalPath)).digest("hex");
+	return join(tmpdir(), "afol-external-locks", `${key}.lock`);
+}
+
+export async function withExternalPathLock<T>(
+	canonicalPath: string,
+	action: () => Promise<T>,
+): Promise<T> {
+	const lockPath = resolveExternalPathLockPath(canonicalPath);
+	mkdirSync(dirname(lockPath), { recursive: true });
+	const startedAt = Date.now();
+	let fd: number | null = null;
+	while (fd === null) {
+		try {
+			fd = openSync(lockPath, "wx");
+		} catch (error) {
+			if (!isAlreadyExistsError(error)) throw error;
+			const now = Date.now();
+			const staleMetadata = shouldRecoverStaleLock(lockPath, now);
+			if (
+				staleMetadata !== null &&
+				tryReclaimStaleLock(lockPath, staleMetadata)
+			) {
+				continue;
+			}
+			if (now - startedAt >= LOCK_TIMEOUT_MS) {
+				throw new Error(
+					`Timed out waiting for external path lock: ${readExistingLockHint(lockPath)}`,
+				);
+			}
+			sleepSync(LOCK_RETRY_MS);
+		}
+	}
+
+	let ownedIdentity: LockIdentity | null = null;
+	try {
+		ownedIdentity = readFdIdentity(fd);
+		writeFileSync(
+			fd,
+			`${JSON.stringify({
+				pid: process.pid,
+				acquired_at: new Date().toISOString(),
+				host: HOSTNAME,
+				resource: resolve(canonicalPath),
+			})}\n`,
+			"utf8",
+		);
+		fsyncSync(fd);
+		return await action();
+	} finally {
+		if (ownedIdentity !== null)
+			unlinkIfIdentityMatches(lockPath, ownedIdentity);
+		if (fd !== null) closeSync(fd);
+	}
+}
+
+export function withResourceLocks<T>(
+	root: string,
+	canonicalPaths: readonly string[],
+	action: () => T,
+): T {
+	const normalizedPaths = [
+		...new Set(canonicalPaths.map((path) => resolve(root, path))),
+	].sort();
+	const keys = normalizedPaths.map(
+		(path) => `__resource_${createHash("sha256").update(path).digest("hex")}`,
+	);
+	const acquire = (index: number): T =>
+		index >= keys.length
+			? action()
+			: withSessionLock(root, keys[index] as string, () => acquire(index + 1));
+	return acquire(0);
 }

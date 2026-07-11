@@ -1,8 +1,10 @@
+import { envelopeErr, stringifyEnvelope } from "../core/envelope";
 import {
 	defaultOperationContext,
 	type OperationContext,
 	requiresApproval,
 } from "../core/operation-context";
+import { validateMutationRuntime } from "../services/state/validate";
 import { withTaskInProgressMutation } from "../services/workbench/lifecycle";
 import {
 	parseArchiveArgs,
@@ -27,7 +29,18 @@ import {
 
 export type FileCommandOptions = {
 	beforeMutation?: () => void;
+	cliRoot?: string;
+	invocationPath?: string;
 };
+
+function assertFileRuntime(options: FileCommandOptions): void {
+	const validation = validateMutationRuntime({
+		cliRoot: options.cliRoot,
+		invocationPath: options.invocationPath,
+		operation: "file mutation",
+	});
+	if (!validation.ok) throw new Error(validation.message);
+}
 
 export async function runFileCommand(
 	args: string[],
@@ -62,6 +75,7 @@ export async function runFileCommand(
 				throw new Error("file patch requires local interactive approval");
 			}
 			if (!parsed.dryRun) {
+				assertFileRuntime(options);
 				requireWriteContext(parsed);
 				result = withTaskInProgressMutation(
 					projectRoot,
@@ -83,6 +97,7 @@ export async function runFileCommand(
 				throw new Error("file move requires local interactive approval");
 			}
 			if (!parsed.dryRun) {
+				assertFileRuntime(options);
 				requireWriteContext(parsed);
 				result = withTaskInProgressMutation(
 					projectRoot,
@@ -102,6 +117,7 @@ export async function runFileCommand(
 			}
 			asJson = parsed.json;
 			if (!parsed.dryRun) {
+				assertFileRuntime(options);
 				requireWriteContext(parsed);
 				result = withTaskInProgressMutation(
 					projectRoot,
@@ -122,6 +138,7 @@ export async function runFileCommand(
 				throw new Error("file archive requires local interactive approval");
 			}
 			if (!parsed.dryRun) {
+				assertFileRuntime(options);
 				requireWriteContext(parsed);
 				result = withTaskInProgressMutation(
 					projectRoot,
@@ -141,7 +158,14 @@ export async function runFileCommand(
 		outputResult(result, io, asJson);
 		return result.status === "blocked" ? 4 : 0;
 	} catch (error) {
-		io.stderr(`for file command: ${(error as Error).message}`);
+		const message = `for file command: ${(error as Error).message}`;
+		if (args.includes("--json") || args.includes("-j")) {
+			io.stdout(
+				stringifyEnvelope(
+					envelopeErr("FILE_ERROR", message, { action: "file", exitCode: 2 }),
+				),
+			);
+		} else io.stderr(message);
 		return 2;
 	}
 }

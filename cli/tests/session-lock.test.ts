@@ -22,9 +22,13 @@ import {
 	workerData,
 } from "node:worker_threads";
 import {
+	resolveExternalPathLockPath,
 	resolveSessionLockPath,
+	withExternalPathLock,
+	withResourceLocks,
 	withSessionLock,
 } from "../services/io/session-lock";
+import { withMutationJournalLock } from "../services/mutations/journal";
 
 const RECLAIM_READY = 0;
 const RECLAIM_START = 1;
@@ -252,6 +256,40 @@ function writeRawLock(
 }
 
 describe("session-lock", () => {
+	test("external path lock reclaims dead stale owners", async () => {
+		const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
+		const lockPath = resolveExternalPathLockPath(resource);
+		mkdirSync(dirname(lockPath), { recursive: true });
+		const old = Date.now() - 60_000;
+		writeFileSync(
+			lockPath,
+			`${JSON.stringify({
+				pid: deadPidFromExitedProcess(),
+				host: hostname().toLowerCase(),
+				acquired_at: new Date(old).toISOString(),
+			})}\n`,
+			"utf8",
+		);
+		utimesSync(lockPath, old / 1000, old / 1000);
+		let entered = false;
+		await withExternalPathLock(resource, async () => {
+			entered = true;
+		});
+		expect(entered).toBe(true);
+		expect(existsSync(lockPath)).toBe(false);
+	});
+
+	test("external path lock never removes a replacement inode", async () => {
+		const resource = join(tmpdir(), `external-lock-${crypto.randomUUID()}`);
+		const lockPath = resolveExternalPathLockPath(resource);
+		await withExternalPathLock(resource, async () => {
+			unlinkSync(lockPath);
+			writeFileSync(lockPath, "replacement\n", "utf8");
+		});
+		expect(readFileSync(lockPath, "utf8")).toBe("replacement\n");
+		rmSync(lockPath, { force: true });
+	});
+
 	test("does not reclaim a replacement inode with identical metadata", async () => {
 		const root = mkProjectRoot("reclaim-replacement");
 		try {
@@ -461,6 +499,36 @@ describe("session-lock", () => {
 				writeFileSync(lockPath, "replacement lock\n", "utf8");
 			});
 			expect(readFileSync(lockPath, "utf8")).toBe("replacement lock\n");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("resource locks are deterministic and reentrant", () => {
+		const root = mkProjectRoot("resource-locks");
+		try {
+			expect(
+				withResourceLocks(root, ["/b", "/a"], () =>
+					withResourceLocks(root, ["/a", "/b"], () => "ok"),
+				),
+			).toBe("ok");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("keeps journal-before-resource lock ordering for reverse resource lists", () => {
+		const root = mkProjectRoot("journal-resource-order");
+		try {
+			expect(
+				withMutationJournalLock(root, () =>
+					withResourceLocks(root, ["/b", "/a"], () =>
+						withMutationJournalLock(root, () =>
+							withResourceLocks(root, ["/a", "/b"], () => "ordered"),
+						),
+					),
+				),
+			).toBe("ordered");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

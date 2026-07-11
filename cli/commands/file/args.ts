@@ -19,6 +19,9 @@ type ParsedArgs = {
 	destinationArg: string | undefined;
 	mutationId: string | undefined;
 	appendText: string | undefined;
+	expectedBeforeHash: string | undefined;
+	expectedDestinationHash: string | undefined;
+	expectedDestinationExists: boolean | undefined;
 };
 
 function readFlagValue(
@@ -44,6 +47,9 @@ function parseGenericArgs(values: string[]): ParsedArgs {
 	let destinationArg: string | undefined;
 	let mutationId: string | undefined;
 	let appendText: string | undefined;
+	let expectedBeforeHash: string | undefined;
+	let expectedDestinationHash: string | undefined;
+	let expectedDestinationExists: boolean | undefined;
 
 	for (let index = 0; index < values.length; index += 1) {
 		const value = values[index];
@@ -51,6 +57,26 @@ function parseGenericArgs(values: string[]): ParsedArgs {
 			continue;
 		}
 		switch (value) {
+			case "--expected-before-hash": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				expectedBeforeHash = next;
+				index = nextIndex;
+				break;
+			}
+			case "--expected-destination-hash": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				expectedDestinationHash = next;
+				index = nextIndex;
+				break;
+			}
+			case "--expected-destination-exists": {
+				const [next, nextIndex] = readFlagValue(values, index, value);
+				if (next !== "true" && next !== "false")
+					throw new Error(`${value} requires true or false`);
+				expectedDestinationExists = next === "true";
+				index = nextIndex;
+				break;
+			}
 			case "--dry-run":
 				dryRun = true;
 				break;
@@ -119,6 +145,9 @@ function parseGenericArgs(values: string[]): ParsedArgs {
 		destinationArg: destinationArg,
 		mutationId: mutationId,
 		appendText: appendText,
+		expectedBeforeHash,
+		expectedDestinationHash,
+		expectedDestinationExists,
 	};
 }
 
@@ -139,6 +168,9 @@ export function parsePatchArgs(values: string[]): PatchArgs {
 		session: parsed.session,
 		taskId: parsed.taskId,
 		reason: parsed.reason,
+		expectedBeforeHash: parsed.expectedBeforeHash,
+		expectedDestinationHash: parsed.expectedDestinationHash,
+		expectedDestinationExists: parsed.expectedDestinationExists,
 	};
 }
 
@@ -159,6 +191,9 @@ export function parseMoveArgs(values: string[]): MoveArgs {
 		session: parsed.session,
 		taskId: parsed.taskId,
 		reason: parsed.reason,
+		expectedBeforeHash: parsed.expectedBeforeHash,
+		expectedDestinationHash: parsed.expectedDestinationHash,
+		expectedDestinationExists: parsed.expectedDestinationExists,
 	};
 }
 
@@ -174,6 +209,7 @@ export function parseUndoArgs(values: string[]): UndoArgs {
 		session: parsed.session,
 		taskId: parsed.taskId,
 		reason: parsed.reason,
+		expectedBeforeHash: parsed.expectedBeforeHash,
 	};
 }
 
@@ -188,5 +224,6 @@ export function parseArchiveArgs(values: string[]): CommandArgs {
 		session: parsed.session,
 		taskId: parsed.taskId,
 		reason: parsed.reason,
+		expectedBeforeHash: parsed.expectedBeforeHash,
 	};
 }

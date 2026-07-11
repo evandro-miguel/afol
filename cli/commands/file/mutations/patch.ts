@@ -1,9 +1,12 @@
 import { cpSync, existsSync, rmSync } from "node:fs";
 import { atomicWriteText } from "../../../services/io/atomic";
+import { withResourceLocks } from "../../../services/io/session-lock";
 import {
 	appendMutationRecord,
+	assertMutationJournalIntegrity,
 	createMutationId,
 	type MutationRecord,
+	withMutationJournalLock,
 } from "../../../services/mutations/journal";
 import {
 	backupPath,
@@ -13,6 +16,7 @@ import {
 	makeDiffPreview,
 	normalizeHash,
 	type PatchArgs,
+	readJournalBackupBytes,
 	readTextOrEmpty,
 	requireWriteContext,
 	resolveJournalBackupPath,
@@ -63,6 +67,7 @@ function applyUndoPatchMutation(
 	mutation: MutationRecord,
 	projectRoot: string,
 	reason: string,
+	runtime: { afterPrepared?: () => void } = {},
 ): CommandResult {
 	const patchMutation = mutation as PatchUndoMutation;
 	const target = resolveSafePath(projectRoot, patchMutation.sourcePath);
@@ -70,53 +75,106 @@ function applyUndoPatchMutation(
 		projectRoot,
 		patchMutation.backupPath,
 	);
-	const before = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
-	const beforeHash = before.length > 0 ? normalizeHash(before) : null;
+	return withResourceLocks(projectRoot, [target.path], () => {
+		const targetExists = existsSync(target.path);
+		const before = targetExists ? readTextOrEmpty(target.path) : "";
+		const beforeHash = targetExists ? normalizeHash(before) : null;
+		const backupBytes = readJournalBackupBytes(
+			projectRoot,
+			patchMutation.backupPath,
+		);
+		const backupBefore = backupBytes?.toString("utf8") ?? null;
+		if (beforeHash !== (patchMutation.afterHash ?? null)) {
+			return {
+				command: "ud",
+				status: "blocked",
+				dry_run: false,
+				session: args.session,
+				task_id: args.taskId,
+				reason,
+				path: patchMutation.sourcePath,
+				destination: patchMutation.sourcePath,
+				target_mutation_id: patchMutation.id,
+				message: "undo-conflict: current hash differs from mutation afterHash",
+			};
+		}
+		if (
+			patchMutation.beforeExisted &&
+			(!backupPathValue || !existsSync(backupPathValue))
+		) {
+			return {
+				command: "ud",
+				status: "blocked",
+				dry_run: false,
+				session: args.session,
+				task_id: args.taskId,
+				reason,
+				path: patchMutation.sourcePath,
+				destination: patchMutation.sourcePath,
+				target_mutation_id: patchMutation.id,
+				message: "Undo blocked: original file backup is missing",
+			};
+		}
+		const mutationId = createMutationId();
+		const undoRecord = {
+			id: mutationId,
+			ts: new Date().toISOString(),
+			kind: "undo" as const,
+			status: "prepared" as const,
+			dryRun: false,
+			session: args.session,
+			taskId: args.taskId,
+			reason: `undo ${patchMutation.id}`,
+			targetMutationId: patchMutation.id,
+			sourcePath: patchMutation.sourcePath,
+			destinationPath: patchMutation.sourcePath,
+		};
+		appendMutationRecord(projectRoot, undoRecord);
+		try {
+			runtime.afterPrepared?.();
+			if (backupBefore !== null) atomicWriteText(target.path, backupBefore);
+			else if (targetExists && patchMutation.beforeExisted === false)
+				rmSync(target.path);
 
-	if (backupPathValue && existsSync(backupPathValue)) {
-		cpSync(backupPathValue, target.path);
-	} else if (existsSync(target.path)) {
-		rmSync(target.path);
-	}
-
-	const after = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
-	const afterHash = after.length > 0 ? normalizeHash(after) : null;
-	const mutationId = createMutationId();
-
-	appendMutationRecord(projectRoot, {
-		id: mutationId,
-		ts: new Date().toISOString(),
-		kind: "undo",
-		status: "applied",
-		dryRun: false,
-		session: args.session,
-		taskId: args.taskId,
-		reason: `undo ${patchMutation.id}`,
-		targetMutationId: patchMutation.id,
-		sourcePath: patchMutation.sourcePath,
-		destinationPath: patchMutation.sourcePath,
+			const after = existsSync(target.path) ? readTextOrEmpty(target.path) : "";
+			const afterHash = existsSync(target.path) ? normalizeHash(after) : null;
+			appendMutationRecord(projectRoot, { ...undoRecord, status: "committed" });
+			return {
+				command: "ud",
+				status: "write",
+				dry_run: false,
+				session: args.session,
+				task_id: args.taskId,
+				reason,
+				path: patchMutation.sourcePath,
+				destination: patchMutation.sourcePath,
+				target_mutation_id: patchMutation.id,
+				before_hash: beforeHash,
+				after_hash: afterHash,
+				backup_path: patchMutation.backupPath ?? null,
+				diff_preview: makeDiffPreview(before, after, target.relativePath),
+			};
+		} catch (error) {
+			if (targetExists) atomicWriteText(target.path, before);
+			else rmSync(target.path, { force: true });
+			try {
+				appendMutationRecord(projectRoot, {
+					...undoRecord,
+					status: "rolled_back",
+				});
+			} catch {}
+			throw error;
+		}
 	});
-
-	return {
-		command: "ud",
-		status: "write",
-		dry_run: false,
-		session: args.session,
-		task_id: args.taskId,
-		reason,
-		path: patchMutation.sourcePath,
-		destination: patchMutation.sourcePath,
-		target_mutation_id: patchMutation.id,
-		before_hash: beforeHash,
-		after_hash: afterHash,
-		backup_path: patchMutation.backupPath ?? null,
-		diff_preview: makeDiffPreview(before, after, target.relativePath),
-	};
 }
 
 export function runPatchMutation(
 	args: PatchArgs,
 	projectRoot: string,
+	runtime: {
+		afterInitialRead?: () => void;
+		afterPrepared?: () => void;
+	} = {},
 ): CommandResult {
 	const resolved = resolveSafePath(projectRoot, args.path);
 	if (isBinaryPatchTarget(resolved.path)) {
@@ -172,56 +230,101 @@ export function runPatchMutation(
 	}
 
 	requireWriteContext(args);
-
-	let backupPathValue: string | undefined;
-	if (fileExisted) {
-		backupPathValue = backupPath(
-			projectRoot,
-			mutationId,
-			resolved.relativePath,
-		);
-		cpSync(resolved.path, backupPathValue);
-	}
-
-	atomicWriteText(resolved.path, after);
-
-	appendMutationRecord(projectRoot, {
-		id: mutationId,
-		ts: new Date().toISOString(),
-		kind: "patch",
-		status: "applied",
-		dryRun: false,
-		session: args.session,
-		taskId: args.taskId,
-		reason: args.reason,
-		sourcePath: resolved.relativePath,
-		beforeHash,
-		afterHash,
-		backupPath: backupPathValue ?? null,
-		beforeExisted: fileExisted,
-		...(diffPreview ? { diffPreview } : {}),
+	runtime.afterInitialRead?.();
+	return withMutationJournalLock(projectRoot, () => {
+		assertMutationJournalIntegrity(projectRoot);
+		return withResourceLocks(projectRoot, [resolved.path], () => {
+			if (isBinaryPatchTarget(resolved.path)) {
+				return {
+					command: "pt",
+					status: "blocked",
+					dry_run: false,
+					session: args.session,
+					task_id: args.taskId,
+					reason: args.reason,
+					path: resolved.relativePath,
+					message: `Patch blocked: binary target: ${resolved.relativePath}`,
+				};
+			}
+			const lockedExisted = existsSync(resolved.path);
+			const lockedBefore = lockedExisted ? readTextOrEmpty(resolved.path) : "";
+			const lockedBeforeHash = normalizeHash(lockedBefore);
+			if (
+				args.expectedBeforeHash &&
+				args.expectedBeforeHash !== lockedBeforeHash
+			) {
+				throw new Error(`stale-before-hash:${resolved.relativePath}`);
+			}
+			const lockedAfter = `${lockedBefore}${appendText}`;
+			const lockedDiffPreview = makeDiffPreview(
+				lockedBefore,
+				lockedAfter,
+				resolved.relativePath,
+			);
+			let backupPathValue: string | undefined;
+			if (lockedExisted) {
+				backupPathValue = backupPath(
+					projectRoot,
+					mutationId,
+					resolved.relativePath,
+				);
+				cpSync(resolved.path, backupPathValue);
+			}
+			const record = {
+				id: mutationId,
+				ts: new Date().toISOString(),
+				kind: "patch" as const,
+				status: "prepared" as const,
+				dryRun: false,
+				session: args.session,
+				taskId: args.taskId,
+				reason: args.reason,
+				sourcePath: resolved.relativePath,
+				beforeHash: lockedBeforeHash,
+				afterHash: normalizeHash(lockedAfter),
+				backupPath: backupPathValue ?? null,
+				beforeExisted: lockedExisted,
+				...(lockedDiffPreview ? { diffPreview: lockedDiffPreview } : {}),
+			};
+			appendMutationRecord(projectRoot, record);
+			try {
+				runtime.afterPrepared?.();
+				atomicWriteText(resolved.path, lockedAfter);
+				appendMutationRecord(projectRoot, { ...record, status: "committed" });
+			} catch (error) {
+				if (lockedExisted) atomicWriteText(resolved.path, lockedBefore);
+				else rmSync(resolved.path, { force: true });
+				try {
+					appendMutationRecord(projectRoot, {
+						...record,
+						status: "rolled_back",
+					});
+				} catch {}
+				throw error;
+			}
+			return {
+				command: "pt",
+				status: "write",
+				dry_run: false,
+				session: args.session,
+				task_id: args.taskId,
+				reason: args.reason,
+				path: resolved.relativePath,
+				mutation_id: mutationId,
+				before_hash: lockedBeforeHash,
+				after_hash: normalizeHash(lockedAfter),
+				backup_path: backupPathValue ?? null,
+				diff_preview: lockedDiffPreview,
+			};
+		});
 	});
-
-	return {
-		command: "pt",
-		status: "write",
-		dry_run: false,
-		session: args.session,
-		task_id: args.taskId,
-		reason: args.reason,
-		path: resolved.relativePath,
-		mutation_id: mutationId,
-		before_hash: beforeHash,
-		after_hash: afterHash,
-		backup_path: backupPathValue ?? null,
-		diff_preview: diffPreview,
-	};
 }
 
 export function undoPatchMutation(
 	args: CommandArgs,
 	mutation: MutationRecord,
 	projectRoot: string,
+	runtime: { afterPrepared?: () => void } = {},
 ): CommandResult {
 	if (!mutation.sourcePath || mutation.kind !== "patch") {
 		throw new Error(`Expected patch mutation for undo, got ${mutation.kind}`);
@@ -232,5 +335,5 @@ export function undoPatchMutation(
 		return buildUndoPatchDryRunResult(args, mutation, projectRoot, reason);
 	}
 
-	return applyUndoPatchMutation(args, mutation, projectRoot, reason);
+	return applyUndoPatchMutation(args, mutation, projectRoot, reason, runtime);
 }

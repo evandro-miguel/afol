@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import {
 	cpSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	renameSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -41,13 +44,18 @@ import {
 	makeMovePreview,
 	normalizeHash,
 	readTextOrEmpty,
+	readJournalBackupBytes,
 	requireWriteContext,
 	resolveSafePath,
 } from "../commands/file/shared";
 import { agentOperationContext } from "../core/operation-context";
 import {
 	appendMutationRecord,
+	createMutationId,
+	loadMutationJournalStrict,
 	type MutationRecord,
+	mutationJournalPath,
+	withMutationJournalLock,
 } from "../services/mutations/journal";
 import { resolveProjectPaths } from "../services/project/paths";
 
@@ -118,6 +126,45 @@ function parseJsonLine(value: string): Record<string, unknown> {
 	return JSON.parse(value.trim()) as Record<string, unknown>;
 }
 
+function expectSingleJsonError(
+	output: ReturnType<typeof captureIo>,
+	exitCode: number,
+	action = "file",
+): Record<string, unknown> {
+	expect(output.stdout).toHaveLength(1);
+	const payload = parseJsonLine(output.stdout[0] ?? "");
+	expect(payload).toMatchObject({
+		schema: "afol.result/v1",
+		ok: false,
+		action,
+		exit_code: exitCode,
+	});
+	return payload;
+}
+
+function createActiveMutationTask(
+	root: string,
+	session = "JSON",
+	taskId = "T-01",
+): void {
+	const sessionDir = join(root, ".afol", "wb", session);
+	mkdirSync(sessionDir, { recursive: true });
+	writeFileSync(
+		join(sessionDir, `${session}_task_01.md`),
+		[
+			"# Tasks: JSON errors",
+			"",
+			"## State Board",
+			"",
+			"| Task | State | Owner | Notes |",
+			"|------|-------|-------|-------|",
+			`| ${taskId} | in_progress | worker | exercise JSON failure |`,
+			"",
+		].join("\n"),
+		"utf8",
+	);
+}
+
 describe("file args", () => {
 	test("parsePatchArgs preserves explicit path and append text", () => {
 		const parsed = parsePatchArgs([
@@ -162,6 +209,440 @@ describe("file args", () => {
 			"Missing value for --path",
 		);
 		expect(() => parseUndoArgs(["--id"])).toThrow("Missing value for --id");
+	});
+});
+
+describe("mutation transaction hardening", () => {
+	test("every mutation kind restores exact state after a post-prepared failure", () => {
+		const cases: Array<() => void> = [];
+		{
+			const root = mkProjectRoot();
+			cases.push(() => {
+				const target = writeFileTree(root, "notes/patch.txt", "before");
+				expect(() =>
+					runPatchMutation(
+						{
+							command: "pt",
+							path: "notes/patch.txt",
+							appendText: "+after",
+							dryRun: false,
+							json: false,
+							session: "S",
+							taskId: "T",
+							reason: "fault",
+						},
+						root,
+						{
+							afterPrepared: () => {
+								writeFileSync(target, "partial", "utf8");
+								throw new Error("post-prepared");
+							},
+						},
+					),
+				).toThrow("post-prepared");
+				expect(readFileSync(target, "utf8")).toBe("before");
+				expect(loadMutationJournalStrict(root).records.at(-1)?.status).toBe(
+					"rolled_back",
+				);
+				rmSync(root, { recursive: true, force: true });
+			});
+		}
+		{
+			const root = mkProjectRoot();
+			cases.push(() => {
+				const source = writeFileTree(root, "notes/source.txt", "source");
+				const destination = writeFileTree(
+					root,
+					"notes/destination.txt",
+					"dest",
+				);
+				expect(() =>
+					runMoveMutation(
+						{
+							command: "mv",
+							path: "notes/source.txt",
+							destinationPath: "notes/destination.txt",
+							dryRun: false,
+							json: false,
+							session: "S",
+							taskId: "T",
+							reason: "fault",
+							expectedDestinationExists: true,
+							expectedDestinationHash: normalizeHash("dest"),
+						},
+						root,
+						{
+							afterPrepared: () => {
+								rmSync(destination);
+								renameSync(source, destination);
+								throw new Error("post-prepared");
+							},
+						},
+					),
+				).toThrow("post-prepared");
+				expect(readFileSync(source, "utf8")).toBe("source");
+				expect(readFileSync(destination, "utf8")).toBe("dest");
+				expect(loadMutationJournalStrict(root).records.at(-1)?.status).toBe(
+					"rolled_back",
+				);
+				rmSync(root, { recursive: true, force: true });
+			});
+		}
+		{
+			const root = mkProjectRoot();
+			cases.push(() => {
+				const source = writeFileTree(root, "notes/archive.txt", "archive");
+				let destination = "";
+				expect(() =>
+					runArchiveMutation(
+						{
+							command: "ar",
+							path: "notes/archive.txt",
+							dryRun: false,
+							json: false,
+							session: "S",
+							taskId: "T",
+							reason: "fault",
+						},
+						root,
+						{
+							afterPrepared: () => {
+								destination = archiveDestination(
+									root,
+									loadMutationJournalStrict(root).records.at(-1)?.id ?? "",
+									"notes/archive.txt",
+								).path;
+								mkdirSync(dirname(destination), { recursive: true });
+								renameSync(source, destination);
+								throw new Error("post-prepared");
+							},
+						},
+					),
+				).toThrow("post-prepared");
+				expect(readFileSync(source, "utf8")).toBe("archive");
+				expect(existsSync(destination)).toBe(false);
+				expect(loadMutationJournalStrict(root).records.at(-1)?.status).toBe(
+					"rolled_back",
+				);
+				rmSync(root, { recursive: true, force: true });
+			});
+		}
+		for (const run of cases) run();
+	});
+
+	test("every undo kind restores exact state after a post-prepared failure", () => {
+		const root = mkProjectRoot();
+		try {
+			const patchPath = writeFileTree(root, "undo/patch.txt", "before");
+			const patchWrite = runPatchMutation(
+				{
+					command: "pt",
+					path: "undo/patch.txt",
+					appendText: "+after",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "write",
+				},
+				root,
+			);
+			const patchRecord = loadMutationJournalStrict(root).records.find(
+				(record) => record.id === patchWrite.mutation_id,
+			) as MutationRecord;
+			expect(() =>
+				undoPatchMutation(
+					{
+						command: "ud",
+						path: "undo/patch.txt",
+						dryRun: false,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "undo",
+					},
+					patchRecord,
+					root,
+					{
+						afterPrepared: () => {
+							writeFileSync(patchPath, "partial", "utf8");
+							throw new Error("undo-post-prepared");
+						},
+					},
+				),
+			).toThrow("undo-post-prepared");
+			expect(readFileSync(patchPath, "utf8")).toBe("before+after");
+
+			const moveSource = writeFileTree(root, "undo/move-source.txt", "move");
+			const moveDestination = join(root, "undo", "move-destination.txt");
+			const moveWrite = runMoveMutation(
+				{
+					command: "mv",
+					path: "undo/move-source.txt",
+					destinationPath: "undo/move-destination.txt",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "write",
+				},
+				root,
+			);
+			const moveRecord = loadMutationJournalStrict(root).records.find(
+				(record) => record.id === moveWrite.mutation_id,
+			) as MutationRecord;
+			expect(() =>
+				undoMoveMutation(
+					{
+						dryRun: false,
+						session: "S",
+						taskId: "T",
+						reason: "undo",
+					},
+					moveRecord,
+					root,
+					{
+						afterPrepared: () => {
+							renameSync(moveDestination, moveSource);
+							throw new Error("undo-post-prepared");
+						},
+					},
+				),
+			).toThrow("undo-post-prepared");
+			expect(existsSync(moveSource)).toBe(false);
+			expect(readFileSync(moveDestination, "utf8")).toBe("move");
+
+			const archiveSource = writeFileTree(root, "undo/archive.txt", "archive");
+			const archiveWrite = runArchiveMutation(
+				{
+					command: "ar",
+					path: "undo/archive.txt",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "write",
+				},
+				root,
+			);
+			const archiveDestinationPath = archiveWrite.destination as string;
+			const archiveRecord = loadMutationJournalStrict(root).records.find(
+				(record) => record.id === archiveWrite.mutation_id,
+			) as MutationRecord;
+			expect(() =>
+				undoArchiveMutation(
+					{
+						command: "ud",
+						path: "undo/archive.txt",
+						dryRun: false,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "undo",
+					},
+					archiveRecord,
+					root,
+					{
+						afterPrepared: () => {
+							renameSync(join(root, archiveDestinationPath), archiveSource);
+							throw new Error("undo-post-prepared");
+						},
+					},
+				),
+			).toThrow("undo-post-prepared");
+			expect(existsSync(archiveSource)).toBe(false);
+			expect(readFileSync(join(root, archiveDestinationPath), "utf8")).toBe(
+				"archive",
+			);
+			expect(loadMutationJournalStrict(root).issues).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("journal backup reads reject symlink escapes", () => {
+		const root = mkProjectRoot();
+		const outside = writeFileTree(root, "outside.txt", "secret");
+		const link = join(resolveProjectPaths(root).abs.mutationBackupsDir, "link");
+		try {
+			mkdirSync(dirname(link), { recursive: true });
+			symlinkSync(outside, link);
+			expect(() => readJournalBackupBytes(root, link)).toThrow(
+				"escapes mutation backups",
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+	test("strict journal reports unmatched prepared while locked reads remain reentrant", () => {
+		const root = mkProjectRoot();
+		try {
+			appendMutationRecord(root, {
+				id: "M-prepared",
+				ts: new Date().toISOString(),
+				kind: "patch",
+				status: "prepared",
+				dryRun: false,
+				session: "S",
+				taskId: "T",
+				reason: "test",
+				sourcePath: "notes/a.txt",
+			});
+			const result = withMutationJournalLock(root, () =>
+				loadMutationJournalStrict(root),
+			);
+			expect(result.issues).toContain("unmatched-prepared:M-prepared");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("move rejects a stale destination precondition", () => {
+		const root = mkProjectRoot();
+		try {
+			writeFileTree(root, "mut/source-cas.txt", "source");
+			writeFileTree(root, "mut/destination-cas.txt", "changed");
+			expect(() =>
+				runMoveMutation(
+					{
+						command: "mv",
+						path: "mut/source-cas.txt",
+						destinationPath: "mut/destination-cas.txt",
+						dryRun: false,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "cas",
+						expectedDestinationExists: true,
+						expectedDestinationHash: normalizeHash("old"),
+					},
+					root,
+				),
+			).toThrow("stale-destination-hash");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("move blocks an existing destination without explicit preconditions", () => {
+		const root = mkProjectRoot();
+		try {
+			writeFileTree(root, "mut/source-required.txt", "source");
+			writeFileTree(root, "mut/destination-required.txt", "existing");
+			expect(() =>
+				runMoveMutation(
+					{
+						command: "mv",
+						path: "mut/source-required.txt",
+						destinationPath: "mut/destination-required.txt",
+						dryRun: false,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "required",
+					},
+					root,
+				),
+			).toThrow("destination-precondition-required");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("move undo blocks when an overwritten destination backup is missing", () => {
+		const root = mkProjectRoot();
+		try {
+			writeFileTree(root, "mut/source-backup.txt", "source");
+			writeFileTree(root, "mut/destination-backup.txt", "destination");
+			const write = runMoveMutation(
+				{
+					command: "mv",
+					path: "mut/source-backup.txt",
+					destinationPath: "mut/destination-backup.txt",
+					expectedDestinationExists: true,
+					expectedDestinationHash: normalizeHash("destination"),
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "backup",
+				},
+				root,
+			);
+			rmSync(write.overwritten_backup_path as string, { force: true });
+			const result = undoMoveMutation(
+				{ dryRun: false, session: "S", taskId: "T", reason: "undo" },
+				{
+					id: write.mutation_id as string,
+					ts: new Date().toISOString(),
+					kind: "move",
+					status: "committed",
+					dryRun: false,
+					session: "S",
+					taskId: "T",
+					reason: "backup",
+					sourcePath: "mut/source-backup.txt",
+					destinationPath: "mut/destination-backup.txt",
+					afterHash: write.after_hash ?? null,
+					destinationExisted: true,
+					overwrittenBackupPath: write.overwritten_backup_path ?? null,
+				},
+				root,
+			);
+			expect(result).toMatchObject({
+				status: "blocked",
+				message: "Undo blocked: overwritten destination backup is missing",
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+	test("rolls patch back when journal append fails", () => {
+		const root = mkProjectRoot();
+		try {
+			const target = writeFileTree(root, "notes/rollback.txt", "base");
+			const journal = mutationJournalPath(root);
+			mkdirSync(journal, { recursive: true });
+			expect(() =>
+				runPatchMutation(
+					{
+						command: "pt",
+						path: "notes/rollback.txt",
+						appendText: "-changed",
+						dryRun: false,
+						json: false,
+						session: "S",
+						taskId: "T",
+						reason: "fault",
+					},
+					root,
+				),
+			).toThrow();
+			expect(readFileSync(target, "utf8")).toBe("base");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("mutation ids remain unique across processes", () => {
+		const modulePath = join(
+			process.cwd(),
+			"cli",
+			"services",
+			"mutations",
+			"journal.ts",
+		);
+		const code = `import { createMutationId } from ${JSON.stringify(modulePath)}; console.log(JSON.stringify(Array.from({length:100}, () => createMutationId())))`;
+		const first = spawnSync("bun", ["-e", code], { encoding: "utf8" });
+		const second = spawnSync("bun", ["-e", code], { encoding: "utf8" });
+		expect(first.status).toBe(0);
+		expect(second.status).toBe(0);
+		const ids = [
+			...(JSON.parse(first.stdout) as string[]),
+			...(JSON.parse(second.stdout) as string[]),
+		];
+		expect(new Set(ids).size).toBe(200);
+		expect(createMutationId()).toMatch(/^M-.*-[0-9a-f-]{36}$/);
 	});
 });
 
@@ -715,6 +1196,34 @@ describe("file mutation handlers", () => {
 		}
 	});
 
+	test("patch audit preview is recomputed from the locked file state", () => {
+		const root = mkProjectRoot();
+		try {
+			const file = writeFileTree(root, "notes/race.txt", "base");
+			const result = runPatchMutation(
+				{
+					command: "pt",
+					path: "notes/race.txt",
+					appendText: "+agent",
+					dryRun: false,
+					json: false,
+					session: "S",
+					taskId: "T",
+					reason: "race preview",
+				},
+				root,
+				{ afterInitialRead: () => writeFileSync(file, "base+other", "utf8") },
+			);
+			expect(readFileSync(file, "utf8")).toBe("base+other+agent");
+			expect(result.diff_preview).toContain("base+other+agent");
+			const records = loadMutationJournalStrict(root).records;
+			const committed = records.at(-1) as { diffPreview?: string } | undefined;
+			expect(committed?.diffPreview).toContain("base+other+agent");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("undoPatchMutation restores the original file and validates the mutation kind", () => {
 		const root = mkProjectRoot();
 		try {
@@ -1014,6 +1523,8 @@ describe("file mutation handlers", () => {
 					command: "mv",
 					path: "mut/source.txt",
 					destinationPath: "mut/destination.txt",
+					expectedDestinationExists: true,
+					expectedDestinationHash: normalizeHash("existing"),
 					dryRun: false,
 					json: false,
 					session: "S",
@@ -1122,6 +1633,8 @@ describe("file mutation handlers", () => {
 					command: "mv",
 					path: "mut/source.txt",
 					destinationPath: "mut/destination.txt",
+					expectedDestinationExists: true,
+					expectedDestinationHash: normalizeHash("existing"),
 					dryRun: false,
 					json: false,
 					session: "S",
@@ -1141,6 +1654,7 @@ describe("file mutation handlers", () => {
 				reason: "R",
 				sourcePath: "mut/source.txt",
 				destinationPath: "mut/destination.txt",
+				afterHash: write.after_hash ?? null,
 				overwrittenBackupPath: write.overwritten_backup_path ?? null,
 			};
 
@@ -1326,6 +1840,7 @@ describe("file mutation handlers", () => {
 				reason: "R",
 				sourcePath: "notes/archive-undo.txt",
 				destinationPath: write.destination ?? write.backup_path ?? "",
+				afterHash: write.after_hash ?? null,
 			};
 
 			expect(
@@ -1420,6 +1935,8 @@ describe("file mutation handlers", () => {
 						command: "mv",
 						path: "mut/journal-source.txt",
 						destinationPath: "mut/journal-destination.txt",
+						expectedDestinationExists: true,
+						expectedDestinationHash: normalizeHash("existing"),
 						dryRun: false,
 						json: false,
 						session: "S",
@@ -1558,6 +2075,169 @@ describe("file mutation handlers", () => {
 			).toMatchObject({ status: "noop" });
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("file command JSON failure contract", () => {
+	test("parse errors emit exactly one JSON error envelope", async () => {
+		const root = mkProjectRoot();
+		try {
+			const output = captureIo();
+			expect(
+				await runFileCommand(["pt", "--path", "--json"], root, output.io),
+			).toBe(2);
+			expectSingleJsonError(output, 2);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("restricted and runtime preflight errors emit JSON envelopes", async () => {
+		for (const failure of ["restricted", "runtime"] as const) {
+			const root = mkProjectRoot();
+			try {
+				createActiveMutationTask(root);
+				writeFileTree(root, "notes/json.txt", "base");
+				const output = captureIo();
+				const args = [
+					"pt",
+					"--path",
+					"notes/json.txt",
+					"--append",
+					"next",
+					"--session",
+					"JSON",
+					"--task-id",
+					"T-01",
+					"--reason",
+					failure,
+					"--json",
+				];
+				const code = await runFileCommand(
+					args,
+					root,
+					output.io,
+					failure === "restricted" ? agentOperationContext() : undefined,
+					failure === "runtime"
+						? { cliRoot: root, invocationPath: join(root, "missing-afol") }
+						: {},
+				);
+				expect(code).toBe(2);
+				expectSingleJsonError(output, 2);
+				expect(output.stderr).toHaveLength(0);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("apply and stale-hash failures emit JSON envelopes", async () => {
+		for (const failure of ["apply", "hash"] as const) {
+			const root = mkProjectRoot();
+			try {
+				createActiveMutationTask(root);
+				writeFileTree(root, "notes/json.txt", "base");
+				const output = captureIo();
+				const code = await runFileCommand(
+					[
+						"pt",
+						"--path",
+						"notes/json.txt",
+						"--append",
+						"next",
+						"--expected-before-hash",
+						failure === "hash" ? "stale" : normalizeHash("base"),
+						"--session",
+						"JSON",
+						"--task-id",
+						"T-01",
+						"--reason",
+						failure,
+						"--json",
+					],
+					root,
+					output.io,
+					undefined,
+					failure === "apply"
+						? {
+								beforeMutation: () =>
+									setTaskState(root, "JSON", "T-01", "done"),
+							}
+						: {},
+				);
+				expect(code).toBe(2);
+				expectSingleJsonError(output, 2);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		}
+	});
+
+	test("journal and undo conflicts emit one blocked JSON envelope", async () => {
+		for (const failure of ["journal", "undo"] as const) {
+			const root = mkProjectRoot();
+			try {
+				createActiveMutationTask(root);
+				const output = captureIo();
+				if (failure === "journal") {
+					mkdirSync(dirname(mutationJournalPath(root)), { recursive: true });
+					writeFileSync(mutationJournalPath(root), "{broken\n", "utf8");
+					expect(
+						await runFileCommand(
+							[
+								"ud",
+								"--session",
+								"JSON",
+								"--task-id",
+								"T-01",
+								"--reason",
+								"journal",
+								"--json",
+							],
+							root,
+							output.io,
+						),
+					).toBe(2);
+					expectSingleJsonError(output, 2);
+				} else {
+					writeFileTree(root, "notes/undo.txt", "newer");
+					appendMutationRecord(root, {
+						id: "M-undo-json",
+						ts: new Date().toISOString(),
+						kind: "patch",
+						status: "committed",
+						dryRun: false,
+						session: "JSON",
+						taskId: "T-01",
+						reason: "fixture",
+						sourcePath: "notes/undo.txt",
+						afterHash: normalizeHash("expected"),
+						beforeExisted: false,
+					});
+					expect(
+						await runFileCommand(
+							[
+								"ud",
+								"--id",
+								"M-undo-json",
+								"--session",
+								"JSON",
+								"--task-id",
+								"T-01",
+								"--reason",
+								"undo",
+								"--json",
+							],
+							root,
+							output.io,
+						),
+					).toBe(4);
+					expectSingleJsonError(output, 4);
+				}
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 		}
 	});
 });

@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { normalizeHash } from "../commands/file/shared";
 import { resolveProjectPaths } from "../services/project/paths";
 
 const kernelPath = `${process.cwd()}/cli/main.ts`;
@@ -174,9 +175,13 @@ describe("mutation safety command family", () => {
 			expect(readFileSync(target, "utf8")).toBe("v1+v2");
 
 			const journal = readMutationJournal(root);
-			expect(journal.length).toBe(1);
+			expect(journal.length).toBe(2);
+			expect(journal.map((row) => row.status)).toEqual([
+				"prepared",
+				"committed",
+			]);
 			expect(journal[0]?.kind).toBe("patch");
-			expect(journal[0]?.status).toBe("applied");
+			expect(journal[1]?.status).toBe("committed");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -205,6 +210,10 @@ describe("mutation safety command family", () => {
 				"mut/source.txt",
 				"--to",
 				"mut/destination.txt",
+				"--expected-destination-exists",
+				"true",
+				"--expected-destination-hash",
+				normalizeHash("existing"),
 				"--json",
 			]);
 			expect(moveProc.status).toBe(0);
@@ -261,8 +270,8 @@ describe("mutation safety command family", () => {
 			]);
 
 			expect(proc.status).toBe(2);
-			expect(proc.stdout as string).toBe("");
-			expect(proc.stderr as string).toContain(
+			expect(proc.stderr as string).toBe("");
+			expect(proc.stdout as string).toContain(
 				"Source file not found: mut/missing.txt",
 			);
 			expect(readMutationJournal(root)).toEqual([]);
@@ -385,7 +394,8 @@ describe("mutation safety command family", () => {
 			]);
 
 			expect(proc.status).toBe(2);
-			expect(proc.stderr as string).toContain("protected-path");
+			expect(proc.stderr as string).toBe("");
+			expect(proc.stdout as string).toContain("protected-path");
 
 			const boundaryProc = runKernel(root, [
 				"f",
@@ -524,6 +534,10 @@ describe("mutation safety command family", () => {
 				"mut/undo-source.txt",
 				"--to",
 				"mut/undo-destination.txt",
+				"--expected-destination-exists",
+				"true",
+				"--expected-destination-hash",
+				normalizeHash("existing"),
 				"--json",
 			]);
 			expect(moveProc.status).toBe(0);
@@ -552,7 +566,7 @@ describe("mutation safety command family", () => {
 			expect(blockedResult.message).toBe(
 				"Undo blocked: source already exists: mut/undo-source.txt",
 			);
-			expect(readMutationJournal(root)).toHaveLength(1);
+			expect(readMutationJournal(root)).toHaveLength(2);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -583,7 +597,7 @@ describe("mutation safety command family", () => {
 			]);
 			expect(writeProc.status).toBe(0);
 			const beforeUndoJournal = readMutationJournal(root);
-			expect(beforeUndoJournal.length).toBe(1);
+			expect(beforeUndoJournal.length).toBe(2);
 
 			const dryRunUndo = runKernel(root, [
 				"f",
@@ -611,7 +625,75 @@ describe("mutation safety command family", () => {
 		}
 	});
 
-	test("journal loader ignores truncated trailing rows and preserves applied mutations", () => {
+	test("undo blocks drift and a second undo without changing files", () => {
+		const root = mkProjectRoot();
+		try {
+			const target = join(root, "notes", "undo-once.txt");
+			mkdirSync(join(root, "notes"), { recursive: true });
+			writeFileSync(target, "base", "utf8");
+			createMutationSession(root, "S-11", "T-11");
+			const common = [
+				"--session",
+				"S-11",
+				"--task-id",
+				"T-11",
+				"--reason",
+				"safety",
+				"--json",
+			];
+			const patchProc = runKernel(root, [
+				"f",
+				"pt",
+				"--path",
+				"notes/undo-once.txt",
+				"--append",
+				"next",
+				...common,
+			]);
+			const mutationId = String(
+				expectFileEnvelope(parseJsonOutput(patchProc.stdout as string))
+					.mutation_id,
+			);
+			writeFileSync(target, "later-change", "utf8");
+			const conflict = runKernel(root, [
+				"f",
+				"ud",
+				"--id",
+				mutationId,
+				...common,
+			]);
+			expect(conflict.status).toBe(4);
+			expect(readFileSync(target, "utf8")).toBe("later-change");
+			writeFileSync(target, "basenext", "utf8");
+			const firstUndo = runKernel(root, [
+				"f",
+				"ud",
+				"--id",
+				mutationId,
+				...common,
+			]);
+			expect(firstUndo.status).toBe(0);
+			const journalPath = join(
+				resolveProjectPaths(root).abs.mutationsDir,
+				"mutations.jsonl",
+			);
+			const journalBeforeSecond = readFileSync(journalPath, "utf8");
+			const secondUndo = runKernel(root, [
+				"f",
+				"ud",
+				"--id",
+				mutationId,
+				...common,
+			]);
+			expect(secondUndo.status).toBe(4);
+			expect(readFileSync(target, "utf8")).toBe("base");
+			expect(readFileSync(journalPath, "utf8")).toBe(journalBeforeSecond);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("journal corruption blocks undo without mutating files", () => {
 		const root = mkProjectRoot();
 		try {
 			const target = join(root, "notes", "loader.txt");
@@ -653,12 +735,12 @@ describe("mutation safety command family", () => {
 				"undo after truncated row",
 				"--json",
 			]);
-			expect(undoProc.status).toBe(0);
-			const undoResult = expectFileEnvelope(
-				parseJsonOutput(undoProc.stdout as string),
+			expect(undoProc.status).toBe(2);
+			expect(undoProc.stderr as string).toBe("");
+			expect(undoProc.stdout as string).toContain(
+				"Mutation journal corruption",
 			);
-			expect(undoResult.status).toBe("write");
-			expect(readFileSync(target, "utf8")).toBe("base");
+			expect(readFileSync(target, "utf8")).toBe("base-next");
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

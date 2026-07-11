@@ -1,6 +1,8 @@
 import {
 	findLatestSupportedMutation,
 	findMutationById,
+	type MutationRecord,
+	withMutationJournalLock,
 } from "../../../services/mutations/journal";
 import {
 	type CommandResult,
@@ -15,9 +17,36 @@ export function runUndoMutation(
 	args: UndoArgs,
 	projectRoot: string,
 ): CommandResult {
-	const target = args.mutationId
-		? findMutationById(projectRoot, args.mutationId)
-		: findLatestSupportedMutation(projectRoot, args.session, args.taskId);
+	return withMutationJournalLock(projectRoot, () =>
+		runUndoMutationLocked(args, projectRoot),
+	);
+}
+
+function runUndoMutationLocked(
+	args: UndoArgs,
+	projectRoot: string,
+): CommandResult {
+	let target: MutationRecord | null;
+	try {
+		target = args.mutationId
+			? findMutationById(projectRoot, args.mutationId)
+			: findLatestSupportedMutation(projectRoot, args.session, args.taskId);
+	} catch (error) {
+		if ((error as Error).message.startsWith("already-undone:")) {
+			return {
+				command: "ud",
+				status: "blocked",
+				dry_run: args.dryRun,
+				session: args.session,
+				task_id: args.taskId,
+				reason: args.reason,
+				path: "",
+				target_mutation_id: args.mutationId,
+				message: (error as Error).message,
+			};
+		}
+		throw error;
+	}
 
 	if (!target) {
 		return {

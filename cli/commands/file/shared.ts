@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import {
+	closeSync,
+	constants,
+	existsSync,
+	mkdirSync,
+	openSync,
+	readFileSync,
+	realpathSync,
+} from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { createPatch } from "diff";
 import { resolveProjectPaths } from "../../services/project/paths";
@@ -44,6 +52,9 @@ export type CommandArgs = {
 	session: string;
 	taskId: string;
 	reason: string;
+	expectedBeforeHash?: string | undefined;
+	expectedDestinationHash?: string | undefined;
+	expectedDestinationExists?: boolean | undefined;
 };
 
 export type PatchArgs = CommandArgs & {
@@ -237,7 +248,7 @@ export function resolveJournalBackupPath(
 			);
 		}
 
-		return storedPath;
+		return resolvedStoredPath;
 	}
 
 	if (!pathIsInsideRoot(lexicalStoredPath, lexicalBackupsDir)) {
@@ -247,6 +258,20 @@ export function resolveJournalBackupPath(
 	}
 
 	return storedPath;
+}
+
+export function readJournalBackupBytes(
+	projectRoot: string,
+	storedPath: string | null | undefined,
+): Buffer | null {
+	const canonicalPath = resolveJournalBackupPath(projectRoot, storedPath);
+	if (!canonicalPath || !existsSync(canonicalPath)) return null;
+	const fd = openSync(canonicalPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+	try {
+		return readFileSync(fd);
+	} finally {
+		closeSync(fd);
+	}
 }
 
 export function archiveDestination(
