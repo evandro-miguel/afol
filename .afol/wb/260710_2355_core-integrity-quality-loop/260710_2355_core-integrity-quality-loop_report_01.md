@@ -2,7 +2,7 @@
 doc_type: report
 id: 260710_2355_core-integrity-quality-loop_report_01
 theme: core-integrity-quality-loop
-status: review-recorded
+status: final
 owners:
 - independent auditor
 workstream_intent: feature
