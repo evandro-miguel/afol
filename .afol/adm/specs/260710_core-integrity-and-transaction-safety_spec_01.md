@@ -146,7 +146,7 @@ Out of scope:
 
 ## 6) Child Spec Strategy
 
-- Child specs required: conditional.
+- Child specs required: conditional, except for the accepted C01 test-only checkpoint below.
 - Decomposition rule:
   - Use child specs when separate agents own lifecycle, mutation/update,
     bootstrap/governance, or state-integrity slices with independent rollback
@@ -154,7 +154,21 @@ Out of scope:
   - Keep a bounded slice in this parent spec plus its workbench plan when one
     owner can deliver and review it coherently.
 - Planned child specs:
-  - None required before the first lifecycle and completion-authorization slice.
+  - `260711_c01-authorization-red-reproducers_spec-child_01` is active and
+    accepted before any C01 test write. It authorizes `S-C01-R` only: the
+    specified red reproducers in its exact test-file boundary.
+  - `260711_c01-action-policy-and-protected-resources_spec-child_01` is active
+    and accepted as the separately reviewable `S-C01-I` implementation boundary
+    after `STOP-C01-AUTHORITY` and independent critic `GO`.
+  - C01 production implementation requires a separate accepted
+    `STOP-C01-AUTHORITY` decision. The F-22 governing parent-spec owner must
+    accept an amendment to that child spec or a linked F-22 ADR that defines
+    issuer/trust boundary, audience, expiry/renewal, revocation, replay,
+    verification, audit, local fallback, and test-shell policy.
+  - C08 closure requires an approved F-22 governance-owned mutation-policy
+    decision. Its artifact must name the method, threshold, exception policy,
+    decision owner, and evidence artifact. A critic may review this evidence
+    but cannot set the policy.
   - Create later child specs only when the execution plan assigns independently
     reviewable mutation/update or bootstrap/governance boundaries.
 

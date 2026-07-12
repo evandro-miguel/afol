@@ -1,0 +1,209 @@
+{
+  "slice_id": "S-GOV-CONTRACTS",
+  "mode": "read-only",
+  "claims": [
+    {
+      "claim_id": "CTX-ARCHIVE-AUTHORITY",
+      "verdict": "CONFIRMED",
+      "severity": "P0",
+      "observed_behavior": "Defect. The section index reads only docs/arc/SPECS and docs/arc/DECISIONS; trusted mode validates only PSTR and optional session state. Selection can fall back to the first three archived sections.",
+      "intended_contract": ".afol/adm is canonical and docs/arc is a frozen archive; trusted context must not select stale or non-authoritative governance.",
+      "evidence": [
+        "cli/services/context/section-index.ts:87-103",
+        "cli/services/context/bundler.ts:201-224",
+        "cli/services/context/bundler.ts:471-483",
+        ".afol/adm/decisions/ADR-005-afol-administration-and-project-structure.md:37-42,65-68",
+        ".afol/adm/doctrine/ARCHITECTURE.md:42-45"
+      ],
+      "test_coverage": "cli/tests/context-system.test.ts:481-486 and 1870-1909 cover the legacy index and PSTR trust failure; no test requires .afol/adm authority or validates selected section freshness.",
+      "confidence": "high",
+      "recommended_slice": "F22-C02"
+    },
+    {
+      "claim_id": "NEW-FICTITIOUS-GOVERNANCE",
+      "verdict": "CONFIRMED",
+      "severity": "P0",
+      "observed_behavior": "Defect. afol new calls the presence-only resolver, which reports governed when both strings are nonempty. The catalog resolver that validates roadmap/spec authority is not called by this path.",
+      "intended_contract": "F-22 requires rejection of nonexistent, inactive, or unrelated governance bindings before task execution and persistence of canonical path/hash authority.",
+      "evidence": [
+        "cli/commands/workbench.ts:91-110",
+        "cli/services/governance/pending-specs.ts:335-376",
+        "cli/services/governance/pending-specs.ts:807-850",
+        ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:202-205"
+      ],
+      "test_coverage": "cli/tests/quick-task-command.test.ts:156-175 rejects fake authority only for quick-task; no equivalent normal-new test was found.",
+      "confidence": "high",
+      "recommended_slice": "F22-C02"
+    },
+    {
+      "claim_id": "CENTRAL-AUTHORIZATION",
+      "verdict": "CONFIRMED",
+      "severity": "P0",
+      "observed_behavior": "Defect. The registry computes approval metadata only for help/catalog output. main resolves restricted context but drops it when dispatching mutating adm, spec, adr, changelog, state, adapter, and hydrate handlers; adapter enable/disable has no context parameter or gate.",
+      "intended_contract": "Every real write must receive fail-closed approval and runtime provenance through one command-contract enforcement path.",
+      "evidence": [
+        "cli/core/operation-context.ts:35-38,63-115",
+        "cli/registry.ts:1119-1141",
+        "cli/main.ts:226-234,492-497,593-621,650-675",
+        "cli/commands/adapter.ts:36-71",
+        ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:130-137,174-175"
+      ],
+      "test_coverage": "cli/tests/operation-context.test.ts:106-143 covers classification only. No focused integration test was found for restricted callers against the dropped-context mutators.",
+      "confidence": "high",
+      "recommended_slice": "F22-C01"
+    },
+    {
+      "claim_id": "TOOLS-JSON-DRIFT",
+      "verdict": "CONFIRMED",
+      "severity": "P1",
+      "observed_behavior": "Defect. tools.json retains removed done and quick-task result forms and omits transition and governance. The manifest generator refreshes tools.json only as a managed hash; it never derives its tool payload from the registry.",
+      "intended_contract": "The agent-facing catalog claims generation from afol help --json and must describe the live command contract.",
+      "evidence": [
+        ".afol/adm/tools.json:134-167,227-250,1158-1176",
+        "cli/registry.ts:190-236,311-339",
+        "cli/dev/generate-manifest.ts:27-40,60-94,135-162",
+        "package.json:15-27"
+      ],
+      "test_coverage": "cli/tests/help.test.ts and cli/tests/registry.test.ts cover registry/help surfaces; no tools.json semantic parity test or tools generator was found.",
+      "confidence": "high",
+      "recommended_slice": "F22-C02"
+    },
+    {
+      "claim_id": "SPEC-GATE-DECISION-HISTORY",
+      "verdict": "CONFIRMED",
+      "severity": "P1",
+      "observed_behavior": "Defect. Spec checks persist in spec-gate.json, accept docs/arc/SPECS as a live fallback, are not consulted by closeSession, and failed spec/close paths do not append command-error records. ADR supersede takes two positionals rather than the specified --by form.",
+      "intended_contract": "The governing spec requires SQLite materialization, archive-only docs/arc, close blocking for unresolved required conflicts, command-error records, and adr supersede <old-id> --by <new-id>.",
+      "evidence": [
+        "cli/services/spec-gate/checker.ts:37-45,175-197,200-235",
+        "cli/services/workbench/lifecycle.ts:1465-1496",
+        "cli/commands/adr.ts:92-104",
+        ".afol/adm/specs/260612_spec-compatibility-and-decision-history_spec-child_01.md:85-102,115-128,160-194"
+      ],
+      "test_coverage": "cli/tests/spec-gate-system.test.ts:385-393 explicitly covers the archive fallback; its ADR tests use two positional ids at 857-867. No close-conflict or command-error test was found.",
+      "confidence": "high",
+      "recommended_slice": "F22-C06"
+    },
+    {
+      "claim_id": "SPEC-GATE-CORRUPTION-OVERWRITE",
+      "verdict": "CONFIRMED",
+      "severity": "P1",
+      "observed_behavior": "Additional defect. A malformed spec-gate.json is silently converted to an empty store. The next check or waiver writes that empty base plus one result, losing prior decision history; read-modify-write has no lock.",
+      "intended_contract": "F-22 requires corruption to be surfaced and reserves repair for an explicit command; decision history must remain durable.",
+      "evidence": [
+        "cli/services/spec-gate/checker.ts:200-235",
+        ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:109-110,141-142"
+      ],
+      "test_coverage": "No malformed-store or concurrent-save test was found in cli/tests/spec-gate-system.test.ts.",
+      "confidence": "high",
+      "recommended_slice": "F22-C06"
+    },
+    {
+      "claim_id": "SQLITE-VERSIONED-MIGRATIONS",
+      "verdict": "CONFIRMED",
+      "severity": "P1",
+      "observed_behavior": "Design debt with upgrade risk. The v1 schema is created only with CREATE TABLE IF NOT EXISTS. There is no schema version, migration ledger, or relational foreign-key declaration.",
+      "intended_contract": "SQLite is explicitly a v1 execution materialization today; versioned migration behavior is therefore a deferred design requirement, not evidence of an immediate data-loss bug in a fresh v1 database.",
+      "evidence": [
+        "cli/services/state/db.ts:42-85,106-120",
+        "README.md:22-24",
+        "AGENTS.md:84-85"
+      ],
+      "test_coverage": "cli/tests/state-sqlite.test.ts:253-421 covers fresh hydration and source-file drift, not migration from a prior database schema.",
+      "confidence": "high",
+      "recommended_slice": "F22-C04"
+    },
+    {
+      "claim_id": "SQLITE-MATERIALIZATION-FALSE-FRESH",
+      "verdict": "CONFIRMED",
+      "severity": "P0",
+      "observed_behavior": "Defect. validateSessionState compares only source-file hashes. Deleting materialized tasks or evidence while retaining sessions/source_files leaves comparison empty and can report current despite incomplete canonical projections.",
+      "intended_contract": "F-22 requires hydration never to report fresh when canonical rows were discarded; trusted context depends on this validation.",
+      "evidence": [
+        "cli/services/state/session-state.ts:355-408,414-438,466-498",
+        "cli/services/context/bundler.ts:471-483",
+        ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:207-210"
+      ],
+      "test_coverage": "cli/tests/state-sqlite.test.ts:353-403 covers fresh hydration and source changes only; no deletion-of-materialized-rows test was found.",
+      "confidence": "high",
+      "recommended_slice": "F22-C04"
+    },
+    {
+      "claim_id": "JSON-ENVELOPE-CONSISTENCY",
+      "verdict": "CONFIRMED",
+      "severity": "P1",
+      "observed_behavior": "Defect. Canonical afol.result/v1 helpers exist, but legacy writers duplicate data at top level and several JSON-requested error paths print plain stderr. Project-root detection also exits as plain text before command handlers.",
+      "intended_contract": "F-22 requires one stable JSON error envelope for covered JSON callers.",
+      "evidence": [
+        "cli/core/envelope.ts:67-84",
+        "cli/commands/io.ts:26-47",
+        "cli/commands/adr.ts:121-123",
+        "cli/commands/changelog.ts:75-77",
+        "cli/main.ts:378-381",
+        ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:137,210"
+      ],
+      "test_coverage": "cli/tests/envelope.test.ts:9-80 validates helper shapes and legacy copying. cli/tests/adm-paths.test.ts:110-116 expects plain stderr on an invalid adm argument; no all-command JSON error-contract matrix was found.",
+      "confidence": "high",
+      "recommended_slice": "F22-C07"
+    },
+    {
+      "claim_id": "PENDING-SPEC-DOCUMENT-CONFLICT",
+      "verdict": "CONFIRMED",
+      "severity": "P1",
+      "observed_behavior": "Documentation defect. AGENTS.md, README.md, and the runtime reference say every open pending spec blocks new sessions. F-22 and the lifecycle test define the opposite: only that session's start is blocked and unrelated new remains allowed.",
+      "intended_contract": "The active F-22 acceptance criterion is session-scoped pending-spec blocking, not a global new-session lock.",
+      "evidence": [
+        "AGENTS.md:177-181",
+        "README.md:58-61",
+        "docs/afol-runtime-reference.md:100-106",
+        ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:202-205",
+        "cli/tests/workbench-lifecycle.test.ts:470-525"
+      ],
+      "test_coverage": "cli/tests/workbench-lifecycle.test.ts:470-525 directly covers the implemented session-scoped behavior.",
+      "confidence": "high",
+      "recommended_slice": "F22-C02"
+    },
+    {
+      "claim_id": "EVIDENCE-JSON-INCOMPLETE-SKIPPED",
+      "verdict": "REFUTED",
+      "severity": "P1",
+      "observed_behavior": "Resolved implementation difference. Current hydration throws on syntactically valid evidence missing id, task, timestamp, command, or result; it does not silently omit that line.",
+      "intended_contract": "Corrupt or incomplete evidence must fail closed during hydration.",
+      "evidence": [
+        "cli/services/state/session-state.ts:289-341",
+        "cli/tests/state-sqlite.test.ts:405-421"
+      ],
+      "test_coverage": "The existing fixture covers malformed JSON. It does not separately exercise every syntactically valid incomplete-record variant, but the mandatory-field throw is direct.",
+      "confidence": "high",
+      "recommended_slice": "none"
+    }
+  ],
+  "additional_p0_p1": [
+    "SPEC-GATE-CORRUPTION-OVERWRITE",
+    "SQLITE-MATERIALIZATION-FALSE-FRESH",
+    "PENDING-SPEC-DOCUMENT-CONFLICT"
+  ],
+  "classification": {
+    "defects": [
+      "CTX-ARCHIVE-AUTHORITY",
+      "NEW-FICTITIOUS-GOVERNANCE",
+      "CENTRAL-AUTHORIZATION",
+      "TOOLS-JSON-DRIFT",
+      "SPEC-GATE-DECISION-HISTORY",
+      "SPEC-GATE-CORRUPTION-OVERWRITE",
+      "SQLITE-MATERIALIZATION-FALSE-FRESH",
+      "JSON-ENVELOPE-CONSISTENCY",
+      "PENDING-SPEC-DOCUMENT-CONFLICT"
+    ],
+    "design_debt": [
+      "SQLITE-VERSIONED-MIGRATIONS"
+    ],
+    "refuted": [
+      "EVIDENCE-JSON-INCOMPLETE-SKIPPED"
+    ]
+  },
+  "validation": [
+    "Focused rg and line-anchored source inspection only; no mutations, test execution, network access, secrets, or retired runtime surfaces used.",
+    "git diff --check returned success before the permitted artifact write."
+  ]
+}

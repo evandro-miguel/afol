@@ -1,0 +1,36 @@
+{
+  "schema": "codex-quality-loop.authority-critic/v1",
+  "verdict": "REVISE",
+  "confidence": "high",
+  "blocking_findings": [
+    {
+      "id": "C01-ACTION-001",
+      "finding": "The implementation scope has no closed action-admission matrix.",
+      "required_change": "Define canonical action IDs, invocation normalization including dry-run, side-effect class, allowed modes, and denial envelopes for every affected action."
+    },
+    {
+      "id": "C01-RESOURCE-002",
+      "finding": "Protected-resource classes, matching precedence, and file operands are not normative.",
+      "required_change": "Define exact sensitive and AFOL path classes plus patch, move, archive, undo, and preview handling."
+    },
+    {
+      "id": "C01-ROLLBACK-003",
+      "finding": "Reverting only production restores the accepted red tests, but rollback does not state that expected result.",
+      "required_change": "Define rollback verification as restoration of the authorized red outcomes rather than a green six-file suite."
+    }
+  ],
+  "accepted_authority_fields": [
+    "issuer and trust boundary",
+    "audience",
+    "expiry and renewal",
+    "revocation",
+    "replay protection",
+    "verification",
+    "audit",
+    "local-operator fallback",
+    "test-shell policy"
+  ],
+  "accepted_implementation_scope": false,
+  "allowed_next_action": "Revise only the proposed child spec and matching plan text for action, resource, and rollback contracts.",
+  "report_path": ".afol/wb/260710_2355_core-integrity-quality-loop/reports/c01-authority-critic-003.json"
+}

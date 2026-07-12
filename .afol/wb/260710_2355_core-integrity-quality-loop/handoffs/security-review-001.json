@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "slice_id": "S-SECURITY",
+  "lane": "security",
+  "mode": "read-only",
+  "status": "completed",
+  "scope": "AFOL command authorization, operation identity, generic file mutation, protected paths, journals/output, shell execution, root selection, adapter writes, and multi-agent ownership.",
+  "c01_blockers": ["SEC-001", "SEC-002", "SEC-003", "SEC-004", "SEC-006"],
+  "findings": [
+    {
+      "id": "SEC-001",
+      "title": "Restricted file dry-runs disclose secret-bearing text and real writes persist it",
+      "classification": "bug",
+      "severity": "P0",
+      "exploitability": "high; no write or local-approval bypass is needed for the read path",
+      "impact": "A restricted caller can receive raw text from an in-root secret file in diff_preview. A real write also duplicates the prior content into an AFOL backup and writes the raw diff into mutations.jsonl.",
+      "preconditions": "The caller can invoke afol in a project and name an existing text secret file such as .env. The caller supplies a harmless append value to file pt --dry-run.",
+      "mitigations": "Path traversal, symlink escapes, and binary patch targets are rejected. Gitleaks is configured with redacted output, but it is post-fact detection rather than runtime redaction.",
+      "evidence": [
+        "cli/commands/file.ts:65-92 allows restricted dry-run patch planning and returns the mutation result.",
+        "cli/commands/file/shared.ts:96-111 protects only four exact config/lock/manifest paths; .env is not covered.",
+        "cli/commands/file/mutations/patch.ts:179-214 reads the target and returns a unified diff for dry-run; :258-317 writes backupPath and diffPreview for real writes.",
+        "cli/commands/file/output.ts:57-80 emits diff_preview to human and JSON output.",
+        "cli/services/mutations/journal.ts:19-39,216-235 persists diffPreview verbatim in JSONL.",
+        "cli/tests/mutation-safety.test.ts:103-175 and cli/tests/file-command-unit.test.ts:1218-1221 assert preview, backup, and journal retention behavior."
+      ],
+      "test_gap": "No test denies or redacts .env, credentials, keys, or equivalent sensitive paths for restricted dry-runs, mutation output, backups, or journal rows.",
+      "recommended_slice": "F22-C01: enforce secret-path denial/redaction before any target read, preview, backup, or journal write; cover restricted dry-run and real-write cases.",
+      "confidence": "high",
+      "blocks_c01": true
+    },
+    {
+      "id": "SEC-002",
+      "title": "Operation authority is self-attested and defaults to trusted local",
+      "classification": "bug",
+      "severity": "P0",
+      "exploitability": "high for any agent or remote caller that controls its argv or environment",
+      "impact": "A caller can omit --agent/--remote, or set AFOL_AGENT=0/false, and obtain the trusted local context used to authorize real file, update, bootstrap, workbench, and session mutations. The same bypass reaches the deliberate shell capability in done --test-shell.",
+      "preconditions": "The caller can launch the AFOL process directly or control its invocation environment. No OS-level or launcher-issued capability is required by this code path.",
+      "mitigations": "Handlers commonly call requiresApproval, and locks/path checks protect integrity after a caller is trusted. Those controls depend entirely on the caller-provided context.",
+      "evidence": [
+        "cli/core/operation-context.ts:11-38 defines trusted local as the default; :63-115 derives restriction only from caller-controlled flags/environment and explicitly accepts AFOL_AGENT=0/false as unrestricted.",
+        "cli/main.ts:226-234 resolves that context once from argv/environment before dispatch.",
+        "cli/tests/operation-context.test.ts:11-16,35-40,121-148 explicitly assert the trusted default and falsy-environment downgrade behavior.",
+        "cli/commands/workbench.ts:388-453 gates done by that context, then accepts test-shell; cli/commands/workbench/verify.ts:141-157 executes it with shell:true."
+      ],
+      "test_gap": "No process-boundary test proves that an agent cannot launch AFOL without the marker, overwrite the marker, or obtain a launcher-issued capability. Existing tests validate only parsing/classification.",
+      "recommended_slice": "F22-C01: replace self-declared identity with a fail-closed, trusted-launcher capability/provenance contract and make direct agent invocation restricted by default.",
+      "confidence": "high",
+      "blocks_c01": true
+    },
+    {
+      "id": "SEC-003",
+      "title": "Multiple real mutators drop the resolved context; adapter has no gate at all",
+      "classification": "bug",
+      "severity": "P0",
+      "exploitability": "high; an explicitly restricted caller can use these routes without relying on the identity downgrade in SEC-002",
+      "impact": "Governance, state/hydrate, ADM/spec/ADR/changelog, and adapter changes bypass the intended local-approval policy. Adapter enable/disable can rewrite .afol/config.json and archive or restore provider-facing artifacts.",
+      "preconditions": "The caller invokes one of the affected mutating commands in an existing project. The caller may even supply --agent or --remote.",
+      "mitigations": "The registry exposes requires_approval metadata and several other dispatches receive operationCtx. Neither mechanism enforces these omitted routes.",
+      "evidence": [
+        "cli/registry.ts:1119-1141 computes requires_approval as catalog metadata only.",
+        "cli/main.ts:492-497,593-621,650-675 dispatches adm, spec, adr, changelog, state, adapter, and hydrate without operationCtx after resolving it at :226-234.",
+        "cli/commands/adm.ts:70-150, cli/commands/spec.ts:228-286, cli/commands/adr.ts:56-124, cli/commands/state.ts:163-203, and cli/commands/hydrate.ts:83-115 accept no context and perform writes through their services.",
+        "cli/commands/adapter.ts:36-71 has no context parameter; :149-205 performs enable/disable writes and artifact migration directly."
+      ],
+      "test_gap": "No dispatch-matrix integration test invokes every real writer with --agent/--remote and asserts denial. Adapter tests cover unrestricted success and dry-run only (cli/tests/adapter-command.test.ts:260-329).",
+      "recommended_slice": "F22-C01: enforce ActionSpec/side-effect authorization centrally before dispatch, then pass an immutable validated context to every mutator; add a complete route matrix.",
+      "confidence": "high",
+      "blocks_c01": true
+    },
+    {
+      "id": "SEC-004",
+      "title": "Generic file mutation can target AFOL control-plane state and its own journal",
+      "classification": "bug",
+      "severity": "P0",
+      "exploitability": "high once a caller reaches a real file mutation; the session/task check does not classify protected resources",
+      "impact": "A caller can append, move, archive, or otherwise manipulate .afol/wb, .afol/adm, .afol/state, and .afol/data/mutations/mutations.jsonl because they are ordinary in-root targets. This can falsify governance/workbench state or make later file mutations fail closed through journal corruption.",
+      "preconditions": "A real file command has a known session/task currently in_progress. SEC-002 supplies the authorization bypass for an agent caller; SEC-003 is not required.",
+      "mitigations": "The path jail rejects traversal and symlink escapes; journal locks and strict reads detect malformed records after the fact. The protected-path list is too narrow to protect AFOL control-plane resources.",
+      "evidence": [
+        "cli/commands/file/shared.ts:96-111 lists only .afol/config.json and three .agents files as protected; :151-162 applies that sole semantic check.",
+        "cli/commands/file.ts:70-160 sends arbitrary safe relative targets to patch, move, undo, and archive.",
+        "cli/services/workbench/lifecycle.ts:333-360 verifies only session existence, task existence, and in_progress state before a file mutation; :363-375 parses owner but does not authorize against it.",
+        "cli/services/mutations/journal.ts:245-309 treats malformed rows as corruption only when a later reader loads the journal.",
+        "cli/tests/project-root.test.ts:247-343 proves path-jail/symlink behavior, but no test rejects AFOL control-plane targets."
+      ],
+      "test_gap": "No test attempts file pt/mv/ar against .afol/wb, .afol/adm, .afol/state, mutation journals, locks, or evidence and expects protected-path denial.",
+      "recommended_slice": "F22-C01: define protected resource classes centrally and deny them before dry-run/read/backup/write; reserve journal and state paths for internal services only.",
+      "confidence": "high",
+      "blocks_c01": true
+    },
+    {
+      "id": "SEC-005",
+      "title": "Adapter toggle writes are unauthorized, unlocked, and non-atomic",
+      "classification": "bug",
+      "severity": "P1",
+      "exploitability": "high for an authorized-by-default caller; medium for crash/concurrent integrity loss",
+      "impact": "adapter disable writes config before archiving artifacts, with no operation context, transaction, rollback, or lock. A failure or concurrent toggle can leave configuration and provider artifacts inconsistent; an agent can trigger this through the ungated route in SEC-003.",
+      "preconditions": "The project contains an adapter config and a caller invokes adapter enable/disable. Failure, interruption, or concurrent invocation is needed for the consistency aspect.",
+      "mitigations": "resolveAdapterWritePath provides path/symlink confinement, and happy-path tests cover enable/disable. Neither provides atomic commit or authorization.",
+      "evidence": [
+        "cli/commands/adapter.ts:149-150 writes the enable flag before archiveClaudeArtifacts; :204-205 writes before restore.",
+        "cli/services/adapter/claude.ts:98-123 read-modify-writes config with writeFileSync; :142-158 mutates artifacts separately with renameSync.",
+        "cli/tests/adapter-command.test.ts:260-329 tests happy paths and dry-run, not a write failure, concurrent toggle, rollback, or restricted caller."
+      ],
+      "test_gap": "No fault-injection or concurrent-process test proves config/artifact atomicity, and no authorization test covers adapter enable/disable.",
+      "recommended_slice": "F22-C01 for the immediate authorization gate; follow with one bounded adapter transaction/lock slice using atomic config write and rollback.",
+      "confidence": "high",
+      "blocks_c01": false
+    },
+    {
+      "id": "SEC-006",
+      "title": "Observed shell command text is persisted without secret redaction",
+      "classification": "bug",
+      "severity": "P1",
+      "exploitability": "medium; it requires a literal secret in --test-shell/--test command text or another persisted evidence field",
+      "impact": "Literal command arguments can be copied into .evidence.jsonl and workbench events, creating durable plaintext leakage even when subprocess output is not printed by runVerification.",
+      "preconditions": "A trusted caller uses done --test-shell or --test with a secret-bearing command string, or records equivalent literal command evidence.",
+      "mitigations": "runVerification limits buffer size and timeout, but does not redact command text. The security scanner runs gitleaks with --redact only after data is already persisted.",
+      "evidence": [
+        "cli/commands/workbench.ts:450-463 passes parsed.testShellCommand verbatim to recordEvidence.",
+        "cli/commands/workbench/verify.ts:141-157 accepts arbitrary shell text with shell:true.",
+        "cli/services/workbench/lifecycle.ts:1201-1239 stores input.command verbatim in evidence; :1285-1319 repeats it into a workbench event.",
+        "cli/dev/security-scan.ts:483-506 configures post-fact gitleaks scans with --redact."
+      ],
+      "test_gap": "No test rejects, redacts, hashes, or otherwise avoids a secret-bearing evidence command while retaining completion authorization semantics.",
+      "recommended_slice": "F22-C01: centralize command/evidence redaction before persistence and reject literal credential patterns for agent-exposed shell/evidence paths.",
+      "confidence": "high",
+      "blocks_c01": true
+    }
+  ],
+  "deployment_boundaries": [
+    {
+      "id": "DEP-001",
+      "classification": "deployment boundary, not a standalone code exploit",
+      "statement": "AFOL cannot safely treat a process with ordinary project filesystem access as an untrusted principal. A trusted launcher, OS account/container boundary, and tool allowlist must issue the authority described in SEC-002; CLI flags/environment are insufficient.",
+      "evidence": ["cli/core/operation-context.ts:63-115", ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:104-105,174-175"],
+      "required_decision": "Define the deployment issuer and its non-forgeable capability before claiming agent/remote authorization safety."
+    },
+    {
+      "id": "DEP-002",
+      "classification": "deployment boundary, not independent shell injection",
+      "statement": "done --test-shell deliberately grants arbitrary shell execution in the project cwd. Its current local-context gate is only meaningful after SEC-002 is fixed. Do not expose this command to an agent tool catalog that can run it directly.",
+      "evidence": ["cli/commands/workbench.ts:388-453", "cli/commands/workbench/verify.ts:141-180"],
+      "required_decision": "Keep test-shell local-only behind the trusted launcher, or replace it with an approved executable/argument policy."
+    },
+    {
+      "id": "DEP-003",
+      "classification": "deployment/model boundary, not a proven owner-enforcement regression",
+      "statement": "Locks serialize by canonical session/resource, but task owner and session actor are not credentials. A caller can claim an actor label; file mutation only checks task state. Cross-host or multi-agent ownership therefore needs an external authority model.",
+      "evidence": ["cli/services/workbench/lifecycle.ts:333-375", "cli/commands/session.ts:568-575", ".afol/adm/specs/260710_core-integrity-and-transaction-safety_spec_01.md:104-105"],
+      "required_decision": "Decide whether task owner is informational or authorization-bearing; if authorization-bearing, bind it to launcher identity and enforce it in lifecycle mutations."
+    },
+    {
+      "id": "DEP-004",
+      "classification": "validated control with compatibility risk, not a P0/P1 root escape",
+      "statement": "Project-root resolution canonicalizes real paths and rejects traversal/symlink write targets. It still intentionally accepts .agents/config.json as a legacy root, so compatibility removal is a governance decision rather than evidence of an in-root escape.",
+      "evidence": ["cli/services/project/root.ts:20-185", "cli/tests/project-root.test.ts:83-155,247-343"],
+      "required_decision": "Remove the legacy root fallback only under an approved compatibility migration; retain the existing path-jail tests."
+    }
+  ],
+  "validation": {
+    "source_review": "Focused line-anchored inspection only. No .env, credentials, scanner output, network, external web, or retired .agents runtime was read or used.",
+    "tests": {
+      "command": "bun test --reporter=dot cli/tests/operation-context.test.ts cli/tests/mutation-safety.test.ts cli/tests/file-command-unit.test.ts cli/tests/adapter-command.test.ts cli/tests/workbench-lifecycle.test.ts cli/tests/project-root.test.ts",
+      "result": "199 pass, 0 fail, 1128 expect() calls, 6 files, 5.78s"
+    },
+    "scanner_assessment": "The configured gitleaks scan is useful detection with redacted report output, but it cannot establish authorization safety or prevent the runtime leaks above. It was not run because this review did not need to inspect repository secrets."
+  },
+  "uncertainties": [
+    "The inspected code has no non-forgeable launcher/identity issuer. The smallest missing evidence is the actual deployment launcher contract and its OS/container permissions.",
+    "Task owner may be intentionally informational; DEP-003 is therefore kept separate from the confirmed authorization defects."
+  ]
+}

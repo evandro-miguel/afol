@@ -1,0 +1,40 @@
+{
+  "schema": "codex-quality-loop.authority-critic/v1",
+  "verdict": "REVISE",
+  "confidence": "high",
+  "blocking_findings": [
+    {
+      "id": "C01-SCOPE-001",
+      "finding": "The production child spec and plan do not name one identical exact write contract.",
+      "required_change": "Name cli/services/workbench/lifecycle.ts explicitly, narrow the file-command scope to cli/commands/file.ts and cli/commands/file/shared.ts, and keep adapter work limited to central admission rather than transaction changes."
+    },
+    {
+      "id": "C01-REDACTION-002",
+      "finding": "The command-text persistence rule has no deterministic classifier or canonical stored representation.",
+      "required_change": "Specify one bounded synthetic-text classifier, one outcome, one canonical redacted representation, and the same sanitized value in evidence and workbench events."
+    }
+  ],
+  "non_blocking_concerns": [
+    "Align the plan's future-launcher wording with the proposed no-launcher local-operator deployment boundary."
+  ],
+  "accepted_authority_fields": [
+    "issuer and trust boundary",
+    "audience",
+    "expiry and renewal",
+    "revocation",
+    "replay protection",
+    "verification",
+    "audit",
+    "local-operator fallback",
+    "test-shell policy"
+  ],
+  "accepted_implementation_scope": false,
+  "allowed_next_action": "Revise the S-C01-I child spec and plan to make the production file contract and persistence oracle exact, then resubmit for review.",
+  "forbidden_until": [
+    "S-C01-I production implementation, commit, push, or lifecycle completion",
+    "caller-authentication claims",
+    "agent-facing or remote done --test-shell access",
+    "adapter transaction, host, launcher, key, container, deployment, template, manifest, or release work"
+  ],
+  "report_path": ".afol/wb/260710_2355_core-integrity-quality-loop/reports/c01-authority-critic-001.json"
+}

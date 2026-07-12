@@ -1,0 +1,37 @@
+{
+  "schema": "codex-quality-loop.authority-critic/v1",
+  "verdict": "REVISE",
+  "confidence": "high",
+  "blocking_findings": [
+    {
+      "id": "C01-AUDIT-001",
+      "finding": "The audit field is optional rather than a deterministic policy contract.",
+      "required_change": "State either that C01 creates no persistent decision audit and uses the denial envelope as its observable record, or define one exact persisted audit record."
+    },
+    {
+      "id": "C01-SCOPE-002",
+      "finding": "The architect handoff does not match the narrowed child spec and plan.",
+      "required_change": "Remove adapter changes and the file wildcard, add the exact lifecycle path and six tests, and state that adapter denial is central."
+    }
+  ],
+  "accepted_authority_fields": [
+    "issuer and trust boundary",
+    "audience",
+    "expiry and renewal",
+    "revocation",
+    "replay protection",
+    "verification",
+    "local-operator fallback",
+    "test-shell policy"
+  ],
+  "accepted_implementation_scope": false,
+  "allowed_next_action": "Reconcile the audit contract and three scope artifacts, then resubmit for independent review.",
+  "forbidden_until": [
+    "S-C01-I production implementation, commit, push, or lifecycle closure",
+    "governance and critic acceptance",
+    "SEC-002 identity claims",
+    "agent-facing test-shell access",
+    "adapter transaction, host, launcher, key-store, container, deployment, template, manifest, or release work"
+  ],
+  "report_path": ".afol/wb/260710_2355_core-integrity-quality-loop/reports/c01-authority-critic-002.json"
+}

@@ -1,0 +1,740 @@
+{
+  "schema_version": 1,
+  "artifact_type": "baseline_test_design",
+  "status": "complete",
+  "agent_type": "test-engineer",
+  "role": "quantified baseline owner, focused runner, independent test designer",
+  "slice_id": "S-BASELINE-TESTS",
+  "lane": "test-map+runner",
+  "repo_root": "/home/ozy/01_projects/dev/afol/afol.dev",
+  "branch": "dev",
+  "commit": "d7db7155e5a03608d431218d03e4c6e913bcd01c",
+  "afol_session": "260710_2355_core-integrity-quality-loop",
+  "afol_task_id": "T-01",
+  "mode": "read-only",
+  "runner_notes": [
+    "The first B01 logging wrapper attempt failed in zsh because status is a read-only variable. No test failure occurred; B01 was rerun with a corrected wrapper and its final log is canonical."
+  ],
+  "baseline_summary": {
+    "focused_test_pass": 474,
+    "focused_test_fail": 0,
+    "focused_expectations": 3589,
+    "test_elapsed_seconds": 15.4,
+    "manifest_check_pass": true,
+    "quality_verdict": "green focused baseline; incomplete integration oracles",
+    "interpretation": "No assertion weakening or test gaming was observed. The dominant risk is missing or stale oracles, especially outside direct service tests and selected front-door paths."
+  },
+  "baseline_targets": [
+    {
+      "id": "S-F22-LIFECYCLE",
+      "name": "Lifecycle, evidence, verification, governance, state projection",
+      "path": [
+        "cli/commands/workbench.ts",
+        "cli/services/workbench/lifecycle.ts",
+        "cli/services/workbench/verify.ts",
+        "cli/services/governance/pending-specs.ts",
+        "cli/services/state/session-state.ts",
+        "cli/services/local-state/workbench-events.ts",
+        "cli/services/local-state/workbench-index.ts"
+      ],
+      "lines": [
+        "cli/commands/workbench.ts:91-663",
+        "cli/services/workbench/lifecycle.ts:319-1572",
+        "cli/services/workbench/verify.ts:377-688",
+        "cli/services/governance/pending-specs.ts:335-939",
+        "cli/services/state/session-state.ts:355-510",
+        "cli/services/local-state/workbench-events.ts:28-70",
+        "cli/services/local-state/workbench-index.ts:717-979"
+      ],
+      "public_symbols": [
+        "runNewCommand",
+        "runStartCommand",
+        "runEvidenceCommand",
+        "runTransitionCommand",
+        "runDoneCommand",
+        "runCloseCommand",
+        "newWorkstream",
+        "startTask",
+        "recordEvidence",
+        "transitionTask",
+        "doneTask",
+        "closeSession",
+        "verifyWorkbenchTasks",
+        "evidenceCompletionAuthorization",
+        "resolveGovernance",
+        "resolveGovernanceCatalog",
+        "resolvePendingSpec",
+        "hydrateSession",
+        "validateSessionState",
+        "appendWorkbenchEvent",
+        "rebuildWorkBenchIndex",
+        "validateWorkBenchIndex"
+      ],
+      "contracts": [
+        "legal task transitions",
+        "observed exit_code=0 completion authority",
+        "typed artifact and waiver policy",
+        "session-scoped pending-spec blocking",
+        "strict corruption and hydration behavior",
+        "event/index durability after lifecycle writes"
+      ],
+      "current_speed": {
+        "batch": "B03",
+        "elapsed_seconds": 4.71,
+        "tests": 159,
+        "assertions": 702
+      },
+      "current_quality": "159/159 focused lifecycle, verification, governance, and quick-task tests passed; front-door lifecycle subset was also green in B06. Existing tests strongly cover completion and transition rules but do not cover every mutating group or canonical-row loss.",
+      "expected_bar": "Every P0 lifecycle rule needs a front-door or service oracle that checks exit status, durable side effects, and authority identity. Hydration must fail closed when any canonical projection is missing.",
+      "commands": [
+        "bun test cli/tests/workbench-lifecycle.test.ts cli/tests/workbench-verify.test.ts cli/tests/spec-gate-system.test.ts cli/tests/quick-task-command.test.ts cli/tests/verify-command.test.ts",
+        "bun test cli/tests/state-sqlite.test.ts cli/tests/local-state-indexes.test.ts cli/tests/telemetry-command.test.ts cli/tests/session-command.test.ts cli/tests/status.test.ts",
+        "bun test cli/tests/kernel.test.ts --test-name-pattern 'approval|ctx|session bind|bootstrap|init|help'"
+      ],
+      "not_measured": [
+        "context-system trusted authority path",
+        "normal new with nonexistent governance",
+        "close with persisted spec-gate conflict",
+        "deletion of SQLite task/evidence rows while source hashes remain"
+      ]
+    },
+    {
+      "id": "S-F22-MUTATION",
+      "name": "File mutation, resource locks, journal, undo",
+      "path": [
+        "cli/commands/file.ts",
+        "cli/commands/file/mutations/patch.ts",
+        "cli/commands/file/mutations/move.ts",
+        "cli/commands/file/mutations/archive.ts",
+        "cli/commands/file/mutations/undo.ts",
+        "cli/services/io/session-lock.ts",
+        "cli/services/mutations/journal.ts"
+      ],
+      "lines": [
+        "cli/commands/file.ts:46-180",
+        "cli/commands/file/mutations/patch.ts:171-339",
+        "cli/commands/file/mutations/move.ts:266-445",
+        "cli/commands/file/mutations/archive.ts:38-183",
+        "cli/commands/file/mutations/undo.ts:16-72",
+        "cli/services/io/session-lock.ts:313-461",
+        "cli/services/mutations/journal.ts:201-386"
+      ],
+      "public_symbols": [
+        "runFileCommand",
+        "runPatchMutation",
+        "undoPatchMutation",
+        "runMoveMutation",
+        "undoMoveMutation",
+        "runArchiveMutation",
+        "undoArchiveMutation",
+        "runUndoMutation",
+        "withSessionLock",
+        "withExternalPathLock",
+        "withResourceLocks",
+        "appendMutationRecord",
+        "loadMutationJournalStrict",
+        "findLatestSupportedMutation",
+        "findMutationById"
+      ],
+      "contracts": [
+        "dry-run is read-only",
+        "writes carry backup and journal records",
+        "hash compare-and-swap guards commit and undo",
+        "undo blocks drift, missing backup, duplicate undo, and corrupt journal",
+        "canonical resource locks are deterministic"
+      ],
+      "current_speed": {
+        "batch": "B02",
+        "elapsed_seconds": 3.96,
+        "tests": 68,
+        "assertions": 539
+      },
+      "current_quality": "68/68 file, mutation-safety, and session-lock tests passed. Direct mutation and recovery oracles are strong, including backup jail, drift, journal corruption, and restricted-context checks. No mutation-testing score exists.",
+      "expected_bar": "A mutation test must prove no applied file state can survive without a valid journal record and no undo can overwrite changed content. Concurrency claims need independent processes with shared real paths.",
+      "commands": [
+        "bun test cli/tests/file-command-unit.test.ts cli/tests/mutation-safety.test.ts cli/tests/session-lock.test.ts"
+      ],
+      "not_measured": [
+        "independent-process same-path stale-base collision",
+        "mutation runner and threshold",
+        "full command-contract matrix for all file aliases"
+      ]
+    },
+    {
+      "id": "S-F22-SCAFFOLD",
+      "name": "Scaffold update, bootstrap/init, rollback, provenance",
+      "path": [
+        "cli/commands/update.ts",
+        "cli/services/update/check.ts",
+        "cli/commands/bootstrap.ts",
+        "cli/services/bootstrap/planner.ts",
+        "cli/services/bootstrap/cleanup.ts",
+        "cli/services/io/session-lock.ts",
+        "cli/services/mutations/journal.ts"
+      ],
+      "lines": [
+        "cli/commands/update.ts:733-960",
+        "cli/services/update/check.ts:852-1079",
+        "cli/commands/bootstrap.ts:702-931",
+        "cli/services/bootstrap/planner.ts:101-227",
+        "cli/services/bootstrap/cleanup.ts:126-144"
+      ],
+      "public_symbols": [
+        "runUpdateCommand",
+        "checkTemplateUpdate",
+        "formatUpdateCheck",
+        "runBootstrapCommand",
+        "planBootstrapOperations",
+        "planBootstrapCleanup",
+        "withExternalPathLock",
+        "appendMutationRecord"
+      ],
+      "contracts": [
+        "check, preview, and dry-run do not write",
+        "real apply requires approval and session/task/reason metadata",
+        "update re-plans under the global lock",
+        "rollback requires batch, reason, current hashes, and valid backups",
+        "bootstrap/init stage, validate, commit, and restore the exact target on failure"
+      ],
+      "current_speed": {
+        "batches": ["B05", "B06"],
+        "elapsed_seconds": 4.05,
+        "tests": 80,
+        "assertions": 591
+      },
+      "current_quality": "63/63 update/bootstrap tests and 17/17 filtered kernel front-door tests passed. Fault injection, target locks, replan hooks, rollback, provenance, symlink safety, and dry-run write protection are covered. The concurrency tests are not a full independent-process update/bootstrap race matrix.",
+      "expected_bar": "Every real apply path must leave either the original target or a journaled recoverable commit. Two independent processes must not commit from one stale plan.",
+      "commands": [
+        "bun test cli/tests/update-command.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-cleanup.test.ts",
+        "bun test cli/tests/kernel.test.ts --test-name-pattern 'approval|ctx|session bind|bootstrap|init|help'"
+      ],
+      "not_measured": [
+        "independent-process concurrent update apply",
+        "independent-process concurrent bootstrap apply",
+        "Windows/WSL runner behavior"
+      ]
+    },
+    {
+      "id": "S-F22-CONTRACTS",
+      "name": "Generated contracts, downstream payload, JSON envelopes, release surface",
+      "path": [
+        "cli/core/operation-context.ts",
+        "cli/core/envelope.ts",
+        "cli/main.ts",
+        "cli/registry.ts",
+        "cli/commands/adr.ts",
+        "cli/commands/changelog.ts",
+        "cli/dev/generate-manifest.ts",
+        "cli/tests/help.test.ts",
+        "cli/tests/template-policy.test.ts"
+      ],
+      "lines": [
+        "cli/core/operation-context.ts:1-116",
+        "cli/core/envelope.ts:1-88",
+        "cli/main.ts:223-680",
+        "cli/registry.ts:1-1194",
+        "cli/commands/adr.ts:56-124",
+        "cli/commands/changelog.ts:56-78",
+        "cli/dev/generate-manifest.ts:162-227"
+      ],
+      "public_symbols": [
+        "resolveOperationContext",
+        "requiresApproval",
+        "envelopeOk",
+        "envelopeErr",
+        "stringifyEnvelope",
+        "main",
+        "kernelRegistry",
+        "requiresApprovalForSideEffect",
+        "runAdrCommand",
+        "runChangelogCommand",
+        "buildManifestCommands"
+      ],
+      "contracts": [
+        "one approval decision for every real write",
+        "one stable afol.result/v1 JSON error envelope for covered JSON callers",
+        "registry/help/generated manifest parity",
+        "downstream template payload parity"
+      ],
+      "current_speed": {
+        "batches": ["B01", "B07", "B08"],
+        "elapsed_seconds": 2.04,
+        "tests": 79,
+        "assertions": 1298
+      },
+      "current_quality": "38/38 registry/operation-context tests, 41/41 help/template tests, and manifest:check passed. These oracles validate registry metadata and root/template equality, but not tools.json semantic parity or all restricted front-door mutators.",
+      "expected_bar": "A catalog test must compare live command and subcommand semantics to every agent-facing catalog. A restricted front-door test must prove denial and no write for each mutating command family. JSON tests must assert exactly one parseable envelope on stdout and no plain error on stderr.",
+      "commands": [
+        "bun test cli/tests/operation-context.test.ts cli/tests/registry.test.ts",
+        "bun test cli/tests/help.test.ts cli/tests/template-policy.test.ts cli/tests/template-manifest-paths.test.ts",
+        "bun run manifest:check"
+      ],
+      "not_measured": [
+        "tools.json semantic parity with kernelRegistry",
+        "restricted adm/spec/adr/changelog/state/adapter front-door writes",
+        "JSON error behavior before project-root detection",
+        "typecheck, release validation, security scans, and full suite"
+      ]
+    }
+  ],
+  "command_results": [
+    {
+      "id": "B01-operation-registry",
+      "command": "bun test cli/tests/operation-context.test.ts cli/tests/registry.test.ts",
+      "log": "/tmp/afol-quality-loop-tests/01-operation-registry.log",
+      "exit_code": 0,
+      "duration_seconds": 0.04,
+      "tests_pass": 38,
+      "tests_fail": 0,
+      "assertions": 464
+    },
+    {
+      "id": "B02-mutation",
+      "command": "bun test cli/tests/file-command-unit.test.ts cli/tests/mutation-safety.test.ts cli/tests/session-lock.test.ts",
+      "log": "/tmp/afol-quality-loop-tests/02-mutation.log",
+      "exit_code": 0,
+      "duration_seconds": 3.96,
+      "tests_pass": 68,
+      "tests_fail": 0,
+      "assertions": 539
+    },
+    {
+      "id": "B03-lifecycle-governance",
+      "command": "bun test cli/tests/workbench-lifecycle.test.ts cli/tests/workbench-verify.test.ts cli/tests/spec-gate-system.test.ts cli/tests/quick-task-command.test.ts cli/tests/verify-command.test.ts",
+      "log": "/tmp/afol-quality-loop-tests/03-lifecycle-governance.log",
+      "exit_code": 0,
+      "duration_seconds": 4.71,
+      "tests_pass": 159,
+      "tests_fail": 0,
+      "assertions": 702
+    },
+    {
+      "id": "B04-state-events",
+      "command": "bun test cli/tests/state-sqlite.test.ts cli/tests/local-state-indexes.test.ts cli/tests/telemetry-command.test.ts cli/tests/session-command.test.ts cli/tests/status.test.ts",
+      "log": "/tmp/afol-quality-loop-tests/04-state-events.log",
+      "exit_code": 0,
+      "duration_seconds": 0.66,
+      "tests_pass": 88,
+      "tests_fail": 0,
+      "assertions": 459
+    },
+    {
+      "id": "B05-update-bootstrap",
+      "command": "bun test cli/tests/update-command.test.ts cli/tests/bootstrap.test.ts cli/tests/bootstrap-conflicts.test.ts cli/tests/bootstrap-cleanup.test.ts",
+      "log": "/tmp/afol-quality-loop-tests/05-update-bootstrap.log",
+      "exit_code": 0,
+      "duration_seconds": 2.13,
+      "tests_pass": 63,
+      "tests_fail": 0,
+      "assertions": 428
+    },
+    {
+      "id": "B06-kernel-frontdoor",
+      "command": "bun test cli/tests/kernel.test.ts --test-name-pattern 'approval|ctx|session bind|bootstrap|init|help'",
+      "log": "/tmp/afol-quality-loop-tests/06-kernel-frontdoor.log",
+      "exit_code": 0,
+      "duration_seconds": 1.92,
+      "tests_pass": 17,
+      "tests_filtered": 26,
+      "tests_fail": 0,
+      "assertions": 163
+    },
+    {
+      "id": "B07-contract-tests",
+      "command": "bun test cli/tests/help.test.ts cli/tests/template-policy.test.ts cli/tests/template-manifest-paths.test.ts",
+      "log": "/tmp/afol-quality-loop-tests/07-contracts.log",
+      "exit_code": 0,
+      "duration_seconds": 1.98,
+      "tests_pass": 41,
+      "tests_fail": 0,
+      "assertions": 834
+    },
+    {
+      "id": "B08-manifest-check",
+      "command": "bun run manifest:check",
+      "log": "/tmp/afol-quality-loop-tests/07-contracts.log",
+      "exit_code": 0,
+      "duration_seconds": 0.02,
+      "result": "manifest metadata already synced"
+    }
+  ],
+  "p0_p1_matrix": [
+    {
+      "claim_id": "LIFECYCLE-COMPLETION-AUTHORITY",
+      "severity": "P0",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "covered",
+      "test_status": "strong",
+      "current_tests": "cli/tests/workbench-verify.test.ts:20-67,485; cli/tests/workbench-lifecycle.test.ts:3146-3226",
+      "oracle": "Reject declared/missing-exit/n/a and failing evidence; accept later applicable observed exit_code=0 with evidence id."
+    },
+    {
+      "claim_id": "LIFECYCLE-LEGAL-TRANSITIONS",
+      "severity": "P0",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "covered",
+      "test_status": "strong",
+      "current_tests": "cli/tests/workbench-lifecycle.test.ts:3004-3068,3226",
+      "oracle": "Table-driven legal and forbidden edges plus direct-done and terminal-restart rejection."
+    },
+    {
+      "claim_id": "NEW-FICTITIOUS-GOVERNANCE",
+      "severity": "P0",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "confirmed",
+      "test_status": "missing normal-new oracle",
+      "evidence": "cli/commands/workbench.ts:91-100 calls resolveGovernance; cli/services/governance/pending-specs.ts:335-376 marks any nonempty pair governed; quick-task only tests the authoritative resolver at cli/tests/quick-task-command.test.ts:156-175.",
+      "oracle": "Fake feature/spec must exit 2 and leave .afol/wb absent.",
+      "repro": "R-01"
+    },
+    {
+      "claim_id": "CENTRAL-AUTHORIZATION",
+      "severity": "P0",
+      "surface": "S-F22-CONTRACTS",
+      "audit_status": "confirmed",
+      "test_status": "partial; missing mutator front-door matrix",
+      "evidence": "cli/main.ts:492-497,593-663 drops OperationContext for adm, spec, adr, changelog, state, and adapter; operation-context.test.ts covers classification, while kernel.test.ts only covers selected ctx/local-state/session paths.",
+      "oracle": "Restricted caller exits 2, emits the correct denial envelope, and leaves the target unchanged for every real mutator.",
+      "repro": "R-02"
+    },
+    {
+      "claim_id": "CTX-ARCHIVE-AUTHORITY",
+      "severity": "P0",
+      "surface": "S-F22-CONTRACTS",
+      "audit_status": "confirmed_by_prior_claim_review",
+      "test_status": "not_measured in this focused run",
+      "evidence": "The supplied claim handoff reports archive-first section selection; context-system.test.ts was not run in this lane.",
+      "oracle": "Trusted context must select current .afol/adm authority or fail typed and stale; archive-only decoys must never satisfy the request.",
+      "repro": "R-10"
+    },
+    {
+      "claim_id": "SQLITE-MATERIALIZATION-FALSE-FRESH",
+      "severity": "P0",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "confirmed",
+      "test_status": "missing canonical-row deletion oracle",
+      "evidence": "cli/services/state/session-state.ts:355-408 loads tasks/evidence but cli/services/state/session-state.ts:414-498 compares only source-file hashes; cli/tests/state-sqlite.test.ts:353-421 covers source drift and malformed evidence only.",
+      "oracle": "After deleting materialized task/evidence rows without changing source files, validation must be false and typed, never fresh.",
+      "repro": "R-03"
+    },
+    {
+      "claim_id": "MUTATION-UNDO-SAFETY",
+      "severity": "P0",
+      "surface": "S-F22-MUTATION",
+      "audit_status": "covered",
+      "test_status": "strong direct-service oracle; process race not measured",
+      "current_tests": "cli/tests/mutation-safety.test.ts:575-748; cli/tests/file-command-unit.test.ts:1700-2243; cli/tests/session-lock.test.ts",
+      "oracle": "Undo blocks drift, missing/unsafe backup, duplicate undo, and corrupt journal without changing files."
+    },
+    {
+      "claim_id": "SCAFFOLD-ROLLBACK-INTEGRITY",
+      "severity": "P0",
+      "surface": "S-F22-SCAFFOLD",
+      "audit_status": "covered",
+      "test_status": "strong single-process oracle",
+      "current_tests": "cli/tests/update-command.test.ts:1098-1836; cli/tests/bootstrap.test.ts:219-360",
+      "oracle": "Injected update/bootstrap failures restore exact target bytes and preserve journal/recovery semantics. Separate-process races remain unmeasured."
+    },
+    {
+      "claim_id": "TOOLS-JSON-DRIFT",
+      "severity": "P1",
+      "surface": "S-F22-CONTRACTS",
+      "audit_status": "confirmed",
+      "test_status": "missing semantic parity oracle",
+      "evidence": "cli/tests/registry.test.ts:169-182 checks static manifest sync; cli/tests/template-policy.test.ts:242-255 checks root/template equality; neither compares .afol/adm/tools.json entries to the live registry.",
+      "oracle": "Normalized live registry and tools.json command/subcommand sets and side-effect metadata must be equal; retired done/quick-task entries must fail.",
+      "repro": "R-04"
+    },
+    {
+      "claim_id": "SPEC-GATE-ARCHIVE-FALLBACK",
+      "severity": "P1",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "confirmed",
+      "test_status": "wrong oracle currently green",
+      "evidence": "cli/services/spec-gate/checker.ts:175-197 searches .afol/adm/specs and docs/arc/SPECS; cli/tests/spec-gate-system.test.ts:385-396 explicitly expects archive fallback.",
+      "oracle": "Archive-only spec must not be accepted as live authority.",
+      "repro": "R-05"
+    },
+    {
+      "claim_id": "SPEC-GATE-CLOSE-CONFLICT",
+      "severity": "P1",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "confirmed_by_source_review",
+      "test_status": "missing close-conflict oracle",
+      "evidence": "cli/services/workbench/lifecycle.ts:1465-1496 runs strict task verification but does not consult persisted spec-gate conflict state.",
+      "oracle": "A completed task with unresolved required spec conflict must not close or write closed metadata.",
+      "repro": "R-06"
+    },
+    {
+      "claim_id": "SPEC-GATE-CORRUPTION-OVERWRITE",
+      "severity": "P1",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "confirmed",
+      "test_status": "missing malformed-store preservation oracle",
+      "evidence": "cli/services/spec-gate/checker.ts:200-235 converts malformed JSON to an empty store before save; no focused malformed-store test was found.",
+      "oracle": "Corruption must produce a typed failure and preserve the original bytes until explicit repair.",
+      "repro": "R-07"
+    },
+    {
+      "claim_id": "ADR-SUPERSEDE-SYNTAX",
+      "severity": "P1",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "confirmed_by_source_review",
+      "test_status": "wrong legacy syntax oracle currently green",
+      "evidence": "cli/commands/adr.ts:92-104 consumes two positional ids; cli/tests/spec-gate-system.test.ts:857-867 asserts that legacy form.",
+      "oracle": "adr supersede <old-id> --by <new-id> must succeed and update the old ADR; positional legacy form must not be the only contract.",
+      "repro": "R-09"
+    },
+    {
+      "claim_id": "JSON-ENVELOPE-CONSISTENCY",
+      "severity": "P1",
+      "surface": "S-F22-CONTRACTS",
+      "audit_status": "confirmed",
+      "test_status": "partial; helper and selected commands only",
+      "evidence": "cli/core/envelope.ts:1-88 and cli/tests/envelope.test.ts:9-80 validate helpers; cli/commands/adr.ts:121-124 and cli/commands/changelog.ts:75-78 write plain stderr on JSON failures; cli/main.ts:378-381 reports project-root errors as plain text.",
+      "oracle": "Every covered JSON failure has exactly one parseable afol.result/v1 error on stdout and no plain stderr error.",
+      "repro": "R-08"
+    },
+    {
+      "claim_id": "PENDING-SPEC-DOCUMENT-CONFLICT",
+      "severity": "P1",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "runtime_behavior_confirmed; documentation_drift",
+      "test_status": "runtime oracle covered, docs drift not tested",
+      "current_tests": "cli/tests/workbench-lifecycle.test.ts:470-555 proves session-scoped blocking and unrelated new remains allowed.",
+      "oracle": "Keep the runtime test; add a documentation-contract check only if documentation is in the accepted slice."
+    },
+    {
+      "claim_id": "EVIDENCE-JSON-INCOMPLETE-SKIPPED",
+      "severity": "P1",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "refuted_current_behavior",
+      "test_status": "partial positive coverage",
+      "current_tests": "cli/tests/state-sqlite.test.ts:405-421 and cli/tests/workbench-lifecycle.test.ts:1611-1626 reject malformed evidence; field-by-field incomplete variants are not table-driven.",
+      "oracle": "Do not add a failing repro unless a valid-but-incomplete record is shown to be skipped. Current source throws on mandatory-field loss."
+    },
+    {
+      "claim_id": "SQLITE-VERSIONED-MIGRATIONS",
+      "severity": "P1",
+      "surface": "S-F22-LIFECYCLE",
+      "audit_status": "design_debt_not_immediate_f22_failure",
+      "test_status": "not measured and scope-gated",
+      "evidence": "The current contract is SQLite v1 materialization; migration/versioning is a State DB v2 decision, not a fresh-v1 closure oracle.",
+      "oracle": "Do not turn this into a failing F-22 test without an approved scope and migration/rollback contract."
+    }
+  ],
+  "proposed_repros": [
+    {
+      "id": "R-01",
+      "priority": "P0",
+      "test_file": "cli/tests/kernel.test.ts",
+      "test_name": "new rejects nonexistent governance before creating a session",
+      "fixture": "mkProjectRoot('new-fake-governance', '')",
+      "act": "runKernel(root, ['new', 'fake-governance', '--feature-id', 'F-404', '--parent-spec', 'missing-spec', '--json'])",
+      "oracle": "expect exit 2; expect no .afol/wb directory; parse one JSON error or explicit rejection.",
+      "expected_current_failure": "Current runNewCommand returns exit 0, reports governed, and creates the session because it checks only nonempty strings."
+    },
+    {
+      "id": "R-02",
+      "priority": "P0",
+      "test_file": "cli/tests/kernel.test.ts",
+      "test_name": "restricted front door denies ADR writes",
+      "fixture": "spec-gate-system.createFixture() with a clean .afol/adm/decisions directory",
+      "act": "runKernel(root, ['--agent', 'adr', 'new', 'restricted decision', '--json'])",
+      "oracle": "expect exit 2; expect one afol.result/v1 error; expect no ADR file and unchanged target.",
+      "expected_current_failure": "main passes no OperationContext to runAdrCommand, so the command can create an ADR and return 0. Repeat the same oracle for changelog, state, and adapter after scope approval."
+    },
+    {
+      "id": "R-03",
+      "priority": "P0",
+      "test_file": "cli/tests/state-sqlite.test.ts",
+      "test_name": "missing canonical rows cannot validate as fresh",
+      "fixture": "createFixture(); hydrateSession(root, 'test-session'); openDb(root)",
+      "act": "DELETE FROM tasks and evidence for test-session without changing plan/task/evidence source files; call validateSessionState(root, 'test-session').",
+      "oracle": "expect ok false; expect a typed materialization/integrity mismatch; expect no fresh status.",
+      "expected_current_failure": "Current comparison uses only source-file hashes, so the deleted task/evidence rows can still return ok true."
+    },
+    {
+      "id": "R-04",
+      "priority": "P1",
+      "test_file": "cli/tests/registry.test.ts",
+      "test_name": "agent-facing tools catalog matches live registry semantics",
+      "fixture": "Read .afol/adm/tools.json and build the normalized live catalog from kernelRegistry.",
+      "act": "Compare command/subcommand ids, side effects, approval metadata, and retired entries.",
+      "oracle": "expect exact normalized equality; reject retired done/quick-task forms and require transition/governance when live.",
+      "expected_current_failure": "The current tools.json contains stale result forms and lacks live entries according to the supplied claim evidence; no existing test performs this comparison."
+    },
+    {
+      "id": "R-05",
+      "priority": "P1",
+      "test_file": "cli/tests/spec-gate-system.test.ts",
+      "test_name": "archive-only spec is not live authority",
+      "fixture": "createFixture(); write only docs/arc/SPECS/spec-legacy.md; leave .afol/adm/specs without that id.",
+      "act": "checkSpecCompatibility(root, 'session-a', 'T-01').",
+      "oracle": "expect conflict or typed missing-live-spec failure; never compatible.",
+      "expected_current_failure": "Current findSpecFile accepts docs/arc/SPECS and the existing test asserts compatible."
+    },
+    {
+      "id": "R-06",
+      "priority": "P1",
+      "test_file": "cli/tests/workbench-lifecycle.test.ts",
+      "test_name": "close blocks unresolved spec conflict",
+      "fixture": "Create one task, record observed exit_code=0 evidence, mark it done, and persist a conflict entry for the same session/task in spec-gate.json.",
+      "act": "call closeSession(root, session).",
+      "oracle": "expect throw/nonzero close; expect no closed_at and no active-pointer removal.",
+      "expected_current_failure": "closeSession performs strict task verification but does not consult spec-gate conflict state."
+    },
+    {
+      "id": "R-07",
+      "priority": "P1",
+      "test_file": "cli/tests/spec-gate-system.test.ts",
+      "test_name": "malformed spec-gate store fails closed without overwriting history",
+      "fixture": "Write a valid spec-gate.json with one historical result, save its bytes, then replace it with malformed JSON.",
+      "act": "Call checkSpecCompatibility or waiveSpecCheck for another task.",
+      "oracle": "expect typed corruption failure; expect spec-gate.json bytes unchanged.",
+      "expected_current_failure": "readStore converts corruption to an empty store and saveResult can overwrite the prior decision history."
+    },
+    {
+      "id": "R-08",
+      "priority": "P1",
+      "test_file": "cli/tests/spec-gate-system.test.ts",
+      "test_name": "JSON ADR failure is one result envelope",
+      "fixture": "createFixture() with ADR directories ready.",
+      "act": "runAdrCommand('new', ['--json'], root, captured.io).",
+      "oracle": "expect exit 2; expect captured.stdout length 1; parse schema afol.result/v1 with ok false; expect stderr empty.",
+      "expected_current_failure": "runAdrCommand catches the missing-topic error and writes plain stderr even when --json is present."
+    },
+    {
+      "id": "R-09",
+      "priority": "P1",
+      "test_file": "cli/tests/spec-gate-system.test.ts",
+      "test_name": "ADR supersede accepts the specified --by form",
+      "fixture": "Create ADR-001 and ADR-002 using existing helpers.",
+      "act": "runAdrCommand('supersede', ['ADR-001', '--by', 'ADR-002', '--json'], root, captured.io).",
+      "oracle": "expect exit 0 and ADR-001 superseded_by ADR-002.",
+      "expected_current_failure": "The current parser treats the second positional token as the new id, so --by is not the specified contract."
+    },
+    {
+      "id": "R-10",
+      "priority": "P0",
+      "test_file": "cli/tests/context-system.test.ts",
+      "test_name": "trusted context rejects archive-only authority",
+      "fixture": "Use the existing trusted-context fixture, add a current .afol/adm authority candidate, and add an archive-only decoy with a different section payload.",
+      "act": "Invoke the existing trusted bundle path used by context-system.test.ts.",
+      "oracle": "expect selected section to come only from .afol/adm or a typed stale/freshness failure; archive decoy must not be selected.",
+      "expected_current_failure": "Prior claim review reports archive-first selection. This repro was designed but not run in this lane."
+    }
+  ],
+  "oracle_risks": [
+    {
+      "risk": "legacy_behavior asserted as success",
+      "evidence": "spec-gate-system.test.ts:385-396 accepts docs/arc fallback and 857-867 accepts positional ADR supersede.",
+      "impact": "The suite can stay green while contradicting the active F-22 authority and CLI syntax contracts."
+    },
+    {
+      "risk": "helper coverage mistaken for front-door coverage",
+      "evidence": "operation-context and registry tests pass, but main.ts:492-497 and 609-663 omit context for several mutating groups.",
+      "impact": "Classification can be correct while restricted writes remain reachable."
+    },
+    {
+      "risk": "root/template equality is not semantic generation",
+      "evidence": "template-policy.test.ts:242-255 compares two tools catalogs to each other, not to kernelRegistry.",
+      "impact": "Both copies can share the same stale payload and pass."
+    },
+    {
+      "risk": "JSON helper coverage is not command-boundary coverage",
+      "evidence": "envelope.test.ts validates constructors; ADR/changelog catches and project-root detection still use plain stderr.",
+      "impact": "Machine callers can receive no parseable result despite green helper tests."
+    },
+    {
+      "risk": "green focused baseline is not closure evidence",
+      "evidence": "Full suite, typecheck, release, security, mutation, Windows, and several front-door/context tests were not run by this role.",
+      "impact": "Do not use 474 focused passes as F-22 acceptance."
+    }
+  ],
+  "mutation_candidates": [
+    {
+      "id": "M-01",
+      "target": "cli/commands/workbench.ts:99",
+      "mutant": "Use presence-only governance resolution for normal new.",
+      "oracle": "R-01 must fail."
+    },
+    {
+      "id": "M-02",
+      "target": "cli/main.ts:492-663",
+      "mutant": "Drop or fail to propagate OperationContext to one mutating group.",
+      "oracle": "R-02 must fail with denial and no write."
+    },
+    {
+      "id": "M-03",
+      "target": "cli/services/state/session-state.ts:484-498",
+      "mutant": "Return fresh when canonical task/evidence rows are absent.",
+      "oracle": "R-03 must fail."
+    },
+    {
+      "id": "M-04",
+      "target": "cli/services/spec-gate/checker.ts:200-235",
+      "mutant": "Treat malformed store as empty and save new result.",
+      "oracle": "R-07 must fail on typed error and byte preservation."
+    },
+    {
+      "id": "M-05",
+      "target": "cli/services/workbench/lifecycle.ts:1465-1496",
+      "mutant": "Skip required spec-gate conflict check during close.",
+      "oracle": "R-06 must fail."
+    },
+    {
+      "id": "M-06",
+      "target": "cli/commands/adr.ts:121-124; cli/commands/changelog.ts:75-78",
+      "mutant": "Route JSON failures to stderr without an envelope.",
+      "oracle": "R-08 must fail."
+    },
+    {
+      "id": "M-07",
+      "target": "cli/dev/generate-manifest.ts:162-170",
+      "mutant": "Keep generated metadata synced without deriving agent-facing catalog semantics.",
+      "oracle": "R-04 must fail on live registry/tools parity."
+    },
+    {
+      "id": "M-08",
+      "target": "cli/services/io/session-lock.ts:445-460 and update/bootstrap lock callers",
+      "mutant": "Remove deterministic ordering or in-lock replan.",
+      "oracle": "Requires a future independent-process race fixture; not run."
+    }
+  ],
+  "mutation_testing": {
+    "run": false,
+    "reason": "package.json has no configured mutation runner or threshold; installing or adding tooling was forbidden.",
+    "candidate_policy": "Use the listed candidates only after red repros and scope approval; never weaken an existing oracle to improve a score."
+  },
+  "not_measured": [
+    "bun test full suite",
+    "bun run typecheck",
+    "coverage or mutation score",
+    "bun run validate:release",
+    "security scans",
+    "context-system.test.ts",
+    "tools.json semantic parity",
+    "all restricted front-door mutators",
+    "independent-process update/bootstrap/file races",
+    "Windows/WSL execution"
+  ],
+  "next": [
+    "Add only R-01, R-02, R-03, R-04, R-05, R-06, R-07, R-08, and R-09 as focused red tests in an approved child slice; preserve all existing tests.",
+    "Resolve scope for context authority, tools.json parity, spec-gate/ADR hardening, and State DB v1 versus v2 before assigning implementation work.",
+    "Define an approved mutation runner, threshold, and independent-process fixtures before release closure."
+  ],
+  "writes": {
+    "repository_artifact": ".afol/wb/260710_2355_core-integrity-quality-loop/handoffs/baseline-test-design-001.json",
+    "temporary_logs": [
+      "/tmp/afol-quality-loop-tests/01-operation-registry.log",
+      "/tmp/afol-quality-loop-tests/02-mutation.log",
+      "/tmp/afol-quality-loop-tests/03-lifecycle-governance.log",
+      "/tmp/afol-quality-loop-tests/04-state-events.log",
+      "/tmp/afol-quality-loop-tests/05-update-bootstrap.log",
+      "/tmp/afol-quality-loop-tests/06-kernel-frontdoor.log",
+      "/tmp/afol-quality-loop-tests/07-contracts.log"
+    ],
+    "tests_or_source_edited": false
+  }
+}
