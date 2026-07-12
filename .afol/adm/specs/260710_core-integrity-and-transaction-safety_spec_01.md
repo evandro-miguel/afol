@@ -169,6 +169,15 @@ Out of scope:
     decision. Its artifact must name the method, threshold, exception policy,
     decision owner, and evidence artifact. A critic may review this evidence
     but cannot set the policy.
+  - Owner-authorized amendment, 2026-07-12: under the user's explicit core
+    readiness directive, F-22 closure may use evidence-only validation of the
+    already-implemented C02A, C02B/C03, C03B, C03W, C04A, C05, C07A, and C07B
+    routes. This amendment grants no new production scope. C04A is bounded to
+    SQLite State DB v1 completeness; State DB v2 remains F-25. C05 supports one
+    Linux/WSL host per worktree and makes no cross-host or takeover claim.
+    Windows-native F-26 and F-23 through F-28 are accepted exclusions and
+    separately governed future features, not F-22 closure prerequisites. No
+    Windows-native support is claimed.
   - Create later child specs only when the execution plan assigns independently
     reviewable mutation/update or bootstrap/governance boundaries.
 

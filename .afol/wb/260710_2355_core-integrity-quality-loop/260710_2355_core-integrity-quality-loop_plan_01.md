@@ -80,7 +80,7 @@ C01 -> { C02A context/catalog, C02B+C03 governance/lifecycle }
 C02B+C03 -> { C03 bootstrap, C03 publication, C04 v1 proof, C05 }
 C01 -> C07 envelope; C03 publication -> C07 index measurement
 C01 + C02B+C03 -> F-23 and F-27; C01 -> F-24/F-28; C05 -> F-26 host evidence
-all accepted routes + mutation-policy decision + Windows-runner evidence + future-feature approvals -> C08 release/closure
+all accepted F-22 routes + mutation-policy decision + accepted Windows/F-23-through-F-28 exclusions -> C08 release/closure
 ```
 
 - Safe parallel lanes after C01's contract is frozen: C02A and the read-only design of C03 bootstrap/publication. They use separate Linux-side worktrees and do not edit `cli/registry.ts`, `cli/router.ts`, `cli/main.ts`, lifecycle/session context, or generated payloads concurrently.
@@ -268,21 +268,22 @@ all accepted routes + mutation-policy decision + Windows-runner evidence + futur
 
 ## C08 Release, Dogfood, and Closure
 
-- C08 is blocked until the accepted mutation-policy decision and its evidence artifact, defined Windows-runner evidence, and accepted F-23 through F-28 future-feature approvals or explicit approved route dispositions exist.
+- Owner-authorized amendment, 2026-07-12: the user's explicit core-readiness directive authorizes evidence-only closure validation for already-implemented C02A, C02B/C03, C03B, C03W, C04A, C05, C07A, and C07B. It authorizes no new production scope. C04A is bounded to SQLite State DB v1; State DB v2 remains F-25. C05 is bounded to one Linux/WSL host per worktree, with no cross-host or takeover claim.
+- C08 requires the accepted mutation-policy decision and its immutable evidence artifact. Windows-native F-26 and F-23 through F-28 are accepted exclusions and separately governed future features, not F-22 closure prerequisites. F-22 makes no Windows-native support claim.
 - After every approved slice is reviewed, committed, and pushed, a single integration owner uses the external AFOL command for lifecycle/validation: `afol local-state rebuild --json` and `afol validate project --json`. Repository source behavior uses repo-local commands: `bun run manifest:check`, `bun run typecheck`, `bun test`, `bun run validate:release`, and `bun run smoke:clean`.
 - Re-run `gitnexus status` and `gitnexus detect-changes -r afol-dev --scope compare --base-ref main`; confirm graph findings in source.
 - Dogfood in separate Linux-side worktrees with the one-host rule. A clean global-install smoke is external system mutation and needs explicit user authorization; it must validate a real `$HOME/.local/bin/afol`, never a repo wrapper.
-- The final large read-only reviewer receives the cumulative diff, all slice reviews, red/green proof, the accepted mutation-policy decision and evidence artifact, Windows-runner evidence, future-feature approvals/route dispositions, mutation triage, benchmark compatibility record, security reports, CI result, clean-smoke result, and every scope decision. Only that reviewer's recorded PASS may authorize T-05/F-22 closure.
+- The final large read-only reviewer receives the cumulative diff, all slice reviews, red/green proof, the accepted mutation-policy decision and immutable evidence artifact, the accepted exclusions, mutation triage, benchmark compatibility record, security reports, CI result, clean-smoke result, and every scope decision. Only that reviewer's recorded PASS may authorize T-05/F-22 closure.
 
 ## Explicit Stop Conditions
 
 - No accepted STOP-C01-AUTHORITY artifact after C01-R red proofs.
-- No accepted C08 mutation-policy decision/evidence artifact, Windows-runner evidence, future-feature approval/route disposition, or final reviewer PASS.
+- No accepted C08 mutation-policy decision/immutable evidence artifact or final reviewer PASS.
 - Any duplicate or unmapped primary canonical ID.
 - A child spec or future feature is absent, unapproved, or contradicts its parent scope.
 - A focused test, security scan, benchmark baseline, or independent review fails or is stale.
 - A C03 change reopens F-18 command-error delivery without a new governing feature.
-- F-25 lacks migration/downgrade/recovery policy, F-26 lacks a Windows runner, or C05 lacks an approved host/actor model.
+- An implementation attempts State DB v2 without F-25 migration/downgrade/recovery policy, claims Windows-native support without an F-26 runner, or expands C05 beyond one Linux/WSL host per worktree without separately approved governance.
 - Any attempt to close on historic evidence rather than evidence for the current commit.
 
 ## Completion Matrix

@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "mutate": ["cli/core/operation-context.ts:142-148"],
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "bun test cli/tests/operation-context.test.ts cli/tests/kernel.test.ts"
+  },
+  "coverageAnalysis": "off",
+  "reporters": ["clear-text", "json"],
+  "jsonReporter": {
+    "fileName": ".afol/tmp/stryker-c01-report.json"
+  },
+  "timeoutMS": 60000,
+  "timeoutFactor": 1.5,
+  "thresholds": { "high": 90, "low": 90, "break": 90 }
+}

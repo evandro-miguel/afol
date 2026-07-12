@@ -1,0 +1,25 @@
+{
+  "schema": "codex-quality-loop.stryker-compact/v1",
+  "tool": "StrykerJS",
+  "version": "9.4.0",
+  "target": "cli/core/operation-context.ts:142-148",
+  "summary": { "total": 16, "Killed": 16, "survived": 0 },
+  "mutants": [
+    { "id": "6", "mutator": "BooleanLiteral", "status": "Killed", "location": { "start": { "line": 146, "column": 48 }, "end": { "line": 146, "column": 52 } } },
+    { "id": "2", "mutator": "ConditionalExpression", "status": "Killed", "location": { "start": { "line": 146, "column": 6 }, "end": { "line": 146, "column": 39 } } },
+    { "id": "0", "mutator": "BlockStatement", "status": "Killed", "location": { "start": { "line": 145, "column": 12 }, "end": { "line": 148, "column": 2 } } },
+    { "id": "3", "mutator": "LogicalOperator", "status": "Killed", "location": { "start": { "line": 146, "column": 6 }, "end": { "line": 146, "column": 39 } } },
+    { "id": "4", "mutator": "BooleanLiteral", "status": "Killed", "location": { "start": { "line": 146, "column": 6 }, "end": { "line": 146, "column": 13 } } },
+    { "id": "13", "mutator": "ConditionalExpression", "status": "Killed", "location": { "start": { "line": 147, "column": 41 }, "end": { "line": 147, "column": 72 } } },
+    { "id": "12", "mutator": "StringLiteral", "status": "Killed", "location": { "start": { "line": 147, "column": 31 }, "end": { "line": 147, "column": 37 } } },
+    { "id": "10", "mutator": "ConditionalExpression", "status": "Killed", "location": { "start": { "line": 147, "column": 9 }, "end": { "line": 147, "column": 37 } } },
+    { "id": "8", "mutator": "ConditionalExpression", "status": "Killed", "location": { "start": { "line": 147, "column": 9 }, "end": { "line": 147, "column": 72 } } },
+    { "id": "9", "mutator": "LogicalOperator", "status": "Killed", "location": { "start": { "line": 147, "column": 9 }, "end": { "line": 147, "column": 72 } } },
+    { "id": "11", "mutator": "EqualityOperator", "status": "Killed", "location": { "start": { "line": 147, "column": 9 }, "end": { "line": 147, "column": 37 } } },
+    { "id": "14", "mutator": "EqualityOperator", "status": "Killed", "location": { "start": { "line": 147, "column": 41 }, "end": { "line": 147, "column": 72 } } },
+    { "id": "1", "mutator": "ConditionalExpression", "status": "Killed", "location": { "start": { "line": 146, "column": 6 }, "end": { "line": 146, "column": 39 } } },
+    { "id": "5", "mutator": "BooleanLiteral", "status": "Killed", "location": { "start": { "line": 146, "column": 17 }, "end": { "line": 146, "column": 39 } } },
+    { "id": "7", "mutator": "ConditionalExpression", "status": "Killed", "location": { "start": { "line": 147, "column": 9 }, "end": { "line": 147, "column": 72 } } },
+    { "id": "15", "mutator": "StringLiteral", "status": "Killed", "location": { "start": { "line": 147, "column": 63 }, "end": { "line": 147, "column": 72 } } }
+  ]
+}
