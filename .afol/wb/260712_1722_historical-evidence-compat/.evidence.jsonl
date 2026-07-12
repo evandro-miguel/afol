@@ -1,0 +1,1 @@
+{"id":"E-20260712173338004-20c9b2","task_id":"T-01","created_at":"2026-07-12T21:33:38.004Z","command":"bun test cli/tests/validate-command.test.ts cli/tests/verify-command.test.ts","result":"passed","provenance":"observed","task_state":"in_progress","purpose":"completion","authorization_type":"execution","attempt":1,"exit_code":0}

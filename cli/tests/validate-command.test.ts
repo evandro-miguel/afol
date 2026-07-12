@@ -199,6 +199,114 @@ describe("validate command", () => {
 		}
 	});
 
+	test("project readiness ignores missing outcomes for completed history", async () => {
+		const root = createValidationFixture();
+		const session = "260701_0800_closed-history";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | historical task |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(0);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean }>;
+			};
+			expect(
+				payload.checks?.find((entry) => entry.id === "session_evidence")?.ok,
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project readiness ignores failed outcomes for completed history", async () => {
+		const root = createValidationFixture();
+		const session = "260701_0800_failed-history";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | done | worker | historical task |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(
+				join(sessionDir, ".evidence.jsonl"),
+				`${JSON.stringify({ task_id: "T-01", command: "bun test", result: "failed", exit_code: 1, id: "e-1", provenance: "observed" })}\n`,
+				"utf8",
+			);
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test("project readiness remains strict for open tasks despite closed metadata", async () => {
+		const root = createValidationFixture();
+		const session = "260701_0800_open-history";
+		try {
+			const sessionDir = join(root, ".afol", "wb", session);
+			mkdirSync(sessionDir, { recursive: true });
+			writeFileSync(
+				join(sessionDir, `${session}_task_01.md`),
+				[
+					"---",
+					'doc_type: "workbench_task"',
+					`id: "${session}_task_01"`,
+					`session_id: "${session}"`,
+					'status: "closed"',
+					'updated_at: "2026-07-01T08:00:00.000Z"',
+					'closed_at: "2026-07-01T08:00:00.000Z"',
+					"---",
+					"",
+					"## State Board",
+					"",
+					"| Task | State | Owner | Notes |",
+					"|------|-------|-------|-------|",
+					"| T-01 | pending | worker | open task |",
+					"",
+				].join("\n"),
+				"utf8",
+			);
+			writeFileSync(join(sessionDir, ".evidence.jsonl"), "not-json\n", "utf8");
+			rebuildValidationFixtureIndexes(root);
+			const captured = captureIo();
+			const code = await runValidateCommand(root, ["--json"], captured.io);
+			expect(code).toBe(1);
+			const payload = JSON.parse(captured.stdout[0] ?? "{}") as {
+				checks?: Array<{ id: string; ok: boolean }>;
+			};
+			expect(
+				payload.checks?.find((entry) => entry.id === "session_evidence")?.ok,
+			).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects discontinued skills-sync manifest in .agents", async () => {
 		const root = createValidationFixture();
 		try {
